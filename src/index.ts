@@ -14,9 +14,13 @@ import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
+import { generateComponent } from "./core/component-generator.js";
+import { callLLM, llmConfigFromEnv } from "./llm/client.js";
+import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { listProjects, loadProject, updateComponent } from "./persistence/project.js";
+import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -305,10 +309,11 @@ async function main() {
         return;
       }
 
-      // ── Playground API: Save component ──
+      // ── Playground API: Save component (supports tenant-scoped save) ──
       if (url === "/playground/api/components/save" && method === "POST") {
         const body = await parseBody(req);
         const type = body.type as string;
+        const saveTenantId = body.tenant_id as string;
         const category = body.category as string || "custom";
         const source = body.source as string;
 
@@ -318,10 +323,16 @@ async function main() {
         }
 
         try {
-          // Save to component library
-          const catDir = path.join(config.componentLibDir, category);
-          await fs.mkdir(catDir, { recursive: true });
-          await fs.writeFile(path.join(catDir, `${type}.component.html`), source, "utf-8");
+          // If tenant_id provided, save to tenant's custom components dir
+          let saveDir: string;
+          if (saveTenantId) {
+            saveDir = path.join(config.dataDir, saveTenantId, "components", category);
+          } else {
+            saveDir = path.join(config.componentLibDir, category);
+          }
+
+          await fs.mkdir(saveDir, { recursive: true });
+          await fs.writeFile(path.join(saveDir, `${type}.component.html`), source, "utf-8");
 
           // Try to extract schema from the component and save a basic schema
           const parsed = parseComponent(source);
@@ -333,12 +344,159 @@ async function main() {
             data: parsed.schema || {},
           };
           await fs.writeFile(
-            path.join(catDir, `${type}.schema.json`),
+            path.join(saveDir, `${type}.schema.json`),
             JSON.stringify(schema, null, 2),
             "utf-8",
           );
 
           jsonResponse(res, 200, { ok: true });
+        } catch (err) {
+          jsonResponse(res, 500, { error: (err as Error).message });
+        }
+        return;
+      }
+
+      // ── Playground API: List tenant custom components ──
+      const tenantCompMatch = url.match(/^\/playground\/api\/tenant-components\/([^/]+)$/);
+      if (tenantCompMatch && method === "GET") {
+        const tid = decodeURIComponent(tenantCompMatch[1]);
+        const tenantCompDir = path.join(config.dataDir, tid, "components");
+        const components: Array<{ type: string; category: string; label: string }> = [];
+
+        try {
+          const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
+          for (const cat of cats) {
+            if (!cat.isDirectory()) continue;
+            const catPath = path.join(tenantCompDir, cat.name);
+            const files = await fs.readdir(catPath);
+            for (const f of files) {
+              if (!f.endsWith(".component.html")) continue;
+              const t = f.replace(".component.html", "");
+              components.push({
+                type: t,
+                category: cat.name,
+                label: t.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
+              });
+            }
+          }
+        } catch {
+          // No custom components yet
+        }
+
+        jsonResponse(res, 200, components);
+        return;
+      }
+
+      // ── Playground API: Get tenant component source ──
+      const tenantCompSrcMatch = url.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/source$/);
+      if (tenantCompSrcMatch && method === "GET") {
+        const [, tid, compType] = tenantCompSrcMatch.map(decodeURIComponent);
+        const tenantCompDir = path.join(config.dataDir, tid, "components");
+
+        // Search all categories
+        let found = false;
+        try {
+          const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
+          for (const cat of cats) {
+            if (!cat.isDirectory()) continue;
+            const fp = path.join(tenantCompDir, cat.name, `${compType}.component.html`);
+            try {
+              const source = await fs.readFile(fp, "utf-8");
+              res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" });
+              res.end(source);
+              found = true;
+              break;
+            } catch { /* not in this cat */ }
+          }
+        } catch { /* no dir */ }
+
+        if (!found) {
+          jsonResponse(res, 404, { error: "Component source not found" });
+        }
+        return;
+      }
+
+      // ── Playground API: Generate component via LLM ──
+      if (url === "/playground/api/generate" && method === "POST") {
+        const body = await parseBody(req);
+        const prompt = body.prompt as string;
+        const tid = body.tenant_id as string;
+
+        if (!prompt) {
+          jsonResponse(res, 400, { error: "prompt is required" });
+          return;
+        }
+
+        try {
+          let llmCfg;
+          try {
+            llmCfg = llmConfigFromEnv();
+          } catch (e: any) {
+            jsonResponse(res, 500, { error: `LLM not configured: ${e.message}` });
+            return;
+          }
+
+          const brandKit = tid ? await loadBrandKit(tid) : undefined;
+          const result = await generateComponent({
+            prompt,
+            tenant_id: tid,
+            brand_kit: brandKit || undefined,
+            llmGenerate: (systemPrompt, userPrompt) =>
+              callLLM(llmCfg, [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ]),
+          });
+
+          jsonResponse(res, 200, {
+            source: result.source,
+            type: result.type,
+            data: {},
+          });
+        } catch (err) {
+          jsonResponse(res, 500, { error: (err as Error).message });
+        }
+        return;
+      }
+
+      // ── Playground API: Revise component via LLM ──
+      if (url === "/playground/api/revise" && method === "POST") {
+        const body = await parseBody(req);
+        const prompt = body.prompt as string;
+        const source = body.source as string;
+        const tid = body.tenant_id as string;
+
+        if (!prompt || !source) {
+          jsonResponse(res, 400, { error: "prompt and source are required" });
+          return;
+        }
+
+        try {
+          let llmCfg;
+          try {
+            llmCfg = llmConfigFromEnv();
+          } catch (e: any) {
+            jsonResponse(res, 500, { error: `LLM not configured: ${e.message}` });
+            return;
+          }
+
+          const brandKit = tid ? await loadBrandKit(tid) : undefined;
+          const result = await generateComponent({
+            prompt: `Revise this existing component based on this instruction: ${prompt}\n\nExisting component source:\n${source}`,
+            tenant_id: tid,
+            brand_kit: brandKit || undefined,
+            llmGenerate: (systemPrompt, userPrompt) =>
+              callLLM(llmCfg, [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ]),
+          });
+
+          jsonResponse(res, 200, {
+            source: result.source,
+            type: result.type,
+            data: {},
+          });
         } catch (err) {
           jsonResponse(res, 500, { error: (err as Error).message });
         }
@@ -354,12 +512,35 @@ async function main() {
           jsonResponse(res, 404, { error: "Project not found" });
           return;
         }
-        // Stub: just acknowledge the render request
+        const job = queueRender(tenantId, projectId);
         jsonResponse(res, 200, {
-          status: "Render queued",
+          status: "queued",
+          job_id: job.id,
           project_id: projectId,
           tenant_id: tenantId,
         });
+        return;
+      }
+
+      // ── API: Get job status ──
+      const jobMatch = url.match(/^\/api\/jobs\/([^/]+)$/);
+      if (jobMatch && method === "GET") {
+        const jobId = decodeURIComponent(jobMatch[1]);
+        const job = getJobStatus(jobId);
+        if (!job) {
+          jsonResponse(res, 404, { error: "Job not found" });
+          return;
+        }
+        jsonResponse(res, 200, job);
+        return;
+      }
+
+      // ── API: List jobs for tenant ──
+      const jobsMatch = url.match(/^\/api\/jobs\/?$/);
+      if (jobsMatch && method === "GET") {
+        const jobParams = new URL(url, `http://localhost`).searchParams;
+        const tenantFilter = jobParams.get('tenant_id') || undefined;
+        jsonResponse(res, 200, listJobs(tenantFilter));
         return;
       }
 

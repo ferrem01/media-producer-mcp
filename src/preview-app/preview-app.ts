@@ -3,6 +3,12 @@
  *
  * A web-based project viewer for reviewing and editing video/image/deck projects.
  * Vanilla JS, no build step, no framework.
+ *
+ * Features:
+ * - 16:9 iframe scaling (1920x1080 native, CSS transform to fit)
+ * - Auto-tenant from URL param with localStorage persistence
+ * - Format badges with colors
+ * - Render queue integration with job status polling
  */
 
 export function getPreviewHtml(): string {
@@ -30,7 +36,7 @@ export function getPreviewHtml(): string {
   #app {
     display: grid;
     grid-template-rows: 56px 1fr;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 260px 1fr;
     height: 100vh;
   }
 
@@ -46,6 +52,8 @@ export function getPreviewHtml(): string {
   }
   header .left { display: flex; align-items: center; gap: 12px; }
   header h1 { font-size: 16px; font-weight: 600; }
+
+  /* ── Badges ── */
   .badge {
     font-size: 11px;
     font-weight: 600;
@@ -55,6 +63,15 @@ export function getPreviewHtml(): string {
     background: #334155;
     color: #94a3b8;
   }
+  .badge-video { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+  .badge-image { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+  .badge-deck, .badge-slideshow { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+  .badge-gif { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+  .badge-social { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+  .badge-one-pager { background: rgba(14, 165, 233, 0.2); color: #38bdf8; }
+  .badge-email-header { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+  .badge-thumbnail { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+
   .tenant-select {
     display: flex; align-items: center; gap: 8px;
   }
@@ -100,7 +117,9 @@ export function getPreviewHtml(): string {
     color: #64748b;
     padding: 0 12px 8px;
   }
-  .project-item, .scene-item {
+
+  /* ── Project Items ── */
+  .project-item {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -110,8 +129,34 @@ export function getPreviewHtml(): string {
     border-left: 3px solid transparent;
     transition: background 0.1s;
   }
-  .project-item:hover, .scene-item:hover { background: #0f172a; }
-  .project-item.active, .scene-item.active {
+  .project-item:hover { background: #0f172a; }
+  .project-item.active {
+    background: #0f172a;
+    border-left-color: #A78BFA;
+    color: #fff;
+  }
+  .project-info { flex: 1; min-width: 0; }
+  .project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-meta {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 2px;
+    font-size: 11px; color: #64748b;
+  }
+  .project-meta .badge { font-size: 10px; padding: 1px 5px; }
+
+  /* ── Scene Items ── */
+  .scene-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: background 0.1s;
+  }
+  .scene-item:hover { background: #0f172a; }
+  .scene-item.active {
     background: #0f172a;
     border-left-color: #A78BFA;
     color: #fff;
@@ -133,7 +178,7 @@ export function getPreviewHtml(): string {
     overflow: hidden;
   }
 
-  /* ── Preview ── */
+  /* ── Preview Container ── */
   #preview-container {
     position: relative;
     display: flex;
@@ -141,14 +186,15 @@ export function getPreviewHtml(): string {
     justify-content: center;
     background: #000;
     overflow: hidden;
-    padding: 16px;
+  }
+  .preview-wrapper {
+    position: relative;
   }
   #preview-iframe {
     background: #000;
     border: none;
-    max-width: 100%;
-    max-height: 100%;
     box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    transform-origin: top left;
   }
   .no-scene {
     color: #475569;
@@ -303,6 +349,12 @@ export function getPreviewHtml(): string {
     margin-right: 8px;
   }
 
+  /* ── Status badges ── */
+  .status-draft { color: #94a3b8; }
+  .status-rendering { color: #facc15; }
+  .status-rendered { color: #4ade80; }
+  .status-failed { color: #f87171; }
+
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -315,7 +367,7 @@ export function getPreviewHtml(): string {
   <header>
     <div class="left">
       <h1 id="project-name">Media Producer</h1>
-      <span class="badge" id="format-badge">--</span>
+      <span class="badge" id="format-badge" style="display:none">--</span>
     </div>
     <div style="display:flex;align-items:center;gap:12px;">
       <div class="tenant-select">
@@ -342,7 +394,9 @@ export function getPreviewHtml(): string {
   <div id="main">
     <div id="preview-container">
       <div class="no-scene" id="preview-placeholder">Select a scene to preview</div>
-      <iframe id="preview-iframe" style="display:none;"></iframe>
+      <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
+        <iframe id="preview-iframe"></iframe>
+      </div>
     </div>
 
     <div id="timeline-bar">
@@ -381,7 +435,9 @@ export function getPreviewHtml(): string {
     duration: 0,
     animFrameId: null,
     ws: null,
-    wsReconnectTimer: null
+    wsReconnectTimer: null,
+    renderJobId: null,
+    renderPollTimer: null
   };
 
   // ── WebSocket ──
@@ -403,24 +459,20 @@ export function getPreviewHtml(): string {
       try { msg = JSON.parse(e.data); } catch(err) { return; }
 
       if (msg.type === 'scene-html') {
-        // Capture current playback time before replacing content
         var currentTime = 0;
         var tl = getTimeline();
         if (tl) currentTime = tl.time();
 
-        // Update iframe content without reload
         var iframe = els.previewIframe;
         try {
           iframe.contentDocument.open();
           iframe.contentDocument.write(msg.html);
           iframe.contentDocument.close();
         } catch(err) {
-          // Fallback: use srcdoc
           iframe.srcdoc = msg.html;
           return;
         }
 
-        // Wait for the timeline to be ready, then seek to the saved time
         var checkReady = setInterval(function() {
           try {
             if (iframe.contentWindow && iframe.contentWindow.__MP_READY) {
@@ -433,8 +485,6 @@ export function getPreviewHtml(): string {
             clearInterval(checkReady);
           }
         }, 50);
-
-        // Safety timeout -- stop checking after 5s
         setTimeout(function() { clearInterval(checkReady); }, 5000);
       }
 
@@ -456,7 +506,6 @@ export function getPreviewHtml(): string {
     state.ws = ws;
   }
 
-  // Connect WebSocket on load
   connectWebSocket();
 
   // ── DOM refs ──
@@ -470,7 +519,9 @@ export function getPreviewHtml(): string {
     projectList: document.getElementById('project-list'),
     sceneList: document.getElementById('scene-list'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
+    previewWrapper: document.getElementById('preview-wrapper'),
     previewIframe: document.getElementById('preview-iframe'),
+    previewContainer: document.getElementById('preview-container'),
     playBtn: document.getElementById('play-btn'),
     playIcon: document.getElementById('play-icon'),
     slider: document.getElementById('timeline-slider'),
@@ -489,10 +540,19 @@ export function getPreviewHtml(): string {
     return fetch('/api' + path, opts).then(function(r) { return r.json(); });
   }
 
+  // ── Format badge helper ──
+  function formatBadgeClass(format) {
+    return 'badge badge-' + (format || '').toLowerCase();
+  }
+
   // ── Load Projects ──
   function loadProjects() {
     state.tenantId = els.tenantInput.value.trim();
     if (!state.tenantId) return;
+
+    // Persist tenant to localStorage
+    try { localStorage.setItem('mp-tenant', state.tenantId); } catch(e) {}
+
     api('GET', '/projects/' + state.tenantId).then(function(projects) {
       state.projects = projects;
       renderProjectList();
@@ -509,14 +569,21 @@ export function getPreviewHtml(): string {
     var html = '';
     state.projects.forEach(function(p) {
       var active = state.currentProject && state.currentProject.project_id === p.project_id;
+      var sceneCount = p.scenes ? p.scenes.length : (p.scene_count || '?');
+      var statusClass = 'status-' + (p.status || 'draft');
       html += '<div class="project-item' + (active ? ' active' : '') + '" data-id="' + p.project_id + '">'
-        + '<span>' + escHtml(p.name) + '</span>'
-        + '<span class="badge">' + p.format + '</span>'
+        + '<div class="project-info">'
+        + '<div class="project-name">' + escHtml(p.name) + '</div>'
+        + '<div class="project-meta">'
+        + '<span class="' + formatBadgeClass(p.format) + '">' + escHtml(p.format) + '</span>'
+        + '<span class="' + statusClass + '">' + escHtml(p.status || 'draft') + '</span>'
+        + '<span>' + sceneCount + ' scene' + (sceneCount !== 1 ? 's' : '') + '</span>'
+        + '</div>'
+        + '</div>'
         + '</div>';
     });
     els.projectList.innerHTML = html;
 
-    // Click handlers
     els.projectList.querySelectorAll('.project-item').forEach(function(el) {
       el.addEventListener('click', function() {
         selectProject(el.dataset.id);
@@ -532,6 +599,8 @@ export function getPreviewHtml(): string {
 
       els.projectName.textContent = project.name;
       els.formatBadge.textContent = project.format;
+      els.formatBadge.className = formatBadgeClass(project.format);
+      els.formatBadge.style.display = '';
       els.renderBtn.disabled = false;
       els.renderStatus.textContent = '';
 
@@ -579,26 +648,22 @@ export function getPreviewHtml(): string {
     clearProps();
   }
 
-  // ── Preview ──
+  // ── Preview with proper scaling ──
   function loadPreview() {
     var project = state.currentProject;
     var scene = project && project.scenes[state.currentSceneIndex];
     if (!scene) { clearPreview(); return; }
 
     var url = '/api/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-    els.previewIframe.src = url;
-    els.previewIframe.style.display = 'block';
-    els.previewPlaceholder.style.display = 'none';
+    var iframe = els.previewIframe;
 
-    // Size iframe to scene aspect ratio
-    var cw = project.canvas.width || 1920;
-    var ch = project.canvas.height || 1080;
-    var aspect = cw / ch;
-    // Fit within container
-    els.previewIframe.style.aspectRatio = aspect;
-    els.previewIframe.width = cw;
-    els.previewIframe.height = ch;
-    // CSS max-width/max-height handles the rest
+    // Set native resolution
+    iframe.width = project.canvas.width || 1920;
+    iframe.height = project.canvas.height || 1080;
+    iframe.src = url;
+
+    els.previewWrapper.style.display = 'block';
+    els.previewPlaceholder.style.display = 'none';
 
     state.duration = scene.duration_seconds;
     els.slider.disabled = false;
@@ -606,14 +671,49 @@ export function getPreviewHtml(): string {
     els.slider.value = 0;
     updateTimeDisplay(0);
 
-    // Wait for iframe to load before trying to access timeline
-    els.previewIframe.onload = function() {
-      // Timeline should be ready
+    // Scale to fit after load
+    updatePreviewScale();
+
+    iframe.onload = function() {
+      updatePreviewScale();
     };
   }
 
+  function updatePreviewScale() {
+    var container = els.previewContainer;
+    var iframe = els.previewIframe;
+    var wrapper = els.previewWrapper;
+    if (!container || !iframe || wrapper.style.display === 'none') return;
+
+    var project = state.currentProject;
+    var nativeW = (project && project.canvas.width) || 1920;
+    var nativeH = (project && project.canvas.height) || 1080;
+
+    var containerRect = container.getBoundingClientRect();
+    var pad = 32;
+    var availW = containerRect.width - pad * 2;
+    var availH = containerRect.height - pad * 2;
+
+    var scaleX = availW / nativeW;
+    var scaleY = availH / nativeH;
+    var scale = Math.min(scaleX, scaleY, 1);
+
+    iframe.style.width = nativeW + 'px';
+    iframe.style.height = nativeH + 'px';
+    iframe.style.transform = 'scale(' + scale + ')';
+    iframe.style.transformOrigin = 'top left';
+
+    // Center the wrapper
+    var scaledW = nativeW * scale;
+    var scaledH = nativeH * scale;
+    wrapper.style.width = scaledW + 'px';
+    wrapper.style.height = scaledH + 'px';
+  }
+
+  window.addEventListener('resize', updatePreviewScale);
+
   function clearPreview() {
-    els.previewIframe.style.display = 'none';
+    els.previewWrapper.style.display = 'none';
     els.previewIframe.src = 'about:blank';
     els.previewPlaceholder.style.display = '';
     els.slider.disabled = true;
@@ -662,7 +762,6 @@ export function getPreviewHtml(): string {
       var d = state.duration;
       els.slider.value = d > 0 ? Math.round((t / d) * 1000) : 0;
       updateTimeDisplay(t);
-      // Check if timeline ended
       if (t >= d) {
         stopPlayback();
         tl.pause();
@@ -702,7 +801,6 @@ export function getPreviewHtml(): string {
       els.layerList.innerHTML = '<div class="empty-state">No components</div>';
       return;
     }
-    // Sort by z-index descending for display
     var comps = scene.components.map(function(c, i) { return { comp: c, originalIndex: i }; });
     comps.sort(function(a, b) { return (b.comp.z_index || 0) - (a.comp.z_index || 0); });
 
@@ -757,7 +855,6 @@ export function getPreviewHtml(): string {
         } else if (typeof val === 'string') {
           html += '<input type="text" class="prop-input" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
         } else {
-          // array or object -- JSON textarea
           html += '<textarea class="prop-input" data-key="' + escAttr(key) + '">' + escHtml(JSON.stringify(val, null, 2)) + '</textarea>';
         }
 
@@ -792,13 +889,11 @@ export function getPreviewHtml(): string {
       } else if (typeof origVal === 'string') {
         newData[key] = input.value;
       } else {
-        // JSON parse for arrays/objects
         try { newData[key] = JSON.parse(input.value); }
         catch(e) { newData[key] = input.value; }
       }
     });
 
-    // Try WebSocket first for instant update
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
       state.ws.send(JSON.stringify({
         type: 'update-prop',
@@ -808,19 +903,15 @@ export function getPreviewHtml(): string {
         componentId: comp.id,
         data: newData
       }));
-
-      // Update local state optimistically
       comp.data = Object.assign({}, comp.data, newData);
       stopPlayback();
       return;
     }
 
-    // Fallback: HTTP PATCH + iframe reload
     api('PATCH', '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id, { data: newData })
       .then(function(updated) {
         if (updated && updated.scenes) {
           state.currentProject = updated;
-          // Reload preview
           loadPreview();
           renderSceneList();
           renderLayers();
@@ -835,20 +926,64 @@ export function getPreviewHtml(): string {
     els.propEditor.innerHTML = '<div class="empty-state">Select a component</div>';
   }
 
-  // ── Render ──
+  // ── Render with job queue ──
   function triggerRender() {
     if (!state.currentProject) return;
-    els.renderStatus.textContent = 'Rendering...';
+    els.renderStatus.textContent = 'Queuing...';
     els.renderBtn.disabled = true;
+
     api('POST', '/render/' + state.tenantId + '/' + state.currentProject.project_id)
       .then(function(res) {
-        els.renderStatus.textContent = res.status || 'Render queued';
-        els.renderBtn.disabled = false;
+        if (res.job_id) {
+          state.renderJobId = res.job_id;
+          els.renderStatus.textContent = 'Rendering...';
+          pollJobStatus();
+        } else {
+          els.renderStatus.textContent = res.status || 'Queued';
+          els.renderBtn.disabled = false;
+        }
       })
       .catch(function() {
         els.renderStatus.textContent = 'Render failed';
         els.renderBtn.disabled = false;
       });
+  }
+
+  function pollJobStatus() {
+    if (!state.renderJobId) return;
+
+    api('GET', '/jobs/' + state.renderJobId).then(function(job) {
+      if (!job || job.error === 'Job not found') {
+        els.renderStatus.textContent = 'Job not found';
+        els.renderBtn.disabled = false;
+        return;
+      }
+
+      if (job.status === 'completed') {
+        els.renderStatus.textContent = 'Render complete!';
+        els.renderBtn.disabled = false;
+        state.renderJobId = null;
+        return;
+      }
+
+      if (job.status === 'failed') {
+        els.renderStatus.textContent = 'Failed: ' + (job.error || 'unknown');
+        els.renderBtn.disabled = false;
+        state.renderJobId = null;
+        return;
+      }
+
+      // Still rendering - show progress
+      if (job.progress) {
+        els.renderStatus.textContent = 'Rendering... ' + job.progress.percent + '%';
+      } else {
+        els.renderStatus.textContent = 'Rendering...';
+      }
+
+      state.renderPollTimer = setTimeout(pollJobStatus, 2000);
+    }).catch(function() {
+      state.renderPollTimer = setTimeout(pollJobStatus, 3000);
+    });
   }
 
   // ── Util ──
@@ -862,11 +997,22 @@ export function getPreviewHtml(): string {
   els.slider.addEventListener('input', function() { scrub(parseInt(els.slider.value, 10)); });
   els.renderBtn.addEventListener('click', triggerRender);
 
-  // ── Check URL for tenant param ──
+  // ── Auto-tenant: URL param > localStorage ──
   var params = new URLSearchParams(window.location.search);
-  if (params.get('tenant')) {
-    els.tenantInput.value = params.get('tenant');
+  var tenantParam = params.get('tenant');
+  if (tenantParam) {
+    els.tenantInput.value = tenantParam;
+    try { localStorage.setItem('mp-tenant', tenantParam); } catch(e) {}
     loadProjects();
+  } else {
+    // Try localStorage
+    try {
+      var saved = localStorage.getItem('mp-tenant');
+      if (saved) {
+        els.tenantInput.value = saved;
+        loadProjects();
+      }
+    } catch(e) {}
   }
 })();
 </script>

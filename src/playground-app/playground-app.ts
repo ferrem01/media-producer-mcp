@@ -1,8 +1,9 @@
 /**
- * Component Playground SPA
+ * Component Playground SPA - LLM-driven component iteration tool.
  *
- * A self-contained HTML playground for browsing, previewing, and creating
- * media-producer components. No build step -- vanilla JS served as a single HTML string.
+ * Workflow: prompt -> generate -> preview -> iterate -> save
+ * Shows tenant custom components only, not built-in library.
+ * Same dark theme as Preview SPA.
  */
 
 export function getPlaygroundHtml(): string {
@@ -41,59 +42,122 @@ body {
 }
 .header h1 { font-size: 16px; font-weight: 600; color: #f8fafc; }
 .header h1 span { color: #A78BFA; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.tenant-badge {
+  font-size: 13px; color: #94a3b8;
+  display: flex; align-items: center; gap: 6px;
+}
+.tenant-badge input {
+  background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+  padding: 4px 8px; border-radius: 4px; font-size: 13px; font-family: inherit;
+  width: 120px;
+}
 .main { display: flex; flex: 1; overflow: hidden; }
 
 /* ── Sidebar ── */
 .sidebar {
-  width: 260px; min-width: 260px;
+  width: 240px; min-width: 240px;
   background: #1e293b; border-right: 1px solid #334155;
   display: flex; flex-direction: column; overflow: hidden;
 }
-.search-box {
-  padding: 12px;
+.sidebar-header {
+  padding: 12px 16px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: #64748b;
   border-bottom: 1px solid #334155;
 }
-.search-box input {
-  width: 100%; padding: 8px 12px;
-  background: #0f172a; border: 1px solid #334155; border-radius: 6px;
-  color: #e2e8f0; font-size: 13px; outline: none;
-  transition: border-color 0.15s;
-}
-.search-box input:focus { border-color: #A78BFA; }
-.search-box input::placeholder { color: #64748b; }
-.component-list { flex: 1; overflow-y: auto; padding: 8px 0; }
-.category-header {
-  display: flex; align-items: center; gap: 6px;
+.sidebar-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.sidebar-item {
   padding: 8px 16px; cursor: pointer;
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.08em; color: #94a3b8;
-  user-select: none;
-}
-.category-header:hover { color: #cbd5e1; }
-.category-header .arrow { font-size: 10px; transition: transform 0.15s; }
-.category-header.collapsed .arrow { transform: rotate(-90deg); }
-.category-items { }
-.category-header.collapsed + .category-items { display: none; }
-.component-item {
-  padding: 6px 16px 6px 32px; cursor: pointer;
   font-size: 13px; color: #94a3b8;
   transition: all 0.1s;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-left: 3px solid transparent;
 }
-.component-item:hover { color: #e2e8f0; background: rgba(167, 139, 250, 0.06); }
-.component-item.active {
+.sidebar-item:hover { color: #e2e8f0; background: rgba(167, 139, 250, 0.06); }
+.sidebar-item.active {
   color: #A78BFA; background: rgba(167, 139, 250, 0.1);
-  font-weight: 500;
+  border-left-color: #A78BFA; font-weight: 500;
+}
+.sidebar-empty {
+  padding: 20px 16px; color: #475569; font-size: 13px;
+  text-align: center;
 }
 
 /* ── Content Area ── */
 .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.preview-area { flex: 1; position: relative; background: #0a0f1a; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+
+/* ── Prompt Area ── */
+.prompt-area {
+  padding: 16px 20px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+  flex-shrink: 0;
+}
+.prompt-row {
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.prompt-input {
+  flex: 1; padding: 10px 14px;
+  background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+  color: #e2e8f0; font-size: 14px; font-family: inherit;
+  resize: none; min-height: 44px; max-height: 120px;
+  outline: none; transition: border-color 0.15s;
+}
+.prompt-input:focus { border-color: #A78BFA; }
+.prompt-input::placeholder { color: #475569; }
+.btn {
+  padding: 10px 20px; border-radius: 8px;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  border: 1px solid transparent; transition: all 0.15s;
+  font-family: inherit; white-space: nowrap;
+}
+.btn-primary { background: #A78BFA; color: #0f172a; border-color: #A78BFA; }
+.btn-primary:hover { background: #c4b5fd; border-color: #c4b5fd; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: transparent; color: #94a3b8; border-color: #334155; }
+.btn-secondary:hover { color: #e2e8f0; border-color: #64748b; }
+.btn-sm { padding: 6px 14px; font-size: 13px; }
+.btn-success { background: #22c55e; color: #fff; border-color: #22c55e; }
+.btn-success:hover { background: #16a34a; }
+
+/* ── Preview Area ── */
+.preview-area {
+  flex: 1; position: relative;
+  background: #0a0f1a; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.preview-wrapper { position: relative; }
 .preview-area iframe {
   border: none; background: #000;
   box-shadow: 0 0 40px rgba(0,0,0,0.5);
-  transform-origin: center center;
+  transform-origin: top left;
 }
+.preview-empty {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; color: #475569;
+}
+.preview-empty svg { width: 48px; height: 48px; opacity: 0.3; }
+.preview-empty p { font-size: 14px; }
+
+/* ── Generating overlay ── */
+.generating-overlay {
+  position: absolute; inset: 0;
+  background: rgba(15, 23, 42, 0.85);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; z-index: 10;
+}
+.generating-overlay.hidden { display: none; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid #334155;
+  border-top-color: #A78BFA;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.generating-text { color: #94a3b8; font-size: 14px; }
 
 /* ── Timeline ── */
 .timeline-bar {
@@ -107,21 +171,24 @@ body {
   font-size: 16px; padding: 4px; display: flex; align-items: center;
 }
 .timeline-bar button:hover { color: #e2e8f0; }
-.timeline-bar .scrubber { flex: 1; }
-.timeline-bar input[type="range"] {
+.scrubber { flex: 1; }
+.scrubber input[type="range"] {
   width: 100%; height: 4px;
   -webkit-appearance: none; appearance: none;
   background: #334155; border-radius: 2px; outline: none;
 }
-.timeline-bar input[type="range"]::-webkit-slider-thumb {
+.scrubber input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; width: 14px; height: 14px;
   background: #A78BFA; border-radius: 50%; cursor: pointer;
 }
-.time-display { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; min-width: 80px; text-align: right; }
+.time-display {
+  font-size: 12px; color: #64748b;
+  font-variant-numeric: tabular-nums; min-width: 80px; text-align: right;
+}
 
 /* ── Bottom Panels ── */
 .bottom-panels {
-  display: flex; height: 280px; min-height: 200px;
+  display: flex; height: 260px; min-height: 200px;
   border-top: 1px solid #334155; flex-shrink: 0;
 }
 .panel {
@@ -142,13 +209,12 @@ body {
   background: #0f172a;
 }
 
-/* ── Data Editor ── */
-.field-group { margin-bottom: 14px; }
+/* ── Data/Prop Editor ── */
+.field-group { margin-bottom: 12px; }
 .field-label {
   display: block; font-size: 12px; font-weight: 500; color: #94a3b8;
   margin-bottom: 4px;
 }
-.field-label .req { color: #f87171; margin-left: 2px; }
 .field-input {
   width: 100%; padding: 7px 10px;
   background: #1e293b; border: 1px solid #334155; border-radius: 5px;
@@ -156,82 +222,32 @@ body {
   transition: border-color 0.15s;
 }
 .field-input:focus { border-color: #A78BFA; }
-textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-.field-input[type="checkbox"] { width: auto; margin-right: 8px; }
-.checkbox-row { display: flex; align-items: center; }
-.editor-actions {
-  display: flex; gap: 8px; margin-top: 12px; padding-top: 12px;
-  border-top: 1px solid #1e293b;
+textarea.field-input {
+  resize: vertical; min-height: 60px;
+  font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 12px;
 }
-.btn {
-  padding: 7px 16px; border-radius: 6px;
-  font-size: 13px; font-weight: 500; cursor: pointer;
-  border: 1px solid transparent; transition: all 0.15s;
-}
-.btn-primary { background: #A78BFA; color: #0f172a; border-color: #A78BFA; }
-.btn-primary:hover { background: #c4b5fd; border-color: #c4b5fd; }
-.btn-secondary { background: transparent; color: #94a3b8; border-color: #334155; }
-.btn-secondary:hover { color: #e2e8f0; border-color: #64748b; }
 
-/* ── Source View ── */
+/* ── Source / Revise Panel ── */
 .source-view {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
   font-size: 12px; line-height: 1.6;
   white-space: pre-wrap; word-break: break-all;
-  color: #94a3b8;
-  tab-size: 2;
+  color: #94a3b8; tab-size: 2;
 }
-.source-view .s-template { color: #7dd3fc; }
-.source-view .s-style { color: #a5f3fc; }
-.source-view .s-script { color: #c4b5fd; }
-.source-view .s-tag { color: #A78BFA; }
-
-/* ── Empty / New States ── */
-.empty-state {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 100%; gap: 12px; color: #475569;
+.revise-area {
+  display: flex; gap: 8px; margin-bottom: 12px;
 }
-.empty-state svg { width: 48px; height: 48px; opacity: 0.3; }
-.empty-state p { font-size: 14px; }
-
-/* ── New Component Modal ── */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
+.revise-input {
+  flex: 1; padding: 7px 10px;
+  background: #1e293b; border: 1px solid #334155; border-radius: 5px;
+  color: #e2e8f0; font-size: 13px; font-family: inherit; outline: none;
 }
-.modal-overlay.hidden { display: none; }
-.modal {
-  background: #1e293b; border: 1px solid #334155; border-radius: 12px;
-  width: 700px; max-width: 90vw; max-height: 80vh;
-  display: flex; flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+.revise-input:focus { border-color: #A78BFA; }
+.revise-input::placeholder { color: #475569; }
+.source-actions {
+  display: flex; gap: 8px; margin-top: 12px;
+  padding-top: 12px; border-top: 1px solid #1e293b;
 }
-.modal-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px; border-bottom: 1px solid #334155;
-}
-.modal-header h2 { font-size: 16px; font-weight: 600; }
-.modal-close {
-  background: none; border: none; color: #64748b; cursor: pointer;
-  font-size: 20px; padding: 4px; line-height: 1;
-}
-.modal-close:hover { color: #e2e8f0; }
-.modal-body { flex: 1; overflow-y: auto; padding: 20px; }
-.modal-footer {
-  display: flex; justify-content: flex-end; gap: 8px;
-  padding: 14px 20px; border-top: 1px solid #334155;
-}
-.modal-body label { display: block; font-size: 13px; font-weight: 500; color: #94a3b8; margin-bottom: 6px; }
-.modal-body textarea {
-  width: 100%; min-height: 280px; padding: 12px;
-  background: #0f172a; border: 1px solid #334155; border-radius: 6px;
-  color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-size: 12px;
-  resize: vertical; outline: none;
-}
-.modal-body textarea:focus { border-color: #A78BFA; }
-.modal-body .type-row { display: flex; gap: 12px; margin-bottom: 16px; }
-.modal-body .type-row .field-group { flex: 1; }
 </style>
 </head>
 <body>
@@ -239,30 +255,50 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
   <!-- Header -->
   <div class="header">
     <h1><span>&#9654;</span> Component Playground</h1>
-    <button class="btn btn-primary" id="btn-new" title="Create a new component">+ New</button>
+    <div class="header-right">
+      <div class="tenant-badge">
+        <span>Tenant:</span>
+        <input type="text" id="tenant-input" placeholder="tenant-id">
+        <button class="btn btn-secondary btn-sm" id="tenant-load-btn">Load</button>
+      </div>
+    </div>
   </div>
 
   <div class="main">
-    <!-- Sidebar -->
+    <!-- Sidebar: My Components -->
     <div class="sidebar">
-      <div class="search-box">
-        <input type="text" id="search" placeholder="Search components..." autocomplete="off">
+      <div class="sidebar-header">My Components</div>
+      <div class="sidebar-list" id="component-list">
+        <div class="sidebar-empty" id="sidebar-empty">Enter a tenant ID to see your components</div>
       </div>
-      <div class="component-list" id="component-list"></div>
     </div>
 
     <!-- Content -->
     <div class="content">
+      <!-- Prompt -->
+      <div class="prompt-area">
+        <div class="prompt-row">
+          <textarea class="prompt-input" id="prompt-input" rows="1" placeholder="Describe the component you want to create..."></textarea>
+          <button class="btn btn-primary" id="generate-btn">Generate</button>
+        </div>
+      </div>
+
       <!-- Preview -->
       <div class="preview-area" id="preview-area">
-        <div class="empty-state" id="empty-state">
+        <div class="preview-empty" id="preview-empty">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <rect x="2" y="3" width="20" height="14" rx="2"/>
             <path d="M8 21h8M12 17v4"/>
           </svg>
-          <p>Select a component to preview</p>
+          <p>Describe a component above to generate it</p>
         </div>
-        <iframe id="preview-iframe" style="display:none" sandbox="allow-scripts"></iframe>
+        <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
+          <iframe id="preview-iframe" sandbox="allow-scripts"></iframe>
+        </div>
+        <div class="generating-overlay hidden" id="generating-overlay">
+          <div class="spinner"></div>
+          <div class="generating-text" id="generating-text">Generating component...</div>
+        </div>
       </div>
 
       <!-- Timeline -->
@@ -276,55 +312,32 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
 
       <!-- Bottom Panels -->
       <div class="bottom-panels">
-        <!-- Data Editor -->
+        <!-- Prop Editor -->
         <div class="panel">
-          <div class="panel-header">Data Editor</div>
-          <div class="panel-body" id="data-editor">
-            <div class="empty-state" style="padding:20px 0">
-              <p style="font-size:13px;color:#475569">No component selected</p>
+          <div class="panel-header">Prop Editor</div>
+          <div class="panel-body" id="prop-editor">
+            <div class="sidebar-empty">Generate a component to edit props</div>
+          </div>
+        </div>
+
+        <!-- Source / Revise -->
+        <div class="panel">
+          <div class="panel-header">
+            <span>Source / Revise</span>
+            <button class="btn btn-secondary btn-sm" id="btn-copy" style="padding:3px 10px;font-size:11px">Copy</button>
+          </div>
+          <div class="panel-body" id="source-panel">
+            <div class="revise-area">
+              <input class="revise-input" id="revise-input" placeholder="Make the title bigger, add a gradient...">
+              <button class="btn btn-secondary btn-sm" id="revise-btn">Revise</button>
+            </div>
+            <div class="source-view" id="source-view"></div>
+            <div class="source-actions">
+              <button class="btn btn-success btn-sm" id="save-btn">Save to Library</button>
             </div>
           </div>
         </div>
-
-        <!-- Source View -->
-        <div class="panel">
-          <div class="panel-header">
-            <span>Source</span>
-            <button class="btn btn-secondary" id="btn-copy" style="padding:3px 10px;font-size:11px">Copy</button>
-          </div>
-          <div class="panel-body">
-            <div class="source-view" id="source-view"></div>
-          </div>
-        </div>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- New Component Modal -->
-<div class="modal-overlay hidden" id="modal-new">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>New Component</h2>
-      <button class="modal-close" id="modal-close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="type-row">
-        <div class="field-group">
-          <label>Component Type</label>
-          <input class="field-input" id="new-type" placeholder="e.g. hero-banner">
-        </div>
-        <div class="field-group">
-          <label>Category</label>
-          <input class="field-input" id="new-category" placeholder="e.g. titles">
-        </div>
-      </div>
-      <label>Component Source (.component.html)</label>
-      <textarea id="new-source" placeholder="<template>\\n  <div class=&quot;my-component&quot;>\\n    <h1 class=&quot;title&quot;></h1>\\n  </div>\\n</template>\\n\\n<style scoped>\\n  .my-component { ... }\\n</style>\\n\\n<script>\\nfunction createTimeline(el, data, ctx) {\\n  var tl = gsap.timeline();\\n  // ...\\n  return tl;\\n}\\n</script>"></textarea>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
-      <button class="btn btn-primary" id="modal-save">Save Component</button>
     </div>
   </div>
 </div>
@@ -332,14 +345,38 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
 <script>
 (function() {
   // ── State ──
-  var catalog = [];
-  var activeComponent = null;
+  var tenantId = '';
   var currentSource = '';
-  var currentSchema = null;
+  var currentData = {};
+  var tenantComponents = [];
+  var activeComponentType = null;
   var playing = false;
   var animFrame = null;
   var ws = null;
   var wsReconnectTimer = null;
+
+  // ── DOM refs ──
+  var $tenantInput = document.getElementById('tenant-input');
+  var $tenantLoadBtn = document.getElementById('tenant-load-btn');
+  var $componentList = document.getElementById('component-list');
+  var $sidebarEmpty = document.getElementById('sidebar-empty');
+  var $promptInput = document.getElementById('prompt-input');
+  var $generateBtn = document.getElementById('generate-btn');
+  var $previewArea = document.getElementById('preview-area');
+  var $previewEmpty = document.getElementById('preview-empty');
+  var $previewWrapper = document.getElementById('preview-wrapper');
+  var $preview = document.getElementById('preview-iframe');
+  var $generatingOverlay = document.getElementById('generating-overlay');
+  var $generatingText = document.getElementById('generating-text');
+  var $btnPlay = document.getElementById('btn-play');
+  var $scrubber = document.getElementById('scrubber');
+  var $timeDisplay = document.getElementById('time-display');
+  var $propEditor = document.getElementById('prop-editor');
+  var $sourceView = document.getElementById('source-view');
+  var $btnCopy = document.getElementById('btn-copy');
+  var $reviseInput = document.getElementById('revise-input');
+  var $reviseBtn = document.getElementById('revise-btn');
+  var $saveBtn = document.getElementById('save-btn');
 
   // ── WebSocket ──
   function connectWebSocket() {
@@ -348,7 +385,6 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
     var wsConn = new WebSocket(proto + '//' + location.host + '/ws');
 
     wsConn.onopen = function() {
-      console.log('Playground WebSocket connected');
       if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
     };
 
@@ -357,7 +393,6 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
       try { msg = JSON.parse(e.data); } catch(err) { return; }
 
       if (msg.type === 'scene-html') {
-        // Capture current playback time
         var currentTime = 0;
         try {
           if ($preview.contentWindow && $preview.contentWindow.__MP_TIMELINE) {
@@ -365,22 +400,17 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
           }
         } catch(err) {}
 
-        $empty.style.display = 'none';
-        $preview.style.display = 'block';
-        fitPreview();
+        showPreview();
 
-        // Update iframe without reload
         try {
           $preview.contentDocument.open();
           $preview.contentDocument.write(msg.html);
           $preview.contentDocument.close();
         } catch(err) {
-          // Fallback: srcdoc
           $preview.srcdoc = msg.html;
           return;
         }
 
-        // Wait for timeline ready, then seek to saved time
         var checkReady = setInterval(function() {
           try {
             if ($preview.contentWindow && $preview.contentWindow.__MP_READY) {
@@ -395,174 +425,311 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
         }, 50);
         setTimeout(function() { clearInterval(checkReady); }, 5000);
       }
-
-      if (msg.type === 'error') {
-        console.error('Playground WebSocket error:', msg.error);
-      }
     };
 
     wsConn.onclose = function() {
-      console.log('Playground WebSocket disconnected, reconnecting in 2s...');
       ws = null;
       wsReconnectTimer = setTimeout(connectWebSocket, 2000);
     };
-
     wsConn.onerror = function() { wsConn.close(); };
-
     ws = wsConn;
   }
 
   connectWebSocket();
 
-  // ── DOM refs ──
-  var $list = document.getElementById('component-list');
-  var $search = document.getElementById('search');
-  var $preview = document.getElementById('preview-iframe');
-  var $previewArea = document.getElementById('preview-area');
-  var $empty = document.getElementById('empty-state');
-  var $editor = document.getElementById('data-editor');
-  var $source = document.getElementById('source-view');
-  var $scrubber = document.getElementById('scrubber');
-  var $timeDisplay = document.getElementById('time-display');
-  var $btnPlay = document.getElementById('btn-play');
-  var $btnCopy = document.getElementById('btn-copy');
-  var $btnNew = document.getElementById('btn-new');
-  var $modal = document.getElementById('modal-new');
-
-  // ── Load catalog ──
-  fetch('/playground/api/components/catalog')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      catalog = data;
-      renderList('');
-    })
-    .catch(function(err) { console.error('Failed to load catalog:', err); });
-
-  // ── Render sidebar ──
-  function renderList(filter) {
-    var grouped = {};
-    var lf = filter.toLowerCase();
-    catalog.forEach(function(c) {
-      if (lf && c.type.indexOf(lf) === -1 && (c.label || '').toLowerCase().indexOf(lf) === -1 && c.category.indexOf(lf) === -1) return;
-      if (!grouped[c.category]) grouped[c.category] = [];
-      grouped[c.category].push(c);
-    });
-    var html = '';
-    Object.keys(grouped).sort().forEach(function(cat) {
-      html += '<div class="category-header" data-cat="' + cat + '"><span class="arrow">&#9660;</span> ' + cat + ' (' + grouped[cat].length + ')</div>';
-      html += '<div class="category-items">';
-      grouped[cat].forEach(function(c) {
-        var active = activeComponent && activeComponent.type === c.type && activeComponent.category === c.category;
-        html += '<div class="component-item' + (active ? ' active' : '') + '" data-type="' + c.type + '" data-category="' + c.category + '">' + (c.label || c.type) + '</div>';
-      });
-      html += '</div>';
-    });
-    $list.innerHTML = html || '<div class="empty-state" style="padding:20px"><p style="font-size:13px">No components found</p></div>';
+  // ── Helpers ──
+  function escHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
   }
 
-  // ── Sidebar interactions ──
-  $list.addEventListener('click', function(e) {
-    var el = e.target;
-    if (el.classList.contains('category-header')) {
-      el.classList.toggle('collapsed');
+  function showPreview() {
+    $previewEmpty.style.display = 'none';
+    $previewWrapper.style.display = 'block';
+    fitPreview();
+  }
+
+  function fitPreview() {
+    var area = $previewArea.getBoundingClientRect();
+    var sceneW = 1920, sceneH = 1080;
+    var pad = 32;
+    var availW = area.width - pad * 2;
+    var availH = area.height - pad * 2;
+    var scale = Math.min(availW / sceneW, availH / sceneH, 1);
+
+    $preview.style.width = sceneW + 'px';
+    $preview.style.height = sceneH + 'px';
+    $preview.style.transform = 'scale(' + scale + ')';
+    $preview.style.transformOrigin = 'top left';
+
+    var scaledW = sceneW * scale;
+    var scaledH = sceneH * scale;
+    $previewWrapper.style.width = scaledW + 'px';
+    $previewWrapper.style.height = scaledH + 'px';
+  }
+
+  window.addEventListener('resize', fitPreview);
+
+  // ── Tenant ──
+  function setTenant(id) {
+    tenantId = id.trim();
+    if (!tenantId) return;
+    try { localStorage.setItem('pg-tenant', tenantId); } catch(e) {}
+    loadTenantComponents();
+  }
+
+  $tenantLoadBtn.addEventListener('click', function() {
+    setTenant($tenantInput.value);
+  });
+  $tenantInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') setTenant($tenantInput.value);
+  });
+
+  // ── Load tenant custom components ──
+  function loadTenantComponents() {
+    if (!tenantId) return;
+    fetch('/playground/api/tenant-components/' + tenantId)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        tenantComponents = data;
+        renderComponentList();
+      })
+      .catch(function() {
+        tenantComponents = [];
+        renderComponentList();
+      });
+  }
+
+  function renderComponentList() {
+    if (!tenantComponents.length) {
+      $componentList.innerHTML = '<div class="sidebar-empty">No custom components yet. Generate one!</div>';
       return;
     }
-    if (el.classList.contains('component-item')) {
-      loadComponent(el.dataset.category, el.dataset.type);
+    var html = '';
+    tenantComponents.forEach(function(c) {
+      var active = activeComponentType === c.type;
+      var label = c.label || c.type;
+      html += '<div class="sidebar-item' + (active ? ' active' : '') + '" data-type="' + escHtml(c.type) + '">' + escHtml(label) + '</div>';
+    });
+    $componentList.innerHTML = html;
+  }
+
+  $componentList.addEventListener('click', function(e) {
+    var item = e.target.closest('.sidebar-item');
+    if (!item) return;
+    var type = item.dataset.type;
+    loadSavedComponent(type);
+  });
+
+  function loadSavedComponent(type) {
+    activeComponentType = type;
+    renderComponentList();
+
+    // Fetch the component source
+    fetch('/playground/api/tenant-components/' + tenantId + '/' + type + '/source')
+      .then(function(r) { return r.text(); })
+      .then(function(source) {
+        currentSource = source;
+        currentData = {};
+        renderSourceView(source);
+        renderPropEditor({});
+        refreshPreview();
+      })
+      .catch(function(err) {
+        console.error('Failed to load component:', err);
+      });
+  }
+
+  // ── Generate ──
+  $generateBtn.addEventListener('click', function() {
+    var prompt = $promptInput.value.trim();
+    if (!prompt || !tenantId) return;
+    generateComponent(prompt);
+  });
+
+  $promptInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      var prompt = $promptInput.value.trim();
+      if (prompt && tenantId) generateComponent(prompt);
     }
   });
 
-  $search.addEventListener('input', function() { renderList(this.value); });
+  function generateComponent(prompt) {
+    $generateBtn.disabled = true;
+    $generatingOverlay.classList.remove('hidden');
+    $generatingText.textContent = 'Generating component...';
 
-  // ── Load a component ──
-  function loadComponent(category, type) {
-    activeComponent = { category: category, type: type };
-    renderList($search.value);
+    fetch('/playground/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId, prompt: prompt })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+      $generateBtn.disabled = false;
+      $generatingOverlay.classList.add('hidden');
 
-    // Fetch source and schema in parallel
-    Promise.all([
-      fetch('/playground/api/components/' + category + '/' + type + '/source').then(function(r) { return r.text(); }),
-      fetch('/playground/api/components/' + category + '/' + type + '/schema').then(function(r) { return r.json(); }).catch(function() { return null; })
-    ]).then(function(results) {
-      currentSource = results[0];
-      currentSchema = results[1];
+      if (result.error) {
+        alert('Generation failed: ' + result.error);
+        return;
+      }
+
+      currentSource = result.source || '';
+      currentData = result.data || {};
+      activeComponentType = result.type || null;
+
       renderSourceView(currentSource);
-      renderDataEditor(currentSchema);
+      renderPropEditor(currentData);
+      refreshPreview();
+    })
+    .catch(function(err) {
+      $generateBtn.disabled = false;
+      $generatingOverlay.classList.add('hidden');
+      alert('Generation failed: ' + err.message);
+    });
+  }
+
+  // ── Revise ──
+  $reviseBtn.addEventListener('click', function() {
+    var prompt = $reviseInput.value.trim();
+    if (!prompt || !currentSource) return;
+    reviseComponent(prompt);
+  });
+
+  $reviseInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      var prompt = $reviseInput.value.trim();
+      if (prompt && currentSource) reviseComponent(prompt);
+    }
+  });
+
+  function reviseComponent(prompt) {
+    $reviseBtn.disabled = true;
+    $generatingOverlay.classList.remove('hidden');
+    $generatingText.textContent = 'Revising component...';
+
+    fetch('/playground/api/revise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        prompt: prompt,
+        source: currentSource,
+        data: currentData
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+      $reviseBtn.disabled = false;
+      $generatingOverlay.classList.add('hidden');
+
+      if (result.error) {
+        alert('Revision failed: ' + result.error);
+        return;
+      }
+
+      currentSource = result.source || currentSource;
+      if (result.data) currentData = result.data;
+
+      renderSourceView(currentSource);
+      renderPropEditor(currentData);
+      refreshPreview();
+      $reviseInput.value = '';
+    })
+    .catch(function(err) {
+      $reviseBtn.disabled = false;
+      $generatingOverlay.classList.add('hidden');
+      alert('Revision failed: ' + err.message);
+    });
+  }
+
+  // ── Save to Library ──
+  $saveBtn.addEventListener('click', function() {
+    if (!currentSource || !tenantId) return;
+    var typeName = activeComponentType || prompt('Component name (kebab-case):', 'my-component');
+    if (!typeName) return;
+
+    fetch('/playground/api/components/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        type: typeName,
+        source: currentSource
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+      if (result.ok) {
+        activeComponentType = typeName;
+        loadTenantComponents();
+        alert('Saved to library!');
+      } else {
+        alert('Save failed: ' + (result.error || 'Unknown error'));
+      }
+    })
+    .catch(function(err) { alert('Save failed: ' + err.message); });
+  });
+
+  // ── Source View ──
+  function renderSourceView(src) {
+    if (!src) {
+      $sourceView.textContent = '';
+      return;
+    }
+    var escaped = escHtml(src);
+    $sourceView.innerHTML = escaped;
+  }
+
+  // ── Prop Editor ──
+  function renderPropEditor(data) {
+    if (!data || Object.keys(data).length === 0) {
+      $propEditor.innerHTML = '<div class="sidebar-empty">No props to edit</div>';
+      return;
+    }
+
+    var html = '';
+    Object.keys(data).forEach(function(key) {
+      var val = data[key];
+      html += '<div class="field-group">';
+      html += '<label class="field-label">' + escHtml(key) + '</label>';
+
+      if (typeof val === 'boolean') {
+        html += '<input type="checkbox" class="field-input" data-key="' + escHtml(key) + '" data-type="boolean"' + (val ? ' checked' : '') + ' style="width:auto">';
+      } else if (typeof val === 'number') {
+        html += '<input type="number" class="field-input" data-key="' + escHtml(key) + '" data-type="number" value="' + val + '">';
+      } else if (typeof val === 'object') {
+        html += '<textarea class="field-input" data-key="' + escHtml(key) + '" data-type="json">' + escHtml(JSON.stringify(val, null, 2)) + '</textarea>';
+      } else {
+        html += '<input type="text" class="field-input" data-key="' + escHtml(key) + '" data-type="string" value="' + escHtml(String(val)) + '">';
+      }
+
+      html += '</div>';
+    });
+
+    html += '<div style="margin-top:12px"><button class="btn btn-primary btn-sm" id="update-props">Update Preview</button></div>';
+    $propEditor.innerHTML = html;
+
+    document.getElementById('update-props').addEventListener('click', function() {
+      currentData = collectData();
       refreshPreview();
     });
   }
 
-  // ── Source View ──
-  function renderSourceView(src) {
-    // Basic syntax highlighting by section
-    var escaped = escapeHtml(src);
-    escaped = escaped.replace(/(&lt;template[^]*?&lt;\\/template&gt;)/gi, '<span class="s-template">$1</span>');
-    escaped = escaped.replace(/(&lt;style[^]*?&lt;\\/style&gt;)/gi, '<span class="s-style">$1</span>');
-    escaped = escaped.replace(/(&lt;script[^]*?&lt;\\/script&gt;)/gi, '<span class="s-script">$1</span>');
-    $source.innerHTML = escaped;
-  }
-
-  function escapeHtml(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  // ── Data Editor ──
-  function renderDataEditor(schema) {
-    if (!schema || !schema.data || Object.keys(schema.data).length === 0) {
-      $editor.innerHTML = '<div class="empty-state" style="padding:20px 0"><p style="font-size:13px;color:#475569">No data fields</p></div>';
-      return;
-    }
-    var html = '';
-    var data = schema.data;
-    Object.keys(data).forEach(function(key) {
-      var field = data[key];
-      var reqMark = field.required ? '<span class="req">*</span>' : '';
-      var label = field.label || key;
-
-      html += '<div class="field-group">';
-      html += '<label class="field-label">' + escapeHtml(label) + reqMark + '</label>';
-
-      if (field.type === 'boolean') {
-        html += '<div class="checkbox-row"><input type="checkbox" class="field-input" data-key="' + key + '" data-type="boolean"></div>';
-      } else if (field.type === 'number') {
-        html += '<input type="number" class="field-input" data-key="' + key + '" data-type="number" placeholder="' + (field.placeholder || '') + '">';
-      } else if (field.type === 'array') {
-        html += '<textarea class="field-input" data-key="' + key + '" data-type="array" placeholder="JSON array, e.g. [&quot;item1&quot;, &quot;item2&quot;]"></textarea>';
-      } else {
-        // string
-        html += '<input type="text" class="field-input" data-key="' + key + '" data-type="string" placeholder="' + escapeHtml(field.placeholder || '') + '">';
-      }
-      html += '</div>';
-    });
-
-    html += '<div class="editor-actions">';
-    html += '<button class="btn btn-primary" id="btn-preview">Preview</button>';
-    html += '</div>';
-    $editor.innerHTML = html;
-
-    // Fill defaults from schema placeholders
-    document.querySelectorAll('#data-editor .field-input').forEach(function(inp) {
-      if (inp.placeholder && inp.dataset.type === 'string') {
-        inp.value = inp.placeholder;
-      }
-    });
-
-    // Preview button
-    var previewBtn = document.getElementById('btn-preview');
-    if (previewBtn) previewBtn.addEventListener('click', refreshPreview);
-  }
-
   function collectData() {
     var data = {};
-    document.querySelectorAll('#data-editor .field-input').forEach(function(inp) {
+    $propEditor.querySelectorAll('[data-key]').forEach(function(inp) {
       var key = inp.dataset.key;
       if (!key) return;
-      if (inp.dataset.type === 'boolean') {
+      var dtype = inp.dataset.type;
+      if (dtype === 'boolean') {
         data[key] = inp.checked;
-      } else if (inp.dataset.type === 'number') {
+      } else if (dtype === 'number') {
         data[key] = parseFloat(inp.value) || 0;
-      } else if (inp.dataset.type === 'array') {
-        try { data[key] = JSON.parse(inp.value || '[]'); } catch(e) { data[key] = []; }
+      } else if (dtype === 'json') {
+        try { data[key] = JSON.parse(inp.value || '{}'); } catch(e) { data[key] = inp.value; }
       } else {
         data[key] = inp.value;
       }
@@ -575,32 +742,25 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
     if (!currentSource) return;
     stopPlayback();
 
-    var data = collectData();
-
-    // Try WebSocket first for instant preview
+    // Try WebSocket first
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: 'preview-component',
         source: currentSource,
-        data: data
+        data: currentData
       }));
       return;
     }
 
-    // Fallback: HTTP POST
+    // Fallback: HTTP
     fetch('/playground/api/components/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: currentSource, data: data })
+      body: JSON.stringify({ source: currentSource, data: currentData })
     })
     .then(function(r) { return r.text(); })
     .then(function(html) {
-      $empty.style.display = 'none';
-      $preview.style.display = 'block';
-
-      // Size the iframe to fit within the preview area
-      fitPreview();
-
+      showPreview();
       $preview.srcdoc = html;
       $scrubber.value = 0;
       updateTimeDisplay(0, 0);
@@ -608,21 +768,16 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
     .catch(function(err) { console.error('Preview error:', err); });
   }
 
-  function fitPreview() {
-    var area = $previewArea.getBoundingClientRect();
-    var sceneW = 1920, sceneH = 1080;
-    var pad = 40;
-    var availW = area.width - pad * 2;
-    var availH = area.height - pad * 2;
-    var scale = Math.min(availW / sceneW, availH / sceneH, 1);
-    $preview.style.width = sceneW + 'px';
-    $preview.style.height = sceneH + 'px';
-    $preview.style.transform = 'scale(' + scale + ')';
-  }
+  // ── Copy source ──
+  $btnCopy.addEventListener('click', function() {
+    if (!currentSource) return;
+    navigator.clipboard.writeText(currentSource).then(function() {
+      $btnCopy.textContent = 'Copied!';
+      setTimeout(function() { $btnCopy.textContent = 'Copy'; }, 1500);
+    });
+  });
 
-  window.addEventListener('resize', fitPreview);
-
-  // ── Timeline Control ──
+  // ── Timeline ──
   $btnPlay.addEventListener('click', function() {
     if (playing) { stopPlayback(); return; }
     startPlayback();
@@ -630,9 +785,8 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
 
   $scrubber.addEventListener('input', function() {
     try {
-      var iframeWin = $preview.contentWindow;
-      if (!iframeWin || !iframeWin.__MP_TIMELINE) return;
-      var tl = iframeWin.__MP_TIMELINE;
+      var tl = $preview.contentWindow && $preview.contentWindow.__MP_TIMELINE;
+      if (!tl) return;
       var dur = tl.duration();
       var t = (parseFloat($scrubber.value) / 1000) * dur;
       tl.pause();
@@ -645,9 +799,8 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
 
   function startPlayback() {
     try {
-      var iframeWin = $preview.contentWindow;
-      if (!iframeWin || !iframeWin.__MP_TIMELINE) return;
-      var tl = iframeWin.__MP_TIMELINE;
+      var tl = $preview.contentWindow && $preview.contentWindow.__MP_TIMELINE;
+      if (!tl) return;
       tl.play(0);
       playing = true;
       $btnPlay.innerHTML = '&#9646;&#9646;';
@@ -664,9 +817,8 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
   function tick() {
     if (!playing) return;
     try {
-      var iframeWin = $preview.contentWindow;
-      if (!iframeWin || !iframeWin.__MP_TIMELINE) { stopPlayback(); return; }
-      var tl = iframeWin.__MP_TIMELINE;
+      var tl = $preview.contentWindow && $preview.contentWindow.__MP_TIMELINE;
+      if (!tl) { stopPlayback(); return; }
       var dur = tl.duration();
       var t = tl.time();
       $scrubber.value = dur > 0 ? Math.round((t / dur) * 1000) : 0;
@@ -677,57 +829,24 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
   }
 
   function updateTimeDisplay(current, total) {
-    $timeDisplay.textContent = current.toFixed(2) + 's / ' + total.toFixed(2) + 's';
+    $timeDisplay.textContent = (current || 0).toFixed(2) + 's / ' + (total || 0).toFixed(2) + 's';
   }
 
-  // ── Copy source ──
-  $btnCopy.addEventListener('click', function() {
-    if (!currentSource) return;
-    navigator.clipboard.writeText(currentSource).then(function() {
-      $btnCopy.textContent = 'Copied!';
-      setTimeout(function() { $btnCopy.textContent = 'Copy'; }, 1500);
-    });
-  });
-
-  // ── New Component Modal ──
-  $btnNew.addEventListener('click', function() { $modal.classList.remove('hidden'); });
-  document.getElementById('modal-close').addEventListener('click', closeModal);
-  document.getElementById('modal-cancel').addEventListener('click', closeModal);
-  function closeModal() { $modal.classList.add('hidden'); }
-
-  $modal.addEventListener('click', function(e) {
-    if (e.target === $modal) closeModal();
-  });
-
-  document.getElementById('modal-save').addEventListener('click', function() {
-    var type = document.getElementById('new-type').value.trim();
-    var category = document.getElementById('new-category').value.trim() || 'custom';
-    var source = document.getElementById('new-source').value;
-    if (!type || !source) { alert('Type and source are required'); return; }
-
-    fetch('/playground/api/components/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: type, category: category, source: source })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(result) {
-      if (result.ok) {
-        closeModal();
-        // Reload catalog
-        fetch('/playground/api/components/catalog')
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            catalog = data;
-            renderList($search.value);
-            loadComponent(category, type);
-          });
-      } else {
-        alert('Save failed: ' + (result.error || 'Unknown error'));
+  // ── Auto-tenant: URL param > localStorage ──
+  var params = new URLSearchParams(window.location.search);
+  var tenantParam = params.get('tenant');
+  if (tenantParam) {
+    $tenantInput.value = tenantParam;
+    setTenant(tenantParam);
+  } else {
+    try {
+      var saved = localStorage.getItem('pg-tenant');
+      if (saved) {
+        $tenantInput.value = saved;
+        setTenant(saved);
       }
-    })
-    .catch(function(err) { alert('Save failed: ' + err.message); });
-  });
+    } catch(e) {}
+  }
 })();
 </script>
 </body>
