@@ -163,6 +163,9 @@ async function renderVideo(
       fps: project.canvas.fps,
     });
 
+    // Clean up frame PNGs to free disk space
+    await fs.rm(framesDir, { recursive: true, force: true });
+
     sceneMp4s.push(mp4Path);
   }
 
