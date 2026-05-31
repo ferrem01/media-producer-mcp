@@ -154,12 +154,32 @@ export function getPreviewHtml(): string {
     font-size: 13px;
     border-left: 3px solid transparent;
     transition: background 0.1s;
+    position: relative;
   }
   .scene-item:hover { background: #0f172a; }
   .scene-item.active {
     background: #0f172a;
     border-left-color: #A78BFA;
     color: #fff;
+  }
+  .scene-item.drag-over {
+    border-top: 2px solid #A78BFA;
+  }
+  .scene-thumb {
+    width: 48px; height: 27px;
+    border-radius: 3px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .scene-thumb iframe {
+    width: 1920px; height: 1080px;
+    transform: scale(0.025);
+    transform-origin: top left;
+    border: none; pointer-events: none;
+    position: absolute; top: 0; left: 0;
   }
   .scene-dot {
     width: 8px; height: 8px;
@@ -170,6 +190,59 @@ export function getPreviewHtml(): string {
   .scene-item.active .scene-dot { background: #A78BFA; }
   .scene-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .scene-dur { font-size: 11px; color: #64748b; }
+  .scene-drag-handle {
+    cursor: grab; color: #475569; font-size: 14px;
+    flex-shrink: 0; user-select: none;
+    padding: 0 2px;
+  }
+  .scene-drag-handle:active { cursor: grabbing; }
+  .scene-delete {
+    opacity: 0; cursor: pointer; color: #f87171;
+    font-size: 14px; flex-shrink: 0;
+    transition: opacity 0.1s;
+    background: none; border: none; padding: 0 2px;
+    font-family: inherit;
+  }
+  .scene-item:hover .scene-delete { opacity: 0.7; }
+  .scene-delete:hover { opacity: 1 !important; }
+  .add-scene-btn {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 8px 12px;
+    font-size: 12px; color: #64748b;
+    cursor: pointer; transition: color 0.1s;
+    border: none; background: none; width: 100%;
+    font-family: inherit;
+  }
+  .add-scene-btn:hover { color: #A78BFA; }
+
+  /* Add Scene Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal-backdrop.hidden { display: none; }
+  .modal {
+    background: #1e293b; border: 1px solid #334155;
+    border-radius: 12px; padding: 24px;
+    width: 360px; max-width: 90vw;
+  }
+  .modal h3 { font-size: 16px; margin-bottom: 16px; color: #f8fafc; }
+  .modal-field { margin-bottom: 12px; }
+  .modal-field label {
+    display: block; font-size: 12px; color: #94a3b8;
+    margin-bottom: 4px;
+  }
+  .modal-field input, .modal-field select {
+    width: 100%; padding: 8px 10px;
+    background: #0f172a; border: 1px solid #334155;
+    border-radius: 6px; color: #e2e8f0;
+    font-size: 13px; font-family: inherit;
+    outline: none;
+  }
+  .modal-field input:focus, .modal-field select:focus { border-color: #A78BFA; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
   /* ── Main Area ── */
   #main {
@@ -388,6 +461,26 @@ export function getPreviewHtml(): string {
     <div class="sidebar-section" id="scenes-section" style="flex:1;">
       <div class="sidebar-header">Scenes</div>
       <div id="scene-list"><div class="empty-state">Select a project</div></div>
+      <button class="add-scene-btn" id="add-scene-btn" style="display:none;">+ Add Scene</button>
+    </div>
+  </div>
+
+  <!-- Add Scene Modal -->
+  <div class="modal-backdrop hidden" id="add-scene-modal">
+    <div class="modal">
+      <h3>Add Scene</h3>
+      <div class="modal-field">
+        <label>Label</label>
+        <input type="text" id="new-scene-label" placeholder="Scene label">
+      </div>
+      <div class="modal-field">
+        <label>Duration (seconds)</label>
+        <input type="number" id="new-scene-duration" value="5" min="1" max="60" step="0.5">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="cancel-add-scene">Cancel</button>
+        <button class="btn btn-primary" id="confirm-add-scene">Add</button>
+      </div>
     </div>
   </div>
 
@@ -615,25 +708,121 @@ export function getPreviewHtml(): string {
   // ── Scene List ──
   function renderSceneList() {
     var project = state.currentProject;
+    var addBtn = document.getElementById('add-scene-btn');
     if (!project || !project.scenes.length) {
       els.sceneList.innerHTML = '<div class="empty-state">No scenes</div>';
+      if (addBtn) addBtn.style.display = project ? '' : 'none';
       return;
     }
+    if (addBtn) addBtn.style.display = '';
     var html = '';
     project.scenes.forEach(function(scene, i) {
       var active = i === state.currentSceneIndex;
       var label = scene.label || ('Scene ' + (i + 1));
-      html += '<div class="scene-item' + (active ? ' active' : '') + '" data-index="' + i + '">'
-        + '<span class="scene-dot"></span>'
+      var thumbUrl = '/api/scene-thumbnail/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+      html += '<div class="scene-item' + (active ? ' active' : '') + '" data-index="' + i + '" data-scene-id="' + escAttr(scene.id) + '" draggable="true">'
+        + '<span class="scene-drag-handle" title="Drag to reorder">≡</span>'
+        + '<div class="scene-thumb"><iframe src="' + thumbUrl + '" loading="lazy" tabindex="-1"></iframe></div>'
         + '<span class="scene-label">' + (i + 1) + '. ' + escHtml(label) + '</span>'
         + '<span class="scene-dur">' + scene.duration_seconds.toFixed(1) + 's</span>'
+        + '<button class="scene-delete" data-scene-id="' + escAttr(scene.id) + '" title="Delete scene">×</button>'
         + '</div>';
     });
     els.sceneList.innerHTML = html;
 
+    // Click to select
     els.sceneList.querySelectorAll('.scene-item').forEach(function(el) {
-      el.addEventListener('click', function() {
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.scene-delete') || e.target.closest('.scene-drag-handle')) return;
         selectScene(parseInt(el.dataset.index, 10));
+      });
+    });
+
+    // Delete scene
+    els.sceneList.querySelectorAll('.scene-delete').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var sceneId = btn.dataset.sceneId;
+        if (!sceneId || !project) return;
+        if (!confirm('Delete this scene?')) return;
+        api('DELETE', '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + sceneId)
+          .then(function(updated) {
+            if (updated && updated.scenes) {
+              state.currentProject = updated;
+              if (state.currentSceneIndex >= updated.scenes.length) {
+                state.currentSceneIndex = updated.scenes.length - 1;
+              }
+              renderSceneList();
+              if (state.currentSceneIndex >= 0) {
+                loadPreview();
+                renderLayers();
+              } else {
+                clearPreview();
+                clearLayers();
+              }
+            }
+          });
+      });
+    });
+
+    // Drag and drop reorder
+    setupDragReorder();
+  }
+
+  function setupDragReorder() {
+    var items = els.sceneList.querySelectorAll('.scene-item');
+    var dragSrcIndex = null;
+
+    items.forEach(function(item) {
+      item.addEventListener('dragstart', function(e) {
+        dragSrcIndex = parseInt(item.dataset.index, 10);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', item.dataset.index);
+        item.style.opacity = '0.4';
+      });
+
+      item.addEventListener('dragend', function() {
+        item.style.opacity = '';
+        items.forEach(function(it) { it.classList.remove('drag-over'); });
+      });
+
+      item.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        items.forEach(function(it) { it.classList.remove('drag-over'); });
+        item.classList.add('drag-over');
+      });
+
+      item.addEventListener('dragleave', function() {
+        item.classList.remove('drag-over');
+      });
+
+      item.addEventListener('drop', function(e) {
+        e.preventDefault();
+        item.classList.remove('drag-over');
+        var dropIndex = parseInt(item.dataset.index, 10);
+        if (dragSrcIndex === null || dragSrcIndex === dropIndex) return;
+
+        var project = state.currentProject;
+        if (!project) return;
+
+        // Build new order
+        var scenes = project.scenes.slice();
+        var moved = scenes.splice(dragSrcIndex, 1)[0];
+        scenes.splice(dropIndex, 0, moved);
+        var newIds = scenes.map(function(s) { return s.id; });
+
+        api('PATCH', '/projects/' + state.tenantId + '/' + project.project_id + '/reorder', { scene_ids: newIds })
+          .then(function(updated) {
+            if (updated && updated.scenes) {
+              state.currentProject = updated;
+              // Adjust current scene index
+              if (state.currentSceneIndex === dragSrcIndex) {
+                state.currentSceneIndex = dropIndex;
+              }
+              renderSceneList();
+            }
+          });
       });
     });
   }
@@ -989,6 +1178,59 @@ export function getPreviewHtml(): string {
   // ── Util ──
   function escHtml(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
   function escAttr(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  // ── Add Scene Modal ──
+  var addSceneBtn = document.getElementById('add-scene-btn');
+  var addSceneModal = document.getElementById('add-scene-modal');
+  var cancelAddScene = document.getElementById('cancel-add-scene');
+  var confirmAddScene = document.getElementById('confirm-add-scene');
+  var newSceneLabel = document.getElementById('new-scene-label');
+  var newSceneDuration = document.getElementById('new-scene-duration');
+
+  addSceneBtn.addEventListener('click', function() {
+    newSceneLabel.value = 'Scene ' + ((state.currentProject ? state.currentProject.scenes.length : 0) + 1);
+    newSceneDuration.value = '5';
+    addSceneModal.classList.remove('hidden');
+  });
+
+  cancelAddScene.addEventListener('click', function() {
+    addSceneModal.classList.add('hidden');
+  });
+
+  addSceneModal.addEventListener('click', function(e) {
+    if (e.target === addSceneModal) addSceneModal.classList.add('hidden');
+  });
+
+  confirmAddScene.addEventListener('click', function() {
+    var project = state.currentProject;
+    if (!project) return;
+    var label = newSceneLabel.value.trim() || 'New Scene';
+    var dur = parseFloat(newSceneDuration.value) || 5;
+    var sceneId = 'scene_' + Date.now().toString(36);
+
+    var scene = {
+      id: sceneId,
+      label: label,
+      duration_seconds: dur,
+      components: []
+    };
+
+    api('POST', '/projects/' + state.tenantId + '/' + project.project_id + '/scenes', { scene: scene })
+      .then(function(updated) {
+        if (updated && updated.scenes) {
+          state.currentProject = updated;
+          state.currentSceneIndex = updated.scenes.length - 1;
+          renderSceneList();
+          loadPreview();
+          renderLayers();
+        }
+        addSceneModal.classList.add('hidden');
+      })
+      .catch(function() {
+        addSceneModal.classList.add('hidden');
+        alert('Failed to add scene');
+      });
+  });
 
   // ── Events ──
   els.loadBtn.addEventListener('click', loadProjects);

@@ -573,7 +573,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "audio",
-    "Add, update, or remove audio tracks (voiceover, music, SFX) on a project. For voiceover tracks, provide 'text' instead of 'source' to auto-generate TTS.",
+    "Add, update, or remove audio tracks (voiceover, music, SFX) on a project. For voiceover tracks, provide 'text' instead of 'source' to auto-generate TTS. Use sync_points with scene_id to store timing markers in a scene's audio_hints.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
@@ -581,6 +581,11 @@ export function createMcpServer(): McpServer {
       query: z.string().optional().describe("Search query for music (use with action='search')"),
       mood: z.string().optional().describe("Mood filter for music search (e.g. 'happy', 'calm')"),
       genre: z.string().optional().describe("Genre filter for music search"),
+      scene_id: z.string().optional().describe("Scene ID to attach sync_points to (stored in scene audio_hints)"),
+      sync_points: z.array(z.object({
+        at: z.number().describe("Time in seconds within the scene"),
+        label: z.string().describe("Label for the sync point (e.g. 'feature-reveal', 'stat-counter')"),
+      })).optional().describe("Timing sync points to store in the scene's audio_hints for animation synchronization"),
       track: z.object({
         id: z.string(),
         type: z.enum(["voiceover", "music", "sfx"]).optional(),
@@ -713,6 +718,28 @@ export function createMcpServer(): McpServer {
           attack: params.ducking.attack ?? 0.3,
           release: params.ducking.release ?? 0.5,
         };
+      }
+
+      // Store sync_points in scene audio_hints if provided
+      if (params.scene_id && params.sync_points && params.sync_points.length > 0) {
+        const scene = project.scenes.find((s) => s.id === params.scene_id);
+        if (scene) {
+          if (!scene.audio_hints) {
+            scene.audio_hints = {};
+          }
+          scene.audio_hints.sync_points = params.sync_points;
+        }
+      }
+
+      // Store voiceover text in scene audio_hints if adding voiceover with text and scene_id
+      if (params.scene_id && params.action === "add" && params.track.type === "voiceover" && params.track.text) {
+        const scene = project.scenes.find((s) => s.id === params.scene_id);
+        if (scene) {
+          if (!scene.audio_hints) {
+            scene.audio_hints = {};
+          }
+          scene.audio_hints.voiceover_text = params.track.text;
+        }
       }
 
       await saveProject(project);

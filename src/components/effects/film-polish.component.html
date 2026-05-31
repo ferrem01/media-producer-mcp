@@ -16,7 +16,7 @@
   .vignette {
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%);
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.32) 100%);
   }
 
   .grain {
@@ -43,7 +43,7 @@
     var grain = el.querySelector('.grain');
 
     // Apply custom intensity
-    var vignetteAmount = data.vignette !== undefined ? data.vignette : 0.15;
+    var vignetteAmount = data.vignette !== undefined ? data.vignette : 0.08;
     var grainAmount = data.grain !== undefined ? data.grain : 0.06;
     var colorGrade = data.color_grade || 'none';
     var gradeEl = el.querySelector('.color-grade');
@@ -61,7 +61,7 @@
     }
 
     vignette.style.background =
-      'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,' + vignetteAmount * 4 + ') 100%)';
+      'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,' + vignetteAmount * 4 + ') 100%)';
     grain.style.opacity = String(grainAmount);
 
     // Subtle grain animation (shift the noise pattern)

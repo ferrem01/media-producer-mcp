@@ -1,0 +1,13 @@
+{
+  "type": "integration-logos",
+  "label": "Integration Logos",
+  "category": "media",
+  "description": "\"Integrates with\" header + grid of logos from logo.dev",
+  "data": {
+    "title": { "type": "string", "default": "Integrates with", "description": "Header text" },
+    "domains": { "type": "array", "items": { "type": "string" }, "description": "List of domains for logo.dev lookup" },
+    "size": { "type": "number", "default": 64, "description": "Logo size in pixels" },
+    "theme": { "type": "string", "default": "dark", "description": "Logo theme: light or dark" },
+    "columns": { "type": "number", "default": 4, "description": "Number of grid columns" }
+  }
+}

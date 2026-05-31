@@ -19,7 +19,7 @@ import { callLLM, llmConfigFromEnv } from "./llm/client.js";
 import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
-import { listProjects, loadProject, updateComponent } from "./persistence/project.js";
+import { listProjects, loadProject, updateComponent, addScene, removeScene, reorderScenes } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
@@ -118,7 +118,7 @@ async function main() {
     if (method === "OPTIONS") {
       res.writeHead(204, {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
       });
       res.end();
@@ -190,6 +190,88 @@ async function main() {
           return;
         }
         jsonResponse(res, 200, updated);
+        return;
+      }
+
+      // ── API: Add scene ──
+      const addSceneMatch = url.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes$/);
+      if (addSceneMatch && method === "POST") {
+        const [, tenantId, projectId] = addSceneMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const scene = body.scene as import("./core/types.js").Scene;
+        if (!scene || !scene.id) {
+          jsonResponse(res, 400, { error: "scene with id is required" });
+          return;
+        }
+        const updated = await addScene(tenantId, projectId, scene, body.position as number | undefined);
+        if (!updated) {
+          jsonResponse(res, 404, { error: "Project not found" });
+          return;
+        }
+        jsonResponse(res, 200, updated);
+        return;
+      }
+
+      // ── API: Delete scene ──
+      const deleteSceneMatch = url.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)$/);
+      if (deleteSceneMatch && method === "DELETE") {
+        const [, tenantId, projectId, sceneId] = deleteSceneMatch.map(decodeURIComponent);
+        const updated = await removeScene(tenantId, projectId, sceneId);
+        if (!updated) {
+          jsonResponse(res, 404, { error: "Scene not found" });
+          return;
+        }
+        jsonResponse(res, 200, updated);
+        return;
+      }
+
+      // ── API: Reorder scenes ──
+      const reorderMatch = url.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/reorder$/);
+      if (reorderMatch && method === "PATCH") {
+        const [, tenantId, projectId] = reorderMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const sceneIds = body.scene_ids as string[];
+        if (!Array.isArray(sceneIds)) {
+          jsonResponse(res, 400, { error: "scene_ids array is required" });
+          return;
+        }
+        const updated = await reorderScenes(tenantId, projectId, sceneIds);
+        if (!updated) {
+          jsonResponse(res, 404, { error: "Project not found or invalid scene_ids" });
+          return;
+        }
+        jsonResponse(res, 200, updated);
+        return;
+      }
+
+      // ── API: Scene thumbnail ──
+      const thumbMatch = url.match(/^\/api\/scene-thumbnail\/([^/]+)\/([^/]+)\/([^/]+)$/);
+      if (thumbMatch && method === "GET") {
+        const [, tenantId, projectId, sceneId] = thumbMatch.map(decodeURIComponent);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) {
+          jsonResponse(res, 404, { error: "Project not found" });
+          return;
+        }
+        const scene = project.scenes.find((s) => s.id === sceneId);
+        if (!scene) {
+          jsonResponse(res, 404, { error: "Scene not found" });
+          return;
+        }
+        // Return the assembled scene HTML at a small size for thumbnail capture
+        const components = await resolveComponentSources(scene);
+        const html = await assembleScene({
+          scene,
+          components,
+          brandKit: project.brand_kit,
+          canvas: project.canvas,
+          gsapDir: config.gsapDir,
+        });
+        res.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(html);
         return;
       }
 
