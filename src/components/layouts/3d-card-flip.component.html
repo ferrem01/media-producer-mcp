@@ -1,0 +1,170 @@
+<template>
+  <div class="card-flip-wrap">
+    <div class="card-flip-container">
+      <div class="card-inner">
+        <div class="card-face card-front">
+          <h2 class="face-title front-title"></h2>
+          <p class="face-description front-description"></p>
+        </div>
+        <div class="card-face card-back">
+          <h2 class="face-title back-title"></h2>
+          <p class="face-description back-description"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .card-flip-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    perspective: 1200px;
+  }
+
+  .card-flip-container {
+    width: 420px;
+    height: 280px;
+    max-width: 70vw;
+  }
+
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+  }
+
+  .card-face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 20px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 40px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 0 40px rgba(167, 139, 250, 0.05);
+  }
+
+  .card-front {
+    background: linear-gradient(
+      135deg,
+      rgba(167, 139, 250, 0.06) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    border-color: rgba(167, 139, 250, 0.12);
+  }
+
+  .card-back {
+    transform: rotateY(180deg);
+    background: linear-gradient(
+      135deg,
+      rgba(139, 92, 246, 0.08) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    border-color: rgba(139, 92, 246, 0.15);
+  }
+
+  .face-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.15);
+  }
+
+  .face-description {
+    font-size: 17px;
+    font-weight: 400;
+    color: #94a3b8;
+    margin-top: 16px;
+    line-height: 1.45;
+  }
+
+  .face-description:empty {
+    display: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.card-flip-container');
+    var inner = el.querySelector('.card-inner');
+    var frontTitle = el.querySelector('.front-title');
+    var frontDesc = el.querySelector('.front-description');
+    var backTitle = el.querySelector('.back-title');
+    var backDesc = el.querySelector('.back-description');
+
+    if (data.front_title) frontTitle.textContent = data.front_title;
+    if (data.front_description) frontDesc.textContent = data.front_description;
+    if (data.back_title) backTitle.textContent = data.back_title;
+    if (data.back_description) backDesc.textContent = data.back_description;
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Initial state
+    gsap.set(container, { autoAlpha: 0, scale: 0.88, y: 30, filter: 'blur(4px)' });
+
+    // Card entrance
+    tl.to(container, {
+      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+      duration: speed,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Show front briefly, then flip at midpoint
+    var flipTime = ctx.duration * 0.45;
+    tl.to(inner, {
+      rotateY: 180,
+      duration: speed * 1.2,
+      ease: 'power2.inOut'
+    }, flipTime);
+
+    // Subtle shadow shift during flip
+    tl.to(container, {
+      boxShadow: '0 30px 80px rgba(0, 0, 0, 0.4)',
+      duration: speed * 0.6,
+      ease: 'power2.in'
+    }, flipTime);
+
+    tl.to(container, {
+      boxShadow: '0 24px 60px rgba(0, 0, 0, 0.35)',
+      duration: speed * 0.6,
+      ease: 'power2.out'
+    }, flipTime + speed * 0.6);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(container, {
+        autoAlpha: 0, scale: 0.95, y: -15,
+        duration: 0.5,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

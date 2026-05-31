@@ -1,0 +1,217 @@
+<template>
+  <div class="kanban-wrap">
+    <div class="kanban-board"></div>
+  </div>
+</template>
+
+<style scoped>
+  .kanban-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .kanban-board {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+    max-width: 1000px;
+    height: 420px;
+  }
+
+  .kanban-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    overflow: hidden;
+  }
+
+  .column-header {
+    padding: 16px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .column-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .column-body {
+    flex: 1;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  .kanban-card {
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mp-color-text, #ffffff);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    cursor: default;
+  }
+
+  .kanban-card.moving {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(167, 139, 250, 0.1);
+    border-color: rgba(167, 139, 250, 0.2);
+    z-index: 10;
+    position: relative;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var board = el.querySelector('.kanban-board');
+
+    var columns = data.columns || [
+      { title: 'To Do', cards: ['Design homepage', 'Write copy'] },
+      { title: 'In Progress', cards: ['API integration'] },
+      { title: 'Done', cards: ['Setup repo'] }
+    ];
+
+    var accentShades = ['#A78BFA', '#7DD3FC', '#34D399', '#FBBF24', '#F472B6'];
+
+    // Build columns
+    for (var i = 0; i < columns.length; i++) {
+      var col = document.createElement('div');
+      col.className = 'kanban-column';
+
+      var header = document.createElement('div');
+      header.className = 'column-header';
+      header.style.color = accentShades[i % accentShades.length];
+
+      var dot = document.createElement('div');
+      dot.className = 'column-dot';
+      dot.style.background = accentShades[i % accentShades.length];
+      header.appendChild(dot);
+
+      var headerText = document.createTextNode(columns[i].title);
+      header.appendChild(headerText);
+      col.appendChild(header);
+
+      var body = document.createElement('div');
+      body.className = 'column-body';
+      body.setAttribute('data-col-idx', i);
+
+      var cards = columns[i].cards || [];
+      for (var c = 0; c < cards.length; c++) {
+        var card = document.createElement('div');
+        card.className = 'kanban-card';
+        card.textContent = cards[c];
+        card.setAttribute('data-card-name', cards[c]);
+        body.appendChild(card);
+      }
+
+      col.appendChild(body);
+      board.appendChild(col);
+    }
+
+    var allCards = board.querySelectorAll('.kanban-card');
+    var allColumns = board.querySelectorAll('.kanban-column');
+
+    gsap.set(allColumns, { autoAlpha: 0, y: 25 });
+    gsap.set(allCards, { autoAlpha: 0, scale: 0.9 });
+
+    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.5 : 0.7;
+
+    // Columns entrance
+    tl.to(allColumns, {
+      autoAlpha: 1, y: 0,
+      duration: speed,
+      stagger: 0.1,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Cards entrance
+    tl.to(allCards, {
+      autoAlpha: 1, scale: 1,
+      duration: speed * 0.7,
+      stagger: 0.06,
+      ease: 'back.out(1.2)'
+    }, 0.3 + speed * 0.4);
+
+    // Animate card movement if specified
+    if (data.move) {
+      var moveName = data.move.card;
+      var fromIdx = data.move.from;
+      var toIdx = data.move.to;
+
+      var moveCard = board.querySelector('[data-card-name="' + moveName + '"]');
+      var toBody = board.querySelector('[data-col-idx="' + toIdx + '"]');
+
+      if (moveCard && toBody) {
+        var moveTime = 0.3 + speed + allCards.length * 0.06 + 0.5;
+
+        tl.call(function() {
+          moveCard.classList.add('moving');
+        }, null, moveTime);
+
+        // Lift up
+        tl.to(moveCard, {
+          y: -10, scale: 1.05,
+          duration: 0.3,
+          ease: 'power2.out'
+        }, moveTime);
+
+        // Move to new position
+        tl.call(function() {
+          var startRect = moveCard.getBoundingClientRect();
+          toBody.appendChild(moveCard);
+          var endRect = moveCard.getBoundingClientRect();
+          var dx = startRect.left - endRect.left;
+          var dy = startRect.top - endRect.top;
+          gsap.set(moveCard, { x: dx, y: dy });
+        }, null, moveTime + 0.3);
+
+        tl.to(moveCard, {
+          x: 0, y: 0, scale: 1,
+          duration: 0.6,
+          ease: 'power3.out'
+        }, moveTime + 0.35);
+
+        tl.call(function() {
+          moveCard.classList.remove('moving');
+        }, null, moveTime + 1);
+      }
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(allColumns, {
+        autoAlpha: 0, y: -15,
+        duration: 0.4,
+        stagger: 0.04,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

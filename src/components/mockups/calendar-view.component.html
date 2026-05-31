@@ -1,0 +1,220 @@
+<template>
+  <div class="calendar-wrap">
+    <div class="calendar-card">
+      <div class="calendar-header">
+        <span class="calendar-month"></span>
+      </div>
+      <div class="calendar-day-names">
+        <span class="day-name">Sun</span>
+        <span class="day-name">Mon</span>
+        <span class="day-name">Tue</span>
+        <span class="day-name">Wed</span>
+        <span class="day-name">Thu</span>
+        <span class="day-name">Fri</span>
+        <span class="day-name">Sat</span>
+      </div>
+      <div class="calendar-grid"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .calendar-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .calendar-card {
+    width: 520px;
+    max-width: 70vw;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+  }
+
+  .calendar-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .calendar-month {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.01em;
+  }
+
+  .calendar-day-names {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    padding: 12px 16px 4px;
+  }
+
+  .day-name {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    padding: 8px 16px 16px;
+    gap: 2px;
+  }
+
+  .calendar-cell {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 4px 2px;
+    border-radius: 8px;
+    position: relative;
+    min-height: 48px;
+  }
+
+  .day-number {
+    font-size: 13px;
+    font-weight: 500;
+    color: #94a3b8;
+    line-height: 1;
+  }
+
+  .calendar-cell.today {
+    background: rgba(167, 139, 250, 0.1);
+    border: 1px solid rgba(167, 139, 250, 0.2);
+  }
+
+  .calendar-cell.today .day-number {
+    color: var(--mp-color-accent, #A78BFA);
+    font-weight: 700;
+  }
+
+  .calendar-cell.empty .day-number {
+    color: #1e293b;
+  }
+
+  .event-pill {
+    margin-top: 3px;
+    font-size: 8px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 95%;
+    color: #ffffff;
+    line-height: 1.3;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.calendar-card');
+    var monthEl = el.querySelector('.calendar-month');
+    var grid = el.querySelector('.calendar-grid');
+    var events = data.events || [];
+    var month = data.month || 'June 2025';
+
+    monthEl.textContent = month;
+
+    // Build calendar grid (generic 35 cells starting on Monday-ish)
+    var startDay = 1; // offset for first day
+    var daysInMonth = 30;
+    var today = 15;
+
+    // Create event lookup
+    var eventsByDay = {};
+    for (var e = 0; e < events.length; e++) {
+      var day = events[e].day;
+      if (!eventsByDay[day]) eventsByDay[day] = [];
+      eventsByDay[day].push(events[e]);
+    }
+
+    for (var i = 0; i < 35; i++) {
+      var cell = document.createElement('div');
+      cell.className = 'calendar-cell';
+      var dayNum = i - startDay + 1;
+
+      var numEl = document.createElement('div');
+      numEl.className = 'day-number';
+
+      if (dayNum >= 1 && dayNum <= daysInMonth) {
+        numEl.textContent = dayNum;
+        if (dayNum === today) cell.classList.add('today');
+
+        // Add events for this day
+        if (eventsByDay[dayNum]) {
+          for (var ev = 0; ev < eventsByDay[dayNum].length; ev++) {
+            var pill = document.createElement('div');
+            pill.className = 'event-pill';
+            pill.textContent = eventsByDay[dayNum][ev].title;
+            var color = eventsByDay[dayNum][ev].color || '#A78BFA';
+            pill.style.background = color + '33';
+            pill.style.color = color;
+            cell.appendChild(pill);
+          }
+        }
+      } else {
+        cell.classList.add('empty');
+      }
+
+      cell.insertBefore(numEl, cell.firstChild);
+      grid.appendChild(cell);
+    }
+
+    var cells = grid.querySelectorAll('.calendar-cell:not(.empty)');
+    var pills = grid.querySelectorAll('.event-pill');
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    // Initial state
+    gsap.set(card, { autoAlpha: 0, scale: 0.92, y: 30, filter: 'blur(4px)' });
+    gsap.set(pills, { autoAlpha: 0, scale: 0.7 });
+
+    // Card entrance
+    tl.to(card, {
+      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+      duration: speed,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Event pills appear with stagger
+    tl.to(pills, {
+      autoAlpha: 1, scale: 1,
+      duration: speed * 0.6,
+      stagger: 0.08,
+      ease: 'back.out(1.4)'
+    }, 0.3 + speed * 0.6);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(card, {
+        autoAlpha: 0, scale: 0.95, y: -15,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

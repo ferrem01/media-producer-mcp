@@ -1,0 +1,42 @@
+{
+  "type": "form-wizard",
+  "label": "Form Wizard",
+  "category": "mockups",
+  "description": "Multi-step form with typing animation, step indicator, and glass card styling.",
+  "data": {
+    "steps": {
+      "type": "array",
+      "label": "Steps",
+      "required": true,
+      "items": {
+        "label": {
+          "type": "string",
+          "label": "Step Label",
+          "required": true
+        },
+        "fields": {
+          "type": "array",
+          "label": "Fields",
+          "items": {
+            "label": {
+              "type": "string",
+              "label": "Field Label",
+              "required": true
+            },
+            "value": {
+              "type": "string",
+              "label": "Field Value",
+              "optional": true
+            },
+            "type": {
+              "type": "string",
+              "label": "Field Type",
+              "optional": true,
+              "placeholder": "text"
+            }
+          }
+        }
+      }
+    }
+  }
+}

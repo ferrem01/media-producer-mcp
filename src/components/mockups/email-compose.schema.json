@@ -1,0 +1,31 @@
+{
+  "type": "email-compose",
+  "label": "Email Compose",
+  "category": "mockups",
+  "description": "Email being composed in a dark mail client mockup with typing animation and send button glow.",
+  "data": {
+    "to": {
+      "type": "string",
+      "label": "To",
+      "optional": true,
+      "placeholder": "team@company.com"
+    },
+    "from": {
+      "type": "string",
+      "label": "From",
+      "optional": true,
+      "placeholder": "you@company.com"
+    },
+    "subject": {
+      "type": "string",
+      "label": "Subject",
+      "optional": true,
+      "placeholder": "Quick Update"
+    },
+    "body": {
+      "type": "string",
+      "label": "Body",
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,248 @@
+<template>
+  <div class="form-wizard-wrap">
+    <div class="form-card">
+      <div class="step-indicator"></div>
+      <div class="form-body">
+        <div class="step-title"></div>
+        <div class="form-fields"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .form-wizard-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .form-card {
+    width: 480px;
+    max-width: 70vw;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+  }
+
+  .step-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px 32px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .step-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    transition: background 0.3s;
+  }
+
+  .step-dot.active {
+    background: var(--mp-color-accent, #A78BFA);
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.4);
+  }
+
+  .step-dot.completed {
+    background: rgba(167, 139, 250, 0.4);
+  }
+
+  .step-connector {
+    width: 32px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .form-body {
+    padding: 28px 32px 36px;
+  }
+
+  .step-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--mp-color-text, #ffffff);
+    margin-bottom: 20px;
+    letter-spacing: -0.01em;
+  }
+
+  .form-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .field-input {
+    height: 42px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0 14px;
+    font-size: 14px;
+    color: var(--mp-color-text, #ffffff);
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .field-input.typing {
+    border-color: rgba(167, 139, 250, 0.3);
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.08);
+  }
+
+  .field-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 16px;
+    background: var(--mp-color-accent, #A78BFA);
+    margin-left: 1px;
+    animation: blink 0.8s step-end infinite;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.form-card');
+    var indicator = el.querySelector('.step-indicator');
+    var titleEl = el.querySelector('.step-title');
+    var fieldsContainer = el.querySelector('.form-fields');
+    var steps = data.steps || [];
+
+    if (steps.length === 0) {
+      steps = [{ label: 'Contact Info', fields: [{ label: 'Email', value: 'marc@example.com' }, { label: 'Name', value: 'Marc F.' }] }];
+    }
+
+    // Build step dots
+    for (var s = 0; s < steps.length; s++) {
+      if (s > 0) {
+        var conn = document.createElement('div');
+        conn.className = 'step-connector';
+        indicator.appendChild(conn);
+      }
+      var dot = document.createElement('div');
+      dot.className = 'step-dot';
+      if (s === 0) dot.classList.add('active');
+      indicator.appendChild(dot);
+    }
+
+    // Build first step fields
+    function buildStep(stepIdx) {
+      var step = steps[stepIdx];
+      titleEl.textContent = step.label;
+      fieldsContainer.innerHTML = '';
+
+      var fields = step.fields || [];
+      for (var f = 0; f < fields.length; f++) {
+        var fieldDiv = document.createElement('div');
+        fieldDiv.className = 'form-field';
+
+        var label = document.createElement('div');
+        label.className = 'field-label';
+        label.textContent = fields[f].label;
+        fieldDiv.appendChild(label);
+
+        var input = document.createElement('div');
+        input.className = 'field-input';
+        input.setAttribute('data-value', fields[f].value || '');
+        fieldDiv.appendChild(input);
+
+        fieldsContainer.appendChild(fieldDiv);
+      }
+    }
+
+    buildStep(0);
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    // Initial state
+    gsap.set(card, { autoAlpha: 0, scale: 0.92, y: 30, filter: 'blur(4px)' });
+
+    // Card entrance
+    tl.to(card, {
+      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+      duration: speed,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Type into fields
+    var inputEls = fieldsContainer.querySelectorAll('.field-input');
+    var typeStart = 0.3 + speed;
+
+    for (var fi = 0; fi < inputEls.length; fi++) {
+      (function(inputEl, idx) {
+        var val = inputEl.getAttribute('data-value') || '';
+        var cursor = document.createElement('span');
+        cursor.className = 'field-cursor';
+
+        tl.call(function() {
+          inputEl.classList.add('typing');
+          inputEl.textContent = '';
+          inputEl.appendChild(cursor);
+        }, null, typeStart + idx * 1.2);
+
+        // Type each character
+        for (var c = 0; c < val.length; c++) {
+          (function(charIdx) {
+            tl.call(function() {
+              var text = val.substring(0, charIdx + 1);
+              inputEl.textContent = text;
+              inputEl.appendChild(cursor);
+            }, null, typeStart + idx * 1.2 + 0.2 + charIdx * 0.05);
+          })(c);
+        }
+
+        // Remove cursor and typing state
+        tl.call(function() {
+          inputEl.classList.remove('typing');
+          if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+        }, null, typeStart + idx * 1.2 + 0.2 + val.length * 0.05 + 0.3);
+
+      })(inputEls[fi], fi);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(card, {
+        autoAlpha: 0, scale: 0.95, y: -15,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

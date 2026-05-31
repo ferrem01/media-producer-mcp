@@ -1,0 +1,37 @@
+{
+  "type": "calendar-view",
+  "label": "Calendar View",
+  "category": "mockups",
+  "description": "Monthly calendar grid with events appearing as colored pills on their days.",
+  "data": {
+    "month": {
+      "type": "string",
+      "label": "Month",
+      "optional": true,
+      "placeholder": "June 2025"
+    },
+    "events": {
+      "type": "array",
+      "label": "Events",
+      "required": true,
+      "items": {
+        "day": {
+          "type": "number",
+          "label": "Day",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "label": "Event Title",
+          "required": true
+        },
+        "color": {
+          "type": "string",
+          "label": "Color",
+          "optional": true,
+          "placeholder": "#A78BFA"
+        }
+      }
+    }
+  }
+}

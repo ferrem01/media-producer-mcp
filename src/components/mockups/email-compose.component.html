@@ -1,0 +1,267 @@
+<template>
+  <div class="email-compose-wrap">
+    <div class="email-client">
+      <div class="email-toolbar">
+        <div class="toolbar-dots">
+          <span class="tb-dot tb-close"></span>
+          <span class="tb-dot tb-min"></span>
+          <span class="tb-dot tb-max"></span>
+        </div>
+        <span class="toolbar-title">New Message</span>
+        <div class="toolbar-spacer"></div>
+      </div>
+      <div class="email-fields">
+        <div class="email-row">
+          <span class="email-label">From</span>
+          <span class="email-value from-value"></span>
+        </div>
+        <div class="email-row">
+          <span class="email-label">To</span>
+          <span class="email-value to-value"></span>
+        </div>
+        <div class="email-row">
+          <span class="email-label">Subject</span>
+          <span class="email-value subject-value"></span>
+        </div>
+      </div>
+      <div class="email-body-area">
+        <div class="body-text"></div>
+      </div>
+      <div class="email-footer">
+        <button class="send-button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+          Send
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .email-compose-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .email-client {
+    width: 520px;
+    max-width: 72vw;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #1a1a22;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.04);
+  }
+
+  .email-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, #28282f 0%, #22222a 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    gap: 12px;
+  }
+
+  .toolbar-dots {
+    display: flex;
+    gap: 7px;
+  }
+
+  .tb-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+  }
+
+  .tb-close { background: #ff5f57; }
+  .tb-min { background: #febc2e; }
+  .tb-max { background: #28c840; }
+
+  .toolbar-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: #94a3b8;
+  }
+
+  .toolbar-spacer { flex: 1; }
+
+  .email-fields {
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .email-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    min-height: 36px;
+  }
+
+  .email-row:last-child {
+    border-bottom: none;
+  }
+
+  .email-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #475569;
+    width: 60px;
+    flex-shrink: 0;
+  }
+
+  .email-value {
+    font-size: 14px;
+    color: var(--mp-color-text, #ffffff);
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .email-body-area {
+    padding: 20px;
+    min-height: 140px;
+  }
+
+  .body-text {
+    font-size: 14px;
+    color: #cbd5e1;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  .email-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 15px;
+    background: var(--mp-color-accent, #A78BFA);
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    animation: blink 0.8s step-end infinite;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  .email-footer {
+    display: flex;
+    padding: 12px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  .send-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(167, 139, 250, 0.15);
+    color: var(--mp-color-accent, #A78BFA);
+    border: 1px solid rgba(167, 139, 250, 0.2);
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var client = el.querySelector('.email-client');
+    var fromEl = el.querySelector('.from-value');
+    var toEl = el.querySelector('.to-value');
+    var subjectEl = el.querySelector('.subject-value');
+    var bodyEl = el.querySelector('.body-text');
+    var sendBtn = el.querySelector('.send-button');
+
+    var fromText = data.from || 'you@company.com';
+    var toText = data.to || 'team@company.com';
+    var subjectText = data.subject || 'Quick Update';
+    var bodyText = data.body || 'Hey team,\n\nJust wanted to share a quick update on the project.';
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    // Initial state
+    gsap.set(client, { autoAlpha: 0, scale: 0.92, y: 30, filter: 'blur(4px)' });
+
+    // Client entrance
+    tl.to(client, {
+      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+      duration: speed,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Helper: type text into element
+    function typeField(element, text, startTime, charDelay) {
+      var cursor = document.createElement('span');
+      cursor.className = 'email-cursor';
+
+      tl.call(function() {
+        element.textContent = '';
+        element.appendChild(cursor);
+      }, null, startTime);
+
+      for (var c = 0; c < text.length; c++) {
+        (function(charIdx) {
+          tl.call(function() {
+            element.textContent = text.substring(0, charIdx + 1);
+            element.appendChild(cursor);
+          }, null, startTime + 0.1 + charIdx * charDelay);
+        })(c);
+      }
+
+      var endTime = startTime + 0.1 + text.length * charDelay + 0.15;
+      tl.call(function() {
+        if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+      }, null, endTime);
+
+      return endTime;
+    }
+
+    // Type fields sequentially
+    var t = 0.3 + speed + 0.2;
+    t = typeField(fromEl, fromText, t, 0.03);
+    t = typeField(toEl, toText, t + 0.15, 0.03);
+    t = typeField(subjectEl, subjectText, t + 0.15, 0.04);
+    t = typeField(bodyEl, bodyText, t + 0.2, 0.03);
+
+    // Send button glow at the end
+    tl.to(sendBtn, {
+      boxShadow: '0 0 24px rgba(167, 139, 250, 0.4), 0 0 48px rgba(167, 139, 250, 0.15)',
+      background: 'rgba(167, 139, 250, 0.25)',
+      duration: 0.5,
+      ease: 'power2.out'
+    }, t + 0.3);
+
+    tl.to(sendBtn, {
+      boxShadow: '0 0 12px rgba(167, 139, 250, 0.2)',
+      duration: 0.8,
+      yoyo: true,
+      repeat: 1,
+      ease: 'sine.inOut'
+    }, t + 0.8);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(client, {
+        autoAlpha: 0, scale: 0.95, y: -15,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

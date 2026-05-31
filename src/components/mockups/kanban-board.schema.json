@@ -1,0 +1,46 @@
+{
+  "type": "kanban-board",
+  "label": "Kanban Board",
+  "category": "mockups",
+  "description": "Trello-style board with cards moving between columns. Glass card tiles with animated card movement.",
+  "data": {
+    "columns": {
+      "type": "array",
+      "label": "Columns",
+      "required": true,
+      "items": {
+        "title": {
+          "type": "string",
+          "label": "Column Title",
+          "required": true
+        },
+        "cards": {
+          "type": "array",
+          "label": "Cards",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "move": {
+      "type": "object",
+      "label": "Card Movement",
+      "optional": true,
+      "properties": {
+        "card": {
+          "type": "string",
+          "label": "Card Name"
+        },
+        "from": {
+          "type": "number",
+          "label": "From Column Index"
+        },
+        "to": {
+          "type": "number",
+          "label": "To Column Index"
+        }
+      }
+    }
+  }
+}

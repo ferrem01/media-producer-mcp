@@ -1,0 +1,28 @@
+{
+  "type": "3d-card-flip",
+  "label": "3D Card Flip",
+  "category": "layouts",
+  "description": "Card that flips to reveal content on the back using CSS 3D transforms.",
+  "data": {
+    "front_title": {
+      "type": "string",
+      "label": "Front Title",
+      "required": true
+    },
+    "front_description": {
+      "type": "string",
+      "label": "Front Description",
+      "optional": true
+    },
+    "back_title": {
+      "type": "string",
+      "label": "Back Title",
+      "required": true
+    },
+    "back_description": {
+      "type": "string",
+      "label": "Back Description",
+      "optional": true
+    }
+  }
+}
