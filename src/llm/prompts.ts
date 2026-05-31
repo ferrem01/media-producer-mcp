@@ -5,7 +5,7 @@
  * The component prompt was extracted from src/core/component-generator.ts (DRY).
  */
 
-import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
+import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES, CRITIQUER_DESIGN_RULES } from "./design-rules.js";
 import { GSAP_ANIMATION_SKILLS } from "./gsap-skills.js";
 
 /**
@@ -240,7 +240,9 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 1. Focus on: readability, visual hierarchy, animation quality, brand consistency, and overall polish.
 2. Be specific in issues and suggestions (mention exact elements, sizes, colors).
 3. Only include revised_html if score < 7 and you can provide a concrete fix.
-4. Output ONLY the JSON object. No explanation.`;
+4. Output ONLY the JSON object. No explanation.
+
+${CRITIQUER_DESIGN_RULES}`;
 }
 
 /**

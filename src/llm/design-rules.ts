@@ -102,4 +102,71 @@ export const SCENE_PLANNER_DESIGN_RULES = `
 - Content scenes: 4-6s
 - Complex scenes (terminal, code, demo): 5-8s
 - CTA/outro: 3-4s
+
+### Video vs Presentation Styles
+These are DIFFERENT visual languages. Do NOT mix them.
+
+**Video scenes should feel CINEMATIC, not like PowerPoint slides:**
+- One visual concept per scene. Not a slide full of bullets.
+- Rich, layered backgrounds (mesh-gradient + film-polish). Never flat solid colors.
+- Use kinetic-text, typewriter, stat-card for text -- not static text blocks.
+- Text should animate in/out, not just appear.
+- Prefer visual components (browser-frame, device-mockup, bar-chart) over text-list.
+- Less text, more visual impact. If a scene has more than 15 words visible at once, it's a PowerPoint slide, not a video scene.
+- Think Apple keynote, not corporate deck.
+
+**Presentation/deck scenes should be INFORMATION-DENSE and readable:**
+- Clear headers, structured content, readable text.
+- Static layouts with clean typography.
+- Text-list and grid-layout are appropriate here.
+- More text is acceptable -- each slide is meant to be read.
+- Minimal animation (elements appear, but no dramatic entrances).
+`;
+
+/**
+ * Rules for the critiquer (how to evaluate rendered output).
+ */
+export const CRITIQUER_DESIGN_RULES = `
+## Visual Quality Checklist
+
+Score each scene against these criteria:
+
+### Layout & Spacing
+- Content has at least 60px padding from canvas edges
+- Elements are not overlapping unintentionally
+- Text is not cut off or overflowing
+- Visual hierarchy is clear (what should I look at first?)
+- Components are balanced, not crammed to one side
+
+### Typography
+- All text is readable at 1920x1080
+- Title text is 48-88px
+- Body text is at least 16px
+- Text has sufficient contrast against its background (white on dark, dark on light)
+- No white text on light backgrounds or dark text on dark backgrounds
+- Text doesn't extend beyond 80% of canvas width
+
+### Color & Contrast
+- Background has depth (gradient or mesh, not flat solid color)
+- Text color contrasts with background (WCAG AA minimum)
+- Brand colors are used consistently
+- No jarring color combinations
+
+### Animation Quality
+- Elements animate in smoothly (not instant pop)
+- Stagger timing feels natural (not too fast, not too slow)
+- Exit animations happen before the scene cuts
+- No elements stuck in invisible state when they should be visible
+- Motion style matches the intended mood (cinematic = smooth, punchy = snappy)
+
+### Content Appropriateness
+- Content matches the prompt intent
+- Not too much text for a video scene (max 15 words visible at once)
+- Data visualizations have readable labels
+- Lists have reasonable item count (max 6)
+
+### Production Polish
+- Film-polish or similar effect for cinematic scenes
+- Consistent visual style across all scenes
+- Professional feel (not a wireframe or placeholder)
 `;
