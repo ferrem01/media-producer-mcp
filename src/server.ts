@@ -28,6 +28,9 @@ import {
 } from "./persistence/brand-kit.js";
 import { renderProject as renderProjectCore } from "./core/render.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
+import { deriveTypeName } from "./llm/component-gen.js";
+import { runGeneratePipeline, type PipelineTarget } from "./llm/pipeline.js";
+import { llmConfigFromEnv } from "./llm/client.js";
 import { config } from "./config.js";
 import { projectDir, projectOutputDir } from "./persistence/paths.js";
 import path from "node:path";
@@ -625,13 +628,16 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "generate",
-    "Generate a custom component from a natural language description. The LLM writes a .component.html file. Optionally save to tenant library for reuse.",
+    "Generate content from a natural language description. Can generate a single component, a scene, a full video, an image, or a deck/presentation. Uses LLM pipeline when no source is provided.",
     {
       tenant_id: z.string(),
-      prompt: z.string().describe("Description of the component to generate. If 'source' is provided, saves it directly instead of returning a prompt."),
-      source: z.string().optional().describe("If provided, saves this .component.html source to the tenant library (skip the prompt flow)"),
-      type: z.string().optional().describe("Component type name when saving (kebab-case, e.g. 'slack-simulator')"),
+      prompt: z.string().describe("Description of what to generate"),
+      target: z.enum(["component", "scene", "video", "image", "deck", "presentation"]).optional().default("video").describe("What to generate (default: video)"),
+      source: z.string().optional().describe("If provided, saves this .component.html source directly (skip LLM)"),
+      type: z.string().optional().describe("Component type name when saving (kebab-case)"),
       category: z.string().optional().describe("Category to save under (default: custom)"),
+      critique: z.boolean().optional().default(false).describe("Run the critiquer loop on generated output"),
+      scene_count: z.number().optional().describe("Target number of scenes for video/deck"),
       duration: z.number().optional().describe("Animation duration in seconds for preview (default: 3)"),
     },
     async (params) => {
@@ -698,35 +704,31 @@ export function createMcpServer(): McpServer {
           });
         }
 
-        // No source provided -- return the component format spec so the
-        // calling agent (which IS the LLM) can generate the source itself,
-        // then call generate again with the source to save it.
-        return ok({
-          status: "prompt_ready",
-          message: "Generate a .component.html file based on the description below. Then call 'generate' again with the source to save it.",
-          component_format: {
-            sections: ["<template>", "<style scoped>", "<script>"],
-            function_signature: "function createTimeline(el, data, ctx)",
-            ctx_fields: { duration: "number", fps: "number", canvas: "{width, height}", motion: "minimal|punchy|cinematic" },
-            css_variables: [
-              "--mp-color-primary", "--mp-color-secondary", "--mp-color-accent",
-              "--mp-color-background", "--mp-color-surface",
-              "--mp-color-text", "--mp-color-text-muted",
-              "--mp-font-family", "--mp-border-radius",
-            ],
-            rules: [
-              "Use gsap.timeline() NOT gsap.timeline({ paused: true })",
-              "Use var not const/let",
-              "Animate entrance, hold, and exit within ctx.duration",
-              "Design for 1920x1080 canvas",
-              "Use {{key}} for simple text binding",
-              "Build dynamic DOM in createTimeline",
-              "Logo URLs: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark",
-            ],
-          },
+        // No source provided -- run the LLM pipeline
+        let llmConfig;
+        try {
+          llmConfig = llmConfigFromEnv();
+        } catch (e: any) {
+          return err(`LLM not configured: ${e.message}`);
+        }
+
+        const brandKit = await loadBrandKit(params.tenant_id);
+        const result = await runGeneratePipeline({
           prompt: params.prompt,
-          duration: params.duration || 3,
+          target: params.target as PipelineTarget,
+          tenant_id: params.tenant_id,
+          llmConfig,
+          brandKit: brandKit || {
+            colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
+            fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
+            style: { border_radius: "12px", motion: "cinematic" as const },
+          },
+          canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+          critique: params.critique,
+          sceneCount: params.scene_count,
         });
+
+        return ok(result);
       } catch (e: any) {
         return err(`Generate failed: ${e.message}`);
       }

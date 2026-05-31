@@ -11,6 +11,7 @@ import path from "node:path";
 import { config } from "../config.js";
 import { assembleScene } from "./scene-assembler.js";
 import { captureSingleFrame } from "./capture.js";
+import { componentSystemPrompt } from "../llm/prompts.js";
 import type { BrandKit, Canvas, Scene } from "./types.js";
 
 export interface GenerateComponentInput {
@@ -39,67 +40,8 @@ export interface GenerateComponentResult {
   preview_path?: string;
 }
 
-const SYSTEM_PROMPT = `You are a component generator for a media production system. You create single-file HTML components that render animated content for videos, images, and presentations.
-
-## Output Format
-
-You MUST output a single .component.html file with exactly three sections:
-
-\`\`\`html
-<template>
-  <!-- HTML structure here -->
-</template>
-
-<style scoped>
-  /* CSS styles here */
-</style>
-
-<script>
-  function createTimeline(el, data, ctx) {
-    var tl = gsap.timeline();
-    // GSAP animation here
-    return tl;
-  }
-</script>
-\`\`\`
-
-## Rules
-
-1. Output ONLY the component HTML. No explanation, no markdown fences, no commentary.
-
-2. The \`createTimeline(el, data, ctx)\` function:
-   - el: the component's root DOM element
-   - data: JSON data object passed to this component
-   - ctx: { duration, fps, canvas: {width, height}, motion: "minimal"|"punchy"|"cinematic" }
-   - Must return a GSAP timeline (NOT paused -- the master timeline controls playback)
-   - Must animate entrance, hold, and exit within ctx.duration
-   - Use gsap.timeline() NOT gsap.timeline({ paused: true })
-
-3. Use CSS custom properties for theming:
-   - --mp-color-primary, --mp-color-secondary, --mp-color-accent
-   - --mp-color-background, --mp-color-surface
-   - --mp-color-text, --mp-color-text-muted
-   - --mp-font-family (default: 'Inter', sans-serif)
-   - --mp-border-radius
-
-4. Use {{key}} for simple text binding in templates.
-   For dynamic content (lists, complex DOM), build elements in createTimeline.
-
-5. The component will be rendered at 1920x1080 by default. Design for this canvas.
-
-6. Keep animations smooth and professional. Use GSAP easing (power2, power3, back, elastic).
-
-7. Respect ctx.motion for speed:
-   - "minimal": subtle, fast (0.3-0.4s durations)
-   - "punchy": snappy, impactful (0.4-0.6s)
-   - "cinematic": smooth, dramatic (0.6-1.0s)
-
-8. GSAP is available globally. You can use: gsap.to(), gsap.from(), gsap.fromTo(), gsap.set(), gsap.timeline(), and all standard GSAP features.
-
-9. For images, use <img> tags with src from data. The renderer is a real browser so URLs work.
-   For logo.dev logos: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark
-
-10. All variables must use 'var' not 'const' or 'let' (broad compatibility).`;
+// Single source of truth: prompt lives in src/llm/prompts.ts
+const SYSTEM_PROMPT = componentSystemPrompt();
 
 /**
  * Generate a component from a natural language prompt.
