@@ -23,6 +23,7 @@ export interface FreeformPlannerOpts {
   brandKit: BrandKit;
   canvas: Canvas;
   sceneCount?: number;
+  tenantId?: string;
 }
 
 export interface FreeformResult {
@@ -109,7 +110,7 @@ Start with <template> and end with </script>.`;
 
   // ── Build the project ──
   var projectId = `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
-  var tenantId = "freeform"; // will be overridden by pipeline
+  var tenantId = opts.tenantId || "freeform";
 
   // Save scene HTML files
   var compDir = path.join(projectDir(tenantId, projectId), "components");

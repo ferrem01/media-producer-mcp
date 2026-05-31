@@ -15,7 +15,7 @@ import { planProject } from "./project-planner.js";
 import { critiqueScene, type CritiqueResult } from "./critiquer.js";
 import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
-import { planFreeform, saveFreeformComponents } from "./freeform-planner.js";
+import { planFreeform } from "./freeform-planner.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { createProject, saveProject } from "../persistence/project.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
@@ -290,20 +290,10 @@ async function runFreeformPipeline(
     brandKit,
     canvas,
     sceneCount: expanded.sceneCount || opts.sceneCount,
+    tenantId: opts.tenant_id,
   });
 
-  // Fill in tenant_id
-  freeformResult.project.tenant_id = opts.tenant_id;
-
-  // Save freeform component HTML files to project directory
-  await saveFreeformComponents(
-    opts.tenant_id,
-    freeformResult.project.project_id,
-    freeformResult.project.scenes,
-    freeformResult.sceneHtmlSources,
-  );
-
-  // Save the project
+  // Save the project (freeform components already saved by planFreeform)
   await saveProject(freeformResult.project);
 
   return {
