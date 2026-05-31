@@ -2,7 +2,7 @@
  * LLM Pipeline Integration Tests
  *
  * These tests call the real Anthropic API. They require ANTHROPIC_API_KEY
- * in the environment. Skip with: npx vitest run --exclude '**/llm-integration*'
+ * in the environment. Skip with: npx vitest run --exclude llm-integration
  *
  * Tests the full pipeline: expander → planner → component gen → save
  */
