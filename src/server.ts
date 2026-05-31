@@ -36,7 +36,7 @@ import { config } from "./config.js";
 import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
 import path from "node:path";
 import fs from "node:fs/promises";
-import type { Scene, SceneComponent, BrandKit } from "./core/types.js";
+import type { Scene, SceneComponent, BrandKit, Overlay } from "./core/types.js";
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
@@ -70,6 +70,31 @@ const componentSchema = z.object({
   z_index: z.number().optional(),
   enter: animationSchema,
   exit: animationSchema,
+});
+
+const overlaySegmentSchema = z.object({
+  start: z.number(),
+  end: z.number(),
+  mode: z.enum(["full", "pip", "audio-only"]),
+  position: z.string().optional(),
+  shape: z.string().optional(),
+  size: z.object({ width: z.number(), height: z.number() }).optional(),
+  lower_third: z.object({ name: z.string(), title: z.string().optional() }).optional(),
+});
+
+const overlaySchema = z.object({
+  id: z.string(),
+  type: z.enum(["speaker-video", "watermark", "logo"]),
+  source: z.string(),
+  position: z.string().optional(),
+  size: z.object({ width: z.number(), height: z.number() }).optional(),
+  shape: z.enum(["circle", "rounded-rect", "rect"]).optional(),
+  border: z.object({ color: z.string(), width: z.number() }).optional(),
+  opacity: z.number().optional(),
+  margin: z.number().optional(),
+  start_time: z.number().optional(),
+  end_time: z.number().nullable().optional(),
+  segments: z.array(overlaySegmentSchema).optional(),
 });
 
 function ok(data: unknown) {
@@ -210,8 +235,21 @@ export function createMcpServer(): McpServer {
 
       // Component fields (when adding a component to a scene)
       component: componentSchema.optional(),
+
+      // Overlay fields (when adding an overlay to the project)
+      overlay: overlaySchema.optional(),
     },
     async (params) => {
+      if (params.overlay) {
+        // Adding an overlay to the project
+        const project = await loadProject(params.tenant_id, params.project_id);
+        if (!project) return err("Project not found");
+        if (!project.overlays) project.overlays = [];
+        project.overlays.push(params.overlay as Overlay);
+        await saveProject(project);
+        return ok(project);
+      }
+
       if (params.scene_id && params.component) {
         // Adding a component to a scene
         const project = await addComponent(
@@ -236,7 +274,7 @@ export function createMcpServer(): McpServer {
         return ok(project);
       }
 
-      return err("Provide either 'scene' (to add a scene) or 'scene_id' + 'component' (to add a component)");
+      return err("Provide either 'scene' (to add a scene), 'scene_id' + 'component' (to add a component), or 'overlay' (to add an overlay)");
     },
   );
 
@@ -246,12 +284,13 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "update",
-    "Update a project, scene, or component. Infers target from which IDs are provided: project_id only = update project, + scene_id = update scene, + component_id = update component.",
+    "Update a project, scene, component, or overlay. Infers target from which IDs are provided: project_id only = update project, + scene_id = update scene, + component_id = update component, + overlay_id = update overlay.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
       scene_id: z.string().optional(),
       component_id: z.string().optional(),
+      overlay_id: z.string().optional().describe("If provided, updates this overlay"),
 
       // Project-level updates
       name: z.string().optional(),
@@ -276,8 +315,40 @@ export function createMcpServer(): McpServer {
       z_index: z.number().optional(),
       enter: animationSchema,
       exit: animationSchema,
+
+      // Overlay-level updates
+      overlay_source: z.string().optional(),
+      overlay_position: z.string().optional(),
+      overlay_size: z.object({ width: z.number(), height: z.number() }).optional(),
+      overlay_shape: z.enum(["circle", "rounded-rect", "rect"]).optional(),
+      overlay_border: z.object({ color: z.string(), width: z.number() }).optional(),
+      overlay_opacity: z.number().optional(),
+      overlay_segments: z.array(overlaySegmentSchema).optional(),
+      overlay_start_time: z.number().optional(),
+      overlay_end_time: z.number().nullable().optional(),
     },
     async (params) => {
+      // Overlay update
+      if (params.overlay_id) {
+        const project = await loadProject(params.tenant_id, params.project_id);
+        if (!project) return err("Project not found");
+        const overlay = project.overlays?.find((o) => o.id === params.overlay_id);
+        if (!overlay) return err("Overlay not found");
+
+        if (params.overlay_source !== undefined) overlay.source = params.overlay_source;
+        if (params.overlay_position !== undefined) overlay.position = params.overlay_position;
+        if (params.overlay_size !== undefined) overlay.size = params.overlay_size;
+        if (params.overlay_shape !== undefined) overlay.shape = params.overlay_shape;
+        if (params.overlay_border !== undefined) overlay.border = params.overlay_border;
+        if (params.overlay_opacity !== undefined) overlay.opacity = params.overlay_opacity;
+        if (params.overlay_segments !== undefined) overlay.segments = params.overlay_segments as Overlay["segments"];
+        if (params.overlay_start_time !== undefined) overlay.start_time = params.overlay_start_time;
+        if (params.overlay_end_time !== undefined) overlay.end_time = params.overlay_end_time;
+
+        await saveProject(project);
+        return ok(project);
+      }
+
       // Component update
       if (params.scene_id && params.component_id) {
         const updates: Record<string, unknown> = {};
@@ -329,14 +400,27 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "remove",
-    "Remove a project, scene, or component. Infers target from which IDs are provided.",
+    "Remove a project, scene, component, or overlay. Infers target from which IDs are provided.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
       scene_id: z.string().optional(),
       component_id: z.string().optional(),
+      overlay_id: z.string().optional().describe("If provided, removes this overlay"),
     },
     async (params) => {
+      // Remove overlay
+      if (params.overlay_id) {
+        const project = await loadProject(params.tenant_id, params.project_id);
+        if (!project) return err("Project not found");
+        if (!project.overlays) return err("No overlays on project");
+        const idx = project.overlays.findIndex((o) => o.id === params.overlay_id);
+        if (idx === -1) return err("Overlay not found");
+        project.overlays.splice(idx, 1);
+        await saveProject(project);
+        return ok({ removed: "overlay", overlay_id: params.overlay_id });
+      }
+
       // Remove component
       if (params.scene_id && params.component_id) {
         const project = await removeComponent(

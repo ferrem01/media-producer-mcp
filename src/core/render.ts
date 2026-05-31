@@ -22,6 +22,8 @@ import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
+import { compositeOverlays, type OverlaySegment } from "./overlay-compositor.js";
+import { projectAssetsDir } from "../persistence/paths.js";
 
 export interface RenderOptions {
   /** The project to render */
@@ -366,6 +368,48 @@ async function renderVideo(
     await fs.rename(audioOutput, outputPath);
   }
 
+  // ── Speaker overlays ──
+  if (project.overlays && project.overlays.length > 0) {
+    for (const overlay of project.overlays) {
+      if (overlay.type === "speaker-video" && overlay.source) {
+        const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
+
+        // Build segments from overlay config
+        const segments: OverlaySegment[] = overlay.segments
+          ? overlay.segments.map((s) => ({
+              start: s.start,
+              end: s.end,
+              mode: s.mode,
+              position: (s.position as OverlaySegment["position"]) || (overlay.position as OverlaySegment["position"]) || "bottom-right",
+              shape: (s.shape as OverlaySegment["shape"]) || overlay.shape || "circle",
+              size: s.size || overlay.size,
+            }))
+          : [{
+              start: overlay.start_time || 0,
+              end: overlay.end_time ?? Infinity,
+              mode: "pip" as const,
+              position: (overlay.position as OverlaySegment["position"]) || "bottom-right",
+              shape: overlay.shape || "circle",
+              size: overlay.size,
+            }];
+
+        const overlayOutput = outputPath.replace(/\.mp4$/, "-overlay.mp4");
+
+        console.log(`\n  Compositing speaker overlay: ${segments.length} segment(s)`);
+        await compositeOverlays({
+          videoPath: outputPath,
+          speakerPath,
+          segments,
+          outputPath: overlayOutput,
+          width: project.canvas.width,
+          height: project.canvas.height,
+        });
+
+        await fs.rename(overlayOutput, outputPath);
+      }
+    }
+  }
+
   const durationMs = Date.now() - startTime;
   console.log(`\nRender complete: ${outputPath}`);
   console.log(`  Total frames: ${totalFrames}`);
@@ -658,6 +702,15 @@ async function renderEmailHeader(
     durationMs: Date.now() - startTime,
     frameCount: globalFrameIndex,
   };
+}
+
+/**
+ * Resolve an asset path. If it's already absolute, use it directly.
+ * Otherwise resolve relative to the project's assets directory.
+ */
+function resolveAssetPath(source: string, tenantId: string, projectId: string): string {
+  if (path.isAbsolute(source)) return source;
+  return path.join(projectAssetsDir(tenantId, projectId), source);
 }
 
 /**

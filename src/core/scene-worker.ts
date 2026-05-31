@@ -176,8 +176,25 @@ async function main() {
 
     for (var frame = 0; frame < totalFrames; frame++) {
       var time = frame / args.fps;
-      await page.evaluate((t: number) => { (window as any).__MP_TIMELINE.time(t); }, time);
-      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+      await page.evaluate((t: number) => {
+        (window as any).__MP_TIMELINE.time(t);
+
+        // Also seek all video elements to the current time
+        var videos = document.querySelectorAll('video');
+        for (var i = 0; i < videos.length; i++) {
+          var video = videos[i];
+          var startAt = parseFloat(video.getAttribute('data-start-at') || '0');
+          video.currentTime = Math.max(0, t - startAt);
+        }
+      }, time);
+
+      // Wait for both GSAP and video frames to settle
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          // Give video elements a moment to seek
+          setTimeout(resolve, 50);
+        });
+      }));
 
       var frameName = `frame-${String(frame).padStart(6, "0")}.jpg`;
       await page.screenshot({ path: path.join(framesDir, frameName), type: "jpeg", quality: 90 });

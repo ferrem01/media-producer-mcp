@@ -113,7 +113,7 @@ export interface Overlay {
   id: string;
   type: "speaker-video" | "watermark" | "logo";
   source: string;
-  position: string;
+  position?: string;
   size?: { width: number; height: number };
   shape?: "circle" | "rounded-rect" | "rect";
   border?: { color: string; width: number };
@@ -121,6 +121,15 @@ export interface Overlay {
   margin?: number;
   start_time?: number;
   end_time?: number | null;
+  segments?: Array<{
+    start: number;
+    end: number;
+    mode: "full" | "pip" | "audio-only";
+    position?: string;
+    shape?: string;
+    size?: { width: number; height: number };
+    lower_third?: { name: string; title?: string };
+  }>;
 }
 
 // ── Audio ──
