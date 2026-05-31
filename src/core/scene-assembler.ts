@@ -17,6 +17,7 @@ import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./
 import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export interface ComponentSource {
   /** Component type name */
@@ -91,6 +92,9 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   // Read GSAP source (bundled locally)
   const gsapSource = await loadGsapSource(options.gsapDir);
 
+  // Read shared script utilities
+  const sharedSource = await loadSharedUtilities();
+
   // Assemble final HTML
   const html = `<!DOCTYPE html>
 <html>
@@ -132,6 +136,8 @@ ${componentStyles.join("\n\n")}
 </style>
 <script>
 ${gsapSource}
+
+${sharedSource}
 
 // Register GSAP plugins
 if (typeof SplitText !== 'undefined') gsap.registerPlugin(SplitText);
@@ -339,6 +345,32 @@ var gsap = {
   from: function() {},
   set: function() {}
 };`;
+  }
+
+  return sources.join("\n\n");
+}
+
+/**
+ * Load shared script utilities (cursor, typing, camera, script-runner).
+ * These are plain .js files that get inlined into the assembled HTML
+ * alongside GSAP, making them available to all component scripts.
+ */
+async function loadSharedUtilities(): Promise<string> {
+  // Resolve path relative to this source file's location in the repo
+  const thisDir = path.dirname(fileURLToPath(import.meta.url));
+  const sharedDir = path.join(thisDir, "..", "components", "shared");
+
+  const sharedFiles = ["cursor.js", "typing.js", "camera.js", "script-runner.js"];
+  const sources: string[] = [];
+
+  for (const file of sharedFiles) {
+    try {
+      const content = await fs.readFile(path.join(sharedDir, file), "utf-8");
+      sources.push(`// ── shared/${file} ──\n${content}`);
+    } catch {
+      // Shared utilities are optional; warn but don't fail
+      console.warn(`Shared utility not found: ${file}`);
+    }
   }
 
   return sources.join("\n\n");
