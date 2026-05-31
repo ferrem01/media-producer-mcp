@@ -1,0 +1,31 @@
+{
+  "type": "picture-in-picture",
+  "label": "Picture in Picture",
+  "category": "layouts",
+  "description": "Main content area with a smaller overlay in a configurable corner. PiP slides in from its corner.",
+  "data": {
+    "main_content": {
+      "type": "string",
+      "label": "Main Content",
+      "optional": true
+    },
+    "pip_content": {
+      "type": "string",
+      "label": "PiP Content",
+      "optional": true
+    },
+    "pip_position": {
+      "type": "string",
+      "label": "PiP Position",
+      "optional": true,
+      "default": "bottom-right",
+      "enum": ["top-left", "top-right", "bottom-left", "bottom-right"]
+    },
+    "pip_size": {
+      "type": "number",
+      "label": "PiP Size (%)",
+      "optional": true,
+      "default": 30
+    }
+  }
+}

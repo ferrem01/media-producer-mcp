@@ -1,0 +1,142 @@
+<template>
+  <div class="browser-frame">
+    <div class="browser-chrome">
+      <div class="browser-dots">
+        <span class="dot dot-red"></span>
+        <span class="dot dot-yellow"></span>
+        <span class="dot dot-green"></span>
+      </div>
+      <div class="browser-url-bar">
+        <span class="url-text">{{url}}</span>
+      </div>
+    </div>
+    <div class="browser-viewport">
+      <div class="browser-title">{{title}}</div>
+      <div class="browser-content">{{content_html}}</div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .browser-frame {
+    display: flex;
+    flex-direction: column;
+    width: 85%;
+    height: 80%;
+    margin: auto;
+    border-radius: var(--mp-border-radius, 16px);
+    overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    position: absolute;
+    top: 10%;
+    left: 7.5%;
+  }
+
+  .browser-chrome {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #2a2a2e;
+    padding: 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .browser-dots {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  .dot-red { background: #ff5f57; }
+  .dot-yellow { background: #febc2e; }
+  .dot-green { background: #28c840; }
+
+  .browser-url-bar {
+    flex: 1;
+    background: #1a1a1e;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: #8b8b8e;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .browser-viewport {
+    flex: 1;
+    background: var(--mp-color-surface, #1e293b);
+    padding: 40px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .browser-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .browser-title:empty { display: none; }
+
+  .browser-content {
+    font-size: 16px;
+    color: var(--mp-color-text-muted, #94a3b8);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .browser-content:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var frame = el.querySelector('.browser-frame');
+    var viewport = el.querySelector('.browser-viewport');
+
+    if (data.screenshot_url) {
+      viewport.style.backgroundImage = 'url(' + data.screenshot_url + ')';
+      viewport.style.backgroundSize = 'cover';
+      viewport.style.backgroundPosition = 'top center';
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out';
+
+    gsap.set(frame, { autoAlpha: 0, scale: 0.88, y: 30 });
+    gsap.set(viewport.children, { autoAlpha: 0 });
+
+    // Frame scales up
+    tl.to(frame, {
+      autoAlpha: 1, scale: 1, y: 0,
+      duration: speed, ease: ease
+    }, 0.3);
+
+    // Content fades in
+    tl.to(viewport.children, {
+      autoAlpha: 1, duration: 0.4, stagger: 0.1, ease: 'power2.out'
+    }, 0.3 + speed * 0.7);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(frame, {
+        autoAlpha: 0, scale: 0.95, duration: 0.5, ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

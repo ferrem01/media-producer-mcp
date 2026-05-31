@@ -1,0 +1,198 @@
+<template>
+  <div class="terminal-frame">
+    <div class="terminal-chrome">
+      <div class="terminal-dots">
+        <span class="tdot tdot-red"></span>
+        <span class="tdot tdot-yellow"></span>
+        <span class="tdot tdot-green"></span>
+      </div>
+      <div class="terminal-title">{{title}}</div>
+    </div>
+    <div class="terminal-body"></div>
+  </div>
+</template>
+
+<style scoped>
+  .terminal-frame {
+    display: flex;
+    flex-direction: column;
+    width: 80%;
+    height: 75%;
+    position: absolute;
+    top: 12.5%;
+    left: 10%;
+    border-radius: var(--mp-border-radius, 12px);
+    overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+  }
+
+  .terminal-chrome {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #2a2a2e;
+    padding: 10px 16px;
+    flex-shrink: 0;
+  }
+
+  .terminal-dots {
+    display: flex;
+    gap: 7px;
+  }
+
+  .tdot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  .tdot-red { background: #ff5f57; }
+  .tdot-yellow { background: #febc2e; }
+  .tdot-green { background: #28c840; }
+
+  .terminal-title {
+    font-size: 13px;
+    color: #8b8b8e;
+  }
+
+  .terminal-title:empty { display: none; }
+
+  .terminal-body {
+    flex: 1;
+    background: #0d1117;
+    padding: 20px;
+    overflow: hidden;
+  }
+
+  .term-line {
+    margin-bottom: 4px;
+    font-size: 15px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  .term-prompt {
+    color: #7ee787;
+  }
+
+  .term-command {
+    color: #e6edf3;
+  }
+
+  .term-output {
+    color: #8b949e;
+  }
+
+  .term-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 17px;
+    background: #e6edf3;
+    vertical-align: text-bottom;
+    margin-left: 2px;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var frame = el.querySelector('.terminal-frame');
+    var body = el.querySelector('.terminal-body');
+    var lines = data.lines || [];
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.7;
+
+    // Build terminal frame entrance
+    gsap.set(frame, { autoAlpha: 0, scale: 0.92, y: 20 });
+    tl.to(frame, {
+      autoAlpha: 1, scale: 1, y: 0,
+      duration: speed, ease: 'power3.out'
+    }, 0.2);
+
+    // Calculate timing for lines
+    var holdEnd = ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration;
+    var lineStart = 0.2 + speed + 0.2;
+    var availableTime = holdEnd - lineStart - 0.3;
+    var timePerLine = Math.max(0.3, availableTime / Math.max(lines.length, 1));
+
+    for (var i = 0; i < lines.length; i++) {
+      (function(idx, lineData) {
+        var lineEl = document.createElement('div');
+        lineEl.className = 'term-line';
+
+        var prompt = lineData.prompt || '$';
+        var command = lineData.command || '';
+        var output = lineData.output || '';
+
+        // Build prompt span
+        var promptSpan = document.createElement('span');
+        promptSpan.className = 'term-prompt';
+        promptSpan.textContent = prompt + ' ';
+        lineEl.appendChild(promptSpan);
+
+        // Command text (will be typed)
+        var cmdSpan = document.createElement('span');
+        cmdSpan.className = 'term-command';
+        cmdSpan.textContent = '';
+        lineEl.appendChild(cmdSpan);
+
+        // Cursor
+        var cursor = document.createElement('span');
+        cursor.className = 'term-cursor';
+        lineEl.appendChild(cursor);
+
+        body.appendChild(lineEl);
+
+        gsap.set(lineEl, { autoAlpha: 0 });
+
+        var t = lineStart + idx * timePerLine;
+
+        // Show line
+        tl.set(lineEl, { autoAlpha: 1 }, t);
+
+        // Type command character by character
+        if (command) {
+          var charDelay = Math.min(0.04, (timePerLine * 0.5) / command.length);
+          for (var c = 0; c < command.length; c++) {
+            (function(charIdx, ch) {
+              tl.call(function() {
+                cmdSpan.textContent += ch;
+              }, null, t + 0.05 + charIdx * charDelay);
+            })(c, command[c]);
+          }
+        }
+
+        // Show output after command typed
+        if (output) {
+          var outputEl = document.createElement('div');
+          outputEl.className = 'term-line';
+          var outSpan = document.createElement('span');
+          outSpan.className = 'term-output';
+          outSpan.textContent = output;
+          outputEl.appendChild(outSpan);
+          body.appendChild(outputEl);
+          gsap.set(outputEl, { autoAlpha: 0 });
+
+          var outputTime = t + (command ? 0.05 + command.length * charDelay + 0.15 : 0.2);
+          tl.set(cursor, { display: 'none' }, outputTime);
+          tl.set(outputEl, { autoAlpha: 1 }, outputTime);
+        } else {
+          // Hide cursor after typing
+          var hideTime = t + (command ? 0.05 + command.length * 0.04 + 0.3 : timePerLine * 0.8);
+          tl.set(cursor, { display: 'none' }, hideTime);
+        }
+      })(i, lines[i]);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(frame, {
+        autoAlpha: 0, scale: 0.96, duration: 0.5, ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

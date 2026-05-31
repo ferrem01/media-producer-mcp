@@ -1,0 +1,40 @@
+{
+  "type": "bento-grid",
+  "label": "Bento Grid",
+  "category": "layouts",
+  "description": "Asymmetric card grid (Bento-box style). Cards of varying sizes stagger in with scale and fade.",
+  "data": {
+    "cards": {
+      "type": "array",
+      "label": "Cards",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "Title",
+            "required": true
+          },
+          "description": {
+            "type": "string",
+            "label": "Description",
+            "optional": true
+          },
+          "size": {
+            "type": "string",
+            "label": "Size",
+            "optional": true,
+            "default": "small",
+            "enum": ["small", "medium", "large"]
+          },
+          "color": {
+            "type": "string",
+            "label": "Background Color",
+            "optional": true
+          }
+        }
+      }
+    }
+  }
+}

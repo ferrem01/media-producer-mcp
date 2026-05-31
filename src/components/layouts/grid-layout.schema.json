@@ -1,0 +1,39 @@
+{
+  "type": "grid-layout",
+  "label": "Grid Layout",
+  "category": "layouts",
+  "description": "Simple N-column grid with animated children. Items fade up with stagger.",
+  "data": {
+    "items": {
+      "type": "array",
+      "label": "Items",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "Title",
+            "required": true
+          },
+          "description": {
+            "type": "string",
+            "label": "Description",
+            "optional": true
+          },
+          "icon": {
+            "type": "string",
+            "label": "Icon (emoji)",
+            "optional": true
+          }
+        }
+      }
+    },
+    "columns": {
+      "type": "number",
+      "label": "Columns",
+      "optional": true,
+      "default": 3
+    }
+  }
+}

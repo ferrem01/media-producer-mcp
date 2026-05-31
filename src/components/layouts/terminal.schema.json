@@ -1,0 +1,40 @@
+{
+  "type": "terminal",
+  "label": "Terminal",
+  "category": "layouts",
+  "description": "Terminal/CLI mockup with typing animation. Dark background with monospace text.",
+  "data": {
+    "lines": {
+      "type": "array",
+      "label": "Lines",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "label": "Prompt",
+            "optional": true,
+            "default": "$"
+          },
+          "command": {
+            "type": "string",
+            "label": "Command",
+            "optional": true
+          },
+          "output": {
+            "type": "string",
+            "label": "Output",
+            "optional": true
+          }
+        }
+      }
+    },
+    "title": {
+      "type": "string",
+      "label": "Window Title",
+      "optional": true,
+      "placeholder": "bash"
+    }
+  }
+}

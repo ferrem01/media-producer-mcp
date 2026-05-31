@@ -1,0 +1,44 @@
+{
+  "type": "split-screen",
+  "label": "Split Screen",
+  "category": "layouts",
+  "description": "Two-panel layout with configurable split ratio. Panels slide in from their respective sides.",
+  "data": {
+    "left_content": {
+      "type": "string",
+      "label": "Left Content",
+      "optional": true
+    },
+    "right_content": {
+      "type": "string",
+      "label": "Right Content",
+      "optional": true
+    },
+    "split": {
+      "type": "number",
+      "label": "Split Ratio",
+      "optional": true,
+      "default": 0.5,
+      "placeholder": "0.5"
+    },
+    "left_bg": {
+      "type": "string",
+      "label": "Left Background",
+      "optional": true,
+      "placeholder": "#1e293b"
+    },
+    "right_bg": {
+      "type": "string",
+      "label": "Right Background",
+      "optional": true,
+      "placeholder": "#0f172a"
+    },
+    "direction": {
+      "type": "string",
+      "label": "Direction",
+      "optional": true,
+      "default": "horizontal",
+      "enum": ["horizontal", "vertical"]
+    }
+  }
+}

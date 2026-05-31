@@ -1,0 +1,29 @@
+{
+  "type": "browser-frame",
+  "label": "Browser Frame",
+  "category": "layouts",
+  "description": "Content displayed inside a browser chrome mockup with title bar dots and URL bar.",
+  "data": {
+    "url": {
+      "type": "string",
+      "label": "URL",
+      "optional": true,
+      "placeholder": "https://example.com"
+    },
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "optional": true
+    },
+    "content_html": {
+      "type": "string",
+      "label": "Content HTML",
+      "optional": true
+    },
+    "screenshot_url": {
+      "type": "string",
+      "label": "Screenshot URL",
+      "optional": true
+    }
+  }
+}

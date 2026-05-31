@@ -1,0 +1,108 @@
+<template>
+  <div class="bento-grid"></div>
+</template>
+
+<style scoped>
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: minmax(120px, 1fr);
+    gap: 16px;
+    width: 100%;
+    height: 100%;
+    padding: 40px;
+    box-sizing: border-box;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+  }
+
+  .bento-card {
+    background: var(--mp-color-surface, #1e293b);
+    border-radius: var(--mp-border-radius, 16px);
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+
+  .bento-card.size-medium {
+    grid-column: span 2;
+  }
+
+  .bento-card.size-large {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+
+  .bento-card-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 6px 0;
+    line-height: 1.2;
+  }
+
+  .bento-card-desc {
+    font-size: 14px;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin: 0;
+    line-height: 1.4;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var grid = el.querySelector('.bento-grid');
+    var cards = data.cards || [];
+
+    for (var i = 0; i < cards.length; i++) {
+      var card = document.createElement('div');
+      card.className = 'bento-card';
+      var size = cards[i].size || 'small';
+      card.classList.add('size-' + size);
+      if (cards[i].color) card.style.background = cards[i].color;
+
+      var title = document.createElement('div');
+      title.className = 'bento-card-title';
+      title.textContent = cards[i].title || '';
+      card.appendChild(title);
+
+      if (cards[i].description) {
+        var desc = document.createElement('div');
+        desc.className = 'bento-card-desc';
+        desc.textContent = cards[i].description;
+        card.appendChild(desc);
+      }
+
+      grid.appendChild(card);
+    }
+
+    var cardEls = grid.querySelectorAll('.bento-card');
+    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.6;
+    var stagger = ctx.motion === 'minimal' ? 0.06 : ctx.motion === 'punchy' ? 0.08 : 0.12;
+
+    gsap.set(cardEls, { autoAlpha: 0, scale: 0.85 });
+
+    tl.to(cardEls, {
+      autoAlpha: 1,
+      scale: 1,
+      duration: speed,
+      stagger: stagger,
+      ease: 'back.out(1.2)'
+    }, 0.3);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(cardEls, {
+        autoAlpha: 0,
+        scale: 0.9,
+        duration: 0.4,
+        stagger: 0.03,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

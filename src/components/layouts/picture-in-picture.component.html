@@ -1,0 +1,116 @@
+<template>
+  <div class="pip-layout">
+    <div class="pip-main">
+      <div class="pip-main-content">{{main_content}}</div>
+    </div>
+    <div class="pip-overlay">
+      <div class="pip-overlay-content">{{pip_content}}</div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .pip-layout {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+  }
+
+  .pip-main {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--mp-color-background, #0f172a);
+  }
+
+  .pip-main-content {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    text-align: center;
+    padding: 40px;
+    line-height: 1.3;
+  }
+
+  .pip-main-content:empty { display: none; }
+
+  .pip-overlay {
+    position: absolute;
+    background: var(--mp-color-surface, #1e293b);
+    border-radius: var(--mp-border-radius, 16px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .pip-overlay-content {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--mp-color-text, #ffffff);
+    text-align: center;
+    padding: 20px;
+    line-height: 1.3;
+  }
+
+  .pip-overlay-content:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var main = el.querySelector('.pip-main');
+    var mainContent = el.querySelector('.pip-main-content');
+    var overlay = el.querySelector('.pip-overlay');
+    var position = data.pip_position || 'bottom-right';
+    var size = data.pip_size || 30;
+
+    // Size the overlay
+    overlay.style.width = size + '%';
+    overlay.style.height = size + '%';
+
+    // Position the overlay
+    var margin = '20px';
+    var parts = position.split('-');
+    overlay.style[parts[0]] = margin; // top or bottom
+    overlay.style[parts[1]] = margin; // left or right
+
+    // Determine slide direction for overlay entrance
+    var slideX = parts[1] === 'right' ? 120 : -120;
+    var slideY = parts[0] === 'bottom' ? 60 : -60;
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.7;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out';
+
+    // Main content entrance
+    gsap.set(mainContent, { autoAlpha: 0, y: 20 });
+    tl.to(mainContent, {
+      autoAlpha: 1, y: 0, duration: speed, ease: 'power3.out'
+    }, 0.2);
+
+    // PiP slides in from corner
+    gsap.set(overlay, { autoAlpha: 0, x: slideX, y: slideY, scale: 0.8 });
+    tl.to(overlay, {
+      autoAlpha: 1, x: 0, y: 0, scale: 1,
+      duration: speed, ease: ease
+    }, 0.5 + speed * 0.3);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(overlay, {
+        autoAlpha: 0, x: slideX * 0.5, duration: 0.4, ease: 'power2.in'
+      }, exitAt);
+      tl.to(mainContent, {
+        autoAlpha: 0, duration: 0.4, ease: 'power2.in'
+      }, exitAt + 0.1);
+    }
+
+    return tl;
+  }
+</script>

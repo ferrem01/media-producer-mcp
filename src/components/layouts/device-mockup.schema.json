@@ -1,0 +1,25 @@
+{
+  "type": "device-mockup",
+  "label": "Device Mockup",
+  "category": "layouts",
+  "description": "Phone, tablet, or laptop frame with content inside. Animates in with slight rotation.",
+  "data": {
+    "device": {
+      "type": "string",
+      "label": "Device Type",
+      "optional": true,
+      "default": "phone",
+      "enum": ["phone", "tablet", "laptop"]
+    },
+    "screenshot_url": {
+      "type": "string",
+      "label": "Screenshot URL",
+      "optional": true
+    },
+    "content_html": {
+      "type": "string",
+      "label": "Content HTML",
+      "optional": true
+    }
+  }
+}

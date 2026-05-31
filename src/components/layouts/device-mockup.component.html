@@ -1,0 +1,140 @@
+<template>
+  <div class="device-mockup">
+    <div class="device-shell">
+      <div class="device-screen"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .device-mockup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+  }
+
+  .device-shell {
+    position: relative;
+    background: #1a1a1e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+  }
+
+  /* Phone */
+  .device-shell.device-phone {
+    width: 280px;
+    height: 580px;
+    border-radius: 40px;
+    padding: 14px;
+    border: 3px solid #333;
+  }
+
+  .device-shell.device-phone::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 24px;
+    background: #000;
+    border-radius: 12px;
+    z-index: 2;
+  }
+
+  /* Tablet */
+  .device-shell.device-tablet {
+    width: 560px;
+    height: 420px;
+    border-radius: 24px;
+    padding: 16px;
+    border: 3px solid #333;
+  }
+
+  /* Laptop */
+  .device-shell.device-laptop {
+    width: 640px;
+    height: 400px;
+    border-radius: 12px 12px 0 0;
+    padding: 12px 12px 0 12px;
+    border: 3px solid #333;
+    border-bottom: none;
+  }
+
+  .device-shell.device-laptop::after {
+    content: '';
+    position: absolute;
+    bottom: -18px;
+    left: -40px;
+    right: -40px;
+    height: 18px;
+    background: #2a2a2e;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .device-screen {
+    width: 100%;
+    height: 100%;
+    background: var(--mp-color-surface, #1e293b);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mp-color-text, #ffffff);
+    font-size: 16px;
+    line-height: 1.4;
+    text-align: center;
+    padding: 20px;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var shell = el.querySelector('.device-shell');
+    var screen = el.querySelector('.device-screen');
+    var device = data.device || 'phone';
+
+    shell.classList.add('device-' + device);
+
+    if (data.screenshot_url) {
+      screen.style.backgroundImage = 'url(' + data.screenshot_url + ')';
+      screen.style.backgroundSize = 'cover';
+      screen.style.backgroundPosition = 'top center';
+    } else if (data.content_html) {
+      screen.innerHTML = data.content_html;
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.6 : 0.9;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.4)' : 'power3.out';
+
+    gsap.set(shell, { autoAlpha: 0, y: 60, rotateX: 8, rotateY: -4 });
+    gsap.set(screen, { autoAlpha: 0 });
+
+    // Device floats in with slight rotation
+    tl.to(shell, {
+      autoAlpha: 1, y: 0, rotateX: 0, rotateY: 0,
+      duration: speed, ease: ease
+    }, 0.3);
+
+    // Content appears
+    tl.to(screen, {
+      autoAlpha: 1, duration: 0.4, ease: 'power2.out'
+    }, 0.3 + speed * 0.6);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(shell, {
+        autoAlpha: 0, y: -30, duration: 0.5, ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>
