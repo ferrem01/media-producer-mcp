@@ -1,0 +1,239 @@
+<template>
+  <div class="notification-stack">
+    <div class="notification-container"></div>
+  </div>
+</template>
+
+<style scoped>
+  .notification-stack {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .notification-container {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 380px;
+  }
+
+  .notification-container.top-right {
+    top: 40px;
+    right: 40px;
+  }
+
+  .notification-container.top-left {
+    top: 40px;
+    left: 40px;
+  }
+
+  .notification-container.bottom-right {
+    bottom: 40px;
+    right: 40px;
+  }
+
+  .notification-container.bottom-left {
+    bottom: 40px;
+    left: 40px;
+  }
+
+  .notification-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .notification-accent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 3px 0 0 3px;
+  }
+
+  .accent-success { background: #34d399; }
+  .accent-error { background: #f87171; }
+  .accent-info { background: #60a5fa; }
+  .accent-warning { background: #fbbf24; }
+
+  .notification-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .icon-success { background: rgba(52, 211, 153, 0.12); }
+  .icon-error { background: rgba(248, 113, 113, 0.12); }
+  .icon-info { background: rgba(96, 165, 250, 0.12); }
+  .icon-warning { background: rgba(251, 191, 36, 0.12); }
+
+  .notification-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .notification-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .notification-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+  }
+
+  .notification-time {
+    font-size: 11px;
+    color: #6b7280;
+    flex-shrink: 0;
+  }
+
+  .notification-text {
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.5;
+  }
+
+  .notification-text:empty {
+    display: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.notification-container');
+    var notifications = data.notifications || [];
+    var position = data.position || 'top-right';
+
+    container.classList.add(position);
+
+    var isRight = position.indexOf('right') !== -1;
+    var isBottom = position.indexOf('bottom') !== -1;
+    var slideX = isRight ? 60 : -60;
+
+    var defaultIcons = {
+      success: '✓',
+      error: '✕',
+      info: 'ℹ',
+      warning: '⚠'
+    };
+
+    var cardEls = [];
+
+    for (var i = 0; i < notifications.length; i++) {
+      var n = notifications[i];
+      var type = n.type || 'info';
+
+      var card = document.createElement('div');
+      card.className = 'notification-card';
+
+      // Accent stripe
+      var accent = document.createElement('div');
+      accent.className = 'notification-accent accent-' + type;
+      card.appendChild(accent);
+
+      // Icon
+      var iconWrap = document.createElement('div');
+      iconWrap.className = 'notification-icon icon-' + type;
+      iconWrap.textContent = n.icon || defaultIcons[type] || 'ℹ';
+      card.appendChild(iconWrap);
+
+      // Body
+      var body = document.createElement('div');
+      body.className = 'notification-body';
+
+      var header = document.createElement('div');
+      header.className = 'notification-header';
+
+      var title = document.createElement('div');
+      title.className = 'notification-title';
+      title.textContent = n.title || '';
+      header.appendChild(title);
+
+      if (n.time) {
+        var time = document.createElement('span');
+        time.className = 'notification-time';
+        time.textContent = n.time;
+        header.appendChild(time);
+      }
+      body.appendChild(header);
+
+      if (n.body) {
+        var text = document.createElement('div');
+        text.className = 'notification-text';
+        text.textContent = n.body;
+        body.appendChild(text);
+      }
+
+      card.appendChild(body);
+
+      // Insert at top or bottom depending on position
+      if (isBottom) {
+        container.insertBefore(card, container.firstChild);
+      } else {
+        container.appendChild(card);
+      }
+      cardEls.push(card);
+    }
+
+    // Initial states
+    gsap.set(cardEls, { autoAlpha: 0, x: slideX, scale: 1.05 });
+
+    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.55;
+    var stagger = ctx.motion === 'minimal' ? 0.15 : 0.3;
+
+    // Slide in one by one
+    tl.to(cardEls, {
+      autoAlpha: 1, x: 0, scale: 1,
+      duration: speed,
+      stagger: stagger,
+      ease: 'power3.out'
+    }, 0.4);
+
+    // Subtle settle glow
+    tl.to(cardEls, {
+      boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06)',
+      duration: 0.3,
+      stagger: stagger * 0.5
+    }, '-=0.2');
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to(cardEls, {
+        autoAlpha: 0, x: slideX * 0.5,
+        duration: 0.3,
+        stagger: 0.05,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

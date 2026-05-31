@@ -1,0 +1,52 @@
+{
+  "type": "chat-simulator",
+  "label": "Chat Simulator",
+  "category": "mockups",
+  "description": "Slack/Discord/iMessage style chat interface. Messages appear one by one with typing indicators.",
+  "data": {
+    "platform": {
+      "type": "string",
+      "label": "Platform",
+      "optional": true,
+      "enum": ["slack", "discord", "imessage"],
+      "default": "slack"
+    },
+    "channel": {
+      "type": "string",
+      "label": "Channel Name",
+      "optional": true,
+      "placeholder": "general"
+    },
+    "messages": {
+      "type": "array",
+      "label": "Messages",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "string",
+            "label": "Username",
+            "required": true
+          },
+          "text": {
+            "type": "string",
+            "label": "Message Text",
+            "required": true
+          },
+          "avatar_color": {
+            "type": "string",
+            "label": "Avatar Color",
+            "optional": true
+          },
+          "time": {
+            "type": "string",
+            "label": "Timestamp",
+            "optional": true,
+            "placeholder": "10:32 AM"
+          }
+        }
+      }
+    }
+  }
+}

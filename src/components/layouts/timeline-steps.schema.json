@@ -1,0 +1,42 @@
+{
+  "type": "timeline-steps",
+  "label": "Timeline Steps",
+  "category": "layouts",
+  "description": "Horizontal or vertical timeline with milestones. Steps animate in sequentially.",
+  "data": {
+    "steps": {
+      "type": "array",
+      "label": "Steps",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "Step Title",
+            "required": true
+          },
+          "description": {
+            "type": "string",
+            "label": "Description",
+            "optional": true
+          },
+          "status": {
+            "type": "string",
+            "label": "Status",
+            "optional": true,
+            "enum": ["complete", "active", "pending"],
+            "default": "pending"
+          }
+        }
+      }
+    },
+    "direction": {
+      "type": "string",
+      "label": "Direction",
+      "optional": true,
+      "enum": ["horizontal", "vertical"],
+      "default": "horizontal"
+    }
+  }
+}

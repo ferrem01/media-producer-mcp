@@ -14,17 +14,18 @@
     justify-content: center;
     height: 100%;
     width: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 60px 80px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    padding: 80px;
   }
 
   .text-area {
-    font-size: 48px;
-    font-weight: 600;
+    font-size: 42px;
+    font-weight: 500;
     color: var(--mp-color-text, #ffffff);
     text-align: center;
     max-width: 80%;
-    line-height: 1.4;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
   }
 
   .typed-text {
@@ -34,6 +35,7 @@
   .cursor {
     color: var(--mp-color-accent, #A78BFA);
     font-weight: 300;
+    text-shadow: 0 0 20px rgba(167, 139, 250, 0.5);
     animation: blink 0.6s step-end infinite;
   }
 
@@ -48,11 +50,13 @@
     var tl = gsap.timeline();
     var typedText = el.querySelector('.typed-text');
     var cursor = el.querySelector('.cursor');
+    var textArea = el.querySelector('.text-area');
     var text = data.text || '';
     var speed = data.speed || 30;
 
     if (data.cursor_color) {
       cursor.style.color = data.cursor_color;
+      cursor.style.textShadow = '0 0 20px ' + data.cursor_color;
     }
 
     var typeDuration = text.length / speed;
@@ -63,9 +67,19 @@
 
     var counter = { index: 0 };
 
-    gsap.set(cursor, { autoAlpha: 1 });
+    // Initial state
+    gsap.set(textArea, { autoAlpha: 0, y: 20 });
     typedText.textContent = '';
 
+    // Fade in text area
+    tl.to(textArea, {
+      autoAlpha: 1,
+      y: 0,
+      duration: 0.5,
+      ease: 'power3.out'
+    }, 0.2);
+
+    // Type characters
     tl.to(counter, {
       index: text.length,
       duration: typeDuration,
@@ -73,12 +87,14 @@
       onUpdate: function() {
         typedText.textContent = text.substring(0, Math.round(counter.index));
       }
-    }, 0.3);
+    }, 0.5);
 
+    // Exit
     if (ctx.duration > typeDuration + 1.5) {
       var exitAt = ctx.duration - 0.6;
-      tl.to(el.querySelector('.text-area'), {
+      tl.to(textArea, {
         autoAlpha: 0,
+        y: -15,
         duration: 0.4,
         ease: 'power2.in'
       }, exitAt);

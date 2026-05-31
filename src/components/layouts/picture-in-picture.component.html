@@ -15,7 +15,7 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
   }
 
   .pip-main {
@@ -24,7 +24,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--mp-color-background, #0f172a);
   }
 
   .pip-main-content {
@@ -32,17 +31,24 @@
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     text-align: center;
-    padding: 40px;
-    line-height: 1.3;
+    padding: 80px;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.1);
   }
 
   .pip-main-content:empty { display: none; }
 
   .pip-overlay {
     position: absolute;
-    background: var(--mp-color-surface, #1e293b);
-    border-radius: var(--mp-border-radius, 16px);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -54,8 +60,9 @@
     font-weight: 500;
     color: var(--mp-color-text, #ffffff);
     text-align: center;
-    padding: 20px;
-    line-height: 1.3;
+    padding: 24px;
+    line-height: 1.4;
+    letter-spacing: 0.005em;
   }
 
   .pip-overlay-content:empty { display: none; }
@@ -64,12 +71,11 @@
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var main = el.querySelector('.pip-main');
     var mainContent = el.querySelector('.pip-main-content');
     var overlay = el.querySelector('.pip-overlay');
     var overlayContent = el.querySelector('.pip-overlay-content');
 
-    // Inject content (supports HTML)
+    // Inject content
     if (data.main_content) mainContent.innerHTML = data.main_content;
     if (data.pip_content) overlayContent.innerHTML = data.pip_content;
 
@@ -81,40 +87,41 @@
     overlay.style.height = size + '%';
 
     // Position the overlay
-    var margin = '20px';
+    var margin = '24px';
     var parts = position.split('-');
-    overlay.style[parts[0]] = margin; // top or bottom
-    overlay.style[parts[1]] = margin; // left or right
+    overlay.style[parts[0]] = margin;
+    overlay.style[parts[1]] = margin;
 
-    // Determine slide direction for overlay entrance
     var slideX = parts[1] === 'right' ? 120 : -120;
     var slideY = parts[0] === 'bottom' ? 60 : -60;
 
-    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.7;
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out';
 
-    // Main content entrance
-    gsap.set(mainContent, { autoAlpha: 0, y: 20 });
+    // Main content entrance with blur
+    gsap.set(mainContent, { autoAlpha: 0, y: 25, filter: 'blur(4px)' });
     tl.to(mainContent, {
-      autoAlpha: 1, y: 0, duration: speed, ease: 'power3.out'
+      autoAlpha: 1, y: 0, filter: 'blur(0px)',
+      duration: speed, ease: 'power3.out'
     }, 0.2);
 
-    // PiP slides in from corner
-    gsap.set(overlay, { autoAlpha: 0, x: slideX, y: slideY, scale: 0.8 });
+    // PiP slides in from corner with scale + blur
+    gsap.set(overlay, { autoAlpha: 0, x: slideX, y: slideY, scale: 0.8, filter: 'blur(5px)' });
     tl.to(overlay, {
-      autoAlpha: 1, x: 0, y: 0, scale: 1,
+      autoAlpha: 1, x: 0, y: 0, scale: 1, filter: 'blur(0px)',
       duration: speed, ease: ease
-    }, 0.5 + speed * 0.3);
+    }, 0.4 + speed * 0.3);
 
     // Exit
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.7;
       tl.to(overlay, {
-        autoAlpha: 0, x: slideX * 0.5, duration: 0.4, ease: 'power2.in'
+        autoAlpha: 0, x: slideX * 0.4, scale: 0.9,
+        duration: 0.4, ease: 'power2.in'
       }, exitAt);
       tl.to(mainContent, {
         autoAlpha: 0, duration: 0.4, ease: 'power2.in'
-      }, exitAt + 0.1);
+      }, exitAt + 0.05);
     }
 
     return tl;

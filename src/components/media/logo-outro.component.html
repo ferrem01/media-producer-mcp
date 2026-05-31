@@ -14,14 +14,18 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
   }
 
   .logo-text {
     font-size: 80px;
-    font-weight: 800;
+    font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     text-align: center;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.12);
   }
 
   .logo-text:empty {
@@ -29,11 +33,13 @@
   }
 
   .tagline {
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 400;
-    color: var(--mp-color-text-muted, #94a3b8);
-    margin-top: 16px;
+    color: #cbd5e1;
+    margin-top: 20px;
     text-align: center;
+    letter-spacing: 0.005em;
+    line-height: 1.4;
   }
 
   .tagline:empty {
@@ -41,12 +47,14 @@
   }
 
   .cta {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--mp-color-accent, #a78bfa);
-    margin-top: 32px;
+    margin-top: 36px;
     text-align: center;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px rgba(167, 139, 250, 0.2);
   }
 
   .cta:empty {
@@ -62,36 +70,60 @@
     var cta = el.querySelector('.cta');
     var elements = [logo, tagline, cta].filter(function(e) { return e && e.textContent.trim(); });
 
-    gsap.set(elements, { autoAlpha: 0, y: 20 });
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
 
-    // Entrance
-    tl.to(elements, {
-      autoAlpha: 1,
-      y: 0,
-      duration: 0.6,
-      stagger: 0.15,
-      ease: 'power2.out'
-    }, 0.3);
+    // Initial states
+    gsap.set(logo, { autoAlpha: 0, scale: 1.06, filter: 'blur(4px)' });
+    gsap.set(tagline, { autoAlpha: 0, y: 20 });
+    gsap.set(cta, { autoAlpha: 0, y: 15 });
+
+    // Logo entrance
+    if (logo && logo.textContent.trim()) {
+      tl.to(logo, {
+        autoAlpha: 1, scale: 1, filter: 'blur(0px)',
+        duration: speed,
+        ease: 'power3.out'
+      }, 0.3);
+    }
+
+    // Tagline
+    if (tagline && tagline.textContent.trim()) {
+      tl.to(tagline, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.7,
+        ease: 'power2.out'
+      }, 0.3 + speed * 0.5);
+    }
+
+    // CTA
+    if (cta && cta.textContent.trim()) {
+      tl.to(cta, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.6,
+        ease: 'power2.out'
+      }, 0.3 + speed * 0.8);
+    }
 
     // Subtle pulse on logo
     if (logo && logo.textContent.trim()) {
       tl.to(logo, {
-        scale: 1.03,
+        textShadow: '0 0 60px rgba(167, 139, 250, 0.2)',
         duration: 0.8,
         ease: 'sine.inOut',
         yoyo: true,
         repeat: 1
-      }, 1.2);
+      }, 0.3 + speed + 0.3);
     }
 
-    // Fade out
+    // Exit
     if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
       tl.to(elements, {
         autoAlpha: 0,
-        duration: 0.6,
-        stagger: 0.05,
+        duration: 0.5,
+        stagger: 0.04,
         ease: 'power2.in'
-      }, ctx.duration - 0.8);
+      }, exitAt);
     }
 
     return tl;

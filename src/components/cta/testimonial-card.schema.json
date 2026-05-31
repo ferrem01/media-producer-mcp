@@ -1,0 +1,39 @@
+{
+  "type": "testimonial-card",
+  "label": "Testimonial Card",
+  "category": "cta",
+  "description": "Customer testimonial with quote, avatar, name, company, and optional star rating.",
+  "data": {
+    "quote": {
+      "type": "string",
+      "label": "Quote",
+      "required": true
+    },
+    "name": {
+      "type": "string",
+      "label": "Author Name",
+      "required": true
+    },
+    "role": {
+      "type": "string",
+      "label": "Role / Title",
+      "optional": true
+    },
+    "company": {
+      "type": "string",
+      "label": "Company",
+      "optional": true
+    },
+    "avatar_color": {
+      "type": "string",
+      "label": "Avatar Color",
+      "optional": true,
+      "default": "#A78BFA"
+    },
+    "rating": {
+      "type": "number",
+      "label": "Star Rating (1-5)",
+      "optional": true
+    }
+  }
+}

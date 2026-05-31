@@ -12,16 +12,17 @@
     justify-content: center;
     height: 100%;
     width: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 80px 120px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 100px 120px;
   }
 
   .list-title {
-    font-size: 40px;
+    font-size: 44px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
-    margin: 0 0 40px 0;
-    letter-spacing: -0.01em;
+    margin: 0 0 44px 0;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.1);
   }
 
   .list-title:empty {
@@ -42,31 +43,33 @@
     display: flex;
     align-items: flex-start;
     gap: 16px;
-    font-size: 22px;
-    color: var(--mp-color-text, #ffffff);
-    line-height: 1.6;
+    font-size: 20px;
+    color: #cbd5e1;
+    line-height: 1.5;
   }
 
   .list-marker {
     flex-shrink: 0;
     color: var(--mp-color-accent, #A78BFA);
-    font-weight: 700;
+    font-weight: 600;
     min-width: 24px;
-    font-size: 20px;
+    font-size: 18px;
+    text-shadow: 0 0 16px rgba(167, 139, 250, 0.3);
   }
 
   .list-marker.bullet::before {
     content: '\25CF';
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .list-marker.check::before {
     content: '\2713';
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .list-text {
     font-weight: 400;
+    letter-spacing: 0.005em;
   }
 </style>
 
@@ -107,43 +110,39 @@
       itemEls.push(li);
     });
 
-    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.5;
-    var stagger = 0.15;
+    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.45 : 0.55;
+    var stagger = ctx.motion === 'minimal' ? 0.08 : ctx.motion === 'punchy' ? 0.1 : 0.15;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
 
-    var allEls = [];
+    // Title entrance
     if (titleEl && titleEl.textContent.trim()) {
-      allEls.push(titleEl);
-    }
-
-    gsap.set(allEls, { autoAlpha: 0, y: 30 });
-    gsap.set(itemEls, { autoAlpha: 0, y: 20, x: -20 });
-
-    if (allEls.length > 0) {
-      tl.to(allEls, {
-        autoAlpha: 1,
-        y: 0,
+      gsap.set(titleEl, { autoAlpha: 0, y: 25, filter: 'blur(4px)' });
+      tl.to(titleEl, {
+        autoAlpha: 1, y: 0, filter: 'blur(0px)',
         duration: speed,
         ease: ease
       }, 0.2);
     }
 
+    // Items entrance with scale + blur
+    gsap.set(itemEls, { autoAlpha: 0, y: 20, scale: 1.06, filter: 'blur(4px)' });
+
     tl.to(itemEls, {
-      autoAlpha: 1,
-      y: 0,
-      x: 0,
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
       duration: speed,
       stagger: stagger,
       ease: ease
-    }, allEls.length > 0 ? 0.5 : 0.2);
+    }, titleEl && titleEl.textContent.trim() ? 0.5 : 0.2);
 
-    if (ctx.duration > 2.5) {
+    // Exit
+    if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.6;
-      var exitEls = allEls.concat(itemEls);
+      var exitEls = [];
+      if (titleEl && titleEl.textContent.trim()) exitEls.push(titleEl);
+      exitEls = exitEls.concat(itemEls);
       tl.to(exitEls, {
         autoAlpha: 0,
-        x: -15,
-        duration: 0.3,
+        duration: 0.35,
         stagger: 0.03,
         ease: 'power2.in'
       }, exitAt);

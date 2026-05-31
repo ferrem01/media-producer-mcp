@@ -1,0 +1,42 @@
+{
+  "type": "comparison-before-after",
+  "label": "Before / After Comparison",
+  "category": "layouts",
+  "description": "Split comparison with before and after states. Before side uses muted tones, after side is vibrant.",
+  "data": {
+    "before_label": {
+      "type": "string",
+      "label": "Before Label",
+      "optional": true,
+      "default": "Before"
+    },
+    "after_label": {
+      "type": "string",
+      "label": "After Label",
+      "optional": true,
+      "default": "After"
+    },
+    "before_items": {
+      "type": "array",
+      "label": "Before Items",
+      "required": true,
+      "items": { "type": "string" }
+    },
+    "after_items": {
+      "type": "array",
+      "label": "After Items",
+      "required": true,
+      "items": { "type": "string" }
+    },
+    "before_color": {
+      "type": "string",
+      "label": "Before Color",
+      "optional": true
+    },
+    "after_color": {
+      "type": "string",
+      "label": "After Color",
+      "optional": true
+    }
+  }
+}

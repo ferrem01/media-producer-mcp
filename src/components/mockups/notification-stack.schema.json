@@ -1,0 +1,53 @@
+{
+  "type": "notification-stack",
+  "label": "Notification Stack",
+  "category": "mockups",
+  "description": "Stack of notifications sliding in from a corner with type-specific accent colors.",
+  "data": {
+    "notifications": {
+      "type": "array",
+      "label": "Notifications",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "Title",
+            "required": true
+          },
+          "body": {
+            "type": "string",
+            "label": "Body Text",
+            "optional": true
+          },
+          "icon": {
+            "type": "string",
+            "label": "Icon",
+            "optional": true
+          },
+          "type": {
+            "type": "string",
+            "label": "Type",
+            "optional": true,
+            "enum": ["success", "error", "info", "warning"],
+            "default": "info"
+          },
+          "time": {
+            "type": "string",
+            "label": "Timestamp",
+            "optional": true,
+            "placeholder": "Just now"
+          }
+        }
+      }
+    },
+    "position": {
+      "type": "string",
+      "label": "Position",
+      "optional": true,
+      "enum": ["top-right", "top-left", "bottom-right", "bottom-left"],
+      "default": "top-right"
+    }
+  }
+}

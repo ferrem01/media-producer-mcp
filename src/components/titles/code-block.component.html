@@ -3,9 +3,9 @@
     <div class="code-window">
       <div class="window-bar">
         <div class="window-dots">
-          <span class="dot red"></span>
-          <span class="dot yellow"></span>
-          <span class="dot green"></span>
+          <span class="dot dot-close"></span>
+          <span class="dot dot-min"></span>
+          <span class="dot dot-max"></span>
         </div>
         <span class="lang-label">{{language}}</span>
         <div class="window-dots-spacer"></div>
@@ -25,7 +25,7 @@
     justify-content: center;
     height: 100%;
     width: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
     padding: 80px;
   }
 
@@ -33,20 +33,21 @@
     background: #0d1117;
     border-radius: 16px;
     overflow: hidden;
-    width: 75%;
-    max-height: 80%;
+    width: 78%;
+    max-height: 82%;
     border: 1px solid rgba(255, 255, 255, 0.06);
     box-shadow:
-      0 25px 60px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
+      0 30px 80px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .window-bar {
     display: flex;
     align-items: center;
-    height: 44px;
-    padding: 0 16px;
-    background: rgba(255, 255, 255, 0.04);
+    height: 48px;
+    padding: 0 18px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.03) 100%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 
@@ -54,22 +55,22 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    flex: 0 0 60px;
+    flex: 0 0 68px;
   }
 
   .window-dots-spacer {
-    flex: 0 0 60px;
+    flex: 0 0 68px;
   }
 
   .dot {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
   }
 
-  .dot.red { background: #ff5f57; }
-  .dot.yellow { background: #febc2e; }
-  .dot.green { background: #28c840; }
+  .dot-close { background: #ff5f57; }
+  .dot-min { background: #febc2e; }
+  .dot-max { background: #28c840; }
 
   .lang-label {
     flex: 1;
@@ -78,6 +79,7 @@
     text-align: center;
     letter-spacing: 0.03em;
     font-weight: 500;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
 
   .lang-label:empty {
@@ -92,8 +94,7 @@
   .line-numbers {
     display: flex;
     flex-direction: column;
-    padding: 28px 0;
-    padding-left: 20px;
+    padding: 28px 0 28px 20px;
     padding-right: 16px;
     border-right: 1px solid rgba(255, 255, 255, 0.04);
     user-select: none;
@@ -102,18 +103,18 @@
 
   .line-num {
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 16px;
-    line-height: 1.6;
-    color: #4a5568;
+    font-size: 15px;
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.15);
     text-align: right;
     min-width: 24px;
   }
 
   .code-content {
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 16px;
-    line-height: 1.6;
-    color: var(--mp-color-text, #e2e8f0);
+    font-size: 15px;
+    line-height: 1.7;
+    color: #e2e8f0;
     padding: 28px;
     margin: 0;
     overflow: hidden;
@@ -125,7 +126,7 @@
   }
 
   .code-line.highlight {
-    background: rgba(167, 139, 250, 0.1);
+    background: rgba(167, 139, 250, 0.08);
     margin: 0 -28px;
     padding: 0 28px;
     border-left: 2px solid var(--mp-color-accent, #A78BFA);
@@ -147,13 +148,11 @@
 
     var lineEls = [];
     lines.forEach(function(line, i) {
-      // Line number
       var numSpan = document.createElement('span');
       numSpan.className = 'line-num';
       numSpan.textContent = (i + 1).toString();
       lineNumbersEl.appendChild(numSpan);
 
-      // Code line
       var span = document.createElement('span');
       span.className = 'code-line';
       if (highlightLines.indexOf(i + 1) !== -1) {
@@ -164,34 +163,31 @@
       lineEls.push(span);
     });
 
-    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.35 : 0.4;
+    var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.45 : 0.55;
     var stagger = ctx.motion === 'minimal' ? 0.04 : ctx.motion === 'punchy' ? 0.06 : 0.08;
 
-    gsap.set(codeWindow, { autoAlpha: 0, y: 30, scale: 0.95 });
+    // Window entrance with scale + blur
+    gsap.set(codeWindow, { autoAlpha: 0, y: 40, scale: 1.05, filter: 'blur(5px)' });
     gsap.set(lineEls, { autoAlpha: 0, x: -15 });
 
     tl.to(codeWindow, {
-      autoAlpha: 1,
-      y: 0,
-      scale: 1,
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
       duration: speed + 0.2,
       ease: 'power3.out'
     }, 0.2);
 
     tl.to(lineEls, {
-      autoAlpha: 1,
-      x: 0,
+      autoAlpha: 1, x: 0,
       duration: speed,
       stagger: stagger,
       ease: 'power2.out'
-    }, 0.5);
+    }, 0.4 + speed * 0.3);
 
-    if (ctx.duration > 2.5) {
+    // Exit
+    if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.6;
       tl.to(codeWindow, {
-        autoAlpha: 0,
-        y: -15,
-        scale: 0.97,
+        autoAlpha: 0, y: -15, scale: 0.97,
         duration: 0.4,
         ease: 'power2.in'
       }, exitAt);

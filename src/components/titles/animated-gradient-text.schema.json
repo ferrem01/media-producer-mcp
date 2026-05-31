@@ -1,0 +1,26 @@
+{
+  "type": "animated-gradient-text",
+  "label": "Animated Gradient Text",
+  "category": "titles",
+  "description": "Large bold text with a continuously animated gradient fill. Dramatic entrance from scale and blur.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Text",
+      "required": true
+    },
+    "colors": {
+      "type": "array",
+      "label": "Gradient Colors",
+      "optional": true,
+      "items": { "type": "string" },
+      "default": ["#A78BFA", "#F472B6", "#60A5FA", "#34D399"]
+    },
+    "speed": {
+      "type": "number",
+      "label": "Animation Speed (seconds)",
+      "optional": true,
+      "default": 3
+    }
+  }
+}

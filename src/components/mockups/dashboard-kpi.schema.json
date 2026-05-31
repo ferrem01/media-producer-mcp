@@ -1,0 +1,57 @@
+{
+  "type": "dashboard-kpi",
+  "label": "KPI Dashboard",
+  "category": "mockups",
+  "description": "Realistic KPI dashboard with metric cards, sparkline charts, and count-up animations.",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "Dashboard Title",
+      "optional": true,
+      "default": "Dashboard"
+    },
+    "metrics": {
+      "type": "array",
+      "label": "Metrics",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "label": "Metric Label",
+            "required": true
+          },
+          "value": {
+            "type": "number",
+            "label": "Value",
+            "required": true
+          },
+          "change": {
+            "type": "number",
+            "label": "Change %",
+            "optional": true
+          },
+          "prefix": {
+            "type": "string",
+            "label": "Prefix",
+            "optional": true,
+            "placeholder": "$"
+          },
+          "suffix": {
+            "type": "string",
+            "label": "Suffix",
+            "optional": true,
+            "placeholder": "%"
+          },
+          "chart_data": {
+            "type": "array",
+            "label": "Sparkline Data",
+            "optional": true,
+            "items": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}

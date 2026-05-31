@@ -1,0 +1,32 @@
+{
+  "type": "code-editor",
+  "label": "Code Editor",
+  "category": "mockups",
+  "description": "VSCode-style code editor with syntax highlighting, line numbers, and typing effect.",
+  "data": {
+    "filename": {
+      "type": "string",
+      "label": "Filename",
+      "optional": true,
+      "default": "index.ts"
+    },
+    "code": {
+      "type": "string",
+      "label": "Code",
+      "required": true
+    },
+    "language": {
+      "type": "string",
+      "label": "Language",
+      "optional": true,
+      "default": "typescript"
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "enum": ["dark", "light"],
+      "default": "dark"
+    }
+  }
+}

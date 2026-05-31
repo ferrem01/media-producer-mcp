@@ -1,0 +1,18 @@
+{
+  "type": "hero-reveal",
+  "label": "Hero Reveal",
+  "category": "titles",
+  "description": "Full-screen text that scales from huge to normal with blur/depth. Cinematic Apple-style opener.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Hero Text",
+      "required": true
+    },
+    "subtitle": {
+      "type": "string",
+      "label": "Subtitle",
+      "optional": true
+    }
+  }
+}

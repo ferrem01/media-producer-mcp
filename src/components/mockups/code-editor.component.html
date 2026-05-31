@@ -1,0 +1,340 @@
+<template>
+  <div class="code-editor">
+    <div class="editor-frame">
+      <div class="editor-activity-bar">
+        <div class="activity-icon active-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        </div>
+        <div class="activity-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div class="activity-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <div class="activity-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </div>
+      </div>
+      <div class="editor-sidebar">
+        <div class="sidebar-title">EXPLORER</div>
+        <div class="file-tree"></div>
+      </div>
+      <div class="editor-main">
+        <div class="editor-tabs">
+          <div class="editor-tab active-tab">
+            <span class="tab-name"></span>
+            <span class="tab-close">×</span>
+          </div>
+        </div>
+        <div class="editor-content">
+          <div class="line-numbers"></div>
+          <div class="code-area">
+            <pre class="code-text"></pre>
+            <span class="cursor-blink">|</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .code-editor {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 60px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .editor-frame {
+    width: 90%;
+    height: 82%;
+    display: flex;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+
+  .editor-activity-bar {
+    width: 48px;
+    background: #1e1e2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 12px;
+    gap: 8px;
+    flex-shrink: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .activity-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    border-radius: 6px;
+  }
+
+  .active-icon {
+    color: #e2e8f0;
+    border-left: 2px solid var(--mp-color-accent, #A78BFA);
+  }
+
+  .editor-sidebar {
+    width: 200px;
+    background: #1a1b26;
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: #6b7280;
+    padding: 12px 16px 8px;
+  }
+
+  .file-tree {
+    display: flex;
+    flex-direction: column;
+    padding: 0 8px;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    font-size: 13px;
+    color: #9ca3af;
+    border-radius: 4px;
+    cursor: default;
+  }
+
+  .file-item.active-file {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+  }
+
+  .file-icon {
+    font-size: 14px;
+  }
+
+  .editor-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #1a1b26;
+    min-width: 0;
+  }
+
+  .editor-tabs {
+    display: flex;
+    background: #1e1e2e;
+    height: 36px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .editor-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    font-size: 13px;
+    color: #9ca3af;
+    border-bottom: 2px solid transparent;
+    cursor: default;
+  }
+
+  .active-tab {
+    color: #e2e8f0;
+    background: #1a1b26;
+    border-bottom-color: var(--mp-color-accent, #A78BFA);
+  }
+
+  .tab-close {
+    font-size: 16px;
+    opacity: 0.5;
+  }
+
+  .editor-content {
+    flex: 1;
+    display: flex;
+    padding: 16px 0;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  }
+
+  .line-numbers {
+    width: 52px;
+    text-align: right;
+    padding-right: 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #4b5563;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .code-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .code-text {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #e2e8f0;
+    margin: 0;
+    white-space: pre;
+    font-family: inherit;
+  }
+
+  .cursor-blink {
+    color: var(--mp-color-accent, #A78BFA);
+    font-weight: 300;
+    font-size: 14px;
+    position: absolute;
+  }
+
+  /* Syntax highlighting colors (One Dark) */
+  .syn-keyword { color: #c678dd; }
+  .syn-string { color: #98c379; }
+  .syn-number { color: #d19a66; }
+  .syn-function { color: #61afef; }
+  .syn-comment { color: #5c6370; font-style: italic; }
+  .syn-type { color: #e5c07b; }
+  .syn-operator { color: #56b6c2; }
+  .syn-punctuation { color: #abb2bf; }
+  .syn-variable { color: #e06c75; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var frame = el.querySelector('.editor-frame');
+    var tabName = el.querySelector('.tab-name');
+    var fileTree = el.querySelector('.file-tree');
+    var lineNumbers = el.querySelector('.line-numbers');
+    var codeText = el.querySelector('.code-text');
+    var cursor = el.querySelector('.cursor-blink');
+
+    var filename = data.filename || 'index.ts';
+    var code = data.code || '';
+    var language = data.language || 'typescript';
+
+    tabName.textContent = filename;
+
+    // Build file tree
+    var treeFiles = [
+      { name: 'src', icon: '📁', indent: 0 },
+      { name: filename, icon: '📄', indent: 1, active: true },
+      { name: 'package.json', icon: '📄', indent: 0 },
+      { name: 'tsconfig.json', icon: '📄', indent: 0 }
+    ];
+    for (var f = 0; f < treeFiles.length; f++) {
+      var fi = document.createElement('div');
+      fi.className = 'file-item' + (treeFiles[f].active ? ' active-file' : '');
+      fi.style.paddingLeft = (8 + treeFiles[f].indent * 16) + 'px';
+      var icon = document.createElement('span');
+      icon.className = 'file-icon';
+      icon.textContent = treeFiles[f].icon;
+      fi.appendChild(icon);
+      var name = document.createElement('span');
+      name.textContent = treeFiles[f].name;
+      fi.appendChild(name);
+      fileTree.appendChild(fi);
+    }
+
+    // Split code into lines
+    var lines = code.split('\n');
+    var totalLines = lines.length;
+
+    // Build line numbers
+    for (var ln = 1; ln <= totalLines; ln++) {
+      lineNumbers.textContent += ln + '\n';
+    }
+
+    // Simple syntax highlighting
+    function highlightLine(line) {
+      var result = line;
+      // Escape HTML
+      result = result.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      // Comments
+      result = result.replace(/(\/\/.*)$/gm, '<span class="syn-comment">$1</span>');
+      // Strings
+      result = result.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g, '<span class="syn-string">$1</span>');
+      // Keywords
+      result = result.replace(/\b(import|export|from|const|let|var|function|return|if|else|for|while|class|extends|new|async|await|try|catch|throw|interface|type|enum|default)\b/g, '<span class="syn-keyword">$1</span>');
+      // Numbers
+      result = result.replace(/\b(\d+\.?\d*)\b/g, '<span class="syn-number">$1</span>');
+      // Types (capitalized words)
+      result = result.replace(/\b([A-Z][a-zA-Z0-9]+)\b/g, '<span class="syn-type">$1</span>');
+      return result;
+    }
+
+    // Initial states
+    gsap.set(frame, { autoAlpha: 0, scale: 0.94, filter: 'blur(4px)' });
+    gsap.set(cursor, { autoAlpha: 0 });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    // Frame entrance
+    tl.to(frame, {
+      autoAlpha: 1, scale: 1, filter: 'blur(0px)',
+      duration: speed,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Show cursor
+    tl.to(cursor, { autoAlpha: 1, duration: 0.1 }, 0.3 + speed);
+
+    // Type code line by line
+    var currentLine = 0;
+    var lineDelay = Math.min(0.35, (ctx.duration - 2) / Math.max(totalLines, 1));
+
+    for (var i = 0; i < totalLines; i++) {
+      (function(idx, offset) {
+        tl.call(function() {
+          var displayedLines = [];
+          for (var d = 0; d <= idx; d++) {
+            displayedLines.push(highlightLine(lines[d]));
+          }
+          codeText.innerHTML = displayedLines.join('\n');
+        }, null, 0.3 + speed + 0.2 + offset);
+      })(i, i * lineDelay);
+    }
+
+    // Blink cursor
+    tl.to(cursor, {
+      autoAlpha: 0,
+      duration: 0.4,
+      repeat: -1,
+      yoyo: true,
+      ease: 'steps(1)'
+    }, 0.3 + speed + 0.1);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(frame, {
+        autoAlpha: 0, scale: 0.97,
+        duration: 0.5,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

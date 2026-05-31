@@ -1,0 +1,297 @@
+<template>
+  <div class="dashboard-kpi">
+    <div class="dashboard-frame">
+      <div class="dashboard-topbar">
+        <div class="topbar-left">
+          <div class="topbar-logo"></div>
+          <span class="topbar-title"></span>
+        </div>
+        <div class="topbar-right">
+          <div class="topbar-avatar"></div>
+        </div>
+      </div>
+      <div class="kpi-grid"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .dashboard-kpi {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .dashboard-frame {
+    width: 100%;
+    max-width: 1100px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .dashboard-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .topbar-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #A78BFA, #8B5CF6);
+  }
+
+  .topbar-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+  }
+
+  .topbar-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .kpi-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 28px 24px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
+  .kpi-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #94a3b8;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .kpi-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .kpi-value {
+    font-size: 36px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-change {
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 2px 8px;
+  }
+
+  .kpi-change.up {
+    color: #34d399;
+    background: rgba(52, 211, 153, 0.1);
+  }
+
+  .kpi-change.down {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.1);
+  }
+
+  .kpi-sparkline {
+    width: 100%;
+    height: 40px;
+  }
+
+  .kpi-sparkline path {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .kpi-sparkline .spark-fill {
+    stroke: none;
+    fill-opacity: 0.08;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var frame = el.querySelector('.dashboard-frame');
+    var topbar = el.querySelector('.dashboard-topbar');
+    var grid = el.querySelector('.kpi-grid');
+    var titleEl = el.querySelector('.topbar-title');
+
+    titleEl.textContent = data.title || 'Dashboard';
+
+    var metrics = data.metrics || [];
+    var cols = metrics.length <= 2 ? metrics.length : metrics.length <= 3 ? 3 : metrics.length <= 4 ? 2 : 3;
+    grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+
+    var cardEls = [];
+    var counterObjs = [];
+
+    for (var i = 0; i < metrics.length; i++) {
+      var m = metrics[i];
+      var card = document.createElement('div');
+      card.className = 'kpi-card';
+
+      var label = document.createElement('div');
+      label.className = 'kpi-label';
+      label.textContent = m.label || '';
+      card.appendChild(label);
+
+      var valueRow = document.createElement('div');
+      valueRow.className = 'kpi-value-row';
+
+      var valueEl = document.createElement('div');
+      valueEl.className = 'kpi-value';
+      valueEl.textContent = (m.prefix || '') + '0' + (m.suffix || '');
+      valueRow.appendChild(valueEl);
+
+      if (m.change !== undefined && m.change !== null) {
+        var changeEl = document.createElement('div');
+        changeEl.className = 'kpi-change ' + (m.change >= 0 ? 'up' : 'down');
+        changeEl.textContent = (m.change >= 0 ? '+' : '') + m.change + '%';
+        valueRow.appendChild(changeEl);
+      }
+      card.appendChild(valueRow);
+
+      // Sparkline chart
+      var chartData = m.chart_data;
+      if (chartData && chartData.length > 1) {
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'kpi-sparkline');
+        svg.setAttribute('viewBox', '0 0 200 40');
+        svg.setAttribute('preserveAspectRatio', 'none');
+
+        var min = Math.min.apply(null, chartData);
+        var max = Math.max.apply(null, chartData);
+        var range = max - min || 1;
+        var points = [];
+        for (var p = 0; p < chartData.length; p++) {
+          var x = (p / (chartData.length - 1)) * 200;
+          var y = 38 - ((chartData[p] - min) / range) * 34;
+          points.push(x + ',' + y);
+        }
+
+        var strokeColor = (m.change !== undefined && m.change < 0) ? '#f87171' : '#A78BFA';
+
+        // Fill area
+        var fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        fillPath.setAttribute('class', 'spark-fill');
+        fillPath.setAttribute('d', 'M0,40 L' + points.join(' L') + ' L200,40 Z');
+        fillPath.setAttribute('fill', strokeColor);
+        svg.appendChild(fillPath);
+
+        // Stroke line
+        var linePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        linePath.setAttribute('d', 'M' + points.join(' L'));
+        linePath.setAttribute('stroke', strokeColor);
+        svg.appendChild(linePath);
+
+        card.appendChild(svg);
+      }
+
+      grid.appendChild(card);
+      cardEls.push(card);
+      counterObjs.push({
+        el: valueEl,
+        target: m.value || 0,
+        prefix: m.prefix || '',
+        suffix: m.suffix || ''
+      });
+    }
+
+    // Initial states
+    gsap.set(topbar, { autoAlpha: 0, y: -15 });
+    gsap.set(cardEls, { autoAlpha: 0, y: 30, scale: 1.05, filter: 'blur(4px)' });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+    var stagger = ctx.motion === 'minimal' ? 0.06 : 0.1;
+
+    // Topbar entrance
+    tl.to(topbar, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.6,
+      ease: 'power2.out'
+    }, 0.3);
+
+    // Cards entrance
+    tl.to(cardEls, {
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: speed,
+      stagger: stagger,
+      ease: 'power3.out'
+    }, 0.5);
+
+    // Count up numbers
+    for (var k = 0; k < counterObjs.length; k++) {
+      (function(obj, idx) {
+        var counter = { val: 0 };
+        tl.to(counter, {
+          val: obj.target,
+          duration: speed * 1.5,
+          ease: 'power2.out',
+          onUpdate: function() {
+            var v = obj.target >= 1000
+              ? Math.round(counter.val).toLocaleString()
+              : counter.val % 1 !== 0
+                ? counter.val.toFixed(1)
+                : Math.round(counter.val).toString();
+            obj.el.textContent = obj.prefix + v + obj.suffix;
+          }
+        }, 0.5 + idx * stagger);
+      })(counterObjs[k], k);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to([topbar].concat(cardEls), {
+        autoAlpha: 0, y: -15,
+        duration: 0.4,
+        stagger: 0.03,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

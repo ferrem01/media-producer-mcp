@@ -1,11 +1,13 @@
 <template>
   <div class="quote-block">
-    <div class="quote-mark open">&ldquo;</div>
-    <blockquote class="quote-text">{{quote}}</blockquote>
-    <div class="quote-mark close">&rdquo;</div>
-    <div class="attribution">
-      <span class="author">{{author}}</span>
-      <span class="role">{{role}}</span>
+    <div class="quote-card">
+      <div class="quote-mark open">&ldquo;</div>
+      <blockquote class="quote-text">{{quote}}</blockquote>
+      <div class="quote-mark close">&rdquo;</div>
+      <div class="attribution">
+        <span class="author">{{author}}</span>
+        <span class="role">{{role}}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -13,58 +15,77 @@
 <style scoped>
   .quote-block {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
     width: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 60px 100px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
+  }
+
+  .quote-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 85%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 24px;
+    padding: 64px 72px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
     position: relative;
   }
 
   .quote-mark {
-    font-size: 120px;
-    font-weight: 800;
+    font-size: 100px;
+    font-weight: 700;
     color: var(--mp-color-accent, #A78BFA);
-    opacity: 0.3;
-    line-height: 0.6;
+    opacity: 0.25;
+    line-height: 0.5;
     user-select: none;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.2);
   }
 
   .quote-mark.open {
     align-self: flex-start;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
   }
 
   .quote-mark.close {
     align-self: flex-end;
-    margin-top: 8px;
+    margin-top: 12px;
   }
 
   .quote-text {
-    font-size: 40px;
+    font-size: 36px;
     font-weight: 500;
     font-style: italic;
     color: var(--mp-color-text, #ffffff);
     text-align: center;
     line-height: 1.4;
     margin: 0;
-    max-width: 85%;
+    max-width: 90%;
+    letter-spacing: -0.01em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.08);
   }
 
   .attribution {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-top: 32px;
-    gap: 4px;
+    margin-top: 36px;
+    gap: 6px;
   }
 
   .author {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.01em;
   }
 
   .author:empty {
@@ -72,9 +93,10 @@
   }
 
   .role {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 400;
-    color: var(--mp-color-text-muted, #94a3b8);
+    color: #cbd5e1;
+    letter-spacing: 0.005em;
   }
 
   .role:empty {
@@ -86,58 +108,62 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
 
+    var card = el.querySelector('.quote-card');
     var openMark = el.querySelector('.quote-mark.open');
     var closeMark = el.querySelector('.quote-mark.close');
     var quoteText = el.querySelector('.quote-text');
     var attribution = el.querySelector('.attribution');
 
-    var allElements = [openMark, quoteText, closeMark, attribution].filter(function(e) {
-      return e && e.textContent.trim();
-    });
-
-    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.7;
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.75;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
 
-    gsap.set(openMark, { autoAlpha: 0, scale: 0.5 });
-    gsap.set(closeMark, { autoAlpha: 0, scale: 0.5 });
-    gsap.set(quoteText, { autoAlpha: 0, y: 30 });
-    gsap.set(attribution, { autoAlpha: 0, y: 20 });
+    // Initial states
+    gsap.set(card, { autoAlpha: 0, y: 40, scale: 1.05, filter: 'blur(4px)' });
+    gsap.set(openMark, { autoAlpha: 0, scale: 0.6 });
+    gsap.set(closeMark, { autoAlpha: 0, scale: 0.6 });
+    gsap.set(quoteText, { autoAlpha: 0, y: 20 });
+    gsap.set(attribution, { autoAlpha: 0, y: 15 });
 
-    tl.to(openMark, {
-      autoAlpha: 0.3,
-      scale: 1,
+    // Card entrance
+    tl.to(card, {
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
       duration: speed,
       ease: ease
     }, 0.2);
 
+    // Quote marks
+    tl.to(openMark, {
+      autoAlpha: 0.25, scale: 1,
+      duration: speed * 0.7,
+      ease: ease
+    }, 0.3 + speed * 0.3);
+
+    // Quote text
     tl.to(quoteText, {
-      autoAlpha: 1,
-      y: 0,
-      duration: speed,
-      ease: ease
-    }, 0.4);
-
-    tl.to(closeMark, {
-      autoAlpha: 0.3,
-      scale: 1,
-      duration: speed,
-      ease: ease
-    }, 0.5);
-
-    tl.to(attribution, {
-      autoAlpha: 1,
-      y: 0,
+      autoAlpha: 1, y: 0,
       duration: speed * 0.8,
       ease: ease
-    }, 0.7);
+    }, 0.3 + speed * 0.4);
 
-    if (ctx.duration > 2.5) {
+    tl.to(closeMark, {
+      autoAlpha: 0.25, scale: 1,
+      duration: speed * 0.7,
+      ease: ease
+    }, 0.3 + speed * 0.5);
+
+    // Attribution
+    tl.to(attribution, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.6,
+      ease: 'power2.out'
+    }, 0.3 + speed * 0.7);
+
+    // Exit
+    if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.7;
-      tl.to(allElements, {
-        autoAlpha: 0,
-        y: -15,
-        duration: 0.4,
-        stagger: 0.04,
+      tl.to(card, {
+        autoAlpha: 0, y: -20,
+        duration: 0.45,
         ease: 'power2.in'
       }, exitAt);
     }

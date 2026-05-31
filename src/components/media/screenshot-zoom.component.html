@@ -1,7 +1,9 @@
 <template>
   <div class="screenshot-zoom">
-    <div class="screenshot-container">
-      <div class="screenshot-box"></div>
+    <div class="screenshot-frame">
+      <div class="screenshot-container">
+        <div class="screenshot-box"></div>
+      </div>
       <div class="zoom-label"></div>
     </div>
   </div>
@@ -14,17 +16,26 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
     overflow: hidden;
   }
 
-  .screenshot-container {
-    width: 90%;
-    height: 85%;
-    overflow: hidden;
-    border-radius: var(--mp-border-radius, 12px);
+  .screenshot-frame {
+    width: 88%;
+    height: 82%;
     position: relative;
-    border: 2px solid var(--mp-color-surface, #1e293b);
+  }
+
+  .screenshot-container {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 
   .screenshot-box {
@@ -38,16 +49,21 @@
 
   .zoom-label {
     position: absolute;
-    bottom: 16px;
+    bottom: -8px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 18px;
+    font-size: 13px;
     font-weight: 600;
-    color: var(--mp-color-text, #ffffff);
-    background: var(--mp-color-primary, #6366f1);
-    padding: 8px 20px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--mp-color-accent, #A78BFA);
+    background: rgba(167, 139, 250, 0.08);
+    border: 1px solid rgba(167, 139, 250, 0.2);
+    padding: 8px 24px;
     border-radius: 999px;
     white-space: nowrap;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .zoom-label:empty {
@@ -58,11 +74,11 @@
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
+    var frame = el.querySelector('.screenshot-frame');
+    var container = el.querySelector('.screenshot-container');
     var box = el.querySelector('.screenshot-box');
     var label = el.querySelector('.zoom-label');
-    var container = el.querySelector('.screenshot-container');
 
-    // Set background or placeholder
     if (data.src) {
       box.style.backgroundImage = 'url(' + data.src + ')';
     } else {
@@ -72,26 +88,26 @@
       }
     }
 
-    // Label
-    if (data.label) {
-      label.textContent = data.label;
-    }
+    if (data.label) label.textContent = data.label;
 
     var zoomX = data.zoom_x || 50;
     var zoomY = data.zoom_y || 50;
     var zoomScale = data.zoom_scale || 2;
 
-    // Set transform origin to zoom target
     box.style.transformOrigin = zoomX + '% ' + zoomY + '%';
 
-    // Start fully visible
-    gsap.set(container, { autoAlpha: 0 });
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.6 : 0.75;
+
+    // Frame entrance with scale + blur
+    gsap.set(frame, { autoAlpha: 0, scale: 1.06, filter: 'blur(5px)' });
     gsap.set(label, { autoAlpha: 0, y: 10 });
 
-    // Fade in
-    tl.to(container, { autoAlpha: 1, duration: 0.5, ease: 'power2.out' }, 0.2);
+    tl.to(frame, {
+      autoAlpha: 1, scale: 1, filter: 'blur(0px)',
+      duration: speed, ease: 'power3.out'
+    }, 0.2);
 
-    // Hold at full view, then zoom
+    // Smooth zoom
     var zoomStart = Math.min(1.0, ctx.duration * 0.3);
     var zoomDuration = ctx.duration * 0.35;
 
@@ -104,20 +120,18 @@
     // Show label after zoom
     if (data.label) {
       tl.to(label, {
-        autoAlpha: 1,
-        y: 0,
-        duration: 0.4,
-        ease: 'power2.out'
-      }, zoomStart + zoomDuration * 0.8);
+        autoAlpha: 1, y: 0,
+        duration: 0.4, ease: 'power2.out'
+      }, zoomStart + zoomDuration * 0.7);
     }
 
     // Exit
     if (ctx.duration > 2) {
-      tl.to(container, {
-        autoAlpha: 0,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, ctx.duration - 0.5);
+      var exitAt = ctx.duration - 0.6;
+      tl.to(frame, {
+        autoAlpha: 0, scale: 0.97,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt);
     }
 
     return tl;

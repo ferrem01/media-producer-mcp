@@ -1,8 +1,20 @@
 <template>
-  <div class="bento-grid"></div>
+  <div class="bento-grid-wrap">
+    <div class="bento-grid"></div>
+  </div>
 </template>
 
 <style scoped>
+  .bento-grid-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
   .bento-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -10,19 +22,23 @@
     gap: 16px;
     width: 100%;
     height: 100%;
-    padding: 40px;
     box-sizing: border-box;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
   }
 
   .bento-card {
-    background: var(--mp-color-surface, #1e293b);
-    border-radius: var(--mp-border-radius, 16px);
-    padding: 28px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 32px;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     overflow: hidden;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 
   .bento-card.size-medium {
@@ -34,19 +50,26 @@
     grid-row: span 2;
   }
 
+  .bento-card-icon {
+    font-size: 28px;
+    margin-bottom: 16px;
+  }
+
   .bento-card-title {
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     margin: 0 0 6px 0;
     line-height: 1.2;
+    letter-spacing: -0.01em;
   }
 
   .bento-card-desc {
     font-size: 14px;
-    color: var(--mp-color-text-muted, #94a3b8);
+    color: #94a3b8;
     margin: 0;
-    line-height: 1.4;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
   }
 </style>
 
@@ -62,6 +85,13 @@
       var size = cards[i].size || 'small';
       card.classList.add('size-' + size);
       if (cards[i].color) card.style.background = cards[i].color;
+
+      if (cards[i].icon) {
+        var icon = document.createElement('div');
+        icon.className = 'bento-card-icon';
+        icon.textContent = cards[i].icon;
+        card.appendChild(icon);
+      }
 
       var title = document.createElement('div');
       title.className = 'bento-card-title';
@@ -79,25 +109,35 @@
     }
 
     var cardEls = grid.querySelectorAll('.bento-card');
-    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.6;
+    var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.45 : 0.6;
     var stagger = ctx.motion === 'minimal' ? 0.06 : ctx.motion === 'punchy' ? 0.08 : 0.12;
 
-    gsap.set(cardEls, { autoAlpha: 0, scale: 0.85 });
+    // Scale + blur entrance
+    gsap.set(cardEls, { autoAlpha: 0, scale: 1.08, filter: 'blur(5px)' });
 
     tl.to(cardEls, {
-      autoAlpha: 1,
-      scale: 1,
+      autoAlpha: 1, scale: 1, filter: 'blur(0px)',
       duration: speed,
-      stagger: stagger,
-      ease: 'back.out(1.2)'
+      stagger: {
+        each: stagger,
+        from: 'start'
+      },
+      ease: ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out'
     }, 0.3);
 
+    // Subtle glow after entrance
+    tl.to(cardEls, {
+      boxShadow: '0 0 30px rgba(167, 139, 250, 0.05), 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.04)',
+      duration: 0.4,
+      stagger: stagger * 0.5
+    }, '-=0.2');
+
+    // Exit
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.7;
+      var exitAt = ctx.duration - 0.6;
       tl.to(cardEls, {
-        autoAlpha: 0,
-        scale: 0.9,
-        duration: 0.4,
+        autoAlpha: 0, scale: 0.97,
+        duration: 0.35,
         stagger: 0.03,
         ease: 'power2.in'
       }, exitAt);

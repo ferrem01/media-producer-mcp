@@ -1,0 +1,228 @@
+<template>
+  <div class="testimonial-card">
+    <div class="testimonial-container">
+      <div class="quote-mark">"</div>
+      <blockquote class="quote-text"></blockquote>
+      <div class="stars-row"></div>
+      <div class="author-row">
+        <div class="author-avatar"></div>
+        <div class="author-info">
+          <div class="author-name"></div>
+          <div class="author-role"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .testimonial-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .testimonial-container {
+    max-width: 720px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 24px;
+    padding: 56px 52px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    position: relative;
+  }
+
+  .quote-mark {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 120px;
+    line-height: 0.7;
+    color: var(--mp-color-accent, #A78BFA);
+    opacity: 0.15;
+    position: absolute;
+    top: 32px;
+    left: 40px;
+    pointer-events: none;
+  }
+
+  .quote-text {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 22px;
+    font-style: italic;
+    color: #e2e8f0;
+    line-height: 1.6;
+    margin: 0 0 32px 0;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.08);
+  }
+
+  .stars-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 28px;
+  }
+
+  .stars-row:empty {
+    display: none;
+  }
+
+  .star {
+    font-size: 18px;
+    color: #FBBF24;
+  }
+
+  .star.empty {
+    color: rgba(255, 255, 255, 0.1);
+  }
+
+  .author-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .author-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    flex-shrink: 0;
+    border: 2px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .author-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .author-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+  }
+
+  .author-role {
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.5;
+  }
+
+  .author-role:empty {
+    display: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.testimonial-container');
+    var quoteMark = el.querySelector('.quote-mark');
+    var quoteText = el.querySelector('.quote-text');
+    var starsRow = el.querySelector('.stars-row');
+    var authorRow = el.querySelector('.author-row');
+    var avatarEl = el.querySelector('.author-avatar');
+    var nameEl = el.querySelector('.author-name');
+    var roleEl = el.querySelector('.author-role');
+
+    // Set content
+    quoteText.textContent = data.quote || '';
+
+    // Set author info
+    var name = data.name || '';
+    nameEl.textContent = name;
+    var roleParts = [];
+    if (data.role) roleParts.push(data.role);
+    if (data.company) roleParts.push(data.company);
+    roleEl.textContent = roleParts.join(' · ');
+
+    // Avatar
+    var avatarColor = data.avatar_color || '#A78BFA';
+    avatarEl.style.background = 'linear-gradient(135deg, ' + avatarColor + ', ' + avatarColor + 'cc)';
+    avatarEl.textContent = name ? name[0].toUpperCase() : '?';
+
+    // Stars
+    if (data.rating && data.rating > 0) {
+      for (var s = 1; s <= 5; s++) {
+        var star = document.createElement('span');
+        star.className = 'star' + (s <= data.rating ? '' : ' empty');
+        star.textContent = '★';
+        starsRow.appendChild(star);
+      }
+    }
+
+    // Collect animated elements
+    var elements = [quoteMark, quoteText];
+    if (starsRow.children.length > 0) elements.push(starsRow);
+    elements.push(authorRow);
+
+    // Initial states
+    gsap.set(container, { autoAlpha: 0, scale: 1.06, filter: 'blur(4px)' });
+    gsap.set(elements, { autoAlpha: 0, y: 20 });
+    gsap.set(quoteMark, { scale: 0.8 });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.9;
+
+    // Container entrance
+    tl.to(container, {
+      autoAlpha: 1, scale: 1, filter: 'blur(0px)',
+      duration: speed,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Quote mark
+    tl.to(quoteMark, {
+      autoAlpha: 0.15, y: 0, scale: 1,
+      duration: speed * 0.7,
+      ease: 'power2.out'
+    }, 0.5);
+
+    // Quote text
+    tl.to(quoteText, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.8,
+      ease: 'power2.out'
+    }, 0.6);
+
+    // Stars
+    if (starsRow.children.length > 0) {
+      tl.to(starsRow, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.5,
+        ease: 'power2.out'
+      }, 0.6 + speed * 0.5);
+    }
+
+    // Author row
+    tl.to(authorRow, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.6,
+      ease: 'power2.out'
+    }, 0.6 + speed * 0.7);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(container, {
+        autoAlpha: 0, scale: 0.97, y: -15,
+        duration: 0.5,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

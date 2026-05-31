@@ -1,44 +1,62 @@
 <template>
-  <div class="terminal-frame">
-    <div class="terminal-chrome">
-      <div class="terminal-dots">
-        <span class="tdot tdot-red"></span>
-        <span class="tdot tdot-yellow"></span>
-        <span class="tdot tdot-green"></span>
+  <div class="terminal-wrap">
+    <div class="terminal-frame">
+      <div class="terminal-chrome">
+        <div class="terminal-dots">
+          <span class="tdot tdot-close"></span>
+          <span class="tdot tdot-min"></span>
+          <span class="tdot tdot-max"></span>
+        </div>
+        <div class="terminal-title">{{title}}</div>
+        <div class="terminal-dots-spacer"></div>
       </div>
-      <div class="terminal-title">{{title}}</div>
+      <div class="terminal-body"></div>
     </div>
-    <div class="terminal-body"></div>
   </div>
 </template>
 
 <style scoped>
+  .terminal-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+  }
+
   .terminal-frame {
     display: flex;
     flex-direction: column;
-    width: 80%;
-    height: 75%;
-    position: absolute;
-    top: 12.5%;
-    left: 10%;
-    border-radius: var(--mp-border-radius, 12px);
+    width: 82%;
+    height: 80%;
+    border-radius: 14px;
     overflow: hidden;
-    box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
   }
 
   .terminal-chrome {
     display: flex;
     align-items: center;
-    gap: 12px;
-    background: #2a2a2e;
-    padding: 10px 16px;
+    background: linear-gradient(180deg, #38383c 0%, #2d2d31 100%);
+    padding: 0 16px;
+    height: 48px;
     flex-shrink: 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.3);
   }
 
   .terminal-dots {
     display: flex;
-    gap: 7px;
+    gap: 8px;
+    flex: 0 0 68px;
+  }
+
+  .terminal-dots-spacer {
+    flex: 0 0 68px;
   }
 
   .tdot {
@@ -47,13 +65,17 @@
     border-radius: 50%;
   }
 
-  .tdot-red { background: #ff5f57; }
-  .tdot-yellow { background: #febc2e; }
-  .tdot-green { background: #28c840; }
+  .tdot-close { background: #ff5f57; }
+  .tdot-min { background: #febc2e; }
+  .tdot-max { background: #28c840; }
 
   .terminal-title {
+    flex: 1;
     font-size: 13px;
     color: #8b8b8e;
+    text-align: center;
+    font-weight: 500;
+    letter-spacing: 0.03em;
   }
 
   .terminal-title:empty { display: none; }
@@ -61,19 +83,20 @@
   .terminal-body {
     flex: 1;
     background: #0d1117;
-    padding: 20px;
+    padding: 24px;
     overflow: hidden;
   }
 
   .term-line {
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     font-size: 15px;
-    line-height: 1.6;
+    line-height: 1.65;
     white-space: pre-wrap;
   }
 
   .term-prompt {
     color: #7ee787;
+    text-shadow: 0 0 12px rgba(126, 231, 135, 0.2);
   }
 
   .term-command {
@@ -87,10 +110,11 @@
   .term-cursor {
     display: inline-block;
     width: 8px;
-    height: 17px;
+    height: 18px;
     background: #e6edf3;
     vertical-align: text-bottom;
     margin-left: 2px;
+    box-shadow: 0 0 8px rgba(230, 237, 243, 0.3);
   }
 </style>
 
@@ -101,12 +125,12 @@
     var body = el.querySelector('.terminal-body');
     var lines = data.lines || [];
 
-    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.7;
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
 
-    // Build terminal frame entrance
-    gsap.set(frame, { autoAlpha: 0, scale: 0.92, y: 20 });
+    // Frame entrance with scale + blur
+    gsap.set(frame, { autoAlpha: 0, scale: 1.05, y: 30, filter: 'blur(5px)' });
     tl.to(frame, {
-      autoAlpha: 1, scale: 1, y: 0,
+      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
       duration: speed, ease: 'power3.out'
     }, 0.2);
 
@@ -125,19 +149,16 @@
         var command = lineData.command || '';
         var output = lineData.output || '';
 
-        // Build prompt span
         var promptSpan = document.createElement('span');
         promptSpan.className = 'term-prompt';
         promptSpan.textContent = prompt + ' ';
         lineEl.appendChild(promptSpan);
 
-        // Command text (will be typed)
         var cmdSpan = document.createElement('span');
         cmdSpan.className = 'term-command';
         cmdSpan.textContent = '';
         lineEl.appendChild(cmdSpan);
 
-        // Cursor
         var cursor = document.createElement('span');
         cursor.className = 'term-cursor';
         lineEl.appendChild(cursor);
@@ -148,10 +169,8 @@
 
         var t = lineStart + idx * timePerLine;
 
-        // Show line
         tl.set(lineEl, { autoAlpha: 1 }, t);
 
-        // Type command character by character
         if (command) {
           var charDelay = Math.min(0.04, (timePerLine * 0.5) / command.length);
           for (var c = 0; c < command.length; c++) {
@@ -163,7 +182,6 @@
           }
         }
 
-        // Show output after command typed
         if (output) {
           var outputEl = document.createElement('div');
           outputEl.className = 'term-line';
@@ -178,7 +196,6 @@
           tl.set(cursor, { display: 'none' }, outputTime);
           tl.set(outputEl, { autoAlpha: 1 }, outputTime);
         } else {
-          // Hide cursor after typing
           var hideTime = t + (command ? 0.05 + command.length * 0.04 + 0.3 : timePerLine * 0.8);
           tl.set(cursor, { display: 'none' }, hideTime);
         }
@@ -189,7 +206,8 @@
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.7;
       tl.to(frame, {
-        autoAlpha: 0, scale: 0.96, duration: 0.5, ease: 'power2.in'
+        autoAlpha: 0, scale: 0.97, y: -15,
+        duration: 0.5, ease: 'power2.in'
       }, exitAt);
     }
 
