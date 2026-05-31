@@ -11,6 +11,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fork } from "node:child_process";
 import { assembleScene, type ComponentSource } from "./scene-assembler.js";
 import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, concatSegments } from "./encode.js";
@@ -131,102 +132,71 @@ async function renderImage(
 }
 
 /**
- * Render a single scene to MP4, including optional critique loop.
- * Returns { mp4Path, frameCount }.
+ * Render a single scene by spawning a child process.
+ * The child process handles assembly + capture + encode, then exits.
+ * ALL memory (HTML strings, Chromium, frame buffers) is freed on exit.
  */
-async function renderSingleScene(
+async function renderSingleSceneWorker(
   project: Project,
-  scene: Scene,
   sceneIndex: number,
-  componentSources: ComponentSource[],
   workDir: string,
-  gsapDir: string,
-  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
 ): Promise<{ mp4Path: string; frameCount: number }> {
-  console.log(`\n  Scene ${sceneIndex + 1}/${project.scenes.length}: "${scene.label || scene.id}"`);
-
-  // Assemble scene HTML
-  const html = await assembleScene({
-    scene,
-    components: componentSources,
-    brandKit: project.brand_kit,
-    canvas: project.canvas,
-    gsapDir,
-  });
-
+  const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `scene_${sceneIndex}`);
-  const htmlPath = path.join(sceneDir, "scene.html");
-  const framesDir = path.join(sceneDir, "frames");
   const mp4Path = path.join(sceneDir, "scene.mp4");
 
   await fs.mkdir(sceneDir, { recursive: true });
-  await fs.writeFile(htmlPath, html);
 
-  // Critiquer loop: preview -> critique -> revise -> repeat
-  if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
-    let currentHtml = html;
-    for (let rev = 0; rev < (critiqueOpts.maxRevisions || 2); rev++) {
-      const previewPath = path.join(sceneDir, `preview_rev${rev}.png`);
-      await captureSingleFrame({
-        htmlPath,
-        outputPath: previewPath,
-        width: project.canvas.width,
-        height: project.canvas.height,
-        format: "png",
-        atTime: scene.duration_seconds ? scene.duration_seconds / 3 : 0,
-      });
+  // Write the project JSON for the worker to read
+  const projectJsonPath = path.join(sceneDir, "project.json");
+  await fs.writeFile(projectJsonPath, JSON.stringify(project));
 
-      const previewBase64 = (await fs.readFile(previewPath)).toString("base64");
-
-      const critique = await critiqueScene({
-        sceneHtml: currentHtml,
-        previewImageBase64: previewBase64,
-        prompt: scene.label || critiqueOpts.originalPrompt || "",
-        llmConfig: critiqueOpts.llmConfig,
-        format: project.format,
-      });
-
-      console.log(`    Critique score: ${critique.score}/10`);
-      if (critique.score >= 7 || !critique.revised_html) break;
-
-      currentHtml = critique.revised_html;
-      await fs.writeFile(htmlPath, currentHtml);
-      console.log(`    Applied revision ${rev + 1}`);
-    }
-  }
-
-  // Capture frames
-  const captureResult = await captureScene({
-    htmlPath,
-    outputDir: framesDir,
-    fps: project.canvas.fps,
-    duration: scene.duration_seconds,
+  // Write worker args
+  const argsPath = path.join(sceneDir, ".worker-args.json");
+  await fs.writeFile(argsPath, JSON.stringify({
+    projectJsonPath,
+    sceneIndex,
+    workDir: sceneDir,
+    componentLibDir: config.componentLibDir,
+    gsapDir: config.gsapDir,
+    outputMp4Path: mp4Path,
     width: project.canvas.width,
     height: project.canvas.height,
-  });
-
-  // Encode to MP4
-  await encodeScene({
-    framesDir,
-    outputPath: mp4Path,
     fps: project.canvas.fps,
+  }));
+
+  // Spawn the worker
+  const workerPath = path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    "scene-worker.ts"
+  );
+
+  await new Promise<void>((resolve, reject) => {
+    const child = fork(workerPath, [argsPath], {
+      execArgv: ["--import", "tsx/esm"],
+      stdio: "inherit",
+    });
+    child.on("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Scene worker exited with code ${code}`));
+    });
+    child.on("error", reject);
   });
 
-  // Clean up frame PNGs to free disk space
-  await fs.rm(framesDir, { recursive: true, force: true });
+  // Clean up temp files
+  await fs.unlink(projectJsonPath).catch(() => {});
+  await fs.unlink(argsPath).catch(() => {});
 
-  return { mp4Path, frameCount: captureResult.frameCount };
+  const totalFrames = Math.ceil(scene.duration_seconds * project.canvas.fps);
+  return { mp4Path, frameCount: totalFrames };
 }
 
 /**
- * Render scenes in parallel batches with configurable concurrency.
+ * Render scenes in parallel batches using child process workers.
  */
 async function renderScenesParallel(
   project: Project,
-  componentSources: ComponentSource[],
   workDir: string,
-  gsapDir: string,
-  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
 ): Promise<Array<{ mp4Path: string; frameCount: number }>> {
   const concurrency = config.renderConcurrency;
   const results = new Array<{ mp4Path: string; frameCount: number }>(project.scenes.length);
@@ -234,11 +204,12 @@ async function renderScenesParallel(
   console.log(`  Rendering ${project.scenes.length} scenes (concurrency: ${concurrency})`);
 
   for (let batch = 0; batch < project.scenes.length; batch += concurrency) {
-    const batchScenes = project.scenes.slice(batch, batch + concurrency);
-    const promises = batchScenes.map((scene, i) => {
-      const idx = batch + i;
-      return renderSingleScene(project, scene, idx, componentSources, workDir, gsapDir, critiqueOpts);
-    });
+    const batchEnd = Math.min(batch + concurrency, project.scenes.length);
+    const promises: Promise<{ mp4Path: string; frameCount: number }>[] = [];
+    
+    for (let idx = batch; idx < batchEnd; idx++) {
+      promises.push(renderSingleSceneWorker(project, idx, workDir));
+    }
 
     const batchResults = await Promise.all(promises);
     for (let i = 0; i < batchResults.length; i++) {
@@ -254,17 +225,15 @@ async function renderScenesParallel(
  */
 async function renderVideo(
   project: Project,
-  componentSources: ComponentSource[],
+  _componentSources: ComponentSource[],
   workDir: string,
-  gsapDir: string,
+  _gsapDir: string,
   outputPath: string,
   startTime: number,
-  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
+  _critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
 ): Promise<RenderResult> {
-  // Render all scenes (in parallel batches)
-  const sceneResults = await renderScenesParallel(
-    project, componentSources, workDir, gsapDir, critiqueOpts,
-  );
+  // Render all scenes (in parallel batches, each as a child process)
+  const sceneResults = await renderScenesParallel(project, workDir);
 
   const sceneMp4s = sceneResults.map((r) => r.mp4Path);
   const totalFrames = sceneResults.reduce((sum, r) => sum + r.frameCount, 0);
