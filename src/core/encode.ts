@@ -12,6 +12,17 @@ import fs from "node:fs/promises";
 
 const execFileAsync = promisify(execFile);
 
+/** Standard web-compatible encoding args used everywhere. */
+const WEB_ENCODE_ARGS = [
+  "-c:v", "libx264",
+  "-profile:v", "baseline",
+  "-level", "3.1",
+  "-preset", "medium",
+  "-crf", "20",
+  "-pix_fmt", "yuv420p",
+  "-movflags", "+faststart",
+] as const;
+
 export interface EncodeSceneOptions {
   /** Directory containing frame-XXXXXX.png files */
   framesDir: string;
@@ -47,13 +58,7 @@ export async function encodeScene(options: EncodeSceneOptions): Promise<string> 
     "-y",
     "-framerate", String(fps),
     "-i", path.join(framesDir, `frame-%06d.${format}`),
-    "-c:v", "libx264",
-    "-profile:v", "baseline",
-    "-level", "3.1",
-    "-preset", "medium",
-    "-crf", "20",
-    "-pix_fmt", "yuv420p",
-    "-movflags", "+faststart",
+    ...WEB_ENCODE_ARGS,
     outputPath,
   ];
 
@@ -175,13 +180,7 @@ async function concatWithTransitions(
     ...inputs,
     "-filter_complex", filterComplex,
     "-map", "[vout]",
-    "-c:v", "libx264",
-    "-profile:v", "baseline",
-    "-level", "3.1",
-    "-preset", "medium",
-    "-crf", "20",
-    "-pix_fmt", "yuv420p",
-    "-movflags", "+faststart",
+    ...WEB_ENCODE_ARGS,
     outputPath,
   ];
 
