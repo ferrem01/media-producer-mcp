@@ -1,8 +1,8 @@
 /**
  * MCP Server for media-producer-mcp.
  *
- * Exposes project management, scene/component operations,
- * brand kit management, and rendering tools via MCP protocol.
+ * Consolidated tool set (~12 tools). Each tool infers the target
+ * from which IDs are provided (project, scene, component).
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -30,7 +30,47 @@ import { renderProject as renderProjectCore } from "./core/render.js";
 import { config } from "./config.js";
 import { projectDir, projectOutputDir } from "./persistence/paths.js";
 import path from "node:path";
+import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit } from "./core/types.js";
+
+// ── Shared Zod schemas ──
+
+const positionSchema = z.object({
+  x: z.union([z.number(), z.string()]),
+  y: z.union([z.number(), z.string()]),
+  width: z.union([z.number(), z.string()]).optional(),
+  height: z.union([z.number(), z.string()]).optional(),
+}).optional();
+
+const animationSchema = z.object({
+  effect: z.string(),
+  duration: z.number().optional(),
+  stagger: z.number().optional(),
+  ease: z.string().optional(),
+}).optional();
+
+const transitionSchema = z.object({
+  type: z.enum(["crossfade", "wipe-left", "wipe-right", "slide-up", "slide-down", "iris", "none"]),
+  duration_seconds: z.number(),
+}).optional();
+
+const componentSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  data: z.record(z.unknown()),
+  position: positionSchema,
+  z_index: z.number().optional(),
+  enter: animationSchema,
+  exit: animationSchema,
+});
+
+function ok(data: unknown) {
+  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+}
+
+function err(msg: string) {
+  return { content: [{ type: "text" as const, text: msg }], isError: true as const };
+}
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -39,65 +79,160 @@ export function createMcpServer(): McpServer {
   });
 
   // ─────────────────────────────────────────────
-  // Project Management
+  // create - Create a new project
   // ─────────────────────────────────────────────
 
   server.tool(
-    "create_project",
-    "Create a new media project (video, image, deck, one-pager, slideshow)",
+    "create",
+    "Create a new media project (video, image, deck, one-pager, slideshow, gif, social)",
     {
       tenant_id: z.string().describe("Tenant identifier"),
       name: z.string().describe("Project name"),
-      format: z.enum(["video", "image", "slideshow", "deck", "one-pager"]).describe("Output format"),
+      format: z.enum(["video", "image", "slideshow", "deck", "one-pager", "gif", "social", "email-header", "thumbnail"]).describe("Output format"),
       preset: z.enum(["landscape", "vertical", "square"]).optional().describe("Resolution preset (default: landscape)"),
-      fps: z.number().optional().describe("Frames per second for video/slideshow (default: 30)"),
+      fps: z.number().optional().describe("Frames per second for video/slideshow/gif (default: 30)"),
     },
     async (params) => {
       const project = await createProject({
         tenant_id: params.tenant_id,
         name: params.name,
-        format: params.format,
+        format: params.format as any,
         preset: params.preset,
         fps: params.fps,
       });
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
+      return ok(project);
     },
   );
 
+  // ─────────────────────────────────────────────
+  // get - Get project, brand kit, or component catalog
+  // ─────────────────────────────────────────────
+
   server.tool(
-    "get_project",
-    "Get a project's full state and metadata",
+    "get",
+    "Get a project's state, tenant brand kit, or a single scene. Pass project_id for project, 'brand_kit' target for brand kit, project_id + scene_id for a single scene.",
     {
       tenant_id: z.string(),
-      project_id: z.string(),
+      project_id: z.string().optional(),
+      scene_id: z.string().optional(),
+      target: z.enum(["project", "brand_kit"]).optional().describe("What to get (default: project)"),
     },
     async (params) => {
-      const project = await loadProject(params.tenant_id, params.project_id);
-      if (!project) {
-        return { content: [{ type: "text", text: "Project not found" }], isError: true };
+      const target = params.target || "project";
+
+      if (target === "brand_kit") {
+        const kit = await loadBrandKit(params.tenant_id);
+        return ok(kit || { message: "No brand kit configured" });
       }
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
+
+      if (!params.project_id) return err("project_id required");
+
+      const project = await loadProject(params.tenant_id, params.project_id);
+      if (!project) return err("Project not found");
+
+      if (params.scene_id) {
+        const scene = project.scenes.find((s) => s.id === params.scene_id);
+        if (!scene) return err("Scene not found");
+        return ok(scene);
+      }
+
+      return ok(project);
     },
   );
 
+  // ─────────────────────────────────────────────
+  // list - List projects or available components
+  // ─────────────────────────────────────────────
+
   server.tool(
-    "list_projects",
-    "List all projects for a tenant",
+    "list",
+    "List projects for a tenant, or available component types. Pass target='components' to see the component catalog.",
     {
       tenant_id: z.string(),
+      target: z.enum(["projects", "components"]).optional().describe("What to list (default: projects)"),
     },
     async (params) => {
+      const target = params.target || "projects";
+
+      if (target === "components") {
+        const catalog = await listComponentCatalog();
+        return ok(catalog);
+      }
+
       const projects = await listProjects(params.tenant_id);
-      return { content: [{ type: "text", text: JSON.stringify(projects, null, 2) }] };
+      return ok(projects);
     },
   );
 
+  // ─────────────────────────────────────────────
+  // add - Add a scene or component
+  // ─────────────────────────────────────────────
+
   server.tool(
-    "update_project",
-    "Update project metadata (name, canvas, brand_kit, status)",
+    "add",
+    "Add a scene to a project, or a component to a scene. If scene_id is provided, adds a component to that scene. Otherwise adds a new scene.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
+      scene_id: z.string().optional().describe("If provided, adds a component to this scene"),
+
+      // Scene fields (when adding a scene)
+      scene: z.object({
+        id: z.string(),
+        label: z.string().optional(),
+        duration_seconds: z.number(),
+        background: z.string().optional(),
+        transition_in: transitionSchema,
+        components: z.array(componentSchema).default([]),
+      }).optional(),
+      position: z.number().optional().describe("Insert position for scene (0-based, appends if omitted)"),
+
+      // Component fields (when adding a component to a scene)
+      component: componentSchema.optional(),
+    },
+    async (params) => {
+      if (params.scene_id && params.component) {
+        // Adding a component to a scene
+        const project = await addComponent(
+          params.tenant_id,
+          params.project_id,
+          params.scene_id,
+          params.component as SceneComponent,
+        );
+        if (!project) return err("Project or scene not found");
+        return ok(project);
+      }
+
+      if (params.scene) {
+        // Adding a scene
+        const project = await addScene(
+          params.tenant_id,
+          params.project_id,
+          params.scene as Scene,
+          params.position,
+        );
+        if (!project) return err("Project not found");
+        return ok(project);
+      }
+
+      return err("Provide either 'scene' (to add a scene) or 'scene_id' + 'component' (to add a component)");
+    },
+  );
+
+  // ─────────────────────────────────────────────
+  // update - Update project, scene, or component
+  // ─────────────────────────────────────────────
+
+  server.tool(
+    "update",
+    "Update a project, scene, or component. Infers target from which IDs are provided: project_id only = update project, + scene_id = update scene, + component_id = update component.",
+    {
+      tenant_id: z.string(),
+      project_id: z.string(),
+      scene_id: z.string().optional(),
+      component_id: z.string().optional(),
+
+      // Project-level updates
       name: z.string().optional(),
       canvas: z.object({
         width: z.number().optional(),
@@ -107,149 +242,110 @@ export function createMcpServer(): McpServer {
         background: z.string().optional(),
       }).optional(),
       status: z.enum(["draft", "rendering", "rendered", "failed"]).optional(),
+
+      // Scene-level updates
+      label: z.string().optional(),
+      duration_seconds: z.number().optional(),
+      background: z.string().optional(),
+      transition_in: transitionSchema,
+
+      // Component-level updates
+      data: z.record(z.unknown()).optional(),
+      position: positionSchema,
+      z_index: z.number().optional(),
+      enter: animationSchema,
+      exit: animationSchema,
     },
     async (params) => {
+      // Component update
+      if (params.scene_id && params.component_id) {
+        const updates: Record<string, unknown> = {};
+        if (params.data !== undefined) updates.data = params.data;
+        if (params.position !== undefined) updates.position = params.position;
+        if (params.z_index !== undefined) updates.z_index = params.z_index;
+        if (params.enter !== undefined) updates.enter = params.enter;
+        if (params.exit !== undefined) updates.exit = params.exit;
+
+        const project = await updateComponent(
+          params.tenant_id, params.project_id, params.scene_id, params.component_id,
+          updates as any,
+        );
+        if (!project) return err("Project, scene, or component not found");
+        return ok(project);
+      }
+
+      // Scene update
+      if (params.scene_id) {
+        const updates: Record<string, unknown> = {};
+        if (params.label !== undefined) updates.label = params.label;
+        if (params.duration_seconds !== undefined) updates.duration_seconds = params.duration_seconds;
+        if (params.background !== undefined) updates.background = params.background;
+        if (params.transition_in !== undefined) updates.transition_in = params.transition_in;
+
+        const project = await updateScene(
+          params.tenant_id, params.project_id, params.scene_id,
+          updates as any,
+        );
+        if (!project) return err("Project or scene not found");
+        return ok(project);
+      }
+
+      // Project update
       const updates: Record<string, unknown> = {};
       if (params.name !== undefined) updates.name = params.name;
       if (params.canvas !== undefined) updates.canvas = params.canvas;
       if (params.status !== undefined) updates.status = params.status;
 
       const project = await updateProject(params.tenant_id, params.project_id, updates as any);
-      if (!project) {
-        return { content: [{ type: "text", text: "Project not found" }], isError: true };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    "delete_project",
-    "Delete a project and all its data",
-    {
-      tenant_id: z.string(),
-      project_id: z.string(),
-    },
-    async (params) => {
-      const ok = await deleteProject(params.tenant_id, params.project_id);
-      return { content: [{ type: "text", text: ok ? "Deleted" : "Project not found" }] };
+      if (!project) return err("Project not found");
+      return ok(project);
     },
   );
 
   // ─────────────────────────────────────────────
-  // Scene Operations
+  // remove - Remove project, scene, or component
   // ─────────────────────────────────────────────
 
   server.tool(
-    "add_scene",
-    "Add a scene to a project",
+    "remove",
+    "Remove a project, scene, or component. Infers target from which IDs are provided.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
-      scene: z.object({
-        id: z.string(),
-        label: z.string().optional(),
-        duration_seconds: z.number(),
-        background: z.string().optional(),
-        transition_in: z.object({
-          type: z.enum(["crossfade", "wipe-left", "wipe-right", "slide-up", "slide-down", "iris", "none"]),
-          duration_seconds: z.number(),
-        }).optional(),
-        components: z.array(z.object({
-          id: z.string(),
-          type: z.string(),
-          data: z.record(z.unknown()),
-          position: z.object({
-            x: z.union([z.number(), z.string()]),
-            y: z.union([z.number(), z.string()]),
-            width: z.union([z.number(), z.string()]).optional(),
-            height: z.union([z.number(), z.string()]).optional(),
-          }).optional(),
-          z_index: z.number().optional(),
-          enter: z.object({
-            effect: z.string(),
-            duration: z.number().optional(),
-            stagger: z.number().optional(),
-            ease: z.string().optional(),
-          }).optional(),
-          exit: z.object({
-            effect: z.string(),
-            duration: z.number().optional(),
-            stagger: z.number().optional(),
-            ease: z.string().optional(),
-          }).optional(),
-        })).default([]),
-      }),
-      position: z.number().optional().describe("Insert position (0-based). Appends if omitted."),
+      scene_id: z.string().optional(),
+      component_id: z.string().optional(),
     },
     async (params) => {
-      const project = await addScene(
-        params.tenant_id,
-        params.project_id,
-        params.scene as Scene,
-        params.position,
-      );
-      if (!project) {
-        return { content: [{ type: "text", text: "Project not found" }], isError: true };
+      // Remove component
+      if (params.scene_id && params.component_id) {
+        const project = await removeComponent(
+          params.tenant_id, params.project_id, params.scene_id, params.component_id,
+        );
+        if (!project) return err("Project, scene, or component not found");
+        return ok({ removed: "component", component_id: params.component_id });
       }
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
+
+      // Remove scene
+      if (params.scene_id) {
+        const project = await removeScene(params.tenant_id, params.project_id, params.scene_id);
+        if (!project) return err("Project or scene not found");
+        return ok({ removed: "scene", scene_id: params.scene_id });
+      }
+
+      // Remove project
+      const deleted = await deleteProject(params.tenant_id, params.project_id);
+      if (!deleted) return err("Project not found");
+      return ok({ removed: "project", project_id: params.project_id });
     },
   );
 
-  server.tool(
-    "update_scene",
-    "Update a scene's properties (label, duration, background, transition, components)",
-    {
-      tenant_id: z.string(),
-      project_id: z.string(),
-      scene_id: z.string(),
-      label: z.string().optional(),
-      duration_seconds: z.number().optional(),
-      background: z.string().optional(),
-      transition_in: z.object({
-        type: z.enum(["crossfade", "wipe-left", "wipe-right", "slide-up", "slide-down", "iris", "none"]),
-        duration_seconds: z.number(),
-      }).optional(),
-    },
-    async (params) => {
-      const updates: Record<string, unknown> = {};
-      if (params.label !== undefined) updates.label = params.label;
-      if (params.duration_seconds !== undefined) updates.duration_seconds = params.duration_seconds;
-      if (params.background !== undefined) updates.background = params.background;
-      if (params.transition_in !== undefined) updates.transition_in = params.transition_in;
-
-      const project = await updateScene(
-        params.tenant_id,
-        params.project_id,
-        params.scene_id,
-        updates as any,
-      );
-      if (!project) {
-        return { content: [{ type: "text", text: "Project or scene not found" }], isError: true };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
-    },
-  );
+  // ─────────────────────────────────────────────
+  // reorder - Reorder scenes
+  // ─────────────────────────────────────────────
 
   server.tool(
-    "remove_scene",
-    "Remove a scene from a project",
-    {
-      tenant_id: z.string(),
-      project_id: z.string(),
-      scene_id: z.string(),
-    },
-    async (params) => {
-      const project = await removeScene(params.tenant_id, params.project_id, params.scene_id);
-      if (!project) {
-        return { content: [{ type: "text", text: "Project not found" }], isError: true };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    "reorder_scenes",
-    "Reorder scenes in a project by providing the scene IDs in desired order",
+    "reorder",
+    "Reorder scenes in a project by providing scene IDs in the desired order",
     {
       tenant_id: z.string(),
       project_id: z.string(),
@@ -257,217 +353,18 @@ export function createMcpServer(): McpServer {
     },
     async (params) => {
       const project = await reorderScenes(params.tenant_id, params.project_id, params.scene_ids);
-      if (!project) {
-        return { content: [{ type: "text", text: "Project not found or invalid scene IDs" }], isError: true };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
+      if (!project) return err("Project not found or invalid scene IDs");
+      return ok(project);
     },
   );
 
   // ─────────────────────────────────────────────
-  // Component Operations (within a scene)
+  // brand - Get/set brand kit, manage brand assets
   // ─────────────────────────────────────────────
 
   server.tool(
-    "add_component",
-    "Add a component to a scene",
-    {
-      tenant_id: z.string(),
-      project_id: z.string(),
-      scene_id: z.string(),
-      component: z.object({
-        id: z.string(),
-        type: z.string(),
-        data: z.record(z.unknown()),
-        position: z.object({
-          x: z.union([z.number(), z.string()]),
-          y: z.union([z.number(), z.string()]),
-          width: z.union([z.number(), z.string()]).optional(),
-          height: z.union([z.number(), z.string()]).optional(),
-        }).optional(),
-        z_index: z.number().optional(),
-        enter: z.object({
-          effect: z.string(),
-          duration: z.number().optional(),
-          stagger: z.number().optional(),
-          ease: z.string().optional(),
-        }).optional(),
-        exit: z.object({
-          effect: z.string(),
-          duration: z.number().optional(),
-          stagger: z.number().optional(),
-          ease: z.string().optional(),
-        }).optional(),
-      }),
-    },
-    async (params) => {
-      const project = await addComponent(
-        params.tenant_id,
-        params.project_id,
-        params.scene_id,
-        params.component as SceneComponent,
-      );
-      if (!project) {
-        return { content: [{ type: "text", text: "Project or scene not found" }], isError: true };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    "update_component",
-    "Update a component's data, position, z_index, or animations",
-    {
-      tenant_id: z.string(),
-      project_id: z.string(),
-      scene_id: z.string(),
-      component_id: z.string(),
-      data: z.record(z.unknown()).optional(),
-      position: z.object({
-        x: z.union([z.number(), z.string()]),
-        y: z.union([z.number(), z.string()]),
-        width: z.union([z.number(), z.string()]).optional(),
-        height: z.union([z.number(), z.string()]).optional(),
-      }).optional(),
-      z_index: z.number().optional(),
-      enter: z.object({
-        effect: z.string(),
-        duration: z.number().optional(),
-        stagger: z.number().optional(),
-        ease: z.string().optional(),
-      }).optional(),
-      exit: z.object({
-        effect: z.string(),
-        duration: z.number().optional(),
-        stagger: z.number().optional(),
-        ease: z.string().optional(),
-      }).optional(),
-    },
-    async (params) => {
-      const updates: Record<string, unknown> = {};
-      if (params.data !== undefined) updates.data = params.data;
-      if (params.position !== undefined) updates.position = params.position;
-      if (params.z_index !== undefined) updates.z_index = params.z_index;
-      if (params.enter !== undefined) updates.enter = params.enter;
-      if (params.exit !== undefined) updates.exit = params.exit;
-
-      const project = await updateComponent(
-        params.tenant_id,
-        params.project_id,
-        params.scene_id,
-        params.component_id,
-        updates as any,
-      );
-      if (!project) {
-        return { content: [{ type: "text", text: "Project, scene, or component not found" }], isError: true };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    "remove_component",
-    "Remove a component from a scene",
-    {
-      tenant_id: z.string(),
-      project_id: z.string(),
-      scene_id: z.string(),
-      component_id: z.string(),
-    },
-    async (params) => {
-      const project = await removeComponent(
-        params.tenant_id,
-        params.project_id,
-        params.scene_id,
-        params.component_id,
-      );
-      if (!project) {
-        return { content: [{ type: "text", text: "Project, scene, or component not found" }], isError: true };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(project, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    "list_components",
-    "List available component types (built-in library)",
-    {},
-    async () => {
-      // Return the known built-in component catalog from the spec
-      const components = [
-        // Titles & Text
-        { type: "title-slide", category: "titles", label: "Title Slide" },
-        { type: "section-header", category: "titles", label: "Section Header" },
-        { type: "kinetic-text", category: "titles", label: "Kinetic Text" },
-        { type: "typewriter", category: "titles", label: "Typewriter" },
-        { type: "stat-card", category: "titles", label: "Stat Card" },
-        { type: "quote-block", category: "titles", label: "Quote Block" },
-        { type: "code-block", category: "titles", label: "Code Block" },
-        { type: "text-list", category: "titles", label: "Text List" },
-        // Layouts
-        { type: "split-screen", category: "layouts", label: "Split Screen" },
-        { type: "grid-layout", category: "layouts", label: "Grid Layout" },
-        { type: "bento-grid", category: "layouts", label: "Bento Grid" },
-        { type: "browser-frame", category: "layouts", label: "Browser Frame" },
-        { type: "device-mockup", category: "layouts", label: "Device Mockup" },
-        { type: "terminal", category: "layouts", label: "Terminal" },
-        // Media
-        { type: "image-showcase", category: "media", label: "Image Showcase" },
-        { type: "video-embed", category: "media", label: "Video Embed" },
-        { type: "logo-intro", category: "media", label: "Logo Intro" },
-        { type: "logo-outro", category: "media", label: "Logo Outro" },
-        { type: "screenshot-zoom", category: "media", label: "Screenshot Zoom" },
-        // Data Viz
-        { type: "bar-chart", category: "data", label: "Bar Chart" },
-        { type: "line-chart", category: "data", label: "Line Chart" },
-        { type: "pie-chart", category: "data", label: "Pie Chart" },
-        { type: "progress-bar", category: "data", label: "Progress Bar" },
-        { type: "metric-dashboard", category: "data", label: "Metric Dashboard" },
-        { type: "comparison-table", category: "data", label: "Comparison Table" },
-        // Product Mockups
-        { type: "chat-interface", category: "mockups", label: "Chat Interface" },
-        { type: "dashboard-ui", category: "mockups", label: "Dashboard UI" },
-        { type: "form-flow", category: "mockups", label: "Form Flow" },
-        { type: "notification-toast", category: "mockups", label: "Notification Toast" },
-        { type: "modal-dialog", category: "mockups", label: "Modal Dialog" },
-        { type: "cursor-flow", category: "mockups", label: "Cursor Flow" },
-        // Effects
-        { type: "gradient-background", category: "effects", label: "Gradient Background" },
-        { type: "mesh-gradient", category: "effects", label: "Mesh Gradient" },
-        { type: "particle-field", category: "effects", label: "Particle Field" },
-        { type: "film-polish", category: "effects", label: "Film Polish" },
-        { type: "spotlight", category: "effects", label: "Spotlight" },
-        // CTA
-        { type: "cta-card", category: "cta", label: "CTA Card" },
-        { type: "social-proof", category: "cta", label: "Social Proof" },
-        { type: "pricing-card", category: "cta", label: "Pricing Card" },
-      ];
-      return { content: [{ type: "text", text: JSON.stringify(components, null, 2) }] };
-    },
-  );
-
-  // ─────────────────────────────────────────────
-  // Brand Kit
-  // ─────────────────────────────────────────────
-
-  server.tool(
-    "get_brand_kit",
-    "Get a tenant's brand kit",
-    {
-      tenant_id: z.string(),
-    },
-    async (params) => {
-      const kit = await loadBrandKit(params.tenant_id);
-      if (!kit) {
-        return { content: [{ type: "text", text: "No brand kit found for tenant" }] };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(kit, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    "set_brand_kit",
-    "Set or update a tenant's brand kit (colors, fonts, style)",
+    "brand",
+    "Get or set a tenant's brand kit (colors, fonts, logo, style, assets). Pass no fields to get the current brand kit. Pass fields to update.",
     {
       tenant_id: z.string(),
       colors: z.object({
@@ -496,7 +393,15 @@ export function createMcpServer(): McpServer {
       }).optional(),
     },
     async (params) => {
-      // Load existing or start fresh
+      const hasUpdates = params.colors || params.fonts || params.logo || params.style;
+
+      if (!hasUpdates) {
+        // Get brand kit
+        const kit = await loadBrandKit(params.tenant_id);
+        return ok(kit || { message: "No brand kit configured" });
+      }
+
+      // Set/update brand kit
       const existing = await loadBrandKit(params.tenant_id);
       const kit: BrandKit = {
         colors: {
@@ -511,43 +416,83 @@ export function createMcpServer(): McpServer {
           ...params.colors,
         },
         fonts: params.fonts || existing?.fonts || [
-          { family: "Inter", source: "google", weights: [400, 500, 600, 700, 800] },
+          { family: "Inter", source: "google" as const, weights: [400, 500, 600, 700, 800] },
         ],
         logo: params.logo || existing?.logo,
         style: {
           border_radius: "12px",
-          motion: "cinematic",
+          motion: "cinematic" as const,
           ...existing?.style,
           ...params.style,
         },
       };
 
       await saveBrandKit(params.tenant_id, kit);
-      return { content: [{ type: "text", text: JSON.stringify(kit, null, 2) }] };
+      return ok(kit);
     },
   );
 
   // ─────────────────────────────────────────────
-  // Rendering (stubs -- will wire to render pipeline)
+  // render - Render project or scene preview
   // ─────────────────────────────────────────────
 
   server.tool(
-    "render_project",
-    "Render a project to its output format (video/image/deck/etc.)",
+    "render",
+    "Render a project to its output format, or render a single scene as a preview image. Pass scene_id for scene preview.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
+      scene_id: z.string().optional().describe("If provided, renders a single scene preview image"),
       quality: z.enum(["preview", "production"]).optional().describe("Render quality (default: production)"),
     },
     async (params) => {
       const project = await loadProject(params.tenant_id, params.project_id);
-      if (!project) {
-        return { content: [{ type: "text", text: "Project not found" }], isError: true };
+      if (!project) return err("Project not found");
+
+      // Scene preview
+      if (params.scene_id) {
+        const scene = project.scenes.find((s) => s.id === params.scene_id);
+        if (!scene) return err("Scene not found");
+
+        try {
+          const sceneAssembler = await import("./core/scene-assembler.js");
+          const captureModule = await import("./core/capture.js");
+
+          const types = new Set(scene.components.map((c) => c.type));
+          const components: Array<{ type: string; source: string }> = [];
+          for (const t of types) {
+            const source = await findComponentSource(t);
+            if (source) components.push({ type: t, source });
+          }
+
+          const html = await sceneAssembler.assembleScene({
+            scene, components, brandKit: project.brand_kit, canvas: project.canvas, gsapDir: config.gsapDir,
+          });
+
+          const workDir = path.join(projectDir(params.tenant_id, params.project_id), "_work");
+          const htmlPath = path.join(workDir, `preview_${scene.id}.html`);
+          const outputPath = path.join(
+            projectOutputDir(params.tenant_id, params.project_id),
+            `preview_${scene.id}.png`,
+          );
+
+          await fs.mkdir(workDir, { recursive: true });
+          await fs.writeFile(htmlPath, html);
+
+          await captureModule.captureSingleFrame({
+            htmlPath, outputPath,
+            width: project.canvas.width, height: project.canvas.height,
+            atTime: scene.duration_seconds / 3,
+          });
+
+          return ok({ status: "rendered", scene_id: scene.id, output_path: outputPath });
+        } catch (e: any) {
+          return err(`Scene render failed: ${e.message}`);
+        }
       }
 
-      if (project.scenes.length === 0) {
-        return { content: [{ type: "text", text: "Project has no scenes" }], isError: true };
-      }
+      // Full project render
+      if (project.scenes.length === 0) return err("Project has no scenes");
 
       project.status = "rendering";
       await saveProject(project);
@@ -570,125 +515,157 @@ export function createMcpServer(): McpServer {
         project.status = "rendered";
         await saveProject(project);
 
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              status: "rendered",
-              project_id: project.project_id,
-              format: project.format,
-              output_path: result.outputPath,
-              duration_ms: result.durationMs,
-              frame_count: result.frameCount,
-            }, null, 2),
-          }],
-        };
-      } catch (err: any) {
+        return ok({
+          status: "rendered",
+          project_id: project.project_id,
+          format: project.format,
+          output_path: result.outputPath,
+          duration_ms: result.durationMs,
+          frame_count: result.frameCount,
+        });
+      } catch (e: any) {
         project.status = "failed";
         await saveProject(project);
-
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              status: "failed",
-              error: err.message || String(err),
-            }, null, 2),
-          }],
-          isError: true,
-        };
+        return err(`Render failed: ${e.message}`);
       }
     },
   );
 
+  // ─────────────────────────────────────────────
+  // upload - Upload an asset to a project
+  // ─────────────────────────────────────────────
+
   server.tool(
-    "render_scene",
-    "Render a single scene as an image preview",
+    "upload",
+    "Upload an asset (image, video, audio) to a project or to the tenant brand kit. Set target='brand' to upload a brand asset.",
+    {
+      tenant_id: z.string(),
+      project_id: z.string().optional(),
+      target: z.enum(["project", "brand"]).optional().describe("Upload target (default: project)"),
+      url: z.string().optional().describe("URL to download the asset from"),
+      name: z.string().describe("Asset name/filename"),
+      asset_type: z.enum(["image", "video", "audio", "logo", "font", "intro", "outro", "background", "watermark", "music", "other"]).optional(),
+    },
+    async (params) => {
+      // TODO: implement actual file download/storage
+      return ok({
+        status: "not_yet_implemented",
+        message: "Asset upload will be implemented in the next phase",
+        name: params.name,
+        target: params.target || "project",
+      });
+    },
+  );
+
+  // ─────────────────────────────────────────────
+  // audio - Manage audio tracks
+  // ─────────────────────────────────────────────
+
+  server.tool(
+    "audio",
+    "Add, update, or remove audio tracks (voiceover, music, SFX) on a project",
     {
       tenant_id: z.string(),
       project_id: z.string(),
-      scene_id: z.string(),
+      action: z.enum(["add", "update", "remove"]).describe("Action to perform"),
+      track: z.object({
+        id: z.string(),
+        type: z.enum(["voiceover", "music", "sfx"]).optional(),
+        source: z.string().optional(),
+        volume: z.number().min(0).max(1).optional(),
+        start_time: z.number().optional(),
+        loop: z.boolean().optional(),
+        fade_in: z.number().optional(),
+        fade_out: z.number().optional(),
+      }),
     },
     async (params) => {
       const project = await loadProject(params.tenant_id, params.project_id);
-      if (!project) {
-        return { content: [{ type: "text", text: "Project not found" }], isError: true };
+      if (!project) return err("Project not found");
+
+      if (!project.audio) {
+        project.audio = { tracks: [] };
       }
 
-      const scene = project.scenes.find((s) => s.id === params.scene_id);
-      if (!scene) {
-        return { content: [{ type: "text", text: "Scene not found" }], isError: true };
-      }
-
-      try {
-        const sceneAssembler = await import("./core/scene-assembler.js");
-        const captureModule = await import("./core/capture.js");
-        const fs = await import("node:fs/promises");
-
-        // Load component sources
-        const types = new Set(scene.components.map((c) => c.type));
-        const components: Array<{ type: string; source: string }> = [];
-        for (const t of types) {
-          // Search component library
-          const categories = await fs.readdir(config.componentLibDir, { withFileTypes: true }).catch(() => []);
-          for (const cat of categories) {
-            if (!cat.isDirectory()) continue;
-            const fp = path.join(config.componentLibDir, cat.name, `${t}.component.html`);
-            try {
-              const source = await fs.readFile(fp, "utf-8");
-              components.push({ type: t, source });
-              break;
-            } catch { /* not in this category */ }
-          }
+      if (params.action === "add") {
+        if (!params.track.type || !params.track.source) {
+          return err("Track type and source required for add");
         }
-
-        const html = await sceneAssembler.assembleScene({
-          scene,
-          components,
-          brandKit: project.brand_kit,
-          canvas: project.canvas,
-          gsapDir: config.gsapDir,
+        project.audio.tracks.push({
+          id: params.track.id,
+          type: params.track.type,
+          source: params.track.source,
+          volume: params.track.volume ?? 1.0,
+          start_time: params.track.start_time,
+          loop: params.track.loop,
+          fade_in: params.track.fade_in,
+          fade_out: params.track.fade_out,
         });
-
-        const workDir = path.join(projectDir(params.tenant_id, params.project_id), "_work");
-        const htmlPath = path.join(workDir, `preview_${scene.id}.html`);
-        const outputPath = path.join(
-          projectOutputDir(params.tenant_id, params.project_id),
-          `preview_${scene.id}.png`,
-        );
-
-        await fs.mkdir(workDir, { recursive: true });
-        await fs.writeFile(htmlPath, html);
-
-        await captureModule.captureSingleFrame({
-          htmlPath,
-          outputPath,
-          width: project.canvas.width,
-          height: project.canvas.height,
-          atTime: scene.duration_seconds / 3,
-        });
-
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              status: "rendered",
-              scene_id: scene.id,
-              output_path: outputPath,
-            }, null, 2),
-          }],
-        };
-      } catch (err: any) {
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({ status: "failed", error: err.message || String(err) }, null, 2),
-          }],
-          isError: true,
-        };
+      } else if (params.action === "update") {
+        const existing = project.audio.tracks.find((t) => t.id === params.track.id);
+        if (!existing) return err("Track not found");
+        if (params.track.volume !== undefined) existing.volume = params.track.volume;
+        if (params.track.source !== undefined) existing.source = params.track.source;
+        if (params.track.loop !== undefined) existing.loop = params.track.loop;
+        if (params.track.fade_in !== undefined) existing.fade_in = params.track.fade_in;
+        if (params.track.fade_out !== undefined) existing.fade_out = params.track.fade_out;
+      } else if (params.action === "remove") {
+        project.audio.tracks = project.audio.tracks.filter((t) => t.id !== params.track.id);
       }
+
+      await saveProject(project);
+      return ok(project.audio);
     },
   );
 
   return server;
+}
+
+// ── Helpers ──
+
+async function listComponentCatalog(): Promise<Array<{ type: string; category: string; label?: string; description?: string }>> {
+  const catalog: Array<{ type: string; category: string; label?: string; description?: string }> = [];
+
+  try {
+    const categories = await fs.readdir(config.componentLibDir, { withFileTypes: true });
+    for (const cat of categories) {
+      if (!cat.isDirectory() || cat.name === "shared") continue;
+      const catDir = path.join(config.componentLibDir, cat.name);
+      const files = await fs.readdir(catDir);
+
+      for (const file of files) {
+        if (!file.endsWith(".component.html")) continue;
+        const type = file.replace(".component.html", "");
+
+        // Try to load companion schema
+        let label: string | undefined;
+        let description: string | undefined;
+        try {
+          const schemaPath = path.join(catDir, `${type}.schema.json`);
+          const schemaRaw = await fs.readFile(schemaPath, "utf-8");
+          const schema = JSON.parse(schemaRaw);
+          label = schema.label;
+          description = schema.description;
+        } catch { /* no schema */ }
+
+        catalog.push({ type, category: cat.name, label, description });
+      }
+    }
+  } catch { /* component dir doesn't exist */ }
+
+  return catalog;
+}
+
+async function findComponentSource(type: string): Promise<string | null> {
+  try {
+    const categories = await fs.readdir(config.componentLibDir, { withFileTypes: true });
+    for (const cat of categories) {
+      if (!cat.isDirectory()) continue;
+      const fp = path.join(config.componentLibDir, cat.name, `${type}.component.html`);
+      try {
+        return await fs.readFile(fp, "utf-8");
+      } catch { /* not here */ }
+    }
+  } catch { /* no lib dir */ }
+  return null;
 }
