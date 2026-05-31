@@ -11,7 +11,7 @@
 
 <script>
   function createTimeline(el, data, ctx) {
-    var tl = gsap.timeline({ paused: true });
+    var tl = gsap.timeline();
     var bg = el.querySelector('.gradient-bg');
 
     var from = data.from || var_value('--mp-color-background') || '#0f172a';
