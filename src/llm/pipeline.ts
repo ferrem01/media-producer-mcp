@@ -15,6 +15,7 @@ import { planProject } from "./project-planner.js";
 import { critiqueScene, type CritiqueResult } from "./critiquer.js";
 import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
+import { planFreeform, saveFreeformComponents } from "./freeform-planner.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { createProject, saveProject } from "../persistence/project.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
@@ -35,6 +36,7 @@ export interface PipelineOpts {
   critique?: boolean;
   maxRevisions?: number;
   sceneCount?: number;
+  mode?: "freeform" | "structured";
 }
 
 export interface PipelineResult {
@@ -98,7 +100,11 @@ export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineR
         return await runScenePipeline(opts, brandKit, canvas, catalog, "image");
 
       case "video":
-        return await runProjectPipeline(opts, brandKit, canvas, catalog, "video");
+        if (opts.mode === "freeform" || opts.mode === undefined) {
+          return await runFreeformPipeline(opts, brandKit, canvas);
+        } else {
+          return await runProjectPipeline(opts, brandKit, canvas, catalog, "video");
+        }
 
       case "deck":
       case "presentation":
@@ -253,5 +259,56 @@ async function runProjectPipeline(
     target: opts.target,
     project: projectResult.project,
     customComponents: projectResult.customComponents,
+  };
+}
+
+// ── Freeform Pipeline ──
+
+async function runFreeformPipeline(
+  opts: PipelineOpts,
+  brandKit: BrandKit,
+  canvas: Canvas,
+): Promise<PipelineResult> {
+  // Expand thin prompts into rich creative briefs
+  var expanded = await expandPrompt({
+    prompt: opts.prompt,
+    format: "video",
+    llmConfig: opts.llmConfig,
+    brandKit,
+    sceneCount: opts.sceneCount,
+  });
+  var richPrompt = expanded.prompt;
+  if (expanded.expanded) {
+    console.log("  Prompt expanded for freeform planning");
+  }
+
+  // One LLM call produces all scenes with full HTML
+  var freeformResult = await planFreeform({
+    prompt: richPrompt,
+    format: "video",
+    llmConfig: opts.llmConfig,
+    brandKit,
+    canvas,
+    sceneCount: expanded.sceneCount || opts.sceneCount,
+  });
+
+  // Fill in tenant_id
+  freeformResult.project.tenant_id = opts.tenant_id;
+
+  // Save freeform component HTML files to project directory
+  await saveFreeformComponents(
+    opts.tenant_id,
+    freeformResult.project.project_id,
+    freeformResult.project.scenes,
+    freeformResult.sceneHtmlSources,
+  );
+
+  // Save the project
+  await saveProject(freeformResult.project);
+
+  return {
+    status: "completed",
+    target: opts.target,
+    project: freeformResult.project,
   };
 }

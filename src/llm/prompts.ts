@@ -8,6 +8,7 @@
 import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES, CRITIQUER_DESIGN_RULES } from "./design-rules.js";
 import { GSAP_ANIMATION_SKILLS } from "./gsap-skills.js";
 import { SCRIPT_SYSTEM_SKILLS } from "./script-skills.js";
+import type { BrandKit, Canvas } from "../core/types.js";
 
 /**
  * System prompt for generating .component.html files.
@@ -305,6 +306,105 @@ For each scene, provide 2-4 sentences covering:
 6. Think about visual rhythm: alternate between text-heavy and visual scenes.
 7. Keep the brief under 500 words. Dense and actionable, not fluffy.
 8. Output ONLY the creative brief. No preamble, no "Here's the brief:", just the brief itself.`;
+}
+
+/**
+ * System prompt for the freeform planner.
+ * The LLM writes full HTML+CSS+GSAP per scene with complete creative freedom.
+ */
+export function freeformPlannerSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
+  var formatRules = componentFormatRules(format);
+  var brandVars = buildBrandVarsList(brandKit);
+
+  return `You are a world-class motion graphics designer creating cinematic video scenes with HTML, CSS, and GSAP.
+
+You will receive a creative brief and produce a complete multi-scene video. For each scene, you write the FULL HTML, CSS, and GSAP animation code -- not component references, but actual visual code.
+
+## Your Output
+
+Output valid JSON with this structure:
+{
+  "name": "Project Title",
+  "scenes": [
+    {
+      "label": "Scene 1 - Hero",
+      "duration_seconds": 4,
+      "transition_in": { "type": "crossfade", "duration_seconds": 0.5 },
+      "html": "<template>...</template>\\n<style scoped>...</style>\\n<script>function createTimeline(el, data, ctx) {...}</script>"
+    }
+  ]
+}
+
+## Creative Direction
+
+Think like an Apple keynote designer:
+- Each scene is a CINEMATIC MOMENT, not a slide
+- Bold typography with dramatic reveals (scale from 200%, blur clear, per-character stagger)
+- Rich backgrounds: multi-layer gradients, subtle grain, ambient glow
+- One powerful idea per scene -- don't cram multiple concepts
+- Professional spacing: 80px+ from edges, intentional visual hierarchy
+- Motion should feel SMOOTH and DELIBERATE -- use power3.out for entrances, power2.in for exits
+
+## Visual Style Guide
+- Dark premium aesthetic (use var(--mp-color-background) as base)
+- Glass morphism: rgba(255,255,255,0.03) + backdrop-filter: blur(12px)
+- Accent glow: text-shadow: 0 0 80px rgba(accent, 0.2)
+- Elevated elements: box-shadow: 0 25px 60px rgba(0,0,0,0.5)
+- Typography: weight 700 for headlines, -0.02em letter-spacing
+- Subtle film grain via SVG filter overlay
+- Use CSS custom properties for all brand colors
+
+## Canvas
+- Exactly ${canvas.width}x${canvas.height} pixels
+- Overflow hidden on root element
+- All content must fit within 80px safe zone from edges
+
+## Brand Kit CSS Variables
+${brandVars}
+
+${formatRules}
+
+${COMPONENT_DESIGN_RULES}
+
+${GSAP_ANIMATION_SKILLS}
+
+${SCRIPT_SYSTEM_SKILLS}
+
+## CRITICAL RULES
+1. Each scene's html field must be a complete .component.html (template + style scoped + script)
+2. Use var not const/let in script sections
+3. The html is a STRING in JSON -- escape double quotes inside HTML attributes using single quotes instead. Use single quotes for HTML attributes.
+4. Output ONLY valid JSON, no commentary, no markdown fences
+5. All animations must complete within the scene's duration_seconds
+6. Standard pattern: Entrance (0.3-1.0s) -> Hold -> Exit (last 0.5-0.7s)
+7. Use gsap.timeline() (NOT paused -- the master timeline controls playback)
+8. function createTimeline(el, data, ctx) -- ctx has duration, fps, canvas, motion
+9. Available GSAP plugins: SplitText, CustomEase
+10. Available script utilities: runScript(), moveCursor(), typeText(), zoomTo()
+11. Use only valid transition types: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, none
+12. First scene should have no transition_in or use "none"
+13. Keep text per scene to max 15 words visible simultaneously
+14. Use autoAlpha instead of opacity for GSAP animations
+`;
+}
+
+/**
+ * Build brand kit CSS variables list for the freeform prompt.
+ */
+function buildBrandVarsList(brandKit: BrandKit): string {
+  var lines: string[] = [];
+  if (brandKit.colors) {
+    for (var [key, value] of Object.entries(brandKit.colors)) {
+      lines.push(`  --mp-color-${key.replace(/_/g, "-")}: ${value};`);
+    }
+  }
+  if (brandKit.fonts?.length) {
+    lines.push(`  --mp-font-family: '${brandKit.fonts[0].family}', sans-serif;`);
+  }
+  if (brandKit.style?.border_radius) {
+    lines.push(`  --mp-border-radius: ${brandKit.style.border_radius};`);
+  }
+  return lines.join("\n");
 }
 
 // ── Format-specific rules ──

@@ -735,6 +735,7 @@ export function createMcpServer(): McpServer {
       type: z.string().optional().describe("Component type name when saving (kebab-case)"),
       category: z.string().optional().describe("Category to save under (default: custom)"),
       critique: z.boolean().optional().default(false).describe("Run the critiquer loop on generated output"),
+      mode: z.enum(["freeform", "structured"]).optional().describe("Generation mode. freeform = full creative freedom (default), structured = component library"),
       scene_count: z.number().optional().describe("Target number of scenes for video/deck"),
       duration: z.number().optional().describe("Animation duration in seconds for preview (default: 3)"),
       token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
@@ -831,6 +832,7 @@ export function createMcpServer(): McpServer {
           canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
           critique: params.critique,
           sceneCount: params.scene_count,
+          mode: params.mode,
         });
 
         return ok(result);

@@ -42,6 +42,8 @@ export interface RenderOptions {
   llmConfig?: LLMConfig;
   /** Original prompt for context in critique */
   originalPrompt?: string;
+  /** Additional directories to search for component sources (e.g. project-local freeform components) */
+  extraComponentDirs?: string[];
 }
 
 export interface RenderResult {
@@ -65,7 +67,7 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
   console.log(`  Canvas: ${project.canvas.width}x${project.canvas.height} @ ${project.canvas.fps}fps`);
 
   // Load all required component sources
-  const componentSources = await loadComponentSources(project, componentLibDir);
+  const componentSources = await loadComponentSources(project, componentLibDir, options.extraComponentDirs);
 
   switch (project.format) {
     case "image":
@@ -660,6 +662,7 @@ async function renderEmailHeader(
 async function loadComponentSources(
   project: Project,
   componentLibDir: string,
+  extraDirs?: string[],
 ): Promise<ComponentSource[]> {
   // Collect all unique component types used in the project
   const types = new Set<string>();
@@ -672,7 +675,7 @@ async function loadComponentSources(
   const sources: ComponentSource[] = [];
 
   for (const type of types) {
-    const source = await findComponentSource(type, componentLibDir);
+    const source = await findComponentSource(type, componentLibDir, extraDirs);
     if (source) {
       sources.push({ type, source });
     } else {
@@ -689,8 +692,21 @@ async function loadComponentSources(
 async function findComponentSource(
   type: string,
   componentLibDir: string,
+  extraDirs?: string[],
 ): Promise<string | null> {
-  // Search all subdirectories
+  // Search extra dirs first (project-local freeform components take priority)
+  if (extraDirs) {
+    for (const dir of extraDirs) {
+      try {
+        const filePath = path.join(dir, `${type}.component.html`);
+        return await fs.readFile(filePath, "utf-8");
+      } catch {
+        // Not in this dir, continue
+      }
+    }
+  }
+
+  // Search all subdirectories in the component library
   try {
     const categories = await fs.readdir(componentLibDir, { withFileTypes: true });
     for (const cat of categories) {
