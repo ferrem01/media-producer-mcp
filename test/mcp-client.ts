@@ -49,7 +49,7 @@ async function main() {
     console.log("");
 
     // Verify expected tools exist
-    const expectedTools = ["create", "add_scene", "add_component", "render", "list_projects"];
+    const expectedTools = ["create", "get", "list", "add", "update", "remove", "render", "generate"];
     const missing = expectedTools.filter((t) => !toolNames.includes(t));
     if (missing.length > 0) {
       console.warn(`  WARNING: Missing expected tools: ${missing.join(", ")}`);
@@ -91,61 +91,40 @@ async function main() {
     } else {
       console.log(`  Project ID: ${projectId}\n`);
 
-      // 4. Add a scene
+      // 4. Add a scene via the "add" tool
       console.log("-- Adding scene --");
-      const sceneResult = await client.callTool({
-        name: "add_scene",
+      const addResult = await client.callTool({
+        name: "add",
         arguments: {
           tenant_id: "test-mcp",
           project_id: projectId,
-          label: "Hero Scene",
-          duration_seconds: 3,
+          scene: {
+            id: "scene-mcp-test",
+            duration_seconds: 3,
+            label: "Hero Scene",
+            components: [],
+          },
         },
       });
-      console.log(`  Result:`, JSON.stringify(sceneResult.content, null, 2).substring(0, 500));
+      console.log(`  Result:`, JSON.stringify(addResult.content, null, 2).substring(0, 500));
+      console.log("");
 
-      // Extract scene_id
-      let sceneId: string | undefined;
-      if (Array.isArray(sceneResult.content)) {
-        for (const block of sceneResult.content) {
-          if (block.type === "text" && typeof block.text === "string") {
-            try {
-              const parsed = JSON.parse(block.text);
-              sceneId = parsed.scene_id || parsed.id;
-            } catch {
-              const match = block.text.match(/(?:scene_id|"id")["\s:]+([a-zA-Z0-9_-]+)/);
-              if (match) sceneId = match[1];
-            }
-          }
-        }
-      }
-
-      if (sceneId) {
-        console.log(`  Scene ID: ${sceneId}\n`);
-
-        // 5. Add a component
-        console.log("-- Adding component --");
-        const compResult = await client.callTool({
-          name: "add_component",
-          arguments: {
-            tenant_id: "test-mcp",
-            project_id: projectId,
-            scene_id: sceneId,
-            type: "hero-headline",
-            props: {
-              headline: "Hello MCP",
-              subheadline: "Testing the protocol",
-            },
-          },
-        });
-        console.log(`  Result:`, JSON.stringify(compResult.content, null, 2).substring(0, 500));
-        console.log("");
-      }
+      // 5. Get the project back
+      console.log("-- Getting project --");
+      const getResult = await client.callTool({
+        name: "get",
+        arguments: {
+          tenant_id: "test-mcp",
+          project_id: projectId,
+        },
+      });
+      console.log(`  Result:`, JSON.stringify(getResult.content, null, 2).substring(0, 500));
+      console.log("");
 
       // 6. List projects
       console.log("-- Listing projects --");
       const listResult = await client.callTool({
-        name: "list_projects",
+        name: "list",
         arguments: {
           tenant_id: "test-mcp",
         },
