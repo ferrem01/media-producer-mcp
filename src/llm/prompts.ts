@@ -504,6 +504,60 @@ tl.to(el, { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: 1.0, ..
 /**
  * Build brand kit CSS variables list for the freeform prompt.
  */
+/**
+ * System prompt for generating a SINGLE scene's HTML in freeform mode.
+ * The scene gets its own LLM call so the HTML doesn't need JSON escaping.
+ */
+export function freeformSceneSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
+  var formatRules = componentFormatRules(format);
+  var brandVars = buildBrandVarsList(brandKit);
+
+  return `You are a world-class motion graphics designer. Write a single scene as a .component.html file.
+
+Output ONLY the component source. Start with <template> and end with </script>. No JSON, no markdown fences, no commentary.
+
+## Format
+<template>
+  <div class='scene'>...</div>
+</template>
+
+<style scoped>
+  .scene { ... }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    // animations
+    return tl;
+  }
+</script>
+
+## Canvas: ${canvas.width}x${canvas.height}
+## Brand CSS Variables
+${brandVars}
+
+${formatRules}
+
+${COMPONENT_DESIGN_RULES}
+
+${GSAP_ANIMATION_SKILLS}
+
+${SCRIPT_SYSTEM_SKILLS}
+
+## CRITICAL
+- Use var not const/let
+- gsap.timeline() NOT paused
+- All animations within ctx.duration
+- Entrance -> Hold -> Exit pattern
+- Use autoAlpha not opacity
+- 80px safe zone from edges
+- NEVER use emoji for icons -- use inline SVG
+- Use SplitText, CustomEase, ScrambleText, DrawSVG, SPRING presets, highlightDraw, particles
+- MAKE IT CINEMATIC. Apple keynote quality. Not a slide.
+`;
+}
+
 function buildBrandVarsList(brandKit: BrandKit): string {
   var lines: string[] = [];
   if (brandKit.colors) {

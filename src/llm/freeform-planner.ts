@@ -1,16 +1,17 @@
 /**
- * Freeform Planner
+ * Freeform Planner (Two-Pass)
  *
- * A single LLM call that plans AND writes all scenes at once.
- * Instead of selecting from a component library, the LLM writes
- * full HTML+CSS+GSAP per scene with complete creative freedom.
+ * Pass 1: LLM plans the storyboard (JSON: scene labels, durations, transitions, descriptions)
+ * Pass 2: For each scene, LLM writes the full HTML+CSS+GSAP (raw text, no JSON escaping)
+ *
+ * This avoids the HTML-inside-JSON escaping nightmare.
  */
 
 import fs from "node:fs/promises";
 import path from "node:path";
 import { v4 as uuid } from "uuid";
 import { callLLM, type LLMConfig } from "./client.js";
-import { freeformPlannerSystemPrompt } from "./prompts.js";
+import { freeformPlannerSystemPrompt, freeformSceneSystemPrompt } from "./prompts.js";
 import { createProject, saveProject } from "../persistence/project.js";
 import { projectDir } from "../persistence/paths.js";
 import type { BrandKit, Canvas, OutputFormat, Project, Scene, SceneTransition } from "../core/types.js";
@@ -26,165 +27,175 @@ export interface FreeformPlannerOpts {
 
 export interface FreeformResult {
   project: Project;
-  /** One .component.html source per scene, saved to project dir */
   sceneHtmlSources: string[];
 }
 
-interface FreeformLLMOutput {
-  name: string;
-  scenes: Array<{
-    label: string;
-    duration_seconds: number;
-    transition_in?: {
-      type: string;
-      duration_seconds: number;
-    };
-    html: string;
-  }>;
+interface StoryboardScene {
+  label: string;
+  duration_seconds: number;
+  transition_in?: { type: string; duration_seconds: number };
+  description: string;  // detailed visual description for pass 2
 }
 
-/**
- * Plan a full project in freeform mode.
- * One LLM call produces all scenes with complete HTML source.
- */
 export async function planFreeform(opts: FreeformPlannerOpts): Promise<FreeformResult> {
-  var systemPrompt = freeformPlannerSystemPrompt(opts.format, opts.canvas, opts.brandKit);
+  // ── Pass 1: Plan the storyboard ──
+  console.log("  Pass 1: Planning storyboard...");
 
-  var userPrompt = `Create a ${opts.format} project.\n\n${opts.prompt}`;
-  if (opts.sceneCount) {
-    userPrompt += `\n\nTarget scene count: ${opts.sceneCount}.`;
-  }
+  var storyboardPrompt = `You are planning a cinematic ${opts.format} project. Output a JSON storyboard.
 
-  console.log("  Freeform planner: generating all scenes in one call...");
-
-  var raw = await callLLM(opts.llmConfig, [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ], { temperature: 0.5, maxTokens: 16384 });
-
-  // Parse JSON response
-  var plan: FreeformLLMOutput;
-  try {
-    var cleaned = stripJsonFences(raw);
-    plan = JSON.parse(cleaned);
-  } catch (e) {
-    // Try harder: find the first { and last } 
-    try {
-      var firstBrace = raw.indexOf('{');
-      var lastBrace = raw.lastIndexOf('}');
-      if (firstBrace >= 0 && lastBrace > firstBrace) {
-        plan = JSON.parse(raw.substring(firstBrace, lastBrace + 1));
-      } else {
-        throw e;
-      }
-    } catch {
-      throw new Error(`Freeform planner returned invalid JSON: ${raw.substring(0, 500)}`);
+## Output Format (valid JSON, no markdown fences)
+{
+  "name": "Project Title",
+  "scenes": [
+    {
+      "label": "Scene 1 - Hero",
+      "duration_seconds": 4,
+      "transition_in": { "type": "crossfade", "duration_seconds": 0.5 },
+      "description": "Detailed visual description of what this scene should look like and how it should animate. Be VERY specific about typography, layout, colors, animation techniques to use (SplitText, ScrambleText, particles, etc)."
     }
+  ]
+}
+
+## Rules
+- ${opts.sceneCount ? opts.sceneCount + ' scenes' : '5-8 scenes'}
+- First scene: no transition or "none"
+- Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain
+- Each description should be 2-4 sentences with SPECIFIC visual direction
+- Think Apple keynote: one idea per scene, cinematic motion, premium aesthetic
+- Output ONLY JSON, no commentary
+
+## Brief
+${opts.prompt}`;
+
+  var storyboardRaw = await callLLM(opts.llmConfig, [
+    { role: "user", content: storyboardPrompt },
+  ], { temperature: 0.5, maxTokens: 4096 });
+
+  var storyboard = parseJsonResponse(storyboardRaw);
+  if (!storyboard.scenes || storyboard.scenes.length === 0) {
+    throw new Error("Storyboard returned no scenes");
+  }
+  console.log(`  Storyboard: ${storyboard.scenes.length} scenes planned`);
+
+  // ── Pass 2: Generate HTML for each scene ──
+  var sceneSystemPrompt = freeformSceneSystemPrompt(opts.format, opts.canvas, opts.brandKit);
+  var sceneHtmlSources: string[] = [];
+
+  for (var i = 0; i < storyboard.scenes.length; i++) {
+    var sceneInfo = storyboard.scenes[i] as StoryboardScene;
+    console.log(`  Pass 2: Generating scene ${i + 1}/${storyboard.scenes.length}: "${sceneInfo.label}"...`);
+
+    var scenePrompt = `Generate the HTML for this scene:
+
+Label: ${sceneInfo.label}
+Duration: ${sceneInfo.duration_seconds} seconds
+Description: ${sceneInfo.description}
+
+Overall project: ${opts.prompt}
+Scene ${i + 1} of ${storyboard.scenes.length}.
+
+Output ONLY the .component.html source. No JSON wrapping, no markdown fences.
+Start with <template> and end with </script>.`;
+
+    var sceneHtml = await callLLM(opts.llmConfig, [
+      { role: "system", content: sceneSystemPrompt },
+      { role: "user", content: scenePrompt },
+    ], { temperature: 0.5, maxTokens: 8192 });
+
+    // Strip any markdown fences
+    sceneHtml = stripHtmlFences(sceneHtml);
+    sceneHtmlSources.push(sceneHtml);
   }
 
-  if (!plan.scenes || plan.scenes.length === 0) {
-    throw new Error("Freeform planner returned no scenes");
-  }
+  // ── Build the project ──
+  var projectId = `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
+  var tenantId = "freeform"; // will be overridden by pipeline
 
-  console.log(`  Freeform planner: ${plan.scenes.length} scenes generated`);
+  // Save scene HTML files
+  var compDir = path.join(projectDir(tenantId, projectId), "components");
+  await fs.mkdir(compDir, { recursive: true });
 
-  // Create the project
-  var project = await createProject({
-    tenant_id: "", // caller fills in
-    name: plan.name || "Untitled Project",
-    format: opts.format,
-  });
-
-  project.brand_kit = opts.brandKit;
-  project.canvas = opts.canvas;
-
-  // Build scenes and save HTML sources to project directory
   var scenes: Scene[] = [];
-  var htmlSources: string[] = [];
+  for (var i = 0; i < storyboard.scenes.length; i++) {
+    var sceneInfo = storyboard.scenes[i] as StoryboardScene;
+    var compName = `scene_${String(i + 1).padStart(3, "0")}`;
+    var compPath = path.join(compDir, `${compName}.component.html`);
+    await fs.writeFile(compPath, sceneHtmlSources[i]);
+    console.log(`  Saved: ${compPath}`);
 
-  for (var i = 0; i < plan.scenes.length; i++) {
-    var scenePlan = plan.scenes[i];
-    var sceneId = `scene_${String(i + 1).padStart(3, "0")}`;
-    var componentType = sceneId; // component type matches the scene file name
-
-    // Validate and clean the HTML
-    var html = scenePlan.html;
-    if (!html || html.trim().length === 0) {
-      console.warn(`  Scene ${i + 1} has empty HTML, skipping`);
-      continue;
-    }
-
-    htmlSources.push(html);
-
-    var scene: Scene = {
-      id: sceneId,
-      label: scenePlan.label || `Scene ${i + 1}`,
-      duration_seconds: scenePlan.duration_seconds || 4,
-      components: [
-        {
-          id: `comp_full`,
-          type: componentType,
-          data: {},
-          z_index: 0,
-        },
-      ],
-    };
-
-    if (scenePlan.transition_in) {
-      scene.transition_in = {
-        type: scenePlan.transition_in.type as SceneTransition["type"],
-        duration_seconds: scenePlan.transition_in.duration_seconds,
+    var transition: SceneTransition | undefined;
+    if (sceneInfo.transition_in && sceneInfo.transition_in.type !== "none") {
+      transition = {
+        type: sceneInfo.transition_in.type as any,
+        duration_seconds: sceneInfo.transition_in.duration_seconds || 0.5,
       };
     }
 
-    scenes.push(scene);
+    scenes.push({
+      id: `scene_${String(i + 1).padStart(3, "0")}`,
+      label: sceneInfo.label,
+      duration_seconds: sceneInfo.duration_seconds,
+      transition_in: transition,
+      components: [{
+        id: `comp_full_${i}`,
+        type: compName,
+        data: {},
+        z_index: 0,
+      }],
+    });
   }
 
-  project.scenes = scenes;
+  var project: Project = {
+    project_id: projectId,
+    tenant_id: tenantId,
+    name: storyboard.name || "Freeform Project",
+    format: opts.format,
+    status: "draft",
+    canvas: opts.canvas,
+    brand_kit: opts.brandKit,
+    scenes,
+  };
 
-  return { project, sceneHtmlSources: htmlSources };
+  await saveProject(project);
+
+  console.log(`  Freeform components saved: ${sceneHtmlSources.map((_, i) => `scene_${String(i + 1).padStart(3, "0")}.component.html`).join(", ")}`);
+
+  return { project, sceneHtmlSources };
 }
 
-/**
- * Save freeform scene HTML sources to the project's local component directory.
- * Returns the directory path where components were saved.
- */
-export async function saveFreeformComponents(
-  tenantId: string,
-  projectId: string,
-  scenes: Scene[],
-  htmlSources: string[],
-): Promise<string> {
-  var componentsDir = path.join(
-    projectDir(tenantId, projectId),
-    "components",
-  );
-  await fs.mkdir(componentsDir, { recursive: true });
-
-  for (var i = 0; i < scenes.length; i++) {
-    var scene = scenes[i];
-    var componentType = scene.components[0]?.type;
-    if (!componentType || !htmlSources[i]) continue;
-
-    var filePath = path.join(componentsDir, `${componentType}.component.html`);
-    await fs.writeFile(filePath, htmlSources[i]);
-    console.log(`  Saved freeform component: ${filePath}`);
-  }
-
-  return componentsDir;
-}
-
-function stripJsonFences(raw: string): string {
+function parseJsonResponse(raw: string): any {
   var trimmed = raw.trim();
-  // Strip leading ```json and trailing ```
+
+  // Strip markdown fences
   if (trimmed.startsWith('```')) {
-    // Remove first line (```json or ```)
     var firstNewline = trimmed.indexOf('\n');
     if (firstNewline > -1) trimmed = trimmed.substring(firstNewline + 1);
-    // Remove trailing ```
     var lastFence = trimmed.lastIndexOf('```');
     if (lastFence > -1) trimmed = trimmed.substring(0, lastFence);
-    return trimmed.trim();
+    trimmed = trimmed.trim();
+  }
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Find first { and last }
+    var first = trimmed.indexOf('{');
+    var last = trimmed.lastIndexOf('}');
+    if (first >= 0 && last > first) {
+      return JSON.parse(trimmed.substring(first, last + 1));
+    }
+    throw new Error(`Invalid JSON: ${trimmed.substring(0, 300)}`);
+  }
+}
+
+function stripHtmlFences(raw: string): string {
+  var trimmed = raw.trim();
+  if (trimmed.startsWith('```')) {
+    var firstNewline = trimmed.indexOf('\n');
+    if (firstNewline > -1) trimmed = trimmed.substring(firstNewline + 1);
+    var lastFence = trimmed.lastIndexOf('```');
+    if (lastFence > -1) trimmed = trimmed.substring(0, lastFence);
+    trimmed = trimmed.trim();
   }
   return trimmed;
 }
