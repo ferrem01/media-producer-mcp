@@ -3,7 +3,10 @@
     <div class="panel panel-left">
       <div class="panel-content"></div>
     </div>
-    <div class="divider"></div>
+    <div class="divider">
+      <div class="divider-line"></div>
+      <div class="divider-glow"></div>
+    </div>
     <div class="panel panel-right">
       <div class="panel-content"></div>
     </div>
@@ -28,6 +31,7 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    position: relative;
   }
 
   .panel-left {
@@ -40,28 +44,67 @@
 
   .divider {
     flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .split-screen:not(.vertical) .divider {
     width: 1px;
     height: 100%;
-    background: linear-gradient(
-      180deg,
-      transparent 10%,
-      rgba(255, 255, 255, 0.08) 50%,
-      transparent 90%
-    );
   }
 
   .split-screen.vertical .divider {
     height: 1px;
     width: 100%;
+  }
+
+  .divider-line {
+    position: absolute;
+  }
+
+  .split-screen:not(.vertical) .divider-line {
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(
+      180deg,
+      transparent 5%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 95%
+    );
+  }
+
+  .split-screen.vertical .divider-line {
+    height: 1px;
+    width: 100%;
     background: linear-gradient(
       90deg,
-      transparent 10%,
-      rgba(255, 255, 255, 0.08) 50%,
-      transparent 90%
+      transparent 5%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 95%
     );
+  }
+
+  .divider-glow {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(167, 139, 250, 0.12) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
+  }
+
+  .split-screen:not(.vertical) .divider-glow {
+    width: 80px;
+    height: 200px;
+  }
+
+  .split-screen.vertical .divider-glow {
+    width: 200px;
+    height: 80px;
   }
 
   .panel-content {
@@ -70,8 +113,9 @@
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     text-align: center;
-    line-height: 1.3;
+    line-height: 1.25;
     letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.08);
   }
 
   .panel-content:empty {
@@ -86,6 +130,8 @@
     var leftPanel = el.querySelector('.panel-left');
     var rightPanel = el.querySelector('.panel-right');
     var divider = el.querySelector('.divider');
+    var dividerLine = el.querySelector('.divider-line');
+    var dividerGlow = el.querySelector('.divider-glow');
     var split = data.split || 0.5;
     var direction = data.direction || 'horizontal';
     var isVertical = direction === 'vertical';
@@ -116,6 +162,7 @@
 
     // Initial states
     gsap.set(divider, { autoAlpha: 0 });
+    gsap.set(dividerGlow, { autoAlpha: 0, scale: 0.5 });
 
     if (isVertical) {
       gsap.set(leftPanel, { yPercent: -100 });
@@ -133,17 +180,21 @@
       xPercent: 0, yPercent: 0, duration: speed, ease: ease
     }, 0.3);
 
-    // Divider fades in
+    // Divider fades in with glow
     tl.to(divider, {
       autoAlpha: 1, duration: 0.4, ease: 'power2.out'
+    }, 0.2 + speed * 0.4);
+    tl.to(dividerGlow, {
+      autoAlpha: 1, scale: 1,
+      duration: 0.6, ease: 'power2.out'
     }, 0.2 + speed * 0.5);
 
-    // Content fades in
+    // Content fades in with scale + blur
     var contents = el.querySelectorAll('.panel-content');
-    gsap.set(contents, { autoAlpha: 0, y: 20 });
+    gsap.set(contents, { autoAlpha: 0, y: 25, scale: 1.06, filter: 'blur(4px)' });
     tl.to(contents, {
-      autoAlpha: 1, y: 0,
-      duration: 0.5, stagger: 0.12, ease: 'power2.out'
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: 0.55, stagger: 0.15, ease: 'power3.out'
     }, 0.3 + speed * 0.5);
 
     // Exit

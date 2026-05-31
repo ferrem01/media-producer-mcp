@@ -1,8 +1,14 @@
 <template>
   <div class="logo-outro">
-    <div class="logo-text">{{text}}</div>
+    <div class="ambient-ring"></div>
+    <div class="logo-container">
+      <div class="logo-image"></div>
+      <div class="logo-text">{{text}}</div>
+    </div>
     <div class="tagline">{{tagline}}</div>
-    <div class="cta">{{cta}}</div>
+    <div class="cta-wrap">
+      <div class="cta">{{cta}}</div>
+    </div>
   </div>
 </template>
 
@@ -16,6 +22,48 @@
     height: 100%;
     font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
     padding: 80px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ambient-ring {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(167, 139, 250, 0.05) 0%,
+      rgba(139, 92, 246, 0.02) 30%,
+      transparent 60%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .logo-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo-image {
+    width: 100px;
+    height: 100px;
+    border-radius: 24px;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    box-shadow:
+      0 16px 40px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+
+  .logo-image:empty {
+    display: none;
   }
 
   .logo-text {
@@ -40,21 +88,35 @@
     text-align: center;
     letter-spacing: 0.005em;
     line-height: 1.4;
+    position: relative;
+    z-index: 1;
   }
 
   .tagline:empty {
     display: none;
   }
 
+  .cta-wrap {
+    margin-top: 36px;
+    position: relative;
+    z-index: 1;
+  }
+
   .cta {
-    font-size: 16px;
+    display: inline-block;
+    font-size: 14px;
     font-weight: 600;
     color: var(--mp-color-accent, #a78bfa);
-    margin-top: 36px;
-    text-align: center;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    text-shadow: 0 0 20px rgba(167, 139, 250, 0.2);
+    background: rgba(167, 139, 250, 0.08);
+    border: 1px solid rgba(167, 139, 250, 0.2);
+    padding: 14px 36px;
+    border-radius: 999px;
+    text-shadow: 0 0 20px rgba(167, 139, 250, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   }
 
   .cta:empty {
@@ -66,45 +128,83 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var logo = el.querySelector('.logo-text');
+    var logoImage = el.querySelector('.logo-image');
     var tagline = el.querySelector('.tagline');
     var cta = el.querySelector('.cta');
-    var elements = [logo, tagline, cta].filter(function(e) { return e && e.textContent.trim(); });
+    var ring = el.querySelector('.ambient-ring');
 
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
+
+    // Logo image setup
+    if (data.logo_url) {
+      logoImage.style.backgroundImage = 'url(' + data.logo_url + ')';
+    }
 
     // Initial states
-    gsap.set(logo, { autoAlpha: 0, scale: 1.06, filter: 'blur(4px)' });
-    gsap.set(tagline, { autoAlpha: 0, y: 20 });
-    gsap.set(cta, { autoAlpha: 0, y: 15 });
+    gsap.set(ring, { autoAlpha: 0, scale: 0.3 });
 
-    // Logo entrance
+    // Ambient ring
+    tl.to(ring, {
+      autoAlpha: 1, scale: 1,
+      duration: speed * 1.2,
+      ease: 'power2.out'
+    }, 0.1);
+
+    // Logo image
+    if (data.logo_url) {
+      gsap.set(logoImage, { autoAlpha: 0, scale: 0.7, filter: 'blur(6px)' });
+      tl.to(logoImage, {
+        autoAlpha: 1, scale: 1, filter: 'blur(0px)',
+        duration: speed * 0.7,
+        ease: ease
+      }, 0.2);
+    }
+
+    // Logo text entrance
     if (logo && logo.textContent.trim()) {
+      gsap.set(logo, { autoAlpha: 0, scale: 1.08, filter: 'blur(5px)' });
       tl.to(logo, {
         autoAlpha: 1, scale: 1, filter: 'blur(0px)',
         duration: speed,
-        ease: 'power3.out'
-      }, 0.3);
+        ease: ease
+      }, data.logo_url ? 0.3 : 0.2);
     }
 
     // Tagline
     if (tagline && tagline.textContent.trim()) {
+      gsap.set(tagline, { autoAlpha: 0, y: 20, filter: 'blur(3px)' });
       tl.to(tagline, {
-        autoAlpha: 1, y: 0,
+        autoAlpha: 1, y: 0, filter: 'blur(0px)',
         duration: speed * 0.7,
         ease: 'power2.out'
       }, 0.3 + speed * 0.5);
     }
 
-    // CTA
+    // CTA pill entrance
     if (cta && cta.textContent.trim()) {
+      gsap.set(cta, { autoAlpha: 0, y: 15, scale: 0.9, filter: 'blur(3px)' });
       tl.to(cta, {
-        autoAlpha: 1, y: 0,
+        autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
         duration: speed * 0.6,
-        ease: 'power2.out'
+        ease: ease
       }, 0.3 + speed * 0.8);
+
+      // CTA glow pulse
+      tl.to(cta, {
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 30px rgba(167, 139, 250, 0.15)',
+        duration: 0.6,
+        ease: 'power2.out'
+      }, 0.3 + speed + 0.3);
+
+      tl.to(cta, {
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 16px rgba(167, 139, 250, 0.08)',
+        duration: 0.5,
+        ease: 'sine.inOut'
+      }, 0.3 + speed + 0.9);
     }
 
-    // Subtle pulse on logo
+    // Subtle logo pulse
     if (logo && logo.textContent.trim()) {
       tl.to(logo, {
         textShadow: '0 0 60px rgba(167, 139, 250, 0.2)',
@@ -118,10 +218,20 @@
     // Exit
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.7;
+      var elements = [];
+      if (data.logo_url) elements.push(logoImage);
+      if (logo && logo.textContent.trim()) elements.push(logo);
+      if (tagline && tagline.textContent.trim()) elements.push(tagline);
+      if (cta && cta.textContent.trim()) elements.push(cta);
       tl.to(elements, {
         autoAlpha: 0,
         duration: 0.5,
         stagger: 0.04,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to(ring, {
+        autoAlpha: 0,
+        duration: 0.4,
         ease: 'power2.in'
       }, exitAt);
     }

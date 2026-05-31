@@ -4,6 +4,7 @@
       <div class="pip-main-content"></div>
     </div>
     <div class="pip-overlay">
+      <div class="pip-accent-line"></div>
       <div class="pip-overlay-content"></div>
     </div>
   </div>
@@ -48,11 +49,26 @@
     -webkit-backdrop-filter: blur(16px);
     box-shadow:
       0 25px 60px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
+      0 0 0 1px rgba(255, 255, 255, 0.05),
+      0 0 40px rgba(167, 139, 250, 0.04);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+  }
+
+  .pip-accent-line {
+    position: absolute;
+    top: 0;
+    left: 15%;
+    right: 15%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(167, 139, 250, 0.35) 50%,
+      transparent
+    );
   }
 
   .pip-overlay-content {
@@ -74,6 +90,7 @@
     var mainContent = el.querySelector('.pip-main-content');
     var overlay = el.querySelector('.pip-overlay');
     var overlayContent = el.querySelector('.pip-overlay-content');
+    var accentLine = el.querySelector('.pip-accent-line');
 
     // Inject content
     if (data.main_content) mainContent.innerHTML = data.main_content;
@@ -98,19 +115,41 @@
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out';
 
-    // Main content entrance with blur
-    gsap.set(mainContent, { autoAlpha: 0, y: 25, filter: 'blur(4px)' });
+    // Main content entrance with scale + blur
+    gsap.set(mainContent, { autoAlpha: 0, y: 25, scale: 1.06, filter: 'blur(5px)' });
     tl.to(mainContent, {
-      autoAlpha: 1, y: 0, filter: 'blur(0px)',
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
       duration: speed, ease: 'power3.out'
     }, 0.2);
 
     // PiP slides in from corner with scale + blur
-    gsap.set(overlay, { autoAlpha: 0, x: slideX, y: slideY, scale: 0.8, filter: 'blur(5px)' });
+    gsap.set(overlay, { autoAlpha: 0, x: slideX, y: slideY, scale: 0.75, filter: 'blur(6px)' });
+    gsap.set(accentLine, { scaleX: 0 });
+
     tl.to(overlay, {
       autoAlpha: 1, x: 0, y: 0, scale: 1, filter: 'blur(0px)',
       duration: speed, ease: ease
     }, 0.4 + speed * 0.3);
+
+    // Accent line wipes in
+    tl.to(accentLine, {
+      scaleX: 1,
+      duration: 0.4,
+      ease: 'power2.inOut'
+    }, 0.4 + speed * 0.6);
+
+    // Subtle glow pulse on overlay
+    tl.to(overlay, {
+      boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05), 0 0 50px rgba(167, 139, 250, 0.07)',
+      duration: 0.5,
+      ease: 'power2.out'
+    }, 0.4 + speed * 0.8);
+
+    tl.to(overlay, {
+      boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05), 0 0 40px rgba(167, 139, 250, 0.04)',
+      duration: 0.4,
+      ease: 'power2.inOut'
+    }, 0.4 + speed * 0.8 + 0.5);
 
     // Exit
     if (ctx.duration > 2) {

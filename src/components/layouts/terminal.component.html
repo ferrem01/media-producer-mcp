@@ -10,7 +10,9 @@
         <div class="terminal-title">{{title}}</div>
         <div class="terminal-dots-spacer"></div>
       </div>
-      <div class="terminal-body"></div>
+      <div class="terminal-body">
+        <div class="scan-line"></div>
+      </div>
     </div>
   </div>
 </template>
@@ -30,12 +32,13 @@
     flex-direction: column;
     width: 82%;
     height: 80%;
-    border-radius: 14px;
+    border-radius: 16px;
     overflow: hidden;
     box-shadow:
       0 30px 80px rgba(0, 0, 0, 0.5),
       0 0 0 1px rgba(255, 255, 255, 0.06),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 60px rgba(167, 139, 250, 0.03);
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
   }
 
@@ -65,9 +68,9 @@
     border-radius: 50%;
   }
 
-  .tdot-close { background: #ff5f57; }
-  .tdot-min { background: #febc2e; }
-  .tdot-max { background: #28c840; }
+  .tdot-close { background: #ff5f57; box-shadow: 0 0 6px rgba(255, 95, 87, 0.3); }
+  .tdot-min { background: #febc2e; box-shadow: 0 0 6px rgba(254, 188, 46, 0.3); }
+  .tdot-max { background: #28c840; box-shadow: 0 0 6px rgba(40, 200, 64, 0.3); }
 
   .terminal-title {
     flex: 1;
@@ -85,6 +88,25 @@
     background: #0d1117;
     padding: 24px;
     overflow: hidden;
+    position: relative;
+  }
+
+  .scan-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(126, 231, 135, 0.06) 30%,
+      rgba(126, 231, 135, 0.08) 50%,
+      rgba(126, 231, 135, 0.06) 70%,
+      transparent
+    );
+    pointer-events: none;
+    z-index: 1;
   }
 
   .term-line {
@@ -96,11 +118,12 @@
 
   .term-prompt {
     color: #7ee787;
-    text-shadow: 0 0 12px rgba(126, 231, 135, 0.2);
+    text-shadow: 0 0 12px rgba(126, 231, 135, 0.25);
   }
 
   .term-command {
     color: #e6edf3;
+    text-shadow: 0 0 20px rgba(230, 237, 243, 0.05);
   }
 
   .term-output {
@@ -111,10 +134,11 @@
     display: inline-block;
     width: 8px;
     height: 18px;
-    background: #e6edf3;
+    background: #7ee787;
     vertical-align: text-bottom;
     margin-left: 2px;
-    box-shadow: 0 0 8px rgba(230, 237, 243, 0.3);
+    box-shadow: 0 0 12px rgba(126, 231, 135, 0.4);
+    border-radius: 1px;
   }
 </style>
 
@@ -123,16 +147,27 @@
     var tl = gsap.timeline();
     var frame = el.querySelector('.terminal-frame');
     var body = el.querySelector('.terminal-body');
+    var scanLine = el.querySelector('.scan-line');
     var lines = data.lines || [];
 
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
 
     // Frame entrance with scale + blur
-    gsap.set(frame, { autoAlpha: 0, scale: 1.05, y: 30, filter: 'blur(5px)' });
+    gsap.set(frame, { autoAlpha: 0, scale: 1.05, y: 35, filter: 'blur(6px)' });
+    gsap.set(scanLine, { top: '0%' });
+
     tl.to(frame, {
       autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
       duration: speed, ease: 'power3.out'
     }, 0.2);
+
+    // Scan line sweep
+    tl.to(scanLine, {
+      top: '100%',
+      duration: ctx.duration * 0.6,
+      ease: 'none',
+      repeat: -1
+    }, 0.2 + speed);
 
     // Calculate timing for lines
     var holdEnd = ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration;

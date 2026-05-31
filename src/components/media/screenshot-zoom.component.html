@@ -1,8 +1,10 @@
 <template>
   <div class="screenshot-zoom">
     <div class="screenshot-frame">
+      <div class="frame-glow"></div>
       <div class="screenshot-container">
         <div class="screenshot-box"></div>
+        <div class="zoom-ring"></div>
       </div>
       <div class="zoom-label"></div>
     </div>
@@ -27,6 +29,19 @@
     position: relative;
   }
 
+  .frame-glow {
+    position: absolute;
+    inset: -20px;
+    border-radius: 24px;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(167, 139, 250, 0.04) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
   .screenshot-container {
     width: 100%;
     height: 100%;
@@ -36,6 +51,8 @@
     box-shadow:
       0 25px 60px rgba(0, 0, 0, 0.4),
       0 0 0 1px rgba(255, 255, 255, 0.05);
+    position: relative;
+    z-index: 1;
   }
 
   .screenshot-box {
@@ -45,6 +62,19 @@
     background-position: center;
     background-repeat: no-repeat;
     transform-origin: center center;
+  }
+
+  .zoom-ring {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    border: 2px solid rgba(167, 139, 250, 0.4);
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow:
+      0 0 20px rgba(167, 139, 250, 0.15),
+      inset 0 0 20px rgba(167, 139, 250, 0.08);
+    z-index: 2;
   }
 
   .zoom-label {
@@ -64,6 +94,8 @@
     white-space: nowrap;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    text-shadow: 0 0 16px rgba(167, 139, 250, 0.2);
+    z-index: 2;
   }
 
   .zoom-label:empty {
@@ -78,6 +110,8 @@
     var container = el.querySelector('.screenshot-container');
     var box = el.querySelector('.screenshot-box');
     var label = el.querySelector('.zoom-label');
+    var frameGlow = el.querySelector('.frame-glow');
+    var ring = el.querySelector('.zoom-ring');
 
     if (data.src) {
       box.style.backgroundImage = 'url(' + data.src + ')';
@@ -96,31 +130,62 @@
 
     box.style.transformOrigin = zoomX + '% ' + zoomY + '%';
 
+    // Position zoom ring at the focus point
+    ring.style.left = 'calc(' + zoomX + '% - 60px)';
+    ring.style.top = 'calc(' + zoomY + '% - 60px)';
+
     var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.6 : 0.75;
 
     // Frame entrance with scale + blur
-    gsap.set(frame, { autoAlpha: 0, scale: 1.06, filter: 'blur(5px)' });
-    gsap.set(label, { autoAlpha: 0, y: 10 });
+    gsap.set(frame, { autoAlpha: 0, scale: 1.06, filter: 'blur(6px)' });
+    gsap.set(label, { autoAlpha: 0, y: 10, filter: 'blur(3px)' });
+    gsap.set(frameGlow, { autoAlpha: 0, scale: 0.7 });
+    gsap.set(ring, { autoAlpha: 0, scale: 0.5 });
 
     tl.to(frame, {
       autoAlpha: 1, scale: 1, filter: 'blur(0px)',
       duration: speed, ease: 'power3.out'
     }, 0.2);
 
+    // Frame glow
+    tl.to(frameGlow, {
+      autoAlpha: 1, scale: 1,
+      duration: 0.5, ease: 'power2.out'
+    }, 0.2 + speed * 0.4);
+
+    // Zoom ring appears at focus point
+    var zoomStart = Math.min(1.0, ctx.duration * 0.25);
+    tl.to(ring, {
+      autoAlpha: 1, scale: 1,
+      duration: 0.4, ease: 'back.out(1.3)'
+    }, zoomStart);
+
     // Smooth zoom
-    var zoomStart = Math.min(1.0, ctx.duration * 0.3);
     var zoomDuration = ctx.duration * 0.35;
 
     tl.to(box, {
       scale: zoomScale,
       duration: zoomDuration,
       ease: 'power2.inOut'
-    }, zoomStart);
+    }, zoomStart + 0.2);
+
+    // Ring fades as zoom completes
+    tl.to(ring, {
+      autoAlpha: 0, scale: 1.5,
+      duration: 0.4, ease: 'power2.in'
+    }, zoomStart + zoomDuration * 0.6);
+
+    // Elevated shadow settles during zoom
+    tl.to(container, {
+      boxShadow: '0 25px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05), 0 0 40px rgba(167, 139, 250, 0.05)',
+      duration: 0.5,
+      ease: 'power2.out'
+    }, zoomStart + zoomDuration * 0.5);
 
     // Show label after zoom
     if (data.label) {
       tl.to(label, {
-        autoAlpha: 1, y: 0,
+        autoAlpha: 1, y: 0, filter: 'blur(0px)',
         duration: 0.4, ease: 'power2.out'
       }, zoomStart + zoomDuration * 0.7);
     }

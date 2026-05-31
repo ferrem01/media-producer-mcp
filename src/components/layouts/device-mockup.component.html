@@ -1,7 +1,10 @@
 <template>
   <div class="device-mockup">
+    <div class="device-glow"></div>
     <div class="device-shell">
-      <div class="device-screen"></div>
+      <div class="device-screen">
+        <div class="screen-glare"></div>
+      </div>
     </div>
   </div>
 </template>
@@ -16,6 +19,22 @@
     font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
     padding: 80px;
     perspective: 1200px;
+    position: relative;
+  }
+
+  .device-glow {
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(167, 139, 250, 0.08) 0%,
+      rgba(139, 92, 246, 0.03) 40%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 0;
   }
 
   .device-shell {
@@ -27,7 +46,9 @@
     box-shadow:
       0 30px 80px rgba(0, 0, 0, 0.5),
       0 0 0 1px rgba(255, 255, 255, 0.06),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 60px rgba(167, 139, 250, 0.04);
+    z-index: 1;
   }
 
   /* Phone */
@@ -97,6 +118,22 @@
     line-height: 1.4;
     text-align: center;
     padding: 20px;
+    position: relative;
+  }
+
+  .screen-glare {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 1;
   }
 </style>
 
@@ -105,6 +142,7 @@
     var tl = gsap.timeline();
     var shell = el.querySelector('.device-shell');
     var screen = el.querySelector('.device-screen');
+    var glow = el.querySelector('.device-glow');
     var device = data.device || 'phone';
 
     shell.classList.add('device-' + device);
@@ -120,16 +158,24 @@
     var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.65 : 0.9;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out';
 
-    // Dramatic 3D entrance
+    // Dramatic 3D entrance with scale + blur
     gsap.set(shell, {
       autoAlpha: 0,
       y: 60,
       rotateX: 12,
       rotateY: -6,
-      scale: 0.9,
-      filter: 'blur(6px)'
+      scale: 0.88,
+      filter: 'blur(8px)'
     });
     gsap.set(screen, { autoAlpha: 0 });
+    gsap.set(glow, { autoAlpha: 0, scale: 0.4 });
+
+    // Ambient glow appears first
+    tl.to(glow, {
+      autoAlpha: 1, scale: 1,
+      duration: speed * 0.8,
+      ease: 'power2.out'
+    }, 0.1);
 
     // Device floats in with 3D rotation
     tl.to(shell, {
@@ -142,12 +188,29 @@
       autoAlpha: 1, duration: 0.5, ease: 'power2.out'
     }, 0.3 + speed * 0.5);
 
+    // Subtle shadow glow pulse
+    tl.to(shell, {
+      boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 80px rgba(167, 139, 250, 0.08)',
+      duration: 0.6,
+      ease: 'power2.out'
+    }, 0.3 + speed * 0.7);
+
+    tl.to(shell, {
+      boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 60px rgba(167, 139, 250, 0.04)',
+      duration: 0.5,
+      ease: 'power2.inOut'
+    }, 0.3 + speed * 0.7 + 0.6);
+
     // Exit
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.7;
       tl.to(shell, {
         autoAlpha: 0, y: -25, scale: 0.96,
         duration: 0.5, ease: 'power2.in'
+      }, exitAt);
+      tl.to(glow, {
+        autoAlpha: 0,
+        duration: 0.4, ease: 'power2.in'
       }, exitAt);
     }
 

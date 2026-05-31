@@ -1,10 +1,12 @@
 <template>
   <div class="quote-block">
     <div class="quote-card">
+      <div class="accent-line"></div>
       <div class="quote-mark open">&ldquo;</div>
       <blockquote class="quote-text">{{quote}}</blockquote>
       <div class="quote-mark close">&rdquo;</div>
       <div class="attribution">
+        <div class="attr-divider"></div>
         <span class="author">{{author}}</span>
         <span class="role">{{role}}</span>
       </div>
@@ -38,16 +40,33 @@
       0 25px 60px rgba(0, 0, 0, 0.4),
       0 0 0 1px rgba(255, 255, 255, 0.05);
     position: relative;
+    overflow: hidden;
+  }
+
+  .accent-line {
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(167, 139, 250, 0.4) 30%,
+      rgba(139, 92, 246, 0.6) 50%,
+      rgba(167, 139, 250, 0.4) 70%,
+      transparent
+    );
   }
 
   .quote-mark {
     font-size: 100px;
     font-weight: 700;
     color: var(--mp-color-accent, #A78BFA);
-    opacity: 0.25;
+    opacity: 0.2;
     line-height: 0.5;
     user-select: none;
-    text-shadow: 0 0 40px rgba(167, 139, 250, 0.2);
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.25);
   }
 
   .quote-mark.open {
@@ -78,7 +97,14 @@
     flex-direction: column;
     align-items: center;
     margin-top: 36px;
-    gap: 6px;
+    gap: 8px;
+  }
+
+  .attr-divider {
+    width: 40px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.3), transparent);
+    margin-bottom: 8px;
   }
 
   .author {
@@ -109,16 +135,19 @@
     var tl = gsap.timeline();
 
     var card = el.querySelector('.quote-card');
+    var accentLine = el.querySelector('.accent-line');
     var openMark = el.querySelector('.quote-mark.open');
     var closeMark = el.querySelector('.quote-mark.close');
     var quoteText = el.querySelector('.quote-text');
     var attribution = el.querySelector('.attribution');
+    var attrDivider = el.querySelector('.attr-divider');
 
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.75;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
 
     // Initial states
-    gsap.set(card, { autoAlpha: 0, y: 40, scale: 1.05, filter: 'blur(4px)' });
+    gsap.set(card, { autoAlpha: 0, y: 40, scale: 1.05, filter: 'blur(5px)' });
+    gsap.set(accentLine, { scaleX: 0 });
     gsap.set(openMark, { autoAlpha: 0, scale: 0.6 });
     gsap.set(closeMark, { autoAlpha: 0, scale: 0.6 });
     gsap.set(quoteText, { autoAlpha: 0, y: 20 });
@@ -131,9 +160,16 @@
       ease: ease
     }, 0.2);
 
+    // Accent line wipes in
+    tl.to(accentLine, {
+      scaleX: 1,
+      duration: speed * 0.8,
+      ease: 'power2.inOut'
+    }, 0.2 + speed * 0.3);
+
     // Quote marks
     tl.to(openMark, {
-      autoAlpha: 0.25, scale: 1,
+      autoAlpha: 0.2, scale: 1,
       duration: speed * 0.7,
       ease: ease
     }, 0.3 + speed * 0.3);
@@ -146,7 +182,7 @@
     }, 0.3 + speed * 0.4);
 
     tl.to(closeMark, {
-      autoAlpha: 0.25, scale: 1,
+      autoAlpha: 0.2, scale: 1,
       duration: speed * 0.7,
       ease: ease
     }, 0.3 + speed * 0.5);
@@ -162,7 +198,7 @@
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.7;
       tl.to(card, {
-        autoAlpha: 0, y: -20,
+        autoAlpha: 0, y: -20, scale: 0.97,
         duration: 0.45,
         ease: 'power2.in'
       }, exitAt);

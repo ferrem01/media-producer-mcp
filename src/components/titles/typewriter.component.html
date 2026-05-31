@@ -1,5 +1,6 @@
 <template>
   <div class="typewriter">
+    <div class="ambient-glow"></div>
     <div class="text-area">
       <span class="typed-text"></span>
       <span class="cursor">|</span>
@@ -16,6 +17,23 @@
     width: 100%;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
     padding: 80px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ambient-glow {
+    position: absolute;
+    width: 600px;
+    height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(
+      ellipse,
+      rgba(167, 139, 250, 0.05) 0%,
+      rgba(139, 92, 246, 0.02) 40%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 0;
   }
 
   .text-area {
@@ -26,6 +44,18 @@
     max-width: 80%;
     line-height: 1.5;
     letter-spacing: -0.01em;
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 20px;
+    padding: 48px 56px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.08);
   }
 
   .typed-text {
@@ -51,6 +81,7 @@
     var typedText = el.querySelector('.typed-text');
     var cursor = el.querySelector('.cursor');
     var textArea = el.querySelector('.text-area');
+    var glow = el.querySelector('.ambient-glow');
     var text = data.text || '';
     var speed = data.speed || 30;
 
@@ -68,14 +99,24 @@
     var counter = { index: 0 };
 
     // Initial state
-    gsap.set(textArea, { autoAlpha: 0, y: 20 });
+    gsap.set(textArea, { autoAlpha: 0, y: 30, scale: 1.05, filter: 'blur(5px)' });
+    gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
     typedText.textContent = '';
 
-    // Fade in text area
+    // Ambient glow
+    tl.to(glow, {
+      autoAlpha: 1, scale: 1,
+      duration: 0.8,
+      ease: 'power2.out'
+    }, 0.1);
+
+    // Fade in text area with scale + blur
     tl.to(textArea, {
       autoAlpha: 1,
       y: 0,
-      duration: 0.5,
+      scale: 1,
+      filter: 'blur(0px)',
+      duration: 0.6,
       ease: 'power3.out'
     }, 0.2);
 
@@ -87,14 +128,20 @@
       onUpdate: function() {
         typedText.textContent = text.substring(0, Math.round(counter.index));
       }
-    }, 0.5);
+    }, 0.6);
 
     // Exit
     if (ctx.duration > typeDuration + 1.5) {
-      var exitAt = ctx.duration - 0.6;
+      var exitAt = ctx.duration - 0.7;
       tl.to(textArea, {
         autoAlpha: 0,
         y: -15,
+        scale: 0.97,
+        duration: 0.45,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to(glow, {
+        autoAlpha: 0,
         duration: 0.4,
         ease: 'power2.in'
       }, exitAt);

@@ -1,5 +1,6 @@
 <template>
   <div class="kinetic-text">
+    <div class="ambient-glow"></div>
     <div class="text-container"></div>
   </div>
 </template>
@@ -13,21 +14,40 @@
     width: 100%;
     font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
     padding: 80px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ambient-glow {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(167, 139, 250, 0.06) 0%,
+      rgba(139, 92, 246, 0.02) 40%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 0;
   }
 
   .text-container {
-    font-size: 56px;
+    font-size: 60px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     text-align: center;
-    line-height: 1.15;
+    line-height: 1.1;
     letter-spacing: -0.02em;
-    max-width: 80%;
+    max-width: 85%;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 0 0.3em;
-    text-shadow: 0 0 60px rgba(167, 139, 250, 0.1);
+    text-shadow: 0 0 60px rgba(167, 139, 250, 0.12);
+    position: relative;
+    z-index: 1;
   }
 
   .text-container .kt-word {
@@ -43,6 +63,7 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var container = el.querySelector('.text-container');
+    var glow = el.querySelector('.ambient-glow');
     var text = data.text || '';
     var mode = data.mode || 'word';
     var effect = data.effect || 'fade-up';
@@ -53,25 +74,25 @@
 
     if (mode === 'char') {
       var chars = text.split('');
-      chars.forEach(function(ch) {
+      for (var i = 0; i < chars.length; i++) {
         var span = document.createElement('span');
         span.className = 'kt-char';
-        span.textContent = ch === ' ' ? '\u00A0' : ch;
+        span.textContent = chars[i] === ' ' ? '\u00A0' : chars[i];
         container.appendChild(span);
         spans.push(span);
-      });
+      }
     } else {
       var words = text.split(/\s+/);
-      words.forEach(function(word) {
+      for (var j = 0; j < words.length; j++) {
         var span = document.createElement('span');
         span.className = 'kt-word';
-        span.textContent = word;
+        span.textContent = words[j];
         container.appendChild(span);
         spans.push(span);
-      });
+      }
     }
 
-    var fromVars = { autoAlpha: 0, scale: 1.08, filter: 'blur(5px)' };
+    var fromVars = { autoAlpha: 0, scale: 1.08, filter: 'blur(6px)' };
     var toVars = { autoAlpha: 1, scale: 1, filter: 'blur(0px)' };
 
     if (effect === 'fade-up') {
@@ -91,10 +112,18 @@
     }
 
     gsap.set(spans, fromVars);
+    gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
 
     var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.5 : 0.65;
     var stagger = ctx.motion === 'minimal' ? 0.04 : ctx.motion === 'punchy' ? 0.06 : 0.08;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.4)' : 'power3.out';
+
+    // Ambient glow fades in
+    tl.to(glow, {
+      autoAlpha: 1, scale: 1,
+      duration: speed * 1.2,
+      ease: 'power2.out'
+    }, 0.1);
 
     toVars.duration = speed;
     toVars.stagger = stagger;
@@ -102,14 +131,34 @@
 
     tl.to(spans, toVars, 0.3);
 
+    // Subtle text glow pulse after entrance
+    var entranceDone = 0.3 + speed + stagger * spans.length;
+    tl.to(container, {
+      textShadow: '0 0 80px rgba(167, 139, 250, 0.2), 0 0 30px rgba(167, 139, 250, 0.1)',
+      duration: 0.6,
+      ease: 'power2.out'
+    }, entranceDone);
+
+    tl.to(container, {
+      textShadow: '0 0 60px rgba(167, 139, 250, 0.12)',
+      duration: 0.5,
+      ease: 'power2.inOut'
+    }, entranceDone + 0.6);
+
+    // Exit
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
+      var exitAt = ctx.duration - 0.7;
       tl.to(spans, {
         autoAlpha: 0,
         y: -15,
         filter: 'blur(4px)',
         duration: 0.35,
         stagger: 0.02,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to(glow, {
+        autoAlpha: 0,
+        duration: 0.4,
         ease: 'power2.in'
       }, exitAt);
     }
