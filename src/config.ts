@@ -33,6 +33,7 @@ const ROOT_DIR = path.dirname(new URL(import.meta.url).pathname);
 export const config: Config = {
   dataDir: process.env.MP_DATA_DIR || "/data/media-producer",
   port: parseInt(process.env.MP_PORT || "3200", 10),
-  componentLibDir: process.env.MP_COMPONENT_LIB_DIR || path.resolve(ROOT_DIR, "components"),
+  // Point to src/components (HTML files aren't copied by tsc to dist/)
+  componentLibDir: process.env.MP_COMPONENT_LIB_DIR || path.resolve(ROOT_DIR, "../src/components"),
   gsapDir: process.env.MP_GSAP_DIR || path.resolve(ROOT_DIR, "../vendor/gsap"),
 };
