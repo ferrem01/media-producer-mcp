@@ -2,6 +2,7 @@
   <div class="film-polish">
     <div class="vignette"></div>
     <div class="grain"></div>
+    <div class="color-grade"></div>
   </div>
 </template>
 
@@ -26,6 +27,13 @@
     background-size: 128px 128px;
     mix-blend-mode: overlay;
   }
+
+  .color-grade {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
 </style>
 
 <script>
@@ -37,6 +45,20 @@
     // Apply custom intensity
     var vignetteAmount = data.vignette !== undefined ? data.vignette : 0.15;
     var grainAmount = data.grain !== undefined ? data.grain : 0.06;
+    var colorGrade = data.color_grade || 'none';
+    var gradeEl = el.querySelector('.color-grade');
+
+    // Apply color grade overlay
+    var gradeColors = {
+      warm: 'rgba(255, 160, 50, 0.03)',
+      cool: 'rgba(50, 100, 255, 0.03)',
+      vintage: 'rgba(200, 150, 100, 0.05)'
+    };
+    if (gradeColors[colorGrade]) {
+      gradeEl.style.backgroundColor = gradeColors[colorGrade];
+    } else {
+      gradeEl.style.display = 'none';
+    }
 
     vignette.style.background =
       'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,' + vignetteAmount * 4 + ') 100%)';

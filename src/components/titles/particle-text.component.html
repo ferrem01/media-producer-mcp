@@ -1,0 +1,161 @@
+<template>
+  <div class="particle-text-wrap">
+    <canvas class="particle-canvas"></canvas>
+  </div>
+</template>
+
+<style scoped>
+  .particle-text-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .particle-canvas {
+    width: 100%;
+    height: 100%;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var canvas = el.querySelector('.particle-canvas');
+    var cCtx = canvas.getContext('2d');
+    var text = data.text || 'HELLO';
+    var particleColor = data.particle_color || '#A78BFA';
+
+    // Size canvas
+    var rect = el.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    cCtx.scale(dpr, dpr);
+
+    var W = rect.width;
+    var H = rect.height;
+
+    // Render text to offscreen canvas to get pixel positions
+    var offCanvas = document.createElement('canvas');
+    offCanvas.width = W;
+    offCanvas.height = H;
+    var offCtx = offCanvas.getContext('2d');
+
+    var fontSize = Math.min(W / (text.length * 0.65), H * 0.4, 120);
+    offCtx.font = '800 ' + fontSize + 'px Inter, system-ui, sans-serif';
+    offCtx.fillStyle = '#ffffff';
+    offCtx.textAlign = 'center';
+    offCtx.textBaseline = 'middle';
+    offCtx.fillText(text, W / 2, H / 2);
+
+    // Sample pixel positions
+    var imageData = offCtx.getImageData(0, 0, W, H);
+    var pixels = imageData.data;
+    var particles = [];
+    var gap = 4;
+
+    for (var y = 0; y < H; y += gap) {
+      for (var x = 0; x < W; x += gap) {
+        var idx = (y * W + x) * 4;
+        if (pixels[idx + 3] > 128) {
+          particles.push({
+            targetX: x,
+            targetY: y,
+            x: x + (Math.random() - 0.5) * W * 1.5,
+            y: y + (Math.random() - 0.5) * H * 1.5,
+            size: 2 + Math.random() * 1.5,
+            alpha: 0
+          });
+        }
+      }
+    }
+
+    // Limit particles for performance
+    if (particles.length > 3000) {
+      var step = Math.ceil(particles.length / 3000);
+      var filtered = [];
+      for (var i = 0; i < particles.length; i += step) {
+        filtered.push(particles[i]);
+      }
+      particles = filtered;
+    }
+
+    // Parse color for rgba
+    function hexToRgb(hex) {
+      var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 167, g: 139, b: 250 };
+    }
+    var rgb = hexToRgb(particleColor);
+
+    // Animation state
+    var progress = { value: 0 };
+
+    function render() {
+      cCtx.clearRect(0, 0, W, H);
+      var p = progress.value;
+
+      for (var i = 0; i < particles.length; i++) {
+        var part = particles[i];
+        var cx = part.x + (part.targetX - part.x) * p;
+        var cy = part.y + (part.targetY - part.y) * p;
+        var alpha = p * (0.6 + Math.random() * 0.4);
+
+        cCtx.beginPath();
+        cCtx.arc(cx, cy, part.size, 0, Math.PI * 2);
+        cCtx.fillStyle = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha + ')';
+        cCtx.fill();
+      }
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.8 : ctx.motion === 'punchy' ? 1.2 : 1.8;
+
+    // Animate particles assembling
+    tl.to(progress, {
+      value: 1,
+      duration: speed,
+      ease: 'power3.out',
+      onUpdate: render
+    }, 0.3);
+
+    // Add glow effect after assembly
+    tl.to(progress, {
+      value: 1,
+      duration: 0.5,
+      onUpdate: function() {
+        render();
+        // Add text glow overlay
+        cCtx.globalCompositeOperation = 'screen';
+        cCtx.font = '800 ' + fontSize + 'px Inter, system-ui, sans-serif';
+        cCtx.fillStyle = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ', 0.08)';
+        cCtx.textAlign = 'center';
+        cCtx.textBaseline = 'middle';
+        cCtx.shadowBlur = 40;
+        cCtx.shadowColor = particleColor;
+        cCtx.fillText(text, W / 2, H / 2);
+        cCtx.globalCompositeOperation = 'source-over';
+        cCtx.shadowBlur = 0;
+      }
+    }, 0.3 + speed);
+
+    // Exit: scatter particles out
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to(progress, {
+        value: 0,
+        duration: 0.6,
+        ease: 'power2.in',
+        onUpdate: render
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

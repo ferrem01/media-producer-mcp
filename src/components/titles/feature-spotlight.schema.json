@@ -1,0 +1,30 @@
+{
+  "type": "feature-spotlight",
+  "label": "Feature Spotlight",
+  "category": "titles",
+  "description": "Single feature highlight with icon, title, description, and visual element. Left-right split layout.",
+  "data": {
+    "icon": {
+      "type": "string",
+      "label": "Icon",
+      "optional": true,
+      "placeholder": "🚀"
+    },
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "label": "Description",
+      "optional": true
+    },
+    "visual": {
+      "type": "string",
+      "label": "Visual Element",
+      "optional": true,
+      "placeholder": "Emoji or text for the visual circle"
+    }
+  }
+}

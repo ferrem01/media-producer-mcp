@@ -1,0 +1,25 @@
+{
+  "type": "video-player-mockup",
+  "label": "Video Player Mockup",
+  "category": "media",
+  "description": "Video player with play button overlay, progress bar animation, and dark player chrome.",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "Video Title",
+      "optional": true
+    },
+    "duration": {
+      "type": "string",
+      "label": "Duration",
+      "optional": true,
+      "placeholder": "3:24"
+    },
+    "thumbnail_color": {
+      "type": "string",
+      "label": "Thumbnail Color",
+      "optional": true,
+      "placeholder": "#7C3AED"
+    }
+  }
+}

@@ -1,0 +1,279 @@
+<template>
+  <div class="video-player-wrap">
+    <div class="video-player">
+      <div class="video-viewport">
+        <div class="play-button">
+          <svg class="play-icon" width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <path d="M14 10L32 20L14 30V10Z" fill="white"/>
+          </svg>
+        </div>
+        <div class="play-ring"></div>
+      </div>
+      <div class="player-chrome">
+        <div class="chrome-left-controls">
+          <div class="pause-btn">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+              <rect x="2" y="1" width="3.5" height="12" rx="1"/>
+              <rect x="8.5" y="1" width="3.5" height="12" rx="1"/>
+            </svg>
+          </div>
+          <span class="time-current">0:00</span>
+          <span class="time-sep">/</span>
+          <span class="time-total"></span>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-track">
+            <div class="progress-fill"></div>
+            <div class="progress-knob"></div>
+          </div>
+        </div>
+        <div class="chrome-right-controls">
+          <div class="volume-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+          </div>
+          <div class="fullscreen-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="video-title-bar">
+        <span class="video-title"></span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .video-player-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .video-player {
+    width: 78%;
+    max-width: 840px;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.06);
+    position: relative;
+  }
+
+  .video-viewport {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .play-button {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    position: relative;
+  }
+
+  .play-icon {
+    margin-left: 4px;
+  }
+
+  .play-ring {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 2px solid rgba(167, 139, 250, 0.3);
+    z-index: 1;
+  }
+
+  .player-chrome {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: linear-gradient(180deg, #1e1e24 0%, #18181c 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .chrome-left-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #94a3b8;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .pause-btn {
+    color: #e2e8f0;
+    cursor: pointer;
+  }
+
+  .time-sep { color: #475569; }
+
+  .progress-wrap {
+    flex: 1;
+    padding: 0 8px;
+  }
+
+  .progress-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    position: relative;
+    overflow: visible;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--mp-color-accent, #A78BFA);
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
+  }
+
+  .progress-knob {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--mp-color-accent, #A78BFA);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 10px rgba(167, 139, 250, 0.5);
+  }
+
+  .chrome-right-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #94a3b8;
+    flex-shrink: 0;
+  }
+
+  .video-title-bar {
+    padding: 0;
+    height: 0;
+    overflow: hidden;
+  }
+
+  .video-title {
+    font-size: 14px;
+    color: #e2e8f0;
+    font-weight: 500;
+  }
+
+  .video-title-bar:has(.video-title:not(:empty)) {
+    padding: 10px 16px;
+    height: auto;
+    background: #18181c;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var player = el.querySelector('.video-player');
+    var viewport = el.querySelector('.video-viewport');
+    var playBtn = el.querySelector('.play-button');
+    var playRing = el.querySelector('.play-ring');
+    var progressFill = el.querySelector('.progress-fill');
+    var progressKnob = el.querySelector('.progress-knob');
+    var titleEl = el.querySelector('.video-title');
+    var totalTime = el.querySelector('.time-total');
+
+    if (data.title) titleEl.textContent = data.title;
+    if (data.duration) totalTime.textContent = data.duration;
+    else totalTime.textContent = '3:24';
+
+    if (data.thumbnail_color) {
+      viewport.style.background = 'linear-gradient(135deg, ' + data.thumbnail_color + '33 0%, ' + data.thumbnail_color + '11 100%)';
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Initial state
+    gsap.set(player, { autoAlpha: 0, scale: 0.92, y: 30, filter: 'blur(4px)' });
+    gsap.set(playBtn, { scale: 0.6, autoAlpha: 0 });
+    gsap.set(playRing, { scale: 0.4, autoAlpha: 0 });
+
+    // Entrance
+    tl.to(player, {
+      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+      duration: speed,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Play button appears
+    tl.to(playBtn, {
+      scale: 1, autoAlpha: 1,
+      duration: speed * 0.7,
+      ease: 'back.out(1.6)'
+    }, 0.3 + speed * 0.4);
+
+    // Ring pulse
+    tl.to(playRing, {
+      scale: 1, autoAlpha: 1,
+      duration: speed * 0.6,
+      ease: 'power2.out'
+    }, 0.3 + speed * 0.5);
+
+    tl.to(playRing, {
+      scale: 1.4, autoAlpha: 0,
+      duration: 1.2,
+      ease: 'power1.out',
+      repeat: 1
+    }, 0.3 + speed);
+
+    // Progress bar animation
+    var progDuration = Math.max(ctx.duration - 2, 1.5);
+    tl.to(progressFill, {
+      width: '65%',
+      duration: progDuration,
+      ease: 'none'
+    }, 0.3 + speed);
+
+    tl.to(progressKnob, {
+      left: '65%',
+      duration: progDuration,
+      ease: 'none'
+    }, 0.3 + speed);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(player, {
+        autoAlpha: 0, scale: 0.96, y: -15,
+        duration: 0.5,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

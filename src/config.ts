@@ -23,6 +23,12 @@ export interface LLMConfig {
   apiKey: string;
 }
 
+export interface QualityPreset {
+  width: number;
+  height: number;
+  fps: number;
+}
+
 export interface Config {
   /** Root data directory for all tenant data */
   dataDir: string;
@@ -36,6 +42,10 @@ export interface Config {
   llm: LLMConfig;
   /** Number of scenes to render in parallel (default 2) */
   renderConcurrency: number;
+  /** Preview quality preset (faster renders, lower res) */
+  previewQuality: QualityPreset;
+  /** Production quality preset (full resolution) */
+  productionQuality: QualityPreset;
 }
 
 const ROOT_DIR = path.dirname(new URL(import.meta.url).pathname);
@@ -54,4 +64,14 @@ export const config: Config = {
     apiKey: (llmProvider === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY) || "",
   },
   renderConcurrency: parseInt(process.env.MP_RENDER_CONCURRENCY || "2", 10),
+  previewQuality: {
+    width: 1280,
+    height: 720,
+    fps: 24,
+  },
+  productionQuality: {
+    width: 1920,
+    height: 1080,
+    fps: 30,
+  },
 };

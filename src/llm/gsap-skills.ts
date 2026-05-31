@@ -153,6 +153,26 @@ var ease = ctx.motion === 'punchy' ? 'back.out(1.4)' : 'power3.out';
 var exitEase = 'power2.in';
 \`\`\`
 
+### MorphSVG (SVG Shape Morphing)
+Morph between SVG paths:
+\`\`\`javascript
+gsap.to("#circle", { morphSVG: "#star", duration: 1, ease: "power2.inOut" });
+\`\`\`
+
+### DrawSVG (SVG Path Drawing)
+Animate SVG stroke drawing:
+\`\`\`javascript
+gsap.from("path", { drawSVG: "0%", duration: 2, ease: "power2.inOut" });
+// Partial draw:
+gsap.to("path", { drawSVG: "20% 80%", duration: 1 });
+\`\`\`
+
+### ScrambleText (Text Decode Effect)
+Scramble/decode text like a terminal or cipher:
+\`\`\`javascript
+gsap.to(".text", { scrambleText: { text: "REVEALED", chars: "XO@#", speed: 0.3 }, duration: 1 });
+\`\`\`
+
 ### Standard Animation Pattern
 Every component should follow this structure:
 

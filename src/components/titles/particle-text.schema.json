@@ -1,0 +1,20 @@
+{
+  "type": "particle-text",
+  "label": "Particle Text",
+  "category": "titles",
+  "description": "Text made of particles that assemble from random positions into readable text using canvas.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Text",
+      "required": true,
+      "placeholder": "HELLO"
+    },
+    "particle_color": {
+      "type": "string",
+      "label": "Particle Color",
+      "optional": true,
+      "placeholder": "#A78BFA"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "type": "app-store-card",
+  "label": "App Store Card",
+  "category": "media",
+  "description": "App card mockup with icon, rating, and download button. Realistic iOS App Store style.",
+  "data": {
+    "name": {
+      "type": "string",
+      "label": "App Name",
+      "required": true
+    },
+    "developer": {
+      "type": "string",
+      "label": "Developer",
+      "optional": true
+    },
+    "rating": {
+      "type": "number",
+      "label": "Rating",
+      "optional": true,
+      "placeholder": "4.5"
+    },
+    "icon_color": {
+      "type": "string",
+      "label": "Icon Color",
+      "optional": true,
+      "placeholder": "#A78BFA"
+    },
+    "category": {
+      "type": "string",
+      "label": "Category",
+      "optional": true,
+      "placeholder": "Productivity"
+    }
+  }
+}

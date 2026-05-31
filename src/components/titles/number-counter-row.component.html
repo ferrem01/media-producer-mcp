@@ -1,0 +1,177 @@
+<template>
+  <div class="number-counter-row">
+    <div class="stats-container"></div>
+  </div>
+</template>
+
+<style scoped>
+  .number-counter-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .stats-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    max-width: 1100px;
+    width: 100%;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex: 1;
+    padding: 32px 40px;
+    position: relative;
+  }
+
+  .stat-divider {
+    width: 1px;
+    height: 80px;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.08) 30%,
+      rgba(167, 139, 250, 0.2) 50%,
+      rgba(255, 255, 255, 0.08) 70%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    flex-shrink: 0;
+  }
+
+  .stat-value {
+    font-size: 72px;
+    font-weight: 800;
+    color: var(--mp-color-text, #ffffff);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    text-shadow: 0 0 60px rgba(167, 139, 250, 0.25), 0 0 120px rgba(167, 139, 250, 0.1);
+  }
+
+  .stat-label {
+    font-size: 16px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #64748b;
+    margin-top: 16px;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.stats-container');
+    var stats = data.stats || [];
+
+    if (stats.length > 6) stats = stats.slice(0, 6);
+
+    // Build stat items with dividers
+    for (var i = 0; i < stats.length; i++) {
+      if (i > 0) {
+        var divider = document.createElement('div');
+        divider.className = 'stat-divider';
+        container.appendChild(divider);
+      }
+
+      var item = document.createElement('div');
+      item.className = 'stat-item';
+
+      var valueEl = document.createElement('div');
+      valueEl.className = 'stat-value';
+      valueEl.textContent = (stats[i].prefix || '') + '0' + (stats[i].suffix || '');
+      valueEl.setAttribute('data-target', stats[i].value || 0);
+      valueEl.setAttribute('data-prefix', stats[i].prefix || '');
+      valueEl.setAttribute('data-suffix', stats[i].suffix || '');
+      item.appendChild(valueEl);
+
+      var labelEl = document.createElement('div');
+      labelEl.className = 'stat-label';
+      labelEl.textContent = stats[i].label || '';
+      item.appendChild(labelEl);
+
+      container.appendChild(item);
+    }
+
+    var items = container.querySelectorAll('.stat-item');
+    var dividers = container.querySelectorAll('.stat-divider');
+    var values = container.querySelectorAll('.stat-value');
+
+    gsap.set(items, { autoAlpha: 0, y: 30, scale: 0.95 });
+    gsap.set(dividers, { autoAlpha: 0, scaleY: 0 });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+    var stagger = ctx.motion === 'minimal' ? 0.08 : ctx.motion === 'punchy' ? 0.1 : 0.15;
+
+    // Entrance
+    tl.to(items, {
+      autoAlpha: 1, y: 0, scale: 1,
+      duration: speed,
+      stagger: stagger,
+      ease: 'power3.out'
+    }, 0.3);
+
+    tl.to(dividers, {
+      autoAlpha: 1, scaleY: 1,
+      duration: speed * 0.6,
+      stagger: stagger,
+      ease: 'power2.out'
+    }, 0.4);
+
+    // Count up each number
+    for (var j = 0; j < values.length; j++) {
+      (function(valEl, idx) {
+        var target = parseFloat(valEl.getAttribute('data-target')) || 0;
+        var prefix = valEl.getAttribute('data-prefix') || '';
+        var suffix = valEl.getAttribute('data-suffix') || '';
+        var obj = { val: 0 };
+
+        tl.to(obj, {
+          val: target,
+          duration: speed * 1.5,
+          ease: 'power2.out',
+          onUpdate: function() {
+            var display = obj.val;
+            if (target >= 1000) {
+              display = (display / 1000).toFixed(1) + 'K';
+            } else if (target % 1 !== 0) {
+              display = display.toFixed(1);
+            } else {
+              display = Math.round(display);
+            }
+            valEl.textContent = prefix + display + suffix;
+          }
+        }, 0.3 + idx * stagger);
+      })(values[j], j);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(items, {
+        autoAlpha: 0, y: -15,
+        duration: 0.4,
+        stagger: 0.04,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to(dividers, {
+        autoAlpha: 0,
+        duration: 0.3,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

@@ -1,0 +1,25 @@
+{
+  "type": "product-screenshot",
+  "label": "Product Screenshot",
+  "category": "media",
+  "description": "Device-agnostic screenshot frame with 3D rotation, ambient glow, and elevated shadow.",
+  "data": {
+    "alt": {
+      "type": "string",
+      "label": "Alt Text",
+      "optional": true
+    },
+    "rotation": {
+      "type": "number",
+      "label": "Rotation (degrees)",
+      "optional": true,
+      "placeholder": "-6"
+    },
+    "glow_color": {
+      "type": "string",
+      "label": "Glow Color",
+      "optional": true,
+      "placeholder": "#A78BFA"
+    }
+  }
+}

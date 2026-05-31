@@ -147,6 +147,9 @@ if (typeof CustomWiggle !== 'undefined') gsap.registerPlugin(CustomWiggle);
 if (typeof ExpoScaleEase !== 'undefined') gsap.registerPlugin(ExpoScaleEase);
 if (typeof RoughEase !== 'undefined') gsap.registerPlugin(RoughEase);
 if (typeof SlowMo !== 'undefined') gsap.registerPlugin(SlowMo);
+if (typeof MorphSVGPlugin !== 'undefined') gsap.registerPlugin(MorphSVGPlugin);
+if (typeof DrawSVGPlugin !== 'undefined') gsap.registerPlugin(DrawSVGPlugin);
+if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextPlugin);
 </script>
 </head>
 <body>
@@ -310,6 +313,9 @@ async function loadGsapSource(gsapDir: string): Promise<string> {
     "CustomBounce.min.js",
     "CustomWiggle.min.js",
     "EasePack.min.js",
+    "MorphSVGPlugin.min.js",
+    "DrawSVGPlugin.min.js",
+    "ScrambleTextPlugin.min.js",
   ];
   const sources: string[] = [];
 

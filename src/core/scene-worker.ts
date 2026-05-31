@@ -179,8 +179,8 @@ async function main() {
       await page.evaluate((t: number) => { (window as any).__MP_TIMELINE.time(t); }, time);
       await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
 
-      var frameName = `frame-${String(frame).padStart(6, "0")}.png`;
-      await page.screenshot({ path: path.join(framesDir, frameName), type: "png" });
+      var frameName = `frame-${String(frame).padStart(6, "0")}.jpg`;
+      await page.screenshot({ path: path.join(framesDir, frameName), type: "jpeg", quality: 90 });
 
       if (totalFrames > 20 && frame % Math.ceil(totalFrames / 10) === 0) {
         var pct = Math.round((frame / totalFrames) * 100);
@@ -199,7 +199,7 @@ async function main() {
   await execFileAsync("ffmpeg", [
     "-y",
     "-framerate", String(args.fps),
-    "-i", path.join(framesDir, "frame-%06d.png"),
+    "-i", path.join(framesDir, "frame-%06d.jpg"),
     "-c:v", "libx264",
     "-profile:v", "baseline",
     "-level", "3.0",

@@ -18,7 +18,8 @@ export type TransitionType =
   | "zoom-through"
   | "glitch-cut"
   | "morph-wipe"
-  | "scale-rotate";
+  | "scale-rotate"
+  | "curtain";
 
 export interface TransitionOptions {
   /** Transition type */
@@ -58,7 +59,7 @@ export async function renderTransition(opts: TransitionOptions): Promise<string>
   const gsapSource = await loadGsapMinimal(gsapDir);
 
   // Get the animation script for this transition type
-  const animScript = getTransitionScript(type, duration);
+  const animScript = getTransitionScript(type, duration, width);
 
   // Build the HTML
   const html = `<!DOCTYPE html>
@@ -206,7 +207,7 @@ export async function extractFirstFrame(
 /**
  * Get the GSAP animation script for a transition type.
  */
-function getTransitionScript(type: string, duration: number): string {
+function getTransitionScript(type: string, duration: number, width: number = 1920): string {
   switch (type) {
     case "crossfade":
       return `
@@ -264,6 +265,32 @@ function getTransitionScript(type: string, duration: number): string {
   gsap.set(imgB, { scale: 1.2, rotation: 5, autoAlpha: 0 });
   tl.to(imgA, { scale: 0.8, rotation: -5, autoAlpha: 0, duration: dur, ease: 'power2.inOut' }, 0);
   tl.to(imgB, { scale: 1, rotation: 0, autoAlpha: 1, duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "curtain":
+      return `
+  // Create N vertical strips of frame A that peel away
+  var stripCount = 8;
+  var stripW = ${width} / stripCount;
+  imgA.style.display = 'none';
+  gsap.set(imgB, { zIndex: 0 });
+  var stripContainer = document.createElement('div');
+  stripContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;overflow:hidden;';
+  document.body.appendChild(stripContainer);
+  for (var i = 0; i < stripCount; i++) {
+    var strip = document.createElement('div');
+    strip.style.cssText = 'position:absolute;top:0;width:' + stripW + 'px;height:100%;overflow:hidden;left:' + (i * stripW) + 'px;transform-origin:left center;';
+    var inner = document.createElement('img');
+    inner.src = imgA.src;
+    inner.style.cssText = 'position:absolute;top:0;left:-' + (i * stripW) + 'px;width:${width}px;height:100%;object-fit:cover;';
+    strip.appendChild(inner);
+    stripContainer.appendChild(strip);
+    tl.to(strip, {
+      rotateY: -90,
+      autoAlpha: 0,
+      duration: dur * 0.7,
+      ease: 'power2.in'
+    }, i * (dur * 0.3 / stripCount));
+  }`;
 
     default:
       // Fall back to crossfade for unknown types

@@ -1,0 +1,192 @@
+<template>
+  <div class="app-store-card-wrap">
+    <div class="app-card">
+      <div class="app-icon"></div>
+      <div class="app-info">
+        <div class="app-name"></div>
+        <div class="app-developer"></div>
+        <div class="app-meta">
+          <div class="app-stars"></div>
+          <div class="app-category"></div>
+        </div>
+      </div>
+      <div class="app-action">
+        <button class="get-button">GET</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .app-store-card-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .app-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 32px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 20px 60px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.04);
+    min-width: 420px;
+    max-width: 520px;
+  }
+
+  .app-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #A78BFA 0%, #7C3AED 100%);
+    box-shadow: 0 8px 24px rgba(167, 139, 250, 0.25);
+  }
+
+  .app-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .app-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .app-developer {
+    font-size: 13px;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .app-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 2px;
+  }
+
+  .app-stars {
+    font-size: 12px;
+    color: #FBBF24;
+    letter-spacing: 2px;
+  }
+
+  .app-category {
+    font-size: 11px;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .app-action {
+    flex-shrink: 0;
+  }
+
+  .get-button {
+    background: rgba(167, 139, 250, 0.15);
+    color: var(--mp-color-accent, #A78BFA);
+    border: none;
+    border-radius: 999px;
+    padding: 8px 24px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.app-card');
+    var icon = el.querySelector('.app-icon');
+    var nameEl = el.querySelector('.app-name');
+    var devEl = el.querySelector('.app-developer');
+    var starsEl = el.querySelector('.app-stars');
+    var catEl = el.querySelector('.app-category');
+    var btn = el.querySelector('.get-button');
+
+    // Set data
+    if (data.name) nameEl.textContent = data.name;
+    if (data.developer) devEl.textContent = data.developer;
+    if (data.category) catEl.textContent = data.category;
+
+    // Icon color
+    if (data.icon_color) {
+      icon.style.background = 'linear-gradient(135deg, ' + data.icon_color + ' 0%, ' + data.icon_color + 'cc 100%)';
+    }
+
+    // Stars
+    var rating = data.rating || 4.5;
+    var fullStars = Math.floor(rating);
+    var starStr = '';
+    for (var i = 0; i < 5; i++) {
+      starStr += i < fullStars ? '★' : (i < Math.ceil(rating) ? '★' : '☆');
+    }
+    starsEl.textContent = starStr;
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    // Initial state
+    gsap.set(card, { autoAlpha: 0, scale: 0.88, y: 30, filter: 'blur(4px)' });
+
+    // Entrance with bounce
+    tl.to(card, {
+      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+      duration: speed,
+      ease: 'back.out(1.4)'
+    }, 0.3);
+
+    // Subtle shadow glow after entrance
+    tl.to(card, {
+      boxShadow: '0 24px 80px rgba(0, 0, 0, 0.4), 0 0 40px rgba(167, 139, 250, 0.08)',
+      duration: 0.5,
+      ease: 'power2.out'
+    }, 0.3 + speed * 0.6);
+
+    // Button pulse
+    tl.to(btn, {
+      boxShadow: '0 0 20px rgba(167, 139, 250, 0.3)',
+      duration: 0.6,
+      yoyo: true,
+      repeat: 1,
+      ease: 'sine.inOut'
+    }, 0.3 + speed);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(card, {
+        autoAlpha: 0, scale: 0.95, y: -15,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

@@ -1,0 +1,37 @@
+{
+  "type": "number-counter-row",
+  "label": "Number Counter Row",
+  "category": "titles",
+  "description": "Multiple stats side by side with animated count-up numbers and glass dividers.",
+  "data": {
+    "stats": {
+      "type": "array",
+      "label": "Stats",
+      "required": true,
+      "items": {
+        "value": {
+          "type": "number",
+          "label": "Value",
+          "required": true
+        },
+        "label": {
+          "type": "string",
+          "label": "Label",
+          "required": true
+        },
+        "prefix": {
+          "type": "string",
+          "label": "Prefix",
+          "optional": true,
+          "placeholder": "$"
+        },
+        "suffix": {
+          "type": "string",
+          "label": "Suffix",
+          "optional": true,
+          "placeholder": "%"
+        }
+      }
+    }
+  }
+}
