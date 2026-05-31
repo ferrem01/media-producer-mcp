@@ -13,6 +13,7 @@ import { generateComponentLLM } from "./component-gen.js";
 import { planScene } from "./scene-planner.js";
 import { planProject } from "./project-planner.js";
 import { critiqueScene, type CritiqueResult } from "./critiquer.js";
+import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { createProject, saveProject } from "../persistence/project.js";
@@ -102,6 +103,9 @@ export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineR
       case "deck":
       case "presentation":
         return await runProjectPipeline(opts, brandKit, canvas, catalog, "deck");
+
+      default:
+        return { status: "error", target: opts.target, error: `Unknown target: ${opts.target}` };
     }
   } catch (e: any) {
     return {
@@ -152,8 +156,20 @@ async function runScenePipeline(
   catalog: ComponentCatalogEntry[],
   format: OutputFormat = "video",
 ): Promise<PipelineResult> {
-  var sceneResult = await planScene({
+  // Expand thin prompts into rich creative briefs
+  var expanded = await expandPrompt({
     prompt: opts.prompt,
+    format,
+    llmConfig: opts.llmConfig,
+    brandKit,
+  });
+  var richPrompt = expanded.prompt;
+  if (expanded.expanded) {
+    console.log("  Prompt expanded for scene planning");
+  }
+
+  var sceneResult = await planScene({
+    prompt: richPrompt,
     llmConfig: opts.llmConfig,
     componentCatalog: catalog,
     brandKit,
@@ -194,14 +210,28 @@ async function runProjectPipeline(
   catalog: ComponentCatalogEntry[],
   format: OutputFormat,
 ): Promise<PipelineResult> {
-  var projectResult = await planProject({
+  // Expand thin prompts into rich creative briefs
+  var expanded = await expandPrompt({
     prompt: opts.prompt,
+    format,
+    llmConfig: opts.llmConfig,
+    brandKit,
+    sceneCount: opts.sceneCount,
+  });
+  var richPrompt = expanded.prompt;
+  var sceneCount = expanded.sceneCount || opts.sceneCount;
+  if (expanded.expanded) {
+    console.log("  Prompt expanded for project planning");
+  }
+
+  var projectResult = await planProject({
+    prompt: richPrompt,
     format,
     llmConfig: opts.llmConfig,
     componentCatalog: catalog,
     brandKit,
     canvas,
-    sceneCount: opts.sceneCount,
+    sceneCount,
   });
 
   // Fill in tenant_id

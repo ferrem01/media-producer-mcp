@@ -23,6 +23,8 @@ export interface LLMMessage {
 export interface LLMCallOptions {
   maxTokens?: number;
   temperature?: number;
+  /** System prompt (alternative to including a system role message) */
+  systemPrompt?: string;
 }
 
 /**
@@ -69,7 +71,7 @@ async function callAnthropic(
   options?: LLMCallOptions,
 ): Promise<string> {
   // Anthropic expects system prompt separate from messages
-  var systemPrompt = "";
+  var systemPrompt = options?.systemPrompt || "";
   var apiMessages: Array<{ role: string; content: unknown }> = [];
 
   for (var msg of messages) {
