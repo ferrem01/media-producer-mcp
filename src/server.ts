@@ -26,6 +26,10 @@ import {
   loadBrandKit,
   saveBrandKit,
 } from "./persistence/brand-kit.js";
+import { renderProject as renderProjectCore } from "./core/render.js";
+import { config } from "./config.js";
+import { projectDir, projectOutputDir } from "./persistence/paths.js";
+import path from "node:path";
 import type { Scene, SceneComponent, BrandKit } from "./core/types.js";
 
 export function createMcpServer(): McpServer {
@@ -545,23 +549,55 @@ export function createMcpServer(): McpServer {
         return { content: [{ type: "text", text: "Project has no scenes" }], isError: true };
       }
 
-      // TODO: Wire to renderProject() from core/render.ts
-      // For now, mark as rendering and return status
       project.status = "rendering";
       await saveProject(project);
 
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            status: "rendering",
-            project_id: project.project_id,
-            format: project.format,
-            scenes: project.scenes.length,
-            message: "Render queued. Use render_status to check progress.",
-          }, null, 2),
-        }],
-      };
+      try {
+        const ext = project.format === "video" || project.format === "slideshow" ? "mp4" : "png";
+        const outputPath = path.join(
+          projectOutputDir(params.tenant_id, params.project_id),
+          `output.${ext}`,
+        );
+
+        const result = await renderProjectCore({
+          project,
+          workDir: path.join(projectDir(params.tenant_id, params.project_id), "_work"),
+          componentLibDir: config.componentLibDir,
+          gsapDir: config.gsapDir,
+          outputPath,
+        });
+
+        project.status = "rendered";
+        await saveProject(project);
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              status: "rendered",
+              project_id: project.project_id,
+              format: project.format,
+              output_path: result.outputPath,
+              duration_ms: result.durationMs,
+              frame_count: result.frameCount,
+            }, null, 2),
+          }],
+        };
+      } catch (err: any) {
+        project.status = "failed";
+        await saveProject(project);
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              status: "failed",
+              error: err.message || String(err),
+            }, null, 2),
+          }],
+          isError: true,
+        };
+      }
     },
   );
 
@@ -584,17 +620,73 @@ export function createMcpServer(): McpServer {
         return { content: [{ type: "text", text: "Scene not found" }], isError: true };
       }
 
-      // TODO: Wire to scene-level render
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            status: "queued",
-            scene_id: scene.id,
-            message: "Scene render not yet wired to capture pipeline.",
-          }, null, 2),
-        }],
-      };
+      try {
+        const sceneAssembler = await import("./core/scene-assembler.js");
+        const captureModule = await import("./core/capture.js");
+        const fs = await import("node:fs/promises");
+
+        // Load component sources
+        const types = new Set(scene.components.map((c) => c.type));
+        const components: Array<{ type: string; source: string }> = [];
+        for (const t of types) {
+          // Search component library
+          const categories = await fs.readdir(config.componentLibDir, { withFileTypes: true }).catch(() => []);
+          for (const cat of categories) {
+            if (!cat.isDirectory()) continue;
+            const fp = path.join(config.componentLibDir, cat.name, `${t}.component.html`);
+            try {
+              const source = await fs.readFile(fp, "utf-8");
+              components.push({ type: t, source });
+              break;
+            } catch { /* not in this category */ }
+          }
+        }
+
+        const html = await sceneAssembler.assembleScene({
+          scene,
+          components,
+          brandKit: project.brand_kit,
+          canvas: project.canvas,
+          gsapDir: config.gsapDir,
+        });
+
+        const workDir = path.join(projectDir(params.tenant_id, params.project_id), "_work");
+        const htmlPath = path.join(workDir, `preview_${scene.id}.html`);
+        const outputPath = path.join(
+          projectOutputDir(params.tenant_id, params.project_id),
+          `preview_${scene.id}.png`,
+        );
+
+        await fs.mkdir(workDir, { recursive: true });
+        await fs.writeFile(htmlPath, html);
+
+        await captureModule.captureSingleFrame({
+          htmlPath,
+          outputPath,
+          width: project.canvas.width,
+          height: project.canvas.height,
+          atTime: scene.duration_seconds / 3,
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              status: "rendered",
+              scene_id: scene.id,
+              output_path: outputPath,
+            }, null, 2),
+          }],
+        };
+      } catch (err: any) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ status: "failed", error: err.message || String(err) }, null, 2),
+          }],
+          isError: true,
+        };
+      }
     },
   );
 
