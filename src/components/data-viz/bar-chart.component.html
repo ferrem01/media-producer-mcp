@@ -1,7 +1,9 @@
 <template>
   <div class="bar-chart">
     <h2 class="chart-title">{{title}}</h2>
-    <div class="chart-area"></div>
+    <div class="chart-card">
+      <div class="chart-area"></div>
+    </div>
   </div>
 </template>
 
@@ -13,8 +15,8 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 40px 60px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
     box-sizing: border-box;
   }
 
@@ -24,20 +26,36 @@
     color: var(--mp-color-text, #ffffff);
     margin: 0 0 32px 0;
     text-align: center;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.1);
   }
 
   .chart-title:empty {
     display: none;
   }
 
+  .chart-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 40px;
+    width: 100%;
+    flex: 1;
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
   .chart-area {
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    gap: 24px;
+    gap: 28px;
     width: 100%;
-    flex: 1;
-    padding-bottom: 40px;
+    height: 100%;
+    padding-bottom: 8px;
     position: relative;
   }
 
@@ -46,53 +64,56 @@
     flex-direction: column;
     align-items: center;
     flex: 1;
-    max-width: 120px;
+    max-width: 110px;
     height: 100%;
     justify-content: flex-end;
   }
 
   .bar-value {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     margin-bottom: 8px;
+    text-shadow: 0 0 20px rgba(167, 139, 250, 0.15);
   }
 
   .bar-fill {
     width: 100%;
-    border-radius: 8px 8px 0 0;
+    border-radius: 8px 8px 4px 4px;
     min-height: 4px;
+    box-shadow: 0 0 20px rgba(167, 139, 250, 0.1);
   }
 
   .bar-label {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
-    color: var(--mp-color-text-muted, #94a3b8);
+    color: #94a3b8;
     margin-top: 12px;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+    letter-spacing: 0.01em;
   }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
+    var chartCard = el.querySelector('.chart-card');
     var chartArea = el.querySelector('.chart-area');
     var title = el.querySelector('.chart-title');
     var bars = data.bars || [];
     var maxVal = data.max_value || Math.max.apply(null, bars.map(function(b) { return b.value; }));
-    var maxHeight = chartArea.clientHeight - 80;
+    var maxHeight = 280;
     var defaultColors = [
-      'var(--mp-color-primary, #6366f1)',
       'var(--mp-color-accent, #a78bfa)',
+      'var(--mp-color-primary, #6366f1)',
       'var(--mp-color-secondary, #22d3ee)',
       '#f472b6', '#fbbf24', '#34d399'
     ];
 
-    // Build bars in DOM
     bars.forEach(function(bar, i) {
       var group = document.createElement('div');
       group.className = 'bar-group';
@@ -127,31 +148,39 @@
 
     // Title entrance
     if (title && title.textContent.trim()) {
-      gsap.set(title, { autoAlpha: 0, y: 20 });
-      tl.to(title, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.2);
+      gsap.set(title, { autoAlpha: 0, y: 20, filter: 'blur(4px)' });
+      tl.to(title, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out' }, 0.2);
     }
 
-    // Animate bars growing
+    // Card entrance
+    gsap.set(chartCard, { autoAlpha: 0, y: 30, scale: 1.05, filter: 'blur(4px)' });
+    tl.to(chartCard, {
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: 0.6, ease: 'power3.out'
+    }, 0.3);
+
+    // Bars grow
     var stagger = ctx.motion === 'minimal' ? 0.08 : 0.12;
     fills.forEach(function(fill, i) {
       tl.to(fill, {
         height: fill.dataset.targetHeight,
         duration: 0.6,
         ease: 'power3.out'
-      }, 0.5 + i * stagger);
+      }, 0.7 + i * stagger);
     });
 
-    // Show values and labels
-    tl.to(values, { autoAlpha: 1, duration: 0.3, stagger: stagger }, 0.8);
-    tl.to(labels, { autoAlpha: 1, duration: 0.3, stagger: stagger }, 0.8);
+    // Values and labels
+    tl.to(values, { autoAlpha: 1, duration: 0.3, stagger: stagger }, 1.0);
+    tl.to(labels, { autoAlpha: 1, duration: 0.3, stagger: stagger }, 1.0);
 
     // Exit
     if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
       tl.to(el.querySelector('.bar-chart'), {
         autoAlpha: 0,
         duration: 0.4,
         ease: 'power2.in'
-      }, ctx.duration - 0.5);
+      }, exitAt);
     }
 
     return tl;

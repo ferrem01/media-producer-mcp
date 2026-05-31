@@ -15,18 +15,19 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
     padding: 80px;
     box-sizing: border-box;
   }
 
   .cta-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 20px;
-    backdrop-filter: blur(20px);
-    padding: 60px;
-    max-width: 600px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 24px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 64px 72px;
+    max-width: 620px;
     width: 100%;
     text-align: center;
     box-shadow:
@@ -38,8 +39,8 @@
     font-size: 48px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
-    margin: 0 0 16px 0;
-    line-height: 1.15;
+    margin: 0 0 20px 0;
+    line-height: 1.1;
     letter-spacing: -0.02em;
     text-shadow: 0 0 40px rgba(167, 139, 250, 0.15);
   }
@@ -47,8 +48,9 @@
   .cta-description {
     font-size: 20px;
     color: #cbd5e1;
-    margin: 0 0 36px 0;
+    margin: 0 0 40px 0;
     line-height: 1.5;
+    letter-spacing: 0.005em;
   }
 
   .cta-description:empty {
@@ -57,16 +59,18 @@
 
   .cta-button {
     display: inline-block;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: #ffffff;
     background: var(--mp-color-accent, #A78BFA);
     height: 56px;
     line-height: 56px;
-    padding: 0 40px;
-    border-radius: 12px;
+    padding: 0 44px;
+    border-radius: 14px;
     letter-spacing: 0.02em;
-    box-shadow: 0 0 30px rgba(167, 139, 250, 0.25);
+    box-shadow:
+      0 0 30px rgba(167, 139, 250, 0.25),
+      0 8px 24px rgba(167, 139, 250, 0.15);
   }
 
   .cta-button:empty {
@@ -84,39 +88,40 @@
 
     if (data.button_color) {
       button.style.background = data.button_color;
+      button.style.boxShadow = '0 0 30px ' + data.button_color + '40, 0 8px 24px ' + data.button_color + '25';
     }
 
-    gsap.set(card, { autoAlpha: 0, y: 60, scale: 0.95 });
+    var speed = ctx.motion === 'minimal' ? 0.45 : ctx.motion === 'punchy' ? 0.6 : 0.75;
 
-    // Card slides up with scale
+    // Card entrance with scale + blur
+    gsap.set(card, { autoAlpha: 0, y: 50, scale: 1.06, filter: 'blur(5px)' });
+
     tl.to(card, {
-      autoAlpha: 1,
-      y: 0,
-      scale: 1,
-      duration: 0.7,
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: speed,
       ease: 'power3.out'
     }, 0.3);
 
-    // Button subtle pulse
+    // Button pulse with glow
     if (button && button.textContent.trim()) {
       tl.to(button, {
-        scale: 1.03,
-        duration: 0.6,
+        scale: 1.04,
+        boxShadow: '0 0 40px rgba(167, 139, 250, 0.35), 0 8px 32px rgba(167, 139, 250, 0.2)',
+        duration: 0.5,
         ease: 'sine.inOut',
         yoyo: true,
         repeat: 3
-      }, 1.2);
+      }, 0.3 + speed + 0.3);
     }
 
     // Exit
     if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
       tl.to(card, {
-        autoAlpha: 0,
-        y: -30,
-        scale: 0.97,
+        autoAlpha: 0, y: -25, scale: 0.97,
         duration: 0.4,
         ease: 'power2.in'
-      }, ctx.duration - 0.5);
+      }, exitAt);
     }
 
     return tl;

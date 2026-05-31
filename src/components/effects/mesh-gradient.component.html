@@ -5,7 +5,7 @@
         <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
         <feColorMatrix type="saturate" values="0"/>
       </filter>
-      <rect width="100%" height="100%" filter="url(#noiseFilter)" opacity="0.03"/>
+      <rect width="100%" height="100%" filter="url(#noiseFilter)" opacity="0.04"/>
     </svg>
   </div>
 </template>
@@ -16,6 +16,7 @@
     height: 100%;
     position: relative;
     overflow: hidden;
+    background: #09090b;
   }
 
   .noise-overlay {
@@ -31,7 +32,7 @@
   .mesh-blob {
     position: absolute;
     border-radius: 50%;
-    filter: blur(100px);
+    filter: blur(120px);
     opacity: 0.4;
   }
 </style>
@@ -50,16 +51,13 @@
       '#34d399'
     ];
 
-    var bg = 'var(--mp-color-background, #09090b)';
-    container.style.background = bg;
-
     // Create 5 overlapping blobs at different quadrants
     var blobConfigs = [
-      { x: '5%', y: '10%', size: '65%' },
-      { x: '50%', y: '55%', size: '60%' },
-      { x: '55%', y: '5%', size: '55%' },
-      { x: '15%', y: '60%', size: '50%' },
-      { x: '35%', y: '30%', size: '70%' }
+      { x: '5%', y: '8%', size: '65%' },
+      { x: '48%', y: '52%', size: '60%' },
+      { x: '52%', y: '3%', size: '55%' },
+      { x: '12%', y: '58%', size: '52%' },
+      { x: '32%', y: '28%', size: '70%' }
     ];
 
     blobConfigs.forEach(function(cfg, i) {
@@ -71,26 +69,27 @@
       blob.style.height = cfg.size;
       blob.style.left = cfg.x;
       blob.style.top = cfg.y;
+      blob.style.opacity = '0.4';
       container.appendChild(blob);
     });
 
     var blobs = container.querySelectorAll('.mesh-blob');
 
-    // Animate blobs with very slow drift (20s+ cycle)
+    // Animate blobs with 20s+ drift cycle
     blobs.forEach(function(blob, i) {
-      var xShift = (i % 2 === 0 ? 1 : -1) * (60 + i * 15);
-      var yShift = (i % 2 === 0 ? -1 : 1) * (40 + i * 12);
+      var xShift = (i % 2 === 0 ? 1 : -1) * (55 + i * 18);
+      var yShift = (i % 2 === 0 ? -1 : 1) * (35 + i * 14);
       var dur = Math.max(20, (ctx.duration * 0.9) / speed);
 
       tl.to(blob, {
         x: xShift,
         y: yShift,
-        scale: 1.05 + i * 0.03,
+        scale: 1.04 + i * 0.03,
         duration: dur,
         ease: 'sine.inOut',
         yoyo: true,
         repeat: -1
-      }, i * 0.5);
+      }, i * 0.4);
     });
 
     return tl;

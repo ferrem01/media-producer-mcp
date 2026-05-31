@@ -1,8 +1,10 @@
 <template>
   <div class="line-chart">
     <h2 class="chart-title">{{title}}</h2>
-    <div class="chart-area">
-      <svg class="chart-svg" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="chart-card">
+      <div class="chart-area">
+        <svg class="chart-svg" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
     </div>
   </div>
 </template>
@@ -15,8 +17,8 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 40px 60px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
     box-sizing: border-box;
   }
 
@@ -24,17 +26,33 @@
     font-size: 36px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
-    margin: 0 0 24px 0;
+    margin: 0 0 28px 0;
     text-align: center;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.1);
   }
 
   .chart-title:empty {
     display: none;
   }
 
-  .chart-area {
+  .chart-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 32px;
     width: 100%;
     flex: 1;
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
+  .chart-area {
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -51,12 +69,12 @@
     var tl = gsap.timeline();
     var svg = el.querySelector('.chart-svg');
     var title = el.querySelector('.chart-title');
+    var chartCard = el.querySelector('.chart-card');
     var points = data.points || [];
-    var color = data.color || 'var(--mp-color-primary, #6366f1)';
+    var color = data.color || 'var(--mp-color-accent, #a78bfa)';
 
     if (points.length < 2) return tl;
 
-    // Normalize points to SVG viewBox
     var padding = 40;
     var w = 800 - padding * 2;
     var h = 400 - padding * 2;
@@ -74,63 +92,95 @@
       };
     });
 
-    // Build path
     var d = 'M ' + scaled.map(function(p) { return p.x + ' ' + p.y; }).join(' L ');
+
+    // Gradient fill under line
+    var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    var grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    grad.setAttribute('id', 'lineGrad');
+    grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+    grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
+    var stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop1.setAttribute('offset', '0%'); stop1.setAttribute('stop-color', '#a78bfa'); stop1.setAttribute('stop-opacity', '0.15');
+    var stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop2.setAttribute('offset', '100%'); stop2.setAttribute('stop-color', '#a78bfa'); stop2.setAttribute('stop-opacity', '0');
+    grad.appendChild(stop1); grad.appendChild(stop2);
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    // Area fill
+    var areaD = d + ' L ' + scaled[scaled.length - 1].x + ' ' + (padding + h) + ' L ' + scaled[0].x + ' ' + (padding + h) + ' Z';
+    var area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    area.setAttribute('d', areaD);
+    area.setAttribute('fill', 'url(#lineGrad)');
+    area.style.opacity = '0';
+    svg.appendChild(area);
 
     var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', d);
     path.setAttribute('fill', 'none');
     path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', '4');
+    path.setAttribute('stroke-width', '3');
     path.setAttribute('stroke-linecap', 'round');
     path.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(path);
 
-    // Draw dots
+    // Dots with glow
     scaled.forEach(function(p) {
+      var glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      glow.setAttribute('cx', p.x); glow.setAttribute('cy', p.y);
+      glow.setAttribute('r', '10'); glow.setAttribute('fill', '#a78bfa');
+      glow.setAttribute('opacity', '0'); glow.classList.add('dot-glow');
+      svg.appendChild(glow);
+
       var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', p.x);
-      circle.setAttribute('cy', p.y);
-      circle.setAttribute('r', '6');
-      circle.setAttribute('fill', color);
+      circle.setAttribute('cx', p.x); circle.setAttribute('cy', p.y);
+      circle.setAttribute('r', '5'); circle.setAttribute('fill', color);
       circle.style.opacity = '0';
       svg.appendChild(circle);
     });
 
-    // Animate stroke-dashoffset
     var pathLength = path.getTotalLength();
     path.style.strokeDasharray = pathLength;
     path.style.strokeDashoffset = pathLength;
 
-    // Title
+    // Title entrance
     if (title && title.textContent.trim()) {
-      gsap.set(title, { autoAlpha: 0, y: 20 });
-      tl.to(title, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.2);
+      gsap.set(title, { autoAlpha: 0, y: 20, filter: 'blur(4px)' });
+      tl.to(title, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out' }, 0.2);
     }
+
+    // Card entrance
+    gsap.set(chartCard, { autoAlpha: 0, y: 25, scale: 1.05, filter: 'blur(4px)' });
+    tl.to(chartCard, {
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: 0.6, ease: 'power3.out'
+    }, 0.3);
 
     // Draw line
     tl.to(path.style, {
       strokeDashoffset: 0,
-      duration: ctx.duration * 0.5,
+      duration: ctx.duration * 0.4,
       ease: 'power2.inOut'
-    }, 0.5);
+    }, 0.7);
+
+    // Show area fill
+    tl.to(area, { opacity: 1, duration: 0.5, ease: 'power2.out' }, 0.7 + ctx.duration * 0.15);
 
     // Show dots
-    var dots = svg.querySelectorAll('circle');
-    tl.to(dots, {
-      opacity: 1,
-      duration: 0.3,
-      stagger: 0.08,
-      ease: 'power2.out'
-    }, 0.5 + ctx.duration * 0.3);
+    var dots = svg.querySelectorAll('circle:not(.dot-glow)');
+    var glows = svg.querySelectorAll('.dot-glow');
+    tl.to(dots, { opacity: 1, duration: 0.3, stagger: 0.06, ease: 'power2.out' }, 0.7 + ctx.duration * 0.25);
+    tl.to(glows, { opacity: 0.15, duration: 0.3, stagger: 0.06, ease: 'power2.out' }, 0.7 + ctx.duration * 0.25);
 
     // Exit
     if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
       tl.to(el.querySelector('.line-chart'), {
         autoAlpha: 0,
         duration: 0.4,
         ease: 'power2.in'
-      }, ctx.duration - 0.5);
+      }, exitAt);
     }
 
     return tl;

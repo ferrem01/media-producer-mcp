@@ -1,8 +1,10 @@
 <template>
   <div class="progress-bar-component">
     <div class="progress-label">{{label}}</div>
-    <div class="progress-track">
-      <div class="progress-fill"></div>
+    <div class="progress-card">
+      <div class="progress-track">
+        <div class="progress-fill"></div>
+      </div>
     </div>
     <div class="progress-value"></div>
   </div>
@@ -16,8 +18,8 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 40px 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
     box-sizing: border-box;
   }
 
@@ -25,19 +27,34 @@
     font-size: 36px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
-    margin-bottom: 32px;
+    margin-bottom: 40px;
     text-align: center;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.1);
   }
 
   .progress-label:empty {
     display: none;
   }
 
-  .progress-track {
+  .progress-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 20px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 24px;
     width: 100%;
     max-width: 700px;
-    height: 32px;
-    background: var(--mp-color-surface, #1e293b);
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.04);
     border-radius: 999px;
     overflow: hidden;
     position: relative;
@@ -47,13 +64,31 @@
     height: 100%;
     border-radius: 999px;
     width: 0%;
+    box-shadow: 0 0 24px rgba(167, 139, 250, 0.3);
+    position: relative;
+  }
+
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15));
+    border-radius: 0 999px 999px 0;
   }
 
   .progress-value {
-    font-size: 48px;
-    font-weight: 800;
+    font-size: 56px;
+    font-weight: 700;
     color: var(--mp-color-text, #ffffff);
-    margin-top: 24px;
+    margin-top: 32px;
+    letter-spacing: -0.02em;
+    text-shadow:
+      0 0 60px rgba(167, 139, 250, 0.2),
+      0 0 20px rgba(167, 139, 250, 0.1);
+    font-variant-numeric: tabular-nums;
   }
 </style>
 
@@ -63,44 +98,63 @@
     var fill = el.querySelector('.progress-fill');
     var valueEl = el.querySelector('.progress-value');
     var label = el.querySelector('.progress-label');
+    var card = el.querySelector('.progress-card');
     var maxVal = data.max || 100;
     var val = Math.min(data.value || 0, maxVal);
     var pct = (val / maxVal) * 100;
-    var color = data.color || 'var(--mp-color-primary, #6366f1)';
+    var color = data.color || 'var(--mp-color-accent, #A78BFA)';
 
     fill.style.background = color;
     valueEl.textContent = '0%';
 
-    var wrapper = el.querySelector('.progress-bar-component');
-    gsap.set(wrapper, { autoAlpha: 0 });
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.65;
 
-    // Fade in
-    tl.to(wrapper, { autoAlpha: 1, duration: 0.4, ease: 'power2.out' }, 0.2);
+    // Label entrance
+    if (label && label.textContent.trim()) {
+      gsap.set(label, { autoAlpha: 0, y: 20, filter: 'blur(4px)' });
+      tl.to(label, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.2);
+    }
 
-    // Fill bar
+    // Card entrance
+    gsap.set(card, { autoAlpha: 0, y: 30, scale: 1.05, filter: 'blur(4px)' });
+    tl.to(card, {
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: speed, ease: 'power3.out'
+    }, 0.3);
+
+    // Value entrance
+    gsap.set(valueEl, { autoAlpha: 0, y: 15 });
+    tl.to(valueEl, {
+      autoAlpha: 1, y: 0,
+      duration: 0.4, ease: 'power2.out'
+    }, 0.4);
+
+    // Fill bar + count up
     var counter = { val: 0 };
+    var fillDuration = ctx.duration * 0.45;
     tl.to(fill, {
       width: pct + '%',
-      duration: ctx.duration * 0.5,
+      duration: fillDuration,
       ease: 'power2.out'
-    }, 0.5);
+    }, 0.6);
 
     tl.to(counter, {
       val: pct,
-      duration: ctx.duration * 0.5,
+      duration: fillDuration,
       ease: 'power2.out',
       onUpdate: function() {
         valueEl.textContent = Math.round(counter.val) + '%';
       }
-    }, 0.5);
+    }, 0.6);
 
     // Exit
     if (ctx.duration > 2) {
-      tl.to(wrapper, {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(el.querySelector('.progress-bar-component'), {
         autoAlpha: 0,
         duration: 0.4,
         ease: 'power2.in'
-      }, ctx.duration - 0.5);
+      }, exitAt);
     }
 
     return tl;

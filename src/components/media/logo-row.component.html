@@ -13,18 +13,18 @@
     justify-content: center;
     height: 100%;
     width: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 60px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
     gap: 48px;
   }
 
   .logo-row-title {
-    font-size: 32px;
+    font-size: 13px;
     font-weight: 600;
-    color: var(--mp-color-text-muted, #94a3b8);
+    color: #94a3b8;
     text-align: center;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
   }
 
   .logo-row-title:empty {
@@ -35,7 +35,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 48px;
+    gap: 24px;
     flex-wrap: wrap;
   }
 
@@ -44,6 +44,15 @@
     flex-direction: column;
     align-items: center;
     gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 20px 28px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.15),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 
   .logo-item img {
@@ -51,9 +60,10 @@
   }
 
   .logo-item-label {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 500;
-    color: var(--mp-color-text-muted, #94a3b8);
+    color: #94a3b8;
+    letter-spacing: 0.005em;
   }
 </style>
 
@@ -71,7 +81,6 @@
     var container = el.querySelector('.logo-row-logos');
     var title = el.querySelector('.logo-row-title');
 
-    // Build logo items
     for (var i = 0; i < domains.length; i++) {
       var d = typeof domains[i] === 'string' ? { domain: domains[i] } : domains[i];
       var domain = d.domain || 'example.com';
@@ -105,36 +114,46 @@
     }
 
     var items = container.querySelectorAll('.logo-item');
+    var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.45 : 0.55;
+    var stagger = ctx.motion === 'minimal' ? 0.08 : ctx.motion === 'punchy' ? 0.1 : 0.14;
 
-    // Start invisible
-    gsap.set(title, { autoAlpha: 0, y: 20 });
-    gsap.set(items, { autoAlpha: 0, y: 20, scale: 0.9 });
-
-    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.5;
-    var stagger = ctx.motion === 'minimal' ? 0.08 : ctx.motion === 'punchy' ? 0.1 : 0.15;
-
-    // Entrance
+    // Title entrance
     if (title && title.textContent.trim()) {
+      gsap.set(title, { autoAlpha: 0, y: 15 });
       tl.to(title, {
         autoAlpha: 1, y: 0,
-        duration: speed,
+        duration: speed * 0.7,
         ease: 'power3.out'
       }, 0.3);
     }
 
+    // Items: scale + blur entrance
+    gsap.set(items, { autoAlpha: 0, y: 20, scale: 1.08, filter: 'blur(5px)' });
+
     tl.to(items, {
-      autoAlpha: 1, y: 0, scale: 1,
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
       duration: speed,
       stagger: stagger,
-      ease: 'power3.out'
-    }, title && title.textContent.trim() ? '-=0.2' : 0.3);
+      ease: ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out'
+    }, title && title.textContent.trim() ? 0.5 : 0.3);
+
+    // Subtle glow
+    tl.to(items, {
+      boxShadow: '0 0 20px rgba(167, 139, 250, 0.05), 0 4px 16px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.04)',
+      duration: 0.3,
+      stagger: stagger * 0.5
+    }, '-=0.2');
 
     // Exit
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.6;
-      tl.to([title, items], {
+      var exitEls = [];
+      if (title && title.textContent.trim()) exitEls.push(title);
+      for (var j = 0; j < items.length; j++) exitEls.push(items[j]);
+      tl.to(exitEls, {
         autoAlpha: 0,
-        duration: 0.3,
+        duration: 0.35,
+        stagger: 0.03,
         ease: 'power2.in'
       }, exitAt);
     }

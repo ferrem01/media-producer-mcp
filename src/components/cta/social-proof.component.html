@@ -13,8 +13,8 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 40px 60px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
     box-sizing: border-box;
   }
 
@@ -22,8 +22,10 @@
     font-size: 36px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
-    margin: 0 0 40px 0;
+    margin: 0 0 44px 0;
     text-align: center;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.1);
   }
 
   .sp-title:empty {
@@ -34,9 +36,9 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 24px;
+    gap: 20px;
     width: 100%;
-    max-width: 900px;
+    max-width: 960px;
   }
 
   .sp-grid.layout-grid {
@@ -45,27 +47,36 @@
   }
 
   .sp-item {
-    background: var(--mp-color-surface, #1e293b);
-    border-radius: var(--mp-border-radius, 12px);
-    padding: 28px 32px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 32px 36px;
     text-align: center;
     flex: 1;
     min-width: 180px;
     max-width: 280px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 
   .sp-text {
     font-size: 22px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
-    line-height: 1.3;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
   }
 
   .sp-subtext {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 400;
-    color: var(--mp-color-text-muted, #94a3b8);
-    margin-top: 8px;
+    color: #94a3b8;
+    margin-top: 10px;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
   }
 
   .sp-subtext:empty {
@@ -85,7 +96,6 @@
       grid.classList.add('layout-grid');
     }
 
-    // Build items
     items.forEach(function(item) {
       var div = document.createElement('div');
       div.className = 'sp-item';
@@ -106,31 +116,40 @@
     });
 
     var cards = grid.querySelectorAll('.sp-item');
-    gsap.set(cards, { autoAlpha: 0, y: 20, scale: 0.95 });
+    var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.45 : 0.6;
+    var stagger = ctx.motion === 'minimal' ? 0.08 : 0.12;
 
-    // Title
+    // Title entrance
     if (title && title.textContent.trim()) {
-      gsap.set(title, { autoAlpha: 0, y: 20 });
-      tl.to(title, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.2);
+      gsap.set(title, { autoAlpha: 0, y: 20, filter: 'blur(4px)' });
+      tl.to(title, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.2);
     }
 
-    // Stagger items in
+    // Cards with scale + blur entrance
+    gsap.set(cards, { autoAlpha: 0, y: 25, scale: 1.06, filter: 'blur(5px)' });
+
     tl.to(cards, {
-      autoAlpha: 1,
-      y: 0,
-      scale: 1,
-      duration: 0.5,
-      stagger: 0.12,
-      ease: 'power3.out'
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: speed,
+      stagger: stagger,
+      ease: ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out'
     }, 0.5);
+
+    // Glow after entrance
+    tl.to(cards, {
+      boxShadow: '0 0 24px rgba(167, 139, 250, 0.05), 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.04)',
+      duration: 0.4,
+      stagger: stagger * 0.5
+    }, '-=0.2');
 
     // Exit
     if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
       tl.to(el.querySelector('.social-proof'), {
         autoAlpha: 0,
         duration: 0.4,
         ease: 'power2.in'
-      }, ctx.duration - 0.5);
+      }, exitAt);
     }
 
     return tl;

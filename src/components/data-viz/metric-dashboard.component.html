@@ -11,47 +11,61 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 40px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
     box-sizing: border-box;
   }
 
   .metrics-grid {
     display: grid;
-    gap: 24px;
+    gap: 20px;
     width: 100%;
-    max-width: 900px;
+    max-width: 1000px;
   }
 
   .metric-card {
-    background: var(--mp-color-surface, #1e293b);
-    border-radius: var(--mp-border-radius, 12px);
-    padding: 32px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 36px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 
   .metric-value {
-    font-size: 56px;
-    font-weight: 800;
+    font-size: 52px;
+    font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    text-shadow:
+      0 0 60px rgba(167, 139, 250, 0.2),
+      0 0 20px rgba(167, 139, 250, 0.1);
   }
 
   .metric-label {
-    font-size: 18px;
-    font-weight: 500;
-    color: var(--mp-color-text-muted, #94a3b8);
-    margin-top: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-top: 12px;
   }
 
   .metric-change {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
     margin-top: 8px;
+    letter-spacing: 0.02em;
   }
 
   .metric-change.positive {
@@ -71,7 +85,6 @@
     var cols = data.columns || Math.min(metrics.length, 3);
     grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
 
-    // Build metric cards
     metrics.forEach(function(m) {
       var card = document.createElement('div');
       card.className = 'metric-card';
@@ -105,17 +118,26 @@
     var cards = grid.querySelectorAll('.metric-card');
     var valueEls = grid.querySelectorAll('.metric-value');
 
-    gsap.set(cards, { autoAlpha: 0, y: 30, scale: 0.95 });
+    // Scale + blur entrance
+    gsap.set(cards, { autoAlpha: 0, y: 30, scale: 1.06, filter: 'blur(5px)' });
+
+    var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.45 : 0.6;
+    var stagger = ctx.motion === 'minimal' ? 0.08 : 0.12;
 
     // Stagger cards in
     tl.to(cards, {
-      autoAlpha: 1,
-      y: 0,
-      scale: 1,
-      duration: 0.5,
-      stagger: 0.12,
-      ease: 'power3.out'
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: speed,
+      stagger: stagger,
+      ease: ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out'
     }, 0.3);
+
+    // Subtle glow
+    tl.to(cards, {
+      boxShadow: '0 0 30px rgba(167, 139, 250, 0.05), 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.04)',
+      duration: 0.4,
+      stagger: stagger * 0.5
+    }, '-=0.2');
 
     // Count up numbers
     valueEls.forEach(function(ve, i) {
@@ -125,7 +147,7 @@
       var counter = { val: 0 };
       tl.to(counter, {
         val: target,
-        duration: 0.8,
+        duration: 0.9,
         ease: 'power2.out',
         onUpdate: function() {
           var display = target % 1 !== 0 ? counter.val.toFixed(1) : Math.round(counter.val);
@@ -136,13 +158,13 @@
 
     // Exit
     if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
       tl.to(cards, {
-        autoAlpha: 0,
-        y: -15,
+        autoAlpha: 0, y: -15,
         duration: 0.4,
-        stagger: 0.05,
+        stagger: 0.04,
         ease: 'power2.in'
-      }, ctx.duration - 0.6);
+      }, exitAt);
     }
 
     return tl;

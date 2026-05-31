@@ -19,50 +19,66 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 40px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
     box-sizing: border-box;
   }
 
   .pricing-card {
-    background: var(--mp-color-surface, #1e293b);
-    border-radius: var(--mp-border-radius, 16px);
-    padding: 48px 56px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 24px;
+    padding: 56px 64px;
     max-width: 480px;
     width: 100%;
     text-align: center;
-    border: 2px solid transparent;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 
   .pricing-card.highlighted {
-    border-color: var(--mp-color-primary, #6366f1);
-    box-shadow: 0 0 40px rgba(99, 102, 241, 0.15);
+    border-color: rgba(167, 139, 250, 0.25);
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.4),
+      0 0 40px rgba(167, 139, 250, 0.1),
+      0 0 0 1px rgba(167, 139, 250, 0.15);
   }
 
   .pricing-name {
-    font-size: 24px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--mp-color-accent, #a78bfa);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 16px;
+    letter-spacing: 0.12em;
+    margin-bottom: 20px;
   }
 
   .pricing-price-row {
-    margin-bottom: 32px;
+    margin-bottom: 36px;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
   }
 
   .pricing-price {
     font-size: 64px;
-    font-weight: 800;
+    font-weight: 700;
     color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em;
+    text-shadow:
+      0 0 60px rgba(167, 139, 250, 0.15),
+      0 0 20px rgba(167, 139, 250, 0.08);
   }
 
   .pricing-period {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 400;
-    color: var(--mp-color-text-muted, #94a3b8);
-    margin-left: 4px;
+    color: #94a3b8;
+    letter-spacing: 0.005em;
   }
 
   .pricing-period:empty {
@@ -71,17 +87,19 @@
 
   .pricing-features {
     text-align: left;
-    margin-bottom: 36px;
+    margin-bottom: 40px;
   }
 
   .pricing-feature {
-    font-size: 18px;
-    color: var(--mp-color-text-muted, #94a3b8);
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 16px;
+    color: #cbd5e1;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
   }
 
   .pricing-feature:last-child {
@@ -89,19 +107,24 @@
   }
 
   .feature-check {
-    color: var(--mp-color-primary, #6366f1);
-    font-weight: 700;
-    font-size: 18px;
+    color: var(--mp-color-accent, #a78bfa);
+    font-weight: 600;
+    font-size: 16px;
+    text-shadow: 0 0 12px rgba(167, 139, 250, 0.3);
   }
 
   .pricing-cta {
     display: inline-block;
-    font-size: 18px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 600;
     color: #ffffff;
-    background: var(--mp-color-primary, #6366f1);
-    padding: 14px 40px;
-    border-radius: 999px;
+    background: var(--mp-color-accent, #A78BFA);
+    padding: 16px 44px;
+    border-radius: 14px;
+    letter-spacing: 0.02em;
+    box-shadow:
+      0 0 24px rgba(167, 139, 250, 0.2),
+      0 8px 24px rgba(167, 139, 250, 0.12);
   }
 
   .pricing-cta:empty {
@@ -115,6 +138,8 @@
     var card = el.querySelector('.pricing-card');
     var featuresContainer = el.querySelector('.pricing-features');
     var ctaBtn = el.querySelector('.pricing-cta');
+    var priceRow = el.querySelector('.pricing-price-row');
+    var name = el.querySelector('.pricing-name');
 
     if (data.highlighted) {
       card.classList.add('highlighted');
@@ -139,47 +164,53 @@
     });
 
     var featureRows = featuresContainer.querySelectorAll('.pricing-feature');
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
 
-    // Entrance
-    gsap.set(card, { autoAlpha: 0, y: 50, scale: 0.95 });
-    gsap.set(featureRows, { autoAlpha: 0, x: -20 });
+    // Card entrance with scale + blur
+    gsap.set(card, { autoAlpha: 0, y: 50, scale: 1.06, filter: 'blur(5px)' });
+    gsap.set(featureRows, { autoAlpha: 0, x: -15 });
     gsap.set(ctaBtn, { autoAlpha: 0, scale: 0.9 });
 
     tl.to(card, {
-      autoAlpha: 1,
-      y: 0,
-      scale: 1,
-      duration: 0.6,
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: speed,
       ease: 'power3.out'
     }, 0.3);
 
-    // Features animate in one by one
+    // Features stagger in
     tl.to(featureRows, {
-      autoAlpha: 1,
-      x: 0,
+      autoAlpha: 1, x: 0,
       duration: 0.4,
-      stagger: 0.1,
+      stagger: 0.08,
       ease: 'power2.out'
-    }, 0.7);
+    }, 0.3 + speed * 0.5);
 
     // CTA button
     if (ctaBtn && ctaBtn.textContent.trim()) {
       tl.to(ctaBtn, {
-        autoAlpha: 1,
-        scale: 1,
-        duration: 0.4,
-        ease: 'back.out(1.2)'
-      }, 0.7 + features.length * 0.1 + 0.2);
+        autoAlpha: 1, scale: 1,
+        duration: 0.45,
+        ease: ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out'
+      }, 0.3 + speed * 0.5 + features.length * 0.08 + 0.1);
+
+      // Subtle pulse glow on CTA
+      tl.to(ctaBtn, {
+        boxShadow: '0 0 36px rgba(167, 139, 250, 0.3), 0 8px 32px rgba(167, 139, 250, 0.18)',
+        duration: 0.5,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: 2
+      }, '-=0.1');
     }
 
     // Exit
     if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
       tl.to(card, {
-        autoAlpha: 0,
-        y: -20,
+        autoAlpha: 0, y: -20, scale: 0.97,
         duration: 0.4,
         ease: 'power2.in'
-      }, ctx.duration - 0.5);
+      }, exitAt);
     }
 
     return tl;

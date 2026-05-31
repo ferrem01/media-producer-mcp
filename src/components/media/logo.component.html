@@ -15,8 +15,9 @@
     justify-content: center;
     height: 100%;
     width: 100%;
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    gap: 24px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    gap: 28px;
+    padding: 80px;
   }
 
   .logo-img-wrap {
@@ -30,10 +31,11 @@
   }
 
   .logo-label {
-    font-size: 24px;
-    font-weight: 500;
-    color: var(--mp-color-text-muted, #94a3b8);
+    font-size: 18px;
+    font-weight: 400;
+    color: #cbd5e1;
     text-align: center;
+    letter-spacing: 0.005em;
   }
 
   .logo-label:empty {
@@ -52,11 +54,10 @@
     var greyscale = data.greyscale || false;
     var theme = data.theme || 'dark';
 
-    // Build logo.dev URL
     var logoUrl = 'https://img.logo.dev/' + domain
       + '?token=' + LOGO_TOKEN
       + '&format=' + format
-      + '&size=' + (size * 2); // request 2x for retina
+      + '&size=' + (size * 2);
     if (greyscale) logoUrl += '&greyscale=true';
     if (theme && theme !== 'auto') logoUrl += '&theme=' + theme;
 
@@ -68,35 +69,46 @@
     var wrap = el.querySelector('.logo-img-wrap');
     var label = el.querySelector('.logo-label');
 
-    // Start invisible
-    gsap.set([wrap, label], { autoAlpha: 0 });
-    gsap.set(wrap, { scale: 0.8 });
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
 
-    // Determine speed from motion style
-    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.7;
+    // Dramatic scale + blur entrance with glow
+    gsap.set(wrap, { autoAlpha: 0, scale: 1.1, filter: 'blur(6px)' });
+    gsap.set(label, { autoAlpha: 0, y: 12 });
 
-    // Entrance
     tl.to(wrap, {
-      autoAlpha: 1,
-      scale: 1,
+      autoAlpha: 1, scale: 1, filter: 'blur(0px)',
       duration: speed,
-      ease: ctx.motion === 'punchy' ? 'back.out(1.4)' : 'power3.out'
+      ease: ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out'
     }, 0.3);
+
+    // Accent glow on logo
+    tl.fromTo(wrap, {
+      filter: 'blur(0px) drop-shadow(0 0 0px rgba(167, 139, 250, 0))'
+    }, {
+      filter: 'blur(0px) drop-shadow(0 0 30px rgba(167, 139, 250, 0.25))',
+      duration: 0.5,
+      ease: 'power2.out'
+    }, 0.3 + speed * 0.5);
+
+    tl.to(wrap, {
+      filter: 'blur(0px) drop-shadow(0 0 12px rgba(167, 139, 250, 0.1))',
+      duration: 0.4,
+      ease: 'power2.inOut'
+    }, 0.3 + speed * 0.5 + 0.5);
 
     if (label && label.textContent.trim()) {
       tl.to(label, {
-        autoAlpha: 1,
+        autoAlpha: 1, y: 0,
         duration: 0.4,
         ease: 'power2.out'
-      }, '-=0.2');
+      }, 0.3 + speed * 0.6);
     }
 
     // Exit
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.6;
       tl.to([wrap, label], {
-        autoAlpha: 0,
-        scale: 0.95,
+        autoAlpha: 0, scale: 0.95,
         duration: 0.4,
         ease: 'power2.in'
       }, exitAt);

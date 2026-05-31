@@ -1,5 +1,6 @@
 <template>
   <div class="spotlight-effect">
+    <div class="spotlight-glow"></div>
     <div class="spotlight-overlay"></div>
   </div>
 </template>
@@ -9,6 +10,16 @@
     width: 100%;
     height: 100%;
     position: relative;
+    overflow: hidden;
+  }
+
+  .spotlight-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
   }
 
   .spotlight-overlay {
@@ -24,42 +35,60 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var overlay = el.querySelector('.spotlight-overlay');
+    var glow = el.querySelector('.spotlight-glow');
 
     var x = data.x || 50;
     var y = data.y || 50;
     var radius = data.radius || 20;
-    var color = data.color || 'rgba(255,255,255,0.15)';
+    var color = data.color || 'rgba(167, 139, 250, 0.08)';
 
     function setSpotlight(cx, cy, r) {
       overlay.style.background = 'radial-gradient(circle at ' + cx + '% ' + cy + '%, ' +
-        'transparent ' + r + '%, rgba(0,0,0,0.7) ' + (r + 15) + '%)';
+        'transparent ' + r + '%, rgba(0,0,0,0.7) ' + (r + 18) + '%)';
+      glow.style.background = 'radial-gradient(circle at ' + cx + '% ' + cy + '%, ' +
+        color + ' 0%, transparent ' + (r + 10) + '%)';
     }
 
-    // Start with dark overlay
+    // Start with dark overlay, no glow
     overlay.style.background = 'rgba(0,0,0,0.7)';
+    glow.style.background = 'transparent';
 
-    // Animate spotlight appearing
     var state = { cx: x, cy: y, r: 0 };
 
+    // Smooth spotlight open
     tl.to(state, {
       r: radius,
-      duration: 0.8,
+      duration: 0.9,
       ease: 'power2.out',
       onUpdate: function() {
         setSpotlight(state.cx, state.cy, state.r);
       }
     }, 0.3);
 
-    // Hold, then optionally close
+    // Optional slow drift
+    if (ctx.duration > 4) {
+      var driftDuration = ctx.duration - 2.5;
+      tl.to(state, {
+        cx: x + (Math.random() > 0.5 ? 5 : -5),
+        cy: y + (Math.random() > 0.5 ? 3 : -3),
+        duration: driftDuration,
+        ease: 'sine.inOut',
+        onUpdate: function() {
+          setSpotlight(state.cx, state.cy, state.r);
+        }
+      }, 1.2);
+    }
+
+    // Smooth close
     if (ctx.duration > 3) {
       tl.to(state, {
         r: 0,
-        duration: 0.5,
+        duration: 0.6,
         ease: 'power2.in',
         onUpdate: function() {
           setSpotlight(state.cx, state.cy, state.r);
         }
-      }, ctx.duration - 0.6);
+      }, ctx.duration - 0.7);
     }
 
     return tl;
