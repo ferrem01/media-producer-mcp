@@ -92,6 +92,11 @@ export interface SceneTransition {
   duration_seconds: number;
 }
 
+export interface SceneAudioHints {
+  voiceover_text?: string;
+  sync_points?: Array<{ at: number; label: string }>;
+}
+
 export interface Scene {
   id: string;
   label?: string;
@@ -99,6 +104,7 @@ export interface Scene {
   background?: string;
   transition_in?: SceneTransition;
   components: SceneComponent[];
+  audio_hints?: SceneAudioHints;
 }
 
 // ── Overlays ──

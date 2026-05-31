@@ -20,6 +20,7 @@ import { critiqueScene } from "../llm/critiquer.js";
 import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
+import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
 
 export interface RenderOptions {
   /** The project to render */
@@ -291,6 +292,45 @@ async function renderVideo(
     await concatSegments(segments, outputPath);
   } else if (sceneMp4s.length === 1) {
     await fs.copyFile(sceneMp4s[0], outputPath);
+  }
+
+  // ── Audio mixing ──
+  const totalDuration = project.scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
+
+  if (project.audio && project.audio.tracks.length > 0) {
+    console.log(`\n  Mixing ${project.audio.tracks.length} audio track(s)...`);
+
+    const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
+    const audioTracks: AudioTrackInput[] = project.audio.tracks.map((t) => ({
+      path: t.source,
+      type: t.type,
+      volume: t.volume,
+      startTime: t.start_time,
+      fadeIn: t.fade_in,
+      fadeOut: t.fade_out,
+      loop: t.loop,
+    }));
+
+    const duckingOpts = project.audio.ducking?.enabled
+      ? {
+          duckTrack: project.audio.ducking.duck_track,
+          triggerTrack: project.audio.ducking.trigger_track,
+          duckedVolume: project.audio.ducking.ducked_volume,
+          attack: project.audio.ducking.attack ?? 0.3,
+          release: project.audio.ducking.release ?? 0.5,
+        }
+      : undefined;
+
+    await mixAudio({
+      videoPath: outputPath,
+      outputPath: audioOutput,
+      tracks: audioTracks,
+      ducking: duckingOpts,
+      totalDuration,
+    });
+
+    // Replace the video-only output with the audio-mixed version
+    await fs.rename(audioOutput, outputPath);
   }
 
   const durationMs = Date.now() - startTime;

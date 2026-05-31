@@ -27,15 +27,17 @@ import {
   saveBrandKit,
 } from "./persistence/brand-kit.js";
 import { renderProject as renderProjectCore } from "./core/render.js";
+import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { deriveTypeName } from "./llm/component-gen.js";
 import { runGeneratePipeline, type PipelineTarget } from "./llm/pipeline.js";
 import { llmConfigFromEnv } from "./llm/client.js";
 import { config } from "./config.js";
-import { projectDir, projectOutputDir } from "./persistence/paths.js";
+import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit } from "./core/types.js";
+import { generateTTS } from "./audio/tts.js";
 
 // ── Shared Zod schemas ──
 
@@ -119,7 +121,8 @@ export function createMcpServer(): McpServer {
       tenant_id: z.string(),
       project_id: z.string().optional(),
       scene_id: z.string().optional(),
-      target: z.enum(["project", "brand_kit"]).optional().describe("What to get (default: project)"),
+      target: z.enum(["project", "brand_kit", "job", "jobs"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs."),
+      job_id: z.string().optional().describe("Job ID to check status (use with target='job')"),
     },
     async (params) => {
       const target = params.target || "project";
@@ -127,6 +130,18 @@ export function createMcpServer(): McpServer {
       if (target === "brand_kit") {
         const kit = await loadBrandKit(params.tenant_id);
         return ok(kit || { message: "No brand kit configured" });
+      }
+
+      if (target === "job") {
+        if (!params.job_id) return err("job_id required for target='job'");
+        const job = getJobStatus(params.job_id);
+        if (!job) return err("Job not found");
+        return ok(job);
+      }
+
+      if (target === "jobs") {
+        const jobs = listJobs(params.tenant_id);
+        return ok(jobs);
       }
 
       if (!params.project_id) return err("project_id required");
@@ -498,47 +513,22 @@ export function createMcpServer(): McpServer {
         }
       }
 
-      // Full project render
+      // Full project render -- queue it and return immediately
       if (project.scenes.length === 0) return err("Project has no scenes");
 
-      project.status = "rendering";
-      await saveProject(project);
+      const job = queueRender(params.tenant_id, params.project_id, {
+        quality: params.quality,
+        critique: params.critique,
+        maxRevisions: params.maxRevisions,
+        originalPrompt: params.originalPrompt,
+      });
 
-      try {
-        const ext = project.format === "video" || project.format === "slideshow" ? "mp4" : "png";
-        const outputPath = path.join(
-          projectOutputDir(params.tenant_id, params.project_id),
-          `output.${ext}`,
-        );
-
-        const result = await renderProjectCore({
-          project,
-          workDir: path.join(projectDir(params.tenant_id, params.project_id), "_work"),
-          componentLibDir: config.componentLibDir,
-          gsapDir: config.gsapDir,
-          outputPath,
-          critique: params.critique,
-          maxRevisions: params.maxRevisions,
-          llmConfig: params.critique ? llmConfigFromEnv() : undefined,
-          originalPrompt: params.originalPrompt,
-        });
-
-        project.status = "rendered";
-        await saveProject(project);
-
-        return ok({
-          status: "rendered",
-          project_id: project.project_id,
-          format: project.format,
-          output_path: result.outputPath,
-          duration_ms: result.durationMs,
-          frame_count: result.frameCount,
-        });
-      } catch (e: any) {
-        project.status = "failed";
-        await saveProject(project);
-        return err(`Render failed: ${e.message}`);
-      }
+      return ok({
+        status: "queued",
+        job_id: job.id,
+        project_id: project.project_id,
+        message: "Render queued. Use get(target='job', job_id='" + job.id + "') to check status.",
+      });
     },
   );
 
@@ -574,7 +564,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "audio",
-    "Add, update, or remove audio tracks (voiceover, music, SFX) on a project",
+    "Add, update, or remove audio tracks (voiceover, music, SFX) on a project. For voiceover tracks, provide 'text' instead of 'source' to auto-generate TTS.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
@@ -582,13 +572,23 @@ export function createMcpServer(): McpServer {
       track: z.object({
         id: z.string(),
         type: z.enum(["voiceover", "music", "sfx"]).optional(),
-        source: z.string().optional(),
+        source: z.string().optional().describe("Audio file path. Omit for voiceover with text."),
+        text: z.string().optional().describe("Text to generate TTS voiceover from (type must be voiceover)"),
+        voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS voice (default: nova)"),
         volume: z.number().min(0).max(1).optional(),
         start_time: z.number().optional(),
         loop: z.boolean().optional(),
         fade_in: z.number().optional(),
         fade_out: z.number().optional(),
       }),
+      ducking: z.object({
+        enabled: z.boolean(),
+        duck_track: z.string().describe("Track ID to duck (usually music)"),
+        trigger_track: z.string().describe("Track ID that triggers ducking (usually voiceover)"),
+        ducked_volume: z.number().min(0).max(1).optional(),
+        attack: z.number().optional(),
+        release: z.number().optional(),
+      }).optional().describe("Configure audio ducking"),
     },
     async (params) => {
       const project = await loadProject(params.tenant_id, params.project_id);
@@ -599,13 +599,35 @@ export function createMcpServer(): McpServer {
       }
 
       if (params.action === "add") {
-        if (!params.track.type || !params.track.source) {
-          return err("Track type and source required for add");
+        if (!params.track.type) {
+          return err("Track type required for add");
         }
+
+        let source = params.track.source;
+
+        // Auto-generate TTS if type is voiceover and text is provided without a source
+        if (params.track.type === "voiceover" && params.track.text && !source) {
+          const assetsDir = projectAssetsDir(params.tenant_id, params.project_id);
+          const audioDir = path.join(assetsDir, "audio");
+          await fs.mkdir(audioDir, { recursive: true });
+
+          const outputPath = path.join(audioDir, `${params.track.id}.mp3`);
+          await generateTTS({
+            text: params.track.text,
+            voice: params.track.voice || "nova",
+            outputPath,
+          });
+          source = outputPath;
+        }
+
+        if (!source) {
+          return err("Track source or text (for voiceover) required for add");
+        }
+
         project.audio.tracks.push({
           id: params.track.id,
           type: params.track.type,
-          source: params.track.source,
+          source,
           volume: params.track.volume ?? 1.0,
           start_time: params.track.start_time,
           loop: params.track.loop,
@@ -615,6 +637,22 @@ export function createMcpServer(): McpServer {
       } else if (params.action === "update") {
         const existing = project.audio.tracks.find((t) => t.id === params.track.id);
         if (!existing) return err("Track not found");
+
+        // If updating voiceover with new text, regenerate TTS
+        if (existing.type === "voiceover" && params.track.text) {
+          const assetsDir = projectAssetsDir(params.tenant_id, params.project_id);
+          const audioDir = path.join(assetsDir, "audio");
+          await fs.mkdir(audioDir, { recursive: true });
+
+          const outputPath = path.join(audioDir, `${existing.id}.mp3`);
+          await generateTTS({
+            text: params.track.text,
+            voice: params.track.voice || "nova",
+            outputPath,
+          });
+          existing.source = outputPath;
+        }
+
         if (params.track.volume !== undefined) existing.volume = params.track.volume;
         if (params.track.source !== undefined) existing.source = params.track.source;
         if (params.track.loop !== undefined) existing.loop = params.track.loop;
@@ -622,6 +660,18 @@ export function createMcpServer(): McpServer {
         if (params.track.fade_out !== undefined) existing.fade_out = params.track.fade_out;
       } else if (params.action === "remove") {
         project.audio.tracks = project.audio.tracks.filter((t) => t.id !== params.track.id);
+      }
+
+      // Update ducking config if provided
+      if (params.ducking) {
+        project.audio.ducking = {
+          enabled: params.ducking.enabled,
+          duck_track: params.ducking.duck_track,
+          trigger_track: params.ducking.trigger_track,
+          ducked_volume: params.ducking.ducked_volume ?? 0.1,
+          attack: params.ducking.attack ?? 0.3,
+          release: params.ducking.release ?? 0.5,
+        };
       }
 
       await saveProject(project);
