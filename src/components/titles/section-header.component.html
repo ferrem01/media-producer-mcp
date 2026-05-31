@@ -1,0 +1,96 @@
+<template>
+  <div class="section-header">
+    <span class="eyebrow">{{eyebrow}}</span>
+    <h1 class="title">{{title}}</h1>
+    <p class="description">{{description}}</p>
+  </div>
+</template>
+
+<style scoped>
+  .section-header {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    padding: 60px 80px;
+  }
+
+  .eyebrow {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--mp-color-accent, #A78BFA);
+    margin-bottom: 16px;
+  }
+
+  .eyebrow:empty {
+    display: none;
+  }
+
+  .title {
+    font-size: 72px;
+    font-weight: 800;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0;
+    line-height: 1.1;
+    max-width: 80%;
+  }
+
+  .description {
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin-top: 20px;
+    line-height: 1.5;
+    max-width: 65%;
+  }
+
+  .description:empty {
+    display: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var eyebrow = el.querySelector('.eyebrow');
+    var title = el.querySelector('.title');
+    var description = el.querySelector('.description');
+
+    var elements = [eyebrow, title, description].filter(function(e) {
+      return e && e.textContent.trim();
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.7;
+    var stagger = ctx.motion === 'minimal' ? 0.1 : ctx.motion === 'punchy' ? 0.12 : 0.18;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
+    var distance = ctx.motion === 'minimal' ? 30 : ctx.motion === 'punchy' ? 50 : 60;
+
+    gsap.set(elements, { autoAlpha: 0, x: -distance });
+
+    tl.to(elements, {
+      autoAlpha: 1,
+      x: 0,
+      duration: speed,
+      stagger: stagger,
+      ease: ease
+    }, 0.2);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(elements, {
+        autoAlpha: 0,
+        x: -20,
+        duration: 0.4,
+        stagger: 0.05,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

@@ -1,0 +1,147 @@
+<template>
+  <div class="text-list">
+    <h2 class="list-title">{{title}}</h2>
+    <ul class="list-container"></ul>
+  </div>
+</template>
+
+<style scoped>
+  .text-list {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    padding: 60px 100px;
+  }
+
+  .list-title {
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 40px 0;
+  }
+
+  .list-title:empty {
+    display: none;
+  }
+
+  .list-container {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    font-size: 28px;
+    color: var(--mp-color-text, #ffffff);
+    line-height: 1.4;
+  }
+
+  .list-marker {
+    flex-shrink: 0;
+    color: var(--mp-color-accent, #A78BFA);
+    font-weight: 700;
+    min-width: 28px;
+  }
+
+  .list-marker.bullet::before {
+    content: '\25CF';
+    font-size: 16px;
+  }
+
+  .list-marker.check::before {
+    content: '\2713';
+    font-size: 24px;
+  }
+
+  .list-text {
+    font-weight: 400;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.list-container');
+    var titleEl = el.querySelector('.list-title');
+    var items = data.items || [];
+    var style = data.style || 'bullet';
+
+    container.innerHTML = '';
+
+    var itemEls = [];
+    items.forEach(function(item, i) {
+      var li = document.createElement('li');
+      li.className = 'list-item';
+
+      var marker = document.createElement('span');
+      marker.className = 'list-marker';
+
+      if (style === 'number') {
+        marker.textContent = (i + 1) + '.';
+      } else {
+        marker.classList.add(style === 'check' ? 'check' : 'bullet');
+      }
+
+      var text = document.createElement('span');
+      text.className = 'list-text';
+      text.textContent = item;
+
+      li.appendChild(marker);
+      li.appendChild(text);
+      container.appendChild(li);
+      itemEls.push(li);
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.5;
+    var stagger = ctx.motion === 'minimal' ? 0.1 : ctx.motion === 'punchy' ? 0.15 : 0.2;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
+
+    var allEls = [];
+    if (titleEl && titleEl.textContent.trim()) {
+      allEls.push(titleEl);
+    }
+
+    gsap.set(allEls, { autoAlpha: 0, y: 30 });
+    gsap.set(itemEls, { autoAlpha: 0, x: -30 });
+
+    if (allEls.length > 0) {
+      tl.to(allEls, {
+        autoAlpha: 1,
+        y: 0,
+        duration: speed,
+        ease: ease
+      }, 0.2);
+    }
+
+    tl.to(itemEls, {
+      autoAlpha: 1,
+      x: 0,
+      duration: speed,
+      stagger: stagger,
+      ease: ease
+    }, allEls.length > 0 ? 0.5 : 0.2);
+
+    if (ctx.duration > 2.5) {
+      var exitAt = ctx.duration - 0.6;
+      var exitEls = allEls.concat(itemEls);
+      tl.to(exitEls, {
+        autoAlpha: 0,
+        x: -15,
+        duration: 0.3,
+        stagger: 0.03,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

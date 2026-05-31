@@ -1,0 +1,24 @@
+{
+  "type": "section-header",
+  "label": "Section Header",
+  "category": "titles",
+  "description": "Left-aligned section header with optional eyebrow text and description. Slide-in-from-left entrance.",
+  "data": {
+    "eyebrow": {
+      "type": "string",
+      "label": "Eyebrow Text",
+      "optional": true,
+      "placeholder": "CHAPTER 1"
+    },
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "label": "Description",
+      "optional": true
+    }
+  }
+}

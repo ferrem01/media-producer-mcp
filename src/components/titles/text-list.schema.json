@@ -1,0 +1,26 @@
+{
+  "type": "text-list",
+  "label": "Text List",
+  "category": "titles",
+  "description": "Animated bullet, numbered, or checkmark list with staggered item entrance.",
+  "data": {
+    "items": {
+      "type": "array",
+      "label": "List Items",
+      "required": true,
+      "items": { "type": "string" }
+    },
+    "style": {
+      "type": "string",
+      "label": "List Style",
+      "optional": true,
+      "enum": ["bullet", "number", "check"],
+      "default": "bullet"
+    },
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "type": "typewriter",
+  "label": "Typewriter",
+  "category": "titles",
+  "description": "Typing animation with blinking cursor. Types out text character by character.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Text",
+      "required": true
+    },
+    "speed": {
+      "type": "number",
+      "label": "Characters Per Second",
+      "optional": true,
+      "default": 30
+    },
+    "cursor_color": {
+      "type": "string",
+      "label": "Cursor Color",
+      "optional": true,
+      "placeholder": "#A78BFA"
+    }
+  }
+}

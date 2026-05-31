@@ -1,0 +1,116 @@
+<template>
+  <div class="kinetic-text">
+    <div class="text-container"></div>
+  </div>
+</template>
+
+<style scoped>
+  .kinetic-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    padding: 60px 80px;
+  }
+
+  .text-container {
+    font-size: 64px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    text-align: center;
+    line-height: 1.3;
+    max-width: 85%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 0.3em;
+  }
+
+  .text-container .kt-word {
+    display: inline-block;
+  }
+
+  .text-container .kt-char {
+    display: inline-block;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.text-container');
+    var text = data.text || '';
+    var mode = data.mode || 'word';
+    var effect = data.effect || 'fade-up';
+
+    container.innerHTML = '';
+
+    var spans = [];
+
+    if (mode === 'char') {
+      var chars = text.split('');
+      chars.forEach(function(ch) {
+        var span = document.createElement('span');
+        span.className = 'kt-char';
+        span.textContent = ch === ' ' ? '\u00A0' : ch;
+        container.appendChild(span);
+        spans.push(span);
+      });
+    } else {
+      var words = text.split(/\s+/);
+      words.forEach(function(word) {
+        var span = document.createElement('span');
+        span.className = 'kt-word';
+        span.textContent = word;
+        container.appendChild(span);
+        spans.push(span);
+      });
+    }
+
+    var fromVars = { autoAlpha: 0 };
+    var toVars = { autoAlpha: 1 };
+
+    if (effect === 'fade-up') {
+      fromVars.y = 40;
+      toVars.y = 0;
+    } else if (effect === 'slide-right') {
+      fromVars.x = -40;
+      toVars.x = 0;
+    } else if (effect === 'scale') {
+      fromVars.scale = 0;
+      toVars.scale = 1;
+    } else if (effect === 'rotate') {
+      fromVars.rotation = -15;
+      fromVars.y = 20;
+      toVars.rotation = 0;
+      toVars.y = 0;
+    }
+
+    gsap.set(spans, fromVars);
+
+    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.5;
+    var stagger = ctx.motion === 'minimal' ? 0.03 : ctx.motion === 'punchy' ? 0.04 : 0.06;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.4)' : 'power3.out';
+
+    toVars.duration = speed;
+    toVars.stagger = stagger;
+    toVars.ease = ease;
+
+    tl.to(spans, toVars, 0.3);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(spans, {
+        autoAlpha: 0,
+        y: -15,
+        duration: 0.3,
+        stagger: 0.02,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

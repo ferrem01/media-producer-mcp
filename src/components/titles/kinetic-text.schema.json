@@ -1,0 +1,27 @@
+{
+  "type": "kinetic-text",
+  "label": "Kinetic Text",
+  "category": "titles",
+  "description": "Per-word or per-character text animation with staggered entrance effects.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Text",
+      "required": true
+    },
+    "mode": {
+      "type": "string",
+      "label": "Split Mode",
+      "optional": true,
+      "enum": ["word", "char"],
+      "default": "word"
+    },
+    "effect": {
+      "type": "string",
+      "label": "Effect",
+      "optional": true,
+      "enum": ["fade-up", "slide-right", "scale", "rotate"],
+      "default": "fade-up"
+    }
+  }
+}

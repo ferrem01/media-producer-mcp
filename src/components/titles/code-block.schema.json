@@ -1,0 +1,25 @@
+{
+  "type": "code-block",
+  "label": "Code Block",
+  "category": "titles",
+  "description": "Code display with line-by-line animation. Dark themed window with optional line highlighting.",
+  "data": {
+    "code": {
+      "type": "string",
+      "label": "Code",
+      "required": true
+    },
+    "language": {
+      "type": "string",
+      "label": "Language",
+      "optional": true,
+      "placeholder": "javascript"
+    },
+    "highlight_lines": {
+      "type": "array",
+      "label": "Highlighted Lines",
+      "optional": true,
+      "items": { "type": "number" }
+    }
+  }
+}

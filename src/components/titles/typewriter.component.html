@@ -1,0 +1,89 @@
+<template>
+  <div class="typewriter">
+    <div class="text-area">
+      <span class="typed-text"></span>
+      <span class="cursor">|</span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .typewriter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    padding: 60px 80px;
+  }
+
+  .text-area {
+    font-size: 48px;
+    font-weight: 600;
+    color: var(--mp-color-text, #ffffff);
+    text-align: center;
+    max-width: 80%;
+    line-height: 1.4;
+  }
+
+  .typed-text {
+    white-space: pre-wrap;
+  }
+
+  .cursor {
+    color: var(--mp-color-accent, #A78BFA);
+    font-weight: 300;
+    animation: blink 0.6s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var typedText = el.querySelector('.typed-text');
+    var cursor = el.querySelector('.cursor');
+    var text = data.text || '';
+    var speed = data.speed || 30;
+
+    if (data.cursor_color) {
+      cursor.style.color = data.cursor_color;
+    }
+
+    var typeDuration = text.length / speed;
+    var maxTypeDuration = Math.max(ctx.duration * 0.7, ctx.duration - 1.5);
+    if (typeDuration > maxTypeDuration) {
+      typeDuration = maxTypeDuration;
+    }
+
+    var counter = { index: 0 };
+
+    gsap.set(cursor, { autoAlpha: 1 });
+    typedText.textContent = '';
+
+    tl.to(counter, {
+      index: text.length,
+      duration: typeDuration,
+      ease: 'steps(' + text.length + ')',
+      onUpdate: function() {
+        typedText.textContent = text.substring(0, Math.round(counter.index));
+      }
+    }, 0.3);
+
+    if (ctx.duration > typeDuration + 1.5) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(el.querySelector('.text-area'), {
+        autoAlpha: 0,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

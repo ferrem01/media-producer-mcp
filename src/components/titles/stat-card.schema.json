@@ -1,0 +1,36 @@
+{
+  "type": "stat-card",
+  "label": "Stat Card",
+  "category": "titles",
+  "description": "Animated number counter with label. Number counts up from 0 to the target value.",
+  "data": {
+    "value": {
+      "type": "number",
+      "label": "Value",
+      "required": true
+    },
+    "prefix": {
+      "type": "string",
+      "label": "Prefix",
+      "optional": true,
+      "placeholder": "$"
+    },
+    "suffix": {
+      "type": "string",
+      "label": "Suffix",
+      "optional": true,
+      "placeholder": "%"
+    },
+    "label": {
+      "type": "string",
+      "label": "Label",
+      "required": true
+    },
+    "decimals": {
+      "type": "number",
+      "label": "Decimal Places",
+      "optional": true,
+      "default": 0
+    }
+  }
+}
