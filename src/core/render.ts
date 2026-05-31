@@ -227,7 +227,7 @@ async function renderVideo(
   project: Project,
   _componentSources: ComponentSource[],
   workDir: string,
-  _gsapDir: string,
+  gsapDir: string,
   outputPath: string,
   startTime: number,
   _critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
