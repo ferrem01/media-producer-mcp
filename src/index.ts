@@ -15,6 +15,7 @@ import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
+import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { listProjects, loadProject, updateComponent } from "./persistence/project.js";
 import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
@@ -284,61 +285,13 @@ async function main() {
             }
           } catch { /* no GSAP */ }
 
-          // Default brand kit for playground preview
-          const defaultBrand = {
-            colors: { primary: "#A78BFA", secondary: "#6366f1", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
-            fonts: [{ family: "Inter", source: "google" as const, weights: [400, 500, 600, 700] }],
-          };
-
-          const html = \`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-<style>
-:root {
-  --mp-color-primary: \${defaultBrand.colors.primary};
-  --mp-color-secondary: \${defaultBrand.colors.secondary};
-  --mp-color-accent: \${defaultBrand.colors.accent};
-  --mp-color-background: \${defaultBrand.colors.background};
-  --mp-color-surface: \${defaultBrand.colors.surface};
-  --mp-color-text: \${defaultBrand.colors.text};
-  --mp-color-text-muted: \${defaultBrand.colors.text_muted};
-  --mp-font-family: 'Inter', system-ui, sans-serif;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0f172a; }
-.mp-component { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; }
-\${scopedCSS}
-</style>
-<script>
-\${gsapSource}
-if (typeof SplitText !== 'undefined') gsap.registerPlugin(SplitText);
-if (typeof CustomEase !== 'undefined') gsap.registerPlugin(CustomEase);
-</script>
-</head>
-<body>
-<div class="mp-component" data-cid="pg-comp">
-  \${boundHtml}
-</div>
-<script>
-(function() {
-  var data = \${JSON.stringify(data)};
-  var el = document.querySelector('[data-cid="pg-comp"]');
-  var ctx = { duration: 5, motion: 'cinematic' };
-  \${parsed.script}
-  var tl = createTimeline(el, data, ctx);
-  var master = gsap.timeline({ paused: true });
-  master.add(tl, 0);
-  window.__MP_TIMELINE = master;
-  window.__MP_DURATION = 5;
-  window.__MP_READY = true;
-})();
-</script>
-</body>
-</html>\`;
+          const html = buildPlaygroundPreview({
+            boundHtml,
+            scopedCSS,
+            gsapSource,
+            script: parsed.script,
+            data,
+          });
 
           res.writeHead(200, {
             "Content-Type": "text/html; charset=utf-8",
@@ -374,7 +327,7 @@ if (typeof CustomEase !== 'undefined') gsap.registerPlugin(CustomEase);
           const schema = {
             type,
             category,
-            label: type.replace(/-/g, " ").replace(/\\b\\w/g, (c: string) => c.toUpperCase()),
+            label: type.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
             description: "Custom component",
             data: parsed.schema || {},
           };
