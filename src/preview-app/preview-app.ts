@@ -379,8 +379,85 @@ export function getPreviewHtml(): string {
     currentComponentIndex: -1,
     playing: false,
     duration: 0,
-    animFrameId: null
+    animFrameId: null,
+    ws: null,
+    wsReconnectTimer: null
   };
+
+  // ── WebSocket ──
+  function connectWebSocket() {
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) return;
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var ws = new WebSocket(proto + '//' + location.host + '/ws');
+
+    ws.onopen = function() {
+      console.log('WebSocket connected');
+      if (state.wsReconnectTimer) {
+        clearTimeout(state.wsReconnectTimer);
+        state.wsReconnectTimer = null;
+      }
+    };
+
+    ws.onmessage = function(e) {
+      var msg;
+      try { msg = JSON.parse(e.data); } catch(err) { return; }
+
+      if (msg.type === 'scene-html') {
+        // Capture current playback time before replacing content
+        var currentTime = 0;
+        var tl = getTimeline();
+        if (tl) currentTime = tl.time();
+
+        // Update iframe content without reload
+        var iframe = els.previewIframe;
+        try {
+          iframe.contentDocument.open();
+          iframe.contentDocument.write(msg.html);
+          iframe.contentDocument.close();
+        } catch(err) {
+          // Fallback: use srcdoc
+          iframe.srcdoc = msg.html;
+          return;
+        }
+
+        // Wait for the timeline to be ready, then seek to the saved time
+        var checkReady = setInterval(function() {
+          try {
+            if (iframe.contentWindow && iframe.contentWindow.__MP_READY) {
+              clearInterval(checkReady);
+              iframe.contentWindow.__MP_TIMELINE.time(currentTime);
+              iframe.contentWindow.__MP_TIMELINE.pause();
+              updateTimeDisplay(currentTime);
+            }
+          } catch(err) {
+            clearInterval(checkReady);
+          }
+        }, 50);
+
+        // Safety timeout -- stop checking after 5s
+        setTimeout(function() { clearInterval(checkReady); }, 5000);
+      }
+
+      if (msg.type === 'error') {
+        console.error('WebSocket error:', msg.error);
+      }
+    };
+
+    ws.onclose = function() {
+      console.log('WebSocket disconnected, reconnecting in 2s...');
+      state.ws = null;
+      state.wsReconnectTimer = setTimeout(connectWebSocket, 2000);
+    };
+
+    ws.onerror = function() {
+      ws.close();
+    };
+
+    state.ws = ws;
+  }
+
+  // Connect WebSocket on load
+  connectWebSocket();
 
   // ── DOM refs ──
   var els = {
@@ -721,7 +798,24 @@ export function getPreviewHtml(): string {
       }
     });
 
-    // Update via API (PATCH component data)
+    // Try WebSocket first for instant update
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'update-prop',
+        tenantId: state.tenantId,
+        projectId: project.project_id,
+        sceneId: scene.id,
+        componentId: comp.id,
+        data: newData
+      }));
+
+      // Update local state optimistically
+      comp.data = Object.assign({}, comp.data, newData);
+      stopPlayback();
+      return;
+    }
+
+    // Fallback: HTTP PATCH + iframe reload
     api('PATCH', '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id, { data: newData })
       .then(function(updated) {
         if (updated && updated.scenes) {

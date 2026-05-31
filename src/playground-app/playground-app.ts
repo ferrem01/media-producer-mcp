@@ -338,6 +338,81 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
   var currentSchema = null;
   var playing = false;
   var animFrame = null;
+  var ws = null;
+  var wsReconnectTimer = null;
+
+  // ── WebSocket ──
+  function connectWebSocket() {
+    if (ws && ws.readyState === WebSocket.OPEN) return;
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var wsConn = new WebSocket(proto + '//' + location.host + '/ws');
+
+    wsConn.onopen = function() {
+      console.log('Playground WebSocket connected');
+      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+    };
+
+    wsConn.onmessage = function(e) {
+      var msg;
+      try { msg = JSON.parse(e.data); } catch(err) { return; }
+
+      if (msg.type === 'scene-html') {
+        // Capture current playback time
+        var currentTime = 0;
+        try {
+          if ($preview.contentWindow && $preview.contentWindow.__MP_TIMELINE) {
+            currentTime = $preview.contentWindow.__MP_TIMELINE.time();
+          }
+        } catch(err) {}
+
+        $empty.style.display = 'none';
+        $preview.style.display = 'block';
+        fitPreview();
+
+        // Update iframe without reload
+        try {
+          $preview.contentDocument.open();
+          $preview.contentDocument.write(msg.html);
+          $preview.contentDocument.close();
+        } catch(err) {
+          // Fallback: srcdoc
+          $preview.srcdoc = msg.html;
+          return;
+        }
+
+        // Wait for timeline ready, then seek to saved time
+        var checkReady = setInterval(function() {
+          try {
+            if ($preview.contentWindow && $preview.contentWindow.__MP_READY) {
+              clearInterval(checkReady);
+              $preview.contentWindow.__MP_TIMELINE.time(currentTime);
+              $preview.contentWindow.__MP_TIMELINE.pause();
+              var dur = $preview.contentWindow.__MP_TIMELINE.duration();
+              $scrubber.value = dur > 0 ? Math.round((currentTime / dur) * 1000) : 0;
+              updateTimeDisplay(currentTime, dur);
+            }
+          } catch(err) { clearInterval(checkReady); }
+        }, 50);
+        setTimeout(function() { clearInterval(checkReady); }, 5000);
+      }
+
+      if (msg.type === 'error') {
+        console.error('Playground WebSocket error:', msg.error);
+      }
+    };
+
+    wsConn.onclose = function() {
+      console.log('Playground WebSocket disconnected, reconnecting in 2s...');
+      ws = null;
+      wsReconnectTimer = setTimeout(connectWebSocket, 2000);
+    };
+
+    wsConn.onerror = function() { wsConn.close(); };
+
+    ws = wsConn;
+  }
+
+  connectWebSocket();
 
   // ── DOM refs ──
   var $list = document.getElementById('component-list');
@@ -502,6 +577,17 @@ textarea.field-input { resize: vertical; min-height: 60px; font-family: 'JetBrai
 
     var data = collectData();
 
+    // Try WebSocket first for instant preview
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'preview-component',
+        source: currentSource,
+        data: data
+      }));
+      return;
+    }
+
+    // Fallback: HTTP POST
     fetch('/playground/api/components/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

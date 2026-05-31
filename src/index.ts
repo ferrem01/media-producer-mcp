@@ -20,6 +20,7 @@ import { listProjects, loadProject, updateComponent } from "./persistence/projec
 import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { setupWebSocket } from "./ws.js";
 
 /**
  * Resolve all component sources for a scene by reading .component.html files
@@ -370,6 +371,8 @@ async function main() {
       jsonResponse(res, 500, { error: "Internal server error" });
     }
   });
+
+  setupWebSocket(httpServer);
 
   httpServer.listen(config.port, () => {
     console.error(`media-producer-mcp HTTP on :${config.port}`);
