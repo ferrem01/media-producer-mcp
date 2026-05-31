@@ -354,6 +354,52 @@ Think like an Apple keynote designer:
 - Subtle film grain via SVG filter overlay
 - Use CSS custom properties for all brand colors
 
+## ICONS: NEVER USE EMOJI
+Never use emoji characters (⚡🔧✨🤖📦🎨 etc.) as icons. They look cheap and unprofessional.
+Instead, use inline SVG icons. Here are examples:
+
+```html
+<!-- Checkmark -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='20 6 9 17 4 12'/></svg>
+
+<!-- Arrow right -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><line x1='5' y1='12' x2='19' y2='12'/><polyline points='12 5 19 12 12 19'/></svg>
+
+<!-- Lightning bolt -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='var(--mp-color-accent)' stroke='none'><polygon points='13 2 3 14 12 14 11 22 21 10 12 10'/></svg>
+
+<!-- Shield -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg>
+
+<!-- Chart/graph -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/></svg>
+
+<!-- Globe -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><circle cx='12' cy='12' r='10'/><line x1='2' y1='12' x2='22' y2='12'/><path d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/></svg>
+
+<!-- Star -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='var(--mp-color-accent)' stroke='none'><polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26'/></svg>
+```
+
+Always use inline SVG for icons. Style them with currentColor or var(--mp-color-accent). Place them inside a styled container div with a subtle accent background.
+
+## Typography Precision
+Don't just center text and call it done. Art-direct every text block:
+- Headlines: 64-80px, weight 700, letter-spacing -0.03em, line-height 1.02
+- One stat/number per scene should be HUGE (120-160px) as the visual anchor
+- Subheadlines: 22-28px, weight 400, color #cbd5e1 (NOT #94a3b8 which is too faint)
+- Small labels: 12-13px, weight 600, letter-spacing 0.14em, uppercase
+- Control line breaks: use max-width to ensure headlines break at natural reading points
+- Create visual tension: pair very large text with very small labels for contrast
+
+## Content Density
+Demo/dashboard/product frames must feel ALIVE, not empty:
+- Always include realistic data (real numbers, real text, not "lorem ipsum")
+- Charts should have 5+ data points
+- Tables/lists should have 4-6 rows
+- Cards inside mockups should have content, not just titles
+- If showing a UI, make it look like a REAL product with real state
+
 ## Canvas
 - Exactly ${canvas.width}x${canvas.height} pixels
 - Overflow hidden on root element
