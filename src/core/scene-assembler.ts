@@ -83,7 +83,9 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     }
 
     // Collect scripts for master timeline assembly
-    componentScripts.push(buildComponentScript(comp, parsed.script, scene.duration_seconds, canvas));
+    componentScripts.push(buildComponentScript(comp, parsed.script, scene.duration_seconds, canvas, {
+      motion: brandKit.style?.motion || "cinematic",
+    }));
   }
 
   // Read GSAP source (bundled locally)
@@ -94,6 +96,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
 <html>
 <head>
 <meta charset="utf-8">
+${generateFontLinks(brandKit)}
 <style>
 /* ── Brand Kit ── */
 ${brandCSS}
@@ -139,6 +142,25 @@ ${componentScripts.join("\n\n")}
 </html>`;
 
   return html;
+}
+
+/**
+ * Generate Google Fonts link tags from the brand kit.
+ */
+function generateFontLinks(brand: BrandKit): string {
+  const links: string[] = [];
+  for (const font of brand.fonts || []) {
+    if (font.source === "google") {
+      const weights = font.weights?.join(";") || "400;700";
+      const family = font.family.replace(/\s+/g, "+");
+      links.push(
+        `<link rel="preconnect" href="https://fonts.googleapis.com">` +
+        `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>` +
+        `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${family}:wght@${weights}&display=swap">`
+      );
+    }
+  }
+  return links.join("\n");
 }
 
 /**
@@ -218,6 +240,7 @@ function buildComponentScript(
   scriptSource: string,
   duration: number,
   canvas: Canvas,
+  options?: { motion?: string },
 ): string {
   // Wrap the component's createTimeline in an IIFE
   // Pass the component's DOM element, data, and context
@@ -231,7 +254,7 @@ function buildComponentScript(
       duration: ${duration},
       fps: ${canvas.fps},
       canvas: { width: ${canvas.width}, height: ${canvas.height} },
-      motion: "${canvas.background || "cinematic"}"
+      motion: "${options?.motion || "cinematic"}"
     };
 
     // Component's createTimeline function

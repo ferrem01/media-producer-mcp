@@ -103,28 +103,48 @@ function escapeHtml(str: string): string {
  */
 export function scopeCSS(css: string, instanceId: string): string {
   const scope = `[data-cid="${instanceId}"]`;
+  const lines = css.split("\n");
+  const output: string[] = [];
 
-  // Split CSS into rules and scope each selector
-  return css.replace(
-    /([^{}]+)\{/g,
-    (match, selectors: string) => {
-      // Don't scope @-rules (keyframes, media, etc.)
-      if (selectors.trim().startsWith("@")) return match;
+  for (const line of lines) {
+    const trimmed = line.trim();
 
-      const scoped = selectors
+    // Pass through @-rules (imports, keyframes, media)
+    if (trimmed.startsWith("@")) {
+      output.push(line);
+      continue;
+    }
+
+    // Pass through closing braces, empty lines, comments
+    if (!trimmed || trimmed === "}" || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+      output.push(line);
+      continue;
+    }
+
+    // Lines that contain a { are selector lines
+    if (trimmed.includes("{")) {
+      // Extract selector part (everything before the {)
+      const braceIdx = trimmed.indexOf("{");
+      const selectorPart = trimmed.substring(0, braceIdx);
+      const rest = trimmed.substring(braceIdx);
+
+      const scoped = selectorPart
         .split(",")
-        .map((sel: string) => {
-          const trimmed = sel.trim();
-          if (!trimmed) return trimmed;
-          // :root and html/body selectors become the scope itself
-          if (trimmed === ":root" || trimmed === "html" || trimmed === "body") {
-            return scope;
-          }
-          return `${scope} ${trimmed}`;
+        .map((sel) => {
+          const s = sel.trim();
+          if (!s) return s;
+          if (s === ":root" || s === "html" || s === "body") return scope;
+          return `${scope} ${s}`;
         })
         .join(", ");
 
-      return `${scoped} {`;
+      output.push(`${scoped} ${rest}`);
+      continue;
     }
-  );
+
+    // Everything else (property declarations) passes through
+    output.push(line);
+  }
+
+  return output.join("\n");
 }
