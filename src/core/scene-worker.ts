@@ -41,6 +41,8 @@ interface WorkerArgs {
   format?: string;
   /** Original prompt for critique context */
   originalPrompt?: string;
+  /** Extra directories to search for component sources (e.g. freeform project-local) */
+  extraComponentDirs?: string[];
 }
 
 async function main() {
@@ -71,7 +73,7 @@ async function main() {
 
   var components: Array<{ type: string; source: string }> = [];
   for (var type of componentTypes) {
-    var source = await findComponentSource(type, args.componentLibDir);
+    var source = await findComponentSource(type, args.componentLibDir, args.extraComponentDirs);
     if (source) {
       components.push({ type, source });
     } else {
@@ -217,14 +219,25 @@ async function main() {
   await fs.rm(framesDir, { recursive: true, force: true });
 }
 
-async function findComponentSource(type: string, libDir: string): Promise<string | null> {
+async function findComponentSource(type: string, libDir: string, extraDirs?: string[]): Promise<string | null> {
+  // Check extra dirs first (project-local freeform components)
+  if (extraDirs) {
+    for (var dir of extraDirs) {
+      try {
+        var fp = path.join(dir, `${type}.component.html`);
+        return await fs.readFile(fp, "utf-8");
+      } catch { /* not here */ }
+    }
+  }
+
+  // Search library subdirectories
   try {
     var categories = await fs.readdir(libDir, { withFileTypes: true });
     for (var cat of categories) {
       if (!cat.isDirectory()) continue;
-      var fp = path.join(libDir, cat.name, `${type}.component.html`);
+      var fp2 = path.join(libDir, cat.name, `${type}.component.html`);
       try {
-        return await fs.readFile(fp, "utf-8");
+        return await fs.readFile(fp2, "utf-8");
       } catch { /* not here */ }
     }
   } catch { /* no lib dir */ }

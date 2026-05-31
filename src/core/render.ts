@@ -81,7 +81,7 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
         maxRevisions: options.maxRevisions,
         llmConfig: options.llmConfig,
         originalPrompt: options.originalPrompt,
-      });
+      }, options.extraComponentDirs);
 
     case "deck":
     case "presentation":
@@ -158,6 +158,7 @@ async function renderSingleSceneWorker(
   sceneIndex: number,
   workDir: string,
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
+  extraComponentDirs?: string[],
 ): Promise<{ mp4Path: string; frameCount: number }> {
   const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `scene_${sceneIndex}`);
@@ -181,6 +182,7 @@ async function renderSingleSceneWorker(
     width: project.canvas.width,
     height: project.canvas.height,
     fps: project.canvas.fps,
+    extraComponentDirs: extraComponentDirs || [],
   };
 
   if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
@@ -227,6 +229,7 @@ async function renderScenesParallel(
   project: Project,
   workDir: string,
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
+  extraComponentDirs?: string[],
 ): Promise<Array<{ mp4Path: string; frameCount: number }>> {
   const concurrency = config.renderConcurrency;
   const results = new Array<{ mp4Path: string; frameCount: number }>(project.scenes.length);
@@ -238,7 +241,7 @@ async function renderScenesParallel(
     const promises: Promise<{ mp4Path: string; frameCount: number }>[] = [];
     
     for (let idx = batch; idx < batchEnd; idx++) {
-      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts));
+      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts, extraComponentDirs));
     }
 
     const batchResults = await Promise.all(promises);
@@ -261,9 +264,10 @@ async function renderVideo(
   outputPath: string,
   startTime: number,
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
+  extraComponentDirs?: string[],
 ): Promise<RenderResult> {
   // Render all scenes (in parallel batches, each as a child process)
-  const sceneResults = await renderScenesParallel(project, workDir, critiqueOpts);
+  const sceneResults = await renderScenesParallel(project, workDir, critiqueOpts, extraComponentDirs);
 
   const sceneMp4s = sceneResults.map((r) => r.mp4Path);
   const totalFrames = sceneResults.reduce((sum, r) => sum + r.frameCount, 0);
