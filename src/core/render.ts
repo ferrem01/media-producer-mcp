@@ -3,14 +3,20 @@
  *
  * Orchestrates the full render flow:
  *   project.json -> assemble scenes -> capture frames -> encode video
+ *
+ * Features:
+ * - Parallel scene rendering with configurable concurrency
+ * - GSAP-powered transitions rendered as mini HTML scenes
  */
 
 import fs from "node:fs/promises";
 import path from "node:path";
 import { assembleScene, type ComponentSource } from "./scene-assembler.js";
 import { captureScene, captureSingleFrame } from "./capture.js";
-import { encodeScene, concatScenes } from "./encode.js";
+import { encodeScene, concatSegments } from "./encode.js";
+import { renderTransition, extractFirstFrame, extractLastFrame } from "./transitions.js";
 import { critiqueScene } from "../llm/critiquer.js";
+import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 
@@ -125,7 +131,126 @@ async function renderImage(
 }
 
 /**
- * Render a video output.
+ * Render a single scene to MP4, including optional critique loop.
+ * Returns { mp4Path, frameCount }.
+ */
+async function renderSingleScene(
+  project: Project,
+  scene: Scene,
+  sceneIndex: number,
+  componentSources: ComponentSource[],
+  workDir: string,
+  gsapDir: string,
+  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
+): Promise<{ mp4Path: string; frameCount: number }> {
+  console.log(`\n  Scene ${sceneIndex + 1}/${project.scenes.length}: "${scene.label || scene.id}"`);
+
+  // Assemble scene HTML
+  const html = await assembleScene({
+    scene,
+    components: componentSources,
+    brandKit: project.brand_kit,
+    canvas: project.canvas,
+    gsapDir,
+  });
+
+  const sceneDir = path.join(workDir, `scene_${sceneIndex}`);
+  const htmlPath = path.join(sceneDir, "scene.html");
+  const framesDir = path.join(sceneDir, "frames");
+  const mp4Path = path.join(sceneDir, "scene.mp4");
+
+  await fs.mkdir(sceneDir, { recursive: true });
+  await fs.writeFile(htmlPath, html);
+
+  // Critiquer loop: preview -> critique -> revise -> repeat
+  if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
+    let currentHtml = html;
+    for (let rev = 0; rev < (critiqueOpts.maxRevisions || 2); rev++) {
+      const previewPath = path.join(sceneDir, `preview_rev${rev}.png`);
+      await captureSingleFrame({
+        htmlPath,
+        outputPath: previewPath,
+        width: project.canvas.width,
+        height: project.canvas.height,
+        format: "png",
+        atTime: scene.duration_seconds ? scene.duration_seconds / 3 : 0,
+      });
+
+      const previewBase64 = (await fs.readFile(previewPath)).toString("base64");
+
+      const critique = await critiqueScene({
+        sceneHtml: currentHtml,
+        previewImageBase64: previewBase64,
+        prompt: scene.label || critiqueOpts.originalPrompt || "",
+        llmConfig: critiqueOpts.llmConfig,
+        format: project.format,
+      });
+
+      console.log(`    Critique score: ${critique.score}/10`);
+      if (critique.score >= 7 || !critique.revised_html) break;
+
+      currentHtml = critique.revised_html;
+      await fs.writeFile(htmlPath, currentHtml);
+      console.log(`    Applied revision ${rev + 1}`);
+    }
+  }
+
+  // Capture frames
+  const captureResult = await captureScene({
+    htmlPath,
+    outputDir: framesDir,
+    fps: project.canvas.fps,
+    duration: scene.duration_seconds,
+    width: project.canvas.width,
+    height: project.canvas.height,
+  });
+
+  // Encode to MP4
+  await encodeScene({
+    framesDir,
+    outputPath: mp4Path,
+    fps: project.canvas.fps,
+  });
+
+  // Clean up frame PNGs to free disk space
+  await fs.rm(framesDir, { recursive: true, force: true });
+
+  return { mp4Path, frameCount: captureResult.frameCount };
+}
+
+/**
+ * Render scenes in parallel batches with configurable concurrency.
+ */
+async function renderScenesParallel(
+  project: Project,
+  componentSources: ComponentSource[],
+  workDir: string,
+  gsapDir: string,
+  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
+): Promise<Array<{ mp4Path: string; frameCount: number }>> {
+  const concurrency = config.renderConcurrency;
+  const results = new Array<{ mp4Path: string; frameCount: number }>(project.scenes.length);
+
+  console.log(`  Rendering ${project.scenes.length} scenes (concurrency: ${concurrency})`);
+
+  for (let batch = 0; batch < project.scenes.length; batch += concurrency) {
+    const batchScenes = project.scenes.slice(batch, batch + concurrency);
+    const promises = batchScenes.map((scene, i) => {
+      const idx = batch + i;
+      return renderSingleScene(project, scene, idx, componentSources, workDir, gsapDir, critiqueOpts);
+    });
+
+    const batchResults = await Promise.all(promises);
+    for (let i = 0; i < batchResults.length; i++) {
+      results[batch + i] = batchResults[i];
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Render a video output with parallel scene rendering and GSAP transitions.
  */
 async function renderVideo(
   project: Project,
@@ -136,100 +261,65 @@ async function renderVideo(
   startTime: number,
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
 ): Promise<RenderResult> {
-  const sceneMp4s: string[] = [];
-  let totalFrames = 0;
+  // Render all scenes (in parallel batches)
+  const sceneResults = await renderScenesParallel(
+    project, componentSources, workDir, gsapDir, critiqueOpts,
+  );
 
-  for (let i = 0; i < project.scenes.length; i++) {
-    const scene = project.scenes[i];
-    console.log(`\n  Scene ${i + 1}/${project.scenes.length}: "${scene.label || scene.id}"`);
+  const sceneMp4s = sceneResults.map((r) => r.mp4Path);
+  const totalFrames = sceneResults.reduce((sum, r) => sum + r.frameCount, 0);
 
-    // Assemble scene HTML
-    const html = await assembleScene({
-      scene,
-      components: componentSources,
-      brandKit: project.brand_kit,
-      canvas: project.canvas,
-      gsapDir,
-    });
+  // Build the final segment list: scene + transition + scene + transition + ...
+  if (sceneMp4s.length > 1) {
+    const segments: string[] = [sceneMp4s[0]];
 
-    const sceneDir = path.join(workDir, `scene_${i}`);
-    const htmlPath = path.join(sceneDir, "scene.html");
-    const framesDir = path.join(sceneDir, "frames");
-    const mp4Path = path.join(sceneDir, "scene.mp4");
+    for (let i = 1; i < sceneMp4s.length; i++) {
+      const scene = project.scenes[i];
+      const transitionType = scene.transition_in?.type || "crossfade";
+      const transitionDuration = scene.transition_in?.duration_seconds || 0.5;
 
-    await fs.mkdir(sceneDir, { recursive: true });
-    await fs.writeFile(htmlPath, html);
-
-    // Critiquer loop: preview -> critique -> revise -> repeat
-    if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
-      let currentHtml = html;
-      for (let rev = 0; rev < (critiqueOpts.maxRevisions || 2); rev++) {
-        const previewPath = path.join(sceneDir, `preview_rev${rev}.png`);
-        await captureSingleFrame({
-          htmlPath,
-          outputPath: previewPath,
-          width: project.canvas.width,
-          height: project.canvas.height,
-          format: "png",
-          atTime: scene.duration_seconds ? scene.duration_seconds / 3 : 0,
-        });
-
-        const previewBase64 = (await fs.readFile(previewPath)).toString("base64");
-
-        const critique = await critiqueScene({
-          sceneHtml: currentHtml,
-          previewImageBase64: previewBase64,
-          prompt: scene.label || critiqueOpts.originalPrompt || "",
-          llmConfig: critiqueOpts.llmConfig,
-          format: project.format,
-        });
-
-        console.log(`    Critique score: ${critique.score}/10`);
-        if (critique.score >= 7 || !critique.revised_html) break;
-
-        currentHtml = critique.revised_html;
-        await fs.writeFile(htmlPath, currentHtml);
-        console.log(`    Applied revision ${rev + 1}`);
+      if (transitionType === "none") {
+        // No transition, just append the scene
+        segments.push(sceneMp4s[i]);
+        continue;
       }
+
+      // Extract last frame of previous scene and first frame of current scene
+      const transWorkDir = path.join(workDir, `transition_${i - 1}_${i}`);
+      await fs.mkdir(transWorkDir, { recursive: true });
+
+      const lastFramePath = path.join(transWorkDir, "frameA.png");
+      const firstFramePath = path.join(transWorkDir, "frameB.png");
+
+      await extractLastFrame(
+        sceneMp4s[i - 1], lastFramePath,
+        project.canvas.width, project.canvas.height,
+      );
+      await extractFirstFrame(
+        sceneMp4s[i], firstFramePath,
+        project.canvas.width, project.canvas.height,
+      );
+
+      // Render the transition as a mini video segment
+      console.log(`\n  Transition ${i - 1}->${i}: ${transitionType} (${transitionDuration}s)`);
+      const transitionMp4 = await renderTransition({
+        type: transitionType,
+        duration: transitionDuration,
+        frameA: lastFramePath,
+        frameB: firstFramePath,
+        width: project.canvas.width,
+        height: project.canvas.height,
+        fps: project.canvas.fps,
+        workDir: transWorkDir,
+        gsapDir,
+      });
+
+      segments.push(transitionMp4);
+      segments.push(sceneMp4s[i]);
     }
 
-    // Capture frames
-    const captureResult = await captureScene({
-      htmlPath,
-      outputDir: framesDir,
-      fps: project.canvas.fps,
-      duration: scene.duration_seconds,
-      width: project.canvas.width,
-      height: project.canvas.height,
-    });
-
-    totalFrames += captureResult.frameCount;
-
-    // Encode to MP4
-    await encodeScene({
-      framesDir,
-      outputPath: mp4Path,
-      fps: project.canvas.fps,
-    });
-
-    // Clean up frame PNGs to free disk space
-    await fs.rm(framesDir, { recursive: true, force: true });
-
-    sceneMp4s.push(mp4Path);
-  }
-
-  // Concatenate scenes
-  if (sceneMp4s.length > 1) {
-    const transitions = project.scenes.slice(1).map((s) => ({
-      type: s.transition_in?.type || "crossfade",
-      duration_seconds: s.transition_in?.duration_seconds || 0.5,
-    }));
-
-    await concatScenes({
-      scenes: sceneMp4s,
-      outputPath,
-      transitions,
-    });
+    // Simple concat of all segments (no xfade needed, transitions are their own segments)
+    await concatSegments(segments, outputPath);
   } else if (sceneMp4s.length === 1) {
     await fs.copyFile(sceneMp4s[0], outputPath);
   }

@@ -34,6 +34,8 @@ export interface Config {
   gsapDir: string;
   /** LLM configuration */
   llm: LLMConfig;
+  /** Number of scenes to render in parallel (default 2) */
+  renderConcurrency: number;
 }
 
 const ROOT_DIR = path.dirname(new URL(import.meta.url).pathname);
@@ -51,4 +53,5 @@ export const config: Config = {
     model: process.env.MP_LLM_MODEL || (llmProvider === "anthropic" ? "claude-sonnet-4-20250514" : "gpt-4o"),
     apiKey: (llmProvider === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY) || "",
   },
+  renderConcurrency: parseInt(process.env.MP_RENDER_CONCURRENCY || "2", 10),
 };

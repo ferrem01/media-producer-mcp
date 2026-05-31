@@ -107,6 +107,21 @@ export async function concatScenes(options: ConcatOptions): Promise<string> {
 }
 
 /**
+ * Concatenate video segments using simple concat demuxer.
+ * Used for the new GSAP-transition pipeline where transitions
+ * are already rendered as their own video segments.
+ */
+export async function concatSegments(segments: string[], outputPath: string): Promise<string> {
+  if (segments.length === 0) throw new Error("No segments to concatenate");
+  if (segments.length === 1) {
+    await fs.copyFile(segments[0], outputPath);
+    return outputPath;
+  }
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+  return concatSimple(segments, outputPath);
+}
+
+/**
  * Simple concat without transitions.
  */
 async function concatSimple(scenes: string[], outputPath: string): Promise<string> {
