@@ -65,9 +65,21 @@ export async function planFreeform(opts: FreeformPlannerOpts): Promise<FreeformR
   // Parse JSON response
   var plan: FreeformLLMOutput;
   try {
-    plan = JSON.parse(stripJsonFences(raw));
+    var cleaned = stripJsonFences(raw);
+    plan = JSON.parse(cleaned);
   } catch (e) {
-    throw new Error(`Freeform planner returned invalid JSON: ${raw.substring(0, 500)}`);
+    // Try harder: find the first { and last } 
+    try {
+      var firstBrace = raw.indexOf('{');
+      var lastBrace = raw.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        plan = JSON.parse(raw.substring(firstBrace, lastBrace + 1));
+      } else {
+        throw e;
+      }
+    } catch {
+      throw new Error(`Freeform planner returned invalid JSON: ${raw.substring(0, 500)}`);
+    }
   }
 
   if (!plan.scenes || plan.scenes.length === 0) {
