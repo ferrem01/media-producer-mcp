@@ -27,6 +27,7 @@ import {
   saveBrandKit,
 } from "./persistence/brand-kit.js";
 import { renderProject as renderProjectCore } from "./core/render.js";
+import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { config } from "./config.js";
 import { projectDir, projectOutputDir } from "./persistence/paths.js";
 import path from "node:path";
@@ -615,6 +616,151 @@ export function createMcpServer(): McpServer {
 
       await saveProject(project);
       return ok(project.audio);
+    },
+  );
+
+  // ─────────────────────────────────────────────
+  // generate - LLM generates a custom component
+  // ─────────────────────────────────────────────
+
+  server.tool(
+    "generate",
+    "Generate a custom component from a natural language description. The LLM writes a .component.html file. Optionally save to tenant library for reuse.",
+    {
+      tenant_id: z.string(),
+      prompt: z.string().describe("Description of the component to generate"),
+      save: z.boolean().optional().describe("Save to tenant component library for reuse (default: false)"),
+      category: z.string().optional().describe("Category to save under (default: custom)"),
+      duration: z.number().optional().describe("Animation duration in seconds for preview (default: 3)"),
+    },
+    async (params) => {
+      try {
+        // The LLM generate function -- for now, return a stub that tells the caller
+        // to provide the component source directly. In production, this would call
+        // an LLM API (OpenAI, Anthropic, etc.)
+        //
+        // The MCP pattern: the CALLING agent IS the LLM. So we provide the system
+        // prompt and let the caller generate the component, then pass it back
+        // through a separate "save" flow.
+        //
+        // For now, return the system prompt so the calling agent can generate
+        // the component itself and use add_component or save_component.
+
+        const { generateComponent: genComp } = await import("./core/component-generator.js");
+
+        // Check if there's an LLM provider configured
+        // For MCP, the calling agent IS the LLM, so we return the prompt template
+        // and let it generate the component source.
+        return ok({
+          status: "prompt_ready",
+          message: "Generate a .component.html file based on the description below. Follow the format exactly. Then call 'save_component' with the source.",
+          component_format: {
+            sections: ["<template>", "<style scoped>", "<script>"],
+            function_signature: "function createTimeline(el, data, ctx)",
+            ctx_fields: { duration: "number", fps: "number", canvas: "{width, height}", motion: "minimal|punchy|cinematic" },
+            css_variables: [
+              "--mp-color-primary", "--mp-color-secondary", "--mp-color-accent",
+              "--mp-color-background", "--mp-color-surface",
+              "--mp-color-text", "--mp-color-text-muted",
+              "--mp-font-family", "--mp-border-radius",
+            ],
+            rules: [
+              "Use gsap.timeline() NOT gsap.timeline({ paused: true })",
+              "Use var not const/let",
+              "Animate entrance, hold, and exit within ctx.duration",
+              "Design for 1920x1080 canvas",
+              "Use {{key}} for simple text binding",
+              "Build dynamic DOM in createTimeline",
+              "Logo URLs: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark",
+            ],
+          },
+          prompt: params.prompt,
+          duration: params.duration || 3,
+        });
+      } catch (e: any) {
+        return err(`Generate failed: ${e.message}`);
+      }
+    },
+  );
+
+  // ─────────────────────────────────────────────
+  // save_component - Save a generated component
+  // ─────────────────────────────────────────────
+
+  server.tool(
+    "save_component",
+    "Save a generated .component.html to the tenant's component library for reuse across projects.",
+    {
+      tenant_id: z.string(),
+      type: z.string().describe("Component type name (kebab-case, e.g. 'slack-simulator')"),
+      source: z.string().describe("The full .component.html source"),
+      category: z.string().optional().describe("Category folder (default: custom)"),
+      preview: z.boolean().optional().describe("Generate a preview image (default: true)"),
+    },
+    async (params) => {
+      try {
+        const savedPath = await saveGeneratedComponent(
+          params.tenant_id,
+          params.type,
+          params.source,
+          params.category || "custom",
+        );
+
+        // Generate preview if requested
+        let preview_path: string | undefined;
+        if (params.preview !== false) {
+          try {
+            const sceneAssembler = await import("./core/scene-assembler.js");
+            const captureModule = await import("./core/capture.js");
+
+            const scene = {
+              id: "preview",
+              label: "Preview",
+              duration_seconds: 3,
+              components: [{ id: "comp_preview", type: params.type, data: {}, z_index: 10 }],
+            };
+
+            const html = await sceneAssembler.assembleScene({
+              scene,
+              components: [{ type: params.type, source: params.source }],
+              brandKit: {
+                colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
+                fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
+                style: { border_radius: "12px", motion: "cinematic" as const },
+              },
+              canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+              gsapDir: config.gsapDir,
+            });
+
+            const workDir = path.join(config.dataDir, params.tenant_id, "_previews");
+            const htmlPath = path.join(workDir, `${params.type}.html`);
+            preview_path = path.join(workDir, `${params.type}.png`);
+
+            await fs.mkdir(workDir, { recursive: true });
+            await fs.writeFile(htmlPath, html);
+
+            await captureModule.captureSingleFrame({
+              htmlPath,
+              outputPath: preview_path,
+              width: 1920,
+              height: 1080,
+              atTime: 1.0,
+            });
+          } catch (previewErr) {
+            console.error("Preview generation failed:", previewErr);
+          }
+        }
+
+        return ok({
+          status: "saved",
+          type: params.type,
+          category: params.category || "custom",
+          path: savedPath,
+          preview_path,
+        });
+      } catch (e: any) {
+        return err(`Save failed: ${e.message}`);
+      }
     },
   );
 
