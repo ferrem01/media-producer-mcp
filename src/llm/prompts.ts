@@ -6,6 +6,7 @@
  */
 
 import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
+import { GSAP_ANIMATION_SKILLS } from "./gsap-skills.js";
 
 /**
  * System prompt for generating .component.html files.
@@ -75,7 +76,9 @@ You MUST output a single .component.html file with exactly three sections:
 
 10. All variables must use 'var' not 'const' or 'let' (broad compatibility).
 
-${COMPONENT_DESIGN_RULES}`;
+${COMPONENT_DESIGN_RULES}
+
+${GSAP_ANIMATION_SKILLS}`;
 }
 
 /**
