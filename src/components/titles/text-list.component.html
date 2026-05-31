@@ -13,14 +13,15 @@
     height: 100%;
     width: 100%;
     font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 60px 100px;
+    padding: 80px 120px;
   }
 
   .list-title {
-    font-size: 48px;
+    font-size: 40px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     margin: 0 0 40px 0;
+    letter-spacing: -0.01em;
   }
 
   .list-title:empty {
@@ -34,32 +35,34 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+    max-width: 60%;
   }
 
   .list-item {
     display: flex;
     align-items: flex-start;
     gap: 16px;
-    font-size: 28px;
+    font-size: 22px;
     color: var(--mp-color-text, #ffffff);
-    line-height: 1.4;
+    line-height: 1.6;
   }
 
   .list-marker {
     flex-shrink: 0;
     color: var(--mp-color-accent, #A78BFA);
     font-weight: 700;
-    min-width: 28px;
+    min-width: 24px;
+    font-size: 20px;
   }
 
   .list-marker.bullet::before {
     content: '\25CF';
-    font-size: 16px;
+    font-size: 14px;
   }
 
   .list-marker.check::before {
     content: '\2713';
-    font-size: 24px;
+    font-size: 20px;
   }
 
   .list-text {
@@ -74,6 +77,9 @@
     var titleEl = el.querySelector('.list-title');
     var items = data.items || [];
     var style = data.style || 'bullet';
+
+    // Cap at 6 items
+    if (items.length > 6) items = items.slice(0, 6);
 
     container.innerHTML = '';
 
@@ -102,7 +108,7 @@
     });
 
     var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.5;
-    var stagger = ctx.motion === 'minimal' ? 0.1 : ctx.motion === 'punchy' ? 0.15 : 0.2;
+    var stagger = 0.15;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
 
     var allEls = [];
@@ -111,7 +117,7 @@
     }
 
     gsap.set(allEls, { autoAlpha: 0, y: 30 });
-    gsap.set(itemEls, { autoAlpha: 0, x: -30 });
+    gsap.set(itemEls, { autoAlpha: 0, y: 20, x: -20 });
 
     if (allEls.length > 0) {
       tl.to(allEls, {
@@ -124,6 +130,7 @@
 
     tl.to(itemEls, {
       autoAlpha: 1,
+      y: 0,
       x: 0,
       duration: speed,
       stagger: stagger,

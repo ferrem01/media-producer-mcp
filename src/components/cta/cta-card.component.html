@@ -16,31 +16,37 @@
     width: 100%;
     height: 100%;
     font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 40px;
+    padding: 80px;
     box-sizing: border-box;
   }
 
   .cta-card {
-    background: var(--mp-color-surface, #1e293b);
-    border-radius: var(--mp-border-radius, 16px);
-    padding: 56px 64px;
-    max-width: 700px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    backdrop-filter: blur(20px);
+    padding: 60px;
+    max-width: 600px;
     width: 100%;
     text-align: center;
-    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 
   .cta-headline {
     font-size: 48px;
-    font-weight: 800;
+    font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     margin: 0 0 16px 0;
     line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.15);
   }
 
   .cta-description {
-    font-size: 22px;
-    color: var(--mp-color-text-muted, #94a3b8);
+    font-size: 20px;
+    color: #cbd5e1;
     margin: 0 0 36px 0;
     line-height: 1.5;
   }
@@ -51,13 +57,16 @@
 
   .cta-button {
     display: inline-block;
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 18px;
+    font-weight: 600;
     color: #ffffff;
-    background: var(--mp-color-primary, #6366f1);
-    padding: 16px 48px;
-    border-radius: 999px;
+    background: var(--mp-color-accent, #A78BFA);
+    height: 56px;
+    line-height: 56px;
+    padding: 0 40px;
+    border-radius: 12px;
     letter-spacing: 0.02em;
+    box-shadow: 0 0 30px rgba(167, 139, 250, 0.25);
   }
 
   .cta-button:empty {
@@ -77,24 +86,25 @@
       button.style.background = data.button_color;
     }
 
-    gsap.set(card, { autoAlpha: 0, y: 60 });
+    gsap.set(card, { autoAlpha: 0, y: 60, scale: 0.95 });
 
-    // Card slides up
+    // Card slides up with scale
     tl.to(card, {
       autoAlpha: 1,
       y: 0,
+      scale: 1,
       duration: 0.7,
       ease: 'power3.out'
     }, 0.3);
 
-    // Button pulse
+    // Button subtle pulse
     if (button && button.textContent.trim()) {
       tl.to(button, {
-        scale: 1.05,
-        duration: 0.5,
+        scale: 1.03,
+        duration: 0.6,
         ease: 'sine.inOut',
         yoyo: true,
-        repeat: 2
+        repeat: 3
       }, 1.2);
     }
 
@@ -103,6 +113,7 @@
       tl.to(card, {
         autoAlpha: 0,
         y: -30,
+        scale: 0.97,
         duration: 0.4,
         ease: 'power2.in'
       }, ctx.duration - 0.5);

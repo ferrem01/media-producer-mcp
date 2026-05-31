@@ -10,17 +10,17 @@
   .section-header {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     height: 100%;
     width: 100%;
     font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 60px 80px;
+    padding: 200px 80px 80px 120px;
   }
 
   .eyebrow {
-    font-size: 16px;
+    font-size: 13px;
     font-weight: 600;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
     color: var(--mp-color-accent, #A78BFA);
     margin-bottom: 16px;
@@ -31,21 +31,23 @@
   }
 
   .title {
-    font-size: 72px;
-    font-weight: 800;
+    font-size: 56px;
+    font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     margin: 0;
     line-height: 1.1;
     max-width: 80%;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.15);
   }
 
   .description {
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 400;
-    color: var(--mp-color-text-muted, #94a3b8);
+    color: #cbd5e1;
     margin-top: 20px;
     line-height: 1.5;
-    max-width: 65%;
+    max-width: 50%;
   }
 
   .description:empty {
@@ -70,11 +72,12 @@
     var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
     var distance = ctx.motion === 'minimal' ? 30 : ctx.motion === 'punchy' ? 50 : 60;
 
-    gsap.set(elements, { autoAlpha: 0, x: -distance });
+    gsap.set(elements, { autoAlpha: 0, x: -distance, filter: 'blur(4px)' });
 
     tl.to(elements, {
       autoAlpha: 1,
       x: 0,
+      filter: 'blur(0px)',
       duration: speed,
       stagger: stagger,
       ease: ease
@@ -85,6 +88,7 @@
       tl.to(elements, {
         autoAlpha: 0,
         x: -20,
+        filter: 'blur(4px)',
         duration: 0.4,
         stagger: 0.05,
         ease: 'power2.in'

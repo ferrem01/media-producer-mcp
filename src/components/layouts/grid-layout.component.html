@@ -8,15 +8,18 @@
     gap: 24px;
     width: 100%;
     height: 100%;
-    padding: 48px;
+    padding: 80px;
     box-sizing: border-box;
     align-content: center;
+    justify-content: center;
     font-family: var(--mp-font-family, 'Inter', sans-serif);
   }
 
   .grid-item {
-    background: var(--mp-color-surface, #1e293b);
-    border-radius: var(--mp-border-radius, 16px);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    backdrop-filter: blur(20px);
     padding: 32px;
     display: flex;
     flex-direction: column;
@@ -25,24 +28,35 @@
     gap: 12px;
   }
 
+  .grid-item-icon-wrap {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(167, 139, 250, 0.1);
+    flex-shrink: 0;
+  }
+
   .grid-item-icon {
-    font-size: 36px;
+    font-size: 32px;
     line-height: 1;
   }
 
   .grid-item-title {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--mp-color-text, #ffffff);
     margin: 0;
     line-height: 1.2;
   }
 
   .grid-item-desc {
-    font-size: 14px;
-    color: var(--mp-color-text-muted, #94a3b8);
+    font-size: 15px;
+    color: #94a3b8;
     margin: 0;
-    line-height: 1.4;
+    line-height: 1.5;
   }
 </style>
 
@@ -53,17 +67,20 @@
     var items = data.items || [];
     var columns = data.columns || 3;
 
-    grid.style.gridTemplateColumns = 'repeat(' + columns + ', 1fr)';
+    grid.style.gridTemplateColumns = 'repeat(' + Math.min(columns, 3) + ', 1fr)';
 
     for (var i = 0; i < items.length; i++) {
       var item = document.createElement('div');
       item.className = 'grid-item';
 
       if (items[i].icon) {
+        var iconWrap = document.createElement('div');
+        iconWrap.className = 'grid-item-icon-wrap';
         var icon = document.createElement('div');
         icon.className = 'grid-item-icon';
         icon.textContent = items[i].icon;
-        item.appendChild(icon);
+        iconWrap.appendChild(icon);
+        item.appendChild(iconWrap);
       }
 
       var title = document.createElement('div');
@@ -85,11 +102,12 @@
     var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.6;
     var stagger = ctx.motion === 'minimal' ? 0.06 : ctx.motion === 'punchy' ? 0.08 : 0.1;
 
-    gsap.set(itemEls, { autoAlpha: 0, y: 30 });
+    gsap.set(itemEls, { autoAlpha: 0, y: 30, scale: 0.95 });
 
     tl.to(itemEls, {
       autoAlpha: 1,
       y: 0,
+      scale: 1,
       duration: speed,
       stagger: stagger,
       ease: 'power3.out'

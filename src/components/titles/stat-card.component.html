@@ -18,7 +18,7 @@
     height: 100%;
     width: 100%;
     font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 60px;
+    padding: 80px;
   }
 
   .value-row {
@@ -28,9 +28,10 @@
   }
 
   .prefix, .suffix {
-    font-size: 48px;
-    font-weight: 600;
+    font-size: 120px;
+    font-weight: 300;
     color: var(--mp-color-accent, #A78BFA);
+    line-height: 1;
   }
 
   .prefix:empty, .suffix:empty {
@@ -43,15 +44,16 @@
     color: var(--mp-color-text, #ffffff);
     line-height: 1;
     font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 60px rgba(167, 139, 250, 0.3);
   }
 
   .label {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 500;
-    color: var(--mp-color-text-muted, #94a3b8);
-    margin-top: 16px;
+    color: #94a3b8;
+    margin-top: 20px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
   }
 </style>
 
@@ -63,7 +65,7 @@
     var targetValue = data.value || 0;
     var decimals = data.decimals || 0;
 
-    gsap.set(card, { autoAlpha: 0, scale: 0.9 });
+    gsap.set(card, { autoAlpha: 0, scale: 0.9, filter: 'blur(6px)' });
 
     var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.5;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out';
@@ -71,6 +73,7 @@
     tl.to(card, {
       autoAlpha: 1,
       scale: 1,
+      filter: 'blur(0px)',
       duration: speed,
       ease: ease
     }, 0.2);
@@ -92,6 +95,7 @@
       tl.to(card, {
         autoAlpha: 0,
         scale: 0.95,
+        filter: 'blur(4px)',
         duration: 0.4,
         ease: 'power2.in'
       }, exitAt);

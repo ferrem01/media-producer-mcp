@@ -7,6 +7,7 @@
         <span class="dot dot-green"></span>
       </div>
       <div class="browser-url-bar">
+        <span class="url-icon">🔒</span>
         <span class="url-text">{{url}}</span>
       </div>
     </div>
@@ -22,14 +23,16 @@
     display: flex;
     flex-direction: column;
     width: 85%;
-    height: 80%;
+    height: 78%;
     margin: auto;
-    border-radius: var(--mp-border-radius, 16px);
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+    box-shadow:
+      0 30px 70px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
     font-family: var(--mp-font-family, 'Inter', sans-serif);
     position: absolute;
-    top: 10%;
+    top: 8%;
     left: 7.5%;
   }
 
@@ -37,8 +40,9 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    background: #2a2a2e;
-    padding: 12px 16px;
+    background: linear-gradient(180deg, #2a2a2e, #232327);
+    padding: 0 16px;
+    height: 48px;
     flex-shrink: 0;
   }
 
@@ -60,8 +64,11 @@
 
   .browser-url-bar {
     flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     background: #1a1a1e;
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 6px 14px;
     font-size: 13px;
     color: #8b8b8e;
@@ -70,9 +77,14 @@
     text-overflow: ellipsis;
   }
 
+  .url-icon {
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
   .browser-viewport {
     flex: 1;
-    background: var(--mp-color-surface, #1e293b);
+    background: #0f172a;
     padding: 40px;
     overflow: hidden;
     display: flex;

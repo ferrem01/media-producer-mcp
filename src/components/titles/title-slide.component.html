@@ -15,19 +15,20 @@
     height: 100%;
     width: 100%;
     font-family: var(--mp-font-family, 'Inter', sans-serif);
-    padding: 40px;
+    padding: 80px;
   }
 
   .badge {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--mp-color-accent, #A78BFA);
-    background: rgba(167, 139, 250, 0.12);
+    background: rgba(167, 139, 250, 0.08);
+    border: 1px solid rgba(167, 139, 250, 0.3);
     padding: 8px 20px;
     border-radius: 999px;
-    margin-bottom: 32px;
+    margin-bottom: 36px;
   }
 
   .badge:empty {
@@ -35,23 +36,26 @@
   }
 
   .title {
-    font-size: 88px;
-    font-weight: 800;
+    font-size: 72px;
+    font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     margin: 0;
     line-height: 1.05;
     text-align: center;
     max-width: 80%;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.15);
   }
 
   .subtitle {
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 400;
-    color: var(--mp-color-text-muted, #94a3b8);
+    color: #cbd5e1;
     margin-top: 24px;
     text-align: center;
-    max-width: 70%;
+    max-width: 60%;
     line-height: 1.4;
+    letter-spacing: 0.01em;
   }
 
   .subtitle:empty {
@@ -71,18 +75,19 @@
       return e && e.textContent.trim();
     });
 
-    // Start invisible
-    gsap.set(elements, { autoAlpha: 0, y: 40 });
+    // Start invisible with scale + blur for dramatic entrance
+    gsap.set(elements, { autoAlpha: 0, scale: 1.1, filter: 'blur(8px)' });
 
     // Determine motion intensity
-    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.7;
-    var stagger = ctx.motion === 'minimal' ? 0.1 : ctx.motion === 'punchy' ? 0.12 : 0.18;
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+    var stagger = ctx.motion === 'minimal' ? 0.12 : ctx.motion === 'punchy' ? 0.15 : 0.2;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
 
-    // Entrance
+    // Entrance - scale down from 1.1 + clear blur
     tl.to(elements, {
       autoAlpha: 1,
-      y: 0,
+      scale: 1,
+      filter: 'blur(0px)',
       duration: speed,
       stagger: stagger,
       ease: ease
@@ -93,7 +98,8 @@
       var exitAt = ctx.duration - 0.8;
       tl.to(elements, {
         autoAlpha: 0,
-        y: -20,
+        scale: 0.95,
+        filter: 'blur(4px)',
         duration: 0.4,
         stagger: 0.05,
         ease: 'power2.in'
