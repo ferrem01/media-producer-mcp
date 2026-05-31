@@ -205,4 +205,64 @@ function createTimeline(el, data, ctx) {
   return tl;
 }
 \`\`\`
+
+### Shared Utilities (available globally in every component)
+
+**Spring Physics Presets:**
+Use the global \`SPRING\` object for natural motion:
+\`\`\`javascript
+tl.to(el, { y: 0, ...SPRING.bouncy });  // elastic.out(1, 0.3)
+tl.to(el, { scale: 1, ...SPRING.stiff });  // back.out(1.7)
+tl.to(el, { x: 0, ...SPRING.gentle });  // power3.out
+tl.to(el, { y: 0, ...SPRING.snappy });  // back.out(1.2)
+tl.to(el, { scale: 1, ...SPRING.wobbly });  // elastic.out(0.8, 0.4)
+\`\`\`
+
+**Text Emphasis Effects:**
+\`\`\`javascript
+// Animated highlight behind text (like a marker pen)
+highlightDraw(tl, element, at, duration, color);
+// Example: highlightDraw(tl, el.querySelector('.keyword'), 2.0, 0.5, 'rgba(167,139,250,0.3)');
+
+// Hand-drawn circle annotation around text
+circleAnnotation(tl, element, at, duration, color);
+
+// Animated underline
+underlineDraw(tl, element, at, duration, color);
+\`\`\`
+
+**Parallax Depth:**
+\`\`\`javascript
+// Create layers that move at different speeds for depth
+var layers = createParallaxLayers(container, [
+  { selector: '.bg-element', depth: 0.2 },   // slow (background)
+  { selector: '.mid-element', depth: 0.5 },   // medium
+  { selector: '.fg-element', depth: 1.0 },    // fast (foreground)
+]);
+animateParallax(tl, layers, 'horizontal', 50, 3.0, 0.5);
+\`\`\`
+
+### MorphSVG (SVG Shape Morphing)
+\`\`\`javascript
+gsap.to('#circle', { morphSVG: '#star', duration: 1, ease: 'power2.inOut' });
+\`\`\`
+
+### DrawSVG (SVG Path Drawing)
+\`\`\`javascript
+gsap.from('path', { drawSVG: '0%', duration: 2, ease: 'power2.inOut' });
+// Partial draw:
+gsap.to('path', { drawSVG: '20% 80%', duration: 1 });
+\`\`\`
+
+### ScrambleText (Text Decode/Cipher Effect)
+\`\`\`javascript
+gsap.to('.text', { scrambleText: { text: 'REVEALED', chars: 'XO@#', speed: 0.3 }, duration: 1 });
+\`\`\`
+
+### Film Polish Options
+The film-polish component supports color grading:
+\`\`\`json
+{ "type": "film-polish", "data": { "vignette": 0.08, "grain": 0.04, "color_grade": "warm" } }
+\`\`\`
+Grades: \"warm\" (orange tint), \"cool\" (blue tint), \"vintage\" (desaturated warm), \"none\"
 `;

@@ -370,6 +370,72 @@ ${GSAP_ANIMATION_SKILLS}
 
 ${SCRIPT_SYSTEM_SKILLS}
 
+## Visual Recipes (use these techniques to make scenes look AMAZING)
+
+### Per-character text reveal (SplitText)
+\`\`\`javascript
+var split = new SplitText(el.querySelector('.title'), { type: 'chars' });
+gsap.set(split.chars, { autoAlpha: 0, y: 40, rotationX: -90 });
+tl.to(split.chars, { autoAlpha: 1, y: 0, rotationX: 0, stagger: 0.03, duration: 0.6, ease: 'back.out(1.2)' }, 0.3);
+\`\`\`
+
+### Glowing stat counter
+\`\`\`javascript
+var counter = { val: 0 };
+tl.to(counter, { val: 340, duration: 2, ease: 'power2.out', onUpdate: function() {
+  el.querySelector('.number').textContent = Math.round(counter.val) + '%';
+}}, 0.5);
+// Add glow: text-shadow: 0 0 80px rgba(167,139,250,0.3)
+\`\`\`
+
+### Text with animated highlight marker
+\`\`\`javascript
+highlightDraw(tl, el.querySelector('.keyword'), 1.5, 0.5, 'rgba(167,139,250,0.3)');
+\`\`\`
+
+### ScrambleText decode reveal
+\`\`\`javascript
+tl.to(el.querySelector('.reveal-text'), { scrambleText: { text: 'QUOTIENT x CANVA', chars: '!@#$%', speed: 0.4 }, duration: 1.5 }, 0.3);
+\`\`\`
+
+### SVG line drawing
+\`\`\`javascript
+var path = el.querySelector('path');
+gsap.set(path, { drawSVG: '0%' });
+tl.to(path, { drawSVG: '100%', duration: 2, ease: 'power2.inOut' }, 0.5);
+\`\`\`
+
+### Ambient floating particles (background depth)
+\`\`\`css
+.particle { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: rgba(167,139,250,0.15); }
+\`\`\`
+\`\`\`javascript
+// Create 20-30 particles, animate with random drift
+for (var i = 0; i < 25; i++) {
+  var p = document.createElement('div'); p.className = 'particle';
+  p.style.left = Math.random() * 100 + '%'; p.style.top = Math.random() * 100 + '%';
+  el.appendChild(p);
+  gsap.to(p, { x: 'random(-50,50)', y: 'random(-50,50)', duration: 'random(3,6)', repeat: -1, yoyo: true, ease: 'sine.inOut', delay: Math.random() * 2 });
+}
+\`\`\`
+
+### Glass card with ambient glow
+\`\`\`css
+.card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 25px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+\`\`\`
+
+### Dramatic entrance with spring physics
+\`\`\`javascript
+gsap.set(el, { autoAlpha: 0, scale: 0.8, y: 60, filter: 'blur(8px)' });
+tl.to(el, { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: 1.0, ...SPRING.bouncy }, 0.3);
+\`\`\`
+
 ## CRITICAL RULES
 1. Each scene's html field must be a complete .component.html (template + style scoped + script)
 2. Use var not const/let in script sections
@@ -379,12 +445,13 @@ ${SCRIPT_SYSTEM_SKILLS}
 6. Standard pattern: Entrance (0.3-1.0s) -> Hold -> Exit (last 0.5-0.7s)
 7. Use gsap.timeline() (NOT paused -- the master timeline controls playback)
 8. function createTimeline(el, data, ctx) -- ctx has duration, fps, canvas, motion
-9. Available GSAP plugins: SplitText, CustomEase
-10. Available script utilities: runScript(), moveCursor(), typeText(), zoomTo()
-11. Use only valid transition types: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, none
+9. Available GSAP plugins: SplitText, CustomEase, MorphSVG, DrawSVG, ScrambleText
+10. Available utilities: runScript(), moveCursor(), typeText(), zoomTo(), highlightDraw(), circleAnnotation(), underlineDraw(), SPRING presets, createParallaxLayers()
+11. Use only valid transition types: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, none
 12. First scene should have no transition_in or use "none"
 13. Keep text per scene to max 15 words visible simultaneously
 14. Use autoAlpha instead of opacity for GSAP animations
+15. USE the visual recipes above. Don't just fade text in. Use SplitText, ScrambleText, counter animations, SVG draws, particle effects, spring physics. MAKE IT CINEMATIC.
 `;
 }
 
