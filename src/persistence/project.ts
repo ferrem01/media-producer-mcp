@@ -168,6 +168,7 @@ export async function updateProject(
 export async function deleteProject(tenantId: string, projectId: string): Promise<boolean> {
   const dir = projectDir(tenantId, projectId);
   try {
+    await fs.access(dir);
     await fs.rm(dir, { recursive: true, force: true });
     return true;
   } catch {
