@@ -132,6 +132,15 @@ ${componentStyles.join("\n\n")}
 </style>
 <script>
 ${gsapSource}
+
+// Register GSAP plugins
+if (typeof SplitText !== 'undefined') gsap.registerPlugin(SplitText);
+if (typeof CustomEase !== 'undefined') gsap.registerPlugin(CustomEase);
+if (typeof CustomBounce !== 'undefined') gsap.registerPlugin(CustomBounce);
+if (typeof CustomWiggle !== 'undefined') gsap.registerPlugin(CustomWiggle);
+if (typeof ExpoScaleEase !== 'undefined') gsap.registerPlugin(ExpoScaleEase);
+if (typeof RoughEase !== 'undefined') gsap.registerPlugin(RoughEase);
+if (typeof SlowMo !== 'undefined') gsap.registerPlugin(SlowMo);
 </script>
 </head>
 <body>
@@ -288,7 +297,14 @@ function buildComponentScript(
  * Falls back to a CDN URL in script tag if local files not found.
  */
 async function loadGsapSource(gsapDir: string): Promise<string> {
-  const files = ["gsap.min.js"];
+  const files = [
+    "gsap.min.js",
+    "SplitText.min.js",
+    "CustomEase.min.js",
+    "CustomBounce.min.js",
+    "CustomWiggle.min.js",
+    "EasePack.min.js",
+  ];
   const sources: string[] = [];
 
   for (const file of files) {

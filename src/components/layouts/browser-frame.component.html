@@ -1,18 +1,25 @@
 <template>
   <div class="browser-frame">
     <div class="browser-chrome">
-      <div class="browser-dots">
-        <span class="dot dot-red"></span>
-        <span class="dot dot-yellow"></span>
-        <span class="dot dot-green"></span>
+      <div class="chrome-left">
+        <div class="browser-dots">
+          <span class="dot dot-close"></span>
+          <span class="dot dot-min"></span>
+          <span class="dot dot-max"></span>
+        </div>
       </div>
-      <div class="browser-url-bar">
-        <span class="url-icon">🔒</span>
-        <span class="url-text">{{url}}</span>
+      <div class="chrome-center">
+        <div class="url-bar">
+          <svg class="lock-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span class="url-text"></span>
+        </div>
       </div>
+      <div class="chrome-right"></div>
     </div>
     <div class="browser-viewport">
-      <div class="browser-title"></div>
       <div class="browser-content"></div>
     </div>
   </div>
@@ -22,34 +29,49 @@
   .browser-frame {
     display: flex;
     flex-direction: column;
-    width: 85%;
+    width: 82%;
     height: 78%;
-    margin: auto;
+    position: absolute;
+    top: 11%;
+    left: 9%;
     border-radius: 12px;
     overflow: hidden;
     box-shadow:
-      0 30px 70px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
-    font-family: var(--mp-font-family, 'Inter', sans-serif);
-    position: absolute;
-    top: 8%;
-    left: 7.5%;
+      0 30px 80px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
   }
 
   .browser-chrome {
     display: flex;
     align-items: center;
-    gap: 12px;
-    background: linear-gradient(180deg, #2a2a2e, #232327);
+    background: linear-gradient(180deg, #38383c 0%, #2d2d31 100%);
     padding: 0 16px;
     height: 48px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+  }
+
+  .chrome-left {
+    width: 72px;
+    flex-shrink: 0;
+  }
+
+  .chrome-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+  }
+
+  .chrome-right {
+    width: 72px;
     flex-shrink: 0;
   }
 
   .browser-dots {
     display: flex;
     gap: 8px;
-    flex-shrink: 0;
   }
 
   .dot {
@@ -58,59 +80,45 @@
     border-radius: 50%;
   }
 
-  .dot-red { background: #ff5f57; }
-  .dot-yellow { background: #febc2e; }
-  .dot-green { background: #28c840; }
+  .dot-close { background: #ff5f57; }
+  .dot-min { background: #febc2e; }
+  .dot-max { background: #28c840; }
 
-  .browser-url-bar {
-    flex: 1;
+  .url-bar {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: #1a1a1e;
+    background: rgba(0, 0, 0, 0.25);
     border-radius: 8px;
     padding: 6px 14px;
-    font-size: 13px;
-    color: #8b8b8e;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    min-width: 320px;
+    max-width: 480px;
   }
 
-  .url-icon {
-    font-size: 11px;
+  .lock-icon {
+    color: #8b8b8e;
     flex-shrink: 0;
+  }
+
+  .url-text {
+    font-size: 13px;
+    color: #8b8b8e;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .browser-viewport {
     flex: 1;
     background: #0f172a;
-    padding: 40px;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
   }
-
-  .browser-title {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
-    margin-bottom: 16px;
-    text-align: center;
-  }
-
-  .browser-title:empty { display: none; }
 
   .browser-content {
-    font-size: 16px;
-    color: var(--mp-color-text-muted, #94a3b8);
-    text-align: center;
-    line-height: 1.5;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
   }
-
-  .browser-content:empty { display: none; }
 </style>
 
 <script>
@@ -118,40 +126,61 @@
     var tl = gsap.timeline();
     var frame = el.querySelector('.browser-frame');
     var viewport = el.querySelector('.browser-viewport');
+    var content = el.querySelector('.browser-content');
+    var urlText = el.querySelector('.url-text');
 
-    // Inject content (supports HTML)
-    var titleEl = viewport.querySelector('.browser-title');
-    var contentEl = viewport.querySelector('.browser-content');
-    if (data.title) titleEl.textContent = data.title;
-    if (data.content_html) contentEl.innerHTML = data.content_html;
+    // Set URL
+    if (data.url) urlText.textContent = data.url;
 
-    if (data.screenshot_url) {
+    // Set content
+    if (data.content_html) {
+      content.innerHTML = data.content_html;
+    } else if (data.screenshot_url) {
       viewport.style.backgroundImage = 'url(' + data.screenshot_url + ')';
       viewport.style.backgroundSize = 'cover';
       viewport.style.backgroundPosition = 'top center';
     }
 
-    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.6 : 0.8;
-    var ease = ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out';
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
 
-    gsap.set(frame, { autoAlpha: 0, scale: 0.88, y: 30 });
-    gsap.set(viewport.children, { autoAlpha: 0 });
+    // Initial state: small, faded, below
+    gsap.set(frame, {
+      autoAlpha: 0,
+      scale: 0.92,
+      y: 40,
+      filter: 'blur(4px)'
+    });
 
-    // Frame scales up
+    // Dramatic entrance
     tl.to(frame, {
-      autoAlpha: 1, scale: 1, y: 0,
-      duration: speed, ease: ease
+      autoAlpha: 1,
+      scale: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      duration: speed,
+      ease: 'power3.out'
     }, 0.3);
 
-    // Content fades in
-    tl.to(viewport.children, {
-      autoAlpha: 1, duration: 0.4, stagger: 0.1, ease: 'power2.out'
-    }, 0.3 + speed * 0.7);
+    // Content inside fades in slightly after
+    if (content.children.length > 0) {
+      gsap.set(content.children, { autoAlpha: 0 });
+      tl.to(content.children, {
+        autoAlpha: 1,
+        duration: 0.5,
+        stagger: 0.08,
+        ease: 'power2.out'
+      }, 0.3 + speed * 0.5);
+    }
 
+    // Exit
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.7;
       tl.to(frame, {
-        autoAlpha: 0, scale: 0.95, duration: 0.5, ease: 'power2.in'
+        autoAlpha: 0,
+        scale: 0.96,
+        y: -20,
+        duration: 0.5,
+        ease: 'power2.in'
       }, exitAt);
     }
 
