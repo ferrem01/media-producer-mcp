@@ -138,9 +138,15 @@ async function main() {
       }
 
       if (critiqueResult.revised_html) {
-        console.log(`    Applying revised HTML`);
-        html = critiqueResult.revised_html;
-        await fs.writeFile(htmlPath, html);
+        // Validate the revised HTML has the required GSAP timeline signals
+        if (critiqueResult.revised_html.includes("__MP_READY") && critiqueResult.revised_html.includes("__MP_TIMELINE")) {
+          console.log(`    Applying revised HTML`);
+          html = critiqueResult.revised_html;
+          await fs.writeFile(htmlPath, html);
+        } else {
+          console.log(`    Revised HTML missing GSAP timeline signals, keeping current`);
+          break;
+        }
       } else {
         console.log(`    No revised HTML provided, keeping current`);
         break;
