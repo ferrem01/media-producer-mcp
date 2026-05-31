@@ -69,11 +69,21 @@ function extractSchema(source: string): Record<string, unknown> | undefined {
  * Leaves unmatched placeholders empty.
  */
 export function bindTemplate(template: string, data: Record<string, unknown>): string {
-  return template.replace(/\{\{(\w+(?:\.\w+)*)\}\}/g, (_match, key: string) => {
+  // Triple braces {{{key}}} = unescaped HTML
+  let result = template.replace(/\{\{\{(\w+(?:\.\w+)*)\}\}\}/g, (_match, key: string) => {
+    const value = resolveKey(data, key);
+    if (value === undefined || value === null) return "";
+    return String(value);
+  });
+
+  // Double braces {{key}} = escaped text
+  result = result.replace(/\{\{(\w+(?:\.\w+)*)\}\}/g, (_match, key: string) => {
     const value = resolveKey(data, key);
     if (value === undefined || value === null) return "";
     return escapeHtml(String(value));
   });
+
+  return result;
 }
 
 function resolveKey(obj: Record<string, unknown>, key: string): unknown {

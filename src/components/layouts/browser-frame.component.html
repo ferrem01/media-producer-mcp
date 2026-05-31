@@ -11,8 +11,8 @@
       </div>
     </div>
     <div class="browser-viewport">
-      <div class="browser-title">{{title}}</div>
-      <div class="browser-content">{{content_html}}</div>
+      <div class="browser-title"></div>
+      <div class="browser-content"></div>
     </div>
   </div>
 </template>
@@ -106,6 +106,12 @@
     var tl = gsap.timeline();
     var frame = el.querySelector('.browser-frame');
     var viewport = el.querySelector('.browser-viewport');
+
+    // Inject content (supports HTML)
+    var titleEl = viewport.querySelector('.browser-title');
+    var contentEl = viewport.querySelector('.browser-content');
+    if (data.title) titleEl.textContent = data.title;
+    if (data.content_html) contentEl.innerHTML = data.content_html;
 
     if (data.screenshot_url) {
       viewport.style.backgroundImage = 'url(' + data.screenshot_url + ')';

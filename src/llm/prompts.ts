@@ -124,9 +124,18 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 2. Fill in ALL required data fields for each component based on the user's prompt.
 3. Use sensible defaults for optional fields.
 4. Component IDs should be unique within the scene (comp_1, comp_2, etc.).
-5. Set z_index to layer components (higher = on top). Start at 10, increment by 10.
+5. Set z_index to layer components (higher = on top). Background at 0, main content at 10, effects/overlays at 100.
 6. Duration should match the content needs (3-7 seconds for simple, 7-15 for complex).
-7. Output ONLY the JSON object. No explanation.`;
+7. Output ONLY the JSON object. No explanation.
+
+## CRITICAL: Data Field Values
+
+8. Keep data field values SIMPLE. Use plain text strings, not HTML markup.
+   - GOOD: { "left_content": "Campaign Management", "right_content": "Content Creation" }
+   - BAD: { "left_content": "<div style='padding:20px'><h3>Campaign Management</h3></div>" }
+9. The only fields that accept HTML are those explicitly named "content_html" (e.g. in browser-frame, device-mockup). For those, keep HTML minimal and clean.
+10. Always include a background component (gradient-background or mesh-gradient) at z_index 0.
+11. Use the correct transition types: crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, none. Do NOT use slide_left, zoom_in, scale_up.`;
 }
 
 /**

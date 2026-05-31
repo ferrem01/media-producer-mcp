@@ -1,10 +1,10 @@
 <template>
   <div class="pip-layout">
     <div class="pip-main">
-      <div class="pip-main-content">{{main_content}}</div>
+      <div class="pip-main-content"></div>
     </div>
     <div class="pip-overlay">
-      <div class="pip-overlay-content">{{pip_content}}</div>
+      <div class="pip-overlay-content"></div>
     </div>
   </div>
 </template>
@@ -67,6 +67,12 @@
     var main = el.querySelector('.pip-main');
     var mainContent = el.querySelector('.pip-main-content');
     var overlay = el.querySelector('.pip-overlay');
+    var overlayContent = el.querySelector('.pip-overlay-content');
+
+    // Inject content (supports HTML)
+    if (data.main_content) mainContent.innerHTML = data.main_content;
+    if (data.pip_content) overlayContent.innerHTML = data.pip_content;
+
     var position = data.pip_position || 'bottom-right';
     var size = data.pip_size || 30;
 
