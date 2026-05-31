@@ -164,7 +164,15 @@ export async function saveFreeformComponents(
 
 function stripJsonFences(raw: string): string {
   var trimmed = raw.trim();
-  var match = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
-  if (match) return match[1].trim();
+  // Strip leading ```json and trailing ```
+  if (trimmed.startsWith('```')) {
+    // Remove first line (```json or ```)
+    var firstNewline = trimmed.indexOf('\n');
+    if (firstNewline > -1) trimmed = trimmed.substring(firstNewline + 1);
+    // Remove trailing ```
+    var lastFence = trimmed.lastIndexOf('```');
+    if (lastFence > -1) trimmed = trimmed.substring(0, lastFence);
+    return trimmed.trim();
+  }
   return trimmed;
 }
