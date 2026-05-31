@@ -1,0 +1,38 @@
+{
+  "type": "logo",
+  "label": "Company Logo",
+  "category": "media",
+  "description": "Display a company logo from logo.dev by domain name. Supports theme (dark/light), greyscale, and custom sizing.",
+  "data": {
+    "domain": {
+      "type": "string",
+      "label": "Domain",
+      "required": true,
+      "placeholder": "apple.com"
+    },
+    "size": {
+      "type": "number",
+      "label": "Size (px)",
+      "optional": true,
+      "default": 128
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "enum": ["dark", "light", "auto"],
+      "default": "dark"
+    },
+    "greyscale": {
+      "type": "boolean",
+      "label": "Greyscale",
+      "optional": true,
+      "default": false
+    },
+    "label": {
+      "type": "string",
+      "label": "Label Text",
+      "optional": true
+    }
+  }
+}

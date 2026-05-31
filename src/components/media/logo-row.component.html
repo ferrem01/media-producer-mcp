@@ -1,0 +1,144 @@
+<template>
+  <div class="logo-row">
+    <h2 class="logo-row-title">{{title}}</h2>
+    <div class="logo-row-logos"></div>
+  </div>
+</template>
+
+<style scoped>
+  .logo-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    padding: 60px;
+    gap: 48px;
+  }
+
+  .logo-row-title {
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--mp-color-text-muted, #94a3b8);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .logo-row-title:empty {
+    display: none;
+  }
+
+  .logo-row-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 48px;
+    flex-wrap: wrap;
+  }
+
+  .logo-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-item img {
+    object-fit: contain;
+  }
+
+  .logo-item-label {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--mp-color-text-muted, #94a3b8);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var LOGO_TOKEN = 'pk_B_cdrQLyTkSFPzSMm52goQ';
+
+    var domains = data.domains || [];
+    var size = data.size || 64;
+    var theme = data.theme || 'dark';
+    var greyscale = data.greyscale !== undefined ? data.greyscale : false;
+    var showLabels = data.show_labels !== undefined ? data.show_labels : false;
+
+    var container = el.querySelector('.logo-row-logos');
+    var title = el.querySelector('.logo-row-title');
+
+    // Build logo items
+    for (var i = 0; i < domains.length; i++) {
+      var d = typeof domains[i] === 'string' ? { domain: domains[i] } : domains[i];
+      var domain = d.domain || 'example.com';
+      var label = d.label || '';
+
+      var logoUrl = 'https://img.logo.dev/' + domain
+        + '?token=' + LOGO_TOKEN
+        + '&format=png'
+        + '&size=' + (size * 2);
+      if (greyscale) logoUrl += '&greyscale=true';
+      if (theme !== 'auto') logoUrl += '&theme=' + theme;
+
+      var item = document.createElement('div');
+      item.className = 'logo-item';
+
+      var img = document.createElement('img');
+      img.src = logoUrl;
+      img.style.width = size + 'px';
+      img.style.height = size + 'px';
+      img.alt = domain;
+      item.appendChild(img);
+
+      if (showLabels && label) {
+        var lbl = document.createElement('span');
+        lbl.className = 'logo-item-label';
+        lbl.textContent = label;
+        item.appendChild(lbl);
+      }
+
+      container.appendChild(item);
+    }
+
+    var items = container.querySelectorAll('.logo-item');
+
+    // Start invisible
+    gsap.set(title, { autoAlpha: 0, y: 20 });
+    gsap.set(items, { autoAlpha: 0, y: 20, scale: 0.9 });
+
+    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.5;
+    var stagger = ctx.motion === 'minimal' ? 0.08 : ctx.motion === 'punchy' ? 0.1 : 0.15;
+
+    // Entrance
+    if (title && title.textContent.trim()) {
+      tl.to(title, {
+        autoAlpha: 1, y: 0,
+        duration: speed,
+        ease: 'power3.out'
+      }, 0.3);
+    }
+
+    tl.to(items, {
+      autoAlpha: 1, y: 0, scale: 1,
+      duration: speed,
+      stagger: stagger,
+      ease: 'power3.out'
+    }, title && title.textContent.trim() ? '-=0.2' : 0.3);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to([title, items], {
+        autoAlpha: 0,
+        duration: 0.3,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

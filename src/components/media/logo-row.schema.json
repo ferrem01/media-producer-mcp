@@ -1,0 +1,46 @@
+{
+  "type": "logo-row",
+  "label": "Logo Row",
+  "category": "media",
+  "description": "Display a row of company logos from logo.dev. Pass domains as strings or objects with domain + label. Great for 'trusted by' sections.",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "optional": true,
+      "placeholder": "Trusted By"
+    },
+    "domains": {
+      "type": "array",
+      "label": "Domains",
+      "required": true,
+      "description": "Array of domain strings or {domain, label} objects",
+      "placeholder": ["google.com", "apple.com", "microsoft.com"]
+    },
+    "size": {
+      "type": "number",
+      "label": "Logo Size (px)",
+      "optional": true,
+      "default": 64
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "enum": ["dark", "light", "auto"],
+      "default": "dark"
+    },
+    "greyscale": {
+      "type": "boolean",
+      "label": "Greyscale",
+      "optional": true,
+      "default": false
+    },
+    "show_labels": {
+      "type": "boolean",
+      "label": "Show Labels",
+      "optional": true,
+      "default": false
+    }
+  }
+}
