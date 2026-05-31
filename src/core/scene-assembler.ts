@@ -116,6 +116,17 @@ html, body {
   overflow: hidden;
 }
 
+/* ── Safety defaults ── */
+.mp-component * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ── Component Styles ── */
 ${componentStyles.join("\n\n")}
 </style>

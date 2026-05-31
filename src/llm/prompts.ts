@@ -5,6 +5,8 @@
  * The component prompt was extracted from src/core/component-generator.ts (DRY).
  */
 
+import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
+
 /**
  * System prompt for generating .component.html files.
  * This is THE canonical component generation prompt -- used by both
@@ -71,7 +73,9 @@ You MUST output a single .component.html file with exactly three sections:
 9. For images, use <img> tags with src from data. The renderer is a real browser so URLs work.
    For logo.dev logos: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark
 
-10. All variables must use 'var' not 'const' or 'let' (broad compatibility).`;
+10. All variables must use 'var' not 'const' or 'let' (broad compatibility).
+
+${COMPONENT_DESIGN_RULES}`;
 }
 
 /**
@@ -135,7 +139,9 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
    - BAD: { "left_content": "<div style='padding:20px'><h3>Campaign Management</h3></div>" }
 9. The only fields that accept HTML are those explicitly named "content_html" (e.g. in browser-frame, device-mockup). For those, keep HTML minimal and clean.
 10. Always include a background component (gradient-background or mesh-gradient) at z_index 0.
-11. Use the correct transition types: crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, none. Do NOT use slide_left, zoom_in, scale_up.`;
+11. Use the correct transition types: crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, none. Do NOT use slide_left, zoom_in, scale_up.
+
+${SCENE_PLANNER_DESIGN_RULES}`;
 }
 
 /**
@@ -185,7 +191,9 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 4. For decks/presentations: one slide per scene, 5-7 seconds each.
 5. First scene should be an intro/title. Last scene should be a CTA or summary.
 6. Use transitions between scenes (crossfade is default, vary for visual interest).
-7. Output ONLY the JSON object. No explanation.`;
+7. Output ONLY the JSON object. No explanation.
+
+${SCENE_PLANNER_DESIGN_RULES}`;
 }
 
 /**
