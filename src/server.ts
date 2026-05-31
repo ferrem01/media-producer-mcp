@@ -448,6 +448,9 @@ export function createMcpServer(): McpServer {
       project_id: z.string(),
       scene_id: z.string().optional().describe("If provided, renders a single scene preview image"),
       quality: z.enum(["preview", "production"]).optional().describe("Render quality (default: production)"),
+      critique: z.boolean().optional().default(false).describe("Run critiquer loop on each scene during render"),
+      maxRevisions: z.number().optional().default(2).describe("Max critique revision iterations per scene"),
+      originalPrompt: z.string().optional().describe("Original prompt for context in critique"),
     },
     async (params) => {
       const project = await loadProject(params.tenant_id, params.project_id);
@@ -514,6 +517,10 @@ export function createMcpServer(): McpServer {
           componentLibDir: config.componentLibDir,
           gsapDir: config.gsapDir,
           outputPath,
+          critique: params.critique,
+          maxRevisions: params.maxRevisions,
+          llmConfig: params.critique ? llmConfigFromEnv() : undefined,
+          originalPrompt: params.originalPrompt,
         });
 
         project.status = "rendered";

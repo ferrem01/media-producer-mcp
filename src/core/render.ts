@@ -10,6 +10,8 @@ import path from "node:path";
 import { assembleScene, type ComponentSource } from "./scene-assembler.js";
 import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, concatScenes } from "./encode.js";
+import { critiqueScene } from "../llm/critiquer.js";
+import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 
 export interface RenderOptions {
@@ -23,6 +25,14 @@ export interface RenderOptions {
   gsapDir: string;
   /** Output file path */
   outputPath: string;
+  /** Run critiquer loop on each scene */
+  critique?: boolean;
+  /** Max revision iterations per scene (default 2) */
+  maxRevisions?: number;
+  /** LLM config needed for critiquer calls */
+  llmConfig?: LLMConfig;
+  /** Original prompt for context in critique */
+  originalPrompt?: string;
 }
 
 export interface RenderResult {
@@ -55,7 +65,12 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
 
     case "video":
     case "slideshow":
-      return renderVideo(project, componentSources, workDir, gsapDir, outputPath, startTime);
+      return renderVideo(project, componentSources, workDir, gsapDir, outputPath, startTime, {
+        critique: options.critique,
+        maxRevisions: options.maxRevisions,
+        llmConfig: options.llmConfig,
+        originalPrompt: options.originalPrompt,
+      });
 
     case "deck":
       return renderDeck(project, componentSources, workDir, gsapDir, outputPath, startTime);
@@ -119,6 +134,7 @@ async function renderVideo(
   gsapDir: string,
   outputPath: string,
   startTime: number,
+  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
 ): Promise<RenderResult> {
   const sceneMp4s: string[] = [];
   let totalFrames = 0;
@@ -143,6 +159,39 @@ async function renderVideo(
 
     await fs.mkdir(sceneDir, { recursive: true });
     await fs.writeFile(htmlPath, html);
+
+    // Critiquer loop: preview -> critique -> revise -> repeat
+    if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
+      let currentHtml = html;
+      for (let rev = 0; rev < (critiqueOpts.maxRevisions || 2); rev++) {
+        const previewPath = path.join(sceneDir, `preview_rev${rev}.png`);
+        await captureSingleFrame({
+          htmlPath,
+          outputPath: previewPath,
+          width: project.canvas.width,
+          height: project.canvas.height,
+          format: "png",
+          atTime: scene.duration_seconds ? scene.duration_seconds / 3 : 0,
+        });
+
+        const previewBase64 = (await fs.readFile(previewPath)).toString("base64");
+
+        const critique = await critiqueScene({
+          sceneHtml: currentHtml,
+          previewImageBase64: previewBase64,
+          prompt: scene.label || critiqueOpts.originalPrompt || "",
+          llmConfig: critiqueOpts.llmConfig,
+          format: project.format,
+        });
+
+        console.log(`    Critique score: ${critique.score}/10`);
+        if (critique.score >= 7 || !critique.revised_html) break;
+
+        currentHtml = critique.revised_html;
+        await fs.writeFile(htmlPath, currentHtml);
+        console.log(`    Applied revision ${rev + 1}`);
+      }
+    }
 
     // Capture frames
     const captureResult = await captureScene({

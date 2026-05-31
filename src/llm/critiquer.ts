@@ -5,13 +5,13 @@
  * Uses vision (image input) to evaluate the rendered scene.
  */
 
-import fs from "node:fs/promises";
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { critiquerSystemPrompt } from "./prompts.js";
 
 export interface CritiqueSceneOpts {
   sceneHtml: string;
-  previewImagePath: string;
+  /** Base64-encoded preview image (PNG) */
+  previewImageBase64: string;
   prompt: string;
   llmConfig: LLMConfig;
   format?: string;
@@ -28,10 +28,7 @@ export interface CritiqueResult {
  * Critique a rendered scene by analyzing its preview image.
  */
 export async function critiqueScene(opts: CritiqueSceneOpts): Promise<CritiqueResult> {
-  // Read the preview image and encode as base64
-  var imageBuffer = await fs.readFile(opts.previewImagePath);
-  var base64 = imageBuffer.toString("base64");
-  var dataUrl = `data:image/png;base64,${base64}`;
+  var dataUrl = `data:image/png;base64,${opts.previewImageBase64}`;
 
   // Build multi-modal message
   var userContent: LLMContentPart[] = [
