@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "name": { "type": "string", "description": "Tier name" },
+    "price": { "type": "string", "description": "Price display (e.g. $49)" },
+    "period": { "type": "string", "description": "Billing period (e.g. /month)" },
+    "features": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of feature strings"
+    },
+    "highlighted": { "type": "boolean", "description": "Whether to highlight the card" },
+    "cta": { "type": "string", "description": "CTA button text" }
+  },
+  "required": ["name", "price", "features"]
+}

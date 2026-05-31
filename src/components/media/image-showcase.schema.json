@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "src": { "type": "string", "description": "Image URL or path" },
+    "alt": { "type": "string", "description": "Alt text, shown as placeholder if no src" },
+    "effect": {
+      "type": "string",
+      "enum": ["ken-burns", "reveal-left", "reveal-right", "zoom-in", "fade"],
+      "default": "ken-burns",
+      "description": "Animation effect"
+    },
+    "caption": { "type": "string", "description": "Caption text below image" }
+  }
+}

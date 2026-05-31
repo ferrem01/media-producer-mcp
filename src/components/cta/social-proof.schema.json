@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" },
+          "subtext": { "type": "string" }
+        },
+        "required": ["text"]
+      },
+      "description": "Array of social proof items"
+    },
+    "title": { "type": "string", "description": "Section title" },
+    "layout": {
+      "type": "string",
+      "enum": ["row", "grid"],
+      "default": "row",
+      "description": "Layout mode"
+    }
+  },
+  "required": ["items"]
+}

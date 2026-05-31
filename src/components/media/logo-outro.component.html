@@ -1,0 +1,99 @@
+<template>
+  <div class="logo-outro">
+    <div class="logo-text">{{text}}</div>
+    <div class="tagline">{{tagline}}</div>
+    <div class="cta">{{cta}}</div>
+  </div>
+</template>
+
+<style scoped>
+  .logo-outro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+  }
+
+  .logo-text {
+    font-size: 80px;
+    font-weight: 800;
+    color: var(--mp-color-text, #ffffff);
+    text-align: center;
+  }
+
+  .logo-text:empty {
+    display: none;
+  }
+
+  .tagline {
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin-top: 16px;
+    text-align: center;
+  }
+
+  .tagline:empty {
+    display: none;
+  }
+
+  .cta {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--mp-color-accent, #a78bfa);
+    margin-top: 32px;
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+
+  .cta:empty {
+    display: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var logo = el.querySelector('.logo-text');
+    var tagline = el.querySelector('.tagline');
+    var cta = el.querySelector('.cta');
+    var elements = [logo, tagline, cta].filter(function(e) { return e && e.textContent.trim(); });
+
+    gsap.set(elements, { autoAlpha: 0, y: 20 });
+
+    // Entrance
+    tl.to(elements, {
+      autoAlpha: 1,
+      y: 0,
+      duration: 0.6,
+      stagger: 0.15,
+      ease: 'power2.out'
+    }, 0.3);
+
+    // Subtle pulse on logo
+    if (logo && logo.textContent.trim()) {
+      tl.to(logo, {
+        scale: 1.03,
+        duration: 0.8,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: 1
+      }, 1.2);
+    }
+
+    // Fade out
+    if (ctx.duration > 2) {
+      tl.to(elements, {
+        autoAlpha: 0,
+        duration: 0.6,
+        stagger: 0.05,
+        ease: 'power2.in'
+      }, ctx.duration - 0.8);
+    }
+
+    return tl;
+  }
+</script>

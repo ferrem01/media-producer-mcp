@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "x": { "type": "number", "default": 50, "description": "Spotlight center X (0-100%)" },
+    "y": { "type": "number", "default": 50, "description": "Spotlight center Y (0-100%)" },
+    "radius": { "type": "number", "default": 20, "description": "Spotlight radius (%)" },
+    "color": { "type": "string", "description": "Spotlight color" }
+  }
+}

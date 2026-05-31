@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "bars": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string" },
+          "value": { "type": "number" },
+          "color": { "type": "string" }
+        },
+        "required": ["label", "value"]
+      },
+      "description": "Array of bar data"
+    },
+    "title": { "type": "string", "description": "Chart title" },
+    "max_value": { "type": "number", "description": "Override max value for scale" }
+  },
+  "required": ["bars"]
+}

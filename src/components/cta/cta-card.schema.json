@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "headline": { "type": "string", "description": "Main headline text" },
+    "description": { "type": "string", "description": "Supporting description" },
+    "button_text": { "type": "string", "description": "Button label" },
+    "button_color": { "type": "string", "description": "Button background color" }
+  },
+  "required": ["headline"]
+}

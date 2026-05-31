@@ -1,0 +1,109 @@
+<template>
+  <div class="image-showcase">
+    <div class="image-container">
+      <div class="image-box"></div>
+    </div>
+    <p class="caption">{{caption}}</p>
+  </div>
+</template>
+
+<style scoped>
+  .image-showcase {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    overflow: hidden;
+  }
+
+  .image-container {
+    width: 85%;
+    height: 75%;
+    overflow: hidden;
+    border-radius: var(--mp-border-radius, 12px);
+    position: relative;
+  }
+
+  .image-box {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .caption {
+    font-size: 24px;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin-top: 20px;
+    text-align: center;
+    max-width: 70%;
+  }
+
+  .caption:empty {
+    display: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.image-container');
+    var box = el.querySelector('.image-box');
+    var caption = el.querySelector('.caption');
+    var effect = data.effect || 'ken-burns';
+
+    // Set background image or placeholder
+    if (data.src) {
+      box.style.backgroundImage = 'url(' + data.src + ')';
+    } else {
+      box.style.background = 'linear-gradient(135deg, ' +
+        'var(--mp-color-primary, #6366f1), ' +
+        'var(--mp-color-accent, #a78bfa))';
+      if (data.alt) {
+        box.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--mp-color-text,#fff);font-size:28px;font-weight:600;text-align:center;padding:20px;">' + data.alt + '</div>';
+      }
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : 0.7;
+
+    if (effect === 'ken-burns') {
+      gsap.set(container, { autoAlpha: 0 });
+      gsap.set(box, { scale: 1 });
+      tl.to(container, { autoAlpha: 1, duration: speed, ease: 'power2.out' }, 0.2);
+      tl.to(box, { scale: 1.15, duration: ctx.duration - 0.5, ease: 'none' }, 0);
+    } else if (effect === 'reveal-left') {
+      gsap.set(container, { clipPath: 'inset(0 100% 0 0)' });
+      tl.to(container, { clipPath: 'inset(0 0% 0 0)', duration: speed, ease: 'power3.out' }, 0.2);
+    } else if (effect === 'reveal-right') {
+      gsap.set(container, { clipPath: 'inset(0 0 0 100%)' });
+      tl.to(container, { clipPath: 'inset(0 0 0 0%)', duration: speed, ease: 'power3.out' }, 0.2);
+    } else if (effect === 'zoom-in') {
+      gsap.set(container, { autoAlpha: 0, scale: 0.8 });
+      tl.to(container, { autoAlpha: 1, scale: 1, duration: speed, ease: 'back.out(1.2)' }, 0.2);
+    } else {
+      gsap.set(container, { autoAlpha: 0 });
+      tl.to(container, { autoAlpha: 1, duration: speed, ease: 'power2.out' }, 0.2);
+    }
+
+    // Caption
+    if (caption && caption.textContent.trim()) {
+      gsap.set(caption, { autoAlpha: 0, y: 20 });
+      tl.to(caption, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, speed + 0.2);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      tl.to(el.querySelector('.image-showcase'), {
+        autoAlpha: 0,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, ctx.duration - 0.5);
+    }
+
+    return tl;
+  }
+</script>

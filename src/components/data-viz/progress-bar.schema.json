@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "value": { "type": "number", "description": "Current value" },
+    "max": { "type": "number", "default": 100, "description": "Maximum value" },
+    "label": { "type": "string", "description": "Label above the bar" },
+    "color": { "type": "string", "description": "Fill color" }
+  },
+  "required": ["value"]
+}

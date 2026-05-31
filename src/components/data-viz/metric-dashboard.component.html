@@ -1,0 +1,150 @@
+<template>
+  <div class="metric-dashboard">
+    <div class="metrics-grid"></div>
+  </div>
+</template>
+
+<style scoped>
+  .metric-dashboard {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    padding: 40px;
+    box-sizing: border-box;
+  }
+
+  .metrics-grid {
+    display: grid;
+    gap: 24px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .metric-card {
+    background: var(--mp-color-surface, #1e293b);
+    border-radius: var(--mp-border-radius, 12px);
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .metric-value {
+    font-size: 56px;
+    font-weight: 800;
+    color: var(--mp-color-text, #ffffff);
+    line-height: 1.1;
+  }
+
+  .metric-label {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin-top: 8px;
+  }
+
+  .metric-change {
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+
+  .metric-change.positive {
+    color: #34d399;
+  }
+
+  .metric-change.negative {
+    color: #f87171;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var grid = el.querySelector('.metrics-grid');
+    var metrics = data.metrics || [];
+    var cols = data.columns || Math.min(metrics.length, 3);
+    grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+
+    // Build metric cards
+    metrics.forEach(function(m) {
+      var card = document.createElement('div');
+      card.className = 'metric-card';
+
+      var valueDiv = document.createElement('div');
+      valueDiv.className = 'metric-value';
+      var prefix = m.prefix || '';
+      var suffix = m.suffix || '';
+      valueDiv.dataset.target = m.value;
+      valueDiv.dataset.prefix = prefix;
+      valueDiv.dataset.suffix = suffix;
+      valueDiv.textContent = prefix + '0' + suffix;
+
+      var labelDiv = document.createElement('div');
+      labelDiv.className = 'metric-label';
+      labelDiv.textContent = m.label;
+
+      card.appendChild(valueDiv);
+      card.appendChild(labelDiv);
+
+      if (m.change !== undefined) {
+        var changeDiv = document.createElement('div');
+        changeDiv.className = 'metric-change ' + (m.change >= 0 ? 'positive' : 'negative');
+        changeDiv.textContent = (m.change >= 0 ? '+' : '') + m.change + '%';
+        card.appendChild(changeDiv);
+      }
+
+      grid.appendChild(card);
+    });
+
+    var cards = grid.querySelectorAll('.metric-card');
+    var valueEls = grid.querySelectorAll('.metric-value');
+
+    gsap.set(cards, { autoAlpha: 0, y: 30, scale: 0.95 });
+
+    // Stagger cards in
+    tl.to(cards, {
+      autoAlpha: 1,
+      y: 0,
+      scale: 1,
+      duration: 0.5,
+      stagger: 0.12,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Count up numbers
+    valueEls.forEach(function(ve, i) {
+      var target = parseFloat(ve.dataset.target);
+      var prefix = ve.dataset.prefix;
+      var suffix = ve.dataset.suffix;
+      var counter = { val: 0 };
+      tl.to(counter, {
+        val: target,
+        duration: 0.8,
+        ease: 'power2.out',
+        onUpdate: function() {
+          var display = target % 1 !== 0 ? counter.val.toFixed(1) : Math.round(counter.val);
+          ve.textContent = prefix + display + suffix;
+        }
+      }, 0.5 + i * 0.1);
+    });
+
+    // Exit
+    if (ctx.duration > 2) {
+      tl.to(cards, {
+        autoAlpha: 0,
+        y: -15,
+        duration: 0.4,
+        stagger: 0.05,
+        ease: 'power2.in'
+      }, ctx.duration - 0.6);
+    }
+
+    return tl;
+  }
+</script>

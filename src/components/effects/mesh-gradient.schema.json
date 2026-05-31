@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "colors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Array of CSS colors for gradient blobs"
+    },
+    "speed": { "type": "number", "default": 1, "description": "Animation speed multiplier" }
+  }
+}

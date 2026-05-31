@@ -1,0 +1,159 @@
+<template>
+  <div class="bar-chart">
+    <h2 class="chart-title">{{title}}</h2>
+    <div class="chart-area"></div>
+  </div>
+</template>
+
+<style scoped>
+  .bar-chart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    padding: 40px 60px;
+    box-sizing: border-box;
+  }
+
+  .chart-title {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 32px 0;
+    text-align: center;
+  }
+
+  .chart-title:empty {
+    display: none;
+  }
+
+  .chart-area {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 24px;
+    width: 100%;
+    flex: 1;
+    padding-bottom: 40px;
+    position: relative;
+  }
+
+  .bar-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    max-width: 120px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+
+  .bar-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin-bottom: 8px;
+  }
+
+  .bar-fill {
+    width: 100%;
+    border-radius: 8px 8px 0 0;
+    min-height: 4px;
+  }
+
+  .bar-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin-top: 12px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var chartArea = el.querySelector('.chart-area');
+    var title = el.querySelector('.chart-title');
+    var bars = data.bars || [];
+    var maxVal = data.max_value || Math.max.apply(null, bars.map(function(b) { return b.value; }));
+    var maxHeight = chartArea.clientHeight - 80;
+    var defaultColors = [
+      'var(--mp-color-primary, #6366f1)',
+      'var(--mp-color-accent, #a78bfa)',
+      'var(--mp-color-secondary, #22d3ee)',
+      '#f472b6', '#fbbf24', '#34d399'
+    ];
+
+    // Build bars in DOM
+    bars.forEach(function(bar, i) {
+      var group = document.createElement('div');
+      group.className = 'bar-group';
+
+      var value = document.createElement('div');
+      value.className = 'bar-value';
+      value.textContent = bar.value;
+
+      var fill = document.createElement('div');
+      fill.className = 'bar-fill';
+      fill.style.background = bar.color || defaultColors[i % defaultColors.length];
+      var targetH = Math.max(8, (bar.value / maxVal) * maxHeight);
+      fill.style.height = '0px';
+      fill.dataset.targetHeight = targetH + 'px';
+
+      var label = document.createElement('div');
+      label.className = 'bar-label';
+      label.textContent = bar.label;
+
+      group.appendChild(value);
+      group.appendChild(fill);
+      group.appendChild(label);
+      chartArea.appendChild(group);
+    });
+
+    var fills = chartArea.querySelectorAll('.bar-fill');
+    var values = chartArea.querySelectorAll('.bar-value');
+    var labels = chartArea.querySelectorAll('.bar-label');
+
+    gsap.set(values, { autoAlpha: 0 });
+    gsap.set(labels, { autoAlpha: 0 });
+
+    // Title entrance
+    if (title && title.textContent.trim()) {
+      gsap.set(title, { autoAlpha: 0, y: 20 });
+      tl.to(title, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.2);
+    }
+
+    // Animate bars growing
+    var stagger = ctx.motion === 'minimal' ? 0.08 : 0.12;
+    fills.forEach(function(fill, i) {
+      tl.to(fill, {
+        height: fill.dataset.targetHeight,
+        duration: 0.6,
+        ease: 'power3.out'
+      }, 0.5 + i * stagger);
+    });
+
+    // Show values and labels
+    tl.to(values, { autoAlpha: 1, duration: 0.3, stagger: stagger }, 0.8);
+    tl.to(labels, { autoAlpha: 1, duration: 0.3, stagger: stagger }, 0.8);
+
+    // Exit
+    if (ctx.duration > 2) {
+      tl.to(el.querySelector('.bar-chart'), {
+        autoAlpha: 0,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, ctx.duration - 0.5);
+    }
+
+    return tl;
+  }
+</script>

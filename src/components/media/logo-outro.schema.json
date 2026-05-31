@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "properties": {
+    "text": { "type": "string", "description": "Logo/brand text" },
+    "tagline": { "type": "string", "description": "Tagline text" },
+    "cta": { "type": "string", "description": "Call-to-action text" }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "properties": {
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" }
+        },
+        "required": ["x", "y"]
+      },
+      "description": "Array of x,y data points"
+    },
+    "title": { "type": "string", "description": "Chart title" },
+    "color": { "type": "string", "description": "Line color" },
+    "labels": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "string" },
+        "y": { "type": "string" }
+      },
+      "description": "Axis labels"
+    }
+  },
+  "required": ["points"]
+}

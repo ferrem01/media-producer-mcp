@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "alt": { "type": "string", "description": "Alt text for placeholder" },
+    "zoom_x": { "type": "number", "description": "X position to zoom into (0-100%)", "default": 50 },
+    "zoom_y": { "type": "number", "description": "Y position to zoom into (0-100%)", "default": 50 },
+    "zoom_scale": { "type": "number", "description": "Zoom magnification level", "default": 2 },
+    "label": { "type": "string", "description": "Label shown near zoomed area" }
+  }
+}

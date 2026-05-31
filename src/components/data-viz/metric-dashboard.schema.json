@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": { "type": "number" },
+          "label": { "type": "string" },
+          "prefix": { "type": "string" },
+          "suffix": { "type": "string" },
+          "change": { "type": "number", "description": "Percentage change indicator" }
+        },
+        "required": ["value", "label"]
+      },
+      "description": "Array of metric data"
+    },
+    "columns": { "type": "number", "description": "Number of grid columns", "default": 3 }
+  },
+  "required": ["metrics"]
+}

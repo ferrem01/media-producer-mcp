@@ -1,0 +1,113 @@
+<template>
+  <div class="cta-card-wrapper">
+    <div class="cta-card">
+      <h2 class="cta-headline">{{headline}}</h2>
+      <p class="cta-description">{{description}}</p>
+      <div class="cta-button">{{button_text}}</div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .cta-card-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    padding: 40px;
+    box-sizing: border-box;
+  }
+
+  .cta-card {
+    background: var(--mp-color-surface, #1e293b);
+    border-radius: var(--mp-border-radius, 16px);
+    padding: 56px 64px;
+    max-width: 700px;
+    width: 100%;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .cta-headline {
+    font-size: 48px;
+    font-weight: 800;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 16px 0;
+    line-height: 1.15;
+  }
+
+  .cta-description {
+    font-size: 22px;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin: 0 0 36px 0;
+    line-height: 1.5;
+  }
+
+  .cta-description:empty {
+    display: none;
+  }
+
+  .cta-button {
+    display: inline-block;
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffffff;
+    background: var(--mp-color-primary, #6366f1);
+    padding: 16px 48px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+  }
+
+  .cta-button:empty {
+    display: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.cta-card');
+    var headline = el.querySelector('.cta-headline');
+    var desc = el.querySelector('.cta-description');
+    var button = el.querySelector('.cta-button');
+
+    if (data.button_color) {
+      button.style.background = data.button_color;
+    }
+
+    gsap.set(card, { autoAlpha: 0, y: 60 });
+
+    // Card slides up
+    tl.to(card, {
+      autoAlpha: 1,
+      y: 0,
+      duration: 0.7,
+      ease: 'power3.out'
+    }, 0.3);
+
+    // Button pulse
+    if (button && button.textContent.trim()) {
+      tl.to(button, {
+        scale: 1.05,
+        duration: 0.5,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: 2
+      }, 1.2);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      tl.to(card, {
+        autoAlpha: 0,
+        y: -30,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, ctx.duration - 0.5);
+    }
+
+    return tl;
+  }
+</script>

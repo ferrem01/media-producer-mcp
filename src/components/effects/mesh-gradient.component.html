@@ -1,0 +1,78 @@
+<template>
+  <div class="mesh-gradient"></div>
+</template>
+
+<style scoped>
+  .mesh-gradient {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mesh-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.7;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.mesh-gradient');
+    var speed = data.speed || 1;
+
+    var colors = data.colors || [
+      'var(--mp-color-primary, #6366f1)',
+      'var(--mp-color-secondary, #22d3ee)',
+      'var(--mp-color-accent, #a78bfa)',
+      '#f472b6'
+    ];
+
+    var bg = 'var(--mp-color-background, #0f172a)';
+    container.style.background = bg;
+
+    // Create overlapping blobs
+    var blobConfigs = [
+      { x: '10%', y: '15%', size: '55%' },
+      { x: '55%', y: '60%', size: '50%' },
+      { x: '60%', y: '10%', size: '45%' },
+      { x: '20%', y: '65%', size: '40%' }
+    ];
+
+    blobConfigs.forEach(function(cfg, i) {
+      if (i >= colors.length) return;
+      var blob = document.createElement('div');
+      blob.className = 'mesh-blob';
+      blob.style.background = colors[i % colors.length];
+      blob.style.width = cfg.size;
+      blob.style.height = cfg.size;
+      blob.style.left = cfg.x;
+      blob.style.top = cfg.y;
+      container.appendChild(blob);
+    });
+
+    var blobs = container.querySelectorAll('.mesh-blob');
+
+    // Animate blobs moving slowly
+    blobs.forEach(function(blob, i) {
+      var xShift = (i % 2 === 0 ? 1 : -1) * (80 + i * 20);
+      var yShift = (i % 2 === 0 ? -1 : 1) * (60 + i * 15);
+      var dur = (ctx.duration * 0.8) / speed;
+
+      tl.to(blob, {
+        x: xShift,
+        y: yShift,
+        scale: 1.1 + i * 0.05,
+        duration: dur,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, 0);
+    });
+
+    return tl;
+  }
+</script>

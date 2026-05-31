@@ -1,0 +1,7 @@
+{
+  "type": "object",
+  "properties": {
+    "text": { "type": "string", "description": "Logo/brand text" },
+    "tagline": { "type": "string", "description": "Tagline below logo" }
+  }
+}
