@@ -16,9 +16,11 @@ const execFileAsync = promisify(execFile);
 const WEB_ENCODE_ARGS = [
   "-c:v", "libx264",
   "-profile:v", "baseline",
-  "-level", "3.1",
+  "-level", "3.0",
   "-preset", "medium",
-  "-crf", "20",
+  "-crf", "23",
+  "-maxrate", "2M",
+  "-bufsize", "4M",
   "-pix_fmt", "yuv420p",
   "-movflags", "+faststart",
 ] as const;
