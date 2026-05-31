@@ -29,6 +29,18 @@ interface WorkerArgs {
   width: number;
   height: number;
   fps: number;
+  /** Enable critique loop */
+  critique?: boolean;
+  /** Max revision iterations (default 2) */
+  maxRevisions?: number;
+  /** Anthropic API key for critiquer */
+  anthropicApiKey?: string;
+  /** LLM model for critiquer */
+  critiqueModel?: string;
+  /** Project format for critique context */
+  format?: string;
+  /** Original prompt for critique context */
+  originalPrompt?: string;
 }
 
 async function main() {
@@ -85,6 +97,59 @@ async function main() {
   var htmlPath = path.join(args.workDir, "scene.html");
   await fs.mkdir(framesDir, { recursive: true });
   await fs.writeFile(htmlPath, html);
+
+  // ── Critique loop ──
+  if (args.critique && args.anthropicApiKey) {
+    var { critiqueScene } = await import("../llm/critiquer.js");
+    var { captureSingleFrame } = await import("./capture.js");
+    var maxRevisions = args.maxRevisions || 2;
+    var previewPath = path.join(args.workDir, "preview.png");
+
+    for (var rev = 0; rev < maxRevisions; rev++) {
+      // Capture a preview frame at the midpoint
+      await captureSingleFrame({
+        htmlPath,
+        outputPath: previewPath,
+        width: args.width,
+        height: args.height,
+        format: "png",
+        atTime: scene.duration_seconds / 2,
+      });
+
+      var previewBase64 = (await fs.readFile(previewPath)).toString("base64");
+
+      var critiqueResult = await critiqueScene({
+        sceneHtml: html,
+        previewImageBase64: previewBase64,
+        prompt: args.originalPrompt || scene.label || "Scene",
+        llmConfig: {
+          provider: "anthropic",
+          apiKey: args.anthropicApiKey,
+          model: args.critiqueModel || "claude-sonnet-4-20250514",
+        },
+        format: args.format,
+      });
+
+      console.log(`    Critique rev ${rev + 1}: score=${critiqueResult.score}/10, issues=${critiqueResult.issues.length}`);
+
+      if (critiqueResult.score >= 7) {
+        console.log(`    Score >= 7, accepted`);
+        break;
+      }
+
+      if (critiqueResult.revised_html) {
+        console.log(`    Applying revised HTML`);
+        html = critiqueResult.revised_html;
+        await fs.writeFile(htmlPath, html);
+      } else {
+        console.log(`    No revised HTML provided, keeping current`);
+        break;
+      }
+    }
+
+    // Clean up preview
+    await fs.unlink(previewPath).catch(() => {});
+  }
 
   // Free the HTML string (can be large with GSAP inlined)
   html = "";

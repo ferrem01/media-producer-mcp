@@ -75,6 +75,13 @@
 
     var blobs = container.querySelectorAll('.mesh-blob');
 
+    // Use CustomEase for more organic blob movement if available
+    var blobEase = 'sine.inOut';
+    if (typeof CustomEase !== 'undefined') {
+      CustomEase.create('blobDrift', 'M0,0 C0.2,0.4 0.4,0.8 0.5,0.9 0.7,1.05 0.9,0.95 1,1');
+      blobEase = 'blobDrift';
+    }
+
     // Animate blobs with 20s+ drift cycle
     blobs.forEach(function(blob, i) {
       var xShift = (i % 2 === 0 ? 1 : -1) * (55 + i * 18);
@@ -86,7 +93,7 @@
         y: yShift,
         scale: 1.04 + i * 0.03,
         duration: dur,
-        ease: 'sine.inOut',
+        ease: blobEase,
         yoyo: true,
         repeat: -1
       }, i * 0.4);

@@ -223,6 +223,54 @@ function mapTransitionType(type: string): string {
   return map[type] || "fade";
 }
 
+export interface EncodeGifOptions {
+  /** Directory containing frame-XXXXXX.png files */
+  framesDir: string;
+  /** Output GIF path */
+  outputPath: string;
+  /** Frames per second */
+  fps: number;
+  /** Output width (default 800) */
+  width?: number;
+  /** Output height (auto-scaled if omitted) */
+  height?: number;
+}
+
+/**
+ * Encode a frame sequence into an animated GIF using ffmpeg palette generation.
+ */
+export async function encodeGif(options: EncodeGifOptions): Promise<string> {
+  const { framesDir, outputPath, fps, width = 800 } = options;
+
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+
+  const scaleFilter = options.height
+    ? `scale=${width}:${options.height}:flags=lanczos`
+    : `scale=${width}:-1:flags=lanczos`;
+
+  const filterComplex = `fps=${fps},${scaleFilter},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+
+  const args = [
+    "-y",
+    "-framerate", String(fps),
+    "-i", path.join(framesDir, "frame-%06d.png"),
+    "-vf", filterComplex,
+    outputPath,
+  ];
+
+  console.log(`  Encoding GIF: ${framesDir} -> ${outputPath}`);
+  const { stderr } = await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
+
+  try {
+    const stat = await fs.stat(outputPath);
+    console.log(`  GIF encoded: ${outputPath} (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
+  } catch {
+    throw new Error(`ffmpeg GIF encoding failed. stderr: ${stderr}`);
+  }
+
+  return outputPath;
+}
+
 /**
  * Get video duration using ffprobe.
  */

@@ -25,6 +25,7 @@ import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { setupWebSocket } from "./ws.js";
+import { authMiddleware } from "./auth/auth.js";
 
 /**
  * Resolve all component sources for a scene by reading .component.html files
@@ -118,7 +119,7 @@ async function main() {
       res.writeHead(204, {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
       });
       res.end();
       return;
@@ -130,6 +131,18 @@ async function main() {
         jsonResponse(res, 200, { status: "ok", service: "media-producer-mcp", version: "0.1.0" });
         return;
       }
+
+      // ── Auth for all non-health routes ──
+      const authPassed = await new Promise<boolean>((resolve) => {
+        authMiddleware(req, res, () => resolve(true));
+        // If middleware already sent a response, resolve false
+        if (res.writableEnded) resolve(false);
+      });
+      // Give the middleware a tick to finish writing if it rejected
+      if (!authPassed && !res.writableEnded) {
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      if (res.writableEnded) return;
 
       // ── Preview SPA ──
       if (url.startsWith("/preview")) {

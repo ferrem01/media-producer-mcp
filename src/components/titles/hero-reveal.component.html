@@ -68,13 +68,19 @@
     });
     gsap.set(subtitleEl, { autoAlpha: 0, y: 30 });
 
-    // Dramatic zoom-in reveal
+    // Dramatic zoom-in reveal with CustomEase if available
+    var heroEase = 'power3.out';
+    if (typeof CustomEase !== 'undefined') {
+      CustomEase.create('heroReveal', 'M0,0 C0.084,0.61 0.214,1.03 0.39,1.03 0.624,1.03 0.658,0.964 1,1');
+      heroEase = 'heroReveal';
+    }
+
     tl.to(textEl, {
       autoAlpha: 1,
       scale: 1,
       filter: 'blur(0px)',
       duration: speed,
-      ease: 'power3.out'
+      ease: heroEase
     }, 0.2);
 
     // Subtitle fade in after text settles

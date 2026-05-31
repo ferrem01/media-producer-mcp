@@ -38,6 +38,8 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit } from "./core/types.js";
 import { generateTTS } from "./audio/tts.js";
+import { searchMusic, downloadTrack } from "./audio/music.js";
+import { isAuthEnabled, validateToken } from "./auth/auth.js";
 
 // ── Shared Zod schemas ──
 
@@ -466,8 +468,15 @@ export function createMcpServer(): McpServer {
       critique: z.boolean().optional().default(false).describe("Run critiquer loop on each scene during render"),
       maxRevisions: z.number().optional().default(2).describe("Max critique revision iterations per scene"),
       originalPrompt: z.string().optional().describe("Original prompt for context in critique"),
+      token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
     },
     async (params) => {
+      // Auth check
+      if (isAuthEnabled()) {
+        if (!params.token) return err("Authentication required: provide a token");
+        const tokenTenant = validateToken(params.token);
+        if (!tokenTenant) return err("Invalid token");
+      }
       const project = await loadProject(params.tenant_id, params.project_id);
       if (!project) return err("Project not found");
 
@@ -568,7 +577,10 @@ export function createMcpServer(): McpServer {
     {
       tenant_id: z.string(),
       project_id: z.string(),
-      action: z.enum(["add", "update", "remove"]).describe("Action to perform"),
+      action: z.enum(["add", "update", "remove", "search"]).describe("Action to perform. Use 'search' to search Jamendo music library."),
+      query: z.string().optional().describe("Search query for music (use with action='search')"),
+      mood: z.string().optional().describe("Mood filter for music search (e.g. 'happy', 'calm')"),
+      genre: z.string().optional().describe("Genre filter for music search"),
       track: z.object({
         id: z.string(),
         type: z.enum(["voiceover", "music", "sfx"]).optional(),
@@ -594,6 +606,20 @@ export function createMcpServer(): McpServer {
       const project = await loadProject(params.tenant_id, params.project_id);
       if (!project) return err("Project not found");
 
+      // Handle search action (no project needed)
+      if (params.action === "search") {
+        if (!params.query) return err("query required for search action");
+        try {
+          const results = await searchMusic(params.query, {
+            mood: params.mood,
+            genre: params.genre,
+          });
+          return ok(results);
+        } catch (e: any) {
+          return err(`Music search failed: ${e.message}`);
+        }
+      }
+
       if (!project.audio) {
         project.audio = { tracks: [] };
       }
@@ -618,6 +644,21 @@ export function createMcpServer(): McpServer {
             outputPath,
           });
           source = outputPath;
+        }
+
+        // Download from Jamendo if source starts with "jamendo:"
+        if (!source && params.track.source && params.track.source.startsWith("jamendo:")) {
+          const trackId = params.track.source.replace("jamendo:", "");
+          const assetsDir = projectAssetsDir(params.tenant_id, params.project_id);
+          const audioDir = path.join(assetsDir, "audio");
+          await fs.mkdir(audioDir, { recursive: true });
+          const outputPath = path.join(audioDir, `jamendo_${trackId}.mp3`);
+          try {
+            await downloadTrack(trackId, outputPath);
+            source = outputPath;
+          } catch (e: any) {
+            return err(`Failed to download Jamendo track: ${e.message}`);
+          }
         }
 
         if (!source) {
@@ -696,8 +737,15 @@ export function createMcpServer(): McpServer {
       critique: z.boolean().optional().default(false).describe("Run the critiquer loop on generated output"),
       scene_count: z.number().optional().describe("Target number of scenes for video/deck"),
       duration: z.number().optional().describe("Animation duration in seconds for preview (default: 3)"),
+      token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
     },
     async (params) => {
+      // Auth check
+      if (isAuthEnabled()) {
+        if (!params.token) return err("Authentication required: provide a token");
+        const tokenTenant = validateToken(params.token);
+        if (!tokenTenant) return err("Invalid token");
+      }
       try {
         // If source is provided, save it directly to the tenant library
         if (params.source) {

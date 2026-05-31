@@ -130,11 +130,24 @@
     }
 
     if (titleEl && titleEl.textContent) {
-      tl.to(titleEl, {
-        autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
-        duration: speed,
-        ease: 'power3.out'
-      }, t);
+      // Use SplitText for per-char reveal if available
+      if (typeof SplitText !== 'undefined' && titleEl.textContent.length > 0) {
+        var splitTitle = new SplitText(titleEl, { type: 'chars' });
+        gsap.set(splitTitle.chars, { autoAlpha: 0, y: 20, scale: 0.9 });
+        gsap.set(titleEl, { autoAlpha: 1, scale: 1, filter: 'blur(0px)' });
+        tl.to(splitTitle.chars, {
+          autoAlpha: 1, y: 0, scale: 1,
+          stagger: 0.02,
+          duration: speed * 0.7,
+          ease: 'power3.out'
+        }, t);
+      } else {
+        tl.to(titleEl, {
+          autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+          duration: speed,
+          ease: 'power3.out'
+        }, t);
+      }
       t += speed * 0.4;
     }
 

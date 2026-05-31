@@ -4,7 +4,7 @@
 
 // ── Output Formats ──
 
-export type OutputFormat = "video" | "image" | "slideshow" | "deck" | "one-pager";
+export type OutputFormat = "video" | "image" | "slideshow" | "deck" | "presentation" | "one-pager" | "gif" | "social" | "email-header" | "thumbnail";
 
 // ── Canvas ──
 

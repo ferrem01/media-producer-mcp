@@ -69,26 +69,41 @@
     var effect = data.effect || 'fade-up';
 
     container.innerHTML = '';
+    container.textContent = text;
 
-    var spans = [];
+    var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.5 : 0.65;
+    var stagger = ctx.motion === 'minimal' ? 0.04 : ctx.motion === 'punchy' ? 0.06 : 0.08;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.4)' : 'power3.out';
 
-    if (mode === 'char') {
-      var chars = text.split('');
-      for (var i = 0; i < chars.length; i++) {
-        var span = document.createElement('span');
-        span.className = 'kt-char';
-        span.textContent = chars[i] === ' ' ? '\u00A0' : chars[i];
-        container.appendChild(span);
-        spans.push(span);
-      }
+    var spans;
+
+    // Use SplitText if available, fallback to manual splitting
+    if (typeof SplitText !== 'undefined') {
+      var splitType = mode === 'char' ? 'chars' : 'words';
+      var split = new SplitText(container, { type: splitType });
+      spans = mode === 'char' ? split.chars : split.words;
     } else {
-      var words = text.split(/\s+/);
-      for (var j = 0; j < words.length; j++) {
-        var span = document.createElement('span');
-        span.className = 'kt-word';
-        span.textContent = words[j];
-        container.appendChild(span);
-        spans.push(span);
+      // Manual fallback
+      container.innerHTML = '';
+      spans = [];
+      if (mode === 'char') {
+        var chars = text.split('');
+        for (var i = 0; i < chars.length; i++) {
+          var span = document.createElement('span');
+          span.className = 'kt-char';
+          span.textContent = chars[i] === ' ' ? '\u00A0' : chars[i];
+          container.appendChild(span);
+          spans.push(span);
+        }
+      } else {
+        var words = text.split(/\s+/);
+        for (var j = 0; j < words.length; j++) {
+          var span = document.createElement('span');
+          span.className = 'kt-word';
+          span.textContent = words[j];
+          container.appendChild(span);
+          spans.push(span);
+        }
       }
     }
 
@@ -113,10 +128,6 @@
 
     gsap.set(spans, fromVars);
     gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
-
-    var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.5 : 0.65;
-    var stagger = ctx.motion === 'minimal' ? 0.04 : ctx.motion === 'punchy' ? 0.06 : 0.08;
-    var ease = ctx.motion === 'punchy' ? 'back.out(1.4)' : 'power3.out';
 
     // Ambient glow fades in
     tl.to(glow, {

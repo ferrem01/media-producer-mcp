@@ -14,7 +14,8 @@ import path from "node:path";
 import { fork } from "node:child_process";
 import { assembleScene, type ComponentSource } from "./scene-assembler.js";
 import { captureScene, captureSingleFrame } from "./capture.js";
-import { encodeScene, concatSegments } from "./encode.js";
+import { encodeScene, encodeGif, concatSegments } from "./encode.js";
+import { exportPdf } from "./pdf-export.js";
 import { renderTransition, extractFirstFrame, extractLastFrame } from "./transitions.js";
 import { critiqueScene } from "../llm/critiquer.js";
 import { config } from "../config.js";
@@ -81,7 +82,20 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
       });
 
     case "deck":
+    case "presentation":
       return renderDeck(project, componentSources, workDir, gsapDir, outputPath, startTime);
+
+    case "gif":
+      return renderGif(project, componentSources, workDir, gsapDir, outputPath, startTime);
+
+    case "social":
+      return renderSocial(project, componentSources, workDir, gsapDir, outputPath, startTime);
+
+    case "email-header":
+      return renderEmailHeader(project, componentSources, workDir, gsapDir, outputPath, startTime);
+
+    case "thumbnail":
+      return renderImage(project, componentSources, workDir, gsapDir, outputPath, startTime);
 
     default:
       throw new Error(`Unsupported format: ${project.format}`);
@@ -141,6 +155,7 @@ async function renderSingleSceneWorker(
   project: Project,
   sceneIndex: number,
   workDir: string,
+  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
 ): Promise<{ mp4Path: string; frameCount: number }> {
   const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `scene_${sceneIndex}`);
@@ -154,7 +169,7 @@ async function renderSingleSceneWorker(
 
   // Write worker args
   const argsPath = path.join(sceneDir, ".worker-args.json");
-  await fs.writeFile(argsPath, JSON.stringify({
+  const workerArgs: Record<string, unknown> = {
     projectJsonPath,
     sceneIndex,
     workDir: sceneDir,
@@ -164,7 +179,18 @@ async function renderSingleSceneWorker(
     width: project.canvas.width,
     height: project.canvas.height,
     fps: project.canvas.fps,
-  }));
+  };
+
+  if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
+    workerArgs.critique = true;
+    workerArgs.maxRevisions = critiqueOpts.maxRevisions || 2;
+    workerArgs.anthropicApiKey = critiqueOpts.llmConfig.apiKey;
+    workerArgs.critiqueModel = critiqueOpts.llmConfig.model;
+    workerArgs.format = project.format;
+    workerArgs.originalPrompt = critiqueOpts.originalPrompt || "";
+  }
+
+  await fs.writeFile(argsPath, JSON.stringify(workerArgs));
 
   // Spawn the worker
   const workerPath = path.resolve(
@@ -198,6 +224,7 @@ async function renderSingleSceneWorker(
 async function renderScenesParallel(
   project: Project,
   workDir: string,
+  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
 ): Promise<Array<{ mp4Path: string; frameCount: number }>> {
   const concurrency = config.renderConcurrency;
   const results = new Array<{ mp4Path: string; frameCount: number }>(project.scenes.length);
@@ -209,7 +236,7 @@ async function renderScenesParallel(
     const promises: Promise<{ mp4Path: string; frameCount: number }>[] = [];
     
     for (let idx = batch; idx < batchEnd; idx++) {
-      promises.push(renderSingleSceneWorker(project, idx, workDir));
+      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts));
     }
 
     const batchResults = await Promise.all(promises);
@@ -231,10 +258,10 @@ async function renderVideo(
   gsapDir: string,
   outputPath: string,
   startTime: number,
-  _critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
+  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
 ): Promise<RenderResult> {
   // Render all scenes (in parallel batches, each as a child process)
-  const sceneResults = await renderScenesParallel(project, workDir);
+  const sceneResults = await renderScenesParallel(project, workDir, critiqueOpts);
 
   const sceneMp4s = sceneResults.map((r) => r.mp4Path);
   const totalFrames = sceneResults.reduce((sum, r) => sum + r.frameCount, 0);
@@ -348,17 +375,283 @@ async function renderVideo(
 
 /**
  * Render a multi-page PDF deck.
+ * Captures each scene as a static PNG, then combines into a PDF.
  */
 async function renderDeck(
-  _project: Project,
-  _componentSources: ComponentSource[],
-  _workDir: string,
-  _gsapDir: string,
-  _outputPath: string,
+  project: Project,
+  componentSources: ComponentSource[],
+  workDir: string,
+  gsapDir: string,
+  outputPath: string,
   startTime: number,
 ): Promise<RenderResult> {
-  // TODO: implement PDF deck rendering
-  throw new Error("Deck rendering not yet implemented");
+  const scenePngs: string[] = [];
+
+  for (let i = 0; i < project.scenes.length; i++) {
+    const scene = project.scenes[i];
+    const html = await assembleScene({
+      scene,
+      components: componentSources,
+      brandKit: project.brand_kit,
+      canvas: project.canvas,
+      gsapDir,
+    });
+
+    const htmlPath = path.join(workDir, `deck_scene_${i}.html`);
+    const pngPath = path.join(workDir, `deck_scene_${i}.png`);
+    await fs.writeFile(htmlPath, html);
+
+    await captureSingleFrame({
+      htmlPath,
+      outputPath: pngPath,
+      width: project.canvas.width,
+      height: project.canvas.height,
+      format: "png",
+      atTime: 0,
+    });
+
+    scenePngs.push(pngPath);
+  }
+
+  const pdfPath = outputPath.endsWith(".pdf") ? outputPath : outputPath.replace(/\.[^.]+$/, ".pdf");
+  await exportPdf({
+    scenePngs,
+    outputPath: pdfPath,
+    width: project.canvas.width,
+    height: project.canvas.height,
+  });
+
+  return {
+    outputPath: pdfPath,
+    format: project.format,
+    durationMs: Date.now() - startTime,
+  };
+}
+
+/** Social media size presets */
+const SOCIAL_PRESETS: Record<string, { width: number; height: number }> = {
+  "instagram-post": { width: 1080, height: 1080 },
+  "instagram-story": { width: 1080, height: 1920 },
+  "linkedin": { width: 1200, height: 627 },
+  "twitter": { width: 1600, height: 900 },
+  "youtube-thumbnail": { width: 1280, height: 720 },
+};
+
+/**
+ * Render a GIF output from all scenes.
+ */
+async function renderGif(
+  project: Project,
+  componentSources: ComponentSource[],
+  workDir: string,
+  gsapDir: string,
+  outputPath: string,
+  startTime: number,
+): Promise<RenderResult> {
+  // Render all scene frames into a single frames directory
+  const framesDir = path.join(workDir, "gif_frames");
+  await fs.mkdir(framesDir, { recursive: true });
+
+  let globalFrameIndex = 0;
+
+  for (let i = 0; i < project.scenes.length; i++) {
+    const scene = project.scenes[i];
+    const sceneDir = path.join(workDir, `gif_scene_${i}`);
+    await fs.mkdir(sceneDir, { recursive: true });
+
+    const html = await assembleScene({
+      scene,
+      components: componentSources,
+      brandKit: project.brand_kit,
+      canvas: project.canvas,
+      gsapDir,
+    });
+
+    const htmlPath = path.join(sceneDir, "scene.html");
+    await fs.writeFile(htmlPath, html);
+
+    const result = await captureScene({
+      htmlPath,
+      outputDir: sceneDir,
+      width: project.canvas.width,
+      height: project.canvas.height,
+      fps: project.canvas.fps,
+      duration: scene.duration_seconds,
+    });
+
+    // Copy frames to the unified frames directory with sequential numbering
+    for (let f = 0; f < result.frameCount; f++) {
+      const srcFrame = path.join(sceneDir, `frame-${String(f + 1).padStart(6, "0")}.png`);
+      const dstFrame = path.join(framesDir, `frame-${String(globalFrameIndex + 1).padStart(6, "0")}.png`);
+      await fs.copyFile(srcFrame, dstFrame);
+      globalFrameIndex++;
+    }
+  }
+
+  const gifPath = outputPath.endsWith(".gif") ? outputPath : outputPath.replace(/\.[^.]+$/, ".gif");
+  await encodeGif({
+    framesDir,
+    outputPath: gifPath,
+    fps: project.canvas.fps,
+    width: 800,
+  });
+
+  return {
+    outputPath: gifPath,
+    format: "gif",
+    durationMs: Date.now() - startTime,
+    frameCount: globalFrameIndex,
+  };
+}
+
+/**
+ * Render social batch: same first scene at multiple social media sizes.
+ */
+async function renderSocial(
+  project: Project,
+  componentSources: ComponentSource[],
+  workDir: string,
+  gsapDir: string,
+  outputPath: string,
+  startTime: number,
+): Promise<RenderResult> {
+  const scene = project.scenes[0];
+  if (!scene) throw new Error("No scenes in project");
+
+  const socialDir = path.join(path.dirname(outputPath), "social");
+  await fs.mkdir(socialDir, { recursive: true });
+
+  const outputs: string[] = [];
+
+  for (const [presetName, dims] of Object.entries(SOCIAL_PRESETS)) {
+    const canvas = { ...project.canvas, width: dims.width, height: dims.height };
+
+    const html = await assembleScene({
+      scene,
+      components: componentSources,
+      brandKit: project.brand_kit,
+      canvas,
+      gsapDir,
+    });
+
+    const htmlPath = path.join(workDir, `social_${presetName}.html`);
+    const pngPath = path.join(socialDir, `${presetName}.png`);
+    await fs.writeFile(htmlPath, html);
+
+    await captureSingleFrame({
+      htmlPath,
+      outputPath: pngPath,
+      width: dims.width,
+      height: dims.height,
+      format: "png",
+      atTime: scene.duration_seconds ? scene.duration_seconds / 2 : 0,
+    });
+
+    outputs.push(pngPath);
+    console.log(`  Social: ${presetName} (${dims.width}x${dims.height})`);
+  }
+
+  return {
+    outputPath: socialDir,
+    format: "social",
+    durationMs: Date.now() - startTime,
+  };
+}
+
+/**
+ * Render email header: animated GIF (600px wide) + static PNG fallback.
+ */
+async function renderEmailHeader(
+  project: Project,
+  componentSources: ComponentSource[],
+  workDir: string,
+  gsapDir: string,
+  outputPath: string,
+  startTime: number,
+): Promise<RenderResult> {
+  const outputDir = path.dirname(outputPath);
+  const baseName = path.basename(outputPath, path.extname(outputPath));
+
+  // 1. Render the animated GIF (all scenes, 600px wide)
+  const framesDir = path.join(workDir, "email_frames");
+  await fs.mkdir(framesDir, { recursive: true });
+
+  let globalFrameIndex = 0;
+
+  for (let i = 0; i < project.scenes.length; i++) {
+    const scene = project.scenes[i];
+    const sceneDir = path.join(workDir, `email_scene_${i}`);
+    await fs.mkdir(sceneDir, { recursive: true });
+
+    const html = await assembleScene({
+      scene,
+      components: componentSources,
+      brandKit: project.brand_kit,
+      canvas: project.canvas,
+      gsapDir,
+    });
+
+    const htmlPath = path.join(sceneDir, "scene.html");
+    await fs.writeFile(htmlPath, html);
+
+    const result = await captureScene({
+      htmlPath,
+      outputDir: sceneDir,
+      width: project.canvas.width,
+      height: project.canvas.height,
+      fps: project.canvas.fps,
+      duration: scene.duration_seconds,
+    });
+
+    for (let f = 0; f < result.frameCount; f++) {
+      const srcFrame = path.join(sceneDir, `frame-${String(f + 1).padStart(6, "0")}.png`);
+      const dstFrame = path.join(framesDir, `frame-${String(globalFrameIndex + 1).padStart(6, "0")}.png`);
+      await fs.copyFile(srcFrame, dstFrame);
+      globalFrameIndex++;
+    }
+  }
+
+  const gifPath = path.join(outputDir, `${baseName}.gif`);
+  await encodeGif({
+    framesDir,
+    outputPath: gifPath,
+    fps: project.canvas.fps,
+    width: 600,
+  });
+
+  // 2. Render the static PNG fallback (first scene, hero moment)
+  const scene = project.scenes[0];
+  if (scene) {
+    const html = await assembleScene({
+      scene,
+      components: componentSources,
+      brandKit: project.brand_kit,
+      canvas: project.canvas,
+      gsapDir,
+    });
+
+    const htmlPath = path.join(workDir, "email_fallback.html");
+    const pngPath = path.join(outputDir, `${baseName}-fallback.png`);
+    await fs.writeFile(htmlPath, html);
+
+    await captureSingleFrame({
+      htmlPath,
+      outputPath: pngPath,
+      width: 600,
+      height: Math.round(600 * (project.canvas.height / project.canvas.width)),
+      format: "png",
+      atTime: scene.duration_seconds ? scene.duration_seconds / 2 : 0,
+    });
+
+    console.log(`  Email header fallback PNG: ${pngPath}`);
+  }
+
+  return {
+    outputPath: gifPath,
+    format: "email-header",
+    durationMs: Date.now() - startTime,
+    frameCount: globalFrameIndex,
+  };
 }
 
 /**
