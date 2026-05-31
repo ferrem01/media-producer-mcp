@@ -358,7 +358,7 @@ Think like an Apple keynote designer:
 Never use emoji characters (⚡🔧✨🤖📦🎨 etc.) as icons. They look cheap and unprofessional.
 Instead, use inline SVG icons. Here are examples:
 
-```html
+\`\`\`html
 <!-- Checkmark -->
 <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='20 6 9 17 4 12'/></svg>
 
@@ -379,7 +379,7 @@ Instead, use inline SVG icons. Here are examples:
 
 <!-- Star -->
 <svg width='20' height='20' viewBox='0 0 24 24' fill='var(--mp-color-accent)' stroke='none'><polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26'/></svg>
-```
+\`\`\`
 
 Always use inline SVG for icons. Style them with currentColor or var(--mp-color-accent). Place them inside a styled container div with a subtle accent background.
 
