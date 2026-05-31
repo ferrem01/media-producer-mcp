@@ -27,6 +27,8 @@ export interface GenerateComponentInput {
   brand_kit?: BrandKit;
   /** Duration for animation preview */
   duration?: number;
+  /** Output format (video, image, deck, gif) for format-specific component rules */
+  format?: string;
   /** LLM provider function -- injected so we don't hardcode a provider */
   llmGenerate: (systemPrompt: string, userPrompt: string) => Promise<string>;
 }
@@ -40,17 +42,17 @@ export interface GenerateComponentResult {
   preview_path?: string;
 }
 
-// Single source of truth: prompt lives in src/llm/prompts.ts
-const SYSTEM_PROMPT = componentSystemPrompt();
-
 /**
  * Generate a component from a natural language prompt.
  */
 export async function generateComponent(input: GenerateComponentInput): Promise<GenerateComponentResult> {
-  const { prompt, tenant_id, canvas, brand_kit, duration, llmGenerate } = input;
+  const { prompt, tenant_id, canvas, brand_kit, duration, format, llmGenerate } = input;
+
+  // Get format-specific system prompt (single source of truth in src/llm/prompts.ts)
+  const systemPrompt = componentSystemPrompt(format);
 
   // Call the LLM
-  const raw = await llmGenerate(SYSTEM_PROMPT, prompt);
+  const raw = await llmGenerate(systemPrompt, prompt);
 
   // Extract the component source (strip any markdown fences the LLM might add)
   const source = extractComponentSource(raw);

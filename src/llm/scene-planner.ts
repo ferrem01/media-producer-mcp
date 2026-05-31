@@ -19,6 +19,7 @@ export interface PlanSceneOpts {
   brandKit: BrandKit;
   canvas: Canvas;
   duration?: number;
+  format?: string;
 }
 
 interface ScenePlannerOutput {
@@ -83,6 +84,7 @@ export async function planScene(opts: PlanSceneOpts): Promise<{
         llmConfig: opts.llmConfig,
         brandKit: opts.brandKit,
         duration: plan.duration_seconds,
+        format: opts.format,
       });
 
       customComponents.push({

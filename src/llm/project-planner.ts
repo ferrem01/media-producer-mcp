@@ -79,6 +79,7 @@ export async function planProject(opts: PlanProjectOpts): Promise<{
       brandKit: opts.brandKit,
       canvas: opts.canvas,
       duration: scenePlan.duration_seconds,
+      format: opts.format,
     });
 
     // Apply the label and transition from the project plan

@@ -14,6 +14,7 @@ export interface CritiqueSceneOpts {
   previewImagePath: string;
   prompt: string;
   llmConfig: LLMConfig;
+  format?: string;
 }
 
 export interface CritiqueResult {
@@ -45,7 +46,7 @@ export async function critiqueScene(opts: CritiqueSceneOpts): Promise<CritiqueRe
   ];
 
   var raw = await callLLM(opts.llmConfig, [
-    { role: "system", content: critiquerSystemPrompt() },
+    { role: "system", content: critiquerSystemPrompt(opts.format) },
     { role: "user", content: userContent },
   ], { temperature: 0.3 });
 

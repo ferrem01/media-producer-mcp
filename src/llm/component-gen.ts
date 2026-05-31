@@ -14,6 +14,7 @@ export interface GenerateComponentOpts {
   llmConfig: LLMConfig;
   brandKit?: BrandKit;
   duration?: number;
+  format?: string;
 }
 
 export interface GenerateComponentOutput {
@@ -40,7 +41,7 @@ export async function generateComponentLLM(
   }
 
   var raw = await callLLM(opts.llmConfig, [
-    { role: "system", content: componentSystemPrompt() },
+    { role: "system", content: componentSystemPrompt(opts.format) },
     { role: "user", content: userPrompt },
   ], { temperature: 0.7 });
 

@@ -13,7 +13,8 @@ import { GSAP_ANIMATION_SKILLS } from "./gsap-skills.js";
  * This is THE canonical component generation prompt -- used by both
  * direct component generation and the scene planner's custom fallback.
  */
-export function componentSystemPrompt(): string {
+export function componentSystemPrompt(format: string = "video"): string {
+  var formatRules = componentFormatRules(format);
   return `You are a component generator for a media production system. You create single-file HTML components that render animated content for videos, images, and presentations.
 
 ## Output Format
@@ -47,7 +48,6 @@ You MUST output a single .component.html file with exactly three sections:
    - data: JSON data object passed to this component
    - ctx: { duration, fps, canvas: {width, height}, motion: "minimal"|"punchy"|"cinematic" }
    - Must return a GSAP timeline (NOT paused -- the master timeline controls playback)
-   - Must animate entrance, hold, and exit within ctx.duration
    - Use gsap.timeline() NOT gsap.timeline({ paused: true })
 
 3. Use CSS custom properties for theming:
@@ -75,6 +75,8 @@ You MUST output a single .component.html file with exactly three sections:
    For logo.dev logos: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark
 
 10. All variables must use 'var' not 'const' or 'let' (broad compatibility).
+
+${formatRules}
 
 ${COMPONENT_DESIGN_RULES}
 
@@ -202,7 +204,8 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
 /**
  * System prompt for the visual critiquer.
  */
-export function critiquerSystemPrompt(): string {
+export function critiquerSystemPrompt(format: string = "video"): string {
+  var formatRules = critiquerFormatRules(format);
   return `You are a visual design critiquer for a media production system. You review rendered scene previews and provide actionable feedback.
 
 You will receive:
@@ -241,6 +244,8 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 2. Be specific in issues and suggestions (mention exact elements, sizes, colors).
 3. Only include revised_html if score < 7 and you can provide a concrete fix.
 4. Output ONLY the JSON object. No explanation.
+
+${formatRules}
 
 ${CRITIQUER_DESIGN_RULES}`;
 }
@@ -297,4 +302,115 @@ For each scene, provide 2-4 sentences covering:
 6. Think about visual rhythm: alternate between text-heavy and visual scenes.
 7. Keep the brief under 500 words. Dense and actionable, not fluffy.
 8. Output ONLY the creative brief. No preamble, no "Here's the brief:", just the brief itself.`;
+}
+
+// ── Format-specific rules ──
+
+/**
+ * Format-specific rules for the component generator.
+ */
+function componentFormatRules(format: string): string {
+  switch (format) {
+    case "video":
+    case "slideshow":
+      return `## Format: Video
+
+- Animate entrance, hold, and exit within ctx.duration.
+- Full entrance/hold/exit animation pattern: elements animate in, hold for reading, animate out.
+- Use cinematic easing (power3.inOut, power2.out, back.out) for dramatic motion.
+- Stagger child elements for visual depth.
+- Exit animations are required -- elements must leave before the scene ends.
+- Think Apple keynote moments, not static slides.`;
+
+    case "image":
+    case "one-pager":
+      return `## Format: Image (Static)
+
+- NO animation needed. This renders as a single static frame.
+- In createTimeline, use gsap.set() to place elements in their final state immediately. Do NOT use gsap.from(), gsap.to(), or gsap.fromTo() for animation.
+- The timeline should only contain gsap.set() calls to position elements.
+- Focus entirely on composition, typography, and visual hierarchy.
+- Every pixel matters -- this is a single frame, not a video. Treat it like a poster or hero image.
+- Ensure text is perfectly positioned and balanced.
+- Use generous whitespace and clear focal points.`;
+
+    case "deck":
+    case "presentation":
+      return `## Format: Deck / Presentation
+
+- Minimal animation only: simple fade-in (opacity 0 to 1) with short duration (0.3-0.5s).
+- No dramatic entrances, no exit animations needed. Elements appear and stay.
+- Focus on readability, clean layout, and information hierarchy.
+- Text should be legible and well-structured -- this is meant to be read, not watched.
+- Use clear heading/body separation. Generous padding.
+- Slide content should stand on its own without motion to carry it.`;
+
+    case "gif":
+      return `## Format: GIF
+
+- Fast, punchy animations with short durations (0.2-0.4s per move).
+- Bold visual effects: strong scale changes, snappy position shifts, high contrast.
+- Loop-friendly: the exit state should feel like it could seamlessly loop back to the entrance.
+- Consider the exit returning elements toward their starting position/state.
+- Minimal text -- GIFs are consumed fast. Max 5-8 words visible.
+- High visual impact over subtlety. Think social media scroll-stopper.`;
+
+    default:
+      return `## Format: General
+
+- Animate entrance, hold, and exit within ctx.duration.
+- Use smooth, professional GSAP animations.`;
+  }
+}
+
+/**
+ * Format-specific rules for the critiquer.
+ */
+function critiquerFormatRules(format: string): string {
+  switch (format) {
+    case "video":
+    case "slideshow":
+      return `## Format-Specific Critique: Video
+
+- Evaluate cinematic quality: does this feel like a premium video moment or a PowerPoint slide?
+- Check animation smoothness: are entrances/exits well-timed? Is there proper staggering?
+- Visual impact: does the scene grab attention? Rich, layered backgrounds (not flat colors)?
+- Enforce the 15-words-max rule: if more than 15 words are visible simultaneously, flag it.
+- Is it too "PowerPoint-like"? Static text blocks, bullet lists, and flat layouts are failures in video.
+- Exit animations: elements should animate out, not just cut.`;
+
+    case "image":
+    case "one-pager":
+      return `## Format-Specific Critique: Image
+
+- Evaluate composition: is there a clear focal point? Is the layout balanced?
+- Visual hierarchy: does the eye flow naturally from primary to secondary to tertiary content?
+- Readability at smaller sizes: would this still read well at 960x540 or as a social media thumbnail?
+- Single-frame impact: does this image make a statement on its own, without motion?
+- Ignore animation concerns entirely -- there should be no animation.
+- If you see entrance/exit animations in the code, flag it as an issue (should use gsap.set only).`;
+
+    case "deck":
+    case "presentation":
+      return `## Format-Specific Critique: Deck
+
+- Evaluate information clarity: is the key message immediately obvious?
+- Readability: is all text legible? Proper font sizes for headers vs body?
+- Consistent structure: does this slide match the visual language of a professional deck?
+- Text density: unlike video, more text is acceptable here, but it must be well-organized.
+- Professional layout: clean alignment, consistent spacing, clear sections.
+- Animation should be minimal (simple fades only). Flag dramatic/cinematic animations as issues.`;
+
+    case "gif":
+      return `## Format-Specific Critique: GIF
+
+- Evaluate punchiness: is the animation fast and attention-grabbing?
+- Loop-friendliness: does the exit transition feel like it could loop back to the start?
+- Bold visuals: are colors high-contrast? Are elements large and readable at small sizes?
+- Minimal text: flag if more than 5-8 words are visible. GIFs need to communicate visually.
+- Scroll-stopper quality: would this make someone pause while scrolling social media?`;
+
+    default:
+      return ``;
+  }
 }

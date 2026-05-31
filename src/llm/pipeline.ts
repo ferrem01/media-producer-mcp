@@ -126,6 +126,7 @@ async function runComponentPipeline(
     prompt: opts.prompt,
     llmConfig: opts.llmConfig,
     brandKit,
+    format: opts.target,
   });
 
   // Save to tenant library
@@ -174,6 +175,7 @@ async function runScenePipeline(
     componentCatalog: catalog,
     brandKit,
     canvas,
+    format,
   });
 
   // Save any custom components to tenant library
@@ -233,6 +235,7 @@ async function runProjectPipeline(
     canvas,
     sceneCount,
   });
+  // format already flows through PlanProjectOpts into planScene
 
   // Fill in tenant_id
   projectResult.project.tenant_id = opts.tenant_id;
