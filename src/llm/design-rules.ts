@@ -101,7 +101,15 @@ export const SCENE_PLANNER_DESIGN_RULES = `
 - Title/intro scenes: 3-4s
 - Content scenes: 4-6s
 - Complex scenes (terminal, code, demo): 5-8s
+- Interactive/scripted scenes (chat simulator, product demos): 8-15s
 - CTA/outro: 3-4s
+
+### Interactive Mockups (Script System)
+- When the prompt asks for a product demo, UI walkthrough, or interactive mockup, the component should use the script system.
+- Include a "script" array and "cursor_targets" in the component data.
+- The scene planner should flag these as needing custom components with script support.
+- Give scripted scenes longer durations (8-15s) to allow for cursor movement and typing.
+- Examples of scripted scenes: chat interfaces, form fill demos, dashboard interactions, app walkthroughs.
 
 ### Video vs Presentation Styles
 These are DIFFERENT visual languages. Do NOT mix them.

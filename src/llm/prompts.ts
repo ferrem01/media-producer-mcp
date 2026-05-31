@@ -7,6 +7,7 @@
 
 import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES, CRITIQUER_DESIGN_RULES } from "./design-rules.js";
 import { GSAP_ANIMATION_SKILLS } from "./gsap-skills.js";
+import { SCRIPT_SYSTEM_SKILLS } from "./script-skills.js";
 
 /**
  * System prompt for generating .component.html files.
@@ -80,7 +81,9 @@ ${formatRules}
 
 ${COMPONENT_DESIGN_RULES}
 
-${GSAP_ANIMATION_SKILLS}`;
+${GSAP_ANIMATION_SKILLS}
+
+${SCRIPT_SYSTEM_SKILLS}`;
 }
 
 /**
