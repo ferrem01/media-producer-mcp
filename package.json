@@ -1,0 +1,29 @@
+{
+  "name": "media-producer-mcp",
+  "version": "0.1.0",
+  "description": "Generalized media production MCP server. HTML + GSAP + Playwright + ffmpeg.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx test/run.ts"
+  },
+  "author": "ferrem01",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "gsap": "^3.12.7",
+    "playwright": "^1.52.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

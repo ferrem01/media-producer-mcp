@@ -1,0 +1,40 @@
+<template>
+  <div class="gradient-bg"></div>
+</template>
+
+<style scoped>
+  .gradient-bg {
+    width: 100%;
+    height: 100%;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline({ paused: true });
+    var bg = el.querySelector('.gradient-bg');
+
+    var from = data.from || var_value('--mp-color-background') || '#0f172a';
+    var to = data.to || var_value('--mp-color-surface') || '#1e293b';
+    var angle = data.angle || 165;
+
+    bg.style.background = 'linear-gradient(' + angle + 'deg, ' + from + ' 0%, ' + to + ' 100%)';
+
+    // Subtle shift animation
+    if (ctx.duration > 2) {
+      tl.fromTo(bg, {
+        backgroundPosition: '0% 0%'
+      }, {
+        backgroundPosition: '100% 100%',
+        duration: ctx.duration,
+        ease: 'none'
+      }, 0);
+    }
+
+    return tl;
+
+    function var_value(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+  }
+</script>

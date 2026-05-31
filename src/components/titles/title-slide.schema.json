@@ -1,0 +1,24 @@
+{
+  "type": "title-slide",
+  "label": "Title Slide",
+  "category": "titles",
+  "description": "Centered title with optional badge and subtitle. Stagger-up entrance, fade exit.",
+  "data": {
+    "badge": {
+      "type": "string",
+      "label": "Badge Text",
+      "optional": true,
+      "placeholder": "ANNOUNCEMENT"
+    },
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "required": true
+    },
+    "subtitle": {
+      "type": "string",
+      "label": "Subtitle",
+      "optional": true
+    }
+  }
+}

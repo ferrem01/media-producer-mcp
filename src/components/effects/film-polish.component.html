@@ -1,0 +1,57 @@
+<template>
+  <div class="film-polish">
+    <div class="vignette"></div>
+    <div class="grain"></div>
+  </div>
+</template>
+
+<style scoped>
+  .film-polish {
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%);
+  }
+
+  .grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.06;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    mix-blend-mode: overlay;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline({ paused: true });
+    var vignette = el.querySelector('.vignette');
+    var grain = el.querySelector('.grain');
+
+    // Apply custom intensity
+    var vignetteAmount = data.vignette !== undefined ? data.vignette : 0.15;
+    var grainAmount = data.grain !== undefined ? data.grain : 0.06;
+
+    vignette.style.background =
+      'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,' + vignetteAmount * 4 + ') 100%)';
+    grain.style.opacity = String(grainAmount);
+
+    // Subtle grain animation (shift the noise pattern)
+    if (grainAmount > 0) {
+      tl.to(grain, {
+        backgroundPosition: '128px 128px',
+        duration: ctx.duration,
+        ease: 'steps(8)',
+        repeat: 0
+      }, 0);
+    }
+
+    return tl;
+  }
+</script>
