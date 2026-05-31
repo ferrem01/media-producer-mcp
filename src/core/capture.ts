@@ -39,6 +39,30 @@ export interface CaptureResult {
 /**
  * Capture a scene frame-by-frame using Playwright.
  */
+// Shared browser instance to avoid OOM from launching per scene
+let _sharedBrowser: Browser | undefined;
+let _browserUseCount = 0;
+const MAX_BROWSER_USES = 20; // restart after N scenes to prevent memory creep
+
+async function getSharedBrowser(): Promise<Browser> {
+  if (!_sharedBrowser || !_sharedBrowser.isConnected() || _browserUseCount >= MAX_BROWSER_USES) {
+    if (_sharedBrowser) {
+      await _sharedBrowser.close().catch(() => {});
+    }
+    _sharedBrowser = await chromium.launch({
+      args: [
+        "--disable-gpu",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+      ],
+    });
+    _browserUseCount = 0;
+  }
+  _browserUseCount++;
+  return _sharedBrowser;
+}
+
 export async function captureScene(options: CaptureOptions): Promise<CaptureResult> {
   const {
     htmlPath,
@@ -57,19 +81,11 @@ export async function captureScene(options: CaptureOptions): Promise<CaptureResu
   // Ensure output directory exists
   await fs.mkdir(outputDir, { recursive: true });
 
-  let browser: Browser | undefined;
+  const browser = await getSharedBrowser();
+  let page: Awaited<ReturnType<Browser['newPage']>> | undefined;
 
   try {
-    browser = await chromium.launch({
-      args: [
-        "--disable-gpu",
-        "--disable-dev-shm-usage",
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-      ],
-    });
-
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setViewportSize({ width, height });
 
     // Load the scene HTML
@@ -128,9 +144,8 @@ export async function captureScene(options: CaptureOptions): Promise<CaptureResu
       durationMs,
     };
   } finally {
-    if (browser) {
-      await browser.close();
-    }
+    // Close the page, not the browser (browser is shared)
+    if (page) await page.close().catch(() => {});
   }
 }
 
@@ -157,14 +172,11 @@ export async function captureSingleFrame(options: {
     atTime,
   } = options;
 
-  let browser: Browser | undefined;
+  const browser = await getSharedBrowser();
+  let page: Awaited<ReturnType<Browser['newPage']>> | undefined;
 
   try {
-    browser = await chromium.launch({
-      args: ["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"],
-    });
-
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setViewportSize({ width, height });
 
     const fileUrl = `file://${path.resolve(htmlPath)}`;
@@ -199,8 +211,6 @@ export async function captureSingleFrame(options: {
     await page.screenshot(screenshotOpts);
     console.log(`  Captured single frame: ${outputPath}`);
   } finally {
-    if (browser) {
-      await browser.close();
-    }
+    if (page) await page.close().catch(() => {});
   }
 }
