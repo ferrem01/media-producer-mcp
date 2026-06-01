@@ -8,6 +8,8 @@
  */
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { randomUUID } from "node:crypto";
 import http from "node:http";
 import { createMcpServer } from "./server.js";
 import { config } from "./config.js";
@@ -26,7 +28,7 @@ import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { setupWebSocket } from "./ws.js";
-import { authMiddleware } from "./auth/auth.js";
+import { authMiddleware, extractToken, validateToken, isAuthEnabled } from "./auth/auth.js";
 import { readTraces, dailyDigest } from "./trace/index.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
 import { initTenantStoreFromFile } from "./auth/tenant-store.js";
@@ -101,6 +103,32 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown): 
   res.end(JSON.stringify(body));
 }
 
+
+// ── MCP HTTP transport session map ──
+const mcpTransports: Record<string, StreamableHTTPServerTransport> = {};
+
+function isInitializeRequestBody(body: unknown): boolean {
+  const single = (x: unknown) =>
+    typeof x === "object" && x !== null && (x as { method?: string }).method === "initialize";
+  if (Array.isArray(body)) return body.some(single);
+  return single(body);
+}
+
+/**
+ * Parse JSON body from an incoming request (returns unknown for MCP).
+ */
+function parseMcpBody(req: http.IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk: Buffer) => { data += chunk.toString(); });
+    req.on("end", () => {
+      try { resolve(JSON.parse(data)); }
+      catch { reject(new Error("Invalid JSON")); }
+    });
+    req.on("error", reject);
+  });
+}
+
 async function main() {
   // Initialize tenant store
   initTenantStoreFromFile("/data/media-producer/_system/tenants.json");
@@ -133,6 +161,94 @@ async function main() {
     }
 
     try {
+      const urlPath = url.split("?")[0];
+
+      // ── MCP Streamable HTTP transport ──
+      if (urlPath === "/mcp") {
+        // Validate auth
+        if (isAuthEnabled()) {
+          const token = extractToken(req);
+          if (!token || !validateToken(token)) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Authentication required" }));
+            return;
+          }
+        }
+
+        if (method === "POST") {
+          let body: unknown;
+          try {
+            body = await parseMcpBody(req);
+          } catch {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null }));
+            return;
+          }
+          (req as any).body = body;
+
+          const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+          // Existing session
+          if (sessionId && mcpTransports[sessionId]) {
+            await mcpTransports[sessionId].handleRequest(req, res, body);
+            return;
+          }
+
+          // New session (initialize)
+          if (!sessionId && isInitializeRequestBody(body)) {
+            const transport = new StreamableHTTPServerTransport({
+              sessionIdGenerator: () => randomUUID(),
+              onsessioninitialized: (sid) => {
+                mcpTransports[sid] = transport;
+              },
+            });
+            transport.onclose = () => {
+              const sid = transport.sessionId;
+              if (sid && mcpTransports[sid]) delete mcpTransports[sid];
+            };
+            const mcpServer = createMcpServer();
+            await mcpServer.connect(transport);
+            await transport.handleRequest(req, res, body);
+            return;
+          }
+
+          // Bad request
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            jsonrpc: "2.0",
+            error: { code: -32000, message: "Bad Request: No valid session ID provided" },
+            id: null,
+          }));
+          return;
+        }
+
+        if (method === "GET") {
+          const sessionId = req.headers["mcp-session-id"] as string | undefined;
+          if (!sessionId || !mcpTransports[sessionId]) {
+            res.writeHead(400, { "Content-Type": "text/plain" });
+            res.end("Invalid or missing session ID");
+            return;
+          }
+          await mcpTransports[sessionId].handleRequest(req, res);
+          return;
+        }
+
+        if (method === "DELETE") {
+          const sessionId = req.headers["mcp-session-id"] as string | undefined;
+          if (!sessionId || !mcpTransports[sessionId]) {
+            res.writeHead(400, { "Content-Type": "text/plain" });
+            res.end("Invalid or missing session ID");
+            return;
+          }
+          await mcpTransports[sessionId].handleRequest(req, res);
+          return;
+        }
+
+        res.writeHead(405, { "Content-Type": "text/plain" });
+        res.end("Method not allowed");
+        return;
+      }
+
       // ── Health ──
       if (url === "/health" || url === "/") {
         jsonResponse(res, 200, { status: "ok", service: "media-producer-mcp", version: "0.1.0" });
@@ -140,7 +256,6 @@ async function main() {
       }
 
       // ── OAuth routes (unauthenticated) ──
-      const urlPath = url.split("?")[0];
 
       if (urlPath === "/auth/google/login" && method === "GET") {
         await handleGoogleLogin(req, res);
@@ -764,6 +879,7 @@ async function main() {
     console.error(`  Data directory: ${config.dataDir}`);
     console.error(`  Component library: ${config.componentLibDir}`);
     console.error(`MCP server ready on stdio`);
+    console.error(`  MCP HTTP endpoint: http://localhost:${config.port}/mcp`);
   });
 }
 
