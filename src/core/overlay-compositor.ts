@@ -126,17 +126,20 @@ export async function compositeOverlays(opts: CompositeOverlayOptions): Promise<
       const pos = pipPosition(seg.position, width, height, pipW, pipH);
 
       if (seg.shape === "circle") {
-        // Scale speaker to PiP size, apply circular mask
+        // Center-crop speaker to square, then scale to PiP size, apply circular mask
         const scaledLabel = `pip_scaled_${overlayIndex}`;
         const circLabel = `pip_circ_${overlayIndex}`;
         const outLabel = `out_${overlayIndex}`;
-        const radius = Math.min(pipW, pipH) / 2;
+        const cropSize = Math.min(pipW, pipH);
+        const radius = cropSize / 2;
 
-        filters.push(`[1:v]scale=${pipW}:${pipH}[${scaledLabel}]`);
+        // Center-crop speaker to square then scale. Most speaker videos are landscape,
+        // so crop width to match height (ih), centered horizontally.
+        filters.push(`[1:v]crop=ih:ih:(iw-ih)/2:0,scale=${cropSize}:${cropSize}[${scaledLabel}]`);
         filters.push(
           `[${scaledLabel}]format=rgba,geq=` +
           `r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':` +
-          `a='if(gt(sqrt(pow(X-${pipW}/2,2)+pow(Y-${pipH}/2,2)),${Math.floor(radius)}),0,255)'` +
+          `a='if(gt(sqrt(pow(X-${cropSize}/2,2)+pow(Y-${cropSize}/2,2)),${Math.floor(radius)}),0,255)'` +
           `[${circLabel}]`
         );
         filters.push(
@@ -144,10 +147,11 @@ export async function compositeOverlays(opts: CompositeOverlayOptions): Promise<
         );
         currentLabel = outLabel;
       } else {
-        // Rectangular or rounded-rect PiP (rounded-rect approximated as rect in ffmpeg)
+        // Rectangular or rounded-rect PiP -- preserve aspect ratio
         const scaledLabel = `pip_${overlayIndex}`;
         const outLabel = `out_${overlayIndex}`;
-        filters.push(`[1:v]scale=${pipW}:${pipH}[${scaledLabel}]`);
+        // Scale to fit within pipW x pipH, crop any overflow
+        filters.push(`[1:v]scale=${pipW}:${pipH}:force_original_aspect_ratio=increase,crop=${pipW}:${pipH}[${scaledLabel}]`);
 
         if (seg.border && seg.border.width > 0) {
           // Add border by padding
