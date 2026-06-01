@@ -3,7 +3,10 @@
     <div class="cta-card">
       <h2 class="cta-headline">{{headline}}</h2>
       <p class="cta-description">{{description}}</p>
-      <div class="cta-button">{{button_text}}</div>
+      <div class="cta-button-wrap">
+        <div class="cta-button-glow"></div>
+        <div class="cta-button">{{button_text}}</div>
+      </div>
     </div>
   </div>
 </template>
@@ -21,18 +24,29 @@
   }
 
   .cta-card {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 24px;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     padding: 64px 72px;
     max-width: 620px;
     width: 100%;
     text-align: center;
     box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
       0 25px 60px rgba(0, 0, 0, 0.4),
       0 0 0 1px rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cta-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, transparent 40%);
+    pointer-events: none;
   }
 
   .cta-headline {
@@ -41,8 +55,8 @@
     color: var(--mp-color-text, #ffffff);
     margin: 0 0 20px 0;
     line-height: 1.1;
-    letter-spacing: -0.02em;
-    text-shadow: 0 0 40px rgba(167, 139, 250, 0.15);
+    letter-spacing: -0.03em;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3), 0 0 40px rgba(167, 139, 250, 0.1);
   }
 
   .cta-description {
@@ -57,20 +71,38 @@
     display: none;
   }
 
+  .cta-button-wrap {
+    display: inline-block;
+    position: relative;
+  }
+
+  .cta-button-glow {
+    position: absolute;
+    inset: -8px;
+    border-radius: 22px;
+    background: var(--mp-color-accent, #A78BFA);
+    filter: blur(20px);
+    opacity: 0.25;
+    pointer-events: none;
+  }
+
   .cta-button {
+    position: relative;
     display: inline-block;
     font-size: 16px;
     font-weight: 600;
     color: #ffffff;
-    background: var(--mp-color-accent, #A78BFA);
+    background: linear-gradient(135deg, var(--mp-color-accent, #A78BFA) 0%, #8b5cf6 100%);
     height: 56px;
     line-height: 56px;
-    padding: 0 44px;
+    padding: 0 48px;
     border-radius: 14px;
-    letter-spacing: 0.02em;
+    letter-spacing: -0.01em;
     box-shadow:
       0 0 30px rgba(167, 139, 250, 0.25),
-      0 8px 24px rgba(167, 139, 250, 0.15);
+      0 8px 24px rgba(167, 139, 250, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   }
 
   .cta-button:empty {
@@ -85,16 +117,19 @@
     var headline = el.querySelector('.cta-headline');
     var desc = el.querySelector('.cta-description');
     var button = el.querySelector('.cta-button');
+    var buttonGlow = el.querySelector('.cta-button-glow');
 
     if (data.button_color) {
-      button.style.background = data.button_color;
-      button.style.boxShadow = '0 0 30px ' + data.button_color + '40, 0 8px 24px ' + data.button_color + '25';
+      button.style.background = 'linear-gradient(135deg, ' + data.button_color + ' 0%, ' + data.button_color + 'cc 100%)';
+      buttonGlow.style.background = data.button_color;
+      button.style.boxShadow = '0 0 30px ' + data.button_color + '40, 0 8px 24px ' + data.button_color + '25, inset 0 1px 0 rgba(255,255,255,0.15)';
     }
 
     var speed = ctx.motion === 'minimal' ? 0.45 : ctx.motion === 'punchy' ? 0.6 : 0.75;
 
     // Card entrance with scale + blur
     gsap.set(card, { autoAlpha: 0, y: 50, scale: 1.06, filter: 'blur(5px)' });
+    gsap.set(buttonGlow, { autoAlpha: 0, scale: 0.5 });
 
     tl.to(card, {
       autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
@@ -102,26 +137,46 @@
       ease: 'power3.out'
     }, 0.3);
 
-    // Button pulse with glow
+    // Button glow appears
+    tl.to(buttonGlow, {
+      autoAlpha: 0.3, scale: 1,
+      duration: speed * 0.6,
+      ease: 'power2.out'
+    }, 0.3 + speed * 0.5);
+
+    // Breathing glow pulse on the button
     if (button && button.textContent.trim()) {
-      tl.to(button, {
-        scale: 1.04,
-        boxShadow: '0 0 40px rgba(167, 139, 250, 0.35), 0 8px 32px rgba(167, 139, 250, 0.2)',
-        duration: 0.5,
+      tl.to(buttonGlow, {
+        scale: 1.3,
+        autoAlpha: 0.15,
+        duration: 1.2,
         ease: 'sine.inOut',
         yoyo: true,
-        repeat: 3
-      }, 0.3 + speed + 0.3);
+        repeat: -1
+      }, 0.3 + speed + 0.2);
+
+      tl.to(button, {
+        scale: 1.02,
+        duration: 1.2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, 0.3 + speed + 0.2);
     }
 
     // Exit
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
+      var exitAt = ctx.duration - 0.7;
+      tl.to([buttonGlow], {
+        autoAlpha: 0,
+        duration: 0.3,
+        ease: 'power2.in'
+      }, exitAt);
       tl.to(card, {
         autoAlpha: 0, y: -25, scale: 0.97,
         duration: 0.4,
         ease: 'power2.in'
-      }, exitAt);
+      }, exitAt + 0.05);
     }
 
     return tl;

@@ -1,0 +1,15 @@
+{
+  "name": "depth-blur",
+  "category": "effects",
+  "description": "Cinematic depth-of-field effect that subtly blurs the edges of the canvas for a more immersive feel",
+  "data": {
+    "type": "object",
+    "properties": {
+      "intensity": {
+        "type": "number",
+        "description": "Blur intensity multiplier (default 1)",
+        "default": 1
+      }
+    }
+  }
+}

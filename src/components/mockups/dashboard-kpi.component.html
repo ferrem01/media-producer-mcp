@@ -7,6 +7,11 @@
           <span class="topbar-title"></span>
         </div>
         <div class="topbar-right">
+          <div class="topbar-nav">
+            <span class="nav-item active">Overview</span>
+            <span class="nav-item">Analytics</span>
+            <span class="nav-item">Reports</span>
+          </div>
           <div class="topbar-avatar"></div>
         </div>
       </div>
@@ -38,7 +43,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 4px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .topbar-left {
@@ -51,7 +61,8 @@
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    background: linear-gradient(135deg, #A78BFA, #8B5CF6);
+    background: linear-gradient(135deg, var(--mp-color-accent, #A78BFA), #8B5CF6);
+    box-shadow: 0 4px 12px rgba(167, 139, 250, 0.2);
   }
 
   .topbar-title {
@@ -64,6 +75,23 @@
   .topbar-right {
     display: flex;
     align-items: center;
+    gap: 24px;
+  }
+
+  .topbar-nav {
+    display: flex;
+    gap: 20px;
+  }
+
+  .nav-item {
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    letter-spacing: 0.01em;
+  }
+
+  .nav-item.active {
+    color: #ffffff;
   }
 
   .topbar-avatar {
@@ -81,7 +109,7 @@
   }
 
   .kpi-card {
-    background: rgba(255, 255, 255, 0.03);
+    background: #1e293b;
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 16px;
     padding: 28px 24px;
@@ -90,7 +118,26 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 4px 6px rgba(0, 0, 0, 0.1),
+      0 20px 40px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .kpi-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
   .kpi-label {
@@ -100,6 +147,17 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
+
+  .kpi-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: 0 0 6px currentColor;
+  }
+
+  .kpi-status-dot.green { background: #34d399; color: #34d399; }
+  .kpi-status-dot.yellow { background: #fbbf24; color: #fbbf24; }
+  .kpi-status-dot.red { background: #f87171; color: #f87171; }
 
   .kpi-value-row {
     display: flex;
@@ -113,6 +171,7 @@
     color: #ffffff;
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 30px rgba(167, 139, 250, 0.1);
   }
 
   .kpi-change {
@@ -120,6 +179,9 @@
     font-weight: 600;
     border-radius: 6px;
     padding: 2px 8px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
   }
 
   .kpi-change.up {
@@ -172,10 +234,22 @@
       var card = document.createElement('div');
       card.className = 'kpi-card';
 
+      // Label row with status dot
+      var labelRow = document.createElement('div');
+      labelRow.className = 'kpi-label-row';
+
       var label = document.createElement('div');
       label.className = 'kpi-label';
       label.textContent = m.label || '';
-      card.appendChild(label);
+      labelRow.appendChild(label);
+
+      // Status dot based on change
+      var dot = document.createElement('div');
+      var dotColor = m.change === undefined ? 'green' : m.change >= 5 ? 'green' : m.change >= 0 ? 'yellow' : 'red';
+      dot.className = 'kpi-status-dot ' + dotColor;
+      labelRow.appendChild(dot);
+
+      card.appendChild(labelRow);
 
       var valueRow = document.createElement('div');
       valueRow.className = 'kpi-value-row';
@@ -188,7 +262,8 @@
       if (m.change !== undefined && m.change !== null) {
         var changeEl = document.createElement('div');
         changeEl.className = 'kpi-change ' + (m.change >= 0 ? 'up' : 'down');
-        changeEl.textContent = (m.change >= 0 ? '+' : '') + m.change + '%';
+        var arrow = m.change >= 0 ? '▲ ' : '▼ ';
+        changeEl.textContent = arrow + (m.change >= 0 ? '+' : '') + m.change + '%';
         valueRow.appendChild(changeEl);
       }
       card.appendChild(valueRow);
@@ -213,14 +288,12 @@
 
         var strokeColor = (m.change !== undefined && m.change < 0) ? '#f87171' : '#A78BFA';
 
-        // Fill area
         var fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         fillPath.setAttribute('class', 'spark-fill');
         fillPath.setAttribute('d', 'M0,40 L' + points.join(' L') + ' L200,40 Z');
         fillPath.setAttribute('fill', strokeColor);
         svg.appendChild(fillPath);
 
-        // Stroke line
         var linePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         linePath.setAttribute('d', 'M' + points.join(' L'));
         linePath.setAttribute('stroke', strokeColor);
@@ -283,7 +356,7 @@
 
     // Exit
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
+      var exitAt = ctx.duration - 0.7;
       tl.to([topbar].concat(cardEls), {
         autoAlpha: 0, y: -15,
         duration: 0.4,

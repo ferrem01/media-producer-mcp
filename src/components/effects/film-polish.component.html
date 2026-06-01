@@ -2,6 +2,8 @@
   <div class="film-polish">
     <div class="vignette"></div>
     <div class="grain"></div>
+    <div class="letterbox-top"></div>
+    <div class="letterbox-bottom"></div>
     <div class="color-grade"></div>
   </div>
 </template>
@@ -11,22 +13,46 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
+    position: relative;
   }
 
   .vignette {
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.32) 100%);
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.25) 100%);
   }
 
   .grain {
     position: absolute;
     inset: 0;
-    opacity: 0.06;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 128px 128px;
+    opacity: 0.03;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.015) 1px, rgba(255,255,255,0.015) 2px),
+      repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255,255,255,0.01) 1px, rgba(255,255,255,0.01) 2px);
+    background-size: 3px 3px;
     mix-blend-mode: overlay;
+    animation: grainShift 0.5s steps(4) infinite;
   }
+
+  @keyframes grainShift {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(-1px, 1px); }
+    50% { transform: translate(1px, -1px); }
+    75% { transform: translate(-1px, -1px); }
+    100% { transform: translate(0, 0); }
+  }
+
+  .letterbox-top, .letterbox-bottom {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 0;
+    background: #000000;
+    z-index: 2;
+  }
+
+  .letterbox-top { top: 0; }
+  .letterbox-bottom { bottom: 0; }
 
   .color-grade {
     position: absolute;
@@ -41,18 +67,21 @@
     var tl = gsap.timeline();
     var vignette = el.querySelector('.vignette');
     var grain = el.querySelector('.grain');
+    var letterboxTop = el.querySelector('.letterbox-top');
+    var letterboxBottom = el.querySelector('.letterbox-bottom');
+    var gradeEl = el.querySelector('.color-grade');
 
     // Apply custom intensity
-    var vignetteAmount = data.vignette !== undefined ? data.vignette : 0.08;
-    var grainAmount = data.grain !== undefined ? data.grain : 0.06;
+    var vignetteAmount = data.vignette !== undefined ? data.vignette : 0.06;
+    var grainAmount = data.grain !== undefined ? data.grain : 0.03;
     var colorGrade = data.color_grade || 'none';
-    var gradeEl = el.querySelector('.color-grade');
+    var letterbox = data.letterbox !== undefined ? data.letterbox : false;
 
     // Apply color grade overlay
     var gradeColors = {
-      warm: 'rgba(255, 160, 50, 0.03)',
-      cool: 'rgba(50, 100, 255, 0.03)',
-      vintage: 'rgba(200, 150, 100, 0.05)'
+      warm: 'rgba(255, 160, 50, 0.02)',
+      cool: 'rgba(50, 100, 255, 0.02)',
+      vintage: 'rgba(200, 150, 100, 0.03)'
     };
     if (gradeColors[colorGrade]) {
       gradeEl.style.backgroundColor = gradeColors[colorGrade];
@@ -61,15 +90,22 @@
     }
 
     vignette.style.background =
-      'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,' + vignetteAmount * 4 + ') 100%)';
+      'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,' + (vignetteAmount * 3.5) + ') 100%)';
     grain.style.opacity = String(grainAmount);
+
+    // Letterbox bars
+    if (letterbox) {
+      var barHeight = typeof letterbox === 'number' ? letterbox : 42;
+      letterboxTop.style.height = barHeight + 'px';
+      letterboxBottom.style.height = barHeight + 'px';
+    }
 
     // Subtle grain animation (shift the noise pattern)
     if (grainAmount > 0) {
       tl.to(grain, {
-        backgroundPosition: '128px 128px',
+        backgroundPosition: '64px 64px',
         duration: ctx.duration,
-        ease: 'steps(8)',
+        ease: 'steps(12)',
         repeat: 0
       }, 0);
     }

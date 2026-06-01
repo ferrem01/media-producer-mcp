@@ -24,24 +24,41 @@
   }
 
   .metric-card {
-    background: rgba(255, 255, 255, 0.03);
+    background: #1e293b;
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 16px;
-    padding: 36px;
+    padding: 32px 36px;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    justify-content: center;
-    text-align: center;
+    gap: 20px;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
       0 8px 32px rgba(0, 0, 0, 0.2),
       0 0 0 1px rgba(255, 255, 255, 0.03);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .metric-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
   }
 
   .metric-value {
-    font-size: 52px;
+    font-size: 48px;
     font-weight: 700;
     color: var(--mp-color-text, #ffffff);
     line-height: 1.1;
@@ -52,20 +69,28 @@
       0 0 20px rgba(167, 139, 250, 0.1);
   }
 
+  .metric-label-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
   .metric-label {
     font-size: 14px;
     font-weight: 600;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: #94a3b8;
-    margin-top: 12px;
   }
 
   .metric-change {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    margin-top: 8px;
     letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 3px;
   }
 
   .metric-change.positive {
@@ -74,6 +99,33 @@
 
   .metric-change.negative {
     color: #f87171;
+  }
+
+  .trend-arrow {
+    font-size: 11px;
+  }
+
+  .metric-sparkline-wrap {
+    width: 80px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+
+  .metric-sparkline-wrap svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .metric-sparkline-wrap path.spark-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .metric-sparkline-wrap path.spark-fill {
+    stroke: none;
+    fill-opacity: 0.1;
   }
 </style>
 
@@ -89,6 +141,9 @@
       var card = document.createElement('div');
       card.className = 'metric-card';
 
+      var info = document.createElement('div');
+      info.className = 'metric-info';
+
       var valueDiv = document.createElement('div');
       valueDiv.className = 'metric-value';
       var prefix = m.prefix || '';
@@ -98,18 +153,65 @@
       valueDiv.dataset.suffix = suffix;
       valueDiv.textContent = prefix + '0' + suffix;
 
+      var labelRow = document.createElement('div');
+      labelRow.className = 'metric-label-row';
+
       var labelDiv = document.createElement('div');
       labelDiv.className = 'metric-label';
       labelDiv.textContent = m.label;
-
-      card.appendChild(valueDiv);
-      card.appendChild(labelDiv);
+      labelRow.appendChild(labelDiv);
 
       if (m.change !== undefined) {
         var changeDiv = document.createElement('div');
         changeDiv.className = 'metric-change ' + (m.change >= 0 ? 'positive' : 'negative');
-        changeDiv.textContent = (m.change >= 0 ? '+' : '') + m.change + '%';
-        card.appendChild(changeDiv);
+        var arrow = document.createElement('span');
+        arrow.className = 'trend-arrow';
+        arrow.textContent = m.change >= 0 ? '▲' : '▼';
+        changeDiv.appendChild(arrow);
+        var changeText = document.createTextNode((m.change >= 0 ? '+' : '') + m.change + '%');
+        changeDiv.appendChild(changeText);
+        labelRow.appendChild(changeDiv);
+      }
+
+      info.appendChild(valueDiv);
+      info.appendChild(labelRow);
+      card.appendChild(info);
+
+      // Mini sparkline
+      if (m.chart_data && m.chart_data.length > 1) {
+        var sparkWrap = document.createElement('div');
+        sparkWrap.className = 'metric-sparkline-wrap';
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 80 36');
+        svg.setAttribute('preserveAspectRatio', 'none');
+
+        var chartData = m.chart_data;
+        var min = Math.min.apply(null, chartData);
+        var max = Math.max.apply(null, chartData);
+        var range = max - min || 1;
+        var points = [];
+        for (var p = 0; p < chartData.length; p++) {
+          var x = (p / (chartData.length - 1)) * 80;
+          var y = 34 - ((chartData[p] - min) / range) * 30;
+          points.push(x + ',' + y);
+        }
+
+        var strokeColor = (m.change !== undefined && m.change < 0) ? '#f87171' : '#A78BFA';
+
+        var fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        fillPath.setAttribute('class', 'spark-fill');
+        fillPath.setAttribute('d', 'M0,36 L' + points.join(' L') + ' L80,36 Z');
+        fillPath.setAttribute('fill', strokeColor);
+        svg.appendChild(fillPath);
+
+        var linePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        linePath.setAttribute('class', 'spark-line');
+        linePath.setAttribute('d', 'M' + points.join(' L'));
+        linePath.setAttribute('stroke', strokeColor);
+        svg.appendChild(linePath);
+
+        sparkWrap.appendChild(svg);
+        card.appendChild(sparkWrap);
       }
 
       grid.appendChild(card);
@@ -132,13 +234,6 @@
       ease: ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out'
     }, 0.3);
 
-    // Subtle glow
-    tl.to(cards, {
-      boxShadow: '0 0 30px rgba(167, 139, 250, 0.05), 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.04)',
-      duration: 0.4,
-      stagger: stagger * 0.5
-    }, '-=0.2');
-
     // Count up numbers
     valueEls.forEach(function(ve, i) {
       var target = parseFloat(ve.dataset.target);
@@ -158,7 +253,7 @@
 
     // Exit
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
+      var exitAt = ctx.duration - 0.7;
       tl.to(cards, {
         autoAlpha: 0, y: -15,
         duration: 0.4,

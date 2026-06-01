@@ -1,0 +1,113 @@
+<template>
+  <div class="depth-blur">
+    <div class="blur-edge blur-top"></div>
+    <div class="blur-edge blur-bottom"></div>
+    <div class="blur-edge blur-left"></div>
+    <div class="blur-edge blur-right"></div>
+  </div>
+</template>
+
+<style scoped>
+  .depth-blur {
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    position: relative;
+  }
+
+  .blur-edge {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .blur-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 15%;
+    background: linear-gradient(180deg, rgba(0,0,0,0.12) 0%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, black 0%, transparent 100%);
+    mask-image: linear-gradient(180deg, black 0%, transparent 100%);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+
+  .blur-bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 15%;
+    background: linear-gradient(0deg, rgba(0,0,0,0.12) 0%, transparent 100%);
+    -webkit-mask-image: linear-gradient(0deg, black 0%, transparent 100%);
+    mask-image: linear-gradient(0deg, black 0%, transparent 100%);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+
+  .blur-left {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 10%;
+    background: linear-gradient(90deg, rgba(0,0,0,0.08) 0%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, black 0%, transparent 100%);
+    mask-image: linear-gradient(90deg, black 0%, transparent 100%);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .blur-right {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 10%;
+    background: linear-gradient(270deg, rgba(0,0,0,0.08) 0%, transparent 100%);
+    -webkit-mask-image: linear-gradient(270deg, black 0%, transparent 100%);
+    mask-image: linear-gradient(270deg, black 0%, transparent 100%);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var edges = el.querySelectorAll('.blur-edge');
+    var intensity = data.intensity || 1;
+
+    // Adjust blur amounts based on intensity
+    if (intensity !== 1) {
+      var topBottom = el.querySelectorAll('.blur-top, .blur-bottom');
+      var leftRight = el.querySelectorAll('.blur-left, .blur-right');
+      for (var i = 0; i < topBottom.length; i++) {
+        topBottom[i].style.webkitBackdropFilter = 'blur(' + (3 * intensity) + 'px)';
+        topBottom[i].style.backdropFilter = 'blur(' + (3 * intensity) + 'px)';
+      }
+      for (var j = 0; j < leftRight.length; j++) {
+        leftRight[j].style.webkitBackdropFilter = 'blur(' + (2 * intensity) + 'px)';
+        leftRight[j].style.backdropFilter = 'blur(' + (2 * intensity) + 'px)';
+      }
+    }
+
+    // Subtle fade in
+    gsap.set(edges, { autoAlpha: 0 });
+    tl.to(edges, {
+      autoAlpha: 1,
+      duration: 0.8,
+      ease: 'power2.out'
+    }, 0.1);
+
+    // Gentle breathing on the blur edges
+    if (ctx.duration > 3) {
+      tl.to(edges, {
+        autoAlpha: 0.85,
+        duration: 2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, 1);
+    }
+
+    return tl;
+  }
+</script>
