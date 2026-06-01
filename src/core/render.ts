@@ -457,7 +457,7 @@ async function renderDeck(
       width: project.canvas.width,
       height: project.canvas.height,
       format: "png",
-      atTime: 0,
+      atTime: scene.duration_seconds ? scene.duration_seconds / 3 : 1,
     });
 
     scenePngs.push(pngPath);
