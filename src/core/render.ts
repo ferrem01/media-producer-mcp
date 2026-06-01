@@ -201,12 +201,12 @@ async function renderSingleSceneWorker(
   // Spawn the worker
   const workerPath = path.resolve(
     path.dirname(new URL(import.meta.url).pathname),
-    "scene-worker.ts"
+    "scene-worker.js"
   );
 
   await new Promise<void>((resolve, reject) => {
     const child = fork(workerPath, [argsPath], {
-      execArgv: ["--import", "tsx/esm"],
+      execArgv: [],
       stdio: "inherit",
     });
     child.on("exit", (code) => {
