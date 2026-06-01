@@ -1,0 +1,563 @@
+<template>
+  <div class='scene'>
+    <div class='browser-mockup'>
+      <div class='browser-chrome'>
+        <div class='traffic-lights'>
+          <div class='light red'></div>
+          <div class='light yellow'></div>
+          <div class='light green'></div>
+        </div>
+        <div class='address-bar'>
+          <div class='url'>app.quotient.com/campaigns</div>
+        </div>
+      </div>
+      <div class='browser-content'>
+        <div class='dashboard-header'>
+          <h1 class='dashboard-title'>Campaign Dashboard</h1>
+          <div class='user-avatar'></div>
+        </div>
+        <div class='dashboard-main'>
+          <div class='campaign-list'>
+            <div class='campaign-card active'>
+              <div class='campaign-name'>Q4 Product Launch</div>
+              <div class='campaign-stats'>
+                <span class='stat'>CTR: 4.2%</span>
+                <span class='stat'>Conv: 12.8%</span>
+              </div>
+            </div>
+            <div class='campaign-card'>
+              <div class='campaign-name'>Holiday Promotion</div>
+              <div class='campaign-stats'>
+                <span class='stat'>CTR: 3.8%</span>
+                <span class='stat'>Conv: 9.4%</span>
+              </div>
+            </div>
+          </div>
+          <div class='integration-panel' data-target="canva-panel">
+            <div class='panel-header'>
+              <svg class='canva-logo' width='24' height='24' viewBox='0 0 24 24' fill='none'>
+                <path d='M7.5 12C7.5 9.51 9.51 7.5 12 7.5S16.5 9.51 16.5 12 14.49 16.5 12 16.5 7.5 14.49 7.5 12Z' fill='#00C4CC'/>
+                <path d='M12 3C7.03 3 3 7.03 3 12S7.03 21 12 21 21 16.97 21 12 16.97 3 12 3ZM12 18C8.69 18 6 15.31 6 12S8.69 6 12 6 18 8.69 18 12 15.31 18 12 18Z' fill='#00C4CC'/>
+              </svg>
+              <h3 class='panel-title'>Canva Integration</h3>
+            </div>
+            <div class='panel-content'>
+              <p class='panel-description'>Create on-brand content with your campaign assets</p>
+              <div class='brand-assets'>
+                <div class='asset-preview logo'></div>
+                <div class='asset-preview colors'></div>
+                <div class='asset-preview fonts'></div>
+              </div>
+              <button class='canva-btn' data-target="create-btn">
+                <svg width='16' height='16' viewBox='0 0 16 16' fill='none'>
+                  <path d='M8 3V13M3 8H13' stroke='white' stroke-width='2' stroke-linecap='round'/>
+                </svg>
+                Create with Canva
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class='canva-editor' data-target="canva-editor">
+      <div class='editor-header'>
+        <svg class='canva-logo-large' width='32' height='32' viewBox='0 0 24 24' fill='none'>
+          <path d='M7.5 12C7.5 9.51 9.51 7.5 12 7.5S16.5 9.51 16.5 12 14.49 16.5 12 16.5 7.5 14.49 7.5 12Z' fill='#00C4CC'/>
+          <path d='M12 3C7.03 3 3 7.03 3 12S7.03 21 12 21 21 16.97 21 12 16.97 3 12 3ZM12 18C8.69 18 6 15.31 6 12S8.69 6 12 6 18 8.69 18 12 15.31 18 12 18Z' fill='#00C4CC'/>
+        </svg>
+        <h2 class='editor-title'>Q4 Product Launch - Social Post</h2>
+      </div>
+      <div class='editor-content'>
+        <div class='canvas-area'>
+          <div class='design-preview'>
+            <div class='brand-logo-placeholder'></div>
+            <div class='text-element'>New Product Launch</div>
+            <div class='cta-element'>Learn More</div>
+          </div>
+        </div>
+        <div class='sidebar'>
+          <div class='brand-kit'>
+            <h4>Brand Kit</h4>
+            <div class='brand-colors'>
+              <div class='color-swatch primary'></div>
+              <div class='color-swatch secondary'></div>
+              <div class='color-swatch accent'></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    width: 100%;
+    height: 100vh;
+    background: var(--mp-color-background);
+    overflow: hidden;
+    position: relative;
+    padding: 60px;
+    box-sizing: border-box;
+  }
+
+  .browser-mockup {
+    width: 100%;
+    max-width: 1200px;
+    height: 700px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .browser-chrome {
+    height: 60px;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .traffic-lights {
+    display: flex;
+    gap: 8px;
+    margin-right: 20px;
+  }
+
+  .light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  .light.red { background: #ff5f57; }
+  .light.yellow { background: #ffbd2e; }
+  .light.green { background: #28ca42; }
+
+  .address-bar {
+    flex: 1;
+    height: 32px;
+    background: #ffffff;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border: 1px solid #e0e0e0;
+  }
+
+  .url {
+    font-size: 14px;
+    color: #666;
+    font-family: var(--mp-font-family);
+  }
+
+  .browser-content {
+    height: calc(100% - 60px);
+    background: #fafafa;
+    padding: 24px;
+    overflow: hidden;
+  }
+
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+  }
+
+  .dashboard-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0;
+    font-family: var(--mp-font-family);
+  }
+
+  .user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--mp-color-primary), var(--mp-color-secondary));
+  }
+
+  .dashboard-main {
+    display: flex;
+    gap: 32px;
+    height: calc(100% - 100px);
+  }
+
+  .campaign-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .campaign-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+  }
+
+  .campaign-card.active {
+    border-color: var(--mp-color-primary);
+    box-shadow: 0 4px 16px rgba(91, 33, 182, 0.2);
+  }
+
+  .campaign-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 12px;
+    font-family: var(--mp-font-family);
+  }
+
+  .campaign-stats {
+    display: flex;
+    gap: 16px;
+  }
+
+  .stat {
+    font-size: 14px;
+    color: #666;
+    font-family: var(--mp-font-family);
+  }
+
+  .integration-panel {
+    width: 350px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .panel-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+    font-family: var(--mp-font-family);
+  }
+
+  .panel-description {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 24px;
+    line-height: 1.5;
+    font-family: var(--mp-font-family);
+  }
+
+  .brand-assets {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .asset-preview {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+  }
+
+  .asset-preview.logo {
+    background: linear-gradient(135deg, var(--mp-color-primary), var(--mp-color-secondary));
+  }
+
+  .asset-preview.colors {
+    background: linear-gradient(90deg, var(--mp-color-primary) 0%, var(--mp-color-secondary) 50%, var(--mp-color-accent) 100%);
+  }
+
+  .asset-preview.fonts {
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+  }
+
+  .asset-preview.fonts::after {
+    content: 'Aa';
+  }
+
+  .canva-btn {
+    width: 100%;
+    height: 48px;
+    background: linear-gradient(135deg, #00C4CC, #7B68EE);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: var(--mp-font-family);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(0, 196, 204, 0.3);
+  }
+
+  .canva-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 196, 204, 0.4);
+  }
+
+  .canva-editor {
+    position: absolute;
+    top: 60px;
+    left: 60px;
+    width: calc(100% - 120px);
+    height: calc(100% - 120px);
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.9) translateY(20px);
+  }
+
+  .editor-header {
+    height: 60px;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    border-bottom: 1px solid #e0e0e0;
+    gap: 12px;
+  }
+
+  .editor-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+    font-family: var(--mp-font-family);
+  }
+
+  .editor-content {
+    display: flex;
+    height: calc(100% - 60px);
+  }
+
+  .canvas-area {
+    flex: 1;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+
+  .design-preview {
+    width: 400px;
+    height: 400px;
+    background: linear-gradient(135deg, var(--mp-color-primary), var(--mp-color-secondary));
+    border-radius: 16px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    box-shadow: 0 8px 32px rgba(91, 33, 182, 0.3);
+  }
+
+  .brand-logo-placeholder {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+  }
+
+  .text-element {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+    text-align: center;
+    font-family: var(--mp-font-family);
+  }
+
+  .cta-element {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    padding: 12px 24px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    font-family: var(--mp-font-family);
+  }
+
+  .sidebar {
+    width: 280px;
+    background: #fafafa;
+    border-left: 1px solid #e0e0e0;
+    padding: 24px;
+  }
+
+  .brand-kit h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0 0 16px 0;
+    font-family: var(--mp-font-family);
+  }
+
+  .brand-colors {
+    display: flex;
+    gap: 8px;
+  }
+
+  .color-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 2px solid #e0e0e0;
+  }
+
+  .color-swatch.primary { background: var(--mp-color-primary); }
+  .color-swatch.secondary { background: var(--mp-color-secondary); }
+  .color-swatch.accent { background: var(--mp-color-accent); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    
+    // Query elements
+    var browserMockup = el.querySelector('.browser-mockup');
+    var integrationPanel = el.querySelector('.integration-panel');
+    var canvaBtn = el.querySelector('.canva-btn');
+    var canvaEditor = el.querySelector('.canva-editor');
+    var campaignCards = el.querySelectorAll('.campaign-card');
+    var brandAssets = el.querySelectorAll('.asset-preview');
+    var designElements = el.querySelectorAll('.brand-logo-placeholder, .text-element, .cta-element');
+    
+    // Set initial states
+    gsap.set(browserMockup, { autoAlpha: 0, scale: 0.9, y: 30 });
+    gsap.set(integrationPanel, { autoAlpha: 0, x: 50 });
+    gsap.set(campaignCards, { autoAlpha: 0, y: 20 });
+    gsap.set(brandAssets, { autoAlpha: 0, scale: 0.8 });
+    gsap.set(canvaEditor, { autoAlpha: 0, scale: 0.9, y: 20 });
+    gsap.set(designElements, { autoAlpha: 0, y: 20 });
+    
+    // Motion settings
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
+    
+    // Entrance animations
+    tl.to(browserMockup, { 
+      autoAlpha: 1, 
+      scale: 1, 
+      y: 0, 
+      duration: speed * 1.2, 
+      ease: ease 
+    }, 0.2);
+    
+    tl.to(campaignCards, { 
+      autoAlpha: 1, 
+      y: 0, 
+      stagger: 0.1, 
+      duration: speed, 
+      ease: ease 
+    }, 0.6);
+    
+    tl.to(integrationPanel, { 
+      autoAlpha: 1, 
+      x: 0, 
+      duration: speed, 
+      ease: ease 
+    }, 0.8);
+    
+    tl.to(brandAssets, { 
+      autoAlpha: 1, 
+      scale: 1, 
+      stagger: 0.05, 
+      duration: speed * 0.8, 
+      ease: ease 
+    }, 1.2);
+    
+    // Create and animate cursor
+    var cursor = createCursor(el);
+    gsap.set(cursor, { autoAlpha: 0 });
+    
+    tl.to(cursor, { autoAlpha: 1, duration: 0.3 }, 1.8);
+    
+    // Move cursor to Canva button and click
+    moveCursor(tl, cursor, canvaBtn, 2.0, 0.8, 'power2.out');
+    clickCursor(tl, cursor, 2.8);
+    
+    // Button click effect
+    tl.to(canvaBtn, { 
+      scale: 0.95, 
+      duration: 0.1, 
+      ease: 'power2.out' 
+    }, 2.8);
+    
+    tl.to(canvaBtn, { 
+      scale: 1, 
+      duration: 0.2, 
+      ease: 'back.out(1.7)' 
+    }, 2.9);
+    
+    // Transition to Canva editor
+    tl.to(browserMockup, { 
+      autoAlpha: 0, 
+      scale: 0.95, 
+      duration: 0.4, 
+      ease: 'power2.in' 
+    }, 3.2);
+    
+    tl.to(canvaEditor, { 
+      autoAlpha: 1, 
+      scale: 1, 
+      y: 0, 
+      duration: speed, 
+      ease: ease 
+    }, 3.4);
+    
+    // Animate design elements appearing
+    tl.to(designElements, { 
+      autoAlpha: 1, 
+      y: 0, 
+      stagger: 0.1, 
+      duration: speed * 0.8, 
+      ease: ease 
+    }, 3.8);
+    
+    // Hide cursor
+    hideCursor(tl, cursor, 4.2);
+    
+    // Exit animation
+    if (ctx.duration > 4.5) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to([canvaEditor, cursor], { 
+        autoAlpha: 0, 
+        duration: 0.4, 
+        ease: 'power2.in' 
+      }, exitAt);
+    }
+    
+    return tl;
+  }
+</script>

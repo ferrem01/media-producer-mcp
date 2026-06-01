@@ -1,0 +1,110 @@
+{
+  "project_id": "proj_a0a4db8f",
+  "tenant_id": "test-tenant",
+  "name": "Integration Test - Final",
+  "format": "video",
+  "status": "draft",
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "preset": "landscape",
+    "fps": 30,
+    "background": "#0f172a"
+  },
+  "brand_kit": {
+    "colors": {
+      "primary": "#5B21B6",
+      "secondary": "#7C3AED",
+      "accent": "#A78BFA",
+      "background": "#0f172a",
+      "surface": "#1e293b",
+      "text": "#ffffff",
+      "text_muted": "#94a3b8"
+    },
+    "fonts": [
+      {
+        "family": "Inter",
+        "source": "google",
+        "weights": [
+          400,
+          600,
+          800
+        ]
+      }
+    ],
+    "style": {
+      "border_radius": "12px",
+      "motion": "cinematic"
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene_title",
+      "label": "Title Slide",
+      "duration_seconds": 3,
+      "background": "#0f172a",
+      "components": [
+        {
+          "id": "comp_bg1",
+          "type": "gradient-background",
+          "data": {
+            "from": "#0f172a",
+            "to": "#1e293b",
+            "angle": 165
+          },
+          "z_index": 0
+        },
+        {
+          "id": "comp_title1",
+          "type": "title-slide",
+          "data": {
+            "badge": "INTEGRATION TEST",
+            "title": "Media Producer MCP v0.1",
+            "subtitle": "HTML + GSAP + Playwright + ffmpeg"
+          },
+          "z_index": 10
+        },
+        {
+          "id": "comp_polish1",
+          "type": "film-polish",
+          "data": {
+            "vignette": 0.12,
+            "grain": 0.04
+          },
+          "z_index": 100
+        }
+      ]
+    },
+    {
+      "id": "scene_features",
+      "label": "Key Features",
+      "duration_seconds": 4,
+      "transition_in": {
+        "type": "crossfade",
+        "duration_seconds": 0.5
+      },
+      "components": [
+        {
+          "id": "comp_bg2",
+          "type": "gradient-background",
+          "data": {
+            "from": "#1e293b",
+            "to": "#0f172a",
+            "angle": 200
+          },
+          "z_index": 0
+        },
+        {
+          "id": "comp_title2",
+          "type": "title-slide",
+          "data": {
+            "badge": "FEATURES",
+            "title": "Multi-Format Output",
+            "subtitle": "Video, Image, Deck, GIF, Social"
+          },
+          "z_index": 10
+        }
+      ]
+    }
+  ]
+}

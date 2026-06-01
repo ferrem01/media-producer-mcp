@@ -2,7 +2,7 @@
  * Component Playground SPA - LLM-driven component iteration tool.
  *
  * Workflow: prompt -> generate -> preview -> iterate -> save
- * Shows tenant custom components only, not built-in library.
+ * Chat-style iteration log, tabbed right panel, component browser.
  * Same dark theme as Preview SPA.
  */
 
@@ -36,7 +36,7 @@ body {
 .app { display: flex; flex-direction: column; height: 100vh; }
 .header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px;
+  padding: 10px 20px;
   background: #1e293b; border-bottom: 1px solid #334155;
   flex-shrink: 0;
 }
@@ -52,60 +52,91 @@ body {
   padding: 4px 8px; border-radius: 4px; font-size: 13px; font-family: inherit;
   width: 120px;
 }
-.main { display: flex; flex: 1; overflow: hidden; }
+.main-area { display: flex; flex: 1; overflow: hidden; }
 
-/* ── Sidebar ── */
-.sidebar {
-  width: 240px; min-width: 240px;
+/* ── Left Panel (Chat Log) ── */
+.left-panel {
+  width: 320px; min-width: 280px;
   background: #1e293b; border-right: 1px solid #334155;
   display: flex; flex-direction: column; overflow: hidden;
 }
-.sidebar-header {
-  padding: 12px 16px;
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.08em; color: #64748b;
+.left-panel-header {
+  padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between;
   border-bottom: 1px solid #334155;
+  gap: 8px;
+  flex-shrink: 0;
 }
-.sidebar-list { flex: 1; overflow-y: auto; padding: 8px 0; }
-.sidebar-item {
-  padding: 8px 16px; cursor: pointer;
-  font-size: 13px; color: #94a3b8;
-  transition: all 0.1s;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  border-left: 3px solid transparent;
+.left-panel-header .new-btn {
+  padding: 5px 12px; font-size: 12px; font-weight: 500;
+  background: #A78BFA; color: #0f172a; border: none; border-radius: 5px;
+  cursor: pointer; white-space: nowrap;
 }
-.sidebar-item:hover { color: #e2e8f0; background: rgba(167, 139, 250, 0.06); }
-.sidebar-item.active {
-  color: #A78BFA; background: rgba(167, 139, 250, 0.1);
-  border-left-color: #A78BFA; font-weight: 500;
+.left-panel-header .new-btn:hover { background: #c4b5fd; }
+.component-browser-select {
+  flex: 1; min-width: 0;
+  background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+  padding: 5px 8px; border-radius: 5px; font-size: 12px; font-family: inherit;
+  cursor: pointer;
 }
-.sidebar-empty {
-  padding: 20px 16px; color: #475569; font-size: 13px;
-  text-align: center;
+.component-browser-select option { background: #1e293b; color: #e2e8f0; }
+
+.chat-log {
+  flex: 1; overflow-y: auto; padding: 10px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.chat-entry {
+  padding: 10px 12px; border-radius: 8px;
+  cursor: pointer; transition: all 0.12s;
+  border: 1px solid transparent;
+}
+.chat-entry:hover { border-color: #334155; }
+.chat-entry.active { border-color: #A78BFA; background: rgba(167, 139, 250, 0.08); }
+.chat-prompt {
+  font-size: 13px; color: #e2e8f0; margin-bottom: 4px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.chat-meta {
+  font-size: 11px; color: #64748b;
+  display: flex; align-items: center; gap: 8px;
+}
+.chat-meta .badge {
+  display: inline-block; padding: 1px 6px; border-radius: 3px;
+  background: rgba(167, 139, 250, 0.15); color: #A78BFA;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+}
+.chat-empty {
+  padding: 30px 16px; color: #475569; font-size: 13px;
+  text-align: center; line-height: 1.7;
 }
 
-/* ── Content Area ── */
-.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+/* ── Center Column ── */
+.center-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 
 /* ── Prompt Area ── */
 .prompt-area {
-  padding: 16px 20px;
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
+  padding: 12px 16px;
+  background: #1e293b; border-bottom: 1px solid #334155;
   flex-shrink: 0;
 }
-.prompt-row {
-  display: flex; gap: 10px; align-items: flex-start;
-}
+.prompt-row { display: flex; gap: 10px; align-items: flex-end; }
 .prompt-input {
   flex: 1; padding: 10px 14px;
   background: #0f172a; border: 1px solid #334155; border-radius: 8px;
   color: #e2e8f0; font-size: 14px; font-family: inherit;
-  resize: none; min-height: 44px; max-height: 120px;
+  resize: none; min-height: 60px; max-height: 160px;
   outline: none; transition: border-color 0.15s;
 }
 .prompt-input:focus { border-color: #A78BFA; }
 .prompt-input::placeholder { color: #475569; }
+.prompt-hint {
+  font-size: 11px; color: #475569; margin-top: 6px;
+}
+.prompt-hint kbd {
+  background: #334155; padding: 1px 5px; border-radius: 3px;
+  font-family: inherit; font-size: 10px; color: #94a3b8;
+}
 .btn {
   padding: 10px 20px; border-radius: 8px;
   font-size: 14px; font-weight: 500; cursor: pointer;
@@ -121,12 +152,44 @@ body {
 .btn-success { background: #22c55e; color: #fff; border-color: #22c55e; }
 .btn-success:hover { background: #16a34a; }
 
+/* ── Status indicator (replaces blocking overlay) ── */
+.status-indicator {
+  display: none;
+  align-items: center; gap: 8px;
+  padding: 6px 14px;
+  background: rgba(167, 139, 250, 0.1);
+  border-bottom: 1px solid #334155;
+  flex-shrink: 0;
+  font-size: 13px; color: #A78BFA;
+}
+.status-indicator.visible { display: flex; }
+.pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #A78BFA;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.status-elapsed { color: #64748b; font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; }
+
 /* ── Preview Area ── */
 .preview-area {
   flex: 1; position: relative;
   background: #0a0f1a; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
 }
+.preview-info {
+  position: absolute; top: 8px; left: 12px;
+  font-size: 11px; color: #64748b;
+  display: flex; align-items: center; gap: 10px;
+  z-index: 5;
+}
+.fullscreen-btn {
+  position: absolute; top: 8px; right: 12px;
+  background: rgba(30, 41, 59, 0.8); border: 1px solid #334155;
+  color: #94a3b8; padding: 4px 8px; border-radius: 4px;
+  font-size: 11px; cursor: pointer; z-index: 5;
+}
+.fullscreen-btn:hover { color: #e2e8f0; border-color: #64748b; }
 .preview-wrapper { position: relative; }
 .preview-area iframe {
   border: none; background: #000;
@@ -140,30 +203,11 @@ body {
 .preview-empty svg { width: 48px; height: 48px; opacity: 0.3; }
 .preview-empty p { font-size: 14px; }
 
-/* ── Generating overlay ── */
-.generating-overlay {
-  position: absolute; inset: 0;
-  background: rgba(15, 23, 42, 0.85);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 16px; z-index: 10;
-}
-.generating-overlay.hidden { display: none; }
-.spinner {
-  width: 40px; height: 40px;
-  border: 3px solid #334155;
-  border-top-color: #A78BFA;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.generating-text { color: #94a3b8; font-size: 14px; }
-
 /* ── Timeline ── */
 .timeline-bar {
   display: flex; align-items: center; gap: 12px;
-  padding: 10px 16px;
-  background: #1e293b; border-top: 1px solid #334155; border-bottom: 1px solid #334155;
+  padding: 8px 16px;
+  background: #1e293b; border-top: 1px solid #334155;
   flex-shrink: 0;
 }
 .timeline-bar button {
@@ -186,30 +230,33 @@ body {
   font-variant-numeric: tabular-nums; min-width: 80px; text-align: right;
 }
 
-/* ── Bottom Panels ── */
-.bottom-panels {
-  display: flex; height: 260px; min-height: 200px;
-  border-top: 1px solid #334155; flex-shrink: 0;
+/* ── Right Panel (Tabbed) ── */
+.right-panel {
+  width: 340px; min-width: 280px;
+  background: #1e293b; border-left: 1px solid #334155;
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.panel {
-  flex: 1; display: flex; flex-direction: column;
-  overflow: hidden;
+.tab-bar {
+  display: flex; border-bottom: 1px solid #334155; flex-shrink: 0;
 }
-.panel + .panel { border-left: 1px solid #334155; }
-.panel-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 14px;
-  background: #1e293b; border-bottom: 1px solid #334155;
-  font-size: 12px; font-weight: 600; color: #94a3b8;
-  text-transform: uppercase; letter-spacing: 0.06em;
-  flex-shrink: 0;
+.tab-btn {
+  flex: 1; padding: 9px 10px;
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #64748b;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; transition: all 0.12s;
+  font-family: inherit;
 }
-.panel-body {
+.tab-btn:hover { color: #94a3b8; }
+.tab-btn.active { color: #A78BFA; border-bottom-color: #A78BFA; }
+.tab-content {
   flex: 1; overflow-y: auto; padding: 14px;
   background: #0f172a;
+  display: none;
 }
+.tab-content.active { display: block; }
 
-/* ── Data/Prop Editor ── */
+/* ── Props tab ── */
 .field-group { margin-bottom: 12px; }
 .field-label {
   display: block; font-size: 12px; font-weight: 500; color: #94a3b8;
@@ -227,27 +274,57 @@ textarea.field-input {
   font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 12px;
 }
 
-/* ── Source / Revise Panel ── */
+/* ── Source tab (syntax highlighting) ── */
 .source-view {
   font-family: 'JetBrains Mono', 'Consolas', monospace;
   font-size: 12px; line-height: 1.6;
   white-space: pre-wrap; word-break: break-all;
   color: #94a3b8; tab-size: 2;
 }
-.revise-area {
-  display: flex; gap: 8px; margin-bottom: 12px;
-}
-.revise-input {
-  flex: 1; padding: 7px 10px;
-  background: #1e293b; border: 1px solid #334155; border-radius: 5px;
-  color: #e2e8f0; font-size: 13px; font-family: inherit; outline: none;
-}
-.revise-input:focus { border-color: #A78BFA; }
-.revise-input::placeholder { color: #475569; }
+.source-view .tag { color: #7dd3fc; }
+.source-view .attr { color: #fbbf24; }
+.source-view .str { color: #86efac; }
+.source-view .cmt { color: #475569; font-style: italic; }
 .source-actions {
-  display: flex; gap: 8px; margin-top: 12px;
+  display: flex; gap: 8px; margin-top: 14px;
   padding-top: 12px; border-top: 1px solid #1e293b;
 }
+
+/* ── History tab ── */
+.history-list { display: flex; flex-direction: column; gap: 6px; }
+.history-item {
+  padding: 8px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid transparent; transition: all 0.12s;
+}
+.history-item:hover { border-color: #334155; background: rgba(167, 139, 250, 0.04); }
+.history-item.active { border-color: #A78BFA; background: rgba(167, 139, 250, 0.08); }
+.history-prompt {
+  font-size: 12px; color: #e2e8f0; margin-bottom: 3px;
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.history-meta { font-size: 11px; color: #64748b; }
+.history-empty {
+  padding: 20px 10px; color: #475569; font-size: 13px; text-align: center;
+}
+
+/* ── Status Bar ── */
+.status-bar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 6px 16px;
+  background: #1e293b; border-top: 1px solid #334155;
+  font-size: 11px; color: #64748b;
+  flex-shrink: 0;
+}
+.status-bar .ws-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  display: inline-block;
+}
+.ws-dot.connected { background: #22c55e; }
+.ws-dot.disconnected { background: #ef4444; }
+
+/* ── Utility ── */
+.hidden { display: none !important; }
 </style>
 </head>
 <body>
@@ -264,27 +341,48 @@ textarea.field-input {
     </div>
   </div>
 
-  <div class="main">
-    <!-- Sidebar: My Components -->
-    <div class="sidebar">
-      <div class="sidebar-header">My Components</div>
-      <div class="sidebar-list" id="component-list">
-        <div class="sidebar-empty" id="sidebar-empty">Enter a tenant ID to see your components</div>
+  <div class="main-area">
+    <!-- Left Panel: Chat Log -->
+    <div class="left-panel">
+      <div class="left-panel-header">
+        <select id="component-browser" class="component-browser-select">
+          <option value="">Load component...</option>
+        </select>
+        <button class="new-btn" id="new-component-btn">+ New</button>
+      </div>
+      <div class="chat-log" id="chat-log">
+        <div class="chat-empty" id="chat-empty">
+          Describe a component above to get started.<br>Each prompt and result shows here as a conversation.
+        </div>
       </div>
     </div>
 
-    <!-- Content -->
-    <div class="content">
+    <!-- Center Column -->
+    <div class="center-col">
       <!-- Prompt -->
       <div class="prompt-area">
         <div class="prompt-row">
-          <textarea class="prompt-input" id="prompt-input" rows="1" placeholder="Describe the component you want to create..."></textarea>
+          <textarea class="prompt-input" id="prompt-input" rows="2"
+            placeholder="Describe a component... or paste a revision instruction"></textarea>
           <button class="btn btn-primary" id="generate-btn">Generate</button>
         </div>
+        <div class="prompt-hint"><kbd>Cmd+Enter</kbd> to send</div>
+      </div>
+
+      <!-- Status Indicator (non-blocking) -->
+      <div class="status-indicator" id="status-indicator">
+        <div class="pulse-dot"></div>
+        <span id="status-text">Generating...</span>
+        <span class="status-elapsed" id="status-elapsed"></span>
       </div>
 
       <!-- Preview -->
       <div class="preview-area" id="preview-area">
+        <div class="preview-info" id="preview-info" style="display:none">
+          <span id="info-type"></span>
+          <span id="info-size"></span>
+        </div>
+        <button class="fullscreen-btn" id="fullscreen-btn" style="display:none">Fullscreen</button>
         <div class="preview-empty" id="preview-empty">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <rect x="2" y="3" width="20" height="14" rx="2"/>
@@ -294,10 +392,6 @@ textarea.field-input {
         </div>
         <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
           <iframe id="preview-iframe" sandbox="allow-scripts"></iframe>
-        </div>
-        <div class="generating-overlay hidden" id="generating-overlay">
-          <div class="spinner"></div>
-          <div class="generating-text" id="generating-text">Generating component...</div>
         </div>
       </div>
 
@@ -309,36 +403,41 @@ textarea.field-input {
         </div>
         <div class="time-display" id="time-display">0.00s / 0.00s</div>
       </div>
+    </div>
 
-      <!-- Bottom Panels -->
-      <div class="bottom-panels">
-        <!-- Prop Editor -->
-        <div class="panel">
-          <div class="panel-header">Prop Editor</div>
-          <div class="panel-body" id="prop-editor">
-            <div class="sidebar-empty">Generate a component to edit props</div>
-          </div>
+    <!-- Right Panel (Tabbed) -->
+    <div class="right-panel">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="props">Props</button>
+        <button class="tab-btn" data-tab="source">Source</button>
+        <button class="tab-btn" data-tab="history">History</button>
+      </div>
+      <div class="tab-content active" id="tab-props">
+        <div class="chat-empty">Generate a component to edit props</div>
+      </div>
+      <div class="tab-content" id="tab-source">
+        <div class="source-actions" style="border-top:none;padding-top:0;margin-top:0;margin-bottom:12px">
+          <button class="btn btn-secondary btn-sm" id="btn-copy" style="padding:3px 10px;font-size:11px">Copy</button>
+          <button class="btn btn-success btn-sm" id="save-btn" style="padding:3px 10px;font-size:11px">Save to Library</button>
         </div>
-
-        <!-- Source / Revise -->
-        <div class="panel">
-          <div class="panel-header">
-            <span>Source / Revise</span>
-            <button class="btn btn-secondary btn-sm" id="btn-copy" style="padding:3px 10px;font-size:11px">Copy</button>
-          </div>
-          <div class="panel-body" id="source-panel">
-            <div class="revise-area">
-              <input class="revise-input" id="revise-input" placeholder="Make the title bigger, add a gradient...">
-              <button class="btn btn-secondary btn-sm" id="revise-btn">Revise</button>
-            </div>
-            <div class="source-view" id="source-view"></div>
-            <div class="source-actions">
-              <button class="btn btn-success btn-sm" id="save-btn">Save to Library</button>
-            </div>
-          </div>
-        </div>
+        <div class="source-view" id="source-view"></div>
+      </div>
+      <div class="tab-content" id="tab-history">
+        <div class="history-empty" id="history-empty">No versions yet. Generate or revise a component to start tracking history.</div>
+        <div class="history-list" id="history-list"></div>
       </div>
     </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status-bar" id="status-bar">
+    <span id="sb-tenant">Tenant: --</span>
+    <span id="sb-type">Component: --</span>
+    <span id="sb-size">Size: --</span>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:4px">
+      <span class="ws-dot disconnected" id="ws-dot"></span>
+      <span id="ws-label">Disconnected</span>
+    </span>
   </div>
 </div>
 
@@ -348,35 +447,61 @@ textarea.field-input {
   var tenantId = '';
   var currentSource = '';
   var currentData = {};
-  var tenantComponents = [];
   var activeComponentType = null;
   var playing = false;
   var animFrame = null;
   var ws = null;
   var wsReconnectTimer = null;
+  // Chat log entries: { id, prompt, type, action, source, data, timestamp }
+  var chatEntries = [];
+  var activeChatId = null;
+  // Version history for current session
+  var versionHistory = []; // { id, prompt, source, data, type, timestamp }
+  var activeVersionId = null;
+  // Generating state
+  var generating = false;
+  var genStartTime = null;
+  var genTimer = null;
+  // Component browser data
+  var tenantComponents = [];
+  var catalogComponents = [];
 
   // ── DOM refs ──
   var $tenantInput = document.getElementById('tenant-input');
   var $tenantLoadBtn = document.getElementById('tenant-load-btn');
-  var $componentList = document.getElementById('component-list');
-  var $sidebarEmpty = document.getElementById('sidebar-empty');
+  var $componentBrowser = document.getElementById('component-browser');
+  var $newBtn = document.getElementById('new-component-btn');
+  var $chatLog = document.getElementById('chat-log');
+  var $chatEmpty = document.getElementById('chat-empty');
   var $promptInput = document.getElementById('prompt-input');
   var $generateBtn = document.getElementById('generate-btn');
+  var $statusIndicator = document.getElementById('status-indicator');
+  var $statusText = document.getElementById('status-text');
+  var $statusElapsed = document.getElementById('status-elapsed');
   var $previewArea = document.getElementById('preview-area');
+  var $previewInfo = document.getElementById('preview-info');
+  var $infoType = document.getElementById('info-type');
+  var $infoSize = document.getElementById('info-size');
+  var $fullscreenBtn = document.getElementById('fullscreen-btn');
   var $previewEmpty = document.getElementById('preview-empty');
   var $previewWrapper = document.getElementById('preview-wrapper');
   var $preview = document.getElementById('preview-iframe');
-  var $generatingOverlay = document.getElementById('generating-overlay');
-  var $generatingText = document.getElementById('generating-text');
   var $btnPlay = document.getElementById('btn-play');
   var $scrubber = document.getElementById('scrubber');
   var $timeDisplay = document.getElementById('time-display');
-  var $propEditor = document.getElementById('prop-editor');
+  var $tabProps = document.getElementById('tab-props');
+  var $tabSource = document.getElementById('tab-source');
+  var $tabHistory = document.getElementById('tab-history');
   var $sourceView = document.getElementById('source-view');
   var $btnCopy = document.getElementById('btn-copy');
-  var $reviseInput = document.getElementById('revise-input');
-  var $reviseBtn = document.getElementById('revise-btn');
   var $saveBtn = document.getElementById('save-btn');
+  var $historyList = document.getElementById('history-list');
+  var $historyEmpty = document.getElementById('history-empty');
+  var $sbTenant = document.getElementById('sb-tenant');
+  var $sbType = document.getElementById('sb-type');
+  var $sbSize = document.getElementById('sb-size');
+  var $wsDot = document.getElementById('ws-dot');
+  var $wsLabel = document.getElementById('ws-label');
 
   // ── WebSocket ──
   function connectWebSocket() {
@@ -386,6 +511,8 @@ textarea.field-input {
 
     wsConn.onopen = function() {
       if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+      $wsDot.className = 'ws-dot connected';
+      $wsLabel.textContent = 'Connected';
     };
 
     wsConn.onmessage = function(e) {
@@ -429,6 +556,8 @@ textarea.field-input {
 
     wsConn.onclose = function() {
       ws = null;
+      $wsDot.className = 'ws-dot disconnected';
+      $wsLabel.textContent = 'Disconnected';
       wsReconnectTimer = setTimeout(connectWebSocket, 2000);
     };
     wsConn.onerror = function() { wsConn.close(); };
@@ -444,10 +573,68 @@ textarea.field-input {
     return d.innerHTML;
   }
 
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  function fmtTime(ts) {
+    var d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    return (bytes / 1024).toFixed(1) + ' KB';
+  }
+
+  // ── Syntax highlighting (basic HTML) ──
+  function highlightHtml(src) {
+    var esc = escHtml(src);
+    // Comments
+    esc = esc.replace(/&lt;!--[\\s\\S]*?--&gt;/g, function(m) {
+      return '<span class="cmt">' + m + '</span>';
+    });
+    // Tags
+    esc = esc.replace(/(&lt;\\/?)([a-zA-Z][a-zA-Z0-9-]*)/g, function(m, open, tag) {
+      return open + '<span class="tag">' + tag + '</span>';
+    });
+    // Attributes
+    esc = esc.replace(/\\s([a-zA-Z][a-zA-Z0-9-]*)=/g, function(m, attr) {
+      return ' <span class="attr">' + attr + '</span>=';
+    });
+    // Strings (quoted)
+    esc = esc.replace(/(&quot;)(.*?)(&quot;)/g, function(m, q1, content, q2) {
+      return '<span class="str">' + q1 + content + q2 + '</span>';
+    });
+    return esc;
+  }
+
+  // ── Show/Hide generating status (non-blocking) ──
+  function showGenerating(label) {
+    generating = true;
+    genStartTime = Date.now();
+    $statusText.textContent = label || 'Generating...';
+    $statusElapsed.textContent = '0.0s';
+    $statusIndicator.classList.add('visible');
+    $generateBtn.disabled = true;
+    genTimer = setInterval(function() {
+      var elapsed = ((Date.now() - genStartTime) / 1000).toFixed(1);
+      $statusElapsed.textContent = elapsed + 's';
+    }, 100);
+  }
+
+  function hideGenerating() {
+    generating = false;
+    $statusIndicator.classList.remove('visible');
+    $generateBtn.disabled = false;
+    if (genTimer) { clearInterval(genTimer); genTimer = null; }
+  }
+
+  // ── Preview ──
   function showPreview() {
     $previewEmpty.style.display = 'none';
     $previewWrapper.style.display = 'block';
+    $fullscreenBtn.style.display = 'block';
     fitPreview();
+    updatePreviewInfo();
   }
 
   function fitPreview() {
@@ -471,62 +658,135 @@ textarea.field-input {
 
   window.addEventListener('resize', fitPreview);
 
+  function updatePreviewInfo() {
+    if (activeComponentType || currentSource) {
+      $previewInfo.style.display = 'flex';
+      $infoType.textContent = activeComponentType || 'untitled';
+      $infoSize.textContent = currentSource ? fmtSize(new Blob([currentSource]).size) : '';
+    } else {
+      $previewInfo.style.display = 'none';
+    }
+  }
+
+  function updateStatusBar() {
+    $sbTenant.textContent = 'Tenant: ' + (tenantId || '--');
+    $sbType.textContent = 'Component: ' + (activeComponentType || '--');
+    $sbSize.textContent = 'Size: ' + (currentSource ? fmtSize(new Blob([currentSource]).size) : '--');
+  }
+
+  // ── Fullscreen ──
+  $fullscreenBtn.addEventListener('click', function() {
+    if ($previewArea.requestFullscreen) $previewArea.requestFullscreen();
+    else if ($previewArea.webkitRequestFullscreen) $previewArea.webkitRequestFullscreen();
+  });
+
+  // ── Tabs ──
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
   // ── Tenant ──
   function setTenant(id) {
     tenantId = id.trim();
     if (!tenantId) return;
     try { localStorage.setItem('pg-tenant', tenantId); } catch(e) {}
     loadTenantComponents();
+    loadCatalog();
+    updateStatusBar();
   }
 
-  $tenantLoadBtn.addEventListener('click', function() {
-    setTenant($tenantInput.value);
-  });
+  $tenantLoadBtn.addEventListener('click', function() { setTenant($tenantInput.value); });
   $tenantInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') setTenant($tenantInput.value);
   });
 
-  // ── Load tenant custom components ──
+  // ── Load tenant components ──
   function loadTenantComponents() {
     if (!tenantId) return;
     fetch('/playground/api/tenant-components/' + tenantId)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         tenantComponents = data;
-        renderComponentList();
+        rebuildComponentBrowser();
       })
       .catch(function() {
         tenantComponents = [];
-        renderComponentList();
+        rebuildComponentBrowser();
       });
   }
 
-  function renderComponentList() {
-    if (!tenantComponents.length) {
-      $componentList.innerHTML = '<div class="sidebar-empty">No custom components yet. Generate one!</div>';
-      return;
-    }
-    var html = '';
-    tenantComponents.forEach(function(c) {
-      var active = activeComponentType === c.type;
-      var label = c.label || c.type;
-      html += '<div class="sidebar-item' + (active ? ' active' : '') + '" data-type="' + escHtml(c.type) + '">' + escHtml(label) + '</div>';
-    });
-    $componentList.innerHTML = html;
+  // ── Load catalog ──
+  function loadCatalog() {
+    fetch('/playground/api/components/catalog')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        catalogComponents = data;
+        rebuildComponentBrowser();
+      })
+      .catch(function() { catalogComponents = []; });
   }
 
-  $componentList.addEventListener('click', function(e) {
-    var item = e.target.closest('.sidebar-item');
-    if (!item) return;
-    var type = item.dataset.type;
-    loadSavedComponent(type);
+  // ── Component Browser dropdown ──
+  function rebuildComponentBrowser() {
+    var html = '<option value="">Load component...</option>';
+
+    if (tenantComponents.length) {
+      html += '<optgroup label="My Components">';
+      tenantComponents.forEach(function(c) {
+        var label = c.label || c.type;
+        html += '<option value="tenant:' + escHtml(c.type) + '">' + escHtml(label) + '</option>';
+      });
+      html += '</optgroup>';
+    }
+
+    if (Array.isArray(catalogComponents)) {
+      // Flat list
+      if (catalogComponents.length && !catalogComponents[0].components) {
+        html += '<optgroup label="Library">';
+        catalogComponents.forEach(function(c) {
+          html += '<option value="library:' + escHtml(c.category || 'default') + ':' + escHtml(c.type) + '">' + escHtml(c.label || c.type) + '</option>';
+        });
+        html += '</optgroup>';
+      } else {
+        // Categorized
+        catalogComponents.forEach(function(cat) {
+          if (cat.components && cat.components.length) {
+            html += '<optgroup label="' + escHtml(cat.category || cat.label || 'Library') + '">';
+            cat.components.forEach(function(c) {
+              html += '<option value="library:' + escHtml(cat.category || 'default') + ':' + escHtml(c.type) + '">' + escHtml(c.label || c.type) + '</option>';
+            });
+            html += '</optgroup>';
+          }
+        });
+      }
+    }
+
+    $componentBrowser.innerHTML = html;
+  }
+
+  $componentBrowser.addEventListener('change', function() {
+    var val = $componentBrowser.value;
+    if (!val) return;
+    $componentBrowser.value = '';
+
+    if (val.startsWith('tenant:')) {
+      var type = val.slice(7);
+      loadSavedComponent(type);
+    } else if (val.startsWith('library:')) {
+      var parts = val.split(':');
+      var cat = parts[1];
+      var type = parts[2];
+      loadLibraryComponent(cat, type);
+    }
   });
 
   function loadSavedComponent(type) {
     activeComponentType = type;
-    renderComponentList();
-
-    // Fetch the component source
     fetch('/playground/api/tenant-components/' + tenantId + '/' + type + '/source')
       .then(function(r) { return r.text(); })
       .then(function(source) {
@@ -535,31 +795,191 @@ textarea.field-input {
         renderSourceView(source);
         renderPropEditor({});
         refreshPreview();
+        updateStatusBar();
+        // Add to history
+        addVersion('Loaded: ' + type, source, {}, type);
       })
-      .catch(function(err) {
-        console.error('Failed to load component:', err);
-      });
+      .catch(function(err) { console.error('Failed to load component:', err); });
   }
 
-  // ── Generate ──
+  function loadLibraryComponent(category, type) {
+    activeComponentType = type;
+    fetch('/playground/api/components/' + category + '/' + type + '/source')
+      .then(function(r) { return r.text(); })
+      .then(function(source) {
+        currentSource = source;
+        currentData = {};
+        renderSourceView(source);
+        renderPropEditor({});
+        refreshPreview();
+        updateStatusBar();
+        addVersion('Loaded library: ' + type, source, {}, type);
+      })
+      .catch(function(err) { console.error('Failed to load library component:', err); });
+  }
+
+  // ── New Component ──
+  $newBtn.addEventListener('click', function() {
+    currentSource = '';
+    currentData = {};
+    activeComponentType = null;
+    activeChatId = null;
+    $previewEmpty.style.display = 'flex';
+    $previewWrapper.style.display = 'none';
+    $fullscreenBtn.style.display = 'none';
+    $previewInfo.style.display = 'none';
+    $promptInput.value = '';
+    $promptInput.placeholder = 'Describe a component... or paste a revision instruction';
+    renderSourceView('');
+    renderPropEditor({});
+    updateStatusBar();
+    // Don't clear history, it persists across the session
+  });
+
+  // ── Chat Log ──
+  function addChatEntry(prompt, type, action, source, data) {
+    var entry = {
+      id: uid(),
+      prompt: prompt,
+      type: type || 'unknown',
+      action: action || 'generate',
+      source: source,
+      data: data || {},
+      timestamp: Date.now()
+    };
+    chatEntries.push(entry);
+    activeChatId = entry.id;
+    renderChatLog();
+    return entry;
+  }
+
+  function renderChatLog() {
+    if (!chatEntries.length) {
+      $chatEmpty.style.display = 'block';
+      $chatLog.querySelectorAll('.chat-entry').forEach(function(el) { el.remove(); });
+      return;
+    }
+    $chatEmpty.style.display = 'none';
+
+    var html = '';
+    chatEntries.forEach(function(entry) {
+      var isActive = entry.id === activeChatId;
+      html += '<div class="chat-entry' + (isActive ? ' active' : '') + '" data-id="' + entry.id + '">';
+      html += '<div class="chat-prompt">' + escHtml(entry.prompt) + '</div>';
+      html += '<div class="chat-meta">';
+      html += '<span class="badge">' + escHtml(entry.action) + '</span>';
+      html += '<span>' + escHtml(entry.type) + '</span>';
+      html += '<span>' + fmtTime(entry.timestamp) + '</span>';
+      html += '</div></div>';
+    });
+    $chatLog.innerHTML = html;
+    // Scroll to bottom
+    $chatLog.scrollTop = $chatLog.scrollHeight;
+  }
+
+  $chatLog.addEventListener('click', function(e) {
+    var el = e.target.closest('.chat-entry');
+    if (!el) return;
+    var id = el.dataset.id;
+    var entry = chatEntries.find(function(e) { return e.id === id; });
+    if (!entry) return;
+
+    activeChatId = entry.id;
+    currentSource = entry.source;
+    currentData = entry.data || {};
+    activeComponentType = entry.type;
+
+    renderChatLog();
+    renderSourceView(currentSource);
+    renderPropEditor(currentData);
+    refreshPreview();
+    updateStatusBar();
+  });
+
+  // ── Version History ──
+  function addVersion(prompt, source, data, type) {
+    var v = {
+      id: uid(),
+      prompt: prompt,
+      source: source,
+      data: data || {},
+      type: type || activeComponentType || 'unknown',
+      timestamp: Date.now()
+    };
+    versionHistory.push(v);
+    activeVersionId = v.id;
+    renderHistory();
+    return v;
+  }
+
+  function renderHistory() {
+    if (!versionHistory.length) {
+      $historyEmpty.style.display = 'block';
+      $historyList.innerHTML = '';
+      return;
+    }
+    $historyEmpty.style.display = 'none';
+
+    var html = '';
+    // Show newest first
+    for (var i = versionHistory.length - 1; i >= 0; i--) {
+      var v = versionHistory[i];
+      var isActive = v.id === activeVersionId;
+      html += '<div class="history-item' + (isActive ? ' active' : '') + '" data-id="' + v.id + '">';
+      html += '<div class="history-prompt">' + escHtml(v.prompt) + '</div>';
+      html += '<div class="history-meta">';
+      html += escHtml(v.type) + ' &middot; ' + fmtTime(v.timestamp) + ' &middot; ' + fmtSize(new Blob([v.source]).size);
+      html += '</div></div>';
+    }
+    $historyList.innerHTML = html;
+  }
+
+  $historyList.addEventListener('click', function(e) {
+    var el = e.target.closest('.history-item');
+    if (!el) return;
+    var id = el.dataset.id;
+    var v = versionHistory.find(function(h) { return h.id === id; });
+    if (!v) return;
+
+    activeVersionId = v.id;
+    currentSource = v.source;
+    currentData = v.data || {};
+    activeComponentType = v.type;
+
+    renderHistory();
+    renderSourceView(currentSource);
+    renderPropEditor(currentData);
+    refreshPreview();
+    updateStatusBar();
+  });
+
+  // ── Generate / Revise ──
   $generateBtn.addEventListener('click', function() {
     var prompt = $promptInput.value.trim();
     if (!prompt || !tenantId) return;
-    generateComponent(prompt);
+    doGenerate(prompt);
   });
 
   $promptInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Cmd+Enter or Ctrl+Enter
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       var prompt = $promptInput.value.trim();
-      if (prompt && tenantId) generateComponent(prompt);
+      if (prompt && tenantId) doGenerate(prompt);
     }
   });
 
+  function doGenerate(prompt) {
+    // Auto-detect: revise if we have current source, generate if not
+    if (currentSource) {
+      reviseComponent(prompt);
+    } else {
+      generateComponent(prompt);
+    }
+  }
+
   function generateComponent(prompt) {
-    $generateBtn.disabled = true;
-    $generatingOverlay.classList.remove('hidden');
-    $generatingText.textContent = 'Generating component...';
+    showGenerating('Generating...');
 
     fetch('/playground/api/generate', {
       method: 'POST',
@@ -568,8 +988,7 @@ textarea.field-input {
     })
     .then(function(r) { return r.json(); })
     .then(function(result) {
-      $generateBtn.disabled = false;
-      $generatingOverlay.classList.add('hidden');
+      hideGenerating();
 
       if (result.error) {
         alert('Generation failed: ' + result.error);
@@ -580,35 +999,24 @@ textarea.field-input {
       currentData = result.data || {};
       activeComponentType = result.type || null;
 
+      // Add to chat log and version history
+      addChatEntry(prompt, activeComponentType, 'generate', currentSource, currentData);
+      addVersion(prompt, currentSource, currentData, activeComponentType);
+
       renderSourceView(currentSource);
       renderPropEditor(currentData);
       refreshPreview();
+      updateStatusBar();
+      $promptInput.value = '';
     })
     .catch(function(err) {
-      $generateBtn.disabled = false;
-      $generatingOverlay.classList.add('hidden');
+      hideGenerating();
       alert('Generation failed: ' + err.message);
     });
   }
 
-  // ── Revise ──
-  $reviseBtn.addEventListener('click', function() {
-    var prompt = $reviseInput.value.trim();
-    if (!prompt || !currentSource) return;
-    reviseComponent(prompt);
-  });
-
-  $reviseInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      var prompt = $reviseInput.value.trim();
-      if (prompt && currentSource) reviseComponent(prompt);
-    }
-  });
-
   function reviseComponent(prompt) {
-    $reviseBtn.disabled = true;
-    $generatingOverlay.classList.remove('hidden');
-    $generatingText.textContent = 'Revising component...';
+    showGenerating('Revising...');
 
     fetch('/playground/api/revise', {
       method: 'POST',
@@ -622,8 +1030,7 @@ textarea.field-input {
     })
     .then(function(r) { return r.json(); })
     .then(function(result) {
-      $reviseBtn.disabled = false;
-      $generatingOverlay.classList.add('hidden');
+      hideGenerating();
 
       if (result.error) {
         alert('Revision failed: ' + result.error);
@@ -633,14 +1040,17 @@ textarea.field-input {
       currentSource = result.source || currentSource;
       if (result.data) currentData = result.data;
 
+      addChatEntry(prompt, activeComponentType, 'revise', currentSource, currentData);
+      addVersion(prompt, currentSource, currentData, activeComponentType);
+
       renderSourceView(currentSource);
       renderPropEditor(currentData);
       refreshPreview();
-      $reviseInput.value = '';
+      updateStatusBar();
+      $promptInput.value = '';
     })
     .catch(function(err) {
-      $reviseBtn.disabled = false;
-      $generatingOverlay.classList.add('hidden');
+      hideGenerating();
       alert('Revision failed: ' + err.message);
     });
   }
@@ -665,7 +1075,8 @@ textarea.field-input {
       if (result.ok) {
         activeComponentType = typeName;
         loadTenantComponents();
-        alert('Saved to library!');
+        $saveBtn.textContent = 'Saved!';
+        setTimeout(function() { $saveBtn.textContent = 'Save to Library'; }, 1500);
       } else {
         alert('Save failed: ' + (result.error || 'Unknown error'));
       }
@@ -676,17 +1087,16 @@ textarea.field-input {
   // ── Source View ──
   function renderSourceView(src) {
     if (!src) {
-      $sourceView.textContent = '';
+      $sourceView.innerHTML = '<span style="color:#475569">No source yet</span>';
       return;
     }
-    var escaped = escHtml(src);
-    $sourceView.innerHTML = escaped;
+    $sourceView.innerHTML = highlightHtml(src);
   }
 
   // ── Prop Editor ──
   function renderPropEditor(data) {
     if (!data || Object.keys(data).length === 0) {
-      $propEditor.innerHTML = '<div class="sidebar-empty">No props to edit</div>';
+      $tabProps.innerHTML = '<div class="chat-empty">No props to edit</div>';
       return;
     }
 
@@ -710,7 +1120,7 @@ textarea.field-input {
     });
 
     html += '<div style="margin-top:12px"><button class="btn btn-primary btn-sm" id="update-props">Update Preview</button></div>';
-    $propEditor.innerHTML = html;
+    $tabProps.innerHTML = html;
 
     document.getElementById('update-props').addEventListener('click', function() {
       currentData = collectData();
@@ -720,7 +1130,7 @@ textarea.field-input {
 
   function collectData() {
     var data = {};
-    $propEditor.querySelectorAll('[data-key]').forEach(function(inp) {
+    $tabProps.querySelectorAll('[data-key]').forEach(function(inp) {
       var key = inp.dataset.key;
       if (!key) return;
       var dtype = inp.dataset.type;
@@ -742,7 +1152,6 @@ textarea.field-input {
     if (!currentSource) return;
     stopPlayback();
 
-    // Try WebSocket first
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: 'preview-component',
@@ -752,7 +1161,6 @@ textarea.field-input {
       return;
     }
 
-    // Fallback: HTTP
     fetch('/playground/api/components/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -832,7 +1240,7 @@ textarea.field-input {
     $timeDisplay.textContent = (current || 0).toFixed(2) + 's / ' + (total || 0).toFixed(2) + 's';
   }
 
-  // ── Auto-tenant: URL param > localStorage ──
+  // ── Init: Auto-tenant from URL param > localStorage ──
   var params = new URLSearchParams(window.location.search);
   var tenantParam = params.get('tenant');
   if (tenantParam) {
@@ -847,6 +1255,8 @@ textarea.field-input {
       }
     } catch(e) {}
   }
+
+  updateStatusBar();
 })();
 </script>
 </body>

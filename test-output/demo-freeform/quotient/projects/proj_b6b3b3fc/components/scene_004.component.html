@@ -1,0 +1,144 @@
+<template>
+  <div class='scene'>
+    <div class='grid-pattern'></div>
+    <div class='content'>
+      <div class='stat-number'>0x</div>
+      <div class='stat-label'>Faster Content Creation</div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    width: 100%;
+    height: 100vh;
+    background: #1e293b;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    font-family: var(--mp-font-family);
+  }
+
+  .grid-pattern {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    opacity: 0.4;
+  }
+
+  .content {
+    text-align: center;
+    z-index: 2;
+    max-width: 80%;
+  }
+
+  .stat-number {
+    font-size: 160px;
+    font-weight: 800;
+    color: #ff6b35;
+    line-height: 1;
+    margin-bottom: 24px;
+    filter: drop-shadow(0 0 40px rgba(255, 107, 53, 0.4));
+    will-change: transform;
+  }
+
+  .stat-label {
+    font-size: 32px;
+    font-weight: 500;
+    color: var(--mp-color-text);
+    line-height: 1.2;
+    opacity: 0.9;
+    max-width: 70%;
+    margin: 0 auto;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    
+    var statNumber = el.querySelector('.stat-number');
+    var statLabel = el.querySelector('.stat-label');
+    var gridPattern = el.querySelector('.grid-pattern');
+    
+    // Set initial states
+    gsap.set([statNumber, statLabel], { autoAlpha: 0, y: 30 });
+    gsap.set(gridPattern, { autoAlpha: 0 });
+    
+    // Motion style adaptation
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+    var bounceEase = ctx.motion === 'punchy' ? 'elastic.out(1, 0.3)' : 'elastic.out(0.8, 0.4)';
+    
+    // Grid pattern entrance
+    tl.to(gridPattern, { 
+      autoAlpha: 0.4, 
+      duration: speed * 0.8, 
+      ease: 'power2.out' 
+    }, 0.2);
+    
+    // Number counter animation
+    var counter = { val: 0 };
+    tl.to(statNumber, { 
+      autoAlpha: 1, 
+      y: 0, 
+      duration: speed * 0.6, 
+      ease: 'power3.out' 
+    }, 0.4);
+    
+    tl.to(counter, {
+      val: 3,
+      duration: speed * 1.5,
+      ease: bounceEase,
+      onUpdate: function() {
+        var currentVal = Math.round(counter.val * 10) / 10;
+        statNumber.textContent = currentVal.toFixed(1).replace('.0', '') + 'x';
+      }
+    }, 0.6);
+    
+    // Label entrance
+    tl.to(statLabel, { 
+      autoAlpha: 1, 
+      y: 0, 
+      duration: speed * 0.7, 
+      ease: 'power3.out' 
+    }, '-=0.3');
+    
+    // Floating animation during hold
+    tl.to(statNumber, {
+      y: -8,
+      duration: 2,
+      ease: 'power1.inOut',
+      yoyo: true,
+      repeat: -1
+    }, 1.2);
+    
+    // Glow pulse effect
+    tl.to(statNumber, {
+      filter: 'drop-shadow(0 0 60px rgba(255, 107, 53, 0.6))',
+      duration: 1.5,
+      ease: 'power2.inOut',
+      yoyo: true,
+      repeat: -1
+    }, 1.5);
+    
+    // Exit animation
+    if (ctx.duration > 2.5) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to([statNumber, statLabel, gridPattern], { 
+        autoAlpha: 0, 
+        duration: 0.4, 
+        ease: 'power2.in' 
+      }, exitAt);
+    }
+    
+    return tl;
+  }
+</script>

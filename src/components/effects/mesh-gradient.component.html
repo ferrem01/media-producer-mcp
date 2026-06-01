@@ -32,8 +32,7 @@
   .mesh-blob {
     position: absolute;
     border-radius: 50%;
-    filter: blur(120px);
-    opacity: 0.4;
+    pointer-events: none;
   }
 </style>
 
@@ -47,56 +46,62 @@
       'var(--mp-color-primary, #6366f1)',
       'var(--mp-color-secondary, #22d3ee)',
       'var(--mp-color-accent, #a78bfa)',
-      '#f472b6',
-      '#34d399'
+      '#f472b6'
     ];
 
-    // Create 5 overlapping blobs at different quadrants
+    // Create 4 large, heavily blurred blobs for organic mesh feel
     var blobConfigs = [
-      { x: '5%', y: '8%', size: '65%' },
-      { x: '48%', y: '52%', size: '60%' },
-      { x: '52%', y: '3%', size: '55%' },
-      { x: '12%', y: '58%', size: '52%' },
-      { x: '32%', y: '28%', size: '70%' }
+      { x: '5%',  y: '5%',  size: '70%', blur: 100 },
+      { x: '45%', y: '50%', size: '65%', blur: 110 },
+      { x: '50%', y: '-5%', size: '60%', blur: 90  },
+      { x: '10%', y: '55%', size: '58%', blur: 120 }
     ];
 
     blobConfigs.forEach(function(cfg, i) {
       if (i >= colors.length) return;
       var blob = document.createElement('div');
       blob.className = 'mesh-blob';
-      blob.style.background = colors[i % colors.length];
+      blob.style.background = 'radial-gradient(circle, ' + colors[i % colors.length] + ' 0%, transparent 70%)';
       blob.style.width = cfg.size;
       blob.style.height = cfg.size;
       blob.style.left = cfg.x;
       blob.style.top = cfg.y;
-      blob.style.opacity = '0.4';
+      blob.style.opacity = '0.45';
+      blob.style.filter = 'blur(' + cfg.blur + 'px)';
       container.appendChild(blob);
     });
 
     var blobs = container.querySelectorAll('.mesh-blob');
 
-    // Use CustomEase for more organic blob movement if available
     var blobEase = 'sine.inOut';
-    if (typeof CustomEase !== 'undefined') {
-      CustomEase.create('blobDrift', 'M0,0 C0.2,0.4 0.4,0.8 0.5,0.9 0.7,1.05 0.9,0.95 1,1');
-      blobEase = 'blobDrift';
-    }
 
-    // Animate blobs with 20s+ drift cycle
+    // Animate blobs with slow organic drift
     blobs.forEach(function(blob, i) {
-      var xShift = (i % 2 === 0 ? 1 : -1) * (55 + i * 18);
-      var yShift = (i % 2 === 0 ? -1 : 1) * (35 + i * 14);
-      var dur = Math.max(20, (ctx.duration * 0.9) / speed);
+      var xShift = (i % 2 === 0 ? 1 : -1) * (60 + i * 20);
+      var yShift = (i % 2 === 0 ? -1 : 1) * (40 + i * 15);
+      var cycleDur = (8 + i * 1.5) / speed;
+
+      // Clamp to scene duration if needed
+      var dur = Math.min(cycleDur, ctx.duration * 0.9);
 
       tl.to(blob, {
         x: xShift,
         y: yShift,
-        scale: 1.04 + i * 0.03,
+        scale: 1.06 + i * 0.04,
         duration: dur,
         ease: blobEase,
         yoyo: true,
         repeat: -1
-      }, i * 0.4);
+      }, i * 0.5);
+
+      // Cross-fade opacity for more organic feel
+      tl.to(blob, {
+        opacity: 0.3 + (i % 2) * 0.2,
+        duration: dur * 0.7,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, i * 0.3);
     });
 
     return tl;

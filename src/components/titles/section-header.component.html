@@ -1,5 +1,6 @@
 <template>
   <div class="section-header">
+    <div class="accent-line"></div>
     <span class="eyebrow"></span>
     <h2 class="heading"></h2>
     <p class="description"></p>
@@ -17,6 +18,15 @@
     font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
   }
 
+  .accent-line {
+    width: 48px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--mp-color-accent, #A78BFA) 0%, #c4b5fd 100%);
+    margin-bottom: 28px;
+    box-shadow: 0 0 16px rgba(167, 139, 250, 0.3);
+  }
+
   .eyebrow {
     font-size: 13px;
     font-weight: 600;
@@ -24,6 +34,7 @@
     text-transform: uppercase;
     color: var(--mp-color-accent, #A78BFA);
     margin-bottom: 20px;
+    text-shadow: 0 0 20px rgba(167, 139, 250, 0.2);
   }
 
   .eyebrow:empty {
@@ -36,9 +47,9 @@
     color: var(--mp-color-text, #ffffff);
     margin: 0;
     line-height: 1.08;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.03em;
     max-width: 75%;
-    text-shadow: 0 0 60px rgba(167, 139, 250, 0.08);
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3), 0 0 60px rgba(167, 139, 250, 0.08);
   }
 
   .description {
@@ -49,6 +60,7 @@
     line-height: 1.5;
     max-width: 50%;
     letter-spacing: 0.005em;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
   }
 
   .description:empty {
@@ -60,6 +72,7 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
 
+    var accentLine = el.querySelector('.accent-line');
     var eyebrow = el.querySelector('.eyebrow');
     var heading = el.querySelector('.heading');
     var description = el.querySelector('.description');
@@ -69,13 +82,16 @@
     if (data.title) heading.textContent = data.title;
     if (data.description) description.textContent = data.description;
 
-    var elements = [];
+    var elements = [accentLine];
     if (eyebrow && eyebrow.textContent) elements.push(eyebrow);
     if (heading && heading.textContent) elements.push(heading);
     if (description && description.textContent) elements.push(description);
 
     // Initial states
     gsap.set(elements, { autoAlpha: 0 });
+
+    // Accent line: width from 0
+    gsap.set(accentLine, { scaleX: 0, transformOrigin: 'left center' });
 
     // Eyebrow: slide from left
     if (eyebrow && eyebrow.textContent) {
@@ -94,6 +110,14 @@
 
     var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.5 : 0.7;
     var t = 0.2;
+
+    // Accent line grows in
+    tl.to(accentLine, {
+      autoAlpha: 1, scaleX: 1,
+      duration: speed * 0.6,
+      ease: 'power3.out'
+    }, t);
+    t += speed * 0.15;
 
     // Eyebrow slides in
     if (eyebrow && eyebrow.textContent) {
@@ -126,7 +150,7 @@
 
     // Exit
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
+      var exitAt = ctx.duration - 0.7;
       tl.to(elements, {
         autoAlpha: 0,
         duration: 0.35,

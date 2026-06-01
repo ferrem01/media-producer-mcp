@@ -1,0 +1,159 @@
+{
+  "project_id": "proj_b6b3b3fc",
+  "tenant_id": "quotient",
+  "name": "Quotient x Canva Integration Announcement",
+  "format": "video",
+  "status": "draft",
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "preset": "landscape",
+    "fps": 30,
+    "background": "#0f172a"
+  },
+  "brand_kit": {
+    "colors": {
+      "primary": "#5B21B6",
+      "secondary": "#7C3AED",
+      "accent": "#A78BFA",
+      "background": "#0f172a",
+      "surface": "#1e293b",
+      "text": "#ffffff",
+      "text_muted": "#94a3b8"
+    },
+    "fonts": [
+      {
+        "family": "Inter",
+        "source": "google",
+        "weights": [
+          400,
+          500,
+          600,
+          700,
+          800
+        ]
+      }
+    ],
+    "style": {
+      "border_radius": "12px",
+      "motion": "cinematic"
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene_001",
+      "label": "Scene 1 - Hero Announcement",
+      "duration_seconds": 4,
+      "components": [
+        {
+          "id": "comp_full_0",
+          "type": "scene_001",
+          "data": {},
+          "z_index": 0
+        }
+      ]
+    },
+    {
+      "id": "scene_002",
+      "label": "Scene 2 - Product Demo",
+      "duration_seconds": 5,
+      "transition_in": {
+        "type": "slide-up",
+        "duration_seconds": 0.8
+      },
+      "components": [
+        {
+          "id": "comp_full_1",
+          "type": "scene_002",
+          "data": {},
+          "z_index": 0
+        }
+      ]
+    },
+    {
+      "id": "scene_003",
+      "label": "Scene 3 - Workflow Visual",
+      "duration_seconds": 4,
+      "transition_in": {
+        "type": "morph-wipe",
+        "duration_seconds": 0.6
+      },
+      "components": [
+        {
+          "id": "comp_full_2",
+          "type": "scene_003",
+          "data": {},
+          "z_index": 0
+        }
+      ]
+    },
+    {
+      "id": "scene_004",
+      "label": "Scene 4 - Speed Stat",
+      "duration_seconds": 3,
+      "transition_in": {
+        "type": "zoom-through",
+        "duration_seconds": 0.5
+      },
+      "components": [
+        {
+          "id": "comp_full_3",
+          "type": "scene_004",
+          "data": {},
+          "z_index": 0
+        }
+      ]
+    },
+    {
+      "id": "scene_005",
+      "label": "Scene 5 - Feature Benefits",
+      "duration_seconds": 4,
+      "transition_in": {
+        "type": "iris",
+        "duration_seconds": 0.7
+      },
+      "components": [
+        {
+          "id": "comp_full_4",
+          "type": "scene_005",
+          "data": {},
+          "z_index": 0
+        }
+      ]
+    },
+    {
+      "id": "scene_006",
+      "label": "Scene 6 - ROI Impact",
+      "duration_seconds": 3,
+      "transition_in": {
+        "type": "glitch-cut",
+        "duration_seconds": 0.3
+      },
+      "components": [
+        {
+          "id": "comp_full_5",
+          "type": "scene_006",
+          "data": {},
+          "z_index": 0
+        }
+      ]
+    },
+    {
+      "id": "scene_007",
+      "label": "Scene 7 - CTA",
+      "duration_seconds": 4,
+      "transition_in": {
+        "type": "curtain",
+        "duration_seconds": 0.8
+      },
+      "components": [
+        {
+          "id": "comp_full_6",
+          "type": "scene_007",
+          "data": {},
+          "z_index": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,360 @@
+<template>
+  <div class='scene'>
+    <div class='workflow-container'>
+      <div class='node quotient-node' data-target='quotient-logo'>
+        <div class='logo-container'>
+          <svg width="80" height="80" viewBox="0 0 80 80" class='quotient-logo'>
+            <circle cx="40" cy="40" r="35" fill="var(--mp-color-primary)" stroke="none"/>
+            <path d="M25 30 L40 45 L55 30 M40 45 L40 60" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class='node-label'>Quotient</div>
+      </div>
+
+      <div class='connection-path'>
+        <svg class='path-svg' viewBox="0 0 400 100" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#5B21B6;stop-opacity:0.8"/>
+              <stop offset="50%" style="stop-color:#7C3AED;stop-opacity:1"/>
+              <stop offset="100%" style="stop-color:#A78BFA;stop-opacity:0.8"/>
+            </linearGradient>
+          </defs>
+          <path class='flow-path' d="M 0 50 Q 100 20, 200 50 Q 300 80, 400 50" 
+                stroke="url(#pathGradient)" stroke-width="3" fill="none"/>
+        </svg>
+        
+        <div class='particles-container'>
+          <div class='particle particle-1'></div>
+          <div class='particle particle-2'></div>
+          <div class='particle particle-3'></div>
+          <div class='particle particle-4'></div>
+          <div class='particle particle-5'></div>
+        </div>
+
+        <div class='data-points'>
+          <div class='data-point dp-1'>
+            <div class='data-icon'>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <rect x="2" y="6" width="12" height="2" fill="currentColor"/>
+                <rect x="2" y="10" width="8" height="2" fill="currentColor"/>
+                <rect x="2" y="2" width="10" height="2" fill="currentColor"/>
+              </svg>
+            </div>
+          </div>
+          <div class='data-point dp-2'>
+            <div class='data-icon'>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" fill="none"/>
+                <circle cx="8" cy="8" r="2" fill="currentColor"/>
+              </svg>
+            </div>
+          </div>
+          <div class='data-point dp-3'>
+            <div class='data-icon'>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <path d="M2 12 L6 8 L10 10 L14 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class='node canva-node' data-target='canva-logo'>
+        <div class='logo-container'>
+          <svg width="80" height="80" viewBox="0 0 80 80" class='canva-logo'>
+            <rect x="10" y="10" width="60" height="60" rx="15" fill="#00C4CC"/>
+            <path d="M25 35 Q40 25, 55 35 Q55 50, 40 55 Q25 50, 25 35 Z" fill="white"/>
+            <circle cx="35" cy="40" r="3" fill="#00C4CC"/>
+            <circle cx="45" cy="40" r="3" fill="#00C4CC"/>
+          </svg>
+        </div>
+        <div class='node-label'>Canva</div>
+      </div>
+    </div>
+
+    <div class='workflow-title'>
+      <h2 class='title-text'>Seamless Integration Workflow</h2>
+      <p class='subtitle-text'>Connect your campaign data to creative production</p>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .workflow-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 120px;
+    margin-bottom: 80px;
+    position: relative;
+    width: 100%;
+    max-width: 1000px;
+  }
+
+  .node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+  }
+
+  .logo-container {
+    position: relative;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    backdrop-filter: blur(10px);
+  }
+
+  .quotient-logo, .canva-logo {
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+  }
+
+  .node-label {
+    font-family: var(--mp-font-family);
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    text-align: center;
+  }
+
+  .connection-path {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px;
+    height: 100px;
+    pointer-events: none;
+  }
+
+  .path-svg {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .flow-path {
+    filter: drop-shadow(0 2px 8px rgba(123, 58, 237, 0.3));
+  }
+
+  .particles-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: radial-gradient(circle, #7C3AED 0%, #A78BFA 50%, transparent 100%);
+    border-radius: 50%;
+    box-shadow: 0 0 12px #7C3AED;
+  }
+
+  .data-points {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .data-point {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid #7C3AED;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(123, 58, 237, 0.2);
+    backdrop-filter: blur(10px);
+  }
+
+  .data-icon {
+    color: #7C3AED;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .workflow-title {
+    text-align: center;
+    max-width: 600px;
+  }
+
+  .title-text {
+    font-family: var(--mp-font-family);
+    font-size: 48px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 16px 0;
+    line-height: 1.1;
+  }
+
+  .subtitle-text {
+    font-family: var(--mp-font-family);
+    font-size: 24px;
+    font-weight: 400;
+    color: #64748b;
+    margin: 0;
+    line-height: 1.4;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    // Query elements
+    var quotientNode = el.querySelector('.quotient-node');
+    var canvaNode = el.querySelector('.canva-node');
+    var flowPath = el.querySelector('.flow-path');
+    var particles = el.querySelectorAll('.particle');
+    var dataPoints = el.querySelectorAll('.data-point');
+    var titleText = el.querySelector('.title-text');
+    var subtitleText = el.querySelector('.subtitle-text');
+    var logoContainers = el.querySelectorAll('.logo-container');
+
+    // Motion settings
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+    var stagger = ctx.motion === 'minimal' ? 0.05 : ctx.motion === 'punchy' ? 0.08 : 0.12;
+
+    // Set initial states
+    gsap.set([quotientNode, canvaNode, titleText, subtitleText], { autoAlpha: 0, y: 40 });
+    gsap.set(flowPath, { drawSVG: '0%' });
+    gsap.set(particles, { autoAlpha: 0, scale: 0 });
+    gsap.set(dataPoints, { autoAlpha: 0, scale: 0, y: 20 });
+
+    // Position particles along path
+    gsap.set('.particle-1', { left: '10%', top: '45%' });
+    gsap.set('.particle-2', { left: '25%', top: '25%' });
+    gsap.set('.particle-3', { left: '50%', top: '45%' });
+    gsap.set('.particle-4', { left: '75%', top: '75%' });
+    gsap.set('.particle-5', { left: '90%', top: '45%' });
+
+    // Position data points
+    gsap.set('.dp-1', { left: '20%', top: '35%' });
+    gsap.set('.dp-2', { left: '50%', top: '20%' });
+    gsap.set('.dp-3', { left: '80%', top: '60%' });
+
+    // Entrance animations
+    tl.to(quotientNode, { autoAlpha: 1, y: 0, duration: speed * 0.8, ease: 'back.out(1.2)' }, 0.3)
+      .to(canvaNode, { autoAlpha: 1, y: 0, duration: speed * 0.8, ease: 'back.out(1.2)' }, 0.5)
+      .to(flowPath, { drawSVG: '100%', duration: speed * 1.5, ease: 'power2.inOut' }, 0.8)
+      .to(particles, { 
+        autoAlpha: 1, 
+        scale: 1, 
+        stagger: stagger * 2, 
+        duration: speed * 0.6, 
+        ease: 'back.out(1.4)' 
+      }, 1.2)
+      .to(dataPoints, { 
+        autoAlpha: 1, 
+        scale: 1, 
+        y: 0, 
+        stagger: stagger, 
+        duration: speed * 0.6, 
+        ease: 'back.out(1.2)' 
+      }, 1.4)
+      .to(titleText, { autoAlpha: 1, y: 0, duration: speed * 0.8, ease: 'power3.out' }, 1.8)
+      .to(subtitleText, { autoAlpha: 1, y: 0, duration: speed * 0.6, ease: 'power3.out' }, 2.0);
+
+    // Continuous animations during hold
+    // Logo pulse animation
+    var logoPulse = gsap.timeline({ repeat: -1 });
+    logoPulse.to(logoContainers, { 
+      scale: 1.05, 
+      duration: 1.5, 
+      ease: 'power2.inOut', 
+      stagger: 0.3 
+    })
+    .to(logoContainers, { 
+      scale: 1, 
+      duration: 1.5, 
+      ease: 'power2.inOut', 
+      stagger: 0.3 
+    });
+    tl.add(logoPulse, 2.2);
+
+    // Particle flow animation
+    var particleFlow = gsap.timeline({ repeat: -1 });
+    particleFlow.to(particles, {
+      motionPath: {
+        path: flowPath,
+        autoRotate: false,
+        alignOrigin: [0.5, 0.5]
+      },
+      duration: 3,
+      ease: 'none',
+      stagger: 0.6
+    });
+    tl.add(particleFlow, 2.0);
+
+    // Data point pulse
+    var dataPointPulse = gsap.timeline({ repeat: -1});
+    dataPointPulse.to(dataPoints, {
+      scale: 1.2,
+      duration: 0.8,
+      ease: 'power2.inOut',
+      stagger: 0.4
+    })
+    .to(dataPoints, {
+      scale: 1,
+      duration: 0.8,
+      ease: 'power2.inOut',
+      stagger: 0.4
+    });
+    tl.add(dataPointPulse, 2.5);
+
+    // Exit animations
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to([titleText, subtitleText], { 
+        autoAlpha: 0, 
+        y: -30, 
+        duration: 0.4, 
+        ease: 'power2.in' 
+      }, exitAt)
+      .to([quotientNode, canvaNode], { 
+        autoAlpha: 0, 
+        scale: 0.8, 
+        duration: 0.5, 
+        ease: 'power2.in',
+        stagger: 0.1 
+      }, exitAt + 0.1)
+      .to([particles, dataPoints], { 
+        autoAlpha: 0, 
+        scale: 0, 
+        duration: 0.3, 
+        ease: 'power2.in' 
+      }, exitAt + 0.2);
+    }
+
+    return tl;
+  }
+</script>

@@ -2,7 +2,9 @@
   <div class="bar-chart">
     <h2 class="chart-title">{{title}}</h2>
     <div class="chart-card">
-      <div class="chart-area"></div>
+      <div class="chart-area">
+        <div class="chart-grid-lines"></div>
+      </div>
     </div>
   </div>
 </template>
@@ -44,8 +46,10 @@
     width: 100%;
     flex: 1;
     box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
       0 25px 60px rgba(0, 0, 0, 0.4),
       0 0 0 1px rgba(255, 255, 255, 0.05);
+    position: relative;
   }
 
   .chart-area {
@@ -57,6 +61,21 @@
     height: 100%;
     padding-bottom: 8px;
     position: relative;
+  }
+
+  .chart-grid-lines {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+
+  .grid-line {
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .bar-group {
@@ -81,7 +100,21 @@
     width: 100%;
     border-radius: 8px 8px 4px 4px;
     min-height: 4px;
+    position: relative;
+    overflow: hidden;
     box-shadow: 0 0 20px rgba(167, 139, 250, 0.1);
+  }
+
+  .bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+    border-radius: 8px 8px 0 0;
+    pointer-events: none;
   }
 
   .bar-label {
@@ -103,16 +136,26 @@
     var tl = gsap.timeline();
     var chartCard = el.querySelector('.chart-card');
     var chartArea = el.querySelector('.chart-area');
+    var gridLines = el.querySelector('.chart-grid-lines');
     var title = el.querySelector('.chart-title');
     var bars = data.bars || [];
     var maxVal = data.max_value || Math.max.apply(null, bars.map(function(b) { return b.value; }));
     var maxHeight = 280;
-    var defaultColors = [
-      'var(--mp-color-accent, #a78bfa)',
-      'var(--mp-color-primary, #6366f1)',
-      'var(--mp-color-secondary, #22d3ee)',
-      '#f472b6', '#fbbf24', '#34d399'
+    var defaultGradients = [
+      ['var(--mp-color-accent, #a78bfa)', 'var(--mp-color-primary, #6366f1)'],
+      ['var(--mp-color-primary, #6366f1)', '#4f46e5'],
+      ['var(--mp-color-secondary, #22d3ee)', '#06b6d4'],
+      ['#f472b6', '#ec4899'],
+      ['#fbbf24', '#f59e0b'],
+      ['#34d399', '#10b981']
     ];
+
+    // Add grid lines
+    for (var g = 0; g < 5; g++) {
+      var line = document.createElement('div');
+      line.className = 'grid-line';
+      gridLines.appendChild(line);
+    }
 
     bars.forEach(function(bar, i) {
       var group = document.createElement('div');
@@ -124,7 +167,10 @@
 
       var fill = document.createElement('div');
       fill.className = 'bar-fill';
-      fill.style.background = bar.color || defaultColors[i % defaultColors.length];
+      var grad = defaultGradients[i % defaultGradients.length];
+      fill.style.background = bar.color
+        ? 'linear-gradient(180deg, ' + bar.color + ' 0%, ' + bar.color + 'cc 100%)'
+        : 'linear-gradient(180deg, ' + grad[0] + ' 0%, ' + grad[1] + ' 100%)';
       var targetH = Math.max(8, (bar.value / maxVal) * maxHeight);
       fill.style.height = '0px';
       fill.dataset.targetHeight = targetH + 'px';
@@ -159,12 +205,12 @@
       duration: 0.6, ease: 'power3.out'
     }, 0.3);
 
-    // Bars grow
+    // Bars grow with stagger
     var stagger = ctx.motion === 'minimal' ? 0.08 : 0.12;
     fills.forEach(function(fill, i) {
       tl.to(fill, {
         height: fill.dataset.targetHeight,
-        duration: 0.6,
+        duration: 0.7,
         ease: 'power3.out'
       }, 0.7 + i * stagger);
     });
@@ -175,7 +221,7 @@
 
     // Exit
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
+      var exitAt = ctx.duration - 0.7;
       tl.to(el.querySelector('.bar-chart'), {
         autoAlpha: 0,
         duration: 0.4,

@@ -1,0 +1,194 @@
+<template>
+  <div class='scene'>
+    <div class='particles-container'></div>
+    <div class='hero-content'>
+      <h1 class='hero-title'>
+        <span class='word' data-word='quotient'>Quotient</span>
+        <span class='word' data-word='x'>×</span>
+        <span class='word' data-word='canva'>Canva</span>
+      </h1>
+      <div class='underline'></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 25%, #5b21b6 50%, #7c3aed 75%, #8b5cf6 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px;
+  }
+
+  .particles-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .particle {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    will-change: transform;
+  }
+
+  .hero-content {
+    text-align: center;
+    position: relative;
+    z-index: 2;
+    max-width: 90%;
+  }
+
+  .hero-title {
+    font-family: var(--mp-font-family);
+    font-size: 120px;
+    font-weight: 800;
+    color: var(--mp-color-text);
+    margin: 0;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .word {
+    display: inline-block;
+    margin: 0 0.1em;
+    will-change: transform;
+  }
+
+  .word[data-word='x'] {
+    color: var(--mp-color-accent);
+    font-weight: 300;
+    margin: 0 0.3em;
+  }
+
+  .underline {
+    width: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--mp-color-accent), var(--mp-color-secondary));
+    margin: 40px auto 0;
+    border-radius: 2px;
+    box-shadow: 0 0 20px rgba(167, 139, 250, 0.6);
+  }
+
+  @media (max-width: 1600px) {
+    .hero-title {
+      font-size: 100px;
+    }
+  }
+
+  @media (max-width: 1200px) {
+    .hero-title {
+      font-size: 80px;
+    }
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    
+    // Query elements
+    var words = el.querySelectorAll('.word');
+    var underline = el.querySelector('.underline');
+    var particlesContainer = el.querySelector('.particles-container');
+    
+    // Create particles
+    var particles = [];
+    for (var i = 0; i < 25; i++) {
+      var particle = document.createElement('div');
+      particle.className = 'particle';
+      particle.style.left = Math.random() * 100 + '%';
+      particle.style.top = Math.random() * 100 + '%';
+      particle.style.opacity = Math.random() * 0.6 + 0.2;
+      particlesContainer.appendChild(particle);
+      particles.push(particle);
+    }
+    
+    // Set initial states
+    gsap.set(words, { autoAlpha: 0, y: 60, rotationX: -15 });
+    gsap.set(underline, { width: 0, autoAlpha: 0 });
+    gsap.set(particles, { y: 20 });
+    
+    // Motion speed adaptation
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.7 : 0.6;
+    var staggerDelay = ctx.motion === 'minimal' ? 0.15 : ctx.motion === 'punchy' ? 0.08 : 0.12;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.4)' : 'elastic.out(1, 0.3)';
+    
+    // Entrance animations
+    tl.to(words, {
+      autoAlpha: 1,
+      y: 0,
+      rotationX: 0,
+      duration: speed * 1.2,
+      ease: ease,
+      stagger: staggerDelay
+    }, 0.5);
+    
+    // Underline drawing
+    tl.to(underline, {
+      autoAlpha: 1,
+      width: '60%',
+      duration: speed * 1.5,
+      ease: 'power3.out'
+    }, '-=0.3');
+    
+    // Particle float animation
+    tl.to(particles, {
+      y: -100,
+      duration: 3,
+      ease: 'none',
+      stagger: {
+        each: 0.1,
+        repeat: -1,
+        yoyo: true
+      }
+    }, 0);
+    
+    // Subtle word emphasis
+    tl.to(words[0], {
+      scale: 1.05,
+      duration: 0.3,
+      ease: 'power2.out',
+      yoyo: true,
+      repeat: 1
+    }, 2.0);
+    
+    tl.to(words[2], {
+      scale: 1.05,
+      duration: 0.3,
+      ease: 'power2.out',
+      yoyo: true,
+      repeat: 1
+    }, 2.3);
+    
+    // Exit animation
+    var exitAt = ctx.duration - 0.8;
+    tl.to([words, underline], {
+      autoAlpha: 0,
+      y: -30,
+      duration: 0.5,
+      ease: 'power2.in',
+      stagger: 0.05
+    }, exitAt);
+    
+    tl.to(particles, {
+      autoAlpha: 0,
+      duration: 0.3,
+      ease: 'power2.in'
+    }, exitAt);
+    
+    return tl;
+  }
+</script>

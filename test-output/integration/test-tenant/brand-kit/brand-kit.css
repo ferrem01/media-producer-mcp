@@ -1,0 +1,16 @@
+/* Auto-generated from brand-kit.json -- do not edit */
+:root {
+  --mp-color-primary: #5B21B6;
+  --mp-color-secondary: #7C3AED;
+  --mp-color-accent: #A78BFA;
+  --mp-color-background: #0f172a;
+  --mp-color-surface: #1e293b;
+  --mp-color-text: #ffffff;
+  --mp-color-text-muted: #94a3b8;
+  --mp-font-family: 'Inter', sans-serif;
+  --mp-font-weight-normal: 400;
+  --mp-font-weight-semibold: 600;
+  --mp-font-weight-extrabold: 800;
+  --mp-border-radius: 12px;
+  --mp-motion-style: cinematic;
+}

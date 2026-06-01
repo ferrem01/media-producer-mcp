@@ -1,0 +1,218 @@
+<template>
+  <div class='scene'>
+    <div class='background-shapes'>
+      <div class='shape shape-1'></div>
+      <div class='shape shape-2'></div>
+      <div class='shape shape-3'></div>
+      <div class='shape shape-4'></div>
+    </div>
+    <div class='content'>
+      <div class='roi-container'>
+        <div class='roi-number'>340%</div>
+        <div class='roi-label'>ROI</div>
+      </div>
+      <div class='impact-text'>Impact delivered</div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px;
+  }
+
+  .background-shapes {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+
+  .shape {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.08;
+  }
+
+  .shape-1 {
+    width: 300px;
+    height: 300px;
+    background: linear-gradient(135deg, var(--mp-color-primary), var(--mp-color-secondary));
+    top: -100px;
+    left: -100px;
+  }
+
+  .shape-2 {
+    width: 200px;
+    height: 200px;
+    background: linear-gradient(45deg, var(--mp-color-secondary), var(--mp-color-accent));
+    top: 200px;
+    right: -50px;
+  }
+
+  .shape-3 {
+    width: 150px;
+    height: 150px;
+    background: linear-gradient(225deg, var(--mp-color-accent), var(--mp-color-primary));
+    bottom: 100px;
+    left: 200px;
+  }
+
+  .shape-4 {
+    width: 250px;
+    height: 250px;
+    background: linear-gradient(315deg, var(--mp-color-primary), var(--mp-color-accent));
+    bottom: -80px;
+    right: 150px;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    max-width: 800px;
+  }
+
+  .roi-container {
+    margin-bottom: 32px;
+  }
+
+  .roi-number {
+    font-family: var(--mp-font-family);
+    font-size: 140px;
+    font-weight: 900;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--mp-color-primary) 0%, #3B82F6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 16px;
+    will-change: transform;
+  }
+
+  .roi-label {
+    font-family: var(--mp-font-family);
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--mp-color-primary);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .impact-text {
+    font-family: var(--mp-font-family);
+    font-size: 28px;
+    font-weight: 500;
+    color: #64748b;
+    letter-spacing: 0.02em;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    // Query elements
+    var roiNumber = el.querySelector('.roi-number');
+    var roiLabel = el.querySelector('.roi-label');
+    var impactText = el.querySelector('.impact-text');
+    var shapes = el.querySelectorAll('.shape');
+
+    // Set initial states
+    gsap.set([roiNumber, roiLabel, impactText], { autoAlpha: 0, y: 50 });
+    gsap.set(shapes, { autoAlpha: 0, scale: 0.8 });
+
+    // Motion adaptation
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.4)' : 'power3.out';
+
+    // Background shapes entrance with stagger
+    tl.to(shapes, {
+      autoAlpha: 1,
+      scale: 1,
+      stagger: 0.1,
+      duration: speed * 1.2,
+      ease: ease
+    }, 0.2);
+
+    // Continuous rotation for shapes
+    gsap.to(shapes[0], { rotation: 360, duration: 20, ease: 'none', repeat: -1 });
+    gsap.to(shapes[1], { rotation: -360, duration: 25, ease: 'none', repeat: -1 });
+    gsap.to(shapes[2], { rotation: 360, duration: 30, ease: 'none', repeat: -1 });
+    gsap.to(shapes[3], { rotation: -360, duration: 22, ease: 'none', repeat: -1 });
+
+    // Parallax movement for depth
+    gsap.to(shapes[0], { x: 30, y: -20, duration: 8, ease: 'sine.inOut', repeat: -1, yoyo: true });
+    gsap.to(shapes[1], { x: -25, y: 15, duration: 10, ease: 'sine.inOut', repeat: -1, yoyo: true });
+    gsap.to(shapes[2], { x: 20, y: 25, duration: 12, ease: 'sine.inOut', repeat: -1, yoyo: true });
+    gsap.to(shapes[3], { x: -15, y: -30, duration: 9, ease: 'sine.inOut', repeat: -1, yoyo: true });
+
+    // ROI number with scramble effect
+    tl.to(roiNumber, {
+      autoAlpha: 1,
+      y: 0,
+      duration: speed,
+      ease: ease
+    }, 0.5);
+
+    // ScrambleText effect for the number
+    tl.to(roiNumber, {
+      scrambleText: {
+        text: '340%',
+        chars: '0123456789%',
+        speed: 0.8,
+        revealDelay: 0.3
+      },
+      duration: 1.2,
+      ease: 'power2.out'
+    }, 0.6);
+
+    // ROI label entrance
+    tl.to(roiLabel, {
+      autoAlpha: 1,
+      y: 0,
+      duration: speed * 0.8,
+      ease: ease
+    }, '-=0.4');
+
+    // Impact text entrance
+    tl.to(impactText, {
+      autoAlpha: 1,
+      y: 0,
+      duration: speed * 0.8,
+      ease: ease
+    }, '-=0.2');
+
+    // Exit animations
+    if (ctx.duration > 2.5) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to([roiNumber, roiLabel, impactText], {
+        autoAlpha: 0,
+        y: -30,
+        stagger: 0.05,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt);
+
+      tl.to(shapes, {
+        autoAlpha: 0,
+        scale: 0.9,
+        stagger: 0.03,
+        duration: 0.3,
+        ease: 'power2.in'
+      }, exitAt + 0.1);
+    }
+
+    return tl;
+  }
+</script>

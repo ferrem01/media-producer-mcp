@@ -1,0 +1,232 @@
+<template>
+  <div class='scene'>
+    <div class='background'></div>
+    <div class='cards-container'>
+      <div class='card' data-card='1'>
+        <div class='icon-container'>
+          <svg class='icon' viewBox='0 0 48 48' fill='none'>
+            <path d='M24 4L30 10H18L24 4Z' fill='currentColor'/>
+            <rect x='8' y='12' width='32' height='28' rx='4' stroke='currentColor' stroke-width='2' fill='none'/>
+            <path d='M16 20H32M16 26H28M16 32H24' stroke='currentColor' stroke-width='2' stroke-linecap='round'/>
+            <circle cx='36' cy='16' r='6' fill='var(--mp-color-accent)'/>
+            <path d='M33 16L35 18L39 14' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/>
+          </svg>
+        </div>
+        <h3 class='card-title'>Brand Consistency</h3>
+        <p class='card-text'>Maintain perfect brand alignment across all campaigns with automated asset management</p>
+      </div>
+
+      <div class='card' data-card='2'>
+        <div class='icon-container'>
+          <svg class='icon' viewBox='0 0 48 48' fill='none'>
+            <circle cx='24' cy='24' r='18' stroke='currentColor' stroke-width='2' fill='none'/>
+            <path d='M24 8V24L32 32' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/>
+            <circle cx='38' cy='10' r='6' fill='var(--mp-color-secondary)'/>
+            <path d='M35 10L37 12L41 8' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/>
+            <rect x='6' y='36' width='12' height='8' rx='2' fill='var(--mp-color-primary)' opacity='0.8'/>
+            <rect x='20' y='38' width='8' height='6' rx='1' fill='var(--mp-color-accent)' opacity='0.6'/>
+          </svg>
+        </div>
+        <h3 class='card-title'>Smart Automation</h3>
+        <p class='card-text'>Streamline content creation with intelligent workflows that reduce manual work by 75%</p>
+      </div>
+
+      <div class='card' data-card='3'>
+        <div class='icon-container'>
+          <svg class='icon' viewBox='0 0 48 48' fill='none'>
+            <circle cx='16' cy='16' r='8' stroke='currentColor' stroke-width='2' fill='none'/>
+            <circle cx='32' cy='16' r='8' stroke='currentColor' stroke-width='2' fill='none'/>
+            <circle cx='24' cy='32' r='8' stroke='currentColor' stroke-width='2' fill='none'/>
+            <path d='M22.4 22.4L17.6 17.6M25.6 22.4L30.4 17.6M24 24V24' stroke='currentColor' stroke-width='2' stroke-linecap='round'/>
+            <circle cx='16' cy='16' r='3' fill='var(--mp-color-primary)'/>
+            <circle cx='32' cy='16' r='3' fill='var(--mp-color-secondary)'/>
+            <circle cx='24' cy='32' r='3' fill='var(--mp-color-accent)'/>
+          </svg>
+        </div>
+        <h3 class='card-title'>Team Collaboration</h3>
+        <p class='card-text'>Enable seamless collaboration between marketing and design teams in real-time</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px;
+  }
+
+  .background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
+    z-index: 0;
+  }
+
+  .cards-container {
+    display: flex;
+    gap: 48px;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    width: 100%;
+  }
+
+  .card {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--mp-border-radius);
+    padding: 48px 32px;
+    text-align: center;
+    width: 320px;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 
+                0 4px 16px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    will-change: transform;
+  }
+
+  .card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15), 
+                0 8px 24px rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  .icon-container {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    backdrop-filter: blur(10px);
+  }
+
+  .icon {
+    width: 48px;
+    height: 48px;
+    color: var(--mp-color-primary);
+  }
+
+  .card-title {
+    font-family: var(--mp-font-family);
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--mp-color-primary);
+    margin: 0 0 16px 0;
+    line-height: 1.2;
+  }
+
+  .card-text {
+    font-family: var(--mp-font-family);
+    font-size: 16px;
+    font-weight: 400;
+    color: #475569;
+    margin: 0;
+    line-height: 1.5;
+    text-align: center;
+    max-width: 280px;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var cards = el.querySelectorAll('.card');
+    var icons = el.querySelectorAll('.icon-container');
+    var titles = el.querySelectorAll('.card-title');
+    var texts = el.querySelectorAll('.card-text');
+
+    // Determine speed from motion style
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+    var staggerDelay = ctx.motion === 'minimal' ? 0.1 : ctx.motion === 'punchy' ? 0.15 : 0.2;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.4)' : 'power3.out';
+
+    // Set initial states
+    gsap.set(cards, { autoAlpha: 0, y: 60, scale: 0.9 });
+    gsap.set(icons, { scale: 0, rotation: -15 });
+    gsap.set([titles, texts], { autoAlpha: 0, y: 20 });
+
+    // Entrance animations
+    tl.to(cards, {
+      autoAlpha: 1,
+      y: 0,
+      scale: 1,
+      duration: speed,
+      ease: ease,
+      stagger: staggerDelay
+    }, 0.4);
+
+    tl.to(icons, {
+      scale: 1,
+      rotation: 0,
+      duration: speed * 0.8,
+      ease: 'elastic.out(1, 0.6)',
+      stagger: staggerDelay
+    }, 0.6);
+
+    tl.to(titles, {
+      autoAlpha: 1,
+      y: 0,
+      duration: speed * 0.6,
+      ease: 'power2.out',
+      stagger: staggerDelay * 0.5
+    }, 0.8);
+
+    tl.to(texts, {
+      autoAlpha: 1,
+      y: 0,
+      duration: speed * 0.6,
+      ease: 'power2.out',
+      stagger: staggerDelay * 0.5
+    }, 1.0);
+
+    // Add subtle floating animation during hold
+    tl.to(cards, {
+      y: -8,
+      duration: 2,
+      ease: 'power1.inOut',
+      yoyo: true,
+      repeat: -1,
+      stagger: {
+        each: 0.3,
+        repeat: -1
+      }
+    }, 1.5);
+
+    // Exit animations
+    if (ctx.duration > 2.5) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to(cards, {
+        autoAlpha: 0,
+        y: -40,
+        scale: 0.95,
+        duration: 0.5,
+        ease: 'power2.in',
+        stagger: 0.1
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

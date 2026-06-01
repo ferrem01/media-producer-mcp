@@ -1,12 +1,8 @@
 <template>
   <div class="gradient-bg">
-    <svg class="noise-overlay" width="100%" height="100%">
-      <filter id="noiseFilter">
-        <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
-        <feColorMatrix type="saturate" values="0"/>
-      </filter>
-      <rect width="100%" height="100%" filter="url(#noiseFilter)" opacity="0.04"/>
-    </svg>
+    <div class="gradient-layer-1"></div>
+    <div class="gradient-layer-2"></div>
+    <div class="noise-overlay"></div>
   </div>
 </template>
 
@@ -15,40 +11,67 @@
     width: 100%;
     height: 100%;
     position: relative;
+    overflow: hidden;
+  }
+
+  .gradient-layer-1 {
+    position: absolute;
+    inset: 0;
+  }
+
+  .gradient-layer-2 {
+    position: absolute;
+    inset: 0;
+    opacity: 0.5;
   }
 
   .noise-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-    pointer-events: none;
+    inset: 0;
+    opacity: 0.03;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px),
+      repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px);
+    background-size: 4px 4px;
     mix-blend-mode: overlay;
-    opacity: 0.04;
+    pointer-events: none;
   }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var bg = el.querySelector('.gradient-bg');
+    var layer1 = el.querySelector('.gradient-layer-1');
+    var layer2 = el.querySelector('.gradient-layer-2');
 
     var from = data.from || var_value('--mp-color-background') || '#0f172a';
     var to = data.to || var_value('--mp-color-surface') || '#1e293b';
     var angle = data.angle || 165;
 
-    bg.style.background = 'linear-gradient(' + angle + 'deg, ' + from + ' 0%, ' + to + ' 100%)';
+    // Primary linear gradient
+    layer1.style.background = 'linear-gradient(' + angle + 'deg, ' + from + ' 0%, ' + to + ' 100%)';
 
-    // Subtle shift animation
+    // Radial overlay for depth
+    layer2.style.background = 'radial-gradient(ellipse at 30% 20%, ' + from + ' 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, ' + to + ' 0%, transparent 50%)';
+
+    // Animate color shift
     if (ctx.duration > 2) {
-      tl.fromTo(bg, {
+      tl.to(layer2, {
+        opacity: 0.7,
+        duration: ctx.duration * 0.4,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: 1
+      }, 0);
+
+      // Subtle background position shift on layer 1
+      layer1.style.backgroundSize = '200% 200%';
+      tl.fromTo(layer1, {
         backgroundPosition: '0% 0%'
       }, {
         backgroundPosition: '100% 100%',
         duration: ctx.duration,
-        ease: 'none'
+        ease: 'sine.inOut'
       }, 0);
     }
 

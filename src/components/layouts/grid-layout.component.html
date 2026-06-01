@@ -23,27 +23,41 @@
   }
 
   .grid-card {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 16px;
     padding: 36px 32px;
     display: flex;
     flex-direction: column;
     gap: 16px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    transition: box-shadow 0.3s;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 4px 6px rgba(0, 0, 0, 0.1),
+      0 20px 40px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .grid-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, transparent 50%);
+    pointer-events: none;
   }
 
   .card-icon-wrap {
     width: 52px;
     height: 52px;
     border-radius: 14px;
-    background: linear-gradient(135deg, rgba(167, 139, 250, 0.15) 0%, rgba(139, 92, 246, 0.08) 100%);
+    background: linear-gradient(135deg, rgba(167, 139, 250, 0.18) 0%, rgba(139, 92, 246, 0.08) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
+    box-shadow: 0 4px 12px rgba(167, 139, 250, 0.1);
   }
 
   .card-title {
@@ -51,6 +65,7 @@
     font-weight: 600;
     color: var(--mp-color-text, #ffffff);
     letter-spacing: -0.01em;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
   }
 
   .card-description {
@@ -106,8 +121,8 @@
     // Initial states
     gsap.set(cards, {
       autoAlpha: 0,
-      y: 30,
-      scale: 0.95
+      y: 35,
+      scale: 0.94
     });
 
     var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.6;
@@ -124,19 +139,19 @@
       ease: ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out'
     }, 0.4);
 
-    // Add subtle glow to each card after entrance
+    // Elevated glow state after entrance
     tl.to(cards, {
-      boxShadow: '0 0 30px rgba(167, 139, 250, 0.06), 0 8px 32px rgba(0, 0, 0, 0.2)',
-      duration: 0.4,
+      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 30px rgba(167, 139, 250, 0.06), 0 8px 32px rgba(0, 0, 0, 0.25), 0 20px 50px rgba(0, 0, 0, 0.15)',
+      duration: 0.5,
       stagger: stagger * 0.5
     }, '-=0.2');
 
     // Exit
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.5;
+      var exitAt = ctx.duration - 0.7;
       tl.to(cards, {
-        autoAlpha: 0, scale: 0.97,
-        duration: 0.3,
+        autoAlpha: 0, scale: 0.97, y: -10,
+        duration: 0.35,
         stagger: 0.03,
         ease: 'power2.in'
       }, exitAt);
