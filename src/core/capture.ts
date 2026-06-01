@@ -79,13 +79,13 @@ export async function captureScene(options: CaptureOptions): Promise<CaptureResu
   // Spawn worker as child process
   const workerPath = path.resolve(
     path.dirname(new URL(import.meta.url).pathname),
-    "capture-worker.ts"
+    "capture-worker.js"
   );
 
   // Use tsx to run the TypeScript worker
   await new Promise<void>((resolve, reject) => {
     const child = fork(workerPath, [argsPath], {
-      execArgv: ["--import", "tsx/esm"],
+      execArgv: [],
       stdio: "inherit",
     });
     child.on("exit", (code) => {
