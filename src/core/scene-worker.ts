@@ -165,7 +165,7 @@ async function main() {
   // Capture frames with Playwright
   var totalFrames = Math.ceil(scene.duration_seconds * args.fps);
   var browser = await chromium.launch({
-    args: ["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox"],
+    args: ["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox", "--allow-file-access-from-files"],
   });
 
   try {

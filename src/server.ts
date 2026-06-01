@@ -853,6 +853,7 @@ export function createMcpServer(): McpServer {
       critique: z.boolean().optional().default(false).describe("Run the critiquer loop on generated output"),
       mode: z.enum(["freeform", "structured"]).optional().describe("Generation mode. freeform = full creative freedom (default), structured = component library"),
       scene_count: z.number().optional().describe("Target number of scenes for video/deck"),
+      generate_images: z.boolean().optional().default(true).describe("Generate AI hero images during planning (requires OpenAI key)"),
       duration: z.number().optional().describe("Animation duration in seconds for preview (default: 3)"),
       image_size: z.enum(["1024x1024", "1536x1024", "1024x1536", "auto"]).optional().describe("Image size for ai_image target"),
       image_quality: z.enum(["low", "medium", "high", "auto"]).optional().describe("Image quality for ai_image target"),
@@ -983,6 +984,7 @@ export function createMcpServer(): McpServer {
               critique: params.critique,
               sceneCount: params.scene_count,
               mode: params.mode,
+          generateImages: params.generate_images,
             });
 
             // If pipeline created a project, track the projectId

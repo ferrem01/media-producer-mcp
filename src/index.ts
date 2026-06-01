@@ -250,6 +250,24 @@ async function main() {
         return;
       }
 
+      // ── Static asset serving for project/tenant assets ──
+      const assetMatch = url.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
+      if (assetMatch && method === "GET") {
+        const [, assetTenantId, assetProjectId, assetPath] = assetMatch.map(decodeURIComponent);
+        const fullPath = path.join(config.dataDir, assetTenantId, "projects", assetProjectId, "assets", assetPath);
+        try {
+          const data = await fs.readFile(fullPath);
+          const ext = path.extname(fullPath).toLowerCase();
+          const contentType = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".gif" ? "image/gif" : ext === ".mp4" ? "video/mp4" : "application/octet-stream";
+          res.writeHead(200, { "Content-Type": contentType, "Content-Length": data.length, "Cache-Control": "public, max-age=3600" });
+          res.end(data);
+        } catch {
+          res.writeHead(404);
+          res.end("Asset not found");
+        }
+        return;
+      }
+
       // ── Health ──
       if (url === "/health" || url === "/") {
         jsonResponse(res, 200, { status: "ok", service: "media-producer-mcp", version: "0.1.0" });

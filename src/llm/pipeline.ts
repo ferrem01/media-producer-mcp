@@ -37,6 +37,7 @@ export interface PipelineOpts {
   critique?: boolean;
   maxRevisions?: number;
   sceneCount?: number;
+  generateImages?: boolean;
   mode?: "freeform" | "structured";
   trace?: TraceBuilder;
 }
@@ -346,6 +347,7 @@ async function runFreeformPipeline(
     canvas,
     sceneCount: expanded.sceneCount || opts.sceneCount,
     tenantId: opts.tenant_id,
+    generateImages: opts.generateImages,
   });
   trace?.endEvent({
     scene_count: freeformResult.project.scenes.length,

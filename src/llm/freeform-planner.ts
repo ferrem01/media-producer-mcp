@@ -14,7 +14,8 @@ import { callLLM, type LLMConfig } from "./client.js";
 import { freeformPlannerSystemPrompt, freeformSceneSystemPrompt } from "./prompts.js";
 import { createProject, saveProject } from "../persistence/project.js";
 import { projectDir } from "../persistence/paths.js";
-import type { BrandKit, Canvas, OutputFormat, Project, Scene, SceneTransition } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, Project, Scene, SceneTransition, Asset } from "../core/types.js";
+import { generateImage } from "../media/image-gen.js";
 
 export interface FreeformPlannerOpts {
   prompt: string;
@@ -24,6 +25,7 @@ export interface FreeformPlannerOpts {
   canvas: Canvas;
   sceneCount?: number;
   tenantId?: string;
+  generateImages?: boolean;
 }
 
 export interface FreeformResult {
@@ -35,7 +37,8 @@ interface StoryboardScene {
   label: string;
   duration_seconds: number;
   transition_in?: { type: string; duration_seconds: number };
-  description: string;  // detailed visual description for pass 2
+  description: string;
+  hero_image?: string;  // DALL-E prompt for AI-generated hero image
 }
 
 export async function planFreeform(opts: FreeformPlannerOpts): Promise<FreeformResult> {
@@ -52,7 +55,8 @@ export async function planFreeform(opts: FreeformPlannerOpts): Promise<FreeformR
       "label": "Scene 1 - Hero",
       "duration_seconds": 4,
       "transition_in": { "type": "crossfade", "duration_seconds": 0.5 },
-      "description": "Detailed visual description of what this scene should look like and how it should animate. Be VERY specific about typography, layout, colors, animation techniques to use (SplitText, ScrambleText, particles, etc)."
+      "description": "Detailed visual description of what this scene should look like and how it should animate. Be VERY specific about typography, layout, colors, animation techniques to use (SplitText, ScrambleText, particles, etc).",
+      "hero_image": "(OPTIONAL) A detailed DALL-E image prompt if this scene would benefit from an AI-generated visual. Describe the IMAGE, not the scene layout."
     }
   ]
 }
@@ -73,6 +77,11 @@ export async function planFreeform(opts: FreeformPlannerOpts): Promise<FreeformR
 - Never have two text-on-gradient scenes in a row
 - At least one scene should be a product demo with realistic UI content
 - At least one scene should have a single dominant number/stat
+- OPTIONAL: Include "hero_image" with a DALL-E prompt if the scene would benefit from an AI-generated image
+  * Use for: hero visuals, product illustrations, abstract art, dramatic photographs
+  * Do NOT use for: text-only scenes, stat cards, code demos, pure UI mockups
+  * hero_image prompts should describe the IMAGE itself, not the scene layout
+  * Example: "A futuristic holographic marketing dashboard floating in a dark room, purple and blue neon lighting, cinematic depth of field"
 - Output ONLY JSON, no commentary
 
 ## Brief
@@ -88,6 +97,65 @@ ${opts.prompt}`;
   }
   console.log(`  Storyboard: ${storyboard.scenes.length} scenes planned`);
 
+  // ── Pass 1.5: Generate hero images (if enabled) ──
+  var canGenerateImages = opts.generateImages !== false && !!process.env.OPENAI_API_KEY;
+  var heroImages: Map<number, { path: string; width: number; height: number }> = new Map();
+  var projectId = `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
+  var tenantId = opts.tenantId || "freeform";
+  var projectAssets: Asset[] = [];
+
+  if (canGenerateImages) {
+    var imagePromises: Array<{ index: number; prompt: string }> = [];
+    for (var si = 0; si < storyboard.scenes.length; si++) {
+      var sceneData = storyboard.scenes[si] as StoryboardScene;
+      if (sceneData.hero_image) {
+        imagePromises.push({ index: si, prompt: sceneData.hero_image });
+      }
+    }
+
+    if (imagePromises.length > 0) {
+      console.log(`  Pass 1.5: Generating ${imagePromises.length} hero image(s)...`);
+      var assetsDir = path.join(projectDir(tenantId, projectId), "assets");
+      await fs.mkdir(assetsDir, { recursive: true });
+
+      var results = await Promise.allSettled(
+        imagePromises.map(async (item) => {
+          var imgPath = path.join(assetsDir, `hero_scene_${item.index + 1}.png`);
+          console.log(`    Scene ${item.index + 1}: "${item.prompt.substring(0, 60)}..."`);
+          var result = await generateImage({
+            prompt: item.prompt,
+            size: "1536x1024",
+            quality: "high",
+            outputPath: imgPath,
+          });
+          return { index: item.index, result };
+        })
+      );
+
+      for (var r of results) {
+        if (r.status === "fulfilled") {
+          var { index: idx, result: imgResult } = r.value;
+          heroImages.set(idx, { path: imgResult.path, width: imgResult.width, height: imgResult.height });
+          projectAssets.push({
+            id: `asset_hero_${idx + 1}`,
+            type: "ai_image",
+            path: imgResult.path,
+            name: `Hero image: scene ${idx + 1}`,
+            prompt: (storyboard.scenes[idx] as StoryboardScene).hero_image,
+            width: imgResult.width,
+            height: imgResult.height,
+            model: "gpt-image-1",
+            scene_id: `scene_${String(idx + 1).padStart(3, "0")}`,
+            created_at: new Date().toISOString(),
+          });
+          console.log(`    Scene ${idx + 1}: saved (${imgResult.width}x${imgResult.height})`);
+        } else {
+          console.warn(`    Scene ${(r as any).reason?.index || "?"}: FAILED - ${(r.reason as Error)?.message || r.reason}`);
+        }
+      }
+    }
+  }
+
   // ── Pass 2: Generate HTML for each scene ──
   var sceneSystemPrompt = freeformSceneSystemPrompt(opts.format, opts.canvas, opts.brandKit);
   var sceneHtmlSources: string[] = [];
@@ -96,11 +164,21 @@ ${opts.prompt}`;
     var sceneInfo = storyboard.scenes[i] as StoryboardScene;
     console.log(`  Pass 2: Generating scene ${i + 1}/${storyboard.scenes.length}: "${sceneInfo.label}"...`);
 
+    var imageContext = "";
+    if (heroImages.has(i)) {
+      var heroImg = heroImages.get(i)!;
+      // Serve via HTTP so Playwright can load it (file:// and data URIs have issues)
+      var imgFilename = path.basename(heroImg.path);
+      var imgUrl = `http://localhost:3200/assets/${tenantId}/projects/${projectId}/assets/${imgFilename}`;
+      imageContext = `\n\nA hero image has been generated for this scene. Use it as the main visual.\nImage URL: ${imgUrl}\nDimensions: ${heroImg.width}x${heroImg.height}\nUse an <img> tag with this URL as src. Style it to fill the scene or use as a dramatic background.\nExample: <img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0">\nLayer your text/UI ON TOP with z-index and text-shadow for readability.`;
+    }
+
     var scenePrompt = `Generate the HTML for this scene:
 
 Label: ${sceneInfo.label}
 Duration: ${sceneInfo.duration_seconds} seconds
 Description: ${sceneInfo.description}
+${imageContext}
 
 Overall project: ${opts.prompt}
 Scene ${i + 1} of ${storyboard.scenes.length}.
@@ -115,12 +193,12 @@ Start with <template> and end with </script>.`;
 
     // Strip any markdown fences
     sceneHtml = stripHtmlFences(sceneHtml);
+
     sceneHtmlSources.push(sceneHtml);
   }
 
   // ── Build the project ──
-  var projectId = `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
-  var tenantId = opts.tenantId || "freeform";
+  // projectId and tenantId already set in Pass 1.5
 
   // Save scene HTML files
   var compDir = path.join(projectDir(tenantId, projectId), "components");
@@ -165,6 +243,7 @@ Start with <template> and end with </script>.`;
     canvas: opts.canvas,
     brand_kit: opts.brandKit,
     scenes,
+    assets: projectAssets.length > 0 ? projectAssets : undefined,
   };
 
   await saveProject(project);

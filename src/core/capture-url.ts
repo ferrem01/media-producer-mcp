@@ -26,7 +26,7 @@ export interface CaptureUrlResult {
 
 export async function captureUrl(opts: CaptureUrlOptions): Promise<CaptureUrlResult> {
   const browser = await chromium.launch({
-    args: ["--disable-gpu", "--no-sandbox", "--disable-setuid-sandbox"],
+    args: ["--disable-gpu", "--no-sandbox", "--disable-setuid-sandbox", "--allow-file-access-from-files"],
   });
   try {
     const page = await browser.newPage();
