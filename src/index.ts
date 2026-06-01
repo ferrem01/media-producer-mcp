@@ -666,6 +666,44 @@ async function main() {
         return;
       }
 
+      // ── API: Wait for job completion (long-poll) ──
+      const jobWaitMatch = url.match(/^\/api\/jobs\/([^/]+)\/wait/);
+      if (jobWaitMatch && method === "GET") {
+        const jobId = decodeURIComponent(jobWaitMatch[1]);
+        const urlParams = new URL(url, "http://localhost").searchParams;
+        const timeoutSec = Math.min(Number(urlParams.get("timeout") || "120"), 300);
+        const timeoutMs = timeoutSec * 1000;
+        const start = Date.now();
+
+        const poll = async (): Promise<void> => {
+          while (Date.now() - start < timeoutMs) {
+            const job = getJob(jobId);
+            if (!job) {
+              jsonResponse(res, 404, { error: "Job not found" });
+              return;
+            }
+            if (job.status === "completed" || job.status === "failed") {
+              jsonResponse(res, 200, job);
+              return;
+            }
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+          // Timeout
+          const job = getJob(jobId);
+          if (!job) {
+            jsonResponse(res, 404, { error: "Job not found" });
+            return;
+          }
+          jsonResponse(res, 200, {
+            ...job,
+            _timeout: true,
+            message: "Wait timed out. Job is still " + (job.status || "unknown"),
+          });
+        };
+        await poll();
+        return;
+      }
+
       // ── API: List jobs for tenant ──
       const jobsMatch = url.match(/^\/api\/jobs\/?$/);
       if (jobsMatch && method === "GET") {

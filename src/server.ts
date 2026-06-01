@@ -42,6 +42,7 @@ import type { Scene, SceneComponent, BrandKit, Overlay } from "./core/types.js";
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
+import { captureUrl } from "./core/capture-url.js";
 
 // ── Shared Zod schemas ──
 
@@ -976,6 +977,144 @@ export function createMcpServer(): McpServer {
         });
       } catch (e: any) {
         return err(`Generate failed: ${e.message}`);
+      }
+    },
+  );
+
+
+  // ─────────────────────────────────────────────
+  // job - Dedicated job management tool
+  // ─────────────────────────────────────────────
+
+  server.tool(
+    "job",
+    "Check or wait for any async job (generate, render). action=status to poll, action=wait to block until done or timeout, action=list to list jobs for a tenant.",
+    {
+      action: z.enum(["status", "wait", "list"]),
+      job_id: z.string().optional().describe("Job ID to check (required for status/wait)"),
+      tenant_id: z.string().optional().describe("Tenant ID (required for list)"),
+      job_type: z.enum(["render", "generate"]).optional().describe("Filter by job type (for list)"),
+      timeout_seconds: z.number().optional().default(120).describe("Max seconds to wait (for wait action, default 120)"),
+    },
+    async (params) => {
+      if (params.action === "list") {
+        if (!params.tenant_id) return err("tenant_id required for list");
+        const jobs = listAllJobs(params.tenant_id, params.job_type);
+        return ok(jobs);
+      }
+
+      if (params.action === "status") {
+        if (!params.job_id) return err("job_id required for status");
+        const job = getJob(params.job_id);
+        if (!job) return err("Job not found");
+        return ok(job);
+      }
+
+      if (params.action === "wait") {
+        if (!params.job_id) return err("job_id required for wait");
+        const timeoutMs = (params.timeout_seconds || 120) * 1000;
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+          const job = getJob(params.job_id);
+          if (!job) return err("Job not found");
+          if (job.status === "completed" || job.status === "failed") {
+            return ok(job);
+          }
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+        // Timeout -- return current state
+        const job = getJob(params.job_id);
+        return ok({
+          ...job,
+          _timeout: true,
+          message: "Wait timed out. Job is still " + (job?.status || "unknown"),
+        });
+      }
+
+      return err("Unknown action");
+    },
+  );
+
+  // ─────────────────────────────────────────────
+  // capture - Screenshot URLs for component creation
+  // ─────────────────────────────────────────────
+
+  server.tool(
+    "capture",
+    "Capture a screenshot of a URL. Can save as a project asset or create an image-showcase component from it.",
+    {
+      tenant_id: z.string(),
+      url: z.string().describe("URL to screenshot"),
+      project_id: z.string().optional().describe("Project to save asset to (optional)"),
+      viewport_width: z.number().optional().default(1920).describe("Viewport width"),
+      viewport_height: z.number().optional().default(1080).describe("Viewport height"),
+      full_page: z.boolean().optional().default(false).describe("Capture full scrollable page"),
+      selector: z.string().optional().describe("CSS selector to capture (captures only that element)"),
+      delay_ms: z.number().optional().default(2000).describe("Wait ms after page load before capture"),
+      create_component: z.boolean().optional().default(false).describe("Auto-create an image-showcase component using the screenshot"),
+      token: z.string().optional(),
+    },
+    async (params) => {
+      // Auth check
+      if (isAuthEnabled()) {
+        if (!params.token) return err("Authentication required: provide a token");
+        const tokenTenant = validateToken(params.token);
+        if (!tokenTenant) return err("Invalid token");
+      }
+
+      const timestamp = Date.now();
+      const captureDir = path.join(config.dataDir, params.tenant_id, "assets", "captures");
+      const outputPath = path.join(captureDir, `capture_${timestamp}.png`);
+
+      try {
+        const result = await captureUrl({
+          url: params.url,
+          outputPath,
+          width: params.viewport_width,
+          height: params.viewport_height,
+          fullPage: params.full_page,
+          selector: params.selector,
+          delayMs: params.delay_ms,
+        });
+
+        // If project_id provided, also copy to project assets dir
+        if (params.project_id) {
+          const projAssetsDir = projectAssetsDir(params.tenant_id, params.project_id);
+          const projCapturePath = path.join(projAssetsDir, "captures", `capture_${timestamp}.png`);
+          await fs.mkdir(path.dirname(projCapturePath), { recursive: true });
+          await fs.copyFile(outputPath, projCapturePath);
+        }
+
+        // If create_component requested, create an image-showcase component entry
+        if (params.create_component && params.project_id) {
+          const project = await loadProject(params.tenant_id, params.project_id);
+          if (project && project.scenes.length > 0) {
+            const scene = project.scenes[project.scenes.length - 1];
+            const compId = `comp_capture_${timestamp}`;
+            const component: SceneComponent = {
+              id: compId,
+              type: "image-showcase",
+              data: {
+                src: result.path,
+                alt: `Screenshot of ${params.url}`,
+                width: result.width,
+                height: result.height,
+              },
+              z_index: 10,
+            };
+            await addComponent(params.tenant_id, params.project_id, scene.id, component);
+          }
+        }
+
+        return ok({
+          status: "captured",
+          path: result.path,
+          width: result.width,
+          height: result.height,
+          url: params.url,
+        });
+      } catch (e: any) {
+        return err(`Capture failed: ${e.message}`);
       }
     },
   );
