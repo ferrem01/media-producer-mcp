@@ -224,6 +224,7 @@ export async function compositeOverlays(opts: CompositeOverlayOptions): Promise<
     "-pix_fmt", "yuv420p",
     "-movflags", "+faststart",
     "-shortest",
+    "-t", String(videoDuration),
     outputPath,
   );
 
