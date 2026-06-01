@@ -1,8 +1,7 @@
 /**
  * Render Queue
  *
- * Async job management for renders. Accepts a render request, returns a job ID
- * immediately, and runs the render in the background.
+ * Async job management for renders. Now a thin wrapper over the unified job-queue.
  */
 
 import { renderProject as renderProjectCore, type RenderOptions } from "./render.js";
@@ -11,8 +10,8 @@ import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { llmConfigFromEnv } from "../llm/client.js";
 import path from "node:path";
-import crypto from "node:crypto";
 import { TraceBuilder } from "../trace/index.js";
+import { queueJob, getJob, listAllJobs, type Job } from "./job-queue.js";
 
 export interface RenderJob {
   id: string;
@@ -29,8 +28,33 @@ export interface RenderJob {
   frameCount?: number;
 }
 
-// In-memory job store
-const jobs = new Map<string, RenderJob>();
+/**
+ * Adapt a unified Job to the legacy RenderJob shape.
+ */
+function toRenderJob(job: Job): RenderJob {
+  const statusMap: Record<string, RenderJob["status"]> = {
+    queued: "queued",
+    running: "rendering",
+    completed: "completed",
+    failed: "failed",
+  };
+  return {
+    id: job.id,
+    tenantId: job.tenantId,
+    projectId: job.projectId || "",
+    status: statusMap[job.status] || "queued",
+    progress: job.progress
+      ? { scene: 0, totalScenes: 0, percent: job.progress.percent }
+      : undefined,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt,
+    outputPath: job.outputPath,
+    error: job.error,
+    format: job.format,
+    durationMs: job.durationMs,
+    frameCount: job.frameCount,
+  };
+}
 
 /**
  * Queue a render job. Returns the job immediately with status "queued".
@@ -47,47 +71,37 @@ export function queueRender(
     trace?: TraceBuilder;
   },
 ): RenderJob {
-  const id = `job_${crypto.randomUUID().slice(0, 8)}`;
-  const job: RenderJob = {
-    id,
-    tenantId,
-    projectId,
-    status: "queued",
-  };
-
-  jobs.set(id, job);
-
-  // Fire and forget -- run the render in the background
-  runRender(job, options).catch((err) => {
-    console.error(`Render job ${id} failed:`, err);
+  const job = queueJob("render", tenantId, async (j) => {
+    j.projectId = projectId;
+    await runRender(j, projectId, options);
   });
+  job.projectId = projectId;
 
-  return job;
+  return toRenderJob(job);
 }
 
 /**
  * Get a job's current status.
  */
 export function getJobStatus(jobId: string): RenderJob | null {
-  return jobs.get(jobId) || null;
+  const job = getJob(jobId);
+  if (!job) return null;
+  return toRenderJob(job);
 }
 
 /**
  * List all jobs, optionally filtered by tenant.
  */
 export function listJobs(tenantId?: string): RenderJob[] {
-  const all = Array.from(jobs.values());
-  if (tenantId) {
-    return all.filter((j) => j.tenantId === tenantId);
-  }
-  return all;
+  return listAllJobs(tenantId, "render").map(toRenderJob);
 }
 
 /**
  * Run the actual render in the background.
  */
 async function runRender(
-  job: RenderJob,
+  job: Job,
+  projectId: string,
   options?: {
     quality?: "preview" | "production";
     critique?: boolean;
@@ -96,12 +110,10 @@ async function runRender(
     trace?: TraceBuilder;
   },
 ): Promise<void> {
-  job.status = "rendering";
-  job.startedAt = Date.now();
-  const trace = options?.trace || new TraceBuilder("render", job.tenantId, job.projectId, options?.originalPrompt || "render");
+  const trace = options?.trace || new TraceBuilder("render", job.tenantId, projectId, options?.originalPrompt || "render");
 
   try {
-    const project = await loadProject(job.tenantId, job.projectId);
+    const project = await loadProject(job.tenantId, projectId);
     if (!project) {
       job.status = "failed";
       job.error = "Project not found";
@@ -120,17 +132,17 @@ async function runRender(
     project.status = "rendering";
     await saveProject(project);
 
-    job.progress = { scene: 0, totalScenes: project.scenes.length, percent: 0 };
+    job.progress = { step: "rendering", percent: 0 };
 
     const ext = project.format === "video" || project.format === "slideshow" ? "mp4" : "png";
     const outputPath = path.join(
-      projectOutputDir(job.tenantId, job.projectId),
+      projectOutputDir(job.tenantId, projectId),
       `output.${ext}`,
     );
 
     const renderOpts: RenderOptions = {
       project,
-      workDir: path.join(projectDir(job.tenantId, job.projectId), "_work"),
+      workDir: path.join(projectDir(job.tenantId, projectId), "_work"),
       componentLibDir: config.componentLibDir,
       gsapDir: config.gsapDir,
       outputPath,
@@ -156,11 +168,7 @@ async function runRender(
     job.format = result.format;
     job.durationMs = result.durationMs;
     job.frameCount = result.frameCount;
-    job.progress = {
-      scene: project.scenes.length,
-      totalScenes: project.scenes.length,
-      percent: 100,
-    };
+    job.progress = { step: "complete", percent: 100 };
 
     // Trace render outcome
     trace.setRender(
@@ -184,7 +192,7 @@ async function runRender(
 
     // Try to update project status
     try {
-      const project = await loadProject(job.tenantId, job.projectId);
+      const project = await loadProject(job.tenantId, projectId);
       if (project) {
         project.status = "failed";
         await saveProject(project);

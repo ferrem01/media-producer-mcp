@@ -21,6 +21,7 @@ import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { listProjects, loadProject, updateComponent, addScene, removeScene, reorderScenes } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
+import { getJob, listAllJobs } from "./core/job-queue.js";
 import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -656,7 +657,7 @@ async function main() {
       const jobMatch = url.match(/^\/api\/jobs\/([^/]+)$/);
       if (jobMatch && method === "GET") {
         const jobId = decodeURIComponent(jobMatch[1]);
-        const job = getJobStatus(jobId);
+        const job = getJob(jobId);
         if (!job) {
           jsonResponse(res, 404, { error: "Job not found" });
           return;
@@ -670,7 +671,8 @@ async function main() {
       if (jobsMatch && method === "GET") {
         const jobParams = new URL(url, `http://localhost`).searchParams;
         const tenantFilter = jobParams.get('tenant_id') || undefined;
-        jsonResponse(res, 200, listJobs(tenantFilter));
+        const typeFilter = jobParams.get('type') as "render" | "generate" | undefined;
+        jsonResponse(res, 200, listAllJobs(tenantFilter, typeFilter || undefined));
         return;
       }
 

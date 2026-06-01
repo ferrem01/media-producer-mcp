@@ -28,6 +28,8 @@ import {
 } from "./persistence/brand-kit.js";
 import { renderProject as renderProjectCore } from "./core/render.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
+import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
+import { TraceBuilder } from "./trace/index.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { deriveTypeName } from "./llm/component-gen.js";
 import { runGeneratePipeline, type PipelineTarget } from "./llm/pipeline.js";
@@ -150,6 +152,7 @@ export function createMcpServer(): McpServer {
       scene_id: z.string().optional(),
       target: z.enum(["project", "brand_kit", "job", "jobs"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs."),
       job_id: z.string().optional().describe("Job ID to check status (use with target='job')"),
+      job_type: z.enum(["render", "generate"]).optional().describe("Filter jobs by type (use with target='jobs')"),
     },
     async (params) => {
       const target = params.target || "project";
@@ -161,13 +164,13 @@ export function createMcpServer(): McpServer {
 
       if (target === "job") {
         if (!params.job_id) return err("job_id required for target='job'");
-        const job = getJobStatus(params.job_id);
+        const job = getJob(params.job_id);
         if (!job) return err("Job not found");
         return ok(job);
       }
 
       if (target === "jobs") {
-        const jobs = listJobs(params.tenant_id);
+        const jobs = listAllJobs(params.tenant_id, params.job_type);
         return ok(jobs);
       }
 
@@ -921,7 +924,7 @@ export function createMcpServer(): McpServer {
           });
         }
 
-        // No source provided -- run the LLM pipeline
+        // No source provided -- run the LLM pipeline async via job queue
         let llmConfig;
         try {
           llmConfig = llmConfigFromEnv();
@@ -930,23 +933,47 @@ export function createMcpServer(): McpServer {
         }
 
         const brandKit = await loadBrandKit(params.tenant_id);
-        const result = await runGeneratePipeline({
-          prompt: params.prompt,
-          target: params.target as PipelineTarget,
-          tenant_id: params.tenant_id,
-          llmConfig,
-          brandKit: brandKit || {
-            colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
-            fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
-            style: { border_radius: "12px", motion: "cinematic" as const },
-          },
-          canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
-          critique: params.critique,
-          sceneCount: params.scene_count,
-          mode: params.mode,
+        const job = queueJob("generate", params.tenant_id, async (j) => {
+          const trace = new TraceBuilder("generate", params.tenant_id, "", params.prompt);
+          try {
+            j.progress = { step: "running_pipeline", percent: 10 };
+            const pipelineResult = await runGeneratePipeline({
+              prompt: params.prompt,
+              target: params.target as PipelineTarget,
+              tenant_id: params.tenant_id,
+              llmConfig,
+              brandKit: brandKit || {
+                colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
+                fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
+                style: { border_radius: "12px", motion: "cinematic" as const },
+              },
+              canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+              critique: params.critique,
+              sceneCount: params.scene_count,
+              mode: params.mode,
+            });
+
+            // If pipeline created a project, track the projectId
+            if (pipelineResult && typeof pipelineResult === "object" && "project_id" in (pipelineResult as any)) {
+              j.projectId = (pipelineResult as any).project_id;
+            }
+
+            j.progress = { step: "complete", percent: 100 };
+            trace.setOutcome("success");
+            return pipelineResult;
+          } catch (pipelineErr: any) {
+            trace.setOutcome("failed", pipelineErr.message);
+            throw pipelineErr;
+          } finally {
+            trace.finish();
+          }
         });
 
-        return ok(result);
+        return ok({
+          status: "queued",
+          job_id: job.id,
+          message: "Use get(target='job', job_id='" + job.id + "') to check status.",
+        });
       } catch (e: any) {
         return err(`Generate failed: ${e.message}`);
       }
