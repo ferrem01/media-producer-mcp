@@ -132,8 +132,17 @@
     // Set URL
     if (data.url) urlText.textContent = data.url;
 
-    // Set content
-    if (data.content_html) {
+    // Set content: video_url > content_html > screenshot_url
+    if (data.video_url) {
+      var video = document.createElement('video');
+      video.src = data.video_url;
+      video.muted = true;
+      video.playsInline = true;
+      video.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+      // data-start-at tells the scene-worker when this video begins in the timeline
+      if (data.video_start_at) video.setAttribute('data-start-at', String(data.video_start_at));
+      content.appendChild(video);
+    } else if (data.content_html) {
       content.innerHTML = data.content_html;
     } else if (data.screenshot_url) {
       viewport.style.backgroundImage = 'url(' + data.screenshot_url + ')';
