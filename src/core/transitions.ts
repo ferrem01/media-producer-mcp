@@ -19,7 +19,17 @@ export type TransitionType =
   | "glitch-cut"
   | "morph-wipe"
   | "scale-rotate"
-  | "curtain";
+  | "curtain"
+  | "slide-up"
+  | "slide-down"
+  | "slide-left"
+  | "slide-right"
+  | "wipe-left"
+  | "wipe-right"
+  | "wipe-up"
+  | "wipe-down"
+  | "iris"
+  | "push";
 
 export interface TransitionOptions {
   /** Transition type */
@@ -291,6 +301,67 @@ function getTransitionScript(type: string, duration: number, width: number = 192
       ease: 'power2.in'
     }, i * (dur * 0.3 / stripCount));
   }`;
+
+
+    case "slide-up":
+      return `
+  gsap.set(imgB, { yPercent: 100 });
+  imgB.style.zIndex = '2';
+  tl.to(imgB, { yPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "slide-down":
+      return `
+  gsap.set(imgB, { yPercent: -100 });
+  imgB.style.zIndex = '2';
+  tl.to(imgB, { yPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "slide-left":
+      return `
+  gsap.set(imgB, { xPercent: 100 });
+  imgB.style.zIndex = '2';
+  tl.to(imgB, { xPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "slide-right":
+      return `
+  gsap.set(imgB, { xPercent: -100 });
+  imgB.style.zIndex = '2';
+  tl.to(imgB, { xPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "wipe-left":
+      return `
+  gsap.set(imgB, { clipPath: 'inset(0 100% 0 0)' });
+  imgB.style.zIndex = '2';
+  tl.to(imgB, { clipPath: 'inset(0 0% 0 0)', duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "wipe-right":
+      return `
+  gsap.set(imgB, { clipPath: 'inset(0 0 0 100%)' });
+  imgB.style.zIndex = '2';
+  tl.to(imgB, { clipPath: 'inset(0 0 0 0%)', duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "wipe-up":
+      return `
+  gsap.set(imgB, { clipPath: 'inset(100% 0 0 0)' });
+  imgB.style.zIndex = '2';
+  tl.to(imgB, { clipPath: 'inset(0% 0 0 0)', duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "wipe-down":
+      return `
+  gsap.set(imgB, { clipPath: 'inset(0 0 100% 0)' });
+  imgB.style.zIndex = '2';
+  tl.to(imgB, { clipPath: 'inset(0 0 0% 0)', duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "iris":
+      return `
+  gsap.set(imgB, { clipPath: 'circle(0% at 50% 50%)' });
+  imgB.style.zIndex = '2';
+  tl.to(imgB, { clipPath: 'circle(100% at 50% 50%)', duration: dur, ease: 'power2.inOut' }, 0);`;
+
+    case "push":
+      return `
+  gsap.set(imgB, { xPercent: 100 });
+  tl.to(imgA, { xPercent: -100, duration: dur, ease: 'power2.inOut' }, 0);
+  tl.to(imgB, { xPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);`;
 
     default:
       // Fall back to crossfade for unknown types
