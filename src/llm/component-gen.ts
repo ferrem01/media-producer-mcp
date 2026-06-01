@@ -8,6 +8,7 @@
 import { callLLM, type LLMConfig } from "./client.js";
 import { componentSystemPrompt } from "./prompts.js";
 import type { BrandKit } from "../core/types.js";
+import type { TraceBuilder } from "../trace/index.js";
 
 export interface GenerateComponentOpts {
   prompt: string;
@@ -15,6 +16,7 @@ export interface GenerateComponentOpts {
   brandKit?: BrandKit;
   duration?: number;
   format?: string;
+  trace?: TraceBuilder;
 }
 
 export interface GenerateComponentOutput {
@@ -40,13 +42,19 @@ export async function generateComponentLLM(
     userPrompt += `\n\nTarget duration: ${opts.duration} seconds.`;
   }
 
+  var llmStart = Date.now();
   var raw = await callLLM(opts.llmConfig, [
     { role: "system", content: componentSystemPrompt(opts.format) },
     { role: "user", content: userPrompt },
   ], { temperature: 0.7 });
+  var llmDurationMs = Date.now() - llmStart;
 
   var source = extractComponentSource(raw);
   var type = deriveTypeName(opts.prompt);
+
+  if (opts.trace) {
+    opts.trace.setComponentGen(type, source.length, llmDurationMs);
+  }
 
   return { source, type };
 }

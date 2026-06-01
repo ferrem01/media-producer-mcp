@@ -7,6 +7,7 @@
 
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { critiquerSystemPrompt } from "./prompts.js";
+import type { TraceBuilder } from "../trace/index.js";
 
 export interface CritiqueSceneOpts {
   sceneHtml: string;
@@ -15,6 +16,8 @@ export interface CritiqueSceneOpts {
   prompt: string;
   llmConfig: LLMConfig;
   format?: string;
+  trace?: TraceBuilder;
+  critiqueRound?: number;
 }
 
 export interface CritiqueResult {
@@ -58,6 +61,16 @@ export async function critiqueScene(opts: CritiqueSceneOpts): Promise<CritiqueRe
   // Validate score range
   if (typeof result.score !== "number" || result.score < 1 || result.score > 10) {
     result.score = 5;
+  }
+
+  if (opts.trace) {
+    opts.trace.addCritique(
+      opts.critiqueRound ?? 0,
+      result.score,
+      (result.issues || []).length,
+      !!result.revised_html,
+      result.score >= 7,
+    );
   }
 
   return {

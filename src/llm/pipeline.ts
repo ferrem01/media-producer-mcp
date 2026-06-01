@@ -22,6 +22,7 @@ import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import type { BrandKit, Canvas, OutputFormat, Project } from "../core/types.js";
+import { TraceBuilder } from "../trace/index.js";
 
 export type PipelineTarget = "component" | "scene" | "video" | "image" | "deck" | "presentation";
 
@@ -37,6 +38,7 @@ export interface PipelineOpts {
   maxRevisions?: number;
   sceneCount?: number;
   mode?: "freeform" | "structured";
+  trace?: TraceBuilder;
 }
 
 export interface PipelineResult {
@@ -82,43 +84,64 @@ export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineR
   var brandKit = opts.brandKit || DEFAULT_BRAND_KIT;
   var canvas = opts.canvas || DEFAULT_CANVAS;
 
+  // Create trace if not provided
+  const trace = opts.trace || new TraceBuilder("generate", opts.tenant_id, opts.project_id || "", opts.prompt);
+  trace.setBrandKit(!!opts.brandKit);
+  trace.setCanvas(canvas.width, canvas.height, canvas.fps);
+
   // Build component catalog
+  trace.beginEvent("build_catalog");
   var catalog = await buildComponentCatalog(
     config.componentLibDir,
     tenantComponentsDir(opts.tenant_id),
   );
+  trace.endEvent();
 
   try {
+    let result: PipelineResult;
     switch (opts.target) {
       case "component":
-        return await runComponentPipeline(opts, brandKit);
+        result = await runComponentPipeline(opts, brandKit, trace);
+        break;
 
       case "scene":
-        return await runScenePipeline(opts, brandKit, canvas, catalog);
+        result = await runScenePipeline(opts, brandKit, canvas, catalog, "video", trace);
+        break;
 
       case "image":
-        return await runScenePipeline(opts, brandKit, canvas, catalog, "image");
+        result = await runScenePipeline(opts, brandKit, canvas, catalog, "image", trace);
+        break;
 
       case "video":
         if (opts.mode === "freeform" || opts.mode === undefined) {
-          return await runFreeformPipeline(opts, brandKit, canvas);
+          result = await runFreeformPipeline(opts, brandKit, canvas, trace);
         } else {
-          return await runProjectPipeline(opts, brandKit, canvas, catalog, "video");
+          result = await runProjectPipeline(opts, brandKit, canvas, catalog, "video", trace);
         }
+        break;
 
       case "deck":
       case "presentation":
-        return await runProjectPipeline(opts, brandKit, canvas, catalog, "deck");
+        result = await runProjectPipeline(opts, brandKit, canvas, catalog, "deck", trace);
+        break;
 
       default:
-        return { status: "error", target: opts.target, error: `Unknown target: ${opts.target}` };
+        result = { status: "error", target: opts.target, error: `Unknown target: ${opts.target}` };
     }
+
+    trace.setOutcome(result.status === "completed" ? "success" : "failed", result.error);
+    return result;
   } catch (e: any) {
+    trace.setOutcome("failed", e.message || String(e));
     return {
       status: "error",
       target: opts.target,
       error: e.message || String(e),
     };
+  } finally {
+    if (!opts.trace) {
+      trace.finish();
+    }
   }
 }
 
@@ -127,21 +150,27 @@ export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineR
 async function runComponentPipeline(
   opts: PipelineOpts,
   brandKit: BrandKit,
+  trace?: TraceBuilder,
 ): Promise<PipelineResult> {
+  trace?.beginEvent("component_llm");
   var result = await generateComponentLLM({
     prompt: opts.prompt,
     llmConfig: opts.llmConfig,
     brandKit,
     format: opts.target,
   });
+  trace?.endEvent({ type: result.type, source_length: result.source.length });
+  trace?.setComponentGen(result.type, result.source.length, 0);
 
   // Save to tenant library
+  trace?.beginEvent("save_component");
   var savedPath = await saveGeneratedComponent(
     opts.tenant_id,
     result.type,
     result.source,
     "custom",
   );
+  trace?.endEvent();
 
   return {
     status: "completed",
@@ -162,8 +191,10 @@ async function runScenePipeline(
   canvas: Canvas,
   catalog: ComponentCatalogEntry[],
   format: OutputFormat = "video",
+  trace?: TraceBuilder,
 ): Promise<PipelineResult> {
   // Expand thin prompts into rich creative briefs
+  trace?.beginEvent("expand_prompt");
   var expanded = await expandPrompt({
     prompt: opts.prompt,
     format,
@@ -171,16 +202,24 @@ async function runScenePipeline(
     brandKit,
   });
   var richPrompt = expanded.prompt;
+  trace?.endEvent({ expanded: expanded.expanded });
   if (expanded.expanded) {
     console.log("  Prompt expanded for scene planning");
   }
 
+  trace?.beginEvent("plan_scene");
   var sceneResult = await planScene({
     prompt: richPrompt,
     llmConfig: opts.llmConfig,
     componentCatalog: catalog,
     brandKit,
     canvas,
+    format,
+  });
+  trace?.endEvent({ components: sceneResult.scene.components.map((c: any) => c.type) });
+  trace?.setPlanner({
+    scene_count: 1,
+    components: sceneResult.scene.components.map((c: any) => c.type),
     format,
   });
 
@@ -217,8 +256,10 @@ async function runProjectPipeline(
   canvas: Canvas,
   catalog: ComponentCatalogEntry[],
   format: OutputFormat,
+  trace?: TraceBuilder,
 ): Promise<PipelineResult> {
   // Expand thin prompts into rich creative briefs
+  trace?.beginEvent("expand_prompt");
   var expanded = await expandPrompt({
     prompt: opts.prompt,
     format,
@@ -228,10 +269,12 @@ async function runProjectPipeline(
   });
   var richPrompt = expanded.prompt;
   var sceneCount = expanded.sceneCount || opts.sceneCount;
+  trace?.endEvent({ expanded: expanded.expanded });
   if (expanded.expanded) {
     console.log("  Prompt expanded for project planning");
   }
 
+  trace?.beginEvent("plan_project");
   var projectResult = await planProject({
     prompt: richPrompt,
     format,
@@ -240,6 +283,14 @@ async function runProjectPipeline(
     brandKit,
     canvas,
     sceneCount,
+  });
+  trace?.endEvent({
+    scene_count: projectResult.project.scenes.length,
+  });
+  trace?.setPlanner({
+    scene_count: projectResult.project.scenes.length,
+    components: projectResult.project.scenes.flatMap((s: any) => s.components?.map((c: any) => c.type) || []),
+    format,
   });
   // format already flows through PlanProjectOpts into planScene
 
@@ -268,8 +319,10 @@ async function runFreeformPipeline(
   opts: PipelineOpts,
   brandKit: BrandKit,
   canvas: Canvas,
+  trace?: TraceBuilder,
 ): Promise<PipelineResult> {
   // Expand thin prompts into rich creative briefs
+  trace?.beginEvent("expand_prompt");
   var expanded = await expandPrompt({
     prompt: opts.prompt,
     format: "video",
@@ -278,11 +331,13 @@ async function runFreeformPipeline(
     sceneCount: opts.sceneCount,
   });
   var richPrompt = expanded.prompt;
+  trace?.endEvent({ expanded: expanded.expanded });
   if (expanded.expanded) {
     console.log("  Prompt expanded for freeform planning");
   }
 
   // One LLM call produces all scenes with full HTML
+  trace?.beginEvent("plan_freeform");
   var freeformResult = await planFreeform({
     prompt: richPrompt,
     format: "video",
@@ -291,6 +346,14 @@ async function runFreeformPipeline(
     canvas,
     sceneCount: expanded.sceneCount || opts.sceneCount,
     tenantId: opts.tenant_id,
+  });
+  trace?.endEvent({
+    scene_count: freeformResult.project.scenes.length,
+  });
+  trace?.setPlanner({
+    scene_count: freeformResult.project.scenes.length,
+    components: freeformResult.project.scenes.flatMap((s: any) => s.components?.map((c: any) => c.type) || []),
+    format: "video",
   });
 
   // Save the project (freeform components already saved by planFreeform)

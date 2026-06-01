@@ -26,6 +26,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { setupWebSocket } from "./ws.js";
 import { authMiddleware } from "./auth/auth.js";
+import { readTraces, dailyDigest } from "./trace/index.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
 import { initTenantStoreFromFile } from "./auth/tenant-store.js";
 
@@ -670,6 +671,39 @@ async function main() {
         const jobParams = new URL(url, `http://localhost`).searchParams;
         const tenantFilter = jobParams.get('tenant_id') || undefined;
         jsonResponse(res, 200, listJobs(tenantFilter));
+        return;
+      }
+
+      // ── API: Get traces for tenant ──
+      const tracesMatch = url.match(/^\/api\/traces\/([^/]+)$/);
+      if (tracesMatch && method === "GET") {
+        authMiddleware(req, res, () => {
+          const tenantId = decodeURIComponent(tracesMatch[1]);
+          const params = new URL(url, "http://localhost").searchParams;
+          const since = params.get("since") || undefined;
+          const operation = params.get("operation") as any || undefined;
+          const limit = params.get("limit") ? Number(params.get("limit")) : 100;
+
+          const traces = readTraces({ tenantId, since, operation, limit });
+          jsonResponse(res, 200, traces);
+        });
+        return;
+      }
+
+      // ── API: Get trace digest for tenant ──
+      const digestMatch = url.match(/^\/api\/traces\/([^/]+)\/digest$/);
+      if (digestMatch && method === "GET") {
+        authMiddleware(req, res, () => {
+          const params = new URL(url, "http://localhost").searchParams;
+          const hoursBack = params.get("hours") ? Number(params.get("hours")) : 24;
+
+          const digest = dailyDigest(hoursBack);
+          res.writeHead(200, {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end(digest);
+        });
         return;
       }
 

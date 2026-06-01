@@ -12,6 +12,7 @@ import { config } from "../config.js";
 import { llmConfigFromEnv } from "../llm/client.js";
 import path from "node:path";
 import crypto from "node:crypto";
+import { TraceBuilder } from "../trace/index.js";
 
 export interface RenderJob {
   id: string;
@@ -43,6 +44,7 @@ export function queueRender(
     critique?: boolean;
     maxRevisions?: number;
     originalPrompt?: string;
+    trace?: TraceBuilder;
   },
 ): RenderJob {
   const id = `job_${crypto.randomUUID().slice(0, 8)}`;
@@ -91,10 +93,12 @@ async function runRender(
     critique?: boolean;
     maxRevisions?: number;
     originalPrompt?: string;
+    trace?: TraceBuilder;
   },
 ): Promise<void> {
   job.status = "rendering";
   job.startedAt = Date.now();
+  const trace = options?.trace || new TraceBuilder("render", job.tenantId, job.projectId, options?.originalPrompt || "render");
 
   try {
     const project = await loadProject(job.tenantId, job.projectId);
@@ -158,6 +162,16 @@ async function runRender(
       percent: 100,
     };
 
+    // Trace render outcome
+    trace.setRender(
+      job.id,
+      result.format || "mp4",
+      project.scenes.length,
+      job.durationMs || (Date.now() - (job.startedAt || Date.now())),
+      undefined,
+    );
+    trace.setOutcome("success");
+
     // Update project status
     project.status = "rendered";
     await saveProject(project);
@@ -165,6 +179,8 @@ async function runRender(
     job.status = "failed";
     job.error = err.message || "Unknown error";
     job.completedAt = Date.now();
+
+    trace.setOutcome("failed", job.error);
 
     // Try to update project status
     try {
@@ -175,6 +191,10 @@ async function runRender(
       }
     } catch {
       // ignore
+    }
+  } finally {
+    if (!options?.trace) {
+      trace.finish();
     }
   }
 }
