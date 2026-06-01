@@ -63,6 +63,16 @@ export async function planFreeform(opts: FreeformPlannerOpts): Promise<FreeformR
 - Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain
 - Each description should be 2-4 sentences with SPECIFIC visual direction
 - Think Apple keynote: one idea per scene, cinematic motion, premium aesthetic
+- VARY scene types across the video -- don't repeat the same layout:
+  * Hero text reveal (huge typography, SplitText animation)
+  * Product mockup (browser frame or device with realistic UI)
+  * Single giant stat (one number at 160px, counting up)
+  * Visual metaphor (abstract shapes, SVG animation, particles)
+  * Feature grid (3 items with SVG icons, glass cards)
+  * CTA (bold headline + glowing button)
+- Never have two text-on-gradient scenes in a row
+- At least one scene should be a product demo with realistic UI content
+- At least one scene should have a single dominant number/stat
 - Output ONLY JSON, no commentary
 
 ## Brief

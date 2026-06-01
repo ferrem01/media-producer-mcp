@@ -337,13 +337,17 @@ Output valid JSON with this structure:
 
 ## Creative Direction
 
-Think like an Apple keynote designer:
-- Each scene is a CINEMATIC MOMENT, not a slide
-- Bold typography with dramatic reveals (scale from 200%, blur clear, per-character stagger)
-- Rich backgrounds: multi-layer gradients, subtle grain, ambient glow
-- One powerful idea per scene -- don't cram multiple concepts
-- Professional spacing: 80px+ from edges, intentional visual hierarchy
+Think like an Apple keynote designer crossed with a Stripe marketing page:
+- Each scene is a CINEMATIC MOMENT with emotional weight -- not a slide, not a template
+- One powerful visual idea per scene. If a scene has text + icons + cards + buttons, it's too busy. Pick ONE dominant element.
+- Create VISUAL TENSION: pair enormous typography (120px+) with tiny labels (12px). Pair full-bleed gradients with precise small elements.
+- VARY the rhythm: hero text scene → product demo scene → single giant stat → visual metaphor → CTA. Don't make every scene the same layout.
+- Dramatic typography: headlines should feel SCULPTED. Use letter-spacing -0.03em, line-height 1.0, font-weight 800 for impact moments.
+- Rich backgrounds: multi-layer gradients with 3+ color stops, ambient glow orbs, subtle particle fields, SVG noise texture
 - Motion should feel SMOOTH and DELIBERATE -- use power3.out for entrances, power2.in for exits
+- Every scene needs a FOCAL POINT: one thing the eye goes to first. If everything has equal visual weight, nothing stands out.
+- LESS IS MORE: a single stat at 160px is more impactful than three stats at 48px. A single word revealed with SplitText is more cinematic than a paragraph fading in.
+- Think about what would make someone stop scrolling on X/Twitter. That's the bar.
 
 ## Visual Style Guide
 - Dark premium aesthetic (use var(--mp-color-background) as base)
