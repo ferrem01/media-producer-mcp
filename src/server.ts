@@ -43,6 +43,7 @@ import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { captureUrl } from "./core/capture-url.js";
+import { generateImage } from "./media/image-gen.js";
 
 // ── Shared Zod schemas ──
 
@@ -845,7 +846,7 @@ export function createMcpServer(): McpServer {
     {
       tenant_id: z.string(),
       prompt: z.string().describe("Description of what to generate"),
-      target: z.enum(["component", "scene", "video", "image", "deck", "presentation"]).optional().default("video").describe("What to generate (default: video)"),
+      target: z.enum(["component", "scene", "video", "image", "deck", "presentation", "ai_image"]).optional().default("video").describe("What to generate (default: video). Use ai_image for AI-generated images via OpenAI."),
       source: z.string().optional().describe("If provided, saves this .component.html source directly (skip LLM)"),
       type: z.string().optional().describe("Component type name when saving (kebab-case)"),
       category: z.string().optional().describe("Category to save under (default: custom)"),
@@ -853,6 +854,9 @@ export function createMcpServer(): McpServer {
       mode: z.enum(["freeform", "structured"]).optional().describe("Generation mode. freeform = full creative freedom (default), structured = component library"),
       scene_count: z.number().optional().describe("Target number of scenes for video/deck"),
       duration: z.number().optional().describe("Animation duration in seconds for preview (default: 3)"),
+      image_size: z.enum(["1024x1024", "1536x1024", "1024x1536", "auto"]).optional().describe("Image size for ai_image target"),
+      image_quality: z.enum(["low", "medium", "high", "auto"]).optional().describe("Image quality for ai_image target"),
+      image_model: z.enum(["gpt-image-1", "dall-e-3"]).optional().describe("Image model for ai_image target"),
       token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
     },
     async (params) => {
@@ -863,6 +867,33 @@ export function createMcpServer(): McpServer {
         if (!tokenTenant) return err("Invalid token");
       }
       try {
+        // ── AI Image Generation (synchronous) ──
+        if (params.target === 'ai_image') {
+          const timestamp = Date.now();
+          const assetsDir = path.join(config.dataDir, params.tenant_id, 'assets', 'generated');
+          const outputPath = path.join(assetsDir, `img_${timestamp}.png`);
+
+          const result = await generateImage({
+            prompt: params.prompt,
+            model: params.image_model || 'gpt-image-1',
+            size: params.image_size || '1536x1024',
+            quality: params.image_quality || 'high',
+            outputPath,
+          });
+
+          // If project_id is provided via prompt metadata, copy to project assets
+          // (for now, the generated asset lives in the tenant assets dir)
+
+          return ok({
+            status: 'completed',
+            type: 'ai_image',
+            path: result.path,
+            width: result.width,
+            height: result.height,
+            revised_prompt: result.revised_prompt,
+          });
+        }
+
         // If source is provided, save it directly to the tenant library
         if (params.source) {
           const typeName = params.type || deriveTypeName(params.prompt);

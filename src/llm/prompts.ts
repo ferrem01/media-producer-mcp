@@ -629,6 +629,22 @@ function componentFormatRules(format: string): string {
 - Minimal text -- GIFs are consumed fast. Max 5-8 words visible.
 - High visual impact over subtlety. Think social media scroll-stopper.`;
 
+
+    case "social":
+    case "email-header":
+    case "thumbnail":
+      return `## Format: Social / Thumbnail (Static)
+
+- This is a STATIC composition, not a video frame. Design for one-glance impact.
+- DO NOT use animation-oriented effects (hero-reveal, kinetic-text, typewriter). Use gsap.set() only.
+- Typography should be LARGE and BOLD. Title at 80-96px, not 48px.
+- Content should be minimal: one headline, one supporting line, maybe one stat or icon.
+- Even less text than an image. Think billboard, not slide.
+- Background should be rich (gradients, mesh patterns) but not distracting.
+- If an AI-generated image is available as an asset, use it prominently as the hero visual.
+- Maximum 10 words visible total. Every word must earn its place.
+- Strong brand presence: logo, brand colors, consistent style.`;
+
     default:
       return `## Format: General
 
@@ -683,6 +699,20 @@ function critiquerFormatRules(format: string): string {
 - Bold visuals: are colors high-contrast? Are elements large and readable at small sizes?
 - Minimal text: flag if more than 5-8 words are visible. GIFs need to communicate visually.
 - Scroll-stopper quality: would this make someone pause while scrolling social media?`;
+
+
+    case "social":
+    case "email-header":
+    case "thumbnail":
+      return `## Format-Specific Critique: Social / Thumbnail
+
+- One-glance test: can you understand the message in under 2 seconds?
+- Text minimalism: flag if more than 10 words are visible. This is a billboard, not a slide.
+- Typography impact: titles should be 80px+. If text is small or dense, flag it.
+- Visual hierarchy: is there one clear focal point? The eye should not wander.
+- Brand presence: logo or brand colors should be visible but not dominant.
+- NO animations allowed. If you see gsap.to/from/fromTo, flag it. Only gsap.set() is acceptable.
+- If an AI-generated image asset is available but not used prominently, flag it.`;
 
     default:
       return ``;

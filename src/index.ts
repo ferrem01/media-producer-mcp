@@ -30,6 +30,7 @@ import path from "node:path";
 import { setupWebSocket } from "./ws.js";
 import { authMiddleware, extractToken, validateToken, isAuthEnabled } from "./auth/auth.js";
 import { readTraces, dailyDigest } from "./trace/index.js";
+import { generateImage } from "./media/image-gen.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
 import { initTenantStoreFromFile } from "./auth/tenant-store.js";
 
@@ -859,6 +860,54 @@ async function main() {
           });
           res.end(digest);
         });
+        return;
+      }
+
+
+      // ── API: Generate AI Image ──
+      const genImageMatch = url.match(/^\/api\/generate-image\/([^/]+)$/);
+      if (genImageMatch && method === "POST") {
+        const tenantId = decodeURIComponent(genImageMatch[1]);
+        const body = await parseBody(req);
+        const prompt = body.prompt as string;
+        if (!prompt) {
+          jsonResponse(res, 400, { error: "prompt is required" });
+          return;
+        }
+
+        try {
+          const timestamp = Date.now();
+          const assetsDir = path.join(config.dataDir, tenantId, "assets", "generated");
+          const outputPath = path.join(assetsDir, `img_${timestamp}.png`);
+
+          const result = await generateImage({
+            prompt,
+            model: (body.model as any) || "gpt-image-1",
+            size: (body.size as any) || "1536x1024",
+            quality: (body.quality as any) || "high",
+            outputPath,
+          });
+
+          // If project_id provided, copy to project assets dir
+          const projectId = body.project_id as string;
+          if (projectId) {
+            const projAssetsDir = path.join(config.dataDir, tenantId, "projects", projectId, "assets", "generated");
+            const projPath = path.join(projAssetsDir, `img_${timestamp}.png`);
+            await fs.mkdir(projAssetsDir, { recursive: true });
+            await fs.copyFile(outputPath, projPath);
+          }
+
+          jsonResponse(res, 200, {
+            status: "completed",
+            type: "ai_image",
+            path: result.path,
+            width: result.width,
+            height: result.height,
+            revised_prompt: result.revised_prompt,
+          });
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: `Image generation failed: ${e.message}` });
+        }
         return;
       }
 
