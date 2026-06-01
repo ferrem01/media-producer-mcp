@@ -607,7 +607,14 @@ async function main() {
           jsonResponse(res, 404, { error: "Project not found" });
           return;
         }
-        const job = queueRender(tenantId, projectId);
+        const renderBody = await parseBody(req).catch(() => ({}));
+        const renderOptions: { critique?: boolean; maxRevisions?: number; originalPrompt?: string } = {};
+        if (renderBody && typeof renderBody === "object") {
+          if ((renderBody as any).critique) renderOptions.critique = true;
+          if ((renderBody as any).maxRevisions) renderOptions.maxRevisions = Number((renderBody as any).maxRevisions);
+          if ((renderBody as any).originalPrompt) renderOptions.originalPrompt = String((renderBody as any).originalPrompt);
+        }
+        const job = queueRender(tenantId, projectId, renderOptions);
         jsonResponse(res, 200, {
           status: "queued",
           job_id: job.id,
