@@ -1,0 +1,70 @@
+<template>
+  <div class="screencast-frame">
+    <div class="screencast-viewport"></div>
+  </div>
+</template>
+
+<style scoped>
+  .screencast-frame {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .screencast-viewport {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    background: #000;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var viewport = el.querySelector('.screencast-viewport');
+
+    if (data.video_url) {
+      var video = document.createElement('video');
+      video.src = data.video_url;
+      video.muted = true;
+      video.playsInline = true;
+      video.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;background:#000';
+      if (data.video_start_at) video.setAttribute('data-start-at', String(data.video_start_at));
+      viewport.appendChild(video);
+    } else if (data.image_url) {
+      viewport.style.backgroundImage = 'url(' + data.image_url + ')';
+      viewport.style.backgroundSize = 'contain';
+      viewport.style.backgroundPosition = 'center';
+      viewport.style.backgroundRepeat = 'no-repeat';
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+    var frame = el.querySelector('.screencast-frame');
+
+    gsap.set(frame, { autoAlpha: 0, scale: 0.95, y: 30 });
+
+    tl.to(frame, {
+      autoAlpha: 1, scale: 1, y: 0,
+      duration: speed,
+      ease: 'power3.out'
+    }, 0.2);
+
+    if (ctx.duration > 2) {
+      tl.to(frame, {
+        autoAlpha: 0, scale: 0.97, y: -15,
+        duration: 0.5,
+        ease: 'power2.in'
+      }, ctx.duration - 0.6);
+    }
+
+    return tl;
+  }
+</script>
