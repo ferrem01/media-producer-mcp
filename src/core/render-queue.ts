@@ -145,6 +145,7 @@ async function runRender(
       workDir: path.join(projectDir(job.tenantId, projectId), "_work"),
       componentLibDir: config.componentLibDir,
       gsapDir: config.gsapDir,
+      extraComponentDirs: [path.join(projectDir(job.tenantId, projectId), "components")],
       outputPath,
       critique: options?.critique,
       maxRevisions: options?.maxRevisions,
