@@ -3,9 +3,11 @@
  *
  * Reads AUTH_TOKENS env var in format: "token1:tenant1,token2:tenant2"
  * When AUTH_TOKENS is not set, all requests are allowed (dev mode).
+ * Also supports JWT tokens from Google OAuth.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { verifyToken } from "./jwt.js";
 
 export interface AuthToken {
   token: string;
@@ -39,24 +41,31 @@ export function loadAuthTokens(): Map<string, string> | null {
 
 /**
  * Validate a token. Returns tenantId if valid, null otherwise.
- * In dev mode (no AUTH_TOKENS), returns null (caller should allow).
+ * Tries static AUTH_TOKENS first, then JWT verification.
  */
 export function validateToken(token: string): string | null {
   if (!tokenMap) {
     tokenMap = loadAuthTokens();
   }
-  if (!tokenMap) return null; // dev mode -- handled by caller
-  return tokenMap.get(token) || null;
+  // Try static tokens
+  if (tokenMap) {
+    const tenantId = tokenMap.get(token);
+    if (tenantId) return tenantId;
+  }
+  // Try JWT
+  const jwtPayload = verifyToken(token);
+  if (jwtPayload) return jwtPayload.tenant_id;
+  return null;
 }
 
 /**
- * Check if auth is enabled (AUTH_TOKENS is set).
+ * Check if auth is enabled (AUTH_TOKENS or SESSION_SECRET is set).
  */
 export function isAuthEnabled(): boolean {
   if (!tokenMap) {
     tokenMap = loadAuthTokens();
   }
-  return tokenMap !== null;
+  return tokenMap !== null || !!process.env.SESSION_SECRET;
 }
 
 /**
@@ -64,15 +73,13 @@ export function isAuthEnabled(): boolean {
  * Checks Authorization header first, then ?token= query param.
  */
 export function extractToken(req: IncomingMessage): string | null {
-  // Check Authorization header
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
     return authHeader.slice(7).trim();
   }
 
-  // Check query param
   try {
-    const url = new URL(req.url || "", `http://localhost`);
+    const url = new URL(req.url || "", "http://localhost");
     const token = url.searchParams.get("token");
     if (token) return token;
   } catch {
@@ -83,8 +90,9 @@ export function extractToken(req: IncomingMessage): string | null {
 }
 
 /**
- * Express-style auth middleware for HTTP routes.
- * Skips auth when AUTH_TOKENS is not set (dev mode).
+ * Auth middleware for HTTP routes.
+ * Tries static AUTH_TOKENS first, then JWT verification.
+ * Skips auth when neither is configured (dev mode).
  */
 export function authMiddleware(
   req: IncomingMessage,
@@ -103,14 +111,33 @@ export function authMiddleware(
     return;
   }
 
-  const tenantId = validateToken(token);
-  if (!tenantId) {
-    res.writeHead(403, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Invalid token" }));
+  // Try static AUTH_TOKENS first
+  if (!tokenMap) {
+    tokenMap = loadAuthTokens();
+  }
+  if (tokenMap) {
+    const tenantId = tokenMap.get(token);
+    if (tenantId) {
+      (req as any).tenantId = tenantId;
+      next();
+      return;
+    }
+  }
+
+  // Try JWT token
+  const jwtPayload = verifyToken(token);
+  if (jwtPayload) {
+    (req as any).tenantId = jwtPayload.tenant_id;
+    (req as any).user = {
+      email: jwtPayload.email,
+      name: jwtPayload.name,
+      picture: jwtPayload.picture,
+    };
+    next();
     return;
   }
 
-  // Attach tenant info to request for downstream use
-  (req as any).tenantId = tenantId;
-  next();
+  // Neither worked
+  res.writeHead(401, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Invalid token" }));
 }

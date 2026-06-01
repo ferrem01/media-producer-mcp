@@ -26,6 +26,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { setupWebSocket } from "./ws.js";
 import { authMiddleware } from "./auth/auth.js";
+import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
+import { initTenantStoreFromFile } from "./auth/tenant-store.js";
 
 /**
  * Resolve all component sources for a scene by reading .component.html files
@@ -98,6 +100,9 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown): 
 }
 
 async function main() {
+  // Initialize tenant store
+  initTenantStoreFromFile("/data/media-producer/_system/tenants.json");
+
   // Create MCP server
   const server = createMcpServer();
 
@@ -132,6 +137,22 @@ async function main() {
         return;
       }
 
+      // ── OAuth routes (unauthenticated) ──
+      const urlPath = url.split("?")[0];
+
+      if (urlPath === "/auth/google/login" && method === "GET") {
+        await handleGoogleLogin(req, res);
+        return;
+      }
+      if (urlPath === "/auth/google/callback" && method === "GET") {
+        await handleGoogleCallback(req, res);
+        return;
+      }
+      if (urlPath === "/auth/token" && method === "POST") {
+        await handleTokenExchange(req, res);
+        return;
+      }
+
       // ── Auth for all non-health routes ──
       const authPassed = await new Promise<boolean>((resolve) => {
         authMiddleware(req, res, () => resolve(true));
@@ -143,6 +164,12 @@ async function main() {
         await new Promise((r) => setTimeout(r, 10));
       }
       if (res.writableEnded) return;
+
+      // ── Auth: Get current user (requires auth) ──
+      if (urlPath === "/auth/me" && method === "GET") {
+        await handleGetMe(req, res);
+        return;
+      }
 
       // ── Preview SPA ──
       if (url.startsWith("/preview")) {
