@@ -7,7 +7,8 @@ export { componentSystemPrompt, scenePlannerSystemPrompt, projectPlannerSystemPr
 export { generateComponentLLM, extractComponentSource, deriveTypeName } from "./component-gen.js";
 export { planScene } from "./scene-planner.js";
 export { planProject } from "./project-planner.js";
-export { planFreeform } from "./freeform-planner.js";
+export { planFreeform, planFreeformStoryboard, generateFreeformScenes } from "./freeform-planner.js";
+export { enrichProjectMedia, type MediaEnrichmentOpts, type MediaEnrichmentResult } from "./media-enrichment.js";
 export { critiqueScene, type CritiqueResult } from "./critiquer.js";
 export { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 export { runGeneratePipeline, type PipelineOpts, type PipelineResult, type PipelineTarget } from "./pipeline.js";

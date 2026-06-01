@@ -1,10 +1,11 @@
 /**
- * Freeform Planner (Two-Pass)
+ * Freeform Planner (Two-Pass, Split)
  *
- * Pass 1: LLM plans the storyboard (JSON: scene labels, durations, transitions, descriptions)
- * Pass 2: For each scene, LLM writes the full HTML+CSS+GSAP (raw text, no JSON escaping)
+ * Pass 1 (planFreeformStoryboard): LLM plans the storyboard JSON
+ * Pass 2 (generateFreeformScenes): For each scene, LLM writes the full HTML+CSS+GSAP
  *
- * This avoids the HTML-inside-JSON escaping nightmare.
+ * Image generation is NOT done here. The storyboard's hero_image fields are
+ * hints consumed by the media-enrichment pipeline step.
  */
 
 import fs from "node:fs/promises";
@@ -15,7 +16,8 @@ import { freeformPlannerSystemPrompt, freeformSceneSystemPrompt } from "./prompt
 import { createProject, saveProject } from "../persistence/project.js";
 import { projectDir } from "../persistence/paths.js";
 import type { BrandKit, Canvas, OutputFormat, Project, Scene, SceneTransition, Asset } from "../core/types.js";
-import { generateImage } from "../media/image-gen.js";
+
+// ── Types ──
 
 export interface FreeformPlannerOpts {
   prompt: string;
@@ -28,6 +30,35 @@ export interface FreeformPlannerOpts {
   generateImages?: boolean;
 }
 
+export interface FreeformStoryboardOpts {
+  prompt: string;
+  format: OutputFormat;
+  llmConfig: LLMConfig;
+  brandKit: BrandKit;
+  canvas: Canvas;
+  sceneCount?: number;
+  tenantId?: string;
+}
+
+export interface FreeformStoryboardResult {
+  storyboard: any;
+  projectId: string;
+  tenantId: string;
+}
+
+export interface FreeformScenesOpts {
+  storyboard: any;
+  imageUrls: Map<number, string>;
+  prompt: string;
+  format: OutputFormat;
+  llmConfig: LLMConfig;
+  brandKit: BrandKit;
+  canvas: Canvas;
+  tenantId: string;
+  projectId: string;
+  assets?: Asset[];
+}
+
 export interface FreeformResult {
   project: Project;
   sceneHtmlSources: string[];
@@ -38,11 +69,12 @@ interface StoryboardScene {
   duration_seconds: number;
   transition_in?: { type: string; duration_seconds: number };
   description: string;
-  hero_image?: string;  // DALL-E prompt for AI-generated hero image
+  hero_image?: string;
 }
 
-export async function planFreeform(opts: FreeformPlannerOpts): Promise<FreeformResult> {
-  // ── Pass 1: Plan the storyboard ──
+// ── Pass 1: Plan storyboard only ──
+
+export async function planFreeformStoryboard(opts: FreeformStoryboardOpts): Promise<FreeformStoryboardResult> {
   console.log("  Pass 1: Planning storyboard...");
 
   var storyboardPrompt = `You are planning a cinematic ${opts.format} project. Output a JSON storyboard.
@@ -97,80 +129,27 @@ ${opts.prompt}`;
   }
   console.log(`  Storyboard: ${storyboard.scenes.length} scenes planned`);
 
-  // ── Pass 1.5: Generate hero images (if enabled) ──
-  var canGenerateImages = opts.generateImages !== false && !!process.env.OPENAI_API_KEY;
-  var heroImages: Map<number, { path: string; width: number; height: number }> = new Map();
   var projectId = `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
   var tenantId = opts.tenantId || "freeform";
-  var projectAssets: Asset[] = [];
 
-  if (canGenerateImages) {
-    var imagePromises: Array<{ index: number; prompt: string }> = [];
-    for (var si = 0; si < storyboard.scenes.length; si++) {
-      var sceneData = storyboard.scenes[si] as StoryboardScene;
-      if (sceneData.hero_image) {
-        imagePromises.push({ index: si, prompt: sceneData.hero_image });
-      }
-    }
+  return { storyboard, projectId, tenantId };
+}
 
-    if (imagePromises.length > 0) {
-      console.log(`  Pass 1.5: Generating ${imagePromises.length} hero image(s)...`);
-      var assetsDir = path.join(projectDir(tenantId, projectId), "assets");
-      await fs.mkdir(assetsDir, { recursive: true });
+// ── Pass 2: Generate scene HTML ──
 
-      var results = await Promise.allSettled(
-        imagePromises.map(async (item) => {
-          var imgPath = path.join(assetsDir, `hero_scene_${item.index + 1}.png`);
-          console.log(`    Scene ${item.index + 1}: "${item.prompt.substring(0, 60)}..."`);
-          var result = await generateImage({
-            prompt: item.prompt,
-            size: "1536x1024",
-            quality: "high",
-            outputPath: imgPath,
-          });
-          return { index: item.index, result };
-        })
-      );
-
-      for (var r of results) {
-        if (r.status === "fulfilled") {
-          var { index: idx, result: imgResult } = r.value;
-          heroImages.set(idx, { path: imgResult.path, width: imgResult.width, height: imgResult.height });
-          projectAssets.push({
-            id: `asset_hero_${idx + 1}`,
-            type: "ai_image",
-            path: imgResult.path,
-            name: `Hero image: scene ${idx + 1}`,
-            prompt: (storyboard.scenes[idx] as StoryboardScene).hero_image,
-            width: imgResult.width,
-            height: imgResult.height,
-            model: "gpt-image-1",
-            scene_id: `scene_${String(idx + 1).padStart(3, "0")}`,
-            created_at: new Date().toISOString(),
-          });
-          console.log(`    Scene ${idx + 1}: saved (${imgResult.width}x${imgResult.height})`);
-        } else {
-          console.warn(`    Scene ${(r as any).reason?.index || "?"}: FAILED - ${(r.reason as Error)?.message || r.reason}`);
-        }
-      }
-    }
-  }
-
-  // ── Pass 2: Generate HTML for each scene ──
+export async function generateFreeformScenes(opts: FreeformScenesOpts): Promise<Project> {
   var sceneSystemPrompt = freeformSceneSystemPrompt(opts.format, opts.canvas, opts.brandKit);
   var sceneHtmlSources: string[] = [];
+  var storyboard = opts.storyboard;
 
   for (var i = 0; i < storyboard.scenes.length; i++) {
     var sceneInfo = storyboard.scenes[i] as StoryboardScene;
     console.log(`  Pass 2: Generating scene ${i + 1}/${storyboard.scenes.length}: "${sceneInfo.label}"...`);
 
     var imageContext = "";
-    if (heroImages.has(i)) {
-      var heroImg = heroImages.get(i)!;
-      // Serve via HTTP so Playwright can load it (file:// and data URIs have issues)
-      var imgFilename = path.basename(heroImg.path);
-      var imgUrl = `http://localhost:3200/assets/${tenantId}/projects/${projectId}/assets/${imgFilename}`;
-      imageContext = `\n\nA hero image has been generated for this scene. Use it as the main visual.\nImage URL: ${imgUrl}\nDimensions: ${heroImg.width}x${heroImg.height}\nUse an <img> tag with this URL as src. Style it to fill the scene or use as a dramatic background.\nExample: <img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0">\nLayer your text/UI ON TOP with z-index and text-shadow for readability.`;
+    if (opts.imageUrls.has(i)) {
+      var imgUrl = opts.imageUrls.get(i)!;
+      imageContext = `\n\nA hero image has been generated for this scene. Use it as the main visual.\nImage URL: ${imgUrl}\nUse an <img> tag with this URL as src. Style it to fill the scene or use as a dramatic background.\nExample: <img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0">\nLayer your text/UI ON TOP with z-index and text-shadow for readability.`;
     }
 
     var scenePrompt = `Generate the HTML for this scene:
@@ -191,17 +170,12 @@ Start with <template> and end with </script>.`;
       { role: "user", content: scenePrompt },
     ], { temperature: 0.5, maxTokens: 8192 });
 
-    // Strip any markdown fences
     sceneHtml = stripHtmlFences(sceneHtml);
-
     sceneHtmlSources.push(sceneHtml);
   }
 
-  // ── Build the project ──
-  // projectId and tenantId already set in Pass 1.5
-
-  // Save scene HTML files
-  var compDir = path.join(projectDir(tenantId, projectId), "components");
+  // Build the project
+  var compDir = path.join(projectDir(opts.tenantId, opts.projectId), "components");
   await fs.mkdir(compDir, { recursive: true });
 
   var scenes: Scene[] = [];
@@ -234,9 +208,12 @@ Start with <template> and end with </script>.`;
     });
   }
 
+  // Merge assets from enrichment
+  var projectAssets: Asset[] = opts.assets || [];
+
   var project: Project = {
-    project_id: projectId,
-    tenant_id: tenantId,
+    project_id: opts.projectId,
+    tenant_id: opts.tenantId,
     name: storyboard.name || "Freeform Project",
     format: opts.format,
     status: "draft",
@@ -250,13 +227,57 @@ Start with <template> and end with </script>.`;
 
   console.log(`  Freeform components saved: ${sceneHtmlSources.map((_, i) => `scene_${String(i + 1).padStart(3, "0")}.component.html`).join(", ")}`);
 
-  return { project, sceneHtmlSources };
+  return project;
 }
+
+// ── Convenience wrapper (backwards compat) ──
+
+export async function planFreeform(opts: FreeformPlannerOpts): Promise<FreeformResult> {
+  // Import media enrichment dynamically to avoid circular deps
+  var { enrichProjectMedia } = await import("./media-enrichment.js");
+
+  // Pass 1: Plan storyboard
+  var { storyboard, projectId, tenantId } = await planFreeformStoryboard({
+    prompt: opts.prompt,
+    format: opts.format,
+    llmConfig: opts.llmConfig,
+    brandKit: opts.brandKit,
+    canvas: opts.canvas,
+    sceneCount: opts.sceneCount,
+    tenantId: opts.tenantId,
+  });
+
+  // Media enrichment
+  var enrichResult = await enrichProjectMedia({
+    storyboard,
+    tenantId,
+    projectId,
+    llmConfig: opts.llmConfig,
+    generateImages: opts.generateImages,
+  });
+
+  // Pass 2: Generate scene HTML
+  var project = await generateFreeformScenes({
+    storyboard,
+    imageUrls: enrichResult.imageUrls,
+    prompt: opts.prompt,
+    format: opts.format,
+    llmConfig: opts.llmConfig,
+    brandKit: opts.brandKit,
+    canvas: opts.canvas,
+    tenantId,
+    projectId,
+    assets: enrichResult.assets,
+  });
+
+  return { project, sceneHtmlSources: [] };
+}
+
+// ── Helpers ──
 
 function parseJsonResponse(raw: string): any {
   var trimmed = raw.trim();
 
-  // Strip markdown fences
   if (trimmed.startsWith('```')) {
     var firstNewline = trimmed.indexOf('\n');
     if (firstNewline > -1) trimmed = trimmed.substring(firstNewline + 1);
@@ -268,7 +289,6 @@ function parseJsonResponse(raw: string): any {
   try {
     return JSON.parse(trimmed);
   } catch {
-    // Find first { and last }
     var first = trimmed.indexOf('{');
     var last = trimmed.lastIndexOf('}');
     if (first >= 0 && last > first) {

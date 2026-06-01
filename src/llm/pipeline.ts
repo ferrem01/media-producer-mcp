@@ -1,8 +1,11 @@
 /**
  * Pipeline Orchestrator
  *
- * Main entry point for the LLM generation pipeline. The `generate` MCP tool
+ * Main entry point for the LLM generation pipeline. The \`generate\` MCP tool
  * calls this. Routes by target format and optionally runs a critiquer loop.
+ *
+ * All modes now share a single media enrichment step between planning and
+ * scene generation (for freeform) or after planning (for structured).
  */
 
 import fs from "node:fs/promises";
@@ -15,7 +18,8 @@ import { planProject } from "./project-planner.js";
 import { critiqueScene, type CritiqueResult } from "./critiquer.js";
 import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
-import { planFreeform } from "./freeform-planner.js";
+import { planFreeformStoryboard, generateFreeformScenes } from "./freeform-planner.js";
+import { enrichProjectMedia } from "./media-enrichment.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { createProject, saveProject } from "../persistence/project.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
@@ -241,6 +245,20 @@ async function runScenePipeline(
   project.canvas = canvas;
   await saveProject(project);
 
+  // Media enrichment
+  trace?.beginEvent("media_enrichment");
+  var enrichResult = await enrichProjectMedia({
+    project,
+    llmConfig: opts.llmConfig,
+    generateImages: opts.generateImages,
+    tenantId: project.tenant_id,
+    projectId: project.project_id,
+  });
+  if (enrichResult.project) {
+    project = enrichResult.project;
+  }
+  trace?.endEvent({ images_generated: enrichResult.imageUrls.size });
+
   return {
     status: "completed",
     target: opts.target,
@@ -293,7 +311,6 @@ async function runProjectPipeline(
     components: projectResult.project.scenes.flatMap((s: any) => s.components?.map((c: any) => c.type) || []),
     format,
   });
-  // format already flows through PlanProjectOpts into planScene
 
   // Fill in tenant_id
   projectResult.project.tenant_id = opts.tenant_id;
@@ -303,7 +320,24 @@ async function runProjectPipeline(
     await saveGeneratedComponent(opts.tenant_id, custom.type, custom.source, "custom");
   }
 
-  // Save the project
+  // Save the project before enrichment
+  await saveProject(projectResult.project);
+
+  // Media enrichment
+  trace?.beginEvent("media_enrichment");
+  var enrichResult = await enrichProjectMedia({
+    project: projectResult.project,
+    llmConfig: opts.llmConfig,
+    generateImages: opts.generateImages,
+    tenantId: projectResult.project.tenant_id,
+    projectId: projectResult.project.project_id,
+  });
+  if (enrichResult.project) {
+    projectResult.project = enrichResult.project;
+  }
+  trace?.endEvent({ images_generated: enrichResult.imageUrls.size });
+
+  // Save again with enriched assets
   await saveProject(projectResult.project);
 
   return {
@@ -337,9 +371,9 @@ async function runFreeformPipeline(
     console.log("  Prompt expanded for freeform planning");
   }
 
-  // One LLM call produces all scenes with full HTML
-  trace?.beginEvent("plan_freeform");
-  var freeformResult = await planFreeform({
+  // Pass 1: Plan storyboard
+  trace?.beginEvent("plan_freeform_storyboard");
+  var { storyboard, projectId, tenantId } = await planFreeformStoryboard({
     prompt: richPrompt,
     format: "video",
     llmConfig: opts.llmConfig,
@@ -347,23 +381,39 @@ async function runFreeformPipeline(
     canvas,
     sceneCount: expanded.sceneCount || opts.sceneCount,
     tenantId: opts.tenant_id,
+  });
+  trace?.endEvent({ scene_count: storyboard.scenes.length });
+
+  // Media enrichment (images, future: video, music)
+  trace?.beginEvent("media_enrichment");
+  var enrichResult = await enrichProjectMedia({
+    storyboard,
+    tenantId,
+    projectId,
+    llmConfig: opts.llmConfig,
     generateImages: opts.generateImages,
   });
-  trace?.endEvent({
-    scene_count: freeformResult.project.scenes.length,
-  });
-  trace?.setPlanner({
-    scene_count: freeformResult.project.scenes.length,
-    components: freeformResult.project.scenes.flatMap((s: any) => s.components?.map((c: any) => c.type) || []),
-    format: "video",
-  });
+  trace?.endEvent({ images_generated: enrichResult.imageUrls.size });
 
-  // Save the project (freeform components already saved by planFreeform)
-  await saveProject(freeformResult.project);
+  // Pass 2: Generate scene HTML (with image URLs available)
+  trace?.beginEvent("generate_freeform_scenes");
+  var project = await generateFreeformScenes({
+    storyboard,
+    imageUrls: enrichResult.imageUrls,
+    prompt: richPrompt,
+    format: "video",
+    llmConfig: opts.llmConfig,
+    brandKit,
+    canvas,
+    tenantId,
+    projectId,
+    assets: enrichResult.assets,
+  });
+  trace?.endEvent({ scene_count: project.scenes.length });
 
   return {
     status: "completed",
     target: opts.target,
-    project: freeformResult.project,
+    project,
   };
 }
