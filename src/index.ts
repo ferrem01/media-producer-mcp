@@ -21,7 +21,7 @@ import { callLLM, llmConfigFromEnv } from "./llm/client.js";
 import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
-import { listProjects, loadProject, updateComponent, addScene, removeScene, reorderScenes } from "./persistence/project.js";
+import { listProjects, loadProject, saveProject, updateComponent, addScene, removeScene, reorderScenes } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs } from "./core/job-queue.js";
 import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
@@ -888,18 +888,39 @@ async function main() {
             outputPath,
           });
 
-          // If project_id provided, copy to project assets dir
+          // If project_id provided, copy to project assets and register in project.json
           const projectId = body.project_id as string;
+          let assetId: string | undefined;
           if (projectId) {
-            const projAssetsDir = path.join(config.dataDir, tenantId, "projects", projectId, "assets", "generated");
+            const projAssetsDir = path.join(config.dataDir, tenantId, "projects", projectId, "assets");
             const projPath = path.join(projAssetsDir, `img_${timestamp}.png`);
             await fs.mkdir(projAssetsDir, { recursive: true });
             await fs.copyFile(outputPath, projPath);
+
+            // Register in project.json
+            const project = await loadProject(tenantId, projectId);
+            if (project) {
+              assetId = `asset_${timestamp}`;
+              if (!project.assets) project.assets = [];
+              project.assets.push({
+                id: assetId,
+                type: "ai_image",
+                path: projPath,
+                name: `AI Image: ${prompt.substring(0, 50)}`,
+                prompt,
+                width: result.width,
+                height: result.height,
+                model: (body.model as string) || "gpt-image-1",
+                created_at: new Date().toISOString(),
+              });
+              await saveProject(project);
+            }
           }
 
           jsonResponse(res, 200, {
             status: "completed",
             type: "ai_image",
+            asset_id: assetId,
             path: result.path,
             width: result.width,
             height: result.height,

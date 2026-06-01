@@ -163,11 +163,22 @@ export interface AudioConfig {
 
 export interface Asset {
   id: string;
-  type: "recording" | "image" | "audio" | "logo" | "other";
+  type: "recording" | "image" | "audio" | "logo" | "ai_image" | "capture" | "other";
   path: string;
   name?: string;
   source_url?: string;
   duration_seconds?: number;
+  /** For AI-generated images: the prompt used */
+  prompt?: string;
+  /** Image dimensions */
+  width?: number;
+  height?: number;
+  /** Model used for generation */
+  model?: string;
+  /** Scene this asset was generated for */
+  scene_id?: string;
+  /** When the asset was created */
+  created_at?: string;
 }
 
 // ── Project ──
