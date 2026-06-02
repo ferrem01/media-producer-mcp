@@ -1343,10 +1343,20 @@ export function getPreviewHtml(): string {
     var comp = scene && scene.components[state.currentComponentIndex];
     if (!project || !scene || !comp) return;
 
-    var path = '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
-    api('PATCH', path, { data: comp.data }).then(function(result) {
-      // Reload the scene preview iframe
-      loadPreview();
+    var patchPath = '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+    api('PATCH', patchPath, { data: comp.data }).then(function(result) {
+      // Invalidate the cached scene HTML and re-fetch fresh
+      var scenePath = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+      fetchHtml(scenePath).then(function(freshHtml) {
+        state.sceneHtmlCache[scene.id] = freshHtml;
+        // Write to iframe immediately
+        writeSceneToIframe(freshHtml);
+        // Re-init the timeline at current position
+        waitForReady(function(tl) {
+          tl.pause();
+          tl.time(0);
+        });
+      });
     }).catch(function(e) {
       console.error('Save failed:', e);
     });
