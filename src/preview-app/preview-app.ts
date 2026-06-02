@@ -463,9 +463,24 @@ export function getPreviewHtml(): string {
   var _token = new URLSearchParams(window.location.search).get('token');
 
   // API helper
-  function api(path) {
-    var opts = { headers: {} };
+  function api(methodOrPath, pathOrBody, bodyArg) {
+    // Support both api(path) and api(method, path, body)
+    var method, path, body;
+    if (pathOrBody && typeof pathOrBody === 'string') {
+      method = methodOrPath;
+      path = pathOrBody;
+      body = bodyArg;
+    } else {
+      method = 'GET';
+      path = methodOrPath;
+      body = pathOrBody;
+    }
+    var opts = { method: method, headers: {} };
     if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
+    if (body) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
     return fetch('/api' + path, opts).then(function(r) {
       if (!r.ok) throw new Error('API error ' + r.status);
       return r.json();
