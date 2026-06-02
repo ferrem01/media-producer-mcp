@@ -788,6 +788,25 @@ async function main() {
       }
 
       // ── API: Get job status ──
+      // ── API: List jobs ──
+      const jobsListMatch = url.match(/^\/api\/jobs\/?$/);
+      if (jobsListMatch && method === "GET") {
+        const jobParams = new URL(url, "http://localhost").searchParams;
+        const typeFilter = jobParams.get("type") as "render" | "generate" | undefined;
+        const tenantFilter = jobParams.get("tenant_id") || undefined;
+        const jobs = listAllJobs(tenantFilter, typeFilter || undefined);
+        // Strip large result payloads from list view
+        const summary = jobs.map((j: any) => ({
+          id: j.id, type: j.type, tenantId: j.tenantId, projectId: j.projectId,
+          status: j.status, progress: j.progress,
+          startedAt: j.startedAt, completedAt: j.completedAt,
+          error: j.error, outputPath: j.outputPath, format: j.format,
+          durationMs: j.durationMs, frameCount: j.frameCount,
+        }));
+        jsonResponse(res, 200, summary);
+        return;
+      }
+
       const jobMatch = url.match(/^\/api\/jobs\/([^/]+)$/);
       if (jobMatch && method === "GET") {
         const jobId = decodeURIComponent(jobMatch[1]);
