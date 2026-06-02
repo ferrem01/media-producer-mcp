@@ -587,8 +587,8 @@ export function getPreviewHtml(): string {
           audio.currentTime = 0;
           audio.play().catch(function() {});
         } else {
-          // Resume from where it was
-          audio.play().catch(function() {});
+          // Resume from where it was - only if actually paused
+          if (audio.paused) audio.play().catch(function() {});
         }
       } else {
         // Non-music tracks (voiceover, sfx): play normally with fade-in
@@ -621,8 +621,11 @@ export function getPreviewHtml(): string {
 
   function pauseAudio() {
     state.audioElements.forEach(function(audio) {
-      audio.pause();
+      if (audio._trackType !== 'music') {
+        audio.pause();
+      }
     });
+    // Music keeps playing. Only stop ducking monitoring.
     stopDucking();
   }
 
@@ -1137,6 +1140,7 @@ export function getPreviewHtml(): string {
     els.propEditor.querySelectorAll('.prop-toggle-input').forEach(function(input) {
       input.addEventListener('change', function() {
         comp.data[input.dataset.key] = input.checked;
+        savePropDebounced();
       });
     });
 
@@ -1148,6 +1152,7 @@ export function getPreviewHtml(): string {
         var v = parseFloat(numInput.value) || 0;
         comp.data[key] = v;
         if (rangeInput) rangeInput.value = v;
+        savePropDebounced();
       });
       if (rangeInput) {
         rangeInput.addEventListener('input', function() {
@@ -1162,6 +1167,7 @@ export function getPreviewHtml(): string {
     els.propEditor.querySelectorAll('.prop-select').forEach(function(sel) {
       sel.addEventListener('change', function() {
         comp.data[sel.dataset.key] = sel.value;
+        savePropDebounced();
       });
     });
 
@@ -1172,6 +1178,7 @@ export function getPreviewHtml(): string {
       picker.addEventListener('input', function() {
         comp.data[key] = picker.value;
         if (textInput) textInput.value = picker.value;
+        savePropDebounced();
       });
       if (textInput) {
         textInput.addEventListener('change', function() {
@@ -1193,6 +1200,7 @@ export function getPreviewHtml(): string {
           comp.data[key][ci] = picker.value;
         }
         if (textInput) textInput.value = picker.value;
+        savePropDebounced();
       });
       if (textInput) {
         textInput.addEventListener('change', function() {
@@ -1202,6 +1210,7 @@ export function getPreviewHtml(): string {
           if (isColorValue(textInput.value)) {
             picker.value = colorToHex(textInput.value);
           }
+          savePropDebounced();
         });
       }
     });
@@ -1213,6 +1222,7 @@ export function getPreviewHtml(): string {
         // Update the link
         var link = input.parentElement.querySelector('.prop-url-link');
         if (link) { link.href = input.value; link.textContent = input.value; }
+        savePropDebounced();
       });
     });
 
@@ -1226,6 +1236,7 @@ export function getPreviewHtml(): string {
           comp.data[key] = parsed;
           if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
           ta.style.borderColor = '';
+          savePropDebounced();
         } catch(e) {
           if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Invalid JSON: ' + e.message; }
           ta.style.borderColor = '#dc2626';
@@ -1236,7 +1247,7 @@ export function getPreviewHtml(): string {
     // Generic text/textarea inputs (short strings, long strings)
     els.propEditor.querySelectorAll('.prop-input:not(.prop-num-input):not(.prop-json-input):not(.prop-url-input)').forEach(function(input) {
       if (input.dataset.key && comp.data.hasOwnProperty(input.dataset.key) && typeof comp.data[input.dataset.key] === 'string') {
-        var handler = function() { comp.data[input.dataset.key] = input.value; };
+        var handler = function() { comp.data[input.dataset.key] = input.value; savePropDebounced(); };
         input.addEventListener('input', handler);
       }
     });
@@ -1245,6 +1256,29 @@ export function getPreviewHtml(): string {
   function clearProps() {
     els.propEditor.innerHTML = '<div class="empty-state">Select a component</div>';
   }
+  // ── Save prop to server and reload preview ──
+  var _saveTimer = null;
+  function savePropDebounced() {
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(savePropNow, 400);
+  }
+
+  function savePropNow() {
+    var project = state.currentProject;
+    var scene = project && project.scenes[state.currentSceneIndex];
+    var comp = scene && scene.components[state.currentComponentIndex];
+    if (!project || !scene || !comp) return;
+
+    var path = '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+    api('PATCH', path, { data: comp.data }).then(function(result) {
+      // Reload the scene preview iframe
+      loadPreview();
+    }).catch(function(e) {
+      console.error('Save failed:', e);
+    });
+  }
+
+
 
   // Timeline / Playback
   function getTimeline() {
