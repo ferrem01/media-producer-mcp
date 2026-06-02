@@ -108,11 +108,11 @@ export async function loadProject(tenantId: string, projectId: string): Promise<
   }
 }
 
-export async function listProjects(tenantId: string): Promise<Array<{ project_id: string; name: string; format: OutputFormat; status: string }>> {
+export async function listProjects(tenantId: string): Promise<Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number }>> {
   const dir = projectsDir(tenantId);
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true });
-    const results: Array<{ project_id: string; name: string; format: OutputFormat; status: string }> = [];
+    const results: Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number }> = [];
 
     for (const entry of entries) {
       if (!entry.isDirectory() || !entry.name.startsWith("proj_")) continue;
@@ -123,6 +123,7 @@ export async function listProjects(tenantId: string): Promise<Array<{ project_id
           name: project.name,
           format: project.format,
           status: project.status,
+          scene_count: project.scenes?.length ?? 0,
         });
       }
     }

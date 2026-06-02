@@ -1,14 +1,8 @@
 /**
  * Preview SPA - single HTML string export.
  *
- * A web-based project viewer for reviewing and editing video/image/deck projects.
+ * Dark-themed video player style preview for media-producer-mcp.
  * Vanilla JS, no build step, no framework.
- *
- * Features:
- * - 16:9 iframe scaling (1920x1080 native, CSS transform to fit)
- * - Auto-tenant from URL param with localStorage persistence
- * - Format badges with colors
- * - Render queue integration with job status polling
  */
 
 export function getPreviewHtml(): string {
@@ -17,471 +11,191 @@ export function getPreviewHtml(): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Media Producer - Preview</title>
+<title>Media Producer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
-  /* ── Reset & Base ── */
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
     width: 100%; height: 100%;
     font-family: 'Inter', -apple-system, sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
+    background: #111;
+    color: #eee;
     overflow: hidden;
   }
 
-  /* ── Layout ── */
+  /* Layout */
   #app {
     display: grid;
-    grid-template-rows: 56px 1fr;
-    grid-template-columns: 260px 1fr;
+    grid-template-rows: 48px 1fr;
+    grid-template-columns: 240px 1fr;
     height: 100vh;
   }
 
-  /* ── Header ── */
+  /* Header */
   header {
     grid-column: 1 / -1;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 20px;
-    background: #1e293b;
-    border-bottom: 1px solid #334155;
+    gap: 16px;
+    padding: 0 16px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
   }
-  header .left { display: flex; align-items: center; gap: 12px; }
-  header h1 { font-size: 16px; font-weight: 600; }
-
-  /* ── Badges ── */
-  .badge {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    padding: 3px 8px;
-    border-radius: 4px;
-    background: #334155;
-    color: #94a3b8;
+  header h1 { font-size: 14px; font-weight: 600; color: #eee; white-space: nowrap; }
+  .header-controls {
+    display: flex; align-items: center; gap: 8px; margin-left: auto;
   }
-  .badge-video { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
-  .badge-image { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-  .badge-deck, .badge-slideshow { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
-  .badge-gif { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
-  .badge-social { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
-  .badge-one-pager { background: rgba(14, 165, 233, 0.2); color: #38bdf8; }
-  .badge-email-header { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
-  .badge-thumbnail { background: rgba(234, 179, 8, 0.2); color: #facc15; }
-
-  .tenant-select {
-    display: flex; align-items: center; gap: 8px;
+  .header-controls label { font-size: 12px; color: #888; }
+  .header-controls input, .header-controls select {
+    background: #111; border: 1px solid #2a2a2a; color: #eee;
+    padding: 4px 8px; border-radius: 4px; font-size: 12px; font-family: inherit;
+    outline: none;
   }
-  .tenant-select label { font-size: 13px; color: #94a3b8; }
-  .tenant-select input, .tenant-select select {
-    background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
-    padding: 4px 8px; border-radius: 4px; font-size: 13px; font-family: inherit;
-  }
+  .header-controls input:focus, .header-controls select:focus { border-color: #A78BFA; }
+  .header-controls select { min-width: 180px; }
   .btn {
-    padding: 6px 14px;
-    border: none;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.15s;
+    padding: 5px 12px; border: none; border-radius: 4px;
+    font-size: 12px; font-weight: 500; font-family: inherit;
+    cursor: pointer; transition: background 0.15s;
   }
-  .btn-primary { background: #A78BFA; color: #0f172a; }
+  .btn-primary { background: #A78BFA; color: #111; }
   .btn-primary:hover { background: #c4b5fd; }
-  .btn-secondary { background: #334155; color: #e2e8f0; }
-  .btn-secondary:hover { background: #475569; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* ── Sidebar ── */
+  /* Sidebar */
   #sidebar {
-    background: #1e293b;
-    border-right: 1px solid #334155;
+    background: #1a1a1a;
+    border-right: 1px solid #2a2a2a;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
   }
-  .sidebar-section {
-    padding: 12px 0;
-    border-bottom: 1px solid #334155;
-  }
-  .sidebar-section:last-child { border-bottom: none; }
   .sidebar-header {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #64748b;
-    padding: 0 12px 8px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #888;
+    padding: 12px 12px 8px;
   }
-
-  /* ── Project Items ── */
-  .project-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 13px;
-    border-left: 3px solid transparent;
-    transition: background 0.1s;
-  }
-  .project-item:hover { background: #0f172a; }
-  .project-item.active {
-    background: #0f172a;
-    border-left-color: #A78BFA;
-    color: #fff;
-  }
-  .project-info { flex: 1; min-width: 0; }
-  .project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .project-meta {
-    display: flex; align-items: center; gap: 6px;
-    margin-top: 2px;
-    font-size: 11px; color: #64748b;
-  }
-  .project-meta .badge { font-size: 10px; padding: 1px 5px; }
-
-  /* ── Scene Items ── */
   .scene-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; cursor: pointer; font-size: 12px;
     border-left: 3px solid transparent;
     transition: background 0.1s;
-    position: relative;
   }
-  .scene-item:hover { background: #0f172a; }
+  .scene-item:hover { background: #222; }
   .scene-item.active {
-    background: #0f172a;
+    background: #222;
     border-left-color: #A78BFA;
     color: #fff;
-  }
-  .scene-item.drag-over {
-    border-top: 2px solid #A78BFA;
   }
   .scene-thumb {
-    width: 48px; height: 27px;
-    border-radius: 3px;
-    background: #0f172a;
-    border: 1px solid #334155;
-    flex-shrink: 0;
-    overflow: hidden;
+    width: 64px; height: 36px;
+    border-radius: 3px; background: #111;
+    border: 1px solid #2a2a2a;
+    flex-shrink: 0; overflow: hidden;
     position: relative;
   }
   .scene-thumb iframe {
     width: 1920px; height: 1080px;
-    transform: scale(0.025);
+    transform: scale(0.03333);
     transform-origin: top left;
     border: none; pointer-events: none;
     position: absolute; top: 0; left: 0;
   }
-  .scene-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #475569;
-    flex-shrink: 0;
+  .scene-info { flex: 1; min-width: 0; }
+  .scene-label {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 12px;
   }
-  .scene-item.active .scene-dot { background: #A78BFA; }
-  .scene-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .scene-dur { font-size: 11px; color: #64748b; }
-  .scene-drag-handle {
-    cursor: grab; color: #475569; font-size: 14px;
-    flex-shrink: 0; user-select: none;
-    padding: 0 2px;
+  .scene-dur {
+    font-size: 10px; color: #888;
+    background: #222; padding: 1px 5px; border-radius: 3px;
+    margin-top: 2px; display: inline-block;
   }
-  .scene-drag-handle:active { cursor: grabbing; }
-  .scene-delete {
-    opacity: 0; cursor: pointer; color: #f87171;
-    font-size: 14px; flex-shrink: 0;
-    transition: opacity 0.1s;
-    background: none; border: none; padding: 0 2px;
-    font-family: inherit;
-  }
-  .scene-item:hover .scene-delete { opacity: 0.7; }
-  .scene-delete:hover { opacity: 1 !important; }
-  .add-scene-btn {
+  .empty-state {
     display: flex; align-items: center; justify-content: center;
-    gap: 6px; padding: 8px 12px;
-    font-size: 12px; color: #64748b;
-    cursor: pointer; transition: color 0.1s;
-    border: none; background: none; width: 100%;
-    font-family: inherit;
+    height: 100%; color: #555; font-size: 12px; text-align: center; padding: 16px;
   }
-  .add-scene-btn:hover { color: #A78BFA; }
 
-  /* Add Scene Modal */
-  .modal-backdrop {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.6);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 100;
-  }
-  .modal-backdrop.hidden { display: none; }
-  .modal {
-    background: #1e293b; border: 1px solid #334155;
-    border-radius: 12px; padding: 24px;
-    width: 360px; max-width: 90vw;
-  }
-  .modal h3 { font-size: 16px; margin-bottom: 16px; color: #f8fafc; }
-  .modal-field { margin-bottom: 12px; }
-  .modal-field label {
-    display: block; font-size: 12px; color: #94a3b8;
-    margin-bottom: 4px;
-  }
-  .modal-field input, .modal-field select {
-    width: 100%; padding: 8px 10px;
-    background: #0f172a; border: 1px solid #334155;
-    border-radius: 6px; color: #e2e8f0;
-    font-size: 13px; font-family: inherit;
-    outline: none;
-  }
-  .modal-field input:focus, .modal-field select:focus { border-color: #A78BFA; }
-  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-
-  /* ── Main Area ── */
+  /* Main */
   #main {
-    display: grid;
-    grid-template-rows: 1fr auto auto;
-    overflow: hidden;
+    display: flex; flex-direction: column; overflow: hidden; background: #000;
   }
-
-  /* ── Preview Container ── */
   #preview-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #000;
-    overflow: hidden;
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
   }
-  .preview-wrapper {
-    position: relative;
-  }
+  .preview-wrapper { position: relative; }
   #preview-iframe {
-    background: #000;
-    border: none;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    background: #000; border: none;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.6);
     transform-origin: top left;
   }
-  .no-scene {
-    color: #475569;
-    font-size: 14px;
-    text-align: center;
-  }
+  .no-scene { color: #555; font-size: 13px; text-align: center; }
 
-  /* ── Timeline ── */
-  #timeline-bar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  /* Playback controls */
+  #playback-bar {
+    display: flex; align-items: center; gap: 12px;
     padding: 10px 16px;
-    background: #1e293b;
-    border-top: 1px solid #334155;
-    border-bottom: 1px solid #334155;
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
   }
   .play-btn {
-    width: 32px; height: 32px;
-    background: #A78BFA;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: background 0.15s;
+    width: 32px; height: 32px; background: #A78BFA;
+    border: none; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: background 0.15s;
   }
   .play-btn:hover { background: #c4b5fd; }
-  .play-btn svg { fill: #0f172a; }
+  .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .play-btn svg { fill: #111; }
   #timeline-slider {
-    flex: 1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 6px;
-    background: #334155;
-    border-radius: 3px;
-    outline: none;
-    cursor: pointer;
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; background: #2a2a2a; border-radius: 2px;
+    outline: none; cursor: pointer;
   }
   #timeline-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: #A78BFA;
-    cursor: pointer;
+    -webkit-appearance: none; width: 12px; height: 12px;
+    border-radius: 50%; background: #A78BFA; cursor: pointer;
   }
   #timeline-slider::-moz-range-thumb {
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: #A78BFA;
-    cursor: pointer;
-    border: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #A78BFA; cursor: pointer; border: none;
   }
   .time-display {
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-    color: #94a3b8;
-    min-width: 90px;
-    text-align: right;
-    flex-shrink: 0;
+    font-size: 11px; font-variant-numeric: tabular-nums;
+    color: #888; min-width: 100px; text-align: right; flex-shrink: 0;
   }
 
-  /* ── Bottom Panels ── */
-  #bottom-panels {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    height: 200px;
-    background: #1e293b;
+  /* Scene indicator in playback bar */
+  .scene-indicator {
+    font-size: 11px; color: #888; white-space: nowrap; flex-shrink: 0;
   }
 
-  /* ── Component Layers ── */
-  #layers-panel {
-    border-right: 1px solid #334155;
-    overflow-y: auto;
-  }
-  #layers-panel .sidebar-header { padding-top: 10px; }
-  .layer-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 13px;
-    transition: background 0.1s;
-  }
-  .layer-item:hover { background: #0f172a; }
-  .layer-item.active { background: #0f172a; color: #A78BFA; }
-  .layer-icon {
-    width: 14px; height: 14px;
-    background: #475569;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
-  .layer-item.active .layer-icon { background: #A78BFA; }
-  .layer-z { font-size: 10px; color: #64748b; margin-left: auto; }
-
-  /* ── Prop Editor ── */
-  #props-panel {
-    overflow-y: auto;
-    padding: 10px 12px;
-  }
-  #props-panel .sidebar-header { padding: 0 0 8px; }
-  .prop-row {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    margin-bottom: 10px;
-  }
-  .prop-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: #94a3b8;
-  }
-  .prop-input {
-    width: 100%;
-    padding: 5px 8px;
-    font-size: 13px;
-    font-family: inherit;
-    background: #0f172a;
-    color: #e2e8f0;
-    border: 1px solid #334155;
-    border-radius: 4px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  .prop-input:focus { border-color: #A78BFA; }
-  textarea.prop-input { resize: vertical; min-height: 48px; font-family: 'SF Mono', monospace; font-size: 11px; }
-  .prop-check {
-    width: 16px; height: 16px;
-    accent-color: #A78BFA;
-  }
-  .prop-actions { display: flex; gap: 8px; margin-top: 4px; }
-
-  /* ── Empty / loading states ── */
-  .empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #475569;
-    font-size: 13px;
-    text-align: center;
-    padding: 16px;
-  }
-
-  /* ── Render status ── */
-  .render-status {
-    font-size: 13px;
-    color: #A78BFA;
-    margin-right: 8px;
-  }
-
-  /* ── Status badges ── */
-  .status-draft { color: #94a3b8; }
-  .status-rendering { color: #facc15; }
-  .status-rendered { color: #4ade80; }
-  .status-failed { color: #f87171; }
-
-  /* ── Scrollbar ── */
-  ::-webkit-scrollbar { width: 6px; }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #444; }
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <div class="left">
-      <h1 id="project-name">Media Producer</h1>
-      <span class="badge" id="format-badge" style="display:none">--</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div class="tenant-select">
-        <label for="tenant-input">Tenant:</label>
-        <input id="tenant-input" type="text" placeholder="tenant-id" value="">
-        <button class="btn btn-secondary" id="load-btn">Load</button>
-      </div>
-      <span class="render-status" id="render-status"></span>
-      <button class="btn btn-primary" id="render-btn" disabled>Render</button>
+    <h1>Media Producer</h1>
+    <div class="header-controls">
+      <label>Tenant</label>
+      <input id="tenant-input" type="text" placeholder="tenant-id" style="width:120px;">
+      <label>Project</label>
+      <select id="project-select" disabled><option value="">-- load tenant first --</option></select>
+      <button class="btn btn-primary" id="load-btn">Load</button>
     </div>
   </header>
 
   <div id="sidebar">
-    <div class="sidebar-section" id="projects-section">
-      <div class="sidebar-header">Projects</div>
-      <div id="project-list"><div class="empty-state">Enter a tenant ID</div></div>
-    </div>
-    <div class="sidebar-section" id="scenes-section" style="flex:1;">
-      <div class="sidebar-header">Scenes</div>
-      <div id="scene-list"><div class="empty-state">Select a project</div></div>
-      <button class="add-scene-btn" id="add-scene-btn" style="display:none;">+ Add Scene</button>
-    </div>
-  </div>
-
-  <!-- Add Scene Modal -->
-  <div class="modal-backdrop hidden" id="add-scene-modal">
-    <div class="modal">
-      <h3>Add Scene</h3>
-      <div class="modal-field">
-        <label>Label</label>
-        <input type="text" id="new-scene-label" placeholder="Scene label">
-      </div>
-      <div class="modal-field">
-        <label>Duration (seconds)</label>
-        <input type="number" id="new-scene-duration" value="5" min="1" max="60" step="0.5">
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" id="cancel-add-scene">Cancel</button>
-        <button class="btn btn-primary" id="confirm-add-scene">Add</button>
-      </div>
-    </div>
+    <div class="sidebar-header">Scenes</div>
+    <div id="scene-list"><div class="empty-state">Load a project</div></div>
   </div>
 
   <div id="main">
@@ -492,7 +206,7 @@ export function getPreviewHtml(): string {
       </div>
     </div>
 
-    <div id="timeline-bar">
+    <div id="playback-bar">
       <button class="play-btn" id="play-btn" disabled>
         <svg id="play-icon" width="14" height="14" viewBox="0 0 14 14">
           <polygon points="3,1 12,7 3,13"/>
@@ -500,116 +214,31 @@ export function getPreviewHtml(): string {
       </button>
       <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
-    </div>
-
-    <div id="bottom-panels">
-      <div id="layers-panel">
-        <div class="sidebar-header">Component Layers</div>
-        <div id="layer-list"><div class="empty-state">No scene selected</div></div>
-      </div>
-      <div id="props-panel">
-        <div class="sidebar-header">Prop Editor</div>
-        <div id="prop-editor"><div class="empty-state">Select a component</div></div>
-      </div>
+      <span class="scene-indicator" id="scene-indicator"></span>
     </div>
   </div>
 </div>
 
 <script>
 (function() {
-  // ── State ──
+  // State
   var state = {
     tenantId: '',
     projects: [],
     currentProject: null,
     currentSceneIndex: -1,
-    currentComponentIndex: -1,
     playing: false,
+    playAll: false,
     duration: 0,
-    animFrameId: null,
-    ws: null,
-    wsReconnectTimer: null,
-    renderJobId: null,
-    renderPollTimer: null
+    totalDuration: 0,
+    animFrameId: null
   };
 
-  // ── WebSocket ──
-  function connectWebSocket() {
-    if (state.ws && state.ws.readyState === WebSocket.OPEN) return;
-    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var ws = new WebSocket(proto + '//' + location.host + '/ws');
-
-    ws.onopen = function() {
-      console.log('WebSocket connected');
-      if (state.wsReconnectTimer) {
-        clearTimeout(state.wsReconnectTimer);
-        state.wsReconnectTimer = null;
-      }
-    };
-
-    ws.onmessage = function(e) {
-      var msg;
-      try { msg = JSON.parse(e.data); } catch(err) { return; }
-
-      if (msg.type === 'scene-html') {
-        var currentTime = 0;
-        var tl = getTimeline();
-        if (tl) currentTime = tl.time();
-
-        var iframe = els.previewIframe;
-        try {
-          iframe.contentDocument.open();
-          iframe.contentDocument.write(msg.html);
-          iframe.contentDocument.close();
-        } catch(err) {
-          iframe.srcdoc = msg.html;
-          return;
-        }
-
-        var checkReady = setInterval(function() {
-          try {
-            if (iframe.contentWindow && iframe.contentWindow.__MP_READY) {
-              clearInterval(checkReady);
-              iframe.contentWindow.__MP_TIMELINE.time(currentTime);
-              iframe.contentWindow.__MP_TIMELINE.pause();
-              updateTimeDisplay(currentTime);
-            }
-          } catch(err) {
-            clearInterval(checkReady);
-          }
-        }, 50);
-        setTimeout(function() { clearInterval(checkReady); }, 5000);
-      }
-
-      if (msg.type === 'error') {
-        console.error('WebSocket error:', msg.error);
-      }
-    };
-
-    ws.onclose = function() {
-      console.log('WebSocket disconnected, reconnecting in 2s...');
-      state.ws = null;
-      state.wsReconnectTimer = setTimeout(connectWebSocket, 2000);
-    };
-
-    ws.onerror = function() {
-      ws.close();
-    };
-
-    state.ws = ws;
-  }
-
-  connectWebSocket();
-
-  // ── DOM refs ──
+  // DOM refs
   var els = {
     tenantInput: document.getElementById('tenant-input'),
+    projectSelect: document.getElementById('project-select'),
     loadBtn: document.getElementById('load-btn'),
-    projectName: document.getElementById('project-name'),
-    formatBadge: document.getElementById('format-badge'),
-    renderBtn: document.getElementById('render-btn'),
-    renderStatus: document.getElementById('render-status'),
-    projectList: document.getElementById('project-list'),
     sceneList: document.getElementById('scene-list'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
     previewWrapper: document.getElementById('preview-wrapper'),
@@ -619,257 +248,218 @@ export function getPreviewHtml(): string {
     playIcon: document.getElementById('play-icon'),
     slider: document.getElementById('timeline-slider'),
     timeDisplay: document.getElementById('time-display'),
-    layerList: document.getElementById('layer-list'),
-    propEditor: document.getElementById('prop-editor')
+    sceneIndicator: document.getElementById('scene-indicator')
   };
 
-  // ── Auth token from URL param ──
-  var _tokenParam = new URLSearchParams(window.location.search).get('token');
+  // Auth token from URL
+  var _token = new URLSearchParams(window.location.search).get('token');
 
-  // ── API ──
-  function api(method, path, body) {
-    var opts = { method: method, headers: {} };
-    if (_tokenParam) { opts.headers['Authorization'] = 'Bearer ' + _tokenParam; }
-    if (body) {
-      opts.headers['Content-Type'] = 'application/json';
-      opts.body = JSON.stringify(body);
+  // API helper
+  function api(path) {
+    var opts = { headers: {} };
+    if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
+    return fetch('/api' + path, opts).then(function(r) {
+      if (!r.ok) throw new Error('API error ' + r.status);
+      return r.json();
+    });
+  }
+
+  // Fetch HTML with auth (for srcdoc approach)
+  function fetchHtml(path) {
+    var opts = { headers: {} };
+    if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
+    return fetch('/api' + path, opts).then(function(r) {
+      if (!r.ok) throw new Error('Fetch error ' + r.status);
+      return r.text();
+    });
+  }
+
+  // Utils
+  function escHtml(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+  // Calculate total video duration
+  function calcTotalDuration() {
+    var p = state.currentProject;
+    if (!p || !p.scenes) return 0;
+    var total = 0;
+    p.scenes.forEach(function(s) { total += s.duration_seconds || 0; });
+    return total;
+  }
+
+  // Calculate cumulative time offset for a scene index
+  function sceneOffset(index) {
+    var p = state.currentProject;
+    if (!p || !p.scenes) return 0;
+    var offset = 0;
+    for (var i = 0; i < index && i < p.scenes.length; i++) {
+      offset += p.scenes[i].duration_seconds || 0;
     }
-    return fetch('/api' + path, opts).then(function(r) { return r.json(); });
+    return offset;
   }
 
-  // ── Format badge helper ──
-  function formatBadgeClass(format) {
-    return 'badge badge-' + (format || '').toLowerCase();
-  }
-
-  // ── Load Projects ──
+  // Load projects for tenant
   function loadProjects() {
     state.tenantId = els.tenantInput.value.trim();
     if (!state.tenantId) return;
 
-    // Persist tenant to localStorage
-    try { localStorage.setItem('mp-tenant', state.tenantId); } catch(e) {}
-
-    api('GET', '/projects/' + state.tenantId).then(function(projects) {
-      state.projects = projects;
-      renderProjectList();
-    }).catch(function(e) {
-      els.projectList.innerHTML = '<div class="empty-state">Failed to load projects</div>';
-    });
-  }
-
-  function renderProjectList() {
-    if (!state.projects.length) {
-      els.projectList.innerHTML = '<div class="empty-state">No projects found</div>';
-      return;
-    }
-    var html = '';
-    state.projects.forEach(function(p) {
-      var active = state.currentProject && state.currentProject.project_id === p.project_id;
-      var sceneCount = p.scenes ? p.scenes.length : (p.scene_count || '?');
-      var statusClass = 'status-' + (p.status || 'draft');
-      html += '<div class="project-item' + (active ? ' active' : '') + '" data-id="' + p.project_id + '">'
-        + '<div class="project-info">'
-        + '<div class="project-name">' + escHtml(p.name) + '</div>'
-        + '<div class="project-meta">'
-        + '<span class="' + formatBadgeClass(p.format) + '">' + escHtml(p.format) + '</span>'
-        + '<span class="' + statusClass + '">' + escHtml(p.status || 'draft') + '</span>'
-        + '<span>' + sceneCount + ' scene' + (sceneCount !== 1 ? 's' : '') + '</span>'
-        + '</div>'
-        + '</div>'
-        + '</div>';
-    });
-    els.projectList.innerHTML = html;
-
-    els.projectList.querySelectorAll('.project-item').forEach(function(el) {
-      el.addEventListener('click', function() {
-        selectProject(el.dataset.id);
+    api('/projects/' + state.tenantId).then(function(projects) {
+      state.projects = projects || [];
+      els.projectSelect.innerHTML = '';
+      if (!state.projects.length) {
+        els.projectSelect.innerHTML = '<option value="">No projects found</option>';
+        els.projectSelect.disabled = true;
+        return;
+      }
+      state.projects.forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p.project_id;
+        var label = p.name || p.project_id;
+        if (p.scene_count != null) label += ' (' + p.scene_count + ' scenes)';
+        if (p.format) label += ' [' + p.format + ']';
+        opt.textContent = label;
+        els.projectSelect.appendChild(opt);
       });
+      els.projectSelect.disabled = false;
+
+      // Auto-select from URL param
+      var urlProject = new URLSearchParams(window.location.search).get('project');
+      if (urlProject) {
+        els.projectSelect.value = urlProject;
+        if (els.projectSelect.value === urlProject) {
+          loadProject(urlProject);
+          return;
+        }
+      }
+    }).catch(function() {
+      els.projectSelect.innerHTML = '<option value="">Failed to load</option>';
     });
   }
 
-  function selectProject(projectId) {
-    api('GET', '/projects/' + state.tenantId + '/' + projectId).then(function(project) {
+  // Load a specific project
+  function loadProject(projectId) {
+    if (!projectId || !state.tenantId) return;
+    api('/projects/' + state.tenantId + '/' + projectId).then(function(project) {
       state.currentProject = project;
       state.currentSceneIndex = -1;
-      state.currentComponentIndex = -1;
-
-      els.projectName.textContent = project.name;
-      els.formatBadge.textContent = project.format;
-      els.formatBadge.className = formatBadgeClass(project.format);
-      els.formatBadge.style.display = '';
-      els.renderBtn.disabled = false;
-      els.renderStatus.textContent = '';
-
-      renderProjectList();
+      state.totalDuration = calcTotalDuration();
+      stopPlayback();
       renderSceneList();
       clearPreview();
-      clearLayers();
-      clearProps();
+
+      // Auto-select first scene
+      if (project.scenes && project.scenes.length > 0) {
+        selectScene(0);
+      }
+    }).catch(function() {
+      els.sceneList.innerHTML = '<div class="empty-state">Failed to load project</div>';
     });
   }
 
-  // ── Scene List ──
+  // Render scene list in sidebar
   function renderSceneList() {
     var project = state.currentProject;
-    var addBtn = document.getElementById('add-scene-btn');
-    if (!project || !project.scenes.length) {
+    if (!project || !project.scenes || !project.scenes.length) {
       els.sceneList.innerHTML = '<div class="empty-state">No scenes</div>';
-      if (addBtn) addBtn.style.display = project ? '' : 'none';
       return;
     }
-    if (addBtn) addBtn.style.display = '';
     var html = '';
     project.scenes.forEach(function(scene, i) {
       var active = i === state.currentSceneIndex;
       var label = scene.label || ('Scene ' + (i + 1));
-      var thumbUrl = '/api/scene-thumbnail/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-      html += '<div class="scene-item' + (active ? ' active' : '') + '" data-index="' + i + '" data-scene-id="' + escAttr(scene.id) + '" draggable="true">'
-        + '<span class="scene-drag-handle" title="Drag to reorder">≡</span>'
-        + '<div class="scene-thumb"><iframe src="' + thumbUrl + '" loading="lazy" tabindex="-1"></iframe></div>'
-        + '<span class="scene-label">' + (i + 1) + '. ' + escHtml(label) + '</span>'
-        + '<span class="scene-dur">' + scene.duration_seconds.toFixed(1) + 's</span>'
-        + '<button class="scene-delete" data-scene-id="' + escAttr(scene.id) + '" title="Delete scene">×</button>'
+      html += '<div class="scene-item' + (active ? ' active' : '') + '" data-index="' + i + '">'
+        + '<div class="scene-thumb" data-scene-id="' + escHtml(scene.id) + '"></div>'
+        + '<div class="scene-info">'
+        + '<div class="scene-label">' + (i + 1) + '. ' + escHtml(label) + '</div>'
+        + '<span class="scene-dur">' + (scene.duration_seconds || 0).toFixed(1) + 's</span>'
+        + '</div>'
         + '</div>';
     });
     els.sceneList.innerHTML = html;
 
-    // Click to select
+    // Click handlers
     els.sceneList.querySelectorAll('.scene-item').forEach(function(el) {
-      el.addEventListener('click', function(e) {
-        if (e.target.closest('.scene-delete') || e.target.closest('.scene-drag-handle')) return;
+      el.addEventListener('click', function() {
         selectScene(parseInt(el.dataset.index, 10));
       });
     });
 
-    // Delete scene
-    els.sceneList.querySelectorAll('.scene-delete').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        var sceneId = btn.dataset.sceneId;
-        if (!sceneId || !project) return;
-        if (!confirm('Delete this scene?')) return;
-        api('DELETE', '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + sceneId)
-          .then(function(updated) {
-            if (updated && updated.scenes) {
-              state.currentProject = updated;
-              if (state.currentSceneIndex >= updated.scenes.length) {
-                state.currentSceneIndex = updated.scenes.length - 1;
-              }
-              renderSceneList();
-              if (state.currentSceneIndex >= 0) {
-                loadPreview();
-                renderLayers();
-              } else {
-                clearPreview();
-                clearLayers();
-              }
-            }
-          });
-      });
-    });
-
-    // Drag and drop reorder
-    setupDragReorder();
-  }
-
-  function setupDragReorder() {
-    var items = els.sceneList.querySelectorAll('.scene-item');
-    var dragSrcIndex = null;
-
-    items.forEach(function(item) {
-      item.addEventListener('dragstart', function(e) {
-        dragSrcIndex = parseInt(item.dataset.index, 10);
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', item.dataset.index);
-        item.style.opacity = '0.4';
-      });
-
-      item.addEventListener('dragend', function() {
-        item.style.opacity = '';
-        items.forEach(function(it) { it.classList.remove('drag-over'); });
-      });
-
-      item.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        items.forEach(function(it) { it.classList.remove('drag-over'); });
-        item.classList.add('drag-over');
-      });
-
-      item.addEventListener('dragleave', function() {
-        item.classList.remove('drag-over');
-      });
-
-      item.addEventListener('drop', function(e) {
-        e.preventDefault();
-        item.classList.remove('drag-over');
-        var dropIndex = parseInt(item.dataset.index, 10);
-        if (dragSrcIndex === null || dragSrcIndex === dropIndex) return;
-
-        var project = state.currentProject;
-        if (!project) return;
-
-        // Build new order
-        var scenes = project.scenes.slice();
-        var moved = scenes.splice(dragSrcIndex, 1)[0];
-        scenes.splice(dropIndex, 0, moved);
-        var newIds = scenes.map(function(s) { return s.id; });
-
-        api('PATCH', '/projects/' + state.tenantId + '/' + project.project_id + '/reorder', { scene_ids: newIds })
-          .then(function(updated) {
-            if (updated && updated.scenes) {
-              state.currentProject = updated;
-              // Adjust current scene index
-              if (state.currentSceneIndex === dragSrcIndex) {
-                state.currentSceneIndex = dropIndex;
-              }
-              renderSceneList();
-            }
-          });
-      });
+    // Load thumbnail iframes via srcdoc (auth)
+    els.sceneList.querySelectorAll('.scene-thumb').forEach(function(thumb) {
+      var sceneId = thumb.dataset.sceneId;
+      var path = '/scene-thumbnail/' + state.tenantId + '/' + project.project_id + '/' + sceneId;
+      fetchHtml(path).then(function(html) {
+        var iframe = document.createElement('iframe');
+        iframe.setAttribute('loading', 'lazy');
+        iframe.setAttribute('tabindex', '-1');
+        iframe.srcdoc = html;
+        thumb.appendChild(iframe);
+      }).catch(function() {});
     });
   }
 
   function selectScene(index) {
     state.currentSceneIndex = index;
-    state.currentComponentIndex = -1;
     stopPlayback();
     renderSceneList();
     loadPreview();
-    renderLayers();
-    clearProps();
   }
 
-  // ── Preview with proper scaling ──
+  // Preview loading
   function loadPreview() {
     var project = state.currentProject;
     var scene = project && project.scenes[state.currentSceneIndex];
     if (!scene) { clearPreview(); return; }
 
-    var url = '/api/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-    var iframe = els.previewIframe;
+    var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+    fetchHtml(path).then(function(html) {
+      var iframe = els.previewIframe;
+      iframe.width = (project.canvas && project.canvas.width) || 1920;
+      iframe.height = (project.canvas && project.canvas.height) || 1080;
 
-    // Set native resolution
-    iframe.width = project.canvas.width || 1920;
-    iframe.height = project.canvas.height || 1080;
-    iframe.src = url;
+      els.previewWrapper.style.display = 'block';
+      els.previewPlaceholder.style.display = 'none';
 
-    els.previewWrapper.style.display = 'block';
-    els.previewPlaceholder.style.display = 'none';
+      // Write HTML into iframe
+      try {
+        iframe.contentDocument.open();
+        iframe.contentDocument.write(html);
+        iframe.contentDocument.close();
+      } catch(e) {
+        iframe.srcdoc = html;
+      }
 
-    state.duration = scene.duration_seconds;
-    els.slider.disabled = false;
-    els.playBtn.disabled = false;
-    els.slider.value = 0;
-    updateTimeDisplay(0);
-
-    // Scale to fit after load
-    updatePreviewScale();
-
-    iframe.onload = function() {
+      state.duration = scene.duration_seconds || 0;
+      state.totalDuration = calcTotalDuration();
+      els.slider.disabled = false;
+      els.playBtn.disabled = false;
+      els.slider.value = 0;
+      updateTimeDisplay(0);
+      updateSceneIndicator();
       updatePreviewScale();
-    };
+
+      // Wait for scene ready then pause at 0
+      waitForReady(function(tl) {
+        tl.pause();
+        tl.time(0);
+      });
+    }).catch(function() {
+      clearPreview();
+    });
+  }
+
+  function waitForReady(cb) {
+    var attempts = 0;
+    var check = setInterval(function() {
+      attempts++;
+      try {
+        var w = els.previewIframe.contentWindow;
+        if (w && w.__MP_READY && w.__MP_TIMELINE) {
+          clearInterval(check);
+          cb(w.__MP_TIMELINE);
+        }
+      } catch(e) { clearInterval(check); }
+      if (attempts > 100) clearInterval(check);
+    }, 50);
   }
 
   function updatePreviewScale() {
@@ -879,67 +469,67 @@ export function getPreviewHtml(): string {
     if (!container || !iframe || wrapper.style.display === 'none') return;
 
     var project = state.currentProject;
-    var nativeW = (project && project.canvas.width) || 1920;
-    var nativeH = (project && project.canvas.height) || 1080;
+    var nW = (project && project.canvas && project.canvas.width) || 1920;
+    var nH = (project && project.canvas && project.canvas.height) || 1080;
 
-    var containerRect = container.getBoundingClientRect();
-    var pad = 32;
-    var availW = containerRect.width - pad * 2;
-    var availH = containerRect.height - pad * 2;
-
-    var scaleX = availW / nativeW;
-    var scaleY = availH / nativeH;
+    var rect = container.getBoundingClientRect();
+    var pad = 24;
+    var scaleX = (rect.width - pad * 2) / nW;
+    var scaleY = (rect.height - pad * 2) / nH;
     var scale = Math.min(scaleX, scaleY, 1);
 
-    iframe.style.width = nativeW + 'px';
-    iframe.style.height = nativeH + 'px';
+    iframe.style.width = nW + 'px';
+    iframe.style.height = nH + 'px';
     iframe.style.transform = 'scale(' + scale + ')';
-    iframe.style.transformOrigin = 'top left';
 
-    // Center the wrapper
-    var scaledW = nativeW * scale;
-    var scaledH = nativeH * scale;
-    wrapper.style.width = scaledW + 'px';
-    wrapper.style.height = scaledH + 'px';
+    wrapper.style.width = (nW * scale) + 'px';
+    wrapper.style.height = (nH * scale) + 'px';
   }
-
   window.addEventListener('resize', updatePreviewScale);
 
   function clearPreview() {
     els.previewWrapper.style.display = 'none';
-    els.previewIframe.src = 'about:blank';
     els.previewPlaceholder.style.display = '';
+    try { els.previewIframe.contentDocument.open(); els.previewIframe.contentDocument.write(''); els.previewIframe.contentDocument.close(); } catch(e) {}
     els.slider.disabled = true;
     els.playBtn.disabled = true;
     els.slider.value = 0;
-    updateTimeDisplay(0);
     state.duration = 0;
+    updateTimeDisplay(0);
+    updateSceneIndicator();
     stopPlayback();
   }
 
-  // ── Timeline ──
+  // Timeline / Playback
   function getTimeline() {
-    try {
-      return els.previewIframe.contentWindow && els.previewIframe.contentWindow.__MP_TIMELINE;
-    } catch(e) { return null; }
+    try { return els.previewIframe.contentWindow && els.previewIframe.contentWindow.__MP_TIMELINE; }
+    catch(e) { return null; }
   }
 
   function togglePlay() {
-    var tl = getTimeline();
-    if (!tl) return;
     if (state.playing) {
       stopPlayback();
-      tl.pause();
+      var tl = getTimeline();
+      if (tl) tl.pause();
     } else {
       state.playing = true;
+      state.playAll = true;
       updatePlayIcon();
-      tl.play();
+      var tl = getTimeline();
+      if (tl) {
+        // If at end of current scene, start from beginning
+        if (tl.time() >= state.duration - 0.05) {
+          tl.time(0);
+        }
+        tl.play();
+      }
       animLoop();
     }
   }
 
   function stopPlayback() {
     state.playing = false;
+    state.playAll = false;
     updatePlayIcon();
     if (state.animFrameId) {
       cancelAnimationFrame(state.animFrameId);
@@ -953,29 +543,139 @@ export function getPreviewHtml(): string {
     if (tl) {
       var t = tl.time();
       var d = state.duration;
-      els.slider.value = d > 0 ? Math.round((t / d) * 1000) : 0;
-      updateTimeDisplay(t);
-      if (t >= d) {
-        stopPlayback();
-        tl.pause();
-        return;
+
+      // Update slider based on total video position
+      var globalTime = sceneOffset(state.currentSceneIndex) + t;
+      var totalDur = state.totalDuration;
+      els.slider.value = totalDur > 0 ? Math.round((globalTime / totalDur) * 1000) : 0;
+      updateTimeDisplay(globalTime);
+
+      // Scene finished - advance to next if playing all
+      if (t >= d - 0.02 && state.playAll) {
+        var project = state.currentProject;
+        if (project && state.currentSceneIndex < project.scenes.length - 1) {
+          // Advance to next scene
+          var nextIndex = state.currentSceneIndex + 1;
+          state.currentSceneIndex = nextIndex;
+          renderSceneList();
+          updateSceneIndicator();
+
+          var scene = project.scenes[nextIndex];
+          state.duration = scene.duration_seconds || 0;
+          var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+
+          fetchHtml(path).then(function(html) {
+            var iframe = els.previewIframe;
+            try {
+              iframe.contentDocument.open();
+              iframe.contentDocument.write(html);
+              iframe.contentDocument.close();
+            } catch(e) {
+              iframe.srcdoc = html;
+            }
+            updatePreviewScale();
+            waitForReady(function(newTl) {
+              newTl.time(0);
+              newTl.play();
+              animLoop();
+            });
+          }).catch(function() { stopPlayback(); });
+          return;
+        } else {
+          // Last scene done
+          stopPlayback();
+          tl.pause();
+          return;
+        }
       }
     }
     state.animFrameId = requestAnimationFrame(animLoop);
   }
 
-  function scrub(val) {
-    var tl = getTimeline();
-    if (!tl) return;
-    var t = (val / 1000) * state.duration;
-    tl.time(t);
-    tl.pause();
-    stopPlayback();
-    updateTimeDisplay(t);
+  function scrub(sliderVal) {
+    var totalDur = state.totalDuration;
+    if (totalDur <= 0) return;
+    var targetGlobal = (sliderVal / 1000) * totalDur;
+
+    // Find which scene this falls into
+    var project = state.currentProject;
+    if (!project || !project.scenes) return;
+
+    var cumulative = 0;
+    var targetScene = 0;
+    var localTime = 0;
+    for (var i = 0; i < project.scenes.length; i++) {
+      var sd = project.scenes[i].duration_seconds || 0;
+      if (targetGlobal < cumulative + sd) {
+        targetScene = i;
+        localTime = targetGlobal - cumulative;
+        break;
+      }
+      cumulative += sd;
+      if (i === project.scenes.length - 1) {
+        targetScene = i;
+        localTime = sd;
+      }
+    }
+
+    updateTimeDisplay(targetGlobal);
+
+    if (targetScene !== state.currentSceneIndex) {
+      // Need to load different scene
+      state.currentSceneIndex = targetScene;
+      state.duration = project.scenes[targetScene].duration_seconds || 0;
+      renderSceneList();
+      updateSceneIndicator();
+
+      var scene = project.scenes[targetScene];
+      var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+      var wasPlaying = state.playing;
+      stopPlayback();
+
+      fetchHtml(path).then(function(html) {
+        var iframe = els.previewIframe;
+        try {
+          iframe.contentDocument.open();
+          iframe.contentDocument.write(html);
+          iframe.contentDocument.close();
+        } catch(e) { iframe.srcdoc = html; }
+        updatePreviewScale();
+        waitForReady(function(tl) {
+          tl.time(localTime);
+          tl.pause();
+        });
+      });
+    } else {
+      // Same scene, just seek
+      var tl = getTimeline();
+      if (tl) {
+        tl.time(localTime);
+        tl.pause();
+        stopPlayback();
+      }
+    }
   }
 
-  function updateTimeDisplay(currentTime) {
-    els.timeDisplay.textContent = (currentTime || 0).toFixed(1) + 's / ' + (state.duration || 0).toFixed(1) + 's';
+  function updateTimeDisplay(globalTime) {
+    var total = state.totalDuration || 0;
+    els.timeDisplay.textContent = fmtTime(globalTime || 0) + ' / ' + fmtTime(total);
+  }
+
+  function fmtTime(sec) {
+    sec = sec || 0;
+    if (sec < 60) return sec.toFixed(1) + 's';
+    var m = Math.floor(sec / 60);
+    var s = sec - m * 60;
+    return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+  }
+
+  function updateSceneIndicator() {
+    var project = state.currentProject;
+    if (!project || !project.scenes || state.currentSceneIndex < 0) {
+      els.sceneIndicator.textContent = '';
+      return;
+    }
+    els.sceneIndicator.textContent = 'Scene ' + (state.currentSceneIndex + 1) + '/' + project.scenes.length;
   }
 
   function updatePlayIcon() {
@@ -986,283 +686,29 @@ export function getPreviewHtml(): string {
     }
   }
 
-  // ── Layers ──
-  function renderLayers() {
-    var project = state.currentProject;
-    var scene = project && project.scenes[state.currentSceneIndex];
-    if (!scene || !scene.components.length) {
-      els.layerList.innerHTML = '<div class="empty-state">No components</div>';
-      return;
-    }
-    var comps = scene.components.map(function(c, i) { return { comp: c, originalIndex: i }; });
-    comps.sort(function(a, b) { return (b.comp.z_index || 0) - (a.comp.z_index || 0); });
-
-    var html = '';
-    comps.forEach(function(item) {
-      var c = item.comp;
-      var active = item.originalIndex === state.currentComponentIndex;
-      html += '<div class="layer-item' + (active ? ' active' : '') + '" data-index="' + item.originalIndex + '">'
-        + '<span class="layer-icon"></span>'
-        + '<span>' + escHtml(c.type) + '</span>'
-        + '<span class="layer-z">z:' + (c.z_index || 0) + '</span>'
-        + '</div>';
-    });
-    els.layerList.innerHTML = html;
-
-    els.layerList.querySelectorAll('.layer-item').forEach(function(el) {
-      el.addEventListener('click', function() {
-        state.currentComponentIndex = parseInt(el.dataset.index, 10);
-        renderLayers();
-        renderProps();
-      });
-    });
-  }
-
-  function clearLayers() {
-    els.layerList.innerHTML = '<div class="empty-state">No scene selected</div>';
-  }
-
-  // ── Prop Editor ──
-  function renderProps() {
-    var project = state.currentProject;
-    var scene = project && project.scenes[state.currentSceneIndex];
-    var comp = scene && scene.components[state.currentComponentIndex];
-    if (!comp) { clearProps(); return; }
-
-    var html = '<div class="sidebar-header" style="padding:0 0 8px;">' + escHtml(comp.type) + ' props</div>';
-    var data = comp.data || {};
-    var keys = Object.keys(data);
-
-    if (!keys.length) {
-      html += '<div class="empty-state">No data fields</div>';
+  // Events
+  els.loadBtn.addEventListener('click', function() {
+    var selected = els.projectSelect.value;
+    if (selected) {
+      loadProject(selected);
     } else {
-      keys.forEach(function(key) {
-        var val = data[key];
-        html += '<div class="prop-row">';
-        html += '<label class="prop-label">' + escHtml(key) + '</label>';
-
-        if (typeof val === 'boolean') {
-          html += '<input type="checkbox" class="prop-check" data-key="' + escAttr(key) + '"' + (val ? ' checked' : '') + '>';
-        } else if (typeof val === 'number') {
-          html += '<input type="number" class="prop-input" data-key="' + escAttr(key) + '" value="' + val + '">';
-        } else if (typeof val === 'string') {
-          html += '<input type="text" class="prop-input" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
-        } else {
-          html += '<textarea class="prop-input" data-key="' + escAttr(key) + '">' + escHtml(JSON.stringify(val, null, 2)) + '</textarea>';
-        }
-
-        html += '</div>';
-      });
+      loadProjects();
     }
-
-    html += '<div class="prop-actions">'
-      + '<button class="btn btn-primary" id="update-props-btn">Update</button>'
-      + '</div>';
-
-    els.propEditor.innerHTML = html;
-
-    document.getElementById('update-props-btn').addEventListener('click', saveProps);
-  }
-
-  function saveProps() {
-    var project = state.currentProject;
-    var scene = project && project.scenes[state.currentSceneIndex];
-    var comp = scene && scene.components[state.currentComponentIndex];
-    if (!comp) return;
-
-    var newData = {};
-    els.propEditor.querySelectorAll('[data-key]').forEach(function(input) {
-      var key = input.dataset.key;
-      var origVal = comp.data[key];
-
-      if (input.type === 'checkbox') {
-        newData[key] = input.checked;
-      } else if (typeof origVal === 'number') {
-        newData[key] = parseFloat(input.value) || 0;
-      } else if (typeof origVal === 'string') {
-        newData[key] = input.value;
-      } else {
-        try { newData[key] = JSON.parse(input.value); }
-        catch(e) { newData[key] = input.value; }
-      }
-    });
-
-    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-      state.ws.send(JSON.stringify({
-        type: 'update-prop',
-        tenantId: state.tenantId,
-        projectId: project.project_id,
-        sceneId: scene.id,
-        componentId: comp.id,
-        data: newData
-      }));
-      comp.data = Object.assign({}, comp.data, newData);
-      stopPlayback();
-      return;
-    }
-
-    api('PATCH', '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id, { data: newData })
-      .then(function(updated) {
-        if (updated && updated.scenes) {
-          state.currentProject = updated;
-          loadPreview();
-          renderSceneList();
-          renderLayers();
-        }
-      })
-      .catch(function(e) {
-        console.error('Failed to update props', e);
-      });
-  }
-
-  function clearProps() {
-    els.propEditor.innerHTML = '<div class="empty-state">Select a component</div>';
-  }
-
-  // ── Render with job queue ──
-  function triggerRender() {
-    if (!state.currentProject) return;
-    els.renderStatus.textContent = 'Queuing...';
-    els.renderBtn.disabled = true;
-
-    api('POST', '/render/' + state.tenantId + '/' + state.currentProject.project_id)
-      .then(function(res) {
-        if (res.job_id) {
-          state.renderJobId = res.job_id;
-          els.renderStatus.textContent = 'Rendering...';
-          pollJobStatus();
-        } else {
-          els.renderStatus.textContent = res.status || 'Queued';
-          els.renderBtn.disabled = false;
-        }
-      })
-      .catch(function() {
-        els.renderStatus.textContent = 'Render failed';
-        els.renderBtn.disabled = false;
-      });
-  }
-
-  function pollJobStatus() {
-    if (!state.renderJobId) return;
-
-    api('GET', '/jobs/' + state.renderJobId).then(function(job) {
-      if (!job || job.error === 'Job not found') {
-        els.renderStatus.textContent = 'Job not found';
-        els.renderBtn.disabled = false;
-        return;
-      }
-
-      if (job.status === 'completed') {
-        els.renderStatus.textContent = 'Render complete!';
-        els.renderBtn.disabled = false;
-        state.renderJobId = null;
-        return;
-      }
-
-      if (job.status === 'failed') {
-        els.renderStatus.textContent = 'Failed: ' + (job.error || 'unknown');
-        els.renderBtn.disabled = false;
-        state.renderJobId = null;
-        return;
-      }
-
-      // Still rendering - show progress
-      if (job.progress) {
-        els.renderStatus.textContent = 'Rendering... ' + job.progress.percent + '%';
-      } else {
-        els.renderStatus.textContent = 'Rendering...';
-      }
-
-      state.renderPollTimer = setTimeout(pollJobStatus, 2000);
-    }).catch(function() {
-      state.renderPollTimer = setTimeout(pollJobStatus, 3000);
-    });
-  }
-
-  // ── Util ──
-  function escHtml(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
-  function escAttr(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-
-  // ── Add Scene Modal ──
-  var addSceneBtn = document.getElementById('add-scene-btn');
-  var addSceneModal = document.getElementById('add-scene-modal');
-  var cancelAddScene = document.getElementById('cancel-add-scene');
-  var confirmAddScene = document.getElementById('confirm-add-scene');
-  var newSceneLabel = document.getElementById('new-scene-label');
-  var newSceneDuration = document.getElementById('new-scene-duration');
-
-  addSceneBtn.addEventListener('click', function() {
-    newSceneLabel.value = 'Scene ' + ((state.currentProject ? state.currentProject.scenes.length : 0) + 1);
-    newSceneDuration.value = '5';
-    addSceneModal.classList.remove('hidden');
   });
-
-  cancelAddScene.addEventListener('click', function() {
-    addSceneModal.classList.add('hidden');
-  });
-
-  addSceneModal.addEventListener('click', function(e) {
-    if (e.target === addSceneModal) addSceneModal.classList.add('hidden');
-  });
-
-  confirmAddScene.addEventListener('click', function() {
-    var project = state.currentProject;
-    if (!project) return;
-    var label = newSceneLabel.value.trim() || 'New Scene';
-    var dur = parseFloat(newSceneDuration.value) || 5;
-    var sceneId = 'scene_' + Date.now().toString(36);
-
-    var scene = {
-      id: sceneId,
-      label: label,
-      duration_seconds: dur,
-      components: []
-    };
-
-    api('POST', '/projects/' + state.tenantId + '/' + project.project_id + '/scenes', { scene: scene })
-      .then(function(updated) {
-        if (updated && updated.scenes) {
-          state.currentProject = updated;
-          state.currentSceneIndex = updated.scenes.length - 1;
-          renderSceneList();
-          loadPreview();
-          renderLayers();
-        }
-        addSceneModal.classList.add('hidden');
-      })
-      .catch(function() {
-        addSceneModal.classList.add('hidden');
-        alert('Failed to add scene');
-      });
-  });
-
-  // ── Events ──
-  els.loadBtn.addEventListener('click', loadProjects);
   els.tenantInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') loadProjects(); });
+  els.projectSelect.addEventListener('change', function() {
+    var val = els.projectSelect.value;
+    if (val) loadProject(val);
+  });
   els.playBtn.addEventListener('click', togglePlay);
   els.slider.addEventListener('input', function() { scrub(parseInt(els.slider.value, 10)); });
-  els.renderBtn.addEventListener('click', triggerRender);
 
-  // ── Auto-tenant: URL param > localStorage ──
+  // Init from URL params
   var params = new URLSearchParams(window.location.search);
   var tenantParam = params.get('tenant');
   if (tenantParam) {
     els.tenantInput.value = tenantParam;
-    try { localStorage.setItem('mp-tenant', tenantParam); } catch(e) {}
     loadProjects();
-    var _projectParam = params.get('project');
-    if (_projectParam) {
-      setTimeout(function() { selectProject(_projectParam); }, 800);
-    }
-  } else {
-    // Try localStorage
-    try {
-      var saved = localStorage.getItem('mp-tenant');
-      if (saved) {
-        els.tenantInput.value = saved;
-        loadProjects();
-      }
-    } catch(e) {}
   }
 })();
 </script>
