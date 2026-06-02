@@ -12,3 +12,5 @@ export { enrichProjectMedia, type MediaEnrichmentOpts, type MediaEnrichmentResul
 export { critiqueScene, type CritiqueResult } from "./critiquer.js";
 export { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 export { runGeneratePipeline, type PipelineOpts, type PipelineResult, type PipelineTarget } from "./pipeline.js";
+export { planStoryboard, type UnifiedPlannerOpts, type PlannedScene, type StoryboardResult } from "./unified-planner.js";
+export { generateScene, type SceneGeneratorOpts, type GeneratedScene } from "./scene-generator.js";

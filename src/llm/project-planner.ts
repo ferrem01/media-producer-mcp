@@ -1,3 +1,5 @@
+// @deprecated - Use unified-planner.ts and scene-generator.ts instead.
+// Kept for backwards compatibility.
 /**
  * Project Planner
  *
