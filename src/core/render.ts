@@ -346,15 +346,24 @@ async function renderVideo(
       loop: t.loop,
     }));
 
-    const duckingOpts = project.audio.ducking?.enabled
-      ? {
-          duckTrack: project.audio.ducking.duck_track,
-          triggerTrack: project.audio.ducking.trigger_track,
+    // Resolve ducking track IDs to file paths (mixer matches by path)
+    let duckingOpts: Parameters<typeof mixAudio>[0]["ducking"] = undefined;
+    if (project.audio.ducking?.enabled) {
+      const duckTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.duck_track);
+      const triggerTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.trigger_track);
+      if (duckTrackObj && triggerTrackObj) {
+        duckingOpts = {
+          duckTrack: duckTrackObj.source,
+          triggerTrack: triggerTrackObj.source,
           duckedVolume: project.audio.ducking.ducked_volume,
           attack: project.audio.ducking.attack ?? 0.3,
           release: project.audio.ducking.release ?? 0.5,
-        }
-      : undefined;
+        };
+        console.log("  Ducking: " + duckTrackObj.id + " ducked by " + triggerTrackObj.id);
+      } else {
+        console.warn("  Ducking: track IDs not found, skipping ducking");
+      }
+    }
 
     await mixAudio({
       videoPath: outputPath,
