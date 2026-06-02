@@ -40,18 +40,36 @@ import { initTenantStoreFromFile } from "./auth/tenant-store.js";
  */
 async function resolveComponentSources(
   scene: import("./core/types.js").Scene,
+  tenantId?: string,
+  projectId?: string,
 ): Promise<ComponentSource[]> {
   const types = new Set(scene.components.map((c) => c.type));
   const sources: ComponentSource[] = [];
 
   for (const type of types) {
-    // Search in component lib subdirectories
-    const libDir = config.componentLibDir;
-    const found = await findComponentFile(libDir, type);
+    let found: string | null = null;
+
+    // 1. Search in project components dir first (custom generated components)
+    if (tenantId && projectId) {
+      const projCompDir = path.join(config.dataDir, tenantId, "projects", projectId, "components");
+      found = await findComponentFile(projCompDir, type);
+    }
+
+    // 2. Search in tenant custom components dir
+    if (!found && tenantId) {
+      const tenantCompDir = path.join(config.dataDir, tenantId, "components");
+      found = await findComponentFile(tenantCompDir, type);
+    }
+
+    // 3. Search in the global component library
+    if (!found) {
+      found = await findComponentFile(config.componentLibDir, type);
+    }
+
     if (found) {
       sources.push({ type, source: found });
     } else {
-      console.warn(`Component type "${type}" not found in library`);
+      console.warn("Component type " + type + " not found");
     }
   }
 
@@ -422,7 +440,7 @@ async function main() {
           return;
         }
         // Return the assembled scene HTML at a small size for thumbnail capture
-        const components = await resolveComponentSources(scene);
+        const components = await resolveComponentSources(scene, tenantId, projectId);
         const html = await assembleScene({
           scene,
           components,
@@ -453,8 +471,8 @@ async function main() {
           return;
         }
 
-        // Resolve component sources
-        const components = await resolveComponentSources(scene);
+        // Resolve component sources (search project, tenant, and library dirs)
+        const components = await resolveComponentSources(scene, tenantId, projectId);
 
         // Assemble the scene HTML
         const html = await assembleScene({
