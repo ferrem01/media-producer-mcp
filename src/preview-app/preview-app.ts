@@ -587,21 +587,24 @@ export function getPreviewHtml(): string {
           audio.currentTime = 0;
           audio.play().catch(function() {});
         } else {
-          // Resume from where it was - only if actually paused
-          if (audio.paused) audio.play().catch(function() {});
+          // Resume from where it was
+          audio.play().catch(function() {});
         }
       } else {
-        // Non-music tracks (voiceover, sfx): play normally with fade-in
-        if (audio._fadeIn > 0) {
-          audio.volume = 0;
-          var targetVol2 = audio._baseVolume;
-          var fadeSteps2 = Math.ceil(audio._fadeIn * 20);
-          var step2 = 0;
-          var fadeInterval2 = setInterval(function() {
-            step2++;
-            audio.volume = Math.min(targetVol2, (step2 / fadeSteps2) * targetVol2);
-            if (step2 >= fadeSteps2) clearInterval(fadeInterval2);
-          }, 50);
+        // Non-music tracks (voiceover, sfx): on first play start from beginning, on resume continue
+        if (!state.musicStarted) {
+          audio.currentTime = 0;
+          if (audio._fadeIn > 0) {
+            audio.volume = 0;
+            var targetVol2 = audio._baseVolume;
+            var fadeSteps2 = Math.ceil(audio._fadeIn * 20);
+            var step2 = 0;
+            var fadeInterval2 = setInterval(function() {
+              step2++;
+              audio.volume = Math.min(targetVol2, (step2 / fadeSteps2) * targetVol2);
+              if (step2 >= fadeSteps2) clearInterval(fadeInterval2);
+            }, 50);
+          }
         }
         audio.play().catch(function() {});
       }
@@ -621,11 +624,8 @@ export function getPreviewHtml(): string {
 
   function pauseAudio() {
     state.audioElements.forEach(function(audio) {
-      if (audio._trackType !== 'music') {
-        audio.pause();
-      }
+      audio.pause();
     });
-    // Music keeps playing. Only stop ducking monitoring.
     stopDucking();
   }
 
@@ -1346,16 +1346,8 @@ export function getPreviewHtml(): string {
           state.duration = scene.duration_seconds || 0;
           var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
 
-          // On scene transition: music continues uninterrupted.
-          // Only restart voiceover if scene-specific.
-          state.audioElements.forEach(function(audio) {
-            if (audio._trackType === 'voiceover') {
-              audio.pause();
-              audio.currentTime = 0;
-              audio.play().catch(function() {});
-            }
-            // Music and sfx continue untouched
-          });
+          // On scene transition: all audio continues uninterrupted.
+          // Voiceover plays through the whole video, not per-scene.
 
           fetchHtml(path).then(function(html) {
             var iframe = els.previewIframe;
