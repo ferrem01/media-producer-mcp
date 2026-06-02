@@ -137,6 +137,7 @@ ${catalogStr}
 - VARY scene types: don't repeat the same layout. Mix hero text, product demos, stats, visual metaphors, grids, CTAs.
 - Never have two identical layout types in a row.
 - For library components: fill ALL required data fields. Use realistic content, not placeholder text.
+- At HIGH creativity: each scene should have ONE self-contained custom component that handles everything (background, layout, text, animation). Do NOT add separate library background components -- the custom component IS the entire scene.
 - For custom components: custom_prompt must be 3-5 sentences with SPECIFIC visual direction (exact sizes, colors, animation names, layout positions).
 - hero_image is OPTIONAL and should be RARE (0-1 per project, not every scene). Only use when a real photograph or illustration would dramatically improve the scene. Most scenes should rely on HTML/CSS/GSAP visuals, not AI images. Skip for: text scenes, stats, code demos, CTAs, dashboards, lists.
 - hero_image prompts describe the IMAGE itself, not the scene layout.
