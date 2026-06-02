@@ -87,7 +87,7 @@ Example: A scene with a library background + custom hero visual + library stat c
 
 Creativity level: ${creativity} (0 = prefer library, 1 = prefer custom)
 - At LOW creativity: use library components for most things. Only go custom when the library genuinely can't express what's needed.
-- At HIGH creativity: generate more custom components for unique visuals. Still use library for simple utility (backgrounds, basic text).
+- At HIGH creativity (0.7-1.0): prefer ONE custom component per scene that owns the entire canvas. The custom component should handle its own background, layout, typography, and animation as one cohesive composition. Do NOT layer library backgrounds under custom components -- let the custom component be self-contained. This produces the most cinematic, Apple keynote-level results.
 - The library is your toolkit -- use it when it fits. Custom is your escape hatch AND your creative tool.
 
 For library components: fill in their data fields. Always include a background component (gradient-background or mesh-gradient) at z_index 0.
