@@ -110,6 +110,21 @@
     glow.className = 'stat-glow';
     wrap.appendChild(glow);
 
+    // Auto-scale font to fit container
+    var containerW = el.offsetWidth || 1920;
+    var containerH = el.offsetHeight || 1080;
+    var scale = Math.min(containerW / 1920, containerH / 1080);
+    if (scale < 0.9) {
+      var numSize = Math.round(160 * Math.min(scale * 2.5, 1));
+      var suffSize = Math.round(100 * Math.min(scale * 2.5, 1));
+      var labelSize = Math.round(20 * Math.min(scale * 2.5, 1));
+      numberEl.style.fontSize = numSize + 'px';
+      prefixEl.style.fontSize = suffSize + 'px';
+      suffixEl.style.fontSize = suffSize + 'px';
+      labelEl.style.fontSize = labelSize + 'px';
+      labelEl.style.marginTop = Math.round(36 * scale * 2) + 'px';
+    }
+
     // Set content
     if (data.prefix) prefixEl.textContent = data.prefix;
     if (data.suffix) suffixEl.textContent = data.suffix;
