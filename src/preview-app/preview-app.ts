@@ -431,7 +431,12 @@ export function getPreviewHtml(): string {
     animFrameId: null,
     audioElements: [],
     audioDuckingInterval: null,
-    musicStarted: false
+    musicStarted: false,
+    // Master clock
+    masterTime: 0,
+    lastTickTime: 0,
+    // Scene HTML cache (keyed by scene id)
+    sceneHtmlCache: {}
   };
 
   // DOM refs
@@ -720,6 +725,21 @@ export function getPreviewHtml(): string {
     });
   }
 
+  // Preload all scene HTML into cache
+  function preloadScenes(project) {
+    state.sceneHtmlCache = {};
+    if (!project || !project.scenes || !project.scenes.length) return Promise.resolve();
+    var promises = project.scenes.map(function(scene) {
+      var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+      return fetchHtml(path).then(function(html) {
+        state.sceneHtmlCache[scene.id] = html;
+      }).catch(function() {
+        state.sceneHtmlCache[scene.id] = null;
+      });
+    });
+    return Promise.all(promises);
+  }
+
   // Load a specific project
   function loadProject(projectId) {
     if (!projectId || !state.tenantId) return;
@@ -728,6 +748,7 @@ export function getPreviewHtml(): string {
       state.currentSceneIndex = -1;
       state.currentComponentIndex = -1;
       state.totalDuration = calcTotalDuration();
+      state.masterTime = 0;
       stopPlayback();
       renderSceneList();
       clearPreview();
@@ -737,9 +758,16 @@ export function getPreviewHtml(): string {
       // Initialize audio tracks once for the project
       initAudio();
 
-      if (project.scenes && project.scenes.length > 0) {
-        selectScene(0);
-      }
+      // Show loading state while preloading scenes
+      els.previewPlaceholder.textContent = 'Preloading scenes...';
+      els.previewPlaceholder.style.display = '';
+
+      preloadScenes(project).then(function() {
+        els.previewPlaceholder.textContent = 'Select a scene to preview';
+        if (project.scenes && project.scenes.length > 0) {
+          selectScene(0);
+        }
+      });
     }).catch(function() {
       els.sceneList.innerHTML = '<div class="empty-state">Failed to load project</div>';
     });
@@ -799,54 +827,89 @@ export function getPreviewHtml(): string {
     state.playAll = false;
     updatePlayIcon();
 
+    // Update master time to match this scene's start
+    state.masterTime = sceneOffset(index);
+
     // Don't touch music audio on manual scene click. Only pause voiceover/sfx.
     pauseMusicKeepPlaying();
 
-    renderSceneList();
+    updateActiveScene(index);
     loadPreview();
     renderLayers();
     clearProps();
   }
 
-  // Preview loading
+  // Update scene list active highlight without re-rendering
+  function updateActiveScene(index) {
+    var items = els.sceneList.querySelectorAll('.scene-item');
+    items.forEach(function(el) {
+      var i = parseInt(el.dataset.index, 10);
+      if (i === index) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    });
+  }
+
+  // Write cached HTML into the preview iframe (no network fetch)
+  function writeSceneToIframe(html) {
+    var iframe = els.previewIframe;
+    var project = state.currentProject;
+    iframe.width = (project && project.canvas && project.canvas.width) || 1920;
+    iframe.height = (project && project.canvas && project.canvas.height) || 1080;
+
+    els.previewWrapper.style.display = 'block';
+    els.previewPlaceholder.style.display = 'none';
+
+    try {
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(html);
+      iframe.contentDocument.close();
+    } catch(e) {
+      iframe.srcdoc = html;
+    }
+    updatePreviewScale();
+  }
+
+  // Preview loading - uses cache, falls back to fetch
   function loadPreview() {
     var project = state.currentProject;
     var scene = project && project.scenes[state.currentSceneIndex];
     if (!scene) { clearPreview(); return; }
 
-    var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-    fetchHtml(path).then(function(html) {
-      var iframe = els.previewIframe;
-      iframe.width = (project.canvas && project.canvas.width) || 1920;
-      iframe.height = (project.canvas && project.canvas.height) || 1080;
+    var cachedHtml = state.sceneHtmlCache[scene.id];
 
-      els.previewWrapper.style.display = 'block';
-      els.previewPlaceholder.style.display = 'none';
-
-      try {
-        iframe.contentDocument.open();
-        iframe.contentDocument.write(html);
-        iframe.contentDocument.close();
-      } catch(e) {
-        iframe.srcdoc = html;
-      }
+    function applyHtml(html) {
+      writeSceneToIframe(html);
 
       state.duration = scene.duration_seconds || 0;
       state.totalDuration = calcTotalDuration();
       els.slider.disabled = false;
       els.playBtn.disabled = false;
-      els.slider.value = 0;
-      updateTimeDisplay(0);
+      var globalTime = sceneOffset(state.currentSceneIndex);
+      els.slider.value = state.totalDuration > 0 ? Math.round((globalTime / state.totalDuration) * 1000) : 0;
+      updateTimeDisplay(globalTime);
       updateSceneIndicator();
-      updatePreviewScale();
 
       waitForReady(function(tl) {
         tl.pause();
         tl.time(0);
       });
-    }).catch(function() {
-      clearPreview();
-    });
+    }
+
+    if (cachedHtml != null) {
+      applyHtml(cachedHtml);
+    } else {
+      // Fallback: fetch if not in cache
+      var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+      fetchHtml(path).then(function(html) {
+        state.sceneHtmlCache[scene.id] = html;
+        applyHtml(html);
+      }).catch(function() {
+        clearPreview();
+      });
+    }
   }
 
   function waitForReady(cb) {
@@ -1297,24 +1360,82 @@ export function getPreviewHtml(): string {
     catch(e) { return null; }
   }
 
+  // Find which scene a global time falls in, returns { index, localTime }
+  function sceneForGlobalTime(globalTime) {
+    var project = state.currentProject;
+    if (!project || !project.scenes || !project.scenes.length) return { index: 0, localTime: 0 };
+    var cumulative = 0;
+    for (var i = 0; i < project.scenes.length; i++) {
+      var sd = project.scenes[i].duration_seconds || 0;
+      if (globalTime < cumulative + sd) {
+        return { index: i, localTime: globalTime - cumulative };
+      }
+      cumulative += sd;
+    }
+    // Past the end - clamp to last scene's end
+    var lastIdx = project.scenes.length - 1;
+    return { index: lastIdx, localTime: project.scenes[lastIdx].duration_seconds || 0 };
+  }
+
   function togglePlay() {
     if (state.playing) {
-      stopPlayback();
+      // PAUSE - just save masterTime and stop the loop
+      if (state.animFrameId) {
+        cancelAnimationFrame(state.animFrameId);
+        state.animFrameId = null;
+      }
+      state.playing = false;
+      state.playAll = false;
+      updatePlayIcon();
       var tl = getTimeline();
       if (tl) tl.pause();
       pauseAudio();
     } else {
+      // RESUME / PLAY
       state.playing = true;
       state.playAll = true;
       updatePlayIcon();
+
+      var globalTime = state.masterTime || 0;
+      var info = sceneForGlobalTime(globalTime);
+      var project = state.currentProject;
+
+      if (info.index !== state.currentSceneIndex && project && project.scenes) {
+        // Need to switch scene
+        state.currentSceneIndex = info.index;
+        state.currentComponentIndex = -1;
+        state.duration = project.scenes[info.index].duration_seconds || 0;
+        updateActiveScene(info.index);
+        renderLayers();
+        clearProps();
+        updateSceneIndicator();
+
+        var scene = project.scenes[info.index];
+        var html = state.sceneHtmlCache[scene.id];
+        if (html != null) {
+          writeSceneToIframe(html);
+          waitForReady(function(newTl) {
+            newTl.time(Math.min(info.localTime, newTl.duration()));
+            newTl.play();
+            state.lastTickTime = performance.now();
+            playAudio();
+            syncAudioToGlobalTime(globalTime);
+            animLoop();
+          });
+        }
+        return;
+      }
+
+      // Same scene - seek GSAP timeline and play
       var tl = getTimeline();
       if (tl) {
-        if (tl.time() >= state.duration - 0.05) {
-          tl.time(0);
-        }
+        tl.time(Math.min(info.localTime, tl.duration()));
         tl.play();
       }
+
+      state.lastTickTime = performance.now();
       playAudio();
+      syncAudioToGlobalTime(globalTime);
       animLoop();
     }
   }
@@ -1331,75 +1452,92 @@ export function getPreviewHtml(): string {
 
   function animLoop() {
     if (!state.playing) return;
-    var tl = getTimeline();
-    if (tl) {
-      var t = tl.time();
-      var d = state.duration;
 
-      var globalTime = sceneOffset(state.currentSceneIndex) + t;
-      var totalDur = state.totalDuration;
-      els.slider.value = totalDur > 0 ? Math.round((globalTime / totalDur) * 1000) : 0;
+    // Master clock: compute elapsed real time
+    var now = performance.now();
+    var elapsed = (now - state.lastTickTime) / 1000;
+    state.lastTickTime = now;
+    state.masterTime += elapsed;
+
+    var globalTime = state.masterTime;
+    var totalDur = state.totalDuration;
+
+    // Clamp to total duration
+    if (globalTime >= totalDur) {
+      state.masterTime = totalDur;
+      globalTime = totalDur;
+      // Playback complete
+      stopPlayback();
+      var tl = getTimeline();
+      if (tl) tl.pause();
+      stopAudioFull();
       updateTimeDisplay(globalTime);
+      els.slider.value = 1000;
+      return;
+    }
 
-      // Keep audio in sync with the visual timeline (correct drift > 0.3s)
-      state.audioElements.forEach(function(audio) {
-        if (audio.paused) return;
-        var expectedTime;
-        if (audio._trackType === 'music' && audio.loop && audio.duration && isFinite(audio.duration)) {
-          expectedTime = globalTime % audio.duration;
-        } else {
-          expectedTime = globalTime;
+    // Update UI
+    els.slider.value = totalDur > 0 ? Math.round((globalTime / totalDur) * 1000) : 0;
+    updateTimeDisplay(globalTime);
+
+    // Keep audio in sync (correct drift > 0.3s)
+    state.audioElements.forEach(function(audio) {
+      if (audio.paused) return;
+      var expectedTime;
+      if (audio._trackType === 'music' && audio.loop && audio.duration && isFinite(audio.duration)) {
+        expectedTime = globalTime % audio.duration;
+      } else {
+        expectedTime = globalTime;
+      }
+      if (audio.duration && isFinite(audio.duration) && Math.abs(audio.currentTime - expectedTime) > 0.3) {
+        audio.currentTime = Math.min(expectedTime, audio.duration);
+      }
+    });
+
+    // Determine which scene we should be on based on master clock
+    var info = sceneForGlobalTime(globalTime);
+
+    if (info.index !== state.currentSceneIndex && state.playAll) {
+      // Scene transition - use cached HTML, no network fetch
+      var project = state.currentProject;
+      state.currentSceneIndex = info.index;
+      state.currentComponentIndex = -1;
+      updateActiveScene(info.index);
+      renderLayers();
+      clearProps();
+      updateSceneIndicator();
+
+      var scene = project.scenes[info.index];
+      state.duration = scene.duration_seconds || 0;
+      var html = state.sceneHtmlCache[scene.id];
+
+      if (html != null) {
+        writeSceneToIframe(html);
+        waitForReady(function(newTl) {
+          // Seek GSAP to match master clock's local time
+          var seekTime = Math.min(info.localTime, newTl.duration());
+          newTl.time(seekTime);
+          newTl.play();
+          // Continue the loop (don't restart - just keep going)
+        });
+      }
+    } else {
+      // Same scene - seek GSAP timeline to stay in sync
+      var tl = getTimeline();
+      if (tl) {
+        var localTime = info.localTime;
+        // Only seek if GSAP is behind/ahead (GSAP animation may be shorter than scene duration)
+        if (localTime <= tl.duration()) {
+          // Let GSAP play naturally, but correct if drifted
+          var drift = Math.abs(tl.time() - localTime);
+          if (drift > 0.1) {
+            tl.time(localTime);
+          }
         }
-        if (audio.duration && isFinite(audio.duration) && Math.abs(audio.currentTime - expectedTime) > 0.3) {
-          audio.currentTime = Math.min(expectedTime, audio.duration);
-        }
-      });
-
-      // Scene finished - advance to next if playing all
-      if (t >= d - 0.02 && state.playAll) {
-        var project = state.currentProject;
-        if (project && state.currentSceneIndex < project.scenes.length - 1) {
-          var nextIndex = state.currentSceneIndex + 1;
-          state.currentSceneIndex = nextIndex;
-          state.currentComponentIndex = -1;
-          renderSceneList();
-          renderLayers();
-          clearProps();
-          updateSceneIndicator();
-
-          var scene = project.scenes[nextIndex];
-          state.duration = scene.duration_seconds || 0;
-          var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-
-          // On scene transition: all audio continues uninterrupted.
-          // Voiceover plays through the whole video, not per-scene.
-
-          fetchHtml(path).then(function(html) {
-            var iframe = els.previewIframe;
-            try {
-              iframe.contentDocument.open();
-              iframe.contentDocument.write(html);
-              iframe.contentDocument.close();
-            } catch(e) {
-              iframe.srcdoc = html;
-            }
-            updatePreviewScale();
-            waitForReady(function(newTl) {
-              newTl.time(0);
-              newTl.play();
-              animLoop();
-            });
-          }).catch(function() { stopPlayback(); stopAudioFull(); });
-          return;
-        } else {
-          // Last scene done
-          stopPlayback();
-          tl.pause();
-          stopAudioFull();
-          return;
-        }
+        // If localTime > tl.duration(), GSAP stays at its end frame (visual holds)
       }
     }
+
     state.animFrameId = requestAnimationFrame(animLoop);
   }
 
@@ -1411,62 +1549,53 @@ export function getPreviewHtml(): string {
     var project = state.currentProject;
     if (!project || !project.scenes) return;
 
-    var cumulative = 0;
-    var targetScene = 0;
-    var localTime = 0;
-    for (var i = 0; i < project.scenes.length; i++) {
-      var sd = project.scenes[i].duration_seconds || 0;
-      if (targetGlobal < cumulative + sd) {
-        targetScene = i;
-        localTime = targetGlobal - cumulative;
-        break;
-      }
-      cumulative += sd;
-      if (i === project.scenes.length - 1) {
-        targetScene = i;
-        localTime = sd;
-      }
-    }
+    // Update master clock
+    state.masterTime = targetGlobal;
+
+    var info = sceneForGlobalTime(targetGlobal);
 
     updateTimeDisplay(targetGlobal);
     syncAudioToGlobalTime(targetGlobal);
 
-    if (targetScene !== state.currentSceneIndex) {
-      state.currentSceneIndex = targetScene;
+    if (info.index !== state.currentSceneIndex) {
+      state.currentSceneIndex = info.index;
       state.currentComponentIndex = -1;
-      state.duration = project.scenes[targetScene].duration_seconds || 0;
-      renderSceneList();
+      state.duration = project.scenes[info.index].duration_seconds || 0;
+      updateActiveScene(info.index);
       renderLayers();
       clearProps();
       updateSceneIndicator();
 
-      var scene = project.scenes[targetScene];
-      var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+      var scene = project.scenes[info.index];
       var wasPlaying = state.playing;
       stopPlayback();
-      // Don't stop music on scrub, only pause non-music
       pauseMusicKeepPlaying();
 
-      fetchHtml(path).then(function(html) {
-        var iframe = els.previewIframe;
-        try {
-          iframe.contentDocument.open();
-          iframe.contentDocument.write(html);
-          iframe.contentDocument.close();
-        } catch(e) { iframe.srcdoc = html; }
-        updatePreviewScale();
+      var html = state.sceneHtmlCache[scene.id];
+      if (html != null) {
+        writeSceneToIframe(html);
         waitForReady(function(tl) {
-          tl.time(localTime);
+          tl.time(Math.min(info.localTime, tl.duration()));
           tl.pause();
         });
-      });
+      } else {
+        // Fallback fetch
+        var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+        fetchHtml(path).then(function(fetchedHtml) {
+          state.sceneHtmlCache[scene.id] = fetchedHtml;
+          writeSceneToIframe(fetchedHtml);
+          waitForReady(function(tl) {
+            tl.time(Math.min(info.localTime, tl.duration()));
+            tl.pause();
+          });
+        });
+      }
     } else {
       var tl = getTimeline();
       if (tl) {
-        tl.time(localTime);
+        tl.time(Math.min(info.localTime, tl.duration()));
         tl.pause();
         stopPlayback();
-        // Keep music playing during same-scene scrub
         pauseMusicKeepPlaying();
       }
     }
