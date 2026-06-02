@@ -29,9 +29,6 @@ import type { BrandKit, Canvas, OutputFormat, Project } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 
 // Keep old imports for backwards compat (deprecated functions still exist in their files)
-// import { planScene } from "./scene-planner.js";
-// import { planProject } from "./project-planner.js";
-// import { planFreeformStoryboard, generateFreeformScenes } from "./freeform-planner.js";
 
 export type PipelineTarget = "component" | "scene" | "video" | "image" | "deck" | "presentation";
 
@@ -48,7 +45,6 @@ export interface PipelineOpts {
   sceneCount?: number;
   generateImages?: boolean;
   /** @deprecated Use creativity instead. Mapped: freeform -> 0.9, structured -> 0.2 */
-  mode?: "freeform" | "structured";
   creativity?: number; // 0-1, default 0.5
   trace?: TraceBuilder;
 }
@@ -94,8 +90,6 @@ const DEFAULT_CANVAS: Canvas = {
  */
 function resolveCreativity(opts: PipelineOpts): number {
   if (opts.creativity !== undefined) return opts.creativity;
-  if (opts.mode === "freeform") return 0.9;
-  if (opts.mode === "structured") return 0.2;
   return 0.5;
 }
 
@@ -288,10 +282,11 @@ async function runUnifiedPipeline(
     });
 
     // Save custom component HTML if needed
-    if (generated.customComponentSource) {
-      var compName = `scene_${String(i + 1).padStart(3, "0")}`;
-      await fs.writeFile(path.join(compDir, `${compName}.component.html`), generated.customComponentSource);
-      console.log(`  Saved: ${compDir}/${compName}.component.html`);
+    if (generated.customSources) {
+      for (var [compName, html] of generated.customSources) {
+        await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
+        console.log(`  Saved: ${compDir}/${compName}.component.html`);
+      }
     }
 
     project.scenes.push(generated.scene);

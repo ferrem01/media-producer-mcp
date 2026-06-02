@@ -851,7 +851,6 @@ export function createMcpServer(): McpServer {
       type: z.string().optional().describe("Component type name when saving (kebab-case)"),
       category: z.string().optional().describe("Category to save under (default: custom)"),
       critique: z.boolean().optional().default(false).describe("Run the critiquer loop on generated output"),
-      mode: z.enum(["freeform", "structured"]).optional().describe("DEPRECATED: use creativity instead. freeform = creativity 0.9, structured = creativity 0.2"),
       creativity: z.number().min(0).max(1).optional().describe("Creativity level 0-1. Low = prefer library components, high = prefer custom generation. Default 0.5"),
       scene_count: z.number().optional().describe("Target number of scenes for video/deck"),
       generate_images: z.boolean().optional().default(true).describe("Generate AI hero images during planning (requires OpenAI key)"),
@@ -984,7 +983,6 @@ export function createMcpServer(): McpServer {
               canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
               critique: params.critique,
               sceneCount: params.scene_count,
-              mode: params.mode,
               creativity: params.creativity,
           generateImages: params.generate_images,
             });
