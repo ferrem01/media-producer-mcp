@@ -237,14 +237,8 @@ export function getPreviewHtml(): string {
     border-left-color: #6366f1;
     color: #6366f1;
   }
-  .layer-icon {
-    width: 12px; height: 12px;
-    background: #d1d5db;
-    border-radius: 3px;
-    flex-shrink: 0;
-    transition: background 0.15s ease;
-  }
-  .layer-item.active .layer-icon { background: #6366f1; }
+  
+
   .layer-type {
     flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 11px;
@@ -1044,7 +1038,6 @@ export function getPreviewHtml(): string {
       var c = item.comp;
       var active = item.originalIndex === state.currentComponentIndex;
       html += '<div class="layer-item' + (active ? ' active' : '') + '" data-index="' + item.originalIndex + '">'
-        + '<span class="layer-icon"></span>'
         + '<span class="layer-type">' + escHtml(c.type) + '</span>'
         + '<span class="layer-z">z:' + (c.z_index || 0) + '</span>'
         + '</div>';
