@@ -106,26 +106,36 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
     const duckIdx = opts.tracks.findIndex(t => t.path === opts.ducking!.duckTrack);
     const triggerIdx = opts.tracks.findIndex(t => t.path === opts.ducking!.triggerTrack);
 
+    console.log("  Ducking: duckIdx=" + duckIdx + " triggerIdx=" + triggerIdx);
+
     if (duckIdx >= 0 && triggerIdx >= 0) {
       const duckLabel = `track${duckIdx}`;
       const triggerLabel = `track${triggerIdx}`;
 
-      // Split trigger for sidechain
+      // Split trigger audio for sidechain key input
       filterParts.push(`[${triggerLabel}]asplit=2[trigger_out][trigger_sc]`);
 
-      // Apply sidechain compress to duck track
-      const ratio = Math.round(1 / opts.ducking.duckedVolume);
+      // Sidechain compress: when voiceover is present, compress music
+      // threshold=0.01 (trigger on any voiceover signal)
+      // ratio=8:1 gives strong ducking
+      // attack/release in ms
+      const attackMs = Math.round((opts.ducking.attack || 0.3) * 1000);
+      const releaseMs = Math.round((opts.ducking.release || 0.5) * 1000);
       filterParts.push(
         `[${duckLabel}][trigger_sc]sidechaincompress=` +
-        `threshold=0.02:ratio=${ratio}:` +
-        `attack=${opts.ducking.attack * 1000}:` +
-        `release=${opts.ducking.release * 1000}` +
+        `threshold=0.015:ratio=10:` +
+        `attack=${attackMs}:release=${releaseMs}:` +
+        `level_sc=1:mix=1` +
         `[ducked]`
       );
 
       // Replace labels
       trackLabels[duckIdx] = "[ducked]";
       trackLabels[triggerIdx] = "[trigger_out]";
+      
+      console.log("  Ducking filter applied: ratio=10, attack=" + attackMs + "ms, release=" + releaseMs + "ms");
+    } else {
+      console.warn("  Ducking: track index not found (duck=" + duckIdx + " trigger=" + triggerIdx + ")");
     }
   }
 
@@ -148,12 +158,13 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
     "-c:v", "copy",
     "-c:a", "aac",
     "-b:a", "192k",
-    "-shortest",
     "-y",
     opts.outputPath,
   ];
 
-  console.log(`  Audio mixer: running ffmpeg`);
+  console.log("  Audio mixer: running ffmpeg");
+  console.log("  Audio mixer filter_complex:", filterComplex);
+  console.log("  Audio mixer args:", JSON.stringify(args.slice(0, 20)));
 
   try {
     await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
