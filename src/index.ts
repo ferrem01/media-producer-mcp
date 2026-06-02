@@ -269,7 +269,7 @@ async function main() {
       }
 
       // ── Static asset serving for project/tenant assets ──
-      const assetMatch = url.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
+      const assetMatch = urlPath.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
       if (assetMatch && method === "GET") {
         const [, assetTenantId, assetProjectId, assetPath] = assetMatch.map(decodeURIComponent);
         const fullPath = path.join(config.dataDir, assetTenantId, "projects", assetProjectId, "assets", assetPath);
@@ -282,6 +282,29 @@ async function main() {
         } catch {
           res.writeHead(404);
           res.end("Asset not found");
+        }
+        return;
+      }
+
+      // ── Serve rendered output files ──
+      const outputMatch = urlPath.match(/^\/output\/([^/]+)\/projects\/([^/]+)\/(.+)$/);
+      if (outputMatch && method === "GET") {
+        const [, outTenantId, outProjectId, outPath] = outputMatch.map(decodeURIComponent);
+        const fullPath = path.join(config.dataDir, outTenantId, "projects", outProjectId, "output", outPath);
+        try {
+          const data = await fs.readFile(fullPath);
+          const ext = path.extname(fullPath).toLowerCase();
+          const contentType = ext === ".mp4" ? "video/mp4" : ext === ".webm" ? "video/webm" : ext === ".mp3" ? "audio/mpeg" : ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".gif" ? "image/gif" : ext === ".pdf" ? "application/pdf" : "application/octet-stream";
+          res.writeHead(200, {
+            "Content-Type": contentType,
+            "Content-Length": data.length,
+            "Content-Disposition": "inline",
+            "Cache-Control": "public, max-age=3600",
+          });
+          res.end(data);
+        } catch {
+          res.writeHead(404);
+          res.end("Output not found");
         }
         return;
       }
