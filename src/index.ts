@@ -299,7 +299,7 @@ async function main() {
             "Content-Type": contentType,
             "Content-Length": data.length,
             "Content-Disposition": "inline",
-            "Cache-Control": "public, max-age=3600",
+            "Cache-Control": "no-cache",
           });
           res.end(data);
         } catch {

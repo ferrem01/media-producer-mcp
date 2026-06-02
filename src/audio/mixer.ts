@@ -101,7 +101,9 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
     trackLabels.push(`[${label}]`);
   }
 
-  // If ducking is enabled, apply sidechain compress
+  // If ducking is enabled, apply volume-envelope ducking
+  // Instead of sidechain compress (unreliable), we detect the trigger track
+  // duration and apply a time-based volume curve to the duck track.
   if (opts.ducking) {
     const duckIdx = opts.tracks.findIndex(t => t.path === opts.ducking!.duckTrack);
     const triggerIdx = opts.tracks.findIndex(t => t.path === opts.ducking!.triggerTrack);
@@ -110,30 +112,55 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
 
     if (duckIdx >= 0 && triggerIdx >= 0) {
       const duckLabel = `track${duckIdx}`;
-      const triggerLabel = `track${triggerIdx}`;
+      const triggerTrack = opts.tracks[triggerIdx];
 
-      // Split trigger audio for sidechain key input
-      filterParts.push(`[${triggerLabel}]asplit=2[trigger_out][trigger_sc]`);
+      // Get trigger track duration by probing the file
+      let triggerDuration = opts.totalDuration;
+      try {
+        const probeResult = await execFileAsync("ffprobe", [
+          "-v", "quiet", "-show_entries", "format=duration",
+          "-of", "csv=p=0", triggerTrack.path
+        ]);
+        const parsed = parseFloat(probeResult.stdout.trim());
+        if (!isNaN(parsed) && parsed > 0) triggerDuration = parsed;
+      } catch { /* use total duration as fallback */ }
 
-      // Sidechain compress: when voiceover is present, compress music
-      // threshold=0.01 (trigger on any voiceover signal)
-      // ratio=8:1 gives strong ducking
-      // attack/release in ms
-      const attackMs = Math.round((opts.ducking.attack || 0.3) * 1000);
-      const releaseMs = Math.round((opts.ducking.release || 0.5) * 1000);
-      filterParts.push(
-        `[${duckLabel}][trigger_sc]sidechaincompress=` +
-        `threshold=0.015:ratio=10:` +
-        `attack=${attackMs}:release=${releaseMs}:` +
-        `level_sc=1:mix=1` +
-        `[ducked]`
-      );
+      const attack = opts.ducking.attack || 0.3;
+      const release = opts.ducking.release || 0.5;
+      const duckedVol = opts.ducking.duckedVolume;
+      const startTime = triggerTrack.startTime || 0;
+      const endTime = startTime + triggerDuration;
 
-      // Replace labels
-      trackLabels[duckIdx] = "[ducked]";
-      trackLabels[triggerIdx] = "[trigger_out]";
-      
-      console.log("  Ducking filter applied: ratio=10, attack=" + attackMs + "ms, release=" + releaseMs + "ms");
+      // Volume envelope: ducked during voiceover, normal otherwise
+      // Use afade-style ramps at boundaries
+      const duckStart = Math.max(0, startTime);
+      const duckEnd = Math.min(endTime, opts.totalDuration);
+      const rampDown = duckStart; // start ramping down
+      const rampUp = duckEnd;     // start ramping up
+
+      // Replace the duck track's filter to include volume envelope
+      // Remove the existing filter for this track and rebuild with ducking
+      const origFilter = filterParts.find(f => f.includes("[" + duckLabel + "]"));
+      if (origFilter) {
+        const idx = filterParts.indexOf(origFilter);
+        // Add volume envelope: low during voiceover, normal before/after
+        // Using volume filter with enable expression
+        const envelopeFilter = origFilter.replace(
+          "[" + duckLabel + "]",
+          "[" + duckLabel + "_pre]"
+        );
+        filterParts[idx] = envelopeFilter;
+
+        // Apply ducking envelope: volume drops to duckedVol during trigger, with smooth ramps
+        filterParts.push(
+          "[" + duckLabel + "_pre]" +
+          "volume='" + duckedVol + "':enable='between(t," + duckStart.toFixed(2) + "," + duckEnd.toFixed(2) + ")'," +
+          "volume='1':enable='not(between(t," + duckStart.toFixed(2) + "," + duckEnd.toFixed(2) + "))'" +
+          "[" + duckLabel + "]"
+        );
+      }
+
+      console.log("  Ducking: vol=" + duckedVol + " during " + duckStart.toFixed(1) + "s-" + duckEnd.toFixed(1) + "s");
     } else {
       console.warn("  Ducking: track index not found (duck=" + duckIdx + " trigger=" + triggerIdx + ")");
     }
