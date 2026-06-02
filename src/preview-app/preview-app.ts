@@ -1,7 +1,7 @@
 /**
  * Preview SPA - single HTML string export.
  *
- * Dark-themed video player style preview for media-producer-mcp.
+ * Light-themed video player style preview for media-producer-mcp.
  * Vanilla JS, no build step, no framework.
  */
 
@@ -20,8 +20,8 @@ export function getPreviewHtml(): string {
   html, body {
     width: 100%; height: 100%;
     font-family: 'Inter', -apple-system, sans-serif;
-    background: #111;
-    color: #eee;
+    background: #f8fafc;
+    color: #1e293b;
     overflow: hidden;
   }
 
@@ -40,42 +40,44 @@ export function getPreviewHtml(): string {
     align-items: center;
     gap: 16px;
     padding: 0 16px;
-    background: #1a1a1a;
-    border-bottom: 1px solid #2a2a2a;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
   }
-  header h1 { font-size: 14px; font-weight: 600; color: #eee; white-space: nowrap; }
+  header h1 { font-size: 14px; font-weight: 600; color: #1e293b; white-space: nowrap; }
   .header-controls {
     display: flex; align-items: center; gap: 8px; margin-left: auto;
   }
-  .header-controls label { font-size: 12px; color: #888; }
+  .header-controls label { font-size: 12px; color: #64748b; }
   .header-controls input, .header-controls select {
-    background: #111; border: 1px solid #2a2a2a; color: #eee;
+    background: #f8fafc; border: 1px solid #e2e8f0; color: #1e293b;
     padding: 4px 8px; border-radius: 4px; font-size: 12px; font-family: inherit;
     outline: none;
   }
-  .header-controls input:focus, .header-controls select:focus { border-color: #A78BFA; }
+  .header-controls input:focus, .header-controls select:focus { border-color: #7c3aed; }
   .header-controls select { min-width: 180px; }
   .btn {
     padding: 5px 12px; border: none; border-radius: 4px;
     font-size: 12px; font-weight: 500; font-family: inherit;
     cursor: pointer; transition: background 0.15s;
   }
-  .btn-primary { background: #A78BFA; color: #111; }
-  .btn-primary:hover { background: #c4b5fd; }
+  .btn-primary { background: #7c3aed; color: #fff; }
+  .btn-primary:hover { background: #6d28d9; }
+  .btn-secondary { background: #e2e8f0; color: #1e293b; }
+  .btn-secondary:hover { background: #cbd5e1; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* Sidebar - spans rows 2 and 3 */
   #sidebar {
     grid-row: 2 / 4;
-    background: #1a1a1a;
-    border-right: 1px solid #2a2a2a;
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
   }
   .sidebar-header {
     font-size: 11px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.05em; color: #888;
+    letter-spacing: 0.05em; color: #64748b;
     padding: 12px 12px 8px;
   }
   .scene-item {
@@ -83,17 +85,18 @@ export function getPreviewHtml(): string {
     padding: 6px 12px; cursor: pointer; font-size: 12px;
     border-left: 3px solid transparent;
     transition: background 0.1s;
+    background: #ffffff;
   }
-  .scene-item:hover { background: #222; }
+  .scene-item:hover { background: #f1f5f9; }
   .scene-item.active {
-    background: #222;
-    border-left-color: #A78BFA;
-    color: #fff;
+    background: #f1f5f9;
+    border-left-color: #7c3aed;
+    color: #1e293b;
   }
   .scene-thumb {
     width: 64px; height: 36px;
-    border-radius: 3px; background: #111;
-    border: 1px solid #2a2a2a;
+    border-radius: 3px; background: #f1f5f9;
+    border: 1px solid #e2e8f0;
     flex-shrink: 0; overflow: hidden;
     position: relative;
   }
@@ -110,18 +113,18 @@ export function getPreviewHtml(): string {
     font-size: 12px;
   }
   .scene-dur {
-    font-size: 10px; color: #888;
-    background: #222; padding: 1px 5px; border-radius: 3px;
+    font-size: 10px; color: #64748b;
+    background: #f1f5f9; padding: 1px 5px; border-radius: 3px;
     margin-top: 2px; display: inline-block;
   }
   .empty-state {
     display: flex; align-items: center; justify-content: center;
-    height: 100%; color: #555; font-size: 12px; text-align: center; padding: 16px;
+    height: 100%; color: #94a3b8; font-size: 12px; text-align: center; padding: 16px;
   }
 
   /* Main */
   #main {
-    display: flex; flex-direction: column; overflow: hidden; background: #000;
+    display: flex; flex-direction: column; overflow: hidden; background: #f1f5f9;
   }
   #preview-container {
     flex: 1; display: flex; align-items: center; justify-content: center;
@@ -130,59 +133,60 @@ export function getPreviewHtml(): string {
   .preview-wrapper { position: relative; }
   #preview-iframe {
     background: #000; border: none;
-    box-shadow: 0 2px 20px rgba(0,0,0,0.6);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+    border-radius: 4px;
     transform-origin: top left;
   }
-  .no-scene { color: #555; font-size: 13px; text-align: center; }
+  .no-scene { color: #94a3b8; font-size: 13px; text-align: center; }
 
   /* Playback controls */
   #playback-bar {
     display: flex; align-items: center; gap: 12px;
     padding: 10px 16px;
-    background: #1a1a1a;
-    border-top: 1px solid #2a2a2a;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
   }
   .play-btn {
-    width: 32px; height: 32px; background: #A78BFA;
+    width: 32px; height: 32px; background: #7c3aed;
     border: none; border-radius: 50%; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; transition: background 0.15s;
   }
-  .play-btn:hover { background: #c4b5fd; }
+  .play-btn:hover { background: #6d28d9; }
   .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .play-btn svg { fill: #111; }
+  .play-btn svg { fill: #fff; }
   #timeline-slider {
     flex: 1; -webkit-appearance: none; appearance: none;
-    height: 4px; background: #2a2a2a; border-radius: 2px;
+    height: 4px; background: #e2e8f0; border-radius: 2px;
     outline: none; cursor: pointer;
   }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
-    border-radius: 50%; background: #A78BFA; cursor: pointer;
+    border-radius: 50%; background: #7c3aed; cursor: pointer;
   }
   #timeline-slider::-moz-range-thumb {
     width: 12px; height: 12px; border-radius: 50%;
-    background: #A78BFA; cursor: pointer; border: none;
+    background: #7c3aed; cursor: pointer; border: none;
   }
   .time-display {
     font-size: 11px; font-variant-numeric: tabular-nums;
-    color: #888; min-width: 100px; text-align: right; flex-shrink: 0;
+    color: #64748b; min-width: 100px; text-align: right; flex-shrink: 0;
   }
 
   /* Scene indicator in playback bar */
   .scene-indicator {
-    font-size: 11px; color: #888; white-space: nowrap; flex-shrink: 0;
+    font-size: 11px; color: #64748b; white-space: nowrap; flex-shrink: 0;
   }
 
   /* Audio indicator */
   .audio-indicator {
-    font-size: 11px; color: #888; white-space: nowrap; flex-shrink: 0;
+    font-size: 11px; color: #64748b; white-space: nowrap; flex-shrink: 0;
     display: flex; align-items: center; gap: 4px;
   }
   .audio-indicator .audio-icon {
     font-size: 13px;
   }
-  .audio-indicator.has-audio { color: #A78BFA; }
+  .audio-indicator.has-audio { color: #7c3aed; }
 
   /* Bottom panels */
   #bottom-panels {
@@ -190,20 +194,20 @@ export function getPreviewHtml(): string {
     display: grid;
     grid-template-columns: 1fr 1fr;
     height: 200px;
-    background: #1a1a1a;
-    border-top: 1px solid #2a2a2a;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
   }
 
   /* Component Layers */
   #layers-panel {
-    border-right: 1px solid #2a2a2a;
+    border-right: 1px solid #e2e8f0;
     overflow-y: auto;
   }
   #layers-panel .panel-header {
     font-size: 11px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.05em; color: #888;
+    letter-spacing: 0.05em; color: #64748b;
     padding: 10px 12px 8px;
-    border-bottom: 1px solid #2a2a2a;
+    border-bottom: 1px solid #e2e8f0;
   }
   .layer-item {
     display: flex; align-items: center; gap: 8px;
@@ -211,23 +215,23 @@ export function getPreviewHtml(): string {
     transition: background 0.1s;
     border-left: 3px solid transparent;
   }
-  .layer-item:hover { background: #222; }
+  .layer-item:hover { background: #f1f5f9; }
   .layer-item.active {
-    background: #222;
-    border-left-color: #A78BFA;
-    color: #A78BFA;
+    background: #f1f5f9;
+    border-left-color: #7c3aed;
+    color: #7c3aed;
   }
   .layer-icon {
     width: 12px; height: 12px;
-    background: #555;
+    background: #94a3b8;
     border-radius: 2px;
     flex-shrink: 0;
   }
-  .layer-item.active .layer-icon { background: #A78BFA; }
+  .layer-item.active .layer-icon { background: #7c3aed; }
   .layer-type { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .layer-z {
-    font-size: 10px; color: #888;
-    background: #222; padding: 1px 5px; border-radius: 3px;
+    font-size: 10px; color: #64748b;
+    background: #f1f5f9; padding: 1px 5px; border-radius: 3px;
     flex-shrink: 0;
   }
 
@@ -237,13 +241,13 @@ export function getPreviewHtml(): string {
   }
   #props-panel .panel-header {
     font-size: 11px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.05em; color: #888;
+    letter-spacing: 0.05em; color: #64748b;
     padding: 10px 12px 8px;
-    border-bottom: 1px solid #2a2a2a;
+    border-bottom: 1px solid #e2e8f0;
   }
   .props-content { padding: 8px 12px; }
   .prop-component-type {
-    font-size: 13px; font-weight: 600; color: #A78BFA;
+    font-size: 13px; font-weight: 600; color: #7c3aed;
     margin-bottom: 8px;
   }
   .prop-row {
@@ -251,16 +255,16 @@ export function getPreviewHtml(): string {
     margin-bottom: 8px;
   }
   .prop-label {
-    font-size: 11px; font-weight: 500; color: #888;
+    font-size: 11px; font-weight: 500; color: #64748b;
   }
   .prop-input {
     width: 100%; padding: 4px 8px;
     font-size: 12px; font-family: inherit;
-    background: #111; color: #eee;
-    border: 1px solid #2a2a2a; border-radius: 4px;
+    background: #f8fafc; color: #1e293b;
+    border: 1px solid #e2e8f0; border-radius: 4px;
     outline: none; transition: border-color 0.15s;
   }
-  .prop-input:focus { border-color: #A78BFA; }
+  .prop-input:focus { border-color: #7c3aed; }
   textarea.prop-input {
     resize: vertical; min-height: 40px;
     font-family: 'SF Mono', 'Fira Code', monospace;
@@ -268,22 +272,96 @@ export function getPreviewHtml(): string {
   }
   .prop-check {
     width: 14px; height: 14px;
-    accent-color: #A78BFA;
+    accent-color: #7c3aed;
   }
   .prop-readonly-json {
-    font-size: 11px; color: #888;
-    background: #111; padding: 6px 8px;
-    border-radius: 4px; border: 1px solid #2a2a2a;
+    font-size: 11px; color: #64748b;
+    background: #f8fafc; padding: 6px 8px;
+    border-radius: 4px; border: 1px solid #e2e8f0;
     font-family: 'SF Mono', 'Fira Code', monospace;
     white-space: pre-wrap; word-break: break-all;
     max-height: 80px; overflow-y: auto;
   }
 
+  /* Smart prop editor styles */
+  .prop-color-row {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .prop-color-picker {
+    width: 32px; height: 28px; padding: 1px 2px;
+    border: 1px solid #e2e8f0; border-radius: 4px;
+    background: #f8fafc; cursor: pointer; flex-shrink: 0;
+  }
+  .prop-color-picker:focus { border-color: #7c3aed; }
+  .prop-color-text {
+    flex: 1; padding: 4px 8px; font-size: 12px; font-family: inherit;
+    background: #f8fafc; color: #1e293b;
+    border: 1px solid #e2e8f0; border-radius: 4px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .prop-color-text:focus { border-color: #7c3aed; }
+
+  .prop-number-row {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .prop-range {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 3px; background: #e2e8f0; border-radius: 2px;
+    outline: none; cursor: pointer;
+  }
+  .prop-range::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 10px; height: 10px;
+    border-radius: 50%; background: #7c3aed; cursor: pointer;
+  }
+  .prop-range::-moz-range-thumb {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #7c3aed; cursor: pointer; border: none;
+  }
+
+  .prop-toggle {
+    position: relative; display: inline-block; width: 34px; height: 18px;
+  }
+  .prop-toggle input { opacity: 0; width: 0; height: 0; }
+  .prop-toggle-slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #cbd5e1; border-radius: 18px; transition: 0.2s;
+  }
+  .prop-toggle-slider::before {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    left: 2px; bottom: 2px;
+    background: #fff; border-radius: 50%; transition: 0.2s;
+  }
+  .prop-toggle input:checked + .prop-toggle-slider { background: #7c3aed; }
+  .prop-toggle input:checked + .prop-toggle-slider::before { transform: translateX(16px); }
+
+  .prop-url-row {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .prop-url-link {
+    font-size: 11px; color: #7c3aed; text-decoration: none;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 100%; display: block;
+  }
+  .prop-url-link:hover { text-decoration: underline; }
+
+  .prop-select {
+    width: 100%; padding: 4px 8px;
+    font-size: 12px; font-family: inherit;
+    background: #f8fafc; color: #1e293b;
+    border: 1px solid #e2e8f0; border-radius: 4px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .prop-select:focus { border-color: #7c3aed; }
+
+  .prop-json-error {
+    font-size: 10px; color: #dc2626; margin-top: 2px;
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #444; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
 </head>
 <body>
@@ -352,7 +430,8 @@ export function getPreviewHtml(): string {
     totalDuration: 0,
     animFrameId: null,
     audioElements: [],
-    audioDuckingInterval: null
+    audioDuckingInterval: null,
+    musicStarted: false
   };
 
   // DOM refs
@@ -427,9 +506,6 @@ export function getPreviewHtml(): string {
   function resolveAudioUrl(source) {
     if (!source) return null;
     if (source.indexOf('http') === 0) return source;
-    // Convert local file path to asset URL
-    // e.g. /data/media-producer/quotient/projects/proj_xxx/assets/audio/vo.mp3
-    // becomes /assets/quotient/projects/proj_xxx/assets/audio/vo.mp3
     var prefix = '/data/media-producer/';
     if (source.indexOf(prefix) === 0) {
       return '/assets/' + source.substring(prefix.length);
@@ -439,6 +515,7 @@ export function getPreviewHtml(): string {
 
   function initAudio() {
     destroyAudio();
+    state.musicStarted = false;
     var p = state.currentProject;
     if (!p || !p.audio || !p.audio.tracks || !p.audio.tracks.length) {
       els.audioIndicator.innerHTML = '';
@@ -469,7 +546,7 @@ export function getPreviewHtml(): string {
     });
 
     if (count > 0) {
-      els.audioIndicator.innerHTML = '<span class="audio-icon">♪</span>' + count + ' track' + (count > 1 ? 's' : '');
+      els.audioIndicator.innerHTML = '<span class="audio-icon">\\u266A</span>' + count + ' track' + (count > 1 ? 's' : '');
       els.audioIndicator.className = 'audio-indicator has-audio';
     } else {
       els.audioIndicator.innerHTML = '';
@@ -483,29 +560,63 @@ export function getPreviewHtml(): string {
       audio.src = '';
     });
     state.audioElements = [];
+    state.musicStarted = false;
     if (state.audioDuckingInterval) {
       clearInterval(state.audioDuckingInterval);
       state.audioDuckingInterval = null;
     }
   }
 
+  // Start or resume audio. Music only fades in on first play.
   function playAudio() {
     state.audioElements.forEach(function(audio) {
-      // Apply fade-in: start at 0 volume, ramp up
-      if (audio._fadeIn > 0) {
-        audio.volume = 0;
-        var targetVol = audio._baseVolume;
-        var fadeSteps = Math.ceil(audio._fadeIn * 20); // 50ms steps
-        var step = 0;
-        var fadeInterval = setInterval(function() {
-          step++;
-          audio.volume = Math.min(targetVol, (step / fadeSteps) * targetVol);
-          if (step >= fadeSteps) clearInterval(fadeInterval);
-        }, 50);
+      if (audio._trackType === 'music') {
+        if (!state.musicStarted) {
+          // First time: apply fade-in if configured
+          if (audio._fadeIn > 0) {
+            audio.volume = 0;
+            var targetVol = audio._baseVolume;
+            var fadeSteps = Math.ceil(audio._fadeIn * 20);
+            var step = 0;
+            var fadeInterval = setInterval(function() {
+              step++;
+              audio.volume = Math.min(targetVol, (step / fadeSteps) * targetVol);
+              if (step >= fadeSteps) clearInterval(fadeInterval);
+            }, 50);
+          }
+          audio.currentTime = 0;
+          audio.play().catch(function() {});
+        } else {
+          // Resume from where it was
+          audio.play().catch(function() {});
+        }
+      } else {
+        // Non-music tracks (voiceover, sfx): play normally with fade-in
+        if (audio._fadeIn > 0) {
+          audio.volume = 0;
+          var targetVol2 = audio._baseVolume;
+          var fadeSteps2 = Math.ceil(audio._fadeIn * 20);
+          var step2 = 0;
+          var fadeInterval2 = setInterval(function() {
+            step2++;
+            audio.volume = Math.min(targetVol2, (step2 / fadeSteps2) * targetVol2);
+            if (step2 >= fadeSteps2) clearInterval(fadeInterval2);
+          }, 50);
+        }
+        audio.play().catch(function() {});
       }
-      audio.play().catch(function() {});
     });
+    state.musicStarted = true;
     startDucking();
+  }
+
+  // Pause only non-music audio. Music keeps playing.
+  function pauseMusicKeepPlaying() {
+    state.audioElements.forEach(function(audio) {
+      if (audio._trackType !== 'music') {
+        audio.pause();
+      }
+    });
   }
 
   function pauseAudio() {
@@ -520,6 +631,7 @@ export function getPreviewHtml(): string {
       audio.pause();
       audio.currentTime = 0;
     });
+    state.musicStarted = false;
     stopDucking();
   }
 
@@ -550,7 +662,6 @@ export function getPreviewHtml(): string {
       clearInterval(state.audioDuckingInterval);
       state.audioDuckingInterval = null;
     }
-    // Restore music volumes
     state.audioElements.forEach(function(audio) {
       if (audio._trackType === 'music') {
         audio.volume = audio._baseVolume;
@@ -582,7 +693,6 @@ export function getPreviewHtml(): string {
       });
       els.projectSelect.disabled = false;
 
-      // Auto-select from URL param
       var urlProject = new URLSearchParams(window.location.search).get('project');
       if (urlProject) {
         els.projectSelect.value = urlProject;
@@ -610,10 +720,9 @@ export function getPreviewHtml(): string {
       clearLayers();
       clearProps();
 
-      // Initialize audio tracks
+      // Initialize audio tracks once for the project
       initAudio();
 
-      // Auto-select first scene
       if (project.scenes && project.scenes.length > 0) {
         selectScene(0);
       }
@@ -643,14 +752,12 @@ export function getPreviewHtml(): string {
     });
     els.sceneList.innerHTML = html;
 
-    // Click handlers
     els.sceneList.querySelectorAll('.scene-item').forEach(function(el) {
       el.addEventListener('click', function() {
         selectScene(parseInt(el.dataset.index, 10));
       });
     });
 
-    // Load thumbnail iframes via srcdoc (auth)
     els.sceneList.querySelectorAll('.scene-thumb').forEach(function(thumb) {
       var sceneId = thumb.dataset.sceneId;
       var path = '/scene-thumbnail/' + state.tenantId + '/' + project.project_id + '/' + sceneId;
@@ -665,9 +772,22 @@ export function getPreviewHtml(): string {
   }
 
   function selectScene(index) {
+    var wasPlaying = state.playing;
     state.currentSceneIndex = index;
     state.currentComponentIndex = -1;
-    stopPlayback();
+
+    // Stop the animation loop but preserve music state
+    if (state.animFrameId) {
+      cancelAnimationFrame(state.animFrameId);
+      state.animFrameId = null;
+    }
+    state.playing = false;
+    state.playAll = false;
+    updatePlayIcon();
+
+    // Don't touch music audio on manual scene click. Only pause voiceover/sfx.
+    pauseMusicKeepPlaying();
+
     renderSceneList();
     loadPreview();
     renderLayers();
@@ -689,7 +809,6 @@ export function getPreviewHtml(): string {
       els.previewWrapper.style.display = 'block';
       els.previewPlaceholder.style.display = 'none';
 
-      // Write HTML into iframe
       try {
         iframe.contentDocument.open();
         iframe.contentDocument.write(html);
@@ -707,7 +826,6 @@ export function getPreviewHtml(): string {
       updateSceneIndicator();
       updatePreviewScale();
 
-      // Wait for scene ready then pause at 0
       waitForReady(function(tl) {
         tl.pause();
         tl.time(0);
@@ -780,7 +898,6 @@ export function getPreviewHtml(): string {
       return;
     }
 
-    // Sort by z_index descending (highest on top)
     var comps = scene.components.map(function(c, i) { return { comp: c, originalIndex: i }; });
     comps.sort(function(a, b) { return (b.comp.z_index || 0) - (a.comp.z_index || 0); });
 
@@ -810,7 +927,108 @@ export function getPreviewHtml(): string {
     els.layerList.innerHTML = '<div class="empty-state">No scene selected</div>';
   }
 
-  // ── Prop Editor ──
+  // ── Smart Prop Editor ──
+
+  // Known enum mappings: key pattern -> possible values
+  var ENUM_MAP = {
+    'mode': ['words', 'letters', 'lines'],
+    'effect': ['scale', 'fade', 'slide', 'none'],
+    'animation': ['scale', 'fade', 'slide', 'bounce', 'none'],
+    'transition': ['fade', 'slide', 'wipe', 'cut', 'none'],
+    'direction': ['left', 'right', 'up', 'down'],
+    'alignment': ['left', 'center', 'right'],
+    'align': ['left', 'center', 'right'],
+    'textAlign': ['left', 'center', 'right'],
+    'text_align': ['left', 'center', 'right'],
+    'position': ['top', 'center', 'bottom', 'left', 'right'],
+    'fontWeight': ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'],
+    'font_weight': ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'],
+    'easing': ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'],
+    'blend': ['normal', 'multiply', 'screen', 'overlay'],
+    'blendMode': ['normal', 'multiply', 'screen', 'overlay'],
+    'blend_mode': ['normal', 'multiply', 'screen', 'overlay']
+  };
+
+  var NAMED_COLORS = [
+    'red','blue','green','black','white','yellow','orange','purple','pink','cyan',
+    'magenta','gray','grey','brown','transparent','aliceblue','antiquewhite','aqua',
+    'aquamarine','azure','beige','bisque','blanchedalmond','blueviolet','burlywood',
+    'cadetblue','chartreuse','chocolate','coral','cornflowerblue','cornsilk','crimson',
+    'darkblue','darkcyan','darkgoldenrod','darkgray','darkgreen','darkgrey','darkkhaki',
+    'darkmagenta','darkolivegreen','darkorange','darkorchid','darkred','darksalmon',
+    'darkseagreen','darkslateblue','darkslategray','darkslategrey','darkturquoise',
+    'darkviolet','deeppink','deepskyblue','dimgray','dimgrey','dodgerblue','firebrick',
+    'floralwhite','forestgreen','fuchsia','gainsboro','ghostwhite','gold','goldenrod',
+    'greenyellow','honeydew','hotpink','indianred','indigo','ivory','khaki','lavender',
+    'lavenderblush','lawngreen','lemonchiffon','lightblue','lightcoral','lightcyan',
+    'lightgoldenrodyellow','lightgray','lightgreen','lightgrey','lightpink','lightsalmon',
+    'lightseagreen','lightskyblue','lightslategray','lightslategrey','lightsteelblue',
+    'lightyellow','lime','limegreen','linen','maroon','mediumaquamarine','mediumblue',
+    'mediumorchid','mediumpurple','mediumseagreen','mediumslateblue','mediumspringgreen',
+    'mediumturquoise','mediumvioletred','midnightblue','mintcream','mistyrose','moccasin',
+    'navajowhite','navy','oldlace','olive','olivedrab','orangered','orchid',
+    'palegoldenrod','palegreen','paleturquoise','palevioletred','papayawhip','peachpuff',
+    'peru','plum','powderblue','rebeccapurple','rosybrown','royalblue','saddlebrown',
+    'salmon','sandybrown','seagreen','seashell','sienna','silver','skyblue','slateblue',
+    'slategray','slategrey','snow','springgreen','steelblue','tan','teal','thistle',
+    'tomato','turquoise','violet','wheat','whitesmoke','yellowgreen'
+  ];
+
+  function isColorValue(val) {
+    if (typeof val !== 'string') return false;
+    var v = val.trim().toLowerCase();
+    if (/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v)) return true;
+    if (/^(rgb|hsl)a?\\s*\\(/i.test(v)) return true;
+    if (NAMED_COLORS.indexOf(v) >= 0) return true;
+    return false;
+  }
+
+  function isUrlValue(val) {
+    return typeof val === 'string' && /^https?:\\/\\//i.test(val.trim());
+  }
+
+  function getEnumOptions(key, currentVal) {
+    // Check exact key match
+    var k = key.toLowerCase().replace(/[-_]/g, '');
+    for (var enumKey in ENUM_MAP) {
+      if (enumKey.toLowerCase().replace(/[-_]/g, '') === k) {
+        return ENUM_MAP[enumKey];
+      }
+    }
+    // Check if key ends with a known enum suffix
+    for (var enumKey2 in ENUM_MAP) {
+      var suffix = enumKey2.toLowerCase().replace(/[-_]/g, '');
+      if (k.length > suffix.length && k.slice(-suffix.length) === suffix) {
+        return ENUM_MAP[enumKey2];
+      }
+    }
+    return null;
+  }
+
+  // Convert any color string to hex for the color picker (best effort)
+  function colorToHex(val) {
+    if (/^#([0-9a-f]{6})$/i.test(val)) return val;
+    if (/^#([0-9a-f]{3})$/i.test(val)) {
+      var c = val.slice(1);
+      return '#' + c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+    }
+    // For named/rgb/hsl, use a canvas to convert
+    try {
+      var ctx = document.createElement('canvas').getContext('2d');
+      ctx.fillStyle = val;
+      return ctx.fillStyle; // returns hex
+    } catch(e) { return '#000000'; }
+  }
+
+  function getNumberRange(val) {
+    // Determine slider range based on value
+    if (val >= 0 && val <= 1) return { min: 0, max: 1, step: 0.01 };
+    if (val >= 0 && val <= 10) return { min: 0, max: 20, step: 0.1 };
+    if (val >= 0 && val <= 100) return { min: 0, max: 200, step: 1 };
+    if (val >= 0 && val <= 1000) return { min: 0, max: 2000, step: 1 };
+    var absVal = Math.abs(val) || 1;
+    return { min: -absVal * 2, max: absVal * 2, step: absVal > 100 ? 1 : 0.1 };
+  }
 
   function renderProps() {
     var project = state.currentProject;
@@ -833,14 +1051,77 @@ export function getPreviewHtml(): string {
         html += '<label class="prop-label">' + escHtml(key) + '</label>';
 
         if (typeof val === 'boolean') {
-          html += '<input type="checkbox" class="prop-check" data-key="' + escAttr(key) + '"' + (val ? ' checked' : '') + '>';
+          // Toggle switch
+          html += '<label class="prop-toggle"><input type="checkbox" class="prop-toggle-input" data-key="' + escAttr(key) + '"' + (val ? ' checked' : '') + '><span class="prop-toggle-slider"></span></label>';
+
         } else if (typeof val === 'number') {
-          html += '<input type="number" class="prop-input" data-key="' + escAttr(key) + '" value="' + val + '" step="any">';
+          // Number input + range slider
+          var range = getNumberRange(val);
+          html += '<div class="prop-number-row">';
+          html += '<input type="number" class="prop-input prop-num-input" data-key="' + escAttr(key) + '" value="' + val + '" step="' + range.step + '">';
+          html += '<input type="range" class="prop-range" data-key="' + escAttr(key) + '" min="' + range.min + '" max="' + range.max + '" step="' + range.step + '" value="' + val + '">';
+          html += '</div>';
+
         } else if (typeof val === 'string') {
-          html += '<input type="text" class="prop-input" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
+          var enumOpts = getEnumOptions(key, val);
+          if (enumOpts) {
+            // Enum select dropdown
+            html += '<select class="prop-select" data-key="' + escAttr(key) + '">';
+            var hasCurrentVal = enumOpts.indexOf(val) >= 0;
+            if (!hasCurrentVal) {
+              html += '<option value="' + escAttr(val) + '" selected>' + escHtml(val) + '</option>';
+            }
+            enumOpts.forEach(function(opt) {
+              html += '<option value="' + escAttr(opt) + '"' + (opt === val ? ' selected' : '') + '>' + escHtml(opt) + '</option>';
+            });
+            html += '</select>';
+          } else if (isColorValue(val)) {
+            // Color picker + text input
+            var hexVal = colorToHex(val);
+            html += '<div class="prop-color-row">';
+            html += '<input type="color" class="prop-color-picker" data-key="' + escAttr(key) + '" value="' + escAttr(hexVal) + '">';
+            html += '<input type="text" class="prop-color-text" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
+            html += '</div>';
+          } else if (isUrlValue(val)) {
+            // URL link + text input
+            html += '<div class="prop-url-row">';
+            html += '<a class="prop-url-link" href="' + escAttr(val) + '" target="_blank" rel="noopener">' + escHtml(val) + '</a>';
+            html += '<input type="text" class="prop-input prop-url-input" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
+            html += '</div>';
+          } else if (val.length > 50) {
+            // Long string textarea
+            html += '<textarea class="prop-input" data-key="' + escAttr(key) + '" rows="3">' + escHtml(val) + '</textarea>';
+          } else {
+            // Short string text input
+            html += '<input type="text" class="prop-input" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
+          }
+
+        } else if (Array.isArray(val)) {
+          // Array: check if it's an array of color strings
+          var isColorArray = val.length > 0 && val.every(function(v) { return isColorValue(v); });
+          if (isColorArray) {
+            html += '<div class="prop-color-array" data-key="' + escAttr(key) + '">';
+            val.forEach(function(c, ci) {
+              var hexC = colorToHex(c);
+              html += '<div class="prop-color-row" style="margin-bottom:4px;">';
+              html += '<input type="color" class="prop-color-picker prop-arr-color" data-key="' + escAttr(key) + '" data-ci="' + ci + '" value="' + escAttr(hexC) + '">';
+              html += '<input type="text" class="prop-color-text prop-arr-color-text" data-key="' + escAttr(key) + '" data-ci="' + ci + '" value="' + escAttr(c) + '">';
+              html += '</div>';
+            });
+            html += '</div>';
+          } else {
+            // Editable JSON textarea
+            html += '<textarea class="prop-input prop-json-input" data-key="' + escAttr(key) + '" rows="3">' + escHtml(JSON.stringify(val, null, 2)) + '</textarea>';
+            html += '<div class="prop-json-error" data-key="' + escAttr(key) + '" style="display:none;"></div>';
+          }
+
+        } else if (typeof val === 'object' && val !== null) {
+          // Object: editable JSON textarea
+          html += '<textarea class="prop-input prop-json-input" data-key="' + escAttr(key) + '" rows="3">' + escHtml(JSON.stringify(val, null, 2)) + '</textarea>';
+          html += '<div class="prop-json-error" data-key="' + escAttr(key) + '" style="display:none;"></div>';
+
         } else {
-          // Object or array: read-only JSON display
-          html += '<div class="prop-readonly-json" data-key="' + escAttr(key) + '">' + escHtml(JSON.stringify(val, null, 2)) + '</div>';
+          html += '<input type="text" class="prop-input" data-key="' + escAttr(key) + '" value="' + escAttr(String(val)) + '">';
         }
 
         html += '</div>';
@@ -850,21 +1131,114 @@ export function getPreviewHtml(): string {
     html += '</div>';
     els.propEditor.innerHTML = html;
 
-    // Listen for changes on editable fields
-    els.propEditor.querySelectorAll('.prop-input, .prop-check').forEach(function(input) {
-      var handler = function() {
-        var key = input.dataset.key;
-        if (!key || !comp.data) return;
-        if (input.type === 'checkbox') {
-          comp.data[key] = input.checked;
-        } else if (typeof comp.data[key] === 'number') {
-          comp.data[key] = parseFloat(input.value) || 0;
-        } else {
-          comp.data[key] = input.value;
+    // ── Wire up event handlers ──
+
+    // Toggle switches (boolean)
+    els.propEditor.querySelectorAll('.prop-toggle-input').forEach(function(input) {
+      input.addEventListener('change', function() {
+        comp.data[input.dataset.key] = input.checked;
+      });
+    });
+
+    // Number inputs + linked range sliders
+    els.propEditor.querySelectorAll('.prop-num-input').forEach(function(numInput) {
+      var key = numInput.dataset.key;
+      var rangeInput = els.propEditor.querySelector('.prop-range[data-key="' + key + '"]');
+      numInput.addEventListener('input', function() {
+        var v = parseFloat(numInput.value) || 0;
+        comp.data[key] = v;
+        if (rangeInput) rangeInput.value = v;
+      });
+      if (rangeInput) {
+        rangeInput.addEventListener('input', function() {
+          var v = parseFloat(rangeInput.value) || 0;
+          comp.data[key] = v;
+          numInput.value = v;
+        });
+      }
+    });
+
+    // Select dropdowns (enum)
+    els.propEditor.querySelectorAll('.prop-select').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        comp.data[sel.dataset.key] = sel.value;
+      });
+    });
+
+    // Color pickers (single value)
+    els.propEditor.querySelectorAll('.prop-color-picker:not(.prop-arr-color)').forEach(function(picker) {
+      var key = picker.dataset.key;
+      var textInput = els.propEditor.querySelector('.prop-color-text[data-key="' + key + '"]');
+      picker.addEventListener('input', function() {
+        comp.data[key] = picker.value;
+        if (textInput) textInput.value = picker.value;
+      });
+      if (textInput) {
+        textInput.addEventListener('change', function() {
+          comp.data[key] = textInput.value;
+          if (isColorValue(textInput.value)) {
+            picker.value = colorToHex(textInput.value);
+          }
+        });
+      }
+    });
+
+    // Color array pickers
+    els.propEditor.querySelectorAll('.prop-arr-color').forEach(function(picker) {
+      var key = picker.dataset.key;
+      var ci = parseInt(picker.dataset.ci, 10);
+      var textInput = els.propEditor.querySelector('.prop-arr-color-text[data-key="' + key + '"][data-ci="' + ci + '"]');
+      picker.addEventListener('input', function() {
+        if (Array.isArray(comp.data[key])) {
+          comp.data[key][ci] = picker.value;
         }
-      };
-      input.addEventListener('change', handler);
-      if (input.type !== 'checkbox') input.addEventListener('input', handler);
+        if (textInput) textInput.value = picker.value;
+      });
+      if (textInput) {
+        textInput.addEventListener('change', function() {
+          if (Array.isArray(comp.data[key])) {
+            comp.data[key][ci] = textInput.value;
+          }
+          if (isColorValue(textInput.value)) {
+            picker.value = colorToHex(textInput.value);
+          }
+        });
+      }
+    });
+
+    // URL inputs
+    els.propEditor.querySelectorAll('.prop-url-input').forEach(function(input) {
+      input.addEventListener('change', function() {
+        comp.data[input.dataset.key] = input.value;
+        // Update the link
+        var link = input.parentElement.querySelector('.prop-url-link');
+        if (link) { link.href = input.value; link.textContent = input.value; }
+      });
+    });
+
+    // JSON textarea inputs (arrays/objects) with validation on blur
+    els.propEditor.querySelectorAll('.prop-json-input').forEach(function(ta) {
+      var key = ta.dataset.key;
+      var errEl = els.propEditor.querySelector('.prop-json-error[data-key="' + key + '"]');
+      ta.addEventListener('blur', function() {
+        try {
+          var parsed = JSON.parse(ta.value);
+          comp.data[key] = parsed;
+          if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+          ta.style.borderColor = '';
+        } catch(e) {
+          if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Invalid JSON: ' + e.message; }
+          ta.style.borderColor = '#dc2626';
+        }
+      });
+    });
+
+    // Generic text/textarea inputs (short strings, long strings)
+    els.propEditor.querySelectorAll('.prop-input:not(.prop-num-input):not(.prop-json-input):not(.prop-url-input)').forEach(function(input) {
+      if (input.dataset.key && comp.data.hasOwnProperty(input.dataset.key) && typeof comp.data[input.dataset.key] === 'string') {
+        var handler = function() { comp.data[input.dataset.key] = input.value; };
+        input.addEventListener('input', handler);
+      }
     });
   }
 
@@ -890,7 +1264,6 @@ export function getPreviewHtml(): string {
       updatePlayIcon();
       var tl = getTimeline();
       if (tl) {
-        // If at end of current scene, start from beginning
         if (tl.time() >= state.duration - 0.05) {
           tl.time(0);
         }
@@ -918,7 +1291,6 @@ export function getPreviewHtml(): string {
       var t = tl.time();
       var d = state.duration;
 
-      // Update slider based on total video position
       var globalTime = sceneOffset(state.currentSceneIndex) + t;
       var totalDur = state.totalDuration;
       els.slider.value = totalDur > 0 ? Math.round((globalTime / totalDur) * 1000) : 0;
@@ -928,7 +1300,6 @@ export function getPreviewHtml(): string {
       if (t >= d - 0.02 && state.playAll) {
         var project = state.currentProject;
         if (project && state.currentSceneIndex < project.scenes.length - 1) {
-          // Advance to next scene
           var nextIndex = state.currentSceneIndex + 1;
           state.currentSceneIndex = nextIndex;
           state.currentComponentIndex = -1;
@@ -941,14 +1312,15 @@ export function getPreviewHtml(): string {
           state.duration = scene.duration_seconds || 0;
           var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
 
-          // On scene change: keep music playing, restart voiceover
+          // On scene transition: music continues uninterrupted.
+          // Only restart voiceover if scene-specific.
           state.audioElements.forEach(function(audio) {
             if (audio._trackType === 'voiceover') {
               audio.pause();
               audio.currentTime = 0;
               audio.play().catch(function() {});
             }
-            // Music continues playing (loop should handle it)
+            // Music and sfx continue untouched
           });
 
           fetchHtml(path).then(function(html) {
@@ -966,7 +1338,7 @@ export function getPreviewHtml(): string {
               newTl.play();
               animLoop();
             });
-          }).catch(function() { stopPlayback(); pauseAudio(); });
+          }).catch(function() { stopPlayback(); stopAudioFull(); });
           return;
         } else {
           // Last scene done
@@ -985,7 +1357,6 @@ export function getPreviewHtml(): string {
     if (totalDur <= 0) return;
     var targetGlobal = (sliderVal / 1000) * totalDur;
 
-    // Find which scene this falls into
     var project = state.currentProject;
     if (!project || !project.scenes) return;
 
@@ -1009,7 +1380,6 @@ export function getPreviewHtml(): string {
     updateTimeDisplay(targetGlobal);
 
     if (targetScene !== state.currentSceneIndex) {
-      // Need to load different scene
       state.currentSceneIndex = targetScene;
       state.currentComponentIndex = -1;
       state.duration = project.scenes[targetScene].duration_seconds || 0;
@@ -1022,7 +1392,8 @@ export function getPreviewHtml(): string {
       var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
       var wasPlaying = state.playing;
       stopPlayback();
-      pauseAudio();
+      // Don't stop music on scrub, only pause non-music
+      pauseMusicKeepPlaying();
 
       fetchHtml(path).then(function(html) {
         var iframe = els.previewIframe;
@@ -1038,13 +1409,13 @@ export function getPreviewHtml(): string {
         });
       });
     } else {
-      // Same scene, just seek
       var tl = getTimeline();
       if (tl) {
         tl.time(localTime);
         tl.pause();
         stopPlayback();
-        pauseAudio();
+        // Keep music playing during same-scene scrub
+        pauseMusicKeepPlaying();
       }
     }
   }
