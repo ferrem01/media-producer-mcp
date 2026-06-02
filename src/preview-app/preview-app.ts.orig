@@ -623,13 +623,9 @@ export function getPreviewHtml(): string {
     propEditor: document.getElementById('prop-editor')
   };
 
-  // ── Auth token from URL param ──
-  var _tokenParam = new URLSearchParams(window.location.search).get('token');
-
   // ── API ──
   function api(method, path, body) {
     var opts = { method: method, headers: {} };
-    if (_tokenParam) { opts.headers['Authorization'] = 'Bearer ' + _tokenParam; }
     if (body) {
       opts.headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(body);
@@ -1250,10 +1246,6 @@ export function getPreviewHtml(): string {
     els.tenantInput.value = tenantParam;
     try { localStorage.setItem('mp-tenant', tenantParam); } catch(e) {}
     loadProjects();
-    var _projectParam = params.get('project');
-    if (_projectParam) {
-      setTimeout(function() { selectProject(_projectParam); }, 800);
-    }
   } else {
     // Try localStorage
     try {
