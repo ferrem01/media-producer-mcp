@@ -152,7 +152,7 @@ async function runRender(
       originalPrompt: options?.originalPrompt,
     };
 
-    if (options?.critique) {
+    if (options?.critique !== false) {
       try {
         renderOpts.llmConfig = llmConfigFromEnv();
       } catch {
