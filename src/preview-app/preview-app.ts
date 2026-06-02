@@ -1358,6 +1358,11 @@ export function getPreviewHtml(): string {
     var comp = scene && scene.components[state.currentComponentIndex];
     if (!project || !scene || !comp) return;
 
+    // Remember current position before reload
+    var savedMasterTime = state.masterTime || 0;
+    var info = sceneForGlobalTime(savedMasterTime);
+    var savedLocalTime = info ? info.localTime : 0;
+
     var patchPath = '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
     api('PATCH', patchPath, { data: comp.data }).then(function(result) {
       // Invalidate the cached scene HTML and re-fetch fresh
@@ -1366,10 +1371,10 @@ export function getPreviewHtml(): string {
         state.sceneHtmlCache[scene.id] = freshHtml;
         // Write to iframe immediately
         writeSceneToIframe(freshHtml);
-        // Re-init the timeline at current position
+        // Re-init the timeline at the same position it was at
         waitForReady(function(tl) {
+          tl.time(Math.min(savedLocalTime, tl.duration() || savedLocalTime));
           tl.pause();
-          tl.time(0);
         });
       });
     }).catch(function(e) {
