@@ -82,6 +82,8 @@ export const SCENE_PLANNER_DESIGN_RULES = `
 - grid-layout: max 6 items. Keep titles under 3 words, descriptions under 8 words.
 - text-list: max 5-6 items, each under 8 words.
 - stat-card: one number, one label. "340%" + "ROI Increase". Not a paragraph.
+- stat-card values: use human-readable short numbers. "50K" not 50000, "2.5M" not 2500000. Use suffix for units ("K+", "%", "M"). value should be a small number (50, 340, 2.5) with the scale in the suffix.
+- When positioning multiple stat cards: center them on the canvas. For 2 cards use x=400 and x=1100 (centered pair). For 3 cards use x=200, x=760, x=1320. Always y=300-500 range.
 - code-block: max 8-10 lines of code. Short, readable snippets.
 - terminal: max 3 command/output pairs.
 
