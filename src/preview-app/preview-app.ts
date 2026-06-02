@@ -501,6 +501,28 @@ export function getPreviewHtml(): string {
     return offset;
   }
 
+
+  // Sync audio currentTime to the global video timeline position
+  function syncAudioToGlobalTime(globalTime) {
+    state.audioElements.forEach(function(audio) {
+      if (audio._trackType === 'music' && audio.loop) {
+        // Looping music: sync to globalTime modulo duration
+        if (audio.duration && isFinite(audio.duration)) {
+          var target = globalTime % audio.duration;
+          if (Math.abs(audio.currentTime - target) > 0.5) {
+            audio.currentTime = target;
+          }
+        }
+      } else {
+        // Non-looping tracks (voiceover, sfx): sync directly
+        var target = Math.min(globalTime, audio.duration || globalTime);
+        if (Math.abs(audio.currentTime - target) > 0.5) {
+          audio.currentTime = target;
+        }
+      }
+    });
+  }
+
   // ── Audio Management ──
 
   function resolveAudioUrl(source) {
@@ -1319,6 +1341,20 @@ export function getPreviewHtml(): string {
       els.slider.value = totalDur > 0 ? Math.round((globalTime / totalDur) * 1000) : 0;
       updateTimeDisplay(globalTime);
 
+      // Keep audio in sync with the visual timeline (correct drift > 0.3s)
+      state.audioElements.forEach(function(audio) {
+        if (audio.paused) return;
+        var expectedTime;
+        if (audio._trackType === 'music' && audio.loop && audio.duration && isFinite(audio.duration)) {
+          expectedTime = globalTime % audio.duration;
+        } else {
+          expectedTime = globalTime;
+        }
+        if (audio.duration && isFinite(audio.duration) && Math.abs(audio.currentTime - expectedTime) > 0.3) {
+          audio.currentTime = Math.min(expectedTime, audio.duration);
+        }
+      });
+
       // Scene finished - advance to next if playing all
       if (t >= d - 0.02 && state.playAll) {
         var project = state.currentProject;
@@ -1393,6 +1429,7 @@ export function getPreviewHtml(): string {
     }
 
     updateTimeDisplay(targetGlobal);
+    syncAudioToGlobalTime(targetGlobal);
 
     if (targetScene !== state.currentSceneIndex) {
       state.currentSceneIndex = targetScene;
