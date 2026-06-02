@@ -567,47 +567,36 @@ export function getPreviewHtml(): string {
     }
   }
 
-  // Start or resume audio. Music only fades in on first play.
+  // Start or resume audio. Never resets currentTime on resume.
   function playAudio() {
+    if (state.musicStarted) {
+      // RESUME: just call play() on all paused tracks. No currentTime reset.
+      state.audioElements.forEach(function(audio) {
+        if (audio.paused) audio.play().catch(function() {});
+      });
+      startDucking();
+      return;
+    }
+
+    // FIRST PLAY: start everything from the beginning
     state.audioElements.forEach(function(audio) {
-      if (audio._trackType === 'music') {
-        if (!state.musicStarted) {
-          // First time: apply fade-in if configured
-          if (audio._fadeIn > 0) {
-            audio.volume = 0;
-            var targetVol = audio._baseVolume;
-            var fadeSteps = Math.ceil(audio._fadeIn * 20);
-            var step = 0;
-            var fadeInterval = setInterval(function() {
-              step++;
-              audio.volume = Math.min(targetVol, (step / fadeSteps) * targetVol);
-              if (step >= fadeSteps) clearInterval(fadeInterval);
-            }, 50);
-          }
-          audio.currentTime = 0;
-          audio.play().catch(function() {});
-        } else {
-          // Resume from where it was
-          audio.play().catch(function() {});
-        }
-      } else {
-        // Non-music tracks (voiceover, sfx): on first play start from beginning, on resume continue
-        if (!state.musicStarted) {
-          audio.currentTime = 0;
-          if (audio._fadeIn > 0) {
-            audio.volume = 0;
-            var targetVol2 = audio._baseVolume;
-            var fadeSteps2 = Math.ceil(audio._fadeIn * 20);
-            var step2 = 0;
-            var fadeInterval2 = setInterval(function() {
-              step2++;
-              audio.volume = Math.min(targetVol2, (step2 / fadeSteps2) * targetVol2);
-              if (step2 >= fadeSteps2) clearInterval(fadeInterval2);
-            }, 50);
-          }
-        }
-        audio.play().catch(function() {});
+      audio.currentTime = 0;
+      audio.volume = audio._baseVolume;
+
+      // Apply fade-in if configured
+      if (audio._fadeIn > 0) {
+        audio.volume = 0;
+        var targetVol = audio._baseVolume;
+        var fadeSteps = Math.ceil(audio._fadeIn * 20);
+        var step = 0;
+        var fadeInterval = setInterval(function() {
+          step++;
+          audio.volume = Math.min(targetVol, (step / fadeSteps) * targetVol);
+          if (step >= fadeSteps) clearInterval(fadeInterval);
+        }, 50);
       }
+
+      audio.play().catch(function() {});
     });
     state.musicStarted = true;
     startDucking();
