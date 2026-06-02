@@ -28,7 +28,7 @@ export function getPreviewHtml(): string {
   /* Layout */
   #app {
     display: grid;
-    grid-template-rows: 48px 1fr;
+    grid-template-rows: 48px 1fr auto;
     grid-template-columns: 240px 1fr;
     height: 100vh;
   }
@@ -64,8 +64,9 @@ export function getPreviewHtml(): string {
   .btn-primary:hover { background: #c4b5fd; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* Sidebar */
+  /* Sidebar - spans rows 2 and 3 */
   #sidebar {
+    grid-row: 2 / 4;
     background: #1a1a1a;
     border-right: 1px solid #2a2a2a;
     overflow-y: auto;
@@ -173,6 +174,111 @@ export function getPreviewHtml(): string {
     font-size: 11px; color: #888; white-space: nowrap; flex-shrink: 0;
   }
 
+  /* Audio indicator */
+  .audio-indicator {
+    font-size: 11px; color: #888; white-space: nowrap; flex-shrink: 0;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .audio-indicator .audio-icon {
+    font-size: 13px;
+  }
+  .audio-indicator.has-audio { color: #A78BFA; }
+
+  /* Bottom panels */
+  #bottom-panels {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: 200px;
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
+  }
+
+  /* Component Layers */
+  #layers-panel {
+    border-right: 1px solid #2a2a2a;
+    overflow-y: auto;
+  }
+  #layers-panel .panel-header {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #888;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .layer-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; cursor: pointer; font-size: 12px;
+    transition: background 0.1s;
+    border-left: 3px solid transparent;
+  }
+  .layer-item:hover { background: #222; }
+  .layer-item.active {
+    background: #222;
+    border-left-color: #A78BFA;
+    color: #A78BFA;
+  }
+  .layer-icon {
+    width: 12px; height: 12px;
+    background: #555;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .layer-item.active .layer-icon { background: #A78BFA; }
+  .layer-type { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .layer-z {
+    font-size: 10px; color: #888;
+    background: #222; padding: 1px 5px; border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* Prop Editor */
+  #props-panel {
+    overflow-y: auto;
+  }
+  #props-panel .panel-header {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #888;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .props-content { padding: 8px 12px; }
+  .prop-component-type {
+    font-size: 13px; font-weight: 600; color: #A78BFA;
+    margin-bottom: 8px;
+  }
+  .prop-row {
+    display: flex; flex-direction: column; gap: 3px;
+    margin-bottom: 8px;
+  }
+  .prop-label {
+    font-size: 11px; font-weight: 500; color: #888;
+  }
+  .prop-input {
+    width: 100%; padding: 4px 8px;
+    font-size: 12px; font-family: inherit;
+    background: #111; color: #eee;
+    border: 1px solid #2a2a2a; border-radius: 4px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .prop-input:focus { border-color: #A78BFA; }
+  textarea.prop-input {
+    resize: vertical; min-height: 40px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+  }
+  .prop-check {
+    width: 14px; height: 14px;
+    accent-color: #A78BFA;
+  }
+  .prop-readonly-json {
+    font-size: 11px; color: #888;
+    background: #111; padding: 6px 8px;
+    border-radius: 4px; border: 1px solid #2a2a2a;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    white-space: pre-wrap; word-break: break-all;
+    max-height: 80px; overflow-y: auto;
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -214,7 +320,19 @@ export function getPreviewHtml(): string {
       </button>
       <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
+      <span class="audio-indicator" id="audio-indicator"></span>
       <span class="scene-indicator" id="scene-indicator"></span>
+    </div>
+  </div>
+
+  <div id="bottom-panels">
+    <div id="layers-panel">
+      <div class="panel-header">Component Layers</div>
+      <div id="layer-list"><div class="empty-state">No scene selected</div></div>
+    </div>
+    <div id="props-panel">
+      <div class="panel-header">Prop Editor</div>
+      <div id="prop-editor"><div class="empty-state">Select a component</div></div>
     </div>
   </div>
 </div>
@@ -227,11 +345,14 @@ export function getPreviewHtml(): string {
     projects: [],
     currentProject: null,
     currentSceneIndex: -1,
+    currentComponentIndex: -1,
     playing: false,
     playAll: false,
     duration: 0,
     totalDuration: 0,
-    animFrameId: null
+    animFrameId: null,
+    audioElements: [],
+    audioDuckingInterval: null
   };
 
   // DOM refs
@@ -248,7 +369,10 @@ export function getPreviewHtml(): string {
     playIcon: document.getElementById('play-icon'),
     slider: document.getElementById('timeline-slider'),
     timeDisplay: document.getElementById('time-display'),
-    sceneIndicator: document.getElementById('scene-indicator')
+    sceneIndicator: document.getElementById('scene-indicator'),
+    audioIndicator: document.getElementById('audio-indicator'),
+    layerList: document.getElementById('layer-list'),
+    propEditor: document.getElementById('prop-editor')
   };
 
   // Auth token from URL
@@ -276,6 +400,7 @@ export function getPreviewHtml(): string {
 
   // Utils
   function escHtml(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function escAttr(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
   // Calculate total video duration
   function calcTotalDuration() {
@@ -295,6 +420,142 @@ export function getPreviewHtml(): string {
       offset += p.scenes[i].duration_seconds || 0;
     }
     return offset;
+  }
+
+  // ── Audio Management ──
+
+  function resolveAudioUrl(source) {
+    if (!source) return null;
+    if (source.indexOf('http') === 0) return source;
+    // Convert local file path to asset URL
+    // e.g. /data/media-producer/quotient/projects/proj_xxx/assets/audio/vo.mp3
+    // becomes /assets/quotient/projects/proj_xxx/assets/audio/vo.mp3
+    var prefix = '/data/media-producer/';
+    if (source.indexOf(prefix) === 0) {
+      return '/assets/' + source.substring(prefix.length);
+    }
+    return source;
+  }
+
+  function initAudio() {
+    destroyAudio();
+    var p = state.currentProject;
+    if (!p || !p.audio || !p.audio.tracks || !p.audio.tracks.length) {
+      els.audioIndicator.innerHTML = '';
+      els.audioIndicator.className = 'audio-indicator';
+      return;
+    }
+
+    var tracks = p.audio.tracks;
+    var count = 0;
+    tracks.forEach(function(track) {
+      var url = resolveAudioUrl(track.source);
+      if (!url) return;
+
+      var audio = document.createElement('audio');
+      audio.preload = 'auto';
+      audio.src = url;
+      audio.volume = typeof track.volume === 'number' ? track.volume : 1;
+      if (track.loop) audio.loop = true;
+
+      audio._trackType = track.type || 'sfx';
+      audio._trackId = track.id || '';
+      audio._fadeIn = track.fade_in || 0;
+      audio._fadeOut = track.fade_out || 0;
+      audio._baseVolume = audio.volume;
+
+      state.audioElements.push(audio);
+      count++;
+    });
+
+    if (count > 0) {
+      els.audioIndicator.innerHTML = '<span class="audio-icon">♪</span>' + count + ' track' + (count > 1 ? 's' : '');
+      els.audioIndicator.className = 'audio-indicator has-audio';
+    } else {
+      els.audioIndicator.innerHTML = '';
+      els.audioIndicator.className = 'audio-indicator';
+    }
+  }
+
+  function destroyAudio() {
+    state.audioElements.forEach(function(audio) {
+      audio.pause();
+      audio.src = '';
+    });
+    state.audioElements = [];
+    if (state.audioDuckingInterval) {
+      clearInterval(state.audioDuckingInterval);
+      state.audioDuckingInterval = null;
+    }
+  }
+
+  function playAudio() {
+    state.audioElements.forEach(function(audio) {
+      // Apply fade-in: start at 0 volume, ramp up
+      if (audio._fadeIn > 0) {
+        audio.volume = 0;
+        var targetVol = audio._baseVolume;
+        var fadeSteps = Math.ceil(audio._fadeIn * 20); // 50ms steps
+        var step = 0;
+        var fadeInterval = setInterval(function() {
+          step++;
+          audio.volume = Math.min(targetVol, (step / fadeSteps) * targetVol);
+          if (step >= fadeSteps) clearInterval(fadeInterval);
+        }, 50);
+      }
+      audio.play().catch(function() {});
+    });
+    startDucking();
+  }
+
+  function pauseAudio() {
+    state.audioElements.forEach(function(audio) {
+      audio.pause();
+    });
+    stopDucking();
+  }
+
+  function stopAudioFull() {
+    state.audioElements.forEach(function(audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+    stopDucking();
+  }
+
+  function startDucking() {
+    stopDucking();
+    var p = state.currentProject;
+    if (!p || !p.audio || !p.audio.ducking) return;
+    var duckedVolume = p.audio.ducking.ducked_volume || 0.12;
+
+    state.audioDuckingInterval = setInterval(function() {
+      var voActive = false;
+      state.audioElements.forEach(function(audio) {
+        if (audio._trackType === 'voiceover' && !audio.paused && audio.currentTime > 0) {
+          voActive = true;
+        }
+      });
+
+      state.audioElements.forEach(function(audio) {
+        if (audio._trackType === 'music') {
+          audio.volume = voActive ? duckedVolume : audio._baseVolume;
+        }
+      });
+    }, 100);
+  }
+
+  function stopDucking() {
+    if (state.audioDuckingInterval) {
+      clearInterval(state.audioDuckingInterval);
+      state.audioDuckingInterval = null;
+    }
+    // Restore music volumes
+    state.audioElements.forEach(function(audio) {
+      if (audio._trackType === 'music') {
+        audio.volume = audio._baseVolume;
+      }
+    });
   }
 
   // Load projects for tenant
@@ -341,10 +602,16 @@ export function getPreviewHtml(): string {
     api('/projects/' + state.tenantId + '/' + projectId).then(function(project) {
       state.currentProject = project;
       state.currentSceneIndex = -1;
+      state.currentComponentIndex = -1;
       state.totalDuration = calcTotalDuration();
       stopPlayback();
       renderSceneList();
       clearPreview();
+      clearLayers();
+      clearProps();
+
+      // Initialize audio tracks
+      initAudio();
 
       // Auto-select first scene
       if (project.scenes && project.scenes.length > 0) {
@@ -399,9 +666,12 @@ export function getPreviewHtml(): string {
 
   function selectScene(index) {
     state.currentSceneIndex = index;
+    state.currentComponentIndex = -1;
     stopPlayback();
     renderSceneList();
     loadPreview();
+    renderLayers();
+    clearProps();
   }
 
   // Preview loading
@@ -500,6 +770,108 @@ export function getPreviewHtml(): string {
     stopPlayback();
   }
 
+  // ── Component Layers ──
+
+  function renderLayers() {
+    var project = state.currentProject;
+    var scene = project && project.scenes[state.currentSceneIndex];
+    if (!scene || !scene.components || !scene.components.length) {
+      els.layerList.innerHTML = '<div class="empty-state">No components</div>';
+      return;
+    }
+
+    // Sort by z_index descending (highest on top)
+    var comps = scene.components.map(function(c, i) { return { comp: c, originalIndex: i }; });
+    comps.sort(function(a, b) { return (b.comp.z_index || 0) - (a.comp.z_index || 0); });
+
+    var html = '';
+    comps.forEach(function(item) {
+      var c = item.comp;
+      var active = item.originalIndex === state.currentComponentIndex;
+      html += '<div class="layer-item' + (active ? ' active' : '') + '" data-index="' + item.originalIndex + '">'
+        + '<span class="layer-icon"></span>'
+        + '<span class="layer-type">' + escHtml(c.type) + '</span>'
+        + '<span class="layer-z">z:' + (c.z_index || 0) + '</span>'
+        + '</div>';
+    });
+    els.layerList.innerHTML = html;
+
+    els.layerList.querySelectorAll('.layer-item').forEach(function(el) {
+      el.addEventListener('click', function() {
+        state.currentComponentIndex = parseInt(el.dataset.index, 10);
+        renderLayers();
+        renderProps();
+      });
+    });
+  }
+
+  function clearLayers() {
+    state.currentComponentIndex = -1;
+    els.layerList.innerHTML = '<div class="empty-state">No scene selected</div>';
+  }
+
+  // ── Prop Editor ──
+
+  function renderProps() {
+    var project = state.currentProject;
+    var scene = project && project.scenes[state.currentSceneIndex];
+    var comp = scene && scene.components && scene.components[state.currentComponentIndex];
+    if (!comp) { clearProps(); return; }
+
+    var html = '<div class="props-content">';
+    html += '<div class="prop-component-type">' + escHtml(comp.type) + '</div>';
+
+    var data = comp.data || {};
+    var keys = Object.keys(data);
+
+    if (!keys.length) {
+      html += '<div class="empty-state" style="height:auto;padding:8px 0;">No properties</div>';
+    } else {
+      keys.forEach(function(key) {
+        var val = data[key];
+        html += '<div class="prop-row">';
+        html += '<label class="prop-label">' + escHtml(key) + '</label>';
+
+        if (typeof val === 'boolean') {
+          html += '<input type="checkbox" class="prop-check" data-key="' + escAttr(key) + '"' + (val ? ' checked' : '') + '>';
+        } else if (typeof val === 'number') {
+          html += '<input type="number" class="prop-input" data-key="' + escAttr(key) + '" value="' + val + '" step="any">';
+        } else if (typeof val === 'string') {
+          html += '<input type="text" class="prop-input" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
+        } else {
+          // Object or array: read-only JSON display
+          html += '<div class="prop-readonly-json" data-key="' + escAttr(key) + '">' + escHtml(JSON.stringify(val, null, 2)) + '</div>';
+        }
+
+        html += '</div>';
+      });
+    }
+
+    html += '</div>';
+    els.propEditor.innerHTML = html;
+
+    // Listen for changes on editable fields
+    els.propEditor.querySelectorAll('.prop-input, .prop-check').forEach(function(input) {
+      var handler = function() {
+        var key = input.dataset.key;
+        if (!key || !comp.data) return;
+        if (input.type === 'checkbox') {
+          comp.data[key] = input.checked;
+        } else if (typeof comp.data[key] === 'number') {
+          comp.data[key] = parseFloat(input.value) || 0;
+        } else {
+          comp.data[key] = input.value;
+        }
+      };
+      input.addEventListener('change', handler);
+      if (input.type !== 'checkbox') input.addEventListener('input', handler);
+    });
+  }
+
+  function clearProps() {
+    els.propEditor.innerHTML = '<div class="empty-state">Select a component</div>';
+  }
+
   // Timeline / Playback
   function getTimeline() {
     try { return els.previewIframe.contentWindow && els.previewIframe.contentWindow.__MP_TIMELINE; }
@@ -511,6 +883,7 @@ export function getPreviewHtml(): string {
       stopPlayback();
       var tl = getTimeline();
       if (tl) tl.pause();
+      pauseAudio();
     } else {
       state.playing = true;
       state.playAll = true;
@@ -523,6 +896,7 @@ export function getPreviewHtml(): string {
         }
         tl.play();
       }
+      playAudio();
       animLoop();
     }
   }
@@ -557,12 +931,25 @@ export function getPreviewHtml(): string {
           // Advance to next scene
           var nextIndex = state.currentSceneIndex + 1;
           state.currentSceneIndex = nextIndex;
+          state.currentComponentIndex = -1;
           renderSceneList();
+          renderLayers();
+          clearProps();
           updateSceneIndicator();
 
           var scene = project.scenes[nextIndex];
           state.duration = scene.duration_seconds || 0;
           var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+
+          // On scene change: keep music playing, restart voiceover
+          state.audioElements.forEach(function(audio) {
+            if (audio._trackType === 'voiceover') {
+              audio.pause();
+              audio.currentTime = 0;
+              audio.play().catch(function() {});
+            }
+            // Music continues playing (loop should handle it)
+          });
 
           fetchHtml(path).then(function(html) {
             var iframe = els.previewIframe;
@@ -579,12 +966,13 @@ export function getPreviewHtml(): string {
               newTl.play();
               animLoop();
             });
-          }).catch(function() { stopPlayback(); });
+          }).catch(function() { stopPlayback(); pauseAudio(); });
           return;
         } else {
           // Last scene done
           stopPlayback();
           tl.pause();
+          stopAudioFull();
           return;
         }
       }
@@ -623,14 +1011,18 @@ export function getPreviewHtml(): string {
     if (targetScene !== state.currentSceneIndex) {
       // Need to load different scene
       state.currentSceneIndex = targetScene;
+      state.currentComponentIndex = -1;
       state.duration = project.scenes[targetScene].duration_seconds || 0;
       renderSceneList();
+      renderLayers();
+      clearProps();
       updateSceneIndicator();
 
       var scene = project.scenes[targetScene];
       var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
       var wasPlaying = state.playing;
       stopPlayback();
+      pauseAudio();
 
       fetchHtml(path).then(function(html) {
         var iframe = els.previewIframe;
@@ -652,6 +1044,7 @@ export function getPreviewHtml(): string {
         tl.time(localTime);
         tl.pause();
         stopPlayback();
+        pauseAudio();
       }
     }
   }

@@ -258,7 +258,7 @@ async function main() {
         try {
           const data = await fs.readFile(fullPath);
           const ext = path.extname(fullPath).toLowerCase();
-          const contentType = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".gif" ? "image/gif" : ext === ".mp4" ? "video/mp4" : "application/octet-stream";
+          const contentType = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".gif" ? "image/gif" : ext === ".mp4" ? "video/mp4" : ext === ".mp3" ? "audio/mpeg" : ext === ".wav" ? "audio/wav" : ext === ".webm" ? "video/webm" : "application/octet-stream";
           res.writeHead(200, { "Content-Type": contentType, "Content-Length": data.length, "Cache-Control": "public, max-age=3600" });
           res.end(data);
         } catch {
