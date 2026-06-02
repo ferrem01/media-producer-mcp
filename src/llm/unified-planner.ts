@@ -81,7 +81,7 @@ Example: A scene with a library background + custom hero visual + library stat c
     { "custom": true, "custom_prompt": "Dramatic product visualization with floating UI cards, holographic effects, 3D perspective transforms. Huge 120px typography saying 'QUOTIENT' with SplitText per-character animation. Ambient purple glow orbs in background.", "z_index": 10 },
     { "type": "stat-card", "data": { "number": "340%", "label": "ROI" }, "z_index": 20, "position": { "x": 1400, "y": 800, "width": 400, "height": 200 } }
   ],
-  "hero_image": "A futuristic AI command center with holographic displays, purple and blue neon lighting",
+  
   "transition_in": { "type": "none", "duration_seconds": 0 }
 }
 
@@ -112,7 +112,7 @@ ${catalogStr}
         { "type": "gradient-background", "data": { "colors": ["#0f172a", "#1e1b4b"] }, "z_index": 0 },
         { "custom": true, "custom_prompt": "A dramatic hero reveal with huge 120px typography saying 'QUOTIENT'. Dark background with ambient purple glow orbs. Title enters with SplitText per-character animation (chars stagger 0.03s, back.out ease). Subtitle at 24px fades in below. Floating particles in background.", "z_index": 10 }
       ],
-      "hero_image": "A futuristic AI command center with holographic displays, purple and blue neon lighting, cinematic depth of field",
+      
       "transition_in": { "type": "none", "duration_seconds": 0 }
     },
     {
@@ -138,7 +138,7 @@ ${catalogStr}
 - Never have two identical layout types in a row.
 - For library components: fill ALL required data fields. Use realistic content, not placeholder text.
 - For custom components: custom_prompt must be 3-5 sentences with SPECIFIC visual direction (exact sizes, colors, animation names, layout positions).
-- hero_image is OPTIONAL. Use for hero visuals, product illustrations, abstract art. Skip for text-only, stats, code demos.
+- hero_image is OPTIONAL and should be RARE (0-1 per project, not every scene). Only use when a real photograph or illustration would dramatically improve the scene. Most scenes should rely on HTML/CSS/GSAP visuals, not AI images. Skip for: text scenes, stats, code demos, CTAs, dashboards, lists.
 - hero_image prompts describe the IMAGE itself, not the scene layout.
 - Every scene MUST have a components array with at least one component.
 - Think Apple keynote: one powerful idea per scene, cinematic motion, premium aesthetic.
