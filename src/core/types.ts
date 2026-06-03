@@ -75,6 +75,7 @@ export interface BrandKit {
     border_radius?: string;
     motion?: "minimal" | "punchy" | "cinematic";
   };
+  guidelines?: string;    // free-form brand rules injected into planner/generator prompts
 }
 
 // ── Components ──

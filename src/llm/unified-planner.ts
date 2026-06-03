@@ -168,17 +168,21 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
     brandAssetsSection += `\nTo use a brand background as the scene background at z_index 0:\n{ "type": "image-showcase", "data": { "src": "${opts.brandKit.assets.backgrounds[0].url}", "fit": "cover" }, "z_index": 0 }\n`;
   }
   if (opts.brandKit.logos?.length) {
-    // Pick the best logo for the current theme
     var isLight = isLightBrand(opts.brandKit);
     var bestLogo = opts.brandKit.logos.find(l => l.theme === (isLight ? "light" : "dark")) || opts.brandKit.logos[0];
-    brandAssetsSection += `\n\n## Brand Logos (MANDATORY)\nALWAYS include the brand logo on EVERY scene. Place it at z_index 30 in the top-left corner.\nAvailable logo variants:\n`;
+    brandAssetsSection += `\n\n## Brand Logos\nAvailable logo variants:\n`;
     for (var logo of opts.brandKit.logos) {
       brandAssetsSection += `- "${logo.name}" (${logo.variant}, ${logo.theme} theme): ${logo.url}\n`;
     }
-    brandAssetsSection += `\nRecommended logo for current brand (${isLight ? "light" : "dark"} background): ${bestLogo.url}\nAdd to EVERY scene:\n{ "type": "image-showcase", "data": { "src": "${bestLogo.url}", "fit": "contain" }, "z_index": 30, "position": { "x": 40, "y": 30, "width": 120, "height": 40 } }\n`;
+    brandAssetsSection += `\nRecommended logo for current background: ${bestLogo.url}\nTo include a logo, add an image-showcase component at z_index 30:\n{ "type": "image-showcase", "data": { "src": "${bestLogo.url}", "fit": "contain" }, "z_index": 30, "position": { "x": 40, "y": 30, "width": 120, "height": 40 } }\n\nFollow the brand guidelines below for when and where to place logos.\n`;
   }
   if (brandAssetsSection) {
     systemPrompt += brandAssetsSection;
+  }
+
+  // Inject brand guidelines (tenant-defined rules)
+  if (opts.brandKit.guidelines) {
+    systemPrompt += `\n\n## Brand Guidelines (FOLLOW THESE RULES)\n${opts.brandKit.guidelines}\n`;
   }
 
   var userPrompt = `Create a ${opts.format} project.\n\n${opts.prompt}`;
@@ -214,28 +218,6 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
     for (var comp of scene.components) {
       if (comp.custom && !comp.custom_prompt) {
         comp.custom_prompt = scene.description || scene.label;
-      }
-    }
-  }
-
-  // Auto-inject brand logo into every scene if the brand has logos and the scene doesn't already have one
-  if (opts.brandKit.logos?.length) {
-    var lightBrand = isLightBrand(opts.brandKit);
-    var bestLogo = opts.brandKit.logos.find(l => l.theme === (lightBrand ? "light" : "dark")) || opts.brandKit.logos[0];
-    for (var scene of storyboard.scenes) {
-      var hasLogo = scene.components.some((c: any) => {
-        if (c.type === "logo" || c.type === "logo-intro" || c.type === "logo-outro") return true;
-        // Check if any image-showcase has the logo URL
-        if (c.type === "image-showcase" && c.data?.src && opts.brandKit.logos!.some((l: any) => c.data.src === l.url)) return true;
-        return false;
-      });
-      if (!hasLogo) {
-        scene.components.push({
-          type: "image-showcase",
-          data: { src: bestLogo.url, fit: "contain" },
-          z_index: 30,
-          position: { x: 40, y: 30, width: 120, height: 40 },
-        });
       }
     }
   }

@@ -516,9 +516,10 @@ export function createMcpServer(): McpServer {
         border_radius: z.string().optional(),
         motion: z.enum(["minimal", "punchy", "cinematic"]).optional(),
       }).optional(),
+      guidelines: z.string().optional().describe("Free-form brand rules for the AI (e.g. logo placement, color usage, tone). Injected into generation prompts."),
     },
     async (params) => {
-      const hasUpdates = params.colors || params.fonts || params.logo || params.logos || params.assets || params.style;
+      const hasUpdates = params.colors || params.fonts || params.logo || params.logos || params.assets || params.style || params.guidelines;
 
       if (!hasUpdates) {
         // Get brand kit
@@ -592,6 +593,7 @@ export function createMcpServer(): McpServer {
           ...existing?.style,
           ...params.style,
         },
+        guidelines: params.guidelines ?? existing?.guidelines,
       };
 
       await saveBrandKit(params.tenant_id, kit);

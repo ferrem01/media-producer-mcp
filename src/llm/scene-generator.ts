@@ -154,6 +154,9 @@ async function generateCustomComponent(opts: CustomComponentOpts): Promise<strin
     }
     brandAssetContext += "Pick the right logo variant based on the scene background (dark/light).\n";
   }
+  if (opts.brandKit.guidelines) {
+    brandAssetContext += `\n\nBrand Guidelines (FOLLOW THESE RULES):\n${opts.brandKit.guidelines}\n`;
+  }
 
   var scenePrompt = `Generate the HTML for this component:
 
