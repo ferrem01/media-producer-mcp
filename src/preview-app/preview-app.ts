@@ -565,17 +565,18 @@ export function getPreviewHtml(): string {
   // Sync audio currentTime to the global video timeline position
   function syncAudioToGlobalTime(globalTime) {
     state.audioElements.forEach(function(audio) {
+      var dur = audio.duration;
+      if (!dur || !isFinite(dur)) return;
+
       if (audio._trackType === 'music' && audio.loop) {
-        // Looping music: sync to globalTime modulo duration
-        if (audio.duration && isFinite(audio.duration)) {
-          var target = globalTime % audio.duration;
-          if (Math.abs(audio.currentTime - target) > 0.5) {
-            audio.currentTime = target;
-          }
+        var target = globalTime % dur;
+        if (Math.abs(audio.currentTime - target) > 0.5) {
+          audio.currentTime = target;
         }
       } else {
-        // Non-looping tracks (voiceover, sfx): sync directly
-        var target = Math.min(globalTime, audio.duration || globalTime);
+        // Non-looping: if past end of track, leave it alone
+        if (globalTime >= dur) return;
+        var target = Math.min(globalTime, dur);
         if (Math.abs(audio.currentTime - target) > 0.5) {
           audio.currentTime = target;
         }
@@ -1552,14 +1553,21 @@ export function getPreviewHtml(): string {
     // Keep audio in sync (correct drift > 0.3s)
     state.audioElements.forEach(function(audio) {
       if (audio.paused) return;
-      var expectedTime;
-      if (audio._trackType === 'music' && audio.loop && audio.duration && isFinite(audio.duration)) {
-        expectedTime = globalTime % audio.duration;
+      var dur = audio.duration;
+      if (!dur || !isFinite(dur)) return;
+
+      if (audio._trackType === 'music' && audio.loop) {
+        // Looping music: sync to globalTime modulo duration
+        var expectedTime = globalTime % dur;
+        if (Math.abs(audio.currentTime - expectedTime) > 0.5) {
+          audio.currentTime = expectedTime;
+        }
       } else {
-        expectedTime = globalTime;
-      }
-      if (audio.duration && isFinite(audio.duration) && Math.abs(audio.currentTime - expectedTime) > 0.3) {
-        audio.currentTime = Math.min(expectedTime, audio.duration);
+        // Non-looping tracks (voiceover, sfx): if track has ended, leave it alone
+        if (globalTime >= dur) return;
+        if (Math.abs(audio.currentTime - globalTime) > 0.5) {
+          audio.currentTime = Math.min(globalTime, dur);
+        }
       }
     });
 
