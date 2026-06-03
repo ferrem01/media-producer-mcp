@@ -3,7 +3,7 @@
  *
  * Pipeline-level step that scans a project's scenes and generates AI hero
  * images where needed. Works for any project regardless of how it was planned
- * (structured, scene, presentation, image). Freeform handles its own images in-planner
+ * Handles hero image generation for any pipeline target.
  * since HTML references them during generation.
  */
 
@@ -36,7 +36,7 @@ export async function enrichProjectWithImages(opts: ImageEnrichmentOpts): Promis
 
   const project = opts.project;
 
-  // Skip if project already has AI-generated images (e.g. from freeform planner)
+  // Skip if project already has AI-generated images
   const existingAiImages = project.assets?.filter(a => a.type === "ai_image") || [];
   if (existingAiImages.length > 0) {
     console.log(`  Image enrichment: skipping (${existingAiImages.length} AI images already exist)`);

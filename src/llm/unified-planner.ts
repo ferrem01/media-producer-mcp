@@ -1,7 +1,7 @@
 /**
  * Unified Planner
  *
- * Single planner that replaces both the freeform storyboard planner and
+ * Unified planner that decides per-scene whether to use library components or
  * the project/scene planner. Each scene contains a components array where
  * EACH component is independently either a library ref or a custom component.
  *

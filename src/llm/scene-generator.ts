@@ -7,7 +7,7 @@
  */
 
 import { callLLM, type LLMConfig } from "./client.js";
-import { freeformSceneSystemPrompt } from "./prompts.js";
+import { sceneComponentSystemPrompt } from "./prompts.js";
 import type { PlannedScene, PlannedComponent } from "./unified-planner.js";
 import type { BrandKit, Canvas, OutputFormat, Scene, SceneComponent, SceneTransition } from "../core/types.js";
 
@@ -132,7 +132,7 @@ interface CustomComponentOpts {
 }
 
 async function generateCustomComponent(opts: CustomComponentOpts): Promise<string> {
-  var sceneSystemPrompt = freeformSceneSystemPrompt(opts.format, opts.canvas, opts.brandKit);
+  var sceneSystemPrompt = sceneComponentSystemPrompt(opts.format, opts.canvas, opts.brandKit);
 
   var imageContext = "";
   if (opts.imageUrl) {

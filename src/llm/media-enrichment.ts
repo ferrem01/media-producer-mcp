@@ -2,7 +2,7 @@
  * Media Enrichment
  *
  * Single pipeline-level step that generates ALL media assets (images, future: video, music)
- * for any project type. Replaces both the freeform planner's inline image gen and the
+ * for any project type. Replaces inline image gen and the
  * separate image-enrichment module.
  *
  * Freeform path: reads hero_image hints directly from the storyboard.
@@ -19,7 +19,7 @@ import { callLLM } from "./client.js";
 
 export interface MediaEnrichmentOpts {
   project?: Project;
-  storyboard?: any;           // freeform storyboard with hero_image fields
+  storyboard?: any;           // storyboard with hero_image fields
   tenantId: string;
   projectId: string;
   llmConfig: LLMConfig;
@@ -33,9 +33,9 @@ export interface MediaEnrichmentResult {
 }
 
 /**
- * Enrich a project (or freeform storyboard) with generated media.
+ * Enrich a project with generated media.
  *
- * For freeform: pass storyboard with hero_image fields. No project needed yet.
+ * Pass storyboard with hero_image fields. No project needed yet.
  * For structured: pass a project. LLM evaluates which scenes need images.
  */
 export async function enrichProjectMedia(opts: MediaEnrichmentOpts): Promise<MediaEnrichmentResult> {

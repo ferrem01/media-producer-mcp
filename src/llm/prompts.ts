@@ -52,12 +52,20 @@ You MUST output a single .component.html file with exactly three sections:
    - Must return a GSAP timeline (NOT paused -- the master timeline controls playback)
    - Use gsap.timeline() NOT gsap.timeline({ paused: true })
 
-3. Use CSS custom properties for theming:
-   - --mp-color-primary, --mp-color-secondary, --mp-color-accent
-   - --mp-color-background, --mp-color-surface
-   - --mp-color-text, --mp-color-text-muted
-   - --mp-font-family (default: 'Inter', sans-serif)
-   - --mp-border-radius
+3. MANDATORY: Use CSS custom properties for ALL colors. NEVER hardcode color hex values.
+   - var(--mp-color-primary), var(--mp-color-secondary), var(--mp-color-accent)
+   - var(--mp-color-background) for ANY full-screen or root background
+   - var(--mp-color-surface) for cards, panels, containers
+   - var(--mp-color-text) for body/heading text
+   - var(--mp-color-text-muted) for secondary text
+   - var(--mp-font-family) for font-family (default: 'Inter', sans-serif)
+   - var(--mp-border-radius) for border radius
+   
+   ❌ WRONG: background: #0f172a;  color: #ffffff;
+   ✅ RIGHT: background: var(--mp-color-background);  color: var(--mp-color-text);
+   
+   The brand kit sets these variables. If you hardcode colors, the brand kit is ignored.
+   The ONLY acceptable hardcoded colors are: transparent, rgba values for overlays/shadows, and currentColor.
 
 4. Use {{key}} for simple text binding in templates.
    For dynamic content (lists, complex DOM), build elements in createTimeline.
@@ -309,7 +317,7 @@ For each scene, provide 2-4 sentences covering:
 }
 
 /**
- * System prompt for the freeform planner.
+ * DEPRECATED: Was the freeform planner prompt, now replaced by unified-planner.ts.
  * The LLM writes full HTML+CSS+GSAP per scene with complete creative freedom.
  */
 function isLightBackground(brandKit: BrandKit): boolean {
@@ -343,6 +351,7 @@ function getBrandStyleGuide(brandKit: BrandKit): string {
 - For contrast issues: adjust TEXT color (use var(--mp-color-text) or lighter shades), never lighten the background`;
 }
 
+/** @deprecated Use unified planner instead. Kept temporarily for export compat. */
 export function freeformPlannerSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
   var formatRules = componentFormatRules(format);
   var brandVars = buildBrandVarsList(brandKit);
@@ -383,8 +392,15 @@ Think like an Apple keynote designer crossed with a Stripe marketing page:
 
 ## Visual Style Guide
 ${brandStyleGuide}
-- Use CSS custom properties for ALL brand colors -- never hardcode hex values that exist in the brand kit
-- The brand kit background (var(--mp-color-background)) is the ground truth. Respect it. Only override if the user explicitly asks for a different theme.
+## CRITICAL: Brand Color Rules
+- NEVER hardcode color hex values. Use var(--mp-color-*) for ALL colors.
+- var(--mp-color-background) is the root/full-screen background. ALWAYS.
+- var(--mp-color-surface) for cards and panels.
+- var(--mp-color-text) for all text. var(--mp-color-text-muted) for secondary text.
+- var(--mp-color-primary) and var(--mp-color-accent) for highlights and accents.
+- The brand kit defines these values. Hardcoding colors = ignoring the brand = broken output.
+- Only acceptable hardcoded values: transparent, rgba() for overlays/shadows/glows, currentColor.
+- If you write background: #0f172a or color: #ffffff anywhere, YOU ARE DOING IT WRONG.
 
 ## ICONS: NEVER USE EMOJI
 Never use emoji characters (⚡🔧✨🤖📦🎨 etc.) as icons. They look cheap and unprofessional.
@@ -534,13 +550,10 @@ tl.to(el, { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: 1.0, ..
 }
 
 /**
- * Build brand kit CSS variables list for the freeform prompt.
+ * System prompt for generating a SINGLE scene's custom component HTML.
+ * Each scene gets its own LLM call so the HTML doesn't need JSON escaping.
  */
-/**
- * System prompt for generating a SINGLE scene's HTML in freeform mode.
- * The scene gets its own LLM call so the HTML doesn't need JSON escaping.
- */
-export function freeformSceneSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
+export function sceneComponentSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
   var formatRules = componentFormatRules(format);
   var brandVars = buildBrandVarsList(brandKit);
 

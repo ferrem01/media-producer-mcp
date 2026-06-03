@@ -3,7 +3,7 @@
  */
 
 export { callLLM, llmConfigFromEnv, type LLMConfig, type LLMMessage, type LLMContentPart } from "./client.js";
-export { componentSystemPrompt, scenePlannerSystemPrompt, projectPlannerSystemPrompt, critiquerSystemPrompt, freeformPlannerSystemPrompt } from "./prompts.js";
+export { componentSystemPrompt, scenePlannerSystemPrompt, projectPlannerSystemPrompt, critiquerSystemPrompt, sceneComponentSystemPrompt } from "./prompts.js";
 export { generateComponentLLM, extractComponentSource, deriveTypeName } from "./component-gen.js";
 export { enrichProjectMedia, type MediaEnrichmentOpts, type MediaEnrichmentResult } from "./media-enrichment.js";
 export { critiqueScene, type CritiqueResult } from "./critiquer.js";
