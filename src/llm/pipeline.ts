@@ -329,6 +329,8 @@ async function runSceneRevisionPipeline(
       maxRetries: opts.maxRevisions ?? 2,
       trace,
       customSources: generated.customSources,
+      catalog,
+      critique: opts.critique,
     });
     finalRevScene = critiqueResult.scene;
     if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
@@ -460,6 +462,8 @@ async function runVideoRevisionPipeline(
         imageUrl,
         trace,
         customSources: generated.customSources,
+        catalog,
+        critique: opts.critique,
       });
       finalVidScene = critiqueResult.scene;
       if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
@@ -580,6 +584,8 @@ async function runImageRevisionPipeline(
       maxRetries: opts.maxRevisions ?? 2,
       trace,
       customSources: generated.customSources,
+      catalog,
+      critique: opts.critique,
     });
     finalImgScene = critiqueResult.scene;
     if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
@@ -701,7 +707,14 @@ async function critiqueAndRetryScene(opts: {
   imageUrl?: string;
   trace?: TraceBuilder;
   customSources?: Map<string, string>;
+  catalog: ComponentCatalogEntry[];
+  critique?: boolean;
 }): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
+  // Skip critique if disabled
+  if (opts.critique === false) {
+    return { scene: opts.scene, customSources: opts.customSources };
+  }
+
   let currentScene = opts.scene;
   let currentCustomSources = opts.customSources;
   let lastCritique: CritiqueResult | undefined;
@@ -794,9 +807,42 @@ async function critiqueAndRetryScene(opts: {
 
       opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false });
 
-      // Regenerate the scene with critique feedback
+      // Re-plan the scene via the planner with critique feedback
+      // This lets the planner change component types, data, positions, or switch to custom
+      const sceneContext = serializeSceneContext(currentScene);
+      const rePlanPrompt = `Re-plan this single scene. The previous version scored ${critiqueResult.score}/10 and had these problems:
+
+Issues: ${critiqueResult.issues.join("; ")}
+Suggestions: ${critiqueResult.suggestions.join("; ")}
+
+Previous scene plan:
+${sceneContext}
+
+Original brief: ${opts.prompt}
+
+Fix the issues. You may change component types, adjust data/props, reposition elements, or use custom components instead of library ones. Output a single scene plan.`;
+
+      const rePlanned = await planStoryboard({
+        prompt: rePlanPrompt,
+        format: opts.format,
+        llmConfig: opts.llmConfig,
+        brandKit: opts.brandKit,
+        canvas: opts.canvas,
+        componentCatalog: opts.catalog,
+        sceneCount: 1,
+        creativity: 0.5,
+        tenantId: opts.tenantId,
+      });
+
+      if (!rePlanned.scenes || rePlanned.scenes.length === 0) {
+        console.log(`  Critique re-plan returned no scenes, keeping current`);
+        break;
+      }
+
+      // Generate the re-planned scene
+      const newPlanned = rePlanned.scenes[0];
       const regenerated = await generateScene({
-        scene: opts.planned,
+        scene: newPlanned,
         sceneIndex: opts.sceneIndex,
         totalScenes: opts.totalScenes,
         prompt: opts.prompt,
@@ -807,7 +853,7 @@ async function critiqueAndRetryScene(opts: {
         imageUrl: opts.imageUrl,
         tenantId: opts.tenantId,
         projectId: opts.projectId,
-        critiqueFeedback,
+        critiqueFeedback: feedbackParts.join("\n"),
       });
 
       // Save custom component HTML if needed
@@ -959,6 +1005,8 @@ async function runUnifiedPipeline(
         imageUrl,
         trace,
         customSources: generated.customSources,
+        catalog,
+        critique: opts.critique,
       });
       finalScene = critiqueResult.scene;
       finalCustomSources = critiqueResult.customSources;
