@@ -30,8 +30,7 @@ import { renderProject as renderProjectCore } from "./core/render.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { queueJob, getJob, listAllJobs } from "./core/job-queue.js";
 import { TraceBuilder } from "./trace/index.js";
-import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
-import { deriveTypeName } from "./llm/component-gen.js";
+// generateComponent / saveGeneratedComponent used by pipeline internally
 import { runGeneratePipeline, type PipelineTarget } from "./llm/pipeline.js";
 import { llmConfigFromEnv } from "./llm/client.js";
 import { config } from "./config.js";
@@ -43,7 +42,7 @@ import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { captureUrl } from "./core/capture-url.js";
-import { generateImage } from "./media/image-gen.js";
+// generateImage moved to internal API (not exposed via MCP generate tool)
 
 // ── Shared Zod schemas ──
 
@@ -121,11 +120,11 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "create",
-    "Create a new media project (video, image, deck, one-pager, slideshow, gif, social)",
+    "Create a new media project (video, image, presentation, one-pager, slideshow, gif, social)",
     {
       tenant_id: z.string().describe("Tenant identifier"),
       name: z.string().describe("Project name"),
-      format: z.enum(["video", "image", "slideshow", "deck", "one-pager", "gif", "social", "email-header", "thumbnail"]).describe("Output format"),
+      format: z.enum(["video", "image", "slideshow", "presentation", "one-pager", "gif", "social", "email-header", "thumbnail"]).describe("Output format"),
       preset: z.enum(["landscape", "vertical", "square"]).optional().describe("Resolution preset (default: landscape)"),
       fps: z.number().optional().describe("Frames per second for video/slideshow/gif (default: 30)"),
     },
@@ -842,25 +841,16 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "generate",
-    "Generate content from a natural language description. Can generate a single component, a scene, a full video, an image, or a deck/presentation. Uses LLM pipeline when no source is provided.",
+    "Generate media from a natural language prompt. Supports video, image, presentation, component, and scene targets. Pass id to revise existing content.",
     {
       tenant_id: z.string(),
       prompt: z.string().describe("Description of what to generate"),
-      target: z.enum(["component", "scene", "video", "image", "deck", "presentation", "ai_image"]).optional().default("video").describe("What to generate (default: video). Use ai_image for AI-generated images via OpenAI."),
-      source: z.string().optional().describe("If provided, saves this .component.html source directly (skip LLM)"),
-      type: z.string().optional().describe("Component type name when saving (kebab-case)"),
-      category: z.string().optional().describe("Category to save under (default: custom)"),
-      critique: z.boolean().optional().default(true).describe("Run the critiquer loop on generated output (enabled by default)"),
-      creativity: z.number().min(0).max(1).optional().describe("Creativity level 0-1. Low = prefer library components, high = prefer custom generation. Default 0.5"),
-      scene_count: z.number().optional().describe("Target number of scenes for video/deck"),
-      generate_images: z.boolean().optional().default(true).describe("Generate AI hero images during planning (requires OpenAI key)"),
-      duration: z.number().optional().describe("Animation duration in seconds for preview (default: 3)"),
-      image_size: z.enum(["1024x1024", "1536x1024", "1024x1536", "auto"]).optional().describe("Image size for ai_image target"),
-      image_quality: z.enum(["low", "medium", "high", "auto"]).optional().describe("Image quality for ai_image target"),
-      image_model: z.enum(["gpt-image-1", "dall-e-3"]).optional().describe("Image model for ai_image target"),
-      id: z.string().optional().describe("ID of existing content to revise. For components: component name (e.g. bold-pricing-card). For scenes: scene_id (requires project_id). For videos: project_id."),
-      project_id: z.string().optional().describe("Project ID for scene revision or ai_image asset linking"),
-      token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
+      target: z.enum(["component", "scene", "video", "image", "presentation"]).optional().default("video").describe("What to generate (default: video)"),
+      id: z.string().optional().describe("ID of existing content to revise. Component: component name. Scene: scene_id (requires project_id). Video/image/presentation: project_id."),
+      project_id: z.string().optional().describe("Project ID (required for scene revision)"),
+      canvas_width: z.number().optional().describe("Explicit canvas width. For images, auto-inferred from prompt if omitted."),
+      canvas_height: z.number().optional().describe("Explicit canvas height. For images, auto-inferred from prompt if omitted."),
+      token: z.string().optional().describe("Auth token"),
     },
     async (params) => {
       // Auth check
@@ -870,96 +860,6 @@ export function createMcpServer(): McpServer {
         if (!tokenTenant) return err("Invalid token");
       }
       try {
-        // ── AI Image Generation (synchronous) ──
-        if (params.target === 'ai_image') {
-          const timestamp = Date.now();
-          const assetsDir = path.join(config.dataDir, params.tenant_id, 'assets', 'generated');
-          const outputPath = path.join(assetsDir, `img_${timestamp}.png`);
-
-          const result = await generateImage({
-            prompt: params.prompt,
-            model: params.image_model || 'gpt-image-1',
-            size: params.image_size || '1536x1024',
-            quality: params.image_quality || 'high',
-            outputPath,
-          });
-
-          // If project_id is provided via prompt metadata, copy to project assets
-          // (for now, the generated asset lives in the tenant assets dir)
-
-          return ok({
-            status: 'completed',
-            type: 'ai_image',
-            path: result.path,
-            width: result.width,
-            height: result.height,
-            revised_prompt: result.revised_prompt,
-          });
-        }
-
-        // If source is provided, save it directly to the tenant library
-        if (params.source) {
-          const typeName = params.type || deriveTypeName(params.prompt);
-          const savedPath = await saveGeneratedComponent(
-            params.tenant_id,
-            typeName,
-            params.source,
-            params.category || "custom",
-          );
-
-          // Generate preview
-          let preview_path: string | undefined;
-          try {
-            const sceneAssembler = await import("./core/scene-assembler.js");
-            const captureModule = await import("./core/capture.js");
-
-            const scene = {
-              id: "preview",
-              label: "Preview",
-              duration_seconds: params.duration || 3,
-              components: [{ id: "comp_preview", type: typeName, data: {}, z_index: 10 }],
-            };
-
-            const html = await sceneAssembler.assembleScene({
-              scene,
-              components: [{ type: typeName, source: params.source }],
-              brandKit: {
-                colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
-                fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
-                style: { border_radius: "12px", motion: "cinematic" as const },
-              },
-              canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
-              gsapDir: config.gsapDir,
-            });
-
-            const workDir = path.join(config.dataDir, params.tenant_id, "_previews");
-            const htmlPath = path.join(workDir, `${typeName}.html`);
-            preview_path = path.join(workDir, `${typeName}.png`);
-
-            await fs.mkdir(workDir, { recursive: true });
-            await fs.writeFile(htmlPath, html);
-
-            await captureModule.captureSingleFrame({
-              htmlPath,
-              outputPath: preview_path,
-              width: 1920,
-              height: 1080,
-              atTime: (params.duration || 3) / 3,
-            });
-          } catch (previewErr) {
-            console.error("Preview generation failed:", previewErr);
-          }
-
-          return ok({
-            status: "saved",
-            type: typeName,
-            category: params.category || "custom",
-            path: savedPath,
-            preview_path,
-          });
-        }
-
-
         // ── Revision mode: load existing content when id is provided ──
         let existingSource: string | undefined;
         let revisionName: string | undefined;
@@ -998,7 +898,7 @@ export function createMcpServer(): McpServer {
             }
             revisionProjectId = params.project_id;
             revisionSceneId = params.id;
-          } else if (params.target === "video") {
+          } else if (params.target === "video" || params.target === "image") {
             revisionProjectId = params.id;
             // Load project to serialize as context
             const proj = await loadProject(params.tenant_id, params.id);
@@ -1033,10 +933,8 @@ export function createMcpServer(): McpServer {
                 style: { border_radius: "12px", motion: "cinematic" as const },
               },
               canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
-              critique: params.critique,
-              sceneCount: params.scene_count,
-              creativity: params.creativity,
-          generateImages: params.generate_images,
+              canvasWidth: params.canvas_width,
+              canvasHeight: params.canvas_height,
               existingSource,
               name: revisionName,
               project_id: revisionProjectId || params.project_id,

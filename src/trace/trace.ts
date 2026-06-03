@@ -5,7 +5,7 @@
  * Traces are written to tenant-specific JSONL files and a global system file.
  *
  * Modeled after video-producer-mcp's trace system, adapted for media-producer's
- * multi-format pipeline (components, scenes, projects, decks, freeform).
+ * multi-format pipeline (components, scenes, projects, presentations, freeform).
  */
 import fs from "node:fs";
 import path from "node:path";

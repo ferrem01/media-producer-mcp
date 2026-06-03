@@ -157,7 +157,7 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
  * System prompt for planning a full multi-scene project.
  */
 export function projectPlannerSystemPrompt(componentCatalog: string): string {
-  return `You are a project planner for a media production system. Your job is to plan a full multi-scene project (video, deck, presentation) by creating a storyboard.
+  return `You are a project planner for a media production system. Your job is to plan a full multi-scene project (video, presentation) by creating a storyboard.
 
 ## Available Components
 
@@ -194,10 +194,10 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 
 ## Rules
 
-1. Break the content into logical scenes (typically 3-8 for a video, more for a deck).
+1. Break the content into logical scenes (typically 3-8 for a video, more for a presentation).
 2. Each scene prompt should be detailed enough for the scene planner to select components and fill data.
 3. For videos: aim for 3-5 second scenes, total 15-60 seconds.
-4. For decks/presentations: one slide per scene, 5-7 seconds each.
+4. For presentations: one slide per scene, 5-7 seconds each.
 5. First scene should be an intro/title. Last scene should be a CTA or summary.
 6. Use transitions between scenes (crossfade is default, vary for visual interest).
 7. Output ONLY the JSON object. No explanation.
@@ -293,7 +293,7 @@ For each scene, provide 2-4 sentences covering:
 
 ### 4. Production Notes
 - Suggested scene count (scale to content: 5-8 for a quick overview, 8-12 for a detailed demo)
-- Duration guidance (3-5s per scene for video, no duration for decks)
+- Duration guidance (3-5s per scene for video, no duration for presentations)
 - Opening and closing (logo intro/outro, CTA placement)
 
 ## Rules
@@ -608,9 +608,8 @@ function componentFormatRules(format: string): string {
 - Ensure text is perfectly positioned and balanced.
 - Use generous whitespace and clear focal points.`;
 
-    case "deck":
     case "presentation":
-      return `## Format: Deck / Presentation
+      return `## Format: Presentation
 
 - Minimal animation only: simple fade-in (opacity 0 to 1) with short duration (0.3-0.5s).
 - No dramatic entrances, no exit animations needed. Elements appear and stay.
@@ -680,13 +679,12 @@ function critiquerFormatRules(format: string): string {
 - Ignore animation concerns entirely -- there should be no animation.
 - If you see entrance/exit animations in the code, flag it as an issue (should use gsap.set only).`;
 
-    case "deck":
     case "presentation":
-      return `## Format-Specific Critique: Deck
+      return `## Format-Specific Critique: Presentation
 
 - Evaluate information clarity: is the key message immediately obvious?
 - Readability: is all text legible? Proper font sizes for headers vs body?
-- Consistent structure: does this slide match the visual language of a professional deck?
+- Consistent structure: does this slide match the visual language of a professional presentation?
 - Text density: unlike video, more text is acceptable here, but it must be well-organized.
 - Professional layout: clean alignment, consistent spacing, clear sections.
 - Animation should be minimal (simple fades only). Flag dramatic/cinematic animations as issues.`;

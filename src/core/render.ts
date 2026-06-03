@@ -85,7 +85,7 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
         originalPrompt: options.originalPrompt,
       }, options.extraComponentDirs);
 
-    case "deck":
+    case "presentation":
     case "presentation":
       return renderDeck(project, componentSources, workDir, gsapDir, outputPath, startTime);
 
@@ -433,7 +433,7 @@ async function renderVideo(
 }
 
 /**
- * Render a multi-page PDF deck.
+ * Render a multi-page PDF presentation.
  * Captures each scene as a static PNG, then combines into a PDF.
  */
 async function renderDeck(

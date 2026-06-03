@@ -101,7 +101,7 @@ Rules:
 - Bad candidates: text-only slides, stat cards, code demos, CTA cards, terminal demos
 - Image prompts should describe the IMAGE itself, not the scene layout
 - Be selective: usually only 1-2 scenes in a project need generated images
-- For decks/presentations: hero image for the title slide is good
+- For presentations: hero image for the title slide is good
 - Output ONLY JSON`;
 
     try {

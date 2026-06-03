@@ -123,9 +123,9 @@ These are DIFFERENT visual languages. Do NOT mix them.
 - Text should animate in/out, not just appear.
 - Prefer visual components (browser-frame, device-mockup, bar-chart) over text-list.
 - Less text, more visual impact. If a scene has more than 15 words visible at once, it's a PowerPoint slide, not a video scene.
-- Think Apple keynote, not corporate deck.
+- Think Apple keynote, not corporate presentation.
 
-**Presentation/deck scenes should be INFORMATION-DENSE and readable:**
+**Presentation scenes should be INFORMATION-DENSE and readable:**
 - Clear headers, structured content, readable text.
 - Static layouts with clean typography.
 - Text-list and grid-layout are appropriate here.

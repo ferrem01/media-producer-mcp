@@ -3,7 +3,7 @@
  *
  * Pipeline-level step that scans a project's scenes and generates AI hero
  * images where needed. Works for any project regardless of how it was planned
- * (structured, scene, deck, image). Freeform handles its own images in-planner
+ * (structured, scene, presentation, image). Freeform handles its own images in-planner
  * since HTML references them during generation.
  */
 
@@ -82,7 +82,7 @@ Rules:
 - Bad candidates: text-only slides, stat cards, code demos, CTA cards, terminal demos
 - Image prompts should describe the IMAGE itself, not the scene layout
 - Be selective: usually only 1-2 scenes in a project need generated images
-- For decks/presentations: hero image for the title slide is good
+- For presentations: hero image for the title slide is good
 - Output ONLY JSON`;
 
   let imageDecisions: Array<{ index: number; needs_image: boolean; image_prompt?: string }> = [];

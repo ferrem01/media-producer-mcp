@@ -27,7 +27,7 @@ export interface GenerateComponentInput {
   brand_kit?: BrandKit;
   /** Duration for animation preview */
   duration?: number;
-  /** Output format (video, image, deck, gif) for format-specific component rules */
+  /** Output format (video, image, presentation, gif) for format-specific component rules */
   format?: string;
   /** LLM provider function -- injected so we don't hardcode a provider */
   llmGenerate: (systemPrompt: string, userPrompt: string) => Promise<string>;

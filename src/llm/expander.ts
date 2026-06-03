@@ -123,12 +123,11 @@ function getFormatContext(format: string): string {
   switch (format) {
     case "video":
     case "slideshow":
-      return "This is a VIDEO (not a PowerPoint). Think CINEMATIC: one visual concept per scene, rich animated backgrounds, kinetic text, visual storytelling. NOT bullet lists or text-heavy slides. Each scene should feel like an Apple keynote moment, not a corporate deck. Max 15 words visible per scene. Prefer visual components (browser-frame, device-mockup, stat-card, bar-chart) over text-list. Each scene is 3-5 seconds.";
+      return "This is a VIDEO (not a PowerPoint). Think CINEMATIC: one visual concept per scene, rich animated backgrounds, kinetic text, visual storytelling. NOT bullet lists or text-heavy slides. Each scene should feel like an Apple keynote moment, not a corporate presentation. Max 15 words visible per scene. Prefer visual components (browser-frame, device-mockup, stat-card, bar-chart) over text-list. Each scene is 3-5 seconds.";
     case "image":
       return "This is a single image. One scene, one powerful visual moment. Think about composition, typography, and visual hierarchy.";
-    case "deck":
     case "presentation":
-      return "This is a slide deck / presentation. Multiple slides, one key point per slide. Think about information hierarchy, readability, and visual consistency.";
+      return "This is a presentation. Multiple slides, one key point per slide. Think about information hierarchy, readability, and visual consistency.";
     case "scene":
       return "This is a single scene within a larger project. Think about components, layout, and animation.";
     default:
