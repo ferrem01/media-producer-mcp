@@ -39,6 +39,16 @@
       bgImage.style.backgroundImage = 'url(' + data.src + ')';
     }
 
+    // For logos/small images: blend mode removes white backgrounds
+    if (data.blend) {
+      bgImage.style.mixBlendMode = data.blend; // e.g. 'multiply', 'darken'
+    }
+
+    // fit mode: contain for logos, cover for backgrounds (default)
+    if (data.fit === 'contain') {
+      bgImage.style.backgroundSize = 'contain';
+    }
+
     // Optional overlay for text readability
     var overlayOpacity = data.overlay_opacity || 0;
     var overlayColor = data.overlay_color || 'var(--mp-color-background, #000000)';

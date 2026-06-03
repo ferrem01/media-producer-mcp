@@ -174,7 +174,7 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
     for (var logo of opts.brandKit.logos) {
       brandAssetsSection += `- "${logo.name}" (${logo.variant}, ${logo.theme} theme): ${logo.url}\n`;
     }
-    brandAssetsSection += `\nRecommended logo for current background: ${bestLogo.url}\nTo include a logo, add an image-showcase component at z_index 30:\n{ "type": "image-showcase", "data": { "src": "${bestLogo.url}", "fit": "contain" }, "z_index": 30, "position": { "x": 40, "y": 30, "width": 120, "height": 40 } }\n\nFollow the brand guidelines below for when and where to place logos.\n`;
+    brandAssetsSection += `\nRecommended logo for current background: ${bestLogo.url}\nTo include a logo, use the image component at z_index 30 with blend mode to remove white backgrounds:\n{ "type": "image", "data": { "src": "${bestLogo.url}", "fit": "contain", "blend": "multiply", "drift": false }, "z_index": 30, "position": { "x": 40, "y": 30, "width": 120, "height": 40 } }\n\nFollow the brand guidelines below for when and where to place logos.\n`;
   }
   if (brandAssetsSection) {
     systemPrompt += brandAssetsSection;
