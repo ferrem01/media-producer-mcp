@@ -717,7 +717,14 @@ async function critiqueAndRetryScene(opts: {
 
   let currentScene = opts.scene;
   let currentCustomSources = opts.customSources;
+  let currentPlanned = opts.planned;
   let lastCritique: CritiqueResult | undefined;
+
+  // Track best attempt by score
+  let bestScene = opts.scene;
+  let bestCustomSources = opts.customSources;
+  let bestScore = 0;
+  let bestCritique: CritiqueResult | undefined;
 
   const extraDirs = [
     opts.compDir,
@@ -785,42 +792,58 @@ async function critiqueAndRetryScene(opts: {
 
       lastCritique = critiqueResult;
       console.log(`  Critique scene ${opts.sceneIndex} attempt ${attempt}: score=${critiqueResult.score}, issues=${critiqueResult.issues.length}`);
+      if (critiqueResult.issues.length > 0) {
+        console.log(`    Issues: ${critiqueResult.issues.join(" | ")}`);
+      }
+      if (critiqueResult.suggestions.length > 0) {
+        console.log(`    Suggestions: ${critiqueResult.suggestions.join(" | ")}`);
+      }
 
       // 5. Clean up temp files
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
 
-      // 6. If score is good enough, accept
-      if (critiqueResult.score >= 7 && critiqueResult.issues.length === 0) {
+      // Track best attempt
+      if (critiqueResult.score > bestScore) {
+        bestScore = critiqueResult.score;
+        bestScene = currentScene;
+        bestCustomSources = currentCustomSources;
+        bestCritique = critiqueResult;
+      }
+
+      // 6. If score >= 7, accept (good enough)
+      if (critiqueResult.score >= 7) {
         opts.trace?.endEvent({ score: critiqueResult.score, accepted: true });
         break;
       }
 
-      // 7. Build critique feedback and regenerate
-      const feedbackParts: string[] = [];
-      if (critiqueResult.issues.length > 0) {
-        feedbackParts.push(`Issues found: ${critiqueResult.issues.join("; ")}`);
+      // 7. If score >= 5, acceptable -- don't re-plan, just accept
+      // Only re-plan for scores < 5 (significant problems)
+      if (critiqueResult.score >= 5) {
+        console.log(`  Score ${critiqueResult.score} is acceptable, keeping without re-plan`);
+        opts.trace?.endEvent({ score: critiqueResult.score, accepted: true, reason: "acceptable" });
+        break;
       }
-      if (critiqueResult.suggestions.length > 0) {
-        feedbackParts.push(`Suggestions: ${critiqueResult.suggestions.join("; ")}`);
-      }
-      const critiqueFeedback = feedbackParts.join("\n");
 
       opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false });
 
-      // Re-plan the scene via the planner with critique feedback
-      // This lets the planner change component types, data, positions, or switch to custom
-      const sceneContext = serializeSceneContext(currentScene);
-      const rePlanPrompt = `Re-plan this single scene. The previous version scored ${critiqueResult.score}/10 and had these problems:
+      // 8. Score < 5: surgical re-plan
+      // Give the planner the EXISTING plan as structured JSON and ask for minimal fixes
+      const existingPlanJSON = JSON.stringify(currentPlanned, null, 2);
+      const rePlanPrompt = `You previously planned this scene and it has rendering problems. Make MINIMAL changes to fix ONLY these issues:
 
-Issues: ${critiqueResult.issues.join("; ")}
-Suggestions: ${critiqueResult.suggestions.join("; ")}
+${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}
 
-Previous scene plan:
-${sceneContext}
+Here is your previous plan (JSON). Keep everything that works. Only change what's broken:
+${existingPlanJSON}
 
 Original brief: ${opts.prompt}
 
-Fix the issues. You may change component types, adjust data/props, reposition elements, or use custom components instead of library ones. Output a single scene plan.`;
+Rules:
+- Keep the same overall structure and components that are working
+- Only adjust component types, data props, or positions to fix the specific issues listed
+- Do NOT start from scratch -- this is a surgical fix
+- If a library component isn't rendering correctly, try a different library component or switch to custom
+- Output a single scene plan in the same JSON format`;
 
       const rePlanned = await planStoryboard({
         prompt: rePlanPrompt,
@@ -835,12 +858,13 @@ Fix the issues. You may change component types, adjust data/props, reposition el
       });
 
       if (!rePlanned.scenes || rePlanned.scenes.length === 0) {
-        console.log(`  Critique re-plan returned no scenes, keeping current`);
+        console.log(`  Critique re-plan returned no scenes, keeping best (score ${bestScore})`);
         break;
       }
 
-      // Generate the re-planned scene
+      // Generate the surgically re-planned scene
       const newPlanned = rePlanned.scenes[0];
+      currentPlanned = newPlanned;
       const regenerated = await generateScene({
         scene: newPlanned,
         sceneIndex: opts.sceneIndex,
@@ -853,7 +877,6 @@ Fix the issues. You may change component types, adjust data/props, reposition el
         imageUrl: opts.imageUrl,
         tenantId: opts.tenantId,
         projectId: opts.projectId,
-        critiqueFeedback: feedbackParts.join("\n"),
       });
 
       // Save custom component HTML if needed
@@ -873,6 +896,10 @@ Fix the issues. You may change component types, adjust data/props, reposition el
     }
   }
 
+  // Return the best-scoring attempt, not the last one
+  if (bestScore > 0 && bestScore >= (lastCritique?.score ?? 0)) {
+    return { scene: bestScene, customSources: bestCustomSources, critiqueResult: bestCritique };
+  }
   return { scene: currentScene, customSources: currentCustomSources, critiqueResult: lastCritique };
 }
 
