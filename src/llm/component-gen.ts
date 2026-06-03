@@ -14,6 +14,8 @@ export interface GenerateComponentOpts {
   prompt: string;
   llmConfig: LLMConfig;
   brandKit?: BrandKit;
+  existingSource?: string;
+  name?: string;
   duration?: number;
   format?: string;
   trace?: TraceBuilder;
@@ -31,6 +33,11 @@ export async function generateComponentLLM(
   opts: GenerateComponentOpts,
 ): Promise<GenerateComponentOutput> {
   var userPrompt = opts.prompt;
+
+  // Revision mode: include existing source for the LLM to revise
+  if (opts.existingSource) {
+    userPrompt = `Here is the current component source to revise:\n\`\`\`html\n${opts.existingSource}\n\`\`\`\n\nRevise it based on these instructions: ${opts.prompt}`;
+  }
 
   // Add brand kit context if available
   if (opts.brandKit) {
@@ -50,7 +57,8 @@ export async function generateComponentLLM(
   var llmDurationMs = Date.now() - llmStart;
 
   var source = extractComponentSource(raw);
-  var type = deriveTypeName(opts.prompt);
+  // In revision mode, preserve the original component name
+  var type = opts.name || deriveTypeName(opts.prompt);
 
   if (opts.trace) {
     opts.trace.setComponentGen(type, source.length, llmDurationMs);

@@ -858,6 +858,8 @@ export function createMcpServer(): McpServer {
       image_size: z.enum(["1024x1024", "1536x1024", "1024x1536", "auto"]).optional().describe("Image size for ai_image target"),
       image_quality: z.enum(["low", "medium", "high", "auto"]).optional().describe("Image quality for ai_image target"),
       image_model: z.enum(["gpt-image-1", "dall-e-3"]).optional().describe("Image model for ai_image target"),
+      id: z.string().optional().describe("ID of existing content to revise. For components: component name (e.g. bold-pricing-card). For scenes: scene_id (requires project_id). For videos: project_id."),
+      project_id: z.string().optional().describe("Project ID for scene revision or ai_image asset linking"),
       token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
     },
     async (params) => {
@@ -957,6 +959,56 @@ export function createMcpServer(): McpServer {
           });
         }
 
+
+        // ── Revision mode: load existing content when id is provided ──
+        let existingSource: string | undefined;
+        let revisionName: string | undefined;
+        let revisionProjectId: string | undefined;
+        let revisionSceneId: string | undefined;
+
+        if (params.id) {
+          if (params.target === "component") {
+            // Try to load existing component source
+            const customPath = path.join(config.dataDir, params.tenant_id, "components", "custom", `${params.id}.component.html`);
+            try {
+              existingSource = await fs.readFile(customPath, "utf-8");
+              revisionName = params.id;
+            } catch {
+              // Try other categories
+              const compBase = path.join(config.dataDir, params.tenant_id, "components");
+              try {
+                const categories = await fs.readdir(compBase, { withFileTypes: true });
+                for (const cat of categories) {
+                  if (!cat.isDirectory()) continue;
+                  const catPath = path.join(compBase, cat.name, `${params.id}.component.html`);
+                  try {
+                    existingSource = await fs.readFile(catPath, "utf-8");
+                    revisionName = params.id;
+                    break;
+                  } catch { /* skip */ }
+                }
+              } catch { /* no components dir */ }
+              if (!existingSource) {
+                return err(`Component "${params.id}" not found in tenant "${params.tenant_id}"`);
+              }
+            }
+          } else if (params.target === "scene") {
+            if (!params.project_id) {
+              return err("project_id is required for scene revision");
+            }
+            revisionProjectId = params.project_id;
+            revisionSceneId = params.id;
+          } else if (params.target === "video") {
+            revisionProjectId = params.id;
+            // Load project to serialize as context
+            const proj = await loadProject(params.tenant_id, params.id);
+            if (!proj) {
+              return err(`Project "${params.id}" not found for revision`);
+            }
+            existingSource = JSON.stringify(proj, null, 2);
+          }
+        }
+
         // No source provided -- run the LLM pipeline async via job queue
         let llmConfig;
         try {
@@ -985,6 +1037,10 @@ export function createMcpServer(): McpServer {
               sceneCount: params.scene_count,
               creativity: params.creativity,
           generateImages: params.generate_images,
+              existingSource,
+              name: revisionName,
+              project_id: revisionProjectId || params.project_id,
+              sceneId: revisionSceneId,
             });
 
             // If pipeline created a project, track the projectId
