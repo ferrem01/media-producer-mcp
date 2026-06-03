@@ -148,6 +148,26 @@ ${catalogStr}
 
 ${SCENE_PLANNER_DESIGN_RULES}`;
 
+  // Inject brand asset info into the system prompt if available
+  var brandAssetsSection = "";
+  if (opts.brandKit.assets?.backgrounds?.length) {
+    brandAssetsSection += "\n\n## Brand Background Images\nThese are pre-approved brand backgrounds. Use them as full-bleed scene backgrounds when appropriate:\n";
+    for (var bg of opts.brandKit.assets.backgrounds) {
+      brandAssetsSection += `- "${bg.name}": ${bg.url} [tags: ${bg.tags.join(", ")}]\n`;
+    }
+    brandAssetsSection += "\nTo use a brand background, add an image-showcase component at z_index 0 with style \"cover\":\n{ \"type\": \"image-showcase\", \"data\": { \"src\": \"<url>\", \"style\": \"cover\" }, \"z_index\": 0 }\n";
+  }
+  if (opts.brandKit.logos?.length) {
+    brandAssetsSection += "\n\n## Brand Logos\n";
+    for (var logo of opts.brandKit.logos) {
+      brandAssetsSection += `- "${logo.name}" (${logo.variant}): ${logo.url} - for ${logo.theme === "any" ? "any" : logo.theme} backgrounds\n`;
+    }
+    brandAssetsSection += "\nUse the logo component with the appropriate URL based on the scene's background.\n";
+  }
+  if (brandAssetsSection) {
+    systemPrompt += brandAssetsSection;
+  }
+
   var userPrompt = `Create a ${opts.format} project.\n\n${opts.prompt}`;
 
   var raw = await callLLM(opts.llmConfig, [

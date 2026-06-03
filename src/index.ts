@@ -286,6 +286,24 @@ async function main() {
         return;
       }
 
+      // ── Static asset serving for brand-kit assets ──
+      const brandAssetMatch = urlPath.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);
+      if (brandAssetMatch && method === "GET") {
+        const [, brandTenantId, brandAssetPath] = brandAssetMatch.map(decodeURIComponent);
+        const fullPath = path.join(config.dataDir, brandTenantId, "brand-kit", "assets", brandAssetPath);
+        try {
+          const data = await fs.readFile(fullPath);
+          const ext = path.extname(fullPath).toLowerCase();
+          const contentType = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".gif" ? "image/gif" : ext === ".svg" ? "image/svg+xml" : ext === ".webp" ? "image/webp" : ext === ".woff2" ? "font/woff2" : ext === ".woff" ? "font/woff" : ext === ".ttf" ? "font/ttf" : ext === ".otf" ? "font/otf" : ext === ".mp4" ? "video/mp4" : ext === ".mp3" ? "audio/mpeg" : "application/octet-stream";
+          res.writeHead(200, { "Content-Type": contentType, "Content-Length": data.length, "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" });
+          res.end(data);
+        } catch {
+          res.writeHead(404);
+          res.end("Brand asset not found");
+        }
+        return;
+      }
+
       // ── Serve rendered output files ──
       const outputMatch = urlPath.match(/^\/output\/([^/]+)\/projects\/([^/]+)\/(.+)$/);
       if (outputMatch && method === "GET") {

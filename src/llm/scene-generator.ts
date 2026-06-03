@@ -139,12 +139,28 @@ async function generateCustomComponent(opts: CustomComponentOpts): Promise<strin
     imageContext = `\n\nA hero image has been generated for this scene. Use it as the main visual.\nImage URL: ${opts.imageUrl}\nUse an <img> tag with this URL as src. Style it to fill the scene or use as a dramatic background.\nExample: <img src='${opts.imageUrl}' style='width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0'>\nLayer your text/UI ON TOP with z-index and text-shadow for readability.`;
   }
 
+  // Build brand asset context
+  var brandAssetContext = "";
+  if (opts.brandKit.assets?.backgrounds?.length) {
+    brandAssetContext += "\n\nAvailable Brand Backgrounds:\n";
+    for (var bg of opts.brandKit.assets.backgrounds) {
+      brandAssetContext += `- "${bg.name}": ${bg.url} [tags: ${bg.tags.join(", ")}]\n`;
+    }
+  }
+  if (opts.brandKit.logos?.length) {
+    brandAssetContext += "\nAvailable Brand Logos:\n";
+    for (var logo of opts.brandKit.logos) {
+      brandAssetContext += `- "${logo.name}" (${logo.variant}, ${logo.theme} theme): ${logo.url}\n`;
+    }
+    brandAssetContext += "Pick the right logo variant based on the scene background (dark/light).\n";
+  }
+
   var scenePrompt = `Generate the HTML for this component:
 
 Scene: ${opts.sceneLabel}
 Duration: ${opts.duration} seconds
 Visual Direction: ${opts.customPrompt}
-${imageContext}
+${imageContext}${brandAssetContext}
 
 Overall project: ${opts.prompt}
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}.

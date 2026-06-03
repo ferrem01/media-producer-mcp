@@ -496,13 +496,29 @@ export function createMcpServer(): McpServer {
         placement: z.string().optional(),
         height: z.number().optional(),
       }).optional(),
+      logos: z.array(z.object({
+        name: z.string(),
+        url: z.string(),
+        variant: z.enum(["full", "icon", "wordmark"]),
+        theme: z.enum(["dark", "light", "any"]),
+        height: z.number().optional(),
+      })).optional().describe("Logo variants (full, icon, wordmark) for different backgrounds"),
+      assets: z.object({
+        backgrounds: z.array(z.object({
+          name: z.string(),
+          url: z.string(),
+          tags: z.array(z.string()),
+          width: z.number().optional(),
+          height: z.number().optional(),
+        })),
+      }).optional().describe("Brand assets (backgrounds, etc.)"),
       style: z.object({
         border_radius: z.string().optional(),
         motion: z.enum(["minimal", "punchy", "cinematic"]).optional(),
       }).optional(),
     },
     async (params) => {
-      const hasUpdates = params.colors || params.fonts || params.logo || params.style;
+      const hasUpdates = params.colors || params.fonts || params.logo || params.logos || params.assets || params.style;
 
       if (!hasUpdates) {
         // Get brand kit
@@ -512,6 +528,46 @@ export function createMcpServer(): McpServer {
 
       // Set/update brand kit
       const existing = await loadBrandKit(params.tenant_id);
+      // Merge logos: append new, replace by name
+      let mergedLogos = existing?.logos || [];
+      if (params.logos) {
+        for (const newLogo of params.logos) {
+          const idx = mergedLogos.findIndex((l: any) => l.name === newLogo.name);
+          if (idx >= 0) mergedLogos[idx] = newLogo as any;
+          else mergedLogos.push(newLogo as any);
+        }
+      }
+
+      // Merge assets: append new backgrounds, replace by name
+      let mergedAssets = existing?.assets || { backgrounds: [] };
+      if (params.assets) {
+        for (const newBg of params.assets.backgrounds) {
+          const idx = mergedAssets.backgrounds.findIndex((b: any) => b.name === newBg.name);
+          if (idx >= 0) mergedAssets.backgrounds[idx] = newBg as any;
+          else mergedAssets.backgrounds.push(newBg as any);
+        }
+      }
+
+      // Determine primary logo: explicit logo param > first "full" variant in logos > existing
+      let primaryLogo: import("./core/types.js").BrandLogo | undefined = existing?.logo;
+      if (params.logo) {
+        // Coerce old-style logo param into new BrandLogo shape
+        primaryLogo = {
+          name: "primary",
+          url: params.logo.url,
+          variant: "full" as const,
+          theme: "any" as const,
+          height: params.logo.height,
+          placement: params.logo.placement,
+        };
+      }
+      if (mergedLogos.length > 0 && !params.logo) {
+        const fullLogo = mergedLogos.find((l: any) => l.variant === "full");
+        if (fullLogo) {
+          primaryLogo = fullLogo as any;
+        }
+      }
+
       const kit: BrandKit = {
         colors: {
           primary: "#5B21B6",
@@ -527,7 +583,9 @@ export function createMcpServer(): McpServer {
         fonts: params.fonts || existing?.fonts || [
           { family: "Inter", source: "google" as const, weights: [400, 500, 600, 700, 800] },
         ],
-        logo: params.logo || existing?.logo,
+        logo: primaryLogo,
+        logos: mergedLogos.length > 0 ? mergedLogos : undefined,
+        assets: mergedAssets.backgrounds.length > 0 ? mergedAssets as any : undefined,
         style: {
           border_radius: "12px",
           motion: "cinematic" as const,
@@ -645,13 +703,68 @@ export function createMcpServer(): McpServer {
       asset_type: z.enum(["image", "video", "audio", "logo", "font", "intro", "outro", "background", "watermark", "music", "other"]).optional(),
     },
     async (params) => {
-      // TODO: implement actual file download/storage
-      return ok({
-        status: "not_yet_implemented",
-        message: "Asset upload will be implemented in the next phase",
-        name: params.name,
-        target: params.target || "project",
-      });
+      const target = params.target || "project";
+
+      if (target === "brand") {
+        if (!params.url) return err("url is required for brand asset upload");
+        const assetType = params.asset_type || "other";
+
+        // Download the file from URL
+        try {
+          const response = await fetch(params.url);
+          if (!response.ok) return err(`Failed to download: HTTP ${response.status}`);
+          const buffer = Buffer.from(await response.arrayBuffer());
+
+          // Determine filename
+          const filename = params.name.includes(".") ? params.name : `${params.name}.${guessExtension(response.headers.get("content-type") || "")}`;
+
+          // Save to brand-kit assets directory
+          const assetDir = path.join(config.dataDir, params.tenant_id, "brand-kit", "assets", assetType);
+          await fs.mkdir(assetDir, { recursive: true });
+          const filePath = path.join(assetDir, filename);
+          await fs.writeFile(filePath, buffer);
+
+          // Return the served URL
+          const servedUrl = `/assets/${params.tenant_id}/brand-kit/${assetType}/${filename}`;
+          return ok({
+            status: "uploaded",
+            name: params.name,
+            path: filePath,
+            url: servedUrl,
+            asset_type: assetType,
+            size: buffer.length,
+          });
+        } catch (e: any) {
+          return err(`Upload failed: ${e.message}`);
+        }
+      }
+
+      // Project asset upload
+      if (!params.project_id) return err("project_id required for project asset upload");
+      if (!params.url) return err("url is required for asset upload");
+
+      try {
+        const response = await fetch(params.url);
+        if (!response.ok) return err(`Failed to download: HTTP ${response.status}`);
+        const buffer = Buffer.from(await response.arrayBuffer());
+
+        const filename = params.name.includes(".") ? params.name : `${params.name}.${guessExtension(response.headers.get("content-type") || "")}`;
+        const assetDir = path.join(config.dataDir, params.tenant_id, "projects", params.project_id, "assets");
+        await fs.mkdir(assetDir, { recursive: true });
+        const filePath = path.join(assetDir, filename);
+        await fs.writeFile(filePath, buffer);
+
+        const servedUrl = `/assets/${params.tenant_id}/projects/${params.project_id}/assets/${filename}`;
+        return ok({
+          status: "uploaded",
+          name: params.name,
+          path: filePath,
+          url: servedUrl,
+          size: buffer.length,
+        });
+      } catch (e: any) {
+        return err(`Upload failed: ${e.message}`);
+      }
     },
   );
 
@@ -1142,6 +1255,24 @@ async function listComponentCatalog(): Promise<Array<{ type: string; category: s
   } catch { /* component dir doesn't exist */ }
 
   return catalog;
+}
+
+function guessExtension(contentType: string): string {
+  const map: Record<string, string> = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/svg+xml": "svg",
+    "video/mp4": "mp4",
+    "audio/mpeg": "mp3",
+    "audio/wav": "wav",
+    "font/woff2": "woff2",
+    "font/woff": "woff",
+    "font/ttf": "ttf",
+    "font/otf": "otf",
+  };
+  return map[contentType] || "bin";
 }
 
 async function findComponentSource(type: string): Promise<string | null> {

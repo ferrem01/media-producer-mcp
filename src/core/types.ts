@@ -44,15 +44,33 @@ export interface BrandFont {
 }
 
 export interface BrandLogo {
-  url: string;
-  placement?: string;
+  name: string;           // e.g. "full-dark", "icon-light"
+  url: string;            // served URL or external URL
+  variant: "full" | "icon" | "wordmark";  // logo type
+  theme: "dark" | "light" | "any";        // which backgrounds it works on
   height?: number;
+  /** @deprecated Use name/variant/theme instead */
+  placement?: string;
+}
+
+export interface BrandAsset {
+  name: string;           // e.g. "hero-gradient"
+  url: string;            // served URL
+  tags: string[];         // e.g. ["hero", "dark", "abstract"]
+  width?: number;
+  height?: number;
+}
+
+export interface BrandAssets {
+  backgrounds: BrandAsset[];
 }
 
 export interface BrandKit {
   colors: BrandColors;
   fonts: BrandFont[];
-  logo?: BrandLogo;
+  logo?: BrandLogo;       // primary logo (backwards compat)
+  logos?: BrandLogo[];     // all logo variants
+  assets?: BrandAssets;   // brand backgrounds, etc.
   style?: {
     border_radius?: string;
     motion?: "minimal" | "punchy" | "cinematic";
