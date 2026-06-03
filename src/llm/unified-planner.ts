@@ -13,6 +13,16 @@ import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js
 import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
 import type { BrandKit, Canvas, OutputFormat } from "../core/types.js";
 
+function isLightBrand(brandKit: BrandKit): boolean {
+  var bg = brandKit.colors?.background || "#0f172a";
+  var hex = bg.replace("#", "");
+  if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+  var r = parseInt(hex.substring(0, 2), 16);
+  var g = parseInt(hex.substring(2, 4), 16);
+  var b = parseInt(hex.substring(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+}
+
 // ── Types ──
 
 export interface UnifiedPlannerOpts {
@@ -151,18 +161,21 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
   // Inject brand asset info into the system prompt if available
   var brandAssetsSection = "";
   if (opts.brandKit.assets?.backgrounds?.length) {
-    brandAssetsSection += "\n\n## Brand Background Images\nThese are pre-approved brand backgrounds. Use them as full-bleed scene backgrounds when appropriate:\n";
+    brandAssetsSection += `\n\n## Brand Background Images (MANDATORY)\nThese are pre-approved brand backgrounds. PREFER these over mesh-gradient or gradient-background when a matching background exists.\n`;
     for (var bg of opts.brandKit.assets.backgrounds) {
       brandAssetsSection += `- "${bg.name}": ${bg.url} [tags: ${bg.tags.join(", ")}]\n`;
     }
-    brandAssetsSection += "\nTo use a brand background, add an image-showcase component at z_index 0 with style \"cover\":\n{ \"type\": \"image-showcase\", \"data\": { \"src\": \"<url>\", \"style\": \"cover\" }, \"z_index\": 0 }\n";
+    brandAssetsSection += `\nTo use a brand background as the scene background at z_index 0:\n{ "type": "image-showcase", "data": { "src": "${opts.brandKit.assets.backgrounds[0].url}", "fit": "cover" }, "z_index": 0 }\n`;
   }
   if (opts.brandKit.logos?.length) {
-    brandAssetsSection += "\n\n## Brand Logos\n";
+    // Pick the best logo for the current theme
+    var isLight = isLightBrand(opts.brandKit);
+    var bestLogo = opts.brandKit.logos.find(l => l.theme === (isLight ? "light" : "dark")) || opts.brandKit.logos[0];
+    brandAssetsSection += `\n\n## Brand Logos (MANDATORY)\nALWAYS include the brand logo on EVERY scene. Place it at z_index 30 in the top-left corner.\nAvailable logo variants:\n`;
     for (var logo of opts.brandKit.logos) {
-      brandAssetsSection += `- "${logo.name}" (${logo.variant}): ${logo.url} - for ${logo.theme === "any" ? "any" : logo.theme} backgrounds\n`;
+      brandAssetsSection += `- "${logo.name}" (${logo.variant}, ${logo.theme} theme): ${logo.url}\n`;
     }
-    brandAssetsSection += "\nUse the logo component with the appropriate URL based on the scene's background.\n";
+    brandAssetsSection += `\nRecommended logo for current brand (${isLight ? "light" : "dark"} background): ${bestLogo.url}\nAdd to EVERY scene:\n{ "type": "image-showcase", "data": { "src": "${bestLogo.url}", "fit": "contain" }, "z_index": 30, "position": { "x": 40, "y": 30, "width": 120, "height": 40 } }\n`;
   }
   if (brandAssetsSection) {
     systemPrompt += brandAssetsSection;
@@ -201,6 +214,28 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
     for (var comp of scene.components) {
       if (comp.custom && !comp.custom_prompt) {
         comp.custom_prompt = scene.description || scene.label;
+      }
+    }
+  }
+
+  // Auto-inject brand logo into every scene if the brand has logos and the scene doesn't already have one
+  if (opts.brandKit.logos?.length) {
+    var lightBrand = isLightBrand(opts.brandKit);
+    var bestLogo = opts.brandKit.logos.find(l => l.theme === (lightBrand ? "light" : "dark")) || opts.brandKit.logos[0];
+    for (var scene of storyboard.scenes) {
+      var hasLogo = scene.components.some((c: any) => {
+        if (c.type === "logo" || c.type === "logo-intro" || c.type === "logo-outro") return true;
+        // Check if any image-showcase has the logo URL
+        if (c.type === "image-showcase" && c.data?.src && opts.brandKit.logos!.some((l: any) => c.data.src === l.url)) return true;
+        return false;
+      });
+      if (!hasLogo) {
+        scene.components.push({
+          type: "image-showcase",
+          data: { src: bestLogo.url, fit: "contain" },
+          z_index: 30,
+          position: { x: 40, y: 30, width: 120, height: 40 },
+        });
       }
     }
   }
