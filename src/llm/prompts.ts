@@ -300,7 +300,7 @@ For each scene, provide 2-4 sentences covering:
 
 1. Be specific. "Show a stat card with the number 10x" is better than "show impressive metrics."
 2. Use the component names from the library when possible: title-slide, section-header, kinetic-text, typewriter, stat-card, quote-block, code-block, text-list, split-screen, bento-grid, grid-layout, browser-frame, device-mockup, terminal, picture-in-picture, logo-intro, logo-outro, bar-chart, line-chart, progress-bar, metric-dashboard, cta-card, social-proof, pricing-card, logo, logo-row.
-3. Default to dark premium aesthetic unless the prompt suggests otherwise.
+3. Follow the brand kit colors faithfully. If the brand background is light, design for light. If dark, design for dark. Only override if the user explicitly requests a different theme.
 4. Always include a logo-intro or title-slide opening and a logo-outro or cta-card closing.
 5. Vary the components -- don't use title-slide for every scene.
 6. Think about visual rhythm: alternate between text-heavy and visual scenes.
@@ -312,9 +312,41 @@ For each scene, provide 2-4 sentences covering:
  * System prompt for the freeform planner.
  * The LLM writes full HTML+CSS+GSAP per scene with complete creative freedom.
  */
+function isLightBackground(brandKit: BrandKit): boolean {
+  var bg = brandKit.colors?.background || "#0f172a";
+  // Parse hex to RGB and check luminance
+  var hex = bg.replace("#", "");
+  if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+  var r = parseInt(hex.substring(0, 2), 16);
+  var g = parseInt(hex.substring(2, 4), 16);
+  var b = parseInt(hex.substring(4, 6), 16);
+  var luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5;
+}
+
+function getBrandStyleGuide(brandKit: BrandKit): string {
+  if (isLightBackground(brandKit)) {
+    return `- Light, clean aesthetic (use var(--mp-color-background) as base)
+- Subtle depth: box-shadow: 0 4px 24px rgba(0,0,0,0.08)
+- Surface cards: var(--mp-color-surface) with 1px solid rgba(0,0,0,0.06) border
+- Accent elements: use var(--mp-color-primary) for key highlights
+- Typography: weight 700 for headlines, -0.02em letter-spacing, color var(--mp-color-text)
+- Keep it airy: generous whitespace, let the content breathe
+- For contrast issues: adjust TEXT color (use var(--mp-color-text) or var(--mp-color-primary)), never darken the background`;
+  }
+  return `- Dark premium aesthetic (use var(--mp-color-background) as base)
+- Glass morphism: rgba(255,255,255,0.03) + backdrop-filter: blur(12px)
+- Accent glow: text-shadow: 0 0 80px rgba(accent, 0.2)
+- Elevated elements: box-shadow: 0 25px 60px rgba(0,0,0,0.5)
+- Typography: weight 700 for headlines, -0.02em letter-spacing
+- Subtle film grain via SVG filter overlay
+- For contrast issues: adjust TEXT color (use var(--mp-color-text) or lighter shades), never lighten the background`;
+}
+
 export function freeformPlannerSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
   var formatRules = componentFormatRules(format);
   var brandVars = buildBrandVarsList(brandKit);
+  var brandStyleGuide = getBrandStyleGuide(brandKit);
 
   return `You are a world-class motion graphics designer creating cinematic video scenes with HTML, CSS, and GSAP.
 
@@ -343,20 +375,16 @@ Think like an Apple keynote designer crossed with a Stripe marketing page:
 - Create VISUAL TENSION: pair enormous typography (120px+) with tiny labels (12px). Pair full-bleed gradients with precise small elements.
 - VARY the rhythm: hero text scene → product demo scene → single giant stat → visual metaphor → CTA. Don't make every scene the same layout.
 - Dramatic typography: headlines should feel SCULPTED. Use letter-spacing -0.03em, line-height 1.0, font-weight 800 for impact moments.
-- Rich backgrounds: multi-layer gradients with 3+ color stops, ambient glow orbs, subtle particle fields, SVG noise texture
+- Rich backgrounds: multi-layer gradients using brand colors, ambient glow orbs, subtle texture overlays
 - Motion should feel SMOOTH and DELIBERATE -- use power3.out for entrances, power2.in for exits
 - Every scene needs a FOCAL POINT: one thing the eye goes to first. If everything has equal visual weight, nothing stands out.
 - LESS IS MORE: a single stat at 160px is more impactful than three stats at 48px. A single word revealed with SplitText is more cinematic than a paragraph fading in.
 - Think about what would make someone stop scrolling on X/Twitter. That's the bar.
 
 ## Visual Style Guide
-- Dark premium aesthetic (use var(--mp-color-background) as base)
-- Glass morphism: rgba(255,255,255,0.03) + backdrop-filter: blur(12px)
-- Accent glow: text-shadow: 0 0 80px rgba(accent, 0.2)
-- Elevated elements: box-shadow: 0 25px 60px rgba(0,0,0,0.5)
-- Typography: weight 700 for headlines, -0.02em letter-spacing
-- Subtle film grain via SVG filter overlay
-- Use CSS custom properties for all brand colors
+${brandStyleGuide}
+- Use CSS custom properties for ALL brand colors -- never hardcode hex values that exist in the brand kit
+- The brand kit background (var(--mp-color-background)) is the ground truth. Respect it. Only override if the user explicitly asks for a different theme.
 
 ## ICONS: NEVER USE EMOJI
 Never use emoji characters (⚡🔧✨🤖📦🎨 etc.) as icons. They look cheap and unprofessional.
@@ -391,7 +419,7 @@ Always use inline SVG for icons. Style them with currentColor or var(--mp-color-
 Don't just center text and call it done. Art-direct every text block:
 - Headlines: 64-80px, weight 700, letter-spacing -0.03em, line-height 1.02
 - One stat/number per scene should be HUGE (120-160px) as the visual anchor
-- Subheadlines: 22-28px, weight 400, color #cbd5e1 (NOT #94a3b8 which is too faint)
+- Subheadlines: 22-28px, weight 400, color var(--mp-color-text-muted)
 - Small labels: 12-13px, weight 600, letter-spacing 0.14em, uppercase
 - Control line breaks: use max-width to ensure headlines break at natural reading points
 - Create visual tension: pair very large text with very small labels for contrast
