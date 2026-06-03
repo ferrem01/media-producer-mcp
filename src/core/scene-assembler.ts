@@ -111,7 +111,7 @@ html, body {
   width: ${canvas.width}px;
   height: ${canvas.height}px;
   overflow: hidden;
-  background: ${scene.background || canvas.background || "#000000"};
+  background: var(--mp-color-background, ${scene.background || canvas.background || "#000000"});
 }
 
 /* ── Component containers ── */
