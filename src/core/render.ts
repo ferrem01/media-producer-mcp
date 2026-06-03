@@ -17,7 +17,7 @@ import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, encodeGif, concatSegments } from "./encode.js";
 import { exportPdf } from "./pdf-export.js";
 import { renderTransition, extractFirstFrame, extractLastFrame } from "./transitions.js";
-import { critiqueScene } from "../llm/critiquer.js";
+// Critique now runs during generate, not render
 import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
@@ -36,14 +36,7 @@ export interface RenderOptions {
   gsapDir: string;
   /** Output file path */
   outputPath: string;
-  /** Run critiquer loop on each scene */
-  critique?: boolean;
-  /** Max revision iterations per scene (default 2) */
-  maxRevisions?: number;
-  /** LLM config needed for critiquer calls */
-  llmConfig?: LLMConfig;
-  /** Original prompt for context in critique */
-  originalPrompt?: string;
+
   /** Additional directories to search for component sources (e.g. project-local freeform components) */
   extraComponentDirs?: string[];
 }
@@ -78,12 +71,7 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
 
     case "video":
     case "slideshow":
-      return renderVideo(project, componentSources, workDir, gsapDir, outputPath, startTime, {
-        critique: options.critique,
-        maxRevisions: options.maxRevisions,
-        llmConfig: options.llmConfig,
-        originalPrompt: options.originalPrompt,
-      }, options.extraComponentDirs);
+      return renderVideo(project, componentSources, workDir, gsapDir, outputPath, startTime, undefined, options.extraComponentDirs);
 
     case "presentation":
     case "presentation":

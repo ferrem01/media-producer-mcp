@@ -613,9 +613,7 @@ export function createMcpServer(): McpServer {
       project_id: z.string(),
       scene_id: z.string().optional().describe("If provided, renders a single scene preview image"),
       quality: z.enum(["preview", "production"]).optional().describe("Render quality (default: production)"),
-      critique: z.boolean().optional().default(true).describe("Run critiquer loop on each scene during render (enabled by default)"),
-      maxRevisions: z.number().optional().default(2).describe("Max critique revision iterations per scene"),
-      originalPrompt: z.string().optional().describe("Original prompt for context in critique"),
+
       token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
     },
     async (params) => {
@@ -675,9 +673,7 @@ export function createMcpServer(): McpServer {
 
       const job = queueRender(params.tenant_id, params.project_id, {
         quality: params.quality,
-        critique: params.critique,
-        maxRevisions: params.maxRevisions,
-        originalPrompt: params.originalPrompt,
+
       });
 
       return ok({

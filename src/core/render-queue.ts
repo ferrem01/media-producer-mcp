@@ -65,9 +65,6 @@ export function queueRender(
   projectId: string,
   options?: {
     quality?: "preview" | "production";
-    critique?: boolean;
-    maxRevisions?: number;
-    originalPrompt?: string;
     trace?: TraceBuilder;
   },
 ): RenderJob {
@@ -104,13 +101,10 @@ async function runRender(
   projectId: string,
   options?: {
     quality?: "preview" | "production";
-    critique?: boolean;
-    maxRevisions?: number;
-    originalPrompt?: string;
     trace?: TraceBuilder;
   },
 ): Promise<void> {
-  const trace = options?.trace || new TraceBuilder("render", job.tenantId, projectId, options?.originalPrompt || "render");
+  const trace = options?.trace || new TraceBuilder("render", job.tenantId, projectId, "render");
 
   try {
     const project = await loadProject(job.tenantId, projectId);
@@ -147,18 +141,7 @@ async function runRender(
       gsapDir: config.gsapDir,
       extraComponentDirs: [path.join(projectDir(job.tenantId, projectId), "components")],
       outputPath,
-      critique: options?.critique,
-      maxRevisions: options?.maxRevisions,
-      originalPrompt: options?.originalPrompt,
     };
-
-    if (options?.critique !== false) {
-      try {
-        renderOpts.llmConfig = llmConfigFromEnv();
-      } catch {
-        // LLM not configured, skip critique
-      }
-    }
 
     const result = await renderProjectCore(renderOpts);
 
