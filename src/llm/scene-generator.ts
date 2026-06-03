@@ -171,9 +171,14 @@ ${imageContext}${brandAssetContext}
 Overall project: ${opts.prompt}
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}.
 
-IMPORTANT: A background component (mesh-gradient or gradient-background) already exists behind this component at z_index 0. It uses brand kit colors.
-DO NOT create your own background layer, gradient div, or full-screen background. Your component root should be transparent (no background property on the root element).
-All your content sits ON TOP of the existing background.
+IMPORTANT LAYOUT RULES:
+- Canvas size: ${opts.canvas.width}x${opts.canvas.height}px. ALL content MUST be visible within these bounds.
+- A background component already exists at z_index 0. Your component root should be transparent (no background property).
+- Use flexbox or CSS grid for layout. Do NOT use absolute positioning with negative values or offsets that push content outside the canvas.
+- Every element in the HTML must be visible in the final render. If you create a CTA button, stat, or headline, it MUST be within the visible canvas area.
+- Test your layout mentally: if the canvas is ${opts.canvas.width}x${opts.canvas.height}, will every element fit? No cut-off text, no hidden buttons, no overflow.
+- Use padding (40-80px from edges) to create breathing room, but keep all content inside.
+- A logo component already exists at z_index 30 in the top-left. Do NOT render your own logo.
 
 ${opts.critiqueFeedback ? `\n\nIMPORTANT - PREVIOUS ATTEMPT FEEDBACK:\n${opts.critiqueFeedback}\nFix all issues listed above in this generation.\n\n` : ""}Output ONLY the .component.html source. No JSON wrapping, no markdown fences.
 Start with <template> and end with </script>.`;

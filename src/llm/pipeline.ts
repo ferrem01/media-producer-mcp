@@ -810,60 +810,58 @@ async function critiqueAndRetryScene(opts: {
         bestCritique = critiqueResult;
       }
 
-      // 6. If score >= 7, accept (good enough)
+      // 6. If score >= 7, accept
       if (critiqueResult.score >= 7) {
+        console.log(`  Score ${critiqueResult.score} accepted`);
         opts.trace?.endEvent({ score: critiqueResult.score, accepted: true });
         break;
       }
 
-      // 7. If score >= 5, acceptable -- don't re-plan, just accept
-      // Only re-plan for scores < 5 (significant problems)
-      if (critiqueResult.score >= 5) {
-        console.log(`  Score ${critiqueResult.score} is acceptable, keeping without re-plan`);
-        opts.trace?.endEvent({ score: critiqueResult.score, accepted: true, reason: "acceptable" });
-        break;
-      }
+      // 7. Score < 7: surgical re-plan to fix issues
 
       opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false });
 
-      // 8. Score < 5: surgical re-plan
-      // Give the planner the EXISTING plan as structured JSON and ask for minimal fixes
+      // 8. Surgical re-plan: direct LLM call to fix the existing plan JSON
       const existingPlanJSON = JSON.stringify(currentPlanned, null, 2);
-      const rePlanPrompt = `You previously planned this scene and it has rendering problems. Make MINIMAL changes to fix ONLY these issues:
+      const fixPrompt = `Fix this scene plan. The rendered output had these problems:
 
 ${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}
 
-Here is your previous plan (JSON). Keep everything that works. Only change what's broken:
+Current plan:
 ${existingPlanJSON}
 
+Canvas: ${opts.canvas.width}x${opts.canvas.height}
 Original brief: ${opts.prompt}
 
-Rules:
-- Keep the same overall structure and components that are working
-- Only adjust component types, data props, or positions to fix the specific issues listed
-- Do NOT start from scratch -- this is a surgical fix
-- If a library component isn't rendering correctly, try a different library component or switch to custom
-- Output a single scene plan in the same JSON format`;
+Return ONLY the fixed scene JSON. Keep the same structure. Only change what's broken:
+- Fix component positions that are off-canvas (must be within 0-${opts.canvas.width} x 0-${opts.canvas.height})
+- Fix missing or incorrect data props
+- Remove duplicate content across components
+- If a component type isn't working, swap it for a different one or make it custom
 
-      const rePlanned = await planStoryboard({
-        prompt: rePlanPrompt,
-        format: opts.format,
-        llmConfig: opts.llmConfig,
-        brandKit: opts.brandKit,
-        canvas: opts.canvas,
-        componentCatalog: opts.catalog,
-        sceneCount: 1,
-        creativity: 0.5,
-        tenantId: opts.tenantId,
-      });
+Output valid JSON only. No markdown fences, no commentary.`;
 
-      if (!rePlanned.scenes || rePlanned.scenes.length === 0) {
-        console.log(`  Critique re-plan returned no scenes, keeping best (score ${bestScore})`);
+      let fixedPlan: any;
+      try {
+        const { callLLM } = await import("./client.js");
+        const fixRaw = await callLLM(opts.llmConfig, [
+          { role: "user", content: fixPrompt },
+        ], { temperature: 0.3, maxTokens: 4096 });
+        const trimmed = fixRaw.trim();
+        const jsonMatch = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
+        fixedPlan = JSON.parse(jsonMatch ? jsonMatch[1].trim() : trimmed);
+      } catch (e: any) {
+        console.log(`  Critique fix-plan failed to parse: ${e.message}, keeping best (score ${bestScore})`);
         break;
       }
 
-      // Generate the surgically re-planned scene
-      const newPlanned = rePlanned.scenes[0];
+      if (!fixedPlan || !fixedPlan.components || fixedPlan.components.length === 0) {
+        console.log(`  Critique fix-plan returned empty, keeping best (score ${bestScore})`);
+        break;
+      }
+
+      // Use the fixed plan
+      const newPlanned = fixedPlan;
       currentPlanned = newPlanned;
       const regenerated = await generateScene({
         scene: newPlanned,

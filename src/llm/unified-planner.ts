@@ -148,12 +148,22 @@ ${catalogStr}
 - VARY scene types: don't repeat the same layout. Mix hero text, product demos, stats, visual metaphors, grids, CTAs.
 - Never have two identical layout types in a row.
 - For library components: use the EXACT type name from the Available Components catalog. Do not abbreviate or shorten names. Fill ALL required data fields. Use realistic content, not placeholder text.
+- NEVER DUPLICATE CONTENT across components. Each piece of content belongs to exactly ONE component:
+  * If a custom component renders a stat (e.g. "340% ROI"), do NOT also add a stat-card library component for the same stat.
+  * If a custom component renders a CTA button, do NOT also add a cta-card library component.
+  * If a custom component renders a headline, do NOT also add a kinetic-text or section-header for the same text.
+- When a custom component handles the main visual content of a scene, the ONLY library components you should add alongside it are:
+  * Background: image, gradient-background, or mesh-gradient at z_index 0
+  * Logo: image component at z_index 30
+  * Do NOT add stat-card, cta-card, or other content components alongside a custom component that already renders that content.
 - At HIGH creativity: each scene should have ONE self-contained custom component that handles everything (background, layout, text, animation). Do NOT add separate library background components -- the custom component IS the entire scene.
-- For custom components: custom_prompt must be 3-5 sentences with SPECIFIC visual direction (exact sizes, colors, animation names, layout positions).
+- For custom components: custom_prompt must be 3-5 sentences with SPECIFIC visual direction (exact sizes, colors, animation names, layout positions). EXPLICITLY STATE what content the custom component should render and what other library components in the scene already handle.
 - hero_image is OPTIONAL and should be RARE (0-1 per project, not every scene). Only use when a real photograph or illustration would dramatically improve the scene. Most scenes should rely on HTML/CSS/GSAP visuals, not AI images. Skip for: text scenes, stats, code demos, CTAs, dashboards, lists.
 - hero_image prompts describe the IMAGE itself, not the scene layout.
 - Every scene MUST have a components array with at least one component.
 - Think Apple keynote: one powerful idea per scene, cinematic motion, premium aesthetic.
+- For IMAGE format: use ONE custom component for all content (headline, subheadline, stats, CTA button, any text). The custom component handles the entire visual composition. Only add library components for: background (image/gradient at z:0) and logo (image at z:30). Do NOT use library stat-card, cta-card, section-header, etc. for images -- the custom component renders everything as one cohesive layout.
+- For VIDEO/PRESENTATION: you CAN mix library + custom components across scenes. Just follow the no-duplicate rule.
 - Output ONLY valid JSON. No commentary.
 
 ${SCENE_PLANNER_DESIGN_RULES}`;
