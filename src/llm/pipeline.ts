@@ -28,6 +28,10 @@ import { config } from "../config.js";
 import type { BrandKit, Canvas, OutputFormat, Project, Scene } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
+import { critiqueScene, type CritiqueResult } from "./critiquer.js";
+import { assembleScene, type ComponentSource } from "../core/scene-assembler.js";
+import { captureSingleFrame } from "../core/capture.js";
+import os from "node:os";
 
 // Keep old imports for backwards compat (deprecated functions still exist in their files)
 
@@ -306,8 +310,40 @@ async function runSceneRevisionPipeline(
     }
   }
 
+  // Critique loop (skip if opts.critique === false)
+  let finalRevScene = generated.scene;
+  if (opts.critique !== false) {
+    const critiqueResult = await critiqueAndRetryScene({
+      scene: generated.scene,
+      planned,
+      sceneIndex,
+      totalScenes: project.scenes.length,
+      prompt: revisionPrompt,
+      format: (project.format || "video") as OutputFormat,
+      llmConfig: opts.llmConfig,
+      brandKit,
+      canvas,
+      tenantId: opts.tenant_id,
+      projectId: project.project_id,
+      compDir,
+      maxRetries: opts.maxRevisions ?? 2,
+      trace,
+      customSources: generated.customSources,
+    });
+    finalRevScene = critiqueResult.scene;
+    if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
+      for (const [compName, html] of critiqueResult.customSources) {
+        await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
+      }
+    }
+  }
+
+  // Preserve the original scene id (re-apply after possible critique regeneration)
+  finalRevScene.id = existingScene.id;
+  if (existingScene.label) finalRevScene.label = existingScene.label;
+
   // Replace the scene in the project
-  project.scenes[sceneIndex] = generated.scene;
+  project.scenes[sceneIndex] = finalRevScene;
   await saveProject(project);
   trace?.endEvent();
 
@@ -404,7 +440,36 @@ async function runVideoRevisionPipeline(
       }
     }
 
-    newScenes.push(generated.scene);
+    // Critique loop (skip if opts.critique === false)
+    let finalVidScene = generated.scene;
+    if (opts.critique !== false) {
+      const critiqueResult = await critiqueAndRetryScene({
+        scene: generated.scene,
+        planned,
+        sceneIndex: i,
+        totalScenes: storyboard.scenes.length,
+        prompt: revisionPrompt,
+        format: (project.format || "video") as OutputFormat,
+        llmConfig: opts.llmConfig,
+        brandKit: project.brand_kit || brandKit,
+        canvas: project.canvas || canvas,
+        tenantId: opts.tenant_id,
+        projectId: project.project_id,
+        compDir,
+        maxRetries: opts.maxRevisions ?? 2,
+        imageUrl,
+        trace,
+        customSources: generated.customSources,
+      });
+      finalVidScene = critiqueResult.scene;
+      if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
+        for (const [compName, html] of critiqueResult.customSources) {
+          await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
+        }
+      }
+    }
+
+    newScenes.push(finalVidScene);
   }
 
   project.scenes = newScenes;
@@ -496,8 +561,40 @@ async function runImageRevisionPipeline(
     }
   }
 
+  // Critique loop (skip if opts.critique === false)
+  let finalImgScene = generated.scene;
+  if (opts.critique !== false) {
+    const critiqueResult = await critiqueAndRetryScene({
+      scene: generated.scene,
+      planned,
+      sceneIndex: 0,
+      totalScenes: 1,
+      prompt: revisionPrompt,
+      format: "image" as OutputFormat,
+      llmConfig: opts.llmConfig,
+      brandKit: project.brand_kit || brandKit,
+      canvas: project.canvas || canvas,
+      tenantId: opts.tenant_id,
+      projectId: project.project_id,
+      compDir,
+      maxRetries: opts.maxRevisions ?? 2,
+      trace,
+      customSources: generated.customSources,
+    });
+    finalImgScene = critiqueResult.scene;
+    if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
+      for (const [compName, html] of critiqueResult.customSources) {
+        await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
+      }
+    }
+  }
+
+  // Preserve original scene id
+  finalImgScene.id = existingScene.id;
+  if (existingScene.label) finalImgScene.label = existingScene.label;
+
   // Replace the scene and update name if planner provided one
-  project.scenes = [generated.scene];
+  project.scenes = [finalImgScene];
   if (storyboard.name) project.name = storyboard.name;
 
   await saveProject(project);
@@ -550,6 +647,187 @@ function serializeProjectContext(project: Project): string {
   }
 
   return lines.join("\n");
+}
+
+// ── Critique Helper ──
+
+async function findComponentSourceForCritique(
+  type: string,
+  componentLibDir: string,
+  extraDirs?: string[],
+): Promise<string | null> {
+  if (extraDirs) {
+    for (const dir of extraDirs) {
+      try {
+        const filePath = path.join(dir, `${type}.component.html`);
+        return await fs.readFile(filePath, "utf-8");
+      } catch {
+        // Not in this dir
+      }
+    }
+  }
+  try {
+    const categories = await fs.readdir(componentLibDir, { withFileTypes: true });
+    for (const cat of categories) {
+      if (!cat.isDirectory()) continue;
+      const filePath = path.join(componentLibDir, cat.name, `${type}.component.html`);
+      try {
+        return await fs.readFile(filePath, "utf-8");
+      } catch {}
+    }
+  } catch {}
+  try {
+    const filePath = path.join(componentLibDir, `${type}.component.html`);
+    return await fs.readFile(filePath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
+async function critiqueAndRetryScene(opts: {
+  scene: Scene;
+  planned: any;
+  sceneIndex: number;
+  totalScenes: number;
+  prompt: string;
+  format: OutputFormat;
+  llmConfig: LLMConfig;
+  brandKit: BrandKit;
+  canvas: Canvas;
+  tenantId: string;
+  projectId: string;
+  compDir: string;
+  maxRetries: number;
+  imageUrl?: string;
+  trace?: TraceBuilder;
+  customSources?: Map<string, string>;
+}): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
+  let currentScene = opts.scene;
+  let currentCustomSources = opts.customSources;
+  let lastCritique: CritiqueResult | undefined;
+
+  const extraDirs = [
+    opts.compDir,
+    tenantComponentsDir(opts.tenantId),
+  ];
+
+  for (let attempt = 0; attempt < opts.maxRetries; attempt++) {
+    opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_attempt_${attempt}`);
+
+    try {
+      // 1. Collect component sources for this scene
+      const componentSources: ComponentSource[] = [];
+      for (const comp of currentScene.components) {
+        if (currentCustomSources?.has(comp.type)) {
+          componentSources.push({ type: comp.type, source: currentCustomSources.get(comp.type)! });
+        } else {
+          const source = await findComponentSourceForCritique(comp.type, config.componentLibDir, extraDirs);
+          if (source) {
+            componentSources.push({ type: comp.type, source });
+          }
+        }
+      }
+
+      if (componentSources.length === 0) {
+        console.log(`  Critique: no component sources found for scene ${opts.sceneIndex}, skipping`);
+        opts.trace?.endEvent({ skipped: true, reason: "no_sources" });
+        break;
+      }
+
+      // 2. Assemble the scene HTML
+      const assembledHtml = await assembleScene({
+        scene: currentScene,
+        components: componentSources,
+        brandKit: opts.brandKit,
+        canvas: opts.canvas,
+        gsapDir: config.gsapDir,
+      });
+
+      // 3. Write to temp file and capture preview
+      const tmpDir = path.join(os.tmpdir(), `critique_${opts.projectId}_${opts.sceneIndex}_${attempt}`);
+      await fs.mkdir(tmpDir, { recursive: true });
+      const htmlPath = path.join(tmpDir, "scene.html");
+      const previewPath = path.join(tmpDir, "preview.png");
+
+      await fs.writeFile(htmlPath, assembledHtml);
+      await captureSingleFrame({
+        htmlPath,
+        outputPath: previewPath,
+        width: opts.canvas.width,
+        height: opts.canvas.height,
+        atTime: currentScene.duration_seconds / 3,
+      });
+
+      // 4. Read preview and critique
+      const previewBase64 = (await fs.readFile(previewPath)).toString("base64");
+      const critiqueResult = await critiqueScene({
+        sceneHtml: assembledHtml,
+        previewImageBase64: previewBase64,
+        prompt: opts.prompt,
+        llmConfig: opts.llmConfig,
+        format: opts.format,
+        trace: opts.trace,
+        critiqueRound: attempt,
+      });
+
+      lastCritique = critiqueResult;
+      console.log(`  Critique scene ${opts.sceneIndex} attempt ${attempt}: score=${critiqueResult.score}, issues=${critiqueResult.issues.length}`);
+
+      // 5. Clean up temp files
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+
+      // 6. If score is good enough, accept
+      if (critiqueResult.score >= 7 && critiqueResult.issues.length === 0) {
+        opts.trace?.endEvent({ score: critiqueResult.score, accepted: true });
+        break;
+      }
+
+      // 7. Build critique feedback and regenerate
+      const feedbackParts: string[] = [];
+      if (critiqueResult.issues.length > 0) {
+        feedbackParts.push(`Issues found: ${critiqueResult.issues.join("; ")}`);
+      }
+      if (critiqueResult.suggestions.length > 0) {
+        feedbackParts.push(`Suggestions: ${critiqueResult.suggestions.join("; ")}`);
+      }
+      const critiqueFeedback = feedbackParts.join("\n");
+
+      opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false });
+
+      // Regenerate the scene with critique feedback
+      const regenerated = await generateScene({
+        scene: opts.planned,
+        sceneIndex: opts.sceneIndex,
+        totalScenes: opts.totalScenes,
+        prompt: opts.prompt,
+        format: opts.format,
+        llmConfig: opts.llmConfig,
+        brandKit: opts.brandKit,
+        canvas: opts.canvas,
+        imageUrl: opts.imageUrl,
+        tenantId: opts.tenantId,
+        projectId: opts.projectId,
+        critiqueFeedback,
+      });
+
+      // Save custom component HTML if needed
+      if (regenerated.customSources) {
+        for (const [compName, compHtml] of regenerated.customSources) {
+          await fs.writeFile(path.join(opts.compDir, `${compName}.component.html`), compHtml);
+        }
+      }
+
+      currentScene = regenerated.scene;
+      currentCustomSources = regenerated.customSources;
+
+    } catch (e: any) {
+      console.error(`  Critique scene ${opts.sceneIndex} attempt ${attempt} failed: ${e.message}`);
+      opts.trace?.endEvent({ error: e.message });
+      break; // Don't let critique failures block the pipeline
+    }
+  }
+
+  return { scene: currentScene, customSources: currentCustomSources, critiqueResult: lastCritique };
 }
 
 // ── Unified Pipeline ──
@@ -660,7 +938,39 @@ async function runUnifiedPipeline(
       }
     }
 
-    project.scenes.push(generated.scene);
+    // Critique loop (skip if opts.critique === false)
+    let finalScene = generated.scene;
+    let finalCustomSources = generated.customSources;
+    if (opts.critique !== false) {
+      const critiqueResult = await critiqueAndRetryScene({
+        scene: generated.scene,
+        planned,
+        sceneIndex: i,
+        totalScenes: storyboard.scenes.length,
+        prompt: richPrompt,
+        format,
+        llmConfig: opts.llmConfig,
+        brandKit,
+        canvas,
+        tenantId: opts.tenant_id,
+        projectId,
+        compDir,
+        maxRetries: opts.maxRevisions ?? 2,
+        imageUrl,
+        trace,
+        customSources: generated.customSources,
+      });
+      finalScene = critiqueResult.scene;
+      finalCustomSources = critiqueResult.customSources;
+      // Update saved custom sources if critique regenerated them
+      if (finalCustomSources && finalCustomSources !== generated.customSources) {
+        for (const [compName, html] of finalCustomSources) {
+          await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
+        }
+      }
+    }
+
+    project.scenes.push(finalScene);
   }
   trace?.endEvent({ scenes: project.scenes.length });
 

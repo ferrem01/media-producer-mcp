@@ -25,6 +25,7 @@ export interface SceneGeneratorOpts {
   imageUrl?: string;        // from media enrichment
   tenantId: string;
   projectId: string;
+  critiqueFeedback?: string; // feedback from visual critiquer for retry
 }
 
 export interface GeneratedScene {
@@ -72,6 +73,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
         canvas: opts.canvas,
         imageUrl: opts.imageUrl,
         duration: planned.duration_seconds,
+        critiqueFeedback: opts.critiqueFeedback,
       });
       customSources.set(compName, html);
       sceneComponents.push({
@@ -129,6 +131,7 @@ interface CustomComponentOpts {
   canvas: Canvas;
   imageUrl?: string;
   duration: number;
+  critiqueFeedback?: string;
 }
 
 async function generateCustomComponent(opts: CustomComponentOpts): Promise<string> {
@@ -172,7 +175,7 @@ IMPORTANT: A background component (mesh-gradient or gradient-background) already
 DO NOT create your own background layer, gradient div, or full-screen background. Your component root should be transparent (no background property on the root element).
 All your content sits ON TOP of the existing background.
 
-Output ONLY the .component.html source. No JSON wrapping, no markdown fences.
+${opts.critiqueFeedback ? `\n\nIMPORTANT - PREVIOUS ATTEMPT FEEDBACK:\n${opts.critiqueFeedback}\nFix all issues listed above in this generation.\n\n` : ""}Output ONLY the .component.html source. No JSON wrapping, no markdown fences.
 Start with <template> and end with </script>.`;
 
   var sceneHtml = await callLLM(opts.llmConfig, [
