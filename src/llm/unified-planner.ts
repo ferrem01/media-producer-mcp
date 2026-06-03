@@ -100,7 +100,7 @@ Creativity level: ${creativity} (0 = prefer library, 1 = prefer custom)
 - At HIGH creativity (0.7-1.0): prefer ONE custom component per scene that owns the entire canvas. The custom component should handle its own background, layout, typography, and animation as one cohesive composition. Do NOT layer library backgrounds under custom components -- let the custom component be self-contained. This produces the most cinematic, Apple keynote-level results.
 - The library is your toolkit -- use it when it fits. Custom is your escape hatch AND your creative tool.
 
-For library components: fill in their data fields. Always include a background component (gradient-background or mesh-gradient) at z_index 0.
+For library components: use the EXACT type name from the catalog above (e.g. "cta-card" not "cta", "stat-card" not "stat", "title-slide" not "title"). Fill in their data fields. Always include a background component (gradient-background or mesh-gradient) at z_index 0.
 For background component colors: ALWAYS use CSS var references from the brand kit (e.g. "var(--mp-color-background)", "var(--mp-color-primary)", "var(--mp-color-surface)"). NEVER hardcode hex colors for backgrounds.
 For custom components: provide a detailed custom_prompt describing the visual, layout, and animation. Be VERY specific about typography sizes, animation techniques (SplitText, ScrambleText, DrawSVG, particles), colors, and layout.
 
@@ -147,7 +147,7 @@ ${catalogStr}
 - Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, none.
 - VARY scene types: don't repeat the same layout. Mix hero text, product demos, stats, visual metaphors, grids, CTAs.
 - Never have two identical layout types in a row.
-- For library components: fill ALL required data fields. Use realistic content, not placeholder text.
+- For library components: use the EXACT type name from the Available Components catalog. Do not abbreviate or shorten names. Fill ALL required data fields. Use realistic content, not placeholder text.
 - At HIGH creativity: each scene should have ONE self-contained custom component that handles everything (background, layout, text, animation). Do NOT add separate library background components -- the custom component IS the entire scene.
 - For custom components: custom_prompt must be 3-5 sentences with SPECIFIC visual direction (exact sizes, colors, animation names, layout positions).
 - hero_image is OPTIONAL and should be RARE (0-1 per project, not every scene). Only use when a real photograph or illustration would dramatically improve the scene. Most scenes should rely on HTML/CSS/GSAP visuals, not AI images. Skip for: text scenes, stats, code demos, CTAs, dashboards, lists.
@@ -165,7 +165,7 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
     for (var bg of opts.brandKit.assets.backgrounds) {
       brandAssetsSection += `- "${bg.name}": ${bg.url} [tags: ${bg.tags.join(", ")}]\n`;
     }
-    brandAssetsSection += `\nTo use a brand background as a full-bleed scene background at z_index 0, use the brand-background component:\n{ "type": "brand-background", "data": { "src": "${opts.brandKit.assets.backgrounds[0].url}" }, "z_index": 0 }\nOptional data props: overlay_opacity (0-1 for text readability), overlay_color, drift (true/false for ken-burns).\n`;
+    brandAssetsSection += `\nTo use a brand background as a full-bleed scene background at z_index 0, use the image component:\n{ "type": "image", "data": { "src": "${opts.brandKit.assets.backgrounds[0].url}" }, "z_index": 0 }\nOptional data props: overlay_opacity (0-1 for text readability), overlay_color, drift (true/false for ken-burns).\n`;
   }
   if (opts.brandKit.logos?.length) {
     var isLight = isLightBrand(opts.brandKit);
