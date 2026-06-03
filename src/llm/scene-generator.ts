@@ -149,6 +149,10 @@ ${imageContext}
 Overall project: ${opts.prompt}
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}.
 
+IMPORTANT: A background component (mesh-gradient or gradient-background) already exists behind this component at z_index 0. It uses brand kit colors.
+DO NOT create your own background layer, gradient div, or full-screen background. Your component root should be transparent (no background property on the root element).
+All your content sits ON TOP of the existing background.
+
 Output ONLY the .component.html source. No JSON wrapping, no markdown fences.
 Start with <template> and end with </script>.`;
 

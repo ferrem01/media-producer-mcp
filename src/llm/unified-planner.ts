@@ -77,7 +77,7 @@ Example: A scene with a library background + custom hero visual + library stat c
   "duration_seconds": 5,
   "description": "Hero reveal with key metric",
   "components": [
-    { "type": "mesh-gradient", "data": { "colors": ["#0f172a", "#1e1b4b"] }, "z_index": 0 },
+    { "type": "mesh-gradient", "data": { "colors": ["var(--mp-color-background)", "var(--mp-color-primary)"] }, "z_index": 0 },
     { "custom": true, "custom_prompt": "Dramatic product visualization with floating UI cards, holographic effects, 3D perspective transforms. Huge 120px typography saying 'QUOTIENT' with SplitText per-character animation. Ambient purple glow orbs in background.", "z_index": 10 },
     { "type": "stat-card", "data": { "number": "340%", "label": "ROI" }, "z_index": 20, "position": { "x": 1400, "y": 800, "width": 400, "height": 200 } }
   ],
@@ -91,6 +91,7 @@ Creativity level: ${creativity} (0 = prefer library, 1 = prefer custom)
 - The library is your toolkit -- use it when it fits. Custom is your escape hatch AND your creative tool.
 
 For library components: fill in their data fields. Always include a background component (gradient-background or mesh-gradient) at z_index 0.
+For background component colors: ALWAYS use CSS var references from the brand kit (e.g. "var(--mp-color-background)", "var(--mp-color-primary)", "var(--mp-color-surface)"). NEVER hardcode hex colors for backgrounds.
 For custom components: provide a detailed custom_prompt describing the visual, layout, and animation. Be VERY specific about typography sizes, animation techniques (SplitText, ScrambleText, DrawSVG, particles), colors, and layout.
 
 You can also include "hero_image" with a DALL-E prompt for any scene that would benefit from an AI-generated visual.
@@ -109,8 +110,8 @@ ${catalogStr}
       "duration_seconds": 5,
       "description": "Dramatic hero reveal with product visualization",
       "components": [
-        { "type": "gradient-background", "data": { "colors": ["#0f172a", "#1e1b4b"] }, "z_index": 0 },
-        { "custom": true, "custom_prompt": "A dramatic hero reveal with huge 120px typography saying 'QUOTIENT'. Dark background with ambient purple glow orbs. Title enters with SplitText per-character animation (chars stagger 0.03s, back.out ease). Subtitle at 24px fades in below. Floating particles in background.", "z_index": 10 }
+        { "type": "gradient-background", "data": { "colors": ["var(--mp-color-background)", "var(--mp-color-surface)"] }, "z_index": 0 },
+        { "custom": true, "custom_prompt": "A dramatic hero reveal with huge 120px typography saying 'QUOTIENT'. Background uses brand colors with ambient glow orbs in the accent color. Title enters with SplitText per-character animation (chars stagger 0.03s, back.out ease). Subtitle at 24px fades in below. Floating particles in background.", "z_index": 10 }
       ],
       
       "transition_in": { "type": "none", "duration_seconds": 0 }
@@ -120,7 +121,7 @@ ${catalogStr}
       "duration_seconds": 4,
       "description": "Show impressive metrics with multiple stat cards",
       "components": [
-        { "type": "gradient-background", "data": { "colors": ["#0f172a", "#1e1b4b"] }, "z_index": 0 },
+        { "type": "gradient-background", "data": { "colors": ["var(--mp-color-background)", "var(--mp-color-surface)"] }, "z_index": 0 },
         { "type": "stat-card", "data": { "number": "340%", "label": "ROI Increase" }, "z_index": 10, "position": { "x": 100, "y": 400, "width": 400, "height": 200 } },
         { "type": "stat-card", "data": { "number": "2.5M", "label": "Users Reached" }, "z_index": 10, "position": { "x": 760, "y": 400, "width": 400, "height": 200 } }
       ],
