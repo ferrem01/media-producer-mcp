@@ -1,0 +1,72 @@
+<template>
+  <div class="brand-background">
+    <div class="bg-image"></div>
+    <div class="bg-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  .brand-background {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bg-image {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .bg-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var bgImage = el.querySelector('.bg-image');
+    var overlay = el.querySelector('.bg-overlay');
+
+    // Set the background image
+    if (data.src) {
+      bgImage.style.backgroundImage = 'url(' + data.src + ')';
+    }
+
+    // Optional overlay for text readability
+    var overlayOpacity = data.overlay_opacity || 0;
+    var overlayColor = data.overlay_color || 'var(--mp-color-background, #000000)';
+    if (overlayOpacity > 0) {
+      overlay.style.background = overlayColor;
+      overlay.style.opacity = overlayOpacity;
+    }
+
+    // Optional ken-burns drift
+    var drift = data.drift !== false;
+    if (drift && ctx.duration > 2) {
+      gsap.set(bgImage, { scale: 1.05 });
+      tl.to(bgImage, {
+        scale: 1,
+        duration: ctx.duration,
+        ease: 'none'
+      }, 0);
+    }
+
+    // Fade in
+    var speed = ctx.motion === 'minimal' ? 0.3 : 0.6;
+    gsap.set(el.querySelector('.brand-background'), { autoAlpha: 0 });
+    tl.to(el.querySelector('.brand-background'), {
+      autoAlpha: 1,
+      duration: speed,
+      ease: 'power2.out'
+    }, 0);
+
+    return tl;
+  }
+</script>

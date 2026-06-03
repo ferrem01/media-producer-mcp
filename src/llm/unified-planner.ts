@@ -165,7 +165,7 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
     for (var bg of opts.brandKit.assets.backgrounds) {
       brandAssetsSection += `- "${bg.name}": ${bg.url} [tags: ${bg.tags.join(", ")}]\n`;
     }
-    brandAssetsSection += `\nTo use a brand background as the scene background at z_index 0:\n{ "type": "image-showcase", "data": { "src": "${opts.brandKit.assets.backgrounds[0].url}", "fit": "cover" }, "z_index": 0 }\n`;
+    brandAssetsSection += `\nTo use a brand background as a full-bleed scene background at z_index 0, use the brand-background component:\n{ "type": "brand-background", "data": { "src": "${opts.brandKit.assets.backgrounds[0].url}" }, "z_index": 0 }\nOptional data props: overlay_opacity (0-1 for text readability), overlay_color, drift (true/false for ken-burns).\n`;
   }
   if (opts.brandKit.logos?.length) {
     var isLight = isLightBrand(opts.brandKit);
