@@ -39,6 +39,9 @@ export interface RenderOptions {
 
   /** Additional directories to search for component sources (e.g. project-local freeform components) */
   extraComponentDirs?: string[];
+
+  /** When true, skip scene rendering and only (re-)apply audio mix + overlays to existing output */
+  audioOnly?: boolean;
 }
 
 export interface RenderResult {
@@ -63,6 +66,14 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
 
   // Load all required component sources
   const componentSources = await loadComponentSources(project, componentLibDir, options.extraComponentDirs);
+
+  // ── Audio-only mode: skip scene rendering, just re-mux audio + overlays ──
+  if (options.audioOnly) {
+    if (project.format !== "video" && project.format !== "slideshow") {
+      throw new Error(`audio_only is only supported for video/slideshow formats, got: ${project.format}`);
+    }
+    return renderAudioOnly(project, workDir, outputPath, startTime);
+  }
 
   switch (project.format) {
     case "image":
@@ -92,6 +103,119 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
     default:
       throw new Error(`Unsupported format: ${project.format}`);
   }
+}
+
+/**
+ * Audio-only render: skip scene rendering, just mix audio + apply overlays
+ * onto the already-rendered video file.
+ */
+async function renderAudioOnly(
+  project: Project,
+  workDir: string,
+  outputPath: string,
+  startTime: number,
+): Promise<RenderResult> {
+  // Check that the existing output exists
+  try {
+    await fs.access(outputPath);
+  } catch {
+    throw new Error(
+      `audio_only requires an existing rendered video at ${outputPath}. Run a full render first.`
+    );
+  }
+
+  console.log(`Audio-only render: muxing audio onto existing video`);
+
+  const totalDuration = project.scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
+
+  // ── Audio mixing ──
+  if (project.audio && project.audio.tracks.length > 0) {
+    console.log(`  Mixing ${project.audio.tracks.length} audio track(s)...`);
+
+    const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
+    const audioTracks: AudioTrackInput[] = project.audio.tracks.map((t) => ({
+      path: t.source,
+      type: t.type,
+      volume: t.volume,
+      startTime: t.start_time,
+      fadeIn: t.fade_in,
+      fadeOut: t.fade_out,
+      loop: t.loop,
+    }));
+
+    let duckingOpts: Parameters<typeof mixAudio>[0]["ducking"] = undefined;
+    if (project.audio.ducking?.enabled) {
+      const duckTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.duck_track);
+      const triggerTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.trigger_track);
+      if (duckTrackObj && triggerTrackObj) {
+        duckingOpts = {
+          duckTrack: duckTrackObj.source,
+          triggerTrack: triggerTrackObj.source,
+          duckedVolume: project.audio.ducking.ducked_volume,
+          attack: project.audio.ducking.attack ?? 0.3,
+          release: project.audio.ducking.release ?? 0.5,
+        };
+      }
+    }
+
+    await mixAudio({
+      videoPath: outputPath,
+      outputPath: audioOutput,
+      tracks: audioTracks,
+      ducking: duckingOpts,
+      totalDuration,
+    });
+
+    await fs.rename(audioOutput, outputPath);
+  } else {
+    console.log("  No audio tracks to mix, nothing to do.");
+  }
+
+  // ── Speaker overlays ──
+  if (project.overlays && project.overlays.length > 0) {
+    for (const overlay of project.overlays) {
+      if (overlay.type === "speaker-video" && overlay.source) {
+        const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
+        const segments: OverlaySegment[] = overlay.segments
+          ? overlay.segments.map((s) => ({
+              start: s.start,
+              end: s.end,
+              mode: s.mode,
+              position: (s.position as OverlaySegment["position"]) || (overlay.position as OverlaySegment["position"]) || "bottom-right",
+              shape: (s.shape as OverlaySegment["shape"]) || overlay.shape || "circle",
+              size: s.size || overlay.size,
+            }))
+          : [{
+              start: overlay.start_time || 0,
+              end: overlay.end_time ?? Infinity,
+              mode: "pip" as const,
+              position: (overlay.position as OverlaySegment["position"]) || "bottom-right",
+              shape: overlay.shape || "circle",
+              size: overlay.size,
+            }];
+
+        const overlayOutput = outputPath.replace(/\.mp4$/, "-overlay.mp4");
+        await compositeOverlays({
+          videoPath: outputPath,
+          speakerPath,
+          segments,
+          outputPath: overlayOutput,
+          width: project.canvas.width,
+          height: project.canvas.height,
+        });
+        await fs.rename(overlayOutput, outputPath);
+      }
+    }
+  }
+
+  const durationMs = Date.now() - startTime;
+  console.log(`Audio-only render complete: ${outputPath} (${(durationMs / 1000).toFixed(1)}s)`);
+
+  return {
+    outputPath,
+    format: project.format,
+    durationMs,
+  };
 }
 
 /**

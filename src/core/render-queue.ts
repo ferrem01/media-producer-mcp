@@ -65,6 +65,7 @@ export function queueRender(
   projectId: string,
   options?: {
     quality?: "preview" | "production";
+    audioOnly?: boolean;
     trace?: TraceBuilder;
   },
 ): RenderJob {
@@ -101,6 +102,7 @@ async function runRender(
   projectId: string,
   options?: {
     quality?: "preview" | "production";
+    audioOnly?: boolean;
     trace?: TraceBuilder;
   },
 ): Promise<void> {
@@ -141,6 +143,7 @@ async function runRender(
       gsapDir: config.gsapDir,
       extraComponentDirs: [path.join(projectDir(job.tenantId, projectId), "components")],
       outputPath,
+      audioOnly: options?.audioOnly,
     };
 
     const result = await renderProjectCore(renderOpts);

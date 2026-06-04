@@ -613,6 +613,7 @@ export function createMcpServer(): McpServer {
       project_id: z.string(),
       scene_id: z.string().optional().describe("If provided, renders a single scene preview image"),
       quality: z.enum(["preview", "production"]).optional().describe("Render quality (default: production)"),
+      audio_only: z.boolean().optional().describe("Skip scene rendering; only (re-)apply audio mix + overlays to the existing rendered video. Requires a prior full render."),
 
       token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
     },
@@ -673,7 +674,7 @@ export function createMcpServer(): McpServer {
 
       const job = queueRender(params.tenant_id, params.project_id, {
         quality: params.quality,
-
+        audioOnly: params.audio_only,
       });
 
       return ok({
