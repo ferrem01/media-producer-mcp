@@ -904,7 +904,7 @@ async function critiqueAndRetryScene(opts: {
         outputPath: previewPath,
         width: opts.canvas.width,
         height: opts.canvas.height,
-        atTime: currentScene.duration_seconds / 3,
+        atTime: currentScene.duration_seconds * 0.9,
       });
 
       // 4. Read preview and critique

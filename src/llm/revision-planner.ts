@@ -178,15 +178,19 @@ Your job is to apply the user's revision request while PRESERVING everything tha
 ## STRATEGY DEFINITIONS
 
 ### "keep"
-Pass the component through completely unchanged. No LLM call, no modification.
-Use for: library components that don't need changes, custom components that are fine.
+Pass the component through. Use for components that need NO changes, OR library components where you only need to update data props.
+- To change a library component's properties: use strategy "keep" but include UPDATED "data" in your output.
+- Example: to make a CTA button darker green, use strategy "keep" with data: { "color": "#065f46" }.
+- For library components, this is the ONLY way to change them. SEARCH/REPLACE only works on custom HTML components.
 
 ### "revise"
 Send the existing custom component HTML through a SEARCH/REPLACE pipeline.
 The \`revise_instructions\` field describes exactly what CSS/HTML changes to make.
 **Be specific**: "Change .headline line-height from 1.4 to 1.1" not "tighten the headline".
 Use for: size changes, spacing adjustments, color tweaks, opacity changes, adding/removing CSS properties.
-IMPORTANT: Only works for custom components (ones with HTML source). Library components can be modified by changing their data props with strategy "keep" and updated data.
+IMPORTANT: SEARCH/REPLACE only works for custom components (ones with HTML source shown above).
+For LIBRARY components (no HTML source), modify them by using strategy "keep" with updated "data" props.
+Example: to darken a CTA button color, output strategy "keep" with the updated data object containing the new color value.
 
 ### "replace"
 Generate a completely new custom component from scratch.

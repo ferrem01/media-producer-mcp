@@ -97,7 +97,7 @@ Example: A scene with a library background + custom hero visual + library stat c
 
 Creativity level: ${creativity} (0 = prefer library, 1 = prefer custom)
 - At LOW creativity: use library components for most things. Only go custom when the library genuinely can't express what's needed.
-- At HIGH creativity (0.7-1.0): prefer ONE custom component per scene that owns the entire canvas. The custom component should handle its own background, layout, typography, and animation as one cohesive composition. Do NOT layer library backgrounds under custom components -- let the custom component be self-contained. This produces the most cinematic, Apple keynote-level results.
+- At HIGH creativity (0.7-1.0): you MUST use exactly ONE custom component per scene that owns the entire canvas. The custom component handles its own background, layout, typography, and animation as one cohesive composition. Do NOT add ANY library components -- no gradient-background, no image, no stat-card, no cta-card, no logo components. The custom component IS the entire scene. This is MANDATORY at creativity >= 0.7, not a suggestion.
 - The library is your toolkit -- use it when it fits. Custom is your escape hatch AND your creative tool.
 
 For library components: use the EXACT type name from the catalog above (e.g. "cta-card" not "cta", "stat-card" not "stat", "title-slide" not "title"). Fill in their data fields. Always include a background component (gradient-background or mesh-gradient) at z_index 0.
@@ -156,7 +156,7 @@ ${catalogStr}
   * Background: image, gradient-background, or mesh-gradient at z_index 0
   * Logo: image component at z_index 30
   * Do NOT add stat-card, cta-card, or other content components alongside a custom component that already renders that content.
-- At HIGH creativity: each scene should have ONE self-contained custom component that handles everything (background, layout, text, animation). Do NOT add separate library background components -- the custom component IS the entire scene.
+- At HIGH creativity: you MUST output exactly ONE component with custom=true. Zero library components. The custom component handles EVERYTHING (background, layout, text, animation, logo, CTA). If you output any library components at creativity >= 0.7, the pipeline will fail.
 - For custom components: custom_prompt must be 3-5 sentences with SPECIFIC visual direction (exact sizes, colors, animation names, layout positions). EXPLICITLY STATE what content the custom component should render and what other library components in the scene already handle.
 - hero_image is OPTIONAL and should be RARE (0-1 per project, not every scene). Only use when a real photograph or illustration would dramatically improve the scene. Most scenes should rely on HTML/CSS/GSAP visuals, not AI images. Skip for: text scenes, stats, code demos, CTAs, dashboards, lists.
 - hero_image prompts describe the IMAGE itself, not the scene layout.

@@ -101,7 +101,7 @@ export async function critiqueAndReviseScene(
         outputPath: previewPath,
         width: opts.canvas.width,
         height: opts.canvas.height,
-        atTime: currentScene.duration_seconds / 3,
+        atTime: currentScene.duration_seconds * 0.9,
       });
 
       // 4. Critique
