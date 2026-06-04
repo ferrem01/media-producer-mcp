@@ -501,6 +501,7 @@ export function getPreviewHtml(): string {
 
   // Auth token from URL
   var _token = new URLSearchParams(window.location.search).get('token');
+  var _urlTenant = new URLSearchParams(window.location.search).get('tenant');
 
   // API helper
   function api(methodOrPath, pathOrBody, bodyArg) {
@@ -742,6 +743,12 @@ export function getPreviewHtml(): string {
         audio.volume = audio._baseVolume;
       }
     });
+  }
+
+  // Auto-load tenant from URL
+  if (_urlTenant) {
+    els.tenantInput.value = _urlTenant;
+    setTimeout(loadProjects, 100);
   }
 
   // Load projects for tenant
@@ -1430,6 +1437,32 @@ export function getPreviewHtml(): string {
     catch(e) { return null; }
   }
 
+  // Sync <video> elements inside the preview iframe to the scene local time.
+  // For live preview: let video play naturally, only seek on large drift or scrub.
+  // For capture mode the scene-worker handles frame-by-frame seeking.
+  function syncIframeVideos(localTime, forceSeek) {
+    try {
+      var iframeDoc = els.previewIframe.contentWindow && els.previewIframe.contentWindow.document;
+      if (!iframeDoc) return;
+      var videos = iframeDoc.querySelectorAll('video');
+      for (var i = 0; i < videos.length; i++) {
+        var v = videos[i];
+        var startAt = parseFloat(v.getAttribute('data-start-at') || '0');
+        var target = Math.max(0, localTime - startAt);
+        if (forceSeek) {
+          v.currentTime = target;
+        } else {
+          // Only correct large drift (>0.5s) to avoid choppy seeking
+          if (Math.abs(v.currentTime - target) > 0.5) v.currentTime = target;
+        }
+        // Ensure video is playing during playback
+        if (state.playing && v.paused && target < v.duration) {
+          v.play().catch(function(){});
+        }
+      }
+    } catch(e) {}
+  }
+
   // Find which scene a global time falls in, returns { index, localTime }
   function sceneForGlobalTime(globalTime) {
     var project = state.currentProject;
@@ -1595,6 +1628,12 @@ export function getPreviewHtml(): string {
           var seekTime = Math.min(info.localTime, newTl.duration());
           newTl.time(seekTime);
           newTl.play();
+          // Start video playback and sync to scene time
+          syncIframeVideos(seekTime);
+          try {
+            var vids = els.previewIframe.contentWindow.document.querySelectorAll('video');
+            for (var vi = 0; vi < vids.length; vi++) vids[vi].play().catch(function(){});
+          } catch(e) {}
           // Continue the loop (don't restart - just keep going)
         });
       }
@@ -1613,6 +1652,8 @@ export function getPreviewHtml(): string {
         }
         // If localTime > tl.duration(), GSAP stays at its end frame (visual holds)
       }
+      // Keep video elements in sync with scene time
+      syncIframeVideos(info.localTime);
     }
 
     state.animFrameId = requestAnimationFrame(animLoop);
@@ -1671,6 +1712,7 @@ export function getPreviewHtml(): string {
       var tl = getTimeline();
       if (tl) {
         tl.time(Math.min(info.localTime, tl.duration()));
+        syncIframeVideos(info.localTime, true);
         tl.pause();
         stopPlayback();
         pauseMusicKeepPlaying();
