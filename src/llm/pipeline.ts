@@ -334,6 +334,7 @@ async function runSceneRevisionPipeline(
       customSources: generated.customSources,
       catalog,
       critique: opts.critique,
+      creativity: resolveCreativity(opts),
     });
     finalRevScene = critiqueResult.scene;
     if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
@@ -467,6 +468,7 @@ async function runVideoRevisionPipeline(
         customSources: generated.customSources,
         catalog,
         critique: opts.critique,
+        creativity: resolveCreativity(opts),
       });
       finalVidScene = critiqueResult.scene;
       if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
@@ -838,6 +840,7 @@ async function critiqueAndRetryScene(opts: {
   customSources?: Map<string, string>;
   catalog: ComponentCatalogEntry[];
   critique?: boolean;
+  creativity?: number;
 }): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
   // Skip critique if disabled
   if (opts.critique === false) {
@@ -967,6 +970,7 @@ Return ONLY the fixed scene JSON. Keep the same structure. Only change what's br
 - Fix missing or incorrect data props
 - Remove duplicate content across components
 - If a component type isn't working, swap it for a different one or make it custom
+${(opts.creativity ?? 0) >= 0.7 ? "\n- CRITICAL: At this creativity level, use ONLY custom components (custom: true). Do NOT add any library components. One custom component per scene that handles everything." : ""}
 
 Output valid JSON only. No markdown fences, no commentary.`;
 
@@ -987,6 +991,28 @@ Output valid JSON only. No markdown fences, no commentary.`;
       if (!fixedPlan || !fixedPlan.components || fixedPlan.components.length === 0) {
         console.log(`  Critique fix-plan returned empty, keeping best (score ${bestScore})`);
         break;
+      }
+
+      // Enforce all-custom at high creativity
+      if ((opts.creativity ?? 0) >= 0.7) {
+        const hasCustom = fixedPlan.components.some((c: any) => c.custom);
+        if (hasCustom) {
+          // Strip library components
+          const before = fixedPlan.components.length;
+          fixedPlan.components = fixedPlan.components.filter((c: any) => c.custom);
+          if (fixedPlan.components.length < before) {
+            console.log(`  Critique fix: stripped ${before - fixedPlan.components.length} library components (all-custom mode)`);
+          }
+        } else {
+          // Convert entire plan to one custom component
+          console.log(`  Critique fix: no custom components at high creativity, converting to custom`);
+          const desc = fixedPlan.description || fixedPlan.label || opts.prompt;
+          fixedPlan.components = [{
+            custom: true,
+            custom_prompt: desc,
+            z_index: 10,
+          }];
+        }
       }
 
       // Use the fixed plan
@@ -1161,6 +1187,7 @@ async function runUnifiedPipeline(
         customSources: generated.customSources,
         catalog,
         critique: opts.critique,
+        creativity: resolveCreativity(opts),
       });
       finalScene = critiqueResult.scene;
       finalCustomSources = critiqueResult.customSources;
