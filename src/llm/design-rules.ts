@@ -19,8 +19,8 @@ export const COMPONENT_DESIGN_RULES = `
 - Always test your mental model: will this text fit at 1920px wide with the padding?
 
 ### Typography Safety
-- Title text: max 48-72px. Never exceed 88px unless it's a single word.
-- Subtitle text: 24-36px.
+- Title text: 64-100px for headlines. Single words or key stats can go bigger (120-160px) for cinematic impact.
+- Subtitle text: 22-32px. Use lighter weight (400) for contrast with bold headlines.
 - Body text: 16-22px.
 - Labels/badges: 12-16px.
 - Line height: 1.1-1.2 for headlines, 1.4-1.6 for body text.

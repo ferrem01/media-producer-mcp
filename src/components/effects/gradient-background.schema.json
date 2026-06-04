@@ -1,0 +1,26 @@
+{
+  "type": "gradient-background",
+  "label": "Gradient Background",
+  "category": "effects",
+  "description": "Full-canvas gradient background with two color stops, configurable angle, and subtle noise overlay. Use as z_index 0 background layer.",
+  "data": {
+    "from": {
+      "type": "string",
+      "label": "Start Color",
+      "required": true,
+      "placeholder": "#0f172a"
+    },
+    "to": {
+      "type": "string",
+      "label": "End Color",
+      "required": true,
+      "placeholder": "#1e293b"
+    },
+    "angle": {
+      "type": "number",
+      "label": "Gradient Angle (degrees)",
+      "optional": true,
+      "placeholder": "165"
+    }
+  }
+}

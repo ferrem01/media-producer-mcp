@@ -48,7 +48,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   }
 
   // Generate brand kit CSS variables
-  const brandCSS = generateBrandCSS(brandKit);
+  const brandCSS = generateBrandCSS(brandKit, scene.background);
 
   // Process each scene component
   const componentBlocks: string[] = [];
@@ -195,13 +195,19 @@ function generateFontLinks(brand: BrandKit): string {
 /**
  * Generate CSS custom properties from the brand kit.
  */
-function generateBrandCSS(brand: BrandKit): string {
+function generateBrandCSS(brand: BrandKit, sceneBackground?: string): string {
   const vars: string[] = [];
 
   if (brand.colors) {
     for (const [key, value] of Object.entries(brand.colors)) {
       vars.push(`  --mp-color-${key.replace(/_/g, "-")}: ${value};`);
     }
+  }
+
+  // Scene-level background override: when a scene explicitly sets a background
+  // color, it takes priority over the brand kit default.
+  if (sceneBackground) {
+    vars.push(`  --mp-color-background: ${sceneBackground};`);
   }
 
   if (brand.fonts?.length) {

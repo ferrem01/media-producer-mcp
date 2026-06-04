@@ -566,9 +566,11 @@ tl.to(el, { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: 1.0, ..
  */
 export function sceneComponentSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
   var formatRules = componentFormatRules(format);
-  var brandVars = buildBrandVarsList(brandKit);
+  var isDarkVideo = (format === "video" || format === "slideshow") && isLightBackground(brandKit);
+  var brandVars = buildBrandVarsList(brandKit, { darkOverride: isDarkVideo, canvasBg: canvas.background || "#0f172a" });
+  var brandStyleGuide = getBrandStyleGuide(isDarkVideo ? { ...brandKit, colors: { ...brandKit.colors, background: canvas.background || "#0f172a" } } : brandKit);
 
-  return `You are a world-class motion graphics designer. Write a single scene as a .component.html file.
+  return `You are a world-class motion graphics designer creating cinematic visual moments with HTML, CSS, and GSAP. Think Apple keynote crossed with Stripe marketing page. Write a single scene as a .component.html file.
 
 Output ONLY the component source. Start with <template> and end with </script>. No JSON, no markdown fences, no commentary.
 
@@ -593,6 +595,119 @@ Output ONLY the component source. Start with <template> and end with </script>. 
 ## Brand CSS Variables
 ${brandVars}
 
+## Visual Style Guide
+${brandStyleGuide}
+
+## Creative Direction
+
+Each scene is a CINEMATIC MOMENT with emotional weight -- not a slide, not a template.
+- One powerful visual idea per scene. If a scene has text + icons + cards + buttons, it's too busy. Pick ONE dominant element.
+- Create VISUAL TENSION: pair enormous typography (100px+) with tiny labels (12px). Pair full-bleed gradients with precise small elements.
+- VARY the rhythm: not every scene should be the same layout.
+- Dramatic typography: headlines should feel SCULPTED. Use letter-spacing -0.03em, line-height 1.0, font-weight 800 for impact moments.
+- Rich backgrounds: multi-layer gradients using brand colors, ambient glow orbs, subtle texture overlays.
+- Motion should feel SMOOTH and DELIBERATE -- use power3.out for entrances, power2.in for exits.
+- Every scene needs a FOCAL POINT: one thing the eye goes to first. If everything has equal visual weight, nothing stands out.
+- LESS IS MORE: a single stat at 160px is more impactful than three stats at 48px. A single word revealed with SplitText is more cinematic than a paragraph fading in.
+- Think about what would make someone stop scrolling on X/Twitter. That's the bar.
+
+## Typography Precision
+Don't just center text and call it done. Art-direct every text block:
+- Headlines: 72-100px, weight 800, letter-spacing -0.03em, line-height 1.02
+- One stat/number per scene should be HUGE (120-160px) as the visual anchor
+- Subheadlines: 22-28px, weight 400, color var(--mp-color-text-muted)
+- Small labels: 12-13px, weight 600, letter-spacing 0.14em, uppercase
+- Control line breaks: use max-width to ensure headlines break at natural reading points
+- Create visual tension: pair very large text with very small labels for contrast
+- Max 15 words visible simultaneously in a video scene
+
+## ICONS: NEVER USE EMOJI
+Never use emoji characters as icons. They look cheap and unprofessional.
+Instead, use inline SVG icons styled with currentColor or var(--mp-color-accent).
+
+` + "`" + "`" + "`" + `html
+<!-- Checkmark -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='20 6 9 17 4 12'/></svg>
+<!-- Arrow right -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><line x1='5' y1='12' x2='19' y2='12'/><polyline points='12 5 19 12 12 19'/></svg>
+<!-- Lightning bolt -->
+<svg width='20' height='20' viewBox='0 0 24 24' fill='var(--mp-color-accent)' stroke='none'><polygon points='13 2 3 14 12 14 11 22 21 10 12 10'/></svg>
+` + "`" + "`" + "`" + `
+
+## Visual Recipes (USE THESE -- don't just fade text in)
+
+### Per-character text reveal (SplitText)
+` + "`" + "`" + "`" + `javascript
+var split = new SplitText(el.querySelector('.title'), { type: 'chars' });
+gsap.set(split.chars, { autoAlpha: 0, y: 40, rotationX: -90 });
+tl.to(split.chars, { autoAlpha: 1, y: 0, rotationX: 0, stagger: 0.03, duration: 0.6, ease: 'back.out(1.2)' }, 0.3);
+` + "`" + "`" + "`" + `
+
+### Glowing stat counter
+` + "`" + "`" + "`" + `javascript
+var counter = { val: 0 };
+tl.to(counter, { val: 340, duration: 2, ease: 'power2.out', onUpdate: function() {
+  el.querySelector('.number').textContent = Math.round(counter.val) + '%';
+}}, 0.5);
+` + "`" + "`" + "`" + `
+
+### ScrambleText decode reveal
+` + "`" + "`" + "`" + `javascript
+tl.to(el.querySelector('.reveal-text'), { scrambleText: { text: 'FINAL TEXT', chars: '!@#$%', speed: 0.4 }, duration: 1.5 }, 0.3);
+` + "`" + "`" + "`" + `
+
+### SVG line drawing
+` + "`" + "`" + "`" + `javascript
+var path = el.querySelector('path');
+gsap.set(path, { drawSVG: '0%' });
+tl.to(path, { drawSVG: '100%', duration: 2, ease: 'power2.inOut' }, 0.5);
+` + "`" + "`" + "`" + `
+
+### Ambient floating particles (background depth)
+` + "`" + "`" + "`" + `javascript
+for (var i = 0; i < 25; i++) {
+  var p = document.createElement('div'); p.className = 'particle';
+  p.style.left = Math.random() * 100 + '%'; p.style.top = Math.random() * 100 + '%';
+  el.querySelector('.particles-container').appendChild(p);
+  gsap.to(p, { x: 'random(-50,50)', y: 'random(-50,50)', duration: 'random(3,6)', repeat: -1, yoyo: true, ease: 'sine.inOut', delay: Math.random() * 2 });
+}
+` + "`" + "`" + "`" + `
+
+### Glass card with ambient glow
+` + "`" + "`" + "`" + `css
+.card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 25px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+` + "`" + "`" + "`" + `
+
+### Dramatic entrance with spring physics
+` + "`" + "`" + "`" + `javascript
+gsap.set(el.querySelector('.hero'), { autoAlpha: 0, scale: 0.8, y: 60, filter: 'blur(8px)' });
+tl.to(el.querySelector('.hero'), { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: 1.0, ...SPRING.bouncy }, 0.3);
+` + "`" + "`" + "`" + `
+
+### Text with animated highlight marker
+` + "`" + "`" + "`" + `javascript
+highlightDraw(tl, el.querySelector('.keyword'), 1.5, 0.5, 'rgba(167,139,250,0.3)');
+` + "`" + "`" + "`" + `
+
+## CRITICAL: Brand Color Rules
+- NEVER hardcode color hex values. Use var(--mp-color-*) for ALL colors.
+- var(--mp-color-background) for root/full-screen backgrounds. ALWAYS.
+- var(--mp-color-surface) for cards and panels.
+- var(--mp-color-text) for all text. var(--mp-color-text-muted) for secondary text.
+- var(--mp-color-primary) and var(--mp-color-accent) for highlights and accents.
+- Only acceptable hardcoded values: transparent, rgba() for overlays/shadows/glows, currentColor.
+
+## Logo Integration
+- For external logos, use logo.dev: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark
+- For the brand's own logos, use the URLs provided in the scene prompt.
+- Logos should be crisp, properly sized, and have appropriate spacing.
+
 ${formatRules}
 
 ${COMPONENT_DESIGN_RULES}
@@ -608,17 +723,32 @@ ${SCRIPT_SYSTEM_SKILLS}
 - Entrance -> Hold -> Exit pattern
 - Use autoAlpha not opacity
 - 80px safe zone from edges
-- NEVER use emoji for icons -- use inline SVG
-- Use SplitText, CustomEase, ScrambleText, DrawSVG, SPRING presets, highlightDraw, particles
 - MAKE IT CINEMATIC. Apple keynote quality. Not a slide.
+- USE the visual recipes above. SplitText, ScrambleText, counter animations, SVG draws, particle effects, spring physics. Don't just fade text in.
+- Every scene should make someone say "wow." That's the bar.
 `;
 }
 
-function buildBrandVarsList(brandKit: BrandKit): string {
+function buildBrandVarsList(brandKit: BrandKit, opts?: { darkOverride?: boolean; canvasBg?: string }): string {
   var lines: string[] = [];
+  var useDark = opts?.darkOverride || false;
+  var canvasBg = opts?.canvasBg || "#0f172a";
+
   if (brandKit.colors) {
     for (var [key, value] of Object.entries(brandKit.colors)) {
-      lines.push(`  --mp-color-${key.replace(/_/g, "-")}: ${value};`);
+      var varName = key.replace(/_/g, "-");
+      // For video (dark override): swap background/text for dark theme
+      if (useDark && varName === "background") {
+        lines.push(`  --mp-color-background: ${canvasBg};  /* overridden for dark video */`);
+      } else if (useDark && varName === "text") {
+        lines.push(`  --mp-color-text: #ffffff;  /* overridden for dark video */`);
+      } else if (useDark && varName === "text-muted") {
+        lines.push(`  --mp-color-text-muted: #94a3b8;  /* overridden for dark video */`);
+      } else if (useDark && varName === "surface") {
+        lines.push(`  --mp-color-surface: #1e293b;  /* overridden for dark video */`);
+      } else {
+        lines.push(`  --mp-color-${varName}: ${value};`);
+      }
     }
   }
   if (brandKit.fonts?.length) {

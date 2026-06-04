@@ -126,7 +126,7 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
       } catch { /* use total duration as fallback */ }
 
       const attack = opts.ducking.attack || 0.3;
-      const release = opts.ducking.release || 0.5;
+      const release = opts.ducking.release || 1.8;
       const duckedVol = opts.ducking.duckedVolume;
       const startTime = triggerTrack.startTime || 0;
       const endTime = startTime + triggerDuration;

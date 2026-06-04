@@ -209,10 +209,60 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
     throw new Error("Unified planner returned no scenes");
   }
 
+  // Build a set of valid library component types for validation
+  var validTypes = new Set(opts.componentCatalog.map((c: PlannedComponent) => c.type));
+  // Also allow "image" which is a built-in renderer component
+  validTypes.add("image");
+
   // Validate and normalize each scene
   for (var scene of storyboard.scenes) {
     if (!scene.components || !Array.isArray(scene.components)) {
       scene.components = [];
+    }
+
+    // At high creativity (>=0.7), enforce all-custom: convert any library components to custom
+    if (creativity >= 0.7) {
+      var hasCustom = scene.components.some((c: PlannedComponent) => c.custom);
+      if (!hasCustom) {
+        // No custom component -- convert the whole scene to one custom component
+        console.warn(`  Scene "${scene.label}": creativity=${creativity} but no custom component, converting to custom`);
+        var libDescriptions = scene.components
+          .filter((c: PlannedComponent) => !c.custom && c.type)
+          .map((c: PlannedComponent) => `${c.type}: ${JSON.stringify(c.data || {})}`)
+          .join("; ");
+        scene.components = [{
+          custom: true,
+          custom_prompt: (scene.description || scene.label) + (libDescriptions ? ". Include these elements: " + libDescriptions : ""),
+          z_index: 10,
+        }];
+      } else {
+        // Has custom -- strip library components (they should all be in the custom component)
+        var stripped = scene.components.filter((c: PlannedComponent) => c.custom);
+        if (stripped.length < scene.components.length) {
+          console.warn(`  Scene "${scene.label}": creativity=${creativity}, stripped ${scene.components.length - stripped.length} library components (all-custom mode)`);
+          scene.components = stripped;
+        }
+      }
+    } else {
+      // At lower creativity, validate library component types exist
+      var validatedComponents: PlannedComponent[] = [];
+      for (var comp of scene.components) {
+        if (comp.custom) {
+          validatedComponents.push(comp);
+        } else if (comp.type && validTypes.has(comp.type)) {
+          validatedComponents.push(comp);
+        } else if (comp.type) {
+          // Unknown library type -- convert to custom
+          console.warn(`  Scene "${scene.label}": unknown component type "${comp.type}", converting to custom`);
+          validatedComponents.push({
+            custom: true,
+            custom_prompt: `Render a "${comp.type}" element with data: ${JSON.stringify(comp.data || {})}. ${scene.description || ""}`,
+            z_index: comp.z_index || 10,
+            position: comp.position,
+          });
+        }
+      }
+      scene.components = validatedComponents;
     }
 
     // If components array is empty, create a single custom component from the description
