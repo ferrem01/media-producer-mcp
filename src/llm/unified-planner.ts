@@ -162,8 +162,9 @@ ${catalogStr}
 - hero_image prompts describe the IMAGE itself, not the scene layout.
 - Every scene MUST have a components array with at least one component.
 - Think Apple keynote: one powerful idea per scene, cinematic motion, premium aesthetic.
-- For IMAGE format: use ONE custom component for all content (headline, subheadline, stats, CTA button, any text). The custom component handles the entire visual composition. Only add library components for: background (image/gradient at z:0) and logo (image at z:30). Do NOT use library stat-card, cta-card, section-header, etc. for images -- the custom component renders everything as one cohesive layout.
-- For VIDEO/PRESENTATION: you CAN mix library + custom components across scenes. Just follow the no-duplicate rule.
+- For IMAGE format: use ONE custom component for all content (headline, subheadline, stats, CTA button, any text). The custom component handles the entire visual composition. Do NOT use library components for images -- the custom component renders everything as one cohesive layout.
+- For PRESENTATION/DECK format: treat each slide like an image. Each slide MUST use ONE custom component that handles everything (background, layout, text, icons, CTA). No library components per slide. Each slide is a self-contained visual composition.
+- For VIDEO: you CAN mix library + custom components across scenes. Just follow the no-duplicate rule.
 - Output ONLY valid JSON. No commentary.
 
 ${SCENE_PLANNER_DESIGN_RULES}`;
