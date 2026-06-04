@@ -244,15 +244,23 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 
 ## Scoring (1-10)
 
-- 9-10: Production ready. Professional quality, clear messaging, smooth animation.
-- 7-8: Good. Minor polish needed.
-- 5-6: Acceptable but needs work. Layout or timing issues.
+- 9-10: Production ready. Professional quality, clear messaging, all text readable, strong visual hierarchy.
+- 7-8: Good. Minor polish needed. All text is clearly readable. Layout is solid.
+- 5-6: Acceptable but needs work. Layout or timing issues. Some text may be hard to read.
 - 3-4: Significant problems. Hard to read, broken layout, poor animation.
 - 1-2: Fundamentally broken. Missing content, crashes, or unreadable.
 
+## HARD SCORING RULES (these override the scale above)
+
+- If ANY text in the image has poor contrast or is hard to read against its background: score MUST be 6 or below. Unreadable text is never "minor polish."
+- If a logo or key visual element is missing or broken (broken image placeholder): score MUST be 5 or below.
+- If the headline is not prominently visible and immediately readable: score MUST be 5 or below.
+- If content from the original prompt is missing (headline, CTA, logos that were requested): score MUST be 4 or below.
+- A beautiful image with unreadable text is NOT a 7 or 8. Readability is the #1 priority.
+
 ## Rules
 
-1. Focus on: readability, visual hierarchy, animation quality, brand consistency, and overall polish.
+1. Focus on: readability FIRST, then visual hierarchy, animation quality, brand consistency, and overall polish.
 2. Be specific in issues and suggestions (mention exact elements, sizes, colors).
 3. Only include revised_html if score < 7 and you can provide a concrete fix.
 4. Output ONLY the JSON object. No explanation.
