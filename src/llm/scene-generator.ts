@@ -144,10 +144,11 @@ async function generateCustomComponent(opts: CustomComponentOpts): Promise<strin
 
   // Build brand asset context
   var brandAssetContext = "";
-  if (opts.brandKit.assets?.backgrounds?.length) {
+  var bgAssets = (opts.brandKit.assets || []).filter(a => a.type === "background");
+  if (bgAssets.length) {
     brandAssetContext += "\n\nAvailable Brand Backgrounds:\n";
-    for (var bg of opts.brandKit.assets.backgrounds) {
-      brandAssetContext += `- "${bg.name}": ${bg.url} [tags: ${bg.tags.join(", ")}]\n`;
+    for (var bg of bgAssets) {
+      brandAssetContext += `- "${bg.name}": ${bg.url}${bg.tags?.length ? ` [tags: ${bg.tags.join(", ")}]` : ""}\n`;
     }
   }
   if (opts.brandKit.logos?.length) {

@@ -1,0 +1,42 @@
+<template>
+  <div class="video-wrap" id="video-container"></div>
+</template>
+
+<style scoped>
+  .video-wrap {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
+  .video-wrap video {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('#video-container');
+
+    // Set object-fit from data or default to cover
+    var fit = data.object_fit || 'cover';
+    var style = 'width:100%;height:100%;object-fit:' + fit + ';display:block;';
+
+    // Use shared video-sync utility (loaded by scene assembler)
+    var video = loadVideoForCapture(container, data.src, { style: style });
+
+    // Fade in
+    gsap.set(container, { autoAlpha: 0 });
+    tl.to(container, { autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, 0);
+
+    // Fade out before scene ends
+    if (ctx.duration > 1) {
+      tl.to(container, { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, ctx.duration - 0.3);
+    }
+
+    return tl;
+  }
+</script>

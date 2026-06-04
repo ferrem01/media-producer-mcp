@@ -144,10 +144,11 @@ function buildRevisionSystemPrompt(
 ): string {
   // Brand asset context
   let brandAssetsSection = "";
-  if (brandKit.assets?.backgrounds?.length) {
+  const backgrounds = (brandKit.assets || []).filter(a => a.type === "background");
+  if (backgrounds.length) {
     brandAssetsSection += `\n\nBrand Background Images:\n`;
-    for (const bg of brandKit.assets.backgrounds) {
-      brandAssetsSection += `- "${bg.name}": ${bg.url} [tags: ${bg.tags.join(", ")}]\n`;
+    for (const bg of backgrounds) {
+      brandAssetsSection += `- "${bg.name}": ${bg.url}${bg.tags?.length ? ` [tags: ${bg.tags.join(", ")}]` : ""}\n`;
     }
   }
   if (brandKit.logos?.length) {

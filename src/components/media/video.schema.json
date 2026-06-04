@@ -1,0 +1,20 @@
+{
+  "type": "video",
+  "label": "Video",
+  "category": "media",
+  "description": "Plays a video file. Used for brand intros, outros, or any pre-rendered video clip.",
+  "data": {
+    "src": {
+      "type": "string",
+      "label": "Video Source",
+      "description": "URL or path to the video file"
+    },
+    "object_fit": {
+      "type": "string",
+      "label": "Object Fit",
+      "optional": true,
+      "description": "CSS object-fit: cover, contain, fill",
+      "placeholder": "cover"
+    }
+  }
+}

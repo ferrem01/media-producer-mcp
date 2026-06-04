@@ -53,16 +53,16 @@ export interface BrandLogo {
   placement?: string;
 }
 
+export type BrandAssetType = "background" | "intro" | "outro" | "watermark" | "music";
+
 export interface BrandAsset {
-  name: string;           // e.g. "hero-gradient"
+  name: string;           // e.g. "hero-gradient", "logo-bouncy-wink"
   url: string;            // served URL
-  tags: string[];         // e.g. ["hero", "dark", "abstract"]
+  type: BrandAssetType;   // asset category
+  tags?: string[];        // e.g. ["hero", "dark", "abstract"]
   width?: number;
   height?: number;
-}
-
-export interface BrandAssets {
-  backgrounds: BrandAsset[];
+  duration?: number;      // seconds, for video/audio assets
 }
 
 export interface BrandKit {
@@ -70,7 +70,7 @@ export interface BrandKit {
   fonts: BrandFont[];
   logo?: BrandLogo;       // primary logo (backwards compat)
   logos?: BrandLogo[];     // all logo variants
-  assets?: BrandAssets;   // brand backgrounds, etc.
+  assets?: BrandAsset[];  // brand assets (backgrounds, intros, outros, watermarks, music)
   style?: {
     border_radius?: string;
     motion?: "minimal" | "punchy" | "cinematic";

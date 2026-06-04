@@ -171,12 +171,41 @@ ${SCENE_PLANNER_DESIGN_RULES}`;
 
   // Inject brand asset info into the system prompt if available
   var brandAssetsSection = "";
-  if (opts.brandKit.assets?.backgrounds?.length) {
+  var brandAssets = opts.brandKit.assets || [];
+  var backgrounds = brandAssets.filter(a => a.type === "background");
+  var intros = brandAssets.filter(a => a.type === "intro");
+  var outros = brandAssets.filter(a => a.type === "outro");
+  var brandMusic = brandAssets.filter(a => a.type === "music");
+
+  if (backgrounds.length) {
     brandAssetsSection += `\n\n## Brand Background Images (MANDATORY)\nThese are pre-approved brand backgrounds. PREFER these over mesh-gradient or gradient-background when a matching background exists.\n`;
-    for (var bg of opts.brandKit.assets.backgrounds) {
-      brandAssetsSection += `- "${bg.name}": ${bg.url} [tags: ${bg.tags.join(", ")}]\n`;
+    for (var bg of backgrounds) {
+      brandAssetsSection += `- "${bg.name}": ${bg.url}${bg.tags?.length ? ` [tags: ${bg.tags.join(", ")}]` : ""}\n`;
     }
-    brandAssetsSection += `\nTo use a brand background as a full-bleed scene background at z_index 0, use the image component:\n{ "type": "image", "data": { "src": "${opts.brandKit.assets.backgrounds[0].url}" }, "z_index": 0 }\nOptional data props: overlay_opacity (0-1 for text readability), overlay_color, drift (true/false for ken-burns).\n`;
+    brandAssetsSection += `\nTo use a brand background as a full-bleed scene background at z_index 0, use the image component:\n{ "type": "image", "data": { "src": "${backgrounds[0].url}" }, "z_index": 0 }\nOptional data props: overlay_opacity (0-1 for text readability), overlay_color, drift (true/false for ken-burns).\n`;
+  }
+
+  if (intros.length) {
+    brandAssetsSection += `\n\n## Brand Intro Videos\nAvailable intro clips that can be used as the first scene of a video. Use the "video" component to play them.\n`;
+    for (var intro of intros) {
+      brandAssetsSection += `- "${intro.name}": ${intro.url} (${intro.duration ? intro.duration.toFixed(1) + "s" : "unknown duration"}${intro.width ? `, ${intro.width}x${intro.height}` : ""})\n`;
+    }
+    brandAssetsSection += `\nTo use a brand intro, add it as the first scene with a video component:\n{ "label": "Intro", "duration_seconds": ${intros[0].duration || 5}, "components": [{ "type": "video", "data": { "src": "${intros[0].url}" }, "z_index": 0 }] }\nOnly add intros when brand guidelines specify to use them.\n`;
+  }
+
+  if (outros.length) {
+    brandAssetsSection += `\n\n## Brand Outro Videos\nAvailable outro clips that can be used as the last scene of a video. Use the "video" component to play them.\n`;
+    for (var outro of outros) {
+      brandAssetsSection += `- "${outro.name}": ${outro.url} (${outro.duration ? outro.duration.toFixed(1) + "s" : "unknown duration"})\n`;
+    }
+    brandAssetsSection += `\nTo use a brand outro, add it as the last scene with a video component.\nOnly add outros when brand guidelines specify to use them.\n`;
+  }
+
+  if (brandMusic.length) {
+    brandAssetsSection += `\n\n## Brand Music\nAvailable music tracks for audio.\n`;
+    for (var m of brandMusic) {
+      brandAssetsSection += `- "${m.name}": ${m.url} (${m.duration ? m.duration.toFixed(1) + "s" : "unknown duration"}${m.tags?.length ? `, tags: ${m.tags.join(", ")}` : ""})\n`;
+    }
   }
   if (opts.brandKit.logos?.length) {
     var isLight = isLightBrand(opts.brandKit);

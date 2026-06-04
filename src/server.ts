@@ -503,15 +503,15 @@ export function createMcpServer(): McpServer {
         theme: z.enum(["dark", "light", "any"]),
         height: z.number().optional(),
       })).optional().describe("Logo variants (full, icon, wordmark) for different backgrounds"),
-      assets: z.object({
-        backgrounds: z.array(z.object({
-          name: z.string(),
-          url: z.string(),
-          tags: z.array(z.string()),
-          width: z.number().optional(),
-          height: z.number().optional(),
-        })),
-      }).optional().describe("Brand assets (backgrounds, etc.)"),
+      assets: z.array(z.object({
+        name: z.string(),
+        url: z.string(),
+        type: z.enum(["background", "intro", "outro", "watermark", "music"]).describe("Asset type"),
+        tags: z.array(z.string()).optional(),
+        width: z.number().optional(),
+        height: z.number().optional(),
+        duration: z.number().optional().describe("Duration in seconds (video/audio assets)"),
+      })).optional().describe("Brand assets (backgrounds, intros, outros, watermarks, music)"),
       style: z.object({
         border_radius: z.string().optional(),
         motion: z.enum(["minimal", "punchy", "cinematic"]).optional(),
@@ -539,13 +539,13 @@ export function createMcpServer(): McpServer {
         }
       }
 
-      // Merge assets: append new backgrounds, replace by name
-      let mergedAssets = existing?.assets || { backgrounds: [] };
+      // Merge assets: append new, replace by name+type
+      let mergedAssets: any[] = existing?.assets || [];
       if (params.assets) {
-        for (const newBg of params.assets.backgrounds) {
-          const idx = mergedAssets.backgrounds.findIndex((b: any) => b.name === newBg.name);
-          if (idx >= 0) mergedAssets.backgrounds[idx] = newBg as any;
-          else mergedAssets.backgrounds.push(newBg as any);
+        for (const newAsset of params.assets) {
+          const idx = mergedAssets.findIndex((a: any) => a.name === newAsset.name && a.type === newAsset.type);
+          if (idx >= 0) mergedAssets[idx] = newAsset as any;
+          else mergedAssets.push(newAsset as any);
         }
       }
 
@@ -586,7 +586,7 @@ export function createMcpServer(): McpServer {
         ],
         logo: primaryLogo,
         logos: mergedLogos.length > 0 ? mergedLogos : undefined,
-        assets: mergedAssets.backgrounds.length > 0 ? mergedAssets as any : undefined,
+        assets: mergedAssets.length > 0 ? mergedAssets : undefined,
         style: {
           border_radius: "12px",
           motion: "cinematic" as const,
@@ -725,6 +725,65 @@ export function createMcpServer(): McpServer {
 
           // Return the served URL
           const servedUrl = `/assets/${params.tenant_id}/brand-kit/${assetType}/${filename}`;
+
+          // Auto-register in brand kit metadata
+          const brandAssetTypes = ["background", "intro", "outro", "watermark", "music"];
+          if (brandAssetTypes.includes(assetType)) {
+            try {
+              const kit = await loadBrandKit(params.tenant_id) || {
+                colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
+                fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
+                style: { border_radius: "12px", motion: "cinematic" as const },
+              };
+              if (!kit.assets) kit.assets = [];
+
+              // Probe media metadata via ffprobe
+              let assetWidth: number | undefined;
+              let assetHeight: number | undefined;
+              let assetDuration: number | undefined;
+              try {
+                const { execFile: execFileCb } = await import("node:child_process");
+                const { promisify } = await import("node:util");
+                const execFileP = promisify(execFileCb);
+                const probe = await execFileP("ffprobe", [
+                  "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", filePath,
+                ]);
+                const probeData = JSON.parse(probe.stdout);
+                const videoStream = probeData.streams?.find((s: any) => s.codec_type === "video");
+                if (videoStream) {
+                  assetWidth = videoStream.width;
+                  assetHeight = videoStream.height;
+                }
+                const imageStream = !videoStream && probeData.streams?.find((s: any) => s.codec_type === "video" || s.codec_name === "png" || s.codec_name === "mjpeg");
+                if (imageStream && !assetWidth) {
+                  assetWidth = imageStream.width;
+                  assetHeight = imageStream.height;
+                }
+                if (probeData.format?.duration) {
+                  assetDuration = parseFloat(probeData.format.duration);
+                }
+              } catch { /* probe failed, skip metadata */ }
+
+              const brandAsset: any = {
+                name: params.name,
+                url: servedUrl,
+                type: assetType,
+                width: assetWidth,
+                height: assetHeight,
+                duration: assetDuration,
+              };
+
+              // Replace existing asset with same name+type, or append
+              const existingIdx = kit.assets.findIndex((a: any) => a.name === brandAsset.name && a.type === brandAsset.type);
+              if (existingIdx >= 0) kit.assets[existingIdx] = brandAsset;
+              else kit.assets.push(brandAsset);
+
+              await saveBrandKit(params.tenant_id, kit);
+            } catch (regErr: any) {
+              console.warn("Failed to auto-register brand asset:", regErr.message);
+            }
+          }
+
           return ok({
             status: "uploaded",
             name: params.name,

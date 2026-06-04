@@ -22,7 +22,25 @@ import {
 export async function loadBrandKit(tenantId: string): Promise<BrandKit | null> {
   try {
     const raw = await fs.readFile(brandKitJsonPath(tenantId), "utf-8");
-    return JSON.parse(raw) as BrandKit;
+    const kit = JSON.parse(raw) as BrandKit;
+
+    // Migration: old format had assets: { backgrounds: [...] }
+    if (kit.assets && !Array.isArray(kit.assets)) {
+      const old = kit.assets as any;
+      if (old.backgrounds && Array.isArray(old.backgrounds)) {
+        kit.assets = old.backgrounds.map((bg: any) => ({ ...bg, type: "background" }));
+      } else {
+        kit.assets = [];
+      }
+    }
+    // Ensure all assets have a type
+    if (Array.isArray(kit.assets)) {
+      for (const a of kit.assets) {
+        if (!(a as any).type) (a as any).type = "background";
+      }
+    }
+
+    return kit;
   } catch {
     return null;
   }
