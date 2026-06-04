@@ -104,7 +104,7 @@ For library components: use the EXACT type name from the catalog above (e.g. "ct
 For background component colors: ALWAYS use CSS var references from the brand kit (e.g. "var(--mp-color-background)", "var(--mp-color-primary)", "var(--mp-color-surface)"). NEVER hardcode hex colors for backgrounds.
 For custom components: provide a detailed custom_prompt describing the visual, layout, and animation. Be VERY specific about typography sizes, animation techniques (SplitText, ScrambleText, DrawSVG, particles), colors, and layout.
 
-You can also include "hero_image" with a DALL-E prompt for any scene that would benefit from an AI-generated visual.
+You can also include "hero_image" with an image generation prompt for any scene that would benefit from an AI-generated visual.
 
 ## Available Components
 
