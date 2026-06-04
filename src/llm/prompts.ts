@@ -8,6 +8,7 @@
 import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES, CRITIQUER_DESIGN_RULES } from "./design-rules.js";
 import { GSAP_ANIMATION_SKILLS } from "./gsap-skills.js";
 import { SCRIPT_SYSTEM_SKILLS } from "./script-skills.js";
+import { COMPONENT_EXEMPLARS } from "./exemplars.js";
 import type { BrandKit, Canvas } from "../core/types.js";
 
 /**
@@ -92,7 +93,9 @@ ${COMPONENT_DESIGN_RULES}
 
 ${GSAP_ANIMATION_SKILLS}
 
-${SCRIPT_SYSTEM_SKILLS}`;
+${SCRIPT_SYSTEM_SKILLS}
+
+${COMPONENT_EXEMPLARS}`;
 }
 
 /**
