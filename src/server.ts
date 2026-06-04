@@ -961,6 +961,7 @@ export function createMcpServer(): McpServer {
       project_id: z.string().optional().describe("Project ID (required for scene revision)"),
       canvas_width: z.number().optional().describe("Explicit canvas width. For images, auto-inferred from prompt if omitted."),
       canvas_height: z.number().optional().describe("Explicit canvas height. For images, auto-inferred from prompt if omitted."),
+      creativity: z.number().min(0).max(1).optional().describe("Creativity level 0-1. Low (0) prefers library components. High (0.7-1.0) creates one self-contained custom component per scene. Default: 0.5."),
       token: z.string().optional().describe("Auth token"),
     },
     async (params) => {
@@ -1046,6 +1047,7 @@ export function createMcpServer(): McpServer {
               canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
               canvasWidth: params.canvas_width,
               canvasHeight: params.canvas_height,
+              creativity: params.creativity,
               existingSource,
               name: revisionName,
               project_id: revisionProjectId || params.project_id,

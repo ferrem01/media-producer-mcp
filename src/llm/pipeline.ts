@@ -18,6 +18,9 @@ import { generateComponentLLM } from "./component-gen.js";
 import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
 import { planStoryboard } from "./unified-planner.js";
+import { planRevision, type RevisionPlan, type RevisedComponent } from "./revision-planner.js";
+import { reviseComponent } from "./component-revise.js";
+import { critiqueAndReviseScene } from "./revision-critique.js";
 import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
@@ -514,97 +517,223 @@ async function runImageRevisionPipeline(
     return { status: "error", target: "image", error: `Project ${opts.project_id} has no scenes` };
   }
 
-  const sceneContext = serializeSceneContext(existingScene);
-  const revisionPrompt = `Revise this image based on these instructions: ${opts.prompt}\n\nCurrent scene:\n${sceneContext}`;
+  const useCanvas = project.canvas || canvas;
+  const useBrandKit = project.brand_kit || brandKit;
 
-  trace?.beginEvent("image_revision_plan");
-  const storyboard = await planStoryboard({
-    prompt: revisionPrompt,
-    format: "image",
-    llmConfig: opts.llmConfig,
-    brandKit: project.brand_kit || brandKit,
-    canvas: project.canvas || canvas,
-    componentCatalog: catalog,
-    sceneCount: 1,
-    creativity: resolveCreativity(opts),
-    tenantId: opts.tenant_id,
-  });
-  trace?.endEvent({ scenes: storyboard.scenes.length });
-
-  if (storyboard.scenes.length === 0) {
-    return { status: "error", target: "image", error: "Planner returned no scenes for image revision" };
+  // Load existing custom component HTML sources
+  const compDir = path.join(projectDir(opts.tenant_id, project.project_id), "components");
+  const customSources = new Map<string, string>();
+  try {
+    const files = await fs.readdir(compDir);
+    for (const file of files) {
+      if (file.endsWith(".component.html")) {
+        const compName = file.replace(".component.html", "");
+        const source = await fs.readFile(path.join(compDir, file), "utf-8");
+        customSources.set(compName, source);
+      }
+    }
+  } catch {
+    // No components dir yet
   }
 
-  // Generate the revised scene
-  trace?.beginEvent("image_revision_generate");
-  const compDir = path.join(projectDir(opts.tenant_id, project.project_id), "components");
-  await fs.mkdir(compDir, { recursive: true });
+  // Also check tenant components dir
+  const tenantCompDir = tenantComponentsDir(opts.tenant_id);
+  try {
+    const files = await fs.readdir(tenantCompDir);
+    for (const file of files) {
+      if (file.endsWith(".component.html") && !customSources.has(file.replace(".component.html", ""))) {
+        const compName = file.replace(".component.html", "");
+        const source = await fs.readFile(path.join(tenantCompDir, file), "utf-8");
+        customSources.set(compName, source);
+      }
+    }
+  } catch { /* no tenant components */ }
 
-  const planned = storyboard.scenes[0];
-  const generated = await generateScene({
-    scene: planned,
-    sceneIndex: 0,
-    totalScenes: 1,
-    prompt: revisionPrompt,
+  // Use the revision planner (NOT the unified planner)
+  trace?.beginEvent("image_revision_plan");
+  console.log(`  [revision] Planning revision for image project ${opts.project_id}`);
+  console.log(`  [revision] Existing components: ${existingScene.components.map(c => c.type).join(", ")}`);
+  console.log(`  [revision] Custom sources available: ${[...customSources.keys()].join(", ") || "none"}`);
+
+  const revisionPlan = await planRevision({
+    prompt: opts.prompt,
+    existingComponents: existingScene.components,
+    customSources,
+    sceneLabel: existingScene.label || "Image",
+    sceneDuration: existingScene.duration_seconds,
     format: "image",
     llmConfig: opts.llmConfig,
-    brandKit: project.brand_kit || brandKit,
-    canvas: project.canvas || canvas,
+    brandKit: useBrandKit,
+    canvas: useCanvas,
+    componentCatalog: catalog,
     tenantId: opts.tenant_id,
-    projectId: project.project_id,
+  });
+  trace?.endEvent({
+    strategies: revisionPlan.components.map(c => `${c.type}:${c.strategy}`),
+    summary: revisionPlan.revision_summary,
   });
 
-  // Preserve original scene id
-  generated.scene.id = existingScene.id;
-  if (existingScene.label) generated.scene.label = existingScene.label;
+  console.log(`  [revision] Plan: ${revisionPlan.revision_summary}`);
+  for (const comp of revisionPlan.components) {
+    console.log(`    ${comp.original_id || "NEW"} (${comp.type}): ${comp.strategy}${comp.revise_instructions ? " - " + comp.revise_instructions.substring(0, 80) : ""}`);
+  }
 
-  // Save custom component HTML
-  if (generated.customSources) {
-    for (const [compName, html] of generated.customSources) {
-      await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
+  // Execute the revision plan
+  trace?.beginEvent("image_revision_execute");
+  await fs.mkdir(compDir, { recursive: true });
+  const newComponents: import("../core/types.js").SceneComponent[] = [];
+  const newCustomSources = new Map<string, string>();
+
+  for (let ci = 0; ci < revisionPlan.components.length; ci++) {
+    const planned = revisionPlan.components[ci];
+
+    if (planned.strategy === "remove") {
+      console.log(`  [revision] Removing ${planned.type}`);
+      continue;
+    }
+
+    if (planned.strategy === "keep") {
+      // Pass through unchanged
+      const existing = existingScene.components.find(c => c.id === planned.original_id);
+      if (existing) {
+        // Apply any data/position updates from the plan
+        const comp = { ...existing };
+        if (planned.data) comp.data = planned.data;
+        if (planned.position) comp.position = planned.position;
+        if (planned.z_index !== undefined) comp.z_index = planned.z_index;
+        newComponents.push(comp);
+        // Preserve custom source
+        if (customSources.has(comp.type)) {
+          newCustomSources.set(comp.type, customSources.get(comp.type)!);
+        }
+      }
+      continue;
+    }
+
+    if (planned.strategy === "revise") {
+      // Surgical SEARCH/REPLACE on existing custom component
+      const existingSource = customSources.get(planned.type);
+      if (!existingSource) {
+        console.log(`  [revision] Cannot revise ${planned.type}: no HTML source found, treating as keep`);
+        const existing = existingScene.components.find(c => c.id === planned.original_id);
+        if (existing) newComponents.push(existing);
+        continue;
+      }
+
+      console.log(`  [revision] Revising ${planned.type} via SEARCH/REPLACE`);
+      const reviseResult = await reviseComponent({
+        existingSource,
+        instructions: planned.revise_instructions || opts.prompt,
+        componentName: planned.type,
+        llmConfig: opts.llmConfig,
+        brandKit: useBrandKit,
+        canvas: useCanvas,
+      });
+
+      console.log(`  [revision] ${planned.type}: ${reviseResult.blocksApplied} blocks applied, fullRewrite=${reviseResult.fullRewrite}`);
+
+      // Save revised HTML
+      await fs.writeFile(path.join(compDir, `${planned.type}.component.html`), reviseResult.source);
+      newCustomSources.set(planned.type, reviseResult.source);
+
+      const existing = existingScene.components.find(c => c.id === planned.original_id);
+      if (existing) {
+        const comp = { ...existing };
+        if (planned.data) comp.data = planned.data;
+        if (planned.position) comp.position = planned.position;
+        if (planned.z_index !== undefined) comp.z_index = planned.z_index;
+        newComponents.push(comp);
+      }
+      continue;
+    }
+
+    if (planned.strategy === "replace") {
+      // Full regeneration of custom component
+      console.log(`  [revision] Replacing ${planned.type} with new custom component`);
+      const compName = planned.original_id
+        ? planned.type
+        : `custom_${existingScene.id}_${ci}`;
+
+      const generated = await generateScene({
+        scene: {
+          label: revisionPlan.label,
+          duration_seconds: revisionPlan.duration_seconds,
+          description: planned.custom_prompt || opts.prompt,
+          components: [{
+            custom: true,
+            custom_prompt: planned.custom_prompt || opts.prompt,
+            z_index: planned.z_index ?? 10,
+          }],
+        },
+        sceneIndex: 0,
+        totalScenes: 1,
+        prompt: opts.prompt,
+        format: "image",
+        llmConfig: opts.llmConfig,
+        brandKit: useBrandKit,
+        canvas: useCanvas,
+        tenantId: opts.tenant_id,
+        projectId: project.project_id,
+      });
+
+      if (generated.customSources) {
+        for (const [name, html] of generated.customSources) {
+          await fs.writeFile(path.join(compDir, `${name}.component.html`), html);
+          newCustomSources.set(name, html);
+        }
+      }
+
+      // Use the generated scene component(s)
+      for (const gc of generated.scene.components) {
+        newComponents.push(gc);
+      }
+      continue;
     }
   }
 
-  // Critique loop (skip if opts.critique === false)
-  let finalImgScene = generated.scene;
-  if (opts.critique !== false) {
-    const critiqueResult = await critiqueAndRetryScene({
-      scene: generated.scene,
-      planned,
-      sceneIndex: 0,
-      totalScenes: 1,
-      prompt: revisionPrompt,
-      format: "image" as OutputFormat,
+  // Build the revised scene
+  const revisedScene: Scene = {
+    id: existingScene.id,
+    label: revisionPlan.label || existingScene.label,
+    duration_seconds: revisionPlan.duration_seconds || existingScene.duration_seconds,
+    transition_in: existingScene.transition_in,
+    components: newComponents,
+    background: existingScene.background,
+  };
+
+  // Revision-aware critique loop: uses SEARCH/REPLACE to fix visual issues
+  // instead of regenerating components from scratch (which destroys content).
+  let finalScene = revisedScene;
+  let finalCustomSources = newCustomSources;
+  if (opts.critique !== false && newCustomSources.size > 0) {
+    console.log(`  [revision] Running revision-aware critique loop`);
+    const critiqueResult = await critiqueAndReviseScene({
+      scene: revisedScene,
+      customSources: newCustomSources,
+      prompt: opts.prompt,
+      format: "image",
       llmConfig: opts.llmConfig,
-      brandKit: project.brand_kit || brandKit,
-      canvas: project.canvas || canvas,
+      brandKit: useBrandKit,
+      canvas: useCanvas,
       tenantId: opts.tenant_id,
       projectId: project.project_id,
       compDir,
       maxRetries: opts.maxRevisions ?? 2,
       trace,
-      customSources: generated.customSources,
-      catalog,
-      critique: opts.critique,
     });
-    finalImgScene = critiqueResult.scene;
-    if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
-      for (const [compName, html] of critiqueResult.customSources) {
-        await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
-      }
-    }
+    finalScene = critiqueResult.scene;
+    finalCustomSources = critiqueResult.customSources;
+    console.log(`  [revision] Critique complete: accepted=${critiqueResult.accepted}, score=${critiqueResult.critiqueResult?.score ?? "n/a"}`);
   }
 
   // Preserve original scene id
-  finalImgScene.id = existingScene.id;
-  if (existingScene.label) finalImgScene.label = existingScene.label;
+  finalScene.id = existingScene.id;
 
-  // Replace the scene and update name if planner provided one
-  project.scenes = [finalImgScene];
-  if (storyboard.name) project.name = storyboard.name;
-
+  project.scenes = [finalScene];
   await saveProject(project);
   trace?.endEvent();
+
+  console.log(`  [revision] Image revision complete for ${opts.project_id}`);
 
   return {
     status: "completed",
