@@ -28,7 +28,7 @@ import { loadProject, saveProject } from "../persistence/project.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
-import type { BrandKit, Canvas, OutputFormat, Project, Scene } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, Project, Scene, SceneTransition } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
 import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
@@ -1019,6 +1019,11 @@ Output valid JSON only. No markdown fences, no commentary.`;
       // Use the fixed plan
       const newPlanned = fixedPlan;
       currentPlanned = newPlanned;
+
+      // Fix 1: Feed critique issues directly into the retry prompt so the
+      // generator knows what went wrong and can avoid the same mistakes.
+      const critiqueFeedback = buildCritiqueFeedback(critiqueResult);
+
       const regenerated = await generateScene({
         scene: newPlanned,
         sceneIndex: opts.sceneIndex,
@@ -1031,6 +1036,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         imageUrl: opts.imageUrl,
         tenantId: opts.tenantId,
         projectId: opts.projectId,
+        critiqueFeedback,
       });
 
       // Save custom component HTML if needed
@@ -1050,11 +1056,91 @@ Output valid JSON only. No markdown fences, no commentary.`;
     }
   }
 
+  // Fix 2: Hard floor -- if best score < 6 after all retries, do a full
+  // recipe swap: force a single custom component with explicit "avoid these
+  // mistakes" instructions. This prevents shipping garbage scenes.
+  if (bestScore > 0 && bestScore < 6 && opts.maxRetries > 0) {
+    console.log(`  Hard floor triggered: best score ${bestScore} < 6, attempting full recipe swap`);
+    opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_recipe_swap`);
+    try {
+      const swapFeedback = bestCritique
+        ? buildCritiqueFeedback(bestCritique)
+        : "Previous attempts had low quality scores. Start fresh with a simpler, bolder design.";
+
+      const swapPlan = {
+        label: currentPlanned.label || `Scene ${opts.sceneIndex + 1}`,
+        duration_seconds: currentPlanned.duration_seconds || 5,
+        description: currentPlanned.description || opts.prompt,
+        transition_in: currentPlanned.transition_in,
+        components: [{
+          custom: true,
+          custom_prompt: `${currentPlanned.description || opts.prompt}\n\nDESIGN MANDATE: Keep it simple. One bold visual idea. Large readable text on a high-contrast background. No more than 10 words visible. Use var(--mp-color-text) on var(--mp-color-background) for guaranteed contrast.`,
+          z_index: 10,
+        }],
+      };
+
+      const swapped = await generateScene({
+        scene: swapPlan,
+        sceneIndex: opts.sceneIndex,
+        totalScenes: opts.totalScenes,
+        prompt: opts.prompt,
+        format: opts.format,
+        llmConfig: opts.llmConfig,
+        brandKit: opts.brandKit,
+        canvas: opts.canvas,
+        imageUrl: opts.imageUrl,
+        tenantId: opts.tenantId,
+        projectId: opts.projectId,
+        critiqueFeedback: swapFeedback,
+      });
+
+      if (swapped.customSources) {
+        for (const [compName, compHtml] of swapped.customSources) {
+          await fs.writeFile(path.join(opts.compDir, `${compName}.component.html`), compHtml);
+        }
+      }
+
+      console.log(`  Recipe swap complete for scene ${opts.sceneIndex}`);
+      opts.trace?.endEvent({ swapped: true, previousBest: bestScore });
+      return { scene: swapped.scene, customSources: swapped.customSources, critiqueResult: bestCritique };
+    } catch (e: any) {
+      console.warn(`  Recipe swap failed (non-fatal): ${e.message}`);
+      opts.trace?.endEvent({ error: e.message });
+    }
+  }
+
   // Return the best-scoring attempt, not the last one
   if (bestScore > 0 && bestScore >= (lastCritique?.score ?? 0)) {
     return { scene: bestScene, customSources: bestCustomSources, critiqueResult: bestCritique };
   }
   return { scene: currentScene, customSources: currentCustomSources, critiqueResult: lastCritique };
+}
+
+/**
+ * Build a human-readable critique feedback string from a CritiqueResult.
+ * This is injected into the scene generator prompt so it knows exactly
+ * what went wrong in the previous attempt.
+ */
+function buildCritiqueFeedback(critique: CritiqueResult): string {
+  const parts: string[] = [];
+  parts.push(`Previous attempt scored ${critique.score}/10.`);
+  if (critique.issues.length > 0) {
+    parts.push("\nISSUES FOUND (you MUST fix all of these):");
+    for (let i = 0; i < critique.issues.length; i++) {
+      parts.push(`  ${i + 1}. ${critique.issues[i]}`);
+    }
+  }
+  if (critique.suggestions.length > 0) {
+    parts.push("\nSUGGESTED FIXES:");
+    for (let i = 0; i < critique.suggestions.length; i++) {
+      parts.push(`  ${i + 1}. ${critique.suggestions[i]}`);
+    }
+  }
+  // Add systemic contrast rule since it's the #1 repeat offender
+  if (critique.issues.some(iss => /contrast|readab|text.*background|dark.*text|light.*text/i.test(iss))) {
+    parts.push("\nCONTRAST FIX: Use var(--mp-color-text) for ALL text on var(--mp-color-background). Do NOT use low-opacity text, muted colors for headlines, or colored text on similarly-colored backgrounds.");
+  }
+  return parts.join("\n");
 }
 
 // ── Unified Pipeline ──
@@ -1231,9 +1317,15 @@ async function runUnifiedPipeline(
       if (editorial.issues.length > 0) {
         console.log(`    Editorial issues: ${editorial.issues.join(" | ")}`);
       }
-      // Log fixes but don't auto-apply yet (future: auto-fix low-hanging fruit)
       if (editorial.fixes.length > 0) {
         console.log(`    Suggested fixes: ${editorial.fixes.map(f => f.type + ": " + f.detail).join(" | ")}`);
+      }
+
+      // Fix 3: Auto-apply safe editorial fixes (transition variety + breathing scenes)
+      var editorialChanges = applyEditorialFixes(project, editorial, brandKit);
+      if (editorialChanges > 0) {
+        console.log(`    Applied ${editorialChanges} editorial auto-fix(es)`);
+        await saveProject(project);
       }
     } catch (e: any) {
       console.warn(`  Editorial critique failed (non-fatal): ${e.message}`);
@@ -1248,6 +1340,78 @@ async function runUnifiedPipeline(
     target: opts.target,
     project,
   };
+}
+
+/**
+ * Fix 3: Auto-apply safe editorial fixes.
+ *
+ * Currently handles:
+ *   - vary_transition: break runs of 3+ identical transitions
+ *   - add_breathing: inject a minimal breathing scene before CTA or dense scenes
+ *
+ * Returns the number of changes applied.
+ */
+function applyEditorialFixes(
+  project: Project,
+  editorial: EditorialCritiqueResult,
+  brandKit: BrandKit,
+): number {
+  var changes = 0;
+  const scenes = project.scenes;
+  if (scenes.length < 3) return 0;
+
+  // --- vary_transition: break runs of 3+ identical transitions ---
+  const ALTERNATE_TRANSITIONS: Array<SceneTransition["type"]> = [
+    "blur-crossfade", "wipe-left", "slide-up", "iris", "scale-rotate",
+  ];
+  for (let i = 2; i < scenes.length; i++) {
+    const t0 = scenes[i - 2].transition_in?.type;
+    const t1 = scenes[i - 1].transition_in?.type;
+    const t2 = scenes[i].transition_in?.type;
+    if (t0 && t1 && t2 && t0 === t1 && t1 === t2) {
+      // Pick a different transition for the middle scene
+      const alt = ALTERNATE_TRANSITIONS.find(t => t !== t0) || "blur-crossfade";
+      scenes[i - 1].transition_in = {
+        type: alt,
+        duration_seconds: scenes[i - 1].transition_in?.duration_seconds || 0.5,
+      };
+      console.log(`    Transition fix: scene ${i} "${scenes[i - 1].label}" ${t0} -> ${alt}`);
+      changes++;
+    }
+  }
+
+  // --- add_breathing: inject a visual pause before the last scene (CTA) ---
+  // Only if editorial flagged it and there isn't already a short breathing scene
+  const needsBreathing = editorial.fixes.some(f => f.type === "add_breathing");
+  if (needsBreathing && scenes.length >= 4) {
+    // Check the second-to-last scene isn't already very short (a breathing scene)
+    const preCta = scenes[scenes.length - 2];
+    if (preCta.duration_seconds > 2.5) {
+      const breathingScene: Scene = {
+        id: `scene_breathing_${Date.now()}`,
+        label: "Visual Pause",
+        duration_seconds: 2,
+        transition_in: { type: "blur-crossfade", duration_seconds: 0.8 },
+        components: [{
+          id: "comp_0",
+          type: "gradient-background",
+          data: {
+            color_start: brandKit.colors?.background || "#0f172a",
+            color_end: brandKit.colors?.surface || "#1e293b",
+            direction: "135deg",
+          },
+          z_index: 0,
+          position: { x: 0, y: 0, width: "100%", height: "100%" },
+        }],
+      };
+      // Insert before the last scene
+      scenes.splice(scenes.length - 1, 0, breathingScene);
+      console.log(`    Breathing scene injected before CTA`);
+      changes++;
+    }
+  }
+
+  return changes;
 }
 
 /**

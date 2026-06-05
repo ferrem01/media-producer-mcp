@@ -70,6 +70,25 @@ You MUST output a single .component.html file with exactly three sections:
    The brand kit sets these variables. If you hardcode colors, the brand kit is ignored.
    The ONLY acceptable hardcoded colors are: transparent, rgba values for overlays/shadows, and currentColor.
 
+   ## TEXT CONTRAST RULES (READ THIS -- #1 CAUSE OF REJECTED SCENES)
+   
+   Every piece of text MUST be readable against its background. This is non-negotiable.
+   
+   ✅ SAFE PATTERNS:
+   - Headlines on dark bg: color: var(--mp-color-text)  (this is white/light by default)
+   - Subtitles on dark bg: color: var(--mp-color-text-muted)  (light gray)
+   - Text on colored surfaces: color: var(--mp-color-text) with a semi-transparent dark overlay behind it
+   - Text on gradient bg: add a dark scrim (background: linear-gradient(transparent, rgba(0,0,0,0.6))) behind text
+   
+   ❌ PATTERNS THAT WILL GET YOUR SCENE REJECTED:
+   - Colored text (var(--mp-color-primary)) on a dark gradient without a contrast backdrop
+   - Low-opacity text (opacity < 0.7) on any background
+   - Small text (< 18px) in var(--mp-color-text-muted) on a busy or gradient background
+   - Text directly on an image without a scrim or text-shadow
+   - ANY text where the color-to-background contrast ratio would be below 4.5:1
+   
+   When in doubt: use var(--mp-color-text) (the lightest/most contrasting text color).
+
 4. Use {{key}} for simple text binding in templates.
    For dynamic content (lists, complex DOM), build elements in createTimeline.
 
@@ -428,6 +447,13 @@ ${brandStyleGuide}
 - Only acceptable hardcoded values: transparent, rgba() for overlays/shadows/glows, currentColor.
 - If you write background: #0f172a or color: #ffffff anywhere, YOU ARE DOING IT WRONG.
 
+## TEXT CONTRAST (scenes get REJECTED for contrast failures)
+- ALL headlines: color: var(--mp-color-text). Always. No exceptions.
+- Subtitles/labels: var(--mp-color-text-muted) minimum.
+- NEVER use var(--mp-color-primary) or var(--mp-color-accent) as the ONLY text color on a dark bg without verifying contrast.
+- Text over images/gradients MUST have either: text-shadow (0 2px 8px rgba(0,0,0,0.8)) OR a dark scrim behind it.
+- If background is dark, text must be light. If background is light, text must be dark. Test mentally.
+
 ## ICONS: NEVER USE EMOJI
 Never use emoji characters (⚡🔧✨🤖📦🎨 etc.) as icons. They look cheap and unprofessional.
 Instead, use inline SVG icons. Here are examples:
@@ -717,6 +743,13 @@ highlightDraw(tl, el.querySelector('.keyword'), 1.5, 0.5, 'rgba(167,139,250,0.3)
 - var(--mp-color-text) for all text. var(--mp-color-text-muted) for secondary text.
 - var(--mp-color-primary) and var(--mp-color-accent) for highlights and accents.
 - Only acceptable hardcoded values: transparent, rgba() for overlays/shadows/glows, currentColor.
+
+## TEXT CONTRAST (scenes get REJECTED for contrast failures)
+- ALL headlines: color: var(--mp-color-text). Always. No exceptions.
+- Subtitles/labels: var(--mp-color-text-muted) minimum.
+- NEVER use var(--mp-color-primary) or var(--mp-color-accent) as the ONLY text color on a dark bg without verifying contrast.
+- Text over images/gradients MUST have either: text-shadow (0 2px 8px rgba(0,0,0,0.8)) OR a dark scrim behind it.
+- If background is dark, text must be light. If background is light, text must be dark. Test mentally.
 
 ## Logo Integration
 - For external logos, use logo.dev: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark
