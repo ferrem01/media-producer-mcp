@@ -1,0 +1,171 @@
+<template>
+  <div class="pricing-tiers">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <div class="content">
+      <div class="eyebrow" data-bind="eyebrow"></div>
+      <h2 class="headline" data-bind="headline">Simple Pricing</h2>
+
+      <div class="tiers">
+        <!-- Tier 1 -->
+        <div class="tier">
+          <div class="tier-name" data-bind="tier_1_name">Starter</div>
+          <div class="tier-price" data-bind="tier_1_price">$29</div>
+          <div class="tier-period" data-bind="tier_1_period">/month</div>
+          <div class="tier-features">
+            <div class="tier-feat" data-bind="tier_1_feat_1">5 projects</div>
+            <div class="tier-feat" data-bind="tier_1_feat_2">Basic analytics</div>
+            <div class="tier-feat" data-bind="tier_1_feat_3">Email support</div>
+          </div>
+        </div>
+
+        <!-- Tier 2 (featured) -->
+        <div class="tier featured">
+          <div class="tier-badge" data-bind="tier_2_badge">MOST POPULAR</div>
+          <div class="tier-name" data-bind="tier_2_name">Professional</div>
+          <div class="tier-price" data-bind="tier_2_price">$99</div>
+          <div class="tier-period" data-bind="tier_2_period">/month</div>
+          <div class="tier-features">
+            <div class="tier-feat" data-bind="tier_2_feat_1">Unlimited projects</div>
+            <div class="tier-feat" data-bind="tier_2_feat_2">Advanced analytics</div>
+            <div class="tier-feat" data-bind="tier_2_feat_3">Priority support</div>
+          </div>
+        </div>
+
+        <!-- Tier 3 -->
+        <div class="tier">
+          <div class="tier-name" data-bind="tier_3_name">Enterprise</div>
+          <div class="tier-price" data-bind="tier_3_price">Custom</div>
+          <div class="tier-period" data-bind="tier_3_period"></div>
+          <div class="tier-features">
+            <div class="tier-feat" data-bind="tier_3_feat_1">Everything in Pro</div>
+            <div class="tier-feat" data-bind="tier_3_feat_2">SSO & SAML</div>
+            <div class="tier-feat" data-bind="tier_3_feat_3">Dedicated CSM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .pricing-tiers {
+    position: relative; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      var(--mp-color-background, #0f172a) 0%,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 88%, var(--mp-color-surface, #1e293b)) 100%
+    ); z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px; z-index: 1; pointer-events: none;
+  }
+
+  .content {
+    position: relative; z-index: 2;
+    text-align: center; max-width: 1100px; padding: 0 60px;
+  }
+  .eyebrow {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.2em; color: var(--mp-color-primary, #6366f1); margin-bottom: 12px;
+  }
+  .eyebrow:empty { display: none; }
+  .headline {
+    font-size: 44px; font-weight: 700; color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em; margin: 0 0 48px; line-height: 1.15;
+  }
+
+  .tiers { display: flex; gap: 20px; justify-content: center; align-items: stretch; }
+  .tier {
+    width: 280px; padding: 36px 28px;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 40%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 6%, transparent);
+    border-radius: 20px; text-align: center;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    display: flex; flex-direction: column; position: relative;
+  }
+  .tier.featured {
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 10%, color-mix(in srgb, var(--mp-color-surface, #1e293b) 60%, transparent));
+    border-color: color-mix(in srgb, var(--mp-color-primary, #6366f1) 30%, transparent);
+    box-shadow: 0 8px 40px color-mix(in srgb, var(--mp-color-primary, #6366f1) 15%, transparent);
+    transform: scale(1.04);
+  }
+  .tier-badge {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    background: var(--mp-color-primary, #6366f1);
+    color: #ffffff; padding: 5px 14px; border-radius: 12px;
+    white-space: nowrap;
+  }
+  .tier-badge:empty { display: none; }
+  .tier-name {
+    font-size: 18px; font-weight: 700;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 70%, transparent);
+    margin-bottom: 16px;
+  }
+  .tier-price {
+    font-size: 56px; font-weight: 800; letter-spacing: -0.03em; line-height: 1;
+    color: var(--mp-color-text, #ffffff);
+  }
+  .featured .tier-price { color: var(--mp-color-primary, #6366f1); }
+  .tier-period {
+    font-size: 15px; font-weight: 500;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 40%, transparent);
+    margin-bottom: 24px;
+  }
+  .tier-period:empty { margin-bottom: 24px; }
+  .tier-features {
+    display: flex; flex-direction: column; gap: 10px;
+    border-top: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 6%, transparent);
+    padding-top: 20px; margin-top: auto;
+  }
+  .tier-feat {
+    font-size: 14px; font-weight: 500;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 55%, transparent);
+  }
+  .tier-feat:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var eyebrow = el.querySelector('.eyebrow');
+    var headline = el.querySelector('.headline');
+    var tiers = el.querySelectorAll('.tier');
+    var featured = el.querySelector('.tier.featured');
+
+    gsap.set([eyebrow, headline], { autoAlpha: 0, y: 20 });
+    gsap.set(tiers, { autoAlpha: 0, y: 40, scale: 0.92 });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    if (eyebrow.textContent.trim()) {
+      tl.to(eyebrow, { autoAlpha: 1, y: 0, duration: speed * 0.4, ease: 'power2.out' }, 0.2);
+    }
+    tl.to(headline, { autoAlpha: 1, y: 0, duration: speed * 0.6, ease: 'power3.out' }, 0.3);
+
+    // Side tiers first, featured pops last
+    var sideTiers = Array.from(tiers).filter(function(t) { return !t.classList.contains('featured'); });
+    tl.to(sideTiers, {
+      autoAlpha: 1, y: 0, scale: 1,
+      stagger: 0.1, duration: speed * 0.6, ease: 'power2.out'
+    }, 0.6);
+    if (featured) {
+      tl.to(featured, { autoAlpha: 1, y: 0, scale: 1.04, duration: speed * 0.7, ease: 'back.out(1.5)' }, 0.8);
+    }
+
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(tiers, { autoAlpha: 0, y: -20, scale: 0.95, stagger: 0.05, duration: 0.3, ease: 'power2.in' }, exitAt);
+      tl.to([headline, eyebrow], { autoAlpha: 0, y: -15, duration: 0.35, ease: 'power2.in' }, exitAt + 0.1);
+    }
+    return tl;
+  }
+</script>

@@ -1,0 +1,148 @@
+<template>
+  <div class="progress-bars">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <div class="content">
+      <div class="header">
+        <div class="eyebrow" data-bind="eyebrow"></div>
+        <h2 class="headline" data-bind="headline">Performance</h2>
+      </div>
+
+      <div class="bars">
+        <div class="bar-row">
+          <div class="bar-label" data-bind="bar_1_label">Metric One</div>
+          <div class="bar-track">
+            <div class="bar-fill" data-bind="bar_1_pct" style="--bar-pct: 85%"></div>
+          </div>
+          <div class="bar-value" data-bind="bar_1_value">85%</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label" data-bind="bar_2_label">Metric Two</div>
+          <div class="bar-track">
+            <div class="bar-fill" data-bind="bar_2_pct" style="--bar-pct: 72%"></div>
+          </div>
+          <div class="bar-value" data-bind="bar_2_value">72%</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label" data-bind="bar_3_label">Metric Three</div>
+          <div class="bar-track">
+            <div class="bar-fill" data-bind="bar_3_pct" style="--bar-pct: 94%"></div>
+          </div>
+          <div class="bar-value" data-bind="bar_3_value">94%</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label" data-bind="bar_4_label">Metric Four</div>
+          <div class="bar-track">
+            <div class="bar-fill" data-bind="bar_4_pct" style="--bar-pct: 61%"></div>
+          </div>
+          <div class="bar-value" data-bind="bar_4_value">61%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .progress-bars {
+    position: relative; width: 100%; height: 100%;
+    display: flex; align-items: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(160deg,
+      var(--mp-color-background, #0f172a) 0%,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 90%, var(--mp-color-surface, #1e293b)) 100%
+    ); z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px; z-index: 1; pointer-events: none;
+  }
+
+  .content {
+    position: relative; z-index: 2;
+    display: flex; align-items: flex-start; gap: 80px;
+    padding: 0 100px; width: 100%;
+  }
+  .header { flex-shrink: 0; width: 300px; padding-top: 8px; }
+  .eyebrow {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.15em; color: var(--mp-color-primary, #6366f1); margin-bottom: 16px;
+  }
+  .eyebrow:empty { display: none; }
+  .headline {
+    font-size: 44px; font-weight: 800; color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em; line-height: 1.1; margin: 0;
+  }
+
+  .bars { flex: 1; display: flex; flex-direction: column; gap: 28px; }
+  .bar-row {
+    display: flex; align-items: center; gap: 20px;
+  }
+  .bar-row:has(.bar-label:empty) { display: none; }
+  .bar-label {
+    font-size: 16px; font-weight: 600; color: var(--mp-color-text, #ffffff);
+    min-width: 140px; text-align: right;
+  }
+  .bar-track {
+    flex: 1; height: 28px; border-radius: 14px;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 60%, transparent);
+    overflow: hidden; position: relative;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 14px;
+    width: var(--bar-pct, 50%);
+    background: linear-gradient(90deg,
+      var(--mp-color-primary, #6366f1),
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 70%, var(--mp-color-accent, #818cf8))
+    );
+    box-shadow: 0 0 16px color-mix(in srgb, var(--mp-color-primary, #6366f1) 30%, transparent);
+    transform-origin: left;
+  }
+  .bar-value {
+    font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;
+    color: var(--mp-color-primary, #6366f1); min-width: 56px;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var eyebrow = el.querySelector('.eyebrow');
+    var headline = el.querySelector('.headline');
+    var rows = el.querySelectorAll('.bar-row');
+    var fills = el.querySelectorAll('.bar-fill');
+    var values = el.querySelectorAll('.bar-value');
+
+    gsap.set([eyebrow, headline], { autoAlpha: 0, x: -25 });
+    gsap.set(rows, { autoAlpha: 0, x: 30 });
+    gsap.set(fills, { scaleX: 0 });
+    gsap.set(values, { autoAlpha: 0 });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.9;
+
+    if (eyebrow.textContent.trim()) {
+      tl.to(eyebrow, { autoAlpha: 1, x: 0, duration: speed * 0.4, ease: 'power2.out' }, 0.2);
+    }
+    tl.to(headline, { autoAlpha: 1, x: 0, duration: speed * 0.7, ease: 'power3.out' }, 0.3);
+
+    // Rows fade in
+    tl.to(rows, { autoAlpha: 1, x: 0, stagger: 0.12, duration: speed * 0.5, ease: 'power2.out' }, 0.5);
+
+    // Bars fill up with cascade
+    tl.to(fills, { scaleX: 1, stagger: 0.15, duration: speed * 0.8, ease: 'power2.out' }, 0.7);
+
+    // Values pop in after their bars fill
+    tl.to(values, { autoAlpha: 1, stagger: 0.15, duration: speed * 0.3, ease: 'power2.out' }, 1.0);
+
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(rows, { autoAlpha: 0, x: -15, stagger: 0.04, duration: 0.3, ease: 'power2.in' }, exitAt);
+      tl.to([headline, eyebrow], { autoAlpha: 0, x: 15, duration: 0.35, ease: 'power2.in' }, exitAt + 0.1);
+    }
+    return tl;
+  }
+</script>

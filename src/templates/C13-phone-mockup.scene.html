@@ -1,0 +1,195 @@
+<template>
+  <div class="phone-mockup">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+    <div class="bg-radial"></div>
+
+    <div class="layout">
+      <!-- Text side -->
+      <div class="text-side">
+        <div class="eyebrow" data-bind="eyebrow"></div>
+        <h2 class="headline" data-bind="headline">Works on Mobile</h2>
+        <p class="body" data-bind="body"></p>
+      </div>
+
+      <!-- Phone -->
+      <div class="phone-wrapper">
+        <div class="phone-shadow"></div>
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="screen-header">
+              <div class="sh-title" data-bind="app_name">App</div>
+            </div>
+            <div class="screen-card"></div>
+            <div class="screen-card sm"></div>
+            <div class="screen-list">
+              <div class="sl-row"></div>
+              <div class="sl-row"></div>
+              <div class="sl-row"></div>
+            </div>
+            <div class="screen-fab">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .phone-mockup {
+    position: relative; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg,
+      var(--mp-color-background, #0f172a) 0%,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 88%, var(--mp-color-surface, #1e293b)) 100%
+    ); z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px; z-index: 1; pointer-events: none;
+  }
+  .bg-radial {
+    position: absolute; top: 50%; right: 15%; transform: translate(0, -50%);
+    width: 600px; height: 600px;
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 10%, transparent) 0%, transparent 60%
+    ); z-index: 1; pointer-events: none;
+  }
+
+  .layout {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; gap: 100px;
+    padding: 0 100px; width: 100%;
+  }
+  .text-side { flex: 1; }
+  .eyebrow {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.15em; color: var(--mp-color-primary, #6366f1); margin-bottom: 16px;
+  }
+  .eyebrow:empty { display: none; }
+  .headline {
+    font-size: 48px; font-weight: 800; color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em; line-height: 1.1; margin: 0;
+  }
+  .body {
+    font-size: 18px; color: color-mix(in srgb, var(--mp-color-text, #ffffff) 55%, transparent);
+    line-height: 1.6; margin: 20px 0 0; max-width: 420px;
+  }
+  .body:empty { display: none; }
+
+  /* Phone */
+  .phone-wrapper { position: relative; flex-shrink: 0; perspective: 1000px; }
+  .phone-shadow {
+    position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%);
+    width: 70%; height: 30px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.4) 0%, transparent 70%);
+    filter: blur(15px);
+  }
+  .phone-frame {
+    width: 280px; height: 560px;
+    background: #111; border-radius: 40px;
+    border: 3px solid #333;
+    overflow: hidden; position: relative;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.5),
+      0 0 0 1px rgba(255,255,255,0.05) inset,
+      0 0 50px color-mix(in srgb, var(--mp-color-primary, #6366f1) 8%, transparent);
+    transform: rotateY(-8deg) rotateX(2deg);
+    transform-style: preserve-3d;
+  }
+  .phone-notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 90px; height: 26px; background: #111;
+    border-radius: 0 0 16px 16px; z-index: 2;
+  }
+  .phone-screen {
+    position: absolute; inset: 4px; border-radius: 36px; overflow: hidden;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 95%, var(--mp-color-background, #0f172a));
+    display: flex; flex-direction: column; padding: 50px 20px 20px;
+  }
+  .screen-header {
+    display: flex; align-items: center; margin-bottom: 20px;
+  }
+  .sh-title {
+    font-size: 16px; font-weight: 800; color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.01em;
+  }
+  .screen-card {
+    height: 80px; border-radius: 14px;
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-primary, #6366f1) 20%, transparent);
+    margin-bottom: 12px;
+  }
+  .screen-card.sm { height: 50px; }
+  .screen-list { flex: 1; display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .sl-row {
+    height: 36px; border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .screen-fab {
+    position: absolute; bottom: 24px; right: 24px;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--mp-color-primary, #6366f1);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--mp-color-primary, #6366f1) 40%, transparent);
+    color: #fff;
+  }
+  .screen-fab svg { width: 20px; height: 20px; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var eyebrow = el.querySelector('.eyebrow');
+    var headline = el.querySelector('.headline');
+    var body = el.querySelector('.body');
+    var phone = el.querySelector('.phone-frame');
+    var phoneW = el.querySelector('.phone-wrapper');
+    var shadow = el.querySelector('.phone-shadow');
+    var radial = el.querySelector('.bg-radial');
+    var cards = el.querySelectorAll('.screen-card');
+    var rows = el.querySelectorAll('.sl-row');
+    var fab = el.querySelector('.screen-fab');
+
+    gsap.set([eyebrow, headline, body], { autoAlpha: 0, x: -30 });
+    gsap.set(phoneW, { autoAlpha: 0, x: 60, scale: 0.9 });
+    gsap.set(shadow, { autoAlpha: 0 });
+    gsap.set(radial, { autoAlpha: 0, scale: 0.5 });
+    gsap.set(cards, { autoAlpha: 0, y: 15 });
+    gsap.set(rows, { autoAlpha: 0, x: 10 });
+    gsap.set(fab, { autoAlpha: 0, scale: 0 });
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    tl.to(radial, { autoAlpha: 1, scale: 1, duration: speed * 1.5, ease: 'power2.out' }, 0);
+
+    if (eyebrow.textContent.trim()) {
+      tl.to(eyebrow, { autoAlpha: 1, x: 0, duration: speed * 0.4, ease: 'power2.out' }, 0.2);
+    }
+    tl.to(headline, { autoAlpha: 1, x: 0, duration: speed * 0.7, ease: 'power3.out' }, 0.3);
+    if (body.textContent.trim()) {
+      tl.to(body, { autoAlpha: 1, x: 0, duration: speed * 0.5, ease: 'power2.out' }, 0.5);
+    }
+
+    tl.to(phoneW, { autoAlpha: 1, x: 0, scale: 1, duration: speed * 1.0, ease: 'power3.out' }, 0.3);
+    tl.to(shadow, { autoAlpha: 1, duration: speed * 0.6 }, 0.6);
+    tl.to(cards, { autoAlpha: 1, y: 0, stagger: 0.1, duration: speed * 0.4, ease: 'power2.out' }, 0.7);
+    tl.to(rows, { autoAlpha: 1, x: 0, stagger: 0.06, duration: speed * 0.3, ease: 'power2.out' }, 0.9);
+    tl.to(fab, { autoAlpha: 1, scale: 1, duration: speed * 0.4, ease: 'back.out(3)' }, 1.1);
+
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to(phoneW, { autoAlpha: 0, x: 40, scale: 0.95, duration: 0.5, ease: 'power2.in' }, exitAt);
+      tl.to([headline, body, eyebrow], { autoAlpha: 0, x: -15, stagger: 0.04, duration: 0.4, ease: 'power2.in' }, exitAt + 0.1);
+    }
+    return tl;
+  }
+</script>

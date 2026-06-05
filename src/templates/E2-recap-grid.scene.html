@@ -1,0 +1,118 @@
+<template>
+  <div class="recap-grid">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <div class="content">
+      <div class="eyebrow" data-bind="eyebrow">RECAP</div>
+      <h2 class="headline" data-bind="headline">Key Takeaways</h2>
+
+      <div class="grid">
+        <div class="recap-card">
+          <div class="card-number">01</div>
+          <div class="card-text" data-bind="point_1">First key takeaway from the presentation.</div>
+        </div>
+        <div class="recap-card">
+          <div class="card-number">02</div>
+          <div class="card-text" data-bind="point_2">Second key takeaway from the presentation.</div>
+        </div>
+        <div class="recap-card">
+          <div class="card-number">03</div>
+          <div class="card-text" data-bind="point_3">Third key takeaway from the presentation.</div>
+        </div>
+        <div class="recap-card">
+          <div class="card-number">04</div>
+          <div class="card-text" data-bind="point_4">Fourth key takeaway from the presentation.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .recap-grid {
+    position: relative; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif); overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 92%, var(--mp-color-primary, #6366f1)) 0%,
+      var(--mp-color-background, #0f172a) 100%
+    ); z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px; z-index: 1; pointer-events: none;
+  }
+
+  .content {
+    position: relative; z-index: 2;
+    text-align: center; max-width: 1100px; padding: 0 80px;
+  }
+  .eyebrow {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.2em; color: var(--mp-color-primary, #6366f1); margin-bottom: 12px;
+  }
+  .eyebrow:empty { display: none; }
+  .headline {
+    font-size: 44px; font-weight: 700; color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em; margin: 0 0 48px; line-height: 1.15;
+  }
+
+  .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    text-align: left;
+  }
+  .recap-card {
+    display: flex; gap: 16px;
+    padding: 28px 24px; border-radius: 16px;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 40%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 5%, transparent);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .recap-card:has(.card-text:empty) { display: none; }
+  .card-number {
+    font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums;
+    color: var(--mp-color-primary, #6366f1);
+    min-width: 28px; padding-top: 2px;
+  }
+  .card-text {
+    font-size: 17px; font-weight: 500; line-height: 1.5;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 80%, transparent);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var eyebrow = el.querySelector('.eyebrow');
+    var headline = el.querySelector('.headline');
+    var cards = el.querySelectorAll('.recap-card');
+
+    gsap.set([eyebrow, headline], { autoAlpha: 0, y: 20 });
+    gsap.set(cards, { autoAlpha: 0, y: 25, scale: 0.94 });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    if (eyebrow.textContent.trim()) {
+      tl.to(eyebrow, { autoAlpha: 1, y: 0, duration: speed * 0.4, ease: 'power2.out' }, 0.2);
+    }
+    tl.to(headline, { autoAlpha: 1, y: 0, duration: speed * 0.6, ease: 'power3.out' }, 0.3);
+
+    // Cards appear in reading order (top-left, top-right, bottom-left, bottom-right)
+    tl.to(cards, {
+      autoAlpha: 1, y: 0, scale: 1,
+      stagger: 0.12, duration: speed * 0.5, ease: 'power2.out'
+    }, 0.6);
+
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(cards, { autoAlpha: 0, scale: 0.95, stagger: 0.04, duration: 0.3, ease: 'power2.in' }, exitAt);
+      tl.to([headline, eyebrow], { autoAlpha: 0, y: -15, duration: 0.35, ease: 'power2.in' }, exitAt + 0.1);
+    }
+    return tl;
+  }
+</script>
