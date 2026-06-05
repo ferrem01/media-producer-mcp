@@ -1,0 +1,268 @@
+<template>
+  <div class="product-hero">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+    <div class="bg-radial"></div>
+
+    <!-- Floating product frame -->
+    <div class="hero-device">
+      <div class="device-shadow"></div>
+      <div class="device-frame">
+        <div class="device-screen">
+          <div class="screen-ui">
+            <div class="ui-topbar">
+              <div class="ui-logo-text" data-bind="product_name">Quotient</div>
+              <div class="ui-nav-items">
+                <span class="ui-nav-link"></span>
+                <span class="ui-nav-link"></span>
+                <span class="ui-nav-link"></span>
+              </div>
+            </div>
+            <div class="ui-hero-section">
+              <div class="ui-hero-text"></div>
+              <div class="ui-hero-subtext"></div>
+              <div class="ui-hero-cta"></div>
+            </div>
+            <div class="ui-card-row">
+              <div class="ui-card-sm"></div>
+              <div class="ui-card-sm"></div>
+              <div class="ui-card-sm"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text overlay -->
+    <div class="text-overlay">
+      <div class="badge" data-bind="badge"></div>
+      <h1 class="headline" data-bind="headline">Meet the Product</h1>
+      <p class="subtitle" data-bind="subtitle"></p>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .product-hero {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      var(--mp-color-background, #0f172a) 0%,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 85%, var(--mp-color-surface, #1e293b)) 100%
+    );
+    z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px; z-index: 1; pointer-events: none;
+  }
+  .bg-radial {
+    position: absolute;
+    top: 35%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 1000px;
+    height: 600px;
+    background: radial-gradient(ellipse,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 12%, transparent) 0%,
+      transparent 65%
+    );
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* Floating device */
+  .hero-device {
+    position: relative;
+    z-index: 2;
+    perspective: 1200px;
+  }
+  .device-shadow {
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 40px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.4) 0%, transparent 70%);
+    filter: blur(20px);
+  }
+  .device-frame {
+    width: 800px;
+    height: 500px;
+    background: #0c0c0c;
+    border-radius: 16px;
+    border: 2px solid #333;
+    overflow: hidden;
+    box-shadow:
+      0 40px 80px rgba(0,0,0,0.5),
+      0 0 0 1px rgba(255,255,255,0.05) inset,
+      0 0 60px color-mix(in srgb, var(--mp-color-primary, #6366f1) 10%, transparent);
+    transform: rotateX(4deg) rotateY(-2deg);
+    transform-style: preserve-3d;
+  }
+  .device-screen {
+    width: 100%; height: 100%;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 95%, var(--mp-color-background, #0f172a));
+  }
+  .screen-ui {
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .ui-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .ui-logo-text {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--mp-color-primary, #6366f1);
+    letter-spacing: -0.02em;
+  }
+  .ui-nav-items { display: flex; gap: 12px; }
+  .ui-nav-link {
+    width: 40px; height: 8px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+  }
+  .ui-hero-section {
+    padding: 40px 32px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .ui-hero-text {
+    width: 260px; height: 20px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 4px;
+  }
+  .ui-hero-subtext {
+    width: 180px; height: 12px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+  }
+  .ui-hero-cta {
+    width: 100px; height: 32px;
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 40%, transparent);
+    border-radius: 8px;
+    margin-top: 8px;
+  }
+  .ui-card-row {
+    flex: 1;
+    display: flex;
+    gap: 12px;
+    padding: 0 32px 32px;
+  }
+  .ui-card-sm {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+  }
+
+  /* Text overlay */
+  .text-overlay {
+    position: absolute;
+    z-index: 3;
+    bottom: 80px;
+    left: 0;
+    right: 0;
+    text-align: center;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--mp-color-primary, #6366f1);
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-primary, #6366f1) 25%, transparent);
+    padding: 6px 16px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  .badge:empty { display: none; }
+  .headline {
+    font-size: 52px;
+    font-weight: 800;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0;
+    text-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  .subtitle {
+    font-size: 20px;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 60%, transparent);
+    margin-top: 12px;
+    line-height: 1.4;
+  }
+  .subtitle:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var device = el.querySelector('.device-frame');
+    var heroDevice = el.querySelector('.hero-device');
+    var shadow = el.querySelector('.device-shadow');
+    var radial = el.querySelector('.bg-radial');
+    var badge = el.querySelector('.badge');
+    var headline = el.querySelector('.headline');
+    var subtitle = el.querySelector('.subtitle');
+    var cards = el.querySelectorAll('.ui-card-sm');
+    var cta = el.querySelector('.ui-hero-cta');
+
+    gsap.set(heroDevice, { autoAlpha: 0, y: 80, scale: 0.88 });
+    gsap.set(shadow, { autoAlpha: 0 });
+    gsap.set(radial, { autoAlpha: 0, scale: 0.5 });
+    gsap.set([badge, headline, subtitle], { autoAlpha: 0, y: 25 });
+    gsap.set(cards, { autoAlpha: 0, y: 10 });
+    gsap.set(cta, { autoAlpha: 0, scale: 0.8 });
+
+    var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.8 : 1.2;
+
+    // Radial glow
+    tl.to(radial, { autoAlpha: 1, scale: 1, duration: speed * 1.5, ease: 'power2.out' }, 0);
+
+    // Device floats up with 3D perspective
+    tl.to(heroDevice, { autoAlpha: 1, y: 0, scale: 1, duration: speed * 1.2, ease: 'power3.out' }, 0.2);
+    tl.to(shadow, { autoAlpha: 1, duration: speed * 0.8, ease: 'power2.out' }, 0.5);
+
+    // UI elements populate inside device
+    tl.to(cards, { autoAlpha: 1, y: 0, stagger: 0.1, duration: speed * 0.4, ease: 'power2.out' }, 0.8);
+    tl.to(cta, { autoAlpha: 1, scale: 1, duration: speed * 0.3, ease: 'back.out(2)' }, 0.9);
+
+    // Text overlay
+    if (badge.textContent.trim()) {
+      tl.to(badge, { autoAlpha: 1, y: 0, duration: speed * 0.4, ease: 'power2.out' }, 0.7);
+    }
+    tl.to(headline, { autoAlpha: 1, y: 0, duration: speed * 0.7, ease: 'power3.out' }, 0.8);
+    if (subtitle.textContent.trim()) {
+      tl.to(subtitle, { autoAlpha: 1, y: 0, duration: speed * 0.5, ease: 'power2.out' }, 1.0);
+    }
+
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.9;
+      tl.to(heroDevice, { autoAlpha: 0, y: -40, scale: 0.95, duration: 0.6, ease: 'power2.in' }, exitAt);
+      tl.to([headline, subtitle, badge], { autoAlpha: 0, y: -20, stagger: 0.05, duration: 0.4, ease: 'power2.in' }, exitAt + 0.1);
+    }
+
+    return tl;
+  }
+</script>

@@ -1,0 +1,157 @@
+<template>
+  <div class="lower-third-scene">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Main visual area (top 2/3) -->
+    <div class="main-area">
+      <div class="main-headline" data-bind="main_text">Key Insight Goes Here</div>
+    </div>
+
+    <!-- Lower Third Bar -->
+    <div class="lower-third">
+      <div class="lt-accent"></div>
+      <div class="lt-content">
+        <div class="lt-name" data-bind="name">Sarah Chen</div>
+        <div class="lt-title" data-bind="title">VP of Marketing, Acme Corp</div>
+      </div>
+      <div class="lt-logo" data-bind="logo_text"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .lower-third-scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      var(--mp-color-background, #0f172a) 0%,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 85%, var(--mp-color-surface, #1e293b)) 100%
+    );
+    z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .main-area {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 120px;
+  }
+  .main-headline {
+    font-size: 56px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    text-align: center;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    max-width: 900px;
+  }
+  .main-headline:empty { display: none; }
+
+  /* Lower Third */
+  .lower-third {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 60px;
+    margin: 0 80px 60px;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 80%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 8%, transparent);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .lt-accent {
+    width: 3px;
+    height: 40px;
+    background: var(--mp-color-primary, #6366f1);
+    border-radius: 2px;
+    flex-shrink: 0;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--mp-color-primary, #6366f1) 40%, transparent);
+  }
+  .lt-content {
+    flex: 1;
+  }
+  .lt-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.01em;
+  }
+  .lt-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 50%, transparent);
+    margin-top: 3px;
+  }
+  .lt-title:empty { display: none; }
+  .lt-logo {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 35%, transparent);
+  }
+  .lt-logo:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var mainArea = el.querySelector('.main-area');
+    var mainHeadline = el.querySelector('.main-headline');
+    var lowerThird = el.querySelector('.lower-third');
+    var ltAccent = el.querySelector('.lt-accent');
+    var ltContent = el.querySelector('.lt-content');
+    var ltLogo = el.querySelector('.lt-logo');
+
+    gsap.set(mainHeadline, { autoAlpha: 0, y: 20 });
+    gsap.set(lowerThird, { autoAlpha: 0, y: 40 });
+    gsap.set(ltAccent, { scaleY: 0 });
+    gsap.set([ltContent, ltLogo], { autoAlpha: 0, x: -15 });
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Main text
+    if (mainHeadline.textContent.trim()) {
+      tl.to(mainHeadline, { autoAlpha: 1, y: 0, duration: speed * 0.8, ease: 'power3.out' }, 0.2);
+    }
+
+    // Lower third slides up
+    tl.to(lowerThird, { autoAlpha: 1, y: 0, duration: speed * 0.7, ease: 'power3.out' }, 0.5);
+    tl.to(ltAccent, { scaleY: 1, duration: speed * 0.4, ease: 'power2.out' }, 0.7);
+    tl.to(ltContent, { autoAlpha: 1, x: 0, duration: speed * 0.5, ease: 'power2.out' }, 0.8);
+    if (ltLogo.textContent.trim()) {
+      tl.to(ltLogo, { autoAlpha: 1, x: 0, duration: speed * 0.4, ease: 'power2.out' }, 0.9);
+    }
+
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(lowerThird, { autoAlpha: 0, y: 30, duration: 0.4, ease: 'power2.in' }, exitAt);
+      tl.to(mainHeadline, { autoAlpha: 0, y: -15, duration: 0.4, ease: 'power2.in' }, exitAt + 0.05);
+    }
+
+    return tl;
+  }
+</script>

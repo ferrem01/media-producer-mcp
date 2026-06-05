@@ -1,0 +1,132 @@
+<template>
+  <div class="chapter-title">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+    <div class="accent-line"></div>
+
+    <div class="content">
+      <div class="chapter-number" data-bind="number"></div>
+      <h1 class="title" data-bind="title">Next Chapter</h1>
+      <p class="subtitle" data-bind="subtitle"></p>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .chapter-title {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 92%, var(--mp-color-primary, #6366f1)) 0%,
+      var(--mp-color-background, #0f172a) 100%
+    );
+    z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .accent-line {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 120px;
+    height: 3px;
+    background: var(--mp-color-primary, #6366f1);
+    border-radius: 2px;
+    z-index: 2;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--mp-color-primary, #6366f1) 40%, transparent);
+  }
+
+  .content {
+    position: relative;
+    z-index: 3;
+    text-align: center;
+    max-width: 800px;
+    padding: 0 80px;
+  }
+  .chapter-number {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--mp-color-primary, #6366f1);
+    margin-bottom: 24px;
+  }
+  .chapter-number:empty { display: none; }
+  .title {
+    font-size: 72px;
+    font-weight: 800;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    margin: 0;
+  }
+  .subtitle {
+    font-size: 22px;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 50%, transparent);
+    margin-top: 20px;
+    line-height: 1.4;
+  }
+  .subtitle:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var accentLine = el.querySelector('.accent-line');
+    var number = el.querySelector('.chapter-number');
+    var title = el.querySelector('.title');
+    var subtitle = el.querySelector('.subtitle');
+
+    gsap.set(accentLine, { scaleX: 0, autoAlpha: 1 });
+    gsap.set([number, title, subtitle], { autoAlpha: 0 });
+    gsap.set(title, { y: 30, filter: 'blur(6px)' });
+    gsap.set(number, { y: -15 });
+    gsap.set(subtitle, { y: 20 });
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Accent line expands
+    tl.to(accentLine, { scaleX: 1, duration: speed * 0.6, ease: 'power3.inOut' }, 0.1);
+
+    // Line fades/moves up as title enters
+    tl.to(accentLine, { y: -60, autoAlpha: 0, duration: speed * 0.4, ease: 'power2.in' }, 0.5);
+
+    // Number appears
+    if (number.textContent.trim()) {
+      tl.to(number, { autoAlpha: 1, y: 0, duration: speed * 0.4, ease: 'power2.out' }, 0.4);
+    }
+
+    // Title deblurs and enters
+    tl.to(title, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: speed * 0.9, ease: 'power3.out' }, 0.5);
+
+    // Subtitle
+    if (subtitle.textContent.trim()) {
+      tl.to(subtitle, { autoAlpha: 1, y: 0, duration: speed * 0.5, ease: 'power2.out' }, 0.8);
+    }
+
+    if (ctx.duration > 2.5) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to([subtitle, title, number], { autoAlpha: 0, y: -20, stagger: 0.06, duration: 0.4, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

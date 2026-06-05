@@ -1,0 +1,131 @@
+<template>
+  <div class="logo-wall">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <div class="content">
+      <div class="eyebrow" data-bind="eyebrow">TRUSTED BY</div>
+      <h2 class="headline" data-bind="headline">Industry Leaders Choose Us</h2>
+
+      <div class="logo-grid">
+        <div class="logo-item" data-bind="logo_1">Company One</div>
+        <div class="logo-item" data-bind="logo_2">Company Two</div>
+        <div class="logo-item" data-bind="logo_3">Company Three</div>
+        <div class="logo-item" data-bind="logo_4">Company Four</div>
+        <div class="logo-item" data-bind="logo_5">Company Five</div>
+        <div class="logo-item" data-bind="logo_6">Company Six</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .logo-wall {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      var(--mp-color-background, #0f172a) 0%,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 90%, var(--mp-color-surface, #1e293b)) 100%
+    );
+    z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    max-width: 1100px;
+    padding: 0 80px;
+  }
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--mp-color-primary, #6366f1);
+    margin-bottom: 16px;
+  }
+  .eyebrow:empty { display: none; }
+  .headline {
+    font-size: 44px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em;
+    margin: 0 0 56px;
+    line-height: 1.15;
+  }
+
+  .logo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .logo-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 88px;
+    padding: 0 32px;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 50%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 6%, transparent);
+    border-radius: 14px;
+    font-size: 20px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 55%, transparent);
+    letter-spacing: 0.02em;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .logo-item:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var eyebrow = el.querySelector('.eyebrow');
+    var headline = el.querySelector('.headline');
+    var items = el.querySelectorAll('.logo-item');
+
+    gsap.set([eyebrow, headline], { autoAlpha: 0, y: 20 });
+    gsap.set(items, { autoAlpha: 0, y: 25, scale: 0.92 });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    if (eyebrow.textContent.trim()) {
+      tl.to(eyebrow, { autoAlpha: 1, y: 0, duration: speed * 0.5, ease: 'power2.out' }, 0.2);
+    }
+    tl.to(headline, { autoAlpha: 1, y: 0, duration: speed * 0.7, ease: 'power3.out' }, 0.3);
+
+    // Logos appear in a cascade
+    tl.to(items, {
+      autoAlpha: 1, y: 0, scale: 1,
+      stagger: { each: 0.08, from: 'random' },
+      duration: speed * 0.5,
+      ease: 'back.out(1.4)'
+    }, 0.6);
+
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(items, { autoAlpha: 0, scale: 0.95, stagger: 0.03, duration: 0.3, ease: 'power2.in' }, exitAt);
+      tl.to([headline, eyebrow], { autoAlpha: 0, y: -15, stagger: 0.05, duration: 0.4, ease: 'power2.in' }, exitAt + 0.1);
+    }
+
+    return tl;
+  }
+</script>

@@ -1,0 +1,204 @@
+<template>
+  <div class="process-scene">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <div class="content">
+      <div class="header">
+        <div class="eyebrow" data-bind="eyebrow"></div>
+        <h2 class="headline" data-bind="headline">How It Works</h2>
+      </div>
+
+      <div class="process-track">
+        <div class="track-line"></div>
+
+        <div class="step">
+          <div class="step-dot"><span class="step-num">1</span></div>
+          <div class="step-content">
+            <h3 class="step-title" data-bind="step_1_title">Step One</h3>
+            <p class="step-desc" data-bind="step_1_desc">Description of the first step.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-dot"><span class="step-num">2</span></div>
+          <div class="step-content">
+            <h3 class="step-title" data-bind="step_2_title">Step Two</h3>
+            <p class="step-desc" data-bind="step_2_desc">Description of the second step.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-dot"><span class="step-num">3</span></div>
+          <div class="step-content">
+            <h3 class="step-title" data-bind="step_3_title">Step Three</h3>
+            <p class="step-desc" data-bind="step_3_desc">Description of the third step.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .process-scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(160deg,
+      var(--mp-color-background, #0f172a) 0%,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 88%, var(--mp-color-primary, #6366f1)) 100%
+    );
+    z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px; z-index: 1; pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: 1200px;
+    padding: 0 80px;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--mp-color-primary, #6366f1);
+    margin-bottom: 12px;
+  }
+  .eyebrow:empty { display: none; }
+  .headline {
+    font-size: 48px;
+    font-weight: 800;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em;
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  .process-track {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    gap: 40px;
+  }
+  .track-line {
+    position: absolute;
+    top: 24px;
+    left: 48px;
+    right: 48px;
+    height: 2px;
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 30%, transparent),
+      var(--mp-color-primary, #6366f1),
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 30%, transparent)
+    );
+  }
+
+  .step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+  .step-dot {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 20%, var(--mp-color-background, #0f172a));
+    border: 2px solid var(--mp-color-primary, #6366f1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+    box-shadow:
+      0 0 20px color-mix(in srgb, var(--mp-color-primary, #6366f1) 25%, transparent),
+      0 0 0 6px var(--mp-color-background, #0f172a);
+    flex-shrink: 0;
+  }
+  .step-num {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--mp-color-primary, #6366f1);
+  }
+  .step-content {
+    max-width: 280px;
+  }
+  .step-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .step-desc {
+    font-size: 15px;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 55%, transparent);
+    line-height: 1.5;
+    margin: 0;
+  }
+  .step-desc:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var headline = el.querySelector('.headline');
+    var eyebrow = el.querySelector('.eyebrow');
+    var trackLine = el.querySelector('.track-line');
+    var steps = el.querySelectorAll('.step');
+    var dots = el.querySelectorAll('.step-dot');
+
+    gsap.set([eyebrow, headline], { autoAlpha: 0, y: 20 });
+    gsap.set(trackLine, { scaleX: 0, transformOrigin: 'left' });
+    gsap.set(steps, { autoAlpha: 0 });
+    gsap.set(dots, { scale: 0 });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.9;
+
+    // Header
+    if (eyebrow.textContent.trim()) {
+      tl.to(eyebrow, { autoAlpha: 1, y: 0, duration: speed * 0.4, ease: 'power2.out' }, 0.2);
+    }
+    tl.to(headline, { autoAlpha: 1, y: 0, duration: speed * 0.7, ease: 'power3.out' }, 0.3);
+
+    // Track line draws across
+    tl.to(trackLine, { scaleX: 1, duration: speed * 1.0, ease: 'power2.inOut' }, 0.5);
+
+    // Steps appear with dot pop
+    for (var i = 0; i < steps.length; i++) {
+      var delay = 0.6 + i * 0.25;
+      tl.to(dots[i], { scale: 1, duration: speed * 0.4, ease: 'back.out(3)' }, delay);
+      tl.to(steps[i], { autoAlpha: 1, duration: speed * 0.5, ease: 'power2.out' }, delay + 0.1);
+    }
+
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(steps, { autoAlpha: 0, y: -15, stagger: 0.05, duration: 0.3, ease: 'power2.in' }, exitAt);
+      tl.to([trackLine, headline, eyebrow], { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, exitAt + 0.1);
+    }
+
+    return tl;
+  }
+</script>

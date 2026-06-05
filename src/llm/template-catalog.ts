@@ -142,6 +142,163 @@ export const SCENE_TEMPLATES: SceneTemplate[] = [
     file: "D2-metric-trio.scene.html",
   },
 
+  {
+    id: "C6-split-compare",
+    name: "Split Compare",
+    category: "content",
+    when: "Side-by-side comparison. Before/after, old way vs new way, us vs them.",
+    feel: "Clean editorial contrast. The right side wins.",
+    slots: [
+      { name: "left_label", type: "string", required: false, description: "Left panel label", example: "Before" },
+      { name: "left_title", type: "string", required: true, description: "Left panel headline", example: "The Old Way" },
+      { name: "left_body", type: "string", required: false, description: "Left panel description", example: "Manual processes, scattered data." },
+      { name: "left_icon_svg", type: "svg", required: false, description: "Left panel icon SVG" },
+      { name: "right_label", type: "string", required: false, description: "Right panel label", example: "After" },
+      { name: "right_title", type: "string", required: true, description: "Right panel headline", example: "With Quotient" },
+      { name: "right_body", type: "string", required: false, description: "Right panel description", example: "Automated pipelines, instant launches." },
+      { name: "right_icon_svg", type: "svg", required: false, description: "Right panel icon SVG" },
+    ],
+    duration: [5, 7],
+    file: "C6-split-compare.scene.html",
+  },
+  {
+    id: "C7-picture-in-picture",
+    name: "Picture-in-Picture",
+    category: "content",
+    when: "Feature or benefit with a floating product/dashboard preview alongside the text.",
+    feel: "Left-aligned text with a floating window on the right. Editorial + product shot.",
+    slots: [
+      { name: "eyebrow", type: "string", required: false, description: "Category label", example: "ANALYTICS" },
+      { name: "headline", type: "string", required: true, description: "Feature headline", example: "Real-Time Analytics" },
+      { name: "body", type: "string", required: false, description: "1-2 sentence description" },
+      { name: "pip_label", type: "string", required: false, description: "Label inside the PiP window", example: "Live Dashboard" },
+    ],
+    duration: [5, 7],
+    file: "C7-picture-in-picture.scene.html",
+  },
+  {
+    id: "C8-device-mockup",
+    name: "Device Mockup",
+    category: "content",
+    when: "Showcasing a product UI in a laptop/device frame. Product demo, walkthrough, dashboard preview.",
+    feel: "Apple product page hero. 3D perspective, ambient glow, premium device frame.",
+    slots: [
+      { name: "eyebrow", type: "string", required: false, description: "Eyebrow label", example: "DASHBOARD" },
+      { name: "headline", type: "string", required: true, description: "Headline above device", example: "Built for Every Screen" },
+      { name: "screen_label", type: "string", required: false, description: "Label inside screen", example: "Dashboard Preview" },
+      { name: "caption", type: "string", required: false, description: "Caption below device" },
+    ],
+    duration: [5, 7],
+    file: "C8-device-mockup.scene.html",
+  },
+  {
+    id: "C9-logo-wall",
+    name: "Logo Wall",
+    category: "content",
+    when: "Social proof. Customer logos, partner logos, integration logos, \"trusted by\" section.",
+    feel: "Credibility through association. Clean grid with glassmorphic cards.",
+    slots: [
+      { name: "eyebrow", type: "string", required: false, description: "Section label", example: "TRUSTED BY" },
+      { name: "headline", type: "string", required: true, description: "Section headline", example: "Industry Leaders Choose Us" },
+      { name: "logo_1", type: "string", required: true, description: "Company name 1", example: "Acme Corp" },
+      { name: "logo_2", type: "string", required: true, description: "Company name 2", example: "TechStart" },
+      { name: "logo_3", type: "string", required: true, description: "Company name 3", example: "DataFlow" },
+      { name: "logo_4", type: "string", required: false, description: "Company name 4" },
+      { name: "logo_5", type: "string", required: false, description: "Company name 5" },
+      { name: "logo_6", type: "string", required: false, description: "Company name 6" },
+    ],
+    duration: [4, 6],
+    file: "C9-logo-wall.scene.html",
+  },
+  {
+    id: "C10-feature-stack",
+    name: "Feature Stack",
+    category: "content",
+    when: "Listing 3-4 features or capabilities as a numbered vertical stack with descriptions.",
+    feel: "Editorial, structured, like a premium product page. Left headline, right stack.",
+    slots: [
+      { name: "eyebrow", type: "string", required: false, description: "Section label" },
+      { name: "headline", type: "string", required: true, description: "Section heading", example: "Everything You Need" },
+      { name: "item_1_title", type: "string", required: true, description: "Feature 1 title" },
+      { name: "item_1_desc", type: "string", required: false, description: "Feature 1 description" },
+      { name: "item_2_title", type: "string", required: true, description: "Feature 2 title" },
+      { name: "item_2_desc", type: "string", required: false, description: "Feature 2 description" },
+      { name: "item_3_title", type: "string", required: true, description: "Feature 3 title" },
+      { name: "item_3_desc", type: "string", required: false, description: "Feature 3 description" },
+      { name: "item_4_title", type: "string", required: false, description: "Feature 4 title" },
+      { name: "item_4_desc", type: "string", required: false, description: "Feature 4 description" },
+    ],
+    duration: [5, 7],
+    file: "C10-feature-stack.scene.html",
+  },
+  {
+    id: "C11-process-steps",
+    name: "Process Steps",
+    category: "content",
+    when: "How it works. 3-step process, workflow, journey, or timeline visualization.",
+    feel: "Connected dots on a horizontal track. Clean, directional, professional.",
+    slots: [
+      { name: "eyebrow", type: "string", required: false, description: "Section label", example: "HOW IT WORKS" },
+      { name: "headline", type: "string", required: true, description: "Section heading", example: "Three Simple Steps" },
+      { name: "step_1_title", type: "string", required: true, description: "Step 1 title", example: "Connect" },
+      { name: "step_1_desc", type: "string", required: false, description: "Step 1 description" },
+      { name: "step_2_title", type: "string", required: true, description: "Step 2 title", example: "Configure" },
+      { name: "step_2_desc", type: "string", required: false, description: "Step 2 description" },
+      { name: "step_3_title", type: "string", required: true, description: "Step 3 title", example: "Launch" },
+      { name: "step_3_desc", type: "string", required: false, description: "Step 3 description" },
+    ],
+    duration: [5, 7],
+    file: "C11-process-steps.scene.html",
+  },
+
+  // ── LOWER THIRDS ──
+  {
+    id: "L1-lower-third",
+    name: "Lower Third",
+    category: "content",
+    when: "Name card / speaker identification / source attribution. Broadcast-style overlay in bottom third.",
+    feel: "News broadcast quality. Glassmorphic bar with accent line and name/title.",
+    slots: [
+      { name: "main_text", type: "string", required: false, description: "Main text in upper area (quote or key point)", example: "AI will reshape demand marketing" },
+      { name: "name", type: "string", required: true, description: "Person's name", example: "Sarah Chen" },
+      { name: "title", type: "string", required: false, description: "Title and company", example: "VP Marketing, Acme Corp" },
+      { name: "logo_text", type: "string", required: false, description: "Logo or brand text on right side" },
+    ],
+    duration: [4, 6],
+    file: "L1-lower-third.scene.html",
+  },
+
+  // ── OPENINGS (additional) ──
+  {
+    id: "O2-chapter-title",
+    name: "Chapter Title",
+    category: "opening",
+    when: "Section divider between topics. Chapter break, new topic introduction.",
+    feel: "Minimal, dramatic. Accent line reveals, then title appears.",
+    slots: [
+      { name: "number", type: "string", required: false, description: "Chapter number", example: "CHAPTER 02" },
+      { name: "title", type: "string", required: true, description: "Section title", example: "The Platform" },
+      { name: "subtitle", type: "string", required: false, description: "Supporting line" },
+    ],
+    duration: [3, 5],
+    file: "O2-chapter-title.scene.html",
+  },
+  {
+    id: "O4-product-hero",
+    name: "Product Hero",
+    category: "opening",
+    when: "Product reveal moment. Large floating device with UI preview and dramatic headline below.",
+    feel: "Apple product page hero. 3D device, ambient glow, premium reveal.",
+    slots: [
+      { name: "badge", type: "string", required: false, description: "Badge text", example: "NEW" },
+      { name: "headline", type: "string", required: true, description: "Product headline", example: "Meet Quotient" },
+      { name: "subtitle", type: "string", required: false, description: "Supporting line" },
+      { name: "product_name", type: "string", required: false, description: "Product name shown in device UI", example: "Quotient" },
+    ],
+    duration: [5, 7],
+    file: "O4-product-hero.scene.html",
+  },
+
   // ── CLOSING ──
   {
     id: "E1-cta-finale",
@@ -179,6 +336,8 @@ export function formatTemplateCatalogForPrompt(): string {
     ["data", "DATA"],
     ["closing", "CLOSINGS"],
   ];
+
+  // Content category includes lower-thirds, overlays, etc. so all non-opening/data/closing are content
 
   for (const [cat, label] of order) {
     const templates = byCategory.get(cat);

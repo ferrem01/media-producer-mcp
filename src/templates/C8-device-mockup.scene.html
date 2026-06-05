@@ -1,0 +1,277 @@
+<template>
+  <div class="device-scene">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+    <div class="bg-glow"></div>
+
+    <!-- Floating headline above device -->
+    <div class="top-text">
+      <div class="eyebrow" data-bind="eyebrow"></div>
+      <h2 class="headline" data-bind="headline">Built for Every Screen</h2>
+    </div>
+
+    <!-- Laptop device -->
+    <div class="device laptop">
+      <div class="laptop-screen">
+        <div class="screen-content">
+          <div class="screen-placeholder" data-bind="screen_label">Dashboard Preview</div>
+          <!-- Fake UI skeleton -->
+          <div class="ui-skeleton">
+            <div class="ui-sidebar">
+              <div class="ui-nav-item active"></div>
+              <div class="ui-nav-item"></div>
+              <div class="ui-nav-item"></div>
+              <div class="ui-nav-item"></div>
+            </div>
+            <div class="ui-main">
+              <div class="ui-header-bar"></div>
+              <div class="ui-cards">
+                <div class="ui-card"></div>
+                <div class="ui-card"></div>
+                <div class="ui-card"></div>
+              </div>
+              <div class="ui-chart"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="laptop-base">
+        <div class="laptop-notch"></div>
+      </div>
+    </div>
+
+    <!-- Bottom caption -->
+    <p class="caption" data-bind="caption"></p>
+  </div>
+</template>
+
+<style scoped>
+  .device-scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    overflow: hidden;
+  }
+  .bg-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      var(--mp-color-background, #0f172a) 0%,
+      color-mix(in srgb, var(--mp-color-background, #0f172a) 80%, var(--mp-color-surface, #1e293b)) 100%
+    );
+    z-index: 0;
+  }
+  .bg-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .bg-glow {
+    position: absolute;
+    width: 800px;
+    height: 400px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -40%);
+    background: radial-gradient(ellipse,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 15%, transparent) 0%,
+      transparent 70%
+    );
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .top-text {
+    position: relative;
+    z-index: 3;
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--mp-color-primary, #6366f1);
+    margin-bottom: 12px;
+  }
+  .eyebrow:empty { display: none; }
+  .headline {
+    font-size: 48px;
+    font-weight: 800;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em;
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  /* Laptop Device */
+  .device {
+    position: relative;
+    z-index: 2;
+  }
+  .laptop-screen {
+    width: 780px;
+    height: 488px;
+    background: #0c0c0c;
+    border-radius: 12px 12px 0 0;
+    border: 2px solid #2a2a2a;
+    border-bottom: none;
+    overflow: hidden;
+    box-shadow:
+      0 -2px 40px rgba(0,0,0,0.5),
+      0 0 0 1px rgba(255,255,255,0.03) inset;
+  }
+  .screen-content {
+    width: 100%;
+    height: 100%;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 95%, var(--mp-color-background, #0f172a));
+    display: flex;
+    flex-direction: column;
+  }
+  .screen-placeholder {
+    font-size: 11px;
+    font-weight: 600;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 30%, transparent);
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .screen-placeholder:empty { display: none; }
+  .ui-skeleton {
+    flex: 1;
+    display: flex;
+  }
+  .ui-sidebar {
+    width: 56px;
+    background: rgba(0,0,0,0.3);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    padding: 16px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .ui-nav-item {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+  }
+  .ui-nav-item.active {
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 30%, transparent);
+  }
+  .ui-main {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .ui-header-bar {
+    height: 20px;
+    width: 200px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+  }
+  .ui-cards {
+    display: flex;
+    gap: 12px;
+  }
+  .ui-card {
+    flex: 1;
+    height: 80px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+  }
+  .ui-chart {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+  }
+
+  .laptop-base {
+    width: 860px;
+    height: 16px;
+    background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+    border-radius: 0 0 8px 8px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .laptop-notch {
+    width: 120px;
+    height: 4px;
+    background: #3a3a3a;
+    border-radius: 0 0 4px 4px;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .caption {
+    position: relative;
+    z-index: 3;
+    font-size: 18px;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 50%, transparent);
+    margin-top: 32px;
+    text-align: center;
+  }
+  .caption:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var topText = el.querySelector('.top-text');
+    var headline = el.querySelector('.headline');
+    var device = el.querySelector('.device');
+    var screen = el.querySelector('.laptop-screen');
+    var cards = el.querySelectorAll('.ui-card');
+    var chart = el.querySelector('.ui-chart');
+    var caption = el.querySelector('.caption');
+    var glow = el.querySelector('.bg-glow');
+
+    gsap.set(topText, { autoAlpha: 0, y: -20 });
+    gsap.set(device, { autoAlpha: 0, y: 60, scale: 0.9, rotateX: 8 });
+    gsap.set(cards, { autoAlpha: 0, y: 15, scale: 0.95 });
+    gsap.set(chart, { autoAlpha: 0, scaleY: 0, transformOrigin: 'bottom' });
+    gsap.set(caption, { autoAlpha: 0, y: 15 });
+    gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Glow appears
+    tl.to(glow, { autoAlpha: 1, scale: 1, duration: speed * 1.5, ease: 'power2.out' }, 0);
+
+    // Text enters
+    tl.to(topText, { autoAlpha: 1, y: 0, duration: speed * 0.6, ease: 'power2.out' }, 0.2);
+
+    // Device rises into frame
+    tl.to(device, { autoAlpha: 1, y: 0, scale: 1, rotateX: 0, duration: speed * 1.2, ease: 'power3.out' }, 0.3);
+
+    // UI elements populate
+    tl.to(cards, { autoAlpha: 1, y: 0, scale: 1, stagger: 0.08, duration: speed * 0.5, ease: 'power2.out' }, 0.8);
+    tl.to(chart, { autoAlpha: 1, scaleY: 1, duration: speed * 0.6, ease: 'power2.out' }, 1.0);
+
+    if (caption.textContent.trim()) {
+      tl.to(caption, { autoAlpha: 1, y: 0, duration: speed * 0.5, ease: 'power2.out' }, 1.1);
+    }
+
+    if (ctx.duration > 3) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to(device, { autoAlpha: 0, y: 30, scale: 0.95, duration: 0.5, ease: 'power2.in' }, exitAt);
+      tl.to([topText, caption], { autoAlpha: 0, y: -15, duration: 0.4, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>
