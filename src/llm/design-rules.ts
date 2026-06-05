@@ -180,3 +180,123 @@ Score each scene against these criteria:
 - Consistent visual style across all scenes
 - Professional feel (not a wireframe or placeholder)
 `;
+
+
+/**
+ * Premium design philosophy -- what separates "correct" from "Apple-level."
+ * Injected into expander + scene planner + critiquer to raise the ceiling.
+ */
+export const PREMIUM_DESIGN_PHILOSOPHY = `
+## What Makes Video Feel Premium
+
+This is not a checklist of things to avoid. This is what makes the difference between
+a video that is "technically correct" and one that makes someone lean forward.
+
+### The One-Idea Rule
+Every scene communicates exactly ONE idea. Not two. Not "also." One.
+If a scene has a headline AND bullet points AND a chart, it is a PowerPoint slide.
+Apple puts "M2" on screen. Nothing else. Then the next scene shows the chip.
+Then the next scene shows the benchmark. Each idea gets its own moment.
+
+### Negative Space Is The Design
+The empty space IS the design. Do not fill it. A headline centered in a 1920x1080 frame
+with 60% of the canvas empty is more powerful than one surrounded by supporting elements.
+Negative space creates focus. Focus creates impact. Less is always more.
+
+### Visual Rhythm (Tension and Release)
+A video is a song. It needs verses and choruses:
+- **Build:** Start slow, establish context (3-4s scenes, gentle motion)
+- **Peak:** Hit the key message (shorter scene, dramatic entrance, bigger type)
+- **Breathe:** Let the viewer absorb (2-3s pause, minimal content, ambient motion)
+- **Build again:** Next wave of information
+- **Climax:** The big number, the demo, the reveal
+- **Resolve:** CTA, clean exit
+
+Never stack three high-energy scenes in a row. Never stack three slow scenes.
+Alternate. Breathe.
+
+### Depth Through Layers
+A flat scene is a PowerPoint slide. A premium scene has depth:
+- **Background layer:** mesh-gradient, subtle noise, slow drift
+- **Mid layer:** glassmorphic surfaces, blurred shapes, ambient elements
+- **Content layer:** the actual message
+- **Polish layer:** film-grain, vignette, light leak
+
+You don't need all four. But you need at least two.
+
+### Motion Tells A Story
+Every animation should have a reason:
+- Elements entering FROM LEFT suggest "coming from the past" or "from the user"
+- Elements entering FROM RIGHT suggest "new" or "future"
+- Elements scaling UP suggest importance or growth
+- Elements fading through BLUR suggest focus-pull, cinematic attention
+- Stagger timing tells the viewer reading order -- what to look at first
+
+Bad motion: everything flies in from random directions at the same time.
+Good motion: headline fades up, then (200ms later) subtitle follows, then (300ms later) supporting visual slides in from the right. The viewer's eye follows a path.
+
+### Typography As Art
+Headlines are not just text. They are the visual centerpiece:
+- Weight 700-800, tight letter-spacing (-0.025em to -0.03em)
+- Consider gradient text for hero moments (white to accent color)
+- SplitText character reveals for dramatic entrances
+- One font family, but dramatic size contrast (76px headline vs 14px label = hierarchy)
+- The title should feel like it BELONGS in that space, not like it was placed there
+
+### Color Restraint
+Premium uses 2-3 colors, not 7:
+- One dark background (slate-900 or deeper)
+- One bright accent (used sparingly -- a badge, a glow, a gradient endpoint)
+- White/near-white for primary text
+- Muted slate for secondary text
+- That's it. Every additional color dilutes the palette.
+
+### The Glass Effect
+Glassmorphism done right is the single fastest path to "premium":
+- background: rgba(255, 255, 255, 0.04-0.06)
+- backdrop-filter: blur(12-20px)
+- border: 1px solid rgba(255, 255, 255, 0.06-0.10)
+- border-radius: 16-24px
+- Subtle shadow: 0 8px 32px rgba(0,0,0,0.2)
+
+This creates depth, separates content from background, and instantly signals quality.
+Use it for cards, panels, frames. Don't overdo it -- 1-2 glass surfaces per scene.
+
+### Exit Animations Matter
+A scene that just cuts away feels amateur. A scene where elements gracefully exit --
+fading up and away, scaling down, blurring out -- feels intentional and polished.
+Always add exit animations when duration > 2s. Start exits 0.6-0.8s before scene end.
+Elements should exit in reverse order of entry (last in, first out).
+
+### The Details Nobody Notices (But Everyone Feels)
+- Slight scale on hover states (1.02-1.05) suggests interactivity
+- Tabular-nums on counters prevents number jitter
+- Letter-spacing on uppercase labels (0.12-0.16em) is the difference between amateur and pro
+- Border-radius consistency (use 12, 16, 20, or 24 -- pick a system)
+- Easing: power3.out for entrances, power2.in for exits, sine.inOut for ambient loops
+- Never use linear easing for UI motion. Ever.
+`;
+
+/**
+ * Anti-patterns: things that instantly make output look amateur.
+ * Quick-reference for the critiquer.
+ */
+export const AMATEUR_TELLS = `
+## Instant Amateur Tells (Reject These)
+
+- Flat solid-color background with no depth (looks like a wireframe)
+- More than 15 words visible at one time in a video scene
+- Multiple ideas crammed into one scene (headline + bullets + chart)
+- No exit animations (content just cuts)
+- All elements entering at the same time (no stagger, no reading order)
+- White text on a #f3f4f6 or similar light background
+- More than 3 different font sizes without clear hierarchy
+- Centered content that is also left-aligned internally (pick one)
+- Rainbow of colors instead of restrained 2-3 color palette
+- Linear easing on any element motion
+- Bullet points that look like a Word document
+- Too many things animating at once (visual chaos)
+- No breathing room between scenes (relentless information)
+- Transitions all the same (crossfade, crossfade, crossfade)
+- Text that goes edge-to-edge without padding
+`;

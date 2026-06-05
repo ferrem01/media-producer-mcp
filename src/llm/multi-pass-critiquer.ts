@@ -11,6 +11,7 @@
 
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { critiquerSystemPrompt } from "./prompts.js";
+import { PREMIUM_DESIGN_PHILOSOPHY, AMATEUR_TELLS } from "./design-rules.js";
 import { PREMIUM_QUALITY_CHECKLIST, EDITORIAL_CRITIQUE } from "./cinematography.js";
 import type { TraceBuilder } from "../trace/index.js";
 import type { Scene } from "../core/types.js";
@@ -126,6 +127,10 @@ export async function critiquePremium(opts: CritiqueSceneOpts): Promise<PremiumC
   var systemPrompt = `You are a premium quality evaluator for a media production system. You assess whether rendered scenes meet Apple-keynote-level production quality.
 
 ${PREMIUM_QUALITY_CHECKLIST}
+
+${PREMIUM_DESIGN_PHILOSOPHY}
+
+${AMATEUR_TELLS}
 
 ## Output Format
 

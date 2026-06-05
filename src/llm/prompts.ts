@@ -5,7 +5,7 @@
  * The component prompt was extracted from src/core/component-generator.ts (DRY).
  */
 
-import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES, CRITIQUER_DESIGN_RULES } from "./design-rules.js";
+import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES, CRITIQUER_DESIGN_RULES, PREMIUM_DESIGN_PHILOSOPHY, AMATEUR_TELLS } from "./design-rules.js";
 import { GSAP_ANIMATION_SKILLS } from "./gsap-skills.js";
 import { SCRIPT_SYSTEM_SKILLS } from "./script-skills.js";
 import { COMPONENT_EXEMPLARS } from "./exemplars.js";
@@ -92,6 +92,8 @@ You MUST output a single .component.html file with exactly three sections:
 ${formatRules}
 
 ${COMPONENT_DESIGN_RULES}
+
+${PREMIUM_DESIGN_PHILOSOPHY}
 
 ${GSAP_ANIMATION_SKILLS}
 
@@ -272,7 +274,9 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 
 ${formatRules}
 
-${CRITIQUER_DESIGN_RULES}`;
+${CRITIQUER_DESIGN_RULES}
+
+${AMATEUR_TELLS}`;
 }
 
 /**
