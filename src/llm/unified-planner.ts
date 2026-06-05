@@ -57,7 +57,6 @@ export interface PlannedScene {
   transition_in?: { type: string; duration_seconds: number };
   components: PlannedComponent[];
   hero_image?: string;
-  _brandAsset?: boolean;
 }
 
 export interface StoryboardResult {
@@ -178,6 +177,7 @@ ${COMPOSITION_PLAYBOOK}`;
 
   // Inject brand asset info into the system prompt if available
   var brandAssetsSection = "";
+  var guidelinesLower = (opts.brandKit.guidelines || "").toLowerCase();
   var brandAssets = opts.brandKit.assets || [];
   var backgrounds = brandAssets.filter(a => a.type === "background");
   var intros = brandAssets.filter(a => a.type === "intro");
@@ -197,7 +197,13 @@ ${COMPOSITION_PLAYBOOK}`;
     for (var intro of intros) {
       brandAssetsSection += `- "${intro.name}": ${intro.url} (${intro.duration ? intro.duration.toFixed(1) + "s" : "unknown duration"}${intro.width ? `, ${intro.width}x${intro.height}` : ""})\n`;
     }
-    brandAssetsSection += `\nTo use a brand intro, add it as the first scene with a video component:\n{ "label": "Intro", "duration_seconds": ${intros[0].duration || 5}, "components": [{ "type": "video", "data": { "src": "${intros[0].url}" }, "z_index": 0 }] }\nOnly add intros when brand guidelines specify to use them.\n`;
+    // Check if guidelines mandate intro usage
+    var introRequired = guidelinesLower.includes("intro") && (guidelinesLower.includes("always") || guidelinesLower.includes("must") || guidelinesLower.includes("required"));
+    if (introRequired) {
+      brandAssetsSection += `\n⚠️ REQUIRED: Brand guidelines mandate this intro as the FIRST scene. You MUST include it.\nAdd this as scene 1:\n{ "label": "Intro", "duration_seconds": ${intros[0].duration || 5}, "components": [{ "type": "video", "data": { "src": "${intros[0].url}" }, "z_index": 0 }] }\nDo NOT skip this. Do NOT replace it with a custom component.\n`;
+    } else {
+      brandAssetsSection += `\nTo use a brand intro, add it as the first scene with a video component:\n{ "label": "Intro", "duration_seconds": ${intros[0].duration || 5}, "components": [{ "type": "video", "data": { "src": "${intros[0].url}" }, "z_index": 0 }] }\nAdd intros when brand guidelines specify to use them.\n`;
+    }
   }
 
   if (outros.length) {
@@ -205,7 +211,13 @@ ${COMPOSITION_PLAYBOOK}`;
     for (var outro of outros) {
       brandAssetsSection += `- "${outro.name}": ${outro.url} (${outro.duration ? outro.duration.toFixed(1) + "s" : "unknown duration"})\n`;
     }
-    brandAssetsSection += `\nTo use a brand outro, add it as the last scene with a video component.\nOnly add outros when brand guidelines specify to use them.\n`;
+    // Check if guidelines mandate outro usage
+    var outroRequired = guidelinesLower.includes("outro") && (guidelinesLower.includes("always") || guidelinesLower.includes("must") || guidelinesLower.includes("required"));
+    if (outroRequired) {
+      brandAssetsSection += `\n⚠️ REQUIRED: Brand guidelines mandate this outro as the LAST scene. You MUST include it.\nAdd this as the final scene:\n{ "label": "Outro", "duration_seconds": ${outros[0].duration || 5}, "components": [{ "type": "video", "data": { "src": "${outros[0].url}" }, "z_index": 0 }] }\nDo NOT skip this. Do NOT replace it with a custom component.\n`;
+    } else {
+      brandAssetsSection += `\nTo use a brand outro, add it as the last scene with a video component.\nAdd outros when brand guidelines specify to use them.\n`;
+    }
   }
 
   if (brandMusic.length) {

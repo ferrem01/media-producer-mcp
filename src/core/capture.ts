@@ -159,7 +159,7 @@ export async function captureSingleFrame(options: {
         (window as any).__MP_TIMELINE.time(t);
       }, atTime);
 
-      // Wait for video elements to seek and render
+      // Wait for video elements to load, seek, and render a frame
       await page.evaluate((seekTime: number) =>
         new Promise<void>((resolve) => {
           const videos = document.querySelectorAll("video");
@@ -168,16 +168,29 @@ export async function captureSingleFrame(options: {
             return;
           }
           let pending = videos.length;
-          const done = () => { if (--pending <= 0) resolve(); };
+          const done = () => { if (--pending <= 0) setTimeout(() => requestAnimationFrame(() => resolve()), 100); };
           videos.forEach((v) => {
             const startAt = parseFloat(v.getAttribute("data-start-at") || "0");
-            v.currentTime = Math.max(0, seekTime - startAt);
+            const targetTime = Math.max(0, seekTime - startAt);
+
+            const seekAndWait = () => {
+              v.currentTime = targetTime;
+              if (v.readyState >= 3) {
+                done();
+              } else {
+                v.addEventListener("seeked", () => done(), { once: true });
+                v.addEventListener("error", () => done(), { once: true });
+                setTimeout(() => done(), 5000);
+              }
+            };
+
+            // Wait for video to have enough data before seeking
             if (v.readyState >= 2) {
-              done();
+              seekAndWait();
             } else {
-              v.addEventListener("seeked", done, { once: true });
-              v.addEventListener("error", done, { once: true });
-              setTimeout(done, 3000); // fallback timeout
+              v.addEventListener("loadeddata", () => seekAndWait(), { once: true });
+              v.addEventListener("error", () => done(), { once: true });
+              setTimeout(() => done(), 8000); // fallback if video never loads
             }
           });
         }),

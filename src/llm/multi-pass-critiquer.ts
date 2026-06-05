@@ -25,6 +25,8 @@ export interface CritiqueSceneOpts {
   format?: string;
   trace?: TraceBuilder;
   critiqueRound?: number;
+  /** Additional context about the scene for the critiquer */
+  sceneContext?: string;
 }
 
 export interface CritiqueResult {

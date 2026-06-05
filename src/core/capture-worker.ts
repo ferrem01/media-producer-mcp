@@ -56,6 +56,24 @@ async function main() {
       { timeout: 15000 }
     );
 
+    // Wait for all video elements to load before starting capture
+    await page.evaluate(() =>
+      new Promise<void>((resolve) => {
+        const videos = document.querySelectorAll("video");
+        if (videos.length === 0) { resolve(); return; }
+        let pending = videos.length;
+        const done = () => { if (--pending <= 0) resolve(); };
+        videos.forEach((v) => {
+          if (v.readyState >= 2) { done(); }
+          else {
+            v.addEventListener("loadeddata", () => done(), { once: true });
+            v.addEventListener("error", () => done(), { once: true });
+            setTimeout(() => done(), 10000);
+          }
+        });
+      })
+    );
+
     for (let frame = 0; frame < totalFrames; frame++) {
       const time = frame / args.fps;
 
@@ -63,8 +81,28 @@ async function main() {
         (window as any).__MP_TIMELINE.time(t);
       }, time);
 
-      await page.evaluate(() =>
-        new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      // Sync video elements to current frame time
+      await page.evaluate((t: number) =>
+        new Promise<void>((resolve) => {
+          const videos = document.querySelectorAll("video");
+          if (videos.length === 0) {
+            requestAnimationFrame(() => resolve());
+            return;
+          }
+          let pending = videos.length;
+          const done = () => { if (--pending <= 0) requestAnimationFrame(() => resolve()); };
+          videos.forEach((v) => {
+            const startAt = parseFloat(v.getAttribute("data-start-at") || "0");
+            const targetTime = Math.max(0, t - startAt);
+            v.currentTime = targetTime;
+            if (v.readyState >= 3) { done(); }
+            else {
+              v.addEventListener("seeked", () => done(), { once: true });
+              setTimeout(() => done(), 2000);
+            }
+          });
+        }),
+        time
       );
 
       const frameName = `frame-${String(frame).padStart(6, "0")}.${args.format}`;

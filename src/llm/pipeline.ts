@@ -12,6 +12,9 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+const execFileAsync = promisify(execFile);
 import { v4 as uuid } from "uuid";
 import type { LLMConfig } from "./client.js";
 import { generateComponentLLM } from "./component-gen.js";
@@ -903,16 +906,67 @@ async function critiqueAndRetryScene(opts: {
       const previewPath = path.join(tmpDir, "preview.png");
 
       await fs.writeFile(htmlPath, assembledHtml);
-      await captureSingleFrame({
-        htmlPath,
-        outputPath: previewPath,
-        width: opts.canvas.width,
-        height: opts.canvas.height,
-        atTime: currentScene.duration_seconds * 0.9,
-      });
+
+      // Video-only scene: extract frame directly from video file via ffmpeg
+      // (Playwright can't load http:// video in file:// pages due to CORS)
+      const isVideoOnly = currentScene.components.length === 1 &&
+        currentScene.components[0].type === "video" &&
+        currentScene.components[0].data?.src;
+
+      if (isVideoOnly) {
+        const videoSrc = currentScene.components[0].data!.src as string;
+        const seekTime = Math.min(currentScene.duration_seconds * 0.5, 3);
+        try {
+          // Resolve URL to local file path for ffmpeg
+          let videoPath = videoSrc;
+          // Resolve relative /assets/ paths to full HTTP URL
+          if (videoPath.startsWith("/assets/") || videoPath.startsWith("/api/")) {
+            videoPath = `http://localhost:${config.port}${videoPath}`;
+          }
+          if (videoPath.startsWith("http://localhost")) {
+            // Download to temp file
+            const tmpVideo = path.join(tmpDir, "source.mp4");
+            const res = await fetch(videoPath);
+            if (res.ok) {
+              const buf = Buffer.from(await res.arrayBuffer());
+              await fs.writeFile(tmpVideo, buf);
+              videoPath = tmpVideo;
+            }
+          }
+          await execFileAsync("ffmpeg", [
+            "-y", "-ss", String(seekTime), "-i", videoPath,
+            "-vframes", "1",
+            "-vf", `scale=${opts.canvas.width}:${opts.canvas.height}:force_original_aspect_ratio=decrease,pad=${opts.canvas.width}:${opts.canvas.height}:(ow-iw)/2:(oh-ih)/2:black`,
+            previewPath,
+          ], { timeout: 15000 });
+          console.log(`  Captured video frame via ffmpeg: ${previewPath}`);
+        } catch (e: any) {
+          console.warn(`  ffmpeg frame extract failed (${e.message}), falling back to Playwright`);
+          await captureSingleFrame({
+            htmlPath,
+            outputPath: previewPath,
+            width: opts.canvas.width,
+            height: opts.canvas.height,
+            atTime: currentScene.duration_seconds * 0.9,
+          });
+        }
+      } else {
+        await captureSingleFrame({
+          htmlPath,
+          outputPath: previewPath,
+          width: opts.canvas.width,
+          height: opts.canvas.height,
+          atTime: currentScene.duration_seconds * 0.9,
+        });
+      }
 
       // 4. Read preview and critique
       const previewBase64 = (await fs.readFile(previewPath)).toString("base64");
+      // Add context for video-only scenes so critiquer evaluates appropriately
+      const videoContext = isVideoOnly
+        ? "This scene contains a pre-rendered video component (brand animation/clip). The video content cannot be modified. Evaluate the video frame for visual quality, brand consistency, and professional appearance. Do NOT penalize for missing headlines, text, messaging, or value propositions - this is an animated brand clip, not a content scene."
+        : undefined;
+
       const critiqueResult = await critiqueMultiPass({
         sceneHtml: assembledHtml,
         previewImageBase64: previewBase64,
@@ -921,6 +975,7 @@ async function critiqueAndRetryScene(opts: {
         format: opts.format,
         trace: opts.trace,
         critiqueRound: attempt,
+        sceneContext: videoContext,
       });
 
       lastCritique = critiqueResult;
@@ -1220,66 +1275,8 @@ async function runUnifiedPipeline(
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
-  // ── Inject deterministic brand intro/outro for video/presentation ──
-  if ((format === "video" || format === "presentation") && brandKit.assets?.length) {
-    const introAsset = brandKit.assets.find((a: any) => a.type === "intro");
-    const outroAsset = brandKit.assets.find((a: any) => a.type === "outro");
-    const guidelines = (brandKit.guidelines || "").toLowerCase();
-    const hasIntroGuideline = guidelines.includes("intro") && (guidelines.includes("always") || guidelines.includes("use"));
-    const hasOutroGuideline = guidelines.includes("outro") && (guidelines.includes("always") || guidelines.includes("use"));
 
-    // Resolve asset URL: prefix relative paths with server base URL
-    const resolveUrl = (url: string) =>
-      url.startsWith("/") ? `http://localhost:${config.port}${url}` : url;
-
-    if (introAsset && hasIntroGuideline) {
-      // Check if planner already added an intro scene (video component with same src)
-      const plannerHasIntro = storyboard.scenes.some((s: any) =>
-        s.components?.some((c: any) =>
-          c.type === "video" && c.data?.src && (c.data.src === introAsset.url || c.data.src === resolveUrl(introAsset.url))
-        )
-      );
-      if (!plannerHasIntro) {
-        console.log(`  Injecting brand intro: "${introAsset.name}" (${introAsset.duration || 5}s)`);
-        storyboard.scenes.unshift({
-          label: "Intro - Brand",
-          duration_seconds: introAsset.duration || 5,
-          description: `Brand intro video: ${introAsset.name}`,
-          components: [{
-            type: "video",
-            data: { src: resolveUrl(introAsset.url) },
-            z_index: 0,
-          }],
-          _brandAsset: true, // marker to skip critique
-        });
-      }
-    }
-
-    if (outroAsset && hasOutroGuideline) {
-      const plannerHasOutro = storyboard.scenes.some((s: any) =>
-        s.components?.some((c: any) =>
-          c.type === "video" && c.data?.src && (c.data.src === outroAsset.url || c.data.src === resolveUrl(outroAsset.url))
-        )
-      );
-      if (!plannerHasOutro) {
-        console.log(`  Injecting brand outro: "${outroAsset.name}" (${outroAsset.duration || 5}s)`);
-        storyboard.scenes.push({
-          label: "Outro - Brand",
-          duration_seconds: outroAsset.duration || 5,
-          description: `Brand outro video: ${outroAsset.name}`,
-          components: [{
-            type: "video",
-            data: { src: resolveUrl(outroAsset.url) },
-            z_index: 0,
-          }],
-          transition_in: { type: "crossfade", duration_seconds: 0.5 },
-          _brandAsset: true,
-        });
-      }
-    }
-  }
-
-  // Create project shell
+    // Create project shell
   var projectId = `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
   var project: Project = {
     project_id: projectId,
@@ -1338,14 +1335,10 @@ async function runUnifiedPipeline(
       }
     }
 
-    // Critique loop (skip if opts.critique === false, or if brand asset scene)
+    // Critique loop (skip if opts.critique === false)
     let finalScene = generated.scene;
     let finalCustomSources = generated.customSources;
-    const isBrandAsset = (planned as any)._brandAsset === true;
-    if (isBrandAsset) {
-      console.log(`  Scene ${i + 1}/${storyboard.scenes.length}: brand asset, skipping critique`);
-    }
-    if (opts.critique !== false && !isBrandAsset) {
+    if (opts.critique !== false) {
       const critiqueResult = await critiqueAndRetryScene({
         scene: generated.scene,
         planned,

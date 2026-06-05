@@ -124,7 +124,6 @@ export interface Scene {
   transition_in?: SceneTransition;
   components: SceneComponent[];
   audio_hints?: SceneAudioHints;
-  _brandAsset?: boolean;
 }
 
 // ── Overlays ──
