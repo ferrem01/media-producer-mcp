@@ -297,8 +297,19 @@ async function renderSingleSceneWorker(
           const buf = Buffer.from(await res.arrayBuffer());
           await fs.writeFile(srcPath, buf);
         } else if (videoSrc.startsWith("/")) {
-          const localPath = path.join(config.dataDir, "..", videoSrc);
-          await fs.copyFile(localPath, srcPath);
+          // Resolve /assets/{tenant}/brand-kit/{path} -> {dataDir}/{tenant}/brand-kit/assets/{path}
+          // Must match the HTTP handler pattern in index.ts
+          const brandMatch = videoSrc.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);
+          if (brandMatch) {
+            const localPath = path.join(config.dataDir, brandMatch[1], "brand-kit", "assets", brandMatch[2]);
+            await fs.copyFile(localPath, srcPath);
+          } else {
+            // For other /assets/ or /api/ paths, fetch via localhost
+            const localRes = await fetch(`http://localhost:${config.port}${videoSrc}`);
+            if (!localRes.ok) throw new Error(`HTTP ${localRes.status}: ${videoSrc}`);
+            const localBuf = Buffer.from(await localRes.arrayBuffer());
+            await fs.writeFile(srcPath, localBuf);
+          }
         }
 
         // Re-encode to match project canvas (resolution, codec, fps, no audio for now)

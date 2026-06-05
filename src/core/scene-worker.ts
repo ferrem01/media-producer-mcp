@@ -171,7 +171,7 @@ async function main() {
   try {
     var page = await browser.newPage();
     await page.setViewportSize({ width: args.width, height: args.height });
-    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "networkidle" });
+    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 15000 });
 
     for (var frame = 0; frame < totalFrames; frame++) {
