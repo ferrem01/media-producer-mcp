@@ -49,7 +49,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   }
 
   // Generate brand kit CSS variables
-  const { css: brandCSS, theme: sceneTheme } = generateBrandCSS(brandKit, scene.background);
+  const { css: brandCSS, theme: sceneTheme, hasBgImage } = generateBrandCSS(brandKit, scene.background);
 
   // Process each scene component
   const componentBlocks: string[] = [];
@@ -108,6 +108,13 @@ ${generateFontLinks(brandKit)}
 /* ── Brand Kit ── */
 ${brandCSS}
 
+${hasBgImage ? `
+/* ── Brand background image: reduce gradient overlay opacity ── */
+.bg-gradient {
+  opacity: 0.65 !important;
+}
+` : ''}
+
 /* ── Reset ── */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
@@ -156,6 +163,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
+${hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
 ${componentBlocks.join("\n\n")}
 
 <script>
@@ -276,7 +284,7 @@ function pickBrandBackground(brand: BrandKit, isDark: boolean): string | undefin
  *   --mp-color-cta: CTA button color (from accent)
  *   --mp-color-glow: glow/shadow color based on primary
  */
-function generateBrandCSS(brand: BrandKit, sceneBackground?: string): { css: string; theme: "dark" | "light" } {
+function generateBrandCSS(brand: BrandKit, sceneBackground?: string): { css: string; theme: "dark" | "light"; hasBgImage: boolean } {
   const vars: string[] = [];
 
   // ── Determine effective theme ──
@@ -348,8 +356,10 @@ function generateBrandCSS(brand: BrandKit, sceneBackground?: string): { css: str
       ? `http://localhost:${config.port}${bgUrl}`
       : bgUrl;
     vars.push(`  --mp-bg-image: url(${resolvedUrl});`);
+    vars.push('  --mp-has-bg-image: 1;');
   } else {
     vars.push('  --mp-bg-image: none;');
+    vars.push('  --mp-has-bg-image: 0;');
   }
 
   // ── CTA color (accent) ──
@@ -365,7 +375,7 @@ function generateBrandCSS(brand: BrandKit, sceneBackground?: string): { css: str
   // ── Theme hint ──
   vars.push(`  --mp-theme: ${sceneIsDark ? 'dark' : 'light'};`);
 
-  return { css: `:root {\n${vars.join('\n')}\n}`, theme: sceneIsDark ? 'dark' : 'light' };
+  return { css: `:root {\n${vars.join('\n')}\n}`, theme: sceneIsDark ? 'dark' : 'light', hasBgImage: !!bgUrl };
 }
 
 
