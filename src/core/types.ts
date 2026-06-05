@@ -116,6 +116,14 @@ export interface SceneAudioHints {
   sync_points?: Array<{ at: number; label: string }>;
 }
 
+export interface ContentRegion {
+  side: "left" | "right";
+  /** Width of the content region, e.g. "40%", "500px" */
+  width: string;
+  /** Optional padding/offset from the edge, e.g. "20px" */
+  offset?: string;
+}
+
 export interface Scene {
   id: string;
   label?: string;
@@ -124,6 +132,11 @@ export interface Scene {
   transition_in?: SceneTransition;
   components: SceneComponent[];
   audio_hints?: SceneAudioHints;
+  /** When set, all components are constrained to this region of the frame.
+   *  Used with full-behind speaker overlay so content appears beside the speaker. */
+  content_region?: ContentRegion;
+  /** When true, the scene background is rendered transparently (used with full-behind overlays). */
+  transparent_background?: boolean;
 }
 
 // ── Overlays ──
@@ -143,7 +156,7 @@ export interface Overlay {
   segments?: Array<{
     start: number;
     end: number;
-    mode: "full" | "pip" | "audio-only";
+    mode: "full" | "pip" | "audio-only" | "full-behind";
     position?: string;
     shape?: string;
     size?: { width: number; height: number };

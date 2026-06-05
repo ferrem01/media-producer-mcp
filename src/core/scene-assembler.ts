@@ -51,6 +51,9 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   // Generate brand kit CSS variables
   const { css: brandCSS, theme: sceneTheme, hasBgImage } = generateBrandCSS(brandKit, scene.background);
 
+  // Determine if scene should use transparent background (for full-behind speaker overlay)
+  const isTransparent = scene.transparent_background === true;
+
   // Process each scene component
   const componentBlocks: string[] = [];
   const componentStyles: string[] = [];
@@ -121,7 +124,7 @@ html, body {
   width: ${canvas.width}px;
   height: ${canvas.height}px;
   overflow: hidden;
-  background: var(--mp-color-background, ${scene.background || canvas.background || "#000000"});
+  background: ${isTransparent ? 'transparent' : `var(--mp-color-background, ${scene.background || canvas.background || "#000000"})`};
 }
 
 /* ── Component containers ── */
@@ -163,8 +166,8 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
-${componentBlocks.join("\n\n")}
+${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
+${buildContentRegionWrapper(scene, componentBlocks)}
 
 <script>
 (function() {
@@ -418,6 +421,43 @@ function buildPositionStyle(comp: SceneComponent): string {
   parts.push(`z-index:${z}`);
 
   return parts.join("; ");
+}
+
+/**
+ * Wrap component blocks in a content_region container when specified.
+ * If no content_region is set, returns the blocks joined normally.
+ *
+ * When content_region is present, all components are placed inside a
+ * positioned div that occupies the specified side and width of the frame.
+ * This leaves the other side clear for the speaker video (full-behind mode).
+ */
+function buildContentRegionWrapper(scene: Scene, componentBlocks: string[]): string {
+  const blocks = componentBlocks.join("\n\n");
+
+  if (!scene.content_region) {
+    return blocks;
+  }
+
+  const { side, width, offset } = scene.content_region;
+  const edgeOffset = offset || "0px";
+
+  // Build CSS for the wrapper
+  // The wrapper is absolutely positioned and fills the full height.
+  // Components inside use their normal positioning relative to this container.
+  let positionCSS: string;
+  if (side === "left") {
+    positionCSS = `left: ${edgeOffset}; top: 0; width: ${width}; height: 100%;`;
+  } else {
+    positionCSS = `right: ${edgeOffset}; top: 0; width: ${width}; height: 100%;`;
+  }
+
+  const wrapperStyle = `position: absolute; ${positionCSS} overflow: hidden; box-sizing: border-box;`;
+
+  return (
+    `<div class="mp-content-region" data-side="${side}" style="${wrapperStyle}">\n` +
+    blocks.split("\n").map(line => "  " + line).join("\n") +
+    `\n</div>`
+  );
 }
 
 /**

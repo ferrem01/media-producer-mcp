@@ -15,7 +15,7 @@ const execFileAsync = promisify(execFile);
 export interface OverlaySegment {
   start: number;
   end: number;
-  mode: "full" | "pip" | "audio-only";
+  mode: "full" | "pip" | "audio-only" | "full-behind";
   position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
   shape?: "circle" | "rounded-rect" | "rect";
   size?: { width: number; height: number };
@@ -30,6 +30,23 @@ export interface CompositeOverlayOptions {
   outputPath: string;
   width: number;
   height: number;
+}
+
+export interface CompositeFullBehindOptions {
+  /** Directory containing PNG frames with alpha channel (scene content) */
+  framesDir: string;
+  /** Speaker video path (becomes the base layer) */
+  speakerPath: string;
+  /** Output video path */
+  outputPath: string;
+  /** Canvas width */
+  width: number;
+  /** Canvas height */
+  height: number;
+  /** Frames per second */
+  fps: number;
+  /** Total duration in seconds (used for audio trimming) */
+  duration: number;
 }
 
 /**
@@ -233,6 +250,64 @@ export async function compositeOverlays(opts: CompositeOverlayOptions): Promise<
   );
 
   console.log(`  Compositing overlays: ${videoSegments.length} video segments`);
+
+  await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
+
+  return outputPath;
+}
+
+/**
+ * Composite scene PNG frames (with alpha) ON TOP of the speaker video.
+ * This is the "full-behind" mode: speaker fills the entire frame as the
+ * base layer, and the HTML scene (with transparent background) renders
+ * on top, so animated components appear beside the speaker's face.
+ *
+ * Input frames must be PNGs with alpha transparency.
+ * The speaker video is scaled to fill the full canvas.
+ *
+ * ffmpeg filter:
+ *   [speaker_scaled][scene_pngs]overlay=0:0:shortest=1
+ */
+export async function compositeFullBehind(opts: CompositeFullBehindOptions): Promise<string> {
+  const { framesDir, speakerPath, outputPath, width, height, fps, duration } = opts;
+
+  const speakerHasAudio = await hasAudioStream(speakerPath);
+
+  // ffmpeg reads PNGs as an image sequence (input 0 = speaker video, input 1 = PNG sequence)
+  const filterComplex = [
+    `[0:v]scale=${width}:${height}[speaker_base]`,
+    `[speaker_base][1:v]overlay=0:0:shortest=1[out]`,
+  ].join("; ");
+
+  const args: string[] = [
+    "-y",
+    // Input 0: speaker video
+    "-i", speakerPath,
+    // Input 1: PNG sequence with alpha
+    "-framerate", String(fps),
+    "-i", `${framesDir}/frame-%06d.png`,
+  ];
+
+  args.push("-filter_complex", filterComplex);
+  args.push("-map", "[out]");
+
+  // Include speaker audio if available
+  if (speakerHasAudio) {
+    args.push("-map", "0:a");
+  }
+
+  // Output encoding
+  args.push(
+    "-c:v", "libx264",
+    "-preset", "medium",
+    "-crf", "23",
+    "-pix_fmt", "yuv420p",
+    "-movflags", "+faststart",
+    "-t", String(duration),
+    outputPath,
+  );
+
+  console.log(`  Compositing full-behind: speaker base + PNG sequence overlay`);
 
   await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
 

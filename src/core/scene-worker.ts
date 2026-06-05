@@ -43,6 +43,13 @@ interface WorkerArgs {
   originalPrompt?: string;
   /** Extra directories to search for component sources (e.g. freeform project-local) */
   extraComponentDirs?: string[];
+  /**
+   * When true, capture frames as PNGs with alpha transparency instead of JPEG.
+   * The frames are NOT encoded to MP4; instead the frames directory is left
+   * in place for the parent process to composite via compositeFullBehind.
+   * Used by the full-behind speaker overlay mode.
+   */
+  captureAsPng?: boolean;
 }
 
 async function main() {
@@ -196,8 +203,13 @@ async function main() {
         });
       }));
 
-      var frameName = `frame-${String(frame).padStart(6, "0")}.jpg`;
-      await page.screenshot({ path: path.join(framesDir, frameName), type: "jpeg", quality: 90 });
+      if (args.captureAsPng) {
+        var frameName = `frame-${String(frame).padStart(6, "0")}.png`;
+        await page.screenshot({ path: path.join(framesDir, frameName), type: "png", omitBackground: true });
+      } else {
+        var frameName = `frame-${String(frame).padStart(6, "0")}.jpg`;
+        await page.screenshot({ path: path.join(framesDir, frameName), type: "jpeg", quality: 90 });
+      }
 
       if (totalFrames > 20 && frame % Math.ceil(totalFrames / 10) === 0) {
         var pct = Math.round((frame / totalFrames) * 100);
@@ -211,29 +223,37 @@ async function main() {
     await browser.close();
   }
 
-  // Encode to MP4
-  await fs.mkdir(path.dirname(args.outputMp4Path), { recursive: true });
-  await execFileAsync("ffmpeg", [
-    "-y",
-    "-framerate", String(args.fps),
-    "-i", path.join(framesDir, "frame-%06d.jpg"),
-    "-c:v", "libx264",
-    "-profile:v", "baseline",
-    "-level", "3.0",
-    "-preset", "medium",
-    "-crf", "23",
-    "-maxrate", "2M",
-    "-bufsize", "4M",
-    "-pix_fmt", "yuv420p",
-    "-movflags", "+faststart",
-    args.outputMp4Path,
-  ], { maxBuffer: 10 * 1024 * 1024 });
+  if (args.captureAsPng) {
+    // PNG/alpha mode: skip mp4 encoding. The frames directory is intentionally
+    // left in place so that render.ts can call compositeFullBehind() on it.
+    // Signal success by writing a small marker file.
+    await fs.writeFile(path.join(args.workDir, ".frames-ready"), framesDir);
+    console.log(`  PNG frames ready for full-behind compositing: ${framesDir}`);
+  } else {
+    // Encode to MP4
+    await fs.mkdir(path.dirname(args.outputMp4Path), { recursive: true });
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-framerate", String(args.fps),
+      "-i", path.join(framesDir, "frame-%06d.jpg"),
+      "-c:v", "libx264",
+      "-profile:v", "baseline",
+      "-level", "3.0",
+      "-preset", "medium",
+      "-crf", "23",
+      "-maxrate", "2M",
+      "-bufsize", "4M",
+      "-pix_fmt", "yuv420p",
+      "-movflags", "+faststart",
+      args.outputMp4Path,
+    ], { maxBuffer: 10 * 1024 * 1024 });
 
-  var stat = await fs.stat(args.outputMp4Path);
-  console.log(`  Encoded: ${args.outputMp4Path} (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
+    var stat = await fs.stat(args.outputMp4Path);
+    console.log(`  Encoded: ${args.outputMp4Path} (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
 
-  // Clean up frames
-  await fs.rm(framesDir, { recursive: true, force: true });
+    // Clean up frames
+    await fs.rm(framesDir, { recursive: true, force: true });
+  }
 }
 
 async function findComponentSource(type: string, libDir: string, extraDirs?: string[]): Promise<string | null> {
