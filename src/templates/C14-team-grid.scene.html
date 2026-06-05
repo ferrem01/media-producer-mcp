@@ -109,6 +109,17 @@
     color: color-mix(in srgb, var(--mp-color-text, #ffffff) 45%, transparent);
   }
   .member-role:empty { display: none; }
+
+  /* ── Light theme overrides ── */
+  [data-theme="light"] .bg-gradient {
+    opacity: 0.6;
+  }
+  [data-theme="light"] .bg-glow {
+    opacity: 0.15;
+  }
+  [data-theme="light"] .bg-noise {
+    opacity: 0.015;
+  }
 </style>
 
 <script>

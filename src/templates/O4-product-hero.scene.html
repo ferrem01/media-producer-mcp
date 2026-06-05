@@ -224,6 +224,38 @@
     line-height: 1.4;
   }
   .subtitle:empty { display: none; }
+
+  /* ── Light theme overrides ── */
+  [data-theme="light"] .bg-gradient {
+    opacity: 0.6;
+  }
+  [data-theme="light"] .bg-glow {
+    opacity: 0.15;
+  }
+  [data-theme="light"] .bg-noise {
+    opacity: 0.015;
+  }
+  [data-theme="light"] .device-frame {
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5),
+      0 0 0 1px rgba(0,0,0,0.06) inset,
+      0 0 60px color-mix(in srgb, var(--mp-color-primary, #6366f1) 10%, transparent);
+  }
+  [data-theme="light"] .ui-topbar {
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+  }
+  [data-theme="light"] .ui-nav-link {
+    background: rgba(0,0,0,0.10);
+  }
+  [data-theme="light"] .ui-hero-text {
+    background: rgba(0,0,0,0.14);
+  }
+  [data-theme="light"] .ui-hero-subtext {
+    background: rgba(0,0,0,0.07);
+  }
+  [data-theme="light"] .ui-card-sm {
+    background: rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.07);
+  }
 </style>
 
 <script>

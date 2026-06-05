@@ -70,7 +70,7 @@
       0 0 80px color-mix(in srgb, var(--mp-color-primary, #6366f1) 15%, transparent);
   }
   .logo-text {
-    font-size: 56px; font-weight: 900; color: #ffffff;
+    font-size: 56px; font-weight: 900; color: var(--mp-color-text, #ffffff);
     letter-spacing: -0.02em;
   }
   .company-name {
@@ -98,6 +98,17 @@
     bottom: 60px; right: 60px;
     border-left: none; border-top: none;
     border-radius: 0 0 8px 0;
+  }
+
+  /* ── Light theme overrides ── */
+  [data-theme="light"] .bg-gradient {
+    opacity: 0.6;
+  }
+  [data-theme="light"] .bg-glow {
+    opacity: 0.15;
+  }
+  [data-theme="light"] .bg-noise {
+    opacity: 0.015;
   }
 </style>
 

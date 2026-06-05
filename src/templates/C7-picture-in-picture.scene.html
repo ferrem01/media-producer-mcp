@@ -180,6 +180,27 @@
     border-radius: 6px 6px 2px 2px;
     min-height: 8px;
   }
+
+  /* ── Light theme overrides ── */
+  [data-theme="light"] .bg-gradient {
+    opacity: 0.6;
+  }
+  [data-theme="light"] .bg-glow {
+    opacity: 0.15;
+  }
+  [data-theme="light"] .bg-noise {
+    opacity: 0.015;
+  }
+  [data-theme="light"] .pip-window {
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4),
+      0 0 0 1px rgba(0,0,0,0.06) inset;
+  }
+  [data-theme="light"] .pip-chrome {
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  [data-theme="light"] .pip-dot {
+    background: rgba(0,0,0,0.15);
+  }
 </style>
 
 <script>

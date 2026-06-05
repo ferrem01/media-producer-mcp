@@ -237,6 +237,41 @@
     text-align: center;
   }
   .caption:empty { display: none; }
+
+  /* ── Light theme overrides ── */
+  [data-theme="light"] .bg-gradient {
+    opacity: 0.6;
+  }
+  [data-theme="light"] .bg-glow {
+    opacity: 0.15;
+  }
+  [data-theme="light"] .bg-noise {
+    opacity: 0.015;
+  }
+  [data-theme="light"] .laptop-screen {
+    box-shadow: 0 -2px 40px rgba(0,0,0,0.5),
+      0 0 0 1px rgba(0,0,0,0.04) inset;
+  }
+  [data-theme="light"] .screen-placeholder {
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+  }
+  [data-theme="light"] .ui-sidebar {
+    border-right: 1px solid rgba(0,0,0,0.07);
+  }
+  [data-theme="light"] .ui-nav-item {
+    background: rgba(0,0,0,0.06);
+  }
+  [data-theme="light"] .ui-header-bar {
+    background: rgba(0,0,0,0.10);
+  }
+  [data-theme="light"] .ui-card {
+    background: rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.07);
+  }
+  [data-theme="light"] .ui-chart {
+    background: rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.06);
+  }
 </style>
 
 <script>

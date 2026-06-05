@@ -49,7 +49,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   }
 
   // Generate brand kit CSS variables
-  const brandCSS = generateBrandCSS(brandKit, scene.background);
+  const { css: brandCSS, theme: sceneTheme } = generateBrandCSS(brandKit, scene.background);
 
   // Process each scene component
   const componentBlocks: string[] = [];
@@ -100,7 +100,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
 
   // Assemble final HTML
   const html = `<!DOCTYPE html>
-<html>
+<html data-theme="${sceneTheme}">
 <head>
 <meta charset="utf-8">
 ${generateFontLinks(brandKit)}
@@ -276,7 +276,7 @@ function pickBrandBackground(brand: BrandKit, isDark: boolean): string | undefin
  *   --mp-color-cta: CTA button color (from accent)
  *   --mp-color-glow: glow/shadow color based on primary
  */
-function generateBrandCSS(brand: BrandKit, sceneBackground?: string): string {
+function generateBrandCSS(brand: BrandKit, sceneBackground?: string): { css: string; theme: "dark" | "light" } {
   const vars: string[] = [];
 
   // ── Determine effective theme ──
@@ -361,7 +361,7 @@ function generateBrandCSS(brand: BrandKit, sceneBackground?: string): string {
   // ── Theme hint ──
   vars.push(`  --mp-theme: ${sceneIsDark ? 'dark' : 'light'};`);
 
-  return `:root {\n${vars.join('\n')}\n}`;
+  return { css: `:root {\n${vars.join('\n')}\n}`, theme: sceneIsDark ? 'dark' : 'light' };
 }
 
 
