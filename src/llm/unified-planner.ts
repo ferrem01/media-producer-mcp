@@ -13,6 +13,7 @@ import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js
 import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
 import { SCENE_RECIPES } from "./scene-recipes.js";
 import { COMPOSITION_PLAYBOOK } from "./cinematography.js";
+import { formatTemplateCatalogForPrompt } from "./template-catalog.js";
 import type { BrandKit, Canvas, OutputFormat } from "../core/types.js";
 
 function isLightBrand(brandKit: BrandKit): boolean {
@@ -48,6 +49,9 @@ export interface PlannedComponent {
   // Custom component
   custom?: boolean;  // true = generate custom HTML
   custom_prompt?: string;  // visual description for custom generation
+  // Template scene
+  template?: string;  // template ID, e.g. "O1-big-statement"
+  template_data?: Record<string, unknown>;  // content for template slots
 }
 
 export interface PlannedScene {
@@ -57,6 +61,9 @@ export interface PlannedScene {
   transition_in?: { type: string; duration_seconds: number };
   components: PlannedComponent[];
   hero_image?: string;
+  // Template scene (entire scene uses a pre-built template)
+  template?: string;  // template ID, e.g. "O1-big-statement"
+  template_data?: Record<string, unknown>;  // content for template slots
 }
 
 export interface StoryboardResult {
@@ -75,32 +82,58 @@ export async function planStoryboard(opts: UnifiedPlannerOpts): Promise<Storyboa
     ? `Exactly ${opts.sceneCount} scenes.`
     : "5-8 scenes (scale to content complexity).";
 
+  var templateCatalogStr = formatTemplateCatalogForPrompt();
+
   var systemPrompt = `You are planning a ${opts.format} project.
 
-For each scene, list the components it needs. Each component is EITHER:
-- A **library component**: { "type": "stat-card", "data": { ... }, "z_index": 10 }
-- A **custom component**: { "custom": true, "custom_prompt": "Detailed visual description...", "z_index": 10 }
+You have THREE options for each scene:
 
-You can MIX library and custom components in a single scene.
+## Option 1: Template Scene (PREFERRED)
+Use a pre-built scene template. These have premium Apple-level visuals baked in. You only provide the content.
 
-Example: A scene with a library background + custom hero visual + library stat card:
 {
   "label": "Scene 1 - Hero",
   "duration_seconds": 5,
-  "description": "Hero reveal with key metric",
-  "components": [
-    { "type": "mesh-gradient", "data": { "colors": ["var(--mp-color-background)", "var(--mp-color-primary)"] }, "z_index": 0 },
-    { "custom": true, "custom_prompt": "Dramatic product visualization with floating UI cards, holographic effects, 3D perspective transforms. Huge 120px typography saying 'QUOTIENT' with SplitText per-character animation. Ambient purple glow orbs in background.", "z_index": 10 },
-    { "type": "stat-card", "data": { "number": "340%", "label": "ROI" }, "z_index": 20, "position": { "x": 1400, "y": 800, "width": 400, "height": 200 } }
-  ],
-  
+  "description": "Bold opening statement",
+  "template": "O1-big-statement",
+  "template_data": { "badge": "INTRODUCING", "headline": "The Future of Marketing", "subtitle": "AI-powered demand generation" },
+  "components": [],
   "transition_in": { "type": "none", "duration_seconds": 0 }
 }
 
-Creativity level: ${creativity} (0 = prefer library, 1 = prefer custom)
-- At LOW creativity: use library components for most things. Only go custom when the library genuinely can't express what's needed.
-- At HIGH creativity (0.7-1.0): you MUST use exactly ONE custom component per scene that owns the entire canvas. The custom component handles its own background, layout, typography, and animation as one cohesive composition. Do NOT add ANY library components -- no gradient-background, no image, no stat-card, no cta-card, no logo components. The custom component IS the entire scene. This is MANDATORY at creativity >= 0.7, not a suggestion.
-- The library is your toolkit -- use it when it fits. Custom is your escape hatch AND your creative tool.
+## Option 2: Library Components
+Compose a scene from pre-built components. Each component has a type and data.
+
+{
+  "label": "Scene 2 - Stats",
+  "duration_seconds": 4,
+  "description": "Key metrics",
+  "components": [
+    { "type": "gradient-background", "data": { "from": "var(--mp-color-background)", "to": "var(--mp-color-surface)" }, "z_index": 0 },
+    { "type": "stat-card", "data": { "number": "340%", "label": "ROI" }, "z_index": 10 }
+  ],
+  "transition_in": { "type": "crossfade", "duration_seconds": 0.5 }
+}
+
+## Option 3: Custom Component (escape hatch)
+Full LLM-generated HTML/CSS/GSAP. Use ONLY when no template or library component fits.
+
+{
+  "label": "Scene 3 - Custom Demo",
+  "duration_seconds": 5,
+  "description": "Unique product visualization",
+  "components": [
+    { "custom": true, "custom_prompt": "Detailed visual description...", "z_index": 10 }
+  ],
+  "transition_in": { "type": "blur-crossfade", "duration_seconds": 0.5 }
+}
+
+PREFER templates over library components, and library components over custom.
+Templates produce the highest quality output. Custom is the lowest consistency.
+Use custom ONLY for scenes that genuinely don't fit any template or library component.
+
+When using a template: set "template" to the template ID, "template_data" with the slot values, and leave "components" as an empty array [].
+You can MIX approaches across scenes -- template for the opener, library for stats, custom for a unique demo.
 
 For library components: use the EXACT type name from the catalog above (e.g. "cta-card" not "cta", "stat-card" not "stat", "title-slide" not "title"). Fill in their data fields. Always include a background component (gradient-background or mesh-gradient) at z_index 0.
 For background component colors: ALWAYS use CSS var references from the brand kit (e.g. "var(--mp-color-background)", "var(--mp-color-primary)", "var(--mp-color-surface)"). NEVER hardcode hex colors for backgrounds.
@@ -170,6 +203,8 @@ ${catalogStr}
 - Output ONLY valid JSON. No commentary.
 
 ${SCENE_PLANNER_DESIGN_RULES}
+
+${templateCatalogStr}
 
 ${SCENE_RECIPES}
 
@@ -268,6 +303,12 @@ ${COMPOSITION_PLAYBOOK}`;
       scene.components = [];
     }
 
+    // Template scenes: skip component validation, the template owns the scene
+    if (scene.template) {
+      console.log(`  Scene "${scene.label}": using template ${scene.template}`);
+      continue;
+    }
+
     // At high creativity (>=0.7), enforce all-custom: convert any library components to custom
     if (creativity >= 0.7) {
       var hasCustom = scene.components.some((c: PlannedComponent) => c.custom);
@@ -333,13 +374,18 @@ ${COMPOSITION_PLAYBOOK}`;
 
   var libraryCount = 0;
   var customCount = 0;
+  var templateCount = 0;
   for (var scene of storyboard.scenes) {
+    if (scene.template) {
+      templateCount++;
+      continue;
+    }
     for (var comp of scene.components) {
       if (comp.custom) customCount++;
       else libraryCount++;
     }
   }
-  console.log(`  Unified planner: ${storyboard.scenes.length} scenes, ${libraryCount} library components, ${customCount} custom components`);
+  console.log(`  Unified planner: ${storyboard.scenes.length} scenes, ${templateCount} template, ${libraryCount} library, ${customCount} custom`);
 
   return storyboard as StoryboardResult;
 }

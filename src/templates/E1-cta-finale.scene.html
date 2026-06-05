@@ -1,0 +1,294 @@
+<!--
+  Scene Template: E1 - CTA Finale
+  Category: CLOSING
+  Use when: Final call to action. Drive the viewer to do something.
+  Feel: Confident, energetic, clear single action.
+  Content slots:
+    - headline: The ask, 3-6 words (e.g. "Start Your Free Trial")
+    - subtitle: Optional supporting urgency line
+    - cta_text: Button label (e.g. "Get Started", "Try It Free")
+    - cta_url: Optional URL (displayed as small text below button)
+  Duration: 4-5s
+-->
+<template>
+  <div class="scene">
+    <!-- Background -->
+    <div class="bg-gradient"></div>
+    <div class="bg-glow"></div>
+    <div class="bg-rays"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Content -->
+    <div class="content">
+      <h1 class="headline"></h1>
+      <p class="subtitle"></p>
+      <div class="cta-btn">
+        <span class="cta-text"></span>
+      </div>
+      <span class="cta-url"></span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  /* ── Background ── */
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 90% 70% at 50% 55%,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 18%, transparent) 0%,
+      var(--mp-color-background, #0a0a0f) 65%);
+  }
+
+  .bg-glow {
+    position: absolute;
+    width: 700px;
+    height: 400px;
+    bottom: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 15%, transparent) 0%,
+      transparent 70%);
+    filter: blur(80px);
+    pointer-events: none;
+  }
+
+  .bg-rays {
+    position: absolute;
+    inset: 0;
+    background: conic-gradient(from 180deg at 50% 110%,
+      transparent 0deg,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 3%, transparent) 30deg,
+      transparent 60deg,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 2%, transparent) 90deg,
+      transparent 120deg,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 3%, transparent) 150deg,
+      transparent 180deg,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 2%, transparent) 210deg,
+      transparent 240deg,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 3%, transparent) 270deg,
+      transparent 300deg,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 2%, transparent) 330deg,
+      transparent 360deg);
+    pointer-events: none;
+  }
+
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  /* ── Content ── */
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    text-align: center;
+  }
+
+  .headline {
+    font-size: 72px;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 20px 0;
+    max-width: 80%;
+    text-shadow: 0 0 60px color-mix(in srgb, var(--mp-color-primary, #6366f1) 25%, transparent);
+  }
+
+  .subtitle {
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin: 0 0 44px 0;
+    max-width: 55%;
+  }
+
+  .subtitle:empty { display: none; }
+
+  .cta-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 52px;
+    border-radius: 14px;
+    background: linear-gradient(135deg,
+      var(--mp-color-primary, #6366f1) 0%,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 80%, var(--mp-color-accent, #a78bfa)) 100%);
+    box-shadow:
+      0 0 40px color-mix(in srgb, var(--mp-color-primary, #6366f1) 35%, transparent),
+      0 4px 20px color-mix(in srgb, var(--mp-color-primary, #6366f1) 25%, transparent),
+      inset 0 1px 0 color-mix(in srgb, white 15%, transparent);
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cta-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+    transform: translateX(-100%);
+  }
+
+  .cta-text {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #ffffff;
+    position: relative;
+    z-index: 1;
+  }
+
+  .cta-url {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--mp-color-text-muted, #64748b);
+    margin-top: 16px;
+    letter-spacing: 0.02em;
+  }
+
+  .cta-url:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var headline = el.querySelector('.headline');
+    var subtitle = el.querySelector('.subtitle');
+    var ctaBtn = el.querySelector('.cta-btn');
+    var ctaText = el.querySelector('.cta-text');
+    var ctaUrl = el.querySelector('.cta-url');
+    var glow = el.querySelector('.bg-glow');
+    var rays = el.querySelector('.bg-rays');
+    var shimmer = el.querySelector('.cta-btn::before');
+
+    // Populate
+    headline.textContent = data.headline || data.text || '';
+    if (data.subtitle) subtitle.textContent = data.subtitle;
+    ctaText.textContent = data.cta_text || 'Get Started';
+    if (data.cta_url) ctaUrl.textContent = data.cta_url;
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Initial states
+    gsap.set(headline, { autoAlpha: 0, y: 30 });
+    gsap.set(subtitle, { autoAlpha: 0, y: 20 });
+    gsap.set(ctaBtn, { autoAlpha: 0, scale: 0.85, y: 20 });
+    gsap.set(ctaUrl, { autoAlpha: 0 });
+    gsap.set(glow, { autoAlpha: 0, scale: 0.5 });
+    gsap.set(rays, { autoAlpha: 0, rotation: -10 });
+
+    // Glow builds
+    tl.to(glow, {
+      autoAlpha: 1, scale: 1,
+      duration: speed * 1.5,
+      ease: 'power2.out'
+    }, 0);
+
+    // Rays fade in with rotation
+    tl.to(rays, {
+      autoAlpha: 1, rotation: 0,
+      duration: speed * 2,
+      ease: 'power1.out'
+    }, 0.1);
+
+    // Headline
+    tl.to(headline, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.7,
+      ease: 'power3.out'
+    }, 0.2);
+
+    // Subtitle
+    if (data.subtitle) {
+      tl.to(subtitle, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.5,
+        ease: 'power2.out'
+      }, 0.45);
+    }
+
+    // CTA button pops in
+    tl.to(ctaBtn, {
+      autoAlpha: 1, scale: 1, y: 0,
+      duration: speed * 0.6,
+      ease: 'back.out(1.4)'
+    }, data.subtitle ? 0.65 : 0.5);
+
+    // CTA shimmer sweep
+    tl.fromTo(ctaBtn.querySelector('::before') || ctaBtn, {
+      backgroundPosition: '-200% 0'
+    }, {
+      backgroundPosition: '200% 0',
+      duration: 1.2,
+      ease: 'power1.inOut'
+    }, data.subtitle ? 1.1 : 0.9);
+
+    // Button glow pulse
+    tl.to(ctaBtn, {
+      boxShadow: '0 0 60px ' + 'color-mix(in srgb, var(--mp-color-primary, #6366f1) 50%, transparent)' +
+                 ', 0 4px 30px ' + 'color-mix(in srgb, var(--mp-color-primary, #6366f1) 35%, transparent)' +
+                 ', inset 0 1px 0 ' + 'color-mix(in srgb, white 15%, transparent)',
+      duration: 1.5, ease: 'sine.inOut',
+      yoyo: true, repeat: -1
+    }, 1.2);
+
+    // URL
+    if (data.cta_url) {
+      tl.to(ctaUrl, {
+        autoAlpha: 1,
+        duration: speed * 0.4,
+        ease: 'power2.out'
+      }, data.subtitle ? 0.9 : 0.7);
+    }
+
+    // Rays slow rotate
+    tl.to(rays, {
+      rotation: 15,
+      duration: 8, ease: 'none',
+      repeat: -1
+    }, 0.5);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to([ctaUrl, subtitle], {
+        autoAlpha: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt);
+      tl.to(ctaBtn, {
+        autoAlpha: 0, scale: 0.9, y: -10,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt + 0.05);
+      tl.to(headline, {
+        autoAlpha: 0, y: -20,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt + 0.1);
+    }
+
+    return tl;
+  }
+</script>

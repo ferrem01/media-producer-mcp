@@ -8,8 +8,12 @@
 
 import { callLLM, type LLMConfig } from "./client.js";
 import { sceneComponentSystemPrompt } from "./prompts.js";
+import { reviseComponent } from "./component-revise.js";
+import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import type { PlannedScene, PlannedComponent } from "./unified-planner.js";
 import type { BrandKit, Canvas, OutputFormat, Scene, SceneComponent, SceneTransition } from "../core/types.js";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 // ── Types ──
 
@@ -34,11 +38,16 @@ export interface GeneratedScene {
 }
 
 /**
- * Generate a single scene with mixed library and custom components.
+ * Generate a single scene with mixed library, custom, or template components.
  */
 export async function generateScene(opts: SceneGeneratorOpts): Promise<GeneratedScene> {
   var planned = opts.scene;
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
+
+  // ── Template scene path ──
+  if (planned.template) {
+    return await generateFromTemplate(opts, planned, sceneId);
+  }
   var sceneComponents: SceneComponent[] = [];
   var customSources: Map<string, string> = new Map();
 
@@ -115,6 +124,97 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   };
 
   return { scene, customSources: customSources.size > 0 ? customSources : undefined };
+}
+
+// ── Template Scene Generation ──
+
+async function generateFromTemplate(
+  opts: SceneGeneratorOpts,
+  planned: PlannedScene,
+  sceneId: string,
+): Promise<GeneratedScene> {
+  var templateDef = SCENE_TEMPLATES.find(t => t.id === planned.template);
+  if (!templateDef) {
+    console.warn(`  Template "${planned.template}" not found, falling back to custom`);
+    // Fall back to custom generation
+    planned.template = undefined;
+    planned.components = [{
+      custom: true,
+      custom_prompt: planned.description || planned.label,
+      z_index: 10,
+    }];
+    return generateScene(opts);
+  }
+
+  // Load the template HTML
+  var templatePath = path.join(TEMPLATES_DIR, templateDef.file);
+  var templateHtml: string;
+  try {
+    templateHtml = await fs.readFile(templatePath, "utf-8");
+  } catch (e: any) {
+    console.warn(`  Template file not found: ${templatePath}, falling back to custom`);
+    planned.template = undefined;
+    planned.components = [{
+      custom: true,
+      custom_prompt: planned.description || planned.label,
+      z_index: 10,
+    }];
+    return generateScene(opts);
+  }
+
+  var templateData = planned.template_data || {};
+  var compName = `template_${sceneId}`;
+
+  // Check if the template needs content adaptation beyond slot filling
+  // Simple slot data can be passed as component data directly
+  // Complex modifications (layout changes, additional elements) use SEARCH/REPLACE
+  var needsAdaptation = opts.critiqueFeedback;
+
+  var finalHtml = templateHtml;
+
+  if (needsAdaptation && opts.critiqueFeedback) {
+    // Use SEARCH/REPLACE to adapt the template based on critique feedback
+    console.log(`  Scene ${opts.sceneIndex + 1}: adapting template ${planned.template} via SEARCH/REPLACE`);
+    var reviseResult = await reviseComponent({
+      existingSource: templateHtml,
+      instructions: opts.critiqueFeedback,
+      componentName: compName,
+      llmConfig: opts.llmConfig,
+      brandKit: opts.brandKit,
+      canvas: opts.canvas,
+    });
+    finalHtml = reviseResult.source;
+    console.log(`  Template adapted: ${reviseResult.blocksApplied} blocks applied, fullRewrite=${reviseResult.fullRewrite}`);
+  }
+
+  var customSources = new Map<string, string>();
+  customSources.set(compName, finalHtml);
+
+  // Build transition
+  var transition: SceneTransition | undefined;
+  if (planned.transition_in && planned.transition_in.type !== "none") {
+    transition = {
+      type: planned.transition_in.type as SceneTransition["type"],
+      duration_seconds: planned.transition_in.duration_seconds || 0.5,
+    };
+  }
+
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (template: ${planned.template})`);
+
+  var scene: Scene = {
+    id: sceneId,
+    label: planned.label,
+    duration_seconds: planned.duration_seconds || templateDef.duration[0],
+    transition_in: transition,
+    components: [{
+      id: "comp_0",
+      type: compName,
+      data: templateData,
+      z_index: 10,
+    }],
+  };
+
+  return { scene, customSources };
 }
 
 // ── Custom Component Generation ──

@@ -1,0 +1,274 @@
+<!--
+  Scene Template: C3 - Feature Grid
+  Category: CONTENT
+  Use when: Showcasing 3-4 features/benefits as glassmorphic cards in a grid.
+  Feel: Modern SaaS, clean information architecture, bento-style.
+  Content slots:
+    - heading: Optional section heading
+    - features: Array of 3-4 objects: { title, description, icon_svg? }
+  Duration: 5-7s
+-->
+<template>
+  <div class="scene">
+    <!-- Background -->
+    <div class="bg-gradient"></div>
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Content -->
+    <div class="content">
+      <h2 class="heading"></h2>
+      <div class="grid">
+        <div class="card" data-idx="0">
+          <div class="card-icon"></div>
+          <h3 class="card-title"></h3>
+          <p class="card-desc"></p>
+        </div>
+        <div class="card" data-idx="1">
+          <div class="card-icon"></div>
+          <h3 class="card-title"></h3>
+          <p class="card-desc"></p>
+        </div>
+        <div class="card" data-idx="2">
+          <div class="card-icon"></div>
+          <h3 class="card-title"></h3>
+          <p class="card-desc"></p>
+        </div>
+        <div class="card" data-idx="3">
+          <div class="card-icon"></div>
+          <h3 class="card-title"></h3>
+          <p class="card-desc"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-color-background, #0a0a0f);
+  }
+
+  .bg-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+  }
+
+  .bg-orb-1 {
+    width: 600px;
+    height: 600px;
+    top: -10%;
+    left: 20%;
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 8%, transparent);
+  }
+
+  .bg-orb-2 {
+    width: 500px;
+    height: 500px;
+    bottom: -10%;
+    right: 15%;
+    background: color-mix(in srgb, var(--mp-color-accent, #a78bfa) 6%, transparent);
+  }
+
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px 100px;
+  }
+
+  .heading {
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.02em;
+    margin: 0 0 48px 0;
+    text-align: center;
+  }
+
+  .heading:empty { display: none; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    max-width: 1000px;
+    width: 100%;
+  }
+
+  .card {
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 50%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 8%, transparent);
+    border-radius: 20px;
+    padding: 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 15%, transparent) 0%,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 10%, transparent) 100%);
+    border: 1px solid color-mix(in srgb, var(--mp-color-primary, #6366f1) 15%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+
+  .card-icon:empty { display: none; }
+
+  .card-icon svg {
+    width: 22px;
+    height: 22px;
+    color: var(--mp-color-accent, #a78bfa);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .card-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  .card-desc {
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin: 0;
+  }
+
+  .card-desc:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var heading = el.querySelector('.heading');
+    var cards = el.querySelectorAll('.card');
+    var features = data.features || [];
+    var orb1 = el.querySelector('.bg-orb-1');
+    var orb2 = el.querySelector('.bg-orb-2');
+
+    // Populate heading
+    if (data.heading) heading.textContent = data.heading;
+
+    // Hide unused cards, populate used ones
+    cards.forEach(function(card, i) {
+      if (i >= features.length) {
+        card.style.display = 'none';
+        return;
+      }
+      var f = features[i];
+      var iconEl = card.querySelector('.card-icon');
+      var titleEl = card.querySelector('.card-title');
+      var descEl = card.querySelector('.card-desc');
+
+      if (f.icon_svg) iconEl.innerHTML = f.icon_svg;
+      titleEl.textContent = f.title || '';
+      if (f.description) descEl.textContent = f.description;
+    });
+
+    // If 3 features, make first card span full width
+    if (features.length === 3) {
+      cards[0].style.gridColumn = '1 / -1';
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    // Initial states
+    gsap.set(heading, { autoAlpha: 0, y: 20 });
+    gsap.set([orb1, orb2], { scale: 0.5, autoAlpha: 0 });
+    cards.forEach(function(card) {
+      if (card.style.display !== 'none') {
+        gsap.set(card, { autoAlpha: 0, y: 30, scale: 0.95 });
+      }
+    });
+
+    // Orbs
+    tl.to([orb1, orb2], {
+      scale: 1, autoAlpha: 1,
+      duration: speed * 2,
+      stagger: 0.15,
+      ease: 'power2.out'
+    }, 0);
+
+    // Heading
+    if (data.heading) {
+      tl.to(heading, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.6,
+        ease: 'power2.out'
+      }, 0.15);
+    }
+
+    // Cards stagger in
+    var visibleCards = [];
+    cards.forEach(function(c) { if (c.style.display !== 'none') visibleCards.push(c); });
+
+    visibleCards.forEach(function(card, i) {
+      tl.to(card, {
+        autoAlpha: 1, y: 0, scale: 1,
+        duration: speed * 0.6,
+        ease: 'back.out(1.2)'
+      }, 0.3 + i * 0.12);
+    });
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.8;
+      visibleCards.reverse().forEach(function(card, i) {
+        tl.to(card, {
+          autoAlpha: 0, y: -15, scale: 0.97,
+          duration: 0.3, ease: 'power2.in'
+        }, exitAt + i * 0.04);
+      });
+      tl.to(heading, {
+        autoAlpha: 0, y: -10,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt + 0.15);
+    }
+
+    return tl;
+  }
+</script>

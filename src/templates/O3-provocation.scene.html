@@ -1,0 +1,167 @@
+<!--
+  Scene Template: O3 - Provocation
+  Category: OPENING
+  Use when: Opening with a question, challenge, or bold claim that creates tension.
+  Feel: TED talk opening. Draws the viewer in.
+  Content slots:
+    - question: The provocative question or statement
+    - attribution: Optional context/source line
+  Duration: 4-5s
+-->
+<template>
+  <div class="scene">
+    <!-- Background -->
+    <div class="bg-base"></div>
+    <div class="bg-orb"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Content -->
+    <div class="content">
+      <div class="question-wrap">
+        <h1 class="question"></h1>
+        <span class="attribution"></span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .bg-base {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-color-background, #0a0a0f);
+  }
+
+  .bg-orb {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    top: 40%;
+    left: 15%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 10%, transparent) 0%,
+      transparent 70%);
+    filter: blur(100px);
+    pointer-events: none;
+  }
+
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 100px 120px;
+  }
+
+  .question-wrap {
+    max-width: 75%;
+  }
+
+  .question {
+    font-size: 68px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0;
+  }
+
+  .attribution {
+    display: inline-block;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--mp-color-text-muted, #64748b);
+    margin-top: 28px;
+    letter-spacing: 0.01em;
+  }
+
+  .attribution:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var question = el.querySelector('.question');
+    var attribution = el.querySelector('.attribution');
+    var orb = el.querySelector('.bg-orb');
+
+    // Populate
+    question.textContent = data.question || data.headline || data.text || '';
+    if (data.attribution) attribution.textContent = data.attribution;
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    gsap.set(orb, { scale: 0.3, autoAlpha: 0 });
+    gsap.set(attribution, { autoAlpha: 0, y: 15 });
+
+    // Orb breathes in
+    tl.to(orb, {
+      scale: 1, autoAlpha: 1,
+      duration: speed * 2,
+      ease: 'power2.out'
+    }, 0);
+
+    // Use SplitText if available for word-by-word reveal
+    if (typeof SplitText !== 'undefined') {
+      var split = new SplitText(question, { type: 'words' });
+      gsap.set(split.words, { autoAlpha: 0, y: 20 });
+      tl.to(split.words, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.5,
+        stagger: 0.06,
+        ease: 'power2.out'
+      }, 0.2);
+    } else {
+      gsap.set(question, { autoAlpha: 0, y: 30, filter: 'blur(6px)' });
+      tl.to(question, {
+        autoAlpha: 1, y: 0, filter: 'blur(0px)',
+        duration: speed * 0.9,
+        ease: 'power3.out'
+      }, 0.2);
+    }
+
+    // Attribution
+    if (data.attribution) {
+      tl.to(attribution, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.4,
+        ease: 'power2.out'
+      }, 0.8);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(attribution, {
+        autoAlpha: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt);
+      tl.to(question, {
+        autoAlpha: 0, y: -15,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt + 0.05);
+    }
+
+    return tl;
+  }
+</script>

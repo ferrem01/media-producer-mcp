@@ -1,0 +1,232 @@
+<!--
+  Scene Template: C5 - Testimonial
+  Category: CONTENT
+  Use when: Customer quote, social proof, endorsement.
+  Feel: Authentic, warm, credible.
+  Content slots:
+    - quote: The testimonial text
+    - author: Person's name
+    - role: Title/company
+    - avatar_url: Optional headshot URL
+  Duration: 5-6s
+-->
+<template>
+  <div class="scene">
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <div class="content">
+      <div class="quote-card">
+        <div class="quote-mark">&ldquo;</div>
+        <blockquote class="quote-text"></blockquote>
+        <div class="quote-author">
+          <div class="author-avatar"></div>
+          <div class="author-info">
+            <span class="author-name"></span>
+            <span class="author-role"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% 50%,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 6%, transparent) 0%,
+      var(--mp-color-background, #0a0a0f) 70%);
+  }
+
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px 120px;
+  }
+
+  .quote-card {
+    max-width: 800px;
+    position: relative;
+  }
+
+  .quote-mark {
+    font-size: 120px;
+    font-weight: 800;
+    line-height: 0.8;
+    background: linear-gradient(135deg,
+      var(--mp-color-primary, #6366f1) 0%,
+      var(--mp-color-accent, #a78bfa) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    opacity: 0.3;
+    position: absolute;
+    top: -20px;
+    left: -15px;
+    pointer-events: none;
+  }
+
+  .quote-text {
+    font-size: 32px;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0;
+    padding-left: 4px;
+    font-style: normal;
+  }
+
+  .quote-author {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 36px;
+    padding-top: 28px;
+    border-top: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 8%, transparent);
+  }
+
+  .author-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 20%, transparent),
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 15%, transparent));
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 10%, transparent);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .author-avatar:empty {
+    /* Show gradient placeholder when no avatar */
+  }
+
+  .author-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .author-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .author-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--mp-color-text, #ffffff);
+  }
+
+  .author-role {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--mp-color-text-muted, #94a3b8);
+  }
+
+  .author-role:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var quoteMark = el.querySelector('.quote-mark');
+    var quoteText = el.querySelector('.quote-text');
+    var authorBlock = el.querySelector('.quote-author');
+    var avatarEl = el.querySelector('.author-avatar');
+    var nameEl = el.querySelector('.author-name');
+    var roleEl = el.querySelector('.author-role');
+
+    // Populate
+    quoteText.textContent = data.quote || data.text || '';
+    nameEl.textContent = data.author || '';
+    if (data.role) roleEl.textContent = data.role;
+    if (data.avatar_url) {
+      avatarEl.innerHTML = '<img src="' + data.avatar_url + '" alt="" />';
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Initial states
+    gsap.set(quoteMark, { autoAlpha: 0, scale: 0.7 });
+    gsap.set(quoteText, { autoAlpha: 0, y: 20 });
+    gsap.set(authorBlock, { autoAlpha: 0, y: 15 });
+
+    // Quote mark fades in
+    tl.to(quoteMark, {
+      autoAlpha: 0.3, scale: 1,
+      duration: speed * 0.8,
+      ease: 'power2.out'
+    }, 0.1);
+
+    // Quote text
+    if (typeof SplitText !== 'undefined' && quoteText.textContent.length <= 150) {
+      gsap.set(quoteText, { autoAlpha: 1, y: 0 });
+      var split = new SplitText(quoteText, { type: 'words' });
+      gsap.set(split.words, { autoAlpha: 0, y: 12 });
+      tl.to(split.words, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.4,
+        stagger: 0.03,
+        ease: 'power2.out'
+      }, 0.25);
+    } else {
+      tl.to(quoteText, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.7,
+        ease: 'power3.out'
+      }, 0.25);
+    }
+
+    // Author
+    tl.to(authorBlock, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.5,
+      ease: 'power2.out'
+    }, 0.7);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(authorBlock, {
+        autoAlpha: 0, y: -10,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt);
+      tl.to(quoteText, {
+        autoAlpha: 0, y: -15,
+        duration: 0.35, ease: 'power2.in'
+      }, exitAt + 0.05);
+      tl.to(quoteMark, {
+        autoAlpha: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt + 0.08);
+    }
+
+    return tl;
+  }
+</script>

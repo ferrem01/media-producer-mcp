@@ -1,0 +1,234 @@
+<!--
+  Scene Template: D2 - Metric Trio
+  Category: DATA
+  Use when: Three related stats side by side. Social proof, KPIs, comparison.
+  Feel: Data-driven confidence. Clean grid of proof points.
+  Content slots:
+    - metrics: Array of 3 objects, each: { value, suffix?, prefix?, label }
+  Duration: 5-6s
+-->
+<template>
+  <div class="scene">
+    <!-- Background -->
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Content -->
+    <div class="content">
+      <div class="metrics-row">
+        <div class="metric-card" data-idx="0">
+          <div class="metric-value-wrap">
+            <span class="metric-prefix"></span>
+            <span class="metric-value">0</span>
+            <span class="metric-suffix"></span>
+          </div>
+          <div class="metric-label"></div>
+        </div>
+        <div class="metric-divider"></div>
+        <div class="metric-card" data-idx="1">
+          <div class="metric-value-wrap">
+            <span class="metric-prefix"></span>
+            <span class="metric-value">0</span>
+            <span class="metric-suffix"></span>
+          </div>
+          <div class="metric-label"></div>
+        </div>
+        <div class="metric-divider"></div>
+        <div class="metric-card" data-idx="2">
+          <div class="metric-value-wrap">
+            <span class="metric-prefix"></span>
+            <span class="metric-value">0</span>
+            <span class="metric-suffix"></span>
+          </div>
+          <div class="metric-label"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 50%,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 8%, transparent) 0%,
+      var(--mp-color-background, #0a0a0f) 70%);
+  }
+
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+  }
+
+  .metrics-row {
+    display: flex;
+    align-items: center;
+    gap: 60px;
+  }
+
+  .metric-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 280px;
+  }
+
+  .metric-divider {
+    width: 1px;
+    height: 120px;
+    background: linear-gradient(180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--mp-color-text, #ffffff) 12%, transparent) 50%,
+      transparent 100%);
+  }
+
+  .metric-value-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+  }
+
+  .metric-value {
+    font-size: 96px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(135deg,
+      var(--mp-color-text, #ffffff) 30%,
+      var(--mp-color-accent, #a78bfa) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .metric-prefix, .metric-suffix {
+    font-size: 56px;
+    font-weight: 300;
+    line-height: 1;
+    background: linear-gradient(135deg,
+      var(--mp-color-accent, #a78bfa) 0%,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 70%, white) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .metric-prefix:empty, .metric-suffix:empty { display: none; }
+
+  .metric-label {
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin-top: 20px;
+  }
+
+  .metric-label:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var cards = el.querySelectorAll('.metric-card');
+    var dividers = el.querySelectorAll('.metric-divider');
+    var metrics = data.metrics || [];
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Populate and animate each metric
+    cards.forEach(function(card, i) {
+      var m = metrics[i] || {};
+      var valueEl = card.querySelector('.metric-value');
+      var prefixEl = card.querySelector('.metric-prefix');
+      var suffixEl = card.querySelector('.metric-suffix');
+      var labelEl = card.querySelector('.metric-label');
+
+      if (m.prefix) prefixEl.textContent = m.prefix;
+      if (m.suffix) suffixEl.textContent = m.suffix;
+      if (m.label) labelEl.textContent = m.label;
+
+      var targetValue = m.value || 0;
+      var decimals = m.decimals || 0;
+
+      // Initial states
+      gsap.set(card, { autoAlpha: 0, y: 40 });
+
+      // Staggered entrance
+      var delay = 0.3 + i * 0.2;
+      tl.to(card, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.6,
+        ease: 'power3.out'
+      }, delay);
+
+      // Count up
+      var counter = { val: 0 };
+      tl.to(counter, {
+        val: targetValue,
+        duration: speed * 1.5,
+        ease: 'power2.out',
+        onUpdate: function() {
+          if (decimals > 0) {
+            valueEl.textContent = counter.val.toFixed(decimals);
+          } else {
+            valueEl.textContent = Math.round(counter.val).toLocaleString();
+          }
+        }
+      }, delay + 0.1);
+    });
+
+    // Dividers fade in
+    dividers.forEach(function(div, i) {
+      gsap.set(div, { autoAlpha: 0, scaleY: 0 });
+      tl.to(div, {
+        autoAlpha: 1, scaleY: 1,
+        duration: speed * 0.6,
+        ease: 'power2.out'
+      }, 0.4 + i * 0.2);
+    });
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to(dividers, {
+        autoAlpha: 0, scaleY: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt);
+      cards.forEach(function(card, i) {
+        tl.to(card, {
+          autoAlpha: 0, y: -20,
+          duration: 0.35,
+          ease: 'power2.in'
+        }, exitAt + 0.05 + i * 0.04);
+      });
+    }
+
+    return tl;
+  }
+</script>

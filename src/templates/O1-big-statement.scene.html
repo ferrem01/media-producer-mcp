@@ -1,0 +1,224 @@
+<!--
+  Scene Template: O1 - Big Statement
+  Category: OPENING
+  Use when: Opening scene. One powerful headline that sets the tone.
+  Feel: Apple WWDC title card. Dramatic, confident, minimal.
+  Content slots:
+    - badge: Optional eyebrow text (e.g. "INTRODUCING", "NEW")
+    - headline: Main statement, max 5-6 words
+    - subtitle: Optional supporting line
+  Duration: 4-5s
+-->
+<template>
+  <div class="scene">
+    <!-- Background layer -->
+    <div class="bg-gradient"></div>
+    <div class="bg-glow"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Content -->
+    <div class="content">
+      <span class="badge"></span>
+      <h1 class="headline"></h1>
+      <p class="subtitle"></p>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  /* ── Background layers ── */
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 45%,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 12%, transparent) 0%,
+      var(--mp-color-background, #0a0a0f) 70%);
+  }
+
+  .bg-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 8%, transparent) 0%,
+      transparent 70%);
+    filter: blur(80px);
+    pointer-events: none;
+  }
+
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  /* ── Content ── */
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    text-align: center;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mp-color-accent, #a78bfa);
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 12%, transparent) 0%,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 6%, transparent) 100%);
+    border: 1px solid color-mix(in srgb, var(--mp-color-accent, #a78bfa) 18%, transparent);
+    padding: 10px 24px;
+    border-radius: 999px;
+    margin-bottom: 36px;
+    backdrop-filter: blur(8px);
+  }
+
+  .badge:empty { display: none; }
+
+  .headline {
+    font-size: 92px;
+    font-weight: 800;
+    line-height: 1.0;
+    letter-spacing: -0.03em;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0;
+    max-width: 85%;
+    text-shadow: 0 0 80px color-mix(in srgb, var(--mp-color-primary, #6366f1) 20%, transparent);
+  }
+
+  .subtitle {
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin: 0;
+    margin-top: 32px;
+    max-width: 60%;
+    letter-spacing: 0.005em;
+  }
+
+  .subtitle:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var badge = el.querySelector('.badge');
+    var headline = el.querySelector('.headline');
+    var subtitle = el.querySelector('.subtitle');
+    var glow = el.querySelector('.bg-glow');
+
+    // Populate content
+    if (data.badge) badge.textContent = data.badge;
+    headline.textContent = data.headline || data.text || '';
+    if (data.subtitle) subtitle.textContent = data.subtitle;
+
+    // Speed based on motion tier
+    var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.8 : 1.2;
+
+    // Initial states
+    gsap.set(badge, { autoAlpha: 0, y: 15, scale: 0.9 });
+    gsap.set(headline, { autoAlpha: 0, scale: 1.8, filter: 'blur(16px)' });
+    gsap.set(subtitle, { autoAlpha: 0, y: 25 });
+    gsap.set(glow, { scale: 0.4, autoAlpha: 0 });
+
+    // Background glow breathes in
+    tl.to(glow, {
+      scale: 1, autoAlpha: 1,
+      duration: speed * 1.5,
+      ease: 'power2.out'
+    }, 0);
+
+    // Badge pops in
+    if (data.badge) {
+      tl.to(badge, {
+        autoAlpha: 1, y: 0, scale: 1,
+        duration: speed * 0.5,
+        ease: 'back.out(1.4)'
+      }, 0.15);
+    }
+
+    // Headline: dramatic zoom + blur reveal
+    // Use SplitText if available for per-character reveal
+    if (typeof SplitText !== 'undefined' && headline.textContent.length <= 30) {
+      gsap.set(headline, { autoAlpha: 1, scale: 1, filter: 'blur(0px)' });
+      var split = new SplitText(headline, { type: 'chars' });
+      gsap.set(split.chars, { autoAlpha: 0, y: 40, rotateX: -90 });
+      tl.to(split.chars, {
+        autoAlpha: 1, y: 0, rotateX: 0,
+        duration: speed * 0.6,
+        stagger: 0.025,
+        ease: 'back.out(1.2)'
+      }, data.badge ? 0.4 : 0.2);
+    } else {
+      tl.to(headline, {
+        autoAlpha: 1, scale: 1, filter: 'blur(0px)',
+        duration: speed,
+        ease: 'expo.out'
+      }, data.badge ? 0.35 : 0.2);
+    }
+
+    // Subtitle fades up
+    if (data.subtitle) {
+      tl.to(subtitle, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.5,
+        ease: 'power2.out'
+      }, data.badge ? 0.7 : 0.5 + speed * 0.6);
+    }
+
+    // Gentle glow pulse
+    tl.to(glow, {
+      scale: 1.15, autoAlpha: 0.7,
+      duration: 3, ease: 'sine.inOut',
+      yoyo: true, repeat: -1
+    }, speed);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to(subtitle, {
+        autoAlpha: 0, y: -15,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt);
+      tl.to(headline, {
+        autoAlpha: 0, scale: 0.92, filter: 'blur(8px)',
+        duration: 0.5, ease: 'power2.in'
+      }, exitAt + 0.08);
+      tl.to(badge, {
+        autoAlpha: 0, y: -10,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt + 0.05);
+      tl.to(glow, {
+        autoAlpha: 0, scale: 0.6,
+        duration: 0.6, ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && cp -r src/components/shared dist/components/",
+    "build": "tsc && cp -r src/components/shared dist/components/ && cp -r src/templates dist/",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.ts",
     "typecheck": "tsc --noEmit",
