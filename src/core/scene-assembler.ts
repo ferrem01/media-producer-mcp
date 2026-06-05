@@ -321,6 +321,10 @@ function generateBrandCSS(brand: BrandKit, sceneBackground?: string): { css: str
   // Scene-level background override
   if (sceneBackground) {
     vars.push(`  --mp-color-background: ${sceneBackground};`);
+  } else if (sceneIsDark && brandIsLight) {
+    // Brand bg is light but scene is dark (dark bg images override).
+    // Force a dark background so the body doesn't flash white.
+    vars.push('  --mp-color-background: #0a0a0f;');
   }
 
   // ── Font ──
