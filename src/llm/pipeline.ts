@@ -31,7 +31,8 @@ import { config } from "../config.js";
 import type { BrandKit, Canvas, OutputFormat, Project, Scene } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
-import { critiqueScene, type CritiqueResult } from "./critiquer.js";
+import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
+import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { assembleScene, type ComponentSource } from "../core/scene-assembler.js";
 import { captureSingleFrame } from "../core/capture.js";
 import os from "node:os";
@@ -912,7 +913,7 @@ async function critiqueAndRetryScene(opts: {
 
       // 4. Read preview and critique
       const previewBase64 = (await fs.readFile(previewPath)).toString("base64");
-      const critiqueResult = await critiqueScene({
+      const critiqueResult = await critiqueMultiPass({
         sceneHtml: assembledHtml,
         previewImageBase64: previewBase64,
         prompt: opts.prompt,
@@ -1208,6 +1209,38 @@ async function runUnifiedPipeline(
     project.assets = [...(project.assets || []), ...enrichResult.assets];
   }
 
+  // Pass 3: Editorial critique (full video flow) -- only for multi-scene video/presentation
+  if (opts.critique !== false && format !== "image" && project.scenes.length >= 3) {
+    trace?.beginEvent("editorial_critique");
+    try {
+      var sceneMeta = project.scenes.map(s => ({
+        label: s.label || "",
+        duration_seconds: s.duration_seconds,
+        transition_in: s.transition_in,
+        component_types: s.components.map(c => c.type),
+        word_count: estimateWordCount(s),
+      }));
+      var editorial = await critiqueEditorial({
+        scenes: sceneMeta,
+        prompt: richPrompt,
+        llmConfig: opts.llmConfig,
+        format,
+        trace,
+      });
+      console.log(`  Editorial critique: overall=${editorial.overall_score}, pacing=${editorial.pacing_score}, variety=${editorial.variety_score}`);
+      if (editorial.issues.length > 0) {
+        console.log(`    Editorial issues: ${editorial.issues.join(" | ")}`);
+      }
+      // Log fixes but don't auto-apply yet (future: auto-fix low-hanging fruit)
+      if (editorial.fixes.length > 0) {
+        console.log(`    Suggested fixes: ${editorial.fixes.map(f => f.type + ": " + f.detail).join(" | ")}`);
+      }
+    } catch (e: any) {
+      console.warn(`  Editorial critique failed (non-fatal): ${e.message}`);
+    }
+    trace?.endEvent();
+  }
+
   await saveProject(project);
 
   return {
@@ -1215,4 +1248,21 @@ async function runUnifiedPipeline(
     target: opts.target,
     project,
   };
+}
+
+/**
+ * Estimate word count in a scene from component data.
+ */
+function estimateWordCount(scene: Scene): number {
+  var words = 0;
+  for (var comp of scene.components) {
+    if (comp.data) {
+      for (var val of Object.values(comp.data)) {
+        if (typeof val === "string") {
+          words += val.split(/\s+/).length;
+        }
+      }
+    }
+  }
+  return words;
 }

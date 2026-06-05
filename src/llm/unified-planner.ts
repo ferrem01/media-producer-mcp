@@ -11,6 +11,8 @@
 import { callLLM, type LLMConfig } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
+import { SCENE_RECIPES } from "./scene-recipes.js";
+import { COMPOSITION_PLAYBOOK } from "./cinematography.js";
 import type { BrandKit, Canvas, OutputFormat } from "../core/types.js";
 
 function isLightBrand(brandKit: BrandKit): boolean {
@@ -167,7 +169,11 @@ ${catalogStr}
 - For VIDEO: you CAN mix library + custom components across scenes. Just follow the no-duplicate rule.
 - Output ONLY valid JSON. No commentary.
 
-${SCENE_PLANNER_DESIGN_RULES}`;
+${SCENE_PLANNER_DESIGN_RULES}
+
+${SCENE_RECIPES}
+
+${COMPOSITION_PLAYBOOK}`;
 
   // Inject brand asset info into the system prompt if available
   var brandAssetsSection = "";

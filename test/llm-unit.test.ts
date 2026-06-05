@@ -182,7 +182,7 @@ describe("system prompts", () => {
     const prompt = expanderSystemPrompt();
     expect(prompt).toContain("Product Launch");
     expect(prompt).toContain("Feature Announcement");
-    expect(prompt).toContain("logo-intro");
+    expect(prompt).toContain("Scene Recipes");
     expect(prompt).toContain("creative brief");
   });
 });
