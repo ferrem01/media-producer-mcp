@@ -637,9 +637,10 @@ export function createMcpServer(): McpServer {
           const captureModule = await import("./core/capture.js");
 
           const types = new Set(scene.components.map((c) => c.type));
+          const projectComponentsDir = path.join(projectDir(params.tenant_id, params.project_id), "components");
           const components: Array<{ type: string; source: string }> = [];
           for (const t of types) {
-            const source = await findComponentSource(t);
+            const source = await findComponentSource(t, [projectComponentsDir]);
             if (source) components.push({ type: t, source });
           }
 
@@ -1335,7 +1336,17 @@ function guessExtension(contentType: string): string {
   return map[contentType] || "bin";
 }
 
-async function findComponentSource(type: string): Promise<string | null> {
+async function findComponentSource(type: string, extraDirs?: string[]): Promise<string | null> {
+  // Check extra dirs first (project-local components)
+  if (extraDirs) {
+    for (const dir of extraDirs) {
+      try {
+        const fp = path.join(dir, `${type}.component.html`);
+        return await fs.readFile(fp, "utf-8");
+      } catch { /* not here */ }
+    }
+  }
+  // Search library subdirectories
   try {
     const categories = await fs.readdir(config.componentLibDir, { withFileTypes: true });
     for (const cat of categories) {
