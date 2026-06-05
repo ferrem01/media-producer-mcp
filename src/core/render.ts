@@ -24,7 +24,7 @@ import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
-import { compositeOverlays, compositeFullBehind, type OverlaySegment } from "./overlay-compositor.js";
+import { compositeOverlays, compositeFullBehind, mixSpeakerAudio, type OverlaySegment } from "./overlay-compositor.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
 export interface RenderOptions {
@@ -687,6 +687,26 @@ async function renderVideo(
         });
 
         await fs.rename(overlayOutput, outputPath);
+      }
+    }
+  }
+
+  // ── Speaker audio: mix as one continuous track across all scenes ──
+  if (project.overlays && project.overlays.length > 0) {
+    for (const overlay of project.overlays) {
+      if (overlay.type === "speaker-video" && overlay.source) {
+        const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
+        // Only mix audio if there are full-behind segments (speaker video is the base layer)
+        const hasFullBehind = overlay.segments?.some(s => s.mode === "full-behind");
+        if (hasFullBehind) {
+          const audioOutput = outputPath.replace(/\.mp4$/, "-speaker-audio.mp4");
+          await mixSpeakerAudio({
+            videoPath: outputPath,
+            speakerPath,
+            outputPath: audioOutput,
+          });
+          await fs.rename(audioOutput, outputPath);
+        }
       }
     }
   }

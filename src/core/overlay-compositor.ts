@@ -294,10 +294,8 @@ export async function compositeFullBehind(opts: CompositeFullBehindOptions): Pro
   args.push("-filter_complex", filterComplex);
   args.push("-map", "[out]");
 
-  // Include speaker audio if available
-  if (speakerHasAudio) {
-    args.push("-map", "0:a");
-  }
+  // Do NOT include speaker audio per-scene -- audio is laid as one
+  // continuous track after all scenes are concatenated (see mixSpeakerAudio).
 
   // Output encoding
   args.push(
@@ -314,5 +312,56 @@ export async function compositeFullBehind(opts: CompositeFullBehindOptions): Pro
 
   await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
 
+  return outputPath;
+}
+
+/**
+ * Mix speaker audio onto the final concatenated video as one continuous track.
+ * This preserves audio continuity across scene boundaries.
+ */
+export async function mixSpeakerAudio(opts: {
+  videoPath: string;
+  speakerPath: string;
+  outputPath: string;
+}): Promise<string> {
+  const { videoPath, speakerPath, outputPath } = opts;
+
+  const videoHasAudio = await hasAudioStream(videoPath);
+  const speakerHasAudio = await hasAudioStream(speakerPath);
+
+  if (!speakerHasAudio) {
+    // No speaker audio to mix -- just copy
+    const content = await import("node:fs/promises");
+    await content.copyFile(videoPath, outputPath);
+    return outputPath;
+  }
+
+  const videoDuration = await getVideoDuration(videoPath);
+
+  const args: string[] = ["-y", "-i", videoPath, "-i", speakerPath];
+
+  if (videoHasAudio) {
+    // Mix both audio tracks
+    args.push(
+      "-filter_complex", "[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2[aout]",
+      "-map", "0:v", "-map", "[aout]",
+    );
+  } else {
+    // Use speaker audio only
+    args.push("-map", "0:v", "-map", "1:a");
+  }
+
+  args.push(
+    "-c:v", "copy",
+    "-c:a", "aac",
+    "-b:a", "192k",
+    "-shortest",
+    "-t", String(videoDuration),
+    outputPath,
+  );
+
+  console.log("  Mixing speaker audio onto final output");
+
+  await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
   return outputPath;
 }
