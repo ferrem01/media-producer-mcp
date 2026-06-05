@@ -47,6 +47,8 @@ export interface CompositeFullBehindOptions {
   fps: number;
   /** Total duration in seconds (used for audio trimming) */
   duration: number;
+  /** Offset into the speaker video in seconds (for continuous speaker across scenes) */
+  speakerOffset?: number;
 }
 
 /**
@@ -269,7 +271,7 @@ export async function compositeOverlays(opts: CompositeOverlayOptions): Promise<
  *   [speaker_scaled][scene_pngs]overlay=0:0:shortest=1
  */
 export async function compositeFullBehind(opts: CompositeFullBehindOptions): Promise<string> {
-  const { framesDir, speakerPath, outputPath, width, height, fps, duration } = opts;
+  const { framesDir, speakerPath, outputPath, width, height, fps, duration, speakerOffset } = opts;
 
   const speakerHasAudio = await hasAudioStream(speakerPath);
 
@@ -281,7 +283,8 @@ export async function compositeFullBehind(opts: CompositeFullBehindOptions): Pro
 
   const args: string[] = [
     "-y",
-    // Input 0: speaker video
+    // Input 0: speaker video (seek to offset for continuous playback)
+    ...(speakerOffset ? ["-ss", String(speakerOffset)] : []),
     "-i", speakerPath,
     // Input 1: PNG sequence with alpha
     "-framerate", String(fps),

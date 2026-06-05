@@ -278,6 +278,7 @@ async function renderSingleSceneWorker(
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
   fullBehindSpeakerPath?: string,
+  fullBehindSpeakerOffset?: number,
 ): Promise<{ mp4Path: string; frameCount: number }> {
   const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `scene_${sceneIndex}`);
@@ -422,6 +423,7 @@ async function renderSingleSceneWorker(
       height: project.canvas.height,
       fps: project.canvas.fps,
       duration: scene.duration_seconds,
+      speakerOffset: fullBehindSpeakerOffset,
     });
     // Clean up PNG frames now that mp4 is produced
     await fs.rm(framesDir, { recursive: true, force: true }).catch(() => {});
@@ -457,7 +459,14 @@ async function renderScenesParallel(
     
     for (let idx = batch; idx < batchEnd; idx++) {
       const fbSpeakerPath = sceneFullBehindSpeaker.get(idx);
-      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts, extraComponentDirs, fbSpeakerPath));
+      // Compute cumulative offset into speaker video for this scene
+      let fbOffset = 0;
+      if (fbSpeakerPath) {
+        for (let si = 0; si < idx; si++) {
+          fbOffset += project.scenes[si].duration_seconds;
+        }
+      }
+      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts, extraComponentDirs, fbSpeakerPath, fbOffset));
     }
 
     const batchResults = await Promise.all(promises);
