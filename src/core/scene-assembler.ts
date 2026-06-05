@@ -221,35 +221,149 @@ function resolveAssetUrls(data: Record<string, any>): Record<string, any> {
 /**
  * Generate CSS custom properties from the brand kit.
  */
+/**
+ * Determine if a hex color is "light" (luminance > 0.5).
+ */
+function isLightColor(hex: string): boolean {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16) / 255;
+  const g = parseInt(c.substring(2, 4), 16) / 255;
+  const b = parseInt(c.substring(4, 6), 16) / 255;
+  // Relative luminance (sRGB)
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum > 0.5;
+}
+
+/**
+ * Pick a brand background image URL based on the scene theme.
+ * Prefers dark-tagged images for dark scenes, light-tagged for light.
+ * Returns undefined if no suitable background found.
+ */
+function pickBrandBackground(brand: BrandKit, isDark: boolean): string | undefined {
+  const bgAssets = (brand.assets || []).filter(a => a.type === 'background');
+  if (bgAssets.length === 0) return undefined;
+
+  const darkTags = /dark|night|deep|midnight/i;
+  const lightTags = /light|white|bright|soft|pastel/i;
+
+  const darkBgs = bgAssets.filter(a =>
+    (a.tags || []).some(t => darkTags.test(t)) || darkTags.test(a.name)
+  );
+  const lightBgs = bgAssets.filter(a =>
+    (a.tags || []).some(t => lightTags.test(t)) || lightTags.test(a.name)
+  );
+
+  if (isDark) {
+    // Prefer dark backgrounds, fall back to any
+    const pool = darkBgs.length > 0 ? darkBgs : bgAssets;
+    return pool[Math.floor(Math.random() * pool.length)]?.url;
+  } else {
+    const pool = lightBgs.length > 0 ? lightBgs : bgAssets;
+    return pool[Math.floor(Math.random() * pool.length)]?.url;
+  }
+}
+
+/**
+ * Generate CSS custom properties from the brand kit.
+ *
+ * Theme-aware: detects whether the effective scene background is light or dark,
+ * and emits appropriate text colors. Templates are dark-themed by default and
+ * reference vars like var(--mp-color-text, #ffffff). This function ensures the
+ * CSS vars match the actual scene theme so text is always readable.
+ *
+ * Also emits:
+ *   --mp-bg-image: url(...) for brand background injection
+ *   --mp-color-cta: CTA button color (from accent)
+ *   --mp-color-glow: glow/shadow color based on primary
+ */
 function generateBrandCSS(brand: BrandKit, sceneBackground?: string): string {
   const vars: string[] = [];
 
+  // ── Determine effective theme ──
+  // Templates are dark by default. The scene is "light" only if the brand
+  // background is explicitly light AND no dark background image is being used.
+  const effectiveBg = sceneBackground || brand.colors?.background || '#0f172a';
+  const brandIsLight = isLightColor(effectiveBg);
+
+  // Templates are designed for dark backgrounds. When the brand kit has a light
+  // background color but also has dark background images (which templates will
+  // use), the scene is still dark. Only treat as truly light if there are NO
+  // dark background assets available.
+  const bgAssets = (brand.assets || []).filter(a => a.type === 'background');
+  const hasDarkBgs = bgAssets.some(a =>
+    (a.tags || []).some(t => /dark|night|deep|midnight/i.test(t)) ||
+    /dark|night|deep|midnight/i.test(a.name)
+  );
+
+  // Scene is dark if: brand bg is dark, OR brand has dark background images
+  const sceneIsDark = !brandIsLight || hasDarkBgs;
+
+  // ── Colors ──
   if (brand.colors) {
     for (const [key, value] of Object.entries(brand.colors)) {
-      vars.push(`  --mp-color-${key.replace(/_/g, "-")}: ${value};`);
+      // Skip text and text_muted -- we handle them theme-aware below
+      if (key === 'text' || key === 'text_muted') continue;
+      vars.push(`  --mp-color-${key.replace(/_/g, '-')}: ${value};`);
     }
   }
 
-  // Scene-level background override: when a scene explicitly sets a background
-  // color, it takes priority over the brand kit default.
+  // ── Theme-aware text colors ──
+  // On dark backgrounds: white text, light muted text
+  // On light backgrounds: use brand text colors
+  if (sceneIsDark) {
+    vars.push('  --mp-color-text: #ffffff;');
+    vars.push('  --mp-color-text-muted: #94a3b8;');
+  } else {
+    vars.push(`  --mp-color-text: ${brand.colors?.text || '#0f172a'};`);
+    vars.push(`  --mp-color-text-muted: ${brand.colors?.text_muted || '#64748b'};`);
+  }
+
+  // Scene-level background override
   if (sceneBackground) {
     vars.push(`  --mp-color-background: ${sceneBackground};`);
   }
 
+  // ── Font ──
   if (brand.fonts?.length) {
     vars.push(`  --mp-font-family: '${brand.fonts[0].family}', sans-serif;`);
   }
 
+  // ── Style props ──
   if (brand.style?.border_radius) {
     vars.push(`  --mp-border-radius: ${brand.style.border_radius};`);
   }
-
   if (brand.style?.motion) {
     vars.push(`  --mp-motion-style: ${brand.style.motion};`);
   }
 
-  return `:root {\n${vars.join("\n")}\n}`;
+  // ── Background image ──
+  const bgUrl = pickBrandBackground(brand, sceneIsDark);
+  if (bgUrl) {
+    // Resolve relative URLs to absolute for file:// protocol
+    const resolvedUrl = bgUrl.startsWith('/assets/') || bgUrl.startsWith('/api/')
+      ? `http://localhost:${config.port}${bgUrl}`
+      : bgUrl;
+    vars.push(`  --mp-bg-image: url(${resolvedUrl});`);
+  } else {
+    vars.push('  --mp-bg-image: none;');
+  }
+
+  // ── CTA color (accent) ──
+  if (brand.colors?.accent) {
+    vars.push(`  --mp-color-cta: ${brand.colors.accent};`);
+  }
+
+  // ── Glow color (derived from primary) ──
+  if (brand.colors?.primary) {
+    vars.push(`  --mp-color-glow: ${brand.colors.primary};`);
+  }
+
+  // ── Theme hint ──
+  vars.push(`  --mp-theme: ${sceneIsDark ? 'dark' : 'light'};`);
+
+  return `:root {\n${vars.join('\n')}\n}`;
 }
+
 
 /**
  * Build inline position style for a component container.

@@ -1,5 +1,6 @@
 <template>
   <div class="pip-scene">
+    <div class="bg-brand-image"></div>
     <div class="bg-gradient"></div>
     <div class="bg-noise"></div>
 
@@ -45,6 +46,16 @@
     font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
     overflow: hidden;
   }
+  .bg-brand-image {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-bg-image, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+
   .bg-gradient {
     position: absolute; inset: 0;
     background: linear-gradient(160deg,

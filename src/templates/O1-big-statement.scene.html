@@ -12,6 +12,7 @@
 <template>
   <div class="scene">
     <!-- Background layer -->
+    <div class="bg-brand-image"></div>
     <div class="bg-gradient"></div>
     <div class="bg-glow"></div>
     <div class="bg-noise"></div>
@@ -35,6 +36,16 @@
   }
 
   /* ── Background layers ── */
+  .bg-brand-image {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-bg-image, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+
   .bg-gradient {
     position: absolute;
     inset: 0;
