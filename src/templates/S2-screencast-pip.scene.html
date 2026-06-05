@@ -1,0 +1,612 @@
+<!--
+  Scene Template: S2 - Screencast with Speaker PiP
+  Category: SPEAKER
+  Use when: Product demo, walkthrough, or feature showcase.
+  Feel: Product tour. Clean browser mockup with subtle speaker presence.
+  Content slots:
+    - url: URL shown in browser bar (e.g. "app.quotient.ai/dashboard")
+    - page_title: Page title in browser tab
+    - headline: Feature or section name (required)
+    - body: 1-2 sentence feature description
+  Duration: 5-8s
+  Speaker: pip mode -- speaker PiP circle added by overlay system separately
+-->
+<template>
+  <div class="scene">
+    <!-- Background layers (this is NOT a transparent template) -->
+    <div class="bg-gradient"></div>
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Scene content -->
+    <div class="scene-layout">
+
+      <!-- Headline area above browser -->
+      <div class="headline-area">
+        <h2 class="headline" data-bind="headline"></h2>
+        <p class="body" data-bind="body"></p>
+      </div>
+
+      <!-- Browser mockup -->
+      <div class="browser-frame">
+        <!-- Browser chrome bar -->
+        <div class="browser-chrome">
+          <div class="window-controls">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+          </div>
+          <!-- Tab bar -->
+          <div class="tab-bar">
+            <div class="tab tab-active">
+              <svg class="tab-icon" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M8 5v3l2 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <span class="tab-title" data-bind="page_title">Dashboard</span>
+              <svg class="tab-close" viewBox="0 0 12 12" fill="none">
+                <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+          <!-- URL bar -->
+          <div class="url-bar">
+            <svg class="url-lock" viewBox="0 0 16 16" fill="none">
+              <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M5 7V5.5a3 3 0 016 0V7" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+            <span class="url-text" data-bind="url">app.quotient.ai/dashboard</span>
+          </div>
+        </div>
+
+        <!-- Browser content area -->
+        <div class="browser-content">
+          <!-- Simulated UI skeleton / content -->
+          <div class="browser-sidebar">
+            <div class="sidebar-nav">
+              <div class="nav-item nav-item-active">
+                <div class="nav-dot"></div>
+                <div class="nav-text nav-text-long"></div>
+              </div>
+              <div class="nav-item">
+                <div class="nav-dot"></div>
+                <div class="nav-text nav-text-med"></div>
+              </div>
+              <div class="nav-item">
+                <div class="nav-dot"></div>
+                <div class="nav-text nav-text-short"></div>
+              </div>
+              <div class="nav-item">
+                <div class="nav-dot"></div>
+                <div class="nav-text nav-text-med"></div>
+              </div>
+            </div>
+          </div>
+          <div class="browser-main">
+            <!-- Skeleton metric cards -->
+            <div class="metric-row">
+              <div class="metric-card metric-card-lit">
+                <div class="metric-label-sk"></div>
+                <div class="metric-value-sk"></div>
+                <div class="metric-trend-sk"></div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label-sk"></div>
+                <div class="metric-value-sk"></div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label-sk"></div>
+                <div class="metric-value-sk"></div>
+              </div>
+            </div>
+            <!-- Skeleton chart area -->
+            <div class="chart-area">
+              <div class="chart-header">
+                <div class="chart-title-sk"></div>
+                <div class="chart-controls">
+                  <div class="chart-pill"></div>
+                  <div class="chart-pill chart-pill-active"></div>
+                  <div class="chart-pill"></div>
+                </div>
+              </div>
+              <div class="chart-bars">
+                <div class="bar" style="--h: 45%"></div>
+                <div class="bar" style="--h: 68%"></div>
+                <div class="bar" style="--h: 52%"></div>
+                <div class="bar" style="--h: 81%"></div>
+                <div class="bar" style="--h: 73%"></div>
+                <div class="bar bar-featured" style="--h: 92%"></div>
+                <div class="bar" style="--h: 85%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  /* ── Background ── */
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-color-background, #070b14);
+  }
+  .bg-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(110px);
+    pointer-events: none;
+  }
+  .bg-orb-1 {
+    width: 500px;
+    height: 500px;
+    top: -10%;
+    left: 20%;
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 9%, transparent);
+  }
+  .bg-orb-2 {
+    width: 400px;
+    height: 400px;
+    bottom: -5%;
+    right: 10%;
+    background: color-mix(in srgb, var(--mp-color-accent, #a78bfa) 6%, transparent);
+  }
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  /* ── Layout ── */
+  .scene-layout {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 72px 56px;
+    box-sizing: border-box;
+    gap: 24px;
+  }
+
+  /* ── Headline area ── */
+  .headline-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .headline {
+    font-size: 38px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 10px;
+  }
+  .body {
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.55;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 55%, transparent);
+    margin: 0;
+    max-width: 560px;
+  }
+  .body:empty { display: none; }
+
+  /* ── Browser Frame ── */
+  .browser-frame {
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 90%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 9%, transparent);
+    box-shadow:
+      0 32px 100px rgba(0, 0, 0, 0.6),
+      0 0 0 0.5px color-mix(in srgb, var(--mp-color-primary, #6366f1) 18%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--mp-color-text, #ffffff) 6%, transparent);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Browser chrome */
+  .browser-chrome {
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 95%, #000 30%);
+    border-bottom: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 7%, transparent);
+    padding: 10px 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Window controls */
+  .window-controls {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .dot-red    { background: #ff5f57; }
+  .dot-yellow { background: #febc2e; }
+  .dot-green  { background: #28c840; }
+
+  /* Tab bar */
+  .tab-bar {
+    display: flex;
+    gap: 2px;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 7px 7px 0 0;
+    background: transparent;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 40%, transparent);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .tab-active {
+    background: color-mix(in srgb, var(--mp-color-background, #070b14) 100%, transparent);
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 8%, transparent);
+    border-bottom: none;
+  }
+  .tab-icon {
+    width: 12px;
+    height: 12px;
+    color: var(--mp-color-accent, #a78bfa);
+  }
+  .tab-title {
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tab-close {
+    width: 10px;
+    height: 10px;
+    opacity: 0.5;
+  }
+
+  /* URL bar */
+  .url-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: color-mix(in srgb, var(--mp-color-background, #070b14) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 7%, transparent);
+    border-radius: 6px;
+    padding: 5px 12px;
+    margin-bottom: 10px;
+  }
+  .url-lock {
+    width: 12px;
+    height: 12px;
+    color: #22c55e;
+    flex-shrink: 0;
+  }
+  .url-text {
+    font-size: 12px;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 65%, transparent);
+    letter-spacing: 0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Browser content area */
+  .browser-content {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .browser-sidebar {
+    width: 180px;
+    flex-shrink: 0;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 80%, #000 10%);
+    border-right: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 5%, transparent);
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+  }
+  .nav-item-active {
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 12%, transparent);
+  }
+  .nav-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--mp-color-text, #ffffff) 20%, transparent);
+    flex-shrink: 0;
+  }
+  .nav-item-active .nav-dot {
+    background: var(--mp-color-primary, #6366f1);
+  }
+  .nav-text {
+    height: 8px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--mp-color-text, #ffffff) 12%, transparent);
+  }
+  .nav-item-active .nav-text {
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 30%, transparent);
+  }
+  .nav-text-long  { width: 80px; }
+  .nav-text-med   { width: 60px; }
+  .nav-text-short { width: 44px; }
+
+  /* Main content area */
+  .browser-main {
+    flex: 1;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  /* Metric cards */
+  .metric-row {
+    display: flex;
+    gap: 12px;
+  }
+  .metric-card {
+    flex: 1;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 60%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 6%, transparent);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .metric-card-lit {
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 8%, var(--mp-color-surface, #1e293b) 60%);
+    border-color: color-mix(in srgb, var(--mp-color-primary, #6366f1) 20%, transparent);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--mp-color-primary, #6366f1) 10%, transparent);
+  }
+  .metric-label-sk {
+    height: 7px;
+    width: 50%;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--mp-color-text, #ffffff) 10%, transparent);
+  }
+  .metric-value-sk {
+    height: 22px;
+    width: 65%;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--mp-color-text, #ffffff) 18%, transparent);
+  }
+  .metric-card-lit .metric-value-sk {
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 40%, transparent);
+  }
+  .metric-trend-sk {
+    height: 6px;
+    width: 35%;
+    border-radius: 3px;
+    background: #22c55e22;
+  }
+
+  /* Chart area */
+  .chart-area {
+    flex: 1;
+    background: color-mix(in srgb, var(--mp-color-surface, #1e293b) 50%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 5%, transparent);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+  }
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chart-title-sk {
+    height: 8px;
+    width: 100px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--mp-color-text, #ffffff) 13%, transparent);
+  }
+  .chart-controls {
+    display: flex;
+    gap: 4px;
+  }
+  .chart-pill {
+    height: 18px;
+    width: 32px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--mp-color-text, #ffffff) 6%, transparent);
+  }
+  .chart-pill-active {
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 25%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mp-color-primary, #6366f1) 30%, transparent);
+  }
+  .chart-bars {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding-top: 8px;
+    min-height: 0;
+  }
+  .bar {
+    flex: 1;
+    height: var(--h, 50%);
+    border-radius: 4px 4px 0 0;
+    background: color-mix(in srgb, var(--mp-color-primary, #6366f1) 25%, transparent);
+    min-height: 4px;
+  }
+  .bar-featured {
+    background: linear-gradient(180deg,
+      var(--mp-color-accent, #a78bfa) 0%,
+      var(--mp-color-primary, #6366f1) 100%
+    );
+    box-shadow: 0 0 16px color-mix(in srgb, var(--mp-color-primary, #6366f1) 35%, transparent);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var browserFrame = el.querySelector('.browser-frame');
+    var urlText = el.querySelector('.url-text');
+    var tabTitle = el.querySelector('.tab-title');
+    var headline = el.querySelector('.headline');
+    var body = el.querySelector('.body');
+    var browserMain = el.querySelector('.browser-main');
+    var metricRow = el.querySelector('.metric-row');
+    var chartArea = el.querySelector('.chart-area');
+    var bars = el.querySelectorAll('.bar');
+    var orb1 = el.querySelector('.bg-orb-1');
+    var orb2 = el.querySelector('.bg-orb-2');
+
+    // Populate
+    if (data.url) urlText.textContent = data.url;
+    if (data.page_title) tabTitle.textContent = data.page_title;
+    headline.textContent = data.headline || '';
+    if (data.body) body.textContent = data.body;
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Initial states
+    gsap.set(browserFrame, { autoAlpha: 0, y: 50, scale: 0.97 });
+    gsap.set(headline, { autoAlpha: 0, y: 16, filter: 'blur(4px)' });
+    gsap.set(body, { autoAlpha: 0, y: 12 });
+    gsap.set(urlText, { autoAlpha: 0 });
+    gsap.set(metricRow, { autoAlpha: 0, y: 10 });
+    gsap.set(chartArea, { autoAlpha: 0, y: 10 });
+    gsap.set(bars, { scaleY: 0, transformOrigin: 'bottom center' });
+    gsap.set([orb1, orb2], { scale: 0.6, autoAlpha: 0 });
+
+    // Orbs breathe in
+    tl.to([orb1, orb2], {
+      scale: 1, autoAlpha: 1,
+      duration: speed * 1.8,
+      stagger: 0.15,
+      ease: 'power2.out'
+    }, 0);
+
+    // Headline
+    tl.to(headline, {
+      autoAlpha: 1, y: 0, filter: 'blur(0px)',
+      duration: speed * 0.6,
+      ease: 'power3.out'
+    }, 0.1);
+    if (data.body) {
+      tl.to(body, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.4,
+        ease: 'power2.out'
+      }, 0.3);
+    }
+
+    // Browser slides up
+    tl.to(browserFrame, {
+      autoAlpha: 1, y: 0, scale: 1,
+      duration: speed * 0.7,
+      ease: 'power3.out'
+    }, 0.2);
+
+    // URL types in (staggered character reveal via opacity)
+    tl.to(urlText, {
+      autoAlpha: 1,
+      duration: speed * 0.5,
+      ease: 'power2.out'
+    }, 0.6);
+
+    // Content fades in
+    tl.to(metricRow, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.5,
+      ease: 'power2.out'
+    }, 0.8);
+    tl.to(chartArea, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.4,
+      ease: 'power2.out'
+    }, 0.95);
+
+    // Bars animate up
+    tl.to(bars, {
+      scaleY: 1,
+      duration: speed * 0.6,
+      stagger: 0.05,
+      ease: 'power3.out'
+    }, 1.0);
+
+    // Orb drift
+    tl.to(orb1, {
+      x: 25, y: -15,
+      duration: 5, ease: 'sine.inOut',
+      yoyo: true, repeat: -1
+    }, 1.5);
+
+    // Exit
+    if (ctx.duration > 2.5) {
+      var exitAt = ctx.duration - 0.9;
+      tl.to([body], {
+        autoAlpha: 0, y: -8,
+        duration: 0.3,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to(browserFrame, {
+        autoAlpha: 0, y: 30, scale: 0.97,
+        duration: 0.45,
+        ease: 'power2.in'
+      }, exitAt + 0.05);
+      tl.to(headline, {
+        autoAlpha: 0, y: -14, filter: 'blur(4px)',
+        duration: 0.35,
+        ease: 'power2.in'
+      }, exitAt + 0.1);
+    }
+
+    return tl;
+  }
+</script>

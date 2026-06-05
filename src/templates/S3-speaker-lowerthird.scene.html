@@ -1,0 +1,333 @@
+<!--
+  Scene Template: S3 - Speaker with Lower Third
+  Category: SPEAKER
+  Use when: Speaker identification, quote attribution, interview or presentation name card.
+  Feel: Broadcast quality. Speaker dominates, clean name bar at bottom.
+  Content slots:
+    - main_text: Optional quote or key message shown above speaker
+    - name: Speaker name (required)
+    - title: Title and company
+    - logo_text: Company or logo text
+  Duration: 4-7s
+  Speaker: full-behind mode (transparent background). Designed as overlay over speaker video.
+-->
+<template>
+  <div class="scene">
+    <!-- NO bg layers -- transparent for full-behind speaker video -->
+
+    <!-- Optional main quote/text in upper portion -->
+    <div class="main-area">
+      <div class="main-quote" data-bind="main_text">
+        <div class="quote-mark">&ldquo;</div>
+        <p class="quote-text"></p>
+      </div>
+    </div>
+
+    <!-- Lower Third Bar -->
+    <div class="lower-third">
+      <!-- Primary accent line (left edge) -->
+      <div class="lt-accent-block">
+        <div class="lt-accent-top"></div>
+        <div class="lt-accent-main"></div>
+      </div>
+
+      <!-- Name + Title -->
+      <div class="lt-info">
+        <div class="lt-name" data-bind="name">Speaker Name</div>
+        <div class="lt-title" data-bind="title">Title, Company</div>
+      </div>
+
+      <!-- Optional company/logo text on right -->
+      <div class="lt-logo-area">
+        <div class="lt-logo" data-bind="logo_text"></div>
+      </div>
+    </div>
+
+    <!-- Bottom gradient fade (helps lower third read over bright video) -->
+    <div class="bottom-vignette"></div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    /* Transparent -- renders over speaker video in full-behind mode */
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Main quote area ── */
+  .main-area {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 80px 120px 40px;
+    pointer-events: none;
+  }
+
+  .main-quote {
+    position: relative;
+    max-width: 780px;
+    text-align: center;
+  }
+  .main-quote:has(.quote-text:empty) { display: none; }
+
+  .quote-mark {
+    font-size: 80px;
+    line-height: 0.6;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--mp-color-primary, #6366f1);
+    opacity: 0.7;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .quote-text {
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0;
+    text-shadow:
+      0 0 40px rgba(0, 0, 0, 0.9),
+      0 2px 12px rgba(0, 0, 0, 0.8),
+      0 4px 24px rgba(0, 0, 0, 0.6);
+  }
+  .quote-text:empty ~ .quote-mark { display: none; }
+
+  /* ── Bottom vignette to help the lower-third read ── */
+  .bottom-vignette {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.65) 0%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  /* ── Lower Third ── */
+  .lower-third {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 0 72px 56px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* Accent block: vertical colored bar */
+  .lt-accent-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-right: 0;
+    flex-shrink: 0;
+  }
+  .lt-accent-top {
+    width: 3px;
+    height: 0;
+    background: transparent;
+  }
+  .lt-accent-main {
+    width: 4px;
+    height: 52px;
+    background: linear-gradient(180deg,
+      var(--mp-color-primary, #6366f1),
+      var(--mp-color-accent, #a78bfa)
+    );
+    border-radius: 2px;
+    box-shadow:
+      0 0 16px color-mix(in srgb, var(--mp-color-primary, #6366f1) 55%, transparent),
+      0 0 32px color-mix(in srgb, var(--mp-color-primary, #6366f1) 25%, transparent);
+  }
+
+  /* Glass pill backing */
+  .lower-third::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    left: -8px;
+    right: -8px;
+    background: color-mix(in srgb, #000000 55%, transparent);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 9%, transparent);
+    border-left: none;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 color-mix(in srgb, var(--mp-color-text, #ffffff) 6%, transparent);
+    z-index: -1;
+  }
+
+  /* Name + title */
+  .lt-info {
+    flex: 1;
+    padding: 16px 20px 16px 18px;
+  }
+  .lt-name {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+  .lt-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 55%, transparent);
+    margin-top: 3px;
+    letter-spacing: 0.01em;
+  }
+  .lt-title:empty { display: none; }
+
+  /* Logo area */
+  .lt-logo-area {
+    padding: 16px 20px;
+    flex-shrink: 0;
+    border-left: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 8%, transparent);
+  }
+  .lt-logo {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 40%, transparent);
+    white-space: nowrap;
+  }
+  .lt-logo:empty { display: none; }
+  .lt-logo-area:has(.lt-logo:empty) { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var mainQuote = el.querySelector('.main-quote');
+    var quoteText = el.querySelector('.quote-text');
+    var quoteMark = el.querySelector('.quote-mark');
+    var lowerThird = el.querySelector('.lower-third');
+    var ltAccent = el.querySelector('.lt-accent-main');
+    var ltName = el.querySelector('.lt-name');
+    var ltTitle = el.querySelector('.lt-title');
+    var ltLogoArea = el.querySelector('.lt-logo-area');
+    var bottomVignette = el.querySelector('.bottom-vignette');
+
+    // Populate
+    if (data.name) ltName.textContent = data.name;
+    if (data.title) ltTitle.textContent = data.title;
+    if (data.logo_text) el.querySelector('.lt-logo').textContent = data.logo_text;
+    if (data.main_text) quoteText.textContent = data.main_text;
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+    var hasQuote = data.main_text && data.main_text.trim();
+
+    // Initial states
+    gsap.set(lowerThird, { autoAlpha: 0, y: 50 });
+    gsap.set(ltAccent, { scaleY: 0, transformOrigin: 'top center' });
+    gsap.set(ltName, { autoAlpha: 0, x: -20 });
+    gsap.set(ltTitle, { autoAlpha: 0, x: -16 });
+    gsap.set(ltLogoArea, { autoAlpha: 0 });
+    gsap.set(bottomVignette, { autoAlpha: 0 });
+
+    if (hasQuote) {
+      gsap.set(mainQuote, { autoAlpha: 0, y: -24, filter: 'blur(6px)' });
+      gsap.set(quoteMark, { autoAlpha: 0, y: -10 });
+    }
+
+    // Bottom vignette fades in first (helps lower third be readable)
+    tl.to(bottomVignette, {
+      autoAlpha: 1,
+      duration: speed * 0.6,
+      ease: 'power2.out'
+    }, 0);
+
+    // Optional main quote fades in from top
+    if (hasQuote) {
+      tl.to(quoteMark, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.4,
+        ease: 'power2.out'
+      }, 0.1);
+      tl.to(mainQuote, {
+        autoAlpha: 1, y: 0, filter: 'blur(0px)',
+        duration: speed * 0.8,
+        ease: 'power3.out'
+      }, 0.15);
+    }
+
+    // Lower third slides up
+    tl.to(lowerThird, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.65,
+      ease: 'power3.out'
+    }, hasQuote ? 0.4 : 0.2);
+
+    // Accent bar draws down
+    tl.to(ltAccent, {
+      scaleY: 1,
+      duration: speed * 0.35,
+      ease: 'power2.out'
+    }, hasQuote ? 0.62 : 0.42);
+
+    // Name stagger in
+    tl.to(ltName, {
+      autoAlpha: 1, x: 0,
+      duration: speed * 0.45,
+      ease: 'power2.out'
+    }, hasQuote ? 0.72 : 0.52);
+
+    // Title
+    if (data.title) {
+      tl.to(ltTitle, {
+        autoAlpha: 1, x: 0,
+        duration: speed * 0.35,
+        ease: 'power2.out'
+      }, hasQuote ? 0.84 : 0.64);
+    }
+
+    // Logo area
+    if (data.logo_text) {
+      tl.to(ltLogoArea, {
+        autoAlpha: 1,
+        duration: speed * 0.3,
+        ease: 'power2.out'
+      }, hasQuote ? 0.94 : 0.74);
+    }
+
+    // Exit
+    if (ctx.duration > 2.5) {
+      var exitAt = ctx.duration - 0.8;
+      if (hasQuote) {
+        tl.to(mainQuote, {
+          autoAlpha: 0, y: -18, filter: 'blur(4px)',
+          duration: 0.35, ease: 'power2.in'
+        }, exitAt);
+      }
+      tl.to(lowerThird, {
+        autoAlpha: 0, y: 30,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt + 0.08);
+      tl.to(bottomVignette, {
+        autoAlpha: 0,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt + 0.1);
+    }
+
+    return tl;
+  }
+</script>

@@ -24,7 +24,7 @@ export interface TemplateSlot {
 export interface SceneTemplate {
   id: string;
   name: string;
-  category: "opening" | "content" | "data" | "closing";
+  category: "opening" | "content" | "data" | "closing" | "speaker";
   /** When the planner should pick this template */
   when: string;
   /** What it feels like */
@@ -35,6 +35,12 @@ export interface SceneTemplate {
   duration: [number, number];
   /** File name in templates/ dir */
   file: string;
+  /** Speaker template metadata -- sets scene flags when selected */
+  speaker?: {
+    mode: "full-behind" | "pip";
+    content_side?: "left" | "right";
+    content_width?: string;
+  };
 }
 
 export const SCENE_TEMPLATES: SceneTemplate[] = [
@@ -495,6 +501,58 @@ export const SCENE_TEMPLATES: SceneTemplate[] = [
     duration: [3, 5],
     file: "O5-logo-intro.scene.html",
   },
+
+
+  // ── SPEAKER ──
+  {
+    id: "S1-speaker-spotlight",
+    name: "Speaker Spotlight",
+    category: "speaker",
+    when: "Speaker on camera with key points, stats, or talking points displayed beside them. Requires speaker_source in project assets.",
+    feel: "Keynote presentation. Speaker commands attention, content panel reinforces the message.",
+    slots: [
+      { name: "eyebrow", type: "string", required: false, description: "Category or section label", example: "KEY INSIGHT" },
+      { name: "headline", type: "string", required: true, description: "Main point, 3-8 words", example: "10x Faster Pipeline" },
+      { name: "body", type: "string", required: false, description: "1-2 sentence supporting detail" },
+      { name: "stat_value", type: "string", required: false, description: "Optional big stat number", example: "10x" },
+      { name: "stat_label", type: "string", required: false, description: "Stat description", example: "faster" },
+    ],
+    duration: [5, 8],
+    file: "S1-speaker-spotlight.scene.html",
+    speaker: { mode: "full-behind", content_side: "right", content_width: "42%" },
+  },
+  {
+    id: "S2-screencast-pip",
+    name: "Screencast with Speaker",
+    category: "speaker",
+    when: "Product demo, walkthrough, or feature showcase. Browser/app frame fills the scene, speaker appears as small PiP circle.",
+    feel: "Product tour. Clean browser mockup with subtle speaker presence.",
+    slots: [
+      { name: "url", type: "string", required: false, description: "URL shown in browser bar", example: "app.quotient.ai/dashboard" },
+      { name: "page_title", type: "string", required: false, description: "Page title in browser tab" },
+      { name: "headline", type: "string", required: true, description: "Feature or section name", example: "Real-Time Analytics" },
+      { name: "body", type: "string", required: false, description: "1-2 sentence feature description" },
+    ],
+    duration: [5, 8],
+    file: "S2-screencast-pip.scene.html",
+    speaker: { mode: "pip" },
+  },
+  {
+    id: "S3-speaker-lowerthird",
+    name: "Speaker with Lower Third",
+    category: "speaker",
+    when: "Speaker identification, quote attribution, or key message with name card. Interview or presentation style.",
+    feel: "Broadcast quality. Speaker dominates, clean name bar at bottom.",
+    slots: [
+      { name: "main_text", type: "string", required: false, description: "Quote or key message shown above speaker", example: "AI will reshape demand marketing" },
+      { name: "name", type: "string", required: true, description: "Speaker name", example: "Marc Ferrentino" },
+      { name: "title", type: "string", required: false, description: "Title and company", example: "CEO, Quotient" },
+      { name: "logo_text", type: "string", required: false, description: "Company or logo text" },
+    ],
+    duration: [4, 7],
+    file: "S3-speaker-lowerthird.scene.html",
+    speaker: { mode: "full-behind" },
+  },
 ];
 
 /**
@@ -515,9 +573,12 @@ export function formatTemplateCatalogForPrompt(): string {
     ["content", "CONTENT"],
     ["data", "DATA"],
     ["closing", "CLOSINGS"],
+    ["speaker", "SPEAKER"],
   ];
 
-  // Content category includes lower-thirds, overlays, etc. so all non-opening/data/closing are content
+  // Speaker templates require a speaker video asset in the project (speaker_source).
+  // When selected, they automatically set transparent_background and content_region on the scene.
+  // The overlay (speaker-video with full-behind or pip segments) is set at the project level.
 
   for (const [cat, label] of order) {
     const templates = byCategory.get(cat);

@@ -1,0 +1,301 @@
+<!--
+  Scene Template: S1 - Speaker Spotlight
+  Category: SPEAKER
+  Use when: Speaker on camera with key points displayed beside them (full-behind transparent overlay).
+  Feel: Keynote presentation. Speaker commands attention, content panel reinforces the message.
+  Content slots:
+    - eyebrow: Optional category/section label (e.g. "KEY INSIGHT")
+    - headline: Main point, 3-8 words (required)
+    - body: 1-2 sentence supporting detail
+    - stat_value: Optional big stat number (e.g. "10x")
+    - stat_label: Stat description (e.g. "faster")
+  Duration: 5-8s
+  Speaker: full-behind mode (transparent background), content_side: right, content_width: 42%
+-->
+<template>
+  <div class="scene">
+    <!-- NO bg layers -- this renders transparently over speaker video -->
+
+    <!-- Glassmorphic content panel on the right -->
+    <div class="content-panel">
+      <div class="panel-inner">
+        <!-- Accent line -->
+        <div class="accent-bar"></div>
+
+        <span class="eyebrow" data-bind="eyebrow"></span>
+        <h2 class="headline" data-bind="headline"></h2>
+        <p class="body" data-bind="body"></p>
+
+        <!-- Optional stat block -->
+        <div class="stat-block">
+          <span class="stat-value" data-bind="stat_value"></span>
+          <span class="stat-label" data-bind="stat_label"></span>
+        </div>
+      </div>
+
+      <!-- Glass shimmer strip -->
+      <div class="panel-shimmer"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    /* Transparent -- renders over speaker video in full-behind mode */
+    background: transparent;
+  }
+
+  /* ── Content Panel ── */
+  .content-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 42%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 48px 60px 40px;
+    box-sizing: border-box;
+  }
+
+  .panel-inner {
+    position: relative;
+    width: 100%;
+    background: color-mix(in srgb, var(--mp-color-background, #0a0a0f) 72%, transparent);
+    backdrop-filter: blur(24px) saturate(1.3);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    border-radius: 20px;
+    border: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 10%, transparent);
+    box-shadow:
+      0 24px 80px rgba(0, 0, 0, 0.55),
+      0 0 0 0.5px color-mix(in srgb, var(--mp-color-primary, #6366f1) 15%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--mp-color-text, #ffffff) 7%, transparent);
+    padding: 48px 44px 44px;
+    overflow: hidden;
+    /* Subtle gradient tint */
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 5%, transparent) 0%,
+      transparent 60%,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 4%, transparent) 100%
+    );
+  }
+
+  /* Shimmer on the panel edge */
+  .panel-shimmer {
+    position: absolute;
+    top: 0;
+    left: -1px;
+    width: 2px;
+    height: 100%;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 60%, transparent) 30%,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 50%, transparent) 70%,
+      transparent 100%
+    );
+    border-radius: 2px;
+  }
+
+  /* ── Accent bar ── */
+  .accent-bar {
+    width: 36px;
+    height: 3px;
+    background: linear-gradient(90deg,
+      var(--mp-color-primary, #6366f1),
+      var(--mp-color-accent, #a78bfa)
+    );
+    border-radius: 2px;
+    margin-bottom: 24px;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--mp-color-primary, #6366f1) 50%, transparent);
+  }
+
+  /* ── Text ── */
+  .eyebrow {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--mp-color-accent, #a78bfa);
+    margin-bottom: 16px;
+  }
+  .eyebrow:empty { display: none; }
+
+  .headline {
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 18px 0;
+  }
+
+  .body {
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.6;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 65%, transparent);
+    margin: 0 0 20px 0;
+  }
+  .body:empty { display: none; }
+
+  /* ── Stat Block ── */
+  .stat-block {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 20px;
+    border-top: 1px solid color-mix(in srgb, var(--mp-color-text, #ffffff) 8%, transparent);
+  }
+  .stat-block:has(.stat-value:empty) { display: none; }
+
+  .stat-value {
+    font-size: 52px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    background: linear-gradient(135deg,
+      var(--mp-color-text, #ffffff) 0%,
+      var(--mp-color-accent, #a78bfa) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .stat-value:empty { display: none; }
+
+  .stat-label {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--mp-color-text, #ffffff) 45%, transparent);
+    padding-bottom: 4px;
+  }
+  .stat-label:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var panel = el.querySelector('.panel-inner');
+    var shimmer = el.querySelector('.panel-shimmer');
+    var accentBar = el.querySelector('.accent-bar');
+    var eyebrow = el.querySelector('.eyebrow');
+    var headline = el.querySelector('.headline');
+    var body = el.querySelector('.body');
+    var statBlock = el.querySelector('.stat-block');
+    var statValue = el.querySelector('.stat-value');
+    var statLabel = el.querySelector('.stat-label');
+
+    // Populate data
+    if (data.eyebrow) eyebrow.textContent = data.eyebrow;
+    headline.textContent = data.headline || '';
+    if (data.body) body.textContent = data.body;
+    if (data.stat_value) statValue.textContent = data.stat_value;
+    if (data.stat_label) statLabel.textContent = data.stat_label;
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Initial states
+    gsap.set(panel, { autoAlpha: 0, x: 60, scale: 0.97 });
+    gsap.set(shimmer, { autoAlpha: 0, scaleY: 0, transformOrigin: 'top center' });
+    gsap.set(accentBar, { autoAlpha: 0, scaleX: 0, transformOrigin: 'left center' });
+    gsap.set(eyebrow, { autoAlpha: 0, y: 10 });
+    gsap.set(headline, { autoAlpha: 0, y: 18, filter: 'blur(5px)' });
+    gsap.set(body, { autoAlpha: 0, y: 14 });
+    gsap.set(statBlock, { autoAlpha: 0, y: 12 });
+
+    // Panel slides in from right
+    tl.to(panel, {
+      autoAlpha: 1, x: 0, scale: 1,
+      duration: speed * 0.65,
+      ease: 'power3.out'
+    }, 0);
+
+    // Shimmer reveals
+    tl.to(shimmer, {
+      autoAlpha: 1, scaleY: 1,
+      duration: speed * 0.8,
+      ease: 'power2.out'
+    }, 0.05);
+
+    // Accent bar draws in
+    tl.to(accentBar, {
+      autoAlpha: 1, scaleX: 1,
+      duration: speed * 0.4,
+      ease: 'power2.out'
+    }, speed * 0.3);
+
+    // Eyebrow
+    if (data.eyebrow) {
+      tl.to(eyebrow, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.35,
+        ease: 'power2.out'
+      }, speed * 0.4);
+    }
+
+    // Headline blurs in
+    tl.to(headline, {
+      autoAlpha: 1, y: 0, filter: 'blur(0px)',
+      duration: speed * 0.7,
+      ease: 'power3.out'
+    }, speed * 0.45);
+
+    // Body
+    if (data.body) {
+      tl.to(body, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.5,
+        ease: 'power2.out'
+      }, speed * 0.65);
+    }
+
+    // Stat block
+    if (data.stat_value) {
+      tl.to(statBlock, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.5,
+        ease: 'power2.out'
+      }, speed * 0.75);
+    }
+
+    // Exit
+    if (ctx.duration > 2.5) {
+      var exitAt = ctx.duration - 0.85;
+      tl.to([body, statBlock], {
+        autoAlpha: 0, y: -10,
+        duration: 0.3, stagger: 0.04,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to(headline, {
+        autoAlpha: 0, y: -14, filter: 'blur(4px)',
+        duration: 0.35,
+        ease: 'power2.in'
+      }, exitAt + 0.06);
+      tl.to([eyebrow, accentBar], {
+        autoAlpha: 0,
+        duration: 0.25, stagger: 0.03,
+        ease: 'power2.in'
+      }, exitAt + 0.1);
+      tl.to(panel, {
+        autoAlpha: 0, x: 40, scale: 0.97,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt + 0.15);
+    }
+
+    return tl;
+  }
+</script>

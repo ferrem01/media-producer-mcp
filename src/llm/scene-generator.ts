@@ -214,6 +214,19 @@ async function generateFromTemplate(
     }],
   };
 
+  // Apply speaker template flags
+  if (templateDef.speaker) {
+    if (templateDef.speaker.mode === "full-behind") {
+      scene.transparent_background = true;
+      if (templateDef.speaker.content_side) {
+        scene.content_region = {
+          side: templateDef.speaker.content_side,
+          width: templateDef.speaker.content_width || "42%",
+        };
+      }
+    }
+  }
+
   return { scene, customSources };
 }
 
