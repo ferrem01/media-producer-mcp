@@ -11,7 +11,9 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fork } from "node:child_process";
+import { fork, execFile } from "node:child_process";
+import { promisify } from "node:util";
+const execFileAsync = promisify(execFile);
 import { assembleScene, type ComponentSource } from "./scene-assembler.js";
 import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, encodeGif, concatSegments } from "./encode.js";
@@ -279,6 +281,58 @@ async function renderSingleSceneWorker(
   const mp4Path = path.join(sceneDir, "scene.mp4");
 
   await fs.mkdir(sceneDir, { recursive: true });
+
+  // Brand asset shortcut: if scene is a pre-rendered video (brand intro/outro),
+  // re-encode to match project canvas settings instead of going through Playwright capture.
+  if (scene.components.length === 1 && scene.components[0].type === "video" && scene.components[0].data?.src) {
+    const videoSrc = scene.components[0].data?.src as string;
+    if (videoSrc) {
+      console.log(`  Scene ${sceneIndex + 1}: brand asset video, re-encoding to ${project.canvas.width}x${project.canvas.height}`);
+      try {
+        // Download the source video to a temp file
+        const srcPath = path.join(sceneDir, "brand_source.mp4");
+        if (videoSrc.startsWith("http://") || videoSrc.startsWith("https://")) {
+          const res = await fetch(videoSrc);
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${videoSrc}`);
+          const buf = Buffer.from(await res.arrayBuffer());
+          await fs.writeFile(srcPath, buf);
+        } else if (videoSrc.startsWith("/")) {
+          const localPath = path.join(config.dataDir, "..", videoSrc);
+          await fs.copyFile(localPath, srcPath);
+        }
+
+        // Re-encode to match project canvas (resolution, codec, fps, no audio for now)
+        const ffmpegArgs = [
+          "-y",
+          "-i", srcPath,
+          "-vf", `scale=${project.canvas.width}:${project.canvas.height}:force_original_aspect_ratio=decrease,pad=${project.canvas.width}:${project.canvas.height}:(ow-iw)/2:(oh-ih)/2:black`,
+          "-r", String(project.canvas.fps),
+          "-c:v", "libx264",
+          "-profile:v", "baseline",
+          "-level", "3.0",
+          "-preset", "medium",
+          "-crf", "23",
+          "-maxrate", "2M",
+          "-bufsize", "4M",
+          "-pix_fmt", "yuv420p",
+          "-movflags", "+faststart",
+          "-an", // strip audio for now (audio mix happens later)
+          mp4Path,
+        ];
+        await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 10 * 1024 * 1024 });
+
+        // Clean up source
+        await fs.unlink(srcPath).catch(() => {});
+
+        const stat = await fs.stat(mp4Path);
+        console.log(`  Encoded: ${mp4Path} (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
+        const totalFrames = Math.ceil(scene.duration_seconds * project.canvas.fps);
+        return { mp4Path, frameCount: totalFrames };
+      } catch (e: any) {
+        console.warn(`  Brand asset encode failed (${e.message}), falling back to capture`);
+      }
+    }
+  }
 
   // Write the project JSON for the worker to read
   const projectJsonPath = path.join(sceneDir, "project.json");

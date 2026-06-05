@@ -57,6 +57,7 @@ export interface PlannedScene {
   transition_in?: { type: string; duration_seconds: number };
   components: PlannedComponent[];
   hero_image?: string;
+  _brandAsset?: boolean;
 }
 
 export interface StoryboardResult {

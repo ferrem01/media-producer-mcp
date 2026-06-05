@@ -140,13 +140,13 @@ export async function captureSingleFrame(options: {
 
   try {
     browser = await chromium.launch({
-      args: ["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"],
+      args: ["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox", "--allow-file-access-from-files"],
     });
     page = await browser.newPage();
     await page.setViewportSize({ width, height });
 
     const fileUrl = `file://${path.resolve(htmlPath)}`;
-    await page.goto(fileUrl, { waitUntil: "networkidle" });
+    await page.goto(fileUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
 
     await page.waitForFunction(
       () => (window as any).__MP_READY === true,
@@ -159,8 +159,29 @@ export async function captureSingleFrame(options: {
         (window as any).__MP_TIMELINE.time(t);
       }, atTime);
 
-      await page.evaluate(() =>
-        new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      // Wait for video elements to seek and render
+      await page.evaluate((seekTime: number) =>
+        new Promise<void>((resolve) => {
+          const videos = document.querySelectorAll("video");
+          if (videos.length === 0) {
+            requestAnimationFrame(() => resolve());
+            return;
+          }
+          let pending = videos.length;
+          const done = () => { if (--pending <= 0) resolve(); };
+          videos.forEach((v) => {
+            const startAt = parseFloat(v.getAttribute("data-start-at") || "0");
+            v.currentTime = Math.max(0, seekTime - startAt);
+            if (v.readyState >= 2) {
+              done();
+            } else {
+              v.addEventListener("seeked", done, { once: true });
+              v.addEventListener("error", done, { once: true });
+              setTimeout(done, 3000); // fallback timeout
+            }
+          });
+        }),
+        atTime || 0,
       );
     }
 

@@ -112,6 +112,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     duration_seconds: planned.duration_seconds || 5,
     transition_in: transition,
     components: sceneComponents,
+    _brandAsset: (planned as any)._brandAsset,
   };
 
   return { scene, customSources: customSources.size > 0 ? customSources : undefined };

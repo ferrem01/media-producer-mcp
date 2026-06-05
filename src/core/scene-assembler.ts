@@ -18,6 +18,7 @@ import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { config } from "../config.js";
 
 export interface ComponentSource {
   /** Component type name */
@@ -63,7 +64,9 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     }
 
     // Bind data to template
-    const boundHtml = bindTemplate(parsed.template, comp.data);
+    // Resolve relative asset URLs to absolute for file:// protocol
+    const resolvedData = resolveAssetUrls(comp.data);
+    const boundHtml = bindTemplate(parsed.template, resolvedData);
 
     // Position the component
     const posStyle = buildPositionStyle(comp);
@@ -84,7 +87,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     }
 
     // Collect scripts for master timeline assembly
-    componentScripts.push(buildComponentScript(comp, parsed.script, scene.duration_seconds, canvas, {
+    componentScripts.push(buildComponentScript({ ...comp, data: resolvedData }, parsed.script, scene.duration_seconds, canvas, {
       motion: brandKit.style?.motion || "cinematic",
     }));
   }
@@ -190,6 +193,29 @@ function generateFontLinks(brand: BrandKit): string {
     }
   }
   return links.join("\n");
+}
+
+/**
+ * Resolve relative /assets/ URLs in component data to absolute URLs so they
+ * work when loaded via file:// protocol in Playwright.
+ */
+function resolveAssetUrls(data: Record<string, any>): Record<string, any> {
+  const baseUrl = `http://localhost:${config.port}`;
+  const resolved = { ...data };
+  for (const [key, val] of Object.entries(resolved)) {
+    if (typeof val === "string" && val.startsWith("/assets/")) {
+      resolved[key] = `${baseUrl}${val}`;
+    } else if (typeof val === "string" && val.startsWith("/api/")) {
+      resolved[key] = `${baseUrl}${val}`;
+    } else if (Array.isArray(val)) {
+      resolved[key] = val.map((v: any) =>
+        typeof v === "string" && (v.startsWith("/assets/") || v.startsWith("/api/"))
+          ? `${baseUrl}${v}`
+          : v
+      );
+    }
+  }
+  return resolved;
 }
 
 /**

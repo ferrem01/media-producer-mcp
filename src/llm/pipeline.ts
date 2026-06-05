@@ -1220,6 +1220,65 @@ async function runUnifiedPipeline(
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
+  // ── Inject deterministic brand intro/outro for video/presentation ──
+  if ((format === "video" || format === "presentation") && brandKit.assets?.length) {
+    const introAsset = brandKit.assets.find((a: any) => a.type === "intro");
+    const outroAsset = brandKit.assets.find((a: any) => a.type === "outro");
+    const guidelines = (brandKit.guidelines || "").toLowerCase();
+    const hasIntroGuideline = guidelines.includes("intro") && (guidelines.includes("always") || guidelines.includes("use"));
+    const hasOutroGuideline = guidelines.includes("outro") && (guidelines.includes("always") || guidelines.includes("use"));
+
+    // Resolve asset URL: prefix relative paths with server base URL
+    const resolveUrl = (url: string) =>
+      url.startsWith("/") ? `http://localhost:${config.port}${url}` : url;
+
+    if (introAsset && hasIntroGuideline) {
+      // Check if planner already added an intro scene (video component with same src)
+      const plannerHasIntro = storyboard.scenes.some((s: any) =>
+        s.components?.some((c: any) =>
+          c.type === "video" && c.data?.src && (c.data.src === introAsset.url || c.data.src === resolveUrl(introAsset.url))
+        )
+      );
+      if (!plannerHasIntro) {
+        console.log(`  Injecting brand intro: "${introAsset.name}" (${introAsset.duration || 5}s)`);
+        storyboard.scenes.unshift({
+          label: "Intro - Brand",
+          duration_seconds: introAsset.duration || 5,
+          description: `Brand intro video: ${introAsset.name}`,
+          components: [{
+            type: "video",
+            data: { src: resolveUrl(introAsset.url) },
+            z_index: 0,
+          }],
+          _brandAsset: true, // marker to skip critique
+        });
+      }
+    }
+
+    if (outroAsset && hasOutroGuideline) {
+      const plannerHasOutro = storyboard.scenes.some((s: any) =>
+        s.components?.some((c: any) =>
+          c.type === "video" && c.data?.src && (c.data.src === outroAsset.url || c.data.src === resolveUrl(outroAsset.url))
+        )
+      );
+      if (!plannerHasOutro) {
+        console.log(`  Injecting brand outro: "${outroAsset.name}" (${outroAsset.duration || 5}s)`);
+        storyboard.scenes.push({
+          label: "Outro - Brand",
+          duration_seconds: outroAsset.duration || 5,
+          description: `Brand outro video: ${outroAsset.name}`,
+          components: [{
+            type: "video",
+            data: { src: resolveUrl(outroAsset.url) },
+            z_index: 0,
+          }],
+          transition_in: { type: "crossfade", duration_seconds: 0.5 },
+          _brandAsset: true,
+        });
+      }
+    }
+  }
+
   // Create project shell
   var projectId = `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
   var project: Project = {
@@ -1279,10 +1338,14 @@ async function runUnifiedPipeline(
       }
     }
 
-    // Critique loop (skip if opts.critique === false)
+    // Critique loop (skip if opts.critique === false, or if brand asset scene)
     let finalScene = generated.scene;
     let finalCustomSources = generated.customSources;
-    if (opts.critique !== false) {
+    const isBrandAsset = (planned as any)._brandAsset === true;
+    if (isBrandAsset) {
+      console.log(`  Scene ${i + 1}/${storyboard.scenes.length}: brand asset, skipping critique`);
+    }
+    if (opts.critique !== false && !isBrandAsset) {
       const critiqueResult = await critiqueAndRetryScene({
         scene: generated.scene,
         planned,
