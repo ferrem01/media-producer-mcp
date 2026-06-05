@@ -365,3 +365,67 @@ export async function mixSpeakerAudio(opts: {
   await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
   return outputPath;
 }
+
+/**
+ * Composite a content video onto the speaker video in a single pass.
+ *
+ * The speaker video is the base layer (providing both video AND audio).
+ * The content video (which has black backgrounds where transparency was)
+ * overlays on top using a "lighten" or additive blend so the black areas
+ * become transparent and the content shows through.
+ *
+ * For true transparency, we use chromakey on pure black OR simply overlay
+ * with the content rendered on transparent (but encoded to mp4 with black bg).
+ * Since our content has white/colored text on black, "lighten" blend works well.
+ *
+ * Actually: the simplest correct approach is to use the content video as-is
+ * and overlay it with blend=lighten so black pixels become the speaker.
+ */
+export async function compositeContentOntoSpeaker(opts: {
+  contentVideoPath: string;
+  speakerPath: string;
+  outputPath: string;
+  width: number;
+  height: number;
+}): Promise<string> {
+  const { contentVideoPath, speakerPath, outputPath, width, height } = opts;
+
+  const speakerHasAudio = await hasAudioStream(speakerPath);
+  const contentDuration = await getVideoDuration(contentVideoPath);
+
+  // Use blend=lighten: for each pixel, take the brighter of speaker vs content.
+  // Black content pixels (0,0,0) always show the speaker.
+  // Colored/white content pixels show the content (since they are brighter than most speaker pixels).
+  const filterComplex = [
+    `[0:v]scale=${width}:${height}[speaker]`,
+    `[speaker][1:v]blend=all_mode=lighten:shortest=1[out]`,
+  ].join("; ");
+
+  const args: string[] = [
+    "-y",
+    "-i", speakerPath,
+    "-i", contentVideoPath,
+    "-filter_complex", filterComplex,
+    "-map", "[out]",
+  ];
+
+  // Speaker audio (stays in perfect sync because we never re-encode the speaker)
+  if (speakerHasAudio) {
+    args.push("-map", "0:a", "-c:a", "aac", "-b:a", "192k");
+  }
+
+  args.push(
+    "-c:v", "libx264",
+    "-preset", "medium",
+    "-crf", "23",
+    "-pix_fmt", "yuv420p",
+    "-movflags", "+faststart",
+    "-t", String(contentDuration),
+    outputPath,
+  );
+
+  console.log("  Compositing: speaker (base) + content (lighten blend)");
+
+  await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
+  return outputPath;
+}

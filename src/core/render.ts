@@ -24,7 +24,7 @@ import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
-import { compositeOverlays, compositeFullBehind, mixSpeakerAudio, type OverlaySegment } from "./overlay-compositor.js";
+import { compositeOverlays, compositeFullBehind, mixSpeakerAudio, compositeContentOntoSpeaker, type OverlaySegment } from "./overlay-compositor.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
 export interface RenderOptions {
@@ -411,21 +411,17 @@ async function renderSingleSceneWorker(
   await fs.unlink(projectJsonPath).catch(() => {});
   await fs.unlink(argsPath).catch(() => {});
 
-  // full-behind: PNG frames are ready; composite them on top of the speaker video
+  // full-behind: PNG frames captured with transparency. Encode to mp4 (content on black bg).
+  // The speaker video composite happens ONCE after all scenes are concatenated.
   if (fullBehindSpeakerPath) {
     const framesDir = path.join(sceneDir, "frames");
-    console.log(`\n  full-behind composite: scene ${sceneIndex + 1}`);
-    await compositeFullBehind({
+    console.log(`\n  Encoding full-behind scene ${sceneIndex + 1} (content-only, speaker composited post-concat)`);
+    await encodeScene({
       framesDir,
-      speakerPath: fullBehindSpeakerPath,
       outputPath: mp4Path,
-      width: project.canvas.width,
-      height: project.canvas.height,
       fps: project.canvas.fps,
-      duration: scene.duration_seconds,
-      speakerOffset: fullBehindSpeakerOffset,
     });
-    // Clean up PNG frames now that mp4 is produced
+    // Clean up PNG frames
     await fs.rm(framesDir, { recursive: true, force: true }).catch(() => {});
     await fs.unlink(path.join(sceneDir, ".frames-ready")).catch(() => {});
   }
@@ -691,21 +687,26 @@ async function renderVideo(
     }
   }
 
-  // ── Speaker audio: mix as one continuous track across all scenes ──
+  // ── Full-behind: composite content video onto speaker video (single pass) ──
+  // The speaker video plays straight through as the base layer.
+  // The concatenated content video (with black/transparent bg) overlays on top.
+  // Audio comes from the speaker video, keeping perfect sync.
   if (project.overlays && project.overlays.length > 0) {
     for (const overlay of project.overlays) {
       if (overlay.type === "speaker-video" && overlay.source) {
         const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
-        // Only mix audio if there are full-behind segments (speaker video is the base layer)
         const hasFullBehind = overlay.segments?.some(s => s.mode === "full-behind");
         if (hasFullBehind) {
-          const audioOutput = outputPath.replace(/\.mp4$/, "-speaker-audio.mp4");
-          await mixSpeakerAudio({
-            videoPath: outputPath,
+          console.log("\n  Compositing content onto speaker video (single pass)...");
+          const compositeOutput = outputPath.replace(/\.mp4$/, "-speaker-composite.mp4");
+          await compositeContentOntoSpeaker({
+            contentVideoPath: outputPath,
             speakerPath,
-            outputPath: audioOutput,
+            outputPath: compositeOutput,
+            width: project.canvas.width,
+            height: project.canvas.height,
           });
-          await fs.rename(audioOutput, outputPath);
+          await fs.rename(compositeOutput, outputPath);
         }
       }
     }
