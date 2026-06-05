@@ -122,7 +122,7 @@ ${catalogStr}
       "duration_seconds": 5,
       "description": "Dramatic hero reveal with product visualization",
       "components": [
-        { "type": "gradient-background", "data": { "colors": ["var(--mp-color-background)", "var(--mp-color-surface)"] }, "z_index": 0 },
+        { "type": "gradient-background", "data": { "from": "var(--mp-color-background)", "to": "var(--mp-color-surface)" }, "z_index": 0 },
         { "custom": true, "custom_prompt": "A dramatic hero reveal with huge 120px typography saying 'QUOTIENT'. Background uses brand colors with ambient glow orbs in the accent color. Title enters with SplitText per-character animation (chars stagger 0.03s, back.out ease). Subtitle at 24px fades in below. Floating particles in background.", "z_index": 10 }
       ],
       
@@ -133,7 +133,7 @@ ${catalogStr}
       "duration_seconds": 4,
       "description": "Show impressive metrics with multiple stat cards",
       "components": [
-        { "type": "gradient-background", "data": { "colors": ["var(--mp-color-background)", "var(--mp-color-surface)"] }, "z_index": 0 },
+        { "type": "gradient-background", "data": { "from": "var(--mp-color-background)", "to": "var(--mp-color-surface)" }, "z_index": 0 },
         { "type": "stat-card", "data": { "number": "340%", "label": "ROI Increase" }, "z_index": 10, "position": { "x": 100, "y": 400, "width": 400, "height": 200 } },
         { "type": "stat-card", "data": { "number": "2.5M", "label": "Users Reached" }, "z_index": 10, "position": { "x": 760, "y": 400, "width": 400, "height": 200 } }
       ],

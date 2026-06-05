@@ -956,6 +956,8 @@ async function critiqueAndRetryScene(opts: {
 
       // 8. Surgical re-plan: direct LLM call to fix the existing plan JSON
       const existingPlanJSON = JSON.stringify(currentPlanned, null, 2);
+      // Build list of valid library component types for the fix prompt
+      const validTypeList = opts.catalog.map(c => c.type).join(', ');
       const fixPrompt = `Fix this scene plan. The rendered output had these problems:
 
 ${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}
@@ -966,11 +968,18 @@ ${existingPlanJSON}
 Canvas: ${opts.canvas.width}x${opts.canvas.height}
 Original brief: ${opts.prompt}
 
-Return ONLY the fixed scene JSON. Keep the same structure. Only change what's broken:
+VALID library component types (use ONLY these exact names, or use custom: true):
+${validTypeList}, image
+
+CRITICAL FIX RULES:
+- Use ONLY the valid component types listed above. Do NOT invent component names like "headline", "text", "accent-line", "rectangle" etc. If you need something not in the list, use { "custom": true, "custom_prompt": "..." }.
+- gradient-background data uses "from" and "to" fields (not "colors"): { "type": "gradient-background", "data": { "from": "var(--mp-color-background)", "to": "var(--mp-color-surface)" } }
+- mesh-gradient data uses "colors" array: { "type": "mesh-gradient", "data": { "colors": ["var(--mp-color-background)", "var(--mp-color-primary)"] } }
 - Fix component positions that are off-canvas (must be within 0-${opts.canvas.width} x 0-${opts.canvas.height})
 - Fix missing or incorrect data props
 - Remove duplicate content across components
-- If a component type isn't working, swap it for a different one or make it custom
+- For text contrast: use white text (#ffffff) or var(--mp-color-text) on dark backgrounds. NEVER use dark text on dark backgrounds.
+- Do NOT bloat the scene by adding many components. Fix the existing ones or swap broken types for valid alternatives. Aim for 2-4 components per scene max.
 ${(opts.creativity ?? 0) >= 0.7 ? "\n- CRITICAL: At this creativity level, use ONLY custom components (custom: true). Do NOT add any library components. One custom component per scene that handles everything." : ""}
 
 Output valid JSON only. No markdown fences, no commentary.`;
@@ -991,6 +1000,25 @@ Output valid JSON only. No markdown fences, no commentary.`;
 
       if (!fixedPlan || !fixedPlan.components || fixedPlan.components.length === 0) {
         console.log(`  Critique fix-plan returned empty, keeping best (score ${bestScore})`);
+        break;
+      }
+
+      // Validate fix-plan component types against catalog
+      const fixValidTypes = new Set(opts.catalog.map(c => c.type));
+      fixValidTypes.add('image');
+      const validatedComps: any[] = [];
+      for (const comp of fixedPlan.components) {
+        if (comp.custom) {
+          validatedComps.push(comp);
+        } else if (comp.type && fixValidTypes.has(comp.type)) {
+          validatedComps.push(comp);
+        } else if (comp.type) {
+          console.log(`  Fix-plan: stripping invalid component type "${comp.type}"`);
+        }
+      }
+      fixedPlan.components = validatedComps;
+      if (fixedPlan.components.length === 0) {
+        console.log(`  Fix-plan: all components invalid after validation, keeping best (score ${bestScore})`);
         break;
       }
 

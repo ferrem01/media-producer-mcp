@@ -1,11 +1,21 @@
 {
-  "type": "object",
-  "properties": {
+  "type": "mesh-gradient",
+  "label": "Mesh Gradient",
+  "category": "effects",
+  "description": "Animated mesh gradient background with multiple color blobs. Use as z_index 0 background layer for organic, flowing backgrounds.",
+  "data": {
     "colors": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Array of CSS colors for gradient blobs"
+      "label": "Gradient Colors",
+      "required": true,
+      "placeholder": "[\"var(--mp-color-background)\", \"var(--mp-color-primary)\"]"
     },
-    "speed": { "type": "number", "default": 1, "description": "Animation speed multiplier" }
+    "speed": {
+      "type": "number",
+      "label": "Animation Speed Multiplier",
+      "optional": true,
+      "placeholder": "1"
+    }
   }
 }
