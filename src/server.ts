@@ -251,14 +251,7 @@ export function createMcpServer(): McpServer {
           trim_start: z.number().optional(),
           trim_end: z.number().optional(),
         })),
-        pip_segments: z.array(z.object({
-          start: z.number(),
-          end: z.number(),
-          position: z.enum(["bottom-right", "bottom-left", "top-right", "top-left"]).optional(),
-          shape: z.enum(["circle", "rounded-rect", "rect"]).optional(),
-          size: z.object({ width: z.number(), height: z.number() }).optional(),
-        })).optional(),
-      }).optional().describe("Speaker track: continuous speaker video as base layer with content overlaid on top"),
+      }).optional().describe("Speaker track: continuous speaker video as base layer with content overlaid on top. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to the string \"speaker\" — the render pipeline resolves it to the actual speaker video path automatically."),
     },
     async (params) => {
       if (params.speaker_track) {
@@ -364,14 +357,7 @@ export function createMcpServer(): McpServer {
           trim_start: z.number().optional(),
           trim_end: z.number().optional(),
         })).optional(),
-        pip_segments: z.array(z.object({
-          start: z.number(),
-          end: z.number(),
-          position: z.enum(["bottom-right", "bottom-left", "top-right", "top-left"]).optional(),
-          shape: z.enum(["circle", "rounded-rect", "rect"]).optional(),
-          size: z.object({ width: z.number(), height: z.number() }).optional(),
-        })).optional(),
-      }).optional().describe("Update speaker track configuration"),
+      }).optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time."),
     },
     async (params) => {
       // Overlay update
