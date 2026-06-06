@@ -21,6 +21,7 @@ interface WorkerArgs {
   width: number;
   height: number;
   format: string;
+  omitBackground?: boolean;
 }
 
 async function main() {
@@ -106,6 +107,7 @@ async function main() {
 
       const frameName = `frame-${String(frame).padStart(6, "0")}.${args.format}`;
       await page.screenshot({
+        omitBackground: args.omitBackground || false,
         path: path.join(args.outputDir, frameName),
         type: args.format as "png" | "jpeg",
       });

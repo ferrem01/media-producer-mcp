@@ -31,6 +31,8 @@ export interface CaptureOptions {
   format?: "png" | "jpeg";
   /** JPEG quality (0-100) */
   quality?: number;
+  /** Omit page background for transparent capture */
+  omitBackground?: boolean;
 }
 
 export interface CaptureResult {
@@ -57,6 +59,7 @@ export async function captureScene(options: CaptureOptions): Promise<CaptureResu
     width,
     height,
     format = "png",
+    omitBackground = false,
   } = options;
 
   const totalFrames = Math.ceil(duration * fps);
@@ -74,6 +77,7 @@ export async function captureScene(options: CaptureOptions): Promise<CaptureResu
     width,
     height,
     format,
+    omitBackground,
   }));
 
   // Spawn worker as child process
@@ -122,6 +126,8 @@ export async function captureSingleFrame(options: {
   height: number;
   format?: "png" | "jpeg";
   quality?: number;
+  /** Omit page background for transparent capture */
+  omitBackground?: boolean;
   /** Time in seconds to capture at (default: 0 for static, or midpoint) */
   atTime?: number;
 }): Promise<void> {
@@ -131,6 +137,7 @@ export async function captureSingleFrame(options: {
     width,
     height,
     format = "png",
+    omitBackground = false,
     quality,
     atTime,
   } = options;

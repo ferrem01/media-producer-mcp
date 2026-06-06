@@ -217,7 +217,7 @@ export async function extractFirstFrame(
 /**
  * Get the GSAP animation script for a transition type.
  */
-function getTransitionScript(type: string, duration: number, width: number = 1920): string {
+export function getTransitionScript(type: string, duration: number, width: number = 1920): string {
   switch (type) {
     case "crossfade":
       return `
@@ -376,7 +376,7 @@ function getTransitionScript(type: string, duration: number, width: number = 192
 /**
  * Load minimal GSAP source (just gsap.min.js) for transitions.
  */
-async function loadGsapMinimal(gsapDir: string): Promise<string> {
+export async function loadGsapMinimal(gsapDir: string): Promise<string> {
   const gsapPath = path.join(gsapDir, "gsap.min.js");
   try {
     return await fs.readFile(gsapPath, "utf-8");

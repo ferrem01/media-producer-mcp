@@ -18,7 +18,7 @@ import { assembleScene, type ComponentSource } from "./scene-assembler.js";
 import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, encodeGif, concatSegments } from "./encode.js";
 import { exportPdf } from "./pdf-export.js";
-import { renderTransition, extractFirstFrame, extractLastFrame } from "./transitions.js";
+import { renderTransition, extractFirstFrame, extractLastFrame, getTransitionScript, loadGsapMinimal } from "./transitions.js";
 // Critique now runs during generate, not render
 import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
@@ -784,12 +784,11 @@ async function renderSceneTransparentFrames(
 }
 
 /**
- * Render a GSAP transition as PNG frames for the speaker track pipeline.
+ * Render a GSAP transition as transparent PNG frames for the speaker track pipeline.
  *
- * Uses the standard renderTransition() to produce an MP4, then extracts
- * the frames as PNGs using ffmpeg. The transition content renders opaque
- * (covering the speaker during the transition) which is correct behaviour:
- * the visual crossfade happens in the content layer; speaker audio plays through.
+ * Builds the transition HTML with a transparent background and captures
+ * directly as PNGs with omitBackground, preserving alpha for compositing
+ * onto the speaker base layer.
  */
 async function renderTransitionTransparent(opts: {
   type: string;
@@ -804,30 +803,70 @@ async function renderTransitionTransparent(opts: {
 }): Promise<{ framesDir: string; frameCount: number }> {
   const { type, duration, frameA, frameB, width, height, fps, workDir, gsapDir } = opts;
 
-  // Render transition as MP4 using the standard GSAP pipeline
-  const transitionMp4 = await renderTransition({
-    type: type as any,
+  // Build transition HTML with transparent background
+  const frameABase64 = (await fs.readFile(frameA)).toString("base64");
+  const frameBBase64 = (await fs.readFile(frameB)).toString("base64");
+  const gsapSource = await loadGsapMinimal(gsapDir);
+  const animScript = getTransitionScript(type, duration, width);
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: ${width}px;
+  height: ${height}px;
+  overflow: hidden;
+  background: transparent;
+}
+#frameA, #frameB {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+</style>
+<script>
+${gsapSource}
+</` + `script>
+</head>
+<body>
+<img id="frameA" src="data:image/png;base64,${frameABase64}">
+<img id="frameB" src="data:image/png;base64,${frameBBase64}">
+<script>
+(function() {
+  var imgA = document.getElementById('frameA');
+  var imgB = document.getElementById('frameB');
+  var dur = ${duration};
+  var tl = gsap.timeline({ paused: true });
+  ${animScript}
+  window.__MP_TIMELINE = tl;
+  window.__MP_DURATION = dur;
+  window.__MP_READY = true;
+})();
+</` + `script>
+</body>
+</html>`;
+
+  const htmlPath = path.join(workDir, "transition.html");
+  await fs.writeFile(htmlPath, html);
+
+  // Capture directly as transparent PNGs (0-based frame numbering)
+  const framesDir = path.join(workDir, "content_frames");
+  await captureScene({
+    htmlPath,
+    outputDir: framesDir,
+    fps,
     duration,
-    frameA,
-    frameB,
     width,
     height,
-    fps,
-    workDir,
-    gsapDir,
+    format: "png",
+    omitBackground: true,
   });
-
-  // Extract frames from the transition MP4 as PNGs
-  const framesDir = path.join(workDir, "content_frames");
-  await fs.mkdir(framesDir, { recursive: true });
-
-  await execFileAsync("ffmpeg", [
-    "-y",
-    "-i", transitionMp4,
-    "-vsync", "cfr",
-    "-r", String(fps),
-    path.join(framesDir, "frame-%06d.png"),
-  ], { maxBuffer: 50 * 1024 * 1024 });
 
   const frameCount = Math.ceil(duration * fps);
   return { framesDir, frameCount };
