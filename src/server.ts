@@ -807,6 +807,42 @@ export function createMcpServer(): McpServer {
                 }
               } catch { /* probe failed, skip metadata */ }
 
+              // ── Normalize video keyframes for seekability ──
+              // Chromium headless can only seek to keyframes. Re-encode if too sparse.
+              if (assetDuration && assetDuration > 0.5) {
+                try {
+                  const { execFile: execFileCb2 } = await import("node:child_process");
+                  const { promisify: promisify2 } = await import("node:util");
+                  const execFileP2 = promisify2(execFileCb2);
+                  const kfProbe = await execFileP2("ffprobe", [
+                    "-v", "quiet", "-select_streams", "v",
+                    "-show_entries", "packet=flags",
+                    "-of", "csv", filePath,
+                  ]);
+                  const keyframeCount = (kfProbe.stdout.match(/K/g) || []).length;
+                  const totalFrames = (kfProbe.stdout.trim().split("\n") || []).length;
+                  const keyframeInterval = totalFrames > 0 ? totalFrames / Math.max(keyframeCount, 1) : 0;
+                  // Re-encode if keyframes are more than 1 second apart
+                  if (keyframeInterval > 30 || keyframeCount <= 1) {
+                    console.log(`  Video keyframe normalization: ${keyframeCount} keyframes in ${totalFrames} frames (interval: ${keyframeInterval.toFixed(0)}). Re-encoding with -g 15...`);
+                    const tmpPath = filePath + ".tmp.mp4";
+                    await execFileP2("ffmpeg", [
+                      "-y", "-i", filePath,
+                      "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                      "-g", "15", "-keyint_min", "15",
+                      "-c:a", "aac", "-b:a", "192k",
+                      "-movflags", "+faststart",
+                      tmpPath,
+                    ], { maxBuffer: 50 * 1024 * 1024 });
+                    const fsMod = await import("node:fs/promises");
+                    await fsMod.rename(tmpPath, filePath);
+                    console.log(`  Re-encoded with proper keyframes: ${filePath}`);
+                  }
+                } catch (kfErr: any) {
+                  console.warn("Keyframe normalization failed (non-fatal):", kfErr.message);
+                }
+              }
+
               const brandAsset: any = {
                 name: params.name,
                 url: servedUrl,
@@ -856,6 +892,41 @@ export function createMcpServer(): McpServer {
         await fs.writeFile(filePath, buffer);
 
         const servedUrl = `/assets/${params.tenant_id}/projects/${params.project_id}/assets/${filename}`;
+
+        // ── Normalize video keyframes for seekability ──
+        const ext = path.extname(filename).toLowerCase();
+        if (['.mp4', '.mov', '.webm', '.mkv'].includes(ext)) {
+          try {
+            const { execFile: execFileCb3 } = await import("node:child_process");
+            const { promisify: promisify3 } = await import("node:util");
+            const execFileP3 = promisify3(execFileCb3);
+            const kfProbe = await execFileP3("ffprobe", [
+              "-v", "quiet", "-select_streams", "v",
+              "-show_entries", "packet=flags",
+              "-of", "csv", filePath,
+            ]);
+            const keyframeCount = (kfProbe.stdout.match(/K/g) || []).length;
+            const totalFrames = (kfProbe.stdout.trim().split("\n") || []).length;
+            const keyframeInterval = totalFrames > 0 ? totalFrames / Math.max(keyframeCount, 1) : 0;
+            if (keyframeInterval > 30 || keyframeCount <= 1) {
+              console.log(`  Project asset keyframe normalization: ${keyframeCount} keyframes in ${totalFrames} frames. Re-encoding...`);
+              const tmpPath = filePath + ".tmp.mp4";
+              await execFileP3("ffmpeg", [
+                "-y", "-i", filePath,
+                "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                "-g", "15", "-keyint_min", "15",
+                "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart",
+                tmpPath,
+              ], { maxBuffer: 50 * 1024 * 1024 });
+              const fsMod = await import("node:fs/promises");
+              await fsMod.rename(tmpPath, filePath);
+            }
+          } catch (kfErr: any) {
+            console.warn("Keyframe normalization failed (non-fatal):", kfErr.message);
+          }
+        }
+
         return ok({
           status: "uploaded",
           name: params.name,
