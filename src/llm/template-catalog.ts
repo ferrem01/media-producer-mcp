@@ -532,6 +532,7 @@ export const SCENE_TEMPLATES: SceneTemplate[] = [
       { name: "page_title", type: "string", required: false, description: "Page title in browser tab" },
       { name: "headline", type: "string", required: true, description: "Feature or section name", example: "Real-Time Analytics" },
       { name: "body", type: "string", required: false, description: "1-2 sentence feature description" },
+      { name: "pip_source", type: "string", required: false, description: "Set to \"speaker\" when speaker_track is active; pipeline resolves to actual video path automatically" },
     ],
     duration: [5, 8],
     file: "S2-screencast-pip.scene.html",

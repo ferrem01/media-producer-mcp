@@ -216,9 +216,6 @@ function buildSingleClipArgs(
  *   - Input 1: PNG sequence frames (content with alpha transparency)
  *   - Output: speaker plays through with content overlaid
  *
- * For v1, PiP is not supported in the speaker track path. If pip_segments exist
- * they are silently ignored here (handled by the old overlay system if needed).
- *
  * @returns Path to the output mp4 (= opts.outputPath)
  */
 export async function compositeContentOverlay(opts: {
@@ -226,7 +223,6 @@ export async function compositeContentOverlay(opts: {
   contentFramesDir: string;
   fps: number;
   outputPath: string;
-  pipSegments?: SpeakerTrack["pip_segments"];
   width: number;
   height: number;
 }): Promise<string> {

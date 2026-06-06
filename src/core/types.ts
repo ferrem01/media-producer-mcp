@@ -249,14 +249,4 @@ export interface SpeakerTrackClip {
 export interface SpeakerTrack {
   /** Ordered list of speaker video clips played end-to-end */
   clips: SpeakerTrackClip[];
-  /** PiP segments for scenes where speaker should be small circle instead of full-behind */
-  pip_segments?: Array<{
-    /** Start time in the OUTPUT timeline */
-    start: number;
-    /** End time in the OUTPUT timeline */
-    end: number;
-    position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
-    shape?: "circle" | "rounded-rect" | "rect";
-    size?: { width: number; height: number };
-  }>;
 }

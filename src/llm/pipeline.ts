@@ -74,7 +74,6 @@ export interface PipelineOpts {
   speaker_start?: number;
   speaker_trim_start?: number;
   speaker_trim_end?: number;
-  speaker_pip_scenes?: number[];
 }
 
 export interface PipelineResult {
@@ -1395,7 +1394,7 @@ async function runUnifiedPipeline(
 
   // Apply speaker track scene-level settings after all scenes are generated
   if (project.speaker_track) {
-    const FULL_FRAME_TYPES = new Set(["screencast", "browser-frame", "video", "image-showcase"]);
+    const FULL_FRAME_TYPES = new Set(["screencast", "browser-frame", "video", "image-showcase", "S2-screencast-pip"]);
     for (var si = 0; si < project.scenes.length; si++) {
       const scene = project.scenes[si];
       if (!scene.content_region) {
@@ -1407,30 +1406,17 @@ async function runUnifiedPipeline(
       }
     }
 
-    // Build pip_segments from speaker_pip_scenes
-    if (opts.speaker_pip_scenes && opts.speaker_pip_scenes.length > 0) {
-      const pipSegments: Array<{
-        start: number;
-        end: number;
-        position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
-        shape?: "circle" | "rounded-rect" | "rect";
-        size?: { width: number; height: number };
-      }> = [];
-      let t = 0;
-      for (let pi = 0; pi < project.scenes.length; pi++) {
-        const sceneDuration = project.scenes[pi].duration_seconds;
-        if (opts.speaker_pip_scenes.includes(pi)) {
-          pipSegments.push({
-            start: t,
-            end: t + sceneDuration,
-            position: "bottom-right" as const,
-            shape: "circle" as const,
-            size: { width: 240, height: 240 },
-          });
+    // Set pip_source: "speaker" on S2-screencast-pip scenes so the pipeline
+    // resolves the speaker video path before rendering.
+    for (const scene of project.scenes) {
+      for (const comp of scene.components) {
+        if (comp.type === "S2-screencast-pip") {
+          const d = comp.data as Record<string, unknown>;
+          if (!d.pip_source) {
+            d.pip_source = "speaker";
+          }
         }
-        t += sceneDuration;
       }
-      project.speaker_track.pip_segments = pipSegments;
     }
   }
 

@@ -500,6 +500,34 @@ async function renderVideoWithSpeakerTrack(
   });
   console.log(`  Speaker base: ${speakerBasePath}`);
 
+  // ── 2b. Resolve "speaker" source references in scene component data ──
+  // Any component data value equal to "speaker" is replaced with the actual
+  // file:// path to the speaker base video. `start_at` is set to the scene's
+  // cumulative start time so the capture worker seeks to the right position.
+  const speakerFileUrl = `file://${path.resolve(speakerBasePath)}`;
+  {
+    let cumulativeTime = 0;
+    for (const scene of project.scenes) {
+      for (const comp of scene.components) {
+        const dataCopy = comp.data as Record<string, unknown>;
+        for (const [key, val] of Object.entries(dataCopy)) {
+          if (val === "speaker") {
+            dataCopy[key] = speakerFileUrl;
+          }
+        }
+        // If any source key was replaced, set start_at for timeline sync
+        if (
+          dataCopy.src === speakerFileUrl ||
+          dataCopy.pip_source === speakerFileUrl ||
+          dataCopy.source === speakerFileUrl
+        ) {
+          dataCopy.start_at = cumulativeTime;
+        }
+      }
+      cumulativeTime += scene.duration_seconds;
+    }
+  }
+
   // ── 3. Render all scenes as transparent PNGs ──
   // Each scene is rendered with transparent_background = true.
   // The scene-worker leaves frames in {sceneDir}/frames/ when captureAsPng is set.
@@ -617,36 +645,11 @@ async function renderVideoWithSpeakerTrack(
     contentFramesDir,
     fps,
     outputPath,
-    pipSegments: speaker_track.pip_segments,
     width,
     height,
   });
 
-  // ── 6b. PiP overlay pass: add speaker PiP circle during specified segments ──
-  if (speaker_track.pip_segments && speaker_track.pip_segments.length > 0) {
-    console.log(`\n[speaker-track] Step 6: Adding PiP overlay (${speaker_track.pip_segments.length} segment(s))...`);
-    const pipOverlayOutput = outputPath.replace(/\.mp4$/, "-pip.mp4");
-    const pipSegments: OverlaySegment[] = speaker_track.pip_segments.map(seg => ({
-      start: seg.start,
-      end: seg.end,
-      mode: "pip" as const,
-      position: (seg.position || "bottom-right") as OverlaySegment["position"],
-      shape: (seg.shape || "circle") as OverlaySegment["shape"],
-      size: seg.size || { width: 240, height: 240 },
-    }));
-    await compositeOverlays({
-      videoPath: outputPath,
-      speakerPath: speakerBasePath,
-      segments: pipSegments,
-      outputPath: pipOverlayOutput,
-      width,
-      height,
-      skipAudio: true,
-    });
-    await fs.rename(pipOverlayOutput, outputPath);
-  }
-
-  // ── 7. Audio mixing (project-level background music / voiceover) ──
+    // ── 7. Audio mixing (project-level background music / voiceover) ──
   const totalProjectDuration = scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
   if (project.audio && project.audio.tracks.length > 0) {
     console.log(`

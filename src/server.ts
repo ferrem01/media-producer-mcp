@@ -1084,7 +1084,7 @@ export function createMcpServer(): McpServer {
       speaker_start: z.number().optional().describe("Start offset in seconds into the speaker video (skip dead air at start)"),
       speaker_trim_start: z.number().optional().describe("Trim: only use speaker video from this timestamp"),
       speaker_trim_end: z.number().optional().describe("Trim: stop using speaker video at this timestamp"),
-      speaker_pip_scenes: z.array(z.number()).optional().describe("Scene indices (0-based) where speaker should appear as small PiP circle instead of full-behind. Those scenes render with their own opaque background."),
+
     },
     async (params) => {
       // Auth check
@@ -1178,7 +1178,6 @@ export function createMcpServer(): McpServer {
               speaker_start: params.speaker_start,
               speaker_trim_start: params.speaker_trim_start,
               speaker_trim_end: params.speaker_trim_end,
-              speaker_pip_scenes: params.speaker_pip_scenes,
             });
 
             // If pipeline created a project, track the projectId
