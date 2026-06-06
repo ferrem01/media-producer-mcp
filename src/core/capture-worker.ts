@@ -94,12 +94,11 @@ async function main() {
           videos.forEach((v) => {
             const startAt = parseFloat(v.getAttribute("data-start-at") || "0");
             const targetTime = Math.max(0, t - startAt);
+            // Always wait for seeked event after setting currentTime.
+            // Even with readyState >= 3, the frame is not decoded until seeked fires.
+            v.addEventListener("seeked", () => done(), { once: true });
+            setTimeout(() => done(), 2000);
             v.currentTime = targetTime;
-            if (v.readyState >= 3) { done(); }
-            else {
-              v.addEventListener("seeked", () => done(), { once: true });
-              setTimeout(() => done(), 2000);
-            }
           });
         }),
         time

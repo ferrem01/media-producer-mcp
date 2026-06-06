@@ -174,14 +174,12 @@ export async function captureSingleFrame(options: {
             const targetTime = Math.max(0, seekTime - startAt);
 
             const seekAndWait = () => {
+              // Always wait for seeked event after setting currentTime.
+              // Even with readyState >= 3, the new frame is not decoded until seeked fires.
+              v.addEventListener("seeked", () => done(), { once: true });
+              v.addEventListener("error", () => done(), { once: true });
+              setTimeout(() => done(), 5000);
               v.currentTime = targetTime;
-              if (v.readyState >= 3) {
-                done();
-              } else {
-                v.addEventListener("seeked", () => done(), { once: true });
-                v.addEventListener("error", () => done(), { once: true });
-                setTimeout(() => done(), 5000);
-              }
             };
 
             // Wait for video to have enough data before seeking
