@@ -10,6 +10,7 @@ import { projectDir, projectOutputDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { llmConfigFromEnv } from "../llm/client.js";
 import path from "node:path";
+import fs from "node:fs/promises";
 import { TraceBuilder } from "../trace/index.js";
 import { queueJob, getJob, listAllJobs, type Job } from "./job-queue.js";
 
@@ -131,6 +132,7 @@ async function runRender(
     job.progress = { step: "rendering", percent: 0 };
 
     const ext = project.format === "video" || project.format === "slideshow" ? "mp4" : "png";
+    await fs.mkdir(projectOutputDir(job.tenantId, projectId), { recursive: true });
     const outputPath = path.join(
       projectOutputDir(job.tenantId, projectId),
       `output.${ext}`,
