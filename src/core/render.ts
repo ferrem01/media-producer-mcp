@@ -724,52 +724,6 @@ async function renderSceneTransparentFrames(
   const sceneDir = path.join(workDir, `speaker_scene_${sceneIndex}`);
   await fs.mkdir(sceneDir, { recursive: true });
 
-  // ── Video bypass: brand intro/outro videos can't be captured via Playwright ──
-  // Chromium headless cannot seek video elements, so we extract frames with ffmpeg instead.
-  if (scene.components.length === 1 && scene.components[0].type === "video" && scene.components[0].data?.src) {
-    const videoSrc = scene.components[0].data.src as string;
-    console.log(`  Scene ${sceneIndex + 1}: video component, extracting frames via ffmpeg (bypass Playwright)`);
-    const framesDir = path.join(sceneDir, "frames");
-    await fs.mkdir(framesDir, { recursive: true });
-
-    // Resolve the video source to a local file
-    const srcPath = path.join(sceneDir, "video_source.mp4");
-    if (videoSrc.startsWith("http://") || videoSrc.startsWith("https://")) {
-      const res = await fetch(videoSrc);
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${videoSrc}`);
-      await fs.writeFile(srcPath, Buffer.from(await res.arrayBuffer()));
-    } else if (videoSrc.startsWith("/")) {
-      const brandMatch = videoSrc.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);
-      if (brandMatch) {
-        const localPath = path.join(config.dataDir, brandMatch[1], "brand-kit", "assets", brandMatch[2]);
-        await fs.copyFile(localPath, srcPath);
-      } else {
-        const localRes = await fetch(`http://localhost:${config.port}${videoSrc}`);
-        if (!localRes.ok) throw new Error(`HTTP ${localRes.status}: ${videoSrc}`);
-        await fs.writeFile(srcPath, Buffer.from(await localRes.arrayBuffer()));
-      }
-    } else {
-      // Absolute filesystem path
-      await fs.copyFile(videoSrc, srcPath);
-    }
-
-    // Extract frames as PNGs, scaled to project canvas
-    const frameCount = Math.ceil(scene.duration_seconds * project.canvas.fps);
-    await execFileAsync("ffmpeg", [
-      "-y",
-      "-i", srcPath,
-      "-vf", `scale=${project.canvas.width}:${project.canvas.height}:force_original_aspect_ratio=decrease,pad=${project.canvas.width}:${project.canvas.height}:(ow-iw)/2:(oh-ih)/2:black`,
-      "-r", String(project.canvas.fps),
-      "-frames:v", String(frameCount),
-      "-start_number", "0",
-      path.join(framesDir, "frame-%06d.png"),
-    ], { maxBuffer: 50 * 1024 * 1024 });
-
-    await fs.unlink(srcPath).catch(() => {});
-    console.log(`  PNG frames ready for speaker track compositing: ${framesDir}`);
-    return { framesDir, frameCount };
-  }
-
   // Clone project and set transparent background for this scene.
   // Only force transparency if the scene hasn't explicitly set transparent_background = false.
   // Scenes that want opaque backgrounds (e.g. screencast, Brady grid) set this to false.

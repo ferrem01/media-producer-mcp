@@ -828,8 +828,10 @@ export function createMcpServer(): McpServer {
                     const tmpPath = filePath + ".tmp.mp4";
                     await execFileP2("ffmpeg", [
                       "-y", "-i", filePath,
-                      "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                      "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.0",
+                      "-preset", "medium", "-crf", "18",
                       "-g", "15", "-keyint_min", "15",
+                      "-pix_fmt", "yuv420p",
                       "-c:a", "aac", "-b:a", "192k",
                       "-movflags", "+faststart",
                       tmpPath,
@@ -913,8 +915,10 @@ export function createMcpServer(): McpServer {
               const tmpPath = filePath + ".tmp.mp4";
               await execFileP3("ffmpeg", [
                 "-y", "-i", filePath,
-                "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.0",
+                "-preset", "medium", "-crf", "18",
                 "-g", "15", "-keyint_min", "15",
+                "-pix_fmt", "yuv420p",
                 "-c:a", "aac", "-b:a", "192k",
                 "-movflags", "+faststart",
                 tmpPath,

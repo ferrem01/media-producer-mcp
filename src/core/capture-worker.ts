@@ -42,6 +42,7 @@ async function main() {
       "--disable-dev-shm-usage",
       "--no-sandbox",
       "--disable-setuid-sandbox",
+      "--allow-file-access-from-files",
     ],
   });
 

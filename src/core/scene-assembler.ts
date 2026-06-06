@@ -215,18 +215,40 @@ function resolveAssetUrls(data: Record<string, any>): Record<string, any> {
   const resolved = { ...data };
   for (const [key, val] of Object.entries(resolved)) {
     if (typeof val === "string" && val.startsWith("/assets/")) {
-      resolved[key] = `${baseUrl}${val}`;
+      resolved[key] = resolveAssetPath(val);
     } else if (typeof val === "string" && val.startsWith("/api/")) {
       resolved[key] = `${baseUrl}${val}`;
     } else if (Array.isArray(val)) {
       resolved[key] = val.map((v: any) =>
-        typeof v === "string" && (v.startsWith("/assets/") || v.startsWith("/api/"))
+        typeof v === "string" && v.startsWith("/assets/")
+          ? resolveAssetPath(v)
+          : typeof v === "string" && v.startsWith("/api/")
           ? `${baseUrl}${v}`
           : v
       );
     }
   }
   return resolved;
+}
+
+/**
+ * Resolve /assets/ URL paths to file:// URIs pointing at the actual filesystem path.
+ * This allows Playwright to load and seek videos properly (HTTP video seeking fails
+ * in headless Chromium). Falls back to http://localhost for unrecognized patterns.
+ */
+function resolveAssetPath(urlPath: string): string {
+  // /assets/{tenant}/brand-kit/{rest} -> {dataDir}/{tenant}/brand-kit/assets/{rest}
+  const brandMatch = urlPath.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);
+  if (brandMatch) {
+    return `file://${path.resolve(config.dataDir, brandMatch[1], "brand-kit", "assets", brandMatch[2])}`;
+  }
+  // /assets/{tenant}/projects/{projectId}/assets/{rest} -> {dataDir}/{tenant}/projects/{projectId}/assets/{rest}
+  const projMatch = urlPath.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
+  if (projMatch) {
+    return `file://${path.resolve(config.dataDir, projMatch[1], "projects", projMatch[2], "assets", projMatch[3])}`;
+  }
+  // Fallback: HTTP
+  return `http://localhost:${config.port}${urlPath}`;
 }
 
 /**
@@ -355,7 +377,9 @@ function generateBrandCSS(brand: BrandKit, sceneBackground?: string): { css: str
   const bgUrl = pickBrandBackground(brand, sceneIsDark);
   if (bgUrl) {
     // Resolve relative URLs to absolute for file:// protocol
-    const resolvedUrl = bgUrl.startsWith('/assets/') || bgUrl.startsWith('/api/')
+    const resolvedUrl = bgUrl.startsWith('/assets/')
+      ? resolveAssetPath(bgUrl)
+      : bgUrl.startsWith('/api/')
       ? `http://localhost:${config.port}${bgUrl}`
       : bgUrl;
     vars.push(`  --mp-bg-image: url(${resolvedUrl});`);
