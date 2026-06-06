@@ -724,9 +724,13 @@ async function renderSceneTransparentFrames(
   const sceneDir = path.join(workDir, `speaker_scene_${sceneIndex}`);
   await fs.mkdir(sceneDir, { recursive: true });
 
-  // Clone project and force transparent background for this scene
+  // Clone project and set transparent background for this scene.
+  // Only force transparency if the scene hasn't explicitly set transparent_background = false.
+  // Scenes that want opaque backgrounds (e.g. screencast, Brady grid) set this to false.
   const projectClone = JSON.parse(JSON.stringify(project));
-  projectClone.scenes[sceneIndex].transparent_background = true;
+  if (projectClone.scenes[sceneIndex].transparent_background !== false) {
+    projectClone.scenes[sceneIndex].transparent_background = true;
+  }
 
   const projectJsonPath = path.join(sceneDir, "project.json");
   await fs.writeFile(projectJsonPath, JSON.stringify(projectClone));
