@@ -229,4 +229,34 @@ export interface Project {
   overlays?: Overlay[];
   audio?: AudioConfig;
   assets?: Asset[];
+  /** New continuous speaker track architecture (replaces per-scene full-behind overlay) */
+  speaker_track?: SpeakerTrack;
+}
+
+// ── Speaker Track ──
+
+export interface SpeakerTrackClip {
+  /** Path to the speaker video file */
+  source: string;
+  /** Start offset into the source video in seconds (skip dead air) */
+  start?: number;
+  /** Trim: only use video from this timestamp */
+  trim_start?: number;
+  /** Trim: stop using video at this timestamp */
+  trim_end?: number;
+}
+
+export interface SpeakerTrack {
+  /** Ordered list of speaker video clips played end-to-end */
+  clips: SpeakerTrackClip[];
+  /** PiP segments for scenes where speaker should be small circle instead of full-behind */
+  pip_segments?: Array<{
+    /** Start time in the OUTPUT timeline */
+    start: number;
+    /** End time in the OUTPUT timeline */
+    end: number;
+    position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
+    shape?: "circle" | "rounded-rect" | "rect";
+    size?: { width: number; height: number };
+  }>;
 }

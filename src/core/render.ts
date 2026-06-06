@@ -25,6 +25,7 @@ import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
 import { compositeOverlays, compositeFullBehind, mixSpeakerAudio, compositeContentOntoSpeaker, type OverlaySegment } from "./overlay-compositor.js";
+import { buildSpeakerBase, compositeContentOverlay } from "./speaker-track.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
 export interface RenderOptions {
@@ -567,6 +568,372 @@ function buildFullBehindSpeakerMap(project: Project): Map<number, string> {
 }
 
 /**
+ * Render a video output using the continuous speaker track architecture.
+ *
+ * Two-layer pipeline:
+ *   1. Build a single continuous speaker base video (never sliced/seeked per scene)
+ *   2. Render ALL scene content as transparent PNGs in one continuous sequence
+ *   3. Composite in a single ffmpeg pass: speaker (base) + content (overlay)
+ *
+ * This eliminates audio drift caused by per-scene seeks in the old full-behind approach.
+ */
+async function renderVideoWithSpeakerTrack(
+  project: Project,
+  workDir: string,
+  gsapDir: string,
+  outputPath: string,
+  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
+  extraComponentDirs?: string[],
+): Promise<RenderResult> {
+  const startTime = Date.now();
+  const { canvas, scenes, speaker_track } = project;
+  if (!speaker_track) throw new Error("renderVideoWithSpeakerTrack called without speaker_track");
+
+  const fps = canvas.fps;
+  const width = canvas.width;
+  const height = canvas.height;
+
+  // ── 1. Calculate total duration (scenes + transitions) ──
+  // We need to know the transition durations to compute total frame count.
+  // Transitions are rendered as their own mini-segments (GSAP HTML scenes).
+  // The total content duration = sum(scene durations) + sum(transition durations).
+  let totalDuration = 0;
+  for (const scene of scenes) {
+    totalDuration += scene.duration_seconds;
+  }
+  // Add transition durations
+  for (let i = 1; i < scenes.length; i++) {
+    const t = scenes[i].transition_in;
+    if (t && t.type !== "none") {
+      totalDuration += t.duration_seconds;
+    }
+  }
+  const totalFrameCount = Math.ceil(totalDuration * fps);
+
+  console.log(`
+[speaker-track] Pipeline start`);
+  console.log(`  Scenes: ${scenes.length}, total duration: ${totalDuration.toFixed(2)}s, frames: ${totalFrameCount}`);
+
+  // ── 2. Build continuous speaker base video ──
+  const speakerBaseDir = path.join(workDir, "speaker_base");
+  await fs.mkdir(speakerBaseDir, { recursive: true });
+  const speakerBasePath = path.join(speakerBaseDir, "speaker_base.mp4");
+
+  console.log(`
+[speaker-track] Step 1: Building speaker base video...`);
+  await buildSpeakerBase({
+    speakerTrack: speaker_track,
+    totalDuration,
+    width,
+    height,
+    outputPath: speakerBasePath,
+    workDir: speakerBaseDir,
+  });
+  console.log(`  Speaker base: ${speakerBasePath}`);
+
+  // ── 3. Render all scenes as transparent PNGs ──
+  // Each scene is rendered with transparent_background = true.
+  // The scene-worker leaves frames in {sceneDir}/frames/ when captureAsPng is set.
+  console.log(`
+[speaker-track] Step 2: Rendering ${scenes.length} scene(s) as transparent PNGs...`);
+
+  const sceneFrameDirs: Array<{ framesDir: string; frameCount: number }> = [];
+
+  // Render scenes in parallel batches (same concurrency as normal pipeline)
+  const concurrency = config.renderConcurrency;
+  for (let batch = 0; batch < scenes.length; batch += concurrency) {
+    const batchEnd = Math.min(batch + concurrency, scenes.length);
+    const promises: Promise<{ framesDir: string; frameCount: number }>[] = [];
+
+    for (let idx = batch; idx < batchEnd; idx++) {
+      promises.push(renderSceneTransparentFrames(project, idx, workDir, critiqueOpts, extraComponentDirs));
+    }
+
+    const batchResults = await Promise.all(promises);
+    for (const r of batchResults) {
+      sceneFrameDirs.push(r);
+    }
+  }
+
+  // ── 4. Render transitions as transparent PNGs ──
+  // For each transition between scenes i-1 and i, we render the GSAP transition
+  // using the last frame of scene i-1 and first frame of scene i.
+  // Transition frames are transparent (content crossfade) -- speaker plays through.
+  console.log(`
+[speaker-track] Step 3: Rendering transitions as transparent PNGs...`);
+
+  // We need scene preview frames (last of prev, first of next) for transition rendering.
+  // Build opaque snapshots from the transparent frames for the GSAP transition engine
+  // (it expects opaque PNG inputs -- the frames represent content, not speaker).
+  const transitionFrameDirs: Array<{ framesDir: string; frameCount: number } | null> = [];
+
+  for (let i = 1; i < scenes.length; i++) {
+    const scene = scenes[i];
+    const t = scene.transition_in;
+    if (!t || t.type === "none") {
+      transitionFrameDirs.push(null);
+      continue;
+    }
+
+    const transWorkDir = path.join(workDir, `speaker_transition_${i - 1}_${i}`);
+    await fs.mkdir(transWorkDir, { recursive: true });
+
+    // Extract last/first frames from the transparent scene PNG sequences.
+    // The transition HTML renders content-to-content crossfade (no speaker).
+    const prevSceneFrames = sceneFrameDirs[i - 1];
+    const currSceneFrames = sceneFrameDirs[i];
+
+    const prevFrameCount = prevSceneFrames.frameCount;
+    const lastFrameSrc = path.join(prevSceneFrames.framesDir, `frame-${String(prevFrameCount - 1).padStart(6, "0")}.png`);
+    const firstFrameSrc = path.join(currSceneFrames.framesDir, `frame-${String(0).padStart(6, "0")}.png`);
+
+    const lastFrameDst = path.join(transWorkDir, "frameA.png");
+    const firstFrameDst = path.join(transWorkDir, "frameB.png");
+
+    await fs.copyFile(lastFrameSrc, lastFrameDst);
+    await fs.copyFile(firstFrameSrc, firstFrameDst);
+
+    console.log(`  Transition ${i - 1}->${i}: ${t.type} (${t.duration_seconds}s)`);
+    const transitionFramesInfo = await renderTransitionTransparent({
+      type: t.type,
+      duration: t.duration_seconds,
+      frameA: lastFrameDst,
+      frameB: firstFrameDst,
+      width,
+      height,
+      fps,
+      workDir: transWorkDir,
+      gsapDir,
+    });
+
+    transitionFrameDirs.push(transitionFramesInfo);
+  }
+
+  // ── 5. Stitch all frames into one continuous numbered sequence ──
+  console.log(`
+[speaker-track] Step 4: Stitching frames into continuous sequence...`);
+  const contentFramesDir = path.join(workDir, "speaker_content_frames");
+  await fs.mkdir(contentFramesDir, { recursive: true });
+
+  let globalFrameIdx = 0;
+  for (let i = 0; i < scenes.length; i++) {
+    // Copy scene frames
+    const { framesDir, frameCount } = sceneFrameDirs[i];
+    for (let f = 0; f < frameCount; f++) {
+      const src = path.join(framesDir, `frame-${String(f).padStart(6, "0")}.png`);
+      const dst = path.join(contentFramesDir, `frame-${String(globalFrameIdx).padStart(6, "0")}.png`);
+      await fs.copyFile(src, dst);
+      globalFrameIdx++;
+    }
+
+    // Copy transition frames (after this scene, before scene i+1)
+    if (i < transitionFrameDirs.length && transitionFrameDirs[i]) {
+      const trans = transitionFrameDirs[i]!;
+      for (let f = 0; f < trans.frameCount; f++) {
+        const src = path.join(trans.framesDir, `frame-${String(f).padStart(6, "0")}.png`);
+        const dst = path.join(contentFramesDir, `frame-${String(globalFrameIdx).padStart(6, "0")}.png`);
+        await fs.copyFile(src, dst);
+        globalFrameIdx++;
+      }
+    }
+  }
+
+  console.log(`  Total frames stitched: ${globalFrameIdx} (expected ~${totalFrameCount})`);
+
+  // ── 6. Single-pass composite: speaker base + content overlay ──
+  console.log(`
+[speaker-track] Step 5: Compositing content overlay onto speaker base...`);
+  await compositeContentOverlay({
+    speakerVideoPath: speakerBasePath,
+    contentFramesDir,
+    fps,
+    outputPath,
+    pipSegments: speaker_track.pip_segments,
+    width,
+    height,
+  });
+
+  // ── 7. Audio mixing (project-level background music / voiceover) ──
+  const totalProjectDuration = scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
+  if (project.audio && project.audio.tracks.length > 0) {
+    console.log(`
+[speaker-track] Mixing ${project.audio.tracks.length} audio track(s)...`);
+    const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
+    const audioTracks = project.audio.tracks.map((t) => ({
+      path: t.source,
+      type: t.type,
+      volume: t.volume,
+      startTime: t.start_time,
+      fadeIn: t.fade_in,
+      fadeOut: t.fade_out,
+      loop: t.loop,
+    }));
+
+    let duckingOpts: Parameters<typeof mixAudio>[0]["ducking"] = undefined;
+    if (project.audio.ducking?.enabled) {
+      const duckTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.duck_track);
+      const triggerTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.trigger_track);
+      if (duckTrackObj && triggerTrackObj) {
+        duckingOpts = {
+          duckTrack: duckTrackObj.source,
+          triggerTrack: triggerTrackObj.source,
+          duckedVolume: project.audio.ducking.ducked_volume,
+          attack: project.audio.ducking.attack ?? 0.3,
+          release: project.audio.ducking.release ?? 0.5,
+        };
+      }
+    }
+
+    await mixAudio({
+      videoPath: outputPath,
+      outputPath: audioOutput,
+      tracks: audioTracks,
+      ducking: duckingOpts,
+      totalDuration: totalProjectDuration,
+    });
+    await fs.rename(audioOutput, outputPath);
+  }
+
+  // Clean up intermediate files
+  await fs.rm(speakerBaseDir, { recursive: true, force: true }).catch(() => {});
+  await fs.rm(contentFramesDir, { recursive: true, force: true }).catch(() => {});
+
+  const durationMs = Date.now() - startTime;
+  console.log(`
+[speaker-track] Render complete: ${outputPath}`);
+  console.log(`  Total frames: ${globalFrameIdx}`);
+  console.log(`  Total time: ${(durationMs / 1000).toFixed(1)}s`);
+
+  return {
+    outputPath,
+    format: project.format,
+    durationMs,
+    frameCount: globalFrameIdx,
+  };
+}
+
+/**
+ * Render a single scene's content as transparent PNG frames for the speaker track pipeline.
+ * Reuses the existing scene-worker with captureAsPng=true.
+ * Returns the path to the frames directory and the frame count.
+ */
+async function renderSceneTransparentFrames(
+  project: Project,
+  sceneIndex: number,
+  workDir: string,
+  critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
+  extraComponentDirs?: string[],
+): Promise<{ framesDir: string; frameCount: number }> {
+  const scene = project.scenes[sceneIndex];
+  const sceneDir = path.join(workDir, `speaker_scene_${sceneIndex}`);
+  await fs.mkdir(sceneDir, { recursive: true });
+
+  // Clone project and force transparent background for this scene
+  const projectClone = JSON.parse(JSON.stringify(project));
+  projectClone.scenes[sceneIndex].transparent_background = true;
+
+  const projectJsonPath = path.join(sceneDir, "project.json");
+  await fs.writeFile(projectJsonPath, JSON.stringify(projectClone));
+
+  const argsPath = path.join(sceneDir, ".worker-args.json");
+  const workerArgs: Record<string, unknown> = {
+    projectJsonPath,
+    sceneIndex,
+    workDir: sceneDir,
+    componentLibDir: config.componentLibDir,
+    gsapDir: config.gsapDir,
+    outputMp4Path: path.join(sceneDir, "scene.mp4"), // not used when captureAsPng=true
+    width: project.canvas.width,
+    height: project.canvas.height,
+    fps: project.canvas.fps,
+    extraComponentDirs: extraComponentDirs || [],
+    captureAsPng: true,
+  };
+
+  if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
+    workerArgs.critique = true;
+    workerArgs.maxRevisions = critiqueOpts.maxRevisions || 2;
+    workerArgs.anthropicApiKey = critiqueOpts.llmConfig.apiKey;
+    workerArgs.critiqueModel = critiqueOpts.llmConfig.model;
+    workerArgs.format = project.format;
+    workerArgs.originalPrompt = critiqueOpts.originalPrompt || "";
+  }
+
+  await fs.writeFile(argsPath, JSON.stringify(workerArgs));
+
+  const workerPath = path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    "scene-worker.js"
+  );
+
+  await new Promise<void>((resolve, reject) => {
+    const child = fork(workerPath, [argsPath], { execArgv: [], stdio: "inherit" });
+    child.on("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Scene worker exited with code ${code} for scene ${sceneIndex}`));
+    });
+    child.on("error", reject);
+  });
+
+  await fs.unlink(projectJsonPath).catch(() => {});
+  await fs.unlink(argsPath).catch(() => {});
+
+  const framesDir = path.join(sceneDir, "frames");
+  const frameCount = Math.ceil(scene.duration_seconds * project.canvas.fps);
+  return { framesDir, frameCount };
+}
+
+/**
+ * Render a GSAP transition as PNG frames for the speaker track pipeline.
+ *
+ * Uses the standard renderTransition() to produce an MP4, then extracts
+ * the frames as PNGs using ffmpeg. The transition content renders opaque
+ * (covering the speaker during the transition) which is correct behaviour:
+ * the visual crossfade happens in the content layer; speaker audio plays through.
+ */
+async function renderTransitionTransparent(opts: {
+  type: string;
+  duration: number;
+  frameA: string;
+  frameB: string;
+  width: number;
+  height: number;
+  fps: number;
+  workDir: string;
+  gsapDir: string;
+}): Promise<{ framesDir: string; frameCount: number }> {
+  const { type, duration, frameA, frameB, width, height, fps, workDir, gsapDir } = opts;
+
+  // Render transition as MP4 using the standard GSAP pipeline
+  const transitionMp4 = await renderTransition({
+    type: type as any,
+    duration,
+    frameA,
+    frameB,
+    width,
+    height,
+    fps,
+    workDir,
+    gsapDir,
+  });
+
+  // Extract frames from the transition MP4 as PNGs
+  const framesDir = path.join(workDir, "content_frames");
+  await fs.mkdir(framesDir, { recursive: true });
+
+  await execFileAsync("ffmpeg", [
+    "-y",
+    "-i", transitionMp4,
+    "-vsync", "cfr",
+    "-r", String(fps),
+    path.join(framesDir, "frame-%06d.png"),
+  ], { maxBuffer: 50 * 1024 * 1024 });
+
+  const frameCount = Math.ceil(duration * fps);
+  return { framesDir, frameCount };
+}
+
+/**
  * Render a video output with parallel scene rendering and GSAP transitions.
  */
 async function renderVideo(
@@ -579,6 +946,13 @@ async function renderVideo(
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
 ): Promise<RenderResult> {
+  // ── Speaker Track pipeline branch ──
+  // When project.speaker_track is set, use the new continuous base layer architecture.
+  // This avoids per-scene speaker seeks which cause audio drift with transitions.
+  if (project.speaker_track) {
+    return renderVideoWithSpeakerTrack(project, workDir, gsapDir, outputPath, critiqueOpts, extraComponentDirs);
+  }
+
   // Render all scenes (in parallel batches, each as a child process)
   const sceneResults = await renderScenesParallel(project, workDir, critiqueOpts, extraComponentDirs);
 
