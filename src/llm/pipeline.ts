@@ -68,6 +68,13 @@ export interface PipelineOpts {
   existingSource?: string;
   name?: string;
   sceneId?: string;
+
+  // Speaker track fields
+  speaker_source?: string;
+  speaker_start?: number;
+  speaker_trim_start?: number;
+  speaker_trim_end?: number;
+  speaker_pip_scenes?: number[];
 }
 
 export interface PipelineResult {
@@ -1272,6 +1279,7 @@ async function runUnifiedPipeline(
     sceneCount,
     creativity,
     tenantId: opts.tenant_id,
+    hasSpeakerTrack: !!opts.speaker_source,
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
@@ -1288,6 +1296,18 @@ async function runUnifiedPipeline(
     brand_kit: brandKit,
     scenes: [],
   };
+
+  // Apply speaker track if provided
+  if (opts.speaker_source) {
+    project.speaker_track = {
+      clips: [{
+        source: opts.speaker_source,
+        start: opts.speaker_start,
+        trim_start: opts.speaker_trim_start,
+        trim_end: opts.speaker_trim_end,
+      }],
+    };
+  }
 
   // 3. Media enrichment (images, future: video, music)
   trace?.beginEvent("media_enrichment");
@@ -1372,6 +1392,48 @@ async function runUnifiedPipeline(
 
     project.scenes.push(finalScene);
   }
+
+  // Apply speaker track scene-level settings after all scenes are generated
+  if (project.speaker_track) {
+    const FULL_FRAME_TYPES = new Set(["screencast", "browser-frame", "video", "image-showcase"]);
+    for (var si = 0; si < project.scenes.length; si++) {
+      const scene = project.scenes[si];
+      if (!scene.content_region) {
+        // Check if any component is a full-frame type
+        const hasFullFrame = scene.components.some(c => FULL_FRAME_TYPES.has(c.type));
+        if (!hasFullFrame) {
+          scene.content_region = { side: "right", width: "42%" };
+        }
+      }
+    }
+
+    // Build pip_segments from speaker_pip_scenes
+    if (opts.speaker_pip_scenes && opts.speaker_pip_scenes.length > 0) {
+      const pipSegments: Array<{
+        start: number;
+        end: number;
+        position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
+        shape?: "circle" | "rounded-rect" | "rect";
+        size?: { width: number; height: number };
+      }> = [];
+      let t = 0;
+      for (let pi = 0; pi < project.scenes.length; pi++) {
+        const sceneDuration = project.scenes[pi].duration_seconds;
+        if (opts.speaker_pip_scenes.includes(pi)) {
+          pipSegments.push({
+            start: t,
+            end: t + sceneDuration,
+            position: "bottom-right" as const,
+            shape: "circle" as const,
+            size: { width: 240, height: 240 },
+          });
+        }
+        t += sceneDuration;
+      }
+      project.speaker_track.pip_segments = pipSegments;
+    }
+  }
+
   trace?.endEvent({ scenes: project.scenes.length });
 
   // Merge assets from enrichment

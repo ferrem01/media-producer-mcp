@@ -38,6 +38,7 @@ export interface UnifiedPlannerOpts {
   sceneCount?: number;
   creativity?: number; // 0-1, default 0.5
   tenantId: string;
+  hasSpeakerTrack?: boolean;
 }
 
 export interface PlannedComponent {
@@ -277,6 +278,25 @@ ${COMPOSITION_PLAYBOOK}`;
   // Inject brand guidelines (tenant-defined rules)
   if (opts.brandKit.guidelines) {
     systemPrompt += `\n\n## Brand Guidelines (FOLLOW THESE RULES)\n${opts.brandKit.guidelines}\n`;
+  }
+
+  // Inject speaker track mode instructions if applicable
+  if (opts.hasSpeakerTrack) {
+    systemPrompt += `\n\n## Speaker Track Mode
+This video uses a speaker track -- a continuous speaker video plays as the base layer.
+Scene content will overlay on top of the speaker.
+
+For content scenes (where the speaker is visible behind):
+- Use Speaker templates (S1-speaker-spotlight, S3-speaker-lowerthird) when they fit
+- Content appears in a region beside the speaker, not full-screen
+- Backgrounds are transparent -- the speaker video shows through
+
+For demo/screencast scenes (where content fills the whole frame):
+- The speaker appears as a small PiP circle
+- Use regular templates (C7-picture-in-picture, S2-screencast-pip) or full-frame content
+- Content has its own opaque background
+
+Prefer Speaker templates over regular templates when the speaker should be visible.`;
   }
 
   var userPrompt = `Create a ${opts.format} project.\n\n${opts.prompt}`;

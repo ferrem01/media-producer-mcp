@@ -37,7 +37,7 @@ import { config } from "./config.js";
 import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
 import path from "node:path";
 import fs from "node:fs/promises";
-import type { Scene, SceneComponent, BrandKit, Overlay } from "./core/types.js";
+import type { Scene, SceneComponent, BrandKit, Overlay, SpeakerTrack } from "./core/types.js";
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
@@ -242,8 +242,33 @@ export function createMcpServer(): McpServer {
 
       // Overlay fields (when adding an overlay to the project)
       overlay: overlaySchema.optional(),
+
+      // Speaker track (when setting a speaker track on the project)
+      speaker_track: z.object({
+        clips: z.array(z.object({
+          source: z.string(),
+          start: z.number().optional(),
+          trim_start: z.number().optional(),
+          trim_end: z.number().optional(),
+        })),
+        pip_segments: z.array(z.object({
+          start: z.number(),
+          end: z.number(),
+          position: z.enum(["bottom-right", "bottom-left", "top-right", "top-left"]).optional(),
+          shape: z.enum(["circle", "rounded-rect", "rect"]).optional(),
+          size: z.object({ width: z.number(), height: z.number() }).optional(),
+        })).optional(),
+      }).optional().describe("Speaker track: continuous speaker video as base layer with content overlaid on top"),
     },
     async (params) => {
+      if (params.speaker_track) {
+        const project = await loadProject(params.tenant_id, params.project_id);
+        if (!project) return err("Project not found");
+        project.speaker_track = params.speaker_track as SpeakerTrack;
+        await saveProject(project);
+        return ok({ message: "Speaker track set", speaker_track: project.speaker_track });
+      }
+
       if (params.overlay) {
         // Adding an overlay to the project
         const project = await loadProject(params.tenant_id, params.project_id);
@@ -330,6 +355,23 @@ export function createMcpServer(): McpServer {
       overlay_segments: z.array(overlaySegmentSchema).optional(),
       overlay_start_time: z.number().optional(),
       overlay_end_time: z.number().nullable().optional(),
+
+      // Speaker track update
+      speaker_track: z.object({
+        clips: z.array(z.object({
+          source: z.string(),
+          start: z.number().optional(),
+          trim_start: z.number().optional(),
+          trim_end: z.number().optional(),
+        })).optional(),
+        pip_segments: z.array(z.object({
+          start: z.number(),
+          end: z.number(),
+          position: z.enum(["bottom-right", "bottom-left", "top-right", "top-left"]).optional(),
+          shape: z.enum(["circle", "rounded-rect", "rect"]).optional(),
+          size: z.object({ width: z.number(), height: z.number() }).optional(),
+        })).optional(),
+      }).optional().describe("Update speaker track configuration"),
     },
     async (params) => {
       // Overlay update
@@ -394,6 +436,20 @@ export function createMcpServer(): McpServer {
 
       const project = await updateProject(params.tenant_id, params.project_id, updates as any);
       if (!project) return err("Project not found");
+
+      // Apply speaker_track update if provided
+      if (params.speaker_track) {
+        const loadedProject = await loadProject(params.tenant_id, params.project_id);
+        if (loadedProject) {
+          loadedProject.speaker_track = {
+            ...loadedProject.speaker_track,
+            ...params.speaker_track,
+          } as SpeakerTrack;
+          await saveProject(loadedProject);
+          return ok(loadedProject);
+        }
+      }
+
       return ok(project);
     },
   );
@@ -1024,6 +1080,11 @@ export function createMcpServer(): McpServer {
       canvas_height: z.number().optional().describe("Explicit canvas height. For images, auto-inferred from prompt if omitted."),
       creativity: z.number().min(0).max(1).optional().describe("Creativity level 0-1. Low (0) prefers library components. High (0.7-1.0) creates one self-contained custom component per scene. Default: 0.5."),
       token: z.string().optional().describe("Auth token"),
+      speaker_source: z.string().optional().describe("Path or URL to speaker video. When provided, uses speaker track mode: speaker video plays full-screen as base layer with content overlaid on top."),
+      speaker_start: z.number().optional().describe("Start offset in seconds into the speaker video (skip dead air at start)"),
+      speaker_trim_start: z.number().optional().describe("Trim: only use speaker video from this timestamp"),
+      speaker_trim_end: z.number().optional().describe("Trim: stop using speaker video at this timestamp"),
+      speaker_pip_scenes: z.array(z.number()).optional().describe("Scene indices (0-based) where speaker should appear as small PiP circle instead of full-behind. Those scenes render with their own opaque background."),
     },
     async (params) => {
       // Auth check
@@ -1113,6 +1174,11 @@ export function createMcpServer(): McpServer {
               name: revisionName,
               project_id: revisionProjectId || params.project_id,
               sceneId: revisionSceneId,
+              speaker_source: params.speaker_source,
+              speaker_start: params.speaker_start,
+              speaker_trim_start: params.speaker_trim_start,
+              speaker_trim_end: params.speaker_trim_end,
+              speaker_pip_scenes: params.speaker_pip_scenes,
             });
 
             // If pipeline created a project, track the projectId
