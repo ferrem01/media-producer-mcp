@@ -585,16 +585,29 @@ async function renderVideo(
   const sceneMp4s = sceneResults.map((r) => r.mp4Path);
   const totalFrames = sceneResults.reduce((sum, r) => sum + r.frameCount, 0);
 
+  // Build full-behind map for transition suppression
+  const sceneFullBehindSpeaker = buildFullBehindSpeakerMap(project);
+
   // Build the final segment list: scene + transition + scene + transition + ...
   if (sceneMp4s.length > 1) {
     const segments: string[] = [sceneMp4s[0]];
 
     for (let i = 1; i < sceneMp4s.length; i++) {
       const scene = project.scenes[i];
+      const prevScene = project.scenes[i - 1];
       const transitionType = scene.transition_in?.type || "crossfade";
       const transitionDuration = scene.transition_in?.duration_seconds || 0.5;
 
-      if (transitionType === "none") {
+      // Skip transitions between consecutive full-behind speaker scenes.
+      // The speaker video is continuous -- transitions would freeze the
+      // speaker in a crossfade blend and insert extra frames that break
+      // audio sync. Content animations provide the visual transition.
+      const bothFullBehind = sceneFullBehindSpeaker.has(i) && sceneFullBehindSpeaker.has(i - 1);
+
+      if (transitionType === "none" || bothFullBehind) {
+        if (bothFullBehind && transitionType !== "none") {
+          console.log(`\n  Transition ${i - 1}->${i}: skipped (consecutive full-behind speaker scenes)`);
+        }
         // No transition, just append the scene
         segments.push(sceneMp4s[i]);
         continue;
