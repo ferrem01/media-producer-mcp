@@ -598,15 +598,15 @@ async function renderVideo(
       const transitionType = scene.transition_in?.type || "crossfade";
       const transitionDuration = scene.transition_in?.duration_seconds || 0.5;
 
-      // Skip transitions between consecutive full-behind speaker scenes.
-      // The speaker video is continuous -- transitions would freeze the
-      // speaker in a crossfade blend and insert extra frames that break
-      // audio sync. Content animations provide the visual transition.
-      const bothFullBehind = sceneFullBehindSpeaker.has(i) && sceneFullBehindSpeaker.has(i - 1);
+      // Skip transitions when either scene is full-behind.
+      // Full-behind scenes have speaker A/V baked in at precise offsets.
+      // Transitions insert extra frames that shift the timeline and break
+      // audio sync. Content GSAP animations handle visual transitions.
+      const eitherFullBehind = sceneFullBehindSpeaker.has(i) || sceneFullBehindSpeaker.has(i - 1);
 
-      if (transitionType === "none" || bothFullBehind) {
-        if (bothFullBehind && transitionType !== "none") {
-          console.log(`\n  Transition ${i - 1}->${i}: skipped (consecutive full-behind speaker scenes)`);
+      if (transitionType === "none" || eitherFullBehind) {
+        if (eitherFullBehind && transitionType !== "none") {
+          console.log(`\n  Transition ${i - 1}->${i}: skipped (full-behind speaker scene)`);
         }
         // No transition, just append the scene
         segments.push(sceneMp4s[i]);
