@@ -694,26 +694,9 @@ async function renderVideo(
     }
   }
 
-  // ── Speaker audio: mix as one continuous track across all scenes ──
-  // Full-behind scenes have speaker video composited per-scene (no audio).
-  // Mix the speaker audio onto the final concatenated video as one continuous track.
-  if (project.overlays && project.overlays.length > 0) {
-    for (const overlay of project.overlays) {
-      if (overlay.type === "speaker-video" && overlay.source) {
-        const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
-        const hasFullBehind = overlay.segments?.some(s => s.mode === "full-behind");
-        if (hasFullBehind) {
-          const audioOutput = outputPath.replace(/\.mp4$/, "-speaker-audio.mp4");
-          await mixSpeakerAudio({
-            videoPath: outputPath,
-            speakerPath,
-            outputPath: audioOutput,
-          });
-          await fs.rename(audioOutput, outputPath);
-        }
-      }
-    }
-  }
+  // Speaker audio is included per-scene in compositeFullBehind (each scene
+  // seeks to the correct offset). Concat preserves audio continuity.
+  // No post-concat audio mixing needed.
 
   const durationMs = Date.now() - startTime;
   console.log(`\nRender complete: ${outputPath}`);

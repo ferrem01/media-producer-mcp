@@ -294,8 +294,12 @@ export async function compositeFullBehind(opts: CompositeFullBehindOptions): Pro
   args.push("-filter_complex", filterComplex);
   args.push("-map", "[out]");
 
-  // Do NOT include speaker audio per-scene -- audio is laid as one
-  // continuous track after all scenes are concatenated (see mixSpeakerAudio).
+  // Include speaker audio per-scene. Each scene seeks to the correct
+  // offset (-ss before -i), so audio is frame-accurate per segment.
+  // Concat preserves audio continuity across scenes.
+  if (speakerHasAudio) {
+    args.push("-map", "0:a");
+  }
 
   // Output encoding
   args.push(
