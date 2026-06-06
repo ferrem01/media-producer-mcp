@@ -507,8 +507,10 @@ function buildFullBehindSpeakerMap(project: Project): Map<number, string> {
         const sceneStart = sceneStarts[i];
         const sceneEnd = sceneStart + project.scenes[i].duration_seconds;
         const segEnd = seg.end === Infinity ? Infinity : seg.end;
-        // Overlap check: scene starts before seg ends AND scene ends after seg starts
-        if (sceneStart < segEnd && sceneEnd > seg.start) {
+        // Overlap check: scene starts before seg ends AND scene ends after seg starts.
+        // Only apply full-behind to scenes that have transparent_background set.
+        // Scenes with their own backgrounds (e.g. screencast) should not be composited.
+        if (sceneStart < segEnd && sceneEnd > seg.start && project.scenes[i].transparent_background) {
           map.set(i, speakerPath);
         }
       }

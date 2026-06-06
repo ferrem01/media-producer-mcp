@@ -393,12 +393,14 @@ export async function compositeContentOntoSpeaker(opts: {
   const speakerHasAudio = await hasAudioStream(speakerPath);
   const contentDuration = await getVideoDuration(contentVideoPath);
 
-  // Use blend=lighten: for each pixel, take the brighter of speaker vs content.
-  // Black content pixels (0,0,0) always show the speaker.
-  // Colored/white content pixels show the content (since they are brighter than most speaker pixels).
+  // colorkey: remove pure black from content video, making those regions
+  // transparent so the speaker shows through. Non-black pixels (text, cards,
+  // UI elements) remain visible on top of the speaker.
+  // similarity=0.08 keys out near-black; blend=0.05 softens edges slightly.
   const filterComplex = [
     `[0:v]scale=${width}:${height}[speaker]`,
-    `[speaker][1:v]blend=all_mode=lighten:shortest=1[out]`,
+    `[1:v]colorkey=black:0.08:0.05[content_keyed]`,
+    `[speaker][content_keyed]overlay=0:0:shortest=1[out]`,
   ].join("; ");
 
   const args: string[] = [
@@ -424,7 +426,7 @@ export async function compositeContentOntoSpeaker(opts: {
     outputPath,
   );
 
-  console.log("  Compositing: speaker (base) + content (lighten blend)");
+  console.log("  Compositing: speaker (base) + content (colorkey black)");
 
   await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
   return outputPath;
