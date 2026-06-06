@@ -431,6 +431,47 @@ async function renderSingleSceneWorker(
     await fs.unlink(path.join(sceneDir, ".frames-ready")).catch(() => {});
   }
 
+  // For non-full-behind scenes: if there's a speaker overlay covering this scene,
+  // mux the speaker audio at the correct offset so concat has continuous audio.
+  if (!fullBehindSpeakerPath && project.overlays) {
+    // Compute this scene's start time
+    let sceneStartTime = 0;
+    for (let si = 0; si < sceneIndex; si++) {
+      sceneStartTime += project.scenes[si].duration_seconds;
+    }
+    for (const overlay of project.overlays) {
+      if (overlay.type !== "speaker-video" || !overlay.source) continue;
+      if (!overlay.segments) continue;
+      // Check if any segment covers this scene's time range
+      const sceneEnd = sceneStartTime + scene.duration_seconds;
+      const covers = overlay.segments.some(seg => {
+        const segEnd = seg.end === Infinity ? Infinity : seg.end;
+        return sceneStartTime < segEnd && sceneEnd > seg.start;
+      });
+      if (covers) {
+        const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
+        const audioOutput = mp4Path.replace(/\.mp4$/, "-with-speaker-audio.mp4");
+        console.log(`  Adding speaker audio to scene ${sceneIndex + 1} (offset ${sceneStartTime}s)`);
+        // Use ffmpeg to seek into speaker video, extract audio, mux onto scene
+        await execFileAsync("ffmpeg", [
+          "-y",
+          "-i", mp4Path,
+          "-ss", String(sceneStartTime),
+          "-i", speakerPath,
+          "-map", "0:v",
+          "-map", "1:a",
+          "-c:v", "copy",
+          "-c:a", "aac",
+          "-b:a", "192k",
+          "-t", String(scene.duration_seconds),
+          audioOutput,
+        ], { maxBuffer: 10 * 1024 * 1024 });
+        await fs.rename(audioOutput, mp4Path);
+        break;
+      }
+    }
+  }
+
   const totalFrames = Math.ceil(scene.duration_seconds * project.canvas.fps);
   return { mp4Path, frameCount: totalFrames };
 }
@@ -679,7 +720,10 @@ async function renderVideo(
 
         const overlayOutput = outputPath.replace(/\.mp4$/, "-overlay.mp4");
 
-        console.log(`\n  Compositing speaker overlay: ${segments.length} segment(s)`);
+        // Skip audio mixing if full-behind scenes already carry speaker audio.
+        // The PiP step should only composite video, not double the audio.
+        const hasFullBehind = overlay.segments?.some((s: any) => s.mode === "full-behind");
+        console.log(`\n  Compositing speaker overlay: ${segments.length} segment(s)${hasFullBehind ? " (video-only, audio from per-scene composites)" : ""}`);
         await compositeOverlays({
           videoPath: outputPath,
           speakerPath,
@@ -687,6 +731,7 @@ async function renderVideo(
           outputPath: overlayOutput,
           width: project.canvas.width,
           height: project.canvas.height,
+          skipAudio: !!hasFullBehind,
         });
 
         await fs.rename(overlayOutput, outputPath);

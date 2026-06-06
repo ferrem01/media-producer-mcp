@@ -30,6 +30,8 @@ export interface CompositeOverlayOptions {
   outputPath: string;
   width: number;
   height: number;
+  /** When true, skip audio mixing -- video-only overlay */
+  skipAudio?: boolean;
 }
 
 export interface CompositeFullBehindOptions {
@@ -110,7 +112,7 @@ function pipPosition(
  * Composite speaker video overlays onto a scene video.
  */
 export async function compositeOverlays(opts: CompositeOverlayOptions): Promise<string> {
-  const { videoPath, speakerPath, segments, outputPath, width, height } = opts;
+  const { videoPath, speakerPath, segments, outputPath, width, height, skipAudio } = opts;
 
   // Clamp segment end times to speaker video duration
   const speakerDuration = await getVideoDuration(speakerPath);
@@ -201,10 +203,14 @@ export async function compositeOverlays(opts: CompositeOverlayOptions): Promise<
   const args: string[] = ["-y", "-i", videoPath, "-i", speakerPath];
 
   if (hasVideoOverlays && filters.length > 0) {
-    // Add audio mixing to the filter complex if needed
     let filterComplex = filters.join("; ");
 
-    if (speakerHasAudio) {
+    if (skipAudio) {
+      // Video-only overlay: keep existing audio from input video, don't mix speaker audio
+      args.push("-filter_complex", filterComplex);
+      args.push("-map", `[${currentLabel}]`);
+      if (videoHasAudio) args.push("-map", "0:a");
+    } else if (speakerHasAudio) {
       if (videoHasAudio) {
         // Mix both audio tracks
         filterComplex += `; [0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2[aout]`;
@@ -223,7 +229,7 @@ export async function compositeOverlays(opts: CompositeOverlayOptions): Promise<
         args.push("-map", "0:a");
       }
     }
-  } else if (speakerHasAudio) {
+  } else if (!skipAudio && speakerHasAudio) {
     // Audio-only mode: no video overlay, just mix audio
     if (videoHasAudio) {
       args.push(
@@ -234,7 +240,7 @@ export async function compositeOverlays(opts: CompositeOverlayOptions): Promise<
       args.push("-map", "0:v", "-map", "1:a");
     }
   } else {
-    // No overlays and no speaker audio -- just copy
+    // No overlays and no speaker audio (or skipAudio) -- just copy
     args.push("-map", "0:v");
     if (videoHasAudio) args.push("-map", "0:a");
   }
