@@ -24,7 +24,7 @@ import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
-import { compositeOverlays, compositeFullBehind, mixSpeakerAudio, compositeContentOntoSpeaker, type OverlaySegment } from "./overlay-compositor.js";
+import { compositeOverlays, type OverlaySegment } from "./overlay-compositor.js";
 import { buildSpeakerBase, compositeContentOverlay } from "./speaker-track.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
@@ -278,8 +278,6 @@ async function renderSingleSceneWorker(
   workDir: string,
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
-  fullBehindSpeakerPath?: string,
-  fullBehindSpeakerOffset?: number,
 ): Promise<{ mp4Path: string; frameCount: number }> {
   const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `scene_${sceneIndex}`);
@@ -351,16 +349,8 @@ async function renderSingleSceneWorker(
   }
 
   // Write the project JSON for the worker to read.
-  // When using full-behind mode, mutate the scene copy to enable transparent background.
   const projectJsonPath = path.join(sceneDir, "project.json");
-  if (fullBehindSpeakerPath) {
-    // Clone project and mark scene as transparent
-    const projectClone = JSON.parse(JSON.stringify(project));
-    projectClone.scenes[sceneIndex].transparent_background = true;
-    await fs.writeFile(projectJsonPath, JSON.stringify(projectClone));
-  } else {
-    await fs.writeFile(projectJsonPath, JSON.stringify(project));
-  }
+  await fs.writeFile(projectJsonPath, JSON.stringify(project));
 
   // Write worker args
   const argsPath = path.join(sceneDir, ".worker-args.json");
@@ -375,8 +365,6 @@ async function renderSingleSceneWorker(
     height: project.canvas.height,
     fps: project.canvas.fps,
     extraComponentDirs: extraComponentDirs || [],
-    // full-behind: capture PNGs with alpha instead of JPEG
-    captureAsPng: !!fullBehindSpeakerPath,
   };
 
   if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
@@ -412,67 +400,6 @@ async function renderSingleSceneWorker(
   await fs.unlink(projectJsonPath).catch(() => {});
   await fs.unlink(argsPath).catch(() => {});
 
-  // full-behind: PNG frames captured with transparency.
-  // Composite them onto the speaker video per-scene (no audio -- audio mixed post-concat).
-  if (fullBehindSpeakerPath) {
-    const framesDir = path.join(sceneDir, "frames");
-    console.log(`\n  full-behind composite: scene ${sceneIndex + 1}`);
-    await compositeFullBehind({
-      framesDir,
-      speakerPath: fullBehindSpeakerPath,
-      outputPath: mp4Path,
-      width: project.canvas.width,
-      height: project.canvas.height,
-      fps: project.canvas.fps,
-      duration: scene.duration_seconds,
-      speakerOffset: fullBehindSpeakerOffset,
-    });
-    // Clean up PNG frames
-    await fs.rm(framesDir, { recursive: true, force: true }).catch(() => {});
-    await fs.unlink(path.join(sceneDir, ".frames-ready")).catch(() => {});
-  }
-
-  // For non-full-behind scenes: if there's a speaker overlay covering this scene,
-  // mux the speaker audio at the correct offset so concat has continuous audio.
-  if (!fullBehindSpeakerPath && project.overlays) {
-    // Compute this scene's start time
-    let sceneStartTime = 0;
-    for (let si = 0; si < sceneIndex; si++) {
-      sceneStartTime += project.scenes[si].duration_seconds;
-    }
-    for (const overlay of project.overlays) {
-      if (overlay.type !== "speaker-video" || !overlay.source) continue;
-      if (!overlay.segments) continue;
-      // Check if any segment covers this scene's time range
-      const sceneEnd = sceneStartTime + scene.duration_seconds;
-      const covers = overlay.segments.some(seg => {
-        const segEnd = seg.end === Infinity ? Infinity : seg.end;
-        return sceneStartTime < segEnd && sceneEnd > seg.start;
-      });
-      if (covers) {
-        const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
-        const audioOutput = mp4Path.replace(/\.mp4$/, "-with-speaker-audio.mp4");
-        console.log(`  Adding speaker audio to scene ${sceneIndex + 1} (offset ${sceneStartTime}s)`);
-        // Use ffmpeg to seek into speaker video, extract audio, mux onto scene
-        await execFileAsync("ffmpeg", [
-          "-y",
-          "-i", mp4Path,
-          "-ss", String(sceneStartTime),
-          "-i", speakerPath,
-          "-map", "0:v",
-          "-map", "1:a",
-          "-c:v", "copy",
-          "-c:a", "aac",
-          "-b:a", "192k",
-          "-t", String(scene.duration_seconds),
-          audioOutput,
-        ], { maxBuffer: 10 * 1024 * 1024 });
-        await fs.rename(audioOutput, mp4Path);
-        break;
-      }
-    }
-  }
-
   const totalFrames = Math.ceil(scene.duration_seconds * project.canvas.fps);
   return { mp4Path, frameCount: totalFrames };
 }
@@ -489,27 +416,14 @@ async function renderScenesParallel(
   const concurrency = config.renderConcurrency;
   const results = new Array<{ mp4Path: string; frameCount: number }>(project.scenes.length);
 
-  // Build a map of scene index -> speaker path for full-behind overlays.
-  // A scene uses full-behind when there is a speaker-video overlay whose segment
-  // time range covers that scene and the segment mode is "full-behind".
-  const sceneFullBehindSpeaker = buildFullBehindSpeakerMap(project);
-
   console.log(`  Rendering ${project.scenes.length} scenes (concurrency: ${concurrency})`);
 
   for (let batch = 0; batch < project.scenes.length; batch += concurrency) {
     const batchEnd = Math.min(batch + concurrency, project.scenes.length);
     const promises: Promise<{ mp4Path: string; frameCount: number }>[] = [];
-    
+
     for (let idx = batch; idx < batchEnd; idx++) {
-      const fbSpeakerPath = sceneFullBehindSpeaker.get(idx);
-      // Compute cumulative offset into speaker video for this scene
-      let fbOffset = 0;
-      if (fbSpeakerPath) {
-        for (let si = 0; si < idx; si++) {
-          fbOffset += project.scenes[si].duration_seconds;
-        }
-      }
-      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts, extraComponentDirs, fbSpeakerPath, fbOffset));
+      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts, extraComponentDirs));
     }
 
     const batchResults = await Promise.all(promises);
@@ -521,51 +435,6 @@ async function renderScenesParallel(
   return results;
 }
 
-/**
- * Build a map from scene index to speaker video path for scenes that should
- * use the full-behind compositing mode.
- *
- * A scene is "full-behind" when it overlaps in time with a speaker-video overlay
- * segment whose mode is "full-behind".
- */
-function buildFullBehindSpeakerMap(project: Project): Map<number, string> {
-  const map = new Map<number, string>();
-  if (!project.overlays) return map;
-
-  // Compute cumulative scene start times
-  const sceneStarts: number[] = [];
-  let t = 0;
-  for (const scene of project.scenes) {
-    sceneStarts.push(t);
-    t += scene.duration_seconds;
-  }
-
-  for (const overlay of project.overlays) {
-    if (overlay.type !== "speaker-video" || !overlay.source) continue;
-    if (!overlay.segments) continue;
-
-    const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
-
-    for (const seg of overlay.segments) {
-      if (seg.mode !== "full-behind") continue;
-
-      // Find all scenes whose time range overlaps this segment
-      for (let i = 0; i < project.scenes.length; i++) {
-        const sceneStart = sceneStarts[i];
-        const sceneEnd = sceneStart + project.scenes[i].duration_seconds;
-        const segEnd = seg.end === Infinity ? Infinity : seg.end;
-        // Overlap check: scene starts before seg ends AND scene ends after seg starts.
-        // Only apply full-behind to scenes that have transparent_background set.
-        // Scenes with their own backgrounds (e.g. screencast) should not be composited.
-        if (sceneStart < segEnd && sceneEnd > seg.start && project.scenes[i].transparent_background) {
-          map.set(i, speakerPath);
-        }
-      }
-    }
-  }
-
-  return map;
-}
 
 /**
  * Render a video output using the continuous speaker track architecture.
@@ -983,9 +852,6 @@ async function renderVideo(
   const sceneMp4s = sceneResults.map((r) => r.mp4Path);
   const totalFrames = sceneResults.reduce((sum, r) => sum + r.frameCount, 0);
 
-  // Build full-behind map for transition suppression
-  const sceneFullBehindSpeaker = buildFullBehindSpeakerMap(project);
-
   // Build the final segment list: scene + transition + scene + transition + ...
   if (sceneMp4s.length > 1) {
     const segments: string[] = [sceneMp4s[0]];
@@ -996,16 +862,7 @@ async function renderVideo(
       const transitionType = scene.transition_in?.type || "crossfade";
       const transitionDuration = scene.transition_in?.duration_seconds || 0.5;
 
-      // Skip transitions when either scene is full-behind.
-      // Full-behind scenes have speaker A/V baked in at precise offsets.
-      // Transitions insert extra frames that shift the timeline and break
-      // audio sync. Content GSAP animations handle visual transitions.
-      const eitherFullBehind = sceneFullBehindSpeaker.has(i) || sceneFullBehindSpeaker.has(i - 1);
-
-      if (transitionType === "none" || eitherFullBehind) {
-        if (eitherFullBehind && transitionType !== "none") {
-          console.log(`\n  Transition ${i - 1}->${i}: skipped (full-behind speaker scene)`);
-        }
+      if (transitionType === "none") {
         // No transition, just append the scene
         segments.push(sceneMp4s[i]);
         continue;
@@ -1150,9 +1007,6 @@ async function renderVideo(
     }
   }
 
-  // Speaker audio is included per-scene in compositeFullBehind (each scene
-  // seeks to the correct offset). Concat preserves audio continuity.
-  // No post-concat audio mixing needed.
 
   const durationMs = Date.now() - startTime;
   console.log(`\nRender complete: ${outputPath}`);

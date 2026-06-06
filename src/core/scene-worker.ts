@@ -46,8 +46,8 @@ interface WorkerArgs {
   /**
    * When true, capture frames as PNGs with alpha transparency instead of JPEG.
    * The frames are NOT encoded to MP4; instead the frames directory is left
-   * in place for the parent process to composite via compositeFullBehind.
-   * Used by the full-behind speaker overlay mode.
+   * in place for the parent process (renderSceneTransparentFrames / speaker track pipeline).
+   * Used by the speaker track pipeline (renderVideoWithSpeakerTrack).
    */
   captureAsPng?: boolean;
 }
@@ -225,10 +225,10 @@ async function main() {
 
   if (args.captureAsPng) {
     // PNG/alpha mode: skip mp4 encoding. The frames directory is intentionally
-    // left in place so that render.ts can call compositeFullBehind() on it.
+    // left in place so the speaker track pipeline can stitch frames into a continuous sequence.
     // Signal success by writing a small marker file.
     await fs.writeFile(path.join(args.workDir, ".frames-ready"), framesDir);
-    console.log(`  PNG frames ready for full-behind compositing: ${framesDir}`);
+    console.log(`  PNG frames ready for speaker track compositing: ${framesDir}`);
   } else {
     // Encode to MP4
     await fs.mkdir(path.dirname(args.outputMp4Path), { recursive: true });
