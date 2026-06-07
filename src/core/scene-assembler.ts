@@ -34,13 +34,17 @@ export interface AssembleOptions {
   canvas: Canvas;
   /** Path to GSAP files directory */
   gsapDir: string;
+  /** When true, keep /assets/ HTTP paths instead of converting to file:// (for preview SPA) */
+  preview?: boolean;
+  /** HTTP URL for the speaker video (used in preview to resolve "speaker" references) */
+  speakerUrl?: string;
 }
 
 /**
  * Assemble a scene into a self-contained HTML document.
  */
 export async function assembleScene(options: AssembleOptions): Promise<string> {
-  const { scene, components, brandKit, canvas } = options;
+  const { scene, components, brandKit, canvas, preview, speakerUrl } = options;
 
   // Build a lookup of component sources by type
   const sourceMap = new Map<string, ParsedComponent>();
@@ -49,7 +53,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   }
 
   // Generate brand kit CSS variables
-  const { css: brandCSS, theme: sceneTheme, hasBgImage } = generateBrandCSS(brandKit, scene.background);
+  const { css: brandCSS, theme: sceneTheme, hasBgImage } = generateBrandCSS(brandKit, scene.background, preview);
 
   // Determine if scene should use transparent background (for full-behind speaker overlay)
   const isTransparent = scene.transparent_background === true;
@@ -68,7 +72,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
 
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol
-    const resolvedData = resolveAssetUrls(comp.data);
+    const resolvedData = resolveAssetUrls(comp.data, preview, speakerUrl);
     const boundHtml = bindTemplate(parsed.template, resolvedData);
 
     // Position the component
@@ -210,20 +214,31 @@ function generateFontLinks(brand: BrandKit): string {
  * Resolve relative /assets/ URLs in component data to absolute URLs so they
  * work when loaded via file:// protocol in Playwright.
  */
-function resolveAssetUrls(data: Record<string, any>): Record<string, any> {
+function resolveAssetUrls(data: Record<string, any>, preview?: boolean, speakerUrl?: string): Record<string, any> {
   const baseUrl = `http://localhost:${config.port}`;
   const resolved = { ...data };
   for (const [key, val] of Object.entries(resolved)) {
+    // In preview mode, resolve "speaker" to the speaker clip HTTP URL
+    if (preview && speakerUrl && typeof val === "string" && val === "speaker") {
+      resolved[key] = speakerUrl;
+      continue;
+    }
     if (typeof val === "string" && val.startsWith("/assets/")) {
-      resolved[key] = resolveAssetPath(val);
+      resolved[key] = resolveAssetPath(val, preview);
     } else if (typeof val === "string" && val.startsWith("/api/")) {
       resolved[key] = `${baseUrl}${val}`;
+    } else if (preview && typeof val === "string" && val.startsWith("file://")) {
+      // In preview mode, convert file:// paths back to HTTP-servable paths.
+      // file://{dataDir}/{tenant}/... -> /assets/{tenant}/...
+      resolved[key] = fileUrlToHttpUrl(val);
     } else if (Array.isArray(val)) {
       resolved[key] = val.map((v: any) =>
         typeof v === "string" && v.startsWith("/assets/")
-          ? resolveAssetPath(v)
+          ? resolveAssetPath(v, preview)
           : typeof v === "string" && v.startsWith("/api/")
           ? `${baseUrl}${v}`
+          : preview && typeof v === "string" && v.startsWith("file://")
+          ? fileUrlToHttpUrl(v)
           : v
       );
     }
@@ -232,11 +247,52 @@ function resolveAssetUrls(data: Record<string, any>): Record<string, any> {
 }
 
 /**
+ * Convert a file:// URL back to an HTTP /assets/ URL for preview mode.
+ * Handles paths under the data dir for both project assets and brand-kit assets.
+ * Falls back to /work/ route for _work directory files (e.g. speaker_base).
+ */
+function fileUrlToHttpUrl(fileUrl: string): string {
+  const filePath = fileUrl.replace("file://", "");
+  const dataDir = config.dataDir;
+
+  // {dataDir}/{tenant}/projects/{projectId}/assets/{rest} -> /assets/{tenant}/projects/{projectId}/assets/{rest}
+  const projMatch = filePath.match(new RegExp(`^${dataDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([^/]+)/projects/([^/]+)/assets/(.+)$`));
+  if (projMatch) {
+    return `http://localhost:${config.port}/assets/${projMatch[1]}/projects/${projMatch[2]}/assets/${projMatch[3]}`;
+  }
+
+  // {dataDir}/{tenant}/brand-kit/assets/{rest} -> /assets/{tenant}/brand-kit/{rest}
+  const brandMatch = filePath.match(new RegExp(`^${dataDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([^/]+)/brand-kit/assets/(.+)$`));
+  if (brandMatch) {
+    return `http://localhost:${config.port}/assets/${brandMatch[1]}/brand-kit/${brandMatch[2]}`;
+  }
+
+  // {dataDir}/{tenant}/projects/{projectId}/_work/{rest} -> /work/{tenant}/projects/{projectId}/{rest}
+  const workMatch = filePath.match(new RegExp(`^${dataDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([^/]+)/projects/([^/]+)/_work/(.+)$`));
+  if (workMatch) {
+    return `http://localhost:${config.port}/work/${workMatch[1]}/projects/${workMatch[2]}/${workMatch[3]}`;
+  }
+
+  // {dataDir}/{tenant}/assets/{rest} -> /assets/{tenant}/assets/{rest}  (tenant-level assets)
+  const tenantMatch = filePath.match(new RegExp(`^${dataDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([^/]+)/assets/(.+)$`));
+  if (tenantMatch) {
+    return `http://localhost:${config.port}/assets/${tenantMatch[1]}/assets/${tenantMatch[2]}`;
+  }
+
+  // Can't convert -- return as-is (will fail in browser but at least won't crash)
+  return fileUrl;
+}
+
+/**
  * Resolve /assets/ URL paths to file:// URIs pointing at the actual filesystem path.
  * This allows Playwright to load and seek videos properly (HTTP video seeking fails
  * in headless Chromium). Falls back to http://localhost for unrecognized patterns.
  */
-function resolveAssetPath(urlPath: string): string {
+function resolveAssetPath(urlPath: string, preview?: boolean): string {
+  // In preview mode, keep HTTP paths so the browser can load them
+  if (preview) {
+    return urlPath;
+  }
   // /assets/{tenant}/brand-kit/{rest} -> {dataDir}/{tenant}/brand-kit/assets/{rest}
   const brandMatch = urlPath.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);
   if (brandMatch) {
@@ -309,7 +365,7 @@ function pickBrandBackground(brand: BrandKit, isDark: boolean): string | undefin
  *   --mp-color-cta: CTA button color (from accent)
  *   --mp-color-glow: glow/shadow color based on primary
  */
-function generateBrandCSS(brand: BrandKit, sceneBackground?: string): { css: string; theme: "dark" | "light"; hasBgImage: boolean } {
+function generateBrandCSS(brand: BrandKit, sceneBackground?: string, preview?: boolean): { css: string; theme: "dark" | "light"; hasBgImage: boolean } {
   const vars: string[] = [];
 
   // ── Determine effective theme ──
@@ -378,7 +434,7 @@ function generateBrandCSS(brand: BrandKit, sceneBackground?: string): { css: str
   if (bgUrl) {
     // Resolve relative URLs to absolute for file:// protocol
     const resolvedUrl = bgUrl.startsWith('/assets/')
-      ? resolveAssetPath(bgUrl)
+      ? resolveAssetPath(bgUrl, preview)
       : bgUrl.startsWith('/api/')
       ? `http://localhost:${config.port}${bgUrl}`
       : bgUrl;

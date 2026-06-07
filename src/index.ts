@@ -148,6 +148,26 @@ function parseMcpBody(req: http.IncomingMessage): Promise<unknown> {
   });
 }
 
+
+/**
+ * Compute the HTTP URL for the first speaker track clip (for preview mode).
+ */
+function getSpeakerUrl(project: any): string | undefined {
+  const clips = project.speaker_track?.clips;
+  if (!clips || clips.length === 0) return undefined;
+  const source = clips[0].source;
+  if (!source) return undefined;
+  const dataDir = config.dataDir;
+  if (source.startsWith(dataDir)) {
+    const rel = source.slice(dataDir.length + 1);
+    return `http://localhost:${config.port}/assets/${rel}`;
+  }
+  if (source.startsWith("/assets/")) {
+    return `http://localhost:${config.port}${source}`;
+  }
+  return source;
+}
+
 async function main() {
   // Initialize tenant store
   initTenantStoreFromFile("/data/media-producer/_system/tenants.json");
@@ -282,6 +302,58 @@ async function main() {
         } catch {
           res.writeHead(404);
           res.end("Asset not found");
+        }
+        return;
+      }
+
+
+      // ── Static asset serving for tenant-level assets ──
+      const tenantAssetMatch = urlPath.match(/^\/assets\/([^/]+)\/assets\/(.+)$/);
+      if (tenantAssetMatch && method === "GET") {
+        const [, taTenantId, taAssetPath] = tenantAssetMatch.map(decodeURIComponent);
+        const fullPath = path.join(config.dataDir, taTenantId, "assets", taAssetPath);
+        try {
+          const stat = await fs.stat(fullPath);
+          const ext = path.extname(fullPath).toLowerCase();
+          const contentType = ext === ".mp4" ? "video/mp4" : ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".webm" ? "video/webm" : ext === ".mp3" ? "audio/mpeg" : ext === ".wav" ? "audio/wav" : "application/octet-stream";
+          const { createReadStream } = await import("node:fs");
+          res.writeHead(200, {
+            "Content-Type": contentType,
+            "Content-Length": stat.size,
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+            "Accept-Ranges": "bytes",
+          });
+          createReadStream(fullPath).pipe(res);
+        } catch {
+          res.writeHead(404);
+          res.end("Asset not found");
+        }
+        return;
+      }
+
+      // ── Static asset serving for _work directory files (preview only) ──
+      const workMatch = urlPath.match(/^\/work\/([^/]+)\/projects\/([^/]+)\/(.+)$/);
+      if (workMatch && method === "GET") {
+        const [, workTenantId, workProjectId, workPath] = workMatch.map(decodeURIComponent);
+        const fullPath = path.join(config.dataDir, workTenantId, "projects", workProjectId, "_work", workPath);
+        try {
+          const stat = await fs.stat(fullPath);
+          const ext = path.extname(fullPath).toLowerCase();
+          const contentType = ext === ".mp4" ? "video/mp4" : ext === ".png" ? "image/png" : ext === ".webm" ? "video/webm" : ext === ".mp3" ? "audio/mpeg" : "application/octet-stream";
+          // Stream for large files (videos)
+          const { createReadStream } = await import("node:fs");
+          res.writeHead(200, {
+            "Content-Type": contentType,
+            "Content-Length": stat.size,
+            "Cache-Control": "no-cache",
+            "Access-Control-Allow-Origin": "*",
+            "Accept-Ranges": "bytes",
+          });
+          createReadStream(fullPath).pipe(res);
+        } catch {
+          res.writeHead(404);
+          res.end("Work file not found");
         }
         return;
       }
@@ -482,12 +554,15 @@ async function main() {
         }
         // Return the assembled scene HTML at a small size for thumbnail capture
         const components = await resolveComponentSources(scene, tenantId, projectId);
+
         const html = await assembleScene({
           scene,
           components,
           brandKit: project.brand_kit,
           canvas: project.canvas,
           gsapDir: config.gsapDir,
+          preview: true,
+          speakerUrl: getSpeakerUrl(project),
         });
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
@@ -522,6 +597,8 @@ async function main() {
           brandKit: project.brand_kit,
           canvas: project.canvas,
           gsapDir: config.gsapDir,
+          preview: true,
+          speakerUrl: getSpeakerUrl(project),
         });
 
         res.writeHead(200, {

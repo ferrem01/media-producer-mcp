@@ -138,8 +138,12 @@ async function runRender(
       `output.${ext}`,
     );
 
+    // Deep clone project so render pipeline mutations (speaker resolution etc.)
+    // don't persist back to project.json
+    const projectForRender = JSON.parse(JSON.stringify(project));
+
     const renderOpts: RenderOptions = {
-      project,
+      project: projectForRender,
       workDir: path.join(projectDir(job.tenantId, projectId), "_work"),
       componentLibDir: config.componentLibDir,
       gsapDir: config.gsapDir,
