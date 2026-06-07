@@ -693,34 +693,28 @@ export function getPreviewHtml(): string {
       var clip = state.mediaClips[ci];
       var el = clip.el;
 
-      // ── Speaker: only active during speaker scenes ──
+      // ── Speaker: continuous base layer, always playing when state.playing ──
       if (clip.kind === 'speaker') {
-        var speakerActive = isSpeakerScene(state.currentSceneIndex);
-        if (!speakerActive) {
-          if (el.style.display !== 'none') {
-            el.style.display = 'none';
-            el.pause();
-            el.muted = true;
-          }
-          clip.lastOffset = null;
-          clip.driftSamples = 0;
-          continue;
-        }
-        // Show + ensure src loaded
-        if (el.style.display === 'none' || el.style.display === '') {
+        // Ensure src is loaded
+        if (!el.src || el.src === '' || el.src === window.location.href) {
           var clipUrl = getSpeakerClipUrl();
           if (!clipUrl) { el.style.display = 'none'; continue; }
-          if (!el.src || el.src === '' || el.src === window.location.href) {
-            el.src = clipUrl;
-            el.load();
-          }
-          els.previewIframe.style.background = 'transparent';
-          el.style.display = 'block';
+          el.src = clipUrl;
+          el.load();
         }
-        // Speaker uses global time directly (no scene offset)
+        // Visibility: show on speaker scenes, hide on opaque scenes
+        var speakerActive = isSpeakerScene(state.currentSceneIndex);
+        if (speakerActive) {
+          el.style.display = 'block';
+          els.previewIframe.style.background = 'transparent';
+        } else {
+          el.style.display = 'none';
+        }
+        // Always sync time + play/pause regardless of visibility
+        // Speaker plays continuously so audio is uninterrupted
         var target = time;
         syncElement(clip, el, target, playing, false);
-        // Mute/unmute based on play state
+        // Unmute when playing (audio should be heard even on non-speaker scenes)
         el.muted = !playing;
         continue;
       }
