@@ -749,11 +749,7 @@ export function getPreviewHtml(): string {
     });
   }
 
-  // Auto-load tenant from URL
-  if (_urlTenant) {
-    els.tenantInput.value = _urlTenant;
-    setTimeout(loadProjects, 100);
-  }
+  // Auto-load tenant from URL -- handled at end of init (see bottom)
 
   // Load projects for tenant
   function loadProjects() {
@@ -975,15 +971,15 @@ export function getPreviewHtml(): string {
       '* { margin: 0; padding: 0; box-sizing: border-box; }' +
       'html, body { width: ' + width + 'px; height: ' + height + 'px; overflow: hidden; background: #000; }' +
       '#frameA, #frameB { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }' +
-      '</style><script>' + gsapSrc + '<\/script></head><body>' +
+      "</style><scr" + "ipt>" + gsapSrc + "</scr" + "ipt></head><body>" +
       '<img id="frameA" src="' + frameADataUri + '">' +
       '<img id="frameB" src="' + frameBDataUri + '">' +
-      '<script>(function() {' +
+      "<scr" + "ipt>(function() {" +
       'var imgA = document.getElementById("frameA"); var imgB = document.getElementById("frameB");' +
       'var dur = ' + duration + '; var tl = gsap.timeline({ paused: true });' +
       animScript +
       'window.__MP_TIMELINE = tl; window.__MP_DURATION = dur; window.__MP_READY = true;' +
-      '})();<\/script></body></html>';
+      "})();</scr" + "ipt></body></html>";
   }
 
   // Capture the current iframe content as a data URI using html2canvas
@@ -1018,7 +1014,7 @@ export function getPreviewHtml(): string {
       var sceneHtml = state.sceneHtmlCache[project.scenes[0].id];
       if (sceneHtml) {
         // Extract GSAP source from between the first <script> tags
-        var match = sceneHtml.match(/<script>([\s\S]*?gsap[\s\S]*?)<\/script>/);
+        var match = sceneHtml.match(new RegExp('<' + 'script>([\\s\\S]*?gsap[\\s\\S]*?)</' + 'script>'));
         if (match) { _gsapSrcCache = match[1]; callback(_gsapSrcCache); return; }
       }
     }
@@ -1857,7 +1853,7 @@ export function getPreviewHtml(): string {
       if (html != null) {
         // Check if we need to play a transition
         var transIn = project.scenes[info.index] && project.scenes[info.index].transition_in;
-        if (transIn && transIn.type && transIn.duration_seconds > 0 && !state._inTransition) {
+        if (false && transIn && transIn.type && transIn.duration_seconds > 0 && !state._inTransition) {
           state._inTransition = true;
           var transDuration = transIn.duration_seconds;
 
