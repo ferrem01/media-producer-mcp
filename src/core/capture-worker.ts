@@ -198,63 +198,32 @@ async function main() {
         frameDirsToCleanup.add(extracted.framesDir);
       }
 
-      // ── Phase 3: Replace <video> with <img> in the DOM ──
-      // Build a serializable lookup for the browser context
-      const browserLookup: Record<string, { framesDir: string; totalFrames: number }> = {};
-      for (const [src, info] of extractionMap) {
-        browserLookup[src] = { framesDir: info.framesDir, totalFrames: info.totalFrames };
-      }
-
-      await page.evaluate((lookup: Record<string, { framesDir: string; totalFrames: number }>) => {
+      // ── Phase 3: Hide <video> elements and insert sibling <img> overlays ──
+      // (Don't replace -- keep GSAP animation targets intact)
+      await page.evaluate(() => {
         const videos = document.querySelectorAll("video");
         videos.forEach((video, idx) => {
-          const src = video.src || video.getAttribute("src") || "";
-          const info = lookup[src];
-          if (!info) return; // No extracted frames for this source
+          video.style.setProperty("visibility", "hidden", "important");
+          video.style.setProperty("pointer-events", "none", "important");
 
           const img = document.createElement("img");
-
-          // Copy computed style properties that matter
-          const cs = window.getComputedStyle(video);
-          img.style.cssText = video.style.cssText;
-          img.style.objectFit = cs.objectFit || "cover";
-          img.style.display = cs.display === "none" ? "none" : (video.style.display || "block");
-          img.style.width = video.style.width || cs.width;
-          img.style.height = video.style.height || cs.height;
-
-          // Preserve data attributes
+          img.id = `__render_frame_${idx}__`;
+          img.className = "__render_frame__";
+          img.style.position = "absolute";
+          img.style.top = "0";
+          img.style.left = "0";
+          img.style.width = "100%";
+          img.style.height = "100%";
+          img.style.objectFit = "cover";
+          img.style.visibility = "visible";
+          img.style.pointerEvents = "none";
           const startAt = video.getAttribute("data-start-at");
           if (startAt) img.setAttribute("data-start-at", startAt);
           img.setAttribute("data-video-id", `vimg-${idx}`);
-          img.setAttribute("data-video-src", src);
-          img.setAttribute("data-frames-dir", info.framesDir);
-          img.setAttribute("data-total-frames", String(info.totalFrames));
 
-          // Set initial frame
-          img.src = `file://${info.framesDir}/frame-000000.png`;
-
-          // Replace video with img in the DOM
-          video.replaceWith(img);
+          video.parentElement?.appendChild(img);
         });
-      }, browserLookup);
-
-      // Wait for initial images to load
-      await page.evaluate(() =>
-        new Promise<void>((resolve) => {
-          const imgs = document.querySelectorAll("img[data-video-id]");
-          if (imgs.length === 0) { resolve(); return; }
-          let pending = imgs.length;
-          const done = () => { if (--pending <= 0) resolve(); };
-          imgs.forEach((img) => {
-            if ((img as HTMLImageElement).complete) { done(); }
-            else {
-              img.addEventListener("load", () => done(), { once: true });
-              img.addEventListener("error", () => done(), { once: true });
-              setTimeout(() => done(), 5000);
-            }
-          });
-        })
-      );
+      });
     }
 
     const hasVideos = extractionMap.size > 0;
@@ -268,50 +237,37 @@ async function main() {
         (window as any).__MP_TIMELINE.time(t);
       }, time);
 
-      // Update video frame images
+      // Update video frame images via file:// paths (not data URIs --
+      // 9 base64 1080p PNGs overwhelm Chrome evaluate pipeline)
       if (hasVideos) {
-        await page.evaluate((params: { t: number; fps: number }) =>
+        const frameUpdates: Array<{ imgId: string; src: string }> = [];
+        for (const vInfo of videoInfos) {
+          const extracted = extractionMap.get(vInfo.src);
+          if (!extracted) continue;
+          const targetTime = Math.max(0, time - vInfo.startAt);
+          const frameIndex = Math.min(Math.round(targetTime * args.fps), extracted.totalFrames - 1);
+          const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.png`);
+          frameUpdates.push({ imgId: `__render_frame_${vInfo.index}__`, src: `file://${framePath}` });
+        }
+
+        await page.evaluate((updates: Array<{ imgId: string; src: string }>) =>
           new Promise<void>((resolve) => {
-            const imgs = document.querySelectorAll("img[data-video-id]");
-            if (imgs.length === 0) {
-              requestAnimationFrame(() => resolve());
-              return;
-            }
-
-            let pending = imgs.length;
+            let pending = updates.length;
+            if (pending === 0) { requestAnimationFrame(() => resolve()); return; }
             const done = () => { if (--pending <= 0) requestAnimationFrame(() => resolve()); };
-
-            imgs.forEach((imgEl) => {
-              const img = imgEl as HTMLImageElement;
-              const startAt = parseFloat(img.getAttribute("data-start-at") || "0");
-              const framesDir = img.getAttribute("data-frames-dir") || "";
-              const totalFrames = parseInt(img.getAttribute("data-total-frames") || "0", 10);
-
-              if (totalFrames === 0) { done(); return; }
-
-              const targetTime = Math.max(0, params.t - startAt);
-              const frameIndex = Math.min(
-                Math.round(targetTime * params.fps),
-                totalFrames - 1
-              );
-              const framePath = `file://${framesDir}/frame-${String(frameIndex).padStart(6, "0")}.png`;
-
-              // Only update if src changed
-              if (img.src === framePath) {
-                done();
-                return;
-              }
-
+            for (const { imgId, src } of updates) {
+              const img = document.getElementById(imgId) as HTMLImageElement | null;
+              if (!img) { done(); continue; }
+              if (img.src === src) { done(); continue; }
               img.addEventListener("load", () => done(), { once: true });
               img.addEventListener("error", () => done(), { once: true });
               setTimeout(() => done(), 3000);
-              img.src = framePath;
-            });
+              img.src = src;
+            }
           }),
-          { t: time, fps: args.fps }
+          frameUpdates
         );
       } else {
-        // No videos - just wait for a repaint after timeline advance
         await page.evaluate(() =>
           new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
         );
