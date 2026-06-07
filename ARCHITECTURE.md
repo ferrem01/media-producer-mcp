@@ -1,0 +1,279 @@
+# Media Producer MCP -- Architecture
+
+Living document. Updated as the system evolves.
+Last updated: 2026-06-07
+
+## What This Is
+
+A media production platform that generates videos, images, GIFs, and decks from text prompts. Built on HTML + GSAP + Playwright + ffmpeg. Runs as an MCP server.
+
+**Repo:** `ferrem01/media-producer-mcp`
+**Server:** 159.203.115.164:3200
+**Stack:** TypeScript, Node.js, Playwright, ffmpeg, GSAP
+
+---
+
+## Core Data Model
+
+### Project
+The top-level container. Format-agnostic (video, image, slideshow, gif, etc.).
+
+```
+project.json
+├── project_id, tenant_id, name, format, status
+├── canvas: { width, height, fps, preset }
+├── brand_kit: { colors, fonts, logos, assets, style, guidelines }
+├── scenes: Scene[]
+├── audio: { tracks, ducking }
+├── assets: Asset[]
+└── speaker_track: { clips[] }
+```
+
+### Scene
+One segment of the timeline. Contains one or more components stacked by z_index.
+
+Key fields:
+- `duration_seconds` -- how long the scene lasts
+- `transition_in` -- how it enters (crossfade, blur-crossfade, zoom-through, slide-*, wipe-*, iris, glitch-cut, scale-rotate, etc.)
+- `components[]` -- the visual elements
+- `transparent_background` -- true for speaker scenes (content overlays the speaker video)
+- `content_region` -- constrains components to a region (e.g. right 42%) so the speaker is visible
+
+### Component
+A self-contained visual element. Each is a `.component.html` file with three sections:
+
+```html
+<template>  <!-- HTML structure -->
+<style scoped>  <!-- CSS, uses brand CSS variables -->
+<script>  <!-- createTimeline(el, data, ctx) returns GSAP timeline -->
+```
+
+Components reference brand kit values via CSS custom properties (`--mp-color-primary`, `--mp-font-family`, etc.). Data is bound via `data-bind` attributes and the `data` object passed to `createTimeline`.
+
+**Component library:** 41+ components across categories (titles, layouts, effects, media, data-viz, CTA, mockups). Both hand-crafted library components and LLM-generated custom components.
+
+### Speaker Track
+The continuous camera/speaker video that plays underneath scene content.
+
+```json
+{
+  "speaker_track": {
+    "clips": [{
+      "source": "/data/media-producer/tenant/assets/camera.mp4",
+      "trim_start": 2,
+      "trim_end": 60
+    }]
+  }
+}
+```
+
+- **Continuous base layer.** The speaker video plays from start to finish, uninterrupted. Audio stays perfectly synced because the video is never sliced, seeked, or re-encoded per scene.
+- **Content overlays the speaker.** Scenes with `transparent_background: true` render transparent content that composites on top of the speaker base.
+- **Component-level speaker embedding.** Any component can show the speaker video by setting `source: "speaker"` or `pip_source: "speaker"` in its data. The system resolves `"speaker"` to the actual video URL. This works for PiP circles, full-screen backgrounds, or any other layout the component defines.
+- **Trim values** (`trim_start`, `trim_end`, `start`) control which portion of the source video is used. Global timeline time 0 maps to `trim_start`.
+
+---
+
+## Unified Render Pipeline
+
+One render entry point (`render.ts`) routes by format. Same scene assembly, same component resolution, same project model regardless of output type.
+
+### Format Routing
+```
+render(project)
+  ├── video/slideshow
+  │   ├── speaker_track? → renderVideoWithSpeakerTrack()
+  │   └── no speaker   → renderVideo()
+  ├── image/one-pager/thumbnail → renderImage()
+  ├── presentation → renderDeck()
+  ├── gif → renderGif()
+  ├── social → renderSocial()
+  └── email-header → renderEmailHeader()
+```
+
+Every format shares:
+- `loadComponentSources()` -- resolves components from global lib, tenant dir, and project dir
+- `scene-assembler.ts` -- builds HTML from scene definition + component templates
+- `scene-worker.ts` -- Playwright frame capture in child process
+- Brand kit CSS variable injection
+- `source: "speaker"` resolution
+
+### Video Render (no speaker track)
+1. Render each scene as frames via Playwright (parallel batches in child processes)
+2. Render transitions as frame sequences between adjacent scenes
+3. Concat segments (scene + transition + scene + ...) via ffmpeg
+4. Mix audio (voiceover, music, SFX with volume envelope ducking)
+
+### Speaker Track Render
+1. **Build speaker base** -- concat clips, scale to canvas, apply trim
+2. **Render all scenes as transparent PNGs** -- Playwright captures with `omitBackground: true`
+3. **Render transitions as transparent PNGs** -- direct Playwright capture (not MP4 extraction)
+4. **Stitch** into one continuous frame sequence
+5. **Single-pass composite** -- overlay content frames onto speaker base via ffmpeg
+6. **Audio mixing** -- project-level music/voiceover mixed with speaker audio
+
+Key insight: transitions only affect the content layer. The speaker video plays through underneath, uninterrupted. The speaker is never sliced or re-encoded per scene.
+
+### Scene Assembly
+`scene-assembler.ts` takes a scene definition and produces a self-contained HTML document:
+- Resolves component HTML from library (global, tenant, or project level)
+- Binds data to templates
+- Injects brand CSS variables
+- Builds GSAP timeline
+- Handles `source: "speaker"` resolution to actual video URLs
+
+### Composite Assembly
+`composite-assembler.ts` takes ALL scenes and produces a single HTML document:
+- Every scene is a positioned div in one document (not separate iframes)
+- Master GSAP timeline orchestrates scene visibility + per-scene animations
+- Transitions are live GSAP tweens between scene containers
+- Used by the preview SPA for instant scrubbing and live transitions
+
+---
+
+## Preview SPA (v2)
+
+Interactive preview at `/preview?tenant=...&project=...`.
+
+### Architecture (inspired by HyperFrames)
+
+**Single Document Model.** All scenes are loaded into one iframe as a single HTML document (via composite-assembler). No per-scene iframe swapping.
+
+**Transport Clock.** GSAP master timeline is always paused and seeked to the clock's current time on every requestAnimationFrame tick. GSAP never free-runs. This eliminates drift.
+
+```
+Transport Clock (rAF loop)
+    ├── clock.now() → global time
+    ├── Master GSAP Timeline (always paused, seeked each tick)
+    │   ├── Scene 0 timeline
+    │   ├── Transition 0→1
+    │   ├── Scene 1 timeline
+    │   └── ...
+    ├── Unified Media Sync (syncMedia)
+    │   ├── Speaker video (continuous, audio source)
+    │   ├── Scene videos (inside iframe)
+    │   └── Audio tracks (music, voiceover)
+    └── UI Update (scrubber, time display, scene indicator)
+```
+
+**Unified Media Sync.** All media elements (speaker video, scene videos, audio tracks) go through one `syncMedia` function with three-tier drift correction:
+- Tier 1 -- Hard sync (>500ms): unconditional seek
+- Tier 2 -- Strict sync (>40ms, 2 consecutive samples): catches accumulated drift, skips playing videos to avoid stutter
+- Tier 3 -- Force sync (>20ms): only on play/pause/seek transitions
+
+**Speaker Video Handling:**
+- Speaker bg `<video>` element sits behind the iframe, plays continuously
+- Unmuted during playback (primary audio source for speaker scenes)
+- Visible on transparent scenes, hidden behind opaque ones, but always playing
+- Speaker-sourced scene videos (PiP, etc.) detected by URL match, synced to same timeline
+- `trim_start`/`trim_end` from speaker track config respected
+
+**Media Buffering.** Play button is disabled until all videos fire `canplaythrough`. Buffering overlay shown on the video area.
+
+---
+
+## LLM Pipeline
+
+Prompt → finished project in multiple stages. One unified pipeline for all formats.
+
+### Stages
+1. **Expand Prompt** -- thin prompt → rich creative brief with scene count
+2. **Plan Storyboard** (unified planner) -- brief → multi-scene storyboard. Per-scene decision: use a library component or generate a custom one. Picks transitions, sets speaker track flags, assigns content regions.
+3. **Media Enrichment** -- generates hero images (OpenAI gpt-image-1), captures screenshots, resolves assets. Runs between planning and scene generation.
+4. **Scene Generation** -- per scene, either fills data for the chosen library component or generates a custom `.component.html` via LLM
+5. **Critique** -- vision-based review of rendered frames. Can trigger scene revision.
+
+### Creativity Parameter
+`creativity` (0-1) controls the library vs custom component mix:
+- **0.0-0.3**: strongly prefers library components. Faster, more consistent.
+- **0.4-0.6**: balanced. Planner decides per-scene based on what fits.
+- **0.7-1.0**: all custom components. Every scene gets a unique LLM-generated `.component.html`.
+
+This replaced the old `mode: "freeform" | "structured"` split. There's no separate code path -- it's one pipeline with a dial.
+
+### Format-Specific Prompts
+All LLM prompts are format-aware (video/image/deck/gif/social). Visual design rules and GSAP animation skills are injected into component generator prompts. Speaker track awareness is passed through to the planner when a speaker source is provided.
+
+---
+
+## Audio System
+
+- **Tracks:** voiceover, music, SFX -- each with volume, fade in/out, loop
+- **Ducking:** time-based volume envelope. When voiceover is active, music volume drops to `ducked_volume` (e.g. 0.12)
+- **Speaker audio:** comes from the speaker track video itself, not a separate audio track
+- **Mixing:** always post-production via ffmpeg. Speaker base audio + project tracks mixed in final pass
+
+---
+
+## MCP Tools
+
+14 tools exposed via MCP protocol:
+- **CRUD:** create, get, list, add, update, remove, reorder
+- **Brand:** brand kit management
+- **Render:** trigger renders, job status/wait
+- **Generate:** LLM-powered full project generation
+- **Capture:** screenshot URLs via Playwright, save as assets
+- **Audio:** TTS generation, track management
+
+---
+
+## File Layout
+
+```
+/data/media-producer/
+├── {tenant-id}/
+│   ├── brand-kit/           # logos, fonts, backgrounds
+│   ├── assets/              # uploaded/captured media
+│   └── projects/
+│       └── {project-id}/
+│           ├── project.json  # project definition
+│           ├── components/   # custom components for this project
+│           ├── assets/       # project-specific assets
+│           ├── output/       # rendered output (video, images, etc.)
+│           └── _work/        # intermediate render artifacts
+```
+
+```
+src/
+├── core/
+│   ├── types.ts              # all interfaces
+│   ├── scene-assembler.ts    # single scene → HTML
+│   ├── composite-assembler.ts # all scenes → single HTML doc
+│   ├── render.ts             # standard render pipeline
+│   ├── speaker-track.ts      # speaker track render pipeline
+│   ├── capture.ts            # Playwright screenshot capture
+│   └── scene-worker.ts       # child process frame capture
+├── llm/
+│   ├── pipeline.ts           # orchestrates all LLM stages
+│   ├── prompts.ts            # system prompts per stage
+│   ├── unified-planner.ts    # scene planning
+│   └── template-catalog.ts   # component library metadata
+├── preview-app/
+│   └── preview-app.ts        # preview SPA (single file, embedded HTML/CSS/JS)
+├── playground-app/
+│   └── playground-app.ts     # component playground
+├── persistence/
+│   └── project.ts            # project CRUD
+├── server.ts                 # MCP tool definitions
+└── index.ts                  # HTTP server + routes
+```
+
+---
+
+## Key Design Decisions
+
+1. **HTML + GSAP, not Remotion.** Components are plain HTML/CSS/JS with GSAP timelines. No React, no bundler. Simpler, faster, and GSAP provides better animation control.
+
+2. **Single-file components.** `<template>` + `<style scoped>` + `<script>` in one `.component.html` file. Self-contained, easy to generate with LLMs, easy to preview.
+
+3. **Speaker as continuous base layer.** The speaker video is never cut or re-encoded per scene. It plays start to finish. Content overlays it. Any component can embed it via `source: "speaker"`.
+
+4. **Transport clock, not GSAP free-run.** GSAP timelines are always paused and seeked. The clock is the sole time authority. Eliminates drift between video, audio, and animations.
+
+5. **Three-tier drift correction.** Hard sync for seeks, strict sync for gradual drift (skipping playing videos to avoid stutter), force sync on transitions. From HyperFrames.
+
+6. **Composite preview.** All scenes in one document, one master timeline. Instant scrubbing across scene boundaries. Live GSAP transitions. No per-scene iframe reloading.
+
+7. **Format-agnostic project model.** `project.json` works for video, image, slideshow, GIF, email header, etc. The render pipeline adapts based on `format`.
+
+8. **Brand kit as CSS variables.** Components don't hardcode colors or fonts. They use `--mp-color-primary`, `--mp-font-family`, etc. Brand consistency is automatic.
