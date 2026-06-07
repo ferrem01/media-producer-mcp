@@ -48,7 +48,7 @@ function generateFieldValue(key: string, field: SchemaField): unknown {
   if (field.default !== undefined) return field.default;
 
   // Use placeholder as fallback for strings
-  if (field.placeholder !== undefined && field.type === "string") return field.placeholder;
+  if (field.placeholder !== undefined && field.type === "string" && key !== "suffix") return field.placeholder;
 
   // Use first enum value
   if (field.enum && field.enum.length > 0) return field.enum[0];
@@ -81,7 +81,9 @@ function generateFieldValue(key: string, field: SchemaField): unknown {
 }
 
 function generateStringValue(key: string, field: SchemaField): string {
-  if (field.placeholder) return field.placeholder;
+  // Skip placeholder for suffix to avoid combos like "$2,847%"
+  if (field.placeholder && key !== "suffix") return field.placeholder;
+
 
   // Smart defaults by key name
   if (key === "headline" || key === "title" || key === "heading" || key === "name") return "Your Headline Here";
@@ -99,6 +101,8 @@ function generateStringValue(key: string, field: SchemaField): string {
     return "This product transformed our workflow completely.";
   if (key === "url" || key === "link" || key === "href") return "https://example.com";
   if (key === "page_title") return "Dashboard";
+  if (key === "suffix") return "";
+  if (key === "prefix") return "$";
   if (key === "email") return "hello@example.com";
   if (key === "phone") return "+1 (555) 123-4567";
   if (key === "time" || key === "timestamp") return "10:32 AM";
