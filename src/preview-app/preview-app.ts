@@ -819,6 +819,129 @@ export function getPreviewHtml(): string {
     return Promise.all(promises);
   }
 
+  // Load composite HTML (all scenes in one document) for transport clock mode
+  function loadComposite(project) {
+    state.compositeLoaded = false;
+    state._compositeHtml = null;
+    if (!project || !project.scenes || !project.scenes.length) return Promise.resolve();
+    var compositePath = '/preview-composite/' + state.tenantId + '/' + project.project_id;
+    return fetchHtml(compositePath).then(function(html) {
+      state._compositeHtml = html;
+    }).catch(function(err) {
+      console.warn('[preview] composite load failed, using per-scene mode:', err);
+      state._compositeHtml = null;
+    });
+  }
+
+  // Initialize composite mode: write composite HTML to iframe
+  function initComposite() {
+    if (!state._compositeHtml) return false;
+    writeSceneToIframe(state._compositeHtml);
+    return true;
+  }
+
+  // Wait for composite document to be ready (all scene timelines registered)
+  function waitForCompositeReady(cb) {
+    var attempts = 0;
+    var check = setInterval(function() {
+      attempts++;
+      try {
+        var w = els.previewIframe.contentWindow;
+        if (w && w.__MP_READY && w.__MP_TIMELINE && w.__MP_SCENE_META) {
+          clearInterval(check);
+          state.compositeLoaded = true;
+          state.totalDuration = w.__MP_DURATION || state.totalDuration;
+          cb(w.__MP_TIMELINE);
+        }
+      } catch(e) { clearInterval(check); }
+      if (attempts > 200) {
+        clearInterval(check);
+        console.warn('[preview] composite ready timeout, falling back to per-scene mode');
+      }
+    }, 50);
+  }
+
+  // Get the master timeline from the composite document
+  function getCompositeMasterTimeline() {
+    try {
+      var w = els.previewIframe.contentWindow;
+      return w && w.__MP_TIMELINE;
+    } catch(e) { return null; }
+  }
+
+  // Sync all video elements inside the composite iframe to the master time
+  function syncCompositeVideos(globalTime) {
+    try {
+      var doc = els.previewIframe.contentWindow && els.previewIframe.contentWindow.document;
+      if (!doc) return;
+      var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
+      if (!meta) return;
+      var videos = doc.querySelectorAll('video');
+      for (var vi = 0; vi < videos.length; vi++) {
+        var v = videos[vi];
+        var sceneEl = v.closest('.mp-scene');
+        if (!sceneEl) continue;
+        var sceneId = sceneEl.getAttribute('data-scene-id');
+        var sceneMeta = null;
+        for (var mi = 0; mi < meta.length; mi++) {
+          if (meta[mi].id === sceneId) { sceneMeta = meta[mi]; break; }
+        }
+        if (!sceneMeta) continue;
+
+        var sceneVisible = sceneEl.style.visibility !== 'hidden' && parseFloat(sceneEl.style.opacity || '0') > 0;
+        if (!sceneVisible) {
+          if (!v.paused) v.pause();
+          continue;
+        }
+
+        var localTime = globalTime - sceneMeta.start;
+        if (localTime < 0 || localTime > sceneMeta.duration) continue;
+
+        var startAt = parseFloat(v.getAttribute('data-start-at') || '0');
+        var target = Math.max(0, localTime - startAt);
+
+        if (!v._driftSamples) v._driftSamples = 0;
+        var drift = Math.abs(v.currentTime - target);
+
+        if (drift > 0.5) {
+          v.currentTime = target;
+          v._driftSamples = 0;
+        } else if (drift > 0.04) {
+          v._driftSamples++;
+          if (v._driftSamples >= 2) {
+            v.currentTime = target;
+            v._driftSamples = 0;
+          }
+        } else {
+          v._driftSamples = 0;
+        }
+
+        if (state.playing && v.paused && target < v.duration) {
+          v.play().catch(function(){});
+        } else if (!state.playing && !v.paused) {
+          v.pause();
+        }
+      }
+    } catch(e) {}
+  }
+
+  // Determine which scene index a global time falls in (composite-aware)
+  function compositeSceneForTime(globalTime) {
+    try {
+      var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
+      if (!meta || !meta.length) return { index: 0, localTime: 0 };
+      for (var i = meta.length - 1; i >= 0; i--) {
+        if (globalTime >= meta[i].start) {
+          return { index: i, localTime: globalTime - meta[i].start };
+        }
+      }
+      return { index: 0, localTime: 0 };
+    } catch(e) {
+      return sceneForGlobalTime(globalTime);
+    }
+  }
+
+
   // Load a specific project
   function loadProject(projectId) {
     if (!projectId || !state.tenantId) return;
@@ -871,6 +994,13 @@ export function getPreviewHtml(): string {
           if (project.scenes && project.scenes.length > 0) {
             selectScene(0);
           }
+        }
+      }).catch(function(err) {
+        console.error('[preview] preload/composite error:', err);
+        // Fall back to per-scene mode
+        els.previewPlaceholder.textContent = 'Select a scene to preview';
+        if (project.scenes && project.scenes.length > 0) {
+          selectScene(0);
         }
       });
     }).catch(function() {

@@ -253,53 +253,36 @@ async function main() {
         frameDirsToCleanup.add(extracted.framesDir);
       }
 
-      // Replace <video> with <img> in the DOM
-      const browserLookup: Record<string, { framesDir: string; totalFrames: number }> = {};
-      for (const [src, info] of extractionMap) {
-        browserLookup[src] = { framesDir: info.framesDir, totalFrames: info.totalFrames };
-      }
-
-      await page.evaluate((lookup: Record<string, { framesDir: string; totalFrames: number }>) => {
+      // Hide <video> elements and insert sibling <img> overlays
+      // (HyperFrames approach: don't replace, keep GSAP targets intact)
+      await page.evaluate(() => {
         const videos = document.querySelectorAll("video");
         videos.forEach((video, idx) => {
-          const src = video.src || video.getAttribute("src") || "";
-          const info = lookup[src];
-          if (!info) return;
+          // Hide the video but keep it in the DOM for GSAP
+          video.style.setProperty("visibility", "hidden", "important");
+          video.style.setProperty("pointer-events", "none", "important");
+
+          // Create a sibling <img> that overlays the video's position
           const img = document.createElement("img");
-          const cs = window.getComputedStyle(video);
+          img.id = `__render_frame_${idx}__`;
+          img.className = "__render_frame__";
           img.style.cssText = video.style.cssText;
-          img.style.objectFit = cs.objectFit || "cover";
-          img.style.display = cs.display === "none" ? "none" : (video.style.display || "block");
-          img.style.width = video.style.width || cs.width;
-          img.style.height = video.style.height || cs.height;
+          img.style.position = "absolute";
+          img.style.top = "0";
+          img.style.left = "0";
+          img.style.width = "100%";
+          img.style.height = "100%";
+          img.style.objectFit = "cover";
+          img.style.visibility = "visible";
+          img.style.pointerEvents = "none";
           const startAt = video.getAttribute("data-start-at");
           if (startAt) img.setAttribute("data-start-at", startAt);
           img.setAttribute("data-video-id", `vimg-${idx}`);
-          img.setAttribute("data-video-src", src);
-          img.setAttribute("data-frames-dir", info.framesDir);
-          img.setAttribute("data-total-frames", String(info.totalFrames));
-          img.src = `file://${info.framesDir}/frame-000000.png`;
-          video.replaceWith(img);
-        });
-      }, browserLookup);
 
-      // Wait for initial images to load
-      await page.evaluate(() =>
-        new Promise<void>((resolve) => {
-          const imgs = document.querySelectorAll("img[data-video-id]");
-          if (imgs.length === 0) { resolve(); return; }
-          let pending = imgs.length;
-          const done = () => { if (--pending <= 0) resolve(); };
-          imgs.forEach((img) => {
-            if ((img as HTMLImageElement).complete) { done(); }
-            else {
-              img.addEventListener("load", () => done(), { once: true });
-              img.addEventListener("error", () => done(), { once: true });
-              setTimeout(() => done(), 5000);
-            }
-          });
-        })
-      );
+          // Insert after the video in the same parent container
+          video.parentElement?.appendChild(img);
+        });
+      });
     }
 
     const hasVideos = extractionMap.size > 0;
@@ -312,31 +295,38 @@ async function main() {
         (window as any).__MP_TIMELINE.time(t);
       }, time);
 
-      // Update video frame images
+      // Update video frame images via data URIs (read from disk on Node side)
       if (hasVideos) {
-        await page.evaluate((params: { t: number; fps: number }) =>
+        // Compute which frame each video element needs
+        const frameUpdates: Array<{ imgId: string; dataUri: string }> = [];
+        for (const vInfo of videoInfos) {
+          const extracted = extractionMap.get(vInfo.src);
+          if (!extracted) continue;
+          const targetTime = Math.max(0, time - vInfo.startAt);
+          const frameIndex = Math.min(Math.round(targetTime * args.fps), extracted.totalFrames - 1);
+          const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.png`);
+          const frameData = await fs.readFile(framePath);
+          const dataUri = `data:image/png;base64,${frameData.toString("base64")}`;
+          frameUpdates.push({ imgId: `__render_frame_${vInfo.index}__`, dataUri });
+        }
+
+        // Inject all frames into the browser in one evaluate call
+        await page.evaluate((updates: Array<{ imgId: string; dataUri: string }>) =>
           new Promise<void>((resolve) => {
-            const imgs = document.querySelectorAll("img[data-video-id]");
-            if (imgs.length === 0) { requestAnimationFrame(() => resolve()); return; }
-            let pending = imgs.length;
+            let pending = updates.length;
+            if (pending === 0) { requestAnimationFrame(() => resolve()); return; }
             const done = () => { if (--pending <= 0) requestAnimationFrame(() => resolve()); };
-            imgs.forEach((imgEl) => {
-              const img = imgEl as HTMLImageElement;
-              const startAt = parseFloat(img.getAttribute("data-start-at") || "0");
-              const framesDir = img.getAttribute("data-frames-dir") || "";
-              const totalFrames = parseInt(img.getAttribute("data-total-frames") || "0", 10);
-              if (totalFrames === 0) { done(); return; }
-              const targetTime = Math.max(0, params.t - startAt);
-              const frameIndex = Math.min(Math.round(targetTime * params.fps), totalFrames - 1);
-              const framePath = `file://${framesDir}/frame-${String(frameIndex).padStart(6, "0")}.png`;
-              if (img.src === framePath) { done(); return; }
+            for (const { imgId, dataUri } of updates) {
+              const img = document.getElementById(imgId) as HTMLImageElement | null;
+              if (!img) { done(); continue; }
+              if (img.src === dataUri) { done(); continue; }
               img.addEventListener("load", () => done(), { once: true });
               img.addEventListener("error", () => done(), { once: true });
               setTimeout(() => done(), 3000);
-              img.src = framePath;
-            });
+              img.src = dataUri;
+            }
           }),
-          { t: time, fps: args.fps }
+          frameUpdates
         );
       } else {
         await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
