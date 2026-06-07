@@ -16,8 +16,9 @@ import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
-import { generateComponent } from "./core/component-generator.js";
-import { callLLM, llmConfigFromEnv } from "./llm/client.js";
+import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
+import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
+import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
@@ -803,7 +804,156 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
-      // ── Playground API: List tenant custom components ──
+      // ── Playground API: Generate component from prompt ──
+      if (url === "/playground/api/generate" && method === "POST") {
+        const body = await parseBody(req);
+        const prompt = body.prompt as string;
+        const tenantId = body.tenant_id as string;
+
+        if (!prompt) {
+          jsonResponse(res, 400, { error: "prompt is required" });
+          return;
+        }
+
+        try {
+          const llmConfig = llmConfigFromEnv();
+          const brandKit = tenantId ? await loadBrandKit(tenantId) : undefined;
+
+          const result = await generateComponent({
+            prompt,
+            tenant_id: tenantId || "default",
+            brand_kit: brandKit || undefined,
+            format: (body.format as string) || "video",
+            duration: (body.duration as number) || 4,
+            llmGenerate: async (systemPrompt: string, userPrompt: string) => {
+              return callLLM(llmConfig, [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ], { maxTokens: 8000 });
+            },
+          });
+
+          jsonResponse(res, 200, {
+            source: result.source,
+            type: result.type,
+            preview_path: result.preview_path,
+          });
+        } catch (err) {
+          console.error("[playground] generate error:", err);
+          jsonResponse(res, 500, { error: (err as Error).message });
+        }
+        return;
+      }
+
+      // ── Playground API: Iterate on component ──
+      if (url === "/playground/api/iterate" && method === "POST") {
+        const body = await parseBody(req);
+        const currentSource = body.source as string;
+        const instruction = body.instruction as string;
+        const tenantId = body.tenant_id as string;
+
+        if (!currentSource || !instruction) {
+          jsonResponse(res, 400, { error: "source and instruction are required" });
+          return;
+        }
+
+        try {
+          const llmConfig = llmConfigFromEnv();
+          const systemPrompt = componentSystemPrompt((body.format as string) || "video");
+
+          const userPrompt = `Here is an existing component:
+
+\`\`\`html
+${currentSource}
+\`\`\`
+
+Please modify this component according to the following instruction:
+${instruction}
+
+Return the COMPLETE updated .component.html file. Keep all existing functionality unless the instruction specifically asks to change it. Make only the requested changes.`;
+
+          const raw = await callLLM(llmConfig, [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ], { maxTokens: 8000 });
+
+          // Extract source (strip markdown fences)
+          let source = raw.trim();
+          const fenceMatch = source.match(/```(?:html)?\s*\n([\s\S]*?)\n```/);
+          if (fenceMatch) source = fenceMatch[1].trim();
+
+          jsonResponse(res, 200, { source });
+        } catch (err) {
+          console.error("[playground] iterate error:", err);
+          jsonResponse(res, 500, { error: (err as Error).message });
+        }
+        return;
+      }
+
+      // ── Playground API: Get tenant brand kit ──
+      const brandKitMatch = url.match(/^\/playground\/api\/brand-kit\/([^/]+)$/);
+      if (brandKitMatch && method === "GET") {
+        const tid = decodeURIComponent(brandKitMatch[1]);
+        try {
+          const bk = await loadBrandKit(tid);
+          jsonResponse(res, 200, bk || {});
+        } catch {
+          jsonResponse(res, 200, {});
+        }
+        return;
+      }
+
+      // ── Playground API: Get tenant component source ──
+      const tenantSourceMatch = url.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/source$/);
+      if (tenantSourceMatch && method === "GET") {
+        const [, tid, compType] = tenantSourceMatch.map(decodeURIComponent);
+        // Search all category subdirs
+        const tenantCompDir = path.join(config.dataDir, tid, "components");
+        try {
+          const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
+          for (const cat of cats) {
+            if (!cat.isDirectory()) continue;
+            const filePath = path.join(tenantCompDir, cat.name, `${compType}.component.html`);
+            try {
+              const source = await fs.readFile(filePath, "utf-8");
+              res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+              res.end(source);
+              return;
+            } catch { continue; }
+          }
+          jsonResponse(res, 404, { error: "Component not found" });
+        } catch {
+          jsonResponse(res, 404, { error: "Component not found" });
+        }
+        return;
+      }
+
+      // ── Playground API: Delete tenant component ──
+      const tenantDeleteMatch = url.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)$/);
+      if (tenantDeleteMatch && method === "DELETE") {
+        const [, tid, compType] = tenantDeleteMatch.map(decodeURIComponent);
+        const tenantCompDir = path.join(config.dataDir, tid, "components");
+        try {
+          const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
+          for (const cat of cats) {
+            if (!cat.isDirectory()) continue;
+            const filePath = path.join(tenantCompDir, cat.name, `${compType}.component.html`);
+            try {
+              await fs.unlink(filePath);
+              // Also delete schema if exists
+              try { await fs.unlink(filePath.replace(".component.html", ".schema.json")); } catch {}
+              jsonResponse(res, 200, { ok: true, deleted: compType });
+              return;
+            } catch { continue; }
+          }
+          jsonResponse(res, 404, { error: "Component not found" });
+        } catch {
+          jsonResponse(res, 404, { error: "Component not found" });
+        }
+        return;
+      }
+
+            // ── Playground API: List tenant custom components ──
       const tenantCompMatch = url.match(/^\/playground\/api\/tenant-components\/([^/]+)$/);
       if (tenantCompMatch && method === "GET") {
         const tid = decodeURIComponent(tenantCompMatch[1]);
