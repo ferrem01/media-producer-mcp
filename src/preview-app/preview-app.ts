@@ -1875,6 +1875,8 @@ export function getPreviewHtml(): string {
     var target = globalTime || 0;
     video.currentTime = target;
     if (video.paused) video.play().catch(function(){});
+    // Unmute speaker audio when actively playing
+    video.muted = !state.playing;
   }
 
   function hideSpeakerBg() {
@@ -1882,6 +1884,7 @@ export function getPreviewHtml(): string {
     if (!video) return;
     video.style.display = 'none';
     video.pause();
+    video.muted = true;
     // In composite mode, keep iframe transparent (scene divs have their own backgrounds)
     if (!state.compositeLoaded) {
       els.previewIframe.style.background = '#000';
@@ -1897,9 +1900,11 @@ export function getPreviewHtml(): string {
       video.currentTime = target;
     }
     if (state.playing && video.paused) {
+      video.muted = false;
       video.play().catch(function(){});
     } else if (!state.playing && !video.paused) {
       video.pause();
+      video.muted = true;
     }
   }
 
@@ -1924,6 +1929,7 @@ export function getPreviewHtml(): string {
       }
       pauseAudio();
       if (els.speakerBg && !els.speakerBg.paused) els.speakerBg.pause();
+      if (els.speakerBg) els.speakerBg.muted = true;
     } else {
       // RESUME / PLAY
       state.playing = true;
