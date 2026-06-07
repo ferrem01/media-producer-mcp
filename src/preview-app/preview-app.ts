@@ -388,6 +388,18 @@ export function getPreviewHtml(): string {
   ::-webkit-scrollbar-thumb:active { background: #9ca3af; }
 
   /* Loading spinner */
+  .buffer-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0,0,0,0.7);
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    backdrop-filter: blur(4px);
+  }
+
   .loading-state {
     display: flex; align-items: center; justify-content: center;
     height: 100%; color: #9ca3af; font-size: 12px; text-align: center; padding: 16px;
@@ -430,6 +442,7 @@ export function getPreviewHtml(): string {
       <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
         <video id="speaker-bg" muted playsinline preload="auto" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
         <iframe id="preview-iframe"></iframe>
+        <div id="buffer-overlay" class="buffer-overlay"><div class="loading-state">Buffering media<div class="loading-dots"><span></span><span></span><span></span></div></div></div>
       </div>
     </div>
 
@@ -506,6 +519,7 @@ export function getPreviewHtml(): string {
     slider: document.getElementById('timeline-slider'),
     timeDisplay: document.getElementById('time-display'),
     sceneIndicator: document.getElementById('scene-indicator'),
+    bufferOverlay: document.getElementById('buffer-overlay'),
     audioIndicator: document.getElementById('audio-indicator'),
     layerList: document.getElementById('layer-list'),
     propEditor: document.getElementById('prop-editor')
@@ -1287,13 +1301,14 @@ export function getPreviewHtml(): string {
             updateTimeDisplay(0);
             // Show speaker bg if first scene needs it
             if (isSpeakerScene(0)) { showSpeakerBg(0); } else { hideSpeakerBg(); }
-            // Wait for all videos to buffer before enabling playback
-            els.previewPlaceholder.innerHTML = '<div class=loading-state>Buffering media<div class=loading-dots><span></span><span></span><span></span></div></div>';
+            // Show preview with buffering overlay on top
+            els.previewPlaceholder.style.display = 'none';
+            els.previewWrapper.style.display = '';
+            els.bufferOverlay.style.display = 'flex';
             waitForMediaReady().then(function() {
               els.slider.disabled = false;
               els.playBtn.disabled = false;
-              els.previewPlaceholder.style.display = 'none';
-              els.previewWrapper.style.display = '';
+              els.bufferOverlay.style.display = 'none';
             });
           });
         } else {
