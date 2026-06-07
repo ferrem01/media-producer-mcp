@@ -184,6 +184,51 @@ async function main() {
   const playgroundHtml = getPlaygroundHtml();
 
   // Start HTTP server
+
+/**
+ * Stream a file with Range request support for video/audio playback.
+ * Browsers require HTTP 206 Partial Content for video seeking.
+ */
+async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, filePath: string): Promise<void> {
+  const { createReadStream } = await import("node:fs");
+  const stat = await fs.stat(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    ".mp4": "video/mp4", ".webm": "video/webm", ".mp3": "audio/mpeg",
+    ".wav": "audio/wav", ".ogg": "audio/ogg", ".png": "image/png",
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+    ".svg": "image/svg+xml", ".webp": "image/webp", ".woff2": "font/woff2",
+    ".woff": "font/woff", ".ttf": "font/ttf", ".otf": "font/otf",
+  };
+  const contentType = mimeTypes[ext] || "application/octet-stream";
+  const range = req.headers.range;
+
+  if (range) {
+    const parts = range.replace(/bytes=/, "").split("-");
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+    const chunkSize = end - start + 1;
+    res.writeHead(206, {
+      "Content-Range": `bytes ${start}-${end}/${stat.size}`,
+      "Accept-Ranges": "bytes",
+      "Content-Length": chunkSize,
+      "Content-Type": contentType,
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "public, max-age=3600",
+    });
+    createReadStream(filePath, { start, end }).pipe(res);
+  } else {
+    res.writeHead(200, {
+      "Content-Length": stat.size,
+      "Content-Type": contentType,
+      "Accept-Ranges": "bytes",
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "public, max-age=3600",
+    });
+    createReadStream(filePath).pipe(res);
+  }
+}
+
   const httpServer = http.createServer(async (req, res) => {
     const url = req.url || "";
     const method = req.method || "GET";
@@ -290,15 +335,11 @@ async function main() {
 
       // ── Static asset serving for project/tenant assets ──
       const assetMatch = urlPath.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
-      if (assetMatch && method === "GET") {
+      if (assetMatch && (method === "GET" || method === "HEAD")) {
         const [, assetTenantId, assetProjectId, assetPath] = assetMatch.map(decodeURIComponent);
         const fullPath = path.join(config.dataDir, assetTenantId, "projects", assetProjectId, "assets", assetPath);
         try {
-          const data = await fs.readFile(fullPath);
-          const ext = path.extname(fullPath).toLowerCase();
-          const contentType = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".gif" ? "image/gif" : ext === ".mp4" ? "video/mp4" : ext === ".mp3" ? "audio/mpeg" : ext === ".wav" ? "audio/wav" : ext === ".webm" ? "video/webm" : "application/octet-stream";
-          res.writeHead(200, { "Content-Type": contentType, "Content-Length": data.length, "Cache-Control": "public, max-age=3600" });
-          res.end(data);
+          await streamFile(req, res, fullPath);
         } catch {
           res.writeHead(404);
           res.end("Asset not found");
@@ -309,22 +350,11 @@ async function main() {
 
       // ── Static asset serving for tenant-level assets ──
       const tenantAssetMatch = urlPath.match(/^\/assets\/([^/]+)\/assets\/(.+)$/);
-      if (tenantAssetMatch && method === "GET") {
+      if (tenantAssetMatch && (method === "GET" || method === "HEAD")) {
         const [, taTenantId, taAssetPath] = tenantAssetMatch.map(decodeURIComponent);
         const fullPath = path.join(config.dataDir, taTenantId, "assets", taAssetPath);
         try {
-          const stat = await fs.stat(fullPath);
-          const ext = path.extname(fullPath).toLowerCase();
-          const contentType = ext === ".mp4" ? "video/mp4" : ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".webm" ? "video/webm" : ext === ".mp3" ? "audio/mpeg" : ext === ".wav" ? "audio/wav" : "application/octet-stream";
-          const { createReadStream } = await import("node:fs");
-          res.writeHead(200, {
-            "Content-Type": contentType,
-            "Content-Length": stat.size,
-            "Cache-Control": "public, max-age=3600",
-            "Access-Control-Allow-Origin": "*",
-            "Accept-Ranges": "bytes",
-          });
-          createReadStream(fullPath).pipe(res);
+          await streamFile(req, res, fullPath);
         } catch {
           res.writeHead(404);
           res.end("Asset not found");
@@ -334,23 +364,11 @@ async function main() {
 
       // ── Static asset serving for _work directory files (preview only) ──
       const workMatch = urlPath.match(/^\/work\/([^/]+)\/projects\/([^/]+)\/(.+)$/);
-      if (workMatch && method === "GET") {
+      if (workMatch && (method === "GET" || method === "HEAD")) {
         const [, workTenantId, workProjectId, workPath] = workMatch.map(decodeURIComponent);
         const fullPath = path.join(config.dataDir, workTenantId, "projects", workProjectId, "_work", workPath);
         try {
-          const stat = await fs.stat(fullPath);
-          const ext = path.extname(fullPath).toLowerCase();
-          const contentType = ext === ".mp4" ? "video/mp4" : ext === ".png" ? "image/png" : ext === ".webm" ? "video/webm" : ext === ".mp3" ? "audio/mpeg" : "application/octet-stream";
-          // Stream for large files (videos)
-          const { createReadStream } = await import("node:fs");
-          res.writeHead(200, {
-            "Content-Type": contentType,
-            "Content-Length": stat.size,
-            "Cache-Control": "no-cache",
-            "Access-Control-Allow-Origin": "*",
-            "Accept-Ranges": "bytes",
-          });
-          createReadStream(fullPath).pipe(res);
+          await streamFile(req, res, fullPath);
         } catch {
           res.writeHead(404);
           res.end("Work file not found");
@@ -360,15 +378,11 @@ async function main() {
 
       // ── Static asset serving for brand-kit assets ──
       const brandAssetMatch = urlPath.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);
-      if (brandAssetMatch && method === "GET") {
+      if (brandAssetMatch && (method === "GET" || method === "HEAD")) {
         const [, brandTenantId, brandAssetPath] = brandAssetMatch.map(decodeURIComponent);
         const fullPath = path.join(config.dataDir, brandTenantId, "brand-kit", "assets", brandAssetPath);
         try {
-          const data = await fs.readFile(fullPath);
-          const ext = path.extname(fullPath).toLowerCase();
-          const contentType = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".gif" ? "image/gif" : ext === ".svg" ? "image/svg+xml" : ext === ".webp" ? "image/webp" : ext === ".woff2" ? "font/woff2" : ext === ".woff" ? "font/woff" : ext === ".ttf" ? "font/ttf" : ext === ".otf" ? "font/otf" : ext === ".mp4" ? "video/mp4" : ext === ".mp3" ? "audio/mpeg" : "application/octet-stream";
-          res.writeHead(200, { "Content-Type": contentType, "Content-Length": data.length, "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" });
-          res.end(data);
+          await streamFile(req, res, fullPath);
         } catch {
           res.writeHead(404);
           res.end("Brand asset not found");
@@ -378,7 +392,7 @@ async function main() {
 
       // ── Serve rendered output files ──
       const outputMatch = urlPath.match(/^\/output\/([^/]+)\/projects\/([^/]+)\/(.+)$/);
-      if (outputMatch && method === "GET") {
+      if (outputMatch && (method === "GET" || method === "HEAD")) {
         const [, outTenantId, outProjectId, outPath] = outputMatch.map(decodeURIComponent);
         const fullPath = path.join(config.dataDir, outTenantId, "projects", outProjectId, "output", outPath);
         try {
