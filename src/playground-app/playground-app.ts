@@ -517,17 +517,81 @@ body {
     schedulePreview();
   }
 
-  // ── Extract default data from template data-bind attributes ──
+  // ── Extract default data from component source ──
   function extractDefaultData(source) {
     var data = {};
-    var matches = source.match(/data-bind="([^"]+)"/g);
-    if (matches) {
-      matches.forEach(function(m) {
+
+    // 1. Extract data-bind attributes
+    var bindMatches = source.match(/data-bind="([^"]+)"/g);
+    if (bindMatches) {
+      bindMatches.forEach(function(m) {
         var key = m.match(/data-bind="([^"]+)"/)[1];
-        data[key] = '';
+        if (!data[key]) data[key] = generatePlaceholder(key);
       });
     }
+
+    // 2. Extract data.xxx references from script
+    var dataRefs = source.match(/data\.([a-zA-Z_][a-zA-Z0-9_]*)/g);
+    if (dataRefs) {
+      dataRefs.forEach(function(m) {
+        var key = m.replace('data.', '');
+        if (key === 'length' || key === 'forEach' || key === 'map' || key === 'filter') return;
+        if (!data[key]) data[key] = generatePlaceholder(key);
+      });
+    }
+
+    // 3. Extract {{mustache}} references from template
+    var mustacheMatches = source.match(/\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g);
+    if (mustacheMatches) {
+      mustacheMatches.forEach(function(m) {
+        var key = m.replace(/\{\{|\}\}/g, '');
+        if (!data[key]) data[key] = generatePlaceholder(key);
+      });
+    }
+
     return JSON.stringify(data, null, 2);
+  }
+
+  function generatePlaceholder(key) {
+    var k = key.toLowerCase();
+    // Numbers / stats
+    if (k === 'stat' || k === 'value' || k === 'number' || k === 'count') return '2,847';
+    if (k === 'percentage' || k === 'percent') return '94%';
+    if (k === 'price') return '$49';
+    if (k === 'rating') return '4.9';
+    if (k === 'duration') return 5;
+    if (k === 'delay' || k === 'speed') return 1;
+    if (k === 'z_index' || k === 'zindex') return 10;
+    if (k === 'opacity') return 1;
+    if (k === 'scale') return 1;
+    if (k === 'columns' || k === 'rows' || k === 'count') return 3;
+    // Colors
+    if (k.indexOf('color') >= 0 || k.indexOf('colour') >= 0) return '#6366f1';
+    if (k.indexOf('background') >= 0 || k === 'bg') return '#0f172a';
+    // URLs
+    if (k === 'url' || k === 'link' || k === 'href') return 'https://example.com';
+    if (k === 'src' || k === 'image' || k === 'img' || k === 'photo' || k === 'avatar') return '';
+    if (k === 'logo' || k === 'icon') return '';
+    if (k === 'video') return '';
+    // Text fields
+    if (k === 'headline' || k === 'title' || k === 'heading' || k === 'name') return 'Your Headline Here';
+    if (k === 'subtitle' || k === 'subheading' || k === 'sub_title') return 'Supporting text goes here';
+    if (k === 'description' || k === 'desc' || k === 'body' || k === 'text' || k === 'content') return 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.';
+    if (k === 'label' || k === 'tag' || k === 'badge' || k === 'eyebrow' || k === 'category') return 'Featured';
+    if (k === 'button' || k === 'cta' || k === 'button_text' || k === 'cta_text') return 'Get Started';
+    if (k === 'author' || k === 'speaker' || k === 'person') return 'Jane Smith';
+    if (k === 'role' || k === 'job_title' || k === 'position') return 'CEO & Founder';
+    if (k === 'company' || k === 'org' || k === 'organization') return 'Acme Inc';
+    if (k === 'quote' || k === 'testimonial') return '"This product transformed our workflow completely."';
+    if (k === 'page_title') return 'Dashboard';
+    if (k.indexOf('feature') >= 0) return 'Smart Analytics';
+    if (k.indexOf('item') >= 0 || k.indexOf('list') >= 0) return 'Item One';
+    // Boolean
+    if (k === 'show' || k === 'visible' || k === 'enabled' || k === 'active') return true;
+    if (k === 'dark' || k === 'inverted' || k === 'reversed') return false;
+    // Catch-all
+    if (k.indexOf('text') >= 0 || k.indexOf('copy') >= 0) return 'Sample text';
+    return 'Sample Value';
   }
 
   // ── Preview ──
