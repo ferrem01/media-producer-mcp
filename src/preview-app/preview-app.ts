@@ -1039,6 +1039,68 @@ export function getPreviewHtml(): string {
     }
   }
 
+  // Wait for all video elements to buffer enough for smooth playback.
+  // Returns a Promise that resolves when speaker bg + all iframe videos
+  // have fired canplaythrough (or timeout after 8s).
+  function waitForMediaReady() {
+    return new Promise(function(resolve) {
+      var videos = [];
+      var timeout = 8000;
+
+      // Speaker bg
+      var spk = els.speakerBg;
+      if (spk && spk.src && spk.src !== window.location.href) {
+        videos.push(spk);
+      }
+
+      // Scene videos inside composite iframe
+      try {
+        var doc = els.previewIframe.contentWindow && els.previewIframe.contentWindow.document;
+        if (doc) {
+          var iframeVids = doc.querySelectorAll('video');
+          for (var i = 0; i < iframeVids.length; i++) {
+            videos.push(iframeVids[i]);
+          }
+        }
+      } catch(e) {}
+
+      if (videos.length === 0) { resolve(); return; }
+
+      var remaining = videos.length;
+      var resolved = false;
+
+      function onReady() {
+        remaining--;
+        if (remaining <= 0 && !resolved) {
+          resolved = true;
+          resolve();
+        }
+      }
+
+      for (var i = 0; i < videos.length; i++) {
+        var v = videos[i];
+        // readyState 4 = HAVE_ENOUGH_DATA (canplaythrough already fired)
+        if (v.readyState >= 4) {
+          onReady();
+        } else {
+          v.addEventListener('canplaythrough', onReady, { once: true });
+          // Also trigger a load if the video hasn't started loading
+          if (v.readyState === 0 && v.src) {
+            v.load();
+          }
+        }
+      }
+
+      // Timeout fallback -- don't block forever on slow connections
+      setTimeout(function() {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      }, timeout);
+    });
+  }
+
   function preloadScenes(project) {
     state.sceneHtmlCache = {};
     // Preload the speaker video alongside scenes
@@ -1220,13 +1282,19 @@ export function getPreviewHtml(): string {
             updateSceneIndicator();
             // Seek to start
             masterTl.time(0);
-            els.slider.disabled = false;
-            els.playBtn.disabled = false;
             state.masterTime = 0;
             els.slider.value = 0;
             updateTimeDisplay(0);
             // Show speaker bg if first scene needs it
             if (isSpeakerScene(0)) { showSpeakerBg(0); } else { hideSpeakerBg(); }
+            // Wait for all videos to buffer before enabling playback
+            els.previewPlaceholder.innerHTML = '<div class=loading-state>Buffering media<div class=loading-dots><span></span><span></span><span></span></div></div>';
+            waitForMediaReady().then(function() {
+              els.slider.disabled = false;
+              els.playBtn.disabled = false;
+              els.previewPlaceholder.style.display = 'none';
+              els.previewWrapper.style.display = '';
+            });
           });
         } else {
           // Fallback: per-scene mode
