@@ -277,3 +277,30 @@ src/
 7. **Format-agnostic project model.** `project.json` works for video, image, slideshow, GIF, email header, etc. The render pipeline adapts based on `format`.
 
 8. **Brand kit as CSS variables.** Components don't hardcode colors or fonts. They use `--mp-color-primary`, `--mp-font-family`, etc. Brand consistency is automatic.
+
+---
+
+## Roadmap
+
+Prioritized list of what's next. Updated as things ship.
+
+### High Priority
+- [ ] **Tenant Component Playground** -- rework from catalog browser to LLM-driven iteration tool. Prompt-based component creation, live preview, version history. Big lift.
+- [ ] **Render speed** -- showcase test took 529s for 40s video. Look at parallelizing frame captures further, draft resolution mode, frame skip for previews.
+
+### Medium Priority
+- [ ] **Preview SPA polish** -- scene click auto-plays from that point, playback rate (0.5x/1x/2x), keyboard shortcuts (space, arrow keys)
+- [ ] **Preview multi-clip speaker** -- preview SPA only reads `clips[0]`, render pipeline already handles multiple clips
+- [ ] **frameADataUri URL leak** -- old transition HTML was leaking literal JS into img src. Probably dead after Phase 3 cleanup but verify render pipeline doesn't have same issue.
+
+### Lower Priority
+- [ ] **Auth for preview SPA** -- anyone with the URL can access any tenant's projects. Token param exists but isn't validated. Low priority unless sharing preview links externally.
+
+### Done / Already Working
+- [x] GIF export (`renderGif` -- captures all scene frames, encodes via ffmpeg)
+- [x] Social batch export (`renderSocial` -- first scene at multiple social sizes)
+- [x] Deck/PDF export (`renderDeck` -- each scene as PNG slide)
+- [x] Email header export (`renderEmailHeader` -- static image)
+- [x] Multiple speaker clips (`speaker-track.ts` handles concat of multiple clips)
+- [x] Preview SPA v2 (transport clock, composite, unified media sync)
+- [x] Old overlay system removed (replaced by component-level `source: "speaker"`)
