@@ -455,7 +455,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
 
       // ── Preview SPA ──
       if (url.startsWith("/preview")) {
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(previewHtml);
         return;
       }
