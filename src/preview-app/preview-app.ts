@@ -1936,6 +1936,10 @@ export function getPreviewHtml(): string {
         // Composite mode: just start the transport clock loop
         // Master timeline is always paused; we seek it on each tick
         state.lastTickTime = performance.now();
+        // Start speaker video if current scene needs it
+        if (isSpeakerScene(state.currentSceneIndex)) {
+          showSpeakerBg(globalTime);
+        }
         playAudio();
         syncAudioToGlobalTime(globalTime);
         animLoop();
