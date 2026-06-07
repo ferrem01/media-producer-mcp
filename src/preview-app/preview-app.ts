@@ -1968,6 +1968,17 @@ export function getPreviewHtml(): string {
     state.animFrameId = requestAnimationFrame(animLoop);
   }
 
+  // Wrap animLoop with error recovery so the rAF chain never breaks
+  var _rawAnimLoop = animLoop;
+  animLoop = function() {
+    try { _rawAnimLoop(); }
+    catch(e) {
+      console.error('[preview] animLoop error:', e);
+      // Keep the loop alive
+      state.animFrameId = requestAnimationFrame(animLoop);
+    }
+  };
+
   function scrub(sliderVal) {
     var totalDur = state.totalDuration;
     if (totalDur <= 0) return;
@@ -2075,6 +2086,20 @@ export function getPreviewHtml(): string {
   });
   els.playBtn.addEventListener('click', togglePlay);
   els.slider.addEventListener('input', function() { scrub(parseInt(els.slider.value, 10)); });
+
+  // Global error handler - show errors visually
+  window.addEventListener('error', function(e) {
+    console.error('[preview] Uncaught error:', e.error || e.message);
+    var banner = document.getElementById('error-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'error-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc2626;color:#fff;padding:8px 16px;font-size:13px;z-index:9999;font-family:monospace;cursor:pointer;';
+      banner.onclick = function() { banner.remove(); };
+      document.body.appendChild(banner);
+    }
+    banner.textContent = 'Error: ' + (e.message || 'Unknown') + ' (line ' + e.lineno + ')';
+  });
 
   // Init from URL params
   var params = new URLSearchParams(window.location.search);
