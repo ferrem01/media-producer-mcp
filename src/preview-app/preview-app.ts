@@ -673,6 +673,12 @@ export function getPreviewHtml(): string {
         var startAt = parseFloat(v.getAttribute('data-start-at') || '0');
         v._mpRegistered = true;
         v._mpSceneEl = sceneEl;
+        // Detect if this video is the speaker track (PiP speaker scenes)
+        var speakerClipUrl = getSpeakerClipUrl();
+        var isSpeakerVideo = speakerClipUrl && v.src && (
+          v.src === speakerClipUrl ||
+          v.src.indexOf(speakerClipUrl.split('/').pop()) >= 0
+        );
         state.mediaClips.push({
           el: v,
           kind: 'scene-video',
@@ -681,6 +687,7 @@ export function getPreviewHtml(): string {
           start: sceneMeta.start,
           end: sceneMeta.start + sceneMeta.duration,
           offset: startAt,
+          isSpeaker: !!isSpeakerVideo,
           lastOffset: null,
           driftSamples: 0
         });
@@ -745,7 +752,22 @@ export function getPreviewHtml(): string {
           if (!el.paused) el.pause();
           continue;
         }
-        var target = clip.offset + localTime;
+        var target;
+        if (clip.isSpeaker) {
+          // Speaker-sourced video: sync to global time + speaker trim offset
+          // The speaker track runs continuously; ignore scene-level start_at
+          var spkTrimStart = 0;
+          for (var si = 0; si < state.mediaClips.length; si++) {
+            if (state.mediaClips[si].kind === 'speaker') {
+              spkTrimStart = state.mediaClips[si].trimStart || 0;
+              break;
+            }
+          }
+          target = time + spkTrimStart;
+        } else {
+          // Regular video asset: start_at is source offset
+          target = clip.offset + localTime;
+        }
         syncElement(clip, el, target, playing, true);
         continue;
       }
