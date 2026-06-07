@@ -12,7 +12,6 @@ export function getPreviewHtml(): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Media Producer</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -710,7 +709,7 @@ export function getPreviewHtml(): string {
     } catch(e) {}
   }
 
-  // The unified sync function -- replaces syncCompositeVideos, syncSpeakerBg, and inline audio sync.
+  // Unified media sync -- three-tier drift correction for all media elements.
   function syncMedia(time, playing) {
     // Discover any new scene videos from iframe
     discoverSceneVideos();
@@ -940,15 +939,6 @@ export function getPreviewHtml(): string {
     });
     state.musicStarted = true;
     startDucking();
-  }
-
-  // Pause only non-music audio. Music keeps playing.
-  function pauseMusicKeepPlaying() {
-    state.audioElements.forEach(function(audio) {
-      if (audio._trackType !== 'music') {
-        audio.pause();
-      }
-    });
   }
 
   function pauseAudio() {
@@ -1186,60 +1176,6 @@ export function getPreviewHtml(): string {
   }
 
   // Sync all video elements inside the composite iframe to the master time
-  function syncCompositeVideos(globalTime) {
-    try {
-      var doc = els.previewIframe.contentWindow && els.previewIframe.contentWindow.document;
-      if (!doc) return;
-      var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
-      if (!meta) return;
-      var videos = doc.querySelectorAll('video');
-      for (var vi = 0; vi < videos.length; vi++) {
-        var v = videos[vi];
-        var sceneEl = v.closest('.mp-scene');
-        if (!sceneEl) continue;
-        var sceneId = sceneEl.getAttribute('data-scene-id');
-        var sceneMeta = null;
-        for (var mi = 0; mi < meta.length; mi++) {
-          if (meta[mi].id === sceneId) { sceneMeta = meta[mi]; break; }
-        }
-        if (!sceneMeta) continue;
-
-        var sceneVisible = sceneEl.style.visibility !== 'hidden' && parseFloat(sceneEl.style.opacity || '0') > 0;
-        if (!sceneVisible) {
-          if (!v.paused) v.pause();
-          continue;
-        }
-
-        var localTime = globalTime - sceneMeta.start;
-        if (localTime < 0 || localTime > sceneMeta.duration) continue;
-
-        var startAt = parseFloat(v.getAttribute('data-start-at') || '0');
-        var target = Math.max(0, localTime - startAt);
-
-        if (!v._driftSamples) v._driftSamples = 0;
-        var drift = Math.abs(v.currentTime - target);
-
-        if (drift > 0.5) {
-          v.currentTime = target;
-          v._driftSamples = 0;
-        } else if (drift > 0.04) {
-          v._driftSamples++;
-          if (v._driftSamples >= 2) {
-            v.currentTime = target;
-            v._driftSamples = 0;
-          }
-        } else {
-          v._driftSamples = 0;
-        }
-
-        if (state.playing && v.paused && target < v.duration) {
-          v.play().catch(function(){});
-        } else if (!state.playing && !v.paused) {
-          v.pause();
-        }
-      }
-    } catch(e) {}
-  }
 
   // Determine which scene index a global time falls in (composite-aware)
   function compositeSceneForTime(globalTime) {
@@ -1300,7 +1236,6 @@ export function getPreviewHtml(): string {
             els.slider.value = 0;
             updateTimeDisplay(0);
             // Show speaker bg if first scene needs it
-            if (isSpeakerScene(0)) { showSpeakerBg(0); } else { hideSpeakerBg(); }
             // Show preview with buffering overlay on top
             els.previewPlaceholder.style.display = 'none';
             els.previewWrapper.style.display = '';
@@ -1386,7 +1321,6 @@ export function getPreviewHtml(): string {
     updatePlayIcon();
 
     // Don't touch music audio on manual scene click. Only pause voiceover/sfx.
-    pauseMusicKeepPlaying();
 
     updateActiveScene(index);
 
@@ -1400,28 +1334,14 @@ export function getPreviewHtml(): string {
         masterTl.time(sceneStart);
         masterTl.pause();
       }
-      syncCompositeVideos(sceneStart);
       els.slider.value = state.totalDuration > 0 ? Math.round((sceneStart / state.totalDuration) * 1000) : 0;
       updateTimeDisplay(sceneStart);
       updateSceneIndicator();
       // Speaker track
-      if (isSpeakerScene(index)) { showSpeakerBg(sceneStart); } else { hideSpeakerBg(); }
-      syncSpeakerBg(sceneStart);
       renderLayers();
       clearProps();
     } else {
-      // Legacy per-scene mode
-      state.masterTime = sceneOffset(index);
-      // Speaker track: show/hide background video
-      if (isSpeakerScene(index)) {
-        showSpeakerBg(state.masterTime);
-      } else {
-        hideSpeakerBg();
-      }
-      loadPreview();
-      renderLayers();
-      clearProps();
-    }
+
   }
 
   // Update scene list active highlight without re-rendering
@@ -1467,65 +1387,10 @@ export function getPreviewHtml(): string {
   }
 
   // Build transition HTML from two data URI frames
-  function buildTransitionHtml(frameADataUri, frameBDataUri, type, duration, width, height, gsapSrc) {
-    var animScript = getTransitionGsap(type, duration);
-    return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
-      '* { margin: 0; padding: 0; box-sizing: border-box; }' +
-      'html, body { width: ' + width + 'px; height: ' + height + 'px; overflow: hidden; background: #000; }' +
-      '#frameA, #frameB { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }' +
-      "</style><scr" + "ipt>" + gsapSrc + "</scr" + "ipt></head><body>" +
-      '<img id="frameA" src="' + frameADataUri + '">' +
-      '<img id="frameB" src="' + frameBDataUri + '">' +
-      "<scr" + "ipt>(function() {" +
-      'var imgA = document.getElementById("frameA"); var imgB = document.getElementById("frameB");' +
-      'var dur = ' + duration + '; var tl = gsap.timeline({ paused: true });' +
-      animScript +
-      'window.__MP_TIMELINE = tl; window.__MP_DURATION = dur; window.__MP_READY = true;' +
-      "})();</scr" + "ipt></body></html>";
-  }
 
-  // Capture the current iframe content as a data URI using html2canvas
-  function captureIframeAsDataUri(callback) {
-    try {
-      var doc = els.previewIframe.contentDocument || els.previewIframe.contentWindow.document;
-      var body = doc.body || doc.documentElement;
-      html2canvas(body, {
-        width: els.previewIframe.width,
-        height: els.previewIframe.height,
-        scale: 1,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#000',
-      }).then(function(canvas) {
-        callback(canvas.toDataURL('image/jpeg', 0.85));
-      }).catch(function() {
-        callback(null);
-      });
-    } catch(e) {
-      callback(null);
-    }
-  }
 
   // GSAP source cache for transition HTML
   var _gsapSrcCache = null;
-  function getGsapSource(callback) {
-    if (_gsapSrcCache) { callback(_gsapSrcCache); return; }
-    // Fetch GSAP from one of the scene HTML pages (it's embedded)
-    var project = state.currentProject;
-    if (project && project.scenes && project.scenes.length > 0) {
-      var sceneHtml = state.sceneHtmlCache[project.scenes[0].id];
-      if (sceneHtml) {
-        // Extract GSAP source from between the first <script> tags
-        var match = sceneHtml.match(new RegExp('<' + 'script>([\\s\\S]*?gsap[\\s\\S]*?)</' + 'script>'));
-        if (match) { _gsapSrcCache = match[1]; callback(_gsapSrcCache); return; }
-      }
-    }
-    // Fallback: fetch from CDN
-    fetch('https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js')
-      .then(function(r) { return r.text(); })
-      .then(function(src) { _gsapSrcCache = src; callback(src); })
-      .catch(function() { callback(''); });
-  }
 
   // Write cached HTML into the preview iframe
   function writeSceneToIframe(html) {
@@ -2110,29 +1975,6 @@ export function getPreviewHtml(): string {
   // Sync <video> elements inside the preview iframe to the scene local time.
   // For live preview: let video play naturally, only seek on large drift or scrub.
   // For capture mode the scene-worker handles frame-by-frame seeking.
-  function syncIframeVideos(localTime, forceSeek) {
-    try {
-      var iframeDoc = els.previewIframe.contentWindow && els.previewIframe.contentWindow.document;
-      if (!iframeDoc) return;
-      var videos = iframeDoc.querySelectorAll('video');
-      for (var i = 0; i < videos.length; i++) {
-        var v = videos[i];
-        var startAt = parseFloat(v.getAttribute('data-start-at') || '0');
-        var target = Math.max(0, localTime - startAt);
-        if (forceSeek || !v._synced) {
-          v.currentTime = target;
-          v._synced = true;
-        } else {
-          // Tight drift correction (0.15s) keeps multi-video grids in sync
-          if (Math.abs(v.currentTime - target) > 0.15) v.currentTime = target;
-        }
-        // Ensure video is playing during playback
-        if (state.playing && v.paused && target < v.duration) {
-          v.play().catch(function(){});
-        }
-      }
-    } catch(e) {}
-  }
 
   // Find which scene a global time falls in, returns { index, localTime }
   function sceneForGlobalTime(globalTime) {
@@ -2177,56 +2019,8 @@ export function getPreviewHtml(): string {
     return scene.transparent_background === true;
   }
 
-  function showSpeakerBg(globalTime) {
-    var video = els.speakerBg;
-    if (!video) return;
-    var clipUrl = getSpeakerClipUrl();
-    if (!clipUrl) { video.style.display = 'none'; return; }
-    // Set src if needed
-    if (!video.src || video.src === '' || video.src === window.location.href) {
-      video.src = clipUrl;
-      video.load();
-    }
-    // Make iframe transparent so speaker shows through
-    els.previewIframe.style.background = 'transparent';
-    // Always show the video element -- let it buffer visually
-    video.style.display = 'block';
-    // Sync time
-    var target = globalTime || 0;
-    video.currentTime = target;
-    if (video.paused) video.play().catch(function(){});
-    // Unmute speaker audio when actively playing
-    video.muted = !state.playing;
-  }
 
-  function hideSpeakerBg() {
-    var video = els.speakerBg;
-    if (!video) return;
-    video.style.display = 'none';
-    video.pause();
-    video.muted = true;
-    // In composite mode, keep iframe transparent (scene divs have their own backgrounds)
-    if (!state.compositeLoaded) {
-      els.previewIframe.style.background = '#000';
-    }
-  }
 
-  function syncSpeakerBg(globalTime) {
-    if (!isSpeakerScene(state.currentSceneIndex)) return;
-    var video = els.speakerBg;
-    if (!video || video.style.display === 'none') return;
-    var target = globalTime || 0;
-    if (Math.abs(video.currentTime - target) > 0.5) {
-      video.currentTime = target;
-    }
-    if (state.playing && video.paused) {
-      video.muted = false;
-      video.play().catch(function(){});
-    } else if (!state.playing && !video.paused) {
-      video.pause();
-      video.muted = true;
-    }
-  }
 
   function togglePlay() {
     if (state.playing) {
@@ -2241,8 +2035,7 @@ export function getPreviewHtml(): string {
 
       if (state.compositeLoaded) {
         // Composite mode: pause master timeline (it's always paused, we just stop the clock)
-        // Videos will be paused by syncCompositeVideos on next check
-        syncCompositeVideos(state.masterTime);
+        // Videos will be paused by syncMedia on next tick
       } else {
         var tl = getTimeline();
         if (tl) tl.pause();
@@ -2273,46 +2066,7 @@ export function getPreviewHtml(): string {
         return;
       }
 
-      // Legacy per-scene mode
-      var info = sceneForGlobalTime(globalTime);
-      var project = state.currentProject;
 
-      if (info.index !== state.currentSceneIndex && project && project.scenes) {
-        state.currentSceneIndex = info.index;
-        state.currentComponentIndex = -1;
-        state.duration = project.scenes[info.index].duration_seconds || 0;
-        updateActiveScene(info.index);
-        renderLayers();
-        clearProps();
-        updateSceneIndicator();
-
-        var scene = project.scenes[info.index];
-        var html = state.sceneHtmlCache[scene.id];
-        if (html != null) {
-          writeSceneToIframe(html);
-          waitForReady(function(newTl) {
-            newTl.time(Math.min(info.localTime, newTl.duration()));
-            newTl.play();
-            state.lastTickTime = performance.now();
-            playAudio();
-            syncAudioToGlobalTime(globalTime);
-            animLoop();
-          });
-        }
-        return;
-      }
-
-      var tl = getTimeline();
-      if (tl) {
-        tl.time(Math.min(info.localTime, tl.duration()));
-        tl.play();
-      }
-
-      state.lastTickTime = performance.now();
-      playAudio();
-      syncAudioToGlobalTime(globalTime);
-      animLoop();
-    }
   }
 
   function stopPlayback() {
@@ -2385,179 +2139,6 @@ export function getPreviewHtml(): string {
       return;
     }
 
-    // ── Legacy per-scene mode ──
-    // Clamp to total duration
-    if (globalTime >= totalDur) {
-      state.masterTime = totalDur;
-      globalTime = totalDur;
-      // Playback complete
-      stopPlayback();
-      var tl = getTimeline();
-      if (tl) tl.pause();
-      stopAudioFull();
-      updateTimeDisplay(globalTime);
-      els.slider.value = 1000;
-      return;
-    }
-
-    // Update UI
-    els.slider.value = totalDur > 0 ? Math.round((globalTime / totalDur) * 1000) : 0;
-    updateTimeDisplay(globalTime);
-
-    // Keep audio in sync (correct drift > 0.3s)
-    state.audioElements.forEach(function(audio) {
-      if (audio.paused) return;
-      var dur = audio.duration;
-      if (!dur || !isFinite(dur)) return;
-
-      if (audio._trackType === 'music' && audio.loop) {
-        // Looping music: sync to globalTime modulo duration
-        var expectedTime = globalTime % dur;
-        if (Math.abs(audio.currentTime - expectedTime) > 0.5) {
-          audio.currentTime = expectedTime;
-        }
-      } else {
-        // Non-looping tracks (voiceover, sfx): if track has ended, leave it alone
-        if (globalTime >= dur) return;
-        if (Math.abs(audio.currentTime - globalTime) > 0.5) {
-          audio.currentTime = Math.min(globalTime, dur);
-        }
-      }
-    });
-
-    // Determine which scene we should be on based on master clock
-    var info = sceneForGlobalTime(globalTime);
-
-    if (info.index !== state.currentSceneIndex && state.playAll) {
-      // Scene transition - use cached HTML, no network fetch
-      var project = state.currentProject;
-      state.currentSceneIndex = info.index;
-      state.currentComponentIndex = -1;
-      updateActiveScene(info.index);
-      renderLayers();
-      clearProps();
-      updateSceneIndicator();
-
-      var scene = project.scenes[info.index];
-      state.duration = scene.duration_seconds || 0;
-      var html = state.sceneHtmlCache[scene.id];
-
-      if (html != null) {
-        // Check if we need to play a transition
-        var transIn = project.scenes[info.index] && project.scenes[info.index].transition_in;
-        if (false && transIn && transIn.type && transIn.duration_seconds > 0 && !state._inTransition) {
-          state._inTransition = true;
-          var transDuration = transIn.duration_seconds;
-
-          // Capture outgoing scene
-          captureIframeAsDataUri(function(frameAUri) {
-            if (!frameAUri) {
-              // Capture failed, just do a hard cut
-              state._inTransition = false;
-              if (isSpeakerScene(info.index)) { showSpeakerBg(state.masterTime); } else { hideSpeakerBg(); }
-              writeSceneToIframe(html);
-              waitForReady(function(newTl) {
-                var seekTime = Math.min(info.localTime, newTl.duration());
-                newTl.time(seekTime); newTl.play();
-                syncIframeVideos(seekTime);
-                try { var vids = els.previewIframe.contentWindow.document.querySelectorAll('video'); for (var vi = 0; vi < vids.length; vi++) vids[vi].play().catch(function(){}); } catch(e) {}
-              });
-              return;
-            }
-
-            // Render incoming scene in a hidden iframe to capture its first frame
-            // First write the incoming scene to get frame B
-            if (isSpeakerScene(info.index)) { showSpeakerBg(state.masterTime); } else { hideSpeakerBg(); }
-            writeSceneToIframe(html);
-            waitForReady(function(newTl) {
-              newTl.time(0);
-              // Small delay to let the first frame render
-              setTimeout(function() {
-                captureIframeAsDataUri(function(frameBUri) {
-                  if (!frameBUri) {
-                    // Just play scene B normally
-                    var seekTime = Math.min(info.localTime, newTl.duration());
-                    newTl.time(seekTime); newTl.play();
-                    syncIframeVideos(seekTime);
-                    state._inTransition = false;
-                    return;
-                  }
-
-                  // Build and play the transition
-                  var w = (project.canvas && project.canvas.width) || 1920;
-                  var h = (project.canvas && project.canvas.height) || 1080;
-                  getGsapSource(function(gsapSrc) {
-                    var transHtml = buildTransitionHtml(frameAUri, frameBUri, transIn.type, transDuration, w, h, gsapSrc);
-                    writeSceneToIframe(transHtml);
-                    waitForReady(function(transTl) {
-                      transTl.play();
-
-                      // After transition completes, swap to scene B
-                      setTimeout(function() {
-                        state._inTransition = false;
-                        if (isSpeakerScene(info.index)) { showSpeakerBg(state.masterTime); } else { hideSpeakerBg(); }
-                        writeSceneToIframe(html);
-                        waitForReady(function(sceneTl) {
-                          // Seek past the transition duration into the scene
-                          var seekTime = Math.min(transDuration + info.localTime, sceneTl.duration());
-                          sceneTl.time(seekTime); sceneTl.play();
-                          syncIframeVideos(seekTime);
-                          try { var vids = els.previewIframe.contentWindow.document.querySelectorAll('video'); for (var vi = 0; vi < vids.length; vi++) vids[vi].play().catch(function(){}); } catch(e) {}
-                        });
-                      }, transDuration * 1000 + 50);
-                    });
-                  });
-                });
-              }, 100);
-            });
-          });
-          return;
-        }
-
-        // No transition -- standard scene change
-        state._inTransition = false;
-        // Speaker track: show/hide background video on scene transition
-        if (isSpeakerScene(info.index)) {
-          showSpeakerBg(state.masterTime);
-        } else {
-          hideSpeakerBg();
-        }
-        writeSceneToIframe(html);
-        waitForReady(function(newTl) {
-          // Seek GSAP to match master clock's local time
-          var seekTime = Math.min(info.localTime, newTl.duration());
-          newTl.time(seekTime);
-          newTl.play();
-          // Start video playback and sync to scene time
-          syncIframeVideos(seekTime);
-          try {
-            var vids = els.previewIframe.contentWindow.document.querySelectorAll('video');
-            for (var vi = 0; vi < vids.length; vi++) vids[vi].play().catch(function(){});
-          } catch(e) {}
-          // Continue the loop (don't restart - just keep going)
-        });
-      }
-    } else {
-      // Same scene - seek GSAP timeline to stay in sync
-      var tl = getTimeline();
-      if (tl) {
-        var localTime = info.localTime;
-        // Only seek if GSAP is behind/ahead (GSAP animation may be shorter than scene duration)
-        if (localTime <= tl.duration()) {
-          // Let GSAP play naturally, but correct if drifted
-          var drift = Math.abs(tl.time() - localTime);
-          if (drift > 0.1) {
-            tl.time(localTime);
-          }
-        }
-        // If localTime > tl.duration(), GSAP stays at its end frame (visual holds)
-      }
-      // Keep video elements in sync with scene time
-      syncIframeVideos(info.localTime);
-      syncSpeakerBg(state.masterTime);
-    }
-
-    state.animFrameId = requestAnimationFrame(animLoop);
   }
 
   // Wrap animLoop with error recovery so the rAF chain never breaks
@@ -2608,52 +2189,7 @@ export function getPreviewHtml(): string {
       return;
     }
 
-    // ── Legacy per-scene mode ──
-    var info = sceneForGlobalTime(targetGlobal);
 
-    if (info.index !== state.currentSceneIndex) {
-      state.currentSceneIndex = info.index;
-      state.currentComponentIndex = -1;
-      state.duration = project.scenes[info.index].duration_seconds || 0;
-      updateActiveScene(info.index);
-      renderLayers();
-      clearProps();
-      updateSceneIndicator();
-
-      var scene = project.scenes[info.index];
-      var wasPlaying = state.playing;
-      stopPlayback();
-      pauseMusicKeepPlaying();
-
-      var html = state.sceneHtmlCache[scene.id];
-      if (html != null) {
-        writeSceneToIframe(html);
-        waitForReady(function(tl) {
-          tl.time(Math.min(info.localTime, tl.duration()));
-          tl.pause();
-        });
-      } else {
-        // Fallback fetch
-        var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-        fetchHtml(path).then(function(fetchedHtml) {
-          state.sceneHtmlCache[scene.id] = fetchedHtml;
-          writeSceneToIframe(fetchedHtml);
-          waitForReady(function(tl) {
-            tl.time(Math.min(info.localTime, tl.duration()));
-            tl.pause();
-          });
-        });
-      }
-    } else {
-      var tl = getTimeline();
-      if (tl) {
-        tl.time(Math.min(info.localTime, tl.duration()));
-        syncIframeVideos(info.localTime, true);
-        tl.pause();
-        stopPlayback();
-        pauseMusicKeepPlaying();
-      }
-    }
   }
 
   function updateTimeDisplay(globalTime) {
