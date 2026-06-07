@@ -87,21 +87,25 @@ body {
 #create-btn:hover { background: #4338ca; }
 
 .comp-group-label {
-  padding: 10px 12px 6px; font-size: 11px; font-weight: 700;
+  padding: 14px 12px 6px; font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em; color: #818cf8;
+  border-top: 1px solid #1e293b;
 }
+.comp-group-label:first-child { border-top: none; padding-top: 10px; }
 .comp-item {
-  padding: 7px 12px 7px 20px; cursor: pointer; font-size: 13px;
+  padding: 8px 12px 8px 20px; cursor: pointer; font-size: 13px;
   color: #e2e8f0; transition: all 0.1s; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
+  overflow: hidden; text-overflow: ellipsis; line-height: 1.4;
+  min-height: 32px; display: flex; align-items: center;
 }
 .comp-item:hover { background: #334155; color: #e2e8f0; }
 .comp-item.active { background: #4f46e520; color: #818cf8; }
 
 .tenant-comp-item {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 7px 12px; cursor: pointer; font-size: 13px;
-  color: #e2e8f0; transition: all 0.1s;
+  padding: 8px 12px; cursor: pointer; font-size: 13px;
+  color: #e2e8f0; transition: all 0.1s; line-height: 1.4;
+  min-height: 32px;
 }
 .tenant-comp-item:hover { background: #334155; color: #e2e8f0; }
 .tenant-comp-item.active { background: #4f46e520; color: #818cf8; }
