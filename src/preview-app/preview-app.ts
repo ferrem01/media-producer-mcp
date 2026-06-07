@@ -12,6 +12,7 @@ export function getPreviewHtml(): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Media Producer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -961,12 +962,12 @@ export function getPreviewHtml(): string {
     iframeOut.width = w;
     iframeOut.height = h;
 
-    // Check if we should crossfade
+    // Check if we should run a transition
     var transition = getTransitionIn(state.currentSceneIndex);
     var duration = transition ? (transition.duration_seconds || 0.5) : 0;
-    var doCrossfade = duration > 0 && state.playAll;
+    var doTransition = duration > 0 && state.playAll;
 
-    if (doCrossfade) {
+    if (doTransition) {
       // Copy current iframe content to the outgoing iframe
       try {
         var currentHtml = iframe.contentDocument.documentElement.outerHTML;
@@ -974,6 +975,12 @@ export function getPreviewHtml(): string {
         iframeOut.contentDocument.write(currentHtml);
         iframeOut.contentDocument.close();
         iframeOut.style.opacity = '1';
+        // Reset any transforms from previous transitions
+        gsap.set(iframeOut, { clearProps: 'all' });
+        iframeOut.style.opacity = '1';
+        iframeOut.style.position = 'absolute';
+        iframeOut.style.top = '0';
+        iframeOut.style.left = '0';
       } catch(e) {
         iframeOut.style.opacity = '0';
       }
@@ -993,20 +1000,83 @@ export function getPreviewHtml(): string {
     }
     updatePreviewScale();
 
-    // Reveal function: fade in new, fade out old
+    // Reveal function: run the actual GSAP transition between iframes
     function revealScene() {
-      if (doCrossfade) {
-        var durationMs = duration * 1000;
-        iframe.style.transition = 'opacity ' + durationMs + 'ms ease';
-        iframeOut.style.transition = 'opacity ' + durationMs + 'ms ease';
-        iframe.style.opacity = '1';
-        iframeOut.style.opacity = '0';
-        // Clean up after transition
-        setTimeout(function() {
-          iframe.style.transition = 'opacity 0.15s ease';
-          iframeOut.style.transition = '';
-          iframeOut.style.opacity = '0';
-        }, durationMs + 50);
+      if (doTransition && typeof gsap !== 'undefined') {
+        var type = transition.type || 'crossfade';
+        var dur = duration;
+        var elA = iframeOut;  // outgoing scene
+        var elB = iframe;     // incoming scene
+
+        // Reset transforms
+        gsap.set(elB, { clearProps: 'all' });
+        elB.style.position = 'relative';
+        elB.style.zIndex = '2';
+
+        // Apply the transition using the same logic as the render pipeline
+        var tl = gsap.timeline({
+          onComplete: function() {
+            gsap.set(elA, { clearProps: 'all' });
+            gsap.set(elB, { clearProps: 'all' });
+            elA.style.opacity = '0';
+            elA.style.position = 'absolute';
+            elB.style.opacity = '1';
+            elB.style.position = 'relative';
+            elB.style.zIndex = '2';
+          }
+        });
+
+        // Map transition types to GSAP animations on iframes
+        switch (type) {
+          case 'crossfade':
+            gsap.set(elB, { autoAlpha: 0 });
+            tl.to(elA, { autoAlpha: 0, duration: dur }, 0);
+            tl.to(elB, { autoAlpha: 1, duration: dur }, 0);
+            break;
+          case 'blur-crossfade':
+            gsap.set(elB, { autoAlpha: 0, filter: 'blur(20px)' });
+            tl.to(elA, { autoAlpha: 0, filter: 'blur(20px)', duration: dur }, 0);
+            tl.to(elB, { autoAlpha: 1, filter: 'blur(0px)', duration: dur }, 0);
+            break;
+          case 'zoom-through':
+            var halfDur = dur * 0.5;
+            tl.to(elA, { scale: 1.5, autoAlpha: 0, duration: halfDur, ease: 'power2.in' }, 0);
+            gsap.set(elB, { scale: 1.5, autoAlpha: 0 });
+            tl.to(elB, { scale: 1, autoAlpha: 1, duration: halfDur, ease: 'power2.out' }, halfDur);
+            break;
+          case 'slide-up':
+            gsap.set(elB, { yPercent: 100 });
+            elB.style.zIndex = '3';
+            tl.to(elB, { yPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);
+            break;
+          case 'slide-down':
+            gsap.set(elB, { yPercent: -100 });
+            elB.style.zIndex = '3';
+            tl.to(elB, { yPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);
+            break;
+          case 'slide-left':
+          case 'slide-reveal':
+            gsap.set(elB, { xPercent: 100 });
+            elB.style.zIndex = '3';
+            tl.to(elB, { xPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);
+            break;
+          case 'morph-wipe':
+          case 'iris':
+            gsap.set(elB, { clipPath: 'circle(0% at 50% 50%)' });
+            elB.style.zIndex = '3';
+            tl.to(elB, { clipPath: 'circle(150% at 50% 50%)', duration: dur, ease: 'power2.inOut' }, 0);
+            break;
+          case 'push':
+            gsap.set(elB, { xPercent: 100 });
+            tl.to(elA, { xPercent: -100, duration: dur, ease: 'power2.inOut' }, 0);
+            tl.to(elB, { xPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);
+            break;
+          default:
+            // Fallback: simple crossfade
+            gsap.set(elB, { autoAlpha: 0 });
+            tl.to(elA, { autoAlpha: 0, duration: dur }, 0);
+            tl.to(elB, { autoAlpha: 1, duration: dur }, 0);
+        }
       } else {
         iframe.style.opacity = '1';
         iframeOut.style.opacity = '0';
