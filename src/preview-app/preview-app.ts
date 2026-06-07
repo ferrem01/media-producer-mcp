@@ -745,7 +745,7 @@ export function getPreviewHtml(): string {
           if (!el.paused) el.pause();
           continue;
         }
-        var target = Math.max(0, localTime - clip.offset);
+        var target = clip.offset + localTime;
         syncElement(clip, el, target, playing, true);
         continue;
       }
