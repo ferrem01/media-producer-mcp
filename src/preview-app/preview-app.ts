@@ -792,8 +792,22 @@ export function getPreviewHtml(): string {
   }
 
   // Preload all scene HTML into cache
+  // Preload speaker background video so it's buffered for instant scene transitions
+  function preloadSpeakerVideo() {
+    var video = els.speakerBg;
+    if (!video) return;
+    var clipUrl = getSpeakerClipUrl();
+    if (!clipUrl) return;
+    if (!video.src || !video.src.includes(clipUrl.split('/').pop())) {
+      video.src = clipUrl;
+      video.load();
+    }
+  }
+
   function preloadScenes(project) {
     state.sceneHtmlCache = {};
+    // Preload the speaker video alongside scenes
+    preloadSpeakerVideo();
     if (!project || !project.scenes || !project.scenes.length) return Promise.resolve();
     var promises = project.scenes.map(function(scene) {
       var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
@@ -949,19 +963,29 @@ export function getPreviewHtml(): string {
     try {
       var doc = iframe.contentDocument || iframe.contentWindow.document;
       var vids = doc.querySelectorAll('video');
-      if (vids.length > 0) {
-        var loaded = 0;
-        var total = vids.length;
+      var speakerReady = true;
+      // For speaker scenes, also wait for speaker-bg video
+      if (isSpeakerScene(state.currentSceneIndex) && els.speakerBg) {
+        speakerReady = els.speakerBg.readyState >= 2;
+      }
+      var totalWait = vids.length + (speakerReady ? 0 : 1);
+      if (totalWait > 0) {
+        var loaded = speakerReady ? 0 : 0;
         var show = function() {
           loaded++;
-          if (loaded >= total) iframe.style.opacity = '1';
+          if (loaded >= totalWait) iframe.style.opacity = '1';
         };
+        // Wait for speaker bg if needed
+        if (!speakerReady) {
+          if (els.speakerBg.readyState >= 2) { show(); }
+          else { els.speakerBg.addEventListener('canplay', show, { once: true }); }
+        }
         for (var i = 0; i < vids.length; i++) {
           if (vids[i].readyState >= 2) { show(); }
           else { vids[i].addEventListener('canplay', show, { once: true }); }
         }
-        // Fallback: show after 800ms regardless
-        setTimeout(function() { iframe.style.opacity = '1'; }, 800);
+        // Fallback: show after 600ms regardless
+        setTimeout(function() { iframe.style.opacity = '1'; }, 600);
       } else {
         iframe.style.opacity = '1';
       }
@@ -1550,8 +1574,8 @@ export function getPreviewHtml(): string {
     // Set src if not already set
     if (!video.src || !video.src.includes(clipUrl.split('/').pop())) {
       video.src = clipUrl;
+      video.load();
     }
-    video.style.display = 'block';
     // Make iframe transparent so speaker shows through
     els.previewIframe.style.background = 'transparent';
     // Sync time
@@ -1559,7 +1583,19 @@ export function getPreviewHtml(): string {
     if (Math.abs(video.currentTime - target) > 0.3) {
       video.currentTime = target;
     }
-    if (video.paused) video.play().catch(function(){});
+    // Show and play once video has data
+    function reveal() {
+      video.style.display = 'block';
+      if (video.paused) video.play().catch(function(){});
+    }
+    if (video.readyState >= 2) {
+      reveal();
+    } else {
+      // Keep hidden until ready, with a short fallback
+      video.style.display = 'none';
+      video.addEventListener('canplay', function() { reveal(); }, { once: true });
+      setTimeout(function() { reveal(); }, 400);
+    }
   }
 
   function hideSpeakerBg() {
