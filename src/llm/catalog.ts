@@ -63,12 +63,13 @@ async function scanDirectory(
           var raw = await fs.readFile(schemaPath, "utf-8");
           var schema = JSON.parse(raw);
 
+          var compType = file.replace(".schema.json", "");
           catalog.push({
-            type: schema.type || file.replace(".schema.json", ""),
+            type: compType,
             category: schema.category || entry.name,
-            label: schema.label,
-            description: schema.description,
-            data: schema.data || {},
+            label: schema.label || compType.split("-").map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(" "),
+            description: schema.description || "",
+            data: schema.data || schema.properties || {},
           });
         } catch {
           // Skip invalid schemas
