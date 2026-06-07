@@ -2330,9 +2330,9 @@ export function getPreviewHtml(): string {
         globalTime = totalDur;
         stopPlayback();
         stopAudioFull();
+        syncMedia(globalTime, false);
         updateTimeDisplay(globalTime);
         els.slider.value = 1000;
-        syncCompositeVideos(globalTime);
         return;
       }
 
