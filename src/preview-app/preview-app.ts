@@ -481,7 +481,10 @@ export function getPreviewHtml(): string {
     // Scene HTML cache (keyed by scene id)
     sceneHtmlCache: {},
     // Composite mode: single document with all scenes
-    compositeLoaded: false
+    compositeLoaded: false,
+    // Unified media clip registry for Phase 2 sync
+    mediaClips: [],
+    forceSync: false
   };
 
   // DOM refs
@@ -591,6 +594,221 @@ export function getPreviewHtml(): string {
     });
   }
 
+  // ── Unified Media Sync (Phase 2) ──
+
+  var HARD_SYNC_THRESHOLD = 0.5;
+  var STRICT_SYNC_THRESHOLD = 0.04;
+  var FORCE_SYNC_THRESHOLD = 0.02;
+  var STRICT_REQUIRED_SAMPLES = 2;
+
+  // Build/rebuild the media clip registry from current project state.
+  // Called once on project load and when composite finishes init.
+  function buildMediaClips() {
+    state.mediaClips = [];
+    var project = state.currentProject;
+    if (!project) return;
+
+    var totalDur = state.totalDuration || 0;
+
+    // 1. Speaker video -- plays for the full duration, active only during speaker scenes
+    var speakerEl = els.speakerBg;
+    if (speakerEl && project.speaker_track && project.speaker_track.clips && project.speaker_track.clips.length) {
+      state.mediaClips.push({
+        el: speakerEl,
+        kind: 'speaker',
+        start: 0,
+        end: totalDur,
+        offset: 0,
+        lastOffset: null,
+        driftSamples: 0
+      });
+    }
+
+    // 2. Audio elements (music, voiceover, sfx)
+    state.audioElements.forEach(function(audio) {
+      state.mediaClips.push({
+        el: audio,
+        kind: 'audio',
+        trackType: audio._trackType || 'sfx',
+        loop: !!audio.loop,
+        start: 0,
+        end: totalDur,
+        offset: 0,
+        lastOffset: null,
+        driftSamples: 0,
+        baseVolume: audio._baseVolume || audio.volume,
+        fadeIn: audio._fadeIn || 0,
+        fadeOut: audio._fadeOut || 0
+      });
+    });
+
+    // 3. Scene videos (inside composite iframe) are discovered dynamically
+    //    in syncMedia because they live in the iframe DOM
+  }
+
+  // Discover scene videos from the composite iframe and add to registry if not already tracked.
+  function discoverSceneVideos() {
+    if (!state.compositeLoaded) return;
+    try {
+      var doc = els.previewIframe.contentWindow && els.previewIframe.contentWindow.document;
+      if (!doc) return;
+      var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
+      if (!meta) return;
+      var videos = doc.querySelectorAll('video');
+      for (var vi = 0; vi < videos.length; vi++) {
+        var v = videos[vi];
+        if (v._mpRegistered) continue;
+        var sceneEl = v.closest('.mp-scene');
+        if (!sceneEl) continue;
+        var sceneId = sceneEl.getAttribute('data-scene-id');
+        var sceneMeta = null;
+        for (var mi = 0; mi < meta.length; mi++) {
+          if (meta[mi].id === sceneId) { sceneMeta = meta[mi]; break; }
+        }
+        if (!sceneMeta) continue;
+        var startAt = parseFloat(v.getAttribute('data-start-at') || '0');
+        v._mpRegistered = true;
+        v._mpSceneEl = sceneEl;
+        state.mediaClips.push({
+          el: v,
+          kind: 'scene-video',
+          sceneEl: sceneEl,
+          sceneId: sceneId,
+          start: sceneMeta.start,
+          end: sceneMeta.start + sceneMeta.duration,
+          offset: startAt,
+          lastOffset: null,
+          driftSamples: 0
+        });
+      }
+    } catch(e) {}
+  }
+
+  // The unified sync function -- replaces syncCompositeVideos, syncSpeakerBg, and inline audio sync.
+  function syncMedia(time, playing) {
+    // Discover any new scene videos from iframe
+    discoverSceneVideos();
+
+    for (var ci = 0; ci < state.mediaClips.length; ci++) {
+      var clip = state.mediaClips[ci];
+      var el = clip.el;
+
+      // ── Speaker: only active during speaker scenes ──
+      if (clip.kind === 'speaker') {
+        var speakerActive = isSpeakerScene(state.currentSceneIndex);
+        if (!speakerActive) {
+          if (el.style.display !== 'none') {
+            el.style.display = 'none';
+            el.pause();
+            el.muted = true;
+          }
+          clip.lastOffset = null;
+          clip.driftSamples = 0;
+          continue;
+        }
+        // Show + ensure src loaded
+        if (el.style.display === 'none' || el.style.display === '') {
+          var clipUrl = getSpeakerClipUrl();
+          if (!clipUrl) { el.style.display = 'none'; continue; }
+          if (!el.src || el.src === '' || el.src === window.location.href) {
+            el.src = clipUrl;
+            el.load();
+          }
+          els.previewIframe.style.background = 'transparent';
+          el.style.display = 'block';
+        }
+        // Speaker uses global time directly (no scene offset)
+        var target = time;
+        syncElement(clip, el, target, playing, false);
+        // Mute/unmute based on play state
+        el.muted = !playing;
+        continue;
+      }
+
+      // ── Scene videos: only active when their scene is visible ──
+      if (clip.kind === 'scene-video') {
+        var sceneVisible = false;
+        try {
+          sceneVisible = clip.sceneEl.style.visibility !== 'hidden' && parseFloat(clip.sceneEl.style.opacity || '0') > 0;
+        } catch(e) {}
+        if (!sceneVisible) {
+          if (!el.paused) el.pause();
+          clip.lastOffset = null;
+          clip.driftSamples = 0;
+          continue;
+        }
+        var localTime = time - clip.start;
+        if (localTime < 0 || localTime > (clip.end - clip.start)) {
+          if (!el.paused) el.pause();
+          continue;
+        }
+        var target = Math.max(0, localTime - clip.offset);
+        syncElement(clip, el, target, playing, true);
+        continue;
+      }
+
+      // ── Audio: global timeline ──
+      if (clip.kind === 'audio') {
+        var target;
+        if (clip.loop) {
+          var dur = el.duration;
+          if (!dur || !isFinite(dur)) continue;
+          target = time % dur;
+        } else {
+          var dur = el.duration;
+          if (!dur || !isFinite(dur)) continue;
+          if (time >= dur) {
+            if (!el.paused) el.pause();
+            continue;
+          }
+          target = Math.min(time, dur);
+        }
+        syncElement(clip, el, target, playing, false);
+        continue;
+      }
+    }
+  }
+
+  // Core drift-correcting sync for a single element.
+  function syncElement(clip, el, target, playing, isSceneVideo) {
+    var drift = Math.abs(el.currentTime - target);
+    var offset = target - el.currentTime;
+    var prevOffset = clip.lastOffset;
+    clip.lastOffset = offset;
+
+    var isPlayingVideo = (el.tagName === 'VIDEO') && !el.paused;
+
+    // Tier 1: Hard sync (>500ms drift)
+    var firstTick = prevOffset === null;
+    var offsetJumped = !firstTick && Math.abs(offset - prevOffset) > 0.5;
+    if (drift > HARD_SYNC_THRESHOLD && (firstTick || offsetJumped || drift > 3)) {
+      el.currentTime = target;
+      clip.driftSamples = 0;
+    }
+    // Tier 2: Strict sync (>40ms, 2 consecutive -- skip for playing videos to avoid stutter)
+    else if (!isPlayingVideo && drift > STRICT_SYNC_THRESHOLD) {
+      clip.driftSamples = (clip.driftSamples || 0) + 1;
+      if (clip.driftSamples >= STRICT_REQUIRED_SAMPLES) {
+        el.currentTime = target;
+        clip.driftSamples = 0;
+      }
+    }
+    // Tier 3: Force sync (>20ms, on seek/play/pause transitions only)
+    else if (!isPlayingVideo && state.forceSync && drift > FORCE_SYNC_THRESHOLD) {
+      el.currentTime = target;
+    }
+    else {
+      clip.driftSamples = 0;
+    }
+
+    // Play/pause
+    if (playing && el.paused) {
+      el.play().catch(function(){});
+    } else if (!playing && !el.paused) {
+      el.pause();
+    }
+  }
+
   // ── Audio Management ──
 
   function resolveAudioUrl(source) {
@@ -642,6 +860,7 @@ export function getPreviewHtml(): string {
       els.audioIndicator.innerHTML = '';
       els.audioIndicator.className = 'audio-indicator';
     }
+    buildMediaClips();
   }
 
   function destroyAudio() {
@@ -853,6 +1072,7 @@ export function getPreviewHtml(): string {
         if (w && w.__MP_READY && w.__MP_TIMELINE && w.__MP_SCENE_META) {
           clearInterval(check);
           state.compositeLoaded = true;
+          buildMediaClips();
           state.totalDuration = w.__MP_DURATION || state.totalDuration;
           cb(w.__MP_TIMELINE);
         }
@@ -1928,8 +2148,10 @@ export function getPreviewHtml(): string {
         if (tl) tl.pause();
       }
       pauseAudio();
-      if (els.speakerBg && !els.speakerBg.paused) els.speakerBg.pause();
-      if (els.speakerBg) els.speakerBg.muted = true;
+      // syncMedia will handle speaker pause+mute on next tick
+      state.forceSync = true;
+      syncMedia(state.masterTime, false);
+      state.forceSync = false;
     } else {
       // RESUME / PLAY
       state.playing = true;
@@ -1942,12 +2164,11 @@ export function getPreviewHtml(): string {
         // Composite mode: just start the transport clock loop
         // Master timeline is always paused; we seek it on each tick
         state.lastTickTime = performance.now();
-        // Start speaker video if current scene needs it
-        if (isSpeakerScene(state.currentSceneIndex)) {
-          showSpeakerBg(globalTime);
-        }
+        // Unified media sync handles speaker + audio
+        state.forceSync = true;
         playAudio();
-        syncAudioToGlobalTime(globalTime);
+        syncMedia(globalTime, true);
+        state.forceSync = false;
         animLoop();
         return;
       }
@@ -2053,27 +2274,12 @@ export function getPreviewHtml(): string {
         renderLayers();
         clearProps();
         updateSceneIndicator();
-        // Speaker track
-        if (isSpeakerScene(cInfo.index)) { showSpeakerBg(globalTime); } else { hideSpeakerBg(); }
+        // Speaker track visibility handled by syncMedia
       }
 
-      // Sync videos and speaker
-      syncCompositeVideos(globalTime);
-      syncSpeakerBg(globalTime);
-
-      // Keep audio in sync
-      state.audioElements.forEach(function(audio) {
-        if (audio.paused) return;
-        var dur = audio.duration;
-        if (!dur || !isFinite(dur)) return;
-        if (audio._trackType === 'music' && audio.loop) {
-          var expectedTime = globalTime % dur;
-          if (Math.abs(audio.currentTime - expectedTime) > 0.5) audio.currentTime = expectedTime;
-        } else {
-          if (globalTime >= dur) return;
-          if (Math.abs(audio.currentTime - globalTime) > 0.5) audio.currentTime = Math.min(globalTime, dur);
-        }
-      });
+      // Unified media sync (Phase 2)
+      syncMedia(globalTime, true);
+      state.forceSync = false;
 
       state.animFrameId = requestAnimationFrame(animLoop);
       return;
@@ -2277,8 +2483,6 @@ export function getPreviewHtml(): string {
     state.masterTime = targetGlobal;
 
     updateTimeDisplay(targetGlobal);
-    syncAudioToGlobalTime(targetGlobal);
-
     // ── Composite mode: just seek the master timeline ──
     if (state.compositeLoaded) {
       var masterTl = getCompositeMasterTimeline();
@@ -2295,12 +2499,12 @@ export function getPreviewHtml(): string {
         renderLayers();
         clearProps();
         updateSceneIndicator();
-        if (isSpeakerScene(cInfo.index)) { showSpeakerBg(targetGlobal); } else { hideSpeakerBg(); }
+        // Speaker track visibility handled by syncMedia
       }
-      syncCompositeVideos(targetGlobal);
-      syncSpeakerBg(targetGlobal);
+      state.forceSync = true;
+      syncMedia(targetGlobal, false);
+      state.forceSync = false;
       stopPlayback();
-      pauseMusicKeepPlaying();
       return;
     }
 
