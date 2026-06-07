@@ -22,6 +22,7 @@ import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
+import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
 import { listProjects, loadProject, saveProject, updateComponent, addScene, removeScene, reorderScenes } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs } from "./core/job-queue.js";
@@ -704,6 +705,22 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           const raw = await fs.readFile(filePath, "utf-8");
           const schema = JSON.parse(raw);
           jsonResponse(res, 200, schema);
+        } catch {
+          jsonResponse(res, 404, { error: "Schema not found" });
+        }
+        return;
+      }
+
+      // ── Playground API: Component defaults (generate sample data from schema) ──
+      const defaultsMatch = url.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/defaults$/);
+      if (defaultsMatch && method === "GET") {
+        const [, dCategory, dType] = defaultsMatch.map(decodeURIComponent);
+        const schemaPath = path.join(config.componentLibDir, dCategory, dType + ".schema.json");
+        try {
+          const raw = await fs.readFile(schemaPath, "utf-8");
+          const schema = JSON.parse(raw);
+          const defaults = generateDefaultsFromSchema(schema);
+          jsonResponse(res, 200, defaults);
         } catch {
           jsonResponse(res, 404, { error: "Schema not found" });
         }

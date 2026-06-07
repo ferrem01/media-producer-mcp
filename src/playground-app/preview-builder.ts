@@ -55,7 +55,7 @@ export function buildPlaygroundPreview(opts: PlaygroundPreviewOptions): string {
     "  var ctx = { duration: 5, motion: 'cinematic' };",
     "  " + script,
     "  var tl = createTimeline(el, data, ctx);",
-    "  var master = gsap.timeline({ paused: true });",
+    "  var master = gsap.timeline({ paused: false });",
     "  master.add(tl, 0);",
     "  window.__MP_TIMELINE = master;",
     "  window.__MP_DURATION = 5;",

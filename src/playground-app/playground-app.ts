@@ -144,7 +144,11 @@ body {
 #preview-iframe {
   border: none; background: #000; border-radius: 6px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  transform-origin: center center;
+  transform-origin: top left;
+  position: absolute; top: 0; left: 0;
+}
+#preview-sizer {
+  position: relative; margin: auto;
 }
 #preview-placeholder {
   color: #475569; font-size: 14px; text-align: center;
@@ -278,7 +282,9 @@ body {
       </div>
       <div id="preview-container">
         <div id="preview-placeholder">Select or create a component to preview</div>
-        <iframe id="preview-iframe" style="display:none;"></iframe>
+        <div id="preview-sizer" style="display:none;">
+          <iframe id="preview-iframe"></iframe>
+        </div>
       </div>
     </div>
 
@@ -348,6 +354,7 @@ body {
     tabLibrary: document.getElementById('tab-library'),
     tabTenant: document.getElementById('tab-tenant'),
     previewIframe: document.getElementById('preview-iframe'),
+    previewSizer: document.getElementById('preview-sizer'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
     previewContainer: document.getElementById('preview-container'),
     previewStatus: document.getElementById('preview-status'),
@@ -486,8 +493,14 @@ body {
 
   // ── Load Component Source ──
   function loadGlobalComponent(category, type) {
-    api('GET', '/playground/api/components/' + encodeURIComponent(category) + '/' + encodeURIComponent(type) + '/source').then(function(source) {
-      setComponent(type, category, source);
+    var sourceUrl = '/playground/api/components/' + encodeURIComponent(category) + '/' + encodeURIComponent(type) + '/source';
+    var defaultsUrl = '/playground/api/components/' + encodeURIComponent(category) + '/' + encodeURIComponent(type) + '/defaults';
+    
+    Promise.all([
+      api('GET', sourceUrl),
+      api('GET', defaultsUrl).catch(function() { return null; })
+    ]).then(function(results) {
+      setComponent(type, category, results[0], results[1]);
     }).catch(function(err) {
       alert('Failed to load: ' + err.message);
     });
@@ -501,14 +514,19 @@ body {
     });
   }
 
-  function setComponent(type, category, source) {
+  function setComponent(type, category, source, schemaDefaults) {
     state.currentType = type;
     state.currentCategory = category;
     state.currentSource = source;
     els.sourceEditor.value = source;
     els.compName.textContent = type;
     els.saveBtn.disabled = false;
-    els.dataEditor.value = extractDefaultData(source);
+    // Use schema-derived defaults if available, fall back to regex extraction
+    if (schemaDefaults && typeof schemaDefaults === 'object' && Object.keys(schemaDefaults).length > 0) {
+      els.dataEditor.value = JSON.stringify(schemaDefaults, null, 2);
+    } else {
+      els.dataEditor.value = extractDefaultData(source);
+    }
     state.chatHistory = [];
     els.chatMessages.innerHTML = '<div class="chat-msg system">Editing: ' + type + '. Describe changes and I\\'ll update the source.</div>';
     // Switch to Source tab when loading
@@ -603,7 +621,7 @@ body {
   function updatePreview() {
     var source = els.sourceEditor.value;
     if (!source.trim()) {
-      els.previewIframe.style.display = 'none';
+      els.previewSizer.style.display = 'none';
       els.previewPlaceholder.style.display = '';
       els.previewPlaceholder.textContent = 'Enter or generate component source';
       return;
@@ -616,7 +634,7 @@ body {
 
     api('POST', '/playground/api/components/preview', { source: source, data: data }).then(function(html) {
       els.previewPlaceholder.style.display = 'none';
-      els.previewIframe.style.display = '';
+      els.previewSizer.style.display = '';
 
       // Set canvas size
       var size = els.canvasSelect.value.split('x');
@@ -645,6 +663,8 @@ body {
     els.previewIframe.style.transform = 'scale(' + scale + ')';
     els.previewIframe.style.width = cw + 'px';
     els.previewIframe.style.height = ch + 'px';
+    els.previewSizer.style.width = Math.floor(cw * scale) + 'px';
+    els.previewSizer.style.height = Math.floor(ch * scale) + 'px';
   }
 
   // ── Play Button ──
