@@ -1340,8 +1340,7 @@ export function getPreviewHtml(): string {
       // Speaker track
       renderLayers();
       clearProps();
-    } else {
-
+    }
   }
 
   // Update scene list active highlight without re-rendering
@@ -2065,8 +2064,7 @@ export function getPreviewHtml(): string {
         animLoop();
         return;
       }
-
-
+    }
   }
 
   function stopPlayback() {
