@@ -87,12 +87,12 @@ body {
 #create-btn:hover { background: #4338ca; }
 
 .comp-group-label {
-  padding: 8px 12px 4px; font-size: 11px; font-weight: 700;
+  padding: 10px 12px 6px; font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em; color: #818cf8;
 }
 .comp-item {
-  padding: 6px 12px 6px 20px; cursor: pointer; font-size: 12px;
-  color: #cbd5e1; transition: all 0.1s; white-space: nowrap;
+  padding: 7px 12px 7px 20px; cursor: pointer; font-size: 13px;
+  color: #e2e8f0; transition: all 0.1s; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
 .comp-item:hover { background: #334155; color: #e2e8f0; }
@@ -100,8 +100,8 @@ body {
 
 .tenant-comp-item {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 12px; cursor: pointer; font-size: 12px;
-  color: #cbd5e1; transition: all 0.1s;
+  padding: 7px 12px; cursor: pointer; font-size: 13px;
+  color: #e2e8f0; transition: all 0.1s;
 }
 .tenant-comp-item:hover { background: #334155; color: #e2e8f0; }
 .tenant-comp-item.active { background: #4f46e520; color: #818cf8; }

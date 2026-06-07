@@ -665,7 +665,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // ── Playground SPA ──
 
       if (urlPath === "/playground" || urlPath === "/playground/") {
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(playgroundHtml);
         return;
       }
