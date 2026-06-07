@@ -4,6 +4,9 @@
  * Uses Playwright to load assembled scene HTML,
  * step through the GSAP timeline frame-by-frame,
  * and screenshot each frame.
+ *
+ * Video handling delegated to capture-worker.ts which uses ffmpeg
+ * frame pre-extraction instead of Chrome video seeking.
  */
 
 import { chromium, type Browser, type Page } from "playwright";
@@ -11,6 +14,7 @@ import { fork, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import crypto from "node:crypto";
 
 const execFileAsync = promisify(execFile);
 
@@ -42,9 +46,58 @@ export interface CaptureResult {
   durationMs: number;
 }
 
+const DATA_DIR = "/data/media-producer";
+
 /**
- * Capture a scene frame-by-frame using Playwright.
+ * Convert a video src URL to a filesystem path.
+ * Handles file:// URLs and http://localhost:3200 URLs.
  */
+function resolveVideoPath(src: string): string {
+  if (src.startsWith("file://")) {
+    return src.slice(7);
+  }
+
+  const projMatch = src.match(
+    /^https?:\/\/localhost:\d+\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/
+  );
+  if (projMatch) {
+    return path.join(DATA_DIR, projMatch[1], "projects", projMatch[2], "assets", projMatch[3]);
+  }
+
+  const brandMatch = src.match(
+    /^https?:\/\/localhost:\d+\/assets\/([^/]+)\/brand-kit\/(.+)$/
+  );
+  if (brandMatch) {
+    return path.join(DATA_DIR, brandMatch[1], "brand-kit", "assets", brandMatch[2]);
+  }
+
+  return src;
+}
+
+/** Info about a video source whose frames have been extracted */
+interface ExtractedVideo {
+  framesDir: string;
+  totalFrames: number;
+}
+
+/**
+ * Extract a single frame from a video at a specific time using ffmpeg.
+ * Used by captureSingleFrame for efficiency (no need to extract ALL frames).
+ */
+async function extractSingleVideoFrame(
+  videoPath: string,
+  time: number,
+  outputPath: string
+): Promise<void> {
+  await execFileAsync("ffmpeg", [
+    "-ss", String(time),
+    "-i", videoPath,
+    "-frames:v", "1",
+    "-y",
+    outputPath,
+  ], { timeout: 30_000 });
+}
+
 /**
  * Capture a scene by spawning a child process.
  * The child process launches Playwright, captures all frames,
@@ -117,7 +170,8 @@ export async function captureScene(options: CaptureOptions): Promise<CaptureResu
 }
 
 /**
- * Capture a single frame (for image output).
+ * Capture a single frame (for image output or critique screenshots).
+ * Uses ffmpeg to extract video frames instead of Chrome seeking.
  */
 export async function captureSingleFrame(options: {
   htmlPath: string;
@@ -144,6 +198,7 @@ export async function captureSingleFrame(options: {
 
   let browser: Browser | undefined;
   let page: Page | undefined;
+  const tempDirs = new Set<string>();
 
   try {
     browser = await chromium.launch({
@@ -165,41 +220,96 @@ export async function captureSingleFrame(options: {
       await page.evaluate((t: number) => {
         (window as any).__MP_TIMELINE.time(t);
       }, atTime);
+    }
 
-      // Wait for video elements to load, seek, and render a frame
-      await page.evaluate((seekTime: number) =>
+    // Handle video elements: extract single frames with ffmpeg, replace with <img>
+    const videoInfos: { src: string; startAt: number; index: number }[] = await page.evaluate(() => {
+      const videos = document.querySelectorAll("video");
+      return Array.from(videos).map((v, i) => ({
+        src: v.src || v.getAttribute("src") || "",
+        startAt: parseFloat(v.getAttribute("data-start-at") || "0"),
+        index: i,
+      }));
+    });
+
+    if (videoInfos.length > 0) {
+      const captureTime = atTime || 0;
+      // For each video, extract the single frame we need
+      const framePathMap: Record<string, string> = {}; // videoSrc+startAt -> framePath
+      const tempDir = `/tmp/vframes_single_${crypto.randomBytes(6).toString("hex")}`;
+      await fs.mkdir(tempDir, { recursive: true });
+      tempDirs.add(tempDir);
+
+      for (const vInfo of videoInfos) {
+        if (!vInfo.src) continue;
+        const videoPath = resolveVideoPath(vInfo.src);
+
+        try {
+          await fs.access(videoPath);
+        } catch {
+          console.warn(`  Warning: Video file not found: ${videoPath}`);
+          continue;
+        }
+
+        const targetTime = Math.max(0, captureTime - vInfo.startAt);
+        const key = `${vInfo.src}__${vInfo.startAt}`;
+
+        // Skip if we already extracted this exact frame
+        if (framePathMap[key]) continue;
+
+        const framePath = path.join(tempDir, `frame_${vInfo.index}.png`);
+        await extractSingleVideoFrame(videoPath, targetTime, framePath);
+        framePathMap[key] = framePath;
+      }
+
+      // Build browser lookup: index -> framePath
+      const browserLookup: Record<number, string> = {};
+      for (const vInfo of videoInfos) {
+        const key = `${vInfo.src}__${vInfo.startAt}`;
+        if (framePathMap[key]) {
+          browserLookup[vInfo.index] = framePathMap[key];
+        }
+      }
+
+      // Replace <video> with <img> in the DOM
+      await page.evaluate((lookup: Record<number, string>) => {
+        const videos = document.querySelectorAll("video");
+        videos.forEach((video, idx) => {
+          const framePath = lookup[idx];
+          if (!framePath) return;
+
+          const img = document.createElement("img");
+          const cs = window.getComputedStyle(video);
+          img.style.cssText = video.style.cssText;
+          img.style.objectFit = cs.objectFit || "cover";
+          img.style.display = cs.display === "none" ? "none" : (video.style.display || "block");
+          img.style.width = video.style.width || cs.width;
+          img.style.height = video.style.height || cs.height;
+
+          const startAt = video.getAttribute("data-start-at");
+          if (startAt) img.setAttribute("data-start-at", startAt);
+
+          img.src = `file://${framePath}`;
+          video.replaceWith(img);
+        });
+      }, browserLookup);
+
+      // Wait for images to load
+      await page.evaluate(() =>
         new Promise<void>((resolve) => {
-          const videos = document.querySelectorAll("video");
-          if (videos.length === 0) {
-            requestAnimationFrame(() => resolve());
-            return;
-          }
-          let pending = videos.length;
-          const done = () => { if (--pending <= 0) setTimeout(() => requestAnimationFrame(() => resolve()), 100); };
-          videos.forEach((v) => {
-            const startAt = parseFloat(v.getAttribute("data-start-at") || "0");
-            const targetTime = Math.max(0, seekTime - startAt);
-
-            const seekAndWait = () => {
-              // Always wait for seeked event after setting currentTime.
-              // Even with readyState >= 3, the new frame is not decoded until seeked fires.
-              v.addEventListener("seeked", () => done(), { once: true });
-              v.addEventListener("error", () => done(), { once: true });
+          const imgs = document.querySelectorAll("img[data-start-at]");
+          if (imgs.length === 0) { resolve(); return; }
+          let pending = imgs.length;
+          const done = () => { if (--pending <= 0) setTimeout(() => resolve(), 50); };
+          imgs.forEach((img) => {
+            if ((img as HTMLImageElement).complete) { done(); }
+            else {
+              img.addEventListener("load", () => done(), { once: true });
+              img.addEventListener("error", () => done(), { once: true });
               setTimeout(() => done(), 5000);
-              v.currentTime = targetTime;
-            };
-
-            // Wait for video to have enough data before seeking
-            if (v.readyState >= 2) {
-              seekAndWait();
-            } else {
-              v.addEventListener("loadeddata", () => seekAndWait(), { once: true });
-              v.addEventListener("error", () => done(), { once: true });
-              setTimeout(() => done(), 8000); // fallback if video never loads
             }
           });
-        }),
-        atTime || 0,
+        })
       );
     }
 
@@ -208,6 +318,7 @@ export async function captureSingleFrame(options: {
     const screenshotOpts: any = {
       path: outputPath,
       type: format,
+      omitBackground,
     };
     if (format === "jpeg" && quality !== undefined) {
       screenshotOpts.quality = quality;
@@ -218,5 +329,9 @@ export async function captureSingleFrame(options: {
   } finally {
     if (page) await page.close().catch(() => {});
     if (browser) await browser.close().catch(() => {});
+    // Cleanup temp dirs
+    for (const dir of tempDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 }
