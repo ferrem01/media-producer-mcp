@@ -12,6 +12,7 @@ export function getPreviewHtml(): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Media Producer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -938,6 +939,96 @@ export function getPreviewHtml(): string {
     });
   }
 
+  // ── Scene Transition Support ──
+  // Get the GSAP script for a transition type (matches render pipeline transitions.ts)
+  function getTransitionGsap(type, dur) {
+    switch (type) {
+      case 'crossfade':
+        return 'gsap.set(imgB, { autoAlpha: 0 }); tl.to(imgA, { autoAlpha: 0, duration: dur }, 0); tl.to(imgB, { autoAlpha: 1, duration: dur }, 0);';
+      case 'blur-crossfade':
+        return 'gsap.set(imgB, { autoAlpha: 0, filter: "blur(20px)" }); tl.to(imgA, { autoAlpha: 0, filter: "blur(20px)", duration: dur }, 0); tl.to(imgB, { autoAlpha: 1, filter: "blur(0px)", duration: dur }, 0);';
+      case 'zoom-through':
+        return 'var halfDur = dur * 0.5; tl.to(imgA, { scale: 1.5, autoAlpha: 0, duration: halfDur, ease: "power2.in" }, 0); gsap.set(imgB, { scale: 1.5, autoAlpha: 0 }); tl.to(imgB, { scale: 1, autoAlpha: 1, duration: halfDur, ease: "power2.out" }, halfDur);';
+      case 'slide-up':
+        return 'gsap.set(imgB, { yPercent: 100 }); imgB.style.zIndex = "2"; tl.to(imgB, { yPercent: 0, duration: dur, ease: "power2.inOut" }, 0);';
+      case 'slide-down':
+        return 'gsap.set(imgB, { yPercent: -100 }); imgB.style.zIndex = "2"; tl.to(imgB, { yPercent: 0, duration: dur, ease: "power2.inOut" }, 0);';
+      case 'slide-left':
+      case 'slide-reveal':
+        return 'gsap.set(imgB, { xPercent: 100 }); imgB.style.zIndex = "2"; tl.to(imgB, { xPercent: 0, duration: dur, ease: "power2.inOut" }, 0);';
+      case 'morph-wipe':
+      case 'iris':
+        return 'gsap.set(imgB, { clipPath: "circle(0% at 50% 50%)" }); imgB.style.zIndex = "2"; tl.to(imgB, { clipPath: "circle(150% at 50% 50%)", duration: dur, ease: "power2.inOut" }, 0);';
+      case 'push':
+        return 'gsap.set(imgB, { xPercent: 100 }); tl.to(imgA, { xPercent: -100, duration: dur, ease: "power2.inOut" }, 0); tl.to(imgB, { xPercent: 0, duration: dur, ease: "power2.inOut" }, 0);';
+      case 'glitch-cut':
+        return 'var glitchDur = Math.min(dur * 0.6, 0.3); gsap.set(imgB, { autoAlpha: 0 }); tl.to(imgA, { x: "+=8", filter: "hue-rotate(90deg) saturate(3)", duration: glitchDur * 0.15, yoyo: true, repeat: 5, ease: "steps(1)" }, 0); tl.set(imgA, { autoAlpha: 0 }, dur - 0.05); tl.set(imgB, { autoAlpha: 1 }, dur - 0.05);';
+      default:
+        return 'gsap.set(imgB, { autoAlpha: 0 }); tl.to(imgA, { autoAlpha: 0, duration: dur }, 0); tl.to(imgB, { autoAlpha: 1, duration: dur }, 0);';
+    }
+  }
+
+  // Build transition HTML from two data URI frames
+  function buildTransitionHtml(frameADataUri, frameBDataUri, type, duration, width, height, gsapSrc) {
+    var animScript = getTransitionGsap(type, duration);
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+      '* { margin: 0; padding: 0; box-sizing: border-box; }' +
+      'html, body { width: ' + width + 'px; height: ' + height + 'px; overflow: hidden; background: #000; }' +
+      '#frameA, #frameB { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }' +
+      '</style><script>' + gsapSrc + '<\/script></head><body>' +
+      '<img id="frameA" src="' + frameADataUri + '">' +
+      '<img id="frameB" src="' + frameBDataUri + '">' +
+      '<script>(function() {' +
+      'var imgA = document.getElementById("frameA"); var imgB = document.getElementById("frameB");' +
+      'var dur = ' + duration + '; var tl = gsap.timeline({ paused: true });' +
+      animScript +
+      'window.__MP_TIMELINE = tl; window.__MP_DURATION = dur; window.__MP_READY = true;' +
+      '})();<\/script></body></html>';
+  }
+
+  // Capture the current iframe content as a data URI using html2canvas
+  function captureIframeAsDataUri(callback) {
+    try {
+      var doc = els.previewIframe.contentDocument || els.previewIframe.contentWindow.document;
+      var body = doc.body || doc.documentElement;
+      html2canvas(body, {
+        width: els.previewIframe.width,
+        height: els.previewIframe.height,
+        scale: 1,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#000',
+      }).then(function(canvas) {
+        callback(canvas.toDataURL('image/jpeg', 0.85));
+      }).catch(function() {
+        callback(null);
+      });
+    } catch(e) {
+      callback(null);
+    }
+  }
+
+  // GSAP source cache for transition HTML
+  var _gsapSrcCache = null;
+  function getGsapSource(callback) {
+    if (_gsapSrcCache) { callback(_gsapSrcCache); return; }
+    // Fetch GSAP from one of the scene HTML pages (it's embedded)
+    var project = state.currentProject;
+    if (project && project.scenes && project.scenes.length > 0) {
+      var sceneHtml = state.sceneHtmlCache[project.scenes[0].id];
+      if (sceneHtml) {
+        // Extract GSAP source from between the first <script> tags
+        var match = sceneHtml.match(/<script>([\s\S]*?gsap[\s\S]*?)<\/script>/);
+        if (match) { _gsapSrcCache = match[1]; callback(_gsapSrcCache); return; }
+      }
+    }
+    // Fallback: fetch from CDN
+    fetch('https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js')
+      .then(function(r) { return r.text(); })
+      .then(function(src) { _gsapSrcCache = src; callback(src); })
+      .catch(function() { callback(''); });
+  }
+
   // Write cached HTML into the preview iframe
   function writeSceneToIframe(html) {
     var iframe = els.previewIframe;
@@ -1764,6 +1855,79 @@ export function getPreviewHtml(): string {
       var html = state.sceneHtmlCache[scene.id];
 
       if (html != null) {
+        // Check if we need to play a transition
+        var transIn = project.scenes[info.index] && project.scenes[info.index].transition_in;
+        if (transIn && transIn.type && transIn.duration_seconds > 0 && !state._inTransition) {
+          state._inTransition = true;
+          var transDuration = transIn.duration_seconds;
+
+          // Capture outgoing scene
+          captureIframeAsDataUri(function(frameAUri) {
+            if (!frameAUri) {
+              // Capture failed, just do a hard cut
+              state._inTransition = false;
+              if (isSpeakerScene(info.index)) { showSpeakerBg(state.masterTime); } else { hideSpeakerBg(); }
+              writeSceneToIframe(html);
+              waitForReady(function(newTl) {
+                var seekTime = Math.min(info.localTime, newTl.duration());
+                newTl.time(seekTime); newTl.play();
+                syncIframeVideos(seekTime);
+                try { var vids = els.previewIframe.contentWindow.document.querySelectorAll('video'); for (var vi = 0; vi < vids.length; vi++) vids[vi].play().catch(function(){}); } catch(e) {}
+              });
+              return;
+            }
+
+            // Render incoming scene in a hidden iframe to capture its first frame
+            // First write the incoming scene to get frame B
+            if (isSpeakerScene(info.index)) { showSpeakerBg(state.masterTime); } else { hideSpeakerBg(); }
+            writeSceneToIframe(html);
+            waitForReady(function(newTl) {
+              newTl.time(0);
+              // Small delay to let the first frame render
+              setTimeout(function() {
+                captureIframeAsDataUri(function(frameBUri) {
+                  if (!frameBUri) {
+                    // Just play scene B normally
+                    var seekTime = Math.min(info.localTime, newTl.duration());
+                    newTl.time(seekTime); newTl.play();
+                    syncIframeVideos(seekTime);
+                    state._inTransition = false;
+                    return;
+                  }
+
+                  // Build and play the transition
+                  var w = (project.canvas && project.canvas.width) || 1920;
+                  var h = (project.canvas && project.canvas.height) || 1080;
+                  getGsapSource(function(gsapSrc) {
+                    var transHtml = buildTransitionHtml(frameAUri, frameBUri, transIn.type, transDuration, w, h, gsapSrc);
+                    writeSceneToIframe(transHtml);
+                    waitForReady(function(transTl) {
+                      transTl.play();
+
+                      // After transition completes, swap to scene B
+                      setTimeout(function() {
+                        state._inTransition = false;
+                        if (isSpeakerScene(info.index)) { showSpeakerBg(state.masterTime); } else { hideSpeakerBg(); }
+                        writeSceneToIframe(html);
+                        waitForReady(function(sceneTl) {
+                          // Seek past the transition duration into the scene
+                          var seekTime = Math.min(transDuration + info.localTime, sceneTl.duration());
+                          sceneTl.time(seekTime); sceneTl.play();
+                          syncIframeVideos(seekTime);
+                          try { var vids = els.previewIframe.contentWindow.document.querySelectorAll('video'); for (var vi = 0; vi < vids.length; vi++) vids[vi].play().catch(function(){}); } catch(e) {}
+                        });
+                      }, transDuration * 1000 + 50);
+                    });
+                  });
+                });
+              }, 100);
+            });
+          });
+          return;
+        }
+
+        // No transition -- standard scene change
+        state._inTransition = false;
         // Speaker track: show/hide background video on scene transition
         if (isSpeakerScene(info.index)) {
           showSpeakerBg(state.masterTime);
