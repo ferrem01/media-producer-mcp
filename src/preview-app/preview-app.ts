@@ -426,7 +426,8 @@ export function getPreviewHtml(): string {
     <div id="preview-container">
       <div class="no-scene" id="preview-placeholder">Select a scene to preview</div>
       <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
-        <iframe id="preview-iframe"></iframe>
+        <video id="speaker-bg" muted playsinline preload="auto" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
+        <iframe id="preview-iframe" style="position:relative;z-index:1;"></iframe>
       </div>
     </div>
 
@@ -488,6 +489,7 @@ export function getPreviewHtml(): string {
     previewPlaceholder: document.getElementById('preview-placeholder'),
     previewWrapper: document.getElementById('preview-wrapper'),
     previewIframe: document.getElementById('preview-iframe'),
+    speakerBg: document.getElementById('speaker-bg'),
     previewContainer: document.getElementById('preview-container'),
     playBtn: document.getElementById('play-btn'),
     playIcon: document.getElementById('play-icon'),
@@ -897,6 +899,12 @@ export function getPreviewHtml(): string {
     pauseMusicKeepPlaying();
 
     updateActiveScene(index);
+    // Speaker track: show/hide background video
+    if (isSpeakerScene(index)) {
+      showSpeakerBg(state.masterTime);
+    } else {
+      hideSpeakerBg();
+    }
     loadPreview();
     renderLayers();
     clearProps();
@@ -1480,6 +1488,75 @@ export function getPreviewHtml(): string {
     return { index: lastIdx, localTime: project.scenes[lastIdx].duration_seconds || 0 };
   }
 
+  // ── Speaker track preview support ──
+  function getSpeakerClipUrl() {
+    var project = state.currentProject;
+    if (!project || !project.speaker_track || !project.speaker_track.clips || !project.speaker_track.clips.length) return null;
+    var source = project.speaker_track.clips[0].source;
+    if (!source) return null;
+    // Already an HTTP URL
+    if (source.startsWith('http')) return source;
+    // Filesystem path -> tenant-level asset URL
+    if (source.startsWith('/data/media-producer/')) {
+      var rel = source.replace('/data/media-producer/', '');
+      return '/assets/' + rel;
+    }
+    if (source.startsWith('/assets/')) return source;
+    return source;
+  }
+
+  function isSpeakerScene(sceneIndex) {
+    var project = state.currentProject;
+    if (!project || !project.scenes || !project.speaker_track) return false;
+    var scene = project.scenes[sceneIndex];
+    if (!scene) return false;
+    // Speaker scenes have transparent_background=true and a speaker_track defined
+    return scene.transparent_background === true;
+  }
+
+  function showSpeakerBg(globalTime) {
+    var video = els.speakerBg;
+    if (!video) return;
+    var clipUrl = getSpeakerClipUrl();
+    if (!clipUrl) { video.style.display = 'none'; return; }
+    // Set src if not already set
+    if (!video.src || !video.src.includes(clipUrl.split('/').pop())) {
+      video.src = clipUrl;
+    }
+    video.style.display = 'block';
+    // Make iframe transparent so speaker shows through
+    els.previewIframe.style.background = 'transparent';
+    // Sync time
+    var target = globalTime || 0;
+    if (Math.abs(video.currentTime - target) > 0.3) {
+      video.currentTime = target;
+    }
+    if (video.paused) video.play().catch(function(){});
+  }
+
+  function hideSpeakerBg() {
+    var video = els.speakerBg;
+    if (!video) return;
+    video.style.display = 'none';
+    video.pause();
+    els.previewIframe.style.background = '#000';
+  }
+
+  function syncSpeakerBg(globalTime) {
+    if (!isSpeakerScene(state.currentSceneIndex)) return;
+    var video = els.speakerBg;
+    if (!video || video.style.display === 'none') return;
+    var target = globalTime || 0;
+    if (Math.abs(video.currentTime - target) > 0.5) {
+      video.currentTime = target;
+    }
+    if (state.playing && video.paused) {
+      video.play().catch(function(){});
+    } else if (!state.playing && !video.paused) {
+      video.pause();
+    }
+  }
+
   function togglePlay() {
     if (state.playing) {
       // PAUSE - just save masterTime and stop the loop
@@ -1493,6 +1570,8 @@ export function getPreviewHtml(): string {
       var tl = getTimeline();
       if (tl) tl.pause();
       pauseAudio();
+      // Pause speaker background video
+      if (els.speakerBg && !els.speakerBg.paused) els.speakerBg.pause();
     } else {
       // RESUME / PLAY
       state.playing = true;
@@ -1622,6 +1701,12 @@ export function getPreviewHtml(): string {
       var html = state.sceneHtmlCache[scene.id];
 
       if (html != null) {
+        // Speaker track: show/hide background video on scene transition
+        if (isSpeakerScene(info.index)) {
+          showSpeakerBg(state.masterTime);
+        } else {
+          hideSpeakerBg();
+        }
         writeSceneToIframe(html);
         waitForReady(function(newTl) {
           // Seek GSAP to match master clock's local time
@@ -1654,6 +1739,7 @@ export function getPreviewHtml(): string {
       }
       // Keep video elements in sync with scene time
       syncIframeVideos(info.localTime);
+      syncSpeakerBg(state.masterTime);
     }
 
     state.animFrameId = requestAnimationFrame(animLoop);
