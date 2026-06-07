@@ -479,7 +479,9 @@ export function getPreviewHtml(): string {
     masterTime: 0,
     lastTickTime: 0,
     // Scene HTML cache (keyed by scene id)
-    sceneHtmlCache: {}
+    sceneHtmlCache: {},
+    // Composite mode: single document with all scenes
+    compositeLoaded: false
   };
 
   // DOM refs
@@ -839,10 +841,36 @@ export function getPreviewHtml(): string {
       els.previewPlaceholder.innerHTML = '<div class="loading-state">Preloading scenes<div class="loading-dots"><span></span><span></span><span></span></div></div>';
       els.previewPlaceholder.style.display = '';
 
-      preloadScenes(project).then(function() {
-        els.previewPlaceholder.textContent = 'Select a scene to preview';
-        if (project.scenes && project.scenes.length > 0) {
-          selectScene(0);
+      // Load composite (all scenes in one doc) alongside individual scenes
+      Promise.all([preloadScenes(project), loadComposite(project)]).then(function() {
+        if (state._compositeHtml && project.scenes && project.scenes.length > 0) {
+          // Composite mode: write single document to iframe
+          els.previewPlaceholder.textContent = 'Loading composite preview...';
+          initComposite();
+          waitForCompositeReady(function(masterTl) {
+            state.currentSceneIndex = 0;
+            state.currentComponentIndex = -1;
+            state.duration = project.scenes[0].duration_seconds || 0;
+            updateActiveScene(0);
+            renderLayers();
+            clearProps();
+            updateSceneIndicator();
+            // Seek to start
+            masterTl.time(0);
+            els.slider.disabled = false;
+            els.playBtn.disabled = false;
+            state.masterTime = 0;
+            els.slider.value = 0;
+            updateTimeDisplay(0);
+            // Show speaker bg if first scene needs it
+            if (isSpeakerScene(0)) { showSpeakerBg(0); } else { hideSpeakerBg(); }
+          });
+        } else {
+          // Fallback: per-scene mode
+          els.previewPlaceholder.textContent = 'Select a scene to preview';
+          if (project.scenes && project.scenes.length > 0) {
+            selectScene(0);
+          }
         }
       });
     }).catch(function() {
@@ -904,22 +932,43 @@ export function getPreviewHtml(): string {
     state.playAll = false;
     updatePlayIcon();
 
-    // Update master time to match this scene's start
-    state.masterTime = sceneOffset(index);
-
     // Don't touch music audio on manual scene click. Only pause voiceover/sfx.
     pauseMusicKeepPlaying();
 
     updateActiveScene(index);
-    // Speaker track: show/hide background video
-    if (isSpeakerScene(index)) {
-      showSpeakerBg(state.masterTime);
+
+    if (state.compositeLoaded) {
+      // Composite mode: seek master timeline to scene start
+      var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
+      var sceneStart = meta && meta[index] ? meta[index].start : sceneOffset(index);
+      state.masterTime = sceneStart;
+      var masterTl = getCompositeMasterTimeline();
+      if (masterTl) {
+        masterTl.time(sceneStart);
+        masterTl.pause();
+      }
+      syncCompositeVideos(sceneStart);
+      els.slider.value = state.totalDuration > 0 ? Math.round((sceneStart / state.totalDuration) * 1000) : 0;
+      updateTimeDisplay(sceneStart);
+      updateSceneIndicator();
+      // Speaker track
+      if (isSpeakerScene(index)) { showSpeakerBg(sceneStart); } else { hideSpeakerBg(); }
+      syncSpeakerBg(sceneStart);
+      renderLayers();
+      clearProps();
     } else {
-      hideSpeakerBg();
+      // Legacy per-scene mode
+      state.masterTime = sceneOffset(index);
+      // Speaker track: show/hide background video
+      if (isSpeakerScene(index)) {
+        showSpeakerBg(state.masterTime);
+      } else {
+        hideSpeakerBg();
+      }
+      loadPreview();
+      renderLayers();
+      clearProps();
     }
-    loadPreview();
-    renderLayers();
-    clearProps();
   }
 
   // Update scene list active highlight without re-rendering
@@ -1569,18 +1618,29 @@ export function getPreviewHtml(): string {
 
     var patchPath = '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
     api('PATCH', patchPath, { data: comp.data }).then(function(result) {
-      // Invalidate the cached scene HTML and re-fetch fresh
-      var scenePath = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-      fetchHtml(scenePath).then(function(freshHtml) {
-        state.sceneHtmlCache[scene.id] = freshHtml;
-        // Write to iframe immediately
-        writeSceneToIframe(freshHtml);
-        // Re-init the timeline at the same position it was at
-        waitForReady(function(tl) {
-          tl.time(Math.min(savedLocalTime, tl.duration() || savedLocalTime));
-          tl.pause();
+      if (state.compositeLoaded) {
+        // Composite mode: re-fetch the entire composite document
+        var compositePath = '/preview-composite/' + state.tenantId + '/' + project.project_id;
+        fetchHtml(compositePath).then(function(freshHtml) {
+          state._compositeHtml = freshHtml;
+          writeSceneToIframe(freshHtml);
+          waitForCompositeReady(function(masterTl) {
+            masterTl.time(savedMasterTime);
+            masterTl.pause();
+          });
         });
-      });
+      } else {
+        // Legacy: re-fetch single scene
+        var scenePath = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+        fetchHtml(scenePath).then(function(freshHtml) {
+          state.sceneHtmlCache[scene.id] = freshHtml;
+          writeSceneToIframe(freshHtml);
+          waitForReady(function(tl) {
+            tl.time(Math.min(savedLocalTime, tl.duration() || savedLocalTime));
+            tl.pause();
+          });
+        });
+      }
     }).catch(function(e) {
       console.error('Save failed:', e);
     });
@@ -1709,7 +1769,7 @@ export function getPreviewHtml(): string {
 
   function togglePlay() {
     if (state.playing) {
-      // PAUSE - just save masterTime and stop the loop
+      // PAUSE
       if (state.animFrameId) {
         cancelAnimationFrame(state.animFrameId);
         state.animFrameId = null;
@@ -1717,10 +1777,16 @@ export function getPreviewHtml(): string {
       state.playing = false;
       state.playAll = false;
       updatePlayIcon();
-      var tl = getTimeline();
-      if (tl) tl.pause();
+
+      if (state.compositeLoaded) {
+        // Composite mode: pause master timeline (it's always paused, we just stop the clock)
+        // Videos will be paused by syncCompositeVideos on next check
+        syncCompositeVideos(state.masterTime);
+      } else {
+        var tl = getTimeline();
+        if (tl) tl.pause();
+      }
       pauseAudio();
-      // Pause speaker background video
       if (els.speakerBg && !els.speakerBg.paused) els.speakerBg.pause();
     } else {
       // RESUME / PLAY
@@ -1729,11 +1795,22 @@ export function getPreviewHtml(): string {
       updatePlayIcon();
 
       var globalTime = state.masterTime || 0;
+
+      if (state.compositeLoaded) {
+        // Composite mode: just start the transport clock loop
+        // Master timeline is always paused; we seek it on each tick
+        state.lastTickTime = performance.now();
+        playAudio();
+        syncAudioToGlobalTime(globalTime);
+        animLoop();
+        return;
+      }
+
+      // Legacy per-scene mode
       var info = sceneForGlobalTime(globalTime);
       var project = state.currentProject;
 
       if (info.index !== state.currentSceneIndex && project && project.scenes) {
-        // Need to switch scene
         state.currentSceneIndex = info.index;
         state.currentComponentIndex = -1;
         state.duration = project.scenes[info.index].duration_seconds || 0;
@@ -1758,7 +1835,6 @@ export function getPreviewHtml(): string {
         return;
       }
 
-      // Same scene - seek GSAP timeline and play
       var tl = getTimeline();
       if (tl) {
         tl.time(Math.min(info.localTime, tl.duration()));
@@ -1794,6 +1870,70 @@ export function getPreviewHtml(): string {
     var globalTime = state.masterTime;
     var totalDur = state.totalDuration;
 
+    // ── Composite mode: transport clock drives master timeline ──
+    if (state.compositeLoaded) {
+      // Clamp
+      if (globalTime >= totalDur) {
+        state.masterTime = totalDur;
+        globalTime = totalDur;
+        stopPlayback();
+        stopAudioFull();
+        updateTimeDisplay(globalTime);
+        els.slider.value = 1000;
+        syncCompositeVideos(globalTime);
+        return;
+      }
+
+      // Seek master timeline (GSAP is always paused, we drive it)
+      var masterTl = getCompositeMasterTimeline();
+      if (masterTl) {
+        masterTl.time(globalTime);
+      }
+
+      // Update UI
+      els.slider.value = totalDur > 0 ? Math.round((globalTime / totalDur) * 1000) : 0;
+      updateTimeDisplay(globalTime);
+
+      // Track which scene we're in for sidebar highlight
+      var cInfo = compositeSceneForTime(globalTime);
+      if (cInfo.index !== state.currentSceneIndex) {
+        state.currentSceneIndex = cInfo.index;
+        state.currentComponentIndex = -1;
+        var project = state.currentProject;
+        if (project && project.scenes) {
+          state.duration = project.scenes[cInfo.index].duration_seconds || 0;
+        }
+        updateActiveScene(cInfo.index);
+        renderLayers();
+        clearProps();
+        updateSceneIndicator();
+        // Speaker track
+        if (isSpeakerScene(cInfo.index)) { showSpeakerBg(globalTime); } else { hideSpeakerBg(); }
+      }
+
+      // Sync videos and speaker
+      syncCompositeVideos(globalTime);
+      syncSpeakerBg(globalTime);
+
+      // Keep audio in sync
+      state.audioElements.forEach(function(audio) {
+        if (audio.paused) return;
+        var dur = audio.duration;
+        if (!dur || !isFinite(dur)) return;
+        if (audio._trackType === 'music' && audio.loop) {
+          var expectedTime = globalTime % dur;
+          if (Math.abs(audio.currentTime - expectedTime) > 0.5) audio.currentTime = expectedTime;
+        } else {
+          if (globalTime >= dur) return;
+          if (Math.abs(audio.currentTime - globalTime) > 0.5) audio.currentTime = Math.min(globalTime, dur);
+        }
+      });
+
+      state.animFrameId = requestAnimationFrame(animLoop);
+      return;
+    }
+
+    // ── Legacy per-scene mode ──
     // Clamp to total duration
     if (globalTime >= totalDur) {
       state.masterTime = totalDur;
@@ -1990,10 +2130,36 @@ export function getPreviewHtml(): string {
     // Update master clock
     state.masterTime = targetGlobal;
 
-    var info = sceneForGlobalTime(targetGlobal);
-
     updateTimeDisplay(targetGlobal);
     syncAudioToGlobalTime(targetGlobal);
+
+    // ── Composite mode: just seek the master timeline ──
+    if (state.compositeLoaded) {
+      var masterTl = getCompositeMasterTimeline();
+      if (masterTl) {
+        masterTl.time(targetGlobal);
+      }
+      // Update scene highlight
+      var cInfo = compositeSceneForTime(targetGlobal);
+      if (cInfo.index !== state.currentSceneIndex) {
+        state.currentSceneIndex = cInfo.index;
+        state.currentComponentIndex = -1;
+        state.duration = project.scenes[cInfo.index].duration_seconds || 0;
+        updateActiveScene(cInfo.index);
+        renderLayers();
+        clearProps();
+        updateSceneIndicator();
+        if (isSpeakerScene(cInfo.index)) { showSpeakerBg(targetGlobal); } else { hideSpeakerBg(); }
+      }
+      syncCompositeVideos(targetGlobal);
+      syncSpeakerBg(targetGlobal);
+      stopPlayback();
+      pauseMusicKeepPlaying();
+      return;
+    }
+
+    // ── Legacy per-scene mode ──
+    var info = sceneForGlobalTime(targetGlobal);
 
     if (info.index !== state.currentSceneIndex) {
       state.currentSceneIndex = info.index;

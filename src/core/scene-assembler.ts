@@ -194,7 +194,7 @@ ${componentScripts.join("\n\n")}
 /**
  * Generate Google Fonts link tags from the brand kit.
  */
-function generateFontLinks(brand: BrandKit): string {
+export function generateFontLinks(brand: BrandKit): string {
   const links: string[] = [];
   for (const font of brand.fonts || []) {
     if (font.source === "google") {
@@ -214,7 +214,7 @@ function generateFontLinks(brand: BrandKit): string {
  * Resolve relative /assets/ URLs in component data to absolute URLs so they
  * work when loaded via file:// protocol in Playwright.
  */
-function resolveAssetUrls(data: Record<string, any>, preview?: boolean, speakerUrl?: string): Record<string, any> {
+export function resolveAssetUrls(data: Record<string, any>, preview?: boolean, speakerUrl?: string): Record<string, any> {
   const baseUrl = `http://localhost:${config.port}`;
   const resolved = { ...data };
   for (const [key, val] of Object.entries(resolved)) {
@@ -365,7 +365,7 @@ function pickBrandBackground(brand: BrandKit, isDark: boolean): string | undefin
  *   --mp-color-cta: CTA button color (from accent)
  *   --mp-color-glow: glow/shadow color based on primary
  */
-function generateBrandCSS(brand: BrandKit, sceneBackground?: string, preview?: boolean): { css: string; theme: "dark" | "light"; hasBgImage: boolean } {
+export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, preview?: boolean): { css: string; theme: "dark" | "light"; hasBgImage: boolean } {
   const vars: string[] = [];
 
   // ── Determine effective theme ──
@@ -465,7 +465,7 @@ function generateBrandCSS(brand: BrandKit, sceneBackground?: string, preview?: b
 /**
  * Build inline position style for a component container.
  */
-function buildPositionStyle(comp: SceneComponent): string {
+export function buildPositionStyle(comp: SceneComponent): string {
   const parts: string[] = [];
   const pos = comp.position;
   const z = comp.z_index ?? 0;
@@ -511,7 +511,7 @@ function buildPositionStyle(comp: SceneComponent): string {
  * positioned div that occupies the specified side and width of the frame.
  * This leaves the other side clear for the speaker video (full-behind mode).
  */
-function buildContentRegionWrapper(scene: Scene, componentBlocks: string[]): string {
+export function buildContentRegionWrapper(scene: Scene, componentBlocks: string[]): string {
   const blocks = componentBlocks.join("\n\n");
 
   if (!scene.content_region) {
@@ -544,7 +544,7 @@ function buildContentRegionWrapper(scene: Scene, componentBlocks: string[]): str
  * Build a script block that creates a component's GSAP timeline
  * and adds it to the master timeline.
  */
-function buildComponentScript(
+export function buildComponentScript(
   comp: SceneComponent,
   scriptSource: string,
   duration: number,
@@ -585,7 +585,7 @@ function buildComponentScript(
  * Load GSAP source from the local gsap directory.
  * Falls back to a CDN URL in script tag if local files not found.
  */
-async function loadGsapSource(gsapDir: string): Promise<string> {
+export async function loadGsapSource(gsapDir: string): Promise<string> {
   const files = [
     "gsap.min.js",
     "SplitText.min.js",
@@ -641,7 +641,7 @@ var gsap = {
  * These are plain .js files that get inlined into the assembled HTML
  * alongside GSAP, making them available to all component scripts.
  */
-async function loadSharedUtilities(): Promise<string> {
+export async function loadSharedUtilities(): Promise<string> {
   // Resolve path relative to this source file's location in the repo
   const thisDir = path.dirname(fileURLToPath(import.meta.url));
   const sharedDir = path.join(thisDir, "..", "components", "shared");

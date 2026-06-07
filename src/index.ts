@@ -26,6 +26,7 @@ import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs } from "./core/job-queue.js";
 import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
+import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
 import { setupWebSocket } from "./ws.js";
 import { authMiddleware, extractToken, validateToken, isAuthEnabled } from "./auth/auth.js";
@@ -623,7 +624,45 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
+
+      // ── API: Preview composite (all scenes in one HTML document) ──
+      const compositeMatch = url.match(/^\/api\/preview-composite\/([^/]+)\/([^/]+)$/);
+      if (compositeMatch && method === "GET") {
+        const [, tenantId, projectId] = compositeMatch.map(decodeURIComponent);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) {
+          jsonResponse(res, 404, { error: "Project not found" });
+          return;
+        }
+        if (!project.scenes || project.scenes.length === 0) {
+          jsonResponse(res, 400, { error: "Project has no scenes" });
+          return;
+        }
+
+        // Resolve all scene component sources
+        const sceneInputs = [];
+        for (const scene of project.scenes) {
+          const components = await resolveComponentSources(scene, tenantId, projectId);
+          sceneInputs.push({ scene, components });
+        }
+
+        const html = await assembleComposite({
+          scenes: sceneInputs,
+          brandKit: project.brand_kit,
+          canvas: project.canvas,
+          gsapDir: config.gsapDir,
+          speakerUrl: getSpeakerUrl(project),
+        });
+
+        res.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(html);
+        return;
+      }
       // ── Playground SPA ──
+
       if (url === "/playground" || url === "/playground/") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(playgroundHtml);
