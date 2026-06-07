@@ -160,10 +160,10 @@ function getSpeakerUrl(project: any): string | undefined {
   const dataDir = config.dataDir;
   if (source.startsWith(dataDir)) {
     const rel = source.slice(dataDir.length + 1);
-    return `http://localhost:${config.port}/assets/${rel}`;
+    return `/assets/${rel}`;
   }
   if (source.startsWith("/assets/")) {
-    return `http://localhost:${config.port}${source}`;
+    return source;
   }
   return source;
 }

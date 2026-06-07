@@ -143,6 +143,7 @@ export function getPreviewHtml(): string {
   .preview-wrapper { position: relative; }
   #preview-iframe {
     background: #000; border: none;
+    transition: opacity 0.15s ease;
     box-shadow: 0 4px 24px rgba(0,0,0,0.08);
     border-radius: 8px;
     transform-origin: top left;
@@ -930,6 +931,8 @@ export function getPreviewHtml(): string {
     iframe.width = (project && project.canvas && project.canvas.width) || 1920;
     iframe.height = (project && project.canvas && project.canvas.height) || 1080;
 
+    // Hide iframe during content swap to avoid flash
+    iframe.style.opacity = '0';
     els.previewWrapper.style.display = 'block';
     els.previewPlaceholder.style.display = 'none';
 
@@ -941,6 +944,30 @@ export function getPreviewHtml(): string {
       iframe.srcdoc = html;
     }
     updatePreviewScale();
+
+    // Wait for videos to be ready before showing
+    try {
+      var doc = iframe.contentDocument || iframe.contentWindow.document;
+      var vids = doc.querySelectorAll('video');
+      if (vids.length > 0) {
+        var loaded = 0;
+        var total = vids.length;
+        var show = function() {
+          loaded++;
+          if (loaded >= total) iframe.style.opacity = '1';
+        };
+        for (var i = 0; i < vids.length; i++) {
+          if (vids[i].readyState >= 2) { show(); }
+          else { vids[i].addEventListener('canplay', show, { once: true }); }
+        }
+        // Fallback: show after 800ms regardless
+        setTimeout(function() { iframe.style.opacity = '1'; }, 800);
+      } else {
+        iframe.style.opacity = '1';
+      }
+    } catch(e) {
+      iframe.style.opacity = '1';
+    }
   }
 
   // Preview loading - uses cache, falls back to fetch
@@ -1457,11 +1484,12 @@ export function getPreviewHtml(): string {
         var v = videos[i];
         var startAt = parseFloat(v.getAttribute('data-start-at') || '0');
         var target = Math.max(0, localTime - startAt);
-        if (forceSeek) {
+        if (forceSeek || !v._synced) {
           v.currentTime = target;
+          v._synced = true;
         } else {
-          // Only correct large drift (>0.5s) to avoid choppy seeking
-          if (Math.abs(v.currentTime - target) > 0.5) v.currentTime = target;
+          // Tight drift correction (0.15s) keeps multi-video grids in sync
+          if (Math.abs(v.currentTime - target) > 0.15) v.currentTime = target;
         }
         // Ensure video is playing during playback
         if (state.playing && v.paused && target < v.duration) {

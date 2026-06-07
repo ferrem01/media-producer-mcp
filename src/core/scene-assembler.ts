@@ -226,7 +226,7 @@ function resolveAssetUrls(data: Record<string, any>, preview?: boolean, speakerU
     if (typeof val === "string" && val.startsWith("/assets/")) {
       resolved[key] = resolveAssetPath(val, preview);
     } else if (typeof val === "string" && val.startsWith("/api/")) {
-      resolved[key] = `${baseUrl}${val}`;
+      resolved[key] = preview ? val : `${baseUrl}${val}`;
     } else if (preview && typeof val === "string" && val.startsWith("file://")) {
       // In preview mode, convert file:// paths back to HTTP-servable paths.
       // file://{dataDir}/{tenant}/... -> /assets/{tenant}/...
@@ -236,7 +236,7 @@ function resolveAssetUrls(data: Record<string, any>, preview?: boolean, speakerU
         typeof v === "string" && v.startsWith("/assets/")
           ? resolveAssetPath(v, preview)
           : typeof v === "string" && v.startsWith("/api/")
-          ? `${baseUrl}${v}`
+          ? (preview ? v : `${baseUrl}${v}`)
           : preview && typeof v === "string" && v.startsWith("file://")
           ? fileUrlToHttpUrl(v)
           : v
@@ -258,25 +258,25 @@ function fileUrlToHttpUrl(fileUrl: string): string {
   // {dataDir}/{tenant}/projects/{projectId}/assets/{rest} -> /assets/{tenant}/projects/{projectId}/assets/{rest}
   const projMatch = filePath.match(new RegExp(`^${dataDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([^/]+)/projects/([^/]+)/assets/(.+)$`));
   if (projMatch) {
-    return `http://localhost:${config.port}/assets/${projMatch[1]}/projects/${projMatch[2]}/assets/${projMatch[3]}`;
+    return `/assets/${projMatch[1]}/projects/${projMatch[2]}/assets/${projMatch[3]}`;
   }
 
   // {dataDir}/{tenant}/brand-kit/assets/{rest} -> /assets/{tenant}/brand-kit/{rest}
   const brandMatch = filePath.match(new RegExp(`^${dataDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([^/]+)/brand-kit/assets/(.+)$`));
   if (brandMatch) {
-    return `http://localhost:${config.port}/assets/${brandMatch[1]}/brand-kit/${brandMatch[2]}`;
+    return `/assets/${brandMatch[1]}/brand-kit/${brandMatch[2]}`;
   }
 
   // {dataDir}/{tenant}/projects/{projectId}/_work/{rest} -> /work/{tenant}/projects/{projectId}/{rest}
   const workMatch = filePath.match(new RegExp(`^${dataDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([^/]+)/projects/([^/]+)/_work/(.+)$`));
   if (workMatch) {
-    return `http://localhost:${config.port}/work/${workMatch[1]}/projects/${workMatch[2]}/${workMatch[3]}`;
+    return `/work/${workMatch[1]}/projects/${workMatch[2]}/${workMatch[3]}`;
   }
 
   // {dataDir}/{tenant}/assets/{rest} -> /assets/{tenant}/assets/{rest}  (tenant-level assets)
   const tenantMatch = filePath.match(new RegExp(`^${dataDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([^/]+)/assets/(.+)$`));
   if (tenantMatch) {
-    return `http://localhost:${config.port}/assets/${tenantMatch[1]}/assets/${tenantMatch[2]}`;
+    return `/assets/${tenantMatch[1]}/assets/${tenantMatch[2]}`;
   }
 
   // Can't convert -- return as-is (will fail in browser but at least won't crash)
@@ -436,7 +436,7 @@ function generateBrandCSS(brand: BrandKit, sceneBackground?: string, preview?: b
     const resolvedUrl = bgUrl.startsWith('/assets/')
       ? resolveAssetPath(bgUrl, preview)
       : bgUrl.startsWith('/api/')
-      ? `http://localhost:${config.port}${bgUrl}`
+      ? (preview ? bgUrl : `http://localhost:${config.port}${bgUrl}`)
       : bgUrl;
     vars.push(`  --mp-bg-image: url(${resolvedUrl});`);
     vars.push('  --mp-has-bg-image: 1;');
