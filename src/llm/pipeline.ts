@@ -419,7 +419,6 @@ async function runVideoRevisionPipeline(
       tenant_id: project.tenant_id,
       audio: project.audio,
       brand_kit: project.brand_kit,
-      overlays: project.overlays,
       canvas: project.canvas,
     };
     Object.assign(project, enrichResult.project, preserved);

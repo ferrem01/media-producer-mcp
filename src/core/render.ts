@@ -24,7 +24,6 @@ import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
-import { compositeOverlays, type OverlaySegment } from "./overlay-compositor.js";
 import { buildSpeakerBase, compositeContentOverlay } from "./speaker-track.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
@@ -43,7 +42,7 @@ export interface RenderOptions {
   /** Additional directories to search for component sources (e.g. project-local freeform components) */
   extraComponentDirs?: string[];
 
-  /** When true, skip scene rendering and only (re-)apply audio mix + overlays to existing output */
+  /** When true, skip scene rendering and only re-apply audio mix to existing output */
   audioOnly?: boolean;
 }
 
@@ -109,7 +108,7 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
 }
 
 /**
- * Audio-only render: skip scene rendering, just mix audio + apply overlays
+ * Audio-only render: skip scene rendering, just re-apply audio mix
  * onto the already-rendered video file.
  */
 async function renderAudioOnly(
@@ -174,44 +173,6 @@ async function renderAudioOnly(
     console.log("  No audio tracks to mix, nothing to do.");
   }
 
-  // ── Speaker overlays ──
-  if (project.overlays && project.overlays.length > 0) {
-    for (const overlay of project.overlays) {
-      if (overlay.type === "speaker-video" && overlay.source) {
-        const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
-        // Exclude full-behind segments (handled during scene render, not in audio-only pass)
-        const segments: OverlaySegment[] = (overlay.segments
-          ? overlay.segments.map((s) => ({
-              start: s.start,
-              end: s.end,
-              mode: s.mode,
-              position: (s.position as OverlaySegment["position"]) || (overlay.position as OverlaySegment["position"]) || "bottom-right",
-              shape: (s.shape as OverlaySegment["shape"]) || overlay.shape || "circle",
-              size: s.size || overlay.size,
-            }))
-          : [{
-              start: overlay.start_time || 0,
-              end: overlay.end_time ?? Infinity,
-              mode: "pip" as const,
-              position: (overlay.position as OverlaySegment["position"]) || "bottom-right",
-              shape: overlay.shape || "circle",
-              size: overlay.size,
-            }]).filter((s) => s.mode !== "full-behind");
-        if (segments.length === 0) continue;
-
-        const overlayOutput = outputPath.replace(/\.mp4$/, "-overlay.mp4");
-        await compositeOverlays({
-          videoPath: outputPath,
-          speakerPath,
-          segments,
-          outputPath: overlayOutput,
-          width: project.canvas.width,
-          height: project.canvas.height,
-        });
-        await fs.rename(overlayOutput, outputPath);
-      }
-    }
-  }
 
   const durationMs = Date.now() - startTime;
   console.log(`Audio-only render complete: ${outputPath} (${(durationMs / 1000).toFixed(1)}s)`);
@@ -1002,56 +963,6 @@ async function renderVideo(
     await fs.rename(audioOutput, outputPath);
   }
 
-  // ── Speaker overlays ──
-  if (project.overlays && project.overlays.length > 0) {
-    for (const overlay of project.overlays) {
-      if (overlay.type === "speaker-video" && overlay.source) {
-        const speakerPath = resolveAssetPath(overlay.source, project.tenant_id, project.project_id);
-
-        // Build segments from overlay config.
-        // full-behind segments are handled at scene-render time and must be excluded here.
-        const allSegments: OverlaySegment[] = overlay.segments
-          ? overlay.segments.map((s) => ({
-              start: s.start,
-              end: s.end,
-              mode: s.mode,
-              position: (s.position as OverlaySegment["position"]) || (overlay.position as OverlaySegment["position"]) || "bottom-right",
-              shape: (s.shape as OverlaySegment["shape"]) || overlay.shape || "circle",
-              size: s.size || overlay.size,
-            }))
-          : [{
-              start: overlay.start_time || 0,
-              end: overlay.end_time ?? Infinity,
-              mode: "pip" as const,
-              position: (overlay.position as OverlaySegment["position"]) || "bottom-right",
-              shape: overlay.shape || "circle",
-              size: overlay.size,
-            }];
-
-        // Only composite segments that aren't full-behind (those were already composited per-scene)
-        const segments = allSegments.filter((s) => s.mode !== "full-behind");
-        if (segments.length === 0) continue;
-
-        const overlayOutput = outputPath.replace(/\.mp4$/, "-overlay.mp4");
-
-        // Skip audio mixing if full-behind scenes already carry speaker audio.
-        // The PiP step should only composite video, not double the audio.
-        const hasFullBehind = overlay.segments?.some((s: any) => s.mode === "full-behind");
-        console.log(`\n  Compositing speaker overlay: ${segments.length} segment(s)${hasFullBehind ? " (video-only, audio from per-scene composites)" : ""}`);
-        await compositeOverlays({
-          videoPath: outputPath,
-          speakerPath,
-          segments,
-          outputPath: overlayOutput,
-          width: project.canvas.width,
-          height: project.canvas.height,
-          skipAudio: !!hasFullBehind,
-        });
-
-        await fs.rename(overlayOutput, outputPath);
-      }
-    }
-  }
 
 
   const durationMs = Date.now() - startTime;

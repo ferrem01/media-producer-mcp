@@ -148,7 +148,7 @@ export async function saveProject(project: Project): Promise<void> {
 export async function updateProject(
   tenantId: string,
   projectId: string,
-  updates: Partial<Pick<Project, "name" | "canvas" | "brand_kit" | "status" | "audio" | "overlays">>,
+  updates: Partial<Pick<Project, "name" | "canvas" | "brand_kit" | "status" | "audio">>,
 ): Promise<Project | null> {
   const project = await loadProject(tenantId, projectId);
   if (!project) return null;
@@ -158,7 +158,6 @@ export async function updateProject(
   if (updates.brand_kit) project.brand_kit = { ...project.brand_kit, ...updates.brand_kit };
   if (updates.status !== undefined) project.status = updates.status;
   if (updates.audio !== undefined) project.audio = updates.audio;
-  if (updates.overlays !== undefined) project.overlays = updates.overlays;
 
   await saveProject(project);
   return project;

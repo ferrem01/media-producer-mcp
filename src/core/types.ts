@@ -133,35 +133,10 @@ export interface Scene {
   components: SceneComponent[];
   audio_hints?: SceneAudioHints;
   /** When set, all components are constrained to this region of the frame.
-   *  Used with full-behind speaker overlay so content appears beside the speaker. */
+   *  Used with speaker track so content appears beside the speaker. */
   content_region?: ContentRegion;
   /** When true, the scene background is rendered transparently (used with full-behind overlays). */
   transparent_background?: boolean;
-}
-
-// ── Overlays ──
-
-export interface Overlay {
-  id: string;
-  type: "speaker-video" | "watermark" | "logo";
-  source: string;
-  position?: string;
-  size?: { width: number; height: number };
-  shape?: "circle" | "rounded-rect" | "rect";
-  border?: { color: string; width: number };
-  opacity?: number;
-  margin?: number;
-  start_time?: number;
-  end_time?: number | null;
-  segments?: Array<{
-    start: number;
-    end: number;
-    mode: "full" | "pip" | "audio-only" | "full-behind";
-    position?: string;
-    shape?: string;
-    size?: { width: number; height: number };
-    lower_third?: { name: string; title?: string };
-  }>;
 }
 
 // ── Audio ──
@@ -226,10 +201,9 @@ export interface Project {
   canvas: Canvas;
   brand_kit: BrandKit;
   scenes: Scene[];
-  overlays?: Overlay[];
   audio?: AudioConfig;
   assets?: Asset[];
-  /** New continuous speaker track architecture (replaces per-scene full-behind overlay) */
+  /** New continuous speaker track architecture  */
   speaker_track?: SpeakerTrack;
 }
 
