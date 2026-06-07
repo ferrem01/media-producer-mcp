@@ -182,7 +182,7 @@ html, body {
   width: ${canvas.width}px;
   height: ${canvas.height}px;
   overflow: hidden;
-  background: ${canvas.background || "#000000"};
+  background: transparent;
 }
 
 /* ── Scene containers ── */

@@ -837,6 +837,9 @@ export function getPreviewHtml(): string {
   function initComposite() {
     if (!state._compositeHtml) return false;
     writeSceneToIframe(state._compositeHtml);
+    // Make iframe background transparent so speaker video shows through
+    // for transparent_background scenes in composite mode
+    els.previewIframe.style.background = 'transparent';
     return true;
   }
 
@@ -1879,7 +1882,10 @@ export function getPreviewHtml(): string {
     if (!video) return;
     video.style.display = 'none';
     video.pause();
-    els.previewIframe.style.background = '#000';
+    // In composite mode, keep iframe transparent (scene divs have their own backgrounds)
+    if (!state.compositeLoaded) {
+      els.previewIframe.style.background = '#000';
+    }
   }
 
   function syncSpeakerBg(globalTime) {
