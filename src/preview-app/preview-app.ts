@@ -484,7 +484,10 @@ export function getPreviewHtml(): string {
     compositeLoaded: false,
     // Unified media clip registry for Phase 2 sync
     mediaClips: [],
-    forceSync: false
+    forceSync: false,
+    // Speaker track trim values (single source of truth)
+    speakerTrimStart: 0,
+    speakerTrimEnd: Infinity
   };
 
   // DOM refs
@@ -614,15 +617,13 @@ export function getPreviewHtml(): string {
     var speakerEl = els.speakerBg;
     if (speakerEl && project.speaker_track && project.speaker_track.clips && project.speaker_track.clips.length) {
       var spkClip = project.speaker_track.clips[0];
-      var trimStart = spkClip.trim_start != null ? spkClip.trim_start : (spkClip.start || 0);
-      var trimEnd = spkClip.trim_end != null ? spkClip.trim_end : Infinity;
+      state.speakerTrimStart = spkClip.trim_start != null ? spkClip.trim_start : (spkClip.start || 0);
+      state.speakerTrimEnd = spkClip.trim_end != null ? spkClip.trim_end : Infinity;
       state.mediaClips.push({
         el: speakerEl,
         kind: 'speaker',
         start: 0,
         end: totalDur,
-        trimStart: trimStart,
-        trimEnd: trimEnd,
         lastOffset: null,
         driftSamples: 0
       });
@@ -723,12 +724,9 @@ export function getPreviewHtml(): string {
         }
         // Always sync time + play/pause regardless of visibility
         // Speaker plays continuously so audio is uninterrupted
-        // Apply trim_start offset: global time 0 maps to trim_start in the source video
-        var target = time + (clip.trimStart || 0);
-        // Clamp to trim_end
-        if (clip.trimEnd && isFinite(clip.trimEnd) && target > clip.trimEnd) {
-          target = clip.trimEnd;
-        }
+        // Apply speaker track trim: global time 0 maps to trim_start in source
+        var target = time + state.speakerTrimStart;
+        if (target > state.speakerTrimEnd) target = state.speakerTrimEnd;
         syncElement(clip, el, target, playing, false);
         // Unmute when playing (audio should be heard even on non-speaker scenes)
         el.muted = !playing;
@@ -754,16 +752,10 @@ export function getPreviewHtml(): string {
         }
         var target;
         if (clip.isSpeaker) {
-          // Speaker-sourced video: sync to global time + speaker trim offset
-          // The speaker track runs continuously; ignore scene-level start_at
-          var spkTrimStart = 0;
-          for (var si = 0; si < state.mediaClips.length; si++) {
-            if (state.mediaClips[si].kind === 'speaker') {
-              spkTrimStart = state.mediaClips[si].trimStart || 0;
-              break;
-            }
-          }
-          target = time + spkTrimStart;
+          // Speaker-sourced video: sync to speaker track timeline
+          // Uses same trim values as the speaker bg -- single source of truth
+          target = time + state.speakerTrimStart;
+          if (target > state.speakerTrimEnd) target = state.speakerTrimEnd;
         } else {
           // Regular video asset: start_at is source offset
           target = clip.offset + localTime;
