@@ -490,8 +490,6 @@ export function getPreviewHtml(): string {
     // Master clock
     masterTime: 0,
     lastTickTime: 0,
-    // Scene HTML cache (keyed by scene id)
-    sceneHtmlCache: {},
     // Composite mode: single document with all scenes
     compositeLoaded: false,
     // Unified media clip registry for Phase 2 sync
@@ -1105,21 +1103,6 @@ export function getPreviewHtml(): string {
     });
   }
 
-  function preloadScenes(project) {
-    state.sceneHtmlCache = {};
-    // Preload the speaker video alongside scenes
-    preloadSpeakerVideo();
-    if (!project || !project.scenes || !project.scenes.length) return Promise.resolve();
-    var promises = project.scenes.map(function(scene) {
-      var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-      return fetchHtml(path).then(function(html) {
-        state.sceneHtmlCache[scene.id] = html;
-      }).catch(function() {
-        state.sceneHtmlCache[scene.id] = null;
-      });
-    });
-    return Promise.all(promises);
-  }
 
   // Load composite HTML (all scenes in one document) for transport clock mode
   function loadComposite(project) {
@@ -1189,7 +1172,7 @@ export function getPreviewHtml(): string {
       }
       return { index: 0, localTime: 0 };
     } catch(e) {
-      return sceneForGlobalTime(globalTime);
+      return { index: 0, localTime: 0 };
     }
   }
 
@@ -1217,7 +1200,7 @@ export function getPreviewHtml(): string {
       els.previewPlaceholder.style.display = '';
 
       // Load composite (all scenes in one doc) alongside individual scenes
-      Promise.all([preloadScenes(project), loadComposite(project)]).then(function() {
+      loadComposite(project).then(function() {
         if (state._compositeHtml && project.scenes && project.scenes.length > 0) {
           // Composite mode: write single document to iframe
           els.previewPlaceholder.textContent = 'Loading composite preview...';
@@ -1247,19 +1230,11 @@ export function getPreviewHtml(): string {
             });
           });
         } else {
-          // Fallback: per-scene mode
-          els.previewPlaceholder.textContent = 'Select a scene to preview';
-          if (project.scenes && project.scenes.length > 0) {
-            selectScene(0);
-          }
+          els.previewPlaceholder.textContent = 'Failed to load composite preview';
         }
       }).catch(function(err) {
-        console.error('[preview] preload/composite error:', err);
-        // Fall back to per-scene mode
-        els.previewPlaceholder.textContent = 'Select a scene to preview';
-        if (project.scenes && project.scenes.length > 0) {
-          selectScene(0);
-        }
+        console.error('[preview] composite load error:', err);
+        els.previewPlaceholder.textContent = 'Failed to load preview';
       });
     }).catch(function() {
       els.sceneList.innerHTML = '<div class="empty-state">Failed to load project</div>';
@@ -1324,7 +1299,8 @@ export function getPreviewHtml(): string {
 
     updateActiveScene(index);
 
-    if (state.compositeLoaded) {
+    if (!state.compositeLoaded) return;
+    {
       // Composite mode: seek master timeline to scene start
       var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
       var sceneStart = meta && meta[index] ? meta[index].start : sceneOffset(index);
@@ -1356,34 +1332,6 @@ export function getPreviewHtml(): string {
     });
   }
 
-  // ── Scene Transition Support ──
-  // Get the GSAP script for a transition type (matches render pipeline transitions.ts)
-  function getTransitionGsap(type, dur) {
-    switch (type) {
-      case 'crossfade':
-        return 'gsap.set(imgB, { autoAlpha: 0 }); tl.to(imgA, { autoAlpha: 0, duration: dur }, 0); tl.to(imgB, { autoAlpha: 1, duration: dur }, 0);';
-      case 'blur-crossfade':
-        return 'gsap.set(imgB, { autoAlpha: 0, filter: "blur(20px)" }); tl.to(imgA, { autoAlpha: 0, filter: "blur(20px)", duration: dur }, 0); tl.to(imgB, { autoAlpha: 1, filter: "blur(0px)", duration: dur }, 0);';
-      case 'zoom-through':
-        return 'var halfDur = dur * 0.5; tl.to(imgA, { scale: 1.5, autoAlpha: 0, duration: halfDur, ease: "power2.in" }, 0); gsap.set(imgB, { scale: 1.5, autoAlpha: 0 }); tl.to(imgB, { scale: 1, autoAlpha: 1, duration: halfDur, ease: "power2.out" }, halfDur);';
-      case 'slide-up':
-        return 'gsap.set(imgB, { yPercent: 100 }); imgB.style.zIndex = "2"; tl.to(imgB, { yPercent: 0, duration: dur, ease: "power2.inOut" }, 0);';
-      case 'slide-down':
-        return 'gsap.set(imgB, { yPercent: -100 }); imgB.style.zIndex = "2"; tl.to(imgB, { yPercent: 0, duration: dur, ease: "power2.inOut" }, 0);';
-      case 'slide-left':
-      case 'slide-reveal':
-        return 'gsap.set(imgB, { xPercent: 100 }); imgB.style.zIndex = "2"; tl.to(imgB, { xPercent: 0, duration: dur, ease: "power2.inOut" }, 0);';
-      case 'morph-wipe':
-      case 'iris':
-        return 'gsap.set(imgB, { clipPath: "circle(0% at 50% 50%)" }); imgB.style.zIndex = "2"; tl.to(imgB, { clipPath: "circle(150% at 50% 50%)", duration: dur, ease: "power2.inOut" }, 0);';
-      case 'push':
-        return 'gsap.set(imgB, { xPercent: 100 }); tl.to(imgA, { xPercent: -100, duration: dur, ease: "power2.inOut" }, 0); tl.to(imgB, { xPercent: 0, duration: dur, ease: "power2.inOut" }, 0);';
-      case 'glitch-cut':
-        return 'var glitchDur = Math.min(dur * 0.6, 0.3); gsap.set(imgB, { autoAlpha: 0 }); tl.to(imgA, { x: "+=8", filter: "hue-rotate(90deg) saturate(3)", duration: glitchDur * 0.15, yoyo: true, repeat: 5, ease: "steps(1)" }, 0); tl.set(imgA, { autoAlpha: 0 }, dur - 0.05); tl.set(imgB, { autoAlpha: 1 }, dur - 0.05);';
-      default:
-        return 'gsap.set(imgB, { autoAlpha: 0 }); tl.to(imgA, { autoAlpha: 0, duration: dur }, 0); tl.to(imgB, { autoAlpha: 1, duration: dur }, 0);';
-    }
-  }
 
   // Build transition HTML from two data URI frames
 
@@ -1458,60 +1406,7 @@ export function getPreviewHtml(): string {
     }
   }
 
-  // Preview loading - uses cache, falls back to fetch
-  function loadPreview() {
-    var project = state.currentProject;
-    var scene = project && project.scenes[state.currentSceneIndex];
-    if (!scene) { clearPreview(); return; }
 
-    var cachedHtml = state.sceneHtmlCache[scene.id];
-
-    function applyHtml(html) {
-      writeSceneToIframe(html);
-
-      state.duration = scene.duration_seconds || 0;
-      state.totalDuration = calcTotalDuration();
-      els.slider.disabled = false;
-      els.playBtn.disabled = false;
-      var globalTime = sceneOffset(state.currentSceneIndex);
-      els.slider.value = state.totalDuration > 0 ? Math.round((globalTime / state.totalDuration) * 1000) : 0;
-      updateTimeDisplay(globalTime);
-      updateSceneIndicator();
-
-      waitForReady(function(tl) {
-        tl.pause();
-        tl.time(0);
-      });
-    }
-
-    if (cachedHtml != null) {
-      applyHtml(cachedHtml);
-    } else {
-      // Fallback: fetch if not in cache
-      var path = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-      fetchHtml(path).then(function(html) {
-        state.sceneHtmlCache[scene.id] = html;
-        applyHtml(html);
-      }).catch(function() {
-        clearPreview();
-      });
-    }
-  }
-
-  function waitForReady(cb) {
-    var attempts = 0;
-    var check = setInterval(function() {
-      attempts++;
-      try {
-        var w = els.previewIframe.contentWindow;
-        if (w && w.__MP_READY && w.__MP_TIMELINE) {
-          clearInterval(check);
-          cb(w.__MP_TIMELINE);
-        }
-      } catch(e) { clearInterval(check); }
-      if (attempts > 100) clearInterval(check);
-    }, 50);
-  }
 
   function updatePreviewScale() {
     var container = els.previewContainer;
@@ -1930,9 +1825,6 @@ export function getPreviewHtml(): string {
 
     // Remember current position before reload
     var savedMasterTime = state.masterTime || 0;
-    var info = sceneForGlobalTime(savedMasterTime);
-    var savedLocalTime = info ? info.localTime : 0;
-
     var patchPath = '/projects/' + state.tenantId + '/' + project.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
     api('PATCH', patchPath, { data: comp.data }).then(function(result) {
       if (state.compositeLoaded) {
@@ -1946,17 +1838,6 @@ export function getPreviewHtml(): string {
             masterTl.pause();
           });
         });
-      } else {
-        // Legacy: re-fetch single scene
-        var scenePath = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-        fetchHtml(scenePath).then(function(freshHtml) {
-          state.sceneHtmlCache[scene.id] = freshHtml;
-          writeSceneToIframe(freshHtml);
-          waitForReady(function(tl) {
-            tl.time(Math.min(savedLocalTime, tl.duration() || savedLocalTime));
-            tl.pause();
-          });
-        });
       }
     }).catch(function(e) {
       console.error('Save failed:', e);
@@ -1965,32 +1846,12 @@ export function getPreviewHtml(): string {
 
 
 
-  // Timeline / Playback
-  function getTimeline() {
-    try { return els.previewIframe.contentWindow && els.previewIframe.contentWindow.__MP_TIMELINE; }
-    catch(e) { return null; }
-  }
 
   // Sync <video> elements inside the preview iframe to the scene local time.
   // For live preview: let video play naturally, only seek on large drift or scrub.
   // For capture mode the scene-worker handles frame-by-frame seeking.
 
   // Find which scene a global time falls in, returns { index, localTime }
-  function sceneForGlobalTime(globalTime) {
-    var project = state.currentProject;
-    if (!project || !project.scenes || !project.scenes.length) return { index: 0, localTime: 0 };
-    var cumulative = 0;
-    for (var i = 0; i < project.scenes.length; i++) {
-      var sd = project.scenes[i].duration_seconds || 0;
-      if (globalTime < cumulative + sd) {
-        return { index: i, localTime: globalTime - cumulative };
-      }
-      cumulative += sd;
-    }
-    // Past the end - clamp to last scene's end
-    var lastIdx = project.scenes.length - 1;
-    return { index: lastIdx, localTime: project.scenes[lastIdx].duration_seconds || 0 };
-  }
 
   // ── Speaker track preview support ──
   function getSpeakerClipUrl() {
@@ -2032,13 +1893,8 @@ export function getPreviewHtml(): string {
       state.playAll = false;
       updatePlayIcon();
 
-      if (state.compositeLoaded) {
-        // Composite mode: pause master timeline (it's always paused, we just stop the clock)
-        // Videos will be paused by syncMedia on next tick
-      } else {
-        var tl = getTimeline();
-        if (tl) tl.pause();
-      }
+      // Composite mode: master timeline is always paused, we just stop the clock
+      // Videos will be paused by syncMedia on next tick
       pauseAudio();
       // syncMedia will handle speaker pause+mute on next tick
       state.forceSync = true;
