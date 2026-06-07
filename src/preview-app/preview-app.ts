@@ -12,7 +12,6 @@ export function getPreviewHtml(): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Media Producer</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -429,8 +428,7 @@ export function getPreviewHtml(): string {
       <div class="no-scene" id="preview-placeholder">Select a scene to preview</div>
       <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
         <video id="speaker-bg" muted playsinline preload="auto" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
-        <iframe id="preview-iframe-out" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;border:none;pointer-events:none;opacity:0;border-radius:8px;"></iframe>
-        <iframe id="preview-iframe" style="position:relative;z-index:2;"></iframe>
+        <iframe id="preview-iframe"></iframe>
       </div>
     </div>
 
@@ -492,7 +490,6 @@ export function getPreviewHtml(): string {
     previewPlaceholder: document.getElementById('preview-placeholder'),
     previewWrapper: document.getElementById('preview-wrapper'),
     previewIframe: document.getElementById('preview-iframe'),
-    previewIframeOut: document.getElementById('preview-iframe-out'),
     speakerBg: document.getElementById('speaker-bg'),
     previewContainer: document.getElementById('preview-container'),
     playBtn: document.getElementById('play-btn'),
@@ -941,52 +938,19 @@ export function getPreviewHtml(): string {
     });
   }
 
-  // Get transition info for a scene
-  function getTransitionIn(sceneIndex) {
-    var project = state.currentProject;
-    if (!project || !project.scenes) return null;
-    var scene = project.scenes[sceneIndex];
-    return scene ? scene.transition_in || null : null;
-  }
-
-  // Write cached HTML into the preview iframe with optional transition
+  // Write cached HTML into the preview iframe
   function writeSceneToIframe(html) {
     var iframe = els.previewIframe;
-    var iframeOut = els.previewIframeOut;
     var project = state.currentProject;
-    var w = (project && project.canvas && project.canvas.width) || 1920;
-    var h = (project && project.canvas && project.canvas.height) || 1080;
+    // Reset any residual styles from previous scenes
+    iframe.style.transform = "";
+    iframe.style.clipPath = "";
+    iframe.style.filter = "";
+    iframe.style.zIndex = "";
+    iframe.width = (project && project.canvas && project.canvas.width) || 1920;
+    iframe.height = (project && project.canvas && project.canvas.height) || 1080;
 
-    iframe.width = w;
-    iframe.height = h;
-    iframeOut.width = w;
-    iframeOut.height = h;
-
-    // Check if we should run a transition
-    var transition = getTransitionIn(state.currentSceneIndex);
-    var duration = transition ? (transition.duration_seconds || 0.5) : 0;
-    var doTransition = duration > 0 && state.playAll;
-
-    if (doTransition) {
-      // Copy current iframe content to the outgoing iframe
-      try {
-        var currentHtml = iframe.contentDocument.documentElement.outerHTML;
-        iframeOut.contentDocument.open();
-        iframeOut.contentDocument.write(currentHtml);
-        iframeOut.contentDocument.close();
-        iframeOut.style.opacity = '1';
-        // Reset any transforms from previous transitions
-        gsap.set(iframeOut, { clearProps: 'all' });
-        iframeOut.style.opacity = '1';
-        iframeOut.style.position = 'absolute';
-        iframeOut.style.top = '0';
-        iframeOut.style.left = '0';
-      } catch(e) {
-        iframeOut.style.opacity = '0';
-      }
-    }
-
-    // Hide incoming iframe during content swap
+    // Hide iframe during content swap to prevent flash
     iframe.style.opacity = '0';
     els.previewWrapper.style.display = 'block';
     els.previewPlaceholder.style.display = 'none';
@@ -1000,119 +964,44 @@ export function getPreviewHtml(): string {
     }
     updatePreviewScale();
 
-    // Reveal function: run the actual GSAP transition between iframes
-    function revealScene() {
-      if (doTransition && typeof gsap !== 'undefined') {
-        var type = transition.type || 'crossfade';
-        var dur = duration;
-        var elA = iframeOut;  // outgoing scene
-        var elB = iframe;     // incoming scene
+    // Show once content is ready (videos + speaker bg)
+    function reveal() { iframe.style.opacity = '1'; }
 
-        // Reset transforms
-        gsap.set(elB, { clearProps: 'all' });
-        elB.style.position = 'relative';
-        elB.style.zIndex = '2';
-
-        // Apply the transition using the same logic as the render pipeline
-        var tl = gsap.timeline({
-          onComplete: function() {
-            gsap.set(elA, { clearProps: 'all' });
-            gsap.set(elB, { clearProps: 'all' });
-            elA.style.opacity = '0';
-            elA.style.position = 'absolute';
-            elB.style.opacity = '1';
-            elB.style.position = 'relative';
-            elB.style.zIndex = '2';
-          }
-        });
-
-        // Map transition types to GSAP animations on iframes
-        switch (type) {
-          case 'crossfade':
-            gsap.set(elB, { autoAlpha: 0 });
-            tl.to(elA, { autoAlpha: 0, duration: dur }, 0);
-            tl.to(elB, { autoAlpha: 1, duration: dur }, 0);
-            break;
-          case 'blur-crossfade':
-            gsap.set(elB, { autoAlpha: 0, filter: 'blur(20px)' });
-            tl.to(elA, { autoAlpha: 0, filter: 'blur(20px)', duration: dur }, 0);
-            tl.to(elB, { autoAlpha: 1, filter: 'blur(0px)', duration: dur }, 0);
-            break;
-          case 'zoom-through':
-            var halfDur = dur * 0.5;
-            tl.to(elA, { scale: 1.5, autoAlpha: 0, duration: halfDur, ease: 'power2.in' }, 0);
-            gsap.set(elB, { scale: 1.5, autoAlpha: 0 });
-            tl.to(elB, { scale: 1, autoAlpha: 1, duration: halfDur, ease: 'power2.out' }, halfDur);
-            break;
-          case 'slide-up':
-            gsap.set(elB, { yPercent: 100 });
-            elB.style.zIndex = '3';
-            tl.to(elB, { yPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);
-            break;
-          case 'slide-down':
-            gsap.set(elB, { yPercent: -100 });
-            elB.style.zIndex = '3';
-            tl.to(elB, { yPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);
-            break;
-          case 'slide-left':
-          case 'slide-reveal':
-            gsap.set(elB, { xPercent: 100 });
-            elB.style.zIndex = '3';
-            tl.to(elB, { xPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);
-            break;
-          case 'morph-wipe':
-          case 'iris':
-            gsap.set(elB, { clipPath: 'circle(0% at 50% 50%)' });
-            elB.style.zIndex = '3';
-            tl.to(elB, { clipPath: 'circle(150% at 50% 50%)', duration: dur, ease: 'power2.inOut' }, 0);
-            break;
-          case 'push':
-            gsap.set(elB, { xPercent: 100 });
-            tl.to(elA, { xPercent: -100, duration: dur, ease: 'power2.inOut' }, 0);
-            tl.to(elB, { xPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);
-            break;
-          default:
-            // Fallback: simple crossfade
-            gsap.set(elB, { autoAlpha: 0 });
-            tl.to(elA, { autoAlpha: 0, duration: dur }, 0);
-            tl.to(elB, { autoAlpha: 1, duration: dur }, 0);
-        }
-      } else {
-        iframe.style.opacity = '1';
-        iframeOut.style.opacity = '0';
-      }
-    }
-
-    // Wait for videos + speaker to be ready before revealing
     try {
       var doc = iframe.contentDocument || iframe.contentWindow.document;
       var vids = doc.querySelectorAll('video');
-      var speakerReady = true;
-      if (isSpeakerScene(state.currentSceneIndex) && els.speakerBg) {
-        speakerReady = els.speakerBg.readyState >= 2;
+      var waitCount = vids.length;
+
+      // Also wait for speaker bg on speaker scenes
+      if (isSpeakerScene(state.currentSceneIndex) && els.speakerBg && els.speakerBg.readyState < 2) {
+        waitCount++;
       }
-      var totalWait = vids.length + (speakerReady ? 0 : 1);
-      if (totalWait > 0) {
+
+      if (waitCount > 0) {
         var loaded = 0;
         var revealed = false;
-        var show = function() {
+        var done = function() {
           loaded++;
-          if (loaded >= totalWait && !revealed) { revealed = true; revealScene(); }
+          if (loaded >= waitCount && !revealed) { revealed = true; reveal(); }
         };
-        if (!speakerReady) {
-          if (els.speakerBg.readyState >= 2) { show(); }
-          else { els.speakerBg.addEventListener('canplay', show, { once: true }); }
+
+        // Speaker bg wait
+        if (isSpeakerScene(state.currentSceneIndex) && els.speakerBg && els.speakerBg.readyState < 2) {
+          els.speakerBg.addEventListener('canplay', done, { once: true });
         }
+
         for (var i = 0; i < vids.length; i++) {
-          if (vids[i].readyState >= 2) { show(); }
-          else { vids[i].addEventListener('canplay', show, { once: true }); }
+          if (vids[i].readyState >= 2) { done(); }
+          else { vids[i].addEventListener('canplay', done, { once: true }); }
         }
-        setTimeout(function() { if (!revealed) { revealed = true; revealScene(); } }, 500);
+
+        // Fallback: show after 400ms no matter what
+        setTimeout(function() { if (!revealed) { revealed = true; reveal(); } }, 400);
       } else {
-        revealScene();
+        reveal();
       }
     } catch(e) {
-      revealScene();
+      reveal();
     }
   }
 
@@ -1693,31 +1582,19 @@ export function getPreviewHtml(): string {
     if (!video) return;
     var clipUrl = getSpeakerClipUrl();
     if (!clipUrl) { video.style.display = 'none'; return; }
-    // Set src if not already set
-    if (!video.src || !video.src.includes(clipUrl.split('/').pop())) {
+    // Set src if needed
+    if (!video.src || video.src === '' || video.src === window.location.href) {
       video.src = clipUrl;
       video.load();
     }
     // Make iframe transparent so speaker shows through
     els.previewIframe.style.background = 'transparent';
+    // Always show the video element -- let it buffer visually
+    video.style.display = 'block';
     // Sync time
     var target = globalTime || 0;
-    if (Math.abs(video.currentTime - target) > 0.3) {
-      video.currentTime = target;
-    }
-    // Show and play once video has data
-    function reveal() {
-      video.style.display = 'block';
-      if (video.paused) video.play().catch(function(){});
-    }
-    if (video.readyState >= 2) {
-      reveal();
-    } else {
-      // Keep hidden until ready, with a short fallback
-      video.style.display = 'none';
-      video.addEventListener('canplay', function() { reveal(); }, { once: true });
-      setTimeout(function() { reveal(); }, 400);
-    }
+    video.currentTime = target;
+    if (video.paused) video.play().catch(function(){});
   }
 
   function hideSpeakerBg() {
