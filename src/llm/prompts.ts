@@ -11,7 +11,7 @@ import { SCRIPT_SYSTEM_SKILLS } from "./script-skills.js";
 import { COMPONENT_EXEMPLARS } from "./exemplars.js";
 import { SCENE_RECIPES } from "./scene-recipes.js";
 import { PACING_PLAYBOOK, COMPOSITION_PLAYBOOK, PREMIUM_QUALITY_CHECKLIST } from "./cinematography.js";
-import type { BrandKit, Canvas } from "../core/types.js";
+import type { BrandKit, Canvas, DesignSystem } from "../core/types.js";
 
 /**
  * System prompt for generating .component.html files.
@@ -377,7 +377,76 @@ function isLightBackground(brandKit: BrandKit): boolean {
   return luminance > 0.5;
 }
 
+/**
+ * Build a rich design system context block for LLM prompts.
+ * Used when brandKit.design_system is available.
+ */
+export function buildDesignSystemContext(brandKit: BrandKit): string {
+  var ds = brandKit.design_system;
+  if (!ds) return "";
+
+  var lines: string[] = [];
+  lines.push("## Extracted Design System (from " + ds.source_url + ")");
+  lines.push("");
+
+  // Guidelines
+  if (ds.guidelines) {
+    lines.push("### Brand Design Language");
+    lines.push(ds.guidelines);
+    lines.push("");
+  }
+
+  // Color roles
+  lines.push("### Color Roles");
+  lines.push("- Primary background: " + ds.color_roles.primary_bg);
+  lines.push("- Surface: " + ds.color_roles.surface);
+  lines.push("- Elevated: " + ds.color_roles.elevated);
+  lines.push("- Primary action: " + ds.color_roles.primary_action);
+  lines.push("- Text primary: " + ds.color_roles.text_primary);
+  lines.push("- Text secondary: " + ds.color_roles.text_secondary);
+  lines.push("- Text muted: " + ds.color_roles.text_muted);
+  lines.push("- Border: " + ds.color_roles.border);
+  lines.push("");
+
+  // Typography
+  lines.push("### Typography");
+  lines.push("- Heading font: " + ds.typography.font_heading + " (weight " + ds.typography.heading_weight + ")");
+  lines.push("- Body font: " + ds.typography.font_body + " (weight " + ds.typography.body_weight + ")");
+  lines.push("- Type scale: display=" + ds.typography.scale.display + ", h1=" + ds.typography.scale.h1 + ", h2=" + ds.typography.scale.h2 + ", body=" + ds.typography.scale.body);
+  lines.push("");
+
+  // Spacing
+  lines.push("### Spacing");
+  lines.push("- Base unit: " + ds.spacing.base_unit + "px");
+  lines.push("- Section gap: " + ds.spacing.section_gap);
+  lines.push("- Card padding: " + ds.spacing.card_padding);
+  lines.push("- Density: " + ds.density);
+  lines.push("");
+
+  // Patterns
+  lines.push("### Component Patterns");
+  lines.push("- Buttons: " + ds.patterns.button_style + " style, " + ds.patterns.button_shape + " shape");
+  lines.push("- Cards: " + ds.patterns.card_style + " style" + (ds.patterns.card_border ? " with border" : ""));
+  lines.push("- Inputs: " + ds.patterns.input_style + " style");
+  lines.push("- Border radius: sm=" + ds.radius.sm + " md=" + ds.radius.md + " lg=" + ds.radius.lg);
+  lines.push("");
+
+  // Motion
+  lines.push("### Motion");
+  lines.push("- Fast: " + ds.motion.duration_fast + ", Normal: " + ds.motion.duration_normal + ", Slow: " + ds.motion.duration_slow);
+  lines.push("- Default easing: " + ds.motion.easing_default);
+  lines.push("");
+
+  return lines.join("\n");
+}
+
 function getBrandStyleGuide(brandKit: BrandKit): string {
+  // Use design system context if available
+  var dsContext = buildDesignSystemContext(brandKit);
+  if (dsContext) {
+    return dsContext;
+  }
+
   if (isLightBackground(brandKit)) {
     return `- Light, clean aesthetic (use var(--mp-color-background) as base)
 - Subtle depth: box-shadow: 0 4px 24px rgba(0,0,0,0.08)

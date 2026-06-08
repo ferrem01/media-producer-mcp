@@ -8,7 +8,7 @@
  */
 
 import fs from "node:fs/promises";
-import type { BrandKit } from "../core/types.js";
+import type { BrandKit, DesignSystem } from "../core/types.js";
 import {
   brandKitDir,
   brandKitJsonPath,

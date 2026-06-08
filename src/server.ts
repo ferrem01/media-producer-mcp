@@ -42,6 +42,7 @@ import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { captureUrl } from "./core/capture-url.js";
+import { registerBrandExtractTool } from "./tools/brand-extract-tool.js";
 // generateImage moved to internal API (not exposed via MCP generate tool)
 
 // ── Shared Zod schemas ──
@@ -1254,6 +1255,9 @@ export function createMcpServer(): McpServer {
       }
     },
   );
+
+  // ── Brand extraction tool ──
+  registerBrandExtractTool(server);
 
   return server;
 }

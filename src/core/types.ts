@@ -76,6 +76,7 @@ export interface BrandKit {
     motion?: "minimal" | "punchy" | "cinematic";
   };
   guidelines?: string;    // free-form brand rules injected into planner/generator prompts
+  design_system?: DesignSystem;
 }
 
 // ── Components ──
@@ -223,4 +224,123 @@ export interface SpeakerTrackClip {
 export interface SpeakerTrack {
   /** Ordered list of speaker video clips played end-to-end */
   clips: SpeakerTrackClip[];
+}
+
+// ── Design System (extracted from websites) ──
+
+export interface DesignSystemColorRoles {
+  primary_bg: string;
+  surface: string;
+  elevated: string;
+  primary_action: string;
+  primary_action_hover: string;
+  secondary_action: string;
+  destructive: string;
+  success: string;
+  warning: string;
+  border: string;
+  border_subtle: string;
+  text_primary: string;
+  text_secondary: string;
+  text_muted: string;
+  text_on_primary: string;
+  link: string;
+  link_hover: string;
+}
+
+export interface DesignSystemTypography {
+  font_heading: string;
+  font_body: string;
+  font_mono: string;
+  scale: {
+    display: string;
+    h1: string;
+    h2: string;
+    h3: string;
+    h4: string;
+    body_lg: string;
+    body: string;
+    body_sm: string;
+    caption: string;
+    overline: string;
+  };
+  line_heights: {
+    tight: string;
+    normal: string;
+    relaxed: string;
+  };
+  letter_spacing: {
+    tight: string;
+    normal: string;
+    wide: string;
+  };
+  heading_weight: string;
+  body_weight: string;
+}
+
+export interface DesignSystemSpacing {
+  base_unit: number;
+  scale: Record<string, string>;
+  section_gap: string;
+  card_padding: string;
+  container_max_width: string;
+}
+
+export interface DesignSystemRadius {
+  none: string;
+  sm: string;
+  md: string;
+  lg: string;
+  full: string;
+  button: string;
+  card: string;
+  input: string;
+}
+
+export interface DesignSystemShadows {
+  sm: string;
+  md: string;
+  lg: string;
+  button: string;
+  card: string;
+  focus_ring: string;
+}
+
+export interface DesignSystemMotion {
+  duration_fast: string;
+  duration_normal: string;
+  duration_slow: string;
+  easing_default: string;
+  easing_enter: string;
+  easing_exit: string;
+  hover_transform: string;
+  hover_shadow: boolean;
+}
+
+export interface DesignSystemPatterns {
+  button_style: "filled" | "outline" | "ghost";
+  button_shape: "rounded" | "pill" | "square";
+  card_style: "flat" | "bordered" | "elevated" | "glass";
+  card_border: boolean;
+  input_style: "outline" | "filled" | "underline";
+  divider_style: "solid" | "dashed" | "none";
+  gradient_direction: string;
+  gradient_style: string;
+}
+
+export interface DesignSystem {
+  source_url: string;
+  extracted_at: string;
+  color_roles: DesignSystemColorRoles;
+  typography: DesignSystemTypography;
+  spacing: DesignSystemSpacing;
+  radius: DesignSystemRadius;
+  shadows: DesignSystemShadows;
+  motion: DesignSystemMotion;
+  patterns: DesignSystemPatterns;
+  density: "compact" | "comfortable" | "spacious";
+  screenshots?: {
+    hero?: string;
+  };
+  guidelines?: string;
 }
