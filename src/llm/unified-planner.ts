@@ -360,26 +360,42 @@ Prefer Speaker templates over regular templates when the speaker should be visib
     }
 
     // At high creativity (>=0.7), enforce all-custom: convert any library components to custom
+    // EXCEPT video components (brand intro/outro) -- those are pre-made assets, not creative content.
     if (creativity >= 0.7) {
-      var hasCustom = scene.components.some((c: PlannedComponent) => c.custom);
-      if (!hasCustom) {
-        // No custom component -- convert the whole scene to one custom component
-        console.warn(`  Scene "${scene.label}": creativity=${creativity} but no custom component, converting to custom`);
-        var libDescriptions = scene.components
-          .filter((c: PlannedComponent) => !c.custom && c.type)
-          .map((c: PlannedComponent) => `${c.type}: ${JSON.stringify(c.data || {})}`)
-          .join("; ");
-        scene.components = [{
-          custom: true,
-          custom_prompt: (scene.description || scene.label) + (libDescriptions ? ". Include these elements: " + libDescriptions : ""),
-          z_index: 10,
-        }];
+      var isVideoScene = scene.components.length === 1 &&
+        scene.components[0].type === "video" &&
+        scene.components[0].data?.src;
+      if (isVideoScene) {
+        // Preserve video scenes as-is (brand intro/outro)
       } else {
-        // Has custom -- strip library components (they should all be in the custom component)
-        var stripped = scene.components.filter((c: PlannedComponent) => c.custom);
-        if (stripped.length < scene.components.length) {
-          console.warn(`  Scene "${scene.label}": creativity=${creativity}, stripped ${scene.components.length - stripped.length} library components (all-custom mode)`);
-          scene.components = stripped;
+        var hasCustom = scene.components.some((c: PlannedComponent) => c.custom);
+        if (!hasCustom) {
+          // No custom component -- convert the whole scene to one custom component
+          // But preserve any video components (brand assets)
+          var videoComps = scene.components.filter((c: PlannedComponent) => c.type === "video" && c.data?.src);
+          var nonVideoComps = scene.components.filter((c: PlannedComponent) => !(c.type === "video" && c.data?.src));
+          if (nonVideoComps.length > 0) {
+            console.warn(`  Scene "${scene.label}": creativity=${creativity} but no custom component, converting to custom`);
+            var libDescriptions = nonVideoComps
+              .filter((c: PlannedComponent) => !c.custom && c.type)
+              .map((c: PlannedComponent) => `${c.type}: ${JSON.stringify(c.data || {})}`)
+              .join("; ");
+            scene.components = [
+              ...videoComps,
+              {
+                custom: true,
+                custom_prompt: (scene.description || scene.label) + (libDescriptions ? ". Include these elements: " + libDescriptions : ""),
+                z_index: 10,
+              },
+            ];
+          }
+        } else {
+          // Has custom -- strip library components EXCEPT video (brand assets)
+          var stripped = scene.components.filter((c: PlannedComponent) => c.custom || (c.type === "video" && c.data?.src));
+          if (stripped.length < scene.components.length) {
+            console.warn(`  Scene "${scene.label}": creativity=${creativity}, stripped ${scene.components.length - stripped.length} library components (all-custom mode)`);
+            scene.components = stripped;
+          }
         }
       }
     } else {

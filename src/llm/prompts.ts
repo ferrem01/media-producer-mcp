@@ -73,21 +73,23 @@ You MUST output a single .component.html file with exactly three sections:
    ## TEXT CONTRAST RULES (READ THIS -- #1 CAUSE OF REJECTED SCENES)
    
    Every piece of text MUST be readable against its background. This is non-negotiable.
+   var(--mp-color-text) adapts automatically based on the scene background (white on dark, dark on light). USE IT.
    
    ✅ SAFE PATTERNS:
-   - Headlines on dark bg: color: var(--mp-color-text)  (this is white/light by default)
-   - Subtitles on dark bg: color: var(--mp-color-text-muted)  (light gray)
-   - Text on colored surfaces: color: var(--mp-color-text) with a semi-transparent dark overlay behind it
-   - Text on gradient bg: add a dark scrim (background: linear-gradient(transparent, rgba(0,0,0,0.6))) behind text
+   - ALL text: color: var(--mp-color-text) -- adapts to background automatically
+   - Subtitles: color: var(--mp-color-text-muted) -- also adapts automatically
+   - Text on colored surfaces: color: var(--mp-color-text) with a semi-transparent overlay behind it
+   - Text on gradient bg: add a scrim behind text for safety
    
    ❌ PATTERNS THAT WILL GET YOUR SCENE REJECTED:
-   - Colored text (var(--mp-color-primary)) on a dark gradient without a contrast backdrop
+   - Hardcoded text colors (#ffffff, #0f172a, etc.) -- use var(--mp-color-text) instead
+   - Colored text (var(--mp-color-primary)) on any bg without verifying contrast
    - Low-opacity text (opacity < 0.7) on any background
    - Small text (< 18px) in var(--mp-color-text-muted) on a busy or gradient background
    - Text directly on an image without a scrim or text-shadow
    - ANY text where the color-to-background contrast ratio would be below 4.5:1
    
-   When in doubt: use var(--mp-color-text) (the lightest/most contrasting text color).
+   When in doubt: use var(--mp-color-text) (adapts to the scene background).
 
 4. Use {{key}} for simple text binding in templates.
    For dynamic content (lists, complex DOM), build elements in createTimeline.
@@ -517,11 +519,13 @@ ${brandStyleGuide}
 - If you write background: #0f172a or color: #ffffff anywhere, YOU ARE DOING IT WRONG.
 
 ## TEXT CONTRAST (scenes get REJECTED for contrast failures)
+- The brand kit has BOTH dark and light backgrounds. Your scene may use either.
+- var(--mp-color-text) adapts automatically based on the scene background. USE IT for all text instead of hardcoding colors.
 - ALL headlines: color: var(--mp-color-text). Always. No exceptions.
 - Subtitles/labels: var(--mp-color-text-muted) minimum.
-- NEVER use var(--mp-color-primary) or var(--mp-color-accent) as the ONLY text color on a dark bg without verifying contrast.
-- Text over images/gradients MUST have either: text-shadow (0 2px 8px rgba(0,0,0,0.8)) OR a dark scrim behind it.
-- If background is dark, text must be light. If background is light, text must be dark. Test mentally.
+- NEVER use var(--mp-color-primary) or var(--mp-color-accent) as the ONLY text color without verifying contrast against your chosen background.
+- Text over images/gradients MUST have either: text-shadow (0 2px 8px rgba(0,0,0,0.8)) OR a scrim behind it.
+- MENTALLY CHECK: what color is YOUR background? What color is YOUR text? Is the contrast ratio above 4.5:1? If not, fix it.
 
 ## ICONS: NEVER USE EMOJI
 Never use emoji characters (⚡🔧✨🤖📦🎨 etc.) as icons. They look cheap and unprofessional.
@@ -676,9 +680,10 @@ tl.to(el, { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: 1.0, ..
  */
 export function sceneComponentSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
   var formatRules = componentFormatRules(format);
-  var isDarkVideo = (format === "video" || format === "slideshow") && isLightBackground(brandKit);
-  var brandVars = buildBrandVarsList(brandKit, { darkOverride: isDarkVideo, canvasBg: canvas.background || "#0f172a" });
-  var brandStyleGuide = getBrandStyleGuide(isDarkVideo ? { ...brandKit, colors: { ...brandKit.colors, background: canvas.background || "#0f172a" } } : brandKit);
+  // Don't override text colors globally -- scenes can have dark OR light backgrounds.
+  // Give the LLM the real brand colors and let it choose text colors per scene.
+  var brandVars = buildBrandVarsList(brandKit);
+  var brandStyleGuide = getBrandStyleGuide(brandKit);
 
   return `You are a world-class motion graphics designer creating cinematic visual moments with HTML, CSS, and GSAP. Think Apple keynote crossed with Stripe marketing page. Write a single scene as a .component.html file.
 
@@ -814,11 +819,13 @@ highlightDraw(tl, el.querySelector('.keyword'), 1.5, 0.5, 'rgba(167,139,250,0.3)
 - Only acceptable hardcoded values: transparent, rgba() for overlays/shadows/glows, currentColor.
 
 ## TEXT CONTRAST (scenes get REJECTED for contrast failures)
+- The brand kit has BOTH dark and light backgrounds. Your scene may use either.
+- var(--mp-color-text) adapts automatically based on the scene background. USE IT for all text instead of hardcoding colors.
 - ALL headlines: color: var(--mp-color-text). Always. No exceptions.
 - Subtitles/labels: var(--mp-color-text-muted) minimum.
-- NEVER use var(--mp-color-primary) or var(--mp-color-accent) as the ONLY text color on a dark bg without verifying contrast.
-- Text over images/gradients MUST have either: text-shadow (0 2px 8px rgba(0,0,0,0.8)) OR a dark scrim behind it.
-- If background is dark, text must be light. If background is light, text must be dark. Test mentally.
+- NEVER use var(--mp-color-primary) or var(--mp-color-accent) as the ONLY text color without verifying contrast against your chosen background.
+- Text over images/gradients MUST have either: text-shadow (0 2px 8px rgba(0,0,0,0.8)) OR a scrim behind it.
+- MENTALLY CHECK: what color is YOUR background? What color is YOUR text? Is the contrast ratio above 4.5:1? If not, fix it.
 
 ## Logo Integration
 - For external logos, use logo.dev: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark
@@ -846,28 +853,19 @@ ${SCRIPT_SYSTEM_SKILLS}
 `;
 }
 
-function buildBrandVarsList(brandKit: BrandKit, opts?: { darkOverride?: boolean; canvasBg?: string }): string {
+function buildBrandVarsList(brandKit: BrandKit): string {
   var lines: string[] = [];
-  var useDark = opts?.darkOverride || false;
-  var canvasBg = opts?.canvasBg || "#0f172a";
 
   if (brandKit.colors) {
     for (var [key, value] of Object.entries(brandKit.colors)) {
       var varName = key.replace(/_/g, "-");
-      // For video (dark override): swap background/text for dark theme
-      if (useDark && varName === "background") {
-        lines.push(`  --mp-color-background: ${canvasBg};  /* overridden for dark video */`);
-      } else if (useDark && varName === "text") {
-        lines.push(`  --mp-color-text: #ffffff;  /* overridden for dark video */`);
-      } else if (useDark && varName === "text-muted") {
-        lines.push(`  --mp-color-text-muted: #94a3b8;  /* overridden for dark video */`);
-      } else if (useDark && varName === "surface") {
-        lines.push(`  --mp-color-surface: #1e293b;  /* overridden for dark video */`);
-      } else {
-        lines.push(`  --mp-color-${varName}: ${value};`);
-      }
+      lines.push(`  --mp-color-${varName}: ${value};`);
     }
   }
+  // Note: --mp-color-text and --mp-color-text-muted are shown as brand defaults here.
+  // At render time, the scene assembler overrides them per-scene based on the actual
+  // background image (dark bg = white text, light bg = dark text). The LLM should
+  // always use var(--mp-color-text) and trust it will be correct at render time.
   if (brandKit.fonts?.length) {
     lines.push(`  --mp-font-family: '${brandKit.fonts[0].family}', sans-serif;`);
   }
