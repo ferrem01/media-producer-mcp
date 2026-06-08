@@ -77,6 +77,7 @@ body {
 .panel-tab:hover { color: #cbd5e1; }
 .tab-content { display: none; flex: 1; overflow-y: auto; }
 .tab-content.active { display: flex; flex-direction: column; }
+#tab-data.active { display: flex; flex-direction: column; overflow: hidden; }
 
 #create-btn-wrap { padding: 10px; flex-shrink: 0; }
 #create-btn {
@@ -173,7 +174,7 @@ body {
 }
 #right-panel .tab-content { padding: 0; }
 #source-editor, #data-editor {
-  width: 100%; height: 100%; resize: none; border: none;
+  width: 100%; height: 100%; resize: none; border: none; flex: 1; min-height: 0;
   background: #0f172a; color: #e2e8f0; padding: 12px;
   font-family: 'JetBrains Mono', monospace; font-size: 12px;
   line-height: 1.6; tab-size: 2;
@@ -241,6 +242,7 @@ body {
 /* ── Data Form Editor ── */
 #data-form { padding: 12px; overflow-y: auto; flex: 1; }
 #data-form.hidden { display: none; }
+.hidden { display: none !important; }
 .form-toggle-bar {
   display: flex; border-bottom: 1px solid #334155; flex-shrink: 0;
 }
@@ -1055,45 +1057,52 @@ select.field-input { cursor: pointer; }
       return;
     }
 
-    // Extract field definitions from schema
-    var fields = extractSchemaFields(schema);
-    if (!fields || Object.keys(fields).length === 0) {
-      formEl.innerHTML = '<div class="no-schema-msg">No editable fields in schema.</div>';
-      return;
-    }
-
-    // Separate regular fields from script/cursor_targets
-    var regularFields = {};
-    var scriptActions = schema.script_actions || [];
-    var defaultTargets = schema.default_cursor_targets || {};
-
-    for (var k in fields) {
-      if (k !== 'script' && k !== 'cursor_targets') {
-        regularFields[k] = fields[k];
+    try {
+      // Extract field definitions from schema
+      var fields = extractSchemaFields(schema);
+      if (!fields || Object.keys(fields).length === 0) {
+        formEl.innerHTML = '<div class="no-schema-msg">No editable fields in schema.</div>';
+        return;
       }
-    }
 
-    // Render regular fields
-    for (var key in regularFields) {
-      var field = regularFields[key];
-      var fieldEl = createFieldEditor(key, field, data[key], function() {
-        syncFormToJson();
-      });
-      formEl.appendChild(fieldEl);
-    }
+      // Separate regular fields from script/cursor_targets
+      var regularFields = {};
+      var scriptActions = schema.script_actions || [];
+      var defaultTargets = schema.default_cursor_targets || {};
 
-    // Render script builder if component supports scripting
-    if (scriptActions.length > 0) {
-      if (!data.script) data.script = [];
-      if (!data.cursor_targets) data.cursor_targets = JSON.parse(JSON.stringify(defaultTargets));
-      var scriptSection = createScriptBuilder(
-        data.script,
-        data.cursor_targets,
-        scriptActions,
-        defaultTargets,
-        function() { syncFormToJson(); }
-      );
-      formEl.appendChild(scriptSection);
+      for (var k in fields) {
+        if (k !== 'script' && k !== 'cursor_targets') {
+          regularFields[k] = fields[k];
+        }
+      }
+
+      // Render regular fields
+      var fieldKeys = Object.keys(regularFields);
+      for (var i = 0; i < fieldKeys.length; i++) {
+        var key = fieldKeys[i];
+        var field = regularFields[key];
+        var fieldEl = createFieldEditor(key, field, data[key], function() {
+          syncFormToJson();
+        });
+        formEl.appendChild(fieldEl);
+      }
+
+      // Render script builder if component supports scripting
+      if (scriptActions.length > 0) {
+        if (!data.script) data.script = [];
+        if (!data.cursor_targets) data.cursor_targets = JSON.parse(JSON.stringify(defaultTargets));
+        var scriptSection = createScriptBuilder(
+          data.script,
+          data.cursor_targets,
+          scriptActions,
+          defaultTargets,
+          function() { syncFormToJson(); }
+        );
+        formEl.appendChild(scriptSection);
+      }
+    } catch(err) {
+      formEl.innerHTML = '<div class="no-schema-msg">Form error: ' + err.message + '</div>';
+      console.error('renderDataForm error:', err);
     }
   }
 
@@ -1116,6 +1125,7 @@ select.field-input { cursor: pointer; }
     group.className = 'field-group';
     group.setAttribute('data-field-key', key);
 
+    try {
     var type = field.type || 'string';
     var label = field.label || key.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
     var isRequired = field.required === true;
@@ -1170,6 +1180,14 @@ select.field-input { cursor: pointer; }
       }
     } else {
       group.appendChild(createStringField(key, value, field, fieldOnChange));
+    }
+
+    } catch(err) {
+      var errMsg = document.createElement('div');
+      errMsg.className = 'no-schema-msg';
+      errMsg.textContent = key + ': ' + err.message;
+      group.appendChild(errMsg);
+      console.error('createFieldEditor error for ' + key + ':', err);
     }
 
     return group;
