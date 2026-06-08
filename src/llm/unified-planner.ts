@@ -201,6 +201,36 @@ ${catalogStr}
 - For IMAGE format: use ONE custom component for all content (headline, subheadline, stats, CTA button, any text). The custom component handles the entire visual composition. Do NOT use library components for images -- the custom component renders everything as one cohesive layout.
 - For PRESENTATION/DECK format: treat each slide like an image. Each slide MUST use ONE custom component that handles everything (background, layout, text, icons, CTA). No library components per slide. Each slide is a self-contained visual composition.
 - For VIDEO: you CAN mix library + custom components across scenes. Just follow the no-duplicate rule.
+- **Interactive Scripts (for mockup/UI components):** Some library components are marked 🎬 Scriptable. For these, you can add "script" and "cursor_targets" to their data to create interactive product demo animations (cursor clicking, typing, zooming). Use scripts for product walkthroughs, UI demos, and feature showcases.
+
+Example of a scripted chat-simulator component:
+{
+  "type": "chat-simulator",
+  "data": {
+    "platform": "slack",
+    "channel": "product",
+    "messages": [],
+    "script": [
+      { "action": "move-cursor", "target": "chat-input", "at": 0.5, "duration": 0.5 },
+      { "action": "click", "target": "chat-input", "at": 1.0 },
+      { "action": "type", "target": "chat-input", "text": "Show me last week's metrics", "at": 1.3, "speed": 25 },
+      { "action": "move-cursor", "target": "send-button", "at": 3.5, "duration": 0.4 },
+      { "action": "click", "target": "send-button", "at": 3.9 },
+      { "action": "wait", "at": 4.2, "duration": 0.8 },
+      { "action": "hide-cursor", "at": 5.0 }
+    ],
+    "cursor_targets": {
+      "chat-input": { "x": "50%", "y": "90%" },
+      "send-button": { "x": "92%", "y": "90%" }
+    }
+  },
+  "z_index": 10
+}
+
+Script actions: move-cursor, click, double-click, hover, drag, type, type-delete, zoom-to, zoom-out, wait, show-element, hide-element, highlight, scroll, hide-cursor, show-cursor, parallel.
+Each action needs "action" and "at" (seconds). Optional: "duration", "target" (named cursor target), "text" (for type), "scale" (for zoom-to).
+When using scripts, set scene duration_seconds long enough for the full script to play (last action at + duration + 1s buffer).
+Only add scripts when the scene calls for an interactive demo. Not every mockup needs a script -- static mockups are fine for feature overviews.
 - Output ONLY valid JSON. No commentary.
 
 ${SCENE_PLANNER_DESIGN_RULES}

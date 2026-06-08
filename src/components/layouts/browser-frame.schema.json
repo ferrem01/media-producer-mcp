@@ -25,5 +25,33 @@
       "label": "Screenshot URL",
       "optional": true
     }
+  },
+  "script_actions": [
+    {
+      "action": "type",
+      "description": "Type into the URL bar or page inputs"
+    },
+    {
+      "action": "click",
+      "description": "Click on page elements or navigation"
+    },
+    {
+      "action": "scroll",
+      "description": "Scroll the page content"
+    },
+    {
+      "action": "zoom-to",
+      "description": "Zoom into a section of the page"
+    }
+  ],
+  "default_cursor_targets": {
+    "url-bar": {
+      "x": "50%",
+      "y": "5%"
+    },
+    "content-area": {
+      "x": "50%",
+      "y": "50%"
+    }
   }
 }

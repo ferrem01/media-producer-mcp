@@ -27,5 +27,33 @@
       "label": "Body",
       "optional": true
     }
+  },
+  "script_actions": [
+    {
+      "action": "type",
+      "description": "Type text into the email body or fields"
+    },
+    {
+      "action": "click",
+      "description": "Click To, Subject, or Send button"
+    }
+  ],
+  "default_cursor_targets": {
+    "to-field": {
+      "x": "50%",
+      "y": "20%"
+    },
+    "subject-field": {
+      "x": "50%",
+      "y": "30%"
+    },
+    "body-field": {
+      "x": "50%",
+      "y": "55%"
+    },
+    "send-button": {
+      "x": "15%",
+      "y": "85%"
+    }
   }
 }

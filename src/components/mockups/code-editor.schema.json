@@ -25,8 +25,39 @@
       "type": "string",
       "label": "Theme",
       "optional": true,
-      "enum": ["dark", "light"],
+      "enum": [
+        "dark",
+        "light"
+      ],
       "default": "dark"
+    }
+  },
+  "script_actions": [
+    {
+      "action": "type",
+      "description": "Type code into the editor"
+    },
+    {
+      "action": "click",
+      "description": "Click on a line or UI element"
+    },
+    {
+      "action": "highlight",
+      "description": "Highlight a code section"
+    },
+    {
+      "action": "zoom-to",
+      "description": "Zoom into a code region"
+    }
+  ],
+  "default_cursor_targets": {
+    "editor": {
+      "x": "50%",
+      "y": "50%"
+    },
+    "tab-bar": {
+      "x": "30%",
+      "y": "8%"
     }
   }
 }

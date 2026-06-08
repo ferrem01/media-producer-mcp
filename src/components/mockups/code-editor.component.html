@@ -335,6 +335,12 @@
       }, exitAt);
     }
 
+
+    // Run interactive script if provided
+    if (data.script && data.script.length > 0) {
+      runScript(tl, el, data.script, data.cursor_targets || {}, ctx);
+    }
+
     return tl;
   }
 </script>

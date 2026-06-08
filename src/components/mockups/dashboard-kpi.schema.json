@@ -48,10 +48,48 @@
             "type": "array",
             "label": "Sparkline Data",
             "optional": true,
-            "items": { "type": "number" }
+            "items": {
+              "type": "number"
+            }
           }
         }
       }
+    }
+  },
+  "script_actions": [
+    {
+      "action": "click",
+      "description": "Click on a metric card or chart"
+    },
+    {
+      "action": "hover",
+      "description": "Hover over a metric to show details"
+    },
+    {
+      "action": "zoom-to",
+      "description": "Zoom into a specific metric"
+    },
+    {
+      "action": "update-value",
+      "description": "Animate a metric value changing"
+    }
+  ],
+  "default_cursor_targets": {
+    "metric-1": {
+      "x": "20%",
+      "y": "35%"
+    },
+    "metric-2": {
+      "x": "50%",
+      "y": "35%"
+    },
+    "metric-3": {
+      "x": "80%",
+      "y": "35%"
+    },
+    "chart-area": {
+      "x": "50%",
+      "y": "70%"
     }
   }
 }

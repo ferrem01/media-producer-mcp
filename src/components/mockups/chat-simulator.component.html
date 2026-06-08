@@ -351,6 +351,41 @@
       }, exitAt);
     }
 
+
+    // Run interactive script if provided
+    if (data.script && data.script.length > 0) {
+      runScript(tl, el, data.script, data.cursor_targets || {}, ctx, {
+      'show-response': function(tl, container, action, at, duration) {
+        var msgArea = container.querySelector('.chat-messages');
+        if (msgArea) {
+          var msgDiv = document.createElement('div');
+          msgDiv.className = 'chat-message';
+          msgDiv.style.opacity = '0';
+          msgDiv.innerHTML = '<div class="msg-avatar" style="background:#10b981;">B</div>' +
+            '<div class="msg-content"><div class="msg-user" style="color:#10b981;">Bot</div>' +
+            '<div class="msg-text">' + (action.text || 'Response here...') + '</div></div>';
+          msgArea.appendChild(msgDiv);
+          tl.to(msgDiv, { opacity: 1, duration: 0.3, ease: 'power2.out' }, at);
+        }
+      },
+      'show-typing': function(tl, container, action, at, duration) {
+        var msgArea = container.querySelector('.chat-messages');
+        if (msgArea) {
+          var indicator = document.createElement('div');
+          indicator.className = 'typing-indicator';
+          indicator.style.opacity = '0';
+          indicator.style.padding = '8px 16px';
+          indicator.style.color = '#64748b';
+          indicator.style.fontSize = '13px';
+          indicator.textContent = 'Bot is typing...';
+          msgArea.appendChild(indicator);
+          tl.to(indicator, { opacity: 1, duration: 0.2 }, at);
+          tl.to(indicator, { opacity: 0, height: 0, duration: 0.2 }, at + (duration || 1.5));
+        }
+      }
+      });
+    }
+
     return tl;
   }
 </script>

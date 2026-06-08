@@ -38,5 +38,33 @@
         }
       }
     }
+  },
+  "script_actions": [
+    {
+      "action": "type",
+      "description": "Type into a form field"
+    },
+    {
+      "action": "click",
+      "description": "Click a field or Next/Submit button"
+    },
+    {
+      "action": "show-element",
+      "description": "Reveal the next step"
+    }
+  ],
+  "default_cursor_targets": {
+    "field-1": {
+      "x": "50%",
+      "y": "45%"
+    },
+    "field-2": {
+      "x": "50%",
+      "y": "55%"
+    },
+    "next-button": {
+      "x": "55%",
+      "y": "75%"
+    }
   }
 }

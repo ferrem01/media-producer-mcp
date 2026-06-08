@@ -42,5 +42,33 @@
         }
       }
     }
+  },
+  "script_actions": [
+    {
+      "action": "drag",
+      "description": "Drag a card from one column to another"
+    },
+    {
+      "action": "click",
+      "description": "Click on a card to expand"
+    },
+    {
+      "action": "hover",
+      "description": "Hover over a card"
+    }
+  ],
+  "default_cursor_targets": {
+    "col-1-card-1": {
+      "x": "17%",
+      "y": "35%"
+    },
+    "col-2-card-1": {
+      "x": "50%",
+      "y": "35%"
+    },
+    "col-3-card-1": {
+      "x": "83%",
+      "y": "35%"
+    }
   }
 }

@@ -21,6 +21,8 @@ export interface ComponentCatalogEntry {
     placeholder?: string;
     items?: { type: string };
   }>;
+  script_actions?: Array<{ action: string; description: string }>;
+  default_cursor_targets?: Record<string, { x: string | number; y: string | number }>;
 }
 
 /**
@@ -70,6 +72,8 @@ async function scanDirectory(
             label: schema.label || compType.split("-").map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(" "),
             description: schema.description || "",
             data: schema.data || schema.properties || {},
+            script_actions: schema.script_actions,
+            default_cursor_targets: schema.default_cursor_targets,
           });
         } catch {
           // Skip invalid schemas
@@ -121,6 +125,17 @@ export function formatCatalogForPrompt(catalog: ComponentCatalogEntry[]): string
           var typeStr = field.type;
           if (field.items) typeStr += `<${field.items.type}>`;
           lines.push(`    - ${key}: ${typeStr}${reqStr}${field.label ? ` -- ${field.label}` : ""}`);
+        }
+      }
+
+      if (comp.script_actions && comp.script_actions.length > 0) {
+        lines.push("  🎬 Scriptable -- supports interactive animations via script + cursor_targets in data:");
+        for (var sa of comp.script_actions) {
+          lines.push(`    - ${sa.action}: ${sa.description}`);
+        }
+        if (comp.default_cursor_targets) {
+          var targetNames = Object.keys(comp.default_cursor_targets);
+          lines.push(`  Default cursor targets: ${targetNames.join(", ")}`);
         }
       }
 
