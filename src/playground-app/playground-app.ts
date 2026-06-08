@@ -237,6 +237,155 @@ body {
 }
 .modal-content textarea:focus { outline: none; border-color: #818cf8; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── Data Form Editor ── */
+#data-form { padding: 12px; overflow-y: auto; flex: 1; }
+#data-form.hidden { display: none; }
+.form-toggle-bar {
+  display: flex; border-bottom: 1px solid #334155; flex-shrink: 0;
+}
+.form-toggle-btn {
+  flex: 1; padding: 6px 0; text-align: center; font-size: 11px;
+  font-weight: 600; cursor: pointer; color: #64748b;
+  border: none; background: none;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+}
+.form-toggle-btn.active { color: #818cf8; border-bottom-color: #818cf8; }
+.form-toggle-btn:hover { color: #cbd5e1; }
+
+.field-group { margin-bottom: 14px; }
+.field-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600; color: #94a3b8;
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.field-label .field-type {
+  font-weight: 400; color: #475569; text-transform: none;
+  font-size: 10px; letter-spacing: 0;
+}
+.field-label .field-required { color: #ef4444; font-size: 9px; }
+.field-label .field-optional { color: #475569; font-size: 10px; font-weight: 400; }
+.field-input {
+  width: 100%; background: #0f172a; border: 1px solid #334155;
+  border-radius: 4px; color: #e2e8f0; padding: 6px 8px;
+  font-size: 12px; font-family: 'Inter', sans-serif;
+  transition: border-color 0.15s;
+}
+.field-input:focus { outline: none; border-color: #818cf8; }
+.field-input::placeholder { color: #475569; }
+select.field-input { cursor: pointer; }
+.field-input[type="number"] { font-family: 'JetBrains Mono', monospace; }
+.field-input[type="color"] {
+  height: 32px; padding: 2px; cursor: pointer; border-radius: 4px;
+}
+.color-field-wrap {
+  display: flex; align-items: center; gap: 6px;
+}
+.color-field-wrap input[type="color"] { width: 32px; flex-shrink: 0; }
+.color-field-wrap input[type="text"] { flex: 1; }
+
+/* Toggle switch for booleans */
+.toggle-wrap { display: flex; align-items: center; gap: 8px; }
+.toggle-switch {
+  position: relative; width: 36px; height: 20px; cursor: pointer;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0; background: #334155;
+  border-radius: 10px; transition: background 0.2s;
+}
+.toggle-switch input:checked + .toggle-track { background: #4f46e5; }
+.toggle-thumb {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  background: #e2e8f0; border-radius: 50%; transition: transform 0.2s;
+}
+.toggle-switch input:checked ~ .toggle-thumb { transform: translateX(16px); }
+.toggle-label { font-size: 12px; color: #94a3b8; }
+
+/* Array fields */
+.array-field { margin-top: 4px; }
+.array-item {
+  display: flex; gap: 4px; align-items: flex-start;
+  padding: 6px 8px; background: #0f172a; border: 1px solid #1e293b;
+  border-radius: 4px; margin-bottom: 4px;
+}
+.array-item:hover { border-color: #334155; }
+.array-item-fields { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.array-item-row { display: flex; gap: 6px; align-items: center; }
+.array-item-row label {
+  font-size: 10px; color: #64748b; min-width: 50px; flex-shrink: 0;
+}
+.array-item-row input, .array-item-row select {
+  flex: 1; background: #1e293b; border: 1px solid #334155;
+  border-radius: 3px; color: #e2e8f0; padding: 4px 6px; font-size: 11px;
+  font-family: 'Inter', sans-serif;
+}
+.array-item-row input:focus, .array-item-row select:focus {
+  outline: none; border-color: #818cf8;
+}
+.array-remove-btn {
+  background: none; border: none; color: #475569; cursor: pointer;
+  font-size: 14px; padding: 2px 4px; border-radius: 3px; flex-shrink: 0;
+  margin-top: 2px;
+}
+.array-remove-btn:hover { color: #ef4444; background: #ef444420; }
+.array-add-btn {
+  background: #1e293b; border: 1px dashed #334155; border-radius: 4px;
+  color: #64748b; padding: 6px; font-size: 11px; cursor: pointer;
+  width: 100%; text-align: center; transition: all 0.15s;
+}
+.array-add-btn:hover { border-color: #818cf8; color: #818cf8; }
+
+/* Script builder */
+.script-section {
+  margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid #334155;
+}
+.script-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.script-header h4 {
+  font-size: 12px; font-weight: 700; color: #818cf8;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.script-item {
+  background: #0f172a; border: 1px solid #1e293b; border-radius: 4px;
+  padding: 8px; margin-bottom: 6px;
+}
+.script-item:hover { border-color: #334155; }
+.script-item-header {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+}
+.script-item-header .script-index {
+  font-size: 10px; font-weight: 700; color: #475569;
+  background: #1e293b; padding: 1px 5px; border-radius: 3px;
+}
+.script-item-header select {
+  flex: 1; background: #1e293b; border: 1px solid #334155;
+  border-radius: 3px; color: #e2e8f0; padding: 3px 6px; font-size: 11px;
+}
+.script-item-params {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px;
+}
+.script-param {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.script-param label {
+  font-size: 10px; color: #64748b;
+}
+.script-param input, .script-param select {
+  background: #1e293b; border: 1px solid #334155;
+  border-radius: 3px; color: #e2e8f0; padding: 3px 6px; font-size: 11px;
+  font-family: 'Inter', sans-serif;
+}
+.script-param input:focus, .script-param select:focus {
+  outline: none; border-color: #818cf8;
+}
+.no-schema-msg {
+  padding: 16px; color: #475569; font-size: 12px; text-align: center;
+  font-style: italic;
+}
 </style>
 </head>
 <body>
@@ -299,7 +448,12 @@ body {
         <textarea id="source-editor" spellcheck="false" placeholder="Component source will appear here..."></textarea>
       </div>
       <div class="tab-content" id="tab-data">
-        <textarea id="data-editor" spellcheck="false" placeholder="{}">{}</textarea>
+        <div class="form-toggle-bar">
+          <button class="form-toggle-btn active" data-mode="form">Form</button>
+          <button class="form-toggle-btn" data-mode="json">JSON</button>
+        </div>
+        <div id="data-form"></div>
+        <textarea id="data-editor" class="hidden" spellcheck="false" placeholder="{}">{}</textarea>
       </div>
       <div class="tab-content" id="tab-chat">
         <div id="chat-container">
@@ -341,7 +495,9 @@ body {
     tenantComponents: [],
     chatHistory: [],
     previewDebounce: null,
-    generating: false
+    generating: false,
+    currentSchema: null,
+    formData: null
   };
 
   // ── DOM Refs ──
@@ -518,6 +674,7 @@ body {
     state.currentType = type;
     state.currentCategory = category;
     state.currentSource = source;
+    state.currentSchema = null;
     els.sourceEditor.value = source;
     els.compName.textContent = type;
     els.saveBtn.disabled = false;
@@ -529,6 +686,25 @@ body {
     }
     state.chatHistory = [];
     els.chatMessages.innerHTML = '<div class="chat-msg system">Editing: ' + type + '. Describe changes and I\\'ll update the source.</div>';
+
+    // Fetch schema for form editor
+    if (category !== 'custom') {
+      api('GET', '/playground/api/components/' + encodeURIComponent(category) + '/' + encodeURIComponent(type) + '/schema').then(function(schema) {
+        state.currentSchema = schema;
+        if (formMode === 'form') {
+          try {
+            var d = JSON.parse(els.dataEditor.value || '{}');
+            renderDataForm(d, schema);
+          } catch(e) {}
+        }
+      }).catch(function() {
+        state.currentSchema = null;
+        renderDataForm({}, null);
+      });
+    } else {
+      renderDataForm({}, null);
+    }
+
     // Switch to Source tab when loading
     var srcTab = document.querySelector('#right-panel .panel-tab[data-tab="source"]');
     if (srcTab) srcTab.click();
@@ -807,7 +983,13 @@ body {
     state.currentSource = els.sourceEditor.value;
     schedulePreview();
   });
-  els.dataEditor.addEventListener('input', schedulePreview);
+  els.dataEditor.addEventListener('input', function() {
+    // When editing JSON directly, update formData
+    try {
+      state.formData = JSON.parse(els.dataEditor.value || '{}');
+    } catch(e) {}
+    schedulePreview();
+  });
 
   // ── Canvas change ──
   els.canvasSelect.addEventListener('change', function() {
@@ -835,6 +1017,783 @@ body {
       }
     }).observe(els.previewContainer);
   }
+
+
+  // ── Form/JSON Toggle ──
+  var formMode = 'form';
+  document.querySelectorAll('.form-toggle-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var mode = btn.getAttribute('data-mode');
+      formMode = mode;
+      document.querySelectorAll('.form-toggle-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      if (mode === 'form') {
+        els.dataEditor.classList.add('hidden');
+        document.getElementById('data-form').classList.remove('hidden');
+        // Sync JSON -> form
+        try {
+          var d = JSON.parse(els.dataEditor.value || '{}');
+          renderDataForm(d, state.currentSchema);
+        } catch(e) {}
+      } else {
+        document.getElementById('data-form').classList.add('hidden');
+        els.dataEditor.classList.remove('hidden');
+        // Form data is already synced to dataEditor on every change
+      }
+    });
+  });
+
+  // ── Schema-Driven Data Form ──
+  function renderDataForm(data, schema) {
+    var formEl = document.getElementById('data-form');
+    formEl.innerHTML = '';
+
+    state.formData = data;
+
+    if (!schema) {
+      formEl.innerHTML = '<div class="no-schema-msg">No schema available. Use JSON tab to edit data.</div>';
+      return;
+    }
+
+    // Extract field definitions from schema
+    var fields = extractSchemaFields(schema);
+    if (!fields || Object.keys(fields).length === 0) {
+      formEl.innerHTML = '<div class="no-schema-msg">No editable fields in schema.</div>';
+      return;
+    }
+
+    // Separate regular fields from script/cursor_targets
+    var regularFields = {};
+    var scriptActions = schema.script_actions || [];
+    var defaultTargets = schema.default_cursor_targets || {};
+
+    for (var k in fields) {
+      if (k !== 'script' && k !== 'cursor_targets') {
+        regularFields[k] = fields[k];
+      }
+    }
+
+    // Render regular fields
+    for (var key in regularFields) {
+      var field = regularFields[key];
+      var fieldEl = createFieldEditor(key, field, data[key], function() {
+        syncFormToJson();
+      });
+      formEl.appendChild(fieldEl);
+    }
+
+    // Render script builder if component supports scripting
+    if (scriptActions.length > 0) {
+      if (!data.script) data.script = [];
+      if (!data.cursor_targets) data.cursor_targets = JSON.parse(JSON.stringify(defaultTargets));
+      var scriptSection = createScriptBuilder(
+        data.script,
+        data.cursor_targets,
+        scriptActions,
+        defaultTargets,
+        function() { syncFormToJson(); }
+      );
+      formEl.appendChild(scriptSection);
+    }
+  }
+
+  function extractSchemaFields(schema) {
+    // Format A: { data: { field: { type, ... } } }
+    if (schema.data && typeof schema.data === 'object') {
+      var dataObj = schema.data;
+      if (dataObj.type === 'object' && dataObj.properties) {
+        return dataObj.properties;
+      }
+      if (!dataObj.type) return schema.data;
+    }
+    // Format B: { properties: { field: { type, ... } } }
+    if (schema.properties) return schema.properties;
+    return null;
+  }
+
+  function createFieldEditor(key, field, value, onChange) {
+    var group = document.createElement('div');
+    group.className = 'field-group';
+    group.setAttribute('data-field-key', key);
+
+    var type = field.type || 'string';
+    var label = field.label || key.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+    var isRequired = field.required === true;
+    var isOptional = field.optional === true;
+
+    // Label
+    var labelEl = document.createElement('div');
+    labelEl.className = 'field-label';
+    var labelText = document.createElement('span');
+    labelText.textContent = label;
+    labelEl.appendChild(labelText);
+
+    var typeSpan = document.createElement('span');
+    typeSpan.className = 'field-type';
+    typeSpan.textContent = type;
+    labelEl.appendChild(typeSpan);
+
+    if (isRequired) {
+      var reqSpan = document.createElement('span');
+      reqSpan.className = 'field-required';
+      reqSpan.textContent = '*';
+      labelEl.appendChild(reqSpan);
+    }
+
+    group.appendChild(labelEl);
+
+    // Field input based on type
+    // Wrap onChange to update state.formData
+    var fieldOnChange = function(newVal) {
+      if (state.formData) state.formData[key] = newVal;
+      onChange();
+    };
+
+    if (type === 'boolean') {
+      group.appendChild(createBooleanField(key, value, fieldOnChange));
+    } else if (type === 'array') {
+      // Arrays are passed by reference, mutations go to state.formData[key]
+      if (!state.formData[key]) state.formData[key] = value || [];
+      group.appendChild(createArrayField(key, field, state.formData[key], onChange));
+    } else if (type === 'object' && field.properties) {
+      if (!state.formData[key]) state.formData[key] = value || {};
+      group.appendChild(createObjectField(key, field.properties, state.formData[key], onChange));
+    } else if (field.enum && field.enum.length > 0) {
+      group.appendChild(createEnumField(key, field.enum, value, field.placeholder, fieldOnChange));
+    } else if (type === 'number') {
+      group.appendChild(createNumberField(key, value, field, fieldOnChange));
+    } else if (type === 'string') {
+      if (key.toLowerCase().indexOf('color') >= 0 || key.toLowerCase() === 'bg' || key.toLowerCase() === 'background') {
+        group.appendChild(createColorField(key, value, field, fieldOnChange));
+      } else {
+        group.appendChild(createStringField(key, value, field, fieldOnChange));
+      }
+    } else {
+      group.appendChild(createStringField(key, value, field, fieldOnChange));
+    }
+
+    return group;
+  }
+
+  function createStringField(key, value, field, onChange) {
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'field-input';
+    input.setAttribute('data-key', key);
+    input.value = value !== undefined && value !== null ? String(value) : '';
+    if (field.placeholder) input.placeholder = field.placeholder;
+    if (field.description) input.title = field.description;
+    input.addEventListener('input', function() { onChange(input.value); });
+    return input;
+  }
+
+  function createNumberField(key, value, field, onChange) {
+    var input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'field-input';
+    input.setAttribute('data-key', key);
+    input.value = value !== undefined && value !== null ? value : '';
+    if (field.placeholder) input.placeholder = field.placeholder;
+    if (field.description) input.title = field.description;
+    input.addEventListener('input', function() {
+      var v = parseFloat(input.value);
+      onChange(isNaN(v) ? 0 : v);
+    });
+    return input;
+  }
+
+  function createColorField(key, value, field, onChange) {
+    var wrap = document.createElement('div');
+    wrap.className = 'color-field-wrap';
+
+    var colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.className = 'field-input';
+    colorInput.value = value && value.match(/^#[0-9a-fA-F]{6}$/) ? value : '#6366f1';
+
+    var textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'field-input';
+    textInput.setAttribute('data-key', key);
+    textInput.value = value || '';
+    textInput.placeholder = field.placeholder || '#000000';
+
+    colorInput.addEventListener('input', function() {
+      textInput.value = colorInput.value;
+      onChange(colorInput.value);
+    });
+    textInput.addEventListener('input', function() {
+      if (textInput.value.match(/^#[0-9a-fA-F]{6}$/)) {
+        colorInput.value = textInput.value;
+      }
+      onChange(textInput.value);
+    });
+
+    wrap.appendChild(colorInput);
+    wrap.appendChild(textInput);
+    return wrap;
+  }
+
+  function createBooleanField(key, value, onChange) {
+    var wrap = document.createElement('div');
+    wrap.className = 'toggle-wrap';
+
+    var toggle = document.createElement('label');
+    toggle.className = 'toggle-switch';
+
+    var input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('data-key', key);
+    input.checked = value === true;
+    input.addEventListener('change', function() { onChange(input.checked); });
+
+    var track = document.createElement('span');
+    track.className = 'toggle-track';
+    var thumb = document.createElement('span');
+    thumb.className = 'toggle-thumb';
+
+    toggle.appendChild(input);
+    toggle.appendChild(track);
+    toggle.appendChild(thumb);
+
+    var label = document.createElement('span');
+    label.className = 'toggle-label';
+    label.textContent = value ? 'On' : 'Off';
+    input.addEventListener('change', function() {
+      label.textContent = input.checked ? 'On' : 'Off';
+    });
+
+    wrap.appendChild(toggle);
+    wrap.appendChild(label);
+    return wrap;
+  }
+
+  function createEnumField(key, options, value, placeholder, onChange) {
+    var select = document.createElement('select');
+    select.className = 'field-input';
+    select.setAttribute('data-key', key);
+
+    options.forEach(function(opt) {
+      var option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt;
+      if (opt === value) option.selected = true;
+      select.appendChild(option);
+    });
+
+    select.addEventListener('change', function() { onChange(select.value); });
+    return select;
+  }
+
+  function createArrayField(key, field, items, onChange) {
+    var wrap = document.createElement('div');
+    wrap.className = 'array-field';
+    wrap.setAttribute('data-array-key', key);
+
+    var itemSchema = field.items || {};
+    var isObjectItems = itemSchema.type === 'object' && itemSchema.properties;
+    var isColorArray = key.toLowerCase().indexOf('color') >= 0;
+
+    function renderItems() {
+      // Clear existing items (keep add button)
+      var existing = wrap.querySelectorAll('.array-item');
+      existing.forEach(function(el) { el.remove(); });
+
+      var addBtn = wrap.querySelector('.array-add-btn');
+
+      items.forEach(function(item, idx) {
+        var itemEl = document.createElement('div');
+        itemEl.className = 'array-item';
+
+        var fieldsWrap = document.createElement('div');
+        fieldsWrap.className = 'array-item-fields';
+
+        if (isObjectItems) {
+          // Object items: render sub-fields
+          for (var prop in itemSchema.properties) {
+            var propField = itemSchema.properties[prop];
+            var row = document.createElement('div');
+            row.className = 'array-item-row';
+
+            var lbl = document.createElement('label');
+            lbl.textContent = propField.label || prop;
+            row.appendChild(lbl);
+
+            var propType = propField.type || 'string';
+            var inp;
+
+            if (propField.enum) {
+              inp = document.createElement('select');
+              propField.enum.forEach(function(opt) {
+                var o = document.createElement('option');
+                o.value = opt; o.textContent = opt;
+                if (item[prop] === opt) o.selected = true;
+                inp.appendChild(o);
+              });
+            } else if (propType === 'number') {
+              inp = document.createElement('input');
+              inp.type = 'number';
+              inp.value = item[prop] !== undefined ? item[prop] : '';
+            } else if (prop.toLowerCase().indexOf('color') >= 0) {
+              inp = document.createElement('input');
+              inp.type = 'color';
+              inp.value = item[prop] && item[prop].match && item[prop].match(/^#[0-9a-fA-F]{6}$/) ? item[prop] : '#6366f1';
+              inp.style.width = '60px';
+            } else {
+              inp = document.createElement('input');
+              inp.type = 'text';
+              inp.value = item[prop] !== undefined ? String(item[prop]) : '';
+              if (propField.placeholder) inp.placeholder = propField.placeholder;
+            }
+
+            inp.setAttribute('data-array-idx', idx);
+            inp.setAttribute('data-prop', prop);
+            inp.addEventListener('input', function() {
+              var i = parseInt(this.getAttribute('data-array-idx'));
+              var p = this.getAttribute('data-prop');
+              var pf = itemSchema.properties[p];
+              if (pf && pf.type === 'number') {
+                items[i][p] = parseFloat(this.value) || 0;
+              } else {
+                items[i][p] = this.value;
+              }
+              onChange();
+            });
+            inp.addEventListener('change', function() {
+              var i = parseInt(this.getAttribute('data-array-idx'));
+              var p = this.getAttribute('data-prop');
+              var pf = itemSchema.properties[p];
+              if (pf && pf.type === 'number') {
+                items[i][p] = parseFloat(this.value) || 0;
+              } else {
+                items[i][p] = this.value;
+              }
+              onChange();
+            });
+
+            row.appendChild(inp);
+            fieldsWrap.appendChild(row);
+          }
+        } else {
+          // Simple items (string/number)
+          var simpleInput;
+          if (isColorArray) {
+            simpleInput = document.createElement('input');
+            simpleInput.type = 'color';
+            simpleInput.value = item && item.match && item.match(/^#[0-9a-fA-F]{6}$/) ? item : '#6366f1';
+            simpleInput.style.width = '100%';
+          } else {
+            simpleInput = document.createElement('input');
+            simpleInput.type = itemSchema.type === 'number' ? 'number' : 'text';
+            simpleInput.value = item !== undefined ? String(item) : '';
+          }
+          simpleInput.setAttribute('data-array-idx', idx);
+          simpleInput.addEventListener('input', function() {
+            var i = parseInt(this.getAttribute('data-array-idx'));
+            if (itemSchema.type === 'number') {
+              items[i] = parseFloat(this.value) || 0;
+            } else {
+              items[i] = this.value;
+            }
+            onChange();
+          });
+          simpleInput.addEventListener('change', function() {
+            var i = parseInt(this.getAttribute('data-array-idx'));
+            if (itemSchema.type === 'number') {
+              items[i] = parseFloat(this.value) || 0;
+            } else {
+              items[i] = this.value;
+            }
+            onChange();
+          });
+          fieldsWrap.appendChild(simpleInput);
+        }
+
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'array-remove-btn';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.setAttribute('data-array-idx', idx);
+        removeBtn.addEventListener('click', function() {
+          var i = parseInt(this.getAttribute('data-array-idx'));
+          items.splice(i, 1);
+          renderItems();
+          onChange();
+        });
+
+        itemEl.appendChild(fieldsWrap);
+        itemEl.appendChild(removeBtn);
+        if (addBtn) {
+          wrap.insertBefore(itemEl, addBtn);
+        } else {
+          wrap.appendChild(itemEl);
+        }
+      });
+    }
+
+    // Add button
+    var addBtn = document.createElement('button');
+    addBtn.className = 'array-add-btn';
+    addBtn.textContent = '+ Add ' + (key.replace(/s$/, '') || 'item');
+    addBtn.addEventListener('click', function() {
+      if (isObjectItems) {
+        var newItem = {};
+        for (var p in itemSchema.properties) {
+          var pf = itemSchema.properties[p];
+          if (pf.type === 'number') newItem[p] = 0;
+          else if (pf.type === 'boolean') newItem[p] = false;
+          else newItem[p] = pf.placeholder || '';
+        }
+        items.push(newItem);
+      } else if (isColorArray) {
+        items.push('#6366f1');
+      } else if (itemSchema.type === 'number') {
+        items.push(0);
+      } else {
+        items.push('');
+      }
+      renderItems();
+      onChange();
+    });
+    wrap.appendChild(addBtn);
+
+    renderItems();
+    return wrap;
+  }
+
+  function createObjectField(key, properties, value, onChange) {
+    var wrap = document.createElement('div');
+    wrap.style.paddingLeft = '12px';
+    wrap.style.borderLeft = '2px solid #334155';
+    wrap.style.marginTop = '4px';
+
+    for (var prop in properties) {
+      var field = properties[prop];
+      var fieldEl = createFieldEditor(prop, field, value[prop], onChange);
+      wrap.appendChild(fieldEl);
+    }
+
+    return wrap;
+  }
+
+  // ── Script Builder ──
+  function createScriptBuilder(scriptItems, cursorTargets, availableActions, defaultTargets, onChange) {
+    var section = document.createElement('div');
+    section.className = 'script-section';
+    section.setAttribute('data-field-key', '__script_section');
+
+    var header = document.createElement('div');
+    header.className = 'script-header';
+
+    var title = document.createElement('h4');
+    title.textContent = 'Script';
+    header.appendChild(title);
+
+    var addBtn = document.createElement('button');
+    addBtn.className = 'array-add-btn';
+    addBtn.style.width = 'auto';
+    addBtn.style.padding = '4px 10px';
+    addBtn.textContent = '+ Action';
+    header.appendChild(addBtn);
+
+    section.appendChild(header);
+
+    // Action name list from available actions
+    var actionNames = availableActions.map(function(a) { return a.action; });
+    // Add standard actions
+    var standardActions = ['move-cursor', 'click', 'type', 'wait', 'hide-cursor', 'zoom-to', 'zoom-out', 'press'];
+    standardActions.forEach(function(a) {
+      if (actionNames.indexOf(a) < 0) actionNames.push(a);
+    });
+
+    // Action param definitions
+    var actionParams = {
+      'move-cursor': ['target', 'at', 'duration'],
+      'click': ['target', 'at'],
+      'type': ['target', 'text', 'at', 'speed'],
+      'wait': ['at', 'duration'],
+      'hide-cursor': ['at'],
+      'zoom-to': ['target', 'at', 'duration', 'scale'],
+      'zoom-out': ['at', 'duration'],
+      'press': ['key', 'at'],
+      'show-response': ['text', 'at', 'duration'],
+      'show-typing': ['at', 'duration'],
+      'select': ['target', 'at'],
+      'hover': ['target', 'at', 'duration'],
+      'drag': ['from', 'to', 'at', 'duration'],
+      'scroll': ['target', 'at', 'direction', 'amount'],
+    };
+
+    var paramTypes = {
+      'target': 'select-target',
+      'at': 'number',
+      'duration': 'number',
+      'speed': 'number',
+      'text': 'string',
+      'key': 'string',
+      'scale': 'number',
+      'from': 'select-target',
+      'to': 'select-target',
+      'direction': 'string',
+      'amount': 'number'
+    };
+
+    // Build target options from cursor_targets
+    var targetKeys = Object.keys(cursorTargets || {});
+    if (targetKeys.length === 0) targetKeys = Object.keys(defaultTargets || {});
+
+    var itemsContainer = document.createElement('div');
+    itemsContainer.className = 'script-items';
+
+    function renderScriptItems() {
+      itemsContainer.innerHTML = '';
+
+      scriptItems.forEach(function(item, idx) {
+        var itemEl = document.createElement('div');
+        itemEl.className = 'script-item';
+
+        var headerRow = document.createElement('div');
+        headerRow.className = 'script-item-header';
+
+        var indexBadge = document.createElement('span');
+        indexBadge.className = 'script-index';
+        indexBadge.textContent = (idx + 1);
+        headerRow.appendChild(indexBadge);
+
+        // Action select
+        var actionSelect = document.createElement('select');
+        actionNames.forEach(function(a) {
+          var opt = document.createElement('option');
+          opt.value = a; opt.textContent = a;
+          if (a === item.action) opt.selected = true;
+          actionSelect.appendChild(opt);
+        });
+        actionSelect.addEventListener('change', function() {
+          item.action = actionSelect.value;
+          // Reset params but keep 'at'
+          var at = item.at;
+          var keys = Object.keys(item);
+          keys.forEach(function(k) { if (k !== 'action' && k !== 'at') delete item[k]; });
+          if (at !== undefined) item.at = at;
+          renderScriptItems();
+          onChange();
+        });
+        headerRow.appendChild(actionSelect);
+
+        // Remove button
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'array-remove-btn';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.addEventListener('click', function() {
+          scriptItems.splice(idx, 1);
+          renderScriptItems();
+          onChange();
+        });
+        headerRow.appendChild(removeBtn);
+
+        itemEl.appendChild(headerRow);
+
+        // Params
+        var params = actionParams[item.action] || ['at', 'duration'];
+        if (params.length > 0) {
+          var paramsGrid = document.createElement('div');
+          paramsGrid.className = 'script-item-params';
+
+          params.forEach(function(param) {
+            var paramDiv = document.createElement('div');
+            paramDiv.className = 'script-param';
+
+            var lbl = document.createElement('label');
+            lbl.textContent = param;
+            paramDiv.appendChild(lbl);
+
+            var pType = paramTypes[param] || 'string';
+            var inp;
+
+            if (pType === 'select-target' && targetKeys.length > 0) {
+              inp = document.createElement('select');
+              var emptyOpt = document.createElement('option');
+              emptyOpt.value = ''; emptyOpt.textContent = '(select)';
+              inp.appendChild(emptyOpt);
+              targetKeys.forEach(function(t) {
+                var opt = document.createElement('option');
+                opt.value = t; opt.textContent = t;
+                if (item[param] === t) opt.selected = true;
+                inp.appendChild(opt);
+              });
+            } else if (pType === 'number') {
+              inp = document.createElement('input');
+              inp.type = 'number';
+              inp.step = '0.1';
+              inp.value = item[param] !== undefined ? item[param] : '';
+              inp.placeholder = param === 'at' ? 'sec' : param === 'speed' ? '25' : '';
+            } else {
+              inp = document.createElement('input');
+              inp.type = 'text';
+              inp.value = item[param] !== undefined ? String(item[param]) : '';
+            }
+
+            inp.setAttribute('data-script-idx', idx);
+            inp.setAttribute('data-param', param);
+
+            var updateFn = function() {
+              var i = parseInt(this.getAttribute('data-script-idx'));
+              var p = this.getAttribute('data-param');
+              var pt = paramTypes[p] || 'string';
+              if (pt === 'number') {
+                var v = parseFloat(this.value);
+                if (!isNaN(v)) scriptItems[i][p] = v;
+                else delete scriptItems[i][p];
+              } else {
+                if (this.value) scriptItems[i][p] = this.value;
+                else delete scriptItems[i][p];
+              }
+              onChange();
+            };
+            inp.addEventListener('input', updateFn);
+            inp.addEventListener('change', updateFn);
+
+            paramDiv.appendChild(inp);
+            paramsGrid.appendChild(paramDiv);
+          });
+
+          itemEl.appendChild(paramsGrid);
+        }
+
+        itemsContainer.appendChild(itemEl);
+      });
+
+      if (scriptItems.length === 0) {
+        var emptyMsg = document.createElement('div');
+        emptyMsg.className = 'no-schema-msg';
+        emptyMsg.style.padding = '8px';
+        emptyMsg.textContent = 'No script actions. Click + Action to add cursor movements, typing, clicks.';
+        itemsContainer.appendChild(emptyMsg);
+      }
+    }
+
+    addBtn.addEventListener('click', function() {
+      var lastAt = scriptItems.length > 0 ? (scriptItems[scriptItems.length - 1].at || 0) + 1 : 0.5;
+      scriptItems.push({ action: actionNames[0] || 'move-cursor', at: Math.round(lastAt * 10) / 10 });
+      renderScriptItems();
+      onChange();
+    });
+
+    section.appendChild(itemsContainer);
+    renderScriptItems();
+
+    // Cursor targets editor
+    if (targetKeys.length > 0 || Object.keys(defaultTargets).length > 0) {
+      var targetsSection = document.createElement('div');
+      targetsSection.style.marginTop = '12px';
+
+      var targetsLabel = document.createElement('div');
+      targetsLabel.className = 'field-label';
+      targetsLabel.style.marginBottom = '6px';
+      var targetsText = document.createElement('span');
+      targetsText.textContent = 'Cursor Targets';
+      targetsLabel.appendChild(targetsText);
+      var targetsTypeSpan = document.createElement('span');
+      targetsTypeSpan.className = 'field-type';
+      targetsTypeSpan.textContent = 'x%, y%';
+      targetsLabel.appendChild(targetsTypeSpan);
+      targetsSection.appendChild(targetsLabel);
+
+      var allTargets = Object.assign({}, defaultTargets, cursorTargets);
+      for (var tKey in allTargets) {
+        var tRow = document.createElement('div');
+        tRow.className = 'array-item-row';
+        tRow.style.marginBottom = '4px';
+
+        var tLabel = document.createElement('label');
+        tLabel.textContent = tKey;
+        tLabel.style.minWidth = '80px';
+        tRow.appendChild(tLabel);
+
+        var xInput = document.createElement('input');
+        xInput.type = 'text';
+        xInput.value = allTargets[tKey].x || '50%';
+        xInput.placeholder = 'x%';
+        xInput.style.width = '60px';
+        xInput.setAttribute('data-target-key', tKey);
+        xInput.setAttribute('data-coord', 'x');
+        xInput.addEventListener('input', function() {
+          var k = this.getAttribute('data-target-key');
+          if (!cursorTargets[k]) cursorTargets[k] = { x: '50%', y: '50%' };
+          cursorTargets[k].x = this.value;
+          onChange();
+        });
+        tRow.appendChild(xInput);
+
+        var yInput = document.createElement('input');
+        yInput.type = 'text';
+        yInput.value = allTargets[tKey].y || '50%';
+        yInput.placeholder = 'y%';
+        yInput.style.width = '60px';
+        yInput.setAttribute('data-target-key', tKey);
+        yInput.setAttribute('data-coord', 'y');
+        yInput.addEventListener('input', function() {
+          var k = this.getAttribute('data-target-key');
+          if (!cursorTargets[k]) cursorTargets[k] = { x: '50%', y: '50%' };
+          cursorTargets[k].y = this.value;
+          onChange();
+        });
+        tRow.appendChild(yInput);
+
+        targetsSection.appendChild(tRow);
+      }
+
+      section.appendChild(targetsSection);
+    }
+
+    return section;
+  }
+
+  // ── Sync Form -> JSON ──
+  function syncFormToJson() {
+    if (!state.formData) return;
+    els.dataEditor.value = JSON.stringify(state.formData, null, 2);
+    schedulePreview();
+  }
+
+  function collectFieldValue(formEl, key, field) {
+    var type = field.type || 'string';
+
+    if (type === 'boolean') {
+      var checkbox = formEl.querySelector('[data-key="' + key + '"]');
+      return checkbox ? checkbox.checked : false;
+    }
+
+    if (type === 'array') {
+      // Array data is maintained in-place by the array builder
+      try {
+        var currentData = JSON.parse(els.dataEditor.value || '{}');
+        return currentData[key] || [];
+      } catch(e) { return []; }
+    }
+
+    if (type === 'object' && field.properties) {
+      var obj = {};
+      for (var prop in field.properties) {
+        var group = formEl.querySelector('[data-field-key="' + prop + '"]');
+        if (group) {
+          obj[prop] = collectFieldValue(group.parentElement, prop, field.properties[prop]);
+        }
+      }
+      return obj;
+    }
+
+    // String, number, enum
+    var input = formEl.querySelector('[data-key="' + key + '"]');
+    if (!input) return field.default || '';
+
+    if (type === 'number') {
+      var v = parseFloat(input.value);
+      return isNaN(v) ? 0 : v;
+    }
+
+    return input.value;
+  }
+
 
   // ── Init ──
   loadCatalog();
