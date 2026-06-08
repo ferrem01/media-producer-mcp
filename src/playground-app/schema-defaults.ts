@@ -16,13 +16,21 @@ interface SchemaField {
   items?: SchemaField;
   properties?: Record<string, SchemaField>;
   description?: string;
-  data?: Record<string, SchemaField>;
+  data?: Record<string, SchemaField> | SchemaField;
 }
 
 export function generateDefaultsFromSchema(schema: SchemaField): Record<string, unknown> {
   // Format A: { data: { field: { type, ... } } }
-  if (schema.data && typeof schema.data === "object" && !schema.data.type) {
-    return generateFromFieldMap(schema.data as Record<string, SchemaField>);
+  if (schema.data && typeof schema.data === "object") {
+    const dataObj = schema.data as SchemaField;
+    // Format A variant: data is a JSON Schema object with type+properties (e.g. depth-blur)
+    if (dataObj.type === "object" && dataObj.properties) {
+      return generateFromFieldMap(dataObj.properties);
+    }
+    // Format A standard: data is a flat field map
+    if (!dataObj.type) {
+      return generateFromFieldMap(schema.data as Record<string, SchemaField>);
+    }
   }
 
   // Format B: { properties: { field: { type, ... } } }
@@ -173,6 +181,10 @@ function generateArrayValue(key: string, field: SchemaField): unknown[] {
   }
 
   if (itemSchema.type === "string") {
+    // Color arrays get hex color defaults
+    if (k.includes("color")) {
+      return ["#6366f1", "#22d3ee", "#a78bfa", "#f472b6"];
+    }
     return ["Item 1", "Item 2", "Item 3"];
   }
 
