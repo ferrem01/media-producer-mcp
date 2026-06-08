@@ -21,6 +21,12 @@
         </div>
       </div>
     </div>
+    <div class="chat-input-bar">
+      <div class="chat-input" data-target="chat-input" contenteditable="false"></div>
+      <button class="send-btn" data-target="send-button">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1.7 14.3c-.2.8.5 1.5 1.3 1.3l12-4c.7-.2.7-1.2 0-1.4l-12-4c-.8-.3-1.5.5-1.3 1.3L3 8l-1.3.5z"/></svg>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -216,6 +222,42 @@
     border-radius: 50%;
     background: #6b7280;
   }
+
+  .chat-input-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+  }
+
+  .chat-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-family: inherit;
+    min-height: 36px;
+    line-height: 1.4;
+  }
+
+  .send-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: var(--mp-color-primary, #A78BFA);
+    color: white;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
 </style>
 
 <script>
@@ -356,20 +398,20 @@
     if (data.script && data.script.length > 0) {
       runScript(tl, el, data.script, data.cursor_targets || {}, ctx, {
       'show-response': function(tl, container, action, at, duration) {
-        var msgArea = container.querySelector('.chat-messages');
+        var msgArea = container.querySelector('.messages-area');
         if (msgArea) {
-          var msgDiv = document.createElement('div');
-          msgDiv.className = 'chat-message';
-          msgDiv.style.opacity = '0';
-          msgDiv.innerHTML = '<div class="msg-avatar" style="background:#10b981;">B</div>' +
-            '<div class="msg-content"><div class="msg-user" style="color:#10b981;">Bot</div>' +
-            '<div class="msg-text">' + (action.text || 'Response here...') + '</div></div>';
-          msgArea.appendChild(msgDiv);
-          tl.to(msgDiv, { opacity: 1, duration: 0.3, ease: 'power2.out' }, at);
+          var row = document.createElement('div');
+          row.className = 'message-row';
+          row.style.opacity = '0';
+          row.innerHTML = '<div style="position:relative"><div class="message-avatar" style="background:#10b981;">B</div></div>' +
+            '<div class="message-body"><div class="message-meta"><span class="message-user">Bot</span></div>' +
+            '<div class="message-text">' + (action.text || 'Response here...') + '</div></div>';
+          msgArea.appendChild(row);
+          tl.to(row, { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out' }, at);
         }
       },
       'show-typing': function(tl, container, action, at, duration) {
-        var msgArea = container.querySelector('.chat-messages');
+        var msgArea = container.querySelector('.messages-area');
         if (msgArea) {
           var indicator = document.createElement('div');
           indicator.className = 'typing-indicator';

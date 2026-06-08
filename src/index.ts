@@ -26,7 +26,7 @@ import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js"
 import { listProjects, loadProject, saveProject, updateComponent, addScene, removeScene, reorderScenes } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs } from "./core/job-queue.js";
-import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
+import { assembleScene, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -755,10 +755,17 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
             }
           } catch { /* no GSAP */ }
 
+          // Load shared utilities (cursor, typing, camera, script-runner)
+          let sharedSource = "";
+          try {
+            sharedSource = await loadSharedUtilities();
+          } catch { /* non-fatal */ }
+
           const html = buildPlaygroundPreview({
             boundHtml,
             scopedCSS,
             gsapSource,
+            sharedSource,
             script: parsed.script,
             data,
           });

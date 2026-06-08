@@ -13,7 +13,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
 import { loadProject, updateComponent } from "./persistence/project.js";
-import { assembleScene, type ComponentSource } from "./core/scene-assembler.js";
+import { assembleScene, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { config } from "./config.js";
@@ -137,10 +137,14 @@ async function handlePreviewComponent(ws: WebSocket, msg: {
     const scopedCSS = parsed.style ? scopeCSS(parsed.style, "pg-comp") : "";
     const gsapSource = await loadGsapSource();
 
+    let sharedSource = "";
+    try { sharedSource = await loadSharedUtilities(); } catch { /* non-fatal */ }
+
     const html = buildPlaygroundPreview({
       boundHtml,
       scopedCSS,
       gsapSource,
+      sharedSource,
       script: parsed.script,
       data: data || {},
     });

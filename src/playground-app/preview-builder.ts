@@ -7,12 +7,13 @@ export interface PlaygroundPreviewOptions {
   boundHtml: string;
   scopedCSS: string;
   gsapSource: string;
+  sharedSource: string;
   script: string;
   data: Record<string, unknown>;
 }
 
 export function buildPlaygroundPreview(opts: PlaygroundPreviewOptions): string {
-  const { boundHtml, scopedCSS, gsapSource, script, data } = opts;
+  const { boundHtml, scopedCSS, gsapSource, sharedSource, script, data } = opts;
 
   const lines = [
     "<!DOCTYPE html>",
@@ -42,6 +43,7 @@ export function buildPlaygroundPreview(opts: PlaygroundPreviewOptions): string {
     gsapSource,
     "if (typeof SplitText !== 'undefined') gsap.registerPlugin(SplitText);",
     "if (typeof CustomEase !== 'undefined') gsap.registerPlugin(CustomEase);",
+    sharedSource,
     "</script>",
     "</head>",
     "<body>",
