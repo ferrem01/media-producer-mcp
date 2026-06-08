@@ -1518,7 +1518,7 @@ select.field-input { cursor: pointer; }
     // Action name list from available actions
     var actionNames = availableActions.map(function(a) { return a.action; });
     // Add standard actions
-    var standardActions = ['move-cursor', 'click', 'type', 'wait', 'hide-cursor', 'zoom-to', 'zoom-out', 'press'];
+    var standardActions = ['move-cursor', 'click', 'double-click', 'type', 'wait', 'hide-cursor', 'show-cursor', 'zoom-to', 'zoom-out', 'pan', 'rotate-3d', 'camera-reset', 'hover', 'drag', 'scroll', 'show-element', 'hide-element', 'highlight', 'toggle', 'update-text', 'press', 'parallel'];
     standardActions.forEach(function(a) {
       if (actionNames.indexOf(a) < 0) actionNames.push(a);
     });
@@ -1527,28 +1527,45 @@ select.field-input { cursor: pointer; }
     var actionParams = {
       'move-cursor': ['target', 'at', 'duration'],
       'click': ['target', 'at'],
+      'double-click': ['target', 'at'],
       'type': ['target', 'text', 'at', 'speed'],
       'wait': ['at', 'duration'],
       'hide-cursor': ['at'],
+      'show-cursor': ['at'],
       'zoom-to': ['target', 'at', 'duration', 'scale'],
       'zoom-out': ['at', 'duration'],
+      'pan': ['x', 'y', 'at', 'duration'],
+      'rotate-3d': ['rotateX', 'rotateY', 'at', 'duration'],
+      'camera-reset': ['at', 'duration'],
       'press': ['key', 'at'],
+      'hover': ['target', 'at', 'duration'],
+      'drag': ['target', 'end_target', 'at', 'duration'],
+      'scroll': ['target', 'scrollY', 'at', 'duration'],
+      'show-element': ['target', 'at', 'duration'],
+      'hide-element': ['target', 'at', 'duration'],
+      'highlight': ['target', 'at', 'color'],
+      'toggle': ['target', 'at'],
+      'update-text': ['target', 'text', 'at'],
       'show-response': ['text', 'at', 'duration'],
       'show-typing': ['at', 'duration'],
-      'select': ['target', 'at'],
-      'hover': ['target', 'at', 'duration'],
-      'drag': ['from', 'to', 'at', 'duration'],
-      'scroll': ['target', 'at', 'direction', 'amount'],
+      'parallel': ['at'],
     };
 
     var paramTypes = {
       'target': 'select-target',
+      'end_target': 'select-target',
       'at': 'number',
       'duration': 'number',
       'speed': 'number',
       'text': 'string',
       'key': 'string',
       'scale': 'number',
+      'x': 'number',
+      'y': 'number',
+      'rotateX': 'number',
+      'rotateY': 'number',
+      'scrollY': 'number',
+      'color': 'string',
       'from': 'select-target',
       'to': 'select-target',
       'direction': 'string',
