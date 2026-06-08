@@ -890,6 +890,18 @@ select.field-input { cursor: pointer; }
     }).then(function(result) {
       els.generateModal.classList.remove('active');
       setComponent(result.type, 'custom', result.source);
+      // Extract custom actions from generated source
+      var genActions = extractCustomActionsFromSource(result.source);
+      if (genActions.length > 0) {
+        if (!state.currentSchema) state.currentSchema = {};
+        if (!state.currentSchema.script_actions) state.currentSchema.script_actions = [];
+        genActions.forEach(function(actionName) {
+          state.currentSchema.script_actions.push({ action: actionName, description: 'Custom action' });
+        });
+        if (formMode === 'form' && state.formData) {
+          renderDataForm(state.formData, state.currentSchema);
+        }
+      }
       // Switch to chat tab
       var chatTab = document.querySelector('#right-panel .panel-tab[data-tab="chat"]');
       if (chatTab) chatTab.click();
@@ -938,6 +950,26 @@ select.field-input { cursor: pointer; }
       state.currentSource = result.source;
       els.sourceEditor.value = result.source;
       addChatMessage('assistant', 'Updated! Preview refreshing.');
+
+      // Hot-reload: extract custom script actions from updated source and refresh form
+      if (state.currentSchema) {
+        var extractedActions = extractCustomActionsFromSource(result.source);
+        if (extractedActions.length > 0) {
+          if (!state.currentSchema.script_actions) state.currentSchema.script_actions = [];
+          var existing = state.currentSchema.script_actions.map(function(a) { return a.action; });
+          extractedActions.forEach(function(actionName) {
+            if (existing.indexOf(actionName) < 0) {
+              state.currentSchema.script_actions.push({ action: actionName, description: 'Custom action' });
+              existing.push(actionName);
+            }
+          });
+        }
+        // Re-render form with current data + updated schema
+        if (formMode === 'form' && state.formData) {
+          renderDataForm(state.formData, state.currentSchema);
+        }
+      }
+
       schedulePreview();
     }).catch(function(err) {
       addChatMessage('error', 'Failed: ' + err.message);
@@ -1829,6 +1861,34 @@ select.field-input { cursor: pointer; }
     return input.value;
   }
 
+
+
+  // ── Extract Custom Script Actions from Source ──
+  function extractCustomActionsFromSource(source) {
+    var actions = [];
+    // Match runScript handler objects: runScript(tl, el, ..., { 'action-name': function... })
+    // Pattern: 'action-name' or "action-name" as keys in handler objects
+    var handlerPattern = /['"]([a-z][a-z0-9-]+)['"]\s*:\s*function/g;
+    var match;
+    // Look for the handlers object passed to runScript
+    var runScriptMatch = source.match(/runScript\s*\([^)]*,\s*\{([^}]+)\}/);
+    if (runScriptMatch) {
+      var handlersBlock = runScriptMatch[1];
+      while ((match = handlerPattern.exec(handlersBlock)) !== null) {
+        actions.push(match[1]);
+      }
+    }
+    // Also look for handlers defined separately: var handlers = { ... }
+    var handlersVarMatch = source.match(/(?:var|const|let)\s+handlers\s*=\s*\{([^}]+)\}/);
+    if (handlersVarMatch) {
+      handlerPattern.lastIndex = 0;
+      var block = handlersVarMatch[1];
+      while ((match = handlerPattern.exec(block)) !== null) {
+        if (actions.indexOf(match[1]) < 0) actions.push(match[1]);
+      }
+    }
+    return actions;
+  }
 
   // ── Init ──
   loadCatalog();
