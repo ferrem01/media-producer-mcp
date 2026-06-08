@@ -328,27 +328,30 @@ function isLightColor(hex: string): boolean {
  * Prefers dark-tagged images for dark scenes, light-tagged for light.
  * Returns undefined if no suitable background found.
  */
-function pickBrandBackground(brand: BrandKit, isDark: boolean): string | undefined {
-  const bgAssets = (brand.assets || []).filter(a => a.type === 'background');
+function pickBrandBackground(brand: BrandKit, isDark: boolean): { url: string; isDark: boolean } | undefined {
+  const bgAssets = (brand.assets || []).filter((a: any) => a.type === 'background');
   if (bgAssets.length === 0) return undefined;
 
   const darkTags = /dark|night|deep|midnight/i;
   const lightTags = /light|white|bright|soft|pastel/i;
 
-  const darkBgs = bgAssets.filter(a =>
-    (a.tags || []).some(t => darkTags.test(t)) || darkTags.test(a.name)
-  );
-  const lightBgs = bgAssets.filter(a =>
-    (a.tags || []).some(t => lightTags.test(t)) || lightTags.test(a.name)
-  );
+  const tagIsDark = (a: any) =>
+    (a.tags || []).some((t: string) => darkTags.test(t)) || darkTags.test(a.name);
+  const tagIsLight = (a: any) =>
+    (a.tags || []).some((t: string) => lightTags.test(t)) || lightTags.test(a.name);
+
+  const darkBgs = bgAssets.filter((a: any) => tagIsDark(a));
+  const lightBgs = bgAssets.filter((a: any) => tagIsLight(a));
 
   if (isDark) {
     // Prefer dark backgrounds, fall back to any
     const pool = darkBgs.length > 0 ? darkBgs : bgAssets;
-    return pool[Math.floor(Math.random() * pool.length)]?.url;
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    return picked ? { url: picked.url, isDark: tagIsDark(picked) || !tagIsLight(picked) } : undefined;
   } else {
     const pool = lightBgs.length > 0 ? lightBgs : bgAssets;
-    return pool[Math.floor(Math.random() * pool.length)]?.url;
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    return picked ? { url: picked.url, isDark: tagIsDark(picked) } : undefined;
   }
 }
 
@@ -369,23 +372,14 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
   const vars: string[] = [];
 
   // ── Determine effective theme ──
-  // Templates are dark by default. The scene is "light" only if the brand
-  // background is explicitly light AND no dark background image is being used.
+  // Decide per-scene: use the explicit scene background color if provided,
+  // otherwise fall back to the brand background color.
   const effectiveBg = sceneBackground || brand.colors?.background || '#0f172a';
-  const brandIsLight = isLightColor(effectiveBg);
+  const bgIsLight = isLightColor(effectiveBg);
 
-  // Templates are designed for dark backgrounds. When the brand kit has a light
-  // background color but also has dark background images (which templates will
-  // use), the scene is still dark. Only treat as truly light if there are NO
-  // dark background assets available.
-  const bgAssets = (brand.assets || []).filter(a => a.type === 'background');
-  const hasDarkBgs = bgAssets.some(a =>
-    (a.tags || []).some(t => /dark|night|deep|midnight/i.test(t)) ||
-    /dark|night|deep|midnight/i.test(a.name)
-  );
-
-  // Scene is dark if: brand bg is dark, OR brand has dark background images
-  const sceneIsDark = !brandIsLight || hasDarkBgs;
+  // Start with the background color to determine theme. The background image
+  // picked below may override this if its tags disagree.
+  let sceneIsDark = !bgIsLight;
 
   // ── Colors ──
   if (brand.colors) {
@@ -394,6 +388,15 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
       if (key === 'text' || key === 'text_muted') continue;
       vars.push(`  --mp-color-${key.replace(/_/g, '-')}: ${value};`);
     }
+  }
+
+  // ── Background image (pick before text colors so tags can refine theme) ──
+  const bgResult = pickBrandBackground(brand, sceneIsDark);
+  if (bgResult) {
+    // Let the picked background image's tags override the theme.
+    // If the brand bg color is light but we picked a dark-tagged image,
+    // switch to dark theme. Vice versa.
+    sceneIsDark = bgResult.isDark;
   }
 
   // ── Theme-aware text colors ──
@@ -410,8 +413,8 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
   // Scene-level background override
   if (sceneBackground) {
     vars.push(`  --mp-color-background: ${sceneBackground};`);
-  } else if (sceneIsDark && brandIsLight) {
-    // Brand bg is light but scene is dark (dark bg images override).
+  } else if (sceneIsDark && bgIsLight) {
+    // Brand bg is light but scene is dark (dark bg image selected).
     // Force a dark background so the body doesn't flash white.
     vars.push('  --mp-color-background: #0a0a0f;');
   }
@@ -430,14 +433,13 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
   }
 
   // ── Background image ──
-  const bgUrl = pickBrandBackground(brand, sceneIsDark);
-  if (bgUrl) {
+  if (bgResult) {
     // Resolve relative URLs to absolute for file:// protocol
-    const resolvedUrl = bgUrl.startsWith('/assets/')
-      ? resolveAssetPath(bgUrl, preview)
-      : bgUrl.startsWith('/api/')
-      ? (preview ? bgUrl : `http://localhost:${config.port}${bgUrl}`)
-      : bgUrl;
+    const resolvedUrl = bgResult.url.startsWith('/assets/')
+      ? resolveAssetPath(bgResult.url, preview)
+      : bgResult.url.startsWith('/api/')
+      ? (preview ? bgResult.url : `http://localhost:${config.port}${bgResult.url}`)
+      : bgResult.url;
     vars.push(`  --mp-bg-image: url(${resolvedUrl});`);
     vars.push('  --mp-has-bg-image: 1;');
   } else {
@@ -458,7 +460,7 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
   // ── Theme hint ──
   vars.push(`  --mp-theme: ${sceneIsDark ? 'dark' : 'light'};`);
 
-  return { css: `:root {\n${vars.join('\n')}\n}`, theme: sceneIsDark ? 'dark' : 'light', hasBgImage: !!bgUrl };
+  return { css: `:root {\n${vars.join('\n')}\n}`, theme: sceneIsDark ? 'dark' : 'light', hasBgImage: !!bgResult };
 }
 
 
