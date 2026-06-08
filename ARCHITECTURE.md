@@ -1,7 +1,7 @@
 # Media Producer MCP -- Architecture
 
 Living document. Updated as the system evolves.
-Last updated: 2026-06-07
+Last updated: 2026-06-08
 
 ## What This Is
 
@@ -280,12 +280,32 @@ src/
 
 ---
 
+## Playground & Tenant Components
+
+Full documentation: [PLAYGROUND.md](./PLAYGROUND.md)
+
+### Playground (`/playground`)
+Interactive three-panel tool for browsing, creating, and iterating on components:
+- **Library browser**: 59 built-in components across 7 categories
+- **Live preview**: Scaled iframe with GSAP animation, canvas size selector, play/restart
+- **Schema-driven data editor**: Typed form controls (text, number, color picker, enum dropdown, boolean toggle, array builder) generated from component schemas. Form/JSON toggle.
+- **Script builder**: Visual editor for interactive script actions (cursor, typing, camera, UI). Dropdown of standard + custom actions with type-matched param inputs.
+- **LLM generate**: Create new components from text prompts
+- **LLM iterate**: Chat-based modification of component source
+- **Save to Library**: Persist as tenant component
+
+### Tenant Components
+Custom components per tenant, stored in `/data/media-producer/{tenant}/components/`. Full CRUD via playground UI and MCP tools. Version history (last 5 snapshots). Available to the planner for that tenant's projects.
+
+### Script System
+GSAP-based interactive animations. Shared utilities (script-runner.js, cursor.js, camera.js, typing.js) loaded into every scene and playground preview. 8 scriptable library components. Standard actions: cursor movement, typing, camera zoom/pan/rotate, UI interactions. Custom action handlers per component. Planner integration for automated script generation.
+
 ## Roadmap
 
 Prioritized list of what's next. Updated as things ship.
 
 ### High Priority
-- [ ] **Tenant Component Playground** -- rework from catalog browser to LLM-driven iteration tool. Prompt-based component creation, live preview, version history. Big lift.
+- [x] **Tenant Component Playground** -- three-panel layout with LLM-driven generation, chat iteration, schema-driven form editor, script builder, tenant CRUD. See [PLAYGROUND.md](./PLAYGROUND.md).
 - [ ] **Render speed** -- showcase test took 529s for 40s video. Look at parallelizing frame captures further, draft resolution mode, frame skip for previews.
 
 ### Medium Priority
@@ -304,3 +324,6 @@ Prioritized list of what's next. Updated as things ship.
 - [x] Multiple speaker clips (`speaker-track.ts` handles concat of multiple clips)
 - [x] Preview SPA v2 (transport clock, composite, unified media sync)
 - [x] Old overlay system removed (replaced by component-level `source: "speaker"`)
+- [x] Tenant Component Playground (three-panel, LLM generate/iterate, schema form editor, script builder)
+- [x] Script system (GSAP-based: cursor, typing, camera, custom handlers, planner integration)
+- [x] Schema defaults system (contextual sample data generation from component schemas)
