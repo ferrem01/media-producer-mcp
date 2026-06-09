@@ -88,6 +88,21 @@ function err(msg: string) {
   return { content: [{ type: "text" as const, text: msg }], isError: true as const };
 }
 
+/** Build the preview SPA URL for a tenant + project. */
+function previewUrl(tenantId: string, projectId: string): string {
+  return `${config.publicUrl}/preview?tenant=${encodeURIComponent(tenantId)}&project=${encodeURIComponent(projectId)}`;
+}
+
+/** Enrich a job object with preview_url when tenant and project are known. */
+function jobWithPreview(job: Record<string, unknown>): Record<string, unknown> {
+  const tenantId = job.tenantId as string | undefined;
+  const projectId = job.projectId as string | undefined;
+  if (tenantId && projectId) {
+    return { ...job, preview_url: previewUrl(tenantId, projectId) };
+  }
+  return job;
+}
+
 export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "media-producer-mcp",
@@ -147,7 +162,7 @@ export function createMcpServer(): McpServer {
         if (!params.job_id) return err("job_id required for target='job'");
         const job = getJob(params.job_id);
         if (!job) return err("Job not found");
-        return ok(job);
+        return ok(jobWithPreview(job as unknown as Record<string, unknown>));
       }
 
       if (target === "jobs") {
@@ -1242,6 +1257,7 @@ export function createMcpServer(): McpServer {
             return ok({
               status: "planned",
               project_id: project.project_id,
+              preview_url: previewUrl(params.tenant_id, project.project_id),
               plan,
             });
           } else {
@@ -1262,6 +1278,7 @@ export function createMcpServer(): McpServer {
             return ok({
               status: "planned",
               project_id: project.project_id,
+              preview_url: previewUrl(params.tenant_id, project.project_id),
               plan,
             });
           }
@@ -1376,6 +1393,7 @@ export function createMcpServer(): McpServer {
             status: "queued",
             job_id: job.id,
             project_id: project.project_id,
+            preview_url: previewUrl(params.tenant_id, project.project_id),
             message: "Generating scenes from plan. Use get(target='job', job_id='" + job.id + "') to check status.",
           });
         }
@@ -1525,7 +1543,7 @@ export function createMcpServer(): McpServer {
         if (!params.job_id) return err("job_id required for status");
         const job = getJob(params.job_id);
         if (!job) return err("Job not found");
-        return ok(job);
+        return ok(jobWithPreview(job as unknown as Record<string, unknown>));
       }
 
       if (params.action === "wait") {
@@ -1536,17 +1554,17 @@ export function createMcpServer(): McpServer {
           const job = getJob(params.job_id);
           if (!job) return err("Job not found");
           if (job.status === "completed" || job.status === "failed") {
-            return ok(job);
+            return ok(jobWithPreview(job as unknown as Record<string, unknown>));
           }
           await new Promise((r) => setTimeout(r, 2000));
         }
         // Timeout -- return current state
         const job = getJob(params.job_id);
-        return ok({
+        return ok(jobWithPreview({
           ...job,
           _timeout: true,
           message: "Wait timed out. Job is still " + (job?.status || "unknown"),
-        });
+        } as Record<string, unknown>));
       }
 
       return err("Unknown action");

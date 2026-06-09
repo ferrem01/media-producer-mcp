@@ -34,6 +34,8 @@ export interface Config {
   dataDir: string;
   /** HTTP port (health check / playground) */
   port: number;
+  /** Public base URL for preview links */
+  publicUrl: string;
   /** Path to built-in component library */
   componentLibDir: string;
   /** Path to GSAP vendor files */
@@ -57,6 +59,7 @@ const llmProvider = (process.env.MP_LLM_PROVIDER || "anthropic") as "anthropic" 
 export const config: Config = {
   dataDir: process.env.MP_DATA_DIR || "/data/media-producer",
   port: parseInt(process.env.MP_PORT || "3200", 10),
+  publicUrl: process.env.MP_PUBLIC_URL || `http://localhost:${parseInt(process.env.MP_PORT || "3200", 10)}`,
   // Point to src/components (HTML files aren't copied by tsc to dist/)
   componentLibDir: process.env.MP_COMPONENT_LIB_DIR || path.resolve(ROOT_DIR, "../src/components"),
   gsapDir: process.env.MP_GSAP_DIR || path.resolve(ROOT_DIR, "../vendor/gsap"),
