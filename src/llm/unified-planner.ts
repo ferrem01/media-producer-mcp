@@ -200,7 +200,7 @@ ${catalogStr}
 - hero_image prompts describe the IMAGE itself, not the scene layout.
 - Every scene MUST have a components array with at least one component.
 - Think Apple keynote: one powerful idea per scene, cinematic motion, premium aesthetic.
-- For EACH scene, include a "voiceover_text" field with 1-2 sentences of narration script. This should be natural spoken text that complements the visuals -- not a description of what's on screen, but what a narrator would SAY. Keep it punchy and conversational. Skip voiceover_text for intro/outro brand asset scenes and breathing pauses.
+- For EACH scene, include a "voiceover_text" field with narration that FITS the scene duration. CRITICAL: at ~150 words per minute, a 5-second scene fits ~12 words (1 short sentence), a 6-second scene fits ~15 words, a 7-second scene fits ~17 words. NEVER write more words than the scene duration allows. Keep narration punchy -- one idea per scene. Skip voiceover_text for intro/outro brand asset scenes and breathing pauses.
 - For IMAGE format: use ONE custom component for all content (headline, subheadline, stats, CTA button, any text). The custom component handles the entire visual composition. Do NOT use library components for images -- the custom component renders everything as one cohesive layout.
 - For PRESENTATION/DECK format: treat each slide like an image. Each slide MUST use ONE custom component that handles everything (background, layout, text, icons, CTA). No library components per slide. Each slide is a self-contained visual composition.
 - For VIDEO: you CAN mix library + custom components across scenes. Just follow the no-duplicate rule.

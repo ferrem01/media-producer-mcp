@@ -1551,7 +1551,36 @@ async function runUnifiedPipeline(
         project.audio = { tracks: [] };
       }
 
-      // Calculate cumulative start times per scene
+      // Probe each clip duration and extend scenes if narration is longer
+      const { execFile: execFileCb } = await import("node:child_process");
+      const { promisify: promisifyFn } = await import("node:util");
+      const execFileVo = promisifyFn(execFileCb);
+
+      const voDurations: number[] = [];
+      for (let i = 0; i < project.scenes.length; i++) {
+        if (voicePaths[i]) {
+          try {
+            const probe = await execFileVo("ffprobe", [
+              "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", voicePaths[i]
+            ]);
+            const clipDur = parseFloat(probe.stdout.trim()) || 0;
+            voDurations[i] = clipDur;
+
+            // Extend scene duration if voiceover is longer (add 0.5s buffer)
+            if (clipDur > project.scenes[i].duration_seconds) {
+              const oldDur = project.scenes[i].duration_seconds;
+              project.scenes[i].duration_seconds = Math.ceil(clipDur + 0.5);
+              console.log(`  Voiceover: extended scene ${i} from ${oldDur}s to ${project.scenes[i].duration_seconds}s (clip: ${clipDur.toFixed(1)}s)`);
+            }
+          } catch {
+            voDurations[i] = 0;
+          }
+        } else {
+          voDurations[i] = 0;
+        }
+      }
+
+      // Calculate cumulative start times using (potentially extended) scene durations
       let cumulativeTime = 0;
       for (let i = 0; i < project.scenes.length; i++) {
         if (voicePaths[i]) {
