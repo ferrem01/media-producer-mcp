@@ -1528,7 +1528,36 @@ async function runUnifiedPipeline(
     trace?.endEvent();
   }
 
-  // ── Voiceover generation (TTS) ──
+  // ── Proactive scene duration sync ──
+  // Estimate TTS duration from word count BEFORE generating audio.
+  // Prevents reactive extension and keeps animations/visuals in sync.
+  if (opts.voiceover && (format === "video" || format === "slideshow")) {
+    const WPM = 150;  // words per minute for TTS
+    const BUFFER_S = 0.8;  // breathing room after narration
+    let durationAdjustments = 0;
+
+    for (const scene of project.scenes) {
+      const voText = scene.audio_hints?.voiceover_text;
+      if (!voText) continue;
+
+      const wordCount = voText.trim().split(/\s+/).length;
+      const estimatedDuration = (wordCount / WPM) * 60 + BUFFER_S;
+
+      if (estimatedDuration > scene.duration_seconds) {
+        const oldDur = scene.duration_seconds;
+        scene.duration_seconds = Math.ceil(estimatedDuration);
+        console.log(`  Duration sync: "${scene.label}" ${oldDur}s -> ${scene.duration_seconds}s (${wordCount} words, ~${estimatedDuration.toFixed(1)}s narration)`);
+        durationAdjustments++;
+      }
+    }
+
+    if (durationAdjustments > 0) {
+      console.log(`  Duration sync: pre-adjusted ${durationAdjustments} scene(s) to fit narration`);
+      await saveProject(project);
+    }
+  }
+
+    // ── Voiceover generation (TTS) ──
   if (opts.voiceover && (format === "video" || format === "slideshow")) {
     trace?.beginEvent("generate_voiceover");
     try {

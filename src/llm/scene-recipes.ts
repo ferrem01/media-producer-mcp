@@ -363,4 +363,178 @@ NEVER:
 - More than 2 scenes without a visual change in composition type
 - A video without at least one DATA recipe (numbers build credibility)
 - A video without a clear OPENING and CLOSING recipe
+
+---
+
+### INDUSTRY-SPECIFIC RECIPES
+
+These recipes are optimized for common verticals. Use them when the prompt
+mentions the industry or when the content clearly fits a vertical.
+
+#### I-SAAS1: "Integration Ecosystem"
+*When to use*: SaaS product showing integrations, API connections, or partner ecosystem.
+*Feel*: Modern SaaS marketing. Connects the dots.
+
+- Layout: integration-logos component centered (60% width) with headline above
+- Background: gradient-background, dark
+- Center: Product logo/icon (48px) with connecting lines radiating outward
+- Surrounding: 6-8 integration partner logos arranged in a circle or grid
+- Animation: Center logo scales in first, then connection lines draw outward (DrawSVG), then partner logos fade in at endpoints (stagger 0.1s)
+- Duration: 5-6s
+- Great for: SaaS, DevTools, Platforms
+
+#### I-SAAS2: "Workflow Automation"
+*When to use*: Showing a multi-step automated process. Before/after manual vs automated.
+*Feel*: Process automation. The "magic" moment.
+
+- Layout: timeline-steps component with 3-4 steps, horizontal layout
+- Background: gradient-background
+- Steps: Each step has an icon (inline SVG), action label (18px bold), and a connecting arrow
+- Key moment: One step has a lightning bolt / "auto" badge indicating automation
+- Animation: Steps reveal left-to-right (0.4s apart). Connecting arrows draw between them. The "auto" step glows or pulses accent color.
+- Duration: 5-7s
+- Great for: SaaS, Automation, Workflow tools
+
+#### I-SAAS3: "Pricing Tiers"
+*When to use*: Showing pricing plans, tier comparison, plan features.
+*Feel*: Clean pricing page. The recommended plan stands out.
+
+- Layout: 3 pricing-card components side by side (or 2 for simple comparison)
+- Background: gradient-background
+- Cards: Plan name, price, feature list. Middle/recommended card is elevated with accent border glow.
+- Animation: Cards stagger in (0.12s apart). Recommended card enters last with a slight bounce and glow effect.
+- Duration: 5-6s
+- Great for: SaaS, Subscription services
+
+#### I-ECOM1: "Product Showcase"
+*When to use*: E-commerce product hero shot. Single product, premium feel.
+*Feel*: Apple product page. The product sells itself.
+
+- Layout: image-showcase component centered (50-60% width), floating with dramatic shadow
+- Background: gradient-background, clean and recessive
+- Product: High-res product image, elevated presentation
+- Optional: Price badge (top-right, accent pill), or "New" label
+- Text: Product name (40px) + one-line value prop (18px muted) below image
+- Animation: Product floats in from below with subtle rotation (3d perspective), shadow builds. Text fades in after.
+- Duration: 5-6s
+- Great for: E-commerce, D2C, Product launches
+
+#### I-ECOM2: "Social Proof Wall"
+*When to use*: Showing customer reviews, ratings, or UGC for credibility.
+*Feel*: Trust-building. Real people, real results.
+
+- Layout: Grid of 3-4 testimonial-card or social-proof components
+- Background: gradient-background, warm
+- Cards: Star rating, short quote (max 2 lines), customer name, optional avatar placeholder
+- One card can be a stat ("4.9/5 average" or "10,000+ reviews")
+- Animation: Cards stagger in from different directions. Star ratings fill in with gold color animation.
+- Duration: 5-6s
+- Great for: E-commerce, Marketplaces, Consumer apps
+
+#### I-FIN1: "Security & Compliance"
+*When to use*: Fintech/healthcare showing trust signals -- certifications, encryption, compliance badges.
+*Feel*: Trustworthy, institutional, reliable.
+
+- Layout: Center headline (40px) + row of 3-5 certification badges/shields below
+- Background: gradient-background, dark with subtle blue tones
+- Badges: Shield icons with labels (SOC2, HIPAA, GDPR, PCI DSS, ISO 27001, etc.)
+- Optional: "Bank-level encryption" or similar trust headline
+- Animation: Headline fades in. Badges stagger in (0.1s apart) with subtle scale bounce. Optional: shield icons have a brief shimmer/glow.
+- Duration: 4-5s
+- Great for: Fintech, Healthcare, Enterprise SaaS
+
+#### I-FIN2: "ROI Calculator"
+*When to use*: Showing financial impact, cost savings, ROI metrics.
+*Feel*: The business case. Numbers that matter to CFOs.
+
+- Layout: stat-card components. One large "hero" savings number + 2-3 supporting metrics
+- Background: gradient-background with subtle green/money accent tones
+- Hero stat: Large number with dollar sign or percentage (120px), "saved" or "increased" label
+- Supporting: Time saved, efficiency gain, payback period in smaller stat-cards below
+- Animation: Hero stat counts up dramatically (2s). Supporting stats stagger in below (0.2s apart) with their own counters.
+- Duration: 5-6s
+- Great for: Fintech, Enterprise, B2B SaaS
+
+#### I-HEALTH1: "Patient Journey"
+*When to use*: Healthcare showing patient experience, care pathway, or treatment steps.
+*Feel*: Empathetic, human, trustworthy. Not clinical.
+
+- Layout: timeline-steps with 3-4 stages, human-centered icons
+- Background: gradient-background, warm and calming (soft blues, whites)
+- Steps: Each stage of the patient/user journey with empathetic language
+- Icons: Human-centered (person, heart, checkmark, shield) -- never cold/technical
+- Animation: Steps reveal gently (0.5s apart), softer ease (power2.out). Warmer, slower feel than tech timelines.
+- Duration: 6-7s
+- Great for: Healthcare, Wellness, Patient platforms
+
+#### I-RE1: "Property Showcase"
+*When to use*: Real estate listing, property feature, or development showcase.
+*Feel*: Premium real estate marketing. Aspirational.
+
+- Layout: image-showcase or browser-frame (70% width) with property image + info overlay
+- Background: gradient-background, dark and elegant
+- Image: Property photo (hero shot)
+- Overlay: Bottom bar with price (36px bold), location (18px), key specs (bed/bath/sqft in a row)
+- Animation: Image fades in with subtle ken-burns zoom. Overlay slides up from bottom (0.6s, power3.out).
+- Duration: 5-6s
+- Great for: Real Estate, Property tech, Hospitality
+
+---
+
+### INDUSTRY FLOW PATTERNS
+
+When the prompt mentions an industry, prefer these scene sequences:
+
+#### SaaS / Developer Tools
+1. O1 or O3 (bold problem statement)
+2. C1 (feature spotlight -- the core value)
+3. P1 or P2 (product demo)
+4. I-SAAS1 (integrations) or I-SAAS2 (workflow)
+5. D1 or D2 (metrics/traction)
+6. I-SAAS3 (pricing) or E1 (CTA)
+7. E3 (logo outro)
+
+#### E-commerce / D2C
+1. O1 or O4 (bold intro or before/after)
+2. I-ECOM1 (product showcase)
+3. C2 (feature bento -- product benefits)
+4. I-ECOM2 (social proof wall)
+5. D1 (hero stat -- sales/reviews/customers)
+6. E1 (CTA -- "Shop Now")
+7. E3 (logo outro)
+
+#### Fintech / Financial Services
+1. O3 (provocation -- the pain point)
+2. C1 (solution spotlight)
+3. I-FIN2 (ROI / savings)
+4. I-FIN1 (security & compliance)
+5. D2 (stats trio -- key metrics)
+6. E1 (CTA)
+7. E3 (logo outro)
+
+#### Healthcare / Wellness
+1. O1 (empathetic big statement)
+2. I-HEALTH1 (patient journey)
+3. C1 (feature/benefit spotlight)
+4. I-FIN1 (compliance badges -- HIPAA, etc.)
+5. D1 (impact stat)
+6. E1 (CTA)
+7. E3 (logo outro)
+
+#### Real Estate / Property
+1. I-RE1 (property hero shot)
+2. C2 (bento -- property features/amenities)
+3. D2 (stats trio -- price, sqft, ROI)
+4. C4 (testimonial -- resident/buyer quote)
+5. E1 (CTA -- "Schedule a Tour")
+6. E3 (logo outro)
+
+#### General B2B / Enterprise
+1. O3 (provocation -- business problem)
+2. C1 (solution overview)
+3. P1 (product frame)
+4. D2 (stats trio -- ROI metrics)
+5. C4 (testimonial)
+6. E1 (CTA)
+7. E3 (logo outro)
 `;
