@@ -216,7 +216,21 @@ async function main() {
   // Capture frames with Playwright + ffmpeg video frame extraction
   var totalFrames = Math.ceil(scene.duration_seconds * args.fps);
   var browser = await chromium.launch({
-    args: ["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox", "--allow-file-access-from-files"],
+    args: [
+      "--disable-gpu",
+      "--disable-dev-shm-usage",
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--allow-file-access-from-files",
+      "--single-process",
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--disable-translate",
+      "--mute-audio",
+      "--no-first-run",
+    ],
   });
 
   const frameDirsToCleanup = new Set<string>();
@@ -224,8 +238,8 @@ async function main() {
   try {
     var page = await browser.newPage();
     await page.setViewportSize({ width: args.width, height: args.height });
-    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "networkidle" });
-    await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 15000 });
+    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "networkidle", timeout: 60000 });
+    await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 60000 });
 
     // ── Video frame extraction: discover, extract, inject ──
     const videoInfos: { src: string; startAt: number; index: number }[] = await page.evaluate(() => {

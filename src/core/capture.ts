@@ -202,17 +202,29 @@ export async function captureSingleFrame(options: {
 
   try {
     browser = await chromium.launch({
-      args: ["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox", "--allow-file-access-from-files"],
+      args: [
+        "--disable-gpu",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--allow-file-access-from-files",
+        "--single-process",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-default-apps",
+        "--mute-audio",
+        "--no-first-run",
+      ],
     });
     page = await browser.newPage();
     await page.setViewportSize({ width, height });
 
     const fileUrl = `file://${path.resolve(htmlPath)}`;
-    await page.goto(fileUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.goto(fileUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
 
     await page.waitForFunction(
       () => (window as any).__MP_READY === true,
-      { timeout: 15000 }
+      { timeout: 60000 }
     );
 
     // If a specific time is requested, advance the timeline
