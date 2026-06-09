@@ -1308,12 +1308,30 @@ export function createMcpServer(): McpServer {
                 sceneCount: project.plan!.scenes.length,
               });
 
-              // Update project status to generated
-              const updated = await loadProject(params.tenant_id, params.project_id!);
-              if (updated) {
-                updated.status = "generated";
-                updated.updated_at = new Date().toISOString();
-                await saveProject(updated);
+              // Copy generated scenes, audio, and assets from the new project back to the original planned project
+              const newProjectId = (pipelineResult as any)?.project_id;
+              if (newProjectId && newProjectId !== params.project_id) {
+                const newProject = await loadProject(params.tenant_id, newProjectId);
+                const origProject = await loadProject(params.tenant_id, params.project_id!);
+                if (newProject && origProject) {
+                  origProject.scenes = newProject.scenes;
+                  origProject.audio = newProject.audio;
+                  origProject.assets = newProject.assets;
+                  origProject.canvas = newProject.canvas;
+                  origProject.speaker_track = newProject.speaker_track;
+                  origProject.status = "generated";
+                  origProject.updated_at = new Date().toISOString();
+                  await saveProject(origProject);
+                  console.log(`  Generate mode: copied ${newProject.scenes.length} scenes from ${newProjectId} to ${params.project_id}`);
+                }
+              } else {
+                // Pipeline wrote to the same project
+                const updated = await loadProject(params.tenant_id, params.project_id!);
+                if (updated) {
+                  updated.status = "generated";
+                  updated.updated_at = new Date().toISOString();
+                  await saveProject(updated);
+                }
               }
 
               if (pipelineResult && typeof pipelineResult === "object" && "project_id" in (pipelineResult as any)) {
