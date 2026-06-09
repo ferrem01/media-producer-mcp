@@ -1,0 +1,205 @@
+<!--
+  Scene Template: D7 - Animated Bar Chart
+  Category: DATA
+  Use when: Comparing values across categories. Market share, performance metrics, survey results.
+  Feel: Bars grow from zero with liquid motion. Clean data visualization.
+  Content slots:
+    - eyebrow: Section label (optional)
+    - headline: Chart title
+    - bar_1_label, bar_1_value, bar_1_display: Label, numeric 0-100, display text (e.g. "85%")
+    - bar_2_label, bar_2_value, bar_2_display
+    - bar_3_label, bar_3_value, bar_3_display
+    - bar_4_label, bar_4_value, bar_4_display (optional)
+    - bar_5_label, bar_5_value, bar_5_display (optional)
+  Duration: 5-7s
+-->
+<template>
+  <div class="scene">
+    <div class="bg-brand-image"></div>
+    <div class="bg-gradient"></div>
+    <div class="content">
+      <div class="header">
+        <div class="eyebrow"></div>
+        <h1 class="headline"></h1>
+      </div>
+      <div class="chart">
+        <div class="bar-row bar-1">
+          <span class="bar-label"></span>
+          <div class="bar-track"><div class="bar-fill"></div></div>
+          <span class="bar-display"></span>
+        </div>
+        <div class="bar-row bar-2">
+          <span class="bar-label"></span>
+          <div class="bar-track"><div class="bar-fill"></div></div>
+          <span class="bar-display"></span>
+        </div>
+        <div class="bar-row bar-3">
+          <span class="bar-label"></span>
+          <div class="bar-track"><div class="bar-fill"></div></div>
+          <span class="bar-display"></span>
+        </div>
+        <div class="bar-row bar-4">
+          <span class="bar-label"></span>
+          <div class="bar-track"><div class="bar-fill"></div></div>
+          <span class="bar-display"></span>
+        </div>
+        <div class="bar-row bar-5">
+          <span class="bar-label"></span>
+          <div class="bar-track"><div class="bar-fill"></div></div>
+          <span class="bar-display"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bg-brand-image {
+  position: absolute; inset: 0; z-index: 0;
+  background: var(--mp-bg-image, none);
+  background-size: cover; background-position: center;
+}
+.bg-gradient {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(135deg,
+    var(--mp-color-background, #0f172a) 0%,
+    color-mix(in srgb, var(--mp-color-background, #0f172a) 85%, var(--mp-color-primary, #6366f1)) 100%);
+}
+.content {
+  position: relative; z-index: 10;
+  width: 75%;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
+.eyebrow {
+  font-family: var(--mp-font-family, Inter, sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--mp-color-primary, #6366f1);
+}
+.headline {
+  font-family: var(--mp-font-heading, var(--mp-font-family, Inter, sans-serif));
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--mp-color-text, #ffffff);
+}
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.bar-label {
+  flex: 0 0 120px;
+  text-align: right;
+  font-family: var(--mp-font-family, Inter, sans-serif);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--mp-color-text, #ffffff);
+}
+.bar-track {
+  flex: 1;
+  height: 36px;
+  background: rgba(var(--mp-color-text-rgb, 255,255,255), 0.06);
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+}
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 18px;
+  background: linear-gradient(90deg, var(--mp-color-primary, #6366f1), var(--mp-color-accent, #10b981));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--mp-color-primary, #6366f1) 40%, transparent);
+  position: relative;
+}
+.bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15));
+  border-radius: 18px;
+}
+.bar-display {
+  flex: 0 0 60px;
+  font-family: var(--mp-font-heading, var(--mp-font-family, Inter, sans-serif));
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--mp-color-accent, #10b981);
+}
+.bar-row:nth-child(2) .bar-fill {
+  background: linear-gradient(90deg, var(--mp-color-secondary, #8b5cf6), var(--mp-color-primary, #6366f1));
+}
+.bar-row:nth-child(3) .bar-fill {
+  background: linear-gradient(90deg, var(--mp-color-accent, #10b981), color-mix(in srgb, var(--mp-color-accent, #10b981) 70%, var(--mp-color-primary, #6366f1)));
+}
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    // Bind data
+    if (data.eyebrow) el.querySelector('.eyebrow').textContent = data.eyebrow;
+    if (data.headline) el.querySelector('.headline').textContent = data.headline;
+
+    var bars = [];
+    for (var i = 1; i <= 5; i++) {
+      var label = data['bar_' + i + '_label'];
+      var value = data['bar_' + i + '_value'];
+      var display = data['bar_' + i + '_display'];
+      var row = el.querySelector('.bar-' + i);
+      if (label && value) {
+        row.querySelector('.bar-label').textContent = label;
+        row.querySelector('.bar-display').textContent = display || (value + '%');
+        row.style.display = 'flex';
+        bars.push({ row: row, fill: row.querySelector('.bar-fill'), value: Number(value) });
+      } else {
+        row.style.display = 'none';
+      }
+    }
+
+    var tl = gsap.timeline();
+    var exitAt = ctx.duration - 0.8;
+
+    // Header entrance
+    tl.from(el.querySelector('.eyebrow'), { autoAlpha: 0, y: 20, duration: 0.4 }, 0.2);
+    tl.from(el.querySelector('.headline'), { autoAlpha: 0, y: 30, duration: 0.5 }, 0.3);
+
+    // Bars grow with stagger
+    bars.forEach(function(b, idx) {
+      var delay = 0.8 + idx * 0.2;
+      tl.from(b.row, { autoAlpha: 0, x: -20, duration: 0.4 }, delay);
+      tl.to(b.fill, { width: b.value + '%', duration: 1.2, ease: 'power3.out' }, delay + 0.1);
+      tl.from(b.row.querySelector('.bar-display'), { autoAlpha: 0, duration: 0.3 }, delay + 0.8);
+    });
+
+    // Exit
+    tl.to(el.querySelector('.content'), { autoAlpha: 0, y: -30, duration: 0.5 }, exitAt);
+
+    return tl;
+  }
+
+  window.__MP_READY = true;
+</script>

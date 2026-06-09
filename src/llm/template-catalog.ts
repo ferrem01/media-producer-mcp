@@ -646,6 +646,54 @@ export const SCENE_TEMPLATES: SceneTemplate[] = [
   },
 
 
+
+  {
+    id: "D6-line-chart",
+    name: "Animated Line Chart",
+    category: "data",
+    when: "Growth trend, revenue curve, performance over time. Data that tells a story of improvement.",
+    feel: "Line draws itself left-to-right like a signature. Dot pulses at the endpoint. Data storytelling.",
+    slots: [
+      { name: "eyebrow", type: "string", required: false, description: "Section label" },
+      { name: "headline", type: "string", required: true, description: "Chart title", example: "Revenue Growth" },
+      { name: "y_label", type: "string", required: false, description: "Y-axis label", example: "Revenue" },
+      { name: "x_labels", type: "string", required: false, description: "Comma-separated X axis labels", example: "Q1,Q2,Q3,Q4" },
+      { name: "data_points", type: "string", required: false, description: "Comma-separated Y values as 0-100 percentages", example: "20,35,55,90" },
+      { name: "highlight_value", type: "string", required: false, description: "Big callout number", example: "+340%" },
+      { name: "highlight_label", type: "string", required: false, description: "Callout description", example: "Year over year" },
+    ],
+    duration: [5, 7] as [number, number],
+    file: "D6-line-chart.scene.html",
+  },
+  {
+    id: "D7-bar-chart",
+    name: "Animated Bar Chart",
+    category: "data",
+    when: "Comparing values across categories. Market share, survey results, performance comparison.",
+    feel: "Bars grow from zero with liquid motion and gradient fills. Clean horizontal bar chart.",
+    slots: [
+      { name: "eyebrow", type: "string", required: false, description: "Section label" },
+      { name: "headline", type: "string", required: true, description: "Chart title", example: "Market Performance" },
+      { name: "bar_1_label", type: "string", required: true, description: "Bar 1 label", example: "Email" },
+      { name: "bar_1_value", type: "number", required: true, description: "Bar 1 width as 0-100", example: "85" },
+      { name: "bar_1_display", type: "string", required: false, description: "Display text", example: "85%" },
+      { name: "bar_2_label", type: "string", required: true, description: "Bar 2 label" },
+      { name: "bar_2_value", type: "number", required: true, description: "Bar 2 width as 0-100" },
+      { name: "bar_2_display", type: "string", required: false, description: "Display text" },
+      { name: "bar_3_label", type: "string", required: true, description: "Bar 3 label" },
+      { name: "bar_3_value", type: "number", required: true, description: "Bar 3 width as 0-100" },
+      { name: "bar_3_display", type: "string", required: false, description: "Display text" },
+      { name: "bar_4_label", type: "string", required: false, description: "Bar 4 label" },
+      { name: "bar_4_value", type: "number", required: false, description: "Bar 4 width as 0-100" },
+      { name: "bar_4_display", type: "string", required: false, description: "Display text" },
+      { name: "bar_5_label", type: "string", required: false, description: "Bar 5 label" },
+      { name: "bar_5_value", type: "number", required: false, description: "Bar 5 width as 0-100" },
+      { name: "bar_5_display", type: "string", required: false, description: "Display text" },
+    ],
+    duration: [5, 7] as [number, number],
+    file: "D7-bar-chart.scene.html",
+  },
+
   // ── SPEAKER ──
   {
     id: "S1-speaker-spotlight",

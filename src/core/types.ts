@@ -138,6 +138,8 @@ export interface Scene {
   content_region?: ContentRegion;
   /** When true, the scene background is rendered transparently (used with full-behind overlays). */
   transparent_background?: boolean;
+  /** Path to stock footage video for scene background */
+  background_video?: string;
 }
 
 // ── Audio ──

@@ -698,6 +698,10 @@ tl.to(el, { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: 1.0, ..
 13. Keep text per scene to max 15 words visible simultaneously
 14. Use autoAlpha instead of opacity for GSAP animations
 15. USE the visual recipes above. Don't just fade text in. Use SplitText, ScrambleText, counter animations, SVG draws, particle effects, spring physics. MAKE IT CINEMATIC.
+16. MANDATORY HEADLINE ANIMATION: Every headline (h1, .headline, .title) MUST use SplitText per-character reveal. Never just fade or slide a headline in as a block. Split it into chars with staggered animation (0.02-0.04s stagger). This single rule makes the difference between "animated slide deck" and "motion graphics video."
+    Example: var split = new SplitText(el.querySelector('.headline'), { type: 'chars' }); tl.from(split.chars, { autoAlpha: 0, y: 30, stagger: 0.03, duration: 0.5, ease: 'back.out(1.7)' }, 0.2);
+17. MANDATORY BODY TEXT: Body text and descriptions should use per-word or per-line reveal (type: 'words' or 'lines'), not per-char. Stagger 0.03-0.06s.
+18. NUMBERS AND STATS: Any number displayed must count up from 0 using gsap.to with a proxy object. Never show a static number that fades in.
 `;
 }
 
@@ -884,6 +888,10 @@ ${SCRIPT_SYSTEM_SKILLS}
 - 80px safe zone from edges
 - MAKE IT CINEMATIC. Apple keynote quality. Not a slide.
 - USE the visual recipes above. SplitText, ScrambleText, counter animations, SVG draws, particle effects, spring physics. Don't just fade text in.
+- MANDATORY: Headlines MUST use SplitText per-character reveal (type: 'chars', stagger 0.02-0.04s). NEVER fade/slide a headline as a block.
+- MANDATORY: Body text uses per-word reveal (type: 'words', stagger 0.03-0.06s). 
+- MANDATORY: Numbers/stats count up from 0 using gsap.to with a proxy object. No static numbers that fade in.
+- These three rules are non-negotiable. They separate "animated slide deck" from "motion graphics video."
 - Every scene should make someone say "wow." That's the bar.
 `;
 }

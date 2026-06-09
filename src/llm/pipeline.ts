@@ -31,6 +31,7 @@ import { loadProject, saveProject } from "../persistence/project.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
+import { fetchStockFootage, generateStockQuery } from "../media/stock-footage.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
 import type { BrandKit, Canvas, OutputFormat, Project, Scene, SceneTransition } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
@@ -61,6 +62,7 @@ export interface PipelineOpts {
   creativity?: number;      // default: 0.5 (0-1, biases library vs custom)
   voiceover?: boolean;      // default: false. Generate TTS voiceover per scene.
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // TTS voice (default: nova)
+  stockFootage?: boolean;   // default: false. Fetch stock video clips for scene backgrounds.
   trace?: TraceBuilder;
 
   // Canvas overrides (any target; for images, overrides prompt inference)
@@ -1328,6 +1330,32 @@ async function runUnifiedPipeline(
   }
   trace?.endEvent({ images: enrichResult.imageUrls.size });
 
+  // 3b. Stock footage backgrounds (optional)
+  var stockFootageMap = new Map<number, string>();
+  if (opts.stockFootage && process.env.PEXELS_API_KEY) {
+    trace?.beginEvent("stock_footage");
+    const stockDir = path.join(projectDir(opts.tenant_id, projectId), "stock");
+    for (let si = 0; si < storyboard.scenes.length; si++) {
+      const planned = storyboard.scenes[si];
+      // Skip intro/outro/breathing scenes and scenes with hero images
+      if (enrichResult.imageUrls.has(si)) continue;
+      if (planned.label?.toLowerCase().includes('intro') || planned.label?.toLowerCase().includes('outro')) continue;
+
+      const query = generateStockQuery(planned.label, planned.description);
+      const clip = await fetchStockFootage({
+        query,
+        minDuration: planned.duration_seconds,
+        outputDir: stockDir,
+        filename: `stock_scene_${si}.mp4`,
+      });
+      if (clip) {
+        stockFootageMap.set(si, clip.localPath);
+      }
+    }
+    console.log(`  Stock footage: ${stockFootageMap.size} clips fetched`);
+    trace?.endEvent({ clips: stockFootageMap.size });
+  }
+
   // 4. Generate scenes (library + custom in one pass)
   trace?.beginEvent("generate_scenes");
   var compDir = path.join(projectDir(opts.tenant_id, projectId), "components");
@@ -1410,13 +1438,17 @@ async function runUnifiedPipeline(
     await Promise.all(batch);
   }
 
-  // Add scenes in order, carrying over voiceover text from planner
+  // Add scenes in order, carrying over voiceover text and stock footage from planner
   for (let si = 0; si < sceneResults.length; si++) {
     const scene = sceneResults[si].scene;
     const planned = storyboard.scenes[si];
     if (planned.voiceover_text) {
       if (!scene.audio_hints) scene.audio_hints = {};
       scene.audio_hints.voiceover_text = planned.voiceover_text;
+    }
+    // Attach stock footage path as scene background video
+    if (stockFootageMap.has(si)) {
+      scene.background_video = stockFootageMap.get(si);
     }
     project.scenes.push(scene);
   }

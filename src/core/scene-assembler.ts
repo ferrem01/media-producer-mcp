@@ -128,6 +128,7 @@ html, body {
   width: ${canvas.width}px;
   height: ${canvas.height}px;
   overflow: hidden;
+  clip-path: inset(0);
   background: ${isTransparent ? 'transparent' : `var(--mp-color-background, ${scene.background || canvas.background || "#000000"})`};
 }
 
@@ -135,6 +136,32 @@ html, body {
 .mp-component {
   position: absolute;
   overflow: hidden;
+}
+
+/* ── Ambient visual layer (continuous flow between scenes) ── */
+.mp-ambient {
+  position: absolute;
+  inset: -50px;
+  width: calc(100% + 100px);
+  height: calc(100% + 100px);
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.12;
+  background:
+    radial-gradient(2px 2px at 20% 30%, var(--mp-color-primary, #6366f1), transparent),
+    radial-gradient(2px 2px at 40% 70%, var(--mp-color-accent, #10b981), transparent),
+    radial-gradient(1.5px 1.5px at 60% 20%, var(--mp-color-primary, #6366f1), transparent),
+    radial-gradient(1.5px 1.5px at 80% 60%, var(--mp-color-accent, #10b981), transparent),
+    radial-gradient(1px 1px at 10% 80%, var(--mp-color-secondary, #8b5cf6), transparent),
+    radial-gradient(1px 1px at 90% 40%, var(--mp-color-secondary, #8b5cf6), transparent),
+    radial-gradient(2.5px 2.5px at 50% 50%, var(--mp-color-primary, #6366f1), transparent);
+  background-size: 100% 100%;
+  animation: mp-ambient-drift 8s ease-in-out infinite alternate;
+}
+@keyframes mp-ambient-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-15px, 10px) scale(1.02); }
+  100% { transform: translate(10px, -15px) scale(1.01); }
 }
 
 /* ── Safety defaults ── */
@@ -170,12 +197,33 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
+<div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
+${isTransparent ? '' : '<div class="mp-ambient"></div>'}
+${scene.background_video ? `<video class="mp-bg-video" src="file://${scene.background_video}" autoplay muted loop playsinline style="position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;opacity:0.35;filter:blur(2px) brightness(0.7);"></video>` : ''}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
 ${buildContentRegionWrapper(scene, componentBlocks)}
+</div>
 
 <script>
 (function() {
   const master = gsap.timeline({ paused: true });
+
+  // ── Camera motion: subtle Ken Burns zoom + drift ──
+  var cameraEl = document.querySelector('.mp-camera');
+  if (cameraEl) {
+    var camDur = ${scene.duration_seconds};
+    // Seed drift direction from scene id for per-scene variety
+    var seed = '${scene.id || "s"}'.split('').reduce(function(a, c) { return a + c.charCodeAt(0); }, 0);
+    var driftX = (seed % 2 === 0 ? 1 : -1) * (4 + (seed % 6));
+    var driftY = (seed % 3 === 0 ? 1 : -1) * (3 + (seed % 5));
+    master.to(cameraEl, {
+      scale: 1.03,
+      x: driftX,
+      y: driftY,
+      duration: camDur,
+      ease: 'none',
+    }, 0);
+  }
 
 ${componentScripts.join("\n\n")}
 
