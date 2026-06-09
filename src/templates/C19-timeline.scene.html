@@ -1,0 +1,336 @@
+<!--
+  Scene Template: C19 - Timeline/Roadmap
+  Category: CONTENT
+  Use when: Horizontal timeline with 3-4 milestones. Roadmap, journey, progress.
+  Feel: Progress, roadmap, journey. Line draws left-to-right with sequential dots.
+  Content slots:
+    - eyebrow: Optional label (e.g. "ROADMAP")
+    - headline: Section heading (e.g. "Our Journey")
+    - point_1_label: Milestone 1 label
+    - point_1_desc: Milestone 1 description
+    - point_2_label: Milestone 2 label
+    - point_2_desc: Milestone 2 description
+    - point_3_label: Milestone 3 label
+    - point_3_desc: Milestone 3 description
+    - point_4_label: Optional milestone 4 label
+    - point_4_desc: Optional milestone 4 description
+  Duration: 5-7s
+-->
+<template>
+  <div class="scene">
+    <!-- Background -->
+    <div class="bg-brand-image"></div>
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Content -->
+    <div class="content">
+      <span class="eyebrow"></span>
+      <h1 class="headline"></h1>
+      <div class="timeline-wrap">
+        <div class="timeline-line">
+          <div class="timeline-line-fill"></div>
+        </div>
+        <div class="milestones">
+          <div class="milestone" data-idx="0">
+            <div class="milestone-dot"></div>
+            <div class="milestone-content milestone-above">
+              <div class="milestone-label"></div>
+              <div class="milestone-desc"></div>
+            </div>
+          </div>
+          <div class="milestone" data-idx="1">
+            <div class="milestone-dot"></div>
+            <div class="milestone-content milestone-below">
+              <div class="milestone-label"></div>
+              <div class="milestone-desc"></div>
+            </div>
+          </div>
+          <div class="milestone" data-idx="2">
+            <div class="milestone-dot"></div>
+            <div class="milestone-content milestone-above">
+              <div class="milestone-label"></div>
+              <div class="milestone-desc"></div>
+            </div>
+          </div>
+          <div class="milestone milestone-4" data-idx="3">
+            <div class="milestone-dot"></div>
+            <div class="milestone-content milestone-below">
+              <div class="milestone-label"></div>
+              <div class="milestone-desc"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .bg-brand-image {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-bg-image, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-color-background, #0a0a0f);
+  }
+
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 60px 100px;
+  }
+
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mp-color-accent, #a78bfa);
+    margin-bottom: 12px;
+  }
+
+  .eyebrow:empty { display: none; }
+
+  .headline {
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 60px 0;
+    text-align: center;
+  }
+
+  .timeline-wrap {
+    position: relative;
+    width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+
+  .timeline-line {
+    position: absolute;
+    left: 5%;
+    right: 5%;
+    top: 50%;
+    height: 3px;
+    background: color-mix(in srgb, var(--mp-color-text, #ffffff) 8%, transparent);
+    border-radius: 2px;
+    transform: translateY(-50%);
+  }
+
+  .timeline-line-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg,
+      var(--mp-color-primary, #6366f1),
+      var(--mp-color-accent, #a78bfa));
+    border-radius: 2px;
+  }
+
+  .milestones {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 5%;
+  }
+
+  .milestone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .milestone-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--mp-color-background, #0a0a0f);
+    border: 3px solid var(--mp-color-primary, #6366f1);
+    z-index: 2;
+    position: relative;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--mp-color-primary, #6366f1) 30%, transparent);
+  }
+
+  .milestone-content {
+    position: absolute;
+    width: 200px;
+    text-align: center;
+  }
+
+  .milestone-above {
+    bottom: calc(100% + 20px);
+  }
+
+  .milestone-below {
+    top: calc(100% + 20px);
+  }
+
+  .milestone-label {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+
+  .milestone-desc {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--mp-color-text-muted, #94a3b8);
+  }
+
+  .milestone-desc:empty { display: none; }
+
+  [data-theme="light"] .bg-gradient { opacity: 0.6; }
+  [data-theme="light"] .bg-noise { opacity: 0.015; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var eyebrow = el.querySelector('.eyebrow');
+    var headline = el.querySelector('.headline');
+    var lineFill = el.querySelector('.timeline-line-fill');
+    var milestones = el.querySelectorAll('.milestone');
+    var milestone4 = el.querySelector('.milestone-4');
+    var dots = el.querySelectorAll('.milestone-dot');
+    var contents = el.querySelectorAll('.milestone-content');
+
+    // Populate
+    if (data.eyebrow) eyebrow.textContent = data.eyebrow;
+    headline.textContent = data.headline || 'Timeline';
+
+    var points = [
+      { label: data.point_1_label, desc: data.point_1_desc },
+      { label: data.point_2_label, desc: data.point_2_desc },
+      { label: data.point_3_label, desc: data.point_3_desc },
+      { label: data.point_4_label, desc: data.point_4_desc }
+    ];
+
+    // Hide 4th milestone if no data
+    if (!data.point_4_label) {
+      milestone4.style.display = 'none';
+    }
+
+    milestones.forEach(function(ms, i) {
+      if (points[i]) {
+        ms.querySelector('.milestone-label').textContent = points[i].label || '';
+        ms.querySelector('.milestone-desc').textContent = points[i].desc || '';
+      }
+    });
+
+    var activePoints = data.point_4_label ? 4 : 3;
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Initial states
+    gsap.set(eyebrow, { autoAlpha: 0, y: -10 });
+    gsap.set(headline, { autoAlpha: 0, y: 20, filter: 'blur(4px)' });
+    gsap.set(dots, { autoAlpha: 0, scale: 0 });
+    gsap.set(contents, { autoAlpha: 0, y: function(i) {
+      return i % 2 === 0 ? 15 : -15;
+    }});
+
+    // Eyebrow
+    if (data.eyebrow) {
+      tl.to(eyebrow, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.3,
+        ease: 'power2.out'
+      }, 0.1);
+    }
+
+    // Headline
+    tl.to(headline, {
+      autoAlpha: 1, y: 0, filter: 'blur(0px)',
+      duration: speed * 0.5,
+      ease: 'power3.out'
+    }, 0.15);
+
+    // Line draws
+    tl.to(lineFill, {
+      width: '100%',
+      duration: speed * 2.0,
+      ease: 'power2.inOut'
+    }, 0.6);
+
+    // Dots and content appear sequentially
+    for (var i = 0; i < activePoints; i++) {
+      var delay = 0.7 + i * 0.4;
+      (function(idx, d) {
+        tl.to(dots[idx], {
+          autoAlpha: 1, scale: 1,
+          duration: speed * 0.35,
+          ease: 'back.out(2)'
+        }, d);
+        tl.to(contents[idx], {
+          autoAlpha: 1, y: 0,
+          duration: speed * 0.4,
+          ease: 'power2.out'
+        }, d + 0.15);
+      })(i, delay);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to(contents, {
+        autoAlpha: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt);
+      tl.to(dots, {
+        autoAlpha: 0, scale: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt + 0.05);
+      tl.to(lineFill, {
+        width: '0%',
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt + 0.05);
+      tl.to([headline, eyebrow], {
+        autoAlpha: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+
+  window.__MP_READY = true;
+</script>

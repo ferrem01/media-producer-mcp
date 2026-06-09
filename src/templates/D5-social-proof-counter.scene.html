@@ -1,0 +1,351 @@
+<!--
+  Scene Template: D5 - Social Proof Counter
+  Category: DATA
+  Use when: Large animated counters showing scale/trust numbers. Three big numbers.
+  Feel: Scale, trust, "we're big and reliable." Counters animate up from zero.
+  Content slots:
+    - eyebrow: Optional label (e.g. "BY THE NUMBERS")
+    - headline: Optional heading
+    - counter_1_value: Number to count to (e.g. 50000)
+    - counter_1_suffix: Suffix (e.g. "+", "K", "M")
+    - counter_1_label: Label (e.g. "Active Users")
+    - counter_2_value: Number
+    - counter_2_suffix: Suffix
+    - counter_2_label: Label
+    - counter_3_value: Number
+    - counter_3_suffix: Suffix
+    - counter_3_label: Label
+  Duration: 5-7s
+-->
+<template>
+  <div class="scene">
+    <!-- Background -->
+    <div class="bg-brand-image"></div>
+    <div class="bg-gradient"></div>
+    <div class="bg-glow"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Content -->
+    <div class="content">
+      <span class="eyebrow"></span>
+      <h1 class="headline"></h1>
+      <div class="counters-row">
+        <div class="counter-block" data-idx="0">
+          <div class="counter-value-wrap">
+            <span class="counter-number">0</span>
+            <span class="counter-suffix"></span>
+          </div>
+          <div class="counter-label"></div>
+        </div>
+        <div class="counter-divider"></div>
+        <div class="counter-block" data-idx="1">
+          <div class="counter-value-wrap">
+            <span class="counter-number">0</span>
+            <span class="counter-suffix"></span>
+          </div>
+          <div class="counter-label"></div>
+        </div>
+        <div class="counter-divider"></div>
+        <div class="counter-block" data-idx="2">
+          <div class="counter-value-wrap">
+            <span class="counter-number">0</span>
+            <span class="counter-suffix"></span>
+          </div>
+          <div class="counter-label"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .bg-brand-image {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-bg-image, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 50%,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 8%, transparent) 0%,
+      var(--mp-color-background, #0a0a0f) 70%);
+  }
+
+  .bg-glow {
+    position: absolute;
+    width: 600px;
+    height: 400px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 10%, transparent) 0%,
+      transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+  }
+
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+  }
+
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mp-color-accent, #a78bfa);
+    margin-bottom: 12px;
+  }
+
+  .eyebrow:empty { display: none; }
+
+  .headline {
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 56px 0;
+    text-align: center;
+  }
+
+  .headline:empty { display: none; }
+
+  .counters-row {
+    display: flex;
+    align-items: center;
+    gap: 60px;
+  }
+
+  .counter-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 280px;
+  }
+
+  .counter-divider {
+    width: 1px;
+    height: 100px;
+    background: linear-gradient(180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--mp-color-text, #ffffff) 12%, transparent) 50%,
+      transparent 100%);
+  }
+
+  .counter-value-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .counter-number {
+    font-size: 108px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(135deg,
+      var(--mp-color-text, #ffffff) 30%,
+      var(--mp-color-accent, #a78bfa) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 40px color-mix(in srgb, var(--mp-color-accent, #a78bfa) 25%, transparent));
+  }
+
+  .counter-suffix {
+    font-size: 64px;
+    font-weight: 300;
+    line-height: 1;
+    background: linear-gradient(135deg,
+      var(--mp-color-accent, #a78bfa) 0%,
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 70%, white) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .counter-suffix:empty { display: none; }
+
+  .counter-label {
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--mp-color-text-muted, #94a3b8);
+    margin-top: 16px;
+    text-align: center;
+  }
+
+  .counter-label:empty { display: none; }
+
+  [data-theme="light"] .bg-gradient { opacity: 0.6; }
+  [data-theme="light"] .bg-glow { opacity: 0.15; }
+  [data-theme="light"] .bg-noise { opacity: 0.015; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var eyebrow = el.querySelector('.eyebrow');
+    var headline = el.querySelector('.headline');
+    var blocks = el.querySelectorAll('.counter-block');
+    var dividers = el.querySelectorAll('.counter-divider');
+    var glow = el.querySelector('.bg-glow');
+
+    // Populate
+    if (data.eyebrow) eyebrow.textContent = data.eyebrow;
+    if (data.headline) headline.textContent = data.headline;
+
+    var counters = [
+      { value: data.counter_1_value, suffix: data.counter_1_suffix, label: data.counter_1_label },
+      { value: data.counter_2_value, suffix: data.counter_2_suffix, label: data.counter_2_label },
+      { value: data.counter_3_value, suffix: data.counter_3_suffix, label: data.counter_3_label }
+    ];
+
+    blocks.forEach(function(block, i) {
+      var c = counters[i] || {};
+      if (c.suffix) block.querySelector('.counter-suffix').textContent = c.suffix;
+      if (c.label) block.querySelector('.counter-label').textContent = c.label;
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Initial states
+    gsap.set(eyebrow, { autoAlpha: 0, y: -10 });
+    gsap.set(headline, { autoAlpha: 0, y: 15 });
+    gsap.set(blocks, { autoAlpha: 0, y: 40 });
+    gsap.set(dividers, { autoAlpha: 0, scaleY: 0 });
+    gsap.set(glow, { scale: 0.5, autoAlpha: 0 });
+
+    // Eyebrow
+    if (data.eyebrow) {
+      tl.to(eyebrow, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.3,
+        ease: 'power2.out'
+      }, 0.1);
+    }
+
+    // Headline
+    if (data.headline) {
+      tl.to(headline, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.4,
+        ease: 'power2.out'
+      }, 0.15);
+    }
+
+    // Glow
+    tl.to(glow, {
+      scale: 1.2, autoAlpha: 1,
+      duration: speed * 1.2,
+      ease: 'power2.out'
+    }, 0.2);
+
+    // Blocks stagger in and count up
+    blocks.forEach(function(block, i) {
+      var c = counters[i] || {};
+      var numEl = block.querySelector('.counter-number');
+      var targetValue = parseFloat(c.value) || 0;
+      var delay = 0.4 + i * 0.2;
+
+      tl.to(block, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.5,
+        ease: 'power3.out'
+      }, delay);
+
+      // Count up animation
+      var counter = { val: 0 };
+      tl.to(counter, {
+        val: targetValue,
+        duration: speed * 1.8,
+        ease: 'power2.out',
+        onUpdate: function() {
+          if (targetValue % 1 !== 0) {
+            numEl.textContent = counter.val.toFixed(1);
+          } else {
+            numEl.textContent = Math.round(counter.val).toLocaleString();
+          }
+        }
+      }, delay + 0.1);
+    });
+
+    // Dividers
+    dividers.forEach(function(div, i) {
+      tl.to(div, {
+        autoAlpha: 1, scaleY: 1,
+        duration: speed * 0.5,
+        ease: 'power2.out'
+      }, 0.5 + i * 0.2);
+    });
+
+    // Glow pulse
+    tl.to(glow, {
+      scale: 1.4, autoAlpha: 0.6,
+      duration: 2.5, ease: 'sine.inOut',
+      yoyo: true, repeat: -1
+    }, 2);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to(glow, {
+        autoAlpha: 0, scale: 0.5,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt);
+      tl.to(dividers, {
+        autoAlpha: 0, scaleY: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt);
+      blocks.forEach(function(block, i) {
+        tl.to(block, {
+          autoAlpha: 0, y: -20,
+          duration: 0.35,
+          ease: 'power2.in'
+        }, exitAt + 0.05 + i * 0.04);
+      });
+      tl.to([headline, eyebrow], {
+        autoAlpha: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+
+  window.__MP_READY = true;
+</script>

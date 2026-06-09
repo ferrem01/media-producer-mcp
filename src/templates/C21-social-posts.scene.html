@@ -1,0 +1,358 @@
+<!--
+  Scene Template: C21 - Social Posts Wall
+  Category: CONTENT
+  Use when: Grid of social media post cards showing customer/user posts. Social proof.
+  Feel: Social proof, community, real user voices. Tweet-like cards with glassmorphism.
+  Content slots:
+    - eyebrow: Optional label (e.g. "WHAT PEOPLE SAY")
+    - headline: Optional heading
+    - post_1_avatar: Initials for avatar
+    - post_1_name: Display name
+    - post_1_handle: @handle
+    - post_1_text: Post text
+    - post_1_likes: Like count
+    - post_2_avatar, post_2_name, post_2_handle, post_2_text, post_2_likes
+    - post_3_avatar, post_3_name, post_3_handle, post_3_text, post_3_likes
+  Duration: 5-7s
+-->
+<template>
+  <div class="scene">
+    <!-- Background -->
+    <div class="bg-brand-image"></div>
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Content -->
+    <div class="content">
+      <span class="eyebrow"></span>
+      <h1 class="headline"></h1>
+      <div class="posts-row">
+        <div class="post-card" data-idx="0">
+          <div class="post-header">
+            <div class="post-avatar"></div>
+            <div class="post-user">
+              <div class="post-name"></div>
+              <div class="post-handle"></div>
+            </div>
+          </div>
+          <div class="post-text"></div>
+          <div class="post-footer">
+            <div class="post-likes">
+              <svg class="heart-icon" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              <span class="likes-count"></span>
+            </div>
+          </div>
+        </div>
+        <div class="post-card" data-idx="1">
+          <div class="post-header">
+            <div class="post-avatar"></div>
+            <div class="post-user">
+              <div class="post-name"></div>
+              <div class="post-handle"></div>
+            </div>
+          </div>
+          <div class="post-text"></div>
+          <div class="post-footer">
+            <div class="post-likes">
+              <svg class="heart-icon" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              <span class="likes-count"></span>
+            </div>
+          </div>
+        </div>
+        <div class="post-card" data-idx="2">
+          <div class="post-header">
+            <div class="post-avatar"></div>
+            <div class="post-user">
+              <div class="post-name"></div>
+              <div class="post-handle"></div>
+            </div>
+          </div>
+          <div class="post-text"></div>
+          <div class="post-footer">
+            <div class="post-likes">
+              <svg class="heart-icon" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              <span class="likes-count"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .bg-brand-image {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-bg-image, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-color-background, #0a0a0f);
+  }
+
+  .bg-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 60px 80px;
+  }
+
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mp-color-accent, #a78bfa);
+    margin-bottom: 12px;
+  }
+
+  .eyebrow:empty { display: none; }
+
+  .headline {
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 40px 0;
+    text-align: center;
+  }
+
+  .headline:empty { display: none; }
+
+  .posts-row {
+    display: flex;
+    gap: 24px;
+    width: 100%;
+    max-width: 1200px;
+    flex: 1;
+    align-items: stretch;
+  }
+
+  .post-card {
+    flex: 1;
+    background: color-mix(in srgb, var(--mp-color-surface, #1a1a2e) 50%, transparent);
+    border: 1px solid rgba(var(--mp-color-text-rgb, "255,255,255"), 0.08);
+    border-radius: 16px;
+    padding: 28px;
+    backdrop-filter: blur(16px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .post-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .post-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 30%, transparent),
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 25%, transparent));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--mp-color-accent, #a78bfa);
+    flex-shrink: 0;
+  }
+
+  .post-user {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .post-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--mp-color-text, #ffffff);
+    line-height: 1.3;
+  }
+
+  .post-handle {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--mp-color-text-muted, #94a3b8);
+  }
+
+  .post-text {
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.55;
+    color: var(--mp-color-text, #ffffff);
+    opacity: 0.9;
+    flex: 1;
+  }
+
+  .post-footer {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(var(--mp-color-text-rgb, "255,255,255"), 0.06);
+  }
+
+  .post-likes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .heart-icon {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: #ef4444;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .likes-count {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mp-color-text-muted, #94a3b8);
+  }
+
+  .likes-count:empty { display: none; }
+
+  [data-theme="light"] .bg-gradient { opacity: 0.6; }
+  [data-theme="light"] .bg-noise { opacity: 0.015; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var eyebrow = el.querySelector('.eyebrow');
+    var headline = el.querySelector('.headline');
+    var cards = el.querySelectorAll('.post-card');
+    var hearts = el.querySelectorAll('.heart-icon');
+
+    // Populate
+    if (data.eyebrow) eyebrow.textContent = data.eyebrow;
+    if (data.headline) headline.textContent = data.headline;
+
+    var posts = [
+      { avatar: data.post_1_avatar, name: data.post_1_name, handle: data.post_1_handle, text: data.post_1_text, likes: data.post_1_likes },
+      { avatar: data.post_2_avatar, name: data.post_2_name, handle: data.post_2_handle, text: data.post_2_text, likes: data.post_2_likes },
+      { avatar: data.post_3_avatar, name: data.post_3_name, handle: data.post_3_handle, text: data.post_3_text, likes: data.post_3_likes }
+    ];
+
+    cards.forEach(function(card, i) {
+      var p = posts[i] || {};
+      card.querySelector('.post-avatar').textContent = p.avatar || '';
+      card.querySelector('.post-name').textContent = p.name || 'User';
+      card.querySelector('.post-handle').textContent = p.handle ? '@' + p.handle.replace(/^@/, '') : '';
+      card.querySelector('.post-text').textContent = p.text || '';
+      card.querySelector('.likes-count').textContent = p.likes || '';
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+
+    // Initial states
+    gsap.set(eyebrow, { autoAlpha: 0, y: -10 });
+    gsap.set(headline, { autoAlpha: 0, y: 15 });
+    gsap.set(cards, { autoAlpha: 0, y: 50 });
+    gsap.set(hearts, { scale: 0 });
+
+    // Eyebrow
+    if (data.eyebrow) {
+      tl.to(eyebrow, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.3,
+        ease: 'power2.out'
+      }, 0.1);
+    }
+
+    // Headline
+    if (data.headline) {
+      tl.to(headline, {
+        autoAlpha: 1, y: 0,
+        duration: speed * 0.4,
+        ease: 'power2.out'
+      }, 0.15);
+    }
+
+    // Cards stagger in from bottom
+    tl.to(cards, {
+      autoAlpha: 1, y: 0,
+      duration: speed * 0.6,
+      stagger: 0.15,
+      ease: 'power3.out'
+    }, 0.4);
+
+    // Hearts pulse on appearance
+    hearts.forEach(function(heart, i) {
+      tl.to(heart, {
+        scale: 1,
+        duration: speed * 0.3,
+        ease: 'back.out(2)'
+      }, 0.7 + i * 0.15);
+      // Pulse
+      tl.to(heart, {
+        scale: 1.3,
+        duration: 0.15,
+        ease: 'power2.out',
+        yoyo: true,
+        repeat: 1
+      }, 0.9 + i * 0.15);
+    });
+
+    // Fill hearts with red after pulse
+    hearts.forEach(function(heart, i) {
+      tl.to(heart, {
+        fill: '#ef4444',
+        duration: 0.01
+      }, 1.0 + i * 0.15);
+    });
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.8;
+      tl.to(cards, {
+        autoAlpha: 0, y: -20,
+        duration: 0.35, stagger: 0.05,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to([headline, eyebrow], {
+        autoAlpha: 0,
+        duration: 0.3, ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+
+  window.__MP_READY = true;
+</script>
