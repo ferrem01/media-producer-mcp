@@ -1,0 +1,19 @@
+{
+  "category": "media",
+  "label": "Asset Placeholder",
+  "description": "Gray placeholder indicating a missing asset. Shows what type of asset is needed (screenshot, screen recording, photo, etc.) with a text description.",
+  "data": {
+    "text": {
+      "type": "string",
+      "required": true,
+      "label": "Description of the needed asset",
+      "placeholder": "Screenshot of the analytics dashboard with real data"
+    },
+    "asset_type": {
+      "type": "string",
+      "optional": true,
+      "label": "Asset type label",
+      "placeholder": "Screenshot"
+    }
+  }
+}

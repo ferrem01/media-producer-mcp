@@ -1671,8 +1671,34 @@ function buildPromptFromPlan(plan: import("./core/types.js").ProjectPlan, brief?
     prompt += `  Template: ${s.template}\n`;
     prompt += `  Duration: ${s.duration_seconds}s\n`;
     if (s.voiceover_text) prompt += `  Voiceover: "${s.voiceover_text}"\n`;
-    prompt += `  Visuals: ${s.visual_notes}\n\n`;
+    prompt += `  Visuals: ${s.visual_notes}\n`;
+
+    // Asset directives
+    if (s.assets && s.assets.length > 0) {
+      for (const asset of s.assets) {
+        if (asset.status === "provided" && asset.path) {
+          // Real asset -- tell the planner to use it
+          if (asset.type === "screen_recording" || asset.type === "camera_video") {
+            prompt += `  ASSET: Use video component with src="${asset.path}"\n`;
+          } else if (asset.type === "screenshot" || asset.type === "photo" || asset.type === "product_shot") {
+            prompt += `  ASSET: Use image component with src="${asset.path}"\n`;
+          }
+        } else if (asset.status === "needed" || asset.status === "fallback") {
+          // Missing asset -- use placeholder component
+          const typeLabel = asset.type.replace(/_/g, " ");
+          prompt += `  ASSET MISSING: Use an asset-placeholder component with data: { "text": "${asset.description}", "asset_type": "${typeLabel}" }. Do NOT generate a mockup -- use the asset-placeholder component.\n`;
+        } else if (asset.status === "generated" && asset.path) {
+          // AI-generated asset
+          prompt += `  ASSET: Use image component with src="${asset.path}"\n`;
+        }
+      }
+    }
+
+    prompt += "\n";
   }
+
+  prompt += `\n## Asset Placeholder Rule\n`;
+  prompt += `When a scene has a MISSING ASSET directive, you MUST use the "asset-placeholder" component type with the specified text and asset_type in the data object. Do NOT attempt to generate HTML mockups, fake dashboards, or UI simulations. Use the asset-placeholder component exactly as directed.\n\n`;
 
   prompt += `Music mood: ${plan.audio.music_mood}\n`;
   prompt += `Pacing: ${plan.audio.pacing}\n`;
