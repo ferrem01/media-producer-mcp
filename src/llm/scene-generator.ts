@@ -316,5 +316,68 @@ function stripHtmlFences(raw: string): string {
     if (lastFence > -1) trimmed = trimmed.substring(0, lastFence);
     trimmed = trimmed.trim();
   }
-  return trimmed;
+  return repairTruncatedComponent(trimmed);
+}
+
+/**
+ * Repair components truncated by LLM max token limits.
+ * Detects missing closing tags and appends minimal valid closers.
+ */
+function repairTruncatedComponent(html: string): string {
+  const hasTemplate = /<template[^>]*>/i.test(html);
+  const hasTemplateClose = /<\/template>/i.test(html);
+  const hasStyle = /<style[^>]*>/i.test(html);
+  const hasStyleClose = /<\/style>/i.test(html);
+  const hasScript = /<script[^>]*>/i.test(html);
+  const hasScriptClose = /<\/script>/i.test(html);
+
+  let repaired = false;
+
+  // If we have opening tags but missing closers, the LLM was truncated
+  if (hasStyle && !hasStyleClose) {
+    // Truncated in <style> - close it and add remaining sections
+    html += "\n}\n</style>";
+    repaired = true;
+  }
+
+  if (hasScript && !hasScriptClose) {
+    // Truncated in <script> - close the function and tag
+    // Try to close any open braces
+    const openBraces = (html.match(/\{/g) || []).length;
+    const closeBraces = (html.match(/\}/g) || []).length;
+    const unclosed = openBraces - closeBraces;
+    if (unclosed > 0) {
+      html += "\n" + "}\n".repeat(unclosed);
+    }
+    html += "\n</script>";
+    repaired = true;
+  }
+
+  if (hasTemplate && !hasTemplateClose) {
+    // Truncated in <template> - close open divs and template
+    const openDivs = (html.match(/<div[^>]*>/gi) || []).length;
+    const closeDivs = (html.match(/<\/div>/gi) || []).length;
+    const unclosedDivs = openDivs - closeDivs;
+    if (unclosedDivs > 0) {
+      html += "\n" + "</div>\n".repeat(unclosedDivs);
+    }
+    html += "\n</template>";
+    repaired = true;
+  }
+
+  // If missing entire sections, add stubs
+  if (!hasTemplate) {
+    html = "<template><div class=\"scene\"></div></template>\n" + html;
+    repaired = true;
+  }
+  if (!hasScript) {
+    html += "\n<script>\nfunction createTimeline(el, data, ctx) { return gsap.timeline(); }\n</script>";
+    repaired = true;
+  }
+
+  if (repaired) {
+    console.warn("  Warning: repaired truncated component (LLM hit max tokens)");
+  }
+
+  return html;
 }
