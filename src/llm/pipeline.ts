@@ -1602,8 +1602,7 @@ async function runUnifiedPipeline(
       // ── Background music with ducking ──
       if (opts.backgroundMusic) {
         try {
-          const { searchMusic, downloadTrack } = await import("../audio/music.js");
-          const musicDir = path.join(projectDir(opts.tenant_id, projectId), "music");
+          const { selectMusic } = await import("../audio/music.js");
 
           // Determine mood from prompt
           const promptLower = richPrompt.toLowerCase();
@@ -1616,21 +1615,20 @@ async function runUnifiedPipeline(
           console.log(`  Background music: searching for "${mood}" mood...`);
 
           const totalDuration = project.scenes.reduce((sum: number, s: any) => sum + s.duration_seconds, 0);
-          const results = await searchMusic(mood, {
-            duration_min: Math.max(30, Math.floor(totalDuration * 0.8)),
-            duration_max: totalDuration * 3,
-            limit: 3,
+          const track = await selectMusic({
+            mood,
+            brandKit,
+            tenantId: opts.tenant_id,
+            minDuration: Math.max(30, Math.floor(totalDuration * 0.8)),
           });
 
-          if (results.length > 0) {
-            const track = results[0];
-            console.log(`  Background music: "${track.name}" by ${track.artist} (${track.duration}s)`);
-            const musicPath = await downloadTrack(track.id, path.join(musicDir, "bgm.mp3"));
+          if (track) {
+            console.log(`  Background music: "${track.title}" by ${track.artist} [${track.source}] (${track.duration}s)`);
 
             project.audio.tracks.push({
               id: "bgm",
               type: "music" as const,
-              source: musicPath,
+              source: track.path,
               volume: 0.12,
               start_time: 0,
               loop: true,
@@ -1645,9 +1643,9 @@ async function runUnifiedPipeline(
               release: 0.8,
             };
 
-            console.log(`  Background music: added with ducking (0.12 → 0.04 during voiceover)`);
+            console.log(`  Background music: added with ducking (0.12 -> 0.04 during voiceover)`);
           } else {
-            console.log("  Background music: no tracks found, skipping");
+            console.log("  Background music: no tracks found from any source, skipping");
           }
         } catch (e: any) {
           console.warn(`  Background music failed (non-fatal): ${e.message}`);
