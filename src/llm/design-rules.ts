@@ -162,6 +162,16 @@ Score each scene against these criteria:
 - Brand colors are used consistently
 - No jarring color combinations
 
+### Card & Container Visibility (CRITICAL -- #1 missed issue)
+- Cards, panels, and containers MUST be clearly distinguishable from the canvas background
+- A card with rgba(255,255,255,0.05) on a light (#f8fafc) background is INVISIBLE. Score <= 5.
+- A card with rgba(255,255,255,0.03) on ANY background lighter than #333 is INVISIBLE. Score <= 5.
+- Glassmorphism/frosted-glass cards ONLY work on dark backgrounds (background luminance < 30%)
+- On light backgrounds, cards need: solid background (var(--mp-color-surface)), visible border (1px solid rgba(0,0,0,0.1)), or box-shadow
+- If you cannot clearly see where a card STARTS and the background ENDS, the card is invisible. Flag it.
+- Semi-transparent overlays on cards must have enough opacity to create a visible boundary (minimum rgba(0,0,0,0.08) on light bg or rgba(255,255,255,0.08) on dark bg)
+- Text INSIDE invisible cards inherits the contrast problem -- if the card is invisible, the text on it is unreadable
+
 ### Animation Quality
 - Elements animate in smoothly (not instant pop)
 - Stagger timing feels natural (not too fast, not too slow)

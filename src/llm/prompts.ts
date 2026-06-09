@@ -91,6 +91,22 @@ You MUST output a single .component.html file with exactly three sections:
    
    When in doubt: use var(--mp-color-text) (adapts to the scene background).
 
+   ## CARD & CONTAINER VISIBILITY RULES (READ THIS -- #2 CAUSE OF REJECTED SCENES)
+   
+   Cards and containers MUST be visually distinct from the background. If a card blends into the canvas, it's broken.
+   
+   ✅ SAFE PATTERNS:
+   - Dark background: cards with rgba(255,255,255,0.06)+ AND border: 1px solid rgba(255,255,255,0.08)+ AND backdrop-filter
+   - Light background: cards with var(--mp-color-surface) (solid), border: 1px solid rgba(0,0,0,0.08)+, box-shadow
+   - ANY background: cards with visible box-shadow (0 4px 24px rgba(0,0,0,0.1)+)
+   
+   ❌ PATTERNS THAT WILL GET YOUR SCENE REJECTED:
+   - rgba(255,255,255,0.03-0.05) cards on light backgrounds -- completely invisible
+   - Cards with no border, no shadow, and near-transparent backgrounds
+   - Glassmorphism on light backgrounds (it only works on dark backgrounds)
+   - Cards where the background color matches the canvas color
+   - Text floating in space because its container card is invisible
+
 4. Use {{key}} for simple text binding in templates.
    For dynamic content (lists, complex DOM), build elements in createTimeline.
 
@@ -285,6 +301,9 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 - If the headline is not prominently visible and immediately readable: score MUST be 5 or below.
 - If content from the original prompt is missing (headline, CTA, logos that were requested): score MUST be 4 or below.
 - A beautiful image with unreadable text is NOT a 7 or 8. Readability is the #1 priority.
+- If cards/panels/containers are nearly invisible against the background (same color, transparent, or barely distinguishable): score MUST be 5 or below. Glassmorphism that makes cards disappear is a layout failure, not a style choice.
+- If you see white or very light cards on a white/light background with no visible border or shadow: score MUST be 4 or below. The card is invisible.
+- Check the PREVIEW IMAGE, not just the HTML. If cards look like they blend into the background in the rendered image, they ARE invisible regardless of what the CSS says.
 
 ## Rules
 
@@ -638,14 +657,22 @@ for (var i = 0; i < 25; i++) {
 }
 \`\`\`
 
-### Glass card with ambient glow
+### Glass card with ambient glow (DARK BACKGROUNDS ONLY)
 \`\`\`css
+/* Use this ONLY on dark backgrounds. On light backgrounds, use solid surface colors with borders. */
 .card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 20px;
   backdrop-filter: blur(20px);
   box-shadow: 0 25px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+/* On LIGHT backgrounds, use this instead: */
+.card-light {
+  background: var(--mp-color-surface);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
 }
 \`\`\`
 
@@ -826,6 +853,14 @@ highlightDraw(tl, el.querySelector('.keyword'), 1.5, 0.5, 'rgba(167,139,250,0.3)
 - NEVER use var(--mp-color-primary) or var(--mp-color-accent) as the ONLY text color without verifying contrast against your chosen background.
 - Text over images/gradients MUST have either: text-shadow (0 2px 8px rgba(0,0,0,0.8)) OR a scrim behind it.
 - MENTALLY CHECK: what color is YOUR background? What color is YOUR text? Is the contrast ratio above 4.5:1? If not, fix it.
+
+## CARD & CONTAINER VISIBILITY (scenes get REJECTED for invisible cards)
+- Cards and panels MUST be visually distinct from the canvas background.
+- On DARK backgrounds: glassmorphism works. Use rgba(255,255,255,0.06)+ with border and backdrop-filter.
+- On LIGHT backgrounds: glassmorphism DOES NOT WORK. Use solid var(--mp-color-surface), visible borders (1px solid rgba(0,0,0,0.08)+), and box-shadows.
+- If you cannot tell where the card ends and the background begins, the card is INVISIBLE and the scene WILL BE REJECTED.
+- MENTALLY CHECK: what color is your canvas? What color are your cards? Can you see the card boundaries? If not, add borders, shadows, or darken the card background.
+- rgba(255,255,255,0.03) on a #f8fafc background = INVISIBLE CARD = REJECTED SCENE.
 
 ## Logo Integration
 - For external logos, use logo.dev: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark
