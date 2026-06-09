@@ -1309,7 +1309,7 @@ export function createMcpServer(): McpServer {
               });
 
               // Copy generated scenes, audio, and assets from the new project back to the original planned project
-              const newProjectId = (pipelineResult as any)?.project_id;
+              const newProjectId = (pipelineResult as any)?.projectId || (pipelineResult as any)?.project_id;
               if (newProjectId && newProjectId !== params.project_id) {
                 const newProject = await loadProject(params.tenant_id, newProjectId);
                 const origProject = await loadProject(params.tenant_id, params.project_id!);
@@ -1450,8 +1450,8 @@ export function createMcpServer(): McpServer {
             });
 
             // If pipeline created a project, track the projectId
-            if (pipelineResult && typeof pipelineResult === "object" && "project_id" in (pipelineResult as any)) {
-              j.projectId = (pipelineResult as any).project_id;
+            if (pipelineResult && typeof pipelineResult === "object") {
+              j.projectId = (pipelineResult as any).projectId || (pipelineResult as any).project_id;
             }
 
             j.progress = { step: "complete", percent: 100 };
