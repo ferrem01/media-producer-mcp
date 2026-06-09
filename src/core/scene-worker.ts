@@ -126,6 +126,7 @@ async function main() {
     var source = await findComponentSource(type, args.componentLibDir, args.extraComponentDirs);
     if (source) {
       components.push({ type, source });
+      console.log(`  Loaded component "${type}" (${source.length} chars, has <script>: ${source.includes('<script>')})`);
     } else {
       console.log(`  Component type "${type}" not found, skipping`);
     }
