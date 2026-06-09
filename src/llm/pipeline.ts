@@ -63,6 +63,7 @@ export interface PipelineOpts {
   voiceover?: boolean;      // default: false. Generate TTS voiceover per scene.
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // TTS voice (default: nova)
   stockFootage?: boolean;   // default: false. Fetch stock video clips for scene backgrounds.
+  backgroundMusic?: boolean;  // default: false. Add background music with voiceover ducking.
   trace?: TraceBuilder;
 
   // Canvas overrides (any target; for images, overrides prompt inference)
@@ -1597,6 +1598,61 @@ async function runUnifiedPipeline(
       }
 
       console.log(`  Voiceover: generated ${voicePaths.filter(p => p).length} TTS clips`);
+
+      // ── Background music with ducking ──
+      if (opts.backgroundMusic) {
+        try {
+          const { searchMusic, downloadTrack } = await import("../audio/music.js");
+          const musicDir = path.join(projectDir(opts.tenant_id, projectId), "music");
+
+          // Determine mood from prompt
+          const promptLower = richPrompt.toLowerCase();
+          let mood = "corporate";
+          if (promptLower.includes("exciting") || promptLower.includes("launch") || promptLower.includes("announcement")) mood = "upbeat";
+          else if (promptLower.includes("calm") || promptLower.includes("elegant") || promptLower.includes("premium")) mood = "calm";
+          else if (promptLower.includes("tech") || promptLower.includes("ai") || promptLower.includes("data")) mood = "electronic";
+          else if (promptLower.includes("emotion") || promptLower.includes("story") || promptLower.includes("inspire")) mood = "inspiring";
+
+          console.log(`  Background music: searching for "${mood}" mood...`);
+
+          const totalDuration = project.scenes.reduce((sum: number, s: any) => sum + s.duration_seconds, 0);
+          const results = await searchMusic(mood, {
+            duration_min: Math.max(30, Math.floor(totalDuration * 0.8)),
+            duration_max: totalDuration * 3,
+            limit: 3,
+          });
+
+          if (results.length > 0) {
+            const track = results[0];
+            console.log(`  Background music: "${track.name}" by ${track.artist} (${track.duration}s)`);
+            const musicPath = await downloadTrack(track.id, path.join(musicDir, "bgm.mp3"));
+
+            project.audio.tracks.push({
+              id: "bgm",
+              type: "music" as const,
+              source: musicPath,
+              volume: 0.12,
+              start_time: 0,
+              loop: true,
+              fade_in: 2,
+              fade_out: 3,
+            });
+
+            // Add ducking config to project audio
+            (project.audio as any).ducking = {
+              music_volume_during_voiceover: 0.04,
+              attack: 0.3,
+              release: 0.8,
+            };
+
+            console.log(`  Background music: added with ducking (0.12 → 0.04 during voiceover)`);
+          } else {
+            console.log("  Background music: no tracks found, skipping");
+          }
+        } catch (e: any) {
+          console.warn(`  Background music failed (non-fatal): ${e.message}`);
+        }
+      }
     } catch (e: any) {
       console.warn(`  Voiceover generation failed (non-fatal): ${e.message}`);
     }
