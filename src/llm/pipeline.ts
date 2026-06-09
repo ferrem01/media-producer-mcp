@@ -31,6 +31,7 @@ import { loadProject, saveProject } from "../persistence/project.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
+import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
 import type { BrandKit, Canvas, OutputFormat, Project, Scene, SceneTransition } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
@@ -58,6 +59,8 @@ export interface PipelineOpts {
   sceneCount?: number;      // planner decides if not set
   generateImages?: boolean; // default: true
   creativity?: number;      // default: 0.5 (0-1, biases library vs custom)
+  voiceover?: boolean;      // default: false. Generate TTS voiceover per scene.
+  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // TTS voice (default: nova)
   trace?: TraceBuilder;
 
   // Canvas overrides (any target; for images, overrides prompt inference)
@@ -1407,9 +1410,15 @@ async function runUnifiedPipeline(
     await Promise.all(batch);
   }
 
-  // Add scenes in order
-  for (const result of sceneResults) {
-    project.scenes.push(result.scene);
+  // Add scenes in order, carrying over voiceover text from planner
+  for (let si = 0; si < sceneResults.length; si++) {
+    const scene = sceneResults[si].scene;
+    const planned = storyboard.scenes[si];
+    if (planned.voiceover_text) {
+      if (!scene.audio_hints) scene.audio_hints = {};
+      scene.audio_hints.voiceover_text = planned.voiceover_text;
+    }
+    project.scenes.push(scene);
   }
 
 
@@ -1482,6 +1491,53 @@ async function runUnifiedPipeline(
       }
     } catch (e: any) {
       console.warn(`  Editorial critique failed (non-fatal): ${e.message}`);
+    }
+    trace?.endEvent();
+  }
+
+  // ── Voiceover generation (TTS) ──
+  if (opts.voiceover && (format === "video" || format === "slideshow")) {
+    trace?.beginEvent("generate_voiceover");
+    try {
+      const voDir = path.join(projectDir(opts.tenant_id, projectId), "voiceover");
+      const voiceoverInputs = project.scenes.map(s => ({
+        label: s.label,
+        voiceover_text: s.audio_hints?.voiceover_text,
+        duration_seconds: s.duration_seconds,
+      }));
+
+      const voicePaths = await generateSceneVoiceovers({
+        scenes: voiceoverInputs,
+        voice: opts.voice || "nova",
+        model: "tts-1-hd",
+        outputDir: voDir,
+        apiKey: process.env.OPENAI_API_KEY || "",
+      });
+
+      // Add voiceover tracks to project audio
+      if (!project.audio) {
+        project.audio = { tracks: [] };
+      }
+
+      // Calculate cumulative start times per scene
+      let cumulativeTime = 0;
+      for (let i = 0; i < project.scenes.length; i++) {
+        if (voicePaths[i]) {
+          project.audio.tracks.push({
+            id: `vo_scene_${i}`,
+            type: "voiceover" as const,
+            source: voicePaths[i],
+            volume: 1.0,
+            start_time: cumulativeTime,
+            loop: false,
+          });
+        }
+        cumulativeTime += project.scenes[i].duration_seconds;
+      }
+
+      console.log(`  Voiceover: generated ${voicePaths.filter(p => p).length} TTS clips`);
+    } catch (e: any) {
+      console.warn(`  Voiceover generation failed (non-fatal): ${e.message}`);
     }
     trace?.endEvent();
   }
