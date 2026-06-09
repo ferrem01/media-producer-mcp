@@ -40,6 +40,9 @@ import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit, SpeakerTrack } from "./core/types.js";
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
+import { writeScript } from "./llm/script-writer.js";
+import { analyzeAssets } from "./llm/asset-analyzer.js";
+import type { ProjectBrief } from "./core/types.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { captureUrl } from "./core/capture-url.js";
 import { registerBrandExtractTool } from "./tools/brand-extract-tool.js";
@@ -271,7 +274,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "update",
-    "Update a project, scene, component. Infers target from which IDs are provided: project_id only = update project, + scene_id = update scene, + component_id = update component.",
+    "Update a project, scene, component, or plan. Infers target from which IDs are provided. Use provide_asset to upload assets for a planned scene. Use plan to directly edit the creative plan.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
@@ -287,7 +290,7 @@ export function createMcpServer(): McpServer {
         fps: z.number().optional(),
         background: z.string().optional(),
       }).optional(),
-      status: z.enum(["draft", "rendering", "rendered", "failed"]).optional(),
+      status: z.enum(["draft", "planned", "generated", "rendering", "rendered", "failed"]).optional(),
 
       // Scene-level updates
       label: z.string().optional(),
@@ -313,9 +316,143 @@ export function createMcpServer(): McpServer {
           trim_end: z.number().optional(),
         })).optional(),
       }).optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time."),
+
+      // Plan modifications (direct edits, no LLM)
+      plan: z.object({
+        narrative: z.string().optional(),
+        estimated_duration: z.number().optional(),
+        audio: z.object({
+          music_mood: z.string().optional(),
+          voice: z.string().optional(),
+          pacing: z.enum(["slow", "moderate", "fast"]).optional(),
+        }).optional(),
+        scenes: z.array(z.object({
+          index: z.number().optional().describe("Index of existing scene to update. Omit to append a new scene."),
+          label: z.string().optional(),
+          purpose: z.string().optional(),
+          recipe: z.string().optional(),
+          voiceover_text: z.string().optional(),
+          duration_seconds: z.number().optional(),
+          visual_notes: z.string().optional(),
+        })).optional(),
+        remove_scenes: z.array(z.number()).optional().describe("Indices of planned scenes to remove"),
+        reorder_scenes: z.array(z.number()).optional().describe("Current indices in desired order"),
+      }).optional().describe("Direct plan edits. Partial updates -- only fields you pass get changed. Works in planned state."),
+
+      // Asset provision
+      provide_asset: z.object({
+        scene_index: z.number(),
+        asset_index: z.number(),
+        path: z.string(),
+      }).optional().describe("Provide an asset for a planned scene. Updates status from 'needed' to 'provided'."),
     },
     async (params) => {
-      // Overlay update
+      // ── Plan modifications ──
+      if (params.plan || params.provide_asset) {
+        const project = await loadProject(params.tenant_id, params.project_id);
+        if (!project) return err("Project not found");
+
+        if (params.plan) {
+          if (!project.plan) {
+            // Create a new plan from scratch
+            project.plan = {
+              narrative: params.plan.narrative || "",
+              scenes: [],
+              audio: {
+                music_mood: params.plan.audio?.music_mood || "corporate",
+                voice: params.plan.audio?.voice || "nova",
+                pacing: (params.plan.audio?.pacing as any) || "moderate",
+              },
+              estimated_duration: params.plan.estimated_duration || 0,
+            };
+          }
+
+          // Merge top-level fields
+          if (params.plan.narrative !== undefined) project.plan.narrative = params.plan.narrative;
+          if (params.plan.estimated_duration !== undefined) project.plan.estimated_duration = params.plan.estimated_duration;
+          if (params.plan.audio) {
+            if (params.plan.audio.music_mood !== undefined) project.plan.audio.music_mood = params.plan.audio.music_mood;
+            if (params.plan.audio.voice !== undefined) project.plan.audio.voice = params.plan.audio.voice;
+            if (params.plan.audio.pacing !== undefined) project.plan.audio.pacing = params.plan.audio.pacing;
+          }
+
+          // Remove scenes (process before adds/updates, use descending order)
+          if (params.plan.remove_scenes?.length) {
+            const toRemove = [...params.plan.remove_scenes].sort((a, b) => b - a);
+            for (const idx of toRemove) {
+              if (idx >= 0 && idx < project.plan.scenes.length) {
+                project.plan.scenes.splice(idx, 1);
+              }
+            }
+          }
+
+          // Reorder scenes
+          if (params.plan.reorder_scenes?.length) {
+            const order = params.plan.reorder_scenes;
+            const reordered = order
+              .filter(i => i >= 0 && i < project.plan!.scenes.length)
+              .map(i => project.plan!.scenes[i]);
+            if (reordered.length === project.plan.scenes.length) {
+              project.plan.scenes = reordered;
+            }
+          }
+
+          // Update or append scenes
+          if (params.plan.scenes?.length) {
+            for (const sceneUpdate of params.plan.scenes) {
+              if (sceneUpdate.index !== undefined && sceneUpdate.index < project.plan.scenes.length) {
+                // Update existing scene
+                const existing = project.plan.scenes[sceneUpdate.index];
+                if (sceneUpdate.label !== undefined) existing.label = sceneUpdate.label;
+                if (sceneUpdate.purpose !== undefined) existing.purpose = sceneUpdate.purpose;
+                if (sceneUpdate.recipe !== undefined) existing.recipe = sceneUpdate.recipe;
+                if (sceneUpdate.voiceover_text !== undefined) existing.voiceover_text = sceneUpdate.voiceover_text;
+                if (sceneUpdate.duration_seconds !== undefined) existing.duration_seconds = sceneUpdate.duration_seconds;
+                if (sceneUpdate.visual_notes !== undefined) existing.visual_notes = sceneUpdate.visual_notes;
+              } else {
+                // Append new scene
+                project.plan.scenes.push({
+                  label: sceneUpdate.label || "New Scene",
+                  purpose: sceneUpdate.purpose || "",
+                  recipe: sceneUpdate.recipe || "C1",
+                  voiceover_text: sceneUpdate.voiceover_text,
+                  duration_seconds: sceneUpdate.duration_seconds || 5,
+                  assets: [],
+                  visual_notes: sceneUpdate.visual_notes || "",
+                });
+              }
+            }
+          }
+
+          // Recalculate estimated duration
+          project.plan.estimated_duration = project.plan.scenes.reduce(
+            (sum, s) => sum + s.duration_seconds, 0
+          );
+
+          project.status = "planned";
+        }
+
+        // Asset provision
+        if (params.provide_asset) {
+          if (!project.plan) return err("Project has no plan");
+          const { scene_index, asset_index, path } = params.provide_asset;
+          if (scene_index < 0 || scene_index >= project.plan.scenes.length) {
+            return err(`Invalid scene_index: ${scene_index}`);
+          }
+          const scene = project.plan.scenes[scene_index];
+          if (asset_index < 0 || asset_index >= scene.assets.length) {
+            return err(`Invalid asset_index: ${asset_index}`);
+          }
+          scene.assets[asset_index].status = "provided";
+          scene.assets[asset_index].path = path;
+        }
+
+        project.updated_at = new Date().toISOString();
+        await saveProject(project);
+        return ok({ status: "updated", project_id: project.project_id, plan: project.plan });
+      }
+
+      // ── Existing update logic (removals) ──
 
       // Remove component
       if (params.scene_id && params.component_id) {
@@ -519,6 +656,14 @@ export function createMcpServer(): McpServer {
       }
       const project = await loadProject(params.tenant_id, params.project_id);
       if (!project) return err("Project not found");
+
+      // Status gating
+      if (project.status === "draft") {
+        return err("Project needs a plan first. Run generate with mode='plan' to create a creative plan.");
+      }
+      if (project.status === "planned") {
+        return err("Project has a plan but scenes haven't been generated yet. Run generate with mode='generate' to build scenes from the plan.");
+      }
 
       // Scene preview
       if (params.scene_id) {
@@ -988,7 +1133,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "generate",
-    "Generate media from a natural language prompt. Supports video, image, presentation, component, and scene targets. Pass id to revise existing content.",
+    "Generate media from a natural language prompt. Use mode='plan' to get a creative plan with script, storyboard, and asset requirements for review. Use mode='generate' to build scenes from an approved plan. Use mode='full' (default) to plan, generate, and render in one shot. Recommended flow: plan -> review/iterate -> provide assets -> generate -> preview/edit -> render.",
     {
       tenant_id: z.string(),
       prompt: z.string().describe("Description of what to generate"),
@@ -1007,7 +1152,28 @@ export function createMcpServer(): McpServer {
       speaker_start: z.number().optional().describe("Start offset in seconds into the speaker video (skip dead air at start)"),
       speaker_trim_start: z.number().optional().describe("Trim: only use speaker video from this timestamp"),
       speaker_trim_end: z.number().optional().describe("Trim: stop using speaker video at this timestamp"),
-
+      mode: z.enum(["plan", "generate", "full"]).optional().default("full").describe("'plan' = create a creative plan for review. 'generate' = build scenes from an approved plan. 'full' = plan + generate + render in one shot (default, current behavior)."),
+      brief: z.object({
+        video_type: z.enum(["product_launch", "feature_announcement", "customer_story", "how_to", "promo", "explainer", "case_study", "brand"]).optional(),
+        context: z.object({
+          messaging: z.string().optional(),
+          audience: z.string().optional(),
+          key_points: z.array(z.string()).optional(),
+          proof_points: z.array(z.string()).optional(),
+          tone: z.string().optional(),
+          industry: z.string().optional(),
+        }).optional(),
+        target_duration: z.number().optional(),
+        style_references: z.array(z.object({ url: z.string(), note: z.string().optional() })).optional(),
+        do_not_include: z.array(z.string()).optional(),
+        available_assets: z.array(z.object({
+          description: z.string(),
+          type: z.enum(["screen_recording", "camera_video", "photo", "screenshot", "logo", "illustration", "other"]),
+          path: z.string().optional(),
+          url: z.string().optional(),
+        })).optional(),
+      }).optional().describe("Structured brief with marketing context. Enhances the prompt with audience, messaging, and asset info."),
+      feedback: z.string().optional().describe("Natural language feedback to revise an existing plan. Requires project_id with a planned project."),
     },
     async (params) => {
       // Auth check
@@ -1017,6 +1183,164 @@ export function createMcpServer(): McpServer {
         if (!tokenTenant) return err("Invalid token");
       }
       try {
+        // ── Plan mode: create or revise a creative plan ──
+        if (params.mode === "plan") {
+          let llmConfig;
+          try {
+            llmConfig = llmConfigFromEnv();
+          } catch (e: any) {
+            return err(`LLM not configured: ${e.message}`);
+          }
+
+          const brandKit = await loadBrandKit(params.tenant_id);
+
+          // Build the brief
+          const brief: ProjectBrief = {
+            prompt: params.prompt,
+            ...(params.brief || {}),
+          };
+
+          // Revision: load existing project and its plan
+          let previousRevisionNotes: string[] | undefined;
+          if (params.project_id && params.feedback) {
+            const existingProject = await loadProject(params.tenant_id, params.project_id);
+            if (!existingProject) return err("Project not found for plan revision");
+            if (existingProject.status !== "planned" && existingProject.status !== "draft") {
+              return err(`Cannot revise plan: project is in '${existingProject.status}' state`);
+            }
+            previousRevisionNotes = existingProject.plan?.revision_notes;
+            // Use the stored brief if the caller didn't provide a new one
+            if (!params.brief && existingProject.brief) {
+              Object.assign(brief, existingProject.brief);
+            }
+          }
+
+          // Run script writer
+          console.log(`  Plan mode: writing script for "${params.prompt.substring(0, 60)}..."`);
+          const plan = await writeScript({
+            brief,
+            llmConfig,
+            brandKit,
+            feedback: params.feedback,
+            previousRevisionNotes,
+          });
+
+          // Run asset analyzer
+          analyzeAssets({ plan, brief, brandKit });
+
+          // Create or update project
+          if (params.project_id) {
+            // Update existing project
+            const project = await loadProject(params.tenant_id, params.project_id);
+            if (!project) return err("Project not found");
+            project.brief = brief;
+            project.plan = plan;
+            project.status = "planned";
+            project.updated_at = new Date().toISOString();
+            await saveProject(project);
+
+            return ok({
+              status: "planned",
+              project_id: project.project_id,
+              plan,
+            });
+          } else {
+            // Create new project with the plan
+            const project = await createProject({
+              tenant_id: params.tenant_id,
+              name: brief.prompt.substring(0, 60),
+              format: (params.target === "component" || params.target === "scene") ? "video" : (params.target || "video") as any,
+              preset: "landscape",
+            });
+            project.brief = brief;
+            project.plan = plan;
+            project.status = "planned";
+            project.created_at = new Date().toISOString();
+            project.updated_at = new Date().toISOString();
+            await saveProject(project);
+
+            return ok({
+              status: "planned",
+              project_id: project.project_id,
+              plan,
+            });
+          }
+        }
+
+        // ── Generate mode: build scenes from an approved plan ──
+        if (params.mode === "generate") {
+          if (!params.project_id) return err("project_id required for generate mode");
+          const project = await loadProject(params.tenant_id, params.project_id);
+          if (!project) return err("Project not found");
+          if (!project.plan) return err("Project has no plan. Run generate with mode='plan' first.");
+          if (project.status !== "planned") {
+            return err(`Cannot generate: project is in '${project.status}' state (expected 'planned')`);
+          }
+
+          // Use the plan's script as the prompt for the unified pipeline
+          // Build a rich prompt from the plan's narrative + scene details
+          const planPrompt = buildPromptFromPlan(project.plan, project.brief);
+
+          let llmConfig;
+          try {
+            llmConfig = llmConfigFromEnv();
+          } catch (e: any) {
+            return err(`LLM not configured: ${e.message}`);
+          }
+
+          const brandKit = await loadBrandKit(params.tenant_id);
+          const job = queueJob("generate", params.tenant_id, async (j) => {
+            const trace = new TraceBuilder("generate", params.tenant_id, "", planPrompt);
+            try {
+              j.progress = { step: "generating_from_plan", percent: 10 };
+              const pipelineResult = await runGeneratePipeline({
+                prompt: planPrompt,
+                target: "video",
+                tenant_id: params.tenant_id,
+                llmConfig,
+                brandKit: brandKit || project.brand_kit,
+                canvas: project.canvas,
+                creativity: params.creativity,
+                project_id: project.project_id,
+                voiceover: true,
+                backgroundMusic: true,
+                voice: project.plan!.audio.voice as any,
+                sceneCount: project.plan!.scenes.length,
+              });
+
+              // Update project status to generated
+              const updated = await loadProject(params.tenant_id, params.project_id!);
+              if (updated) {
+                updated.status = "generated";
+                updated.updated_at = new Date().toISOString();
+                await saveProject(updated);
+              }
+
+              if (pipelineResult && typeof pipelineResult === "object" && "project_id" in (pipelineResult as any)) {
+                j.projectId = (pipelineResult as any).project_id;
+              }
+
+              j.progress = { step: "complete", percent: 100 };
+              trace.setOutcome("success");
+              return pipelineResult;
+            } catch (pipelineErr: any) {
+              trace.setOutcome("failed", pipelineErr.message);
+              throw pipelineErr;
+            } finally {
+              trace.finish();
+            }
+          });
+
+          return ok({
+            status: "queued",
+            job_id: job.id,
+            project_id: project.project_id,
+            message: "Generating scenes from plan. Use get(target='job', job_id='" + job.id + "') to check status.",
+          });
+        }
+
+        // ── Full mode (default) and revision mode below ──
+
         // ── Revision mode: load existing content when id is provided ──
         let existingSource: string | undefined;
         let revisionName: string | undefined;
@@ -1311,6 +1635,38 @@ async function listComponentCatalog(): Promise<Array<{ type: string; category: s
   } catch { /* component dir doesn't exist */ }
 
   return catalog;
+}
+
+/**
+ * Build a rich prompt from a plan for the unified pipeline.
+ * Converts the plan's script into a format the unified planner understands.
+ */
+function buildPromptFromPlan(plan: import("./core/types.js").ProjectPlan, brief?: import("./core/types.js").ProjectBrief): string {
+  let prompt = brief?.prompt || plan.narrative;
+  prompt += "\n\n## Script (FOLLOW THIS EXACTLY)\n";
+  prompt += `Narrative: ${plan.narrative}\n\n`;
+
+  for (let i = 0; i < plan.scenes.length; i++) {
+    const s = plan.scenes[i];
+    prompt += `Scene ${i + 1}: "${s.label}"\n`;
+    prompt += `  Purpose: ${s.purpose}\n`;
+    prompt += `  Recipe: ${s.recipe}\n`;
+    prompt += `  Duration: ${s.duration_seconds}s\n`;
+    if (s.voiceover_text) prompt += `  Voiceover: "${s.voiceover_text}"\n`;
+    prompt += `  Visuals: ${s.visual_notes}\n\n`;
+  }
+
+  prompt += `Music mood: ${plan.audio.music_mood}\n`;
+  prompt += `Pacing: ${plan.audio.pacing}\n`;
+
+  // Add marketing context if available
+  if (brief?.context) {
+    const ctx = brief.context;
+    if (ctx.messaging) prompt += `\n## Messaging\n${ctx.messaging}\n`;
+    if (ctx.tone) prompt += `\nTone: ${ctx.tone}\n`;
+  }
+
+  return prompt;
 }
 
 function guessExtension(contentType: string): string {

@@ -192,9 +192,121 @@ export interface Asset {
   created_at?: string;
 }
 
+// ── Brief ──
+
+export interface ProjectBrief {
+  /** The core ask */
+  prompt: string;
+  /** Video type -- drives narrative structure */
+  video_type?: "product_launch" | "feature_announcement" | "customer_story"
+    | "how_to" | "promo" | "explainer" | "case_study" | "brand";
+  /** Marketing context from the caller */
+  context?: BriefContext;
+  /** Target duration in seconds */
+  target_duration?: number;
+  /** Reference videos the caller likes */
+  style_references?: StyleReference[];
+  /** Things to avoid */
+  do_not_include?: string[];
+  /** Assets the caller already has */
+  available_assets?: AvailableAsset[];
+}
+
+export interface BriefContext {
+  /** Company/product positioning, value props, messaging */
+  messaging?: string;
+  /** Target audience */
+  audience?: string;
+  /** Key points to cover */
+  key_points?: string[];
+  /** Customer quotes, stats, proof points */
+  proof_points?: string[];
+  /** Tone of voice */
+  tone?: string;
+  /** Industry vertical */
+  industry?: string;
+}
+
+export interface StyleReference {
+  url: string;
+  note?: string;
+}
+
+export interface AvailableAsset {
+  description: string;
+  type: "screen_recording" | "camera_video" | "photo" | "screenshot" | "logo" | "illustration" | "other";
+  path?: string;
+  url?: string;
+}
+
+// ── Plan ──
+
+export interface ProjectPlan {
+  /** Narrative summary */
+  narrative: string;
+  /** Scene-by-scene plan */
+  scenes: PlannedScene[];
+  /** Audio direction */
+  audio: PlanAudioDirection;
+  /** Estimated total duration */
+  estimated_duration: number;
+  /** Feedback that shaped this plan */
+  revision_notes?: string[];
+}
+
+export interface PlanAudioDirection {
+  music_mood: string;
+  voice: string;
+  pacing: "slow" | "moderate" | "fast";
+}
+
+export interface PlannedScene {
+  /** Scene label */
+  label: string;
+  /** What this scene communicates */
+  purpose: string;
+  /** Composition approach (recipe id) */
+  recipe: string;
+  /** Voiceover script */
+  voiceover_text?: string;
+  /** Duration */
+  duration_seconds: number;
+  /** What this scene needs to look great */
+  assets: PlannedAsset[];
+  /** Visual description for the storyboard */
+  visual_notes: string;
+}
+
+export type PlannedAssetType =
+  | "screen_recording" | "camera_video" | "photo" | "screenshot"
+  | "product_shot" | "ai_image" | "illustration" | "stock_footage" | "mockup";
+
+export type PlannedAssetStatus = "needed" | "provided" | "generating" | "generated" | "fallback";
+
+export type PlannedAssetPriority = "critical" | "recommended" | "nice_to_have";
+
+export interface PlannedAsset {
+  /** What this asset is for */
+  description: string;
+  /** Asset type */
+  type: PlannedAssetType;
+  /** Current status */
+  status: PlannedAssetStatus;
+  /** How much this affects quality */
+  priority: PlannedAssetPriority;
+  /** What MCP does if this isn't provided */
+  fallback: string;
+  /** Path to the asset (when provided or generated) */
+  path?: string;
+  /** For AI-generated: the generation prompt */
+  generation_prompt?: string;
+  /** For recordings: instructions for the user */
+  recording_instructions?: string;
+}
+
 // ── Project ──
 
-export type ProjectStatus = "draft" | "rendering" | "rendered" | "failed";
+export type ProjectStatus = "draft" | "planned" | "generated" | "rendering" | "rendered" | "failed";
 
 export interface Project {
   project_id: string;
@@ -209,6 +321,14 @@ export interface Project {
   assets?: Asset[];
   /** New continuous speaker track architecture  */
   speaker_track?: SpeakerTrack;
+
+  // ── Lifecycle ──
+  /** Creative brief from the caller */
+  brief?: ProjectBrief;
+  /** Creative plan (script + storyboard + asset manifest) */
+  plan?: ProjectPlan;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ── Speaker Track ──
