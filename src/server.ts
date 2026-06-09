@@ -1136,7 +1136,7 @@ export function createMcpServer(): McpServer {
     "Generate media from a natural language prompt. Use mode='plan' to get a creative plan with script, storyboard, and asset requirements for review. Use mode='generate' to build scenes from an approved plan. Use mode='full' (default) to plan, generate, and render in one shot. Recommended flow: plan -> review/iterate -> provide assets -> generate -> preview/edit -> render.",
     {
       tenant_id: z.string(),
-      prompt: z.string().describe("Description of what to generate"),
+      prompt: z.string().default("").describe("Description of what to generate. Optional for mode='generate' (uses plan narrative)."),
       target: z.enum(["component", "scene", "video", "image", "presentation"]).optional().default("video").describe("What to generate (default: video)"),
       id: z.string().optional().describe("ID of existing content to revise. Component: component name. Scene: scene_id (requires project_id). Video/image/presentation: project_id."),
       project_id: z.string().optional().describe("Project ID (required for scene revision)"),
@@ -1309,20 +1309,43 @@ export function createMcpServer(): McpServer {
               });
 
               // Copy generated scenes, audio, and assets from the new project back to the original planned project
-              const newProjectId = (pipelineResult as any)?.projectId || (pipelineResult as any)?.project_id;
+              // Use the in-memory project object from pipelineResult instead of re-loading from disk
+              // to avoid race conditions where disk write hasn't completed yet
+              const generatedProject = (pipelineResult as any)?.project;
+              const newProjectId = generatedProject?.project_id || (pipelineResult as any)?.projectId || (pipelineResult as any)?.project_id;
               if (newProjectId && newProjectId !== params.project_id) {
-                const newProject = await loadProject(params.tenant_id, newProjectId);
                 const origProject = await loadProject(params.tenant_id, params.project_id!);
-                if (newProject && origProject) {
-                  origProject.scenes = newProject.scenes;
-                  origProject.audio = newProject.audio;
-                  origProject.assets = newProject.assets;
-                  origProject.canvas = newProject.canvas;
-                  origProject.speaker_track = newProject.speaker_track;
+                if (generatedProject && origProject) {
+                  origProject.scenes = generatedProject.scenes;
+                  origProject.audio = generatedProject.audio;
+                  origProject.assets = generatedProject.assets;
+                  origProject.canvas = generatedProject.canvas;
+                  origProject.speaker_track = generatedProject.speaker_track;
                   origProject.status = "generated";
                   origProject.updated_at = new Date().toISOString();
                   await saveProject(origProject);
-                  console.log(`  Generate mode: copied ${newProject.scenes.length} scenes from ${newProjectId} to ${params.project_id}`);
+
+                  // Copy component HTML files and voiceover audio from new project to original
+                  const srcDir = projectDir(params.tenant_id, newProjectId);
+                  const dstDir = projectDir(params.tenant_id, params.project_id!);
+                  for (const subdir of ["components", "voiceover"]) {
+                    const srcSub = path.join(srcDir, subdir);
+                    const dstSub = path.join(dstDir, subdir);
+                    try {
+                      const entries = await fs.readdir(srcSub);
+                      if (entries.length > 0) {
+                        await fs.mkdir(dstSub, { recursive: true });
+                        for (const entry of entries) {
+                          await fs.copyFile(path.join(srcSub, entry), path.join(dstSub, entry));
+                        }
+                        console.log(`  Generate mode: copied ${entries.length} ${subdir} files`);
+                      }
+                    } catch {
+                      // Directory may not exist, skip
+                    }
+                  }
+
+                  console.log(`  Generate mode: copied ${generatedProject.scenes.length} scenes from ${newProjectId} to ${params.project_id}`);
                 }
               } else {
                 // Pipeline wrote to the same project
