@@ -11,7 +11,7 @@
 import { callLLM, type LLMConfig } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
-import { SCENE_RECIPES } from "./scene-recipes.js";
+import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { COMPOSITION_PLAYBOOK } from "./cinematography.js";
 import { formatTemplateCatalogForPrompt } from "./template-catalog.js";
 import type { BrandKit, Canvas, OutputFormat } from "../core/types.js";
@@ -240,7 +240,7 @@ ${SCENE_PLANNER_DESIGN_RULES}
 
 ${templateCatalogStr}
 
-${SCENE_RECIPES}
+${SCENE_TEMPLATES}
 
 ${COMPOSITION_PLAYBOOK}`;
 

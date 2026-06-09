@@ -330,7 +330,7 @@ export function createMcpServer(): McpServer {
           index: z.number().optional().describe("Index of existing scene to update. Omit to append a new scene."),
           label: z.string().optional(),
           purpose: z.string().optional(),
-          recipe: z.string().optional(),
+          template: z.string().optional(),
           voiceover_text: z.string().optional(),
           duration_seconds: z.number().optional(),
           visual_notes: z.string().optional(),
@@ -405,7 +405,7 @@ export function createMcpServer(): McpServer {
                 const existing = project.plan.scenes[sceneUpdate.index];
                 if (sceneUpdate.label !== undefined) existing.label = sceneUpdate.label;
                 if (sceneUpdate.purpose !== undefined) existing.purpose = sceneUpdate.purpose;
-                if (sceneUpdate.recipe !== undefined) existing.recipe = sceneUpdate.recipe;
+                if (sceneUpdate.template !== undefined) existing.template = sceneUpdate.template;
                 if (sceneUpdate.voiceover_text !== undefined) existing.voiceover_text = sceneUpdate.voiceover_text;
                 if (sceneUpdate.duration_seconds !== undefined) existing.duration_seconds = sceneUpdate.duration_seconds;
                 if (sceneUpdate.visual_notes !== undefined) existing.visual_notes = sceneUpdate.visual_notes;
@@ -414,7 +414,7 @@ export function createMcpServer(): McpServer {
                 project.plan.scenes.push({
                   label: sceneUpdate.label || "New Scene",
                   purpose: sceneUpdate.purpose || "",
-                  recipe: sceneUpdate.recipe || "C1",
+                  template: sceneUpdate.template || "C1",
                   voiceover_text: sceneUpdate.voiceover_text,
                   duration_seconds: sceneUpdate.duration_seconds || 5,
                   assets: [],
@@ -1668,7 +1668,7 @@ function buildPromptFromPlan(plan: import("./core/types.js").ProjectPlan, brief?
     const s = plan.scenes[i];
     prompt += `Scene ${i + 1}: "${s.label}"\n`;
     prompt += `  Purpose: ${s.purpose}\n`;
-    prompt += `  Recipe: ${s.recipe}\n`;
+    prompt += `  Template: ${s.template}\n`;
     prompt += `  Duration: ${s.duration_seconds}s\n`;
     if (s.voiceover_text) prompt += `  Voiceover: "${s.voiceover_text}"\n`;
     prompt += `  Visuals: ${s.visual_notes}\n\n`;

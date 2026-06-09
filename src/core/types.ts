@@ -265,8 +265,8 @@ export interface PlannedScene {
   label: string;
   /** What this scene communicates */
   purpose: string;
-  /** Composition approach (recipe id) */
-  recipe: string;
+  /** Scene template ID (e.g. O1, C1, D1) */
+  template: string;
   /** Voiceover script */
   voiceover_text?: string;
   /** Duration */

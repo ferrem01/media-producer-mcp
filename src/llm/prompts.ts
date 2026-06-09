@@ -9,7 +9,7 @@ import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES, CRITIQUER_DESIGN_RU
 import { GSAP_ANIMATION_SKILLS } from "./gsap-skills.js";
 import { SCRIPT_SYSTEM_SKILLS } from "./script-skills.js";
 import { COMPONENT_EXEMPLARS } from "./exemplars.js";
-import { SCENE_RECIPES } from "./scene-recipes.js";
+import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { PACING_PLAYBOOK, COMPOSITION_PLAYBOOK, PREMIUM_QUALITY_CHECKLIST } from "./cinematography.js";
 import type { BrandKit, Canvas, DesignSystem } from "../core/types.js";
 
@@ -348,13 +348,13 @@ Mark each scene with its energy level: \u2605 HIGH or \u2193 low.
 ### 2. Scene-by-Scene Direction
 
 For EACH scene, provide:
-- **Recipe**: Which Scene Recipe to use (e.g., "O1: Big Statement", "D1: Hero Stat", "C2: Bento Overview")
+- **Template**: Which Scene Template to use (e.g., "O1: Big Statement", "D1: Hero Stat", "C2: Bento Overview")
 - **Content**: The specific text, numbers, or data for this scene
 - **Mood**: The emotional tone (dramatic, confident, warm, urgent, contemplative)
 - **Hero moment**: What's the ONE thing the viewer should remember from this scene?
 - **Motion note**: How should elements move? (dramatic SplitText reveal, smooth counter animation, etc.)
 
-${SCENE_RECIPES}
+${SCENE_TEMPLATES}
 
 ### 3. Visual & Motion Style
 - Overall mood: dark premium, bright minimal, bold colorful, or warm organic
@@ -372,11 +372,11 @@ ${SCENE_RECIPES}
 
 1. **Be a cinematographer, not a copywriter.** Don't just describe text content -- describe VISUAL MOMENTS. "A single '340%' counter at 160px dominates the frame, counting up from 0 over 2 seconds" is better than "show the ROI stat."
 2. **Follow the heartbeat.** HIGH-low-HIGH-low. Never three scenes at the same energy.
-3. **Name the recipe.** Every scene should reference a specific Scene Recipe (O1, C1, D1, etc.).
+3. **Name the template.** Every scene should reference a specific Scene Template (O1, C1, D1, etc.).
 4. **One focal point per scene.** If a scene has more than one competing visual idea, split it into two scenes.
 5. **Max 15 words visible per scene.** This is VIDEO, not PowerPoint. Visual impact > information density.
 6. **Vary composition.** Never use the same layout twice in a row. Alternate center, split, full-bleed, asymmetric.
-7. **Include breathing room.** For 6+ scene videos, at least one B1/B2 breathing recipe.
+7. **Include breathing room.** For 6+ scene videos, at least one B1/B2 breathing template.
 8. **Use brand assets.** Logo intro/outro if they exist. Brand backgrounds when they fit.
 9. **Keep the brief under 700 words.** Dense and actionable, not fluffy.
 10. **Output ONLY the creative brief.** No preamble, no "Here is the brief:", just the brief itself.`;
@@ -608,7 +608,7 @@ ${GSAP_ANIMATION_SKILLS}
 
 ${SCRIPT_SYSTEM_SKILLS}
 
-## Visual Recipes (use these techniques to make scenes look AMAZING)
+## Visual Techniques (use these to make scenes look AMAZING)
 
 ### Per-character text reveal (SplitText)
 \`\`\`javascript
@@ -697,7 +697,7 @@ tl.to(el, { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: 1.0, ..
 12. First scene should have no transition_in or use "none"
 13. Keep text per scene to max 15 words visible simultaneously
 14. Use autoAlpha instead of opacity for GSAP animations
-15. USE the visual recipes above. Don't just fade text in. Use SplitText, ScrambleText, counter animations, SVG draws, particle effects, spring physics. MAKE IT CINEMATIC.
+15. USE the visual techniques above. Don't just fade text in. Use SplitText, ScrambleText, counter animations, SVG draws, particle effects, spring physics. MAKE IT CINEMATIC.
 16. MANDATORY HEADLINE ANIMATION: Every headline (h1, .headline, .title) MUST use SplitText per-character reveal. Never just fade or slide a headline in as a block. Split it into chars with staggered animation (0.02-0.04s stagger). This single rule makes the difference between "animated slide deck" and "motion graphics video."
     Example: var split = new SplitText(el.querySelector('.headline'), { type: 'chars' }); tl.from(split.chars, { autoAlpha: 0, y: 30, stagger: 0.03, duration: 0.5, ease: 'back.out(1.7)' }, 0.2);
 17. MANDATORY BODY TEXT: Body text and descriptions should use per-word or per-line reveal (type: 'words' or 'lines'), not per-char. Stagger 0.03-0.06s.
@@ -780,7 +780,7 @@ Instead, use inline SVG icons styled with currentColor or var(--mp-color-accent)
 <svg width='20' height='20' viewBox='0 0 24 24' fill='var(--mp-color-accent)' stroke='none'><polygon points='13 2 3 14 12 14 11 22 21 10 12 10'/></svg>
 ` + "`" + "`" + "`" + `
 
-## Visual Recipes (USE THESE -- don't just fade text in)
+## Visual Techniques (USE THESE -- don't just fade text in)
 
 ### Per-character text reveal (SplitText)
 ` + "`" + "`" + "`" + `javascript
@@ -887,7 +887,7 @@ ${SCRIPT_SYSTEM_SKILLS}
 - Use autoAlpha not opacity
 - 80px safe zone from edges
 - MAKE IT CINEMATIC. Apple keynote quality. Not a slide.
-- USE the visual recipes above. SplitText, ScrambleText, counter animations, SVG draws, particle effects, spring physics. Don't just fade text in.
+- USE the visual techniques above. SplitText, ScrambleText, counter animations, SVG draws, particle effects, spring physics. Don't just fade text in.
 - MANDATORY: Headlines MUST use SplitText per-character reveal (type: 'chars', stagger 0.02-0.04s). NEVER fade/slide a headline as a block.
 - MANDATORY: Body text uses per-word reveal (type: 'words', stagger 0.03-0.06s). 
 - MANDATORY: Numbers/stats count up from 0 using gsap.to with a proxy object. No static numbers that fade in.

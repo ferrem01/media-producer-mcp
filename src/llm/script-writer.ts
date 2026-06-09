@@ -2,7 +2,7 @@
  * Script Writer
  *
  * Takes a ProjectBrief and produces a ProjectPlan: narrative arc,
- * scene-by-scene script with voiceover text, recipe selections,
+ * scene-by-scene script with voiceover text, template selections,
  * and audio direction.
  *
  * This is the "what to say" step. The unified planner (downstream)
@@ -28,12 +28,12 @@ export interface ScriptWriterOptions {
   previousRevisionNotes?: string[];
 }
 
-const RECIPE_CATALOG = `
-## Available Scene Recipes
+const TEMPLATE_CATALOG = `
+## Available Scene Templates
 
 ### OPENING
 - O1 "The Big Statement" -- One powerful headline. Apple WWDC title card energy.
-- O2 "Logo Into Statement" -- Brand intro video plays, then transitions to hook. TWO-SCENE recipe.
+- O2 "Logo Into Statement" -- Brand intro video plays, then transitions to hook. TWO-SCENE template.
 - O3 "The Provocation" -- Question, challenge, or bold claim. TED talk opening.
 - O4 "Split Reveal" -- Introducing a duality: before/after, problem/solution.
 
@@ -104,7 +104,7 @@ function buildSystemPrompt(brief: ProjectBrief, brandKit?: BrandKit | null, feed
 
 ## Your Job
 Write a scene-by-scene script for a ${targetDuration}-second marketing video (approximately ${estimatedScenes} scenes).
-Pick the right recipe for each scene from the catalog below.
+Pick the right template for each scene from the catalog below.
 Write voiceover text that fits within each scene's duration (150 words per minute -- a 5s scene fits ~12 words, a 7s scene fits ~17 words).
 Describe what each scene should look like visually.
 
@@ -116,14 +116,14 @@ ${arc}
 - Hook the viewer in the first 3 seconds.
 - One idea per scene. Never cram multiple concepts into one scene.
 - Vary the energy: alternate between text-heavy and visual scenes.
-- Include at least one DATA recipe for credibility (if proof points are provided).
+- Include at least one DATA template for credibility (if proof points are provided).
 - Always end with a clear CTA and (if brand outro exists) a logo outro.
-- Never use the same recipe twice in a row.
+- Never use the same template twice in a row.
 - Voiceover text must be concise. Punchy sentences. No filler words.
 - Skip voiceover for brand intro/outro video scenes and breathing pauses.
 - Total duration should be within 10% of the target (${targetDuration}s).
 
-${RECIPE_CATALOG}
+${TEMPLATE_CATALOG}
 `;
 
   // Add brand context
@@ -132,10 +132,10 @@ ${RECIPE_CATALOG}
     const outros = brandKit.assets?.filter(a => a.type === "outro") || [];
 
     if (intros.length > 0) {
-      prompt += `\n## Brand Intro\nA brand intro video exists ("${intros[0].name}", ${intros[0].duration || 5}s). Use it as the first scene when appropriate (recipe O2).\n`;
+      prompt += `\n## Brand Intro\nA brand intro video exists ("${intros[0].name}", ${intros[0].duration || 5}s). Use it as the first scene when appropriate (template O2).\n`;
     }
     if (outros.length > 0) {
-      prompt += `\n## Brand Outro\nA brand outro video exists ("${outros[0].name}", ${outros[0].duration || 5}s). Use it as the last scene (recipe E3).\n`;
+      prompt += `\n## Brand Outro\nA brand outro video exists ("${outros[0].name}", ${outros[0].duration || 5}s). Use it as the last scene (template E3).\n`;
     }
     if (brandKit.voice) {
       prompt += `\n## Brand Voice\nPreferred TTS voice: ${brandKit.voice}\n`;
@@ -178,7 +178,7 @@ Return ONLY valid JSON matching this structure:
     {
       "label": "Scene title",
       "purpose": "What this scene communicates and why",
-      "recipe": "recipe-id (e.g. O1, C1, D1, P1, E1)",
+      "template": "template-id (e.g. O1, C1, D1, P1, E1)",
       "voiceover_text": "The exact narration text (or null for no voiceover)",
       "duration_seconds": <number>,
       "visual_notes": "What this scene looks like -- layout, mood, key visual elements"
@@ -252,7 +252,7 @@ export async function writeScript(opts: ScriptWriterOptions): Promise<ProjectPla
   const scenes: PlannedScene[] = (parsed.scenes || []).map((s: any) => ({
     label: s.label || "Untitled",
     purpose: s.purpose || "",
-    recipe: s.recipe || "C1",
+    template: s.template || "C1",
     voiceover_text: s.voiceover_text || undefined,
     duration_seconds: s.duration_seconds || 5,
     assets: [], // Asset analyzer fills this in

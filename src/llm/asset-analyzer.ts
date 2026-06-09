@@ -5,7 +5,7 @@
  * great vs. what it can generate or mock. Populates the PlannedAsset[]
  * on each scene in the plan.
  *
- * Mostly rule-based (fast, no LLM call needed). Uses recipe hints and
+ * Mostly rule-based (fast, no LLM call needed). Uses template hints and
  * scene purpose to determine asset types and priorities.
  */
 
@@ -26,15 +26,15 @@ export interface AssetAnalyzerOptions {
   brandKit?: BrandKit | null;
 }
 
-/** Recipe categories that imply specific asset needs */
-const DEMO_RECIPES = new Set(["P1", "P2", "P3", "P4", "I-SAAS2"]);
-const TESTIMONIAL_RECIPES = new Set(["C4", "I-ECOM2"]);
-const PRODUCT_RECIPES = new Set(["C1", "C5", "I-ECOM1", "I-RE1"]);
-const DATA_RECIPES = new Set(["D1", "D2", "D3", "D4", "I-FIN2"]);
-const INTRO_RECIPES = new Set(["O2", "O5"]);
-const OUTRO_RECIPES = new Set(["E3"]);
-const BREATHING_RECIPES = new Set(["B1", "B2", "B3"]);
-const CTA_RECIPES = new Set(["E1", "E4"]);
+/** Template categories that imply specific asset needs */
+const DEMO_TEMPLATES = new Set(["P1", "P2", "P3", "P4", "I-SAAS2"]);
+const TESTIMONIAL_TEMPLATES = new Set(["C4", "I-ECOM2"]);
+const PRODUCT_TEMPLATES = new Set(["C1", "C5", "I-ECOM1", "I-RE1"]);
+const DATA_TEMPLATES = new Set(["D1", "D2", "D3", "D4", "I-FIN2"]);
+const INTRO_TEMPLATES = new Set(["O2", "O5"]);
+const OUTRO_TEMPLATES = new Set(["E3"]);
+const BREATHING_TEMPLATES = new Set(["B1", "B2", "B3"]);
+const CTA_TEMPLATES = new Set(["E1", "E4"]);
 
 /**
  * Analyze asset needs for each scene in the plan.
@@ -63,13 +63,13 @@ function analyzeScene(
   brandKit?: BrandKit | null,
 ): PlannedAsset[] {
   const assets: PlannedAsset[] = [];
-  const recipe = scene.recipe.split("-")[0].toUpperCase(); // e.g., "P1" from "P1-product-frame"
-  const recipeFull = scene.recipe.split(" ")[0]; // Handle "D1-hero-stat + C4-testimonial"
+  const template = scene.template.split("-")[0].toUpperCase(); // e.g., "P1" from "P1-product-frame"
+  const templateFull = scene.template.split(" ")[0]; // Handle "D1-hero-stat + C4-testimonial"
   const purposeLower = scene.purpose.toLowerCase();
   const notesLower = scene.visual_notes.toLowerCase();
 
   // ── Demo / Product screenshots ──
-  if (DEMO_RECIPES.has(recipe) || DEMO_RECIPES.has(recipeFull)) {
+  if (DEMO_TEMPLATES.has(template) || DEMO_TEMPLATES.has(templateFull)) {
     if (notesLower.includes("screen recording") || notesLower.includes("screencast") || purposeLower.includes("demo")) {
       assets.push(makeAsset({
         description: `Screen recording for "${scene.label}" -- ${extractVisualHint(scene)}`,
@@ -89,7 +89,7 @@ function analyzeScene(
   }
 
   // ── Product / Feature visuals ──
-  if (PRODUCT_RECIPES.has(recipe) || PRODUCT_RECIPES.has(recipeFull)) {
+  if (PRODUCT_TEMPLATES.has(template) || PRODUCT_TEMPLATES.has(templateFull)) {
     if (!assets.some(a => a.type === "screenshot" || a.type === "screen_recording")) {
       assets.push(makeAsset({
         description: `Product visual for "${scene.label}" -- ${extractVisualHint(scene)}`,
@@ -101,7 +101,7 @@ function analyzeScene(
   }
 
   // ── Testimonials / Customer stories ──
-  if (TESTIMONIAL_RECIPES.has(recipe) || TESTIMONIAL_RECIPES.has(recipeFull) || purposeLower.includes("testimonial") || purposeLower.includes("customer")) {
+  if (TESTIMONIAL_TEMPLATES.has(template) || TESTIMONIAL_TEMPLATES.has(templateFull) || purposeLower.includes("testimonial") || purposeLower.includes("customer")) {
     // Check if there's a person mentioned
     if (purposeLower.includes("photo") || notesLower.includes("headshot") || notesLower.includes("photo")) {
       assets.push(makeAsset({
@@ -140,7 +140,7 @@ function analyzeScene(
   }
 
   // ── Intro/Outro brand videos -- check brand kit ──
-  if (INTRO_RECIPES.has(recipe) || INTRO_RECIPES.has(recipeFull)) {
+  if (INTRO_TEMPLATES.has(template) || INTRO_TEMPLATES.has(templateFull)) {
     const brandIntro = brandKit?.assets?.find(a => a.type === "intro");
     if (!brandIntro) {
       assets.push(makeAsset({
@@ -153,7 +153,7 @@ function analyzeScene(
     // If brand intro exists, no asset needed -- it's already in the brand kit
   }
 
-  if (OUTRO_RECIPES.has(recipe) || OUTRO_RECIPES.has(recipeFull)) {
+  if (OUTRO_TEMPLATES.has(template) || OUTRO_TEMPLATES.has(templateFull)) {
     const brandOutro = brandKit?.assets?.find(a => a.type === "outro");
     if (!brandOutro) {
       // No asset needed -- logo outro can be generated from brand kit logo
@@ -161,7 +161,7 @@ function analyzeScene(
   }
 
   // ── Data scenes -- generally no assets needed ──
-  // DATA_RECIPES, BREATHING_RECIPES, CTA_RECIPES -- handled by component library
+  // DATA_TEMPLATES, BREATHING_TEMPLATES, CTA_TEMPLATES -- handled by component library
 
   return assets;
 }

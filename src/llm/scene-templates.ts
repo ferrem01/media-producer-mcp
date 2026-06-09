@@ -1,9 +1,9 @@
 /**
- * Scene Recipes
+ * Scene Templates
  *
  * Pre-composed scene blueprints that the planner selects from.
- * Each recipe is a proven-great composition: components + timing + animation + spacing.
- * The planner picks a recipe, customizes with user content, and produces
+ * Each template is a proven-great composition: components + timing + animation + spacing.
+ * The planner picks a template, customizes with user content, and produces
  * Apple-keynote-quality output without the user needing to describe visuals.
  *
  * Categories:
@@ -15,22 +15,22 @@
  *   - CLOSING: CTAs, outros, final impressions
  */
 
-export const SCENE_RECIPES = `
-## Scene Recipes
+export const SCENE_TEMPLATES = `
+## Scene Templates
 
-These are pre-composed scene blueprints. Each is a proven composition that produces
-professional, Apple-keynote-quality output. Pick the recipe that fits the narrative
+These are pre-composed scene templates. Each is a proven composition that produces
+professional, Apple-keynote-quality output. Pick the template that fits the narrative
 moment, then customize with the user's content.
 
 RULES:
-- Never use the same recipe twice in a row.
-- Vary between text-heavy and visual recipes.
-- Every video needs at least one BREATHING recipe for pacing.
-- Match recipe to narrative moment (see Pacing Arcs).
+- Never use the same template twice in a row.
+- Vary between text-heavy and visual templates.
+- Every video needs at least one BREATHING template for pacing.
+- Match template to narrative moment (see Pacing Arcs).
 
 ---
 
-### OPENING RECIPES
+### OPENING TEMPLATES
 
 #### O1: "The Big Statement"
 *When to use*: Opening scene. One powerful headline that sets the tone.
@@ -51,8 +51,8 @@ RULES:
 *Feel*: Brand signature moment.
 
 - Scene 1 (3-5s): Video component playing brand intro clip at z_index 0. No other components.
-- Scene 2 (4s): Follows with O1 "Big Statement" recipe. Use blur-crossfade transition.
-- Note: This is a TWO-SCENE recipe. The planner should generate both scenes.
+- Scene 2 (4s): Follows with O1 "Big Statement" template. Use blur-crossfade transition.
+- Note: This is a TWO-SCENE template. The planner should generate both scenes.
 
 #### O3: "The Provocation"
 *When to use*: Opening with a question, challenge, or bold claim. Creates tension.
@@ -81,7 +81,7 @@ RULES:
 
 ---
 
-### CONTENT RECIPES
+### CONTENT TEMPLATES
 
 #### C1: "Feature Spotlight"
 *When to use*: Highlighting a single feature or capability. One idea, one visual.
@@ -154,7 +154,7 @@ RULES:
 
 ---
 
-### DATA RECIPES
+### DATA TEMPLATES
 
 #### D1: "Hero Stat"
 *When to use*: One massive, impressive number. The jaw-drop moment.
@@ -205,7 +205,7 @@ RULES:
 
 ---
 
-### DEMO RECIPES
+### DEMO TEMPLATES
 
 #### P1: "Product Frame"
 *When to use*: Showing a product UI, website, or app screenshot. The hero product shot.
@@ -256,7 +256,7 @@ RULES:
 
 ---
 
-### BREATHING RECIPES
+### BREATHING TEMPLATES
 
 #### B1: "Visual Pause"
 *When to use*: Between content-heavy sections. Gives the viewer a beat to absorb.
@@ -293,7 +293,7 @@ RULES:
 
 ---
 
-### CLOSING RECIPES
+### CLOSING TEMPLATES
 
 #### E1: "Call to Action"
 *When to use*: Final sell. Get them to act.
@@ -339,7 +339,7 @@ RULES:
 
 ---
 
-### RECIPE SELECTION GUIDE
+### TEMPLATE SELECTION GUIDE
 
 For a typical 6-8 scene video:
 1. OPENING: O1 or O3 (O2 if brand intro video exists)
@@ -358,17 +358,17 @@ For a 3-4 scene image series:
 4. E1 (CTA)
 
 NEVER:
-- Two data recipes in a row (viewer fatigue)
-- Two content recipes with same layout in a row
+- Two data templates in a row (viewer fatigue)
+- Two content templates with same layout in a row
 - More than 2 scenes without a visual change in composition type
-- A video without at least one DATA recipe (numbers build credibility)
-- A video without a clear OPENING and CLOSING recipe
+- A video without at least one DATA template (numbers build credibility)
+- A video without a clear OPENING and CLOSING template
 
 ---
 
-### INDUSTRY-SPECIFIC RECIPES
+### INDUSTRY-SPECIFIC TEMPLATES
 
-These recipes are optimized for common verticals. Use them when the prompt
+These templates are optimized for common verticals. Use them when the prompt
 mentions the industry or when the content clearly fits a vertical.
 
 #### I-SAAS1: "Integration Ecosystem"

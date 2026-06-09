@@ -1154,11 +1154,11 @@ Output valid JSON only. No markdown fences, no commentary.`;
   }
 
   // Fix 2: Hard floor -- if best score < 6 after all retries, do a full
-  // recipe swap: force a single custom component with explicit "avoid these
+  // template swap: force a single custom component with explicit "avoid these
   // mistakes" instructions. This prevents shipping garbage scenes.
   if (bestScore > 0 && bestScore < 6 && opts.maxRetries > 0) {
-    console.log(`  Hard floor triggered: best score ${bestScore} < 6, attempting full recipe swap`);
-    opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_recipe_swap`);
+    console.log(`  Hard floor triggered: best score ${bestScore} < 6, attempting full template swap`);
+    opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_template_swap`);
     try {
       const swapFeedback = bestCritique
         ? buildCritiqueFeedback(bestCritique)
@@ -1197,11 +1197,11 @@ Output valid JSON only. No markdown fences, no commentary.`;
         }
       }
 
-      console.log(`  Recipe swap complete for scene ${opts.sceneIndex}`);
+      console.log(`  Template swap complete for scene ${opts.sceneIndex}`);
       opts.trace?.endEvent({ swapped: true, previousBest: bestScore });
       return { scene: swapped.scene, customSources: swapped.customSources, critiqueResult: bestCritique };
     } catch (e: any) {
-      console.warn(`  Recipe swap failed (non-fatal): ${e.message}`);
+      console.warn(`  Template swap failed (non-fatal): ${e.message}`);
       opts.trace?.endEvent({ error: e.message });
     }
   }
