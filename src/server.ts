@@ -505,6 +505,7 @@ export function createMcpServer(): McpServer {
       project_id: z.string(),
       scene_id: z.string().optional().describe("If provided, renders a single scene preview image"),
       quality: z.enum(["preview", "production"]).optional().describe("Render quality (default: production)"),
+      format: z.enum(["video", "image", "slideshow", "gif", "social", "email-header", "thumbnail"]).optional().describe("Override output format (default: project format)"),
       audio_only: z.boolean().optional().describe("Skip scene rendering; only (re-)apply audio mix + overlays to the existing rendered video. Requires a prior full render."),
 
       token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
@@ -564,6 +565,13 @@ export function createMcpServer(): McpServer {
 
       // Full project render -- queue it and return immediately
       if (project.scenes.length === 0) return err("Project has no scenes");
+
+      // Apply format override if specified (e.g. render video project as social batch)
+      if (params.format && params.format !== project.format) {
+        project.format = params.format;
+        const { saveProject } = await import("./persistence/project.js");
+        await saveProject(project);
+      }
 
       const job = queueRender(params.tenant_id, params.project_id, {
         quality: params.quality,

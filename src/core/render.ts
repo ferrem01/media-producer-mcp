@@ -1085,11 +1085,18 @@ async function renderGif(
     });
 
     // Copy frames to the unified frames directory with sequential numbering
+    // captureScene writes 0-indexed frames: frame-000000.png, frame-000001.png, etc.
     for (let f = 0; f < result.frameCount; f++) {
-      const srcFrame = path.join(sceneDir, `frame-${String(f + 1).padStart(6, "0")}.png`);
-      const dstFrame = path.join(framesDir, `frame-${String(globalFrameIndex + 1).padStart(6, "0")}.png`);
-      await fs.copyFile(srcFrame, dstFrame);
-      globalFrameIndex++;
+      const srcFrame = path.join(sceneDir, `frame-${String(f).padStart(6, "0")}.png`);
+      const dstFrame = path.join(framesDir, `frame-${String(globalFrameIndex).padStart(6, "0")}.png`);
+      try {
+        await fs.copyFile(srcFrame, dstFrame);
+        globalFrameIndex++;
+      } catch (e) {
+        // Frame might not exist if capture was short
+        console.warn(`  GIF: missing frame ${f} for scene ${i}, stopping at ${globalFrameIndex} total frames`);
+        break;
+      }
     }
   }
 
