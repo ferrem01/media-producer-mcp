@@ -1541,7 +1541,7 @@ async function runUnifiedPipeline(
 
       const voicePaths = await generateSceneVoiceovers({
         scenes: voiceoverInputs,
-        voice: opts.voice || "nova",
+        voice: opts.voice || project.brand_kit?.voice || "nova",
         model: "tts-1-hd",
         outputDir: voDir,
         apiKey: process.env.OPENAI_API_KEY || "",

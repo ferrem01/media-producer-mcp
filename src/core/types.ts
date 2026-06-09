@@ -76,6 +76,7 @@ export interface BrandKit {
     motion?: "minimal" | "punchy" | "cinematic";
   };
   guidelines?: string;    // free-form brand rules injected into planner/generator prompts
+  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // preferred TTS voice
   design_system?: DesignSystem;
 }
 

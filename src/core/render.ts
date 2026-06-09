@@ -1080,7 +1080,7 @@ async function renderGif(
       outputDir: sceneDir,
       width: project.canvas.width,
       height: project.canvas.height,
-      fps: project.canvas.fps,
+      fps: 12, // GIF: reduced fps for reasonable file size
       duration: scene.duration_seconds,
     });
 
@@ -1104,8 +1104,8 @@ async function renderGif(
   await encodeGif({
     framesDir,
     outputPath: gifPath,
-    fps: project.canvas.fps,
-    width: 800,
+    fps: 12,
+    width: 640,
   });
 
   return {
