@@ -62,7 +62,7 @@ export const config: Config = {
   gsapDir: process.env.MP_GSAP_DIR || path.resolve(ROOT_DIR, "../vendor/gsap"),
   llm: {
     provider: llmProvider,
-    model: process.env.MP_LLM_MODEL || (llmProvider === "anthropic" ? "claude-sonnet-4-6-20250514" : "gpt-4o"),
+    model: process.env.MP_LLM_MODEL || (llmProvider === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o"),
     apiKey: (llmProvider === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY) || "",
   },
   renderConcurrency: parseInt(process.env.MP_RENDER_CONCURRENCY || "2", 10),
@@ -78,7 +78,7 @@ export const config: Config = {
   },
   critiqueLlm: {
     provider: "anthropic",
-    model: process.env.MP_CRITIQUE_MODEL || "claude-haiku-3-5-20241022",
+    model: process.env.MP_CRITIQUE_MODEL || "claude-haiku-4-5",
     apiKey: process.env.ANTHROPIC_API_KEY || "",
   },
 };

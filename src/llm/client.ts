@@ -32,7 +32,7 @@ export interface LLMCallOptions {
  */
 export function llmConfigFromEnv(): LLMConfig {
   var provider = (process.env.MP_LLM_PROVIDER || "anthropic") as "anthropic" | "openai";
-  var model = process.env.MP_LLM_MODEL || (provider === "anthropic" ? "claude-sonnet-4-6-20250514" : "gpt-4o");
+  var model = process.env.MP_LLM_MODEL || (provider === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o");
 
   var apiKey: string;
   if (provider === "anthropic") {
