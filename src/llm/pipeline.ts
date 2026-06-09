@@ -345,6 +345,7 @@ async function runSceneRevisionPipeline(
       catalog,
       critique: opts.critique,
       creativity: resolveCreativity(opts),
+      critiqueLlmConfig: config.critiqueLlm,
     });
     finalRevScene = critiqueResult.scene;
     if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
@@ -478,6 +479,7 @@ async function runVideoRevisionPipeline(
         catalog,
         critique: opts.critique,
         creativity: resolveCreativity(opts),
+        critiqueLlmConfig: config.critiqueLlm,
       });
       finalVidScene = critiqueResult.scene;
       if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
@@ -850,6 +852,7 @@ async function critiqueAndRetryScene(opts: {
   catalog: ComponentCatalogEntry[];
   critique?: boolean;
   creativity?: number;
+  critiqueLlmConfig?: LLMConfig;
 }): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
   // Skip critique if disabled
   if (opts.critique === false) {
@@ -976,7 +979,7 @@ async function critiqueAndRetryScene(opts: {
         sceneHtml: assembledHtml,
         previewImageBase64: previewBase64,
         prompt: opts.prompt,
-        llmConfig: opts.llmConfig,
+        llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
         format: opts.format,
         trace: opts.trace,
         critiqueRound: attempt,
@@ -1047,7 +1050,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
       let fixedPlan: any;
       try {
         const { callLLM } = await import("./client.js");
-        const fixRaw = await callLLM(opts.llmConfig, [
+        const fixRaw = await callLLM(opts.critiqueLlmConfig || opts.llmConfig, [
           { role: "user", content: fixPrompt },
         ], { temperature: 0.3, maxTokens: 4096 });
         const trimmed = fixRaw.trim();
@@ -1327,69 +1330,88 @@ async function runUnifiedPipeline(
   var compDir = path.join(projectDir(opts.tenant_id, projectId), "components");
   await fs.mkdir(compDir, { recursive: true });
 
-  for (var i = 0; i < storyboard.scenes.length; i++) {
-    var planned = storyboard.scenes[i];
-    var imageUrl = enrichResult.imageUrls.get(i);
+  // Parallel scene generation + critique with concurrency pool
+  const SCENE_CONCURRENCY = 3;
+  const sceneResults: Array<{ scene: Scene; customSources?: Map<string, string> }> = new Array(storyboard.scenes.length);
 
-    var generated = await generateScene({
-      scene: planned,
-      sceneIndex: i,
-      totalScenes: storyboard.scenes.length,
-      prompt: richPrompt,
-      format,
-      llmConfig: opts.llmConfig,
-      brandKit,
-      canvas,
-      imageUrl,
-      tenantId: opts.tenant_id,
-      projectId,
-    });
+  for (let batchStart = 0; batchStart < storyboard.scenes.length; batchStart += SCENE_CONCURRENCY) {
+    const batchEnd = Math.min(batchStart + SCENE_CONCURRENCY, storyboard.scenes.length);
+    const batch: Promise<void>[] = [];
 
-    // Save custom component HTML if needed
-    if (generated.customSources) {
-      for (var [compName, html] of generated.customSources) {
-        await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
-        console.log(`  Saved: ${compDir}/${compName}.component.html`);
-      }
-    }
+    for (let i = batchStart; i < batchEnd; i++) {
+      batch.push((async () => {
+        const planned = storyboard.scenes[i];
+        const imageUrl = enrichResult.imageUrls.get(i);
 
-    // Critique loop (skip if opts.critique === false)
-    let finalScene = generated.scene;
-    let finalCustomSources = generated.customSources;
-    if (opts.critique !== false) {
-      const critiqueResult = await critiqueAndRetryScene({
-        scene: generated.scene,
-        planned,
-        sceneIndex: i,
-        totalScenes: storyboard.scenes.length,
-        prompt: richPrompt,
-        format,
-        llmConfig: opts.llmConfig,
-        brandKit,
-        canvas,
-        tenantId: opts.tenant_id,
-        projectId,
-        compDir,
-        maxRetries: opts.maxRevisions ?? 2,
-        imageUrl,
-        trace,
-        customSources: generated.customSources,
-        catalog,
-        critique: opts.critique,
-        creativity: resolveCreativity(opts),
-      });
-      finalScene = critiqueResult.scene;
-      finalCustomSources = critiqueResult.customSources;
-      // Update saved custom sources if critique regenerated them
-      if (finalCustomSources && finalCustomSources !== generated.customSources) {
-        for (const [compName, html] of finalCustomSources) {
-          await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
+        const generated = await generateScene({
+          scene: planned,
+          sceneIndex: i,
+          totalScenes: storyboard.scenes.length,
+          prompt: richPrompt,
+          format,
+          llmConfig: opts.llmConfig,
+          brandKit,
+          canvas,
+          imageUrl,
+          tenantId: opts.tenant_id,
+          projectId,
+        });
+
+        // Save custom component HTML if needed
+        if (generated.customSources) {
+          for (const [compName, html] of generated.customSources) {
+            await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
+            console.log(`  Saved: ${compDir}/${compName}.component.html`);
+          }
         }
-      }
+
+        // Critique loop (skip if opts.critique === false)
+        let finalScene = generated.scene;
+        let finalCustomSources = generated.customSources;
+        if (opts.critique !== false) {
+          const critiqueResult = await critiqueAndRetryScene({
+            scene: generated.scene,
+            planned,
+            sceneIndex: i,
+            totalScenes: storyboard.scenes.length,
+            prompt: richPrompt,
+            format,
+            llmConfig: opts.llmConfig,
+            brandKit,
+            canvas,
+            tenantId: opts.tenant_id,
+            projectId,
+            compDir,
+            maxRetries: opts.maxRevisions ?? 2,
+            imageUrl,
+            trace,
+            customSources: generated.customSources,
+            catalog,
+            critique: opts.critique,
+            creativity: resolveCreativity(opts),
+            critiqueLlmConfig: config.critiqueLlm,
+          });
+          finalScene = critiqueResult.scene;
+          finalCustomSources = critiqueResult.customSources;
+          if (finalCustomSources && finalCustomSources !== generated.customSources) {
+            for (const [compName, html] of finalCustomSources) {
+              await fs.writeFile(path.join(compDir, `${compName}.component.html`), html);
+            }
+          }
+        }
+
+        sceneResults[i] = { scene: finalScene, customSources: finalCustomSources };
+      })());
     }
 
-    project.scenes.push(finalScene);
+    await Promise.all(batch);
   }
+
+  // Add scenes in order
+  for (const result of sceneResults) {
+    project.scenes.push(result.scene);
+  }
+
 
   // Apply speaker track scene-level settings after all scenes are generated
   if (project.speaker_track) {
@@ -1440,7 +1462,7 @@ async function runUnifiedPipeline(
       var editorial = await critiqueEditorial({
         scenes: sceneMeta,
         prompt: richPrompt,
-        llmConfig: opts.llmConfig,
+        llmConfig: config.critiqueLlm,
         format,
         trace,
       });

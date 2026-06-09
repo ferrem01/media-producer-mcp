@@ -46,6 +46,8 @@ export interface Config {
   previewQuality: QualityPreset;
   /** Production quality preset (full resolution) */
   productionQuality: QualityPreset;
+  /** LLM configuration for critique calls (faster/cheaper model) */
+  critiqueLlm: LLMConfig;
 }
 
 const ROOT_DIR = path.dirname(new URL(import.meta.url).pathname);
@@ -60,7 +62,7 @@ export const config: Config = {
   gsapDir: process.env.MP_GSAP_DIR || path.resolve(ROOT_DIR, "../vendor/gsap"),
   llm: {
     provider: llmProvider,
-    model: process.env.MP_LLM_MODEL || (llmProvider === "anthropic" ? "claude-sonnet-4-20250514" : "gpt-4o"),
+    model: process.env.MP_LLM_MODEL || (llmProvider === "anthropic" ? "claude-sonnet-4-6-20250514" : "gpt-4o"),
     apiKey: (llmProvider === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY) || "",
   },
   renderConcurrency: parseInt(process.env.MP_RENDER_CONCURRENCY || "2", 10),
@@ -73,5 +75,10 @@ export const config: Config = {
     width: 1920,
     height: 1080,
     fps: 30,
+  },
+  critiqueLlm: {
+    provider: "anthropic",
+    model: process.env.MP_CRITIQUE_MODEL || "claude-haiku-3-5-20241022",
+    apiKey: process.env.ANTHROPIC_API_KEY || "",
   },
 };
