@@ -630,6 +630,8 @@ export function getPreviewHtml(): string {
     audioElements: [],
     audioDuckingInterval: null,
     musicStarted: false,
+    _mobileSceneTl: null,
+    _mobileSceneDur: 0,
     // Master clock
     masterTime: 0,
     lastTickTime: 0,
@@ -2130,6 +2132,42 @@ export function getPreviewHtml(): string {
 
 
 
+  // Mobile per-scene animation loop
+  function mobileAnimLoop() {
+    if (!state.playing || !state._mobileSceneTl) return;
+    var tl = state._mobileSceneTl;
+    var dur = state._mobileSceneDur || tl.duration();
+    var currentTime = tl.time();
+
+    // Update slider and time display
+    if (dur > 0) {
+      els.slider.value = Math.round((currentTime / dur) * 1000);
+    }
+    updateTimeDisplay(currentTime);
+
+    // Check if scene finished
+    if (currentTime >= dur - 0.05) {
+      // Auto-advance to next scene
+      var p = state.currentProject;
+      if (p && state.currentSceneIndex < p.scenes.length - 1) {
+        state.playing = false;
+        selectScene(state.currentSceneIndex + 1);
+        // Auto-play next scene after a brief delay
+        setTimeout(function() {
+          if (!state.playing) togglePlay();
+        }, 300);
+      } else {
+        // Last scene: stop
+        state.playing = false;
+        updatePlayIcon();
+        tl.pause();
+      }
+      return;
+    }
+
+    state.animFrameId = requestAnimationFrame(mobileAnimLoop);
+  }
+
   function togglePlay() {
     if (state.playing) {
       // PAUSE
@@ -2144,10 +2182,16 @@ export function getPreviewHtml(): string {
       // Composite mode: master timeline is always paused, we just stop the clock
       // Videos will be paused by syncMedia on next tick
       pauseAudio();
+      // Mobile per-scene: pause the scene timeline
+      if (state._mobileSceneTl) {
+        state._mobileSceneTl.pause();
+      }
       // syncMedia will handle speaker pause+mute on next tick
-      state.forceSync = true;
-      syncMedia(state.masterTime, false);
-      state.forceSync = false;
+      if (state.compositeLoaded) {
+        state.forceSync = true;
+        syncMedia(state.masterTime, false);
+        state.forceSync = false;
+      }
     } else {
       // RESUME / PLAY
       state.playing = true;
@@ -2166,6 +2210,22 @@ export function getPreviewHtml(): string {
         syncMedia(globalTime, true);
         state.forceSync = false;
         animLoop();
+        return;
+      }
+
+      // Mobile per-scene mode: play the scene's own GSAP timeline
+      if (window.innerWidth <= 768) {
+        try {
+          var sceneTl = els.previewIframe.contentWindow.__MP_TIMELINE;
+          var sceneDur = els.previewIframe.contentWindow.__MP_DURATION || state.duration;
+          if (sceneTl) {
+            state._mobileSceneTl = sceneTl;
+            state._mobileSceneDur = sceneDur;
+            state.lastTickTime = performance.now();
+            sceneTl.play();
+            mobileAnimLoop();
+          }
+        } catch(e) { console.warn('[preview] mobile play error:', e); }
         return;
       }
     }
