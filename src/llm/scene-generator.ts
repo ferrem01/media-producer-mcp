@@ -12,6 +12,7 @@ import { reviseComponent } from "./component-revise.js";
 import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./freeform-skills.js";
 import { getComponentReferenceLibrary } from "./component-reference.js";
+import { generateFreeformAgentic } from "./freeform-agentic.js";
 import type { PlannedScene, PlannedComponent } from "./unified-planner.js";
 import type { BrandKit, Canvas, OutputFormat, Scene, SceneComponent, SceneTransition } from "../core/types.js";
 import fs from "node:fs/promises";
@@ -141,104 +142,22 @@ async function generateFreeformScene(
   sceneId: string,
 ): Promise<GeneratedScene> {
   var compName = `freeform_${sceneId}`;
-  var designSkills = getDesignSkills();
 
-  var brandVarsContext = buildBrandContext(opts.brandKit);
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (freeform-agentic)`);
 
-  // Build component reference library for pattern guidance
-  var componentRefSection = getComponentReferenceLibrary();
-  var componentRefLibrary = componentRefSection
-    ? `## Reference Components (study these patterns, don't copy them)
-
-The following are production components from our library. Study their CSS patterns (shadows, typography, layout) and GSAP techniques (easing, stagger, choreography). Adapt their techniques for YOUR scene -- do not copy their structure.
-
-${componentRefSection}`
-    : "";
-
-  var freeformSystemPrompt = `You are an expert motion graphics designer creating a single video scene as HTML+CSS+GSAP.
-Your output will be captured frame-by-frame by Playwright at ${opts.canvas.width}x${opts.canvas.height} and encoded to video.
-
-## Design Skills (FOLLOW THESE RULES)
-
-${designSkills}
-
-${componentRefLibrary}
-
-## Output Format
-
-Output a single .component.html file with exactly three sections:
-
-\`\`\`html
-<template>
-  <!-- Full scene HTML here -->
-</template>
-
-<style scoped>
-  /* Complete CSS here */
-</style>
-
-<script>
-  function createTimeline(el, data, ctx) {
-    var tl = gsap.timeline();
-    // GSAP animation here
-    return tl;
-  }
-</script>
-\`\`\`
-
-## Technical Rules
-
-1. Output ONLY the component HTML. No explanation, no markdown fences.
-2. The createTimeline(el, data, ctx) function:
-   - el: the component's root DOM element
-   - data: JSON data object
-   - ctx: { duration, fps, canvas: {width, height}, motion }
-   - Must return a GSAP timeline (NOT paused)
-3. Canvas: ${opts.canvas.width}x${opts.canvas.height}px. ALL content MUST be visible.
-4. GSAP is available globally. You can use: gsap.to(), gsap.from(), gsap.fromTo(), gsap.set(), gsap.timeline().
-5. Use 'var' for all variable declarations (not const/let).
-6. Load Google Fonts in <template> with <link> tags.
-7. Build-Breathe-Resolve: stagger entrances (0-30%), hold for readability (30-70%), exit/transition (70-100%).
-8. Scene duration: ${planned.duration_seconds}s. Time your animations to fit.
-9. Lottie animations are available via CDN (lottie-web 5.12.2). Use them for complex icon animations, micro-interactions, and decorative elements. Always sync to the GSAP timeline with goToAndStop() -- never use autoplay. See the design skills doc for patterns.
-
-${brandVarsContext}
-
-## This Scene
-
-Duration: ${planned.duration_seconds} seconds
-Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}
-Project: ${opts.prompt}
-`;
-
-  var freeformUserPrompt = `Create this scene:
-
-Label: ${planned.label}
-Description: ${planned.description}
-
-## Storyboard Brief
-
-${planned.freeform_brief}
-
-## Requirements
-- Follow the storyboard brief closely. Every motion verb in the brief should map to a GSAP tween.
-- Create a visually stunning, polished scene. This is motion graphics, not a web page.
-- Use the design skills rules: multi-layer shadows, varied easing, video-scale typography (64px+ headlines), background depth.
-- Fill the frame. Two focal points minimum. Anchor to edges, not center-float.
-- Every decorative element must have ambient animation (drift, breathe, pulse).
-- Do NOT use ghost/watermark text (large semi-transparent background words like "DATA", "CONNECT"). Use radial glows, grid patterns, accent lines, or grain for background texture instead.
-- All text MUST have correct spacing. Never concatenate words. Check every text string for missing spaces.
-- Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
-- Use gsap.from() for entrances (elements arrive at their CSS position). IMPORTANT: set initial CSS to the FINAL state (opacity: 1, transform: none). Let GSAP animate FROM the hidden state. This ensures the first captured frame shows content, not blank.
-${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
-Output ONLY the .component.html source. Start with <template> and end with </script>.`;
-
-  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (freeform)`);
-
-  var sceneHtml = await callLLM(opts.llmConfig, [
-    { role: "system", content: freeformSystemPrompt },
-    { role: "user", content: freeformUserPrompt },
-  ], { temperature: 0.6, maxTokens: 16384 });
+  var sceneHtml = await generateFreeformAgentic({
+    sceneBrief: planned.freeform_brief || planned.description,
+    sceneLabel: planned.label,
+    sceneDescription: planned.description,
+    sceneDuration: planned.duration_seconds || 5,
+    sceneIndex: opts.sceneIndex,
+    totalScenes: opts.totalScenes,
+    prompt: opts.prompt,
+    llmConfig: opts.llmConfig,
+    brandKit: opts.brandKit,
+    canvas: opts.canvas,
+    critiqueFeedback: opts.critiqueFeedback,
+  });
 
   sceneHtml = stripHtmlFences(sceneHtml);
 

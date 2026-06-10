@@ -13,7 +13,8 @@ export interface LLMConfig {
 
 export type LLMContentPart =
   | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string } };
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "tool_result"; tool_use_id: string; content: string };
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
@@ -25,6 +26,26 @@ export interface LLMCallOptions {
   temperature?: number;
   /** System prompt (alternative to including a system role message) */
   systemPrompt?: string;
+}
+
+// ── Tool Use Types ──
+
+export interface LLMTool {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+export interface LLMToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface LLMAgenticResponse {
+  text: string | null;
+  toolCalls: LLMToolCall[];
+  stopReason: string;
 }
 
 /**
@@ -63,20 +84,33 @@ export async function callLLM(
   }
 }
 
-// ── Anthropic ──
-
-async function callAnthropic(
+/**
+ * Call an LLM with tool-use support. Returns text, tool calls, and stop reason.
+ * Supports multi-turn agentic loops where the LLM can call tools.
+ */
+export async function callLLMAgentic(
   config: LLMConfig,
   messages: LLMMessage[],
+  tools: LLMTool[],
   options?: LLMCallOptions,
-): Promise<string> {
-  // Anthropic expects system prompt separate from messages
-  var systemPrompt = options?.systemPrompt || "";
+): Promise<LLMAgenticResponse> {
+  if (config.provider === "anthropic") {
+    return callAnthropicAgentic(config, messages, tools, options);
+  } else {
+    throw new Error("Agentic tool use is only supported for Anthropic provider currently");
+  }
+}
+
+// ── Anthropic ──
+
+function buildAnthropicMessages(
+  messages: LLMMessage[],
+): { systemPrompt: string; apiMessages: Array<{ role: string; content: unknown }> } {
+  var systemPrompt = "";
   var apiMessages: Array<{ role: string; content: unknown }> = [];
 
   for (var msg of messages) {
     if (msg.role === "system") {
-      // Anthropic only supports one system prompt; concatenate if multiple
       if (typeof msg.content === "string") {
         systemPrompt += (systemPrompt ? "\n\n" : "") + msg.content;
       }
@@ -86,13 +120,11 @@ async function callAnthropic(
     if (typeof msg.content === "string") {
       apiMessages.push({ role: msg.role, content: msg.content });
     } else {
-      // Convert content parts to Anthropic format
       var blocks: Array<unknown> = [];
       for (var part of msg.content) {
         if (part.type === "text") {
           blocks.push({ type: "text", text: part.text });
         } else if (part.type === "image_url") {
-          // Anthropic uses base64 image blocks
           var url = part.image_url.url;
           if (url.startsWith("data:")) {
             var match = url.match(/^data:(image\/[^;]+);base64,(.+)$/);
@@ -107,16 +139,35 @@ async function callAnthropic(
               });
             }
           } else {
-            // URL-based image -- Anthropic supports URL source
             blocks.push({
               type: "image",
               source: { type: "url", url },
             });
           }
+        } else if (part.type === "tool_result") {
+          blocks.push({
+            type: "tool_result",
+            tool_use_id: part.tool_use_id,
+            content: part.content,
+          });
         }
       }
       apiMessages.push({ role: msg.role, content: blocks });
     }
+  }
+
+  return { systemPrompt, apiMessages };
+}
+
+async function callAnthropic(
+  config: LLMConfig,
+  messages: LLMMessage[],
+  options?: LLMCallOptions,
+): Promise<string> {
+  var { systemPrompt, apiMessages } = buildAnthropicMessages(messages);
+
+  if (options?.systemPrompt) {
+    systemPrompt = options.systemPrompt + (systemPrompt ? "\n\n" + systemPrompt : "");
   }
 
   var body: Record<string, unknown> = {
@@ -152,7 +203,6 @@ async function callAnthropic(
     content: Array<{ type: string; text?: string }>;
   };
 
-  // Extract text from response content blocks
   var result = data.content
     .filter((block) => block.type === "text" && block.text)
     .map((block) => block.text!)
@@ -163,6 +213,75 @@ async function callAnthropic(
   }
 
   return result;
+}
+
+async function callAnthropicAgentic(
+  config: LLMConfig,
+  messages: LLMMessage[],
+  tools: LLMTool[],
+  options?: LLMCallOptions,
+): Promise<LLMAgenticResponse> {
+  var { systemPrompt, apiMessages } = buildAnthropicMessages(messages);
+
+  if (options?.systemPrompt) {
+    systemPrompt = options.systemPrompt + (systemPrompt ? "\n\n" + systemPrompt : "");
+  }
+
+  var body: Record<string, unknown> = {
+    model: config.model,
+    max_tokens: options?.maxTokens || 16384,
+    messages: apiMessages,
+    tools: tools,
+  };
+
+  if (systemPrompt) {
+    body.system = systemPrompt;
+  }
+
+  if (options?.temperature !== undefined) {
+    body.temperature = options.temperature;
+  }
+
+  var response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": config.apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    var errorText = await response.text();
+    throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
+  }
+
+  var data = await response.json() as {
+    content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }>;
+    stop_reason: string;
+  };
+
+  var text: string | null = null;
+  var toolCalls: LLMToolCall[] = [];
+
+  for (var block of data.content) {
+    if (block.type === "text" && block.text) {
+      text = (text || "") + block.text;
+    } else if (block.type === "tool_use" && block.id && block.name && block.input) {
+      toolCalls.push({
+        id: block.id,
+        name: block.name,
+        input: block.input,
+      });
+    }
+  }
+
+  return {
+    text,
+    toolCalls,
+    stopReason: data.stop_reason || "end_turn",
+  };
 }
 
 // ── OpenAI ──
@@ -178,7 +297,6 @@ async function callOpenAI(
     if (typeof msg.content === "string") {
       apiMessages.push({ role: msg.role, content: msg.content });
     } else {
-      // OpenAI content parts format
       var parts: Array<unknown> = [];
       for (var part of msg.content) {
         if (part.type === "text") {
