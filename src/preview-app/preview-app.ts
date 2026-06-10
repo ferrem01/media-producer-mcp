@@ -415,150 +415,11 @@ export function getPreviewHtml(): string {
     0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
     40% { opacity: 1; transform: scale(1); }
   }
-
-  /* -- Mobile responsive -- */
-  @media (max-width: 768px) {
-    #app {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      height: 100dvh;
-    }
-
-    /* Header */
-    header { padding: 0 10px; gap: 6px; height: 44px; flex-shrink: 0; }
-    header h1 { font-size: 13px; }
-    .header-controls { gap: 4px; }
-    .header-controls label { display: none; }
-    .header-controls select { min-width: 80px; font-size: 11px; padding: 4px 6px; }
-    .header-controls input { width: 80px !important; font-size: 11px; padding: 4px 6px; }
-    .header-controls .btn { padding: 4px 10px; font-size: 11px; }
-    .header-controls.auto-loaded #tenant-input,
-    .header-controls.auto-loaded label,
-    .header-controls.auto-loaded #load-btn { display: none; }
-    .header-controls.auto-loaded select { min-width: 100px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
-
-    /* Sidebar: hidden, slide-in overlay */
-    #sidebar { display: none; }
-    #sidebar.mobile-open {
-      display: flex;
-      position: fixed;
-      top: 44px; left: 0; bottom: 0;
-      width: 280px; max-width: 80vw;
-      z-index: 200;
-      box-shadow: 4px 0 24px rgba(0,0,0,0.2);
-      animation: slideIn 0.2s ease-out;
-    }
-    @keyframes slideIn {
-      from { transform: translateX(-100%); }
-      to { transform: translateX(0); }
-    }
-    .mobile-backdrop {
-      display: none;
-      position: fixed; inset: 0; top: 44px;
-      background: rgba(0,0,0,0.3); z-index: 150;
-    }
-    .mobile-backdrop.visible { display: block; }
-    .mobile-sidebar-toggle {
-      display: flex !important;
-      align-items: center; justify-content: center;
-      width: 36px; height: 36px;
-      background: #f3f4f6; border: 1px solid #e5e7eb;
-      border-radius: 8px; cursor: pointer; font-size: 18px;
-      flex-shrink: 0; -webkit-tap-highlight-color: transparent;
-    }
-    .mobile-sidebar-toggle:active { background: #e5e7eb; }
-    .scene-item { padding: 10px 12px; min-height: 44px; }
-    .scene-label { font-size: 13px; }
-    .scene-dur { font-size: 11px; }
-    .scene-thumb { display: none; }
-
-    /* Main area: video + controls grouped at top */
-    #main {
-      flex: 1; min-height: 0;
-      display: flex; flex-direction: column;
-      overflow: hidden;
-      background: #f3f4f6;
-    }
-    #preview-container {
-      flex: none;
-      background: #f3f4f6;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 12px 2px 8px;
-    }
-
-    /* Playback bar: fixed at bottom, never pushed off-screen */
-    #playback-bar {
-      flex-shrink: 0;
-      padding: 10px 12px;
-      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-      gap: 10px;
-      background: #ffffff;
-      border-top: 1px solid #e5e7eb;
-    }
-    .play-btn {
-      width: 40px; height: 40px;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .play-btn svg { width: 16px; height: 16px; }
-    #timeline-slider { height: 6px; }
-    #timeline-slider::-webkit-slider-thumb { width: 20px; height: 20px; }
-    .time-display { min-width: 60px; font-size: 10px; }
-    .scene-indicator { font-size: 10px; }
-    .audio-indicator { display: none; }
-
-    /* Hide bottom panels */
-    #bottom-panels { display: none; }
-
-    /* Scene info shown on mobile below video */
-    .mobile-scene-info {
-      display: block !important;
-      padding: 8px 16px;
-      font-size: 13px;
-      font-weight: 500;
-      color: #374151;
-      background: #f3f4f6;
-      text-align: center;
-    }
-    .mobile-scene-info .scene-title { font-weight: 600; }
-    .mobile-scene-info .scene-meta { font-size: 11px; color: #6b7280; margin-top: 2px; }
-
-    /* Scene nav buttons */
-    .mobile-scene-nav {
-      display: flex !important;
-      position: absolute;
-      top: 50%; transform: translateY(-50%);
-      width: 36px; height: 36px;
-      background: rgba(0,0,0,0.5);
-      border: none; border-radius: 50%;
-      color: #fff; font-size: 18px;
-      align-items: center; justify-content: center;
-      cursor: pointer; z-index: 10;
-      -webkit-tap-highlight-color: transparent;
-      opacity: 0.7;
-    }
-    .mobile-scene-nav:active { opacity: 1; }
-    #mobile-prev-scene { left: 8px; }
-    #mobile-next-scene { right: 8px; }
-
-    /* Loading / placeholder text */
-    .no-scene { color: #9ca3af; }
-    .loading-state { color: #6b7280; }
-  }
-  @media (min-width: 769px) {
-    .mobile-sidebar-toggle { display: none; }
-    .mobile-backdrop { display: none !important; }
-    .mobile-scene-nav { display: none !important; }
-  }
-  }
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <button class="mobile-sidebar-toggle" id="mobile-sidebar-toggle" aria-label="Scenes">&#9776;</button>
     <h1>Media Producer</h1>
     <div class="header-controls">
       <label>Tenant</label>
@@ -568,7 +429,6 @@ export function getPreviewHtml(): string {
       <button class="btn btn-primary" id="load-btn">Load</button>
     </div>
   </header>
-  <div class="mobile-backdrop" id="mobile-backdrop"></div>
 
   <div id="sidebar">
     <div class="sidebar-header">Scenes</div>
@@ -577,8 +437,6 @@ export function getPreviewHtml(): string {
 
   <div id="main">
     <div id="preview-container">
-      <button class="mobile-scene-nav" id="mobile-prev-scene" style="display:none;" aria-label="Previous scene">&#8249;</button>
-      <button class="mobile-scene-nav" id="mobile-next-scene" style="display:none;" aria-label="Next scene">&#8250;</button>
       <div class="no-scene" id="preview-placeholder">Select a scene to preview</div>
       <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
         <video id="speaker-bg" muted playsinline preload="auto" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
@@ -586,7 +444,6 @@ export function getPreviewHtml(): string {
         <div id="buffer-overlay" class="buffer-overlay"><div class="loading-state">Buffering media<div class="loading-dots"><span></span><span></span><span></span></div></div></div>
       </div>
     </div>
-    <div class="mobile-scene-info" id="mobile-scene-info" style="display:none;"></div>
 
     <div id="playback-bar">
       <button class="play-btn" id="play-btn" disabled>
@@ -630,8 +487,6 @@ export function getPreviewHtml(): string {
     audioElements: [],
     audioDuckingInterval: null,
     musicStarted: false,
-    _mobileSceneTl: null,
-    _mobileSceneDur: 0,
     // Master clock
     masterTime: 0,
     lastTickTime: 0,
@@ -668,59 +523,7 @@ export function getPreviewHtml(): string {
   };
 
   // Auth token from URL
-  // Mobile sidebar toggle + backdrop + scene nav
-    var _sidebarToggle = document.getElementById('mobile-sidebar-toggle');
-    var _backdrop = document.getElementById('mobile-backdrop');
-    var _prevSceneBtn = document.getElementById('mobile-prev-scene');
-    var _nextSceneBtn = document.getElementById('mobile-next-scene');
-    var _isMobileDevice = window.innerWidth <= 768;
-
-    function _openMobileSidebar() {
-      document.getElementById('sidebar').classList.add('mobile-open');
-      _backdrop.classList.add('visible');
-    }
-    function _closeMobileSidebar() {
-      document.getElementById('sidebar').classList.remove('mobile-open');
-      _backdrop.classList.remove('visible');
-    }
-
-    if (_sidebarToggle) {
-      _sidebarToggle.addEventListener('click', function() {
-        var sb = document.getElementById('sidebar');
-        if (sb.classList.contains('mobile-open')) {
-          _closeMobileSidebar();
-        } else {
-          _openMobileSidebar();
-        }
-      });
-      _backdrop.addEventListener('click', _closeMobileSidebar);
-      document.getElementById('sidebar').addEventListener('click', function(e) {
-        if (e.target.closest('.scene-item') && window.innerWidth <= 768) {
-          _closeMobileSidebar();
-        }
-      });
-    }
-
-    // Mobile prev/next scene buttons
-    if (_prevSceneBtn) {
-      _prevSceneBtn.addEventListener('click', function() {
-        if (state.currentSceneIndex > 0) selectScene(state.currentSceneIndex - 1);
-      });
-    }
-    if (_nextSceneBtn) {
-      _nextSceneBtn.addEventListener('click', function() {
-        var p = state.currentProject;
-        if (p && state.currentSceneIndex < p.scenes.length - 1) selectScene(state.currentSceneIndex + 1);
-      });
-    }
-
-    // Auto-detect URL params and mark header as auto-loaded on mobile
-    var _urlParams = new URLSearchParams(window.location.search);
-    if (_urlParams.get('tenant') && _urlParams.get('project') && _isMobileDevice) {
-      document.querySelector('.header-controls').classList.add('auto-loaded');
-    }
-
-    var _token = new URLSearchParams(window.location.search).get('token');
+  var _token = new URLSearchParams(window.location.search).get('token');
   var _urlTenant = new URLSearchParams(window.location.search).get('tenant');
 
   // API helper
@@ -1315,43 +1118,6 @@ export function getPreviewHtml(): string {
     });
   }
 
-
-  // Mobile per-scene mode: load individual scene HTML into iframe
-  function loadSceneForMobile(index) {
-    var project = state.currentProject;
-    if (!project || !project.scenes || !project.scenes[index]) return;
-    var scene = project.scenes[index];
-    state.currentSceneIndex = index;
-    state.currentComponentIndex = -1;
-    state.duration = scene.duration_seconds || 0;
-
-    els.previewPlaceholder.innerHTML = '<div class="loading-state">Loading scene ' + (index + 1) + '<div class="loading-dots"><span></span><span></span><span></span></div></div>';
-    els.previewPlaceholder.style.display = '';
-    els.previewWrapper.style.display = 'none';
-
-    var scenePath = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
-    fetchHtml(scenePath).then(function(html) {
-      writeSceneToIframe(html);
-      updateActiveScene(index);
-      updateSceneIndicator();
-      updateTimeDisplay(0);
-      els.slider.value = 0;
-      els.slider.disabled = false;
-      els.playBtn.disabled = false;
-      // Update mobile scene info
-      var infoEl = document.getElementById('mobile-scene-info');
-      if (infoEl && window.innerWidth <= 768) {
-        infoEl.style.display = '';
-        var s = state.currentProject.scenes[index];
-        infoEl.innerHTML = '<div class="scene-title">' + (s.label || ('Scene ' + (index + 1))) + '</div>'
-          + '<div class="scene-meta">' + (s.duration_seconds || 0).toFixed(1) + 's • Scene ' + (index + 1) + ' of ' + state.currentProject.scenes.length + '</div>';
-      }
-    }).catch(function(err) {
-      console.error('[preview] scene load failed:', err);
-      els.previewPlaceholder.textContent = 'Failed to load scene ' + (index + 1);
-    });
-  }
-
   // Initialize composite mode: write composite HTML to iframe
   function initComposite() {
     if (!state._compositeHtml) return false;
@@ -1433,48 +1199,43 @@ export function getPreviewHtml(): string {
       els.previewPlaceholder.innerHTML = '<div class="loading-state">Preloading scenes<div class="loading-dots"><span></span><span></span><span></span></div></div>';
       els.previewPlaceholder.style.display = '';
 
-      // Mobile: skip composite (too heavy), use per-scene mode
-      if (window.innerWidth <= 768) {
-        loadSceneForMobile(0);
-      } else {
-        // Desktop: load composite (all scenes in one doc)
-        loadComposite(project).then(function() {
-          if (state._compositeHtml && project.scenes && project.scenes.length > 0) {
-            // Composite mode: write single document to iframe
-            els.previewPlaceholder.textContent = 'Loading composite preview...';
-            initComposite();
-            waitForCompositeReady(function(masterTl) {
-              state.currentSceneIndex = 0;
-              state.currentComponentIndex = -1;
-              state.duration = project.scenes[0].duration_seconds || 0;
-              updateActiveScene(0);
-              renderLayers();
-              clearProps();
-              updateSceneIndicator();
-              // Seek to start
-              masterTl.time(0.001); // Tiny offset: GSAP set() at time 0 needs a non-zero seek to render
-              state.masterTime = 0;
-              els.slider.value = 0;
-              updateTimeDisplay(0);
-              // Show speaker bg if first scene needs it
-              // Show preview with buffering overlay on top
-              els.previewPlaceholder.style.display = 'none';
-              els.previewWrapper.style.display = '';
-              els.bufferOverlay.style.display = 'flex';
-              waitForMediaReady().then(function() {
-                els.slider.disabled = false;
-                els.playBtn.disabled = false;
-                els.bufferOverlay.style.display = 'none';
-              });
+      // Load composite (all scenes in one doc) alongside individual scenes
+      loadComposite(project).then(function() {
+        if (state._compositeHtml && project.scenes && project.scenes.length > 0) {
+          // Composite mode: write single document to iframe
+          els.previewPlaceholder.textContent = 'Loading composite preview...';
+          initComposite();
+          waitForCompositeReady(function(masterTl) {
+            state.currentSceneIndex = 0;
+            state.currentComponentIndex = -1;
+            state.duration = project.scenes[0].duration_seconds || 0;
+            updateActiveScene(0);
+            renderLayers();
+            clearProps();
+            updateSceneIndicator();
+            // Seek to start
+            masterTl.time(0.001);
+            state.masterTime = 0;
+            els.slider.value = 0;
+            updateTimeDisplay(0);
+            // Show speaker bg if first scene needs it
+            // Show preview with buffering overlay on top
+            els.previewPlaceholder.style.display = 'none';
+            els.previewWrapper.style.display = '';
+            els.bufferOverlay.style.display = 'flex';
+            waitForMediaReady().then(function() {
+              els.slider.disabled = false;
+              els.playBtn.disabled = false;
+              els.bufferOverlay.style.display = 'none';
             });
-          } else {
-            els.previewPlaceholder.textContent = 'Failed to load composite preview';
-          }
-        }).catch(function(err) {
-          console.error('[preview] composite load error:', err);
-          els.previewPlaceholder.textContent = 'Failed to load preview';
-        });
-      }
+          });
+        } else {
+          els.previewPlaceholder.textContent = 'Failed to load composite preview';
+        }
+      }).catch(function(err) {
+        console.error('[preview] composite load error:', err);
+        els.previewPlaceholder.textContent = 'Failed to load preview';
+      });
     }).catch(function() {
       els.sceneList.innerHTML = '<div class="empty-state">Failed to load project</div>';
     });
@@ -1507,8 +1268,7 @@ export function getPreviewHtml(): string {
       });
     });
 
-    var _isMobile = window.innerWidth <= 768;
-    if (!_isMobile) els.sceneList.querySelectorAll('.scene-thumb').forEach(function(thumb) {
+    els.sceneList.querySelectorAll('.scene-thumb').forEach(function(thumb) {
       var sceneId = thumb.dataset.sceneId;
       var path = '/scene-thumbnail/' + state.tenantId + '/' + project.project_id + '/' + sceneId;
       fetchHtml(path).then(function(html) {
@@ -1539,10 +1299,7 @@ export function getPreviewHtml(): string {
 
     updateActiveScene(index);
 
-    if (!state.compositeLoaded) {
-      if (window.innerWidth <= 768) loadSceneForMobile(index);
-      return;
-    }
+    if (!state.compositeLoaded) return;
     {
       // Composite mode: seek master timeline to scene start
       var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
@@ -1564,13 +1321,6 @@ export function getPreviewHtml(): string {
 
   // Update scene list active highlight without re-rendering
   function updateActiveScene(index) {
-    // Update mobile scene nav visibility
-    if (window.innerWidth <= 768 && state.currentProject) {
-      var _pBtn = document.getElementById('mobile-prev-scene');
-      var _nBtn = document.getElementById('mobile-next-scene');
-      if (_pBtn) _pBtn.style.display = index > 0 ? '' : 'none';
-      if (_nBtn) _nBtn.style.display = index < state.currentProject.scenes.length - 1 ? '' : 'none';
-    }
     var items = els.sceneList.querySelectorAll('.scene-item');
     items.forEach(function(el) {
       var i = parseInt(el.dataset.index, 10);
@@ -1669,7 +1419,7 @@ export function getPreviewHtml(): string {
     var nH = (project && project.canvas && project.canvas.height) || 1080;
 
     var rect = container.getBoundingClientRect();
-    var pad = window.innerWidth <= 768 ? 2 : 24;
+    var pad = 24;
     var scaleX = (rect.width - pad * 2) / nW;
     var scaleY = (rect.height - pad * 2) / nH;
     var scale = Math.min(scaleX, scaleY, 1);
@@ -2132,42 +1882,6 @@ export function getPreviewHtml(): string {
 
 
 
-  // Mobile per-scene animation loop
-  function mobileAnimLoop() {
-    if (!state.playing || !state._mobileSceneTl) return;
-    var tl = state._mobileSceneTl;
-    var dur = state._mobileSceneDur || tl.duration();
-    var currentTime = tl.time();
-
-    // Update slider and time display
-    if (dur > 0) {
-      els.slider.value = Math.round((currentTime / dur) * 1000);
-    }
-    updateTimeDisplay(currentTime);
-
-    // Check if scene finished
-    if (currentTime >= dur - 0.05) {
-      // Auto-advance to next scene
-      var p = state.currentProject;
-      if (p && state.currentSceneIndex < p.scenes.length - 1) {
-        state.playing = false;
-        selectScene(state.currentSceneIndex + 1);
-        // Auto-play next scene after a brief delay
-        setTimeout(function() {
-          if (!state.playing) togglePlay();
-        }, 300);
-      } else {
-        // Last scene: stop
-        state.playing = false;
-        updatePlayIcon();
-        tl.pause();
-      }
-      return;
-    }
-
-    state.animFrameId = requestAnimationFrame(mobileAnimLoop);
-  }
-
   function togglePlay() {
     if (state.playing) {
       // PAUSE
@@ -2182,16 +1896,10 @@ export function getPreviewHtml(): string {
       // Composite mode: master timeline is always paused, we just stop the clock
       // Videos will be paused by syncMedia on next tick
       pauseAudio();
-      // Mobile per-scene: pause the scene timeline
-      if (state._mobileSceneTl) {
-        state._mobileSceneTl.pause();
-      }
       // syncMedia will handle speaker pause+mute on next tick
-      if (state.compositeLoaded) {
-        state.forceSync = true;
-        syncMedia(state.masterTime, false);
-        state.forceSync = false;
-      }
+      state.forceSync = true;
+      syncMedia(state.masterTime, false);
+      state.forceSync = false;
     } else {
       // RESUME / PLAY
       state.playing = true;
@@ -2210,22 +1918,6 @@ export function getPreviewHtml(): string {
         syncMedia(globalTime, true);
         state.forceSync = false;
         animLoop();
-        return;
-      }
-
-      // Mobile per-scene mode: play the scene's own GSAP timeline
-      if (window.innerWidth <= 768) {
-        try {
-          var sceneTl = els.previewIframe.contentWindow.__MP_TIMELINE;
-          var sceneDur = els.previewIframe.contentWindow.__MP_DURATION || state.duration;
-          if (sceneTl) {
-            state._mobileSceneTl = sceneTl;
-            state._mobileSceneDur = sceneDur;
-            state.lastTickTime = performance.now();
-            sceneTl.play();
-            mobileAnimLoop();
-          }
-        } catch(e) { console.warn('[preview] mobile play error:', e); }
         return;
       }
     }
