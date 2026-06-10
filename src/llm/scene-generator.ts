@@ -11,6 +11,7 @@ import { sceneComponentSystemPrompt } from "./prompts.js";
 import { reviseComponent } from "./component-revise.js";
 import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./freeform-skills.js";
+import { getComponentReferenceLibrary } from "./component-reference.js";
 import type { PlannedScene, PlannedComponent } from "./unified-planner.js";
 import type { BrandKit, Canvas, OutputFormat, Scene, SceneComponent, SceneTransition } from "../core/types.js";
 import fs from "node:fs/promises";
@@ -144,12 +145,24 @@ async function generateFreeformScene(
 
   var brandVarsContext = buildBrandContext(opts.brandKit);
 
+  // Build component reference library for pattern guidance
+  var componentRefSection = getComponentReferenceLibrary();
+  var componentRefLibrary = componentRefSection
+    ? `## Reference Components (study these patterns, don't copy them)
+
+The following are production components from our library. Study their CSS patterns (shadows, typography, layout) and GSAP techniques (easing, stagger, choreography). Adapt their techniques for YOUR scene -- do not copy their structure.
+
+${componentRefSection}`
+    : "";
+
   var freeformSystemPrompt = `You are an expert motion graphics designer creating a single video scene as HTML+CSS+GSAP.
 Your output will be captured frame-by-frame by Playwright at ${opts.canvas.width}x${opts.canvas.height} and encoded to video.
 
 ## Design Skills (FOLLOW THESE RULES)
 
 ${designSkills}
+
+${componentRefLibrary}
 
 ## Output Format
 
@@ -187,6 +200,7 @@ Output a single .component.html file with exactly three sections:
 6. Load Google Fonts in <template> with <link> tags.
 7. Build-Breathe-Resolve: stagger entrances (0-30%), hold for readability (30-70%), exit/transition (70-100%).
 8. Scene duration: ${planned.duration_seconds}s. Time your animations to fit.
+9. Lottie animations are available via CDN (lottie-web 5.12.2). Use them for complex icon animations, micro-interactions, and decorative elements. Always sync to the GSAP timeline with goToAndStop() -- never use autoplay. See the design skills doc for patterns.
 
 ${brandVarsContext}
 

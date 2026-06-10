@@ -489,3 +489,76 @@ Before submitting any scene, verify:
 - [ ] **Ambient:** All decorative elements animate (drift, breathe, rotate).
 - [ ] **Radius:** Consistent system. Inner radius = outer radius − padding.
 - [ ] **Borders:** ≥2px for visibility. Dividers at rgba opacity, not hex colors.
+
+## 10. Lottie Animations
+
+Lottie animations are pre-built motion graphics rendered from After Effects as JSON. They add visual richness that's impossible to achieve with CSS/GSAP alone -- complex icon animations, loading sequences, particle effects, logo reveals.
+
+### How to Use Lottie in Scenes
+
+Load the lottie-web library via CDN and embed animations:
+
+```html
+<template>
+  <!-- Load lottie-web -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+  
+  <div class="scene">
+    <!-- Lottie container -->
+    <div id="lottie-icon" style="width: 200px; height: 200px;"></div>
+  </div>
+</template>
+
+<script>
+function createTimeline(el, data, ctx) {
+  var tl = gsap.timeline();
+  
+  // Load Lottie animation from URL
+  var anim = lottie.loadAnimation({
+    container: el.querySelector('#lottie-icon'),
+    renderer: 'svg',
+    loop: false,
+    autoplay: false,
+    path: 'https://assets.lottiefiles.com/packages/lf20_example.json'
+  });
+  
+  // Sync Lottie to GSAP timeline
+  var totalFrames = 60; // Set based on animation
+  tl.to({ frame: 0 }, {
+    frame: totalFrames,
+    duration: 2,
+    ease: 'none',
+    onUpdate: function() {
+      anim.goToAndStop(Math.round(this.targets()[0].frame), true);
+    }
+  });
+  
+  return tl;
+}
+</script>
+```
+
+### Free Lottie Sources
+
+Use these CDN-hosted Lottie animations:
+- LottieFiles: `https://lottie.host/` (free tier available)
+- IconScout: Pre-built animated icons
+- For generic animations, use data URIs with inline JSON
+
+### When to Use Lottie
+- Animated icons (checkmarks, loading, success/error states)
+- Logo reveals and brand animations
+- Complex particle effects
+- UI micro-interactions (toggle, swipe, tap)
+- Decorative ambient elements
+
+### When NOT to Use Lottie
+- Simple opacity/position animations (GSAP is simpler)
+- Text animations (use GSAP SplitText patterns)
+- Layout transitions (use CSS/GSAP morphing)
+
+### Syncing with GSAP Timeline
+Always sync Lottie to the GSAP timeline for deterministic frame capture:
+- Do NOT use autoplay: true (non-deterministic)
+- Use goToAndStop() with frame numbers
+- Wrap in a gsap.to() tween that drives the frame counter
