@@ -563,8 +563,21 @@ ${gsapSource}
 <script>
 (function() {
   var canvas = document.getElementById('glcanvas');
-  var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-  if (!gl) { console.error('WebGL not supported'); return; }
+  var gl = canvas.getContext('webgl', {preserveDrawingBuffer: true}) || canvas.getContext('experimental-webgl', {preserveDrawingBuffer: true});
+  if (!gl) {
+    console.error('WebGL not supported, falling back to crossfade');
+    // Fallback: create img elements and do a simple crossfade
+    document.body.innerHTML = '<img id="fA" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover" src="data:image/png;base64,${frameABase64}"><img id="fB" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0" src="data:image/png;base64,${frameBBase64}">';
+    var fA = document.getElementById('fA');
+    var fB = document.getElementById('fB');
+    var tl = gsap.timeline({ paused: true });
+    tl.to(fA, { autoAlpha: 0, duration: ${duration} }, 0);
+    tl.to(fB, { autoAlpha: 1, duration: ${duration} }, 0);
+    window.__MP_TIMELINE = tl;
+    window.__MP_DURATION = ${duration};
+    window.__MP_READY = true;
+    return;
+  }
 
   // Vertex shader
   var vertSrc = [
@@ -680,8 +693,20 @@ ${gsapSource}
 
   imgA.onload = onLoad;
   imgB.onload = onLoad;
+  imgA.onerror = function() { console.error('Image A failed'); onLoad(); };
+  imgB.onerror = function() { console.error('Image B failed'); onLoad(); };
   imgA.src = 'data:image/png;base64,${frameABase64}';
   imgB.src = 'data:image/png;base64,${frameBBase64}';
+
+  // Safety timeout: if images don't load in 10s, set ready anyway
+  setTimeout(function() {
+    if (!window.__MP_READY) {
+      console.warn('Shader transition: timeout waiting for images, forcing ready');
+      window.__MP_READY = true;
+      window.__MP_DURATION = ${duration};
+      window.__MP_TIMELINE = gsap.timeline({ paused: true });
+    }
+  }, 10000);
 })();
 </script>
 </body>
@@ -696,25 +721,30 @@ ${gsapSource}
 
   console.log(`  Shader transition: ${type} (${duration}s)`);
 
-  const totalFrames = Math.ceil(duration * fps);
-  await captureScene({
-    htmlPath,
-    outputDir: framesDir,
-    width,
-    height,
-    fps,
-    duration,
-  });
+  try {
+    const totalFrames = Math.ceil(duration * fps);
+    await captureScene({
+      htmlPath,
+      outputDir: framesDir,
+      width,
+      height,
+      fps,
+      duration,
+    });
 
-  console.log(`  Captured ${totalFrames} frames`);
+    console.log(`  Captured ${totalFrames} shader frames`);
 
-  const outputPath = path.join(workDir, "transition.mp4");
-  await encodeScene({
-    framesDir,
-    outputPath,
-    fps,
-  });
+    const outputPath = path.join(workDir, "transition.mp4");
+    await encodeScene({
+      framesDir,
+      outputPath,
+      fps,
+    });
 
-  console.log(`  Encoded: ${outputPath}`);
-  return outputPath;
+    console.log(`  Encoded shader: ${outputPath}`);
+    return outputPath;
+  } catch (err) {
+    console.warn(`  Shader transition ${type} failed, falling back to blur-crossfade: ${err}`);
+    return renderTransition({ ...opts, type: "blur-crossfade" });
+  }
 }

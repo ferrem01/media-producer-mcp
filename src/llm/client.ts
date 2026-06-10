@@ -14,7 +14,8 @@ export interface LLMConfig {
 export type LLMContentPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } }
-  | { type: "tool_result"; tool_use_id: string; content: string };
+  | { type: "tool_result"; tool_use_id: string; content: string }
+  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
@@ -149,6 +150,14 @@ function buildAnthropicMessages(
             type: "tool_result",
             tool_use_id: part.tool_use_id,
             content: part.content,
+          });
+        } else if (part.type === "tool_use") {
+          // Pass through tool_use blocks in assistant messages
+          blocks.push({
+            type: "tool_use",
+            id: part.id,
+            name: part.name,
+            input: part.input,
           });
         }
       }
