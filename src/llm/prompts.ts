@@ -305,6 +305,15 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 - If you see white or very light cards on a white/light background with no visible border or shadow: score MUST be 4 or below. The card is invisible.
 - Check the PREVIEW IMAGE, not just the HTML. If cards look like they blend into the background in the rendered image, they ARE invisible regardless of what the CSS says.
 
+## TEXT RENDERING HARD FAILURES (these are ALWAYS score <= 4)
+
+- If ANY visible text has missing spaces between words (e.g. "Resultsthat" instead of "Results that"): score MUST be 4 or below. This is a ship-blocking bug, not a minor issue.
+- If ANY word is broken/hyphenated mid-word across lines in a way that's unnatural (e.g. "Answ" on one line, "ers." on the next): score MUST be 4 or below.
+- If you see a broken image placeholder (the browser's broken-image icon or alt text showing instead of an image): score MUST be 3 or below.
+- If there are stray orphan characters, fragments, or rendering artifacts (random letters, partial text, garbled output): score MUST be 3 or below.
+- If ghost/watermark text (large semi-transparent background words like "DATA", "CONNECT") appears in more than one scene: flag it as an anti-pattern. It's an AI generation crutch. One per video max.
+- Check ALL text in the image character by character. Missing spaces, broken words, and stray characters are more damaging than poor contrast because they signal "this was not reviewed by a human."
+
 ## Rules
 
 1. Focus on: readability FIRST, then visual hierarchy, animation quality, brand consistency, and overall polish.

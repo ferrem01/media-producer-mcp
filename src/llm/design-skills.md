@@ -464,7 +464,10 @@ Every decorative shape, glow, line, and accent must move. Even 2px of drift over
 `ease: 'none'` is for infinite rotations only. Every entrance, exit, and emphasis needs a curve.
 
 ### ✗ Gradient Text as Default
-`background-clip: text` is the #1 "AI made this" tell. Use it sparingly — once per project max, and only on hero moments.
+`background-clip: text` is the #1 "AI made this" tell. Use it sparingly -- once per project max, and only on hero moments.
+
+### ✗ Ghost Watermark Text in Every Scene
+Large semi-transparent background words ("DATA", "CONNECT", "INSIGHTS") are the #2 AI tell. Use ghost text in ONE scene per video max, not every scene. Instead, vary your background texture: use radial glows, grid patterns, accent lines, or grain. If you find yourself reaching for ghost text, you haven't designed the background yet.
 
 ### ✗ Missing Scene Structure
 Don't animate everything at time 0. Build (staggered entrances) → Breathe (hold for readability) → Resolve (exits or transition). Every scene needs all three phases.

@@ -212,6 +212,10 @@ ${planned.freeform_brief}
 - Use the design skills rules: multi-layer shadows, varied easing, video-scale typography (64px+ headlines), background depth.
 - Fill the frame. Two focal points minimum. Anchor to edges, not center-float.
 - Every decorative element must have ambient animation (drift, breathe, pulse).
+- Do NOT use ghost/watermark text (large semi-transparent background words like "DATA", "CONNECT"). Use radial glows, grid patterns, accent lines, or grain for background texture instead.
+- All text MUST have correct spacing. Never concatenate words. Check every text string for missing spaces.
+- Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
+- Use gsap.from() for entrances (elements arrive at their CSS position). IMPORTANT: set initial CSS to the FINAL state (opacity: 1, transform: none). Let GSAP animate FROM the hidden state. This ensures the first captured frame shows content, not blank.
 ${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
 Output ONLY the .component.html source. Start with <template> and end with </script>.`;
 
