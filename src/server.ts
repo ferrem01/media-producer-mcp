@@ -467,6 +467,57 @@ export function createMcpServer(): McpServer {
         return ok({ status: "updated", project_id: project.project_id, plan: project.plan });
       }
 
+      // ── Property updates (status, name, canvas, scene/component props) ──
+      {
+        const project = await loadProject(params.tenant_id, params.project_id);
+        if (!project) return err("Project not found");
+
+        let updated = false;
+
+        if (params.status !== undefined) {
+          project.status = params.status;
+          updated = true;
+        }
+        if (params.name !== undefined) {
+          project.name = params.name;
+          updated = true;
+        }
+        if (params.canvas !== undefined) {
+          Object.assign(project.canvas, params.canvas);
+          updated = true;
+        }
+
+        // Scene-level property updates (non-removal)
+        if (params.scene_id && !params.component_id) {
+          const scene = project.scenes.find((s: any) => s.id === params.scene_id);
+          if (!scene) return err("Scene not found");
+          if (params.label !== undefined) { scene.label = params.label; updated = true; }
+          if (params.duration_seconds !== undefined) { scene.duration_seconds = params.duration_seconds; updated = true; }
+          if (params.background !== undefined) { scene.background = params.background; updated = true; }
+          if (params.transition_in !== undefined) { scene.transition_in = params.transition_in; updated = true; }
+          if (params.speaker_track !== undefined) { project.speaker_track = params.speaker_track as any; updated = true; }
+        }
+
+        // Component-level property updates (non-removal)
+        if (params.scene_id && params.component_id) {
+          const scene = project.scenes.find((s: any) => s.id === params.scene_id);
+          if (!scene) return err("Scene not found");
+          const comp = scene.components.find((c: any) => c.id === params.component_id);
+          if (!comp) return err("Component not found");
+          if (params.data !== undefined) { Object.assign(comp.data, params.data); updated = true; }
+          if (params.position !== undefined) { comp.position = params.position; updated = true; }
+          if (params.z_index !== undefined) { comp.z_index = params.z_index; updated = true; }
+          if (params.enter !== undefined) { comp.enter = params.enter; updated = true; }
+          if (params.exit !== undefined) { comp.exit = params.exit; updated = true; }
+        }
+
+        if (updated) {
+          project.updated_at = new Date().toISOString();
+          await saveProject(project);
+          return ok({ status: "updated", project_id: project.project_id });
+        }
+      }
+
       // ── Existing update logic (removals) ──
 
       // Remove component

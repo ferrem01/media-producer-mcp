@@ -6,6 +6,7 @@
  */
 
 import fs from "node:fs/promises";
+import { normalizeAllUrls } from "../core/normalize-urls.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Project, OutputFormat, Canvas, BrandKit, Scene } from "../core/types.js";
 import { RESOLUTION_DIMENSIONS, type ResolutionPreset } from "../core/types.js";
@@ -139,9 +140,11 @@ export async function listProjects(tenantId: string): Promise<Array<{ project_id
 export async function saveProject(project: Project): Promise<void> {
   const dir = projectDir(project.tenant_id, project.project_id);
   await fs.mkdir(dir, { recursive: true });
+  // Normalize all URLs to relative paths (never persist localhost URLs)
+  const normalized = normalizeAllUrls(project) as Project;
   await fs.writeFile(
     projectJsonPath(project.tenant_id, project.project_id),
-    JSON.stringify(project, null, 2),
+    JSON.stringify(normalized, null, 2),
   );
 }
 

@@ -13,6 +13,7 @@
  * - window.__MP_TIMELINE and window.__MP_READY for the capture loop
  */
 
+import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
 import fs from "node:fs/promises";
@@ -236,7 +237,7 @@ ${componentScripts.join("\n\n")}
 </body>
 </html>`;
 
-  return html;
+  return normalizeHtmlUrls(html);
 }
 
 /**

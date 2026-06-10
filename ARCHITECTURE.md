@@ -1,7 +1,7 @@
 # Media Producer MCP -- Architecture
 
 Living document. Updated as the system evolves.
-Last updated: 2026-06-08
+Last updated: 2026-06-10
 
 ## What This Is
 
@@ -258,6 +258,66 @@ src/
 └── index.ts                  # HTTP server + routes
 ```
 
+
+## Asset URL Normalization
+
+**Rule: All internal asset URLs must be relative paths. Never store or serve `http://localhost:*` URLs.**
+
+### Problem
+
+The server runs on `localhost:3200` internally. Multiple code paths (brand kit extraction, LLM-generated components, media enrichment) were producing absolute `http://localhost:3200/assets/...` URLs. These work on the server but break when accessed from any external client (phone, browser, different machine).
+
+### Solution: Defense in Depth
+
+URL normalization is enforced at **four layers** so localhost URLs can never leak to clients, even if one layer is bypassed:
+
+```
+Layer 1: Source Generation (LLM/enrichment output)
+    ↓ normalizeHtmlUrls() on component HTML
+Layer 2: Data Persistence (saveProject, saveBrandKit)
+    ↓ normalizeAllUrls() on full objects before JSON.stringify
+Layer 3: HTML Assembly (scene-assembler, composite-assembler)
+    ↓ normalizeHtmlUrls() on final HTML output
+Layer 4: Component Save (component-generator)
+    ↓ normalizeHtmlUrls() on .component.html before writeFile
+```
+
+### Implementation
+
+**`src/core/normalize-urls.ts`** -- three exported functions:
+
+| Function | Input | Use Case |
+|----------|-------|----------|
+| `normalizeAssetUrl(url)` | Single URL string | Point normalization |
+| `normalizeAllUrls(value)` | Any JSON value (deep walk) | Project/brand kit save |
+| `normalizeHtmlUrls(html)` | HTML string | Component/scene/composite output |
+
+All strip `http(s)://localhost:<any-port>/` → `/` via regex. External URLs (cdn, https://...) are untouched.
+
+### Where It's Wired
+
+| File | Function | Layer |
+|------|----------|-------|
+| `persistence/project.ts` | `saveProject()` | `normalizeAllUrls(project)` before write |
+| `persistence/brand-kit.ts` | `saveBrandKit()` | `normalizeAllUrls(kit)` before write |
+| `core/scene-assembler.ts` | `assembleScene()` | `normalizeHtmlUrls(html)` on return |
+| `core/composite-assembler.ts` | `assembleComposite()` | `normalizeHtmlUrls(html)` on return |
+| `core/component-generator.ts` | `saveTenantComponent()` | `normalizeHtmlUrls(source)` before write |
+| `llm/media-enrichment.ts` | image URL generation | Uses relative `/assets/...` paths (source fix) |
+| `llm/image-enrichment.ts` | image URL generation | Uses relative `/assets/...` paths (source fix) |
+
+### URL Format Rules
+
+- **Internal assets:** Always `/assets/{tenant}/...` (relative path, no host)
+- **Brand kit assets:** `/assets/{tenant}/brand-kit/{category}/{file}`
+- **Project assets:** `/assets/{tenant}/projects/{project}/assets/{file}`
+- **External URLs:** Full `https://...` (CDN, stock photos, etc.) -- left untouched
+- **Data paths:** `/data/media-producer/...` (server-side only, resolved by `resolveAudioUrl` in preview)
+
+### Tests
+
+`test/normalize-urls.test.ts` -- 13 tests covering single URL, deep object, HTML attribute, CSS url(), multiple occurrences, empty/external edge cases.
+
 ---
 
 ## Key Design Decisions
@@ -277,6 +337,7 @@ src/
 7. **Format-agnostic project model.** `project.json` works for video, image, slideshow, GIF, email header, etc. The render pipeline adapts based on `format`.
 
 8. **Brand kit as CSS variables.** Components don't hardcode colors or fonts. They use `--mp-color-primary`, `--mp-font-family`, etc. Brand consistency is automatic.
+n9. **Relative asset URLs only.** All internal asset URLs are stored and served as relative paths (`/assets/...`), never absolute localhost URLs. Enforced at four layers: source generation, data persistence, HTML assembly, and component save. See § "Asset URL Normalization" above.
 
 ---
 

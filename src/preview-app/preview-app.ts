@@ -415,11 +415,52 @@ export function getPreviewHtml(): string {
     0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
     40% { opacity: 1; transform: scale(1); }
   }
+
+  /* -- Mobile responsive -- */
+  @media (max-width: 768px) {
+    #app {
+      grid-template-columns: 1fr;
+      grid-template-rows: 44px 1fr auto;
+    }
+    header { padding: 0 10px; gap: 8px; }
+    header h1 { font-size: 12px; }
+    .header-controls select { min-width: 100px; font-size: 11px; }
+    .header-controls label { display: none; }
+    .header-controls .btn { padding: 4px 8px; font-size: 11px; }
+    #sidebar {
+      display: none;
+    }
+    #sidebar.mobile-open {
+      display: flex;
+      position: fixed;
+      top: 44px; left: 0; bottom: 0;
+      width: 260px;
+      z-index: 100;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+    }
+    .mobile-sidebar-toggle {
+      display: flex !important;
+      align-items: center; justify-content: center;
+      width: 32px; height: 32px;
+      background: #f3f4f6; border: 1px solid #e5e7eb;
+      border-radius: 6px; cursor: pointer; font-size: 16px;
+      flex-shrink: 0;
+    }
+    #bottom-panels { display: none; }
+    #playback-bar { padding: 6px 10px; gap: 8px; }
+    .time-display { min-width: 70px; font-size: 10px; }
+    .scene-indicator { font-size: 10px; }
+    .audio-indicator { display: none; }
+  }
+  @media (min-width: 769px) {
+    .mobile-sidebar-toggle { display: none; }
+  }
 </style>
 </head>
 <body>
 <div id="app">
   <header>
+    <button class="mobile-sidebar-toggle" id="mobile-sidebar-toggle" aria-label="Scenes">&#9776;</button>
     <h1>Media Producer</h1>
     <div class="header-controls">
       <label>Tenant</label>
@@ -523,7 +564,21 @@ export function getPreviewHtml(): string {
   };
 
   // Auth token from URL
-  var _token = new URLSearchParams(window.location.search).get('token');
+  // Mobile sidebar toggle
+    var _sidebarToggle = document.getElementById('mobile-sidebar-toggle');
+    if (_sidebarToggle) {
+      _sidebarToggle.addEventListener('click', function() {
+        var sb = document.getElementById('sidebar');
+        sb.classList.toggle('mobile-open');
+      });
+      document.getElementById('sidebar').addEventListener('click', function(e) {
+        if (e.target.closest('.scene-item') && window.innerWidth <= 768) {
+          document.getElementById('sidebar').classList.remove('mobile-open');
+        }
+      });
+    }
+
+    var _token = new URLSearchParams(window.location.search).get('token');
   var _urlTenant = new URLSearchParams(window.location.search).get('tenant');
 
   // API helper
@@ -1268,7 +1323,8 @@ export function getPreviewHtml(): string {
       });
     });
 
-    els.sceneList.querySelectorAll('.scene-thumb').forEach(function(thumb) {
+    var _isMobile = window.innerWidth <= 768;
+    if (!_isMobile) els.sceneList.querySelectorAll('.scene-thumb').forEach(function(thumb) {
       var sceneId = thumb.dataset.sceneId;
       var path = '/scene-thumbnail/' + state.tenantId + '/' + project.project_id + '/' + sceneId;
       fetchHtml(path).then(function(html) {

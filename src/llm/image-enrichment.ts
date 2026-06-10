@@ -148,7 +148,7 @@ Rules:
 
       // Build HTTP URL for the image
       const imgFilename = path.basename(imgResult.path);
-      const imgUrl = `http://localhost:3200/assets/${tenantId}/projects/${projectId}/assets/${imgFilename}`;
+      const imgUrl = `/assets/${tenantId}/projects/${projectId}/assets/${imgFilename}`;
 
       // If scene has image-showcase component, set its src; otherwise add one
       if (scene) {

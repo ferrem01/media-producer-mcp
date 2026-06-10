@@ -8,6 +8,7 @@
  */
 
 import fs from "node:fs/promises";
+import { normalizeAllUrls } from "../core/normalize-urls.js";
 import type { BrandKit, DesignSystem } from "../core/types.js";
 import {
   brandKitDir,
@@ -54,11 +55,14 @@ export async function saveBrandKit(tenantId: string, kit: BrandKit): Promise<voi
   // Ensure brand-kit/ and brand-kit/assets/ exist
   await fs.mkdir(brandKitAssetsDir(tenantId), { recursive: true });
 
+  // Normalize all URLs to relative paths (never persist localhost URLs)
+  const normalized = normalizeAllUrls(kit) as BrandKit;
+
   // Write JSON
-  await fs.writeFile(brandKitJsonPath(tenantId), JSON.stringify(kit, null, 2));
+  await fs.writeFile(brandKitJsonPath(tenantId), JSON.stringify(normalized, null, 2));
 
   // Compile and write CSS
-  const css = compileBrandCSS(kit);
+  const css = compileBrandCSS(normalized);
   await fs.writeFile(brandKitCssPath(tenantId), css);
 }
 

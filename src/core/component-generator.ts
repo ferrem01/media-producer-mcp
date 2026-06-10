@@ -7,6 +7,7 @@
  */
 
 import fs from "node:fs/promises";
+import { normalizeHtmlUrls } from "./normalize-urls.js";
 import path from "node:path";
 import { config } from "../config.js";
 import { assembleScene } from "./scene-assembler.js";
@@ -100,7 +101,7 @@ export async function saveGeneratedComponent(
   await fs.mkdir(tenantCompDir, { recursive: true });
 
   const filePath = path.join(tenantCompDir, `${type}.component.html`);
-  await fs.writeFile(filePath, source);
+  await fs.writeFile(filePath, normalizeHtmlUrls(source));
 
   return filePath;
 }

@@ -12,6 +12,7 @@
  * - Transport clock driven playback (GSAP as puppet)
  */
 
+import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import {
   generateFontLinks,
@@ -252,7 +253,7 @@ ${masterScript}
 </body>
 </html>`;
 
-  return html;
+  return normalizeHtmlUrls(html);
 }
 
 /**

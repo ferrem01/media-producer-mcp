@@ -150,7 +150,7 @@ Rules:
     if (r.status === "fulfilled") {
       var { index: idx, result: imgResult, prompt: imgPrompt } = r.value;
       var imgFilename = path.basename(imgResult.path);
-      var imgUrl = `http://localhost:3200/assets/${tenantId}/projects/${projectId}/assets/${imgFilename}`;
+      var imgUrl = `/assets/${tenantId}/projects/${projectId}/assets/${imgFilename}`;
 
       imageUrls.set(idx, imgUrl);
 

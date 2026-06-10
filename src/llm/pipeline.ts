@@ -1686,6 +1686,7 @@ async function runUnifiedPipeline(
     trace?.endEvent();
   }
 
+  project.status = "generated";
   await saveProject(project);
 
   return {
