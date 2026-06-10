@@ -13,6 +13,7 @@ import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js
 import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
 import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { COMPOSITION_PLAYBOOK } from "./cinematography.js";
+import { getStorytellingGuide } from "./freeform-skills.js";
 import { formatTemplateCatalogForPrompt } from "./template-catalog.js";
 import type { BrandKit, Canvas, OutputFormat } from "../core/types.js";
 
@@ -66,6 +67,9 @@ export interface PlannedScene {
   // Template scene (entire scene uses a pre-built template)
   template?: string;  // template ID, e.g. "O1-big-statement"
   template_data?: Record<string, unknown>;  // content for template slots
+  // Freeform scene (full bespoke HTML generation)
+  freeform?: boolean;  // true = generate full scene HTML from rich storyboard description
+  freeform_brief?: string;  // detailed storyboard-quality scene description
 }
 
 export interface StoryboardResult {
@@ -86,11 +90,31 @@ export async function planStoryboard(opts: UnifiedPlannerOpts): Promise<Storyboa
 
   var templateCatalogStr = formatTemplateCatalogForPrompt();
 
-  var systemPrompt = `You are planning a ${opts.format} project.
+  var storytellingGuide = getStorytellingGuide();
 
-You have THREE options for each scene:
+  var systemPrompt = `You are a creative director planning a ${opts.format} project.
 
-## Option 1: Template Scene (PREFERRED)
+You think in visual STORIES, not slide decks. Every scene should feel like something the viewer wants to watch, not endure.
+
+${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n` : ""}You have FOUR options for each scene:
+
+## Option 1: Freeform Scene (BEST QUALITY — use for hero moments, product demos, visual storytelling)
+Full bespoke HTML+CSS+GSAP generated from a rich storyboard description. Write a detailed visual brief describing what the viewer EXPERIENCES — with motion verbs, depth layers, choreography. This produces the highest quality output.
+
+{
+  "label": "Scene 1 - Connector Discovery",
+  "duration_seconds": 5,
+  "description": "User discovers and activates the connector feature",
+  "freeform": true,
+  "freeform_brief": "A clean workspace fills the frame — warm off-white background with subtle grid lines pulsing faintly. A cursor GLIDES from below toward a plus icon at center. On click, a circular button BLOOMS outward with a soft shadow spreading beneath it. The circle MORPHS into a rounded card panel. Menu items STAGGER in from the right — each row has a thin icon, label text, and a chevron. The cursor DRIFTS to Connectors, which highlights with a warm rounded fill. BG: subtle grid with breathing glow. MG: UI card with menu items. FG: cursor with drop shadow, particle hints.",
+  "components": [],
+  "voiceover_text": "Discover the connector that changes everything.",
+  "transition_in": { "type": "none", "duration_seconds": 0 }
+}
+
+Freeform briefs MUST be 5+ sentences with specific motion verbs, depth layers (BG/MG/FG), and choreography. NOT "show the feature" — describe what HAPPENS frame by frame.
+
+## Option 2: Template Scene (GOOD — use for standard layouts like titles, stats, CTAs)
 Use a pre-built scene template. These have premium Apple-level visuals baked in. You only provide the content.
 
 {
@@ -118,7 +142,7 @@ Compose a scene from pre-built components. Each component has a type and data.
 }
 
 ## Option 3: Custom Component (escape hatch)
-Full LLM-generated HTML/CSS/GSAP. Use ONLY when no template or library component fits.
+Single custom HTML component within the standard structure. Use when no template or library component fits.
 
 {
   "label": "Scene 3 - Custom Demo",
@@ -130,9 +154,15 @@ Full LLM-generated HTML/CSS/GSAP. Use ONLY when no template or library component
   "transition_in": { "type": "blur-crossfade", "duration_seconds": 0.5 }
 }
 
-PREFER templates over library components, and library components over custom.
-Templates produce the highest quality output. Custom is the lowest consistency.
-Use custom ONLY for scenes that genuinely don't fit any template or library component.
+QUALITY RANKING: Freeform > Templates > Library > Custom.
+Use FREEFORM for scenes that tell a visual story — product demos, UI walkthroughs, interaction sequences, before/after transformations, cause-and-effect cascades, metaphors made visual. These produce the highest quality, most impressive output.
+Use TEMPLATES for standard layouts (big statements, stat displays, simple CTAs).
+Use LIBRARY for data-heavy scenes with standard components.
+Use CUSTOM as a last resort.
+
+For product/feature videos, at LEAST 50% of scenes should be freeform. For demos and walkthroughs, aim for 70%+ freeform. Only fall back to templates for simple title/CTA scenes.
+
+When writing freeform_brief: think like a storyboard director. Describe what the viewer EXPERIENCES, not the layout. Use motion verbs (SLAMS, DRIFTS, MORPHS, SNAPS, ASSEMBLES). Include BG/MG/FG layers. Describe choreography and timing relationships between elements.
 
 When using a template: set "template" to the template ID, "template_data" with the slot values, and leave "components" as an empty array [].
 You can MIX approaches across scenes -- template for the opener, library for stats, custom for a unique demo.

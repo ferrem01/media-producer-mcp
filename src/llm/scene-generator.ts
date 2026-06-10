@@ -10,6 +10,7 @@ import { callLLM, type LLMConfig } from "./client.js";
 import { sceneComponentSystemPrompt } from "./prompts.js";
 import { reviseComponent } from "./component-revise.js";
 import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
+import { getDesignSkills } from "./freeform-skills.js";
 import type { PlannedScene, PlannedComponent } from "./unified-planner.js";
 import type { BrandKit, Canvas, OutputFormat, Scene, SceneComponent, SceneTransition } from "../core/types.js";
 import fs from "node:fs/promises";
@@ -43,6 +44,11 @@ export interface GeneratedScene {
 export async function generateScene(opts: SceneGeneratorOpts): Promise<GeneratedScene> {
   var planned = opts.scene;
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
+
+  // ── Freeform scene path ──
+  if (planned.freeform && planned.freeform_brief) {
+    return await generateFreeformScene(opts, planned, sceneId);
+  }
 
   // ── Template scene path ──
   if (planned.template) {
@@ -124,6 +130,146 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   };
 
   return { scene, customSources: customSources.size > 0 ? customSources : undefined };
+}
+
+// ── Freeform Scene Generation ──
+
+async function generateFreeformScene(
+  opts: SceneGeneratorOpts,
+  planned: PlannedScene,
+  sceneId: string,
+): Promise<GeneratedScene> {
+  var compName = `freeform_${sceneId}`;
+  var designSkills = getDesignSkills();
+
+  var brandVarsContext = buildBrandContext(opts.brandKit);
+
+  var freeformSystemPrompt = `You are an expert motion graphics designer creating a single video scene as HTML+CSS+GSAP.
+Your output will be captured frame-by-frame by Playwright at ${opts.canvas.width}x${opts.canvas.height} and encoded to video.
+
+## Design Skills (FOLLOW THESE RULES)
+
+${designSkills}
+
+## Output Format
+
+Output a single .component.html file with exactly three sections:
+
+\`\`\`html
+<template>
+  <!-- Full scene HTML here -->
+</template>
+
+<style scoped>
+  /* Complete CSS here */
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    // GSAP animation here
+    return tl;
+  }
+</script>
+\`\`\`
+
+## Technical Rules
+
+1. Output ONLY the component HTML. No explanation, no markdown fences.
+2. The createTimeline(el, data, ctx) function:
+   - el: the component's root DOM element
+   - data: JSON data object
+   - ctx: { duration, fps, canvas: {width, height}, motion }
+   - Must return a GSAP timeline (NOT paused)
+3. Canvas: ${opts.canvas.width}x${opts.canvas.height}px. ALL content MUST be visible.
+4. GSAP is available globally. You can use: gsap.to(), gsap.from(), gsap.fromTo(), gsap.set(), gsap.timeline().
+5. Use 'var' for all variable declarations (not const/let).
+6. Load Google Fonts in <template> with <link> tags.
+7. Build-Breathe-Resolve: stagger entrances (0-30%), hold for readability (30-70%), exit/transition (70-100%).
+8. Scene duration: ${planned.duration_seconds}s. Time your animations to fit.
+
+${brandVarsContext}
+
+## This Scene
+
+Duration: ${planned.duration_seconds} seconds
+Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}
+Project: ${opts.prompt}
+`;
+
+  var freeformUserPrompt = `Create this scene:
+
+Label: ${planned.label}
+Description: ${planned.description}
+
+## Storyboard Brief
+
+${planned.freeform_brief}
+
+## Requirements
+- Follow the storyboard brief closely. Every motion verb in the brief should map to a GSAP tween.
+- Create a visually stunning, polished scene. This is motion graphics, not a web page.
+- Use the design skills rules: multi-layer shadows, varied easing, video-scale typography (64px+ headlines), background depth.
+- Fill the frame. Two focal points minimum. Anchor to edges, not center-float.
+- Every decorative element must have ambient animation (drift, breathe, pulse).
+${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
+Output ONLY the .component.html source. Start with <template> and end with </script>.`;
+
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (freeform)`);
+
+  var sceneHtml = await callLLM(opts.llmConfig, [
+    { role: "system", content: freeformSystemPrompt },
+    { role: "user", content: freeformUserPrompt },
+  ], { temperature: 0.6, maxTokens: 16384 });
+
+  sceneHtml = stripHtmlFences(sceneHtml);
+
+  var customSources = new Map<string, string>();
+  customSources.set(compName, sceneHtml);
+
+  var transition: SceneTransition | undefined;
+  if (planned.transition_in && planned.transition_in.type !== "none") {
+    transition = {
+      type: planned.transition_in.type as SceneTransition["type"],
+      duration_seconds: planned.transition_in.duration_seconds || 0.5,
+    };
+  }
+
+  var scene: Scene = {
+    id: sceneId,
+    label: planned.label,
+    duration_seconds: planned.duration_seconds || 5,
+    transition_in: transition,
+    components: [{
+      id: "comp_0",
+      type: compName,
+      data: planned.template_data || {},
+      z_index: 10,
+    }],
+  };
+
+  return { scene, customSources };
+}
+
+function buildBrandContext(brandKit: BrandKit): string {
+  var lines: string[] = ["## Brand Kit"];
+  if (brandKit.colors) {
+    lines.push("Colors (use CSS custom properties var(--mp-color-*) in your CSS):");
+    for (var [key, val] of Object.entries(brandKit.colors)) {
+      lines.push(`  --mp-color-${key.replace(/_/g, "-")}: ${val}`);
+    }
+  }
+  if (brandKit.fonts?.length) {
+    lines.push("Fonts:");
+    for (var f of brandKit.fonts) {
+      lines.push(`  ${f.family} (weights: ${f.weights?.join(", ") || "400, 700"})`);
+    }
+  }
+  if (brandKit.style) {
+    lines.push(`Border radius: ${brandKit.style.border_radius || "12px"}`);
+    lines.push(`Motion: ${brandKit.style.motion || "cinematic"}`);
+  }
+  return lines.join("\n");
 }
 
 // ── Template Scene Generation ──
