@@ -313,6 +313,8 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 - If there are stray orphan characters, fragments, or rendering artifacts (random letters, partial text, garbled output): score MUST be 3 or below.
 - If ghost/watermark text (large semi-transparent background words like "DATA", "CONNECT") appears in more than one scene: flag it as an anti-pattern. It's an AI generation crutch. One per video max.
 - Check ALL text in the image character by character. Missing spaces, broken words, and stray characters are more damaging than poor contrast because they signal "this was not reviewed by a human."
+- If the main content (UI mockup, cards, text blocks) fills less than 50% of the canvas with the rest being empty gradient or dead space: score MUST be 5 or below. A tiny UI element floating in a sea of dark gradient is not design, it's a failure to fill the frame.
+- If ANY text uses placeholder/generic copy like "Feature One", "Description of the first feature", "Lorem ipsum": score MUST be 4 or below. Placeholder text is never acceptable.
 
 ## Rules
 

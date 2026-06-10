@@ -451,6 +451,9 @@ Not everything slides up from `y: 30`. Mix directions: headlines from left, data
 ### ✗ Everything Centered
 Center-centered layouts with equal padding on all sides look like placeholder wireframes. Use split frames, asymmetric padding, edge-anchored elements.
 
+### ✗ Scene Content Filling Less Than 70% of the Frame
+If your UI mockup, card panel, or content block only fills 40% of the 1920x1080 canvas with the rest being empty gradient, you have FAILED. Content must occupy at least 70% of the frame. Scale up your UI elements. Push panels wider. Make cards bigger. A tiny UI floating in a sea of dark gradient screams "I didn't design this, I generated it." Fill the frame.
+
 ### ✗ Pure Black or White
 `#000000` and `#ffffff` exist nowhere in nature. Tint every neutral toward your scene's accent hue.
 
@@ -468,6 +471,9 @@ Every decorative shape, glow, line, and accent must move. Even 2px of drift over
 
 ### ✗ Ghost Watermark Text in Every Scene
 Large semi-transparent background words ("DATA", "CONNECT", "INSIGHTS") are the #2 AI tell. Use ghost text in ONE scene per video max, not every scene. Instead, vary your background texture: use radial glows, grid patterns, accent lines, or grain. If you find yourself reaching for ghost text, you haven't designed the background yet.
+
+### ✗ Placeholder or Generic Copy
+NEVER use placeholder text like "Feature One", "Description of the first feature", "Lorem ipsum", or any generic fill text. Every text element must contain specific, benefit-led copy derived from the product description. If you don't know the real copy, invent compelling copy that sounds real. "Connect any data source in 60 seconds" beats "Description of the first feature" every time.
 
 ### ✗ Missing Scene Structure
 Don't animate everything at time 0. Build (staggered entrances) → Breathe (hold for readability) → Resolve (exits or transition). Every scene needs all three phases.
