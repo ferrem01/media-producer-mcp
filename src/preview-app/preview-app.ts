@@ -419,25 +419,26 @@ export function getPreviewHtml(): string {
   /* -- Mobile responsive -- */
   @media (max-width: 768px) {
     #app {
-      grid-template-columns: 1fr;
-      grid-template-rows: 44px 1fr auto;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
     }
 
-    /* Header: compact, hide controls when project loaded via URL */
-    header { padding: 0 10px; gap: 6px; height: 44px; }
+    /* Header */
+    header { padding: 0 10px; gap: 6px; height: 44px; flex-shrink: 0; }
     header h1 { font-size: 13px; }
     .header-controls { gap: 4px; }
     .header-controls label { display: none; }
     .header-controls select { min-width: 80px; font-size: 11px; padding: 4px 6px; }
     .header-controls input { width: 80px !important; font-size: 11px; padding: 4px 6px; }
     .header-controls .btn { padding: 4px 10px; font-size: 11px; }
-    /* Hide tenant/project controls when loaded via URL params */
     .header-controls.auto-loaded #tenant-input,
     .header-controls.auto-loaded label,
     .header-controls.auto-loaded #load-btn { display: none; }
-    .header-controls.auto-loaded select { min-width: 120px; }
+    .header-controls.auto-loaded select { min-width: 100px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 
-    /* Sidebar: hidden by default, slide-in overlay */
+    /* Sidebar: hidden, slide-in overlay */
     #sidebar { display: none; }
     #sidebar.mobile-open {
       display: flex;
@@ -452,44 +453,47 @@ export function getPreviewHtml(): string {
       from { transform: translateX(-100%); }
       to { transform: translateX(0); }
     }
-    /* Backdrop overlay when sidebar is open */
     .mobile-backdrop {
       display: none;
-      position: fixed;
-      inset: 0; top: 44px;
-      background: rgba(0,0,0,0.3);
-      z-index: 150;
+      position: fixed; inset: 0; top: 44px;
+      background: rgba(0,0,0,0.3); z-index: 150;
     }
     .mobile-backdrop.visible { display: block; }
-
-    /* Sidebar toggle button */
     .mobile-sidebar-toggle {
       display: flex !important;
       align-items: center; justify-content: center;
       width: 36px; height: 36px;
       background: #f3f4f6; border: 1px solid #e5e7eb;
       border-radius: 8px; cursor: pointer; font-size: 18px;
-      flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0; -webkit-tap-highlight-color: transparent;
     }
     .mobile-sidebar-toggle:active { background: #e5e7eb; }
-
-    /* Scene items: larger touch targets */
     .scene-item { padding: 10px 12px; min-height: 44px; }
     .scene-label { font-size: 13px; }
     .scene-dur { font-size: 11px; }
     .scene-thumb { display: none; }
 
-    /* Hide bottom panels on mobile */
-    #bottom-panels { display: none; }
+    /* Main area: video + controls grouped at top */
+    #main {
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      background: #f3f4f6;
+    }
+    #preview-container {
+      flex: none;
+      background: #f3f4f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 2px 8px;
+    }
 
-    /* Main preview: reduce padding for more space */
-    #main { background: #f3f4f6; }
-    #preview-container { background: #f3f4f6; }
-
-    /* Playback bar: touch-friendly */
+    /* Playback bar: fixed at bottom, never pushed off-screen */
     #playback-bar {
+      flex-shrink: 0;
       padding: 10px 12px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
       gap: 10px;
       background: #ffffff;
       border-top: 1px solid #e5e7eb;
@@ -499,30 +503,29 @@ export function getPreviewHtml(): string {
       -webkit-tap-highlight-color: transparent;
     }
     .play-btn svg { width: 16px; height: 16px; }
-    #timeline-slider {
-      height: 6px;
-      background: #e5e7eb;
-    }
-    #timeline-slider::-webkit-slider-thumb {
-      width: 20px; height: 20px;
-      /* larger touch target */
-    }
-    .time-display {
-      min-width: 60px; font-size: 10px;
-      color: #6b7280;
-    }
-    .scene-indicator {
-      font-size: 10px;
-      background: #f3f4f6;
-      color: #6b7280;
-    }
+    #timeline-slider { height: 6px; }
+    #timeline-slider::-webkit-slider-thumb { width: 20px; height: 20px; }
+    .time-display { min-width: 60px; font-size: 10px; }
+    .scene-indicator { font-size: 10px; }
     .audio-indicator { display: none; }
 
-    /* Preview placeholder text */
-    .no-scene { color: #9ca3af; }
-    .loading-state { color: #6b7280; }
+    /* Hide bottom panels */
+    #bottom-panels { display: none; }
 
-    /* Prev/next scene navigation buttons (mobile only) */
+    /* Scene info shown on mobile below video */
+    .mobile-scene-info {
+      display: block !important;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #374151;
+      background: #f3f4f6;
+      text-align: center;
+    }
+    .mobile-scene-info .scene-title { font-weight: 600; }
+    .mobile-scene-info .scene-meta { font-size: 11px; color: #6b7280; margin-top: 2px; }
+
+    /* Scene nav buttons */
     .mobile-scene-nav {
       display: flex !important;
       position: absolute;
@@ -534,25 +537,21 @@ export function getPreviewHtml(): string {
       align-items: center; justify-content: center;
       cursor: pointer; z-index: 10;
       -webkit-tap-highlight-color: transparent;
-      opacity: 0.6;
-      transition: opacity 0.15s;
+      opacity: 0.7;
     }
-    .mobile-scene-nav:active { opacity: 1; background: rgba(0,0,0,0.7); }
+    .mobile-scene-nav:active { opacity: 1; }
     #mobile-prev-scene { left: 8px; }
     #mobile-next-scene { right: 8px; }
+
+    /* Loading / placeholder text */
+    .no-scene { color: #9ca3af; }
+    .loading-state { color: #6b7280; }
   }
   @media (min-width: 769px) {
     .mobile-sidebar-toggle { display: none; }
     .mobile-backdrop { display: none !important; }
     .mobile-scene-nav { display: none !important; }
   }
-  /* Safe area insets for notched phones */
-  @supports (padding: env(safe-area-inset-bottom)) {
-    @media (max-width: 768px) {
-      #playback-bar {
-        padding-bottom: calc(10px + env(safe-area-inset-bottom));
-      }
-    }
   }
 </style>
 </head>
@@ -587,6 +586,7 @@ export function getPreviewHtml(): string {
         <div id="buffer-overlay" class="buffer-overlay"><div class="loading-state">Buffering media<div class="loading-dots"><span></span><span></span><span></span></div></div></div>
       </div>
     </div>
+    <div class="mobile-scene-info" id="mobile-scene-info" style="display:none;"></div>
 
     <div id="playback-bar">
       <button class="play-btn" id="play-btn" disabled>
@@ -1342,6 +1342,14 @@ export function getPreviewHtml(): string {
       els.slider.value = 0;
       els.slider.disabled = false;
       els.playBtn.disabled = false;
+      // Update mobile scene info
+      var infoEl = document.getElementById('mobile-scene-info');
+      if (infoEl && window.innerWidth <= 768) {
+        infoEl.style.display = '';
+        var s = state.currentProject.scenes[index];
+        infoEl.innerHTML = '<div class="scene-title">' + (s.label || ('Scene ' + (index + 1))) + '</div>'
+          + '<div class="scene-meta">' + (s.duration_seconds || 0).toFixed(1) + 's • Scene ' + (index + 1) + ' of ' + state.currentProject.scenes.length + '</div>';
+      }
     }).catch(function(err) {
       console.error('[preview] scene load failed:', err);
       els.previewPlaceholder.textContent = 'Failed to load scene ' + (index + 1);
@@ -1662,7 +1670,7 @@ export function getPreviewHtml(): string {
     var nH = (project && project.canvas && project.canvas.height) || 1080;
 
     var rect = container.getBoundingClientRect();
-    var pad = window.innerWidth <= 768 ? 4 : 24;
+    var pad = window.innerWidth <= 768 ? 2 : 24;
     var scaleX = (rect.width - pad * 2) / nW;
     var scaleY = (rect.height - pad * 2) / nH;
     var scale = Math.min(scaleX, scaleY, 1);
