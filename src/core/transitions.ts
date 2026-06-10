@@ -29,7 +29,20 @@ export type TransitionType =
   | "wipe-up"
   | "wipe-down"
   | "iris"
-  | "push";
+  | "push"
+  // Shader transitions (WebGL)
+  | "shader-crosswarp"
+  | "shader-ripple"
+  | "shader-radial"
+  | "shader-directional-warp"
+  | "shader-burn"
+  | "shader-chromatic"
+  | "shader-lens-distortion";
+
+/** Check if a transition type uses WebGL shaders */
+function isShaderTransition(type: string): boolean {
+  return type.startsWith("shader-");
+}
 
 export interface TransitionOptions {
   /** Transition type */
@@ -67,6 +80,11 @@ export async function renderTransition(opts: TransitionOptions): Promise<string>
 
   // Load GSAP source
   const gsapSource = await loadGsapMinimal(gsapDir);
+
+  // Check if this is a shader transition
+  if (isShaderTransition(type)) {
+    return renderShaderTransition(opts, frameABase64, frameBBase64, gsapSource);
+  }
 
   // Get the animation script for this transition type
   const animScript = getTransitionScript(type, duration, width);
@@ -391,4 +409,312 @@ var gsap = {
   fromTo: function() {}
 };`;
   }
+}
+
+// ── Shader Transitions (WebGL) ──
+
+/**
+ * GLSL fragment shader library for transitions.
+ * All shaders from gl-transitions (MIT license).
+ * Each shader expects: uniform float progress, uniform sampler2D from, uniform sampler2D to
+ */
+const SHADER_LIBRARY: Record<string, { glsl: string; uniforms?: Record<string, string> }> = {
+  "shader-crosswarp": {
+    glsl: `
+      // Author: Eke Péter <peterekepeter@gmail.com> | License: MIT
+      vec4 transition(vec2 p) {
+        float x = progress;
+        x = smoothstep(0.0, 1.0, (x * 2.0 + p.x - 1.0));
+        return mix(getFromColor((p - 0.5) * (1.0 - x) + 0.5), getToColor((p - 0.5) * x + 0.5), x);
+      }`,
+  },
+  "shader-ripple": {
+    glsl: `
+      // Author: gre | License: MIT
+      const float amplitude = 100.0;
+      const float speed = 50.0;
+      vec4 transition(vec2 uv) {
+        vec2 dir = uv - vec2(0.5);
+        float dist = length(dir);
+        vec2 offset = dir * (sin(progress * dist * amplitude - progress * speed) + 0.5) / 30.0 * progress;
+        return mix(
+          getFromColor(uv + offset),
+          getToColor(uv),
+          smoothstep(0.2, 1.0, progress)
+        );
+      }`,
+  },
+  "shader-radial": {
+    glsl: `
+      // Author: Xaychru | License: MIT
+      const float smoothness = 1.0;
+      const float PI = 3.141592653589;
+      vec4 transition(vec2 p) {
+        vec2 rp = p * 2.0 - 1.0;
+        return mix(
+          getToColor(p),
+          getFromColor(p),
+          smoothstep(0.0, smoothness, atan(rp.y, rp.x) - (progress - 0.5) * PI * 2.5)
+        );
+      }`,
+  },
+  "shader-directional-warp": {
+    glsl: `
+      // Author: pschroen | License: MIT
+      const float smoothness = 0.1;
+      const vec2 direction = vec2(-1.0, 1.0);
+      const vec2 center = vec2(0.5, 0.5);
+      vec4 transition(vec2 uv) {
+        vec2 v = normalize(direction);
+        v /= abs(v.x) + abs(v.y);
+        float d = v.x * center.x + v.y * center.y;
+        float m = 1.0 - smoothstep(-smoothness, 0.0, v.x * uv.x + v.y * uv.y - (d - 0.5 + progress * (1.0 + smoothness)));
+        return mix(getFromColor((uv - 0.5) * (1.0 - m) + 0.5), getToColor((uv - 0.5) * m + 0.5), m);
+      }`,
+  },
+  "shader-burn": {
+    glsl: `
+      // Author: gre | License: MIT
+      const vec3 burnColor = vec3(0.9, 0.4, 0.2);
+      vec4 transition(vec2 uv) {
+        return mix(
+          getFromColor(uv) + vec4(progress * burnColor, 1.0),
+          getToColor(uv) + vec4((1.0 - progress) * burnColor, 1.0),
+          progress
+        );
+      }`,
+  },
+  "shader-chromatic": {
+    glsl: `
+      // Chromatic aberration transition
+      vec4 transition(vec2 uv) {
+        float amount = 0.03 * sin(progress * 3.14159);
+        vec4 fromR = getFromColor(uv + vec2(amount, 0.0));
+        vec4 fromG = getFromColor(uv);
+        vec4 fromB = getFromColor(uv - vec2(amount, 0.0));
+        vec4 fromAberrated = vec4(fromR.r, fromG.g, fromB.b, 1.0);
+        vec4 toR = getToColor(uv + vec2(amount, 0.0));
+        vec4 toG = getToColor(uv);
+        vec4 toB = getToColor(uv - vec2(amount, 0.0));
+        vec4 toAberrated = vec4(toR.r, toG.g, toB.b, 1.0);
+        return mix(fromAberrated, toAberrated, smoothstep(0.0, 1.0, progress));
+      }`,
+  },
+  "shader-lens-distortion": {
+    glsl: `
+      // Gravitational lens distortion transition
+      vec4 transition(vec2 uv) {
+        vec2 center = vec2(0.5, 0.5);
+        vec2 dir = uv - center;
+        float dist = length(dir);
+        float strength = 0.5 * sin(progress * 3.14159);
+        float distortion = 1.0 + strength * (1.0 - smoothstep(0.0, 0.5, dist));
+        vec2 distortedUV = center + dir * distortion;
+        distortedUV = clamp(distortedUV, 0.0, 1.0);
+        return mix(
+          getFromColor(distortedUV),
+          getToColor(distortedUV),
+          smoothstep(0.3, 0.7, progress)
+        );
+      }`,
+  },
+};
+
+/**
+ * Render a shader-based transition using WebGL.
+ */
+async function renderShaderTransition(
+  opts: TransitionOptions,
+  frameABase64: string,
+  frameBBase64: string,
+  gsapSource: string,
+): Promise<string> {
+  const { type, duration, width, height, fps, workDir } = opts;
+
+  const shaderDef = SHADER_LIBRARY[type];
+  if (!shaderDef) {
+    console.warn(`Shader "${type}" not found, falling back to crossfade`);
+    return renderTransition({ ...opts, type: "crossfade" });
+  }
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: ${width}px;
+  height: ${height}px;
+  overflow: hidden;
+  background: #000;
+}
+canvas {
+  width: ${width}px;
+  height: ${height}px;
+}
+</style>
+<script>
+${gsapSource}
+</script>
+</head>
+<body>
+<canvas id="glcanvas" width="${width}" height="${height}"></canvas>
+<script>
+(function() {
+  var canvas = document.getElementById('glcanvas');
+  var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) { console.error('WebGL not supported'); return; }
+
+  // Vertex shader
+  var vertSrc = [
+    'attribute vec2 a_position;',
+    'varying vec2 v_texCoord;',
+    'void main() {',
+    '  v_texCoord = a_position * 0.5 + 0.5;',
+    '  gl_Position = vec4(a_position, 0.0, 1.0);',
+    '}'
+  ].join('\n');
+
+  // Fragment shader with gl-transitions wrapper
+  var fragSrc = [
+    'precision mediump float;',
+    'varying vec2 v_texCoord;',
+    'uniform sampler2D from;',
+    'uniform sampler2D to;',
+    'uniform float progress;',
+    'uniform vec2 resolution;',
+    '',
+    'vec4 getFromColor(vec2 uv) { return texture2D(from, uv); }',
+    'vec4 getToColor(vec2 uv) { return texture2D(to, uv); }',
+    '',
+    ${JSON.stringify(shaderDef.glsl)},
+    '',
+    'void main() {',
+    '  gl_FragColor = transition(v_texCoord);',
+    '}'
+  ].join('\n');
+
+  // Compile shaders
+  function compileShader(src, type) {
+    var shader = gl.createShader(type);
+    gl.shaderSource(shader, src);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error('Shader error:', gl.getShaderInfoLog(shader));
+      return null;
+    }
+    return shader;
+  }
+
+  var vertShader = compileShader(vertSrc, gl.VERTEX_SHADER);
+  var fragShader = compileShader(fragSrc, gl.FRAGMENT_SHADER);
+  var program = gl.createProgram();
+  gl.attachShader(program, vertShader);
+  gl.attachShader(program, fragShader);
+  gl.linkProgram(program);
+  gl.useProgram(program);
+
+  // Full-screen quad
+  var vertices = new Float32Array([-1,-1, 1,-1, -1,1, 1,1]);
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+  var aPos = gl.getAttribLocation(program, 'a_position');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  // Uniforms
+  var uProgress = gl.getUniformLocation(program, 'progress');
+  var uResolution = gl.getUniformLocation(program, 'resolution');
+  gl.uniform2f(uResolution, ${width}, ${height});
+
+  // Load textures from images
+  function loadTexture(imgElement, unit) {
+    var tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgElement);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    return tex;
+  }
+
+  // Create images and load
+  var imgA = new Image();
+  var imgB = new Image();
+  var loaded = 0;
+
+  function onLoad() {
+    loaded++;
+    if (loaded < 2) return;
+
+    loadTexture(imgA, 0);
+    loadTexture(imgB, 1);
+    gl.uniform1i(gl.getUniformLocation(program, 'from'), 0);
+    gl.uniform1i(gl.getUniformLocation(program, 'to'), 1);
+
+    // GSAP drives the progress uniform
+    var state = { progress: 0 };
+    var tl = gsap.timeline({ paused: true });
+    tl.to(state, {
+      progress: 1,
+      duration: ${duration},
+      ease: 'none',
+      onUpdate: function() {
+        gl.uniform1f(uProgress, state.progress);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      }
+    });
+
+    // Initial render
+    gl.uniform1f(uProgress, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    window.__MP_TIMELINE = tl;
+    window.__MP_DURATION = ${duration};
+    window.__MP_READY = true;
+  }
+
+  imgA.onload = onLoad;
+  imgB.onload = onLoad;
+  imgA.src = 'data:image/png;base64,${frameABase64}';
+  imgB.src = 'data:image/png;base64,${frameBBase64}';
+})();
+</script>
+</body>
+</html>`;
+
+  // Write and capture same as CSS transitions
+  const htmlPath = path.join(workDir, "transition.html");
+  await fs.writeFile(htmlPath, html);
+
+  const framesDir = path.join(workDir, "frames");
+  await fs.mkdir(framesDir, { recursive: true });
+
+  console.log(`  Shader transition: ${type} (${duration}s)`);
+
+  const totalFrames = Math.ceil(duration * fps);
+  await captureScene({
+    htmlPath,
+    outputDir: framesDir,
+    width,
+    height,
+    fps,
+    duration,
+  });
+
+  console.log(`  Captured ${totalFrames} frames`);
+
+  const outputPath = path.join(workDir, "transition.mp4");
+  await encodeScene({
+    framesDir,
+    outputPath,
+    fps,
+  });
+
+  console.log(`  Encoded: ${outputPath}`);
+  return outputPath;
 }
