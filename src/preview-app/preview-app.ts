@@ -484,15 +484,15 @@ export function getPreviewHtml(): string {
     #bottom-panels { display: none; }
 
     /* Main preview: reduce padding for more space */
-    #main { background: #000; }
-    #preview-container { background: #000; }
+    #main { background: #f3f4f6; }
+    #preview-container { background: #f3f4f6; }
 
     /* Playback bar: touch-friendly */
     #playback-bar {
       padding: 10px 12px;
       gap: 10px;
-      background: #111827;
-      border-top: 1px solid #1f2937;
+      background: #ffffff;
+      border-top: 1px solid #e5e7eb;
     }
     .play-btn {
       width: 40px; height: 40px;
@@ -501,7 +501,7 @@ export function getPreviewHtml(): string {
     .play-btn svg { width: 16px; height: 16px; }
     #timeline-slider {
       height: 6px;
-      background: #374151;
+      background: #e5e7eb;
     }
     #timeline-slider::-webkit-slider-thumb {
       width: 20px; height: 20px;
@@ -509,18 +509,18 @@ export function getPreviewHtml(): string {
     }
     .time-display {
       min-width: 60px; font-size: 10px;
-      color: #9ca3af;
+      color: #6b7280;
     }
     .scene-indicator {
       font-size: 10px;
-      background: #1f2937;
-      color: #9ca3af;
+      background: #f3f4f6;
+      color: #6b7280;
     }
     .audio-indicator { display: none; }
 
     /* Preview placeholder text */
-    .no-scene { color: #6b7280; }
-    .loading-state { color: #9ca3af; }
+    .no-scene { color: #9ca3af; }
+    .loading-state { color: #6b7280; }
 
     /* Prev/next scene navigation buttons (mobile only) */
     .mobile-scene-nav {
@@ -528,7 +528,7 @@ export function getPreviewHtml(): string {
       position: absolute;
       top: 50%; transform: translateY(-50%);
       width: 36px; height: 36px;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0,0,0,0.5);
       border: none; border-radius: 50%;
       color: #fff; font-size: 18px;
       align-items: center; justify-content: center;
@@ -537,7 +537,7 @@ export function getPreviewHtml(): string {
       opacity: 0.6;
       transition: opacity 0.15s;
     }
-    .mobile-scene-nav:active { opacity: 1; background: rgba(0,0,0,0.6); }
+    .mobile-scene-nav:active { opacity: 1; background: rgba(0,0,0,0.7); }
     #mobile-prev-scene { left: 8px; }
     #mobile-next-scene { right: 8px; }
   }
@@ -859,7 +859,13 @@ export function getPreviewHtml(): string {
 
   // Discover scene videos from the composite iframe and add to registry if not already tracked.
   function discoverSceneVideos() {
-    if (!state.compositeLoaded) return;
+    if (!state.compositeLoaded) {
+      // Mobile per-scene mode
+      if (window.innerWidth <= 768) {
+        loadSceneForMobile(index);
+      }
+      return;
+    }
     try {
       var doc = els.previewIframe.contentWindow && els.previewIframe.contentWindow.document;
       if (!doc) return;
@@ -1313,6 +1319,35 @@ export function getPreviewHtml(): string {
     });
   }
 
+
+  // Mobile per-scene mode: load individual scene HTML into iframe
+  function loadSceneForMobile(index) {
+    var project = state.currentProject;
+    if (!project || !project.scenes || !project.scenes[index]) return;
+    var scene = project.scenes[index];
+    state.currentSceneIndex = index;
+    state.currentComponentIndex = -1;
+    state.duration = scene.duration_seconds || 0;
+
+    els.previewPlaceholder.innerHTML = '<div class="loading-state">Loading scene ' + (index + 1) + '<div class="loading-dots"><span></span><span></span><span></span></div></div>';
+    els.previewPlaceholder.style.display = '';
+    els.previewWrapper.style.display = 'none';
+
+    var scenePath = '/preview-scene/' + state.tenantId + '/' + project.project_id + '/' + scene.id;
+    fetchHtml(scenePath).then(function(html) {
+      writeSceneToIframe(html);
+      updateActiveScene(index);
+      updateSceneIndicator();
+      updateTimeDisplay(0);
+      els.slider.value = 0;
+      els.slider.disabled = false;
+      els.playBtn.disabled = false;
+    }).catch(function(err) {
+      console.error('[preview] scene load failed:', err);
+      els.previewPlaceholder.textContent = 'Failed to load scene ' + (index + 1);
+    });
+  }
+
   // Initialize composite mode: write composite HTML to iframe
   function initComposite() {
     if (!state._compositeHtml) return false;
@@ -1394,43 +1429,48 @@ export function getPreviewHtml(): string {
       els.previewPlaceholder.innerHTML = '<div class="loading-state">Preloading scenes<div class="loading-dots"><span></span><span></span><span></span></div></div>';
       els.previewPlaceholder.style.display = '';
 
-      // Load composite (all scenes in one doc) alongside individual scenes
-      loadComposite(project).then(function() {
-        if (state._compositeHtml && project.scenes && project.scenes.length > 0) {
-          // Composite mode: write single document to iframe
-          els.previewPlaceholder.textContent = 'Loading composite preview...';
-          initComposite();
-          waitForCompositeReady(function(masterTl) {
-            state.currentSceneIndex = 0;
-            state.currentComponentIndex = -1;
-            state.duration = project.scenes[0].duration_seconds || 0;
-            updateActiveScene(0);
-            renderLayers();
-            clearProps();
-            updateSceneIndicator();
-            // Seek to start
-            masterTl.time(0);
-            state.masterTime = 0;
-            els.slider.value = 0;
-            updateTimeDisplay(0);
-            // Show speaker bg if first scene needs it
-            // Show preview with buffering overlay on top
-            els.previewPlaceholder.style.display = 'none';
-            els.previewWrapper.style.display = '';
-            els.bufferOverlay.style.display = 'flex';
-            waitForMediaReady().then(function() {
-              els.slider.disabled = false;
-              els.playBtn.disabled = false;
-              els.bufferOverlay.style.display = 'none';
+      // Mobile: skip composite (too heavy), use per-scene mode
+      if (window.innerWidth <= 768) {
+        loadSceneForMobile(0);
+      } else {
+        // Desktop: load composite (all scenes in one doc)
+        loadComposite(project).then(function() {
+          if (state._compositeHtml && project.scenes && project.scenes.length > 0) {
+            // Composite mode: write single document to iframe
+            els.previewPlaceholder.textContent = 'Loading composite preview...';
+            initComposite();
+            waitForCompositeReady(function(masterTl) {
+              state.currentSceneIndex = 0;
+              state.currentComponentIndex = -1;
+              state.duration = project.scenes[0].duration_seconds || 0;
+              updateActiveScene(0);
+              renderLayers();
+              clearProps();
+              updateSceneIndicator();
+              // Seek to start
+              masterTl.time(0);
+              state.masterTime = 0;
+              els.slider.value = 0;
+              updateTimeDisplay(0);
+              // Show speaker bg if first scene needs it
+              // Show preview with buffering overlay on top
+              els.previewPlaceholder.style.display = 'none';
+              els.previewWrapper.style.display = '';
+              els.bufferOverlay.style.display = 'flex';
+              waitForMediaReady().then(function() {
+                els.slider.disabled = false;
+                els.playBtn.disabled = false;
+                els.bufferOverlay.style.display = 'none';
+              });
             });
-          });
-        } else {
-          els.previewPlaceholder.textContent = 'Failed to load composite preview';
-        }
-      }).catch(function(err) {
-        console.error('[preview] composite load error:', err);
-        els.previewPlaceholder.textContent = 'Failed to load preview';
-      });
+          } else {
+            els.previewPlaceholder.textContent = 'Failed to load composite preview';
+          }
+        }).catch(function(err) {
+          console.error('[preview] composite load error:', err);
+          els.previewPlaceholder.textContent = 'Failed to load preview';
+        });
+      }
     }).catch(function() {
       els.sceneList.innerHTML = '<div class="empty-state">Failed to load project</div>';
     });
