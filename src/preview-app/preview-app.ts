@@ -422,38 +422,137 @@ export function getPreviewHtml(): string {
       grid-template-columns: 1fr;
       grid-template-rows: 44px 1fr auto;
     }
-    header { padding: 0 10px; gap: 8px; }
-    header h1 { font-size: 12px; }
-    .header-controls select { min-width: 100px; font-size: 11px; }
+
+    /* Header: compact, hide controls when project loaded via URL */
+    header { padding: 0 10px; gap: 6px; height: 44px; }
+    header h1 { font-size: 13px; }
+    .header-controls { gap: 4px; }
     .header-controls label { display: none; }
-    .header-controls .btn { padding: 4px 8px; font-size: 11px; }
-    #sidebar {
-      display: none;
-    }
+    .header-controls select { min-width: 80px; font-size: 11px; padding: 4px 6px; }
+    .header-controls input { width: 80px !important; font-size: 11px; padding: 4px 6px; }
+    .header-controls .btn { padding: 4px 10px; font-size: 11px; }
+    /* Hide tenant/project controls when loaded via URL params */
+    .header-controls.auto-loaded #tenant-input,
+    .header-controls.auto-loaded label,
+    .header-controls.auto-loaded #load-btn { display: none; }
+    .header-controls.auto-loaded select { min-width: 120px; }
+
+    /* Sidebar: hidden by default, slide-in overlay */
+    #sidebar { display: none; }
     #sidebar.mobile-open {
       display: flex;
       position: fixed;
       top: 44px; left: 0; bottom: 0;
-      width: 260px;
-      z-index: 100;
-      box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+      width: 280px; max-width: 80vw;
+      z-index: 200;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.2);
+      animation: slideIn 0.2s ease-out;
     }
+    @keyframes slideIn {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(0); }
+    }
+    /* Backdrop overlay when sidebar is open */
+    .mobile-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0; top: 44px;
+      background: rgba(0,0,0,0.3);
+      z-index: 150;
+    }
+    .mobile-backdrop.visible { display: block; }
+
+    /* Sidebar toggle button */
     .mobile-sidebar-toggle {
       display: flex !important;
       align-items: center; justify-content: center;
-      width: 32px; height: 32px;
+      width: 36px; height: 36px;
       background: #f3f4f6; border: 1px solid #e5e7eb;
-      border-radius: 6px; cursor: pointer; font-size: 16px;
+      border-radius: 8px; cursor: pointer; font-size: 18px;
       flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
     }
+    .mobile-sidebar-toggle:active { background: #e5e7eb; }
+
+    /* Scene items: larger touch targets */
+    .scene-item { padding: 10px 12px; min-height: 44px; }
+    .scene-label { font-size: 13px; }
+    .scene-dur { font-size: 11px; }
+    .scene-thumb { display: none; }
+
+    /* Hide bottom panels on mobile */
     #bottom-panels { display: none; }
-    #playback-bar { padding: 6px 10px; gap: 8px; }
-    .time-display { min-width: 70px; font-size: 10px; }
-    .scene-indicator { font-size: 10px; }
+
+    /* Main preview: reduce padding for more space */
+    #main { background: #000; }
+    #preview-container { background: #000; }
+
+    /* Playback bar: touch-friendly */
+    #playback-bar {
+      padding: 10px 12px;
+      gap: 10px;
+      background: #111827;
+      border-top: 1px solid #1f2937;
+    }
+    .play-btn {
+      width: 40px; height: 40px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .play-btn svg { width: 16px; height: 16px; }
+    #timeline-slider {
+      height: 6px;
+      background: #374151;
+    }
+    #timeline-slider::-webkit-slider-thumb {
+      width: 20px; height: 20px;
+      /* larger touch target */
+    }
+    .time-display {
+      min-width: 60px; font-size: 10px;
+      color: #9ca3af;
+    }
+    .scene-indicator {
+      font-size: 10px;
+      background: #1f2937;
+      color: #9ca3af;
+    }
     .audio-indicator { display: none; }
+
+    /* Preview placeholder text */
+    .no-scene { color: #6b7280; }
+    .loading-state { color: #9ca3af; }
+
+    /* Prev/next scene navigation buttons (mobile only) */
+    .mobile-scene-nav {
+      display: flex !important;
+      position: absolute;
+      top: 50%; transform: translateY(-50%);
+      width: 36px; height: 36px;
+      background: rgba(0,0,0,0.4);
+      border: none; border-radius: 50%;
+      color: #fff; font-size: 18px;
+      align-items: center; justify-content: center;
+      cursor: pointer; z-index: 10;
+      -webkit-tap-highlight-color: transparent;
+      opacity: 0.6;
+      transition: opacity 0.15s;
+    }
+    .mobile-scene-nav:active { opacity: 1; background: rgba(0,0,0,0.6); }
+    #mobile-prev-scene { left: 8px; }
+    #mobile-next-scene { right: 8px; }
   }
   @media (min-width: 769px) {
     .mobile-sidebar-toggle { display: none; }
+    .mobile-backdrop { display: none !important; }
+    .mobile-scene-nav { display: none !important; }
+  }
+  /* Safe area insets for notched phones */
+  @supports (padding: env(safe-area-inset-bottom)) {
+    @media (max-width: 768px) {
+      #playback-bar {
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      }
+    }
   }
 </style>
 </head>
@@ -470,6 +569,7 @@ export function getPreviewHtml(): string {
       <button class="btn btn-primary" id="load-btn">Load</button>
     </div>
   </header>
+  <div class="mobile-backdrop" id="mobile-backdrop"></div>
 
   <div id="sidebar">
     <div class="sidebar-header">Scenes</div>
@@ -478,6 +578,8 @@ export function getPreviewHtml(): string {
 
   <div id="main">
     <div id="preview-container">
+      <button class="mobile-scene-nav" id="mobile-prev-scene" style="display:none;" aria-label="Previous scene">&#8249;</button>
+      <button class="mobile-scene-nav" id="mobile-next-scene" style="display:none;" aria-label="Next scene">&#8250;</button>
       <div class="no-scene" id="preview-placeholder">Select a scene to preview</div>
       <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
         <video id="speaker-bg" muted playsinline preload="auto" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
@@ -564,18 +666,56 @@ export function getPreviewHtml(): string {
   };
 
   // Auth token from URL
-  // Mobile sidebar toggle
+  // Mobile sidebar toggle + backdrop + scene nav
     var _sidebarToggle = document.getElementById('mobile-sidebar-toggle');
+    var _backdrop = document.getElementById('mobile-backdrop');
+    var _prevSceneBtn = document.getElementById('mobile-prev-scene');
+    var _nextSceneBtn = document.getElementById('mobile-next-scene');
+    var _isMobileDevice = window.innerWidth <= 768;
+
+    function _openMobileSidebar() {
+      document.getElementById('sidebar').classList.add('mobile-open');
+      _backdrop.classList.add('visible');
+    }
+    function _closeMobileSidebar() {
+      document.getElementById('sidebar').classList.remove('mobile-open');
+      _backdrop.classList.remove('visible');
+    }
+
     if (_sidebarToggle) {
       _sidebarToggle.addEventListener('click', function() {
         var sb = document.getElementById('sidebar');
-        sb.classList.toggle('mobile-open');
-      });
-      document.getElementById('sidebar').addEventListener('click', function(e) {
-        if (e.target.closest('.scene-item') && window.innerWidth <= 768) {
-          document.getElementById('sidebar').classList.remove('mobile-open');
+        if (sb.classList.contains('mobile-open')) {
+          _closeMobileSidebar();
+        } else {
+          _openMobileSidebar();
         }
       });
+      _backdrop.addEventListener('click', _closeMobileSidebar);
+      document.getElementById('sidebar').addEventListener('click', function(e) {
+        if (e.target.closest('.scene-item') && window.innerWidth <= 768) {
+          _closeMobileSidebar();
+        }
+      });
+    }
+
+    // Mobile prev/next scene buttons
+    if (_prevSceneBtn) {
+      _prevSceneBtn.addEventListener('click', function() {
+        if (state.currentSceneIndex > 0) selectScene(state.currentSceneIndex - 1);
+      });
+    }
+    if (_nextSceneBtn) {
+      _nextSceneBtn.addEventListener('click', function() {
+        var p = state.currentProject;
+        if (p && state.currentSceneIndex < p.scenes.length - 1) selectScene(state.currentSceneIndex + 1);
+      });
+    }
+
+    // Auto-detect URL params and mark header as auto-loaded on mobile
+    var _urlParams = new URLSearchParams(window.location.search);
+    if (_urlParams.get('tenant') && _urlParams.get('project') && _isMobileDevice) {
+      document.querySelector('.header-controls').classList.add('auto-loaded');
     }
 
     var _token = new URLSearchParams(window.location.search).get('token');
@@ -1377,6 +1517,13 @@ export function getPreviewHtml(): string {
 
   // Update scene list active highlight without re-rendering
   function updateActiveScene(index) {
+    // Update mobile scene nav visibility
+    if (window.innerWidth <= 768 && state.currentProject) {
+      var _pBtn = document.getElementById('mobile-prev-scene');
+      var _nBtn = document.getElementById('mobile-next-scene');
+      if (_pBtn) _pBtn.style.display = index > 0 ? '' : 'none';
+      if (_nBtn) _nBtn.style.display = index < state.currentProject.scenes.length - 1 ? '' : 'none';
+    }
     var items = els.sceneList.querySelectorAll('.scene-item');
     items.forEach(function(el) {
       var i = parseInt(el.dataset.index, 10);
@@ -1475,7 +1622,7 @@ export function getPreviewHtml(): string {
     var nH = (project && project.canvas && project.canvas.height) || 1080;
 
     var rect = container.getBoundingClientRect();
-    var pad = 24;
+    var pad = window.innerWidth <= 768 ? 4 : 24;
     var scaleX = (rect.width - pad * 2) / nW;
     var scaleY = (rect.height - pad * 2) / nH;
     var scale = Math.min(scaleX, scaleY, 1);
