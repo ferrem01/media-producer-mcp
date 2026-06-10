@@ -51,21 +51,22 @@
   }
 </style>
 
-<script type="module">
-  export default function setup({ data, gsap, timeline }) {
-    const el = document.querySelector('.asset-placeholder');
-    const textEl = el.querySelector('[data-text]');
-    const typeEl = el.querySelector('[data-type]');
-    const iconEl = el.querySelector('.placeholder-icon');
+<script>
+  function createTimeline(el, data, ctx) {
+    var textEl = el.querySelector('[data-text]');
+    var typeEl = el.querySelector('[data-type]');
+    var iconEl = el.querySelector('.placeholder-icon');
 
-    textEl.textContent = data.text || 'Asset needed';
-    typeEl.textContent = data.asset_type || '';
+    if (textEl) textEl.textContent = data.text || 'Asset needed';
+    if (typeEl) typeEl.textContent = data.asset_type || '';
 
+    var tl = gsap.timeline();
     gsap.set([iconEl, textEl, typeEl], { autoAlpha: 0, y: 10 });
 
-    timeline
-      .to(iconEl, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.2)
+    tl.to(iconEl, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.2)
       .to(textEl, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.4)
       .to(typeEl, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.6);
+
+    return tl;
   }
 </script>

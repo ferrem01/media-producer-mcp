@@ -1456,7 +1456,7 @@ export function getPreviewHtml(): string {
               clearProps();
               updateSceneIndicator();
               // Seek to start
-              masterTl.time(0);
+              masterTl.time(0.001); // Tiny offset: GSAP set() at time 0 needs a non-zero seek to render
               state.masterTime = 0;
               els.slider.value = 0;
               updateTimeDisplay(0);

@@ -602,6 +602,11 @@ export function buildComponentScript(
   canvas: Canvas,
   options?: { motion?: string },
 ): string {
+  // Normalize component scripts: strip ES module syntax (illegal outside <script type="module">)
+  const normalizedScript = scriptSource
+    .replace(/export\s+default\s+function\s+/g, "function ")
+    .replace(/^\s*export\s+/gm, "");
+
   // Wrap the component's createTimeline in an IIFE
   // Pass the component's DOM element, data, and context
   const safeId = comp.id.replace(/[^a-zA-Z0-9_]/g, "_");
