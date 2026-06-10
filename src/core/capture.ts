@@ -203,7 +203,9 @@ export async function captureSingleFrame(options: {
   try {
     browser = await chromium.launch({
       args: [
-        "--disable-gpu",
+        "--enable-gpu",
+        "--use-gl=swiftshader",
+        "--enable-webgl",
         "--disable-dev-shm-usage",
         "--no-sandbox",
         "--disable-setuid-sandbox",
