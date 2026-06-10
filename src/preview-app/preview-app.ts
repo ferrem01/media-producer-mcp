@@ -859,13 +859,7 @@ export function getPreviewHtml(): string {
 
   // Discover scene videos from the composite iframe and add to registry if not already tracked.
   function discoverSceneVideos() {
-    if (!state.compositeLoaded) {
-      // Mobile per-scene mode
-      if (window.innerWidth <= 768) {
-        loadSceneForMobile(index);
-      }
-      return;
-    }
+    if (!state.compositeLoaded) return;
     try {
       var doc = els.previewIframe.contentWindow && els.previewIframe.contentWindow.document;
       if (!doc) return;
@@ -1543,7 +1537,10 @@ export function getPreviewHtml(): string {
 
     updateActiveScene(index);
 
-    if (!state.compositeLoaded) return;
+    if (!state.compositeLoaded) {
+      if (window.innerWidth <= 768) loadSceneForMobile(index);
+      return;
+    }
     {
       // Composite mode: seek master timeline to scene start
       var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
