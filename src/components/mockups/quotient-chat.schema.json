@@ -1,0 +1,120 @@
+{
+  "type": "quotient-chat",
+  "label": "Quotient Chat Panel",
+  "category": "mockups",
+  "description": "Quotient AI chat interface with rich messaging, tool use indicators, asset cards, and animated scripted interactions. Supports user bubbles with avatars, agent markdown messages, typing indicator, and composer with send button.",
+  "data": {
+    "conversation_title": {
+      "type": "string",
+      "label": "Conversation Title",
+      "optional": true,
+      "default": "New Conversation",
+      "placeholder": "Canva Image Generation Feature"
+    },
+    "messages": {
+      "type": "array",
+      "label": "Initial Messages",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": { "type": "string", "label": "Role", "required": true, "enum": ["user", "agent"] },
+          "text": { "type": "string", "label": "Message Text", "required": true }
+        }
+      }
+    },
+    "user_avatar": {
+      "type": "string",
+      "label": "User Avatar (URL or initials)",
+      "optional": true,
+      "default": "",
+      "placeholder": "MF"
+    },
+    "user_avatar_color": {
+      "type": "string",
+      "label": "User Avatar Background Color",
+      "optional": true,
+      "default": "#6366f1"
+    },
+    "badge_count": {
+      "type": "number",
+      "label": "Clipboard Badge Count",
+      "optional": true,
+      "default": 0
+    },
+    "mode": {
+      "type": "string",
+      "label": "Display Mode",
+      "optional": true,
+      "default": "panel",
+      "enum": ["panel", "full"]
+    },
+    "show_progress": {
+      "type": "boolean",
+      "label": "Show Progress Bar",
+      "optional": true,
+      "default": true
+    },
+    "composer_placeholder": {
+      "type": "string",
+      "label": "Composer Placeholder Text",
+      "optional": true,
+      "default": "Type a message...",
+      "placeholder": "Type a message..."
+    }
+  },
+  "script_actions": [
+    {
+      "action": "type",
+      "description": "Type text into the composer input character by character",
+      "params": {
+        "text": "string - Text to type",
+        "speed": "number - Characters per second (default 28)"
+      }
+    },
+    {
+      "action": "send-message",
+      "description": "Send the currently typed text as a user message bubble with avatar, clears composer"
+    },
+    {
+      "action": "agent-message",
+      "description": "Show an agent response with markdown support (**bold**, `code`, *italic*, bullet lists, emoji)",
+      "params": {
+        "text": "string - Agent response text with optional markdown"
+      }
+    },
+    {
+      "action": "tool-use",
+      "description": "Show a tool use indicator: 🟢 Used **action** on **Service**",
+      "params": {
+        "action": "string - Tool action name (e.g. generate-design)",
+        "service": "string - Service name (e.g. Canva)"
+      }
+    },
+    {
+      "action": "asset-card",
+      "description": "Show an asset reference card with document icon, title, and subtitle",
+      "params": {
+        "title": "string - Asset card title",
+        "subtitle": "string - Asset card subtitle (default: Asset)"
+      }
+    },
+    {
+      "action": "show-typing",
+      "description": "Show a typing indicator with animated bouncing dots"
+    },
+    {
+      "action": "hide-typing",
+      "description": "Hide the typing indicator"
+    },
+    {
+      "action": "scroll-to-bottom",
+      "description": "Smooth scroll messages area to bottom"
+    }
+  ],
+  "default_cursor_targets": {
+    "composer": { "x": "50%", "y": "82%" },
+    "send-button": { "x": "93%", "y": "90%" },
+    "expand-btn": { "x": "88%", "y": "3%" }
+  }
+}
