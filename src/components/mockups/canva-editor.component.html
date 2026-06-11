@@ -21,19 +21,19 @@
     <div class="toolbar">
       <div class="toolbar-left">
         <button class="tb-icon-btn" data-target="home-btn">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l7-7 7 7"/><path d="M5 8.5V16a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V8.5"/></svg>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l7-7 7 7"/><path d="M5 8.5V16a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V8.5"/></svg>
         </button>
         <button class="tb-text-btn" data-target="file-btn">File</button>
         <button class="tb-text-btn" data-target="resize-btn">Resize</button>
         <div class="tb-divider"></div>
         <button class="tb-text-btn editing-btn" data-target="editing-btn">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round"><path d="M2 14l1.5-5L12 .5 15.5 4 7 12.5z"/><path d="M10 3l3 3"/></svg>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1a1a1a" stroke-width="1.3" stroke-linecap="round"><path d="M2 14l1.5-5L12 .5 15.5 4 7 12.5z"/><path d="M10 3l3 3"/></svg>
           <span>Editing</span>
-          <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
         </button>
         <div class="tb-divider"></div>
         <button class="tb-icon-btn magic-btn" data-target="magic-btn">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"><path d="M9 1.5l1.2 3.8L14 6.5l-3.8 1.2L9 11.5 7.8 7.7 4 6.5l3.8-1.2z"/><path d="M14 12l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9L11.5 14.5l1.9-.6z"/></svg>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#8B3DFF" stroke-width="1.4" stroke-linecap="round"><path d="M9 1.5l1.2 3.8L14 6.5l-3.8 1.2L9 11.5 7.8 7.7 4 6.5l3.8-1.2z"/><path d="M14 12l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9L11.5 14.5l1.9-.6z"/></svg>
           <span class="magic-badge">New</span>
         </button>
       </div>
@@ -41,10 +41,10 @@
         <span class="tb-plan-label" data-target="plan-label"></span>
         <div class="tb-avatar" data-target="user-avatar"></div>
         <button class="tb-icon-btn" data-target="insights-btn">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="9" width="3" height="7"/><rect x="7.5" y="5" width="3" height="11"/><rect x="13" y="2" width="3" height="14"/></svg>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#1a1a1a" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="9" width="3" height="7"/><rect x="7.5" y="5" width="3" height="11"/><rect x="13" y="2" width="3" height="14"/></svg>
         </button>
         <button class="tb-icon-btn" data-target="comments-btn">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h12a1 1 0 011 1v8a1 1 0 01-1 1H6l-3 3V4a1 1 0 011-1z"/></svg>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#1a1a1a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h12a1 1 0 011 1v8a1 1 0 01-1 1H6l-3 3V4a1 1 0 011-1z"/></svg>
         </button>
         <button class="share-btn" data-target="share-btn">Share</button>
       </div>
@@ -134,8 +134,8 @@
   .browser-right { display: flex; align-items: center; gap: 10px; }
   /* ── Toolbar ── */
   .toolbar {
-    height: 48px; background: linear-gradient(180deg, #7D2AE8 0%, #6B24CC 100%);
-    border-bottom: none;
+    height: 48px; background: #fff;
+    border-bottom: 1px solid #e0e0e0;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 12px; flex-shrink: 0; z-index: 10;
   }
@@ -144,36 +144,33 @@
     width: 36px; height: 36px; border: none; background: transparent; border-radius: 8px;
     display: flex; align-items: center; justify-content: center; cursor: default; position: relative;
   }
-  .tb-icon-btn:hover, .tb-icon-btn.hovered { background: rgba(255,255,255,0.15); }
-  .tb-icon-btn svg { stroke: #fff; }
+  .tb-icon-btn:hover, .tb-icon-btn.hovered { background: #f0f0f0; }
   .tb-text-btn {
     height: 36px; border: none; background: transparent; border-radius: 8px;
-    padding: 0 12px; font-size: 13.5px; font-weight: 500; color: #fff;
+    padding: 0 12px; font-size: 13.5px; font-weight: 500; color: #1a1a1a;
     cursor: default; font-family: inherit;
   }
-  .tb-text-btn:hover, .tb-text-btn.hovered { background: rgba(255,255,255,0.15); }
+  .tb-text-btn:hover, .tb-text-btn.hovered { background: #f0f0f0; }
   .editing-btn { display: flex; align-items: center; gap: 6px; }
-  .editing-btn svg { stroke: #fff; }
   .editing-btn .chevron { margin-left: -2px; }
-  .editing-btn .chevron { stroke: rgba(255,255,255,0.6); }
   .magic-btn { position: relative; }
   .magic-badge {
     position: absolute; top: 0px; right: -6px;
     background: #FF6B35; color: #fff; font-size: 9px; font-weight: 700;
     padding: 1px 4px; border-radius: 4px; letter-spacing: 0.02em;
   }
-  .tb-divider { width: 1px; height: 24px; background: rgba(255,255,255,0.2); margin: 0 6px; }
-  .tb-plan-label { font-size: 13px; font-weight: 500; color: #fff; margin-right: 8px; }
+  .tb-divider { width: 1px; height: 24px; background: #e0e0e0; margin: 0 6px; }
+  .tb-plan-label { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-right: 8px; }
   .tb-avatar {
     width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
     justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
   }
   .share-btn {
     height: 36px; padding: 0 20px; border: none; border-radius: 8px;
-    background: #fff; color: #1a1a1a; font-size: 13.5px; font-weight: 600;
+    background: #8B3DFF; color: #fff; font-size: 13.5px; font-weight: 600;
     cursor: default; font-family: inherit; margin-left: 4px;
   }
-  .share-btn:hover, .share-btn.hovered { background: rgba(255,255,255,0.9); }
+  .share-btn:hover, .share-btn.hovered { background: #7D2AE8; }
   /* ── Sidebar ── */
   .sidebar {
     width: 72px; background: #fff; border-right: 1px solid #e0e0e0;
@@ -313,6 +310,35 @@
     justify-content: center; font-size: 14px; font-weight: 700;
   }
   .canvas-content .design-plus { color: rgba(255,255,255,0.5); font-size: 24px; font-weight: 300; }
+  /* ── Canvas text overlay ── */
+  .canvas-text-box {
+    position: absolute; padding: 8px 12px;
+    border: 2px solid #8B3DFF; border-radius: 4px;
+    background: transparent; z-index: 5; min-width: 200px;
+    opacity: 0;
+  }
+  .canvas-text-box .text-content {
+    font-family: 'Inter', sans-serif; color: #fff; outline: none;
+    min-height: 1.2em; white-space: pre-wrap;
+  }
+  .canvas-text-box .text-content.heading { font-size: 32px; font-weight: 700; }
+  .canvas-text-box .text-content.subheading { font-size: 20px; font-weight: 500; }
+  .canvas-text-box .text-content.body { font-size: 14px; font-weight: 400; }
+  .canvas-text-box .handle {
+    width: 10px; height: 10px; background: #fff; border: 2px solid #8B3DFF;
+    border-radius: 2px; position: absolute;
+  }
+  .canvas-text-box .handle-tl { top: -6px; left: -6px; cursor: nw-resize; }
+  .canvas-text-box .handle-tr { top: -6px; right: -6px; cursor: ne-resize; }
+  .canvas-text-box .handle-bl { bottom: -6px; left: -6px; cursor: sw-resize; }
+  .canvas-text-box .handle-br { bottom: -6px; right: -6px; cursor: se-resize; }
+  .canvas-text-box .handle-ml { top: 50%; left: -6px; transform: translateY(-50%); cursor: w-resize; }
+  .canvas-text-box .handle-mr { top: 50%; right: -6px; transform: translateY(-50%); cursor: e-resize; }
+  .canvas-text-cursor {
+    display: inline-block; width: 2px; background: #fff; animation: blink-cursor 1s step-end infinite;
+    margin-left: 1px; vertical-align: text-bottom;
+  }
+  @keyframes blink-cursor { 0%,100%{opacity:1} 50%{opacity:0} }
   .canvas-content .design-wave {
     position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
     background: linear-gradient(135deg, #f97316, #ec4899, #8b5cf6, #06b6d4);
@@ -618,6 +644,71 @@
         'hide-panel': function(tl, ctr, action, at) {
           var panel = ctr.querySelector('.side-panel');
           tl.to(panel, { width: 0, duration: 0.25, ease: 'power2.in' }, at);
+        },
+        'add-text': function(tl, ctr, action, at) {
+          var frame = ctr.querySelector('.canvas-frame');
+          var preset = action.preset || 'heading';
+          var x = action.x || '15%';
+          var y = action.y || '25%';
+          tl.call(function() {
+            var box = document.createElement('div');
+            box.className = 'canvas-text-box';
+            box.setAttribute('data-target', 'text-box-' + (action.id || '1'));
+            box.style.left = x;
+            box.style.top = y;
+            box.style.opacity = '0';
+            // Handles
+            ['tl','tr','bl','br','ml','mr'].forEach(function(h) {
+              var handle = document.createElement('div');
+              handle.className = 'handle handle-' + h;
+              box.appendChild(handle);
+            });
+            var content = document.createElement('div');
+            content.className = 'text-content ' + preset;
+            content.setAttribute('data-target', 'text-input-' + (action.id || '1'));
+            box.appendChild(content);
+            frame.appendChild(box);
+            gsap.to(box, { opacity: 1, duration: 0.2, ease: 'power2.out' });
+          }, null, at);
+        },
+        'type-canvas': function(tl, ctr, action, at) {
+          var inputId = action.id || '1';
+          var text = action.text || 'Add a heading';
+          var speed = action.speed || 20;
+          var charDelay = 1 / speed;
+          tl.call(function() {
+            var input = ctr.querySelector('[data-target="text-input-' + inputId + '"]');
+            if (!input) return;
+            // Add blinking cursor
+            var cursor = document.createElement('span');
+            cursor.className = 'canvas-text-cursor';
+            cursor.style.height = (input.classList.contains('heading') ? '32px' : input.classList.contains('subheading') ? '20px' : '14px');
+            input.appendChild(cursor);
+          }, null, at);
+          for (var i = 0; i < text.length; i++) {
+            (function(char, idx) {
+              tl.call(function() {
+                var input = ctr.querySelector('[data-target="text-input-' + inputId + '"]');
+                if (!input) return;
+                var cursor = input.querySelector('.canvas-text-cursor');
+                if (cursor) input.removeChild(cursor);
+                input.appendChild(document.createTextNode(char));
+                var newCursor = document.createElement('span');
+                newCursor.className = 'canvas-text-cursor';
+                newCursor.style.height = (input.classList.contains('heading') ? '32px' : input.classList.contains('subheading') ? '20px' : '14px');
+                input.appendChild(newCursor);
+              }, null, at + 0.15 + idx * charDelay);
+            })(text[i], i);
+          }
+        },
+        'remove-text-cursor': function(tl, ctr, action, at) {
+          var inputId = action.id || '1';
+          tl.call(function() {
+            var input = ctr.querySelector('[data-target="text-input-' + inputId + '"]');
+            if (!input) return;
+            var cursor = input.querySelector('.canvas-text-cursor');
+            if (cursor) input.removeChild(cursor);
+          }, null, at);
         },
         'hover-toolbar': function(tl, ctr, action, at) {
           var target = action.target || '';
