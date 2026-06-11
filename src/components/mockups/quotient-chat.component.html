@@ -195,7 +195,8 @@
     display: flex; align-items: center; gap: 6px;
     font-size: 13px; color: #64748b; padding: 2px 0;
   }
-  .tool-use-row .tool-emoji { font-size: 14px; }
+  .tool-use-row .tool-emoji { font-size: 14px; line-height: 1; }
+  .tool-use-row .tool-logo { width: 20px; height: 20px; border-radius: 4px; object-fit: contain; flex-shrink: 0; }
   .tool-use-row .tool-action {
     font-weight: 600; font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 12.5px; color: #0f172a;
@@ -392,10 +393,13 @@
     }
 
     // ── Add tool use ──
-    function addToolUse(action, service) {
+    function addToolUse(action, service, iconUrl) {
       var row = document.createElement('div');
       row.className = 'tool-use-row';
-      row.innerHTML = '<span class="tool-emoji">🟢</span> Used <span class="tool-action">' + action + '</span> on <span class="tool-service">' + service + '</span>';
+      var iconHtml = iconUrl
+        ? '<img class="tool-logo" src="' + iconUrl + '" alt="" />'
+        : '<span class="tool-emoji">🟢</span>';
+      row.innerHTML = iconHtml + ' Used <span class="tool-action">' + action + '</span> on <span class="tool-service">' + service + '</span>';
       messagesArea.appendChild(row);
       scrollToBottom();
       return row;
@@ -480,7 +484,7 @@
         },
         'tool-use': function(tl, ctr, action, at) {
           tl.call(function() {
-            var row = addToolUse(action.tool_name || action.action_name || 'action', action.service || 'Service');
+            var row = addToolUse(action.tool_name || action.action_name || 'action', action.service || 'Service', action.icon || '');
             gsap.from(row, { autoAlpha: 0, y: 8, duration: 0.3, ease: 'power2.out' });
           }, null, at);
         },
