@@ -16,12 +16,13 @@
     <div class="claude-main">
       <div class="messages-area"></div>
       <div class="composer-wrapper">
-        <div class="composer-bar">
-          <button class="plus-btn" data-target="plus-button">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="10" y1="4" x2="10" y2="16"/><line x1="4" y1="10" x2="16" y2="10"/></svg>
-          </button>
+        <div class="composer-box">
           <div class="composer-input" data-target="chat-input" contenteditable="false"></div>
-          <div class="composer-controls">
+          <div class="composer-toolbar">
+            <button class="plus-btn" data-target="plus-button">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="10" y1="4" x2="10" y2="16"/><line x1="4" y1="10" x2="16" y2="10"/></svg>
+            </button>
+            <div class="toolbar-spacer"></div>
             <span class="model-selector" data-target="model-selector"></span>
             <button class="mic-btn" data-target="mic-button">
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -92,21 +93,28 @@
   .msg-text { font-size: 15px; line-height: 1.6; color: #1a1a1a; }
   .msg-row.user .msg-text { background: #f1efe9; padding: 10px 16px; border-radius: 20px; }
   .msg-row.assistant .msg-text { color: #2d2d2d; }
-  /* ── Composer ── */
+  /* ── Composer (multi-line box) ── */
   .composer-wrapper { padding: 8px 24px 16px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
-  .composer-bar {
-    display: flex; align-items: center; width: 100%; max-width: 680px; min-height: 52px;
-    background: #fff; border: 1.5px solid #dddad3; border-radius: 26px;
-    padding: 4px 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); position: relative;
+  .composer-box {
+    display: flex; flex-direction: column; width: 100%; max-width: 680px; min-height: 148px;
+    background: #fff; border: 1.5px solid #dddad3; border-radius: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); position: relative; overflow: hidden;
   }
+  .composer-input {
+    flex: 1; padding: 16px 20px 8px; font-size: 15px; font-family: inherit; color: #1a1a1a;
+    line-height: 1.6; min-height: 72px; outline: none; border: none; background: transparent;
+    resize: none; white-space: pre-wrap; word-wrap: break-word; overflow-y: auto;
+  }
+  .composer-input:empty::before { content: attr(data-placeholder); color: #b0ada5; }
+  .composer-toolbar {
+    display: flex; align-items: center; gap: 2px; padding: 6px 8px 10px; flex-shrink: 0;
+  }
+  .toolbar-spacer { flex: 1; }
   .plus-btn {
     width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent;
     color: #1a1a1a; cursor: default; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .plus-btn.active { background: #f0efe9; }
-  .composer-input { flex: 1; padding: 8px 10px; font-size: 15px; font-family: inherit; color: #1a1a1a; line-height: 1.5; min-height: 24px; outline: none; border: none; background: transparent; }
-  .composer-input:empty::before { content: attr(data-placeholder); color: #b0ada5; }
-  .composer-controls { display: flex; align-items: center; gap: 2px; flex-shrink: 0; padding-right: 2px; }
   .model-selector { font-size: 14px; color: #9B9490; white-space: nowrap; padding: 4px 6px; cursor: default; }
   .model-selector .model-name { color: #3D3A37; font-weight: 500; }
   .model-selector .model-quality { color: #9B9490; font-weight: 400; }
@@ -188,6 +196,7 @@
     var sidebar = el.querySelector('.claude-sidebar');
     var messagesArea = el.querySelector('.messages-area');
     var composerInput = el.querySelector('.composer-input');
+    var composerBox = el.querySelector('.composer-box');
     var sendBtn = el.querySelector('.send-btn');
     var plusBtn = el.querySelector('.plus-btn');
     var plusMenu = el.querySelector('.plus-menu');
@@ -222,7 +231,7 @@
       qualSpan.textContent = ' ' + mParts[mParts.length - 1];
       var chevSpan = document.createElement('span');
       chevSpan.className = 'model-chevron';
-      chevSpan.textContent = ' ▾';
+      chevSpan.textContent = ' \u25BE';
       modelSelector.appendChild(nameSpan);
       modelSelector.appendChild(qualSpan);
       modelSelector.appendChild(chevSpan);
@@ -278,7 +287,7 @@
     };
 
     var pmDef = [
-      { label: 'Add files or photos', icon: 'paperclip', shortcut: '⌘U' },
+      { label: 'Add files or photos', icon: 'paperclip', shortcut: '\u2318U' },
       { label: 'Add to project', icon: 'tray', chevron: true },
       { divider: true },
       { label: 'Skills', icon: 'skills', chevron: true },
@@ -315,8 +324,8 @@
       var rt = document.createElement('span');
       rt.className = 'pm-item-right';
       if (def.shortcut) { var s = document.createElement('span'); s.className = 'shortcut'; s.textContent = def.shortcut; rt.appendChild(s); }
-      if (def.check) { var c = document.createElement('span'); c.className = 'check'; c.textContent = '✓'; rt.appendChild(c); }
-      if (def.chevron) { var ch = document.createElement('span'); ch.className = 'chevron'; ch.textContent = '›'; rt.appendChild(ch); }
+      if (def.check) { var c = document.createElement('span'); c.className = 'check'; c.textContent = '\u2713'; rt.appendChild(c); }
+      if (def.chevron) { var ch = document.createElement('span'); ch.className = 'chevron'; ch.textContent = '\u203A'; rt.appendChild(ch); }
       row.appendChild(rt);
 
       pmContainer.appendChild(row);
@@ -326,14 +335,14 @@
     // ── Connector logos (colored circles/shapes) ──
     var logoStyles = {
       'Canva': { bg: 'linear-gradient(135deg, #00C4CC, #7B2FF7)', text: 'C' },
-      'HubSpot': { bg: '#FF7A59', text: '⚙' },
+      'HubSpot': { bg: '#FF7A59', text: '\u2699' },
       'HyperFrames by HeyGen': { bg: 'linear-gradient(135deg, #7B2FF7, #00C4CC)', text: 'H' },
       'Quotient': { bg: 'linear-gradient(135deg, #6366f1, #8b5cf6)', text: 'Q' },
-      'Claude in Chrome': { bg: '#3D3A37', text: '🌐', textColor: '#fff', fontSize: '14px' },
+      'Claude in Chrome': { bg: '#3D3A37', text: '\uD83C\uDF10', textColor: '#fff', fontSize: '14px' },
       'gmail': { bg: '#f1f1f1', text: 'G', textColor: '#EA4335' }
     };
 
-    // ── Build connector rows ──
+    // ── Build connector rows (all OFF by default) ──
     var smToggleEls = [];
     menuItems.forEach(function(mi, idx) {
       var name = mi.name || mi.label || 'Tool';
@@ -355,7 +364,8 @@
       lb.textContent = name;
       row.appendChild(lb);
 
-      var enabled = mi.connected || mi.enabled || false;
+      // Default to OFF -- only on if explicitly set
+      var enabled = mi.connected === true || mi.enabled === true;
       var tog = document.createElement('div');
       tog.className = 'sm-toggle' + (enabled ? ' on' : '');
       tog.setAttribute('data-target', 'toggle-' + idx);
@@ -368,7 +378,7 @@
       smToggleEls.push({ toggle: tog, enabled: enabled });
     });
 
-    // ── "Add from" items (first 2 connectors that have add_from capability) ──
+    // ── "Add from" items ──
     var addFromItems = menuItems.filter(function(mi) { return mi.add_from !== false; }).slice(0, 2);
     addFromItems.forEach(function(mi) {
       var name = mi.name || mi.label || 'Tool';
@@ -390,7 +400,7 @@
 
       var rt = document.createElement('span');
       rt.className = 'sm-row-right';
-      rt.textContent = '›';
+      rt.textContent = '\u203A';
       row.appendChild(rt);
 
       smAddFrom.appendChild(row);
@@ -434,14 +444,14 @@
       if (fd.chevron) {
         var rt = document.createElement('span');
         rt.className = 'sm-row-right';
-        rt.textContent = '›';
+        rt.textContent = '\u203A';
         row.appendChild(rt);
       }
 
       smFooter.appendChild(row);
     });
 
-    // ── Position ──
+    // ── Position menus relative to + button ──
     gsap.set(plusMenu, { autoAlpha: 0, y: 10, scale: 0.97 });
     gsap.set(submenu, { autoAlpha: 0, x: -8, scale: 0.97 });
     gsap.set(typingIndicator, { autoAlpha: 0 });
@@ -464,7 +474,7 @@
       submenu.style.top = 'auto';
     };
 
-    // ── Initial ──
+    // ── Initial state ──
     gsap.set(chat, { autoAlpha: 0 });
     gsap.set(messageEls, { autoAlpha: 0, y: 16 });
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
@@ -480,15 +490,15 @@
       tl.to(chat, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, ctx.duration - 0.5);
     }
 
-    // ── Script ──
+    // ── Script actions ──
     if (data.script && data.script.length > 0) {
       var cursorTargets = data.cursor_targets || {
-        'chat-input': { x: '50%', y: '88%' },
-        'send-button': { x: '95%', y: '88%' },
-        'plus-button': { x: '8%', y: '88%' },
-        'mic-button': { x: '90%', y: '88%' },
-        'connectors-item': { x: '22%', y: '65%' },
-        'quotient-toggle': { x: '58%', y: '55%' }
+        'chat-input': { x: '50%', y: '75%' },
+        'send-button': { x: '95%', y: '86%' },
+        'plus-button': { x: '8%', y: '86%' },
+        'mic-button': { x: '90%', y: '86%' },
+        'connectors-item': { x: '22%', y: '60%' },
+        'quotient-toggle': { x: '72%', y: '50%' }
       };
 
       runScript(tl, el, data.script, cursorTargets, ctx, {

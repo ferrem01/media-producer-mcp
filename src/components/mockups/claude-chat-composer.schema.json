@@ -2,7 +2,7 @@
   "type": "claude-chat-composer",
   "label": "Claude Chat Composer",
   "category": "mockups",
-  "description": "Claude AI chat interface with composer bar, two-level tools/connectors menu, and animated UI walkthrough. Supports scripted cursor interactions: click plus, open category menu, hover connectors, show submenu, toggle items.",
+  "description": "Claude AI chat interface with multi-line composer box, two-level tools/connectors menu, and animated UI walkthrough. Supports scripted cursor interactions: click plus, open category menu, hover connectors, show submenu, toggle items.",
   "data": {
     "messages": {
       "type": "array",
@@ -45,7 +45,7 @@
     },
     "menu_items": {
       "type": "array",
-      "label": "Connector Items (shown in connectors submenu)",
+      "label": "Connector Items (shown in connectors submenu, all OFF by default)",
       "optional": true,
       "items": {
         "type": "object",
@@ -69,7 +69,7 @@
   "script_actions": [
     {
       "action": "type",
-      "description": "Type text into the composer input field",
+      "description": "Type text into the multi-line composer input area",
       "params": {
         "text": "string - Text to type",
         "speed": "number - Characters per second (default 25)"
@@ -92,7 +92,7 @@
     },
     {
       "action": "show-connectors",
-      "description": "Slide open the connectors submenu to the right of the primary menu, showing toggle switches for each connector"
+      "description": "Slide open the connectors submenu to the right of the primary menu, showing toggle switches for each connector (all OFF by default)"
     },
     {
       "action": "close-menu",
@@ -122,11 +122,11 @@
     }
   ],
   "default_cursor_targets": {
-    "chat-input": { "x": "50%", "y": "88%" },
-    "send-button": { "x": "95%", "y": "88%" },
-    "plus-button": { "x": "8%", "y": "88%" },
-    "mic-button": { "x": "90%", "y": "88%" },
-    "connectors-item": { "x": "28%", "y": "68%" },
-    "quotient-toggle": { "x": "72%", "y": "55%" }
+    "chat-input": { "x": "50%", "y": "75%" },
+    "send-button": { "x": "95%", "y": "86%" },
+    "plus-button": { "x": "8%", "y": "86%" },
+    "mic-button": { "x": "90%", "y": "86%" },
+    "connectors-item": { "x": "28%", "y": "60%" },
+    "quotient-toggle": { "x": "72%", "y": "50%" }
   }
 }
