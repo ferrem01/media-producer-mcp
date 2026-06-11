@@ -1,0 +1,429 @@
+<template>
+  <div class="canva-editor">
+    <!-- Top toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button class="tb-icon-btn" data-target="home-btn">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l7-7 7 7"/><path d="M5 8.5V16a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V8.5"/></svg>
+        </button>
+        <button class="tb-text-btn" data-target="file-btn">File</button>
+        <button class="tb-text-btn" data-target="resize-btn">Resize</button>
+        <div class="tb-divider"></div>
+        <button class="tb-text-btn editing-btn" data-target="editing-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1a1a1a" stroke-width="1.3" stroke-linecap="round"><path d="M2 14l1.5-5L12 .5 15.5 4 7 12.5z"/><path d="M10 3l3 3"/></svg>
+          <span>Editing</span>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+        </button>
+        <div class="tb-divider"></div>
+        <button class="tb-icon-btn magic-btn" data-target="magic-btn">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#8B3DFF" stroke-width="1.4" stroke-linecap="round"><path d="M9 1.5l1.2 3.8L14 6.5l-3.8 1.2L9 11.5 7.8 7.7 4 6.5l3.8-1.2z"/><path d="M14 12l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9L11.5 14.5l1.9-.6z"/></svg>
+          <span class="magic-badge">New</span>
+        </button>
+      </div>
+      <div class="toolbar-right">
+        <span class="tb-plan-label" data-target="plan-label"></span>
+        <div class="tb-avatar" data-target="user-avatar"></div>
+        <button class="tb-icon-btn" data-target="insights-btn">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#1a1a1a" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="9" width="3" height="7"/><rect x="7.5" y="5" width="3" height="11"/><rect x="13" y="2" width="3" height="14"/></svg>
+        </button>
+        <button class="tb-icon-btn" data-target="comments-btn">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#1a1a1a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h12a1 1 0 011 1v8a1 1 0 01-1 1H6l-3 3V4a1 1 0 011-1z"/></svg>
+        </button>
+        <button class="share-btn" data-target="share-btn">Share</button>
+      </div>
+    </div>
+    <div class="editor-body">
+      <!-- Left sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-items" data-target="sidebar-items"></div>
+      </div>
+      <!-- Canvas area -->
+      <div class="canvas-area">
+        <div class="canvas-viewport">
+          <div class="canvas-frame" data-target="canvas-frame">
+            <div class="canvas-content" data-target="canvas-content"></div>
+          </div>
+        </div>
+        <!-- Bottom bar -->
+        <div class="bottom-bar">
+          <div class="bottom-left">
+            <button class="bottom-tab" data-target="magic-media-tab">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1l1 3.2L12.2 5.2 9.2 7.2l1 3.2L8 8.5 5.8 10.4l1-3.2L3.8 5.2 7 4.2z"/></svg>
+              <span>Magic Media</span>
+            </button>
+            <button class="bottom-tab" data-target="notes-tab">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M6 5h4M6 8h4M6 11h2"/></svg>
+              <span>Notes</span>
+            </button>
+            <button class="bottom-tab" data-target="timer-tab">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="9" r="5"/><path d="M8 6.5v2.5l1.5 1.5"/><line x1="7" y1="2" x2="9" y2="2"/></svg>
+              <span>Timer</span>
+            </button>
+          </div>
+          <div class="bottom-center">
+            <button class="add-page-btn" data-target="add-page-btn">+ Add page</button>
+            <button class="add-page-dropdown">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round"><path d="M4 5.5l3 3 3-3"/></svg>
+            </button>
+          </div>
+          <div class="bottom-right">
+            <div class="zoom-control">
+              <div class="zoom-track"><div class="zoom-thumb" data-target="zoom-thumb"></div></div>
+              <span class="zoom-label" data-target="zoom-label"></span>
+            </div>
+            <span class="page-info">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#666" stroke-width="1.2"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>
+              Pages
+            </span>
+            <span class="page-count" data-target="page-count"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .canva-editor {
+    width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0;
+    display: flex; flex-direction: column;
+    background: #e8e8e8;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+  }
+  /* ── Toolbar ── */
+  .toolbar {
+    height: 52px; background: #fff; border-bottom: 1px solid #e0e0e0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; flex-shrink: 0; z-index: 10;
+  }
+  .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 4px; }
+  .tb-icon-btn {
+    width: 36px; height: 36px; border: none; background: transparent; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; cursor: default; position: relative;
+  }
+  .tb-icon-btn:hover, .tb-icon-btn.hovered { background: #f0f0f0; }
+  .tb-text-btn {
+    height: 36px; border: none; background: transparent; border-radius: 8px;
+    padding: 0 12px; font-size: 13.5px; font-weight: 500; color: #1a1a1a;
+    cursor: default; font-family: inherit;
+  }
+  .tb-text-btn:hover, .tb-text-btn.hovered { background: #f0f0f0; }
+  .editing-btn { display: flex; align-items: center; gap: 6px; }
+  .editing-btn .chevron { margin-left: -2px; }
+  .magic-btn { position: relative; }
+  .magic-badge {
+    position: absolute; top: 2px; right: -2px;
+    background: #8B3DFF; color: #fff; font-size: 9px; font-weight: 700;
+    padding: 1px 4px; border-radius: 4px; letter-spacing: 0.02em;
+  }
+  .tb-divider { width: 1px; height: 24px; background: #e0e0e0; margin: 0 6px; }
+  .tb-plan-label { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-right: 8px; }
+  .tb-avatar {
+    width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .share-btn {
+    height: 36px; padding: 0 20px; border: none; border-radius: 8px;
+    background: #1a1a1a; color: #fff; font-size: 13.5px; font-weight: 600;
+    cursor: default; font-family: inherit; margin-left: 4px;
+  }
+  .share-btn:hover, .share-btn.hovered { background: #333; }
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 72px; background: #fff; border-right: 1px solid #e0e0e0;
+    display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+  }
+  .sidebar-items { display: flex; flex-direction: column; padding: 8px 0; }
+  .sb-item {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 10px 4px; cursor: default; border-radius: 8px; margin: 0 6px;
+  }
+  .sb-item:hover, .sb-item.hovered, .sb-item.active { background: #f0edff; }
+  .sb-item.active { background: #ede6ff; }
+  .sb-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: #1a1a1a; }
+  .sb-icon svg { width: 24px; height: 24px; }
+  .sb-label { font-size: 10.5px; color: #1a1a1a; font-weight: 400; text-align: center; white-space: nowrap; }
+  .sb-item-canva .sb-icon { color: #00C4CC; }
+  /* ── Editor body ── */
+  .editor-body { flex: 1; display: flex; overflow: hidden; }
+  /* ── Canvas area ── */
+  .canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .canvas-viewport {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 32px; overflow: hidden; background: #e8e8e8;
+  }
+  .canvas-frame {
+    width: 80%; max-width: 840px; aspect-ratio: 16/9; background: #0f172a;
+    border-radius: 4px; box-shadow: 0 2px 16px rgba(0,0,0,0.15);
+    overflow: hidden; position: relative;
+  }
+  .canvas-content {
+    width: 100%; height: 100%; position: relative; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    padding: 40px; box-sizing: border-box;
+  }
+  .canvas-content .design-logo {
+    position: absolute; top: 20px; left: 24px; display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 600; color: #fff;
+  }
+  .canvas-content .design-logo-icon {
+    width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center;
+    justify-content: center; font-size: 11px; font-weight: 700;
+  }
+  .canvas-content .design-overline {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase;
+    color: #8B5CF6; margin-bottom: 8px;
+  }
+  .canvas-content .design-title {
+    font-size: 38px; font-weight: 700; color: #fff; text-align: center; line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  .canvas-content .design-play {
+    width: 72px; height: 72px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.4);
+    display: flex; align-items: center; justify-content: center; margin-top: 24px;
+    background: rgba(255,255,255,0.08);
+  }
+  .canvas-content .design-play svg { margin-left: 4px; }
+  .canvas-content .design-logos {
+    display: flex; align-items: center; gap: 16px; margin-top: 24px;
+  }
+  .canvas-content .design-partner-logo {
+    width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 700;
+  }
+  .canvas-content .design-plus { color: rgba(255,255,255,0.5); font-size: 24px; font-weight: 300; }
+  .canvas-content .design-wave {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
+    background: linear-gradient(135deg, #f97316, #ec4899, #8b5cf6, #06b6d4);
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120'%3E%3Cpath d='M0,60 C200,120 400,0 600,60 C800,120 1000,0 1200,60 L1200,120 L0,120 Z'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120'%3E%3Cpath d='M0,60 C200,120 400,0 600,60 C800,120 1000,0 1200,60 L1200,120 L0,120 Z'/%3E%3C/svg%3E");
+    mask-size: cover; -webkit-mask-size: cover; opacity: 0.7;
+  }
+  /* ── Bottom bar ── */
+  .bottom-bar {
+    height: 40px; background: #fff; border-top: 1px solid #e0e0e0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; flex-shrink: 0;
+  }
+  .bottom-left, .bottom-right { display: flex; align-items: center; gap: 8px; }
+  .bottom-center { display: flex; align-items: center; gap: 0; }
+  .bottom-tab {
+    display: flex; align-items: center; gap: 4px; border: none; background: transparent;
+    padding: 4px 8px; border-radius: 6px; font-size: 12px; color: #666; cursor: default;
+    font-family: inherit;
+  }
+  .bottom-tab:hover { background: #f0f0f0; color: #1a1a1a; }
+  .add-page-btn {
+    height: 30px; padding: 0 16px; border: 1px solid #d0d0d0; border-right: none;
+    border-radius: 6px 0 0 6px; background: #fff; font-size: 12.5px; color: #1a1a1a;
+    cursor: default; font-family: inherit;
+  }
+  .add-page-dropdown {
+    height: 30px; width: 30px; border: 1px solid #d0d0d0; border-radius: 0 6px 6px 0;
+    background: #fff; display: flex; align-items: center; justify-content: center; cursor: default;
+  }
+  .zoom-control { display: flex; align-items: center; gap: 6px; }
+  .zoom-track { width: 80px; height: 4px; background: #e0e0e0; border-radius: 2px; position: relative; }
+  .zoom-thumb {
+    width: 12px; height: 12px; background: #fff; border: 2px solid #999; border-radius: 50%;
+    position: absolute; top: -4px; left: 65%;
+  }
+  .zoom-label { font-size: 12px; color: #666; min-width: 30px; }
+  .page-info { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #666; }
+  .page-count { font-size: 12px; color: #666; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var editor = el.querySelector('.canva-editor');
+    var sidebarItems = el.querySelector('.sidebar-items');
+    var canvasContent = el.querySelector('.canvas-content');
+    var planLabel = el.querySelector('[data-target="plan-label"]');
+    var userAvatar = el.querySelector('[data-target="user-avatar"]');
+    var zoomLabel = el.querySelector('[data-target="zoom-label"]');
+    var pageCount = el.querySelector('[data-target="page-count"]');
+
+    // ── Data ──
+    var plan = data.plan_name || 'Canva Hero';
+    var avatarInitials = data.avatar_initials || 'MF';
+    var avatarColor = data.avatar_color || '#8B3DFF';
+    var zoom = data.zoom || '88%';
+    var pages = data.pages || '1 / 1';
+    var designTitle = data.design_title || 'Quotient Agent for Canva';
+    var designOverline = data.design_overline || 'INTRODUCING';
+    var designBg = data.design_bg || '#0f172a';
+    var showPlay = data.show_play !== false;
+    var logoName = data.logo_name || 'Quotient';
+    var logoIcon = data.logo_icon || 'Q';
+    var logoColor = data.logo_color || 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+    var partnerLogos = data.partner_logos || [
+      { text: 'Canva', color: '#00C4CC', textColor: '#fff' },
+      { text: 'Q\u2022', color: 'linear-gradient(135deg, #6366f1, #8b5cf6)', textColor: '#fff' }
+    ];
+    var activeSidebarItem = data.active_sidebar || null;
+
+    // ── Setup toolbar ──
+    planLabel.textContent = plan;
+    userAvatar.textContent = avatarInitials;
+    userAvatar.style.background = avatarColor;
+    zoomLabel.textContent = zoom;
+    pageCount.textContent = pages;
+
+    // ── Sidebar icons ──
+    var sbDef = [
+      { id: 'canva-ai', label: 'Canva AI', cls: 'sb-item-canva',
+        icon: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#00C4CC" stroke-width="1.5"/><path d="M8 14c1-3 3-5 5-5s3 2 3 3-1 2-2 2-2-1-2-2" stroke="#00C4CC" stroke-width="1.5" stroke-linecap="round"/></svg>' },
+      { id: 'templates', label: 'Templates',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>' },
+      { id: 'elements', label: 'Elements',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="4"/><rect x="13" y="4" width="8" height="8" rx="1"/><path d="M8 16l4 6 4-6z"/></svg>' },
+      { id: 'text', label: 'Text',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 4h12M12 4v16M8 20h8"/></svg>' },
+      { id: 'brand', label: 'Brand',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.5 5 5.5.8-4 3.9.9 5.3-4.9-2.6L7.1 17l.9-5.3-4-3.9 5.5-.8z"/></svg>' },
+      { id: 'uploads', label: 'Uploads',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/><path d="M12 14V4M8 8l4-4 4 4"/></svg>' },
+      { id: 'tools', label: 'Tools',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 21l8-8M14.5 5.5a4.95 4.95 0 014 4l-3 1 1 3a4.95 4.95 0 01-4-4l3-1-1-3z"/></svg>' },
+      { id: 'projects', label: 'Projects',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>' },
+      { id: 'apps', label: 'Apps',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><line x1="17.5" y1="14" x2="17.5" y2="21"/><line x1="14" y1="17.5" x2="21" y2="17.5"/></svg>' }
+    ];
+
+    sbDef.forEach(function(item) {
+      var el = document.createElement('div');
+      el.className = 'sb-item' + (item.cls ? ' ' + item.cls : '') + (activeSidebarItem === item.id ? ' active' : '');
+      el.setAttribute('data-target', 'sb-' + item.id);
+      var icon = document.createElement('div');
+      icon.className = 'sb-icon';
+      icon.innerHTML = item.icon;
+      el.appendChild(icon);
+      var label = document.createElement('span');
+      label.className = 'sb-label';
+      label.textContent = item.label;
+      el.appendChild(label);
+      sidebarItems.appendChild(el);
+    });
+
+    // ── Canvas content ──
+    var frame = el.querySelector('.canvas-frame');
+    frame.style.background = designBg;
+
+    // Logo
+    var logoDiv = document.createElement('div');
+    logoDiv.className = 'design-logo';
+    var logoIconDiv = document.createElement('div');
+    logoIconDiv.className = 'design-logo-icon';
+    logoIconDiv.style.background = logoColor;
+    logoIconDiv.textContent = logoIcon;
+    logoDiv.appendChild(logoIconDiv);
+    var logoText = document.createElement('span');
+    logoText.textContent = logoName;
+    logoDiv.appendChild(logoText);
+    canvasContent.appendChild(logoDiv);
+
+    // Overline
+    if (designOverline) {
+      var overline = document.createElement('div');
+      overline.className = 'design-overline';
+      overline.textContent = designOverline;
+      canvasContent.appendChild(overline);
+    }
+
+    // Title
+    var title = document.createElement('div');
+    title.className = 'design-title';
+    title.textContent = designTitle;
+    canvasContent.appendChild(title);
+
+    // Play button
+    if (showPlay) {
+      var play = document.createElement('div');
+      play.className = 'design-play';
+      play.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" fill="rgba(255,255,255,0.8)"><path d="M8 4l18 10L8 24z"/></svg>';
+      canvasContent.appendChild(play);
+    }
+
+    // Partner logos
+    if (partnerLogos && partnerLogos.length > 0) {
+      var logosRow = document.createElement('div');
+      logosRow.className = 'design-logos';
+      partnerLogos.forEach(function(pl, idx) {
+        if (idx > 0) {
+          var plus = document.createElement('span');
+          plus.className = 'design-plus';
+          plus.textContent = '+';
+          logosRow.appendChild(plus);
+        }
+        var plogo = document.createElement('div');
+        plogo.className = 'design-partner-logo';
+        plogo.style.background = pl.color;
+        plogo.style.color = pl.textColor || '#fff';
+        plogo.textContent = pl.text;
+        logosRow.appendChild(plogo);
+      });
+      canvasContent.appendChild(logosRow);
+    }
+
+    // Wave decoration
+    var wave = document.createElement('div');
+    wave.className = 'design-wave';
+    canvasContent.appendChild(wave);
+
+    // ── Animation ──
+    gsap.set(editor, { autoAlpha: 0 });
+    tl.to(editor, { autoAlpha: 1, duration: 0.5, ease: 'power2.out' }, 0.2);
+
+    if (ctx.duration > 2) {
+      tl.to(editor, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, ctx.duration - 0.5);
+    }
+
+    // ── Script ──
+    if (data.script && data.script.length > 0) {
+      var cursorTargets = data.cursor_targets || {
+        'canvas-center': { x: '55%', y: '50%' },
+        'share-btn': { x: '95%', y: '3%' },
+        'sidebar-templates': { x: '3%', y: '20%' },
+        'sidebar-elements': { x: '3%', y: '28%' },
+        'sidebar-text': { x: '3%', y: '36%' },
+        'sidebar-apps': { x: '3%', y: '80%' }
+      };
+
+      runScript(tl, el, data.script, cursorTargets, ctx, {
+        'hover-sidebar': function(tl, ctr, action, at) {
+          var target = action.target || '';
+          var item = ctr.querySelector('[data-target="sb-' + target + '"]');
+          // Remove previous hovers
+          var all = ctr.querySelectorAll('.sb-item.hovered');
+          tl.call(function() {
+            for (var i = 0; i < all.length; i++) all[i].classList.remove('hovered');
+            if (item) item.classList.add('hovered');
+          }, null, at);
+        },
+        'click-sidebar': function(tl, ctr, action, at) {
+          var target = action.target || '';
+          var item = ctr.querySelector('[data-target="sb-' + target + '"]');
+          var all = ctr.querySelectorAll('.sb-item.active, .sb-item.hovered');
+          tl.call(function() {
+            for (var i = 0; i < all.length; i++) { all[i].classList.remove('active'); all[i].classList.remove('hovered'); }
+            if (item) item.classList.add('active');
+          }, null, at);
+        },
+        'hover-toolbar': function(tl, ctr, action, at) {
+          var target = action.target || '';
+          var btn = ctr.querySelector('[data-target="' + target + '"]');
+          tl.call(function() {
+            var prev = ctr.querySelectorAll('.tb-text-btn.hovered, .tb-icon-btn.hovered, .share-btn.hovered');
+            for (var i = 0; i < prev.length; i++) prev[i].classList.remove('hovered');
+            if (btn) btn.classList.add('hovered');
+          }, null, at);
+        }
+      });
+    }
+    return tl;
+  }
+</script>

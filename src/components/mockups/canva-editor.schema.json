@@ -1,0 +1,45 @@
+{
+  "type": "canva-editor",
+  "label": "Canva Editor",
+  "category": "mockups",
+  "description": "Canva design editor mockup with left sidebar tools, top toolbar, center canvas with configurable design content, and bottom page controls. Supports scripted cursor interactions for sidebar, toolbar, and canvas.",
+  "data": {
+    "plan_name": { "type": "string", "label": "Plan Name", "optional": true, "default": "Canva Hero" },
+    "avatar_initials": { "type": "string", "label": "User Initials", "optional": true, "default": "MF" },
+    "avatar_color": { "type": "string", "label": "Avatar Color", "optional": true, "default": "#8B3DFF" },
+    "zoom": { "type": "string", "label": "Zoom Level", "optional": true, "default": "88%" },
+    "pages": { "type": "string", "label": "Page Count", "optional": true, "default": "1 / 1" },
+    "design_title": { "type": "string", "label": "Design Title", "optional": true, "default": "Quotient Agent for Canva" },
+    "design_overline": { "type": "string", "label": "Design Overline", "optional": true, "default": "INTRODUCING" },
+    "design_bg": { "type": "string", "label": "Design Background", "optional": true, "default": "#0f172a" },
+    "show_play": { "type": "boolean", "label": "Show Play Button", "optional": true, "default": true },
+    "logo_name": { "type": "string", "label": "Logo Name", "optional": true, "default": "Quotient" },
+    "logo_icon": { "type": "string", "label": "Logo Icon Letter", "optional": true, "default": "Q" },
+    "logo_color": { "type": "string", "label": "Logo BG Color/Gradient", "optional": true, "default": "linear-gradient(135deg, #6366f1, #8b5cf6)" },
+    "partner_logos": {
+      "type": "array", "label": "Partner Logos", "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "label": "Logo Text" },
+          "color": { "type": "string", "label": "Background Color" },
+          "textColor": { "type": "string", "label": "Text Color", "optional": true }
+        }
+      }
+    },
+    "active_sidebar": { "type": "string", "label": "Active Sidebar Item ID", "optional": true }
+  },
+  "script_actions": [
+    { "action": "hover-sidebar", "description": "Highlight a sidebar item", "params": { "target": "string - Sidebar item id (canva-ai, templates, elements, text, brand, uploads, tools, projects, apps)" } },
+    { "action": "click-sidebar", "description": "Activate a sidebar item", "params": { "target": "string - Sidebar item id" } },
+    { "action": "hover-toolbar", "description": "Highlight a toolbar button", "params": { "target": "string - data-target of the toolbar button" } }
+  ],
+  "default_cursor_targets": {
+    "canvas-center": { "x": "55%", "y": "50%" },
+    "share-btn": { "x": "95%", "y": "3%" },
+    "sidebar-templates": { "x": "3%", "y": "20%" },
+    "sidebar-elements": { "x": "3%", "y": "28%" },
+    "sidebar-text": { "x": "3%", "y": "36%" },
+    "sidebar-apps": { "x": "3%", "y": "80%" }
+  }
+}
