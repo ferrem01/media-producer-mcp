@@ -17,7 +17,11 @@ import {
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
 import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./freeform-skills.js";
-import type { BrandKit, Canvas } from "../core/types.js";
+import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
+import {
+  buildReferenceImageParts,
+  buildReferenceImageSummary,
+} from "./reference-images.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +43,7 @@ export interface AgenticFreeformOpts {
   brandKit: BrandKit;
   canvas: Canvas;
   critiqueFeedback?: string;
+  referenceImages?: ReferenceImage[];
 }
 
 // ── Tool Definitions ──
@@ -364,7 +369,7 @@ Your submitted HTML must be a single .component.html file with exactly three sec
 11. Use gsap.from() for entrances (elements arrive at their CSS position). IMPORTANT: set initial CSS to the FINAL state (opacity: 1, transform: none). Let GSAP animate FROM the hidden state.
 
 ${brandVarsContext}
-
+${opts.referenceImages?.length ? buildReferenceImageSummary(opts.referenceImages) + "\nReference images show the target visual design. Your HTML+CSS should match the layout, colors, typography, spacing, and component hierarchy shown in these references.\n" : ""}
 ## This Scene
 
 Duration: ${opts.sceneDuration} seconds
@@ -429,9 +434,21 @@ ${opts.sceneBrief}
 ${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
 Start by searching the library for relevant patterns, then read 1-3 relevant sources before writing your scene.`;
 
+  // Build user message: include reference images as vision content if available
+  var userContent: string | LLMContentPart[];
+  if (opts.referenceImages?.length) {
+    var refParts = buildReferenceImageParts(opts.referenceImages);
+    userContent = [
+      { type: "text" as const, text: userPrompt },
+      ...refParts,
+    ];
+  } else {
+    userContent = userPrompt;
+  }
+
   var messages: LLMMessage[] = [
     { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
+    { role: "user", content: userContent },
   ];
 
   console.log(

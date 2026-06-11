@@ -1240,6 +1240,14 @@ export function createMcpServer(): McpServer {
         })).optional(),
       }).optional().describe("Structured brief with marketing context. Enhances the prompt with audience, messaging, and asset info."),
       feedback: z.string().optional().describe("Natural language feedback to revise an existing plan. Requires project_id with a planned project."),
+      reference_images: z.array(z.object({
+        url: z.string().describe("HTTPS URL or base64 data URI (data:image/...)"),
+        role: z.enum(["ui_reference", "style_reference", "brand_reference", "screenshot"]),
+        label: z.string().optional().describe("Human label for this reference, e.g. 'Claude chat UI'"),
+      })).max(10).optional().describe(
+        "Reference images the LLM can see while planning and generating scenes. " +
+        "Use for UI screenshots, style references, or brand materials."
+      ),
     },
     async (params) => {
       // Auth check
@@ -1539,6 +1547,7 @@ export function createMcpServer(): McpServer {
               speaker_start: params.speaker_start,
               speaker_trim_start: params.speaker_trim_start,
               speaker_trim_end: params.speaker_trim_end,
+              referenceImages: params.reference_images,
             });
 
             // If pipeline created a project, track the projectId

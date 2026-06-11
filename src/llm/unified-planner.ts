@@ -8,14 +8,18 @@
  * A `creativity` parameter (0-1) biases how many components go custom.
  */
 
-import { callLLM, type LLMConfig } from "./client.js";
+import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
 import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { COMPOSITION_PLAYBOOK } from "./cinematography.js";
 import { getStorytellingGuide } from "./freeform-skills.js";
 import { formatTemplateCatalogForPrompt } from "./template-catalog.js";
-import type { BrandKit, Canvas, OutputFormat } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, ReferenceImage } from "../core/types.js";
+import {
+  buildReferenceImageParts,
+  buildReferenceImageSummary,
+} from "./reference-images.js";
 
 function isLightBrand(brandKit: BrandKit): boolean {
   var bg = brandKit.colors?.background || "#0f172a";
@@ -40,6 +44,7 @@ export interface UnifiedPlannerOpts {
   creativity?: number; // 0-1, default 0.5
   tenantId: string;
   hasSpeakerTrack?: boolean;
+  referenceImages?: ReferenceImage[];
 }
 
 export interface PlannedComponent {
@@ -344,6 +349,12 @@ ${COMPOSITION_PLAYBOOK}`;
     systemPrompt += `\n\n## Brand Guidelines (FOLLOW THESE RULES)\n${opts.brandKit.guidelines}\n`;
   }
 
+  // Inject reference image summary into system prompt
+  if (opts.referenceImages?.length) {
+    systemPrompt += buildReferenceImageSummary(opts.referenceImages);
+    systemPrompt += "\nReference images are provided. Study them carefully and write freeform_brief descriptions that match the visual design, layout, spacing, and style shown in these references.\n";
+  }
+
   // Inject speaker track mode instructions if applicable
   if (opts.hasSpeakerTrack) {
     systemPrompt += `\n\n## Speaker Track Mode
@@ -365,9 +376,21 @@ Prefer Speaker templates over regular templates when the speaker should be visib
 
   var userPrompt = `Create a ${opts.format} project.\n\n${opts.prompt}`;
 
+  // Build user message: multi-part with vision content if reference images exist
+  var userContent: string | LLMContentPart[];
+  if (opts.referenceImages?.length) {
+    var refParts = buildReferenceImageParts(opts.referenceImages);
+    userContent = [
+      { type: "text" as const, text: userPrompt },
+      ...refParts,
+    ];
+  } else {
+    userContent = userPrompt;
+  }
+
   var raw = await callLLM(opts.llmConfig, [
     { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
+    { role: "user", content: userContent },
   ], { temperature: 0.5, maxTokens: 8192 });
 
   var storyboard = parseJsonResponse(raw);

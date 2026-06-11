@@ -467,3 +467,26 @@ export interface DesignSystem {
   };
   guidelines?: string;
 }
+
+// ── Reference Images ──
+
+export type ReferenceImageRole =
+  | "ui_reference"       // Screenshot of a UI to replicate
+  | "style_reference"    // Visual style/aesthetic to match
+  | "brand_reference"    // Brand materials (not logos — those go in BrandKit)
+  | "screenshot";        // Generic screenshot for context
+
+export interface ReferenceImage {
+  /** HTTPS URL or base64 data URI (data:image/png;base64,...) */
+  url: string;
+  /** How to use this image */
+  role: ReferenceImageRole;
+  /** Optional human label, e.g. "Claude chat interface" */
+  label?: string;
+  /** Local cached path (set after download, not user-provided) */
+  _cachedPath?: string;
+  /** Base64 data for Anthropic API (set after processing, not user-provided) */
+  _base64Data?: string;
+  /** MIME type (set after processing) */
+  _mediaType?: string;
+}

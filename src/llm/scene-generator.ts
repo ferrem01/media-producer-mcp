@@ -14,7 +14,7 @@ import { getDesignSkills } from "./freeform-skills.js";
 import { getComponentReferenceLibrary } from "./component-reference.js";
 import { generateFreeformAgentic } from "./freeform-agentic.js";
 import type { PlannedScene, PlannedComponent } from "./unified-planner.js";
-import type { BrandKit, Canvas, OutputFormat, Scene, SceneComponent, SceneTransition } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneComponent, SceneTransition } from "../core/types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -33,6 +33,7 @@ export interface SceneGeneratorOpts {
   tenantId: string;
   projectId: string;
   critiqueFeedback?: string; // feedback from visual critiquer for retry
+  referenceImages?: ReferenceImage[];
 }
 
 export interface GeneratedScene {
@@ -157,6 +158,7 @@ async function generateFreeformScene(
     brandKit: opts.brandKit,
     canvas: opts.canvas,
     critiqueFeedback: opts.critiqueFeedback,
+    referenceImages: opts.referenceImages,
   });
 
   sceneHtml = stripHtmlFences(sceneHtml);

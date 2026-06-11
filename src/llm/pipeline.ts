@@ -33,9 +33,10 @@ import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { fetchStockFootage, generateStockQuery } from "../media/stock-footage.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
-import type { BrandKit, Canvas, OutputFormat, Project, Scene, SceneTransition } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, Project, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
+import { processReferenceImages } from "./reference-images.js";
 import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
 import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { assembleScene, type ComponentSource } from "../core/scene-assembler.js";
@@ -65,6 +66,9 @@ export interface PipelineOpts {
   stockFootage?: boolean;   // default: false. Fetch stock video clips for scene backgrounds.
   backgroundMusic?: boolean;  // default: false. Add background music with voiceover ducking.
   trace?: TraceBuilder;
+
+  /** Reference images for vision-aware generation */
+  referenceImages?: ReferenceImage[];
 
   // Canvas overrides (any target; for images, overrides prompt inference)
   canvasWidth?: number;
@@ -1274,6 +1278,22 @@ async function runUnifiedPipeline(
     console.log("  Prompt expanded");
   }
 
+  // 1b. Download and cache reference images
+  var processedRefs: ReferenceImage[] | undefined;
+  var tempProjectId: string | undefined;
+  if (opts.referenceImages?.length) {
+    trace?.beginEvent("process_reference_images");
+    // Need a project ID for caching; create early and reuse for the project shell
+    tempProjectId = `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
+    processedRefs = await processReferenceImages(
+      opts.referenceImages as ReferenceImage[],
+      opts.tenant_id,
+      tempProjectId,
+    );
+    trace?.endEvent({ count: processedRefs.length });
+    console.log(`  Reference images: ${processedRefs.length} processed`);
+  }
+
   // 2. Plan storyboard (unified planner)
   trace?.beginEvent("plan_storyboard");
   var storyboard = await planStoryboard({
@@ -1287,12 +1307,13 @@ async function runUnifiedPipeline(
     creativity,
     tenantId: opts.tenant_id,
     hasSpeakerTrack: !!opts.speaker_source,
+    referenceImages: processedRefs,
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
 
-    // Create project shell
-  var projectId = `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
+    // Create project shell (reuse tempProjectId from reference image processing if available)
+  var projectId = tempProjectId || `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
   var project: Project = {
     project_id: projectId,
     tenant_id: opts.tenant_id,
@@ -1387,6 +1408,7 @@ async function runUnifiedPipeline(
           imageUrl,
           tenantId: opts.tenant_id,
           projectId,
+          referenceImages: processedRefs,
         });
 
         // Save custom component HTML if needed
