@@ -409,10 +409,74 @@ function buildBrandContext(brandKit: BrandKit): string {
 
 const MAX_ITERATIONS = 8;
 
+/**
+ * Pre-search the library using keywords from the prompt and reference image labels.
+ * Returns suggested components/templates the agent should look at first.
+ */
+async function presearchLibrary(prompt: string, referenceImages?: any[]): Promise<string> {
+  // Extract meaningful keywords from the prompt and reference labels
+  var keywords = new Set<string>();
+  var text = prompt.toLowerCase();
+  
+  // Extract notable proper nouns and UI terms from prompt
+  var words = text.split(/\s+/);
+  for (var w of words) {
+    var rclean = rw.replace(/[^a-z0-9-]/g, "");
+    if (rclean.length > 3) keywords.add(rclean);
+  }
+  
+  // Extract from reference image labels
+  if (referenceImages?.length) {
+    for (var ref of referenceImages) {
+      if (ref.label) {
+        for (var rw of ref.label.toLowerCase().split(/\s+/)) {
+          var rclean = rw.replace(/[^a-z0-9-]/g, "");
+          if (rclean.length > 3) keywords.add(rclean);
+        }
+      }
+    }
+  }
+
+  // Run searches with the most specific terms first
+  var keyArr = [...keywords];
+  var seen = new Set<string>();
+  var suggestions: string[] = [];
+
+  // Search in batches of 3-4 keywords
+  var queries = [
+    keyArr.filter(k => /^[A-Z]|claude|slack|notion|figma|github|cursor|menu|toggle|compose/i.test(k)).slice(0, 6).join(" "),
+    keyArr.slice(0, 5).join(" "),
+  ].filter(q => q.length > 0);
+
+  for (var q of queries) {
+    var result = await executeSearchLibrary(q, "all");
+    // Parse results to extract names
+    var lines = result.split("\n").filter(l => l.startsWith("- **"));
+    for (var line of lines) {
+      var match = line.match(/\*\*([^*]+)\*\*/);
+      if (match && !seen.has(match[1])) {
+        seen.add(match[1]);
+        suggestions.push(line);
+      }
+    }
+  }
+
+  if (suggestions.length === 0) return "";
+  return "\n## Suggested Library References\n\nBased on the prompt and reference images, these library items are likely relevant:\n" +
+    suggestions.slice(0, 6).join("\n") +
+    "\n\nConsider reading these with read_source before writing your scene. Search for more if needed.\n";
+}
+
 export async function generateFreeformAgentic(
   opts: AgenticFreeformOpts,
 ): Promise<string> {
+  // Pre-search library for relevant references
+  var suggestions = await presearchLibrary(opts.prompt || opts.sceneBrief || "", opts.referenceImages);
+  
   var systemPrompt = buildAgenticSystemPrompt(opts);
+  if (suggestions) {
+    systemPrompt += suggestions;
+  }
 
   var userPrompt = `Create this scene:
 
@@ -461,6 +525,14 @@ Start by searching the library for relevant patterns, then read 1-3 relevant sou
     console.log(
       `  [agentic] Scene ${opts.sceneIndex + 1}: iteration ${iteration + 1}/${MAX_ITERATIONS}`,
     );
+
+    // After iteration 5, inject urgency to submit
+    if (iteration >= 5 && !lastHtml) {
+      messages.push({
+        role: "user",
+        content: `IMPORTANT: You have ${MAX_ITERATIONS - iteration} iterations remaining. You MUST call submit_scene with your HTML now. Stop searching and write the scene. If you have studied enough references, write and submit the HTML immediately.`,
+      });
+    }
 
     var response = await callLLMAgentic(
       opts.llmConfig,
