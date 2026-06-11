@@ -1,41 +1,39 @@
 <template>
   <div class="canva-editor">
-    <!-- Canva header bar -->
-    <div class="canva-header">
-      <div class="header-left">
-        <svg class="canva-logo" width="64" height="20" viewBox="0 0 64 20" fill="none">
-          <path d="M10 0C4.5 0 0 4.5 0 10s4.5 10 10 10c2.5 0 4.8-.9 6.5-2.5-.8.3-1.7.5-2.5.5-4.4 0-8-3.6-8-8s3.6-8 8-8c.9 0 1.7.2 2.5.5C14.8.9 12.5 0 10 0z" fill="#7D2AE8"/>
-          <path d="M10 4c-.6 0-1.1.2-1.5.6C7.5 5.6 7 7.5 7.5 9.5c.3 1 1 1.5 1.5 1.5.4 0 .8-.3 1-1 .2-.5 0-1-.3-1-.2 0-.3.1-.3.3 0-.5.3-1.3 1-1.3.5 0 1 .5 1 1.2 0 1.5-1 2.8-2.4 2.8" fill="#7D2AE8"/>
-          <text x="22" y="15" font-family="Inter,sans-serif" font-size="15" font-weight="700" fill="#fff">Canva</text>
-        </svg>
+    <!-- Browser URL bar -->
+    <div class="browser-bar">
+      <div class="browser-left">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="3" width="5" height="10" rx="1"/><rect x="9" y="3" width="5" height="10" rx="1"/></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" stroke-linecap="round"><path d="M10 3L5 8l5 5"/></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" stroke-linecap="round"><path d="M6 3l5 5-5 5"/></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"><path d="M3 8a5 5 0 019-3M13 8a5 5 0 01-9 3"/><path d="M11 2v3h3"/></svg>
       </div>
-      <div class="header-center">
-        <div class="header-search">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
-          <span>Search</span>
-        </div>
+      <div class="browser-url">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.2" stroke-linecap="round"><path d="M5 3.5h2a2.5 2.5 0 010 5H5a2.5 2.5 0 010-5z"/></svg>
+        <span>canva.com</span>
       </div>
-      <div class="header-right">
-        <button class="header-create">+ Create a design</button>
+      <div class="browser-right">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.3" stroke-linecap="round"><rect x="3" y="3" width="10" height="10" rx="1.5"/><path d="M6 3v10"/></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="4" width="12" height="8" rx="1.5"/><rect x="4" y="2" width="8" height="12" rx="1.5"/></svg>
       </div>
     </div>
     <!-- Top toolbar -->
     <div class="toolbar">
       <div class="toolbar-left">
         <button class="tb-icon-btn" data-target="home-btn">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l7-7 7 7"/><path d="M5 8.5V16a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V8.5"/></svg>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l7-7 7 7"/><path d="M5 8.5V16a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V8.5"/></svg>
         </button>
         <button class="tb-text-btn" data-target="file-btn">File</button>
         <button class="tb-text-btn" data-target="resize-btn">Resize</button>
         <div class="tb-divider"></div>
         <button class="tb-text-btn editing-btn" data-target="editing-btn">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1a1a1a" stroke-width="1.3" stroke-linecap="round"><path d="M2 14l1.5-5L12 .5 15.5 4 7 12.5z"/><path d="M10 3l3 3"/></svg>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round"><path d="M2 14l1.5-5L12 .5 15.5 4 7 12.5z"/><path d="M10 3l3 3"/></svg>
           <span>Editing</span>
-          <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
         </button>
         <div class="tb-divider"></div>
         <button class="tb-icon-btn magic-btn" data-target="magic-btn">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#8B3DFF" stroke-width="1.4" stroke-linecap="round"><path d="M9 1.5l1.2 3.8L14 6.5l-3.8 1.2L9 11.5 7.8 7.7 4 6.5l3.8-1.2z"/><path d="M14 12l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9L11.5 14.5l1.9-.6z"/></svg>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"><path d="M9 1.5l1.2 3.8L14 6.5l-3.8 1.2L9 11.5 7.8 7.7 4 6.5l3.8-1.2z"/><path d="M14 12l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9L11.5 14.5l1.9-.6z"/></svg>
           <span class="magic-badge">New</span>
         </button>
       </div>
@@ -43,10 +41,10 @@
         <span class="tb-plan-label" data-target="plan-label"></span>
         <div class="tb-avatar" data-target="user-avatar"></div>
         <button class="tb-icon-btn" data-target="insights-btn">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#1a1a1a" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="9" width="3" height="7"/><rect x="7.5" y="5" width="3" height="11"/><rect x="13" y="2" width="3" height="14"/></svg>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="9" width="3" height="7"/><rect x="7.5" y="5" width="3" height="11"/><rect x="13" y="2" width="3" height="14"/></svg>
         </button>
         <button class="tb-icon-btn" data-target="comments-btn">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#1a1a1a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h12a1 1 0 011 1v8a1 1 0 01-1 1H6l-3 3V4a1 1 0 011-1z"/></svg>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h12a1 1 0 011 1v8a1 1 0 01-1 1H6l-3 3V4a1 1 0 011-1z"/></svg>
         </button>
         <button class="share-btn" data-target="share-btn">Share</button>
       </div>
@@ -120,30 +118,24 @@
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.08);
   }
-  /* ── Canva header ── */
-  .canva-header {
-    height: 48px; flex-shrink: 0;
-    background: linear-gradient(135deg, #7D2AE8 0%, #5B1FA6 50%, #3B1470 100%);
+  /* ── Browser URL bar ── */
+  .browser-bar {
+    height: 36px; flex-shrink: 0;
+    background: linear-gradient(180deg, #8B3DFF 0%, #7D2AE8 100%);
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0 16px; border-radius: 12px 12px 0 0;
+    padding: 0 14px; border-radius: 12px 12px 0 0;
   }
-  .header-left { display: flex; align-items: center; }
-  .canva-logo { flex-shrink: 0; }
-  .header-center { flex: 1; display: flex; justify-content: center; padding: 0 24px; }
-  .header-search {
-    display: flex; align-items: center; gap: 8px; padding: 7px 16px;
-    background: rgba(255,255,255,0.15); border-radius: 8px; min-width: 240px;
+  .browser-left { display: flex; align-items: center; gap: 10px; }
+  .browser-url {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 16px; background: rgba(255,255,255,0.15); border-radius: 6px;
   }
-  .header-search span { font-size: 13px; color: rgba(255,255,255,0.6); }
-  .header-right { display: flex; align-items: center; }
-  .header-create {
-    height: 32px; padding: 0 16px; border: none; border-radius: 8px;
-    background: #fff; color: #1a1a1a; font-size: 13px; font-weight: 600;
-    cursor: default; font-family: inherit;
-  }
+  .browser-url span { font-size: 12.5px; color: rgba(255,255,255,0.85); font-weight: 500; }
+  .browser-right { display: flex; align-items: center; gap: 10px; }
   /* ── Toolbar ── */
   .toolbar {
-    height: 52px; background: #fff; border-bottom: 1px solid #e0e0e0;
+    height: 48px; background: linear-gradient(180deg, #7D2AE8 0%, #6B24CC 100%);
+    border-bottom: none;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 12px; flex-shrink: 0; z-index: 10;
   }
@@ -152,33 +144,36 @@
     width: 36px; height: 36px; border: none; background: transparent; border-radius: 8px;
     display: flex; align-items: center; justify-content: center; cursor: default; position: relative;
   }
-  .tb-icon-btn:hover, .tb-icon-btn.hovered { background: #f0f0f0; }
+  .tb-icon-btn:hover, .tb-icon-btn.hovered { background: rgba(255,255,255,0.15); }
+  .tb-icon-btn svg { stroke: #fff; }
   .tb-text-btn {
     height: 36px; border: none; background: transparent; border-radius: 8px;
-    padding: 0 12px; font-size: 13.5px; font-weight: 500; color: #1a1a1a;
+    padding: 0 12px; font-size: 13.5px; font-weight: 500; color: #fff;
     cursor: default; font-family: inherit;
   }
-  .tb-text-btn:hover, .tb-text-btn.hovered { background: #f0f0f0; }
+  .tb-text-btn:hover, .tb-text-btn.hovered { background: rgba(255,255,255,0.15); }
   .editing-btn { display: flex; align-items: center; gap: 6px; }
+  .editing-btn svg { stroke: #fff; }
   .editing-btn .chevron { margin-left: -2px; }
+  .editing-btn .chevron { stroke: rgba(255,255,255,0.6); }
   .magic-btn { position: relative; }
   .magic-badge {
-    position: absolute; top: 2px; right: -2px;
-    background: #8B3DFF; color: #fff; font-size: 9px; font-weight: 700;
+    position: absolute; top: 0px; right: -6px;
+    background: #FF6B35; color: #fff; font-size: 9px; font-weight: 700;
     padding: 1px 4px; border-radius: 4px; letter-spacing: 0.02em;
   }
-  .tb-divider { width: 1px; height: 24px; background: #e0e0e0; margin: 0 6px; }
-  .tb-plan-label { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-right: 8px; }
+  .tb-divider { width: 1px; height: 24px; background: rgba(255,255,255,0.2); margin: 0 6px; }
+  .tb-plan-label { font-size: 13px; font-weight: 500; color: #fff; margin-right: 8px; }
   .tb-avatar {
     width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
     justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
   }
   .share-btn {
     height: 36px; padding: 0 20px; border: none; border-radius: 8px;
-    background: #1a1a1a; color: #fff; font-size: 13.5px; font-weight: 600;
+    background: #fff; color: #1a1a1a; font-size: 13.5px; font-weight: 600;
     cursor: default; font-family: inherit; margin-left: 4px;
   }
-  .share-btn:hover, .share-btn.hovered { background: #333; }
+  .share-btn:hover, .share-btn.hovered { background: rgba(255,255,255,0.9); }
   /* ── Sidebar ── */
   .sidebar {
     width: 72px; background: #fff; border-right: 1px solid #e0e0e0;
@@ -557,7 +552,7 @@
               // Magic Write button
               var magicBtn = document.createElement('button');
               magicBtn.className = 'sp-magic-write-btn';
-              magicBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#8B3DFF" stroke-width="1.4" stroke-linecap="round"><path d="M3 15l1.5-5L13 1.5 16.5 5 8 13.5z"/><path d="M11 4l3 3"/></svg>Magic Write';
+              magicBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"><path d="M3 15l1.5-5L13 1.5 16.5 5 8 13.5z"/><path d="M11 4l3 3"/></svg>Magic Write';
               panelContent.appendChild(magicBtn);
               // Brand Kit row
               var brandRow = document.createElement('div');
