@@ -2,7 +2,7 @@
   "type": "claude-chat-composer",
   "label": "Claude Chat Composer",
   "category": "mockups",
-  "description": "Claude AI chat interface with composer bar, message bubbles, and animated tools/integrations menu. Supports scripted typing, menu interactions, and assistant responses.",
+  "description": "Claude AI chat interface with composer bar, two-level tools/connectors menu, and animated UI walkthrough. Supports scripted cursor interactions: click plus, open category menu, hover connectors, show submenu, toggle items.",
   "data": {
     "messages": {
       "type": "array",
@@ -11,17 +11,8 @@
       "items": {
         "type": "object",
         "properties": {
-          "role": {
-            "type": "string",
-            "label": "Role",
-            "required": true,
-            "enum": ["user", "assistant"]
-          },
-          "text": {
-            "type": "string",
-            "label": "Message Text",
-            "required": true
-          }
+          "role": { "type": "string", "label": "Role", "required": true, "enum": ["user", "assistant"] },
+          "text": { "type": "string", "label": "Message Text", "required": true }
         }
       }
     },
@@ -45,42 +36,26 @@
       "optional": true,
       "placeholder": "Message Claude..."
     },
-    "menu_title": {
+    "model_label": {
       "type": "string",
-      "label": "Menu Title",
+      "label": "Model Label",
       "optional": true,
-      "default": "Tools & integrations",
-      "placeholder": "Tools & integrations"
+      "default": "Sonnet 4.6 Low",
+      "placeholder": "Sonnet 4.6 Low"
     },
     "menu_items": {
       "type": "array",
-      "label": "Menu Items",
+      "label": "Connector Items (shown in connectors submenu)",
       "optional": true,
       "items": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
-            "label": "Item Name",
-            "required": true
-          },
-          "icon": {
-            "type": "string",
-            "label": "Icon Emoji",
-            "optional": true,
-            "placeholder": "🔌"
-          },
-          "connected": {
-            "type": "boolean",
-            "label": "Connected",
-            "optional": true,
-            "default": false
-          },
-          "description": {
-            "type": "string",
-            "label": "Description",
-            "optional": true
-          }
+          "id": { "type": "string", "label": "Connector ID", "optional": true },
+          "name": { "type": "string", "label": "Connector Name", "required": true },
+          "label": { "type": "string", "label": "Display Label", "optional": true },
+          "icon": { "type": "string", "label": "Icon Emoji", "optional": true },
+          "connected": { "type": "boolean", "label": "Initially Connected", "optional": true, "default": false },
+          "enabled": { "type": "boolean", "label": "Initially Enabled", "optional": true, "default": false }
         }
       }
     },
@@ -109,17 +84,26 @@
     },
     {
       "action": "open-menu",
-      "description": "Open the tools & integrations menu with slide-up animation"
+      "description": "Open the primary + menu showing categories: Add files, Skills, Connectors, Research, Web search, etc."
+    },
+    {
+      "action": "hover-connectors",
+      "description": "Highlight the Connectors row in the primary + menu (typically before show-connectors)"
+    },
+    {
+      "action": "show-connectors",
+      "description": "Slide open the connectors submenu to the right of the primary menu, showing toggle switches for each connector"
     },
     {
       "action": "close-menu",
-      "description": "Close the tools & integrations menu"
+      "description": "Close both the primary menu and connectors submenu"
     },
     {
       "action": "toggle-item",
-      "description": "Toggle a menu item's switch on or off",
+      "description": "Toggle a connector's switch on or off in the submenu",
       "params": {
-        "index": "number - Zero-based index of the menu item to toggle"
+        "index": "number - Zero-based index of the connector to toggle",
+        "target": "string - Connector name or id (alternative to index)"
       }
     },
     {
@@ -138,17 +122,11 @@
     }
   ],
   "default_cursor_targets": {
-    "chat-input": {
-      "x": "50%",
-      "y": "92%"
-    },
-    "send-button": {
-      "x": "95%",
-      "y": "92%"
-    },
-    "plus-button": {
-      "x": "5%",
-      "y": "92%"
-    }
+    "chat-input": { "x": "50%", "y": "88%" },
+    "send-button": { "x": "95%", "y": "88%" },
+    "plus-button": { "x": "8%", "y": "88%" },
+    "mic-button": { "x": "90%", "y": "88%" },
+    "connectors-item": { "x": "28%", "y": "68%" },
+    "quotient-toggle": { "x": "72%", "y": "55%" }
   }
 }

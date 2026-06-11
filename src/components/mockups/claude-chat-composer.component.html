@@ -21,18 +21,45 @@
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="14"/><line x1="4" y1="9" x2="14" y2="9"/></svg>
           </button>
           <div class="composer-input" data-target="chat-input" contenteditable="false"></div>
-          <button class="send-btn" data-target="send-button">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5l-0.35 0.35L8 2.5V2.5zM8 2.5v11M3.5 7L8 2.5 12.5 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
+          <div class="composer-controls">
+            <span class="model-selector" data-target="model-selector"></span>
+            <button class="mic-btn" data-target="mic-button">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/>
+                <path d="M3.5 7.5a4.5 4.5 0 009 0"/>
+                <line x1="8" y1="12" x2="8" y2="14.5"/>
+              </svg>
+            </button>
+            <button class="send-btn" data-target="send-button">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 11.5V2.5M3 6.5L7 2.5l4 4"/>
+              </svg>
+            </button>
+          </div>
         </div>
         <div class="composer-footer">
           <span class="composer-model-label"></span>
         </div>
       </div>
     </div>
-    <div class="plus-menu">
-      <div class="plus-menu-header"></div>
+    <!-- Primary + menu (category level) -->
+    <div class="plus-menu" data-target="plus-menu">
       <div class="plus-menu-items"></div>
+    </div>
+    <!-- Connectors submenu (slides out from Connectors row) -->
+    <div class="connectors-submenu" data-target="connectors-submenu">
+      <div class="submenu-items"></div>
+      <div class="submenu-divider"></div>
+      <div class="submenu-footer">
+        <div class="submenu-footer-item">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#6b6b6b" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M5 7h6M5 9.5h4"/></svg>
+          <span>Manage connectors</span>
+        </div>
+        <div class="submenu-footer-item">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#6b6b6b" stroke-width="1.3" stroke-linecap="round"><line x1="8" y1="4" x2="8" y2="12"/><line x1="4" y1="8" x2="12" y2="8"/></svg>
+          <span>Add connector</span>
+        </div>
+      </div>
     </div>
     <div class="typing-indicator">
       <div class="typing-avatar"></div>
@@ -50,16 +77,14 @@
     width: 100%;
     height: 100%;
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     display: flex;
-    background: #f9f8f6;
+    background: #FAF9F7;
     font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
     overflow: hidden;
   }
 
   /* ── Sidebar ── */
-
   .claude-sidebar {
     width: 260px;
     background: #f1efe9;
@@ -68,29 +93,20 @@
     flex-direction: column;
     flex-shrink: 0;
   }
-
-  .claude-sidebar.hidden {
-    display: none;
-  }
-
+  .claude-sidebar.hidden { display: none; }
   .sidebar-header {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 18px 20px 14px;
   }
-
-  .sidebar-logo {
-    flex-shrink: 0;
-  }
-
+  .sidebar-logo { flex-shrink: 0; }
   .sidebar-title {
     font-size: 16px;
     font-weight: 600;
     color: #1a1a1a;
     letter-spacing: -0.01em;
   }
-
   .sidebar-conversations {
     flex: 1;
     padding: 8px 12px;
@@ -99,7 +115,6 @@
     gap: 2px;
     overflow: hidden;
   }
-
   .sidebar-convo-item {
     padding: 8px 12px;
     border-radius: 8px;
@@ -110,13 +125,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-
   .sidebar-convo-item.active {
     background: #e5e3dc;
     color: #1a1a1a;
     font-weight: 500;
   }
-
   .sidebar-new-chat {
     display: flex;
     align-items: center;
@@ -129,7 +142,6 @@
   }
 
   /* ── Main area ── */
-
   .claude-main {
     flex: 1;
     display: flex;
@@ -137,7 +149,6 @@
     min-width: 0;
     position: relative;
   }
-
   .messages-area {
     flex: 1;
     display: flex;
@@ -149,7 +160,6 @@
   }
 
   /* ── Message rows ── */
-
   .msg-row {
     width: 100%;
     max-width: 680px;
@@ -158,30 +168,17 @@
     gap: 14px;
     align-items: flex-start;
   }
-
-  .msg-row.user {
-    justify-content: flex-end;
-  }
-
+  .msg-row.user { justify-content: flex-end; }
   .msg-avatar {
-    width: 28px;
-    height: 28px;
+    width: 28px; height: 28px;
     border-radius: 50%;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-
-  .msg-avatar.assistant {
-    background: #D97706;
-  }
-
-  .msg-avatar.assistant svg {
-    width: 14px;
-    height: 14px;
-  }
-
+  .msg-avatar.assistant { background: #D97706; }
+  .msg-avatar.assistant svg { width: 14px; height: 14px; }
   .msg-content {
     display: flex;
     flex-direction: column;
@@ -189,26 +186,20 @@
     min-width: 0;
     max-width: 85%;
   }
-
   .msg-text {
     font-size: 15px;
     line-height: 1.6;
     color: #1a1a1a;
   }
-
   .msg-row.user .msg-text {
     background: #f1efe9;
     padding: 10px 16px;
     border-radius: 20px;
     color: #1a1a1a;
   }
-
-  .msg-row.assistant .msg-text {
-    color: #2d2d2d;
-  }
+  .msg-row.assistant .msg-text { color: #2d2d2d; }
 
   /* ── Composer ── */
-
   .composer-wrapper {
     padding: 8px 24px 16px;
     display: flex;
@@ -216,7 +207,6 @@
     align-items: center;
     flex-shrink: 0;
   }
-
   .composer-bar {
     display: flex;
     align-items: center;
@@ -225,20 +215,18 @@
     max-width: 680px;
     min-height: 52px;
     background: #ffffff;
-    border: 1px solid #e0ddd6;
+    border: 1.5px solid #e0ddd6;
     border-radius: 26px;
-    padding: 4px 6px 4px 6px;
+    padding: 4px 6px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
     position: relative;
   }
-
   .plus-btn {
-    width: 36px;
-    height: 36px;
+    width: 36px; height: 36px;
     border-radius: 50%;
     border: none;
     background: transparent;
-    color: #8b8b8b;
+    color: #3D3A37;
     cursor: default;
     display: flex;
     align-items: center;
@@ -246,11 +234,7 @@
     flex-shrink: 0;
     transition: background 0.15s;
   }
-
-  .plus-btn:hover {
-    background: #f3f2ee;
-  }
-
+  .plus-btn:hover, .plus-btn.active { background: #f3f2ee; }
   .composer-input {
     flex: 1;
     padding: 8px 10px;
@@ -263,15 +247,43 @@
     border: none;
     background: transparent;
   }
-
   .composer-input:empty::before {
     content: attr(data-placeholder);
     color: #b0ada5;
   }
-
+  .composer-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding-right: 2px;
+  }
+  .model-selector {
+    font-size: 13px;
+    color: #9B9490;
+    white-space: nowrap;
+    padding: 4px 8px;
+    border-radius: 8px;
+    cursor: default;
+  }
+  .model-selector .model-name {
+    color: #3D3A37;
+    font-weight: 500;
+  }
+  .mic-btn {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #3D3A37;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
   .send-btn {
-    width: 36px;
-    height: 36px;
+    width: 36px; height: 36px;
     border-radius: 50%;
     border: none;
     cursor: default;
@@ -279,146 +291,172 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
   }
-
   .send-btn.ghost {
     background: transparent;
     color: #c5c3bd;
   }
-
   .send-btn.active {
-    background: #1a1a1a;
+    background: #D97706;
     color: #ffffff;
   }
-
   .composer-footer {
     padding: 6px 0 0;
     text-align: center;
   }
-
   .composer-model-label {
     font-size: 11px;
     color: #b0ada5;
+    display: none;
   }
 
-  /* ── Plus menu ── */
-
+  /* ── Primary + menu ── */
   .plus-menu {
     position: absolute;
-    width: 280px;
+    width: 260px;
     background: #ffffff;
     border: 1px solid #e5e3dc;
-    border-radius: 14px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.05);
     overflow: hidden;
     z-index: 100;
     pointer-events: none;
   }
-
-  .plus-menu-header {
-    padding: 14px 18px 10px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #6b6b6b;
-    letter-spacing: 0.01em;
-  }
-
   .plus-menu-items {
-    padding: 0 6px 8px;
+    padding: 6px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 0;
   }
-
-  .menu-item {
+  .pm-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border-radius: 10px;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: default;
+    transition: background 0.1s;
+  }
+  .pm-item:hover, .pm-item.hovered { background: #f5f4f1; }
+  .pm-item-icon {
+    width: 16px; height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #3D3A37;
+  }
+  .pm-item-icon svg { width: 16px; height: 16px; }
+  .pm-item-label {
+    flex: 1;
+    font-size: 14px;
+    color: #1a1a1a;
+    white-space: nowrap;
+  }
+  .pm-item-right {
+    font-size: 12px;
+    color: #9B9490;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .pm-item-right .chevron { font-size: 10px; color: #9B9490; }
+  .pm-item-right .shortcut { font-size: 11px; color: #b0ada5; }
+  .pm-item-right .check { color: #3B82F6; font-size: 14px; }
+  .pm-divider {
+    height: 1px;
+    background: #eceae4;
+    margin: 4px 10px;
+  }
+
+  /* ── Connectors submenu ── */
+  .connectors-submenu {
+    position: absolute;
+    width: 280px;
+    background: #ffffff;
+    border: 1px solid #e5e3dc;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.05);
+    overflow: hidden;
+    z-index: 101;
+    pointer-events: none;
+  }
+  .submenu-items {
+    padding: 6px 6px 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .sm-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
     cursor: default;
   }
-
-  .menu-item:hover {
-    background: #f7f6f3;
-  }
-
-  .menu-item-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
+  .sm-item-icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
     background: #f1efe9;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    font-size: 16px;
+    font-size: 14px;
   }
-
-  .menu-item-info {
+  .sm-item-name {
     flex: 1;
-    min-width: 0;
-  }
-
-  .menu-item-name {
     font-size: 14px;
     color: #1a1a1a;
-    font-weight: 500;
+    font-weight: 400;
   }
-
-  .menu-item-desc {
-    font-size: 12px;
-    color: #8b8b8b;
-    margin-top: 1px;
-  }
-
-  .menu-item-toggle {
-    width: 38px;
-    height: 22px;
-    border-radius: 11px;
+  .sm-toggle {
+    width: 36px; height: 20px;
+    border-radius: 10px;
     background: #d8d6d0;
     position: relative;
     flex-shrink: 0;
     cursor: default;
+    transition: background 0.2s;
   }
-
-  .menu-item-toggle.on {
-    background: #16a34a;
-  }
-
-  .menu-item-toggle-knob {
-    width: 18px;
-    height: 18px;
+  .sm-toggle.on { background: #3B82F6; }
+  .sm-toggle-knob {
+    width: 16px; height: 16px;
     border-radius: 50%;
     background: #ffffff;
     position: absolute;
-    top: 2px;
-    left: 2px;
+    top: 2px; left: 2px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.15);
     transition: left 0.2s ease;
   }
-
-  .menu-item-toggle.on .menu-item-toggle-knob {
-    left: 18px;
+  .sm-toggle.on .sm-toggle-knob { left: 18px; }
+  .submenu-divider {
+    height: 1px;
+    background: #eceae4;
+    margin: 4px 10px;
   }
-
-  .menu-item-status {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
+  .submenu-footer {
+    padding: 2px 6px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
   }
-
-  .menu-item-status.connected {
-    background: #16a34a;
+  .submenu-footer-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: default;
+    font-size: 14px;
+    color: #6b6b6b;
   }
-
-  .menu-item-status.disconnected {
-    background: #d8d6d0;
-  }
+  .submenu-footer-item:hover { background: #f5f4f1; }
 
   /* ── Typing indicator ── */
-
   .typing-indicator {
     display: flex;
     align-items: center;
@@ -430,25 +468,20 @@
     left: 50%;
     transform: translateX(-50%);
   }
-
   .typing-avatar {
-    width: 28px;
-    height: 28px;
+    width: 28px; height: 28px;
     border-radius: 50%;
     background: #D97706;
     flex-shrink: 0;
   }
-
   .typing-dots-wrap {
     display: flex;
     gap: 4px;
     align-items: center;
     padding: 8px 0;
   }
-
   .typing-dot {
-    width: 7px;
-    height: 7px;
+    width: 7px; height: 7px;
     border-radius: 50%;
     background: #c5c3bd;
   }
@@ -460,37 +493,46 @@
     var chat = el.querySelector('.claude-chat');
     var sidebar = el.querySelector('.claude-sidebar');
     var messagesArea = el.querySelector('.messages-area');
-    var composerWrapper = el.querySelector('.composer-wrapper');
     var composerBar = el.querySelector('.composer-bar');
     var composerInput = el.querySelector('.composer-input');
     var sendBtn = el.querySelector('.send-btn');
     var plusBtn = el.querySelector('.plus-btn');
     var plusMenu = el.querySelector('.plus-menu');
-    var plusMenuHeader = el.querySelector('.plus-menu-header');
-    var plusMenuItems = el.querySelector('.plus-menu-items');
+    var plusMenuItemsContainer = el.querySelector('.plus-menu-items');
+    var connectorsSubmenu = el.querySelector('.connectors-submenu');
+    var submenuItemsContainer = el.querySelector('.submenu-items');
     var typingIndicator = el.querySelector('.typing-indicator');
+    var modelSelector = el.querySelector('.model-selector');
     var modelLabel = el.querySelector('.composer-model-label');
 
     // ── Data defaults ──
-
     var messages = data.messages || [];
     var assistantName = data.assistant_name || 'Claude';
     var avatarColor = data.assistant_avatar_color || '#D97706';
     var placeholder = data.composer_placeholder || ('Message ' + assistantName + '...');
-    var menuTitle = data.menu_title || 'Tools & integrations';
     var menuItems = data.menu_items || [];
     var showSidebar = data.show_sidebar !== undefined ? data.show_sidebar : false;
+    var modelLabelText = data.model_label || 'Sonnet 4.6 Low';
 
     // ── Setup ──
-
     composerInput.setAttribute('data-placeholder', placeholder);
-    sendBtn.className = 'send-btn ghost';
-    modelLabel.textContent = assistantName + ' 4 Sonnet';
+    sendBtn.className = "send-btn active";
+
+    // Model selector in composer bar
+    var parts = modelLabelText.split(' ');
+    if (parts.length >= 2) {
+      var nameSpan = document.createElement('span');
+      nameSpan.className = 'model-name';
+      nameSpan.textContent = parts.slice(0, -1).join(' ');
+      modelSelector.appendChild(nameSpan);
+      modelSelector.appendChild(document.createTextNode(' ' + parts[parts.length - 1]));
+    } else {
+      modelSelector.textContent = modelLabelText;
+    }
 
     if (!showSidebar) {
       sidebar.classList.add('hidden');
     } else {
-      // Populate sidebar conversation stubs
       var convos = el.querySelector('.sidebar-conversations');
       var convoLabels = ['Current conversation', 'API integration help', 'Code review notes'];
       for (var c = 0; c < convoLabels.length; c++) {
@@ -502,14 +544,12 @@
     }
 
     // ── Build messages ──
-
     var messageEls = [];
     for (var i = 0; i < messages.length; i++) {
       var msg = messages[i];
       var role = msg.role || 'user';
       var row = document.createElement('div');
       row.className = 'msg-row ' + role;
-
       if (role === 'assistant') {
         var avatarEl = document.createElement('div');
         avatarEl.className = 'msg-avatar assistant';
@@ -517,7 +557,6 @@
         avatarEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-3.5 7L15 19h-2.5L9 12l3.5-7H15zM10 5L6.5 12 10 19H7.5L4 12 7.5 5H10z" fill="#fff"/></svg>';
         row.appendChild(avatarEl);
       }
-
       var content = document.createElement('div');
       content.className = 'msg-content';
       var text = document.createElement('div');
@@ -525,116 +564,174 @@
       text.textContent = msg.text || '';
       content.appendChild(text);
       row.appendChild(content);
-
       messagesArea.appendChild(row);
       messageEls.push(row);
     }
 
-    // ── Build plus menu ──
+    // ── Build primary + menu ──
+    var primaryMenuDef = [
+      { label: 'Add files or photos', icon: 'paperclip', shortcut: '⌘U' },
+      { label: 'Add to project', icon: 'tray', chevron: true },
+      { divider: true },
+      { label: 'Skills', icon: 'doc', chevron: true },
+      { label: 'Connectors', icon: 'connector', chevron: true, id: 'connectors' },
+      { label: 'Add plugins...', icon: 'plug' },
+      { divider: true },
+      { label: 'Research', icon: 'research' },
+      { label: 'Web search', icon: 'globe', check: true },
+      { label: 'Use style', icon: 'pen', chevron: true }
+    ];
 
-    plusMenuHeader.textContent = menuTitle;
-    var menuItemEls = [];
-    for (var m = 0; m < menuItems.length; m++) {
-      var mi = menuItems[m];
-      var item = document.createElement('div');
-      item.className = 'menu-item';
-      item.setAttribute('data-target', 'menu-item-' + m);
+    var svgIcons = {
+      paperclip: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M13.5 7.5l-6 6a3 3 0 01-4.24-4.24l6-6a2 2 0 012.83 2.83l-6 6a1 1 0 01-1.42-1.42l6-6"/></svg>',
+      tray: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M2 10h4l1 2h2l1-2h4"/></svg>',
+      doc: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><rect x="3" y="1.5" width="10" height="13" rx="1.5"/><path d="M6 5h4M6 8h4M6 11h2"/></svg>',
+      connector: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><rect x="1.5" y="1.5" width="5" height="5" rx="1"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M6.5 4H9.5M12 6.5V9.5"/></svg>',
+      plug: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M6 2v4M10 2v4M4 6h8v2a4 4 0 01-8 0V6zM8 12v2.5"/></svg>',
+      research: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/><path d="M5 7h4"/></svg>',
+      globe: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2 2 2 10 0 12M8 2c-2 2-2 10 0 12"/></svg>',
+      pen: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M8 2.5c1.5-1 3 0 3.5 1s-.5 3-2 5-4 4-5 4c-1.5 0-2-1-1.5-2.5s2-3.5 3.5-5.5z"/><path d="M4.5 12.5l1-3"/></svg>'
+    };
 
-      var icon = document.createElement('div');
-      icon.className = 'menu-item-icon';
-      icon.textContent = mi.icon || '🔌';
-      item.appendChild(icon);
-
-      var info = document.createElement('div');
-      info.className = 'menu-item-info';
-      var nameEl = document.createElement('div');
-      nameEl.className = 'menu-item-name';
-      nameEl.textContent = mi.name || mi.label || 'Tool';
-      info.appendChild(nameEl);
-      if (mi.description) {
-        var descEl = document.createElement('div');
-        descEl.className = 'menu-item-desc';
-        descEl.textContent = mi.description;
-        info.appendChild(descEl);
+    var connectorsItemEl = null;
+    var pmItemEls = [];
+    for (var p = 0; p < primaryMenuDef.length; p++) {
+      var def = primaryMenuDef[p];
+      if (def.divider) {
+        var div = document.createElement('div');
+        div.className = 'pm-divider';
+        plusMenuItemsContainer.appendChild(div);
+        continue;
       }
-      item.appendChild(info);
+      var pmItem = document.createElement('div');
+      pmItem.className = 'pm-item';
+      if (def.id) pmItem.setAttribute('data-target', 'pm-' + def.id);
 
-      var connected = mi.connected !== undefined ? mi.connected : false;
-      var status = document.createElement('div');
-      status.className = 'menu-item-status ' + (connected ? 'connected' : 'disconnected');
-      item.appendChild(status);
+      var pmIcon = document.createElement('div');
+      pmIcon.className = 'pm-item-icon';
+      pmIcon.innerHTML = svgIcons[def.icon] || '';
+      pmItem.appendChild(pmIcon);
 
-      var toggle = document.createElement('div');
-      toggle.className = 'menu-item-toggle' + (connected ? ' on' : '');
-      toggle.setAttribute('data-target', 'toggle-' + m);
-      var knob = document.createElement('div');
-      knob.className = 'menu-item-toggle-knob';
-      toggle.appendChild(knob);
-      item.appendChild(toggle);
+      var pmLabel = document.createElement('span');
+      pmLabel.className = 'pm-item-label';
+      pmLabel.textContent = def.label;
+      pmItem.appendChild(pmLabel);
 
-      plusMenuItems.appendChild(item);
-      menuItemEls.push({ el: item, toggle: toggle, status: status, connected: connected });
+      var pmRight = document.createElement('span');
+      pmRight.className = 'pm-item-right';
+      if (def.shortcut) {
+        var sc = document.createElement('span');
+        sc.className = 'shortcut';
+        sc.textContent = def.shortcut;
+        pmRight.appendChild(sc);
+      }
+      if (def.check) {
+        var ck = document.createElement('span');
+        ck.className = 'check';
+        ck.textContent = '✓';
+        pmRight.appendChild(ck);
+      }
+      if (def.chevron) {
+        var ch = document.createElement('span');
+        ch.className = 'chevron';
+        ch.textContent = '›';
+        pmRight.appendChild(ch);
+      }
+      pmItem.appendChild(pmRight);
+
+      plusMenuItemsContainer.appendChild(pmItem);
+      pmItemEls.push(pmItem);
+      if (def.id === 'connectors') connectorsItemEl = pmItem;
     }
 
-    // ── Position plus menu above the + button ──
+    // ── Build connectors submenu items ──
+    var connectorIcons = { 'Canva': '🎨', 'HubSpot': '🟠', 'HyperFrames by HeyGen': '🎬', 'Quotient': '💜', 'Claude in Chrome': '🌐', 'gmail': '✉️' };
+    var smItemEls = [];
+    for (var m = 0; m < menuItems.length; m++) {
+      var mi = menuItems[m];
+      var smItem = document.createElement('div');
+      smItem.className = 'sm-item';
+      smItem.setAttribute('data-target', 'sm-item-' + m);
 
+      var smIcon = document.createElement('div');
+      smIcon.className = 'sm-item-icon';
+      var itemName = mi.name || mi.label || 'Tool';
+      smIcon.textContent = mi.icon || connectorIcons[itemName] || '🔌';
+      smItem.appendChild(smIcon);
+
+      var smName = document.createElement('span');
+      smName.className = 'sm-item-name';
+      smName.textContent = itemName;
+      smItem.appendChild(smName);
+
+      var enabled = mi.connected || mi.enabled || false;
+      var smToggle = document.createElement('div');
+      smToggle.className = 'sm-toggle' + (enabled ? ' on' : '');
+      smToggle.setAttribute('data-target', 'toggle-' + m);
+      var smKnob = document.createElement('div');
+      smKnob.className = 'sm-toggle-knob';
+      smToggle.appendChild(smKnob);
+      smItem.appendChild(smToggle);
+
+      submenuItemsContainer.appendChild(smItem);
+      smItemEls.push({ el: smItem, toggle: smToggle, enabled: enabled });
+    }
+
+    // ── Position menus ──
     gsap.set(plusMenu, { autoAlpha: 0, y: 10, scale: 0.97 });
+    gsap.set(connectorsSubmenu, { autoAlpha: 0, x: -8, scale: 0.97 });
     gsap.set(typingIndicator, { autoAlpha: 0 });
 
-    // Position menu at bottom-left of main area, above the composer
-    var _positionMenu = function() {
+    var _positionMenus = function() {
       var chatRect = chat.getBoundingClientRect();
       var btnRect = plusBtn.getBoundingClientRect();
-      var menuH = plusMenu.offsetHeight || 200;
+      // Primary menu above + button
       plusMenu.style.left = (btnRect.left - chatRect.left) + 'px';
       plusMenu.style.bottom = (chatRect.bottom - btnRect.top + 8) + 'px';
       plusMenu.style.top = 'auto';
+      // Connectors submenu to the right of primary menu
+      var pmRect = plusMenu.getBoundingClientRect();
+      connectorsSubmenu.style.left = (pmRect.right - chatRect.left + 4) + 'px';
+      // Align submenu roughly to connectors row
+      if (connectorsItemEl) {
+        var ciRect = connectorsItemEl.getBoundingClientRect();
+        var subH = connectorsSubmenu.offsetHeight || 300;
+        connectorsSubmenu.style.bottom = (chatRect.bottom - ciRect.bottom - subH/2 + 20) + 'px';
+      } else {
+        connectorsSubmenu.style.bottom = plusMenu.style.bottom;
+      }
+      connectorsSubmenu.style.top = 'auto';
     };
 
     // ── Initial states ──
-
     gsap.set(chat, { autoAlpha: 0 });
     gsap.set(messageEls, { autoAlpha: 0, y: 16 });
 
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
 
     // ── Entrance ──
+    tl.to(chat, { autoAlpha: 1, duration: speed * 0.6, ease: 'power2.out' }, 0.2);
 
-    tl.to(chat, {
-      autoAlpha: 1,
-      duration: speed * 0.6,
-      ease: 'power2.out'
-    }, 0.2);
-
-    // Messages appear one by one
     var t = 0.2 + speed * 0.6 + 0.2;
     for (var j = 0; j < messageEls.length; j++) {
-      tl.to(messageEls[j], {
-        autoAlpha: 1, y: 0,
-        duration: 0.35,
-        ease: 'power2.out'
-      }, t);
+      tl.to(messageEls[j], { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power2.out' }, t);
       t += 0.25;
     }
 
     // ── Exit ──
-
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.5;
-      tl.to(chat, {
-        autoAlpha: 0,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, exitAt);
+      tl.to(chat, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, exitAt);
     }
 
     // ── Script handling ──
-
     if (data.script && data.script.length > 0) {
       var cursorTargets = data.cursor_targets || {
-        'chat-input': { x: '50%', y: '92%' },
-        'send-button': { x: '95%', y: '92%' },
-        'plus-button': { x: '5%', y: '92%' }
+        'chat-input': { x: '50%', y: '88%' },
+        'send-button': { x: '95%', y: '88%' },
+        'plus-button': { x: '8%', y: '88%' },
+        'mic-button': { x: '90%', y: '88%' },
+        'connectors-item': { x: '28%', y: '68%' }
       };
 
       runScript(tl, el, data.script, cursorTargets, ctx, {
@@ -645,11 +742,8 @@
           var txt = action.text || '';
           var spd = action.speed || 25;
           typeText(tl, input, txt, at, spd);
-          // Activate send button when text is typed
           var sBtn = container.querySelector('.send-btn');
-          tl.call(function() {
-            sBtn.className = 'send-btn active';
-          }, null, at + 0.1);
+          tl.call(function() { sBtn.className = 'send-btn active'; }, null, at + 0.1);
         },
 
         'click': function(tl, container, action, at, dur) {
@@ -662,77 +756,94 @@
               var msgText = input.textContent;
               tl.call(function() {
                 if (!msgText) return;
-                // Create user message
                 var row = document.createElement('div');
                 row.className = 'msg-row user';
-                var content = document.createElement('div');
-                content.className = 'msg-content';
+                var cnt = document.createElement('div');
+                cnt.className = 'msg-content';
                 var textEl = document.createElement('div');
                 textEl.className = 'msg-text';
                 textEl.textContent = msgText;
-                content.appendChild(textEl);
-                row.appendChild(content);
+                cnt.appendChild(textEl);
+                row.appendChild(cnt);
                 area.appendChild(row);
                 gsap.from(row, { autoAlpha: 0, y: 12, duration: 0.3, ease: 'power2.out' });
-                // Clear input
                 input.textContent = '';
                 sBtn.className = 'send-btn ghost';
               }, null, at);
             }
           } else if (target === 'plus-button' || target === 'plus') {
-            // Delegate to open-menu
+            // Visual click feedback on + button
+            var pb = container.querySelector('.plus-btn');
+            if (pb) {
+              tl.call(function() { pb.classList.add('active'); }, null, at);
+              tl.call(function() { pb.classList.remove('active'); }, null, at + 0.3);
+            }
           }
         },
 
         'open-menu': function(tl, container, action, at, dur) {
           var menu = container.querySelector('.plus-menu');
-          var items = container.querySelectorAll('.menu-item');
-          tl.call(_positionMenu, null, at);
-          tl.to(menu, {
-            autoAlpha: 1, y: 0, scale: 1,
-            duration: 0.3,
-            ease: 'power3.out'
-          }, at + 0.05);
-          // Stagger reveal items
+          var items = container.querySelectorAll('.pm-item');
+          tl.call(_positionMenus, null, at);
+          tl.to(menu, { autoAlpha: 1, y: 0, scale: 1, duration: 0.25, ease: 'power3.out' }, at + 0.05);
           if (items.length) {
-            gsap.set(items, { autoAlpha: 0, y: 8 });
-            tl.to(items, {
-              autoAlpha: 1, y: 0,
-              duration: 0.25,
-              stagger: 0.06,
-              ease: 'power2.out'
-            }, at + 0.15);
+            gsap.set(items, { autoAlpha: 0, y: 6 });
+            tl.to(items, { autoAlpha: 1, y: 0, duration: 0.2, stagger: 0.04, ease: 'power2.out' }, at + 0.12);
           }
         },
 
         'close-menu': function(tl, container, action, at, dur) {
           var menu = container.querySelector('.plus-menu');
-          tl.to(menu, {
-            autoAlpha: 0, y: 10, scale: 0.97,
-            duration: 0.2,
-            ease: 'power2.in'
-          }, at);
+          var submenu = container.querySelector('.connectors-submenu');
+          tl.to(submenu, { autoAlpha: 0, x: -8, scale: 0.97, duration: 0.15, ease: 'power2.in' }, at);
+          tl.to(menu, { autoAlpha: 0, y: 10, scale: 0.97, duration: 0.2, ease: 'power2.in' }, at + 0.05);
+        },
+
+        'hover-connectors': function(tl, container, action, at, dur) {
+          var cItem = container.querySelector('[data-target="pm-connectors"]');
+          if (cItem) {
+            tl.call(function() { cItem.classList.add('hovered'); }, null, at);
+          }
+        },
+
+        'show-connectors': function(tl, container, action, at, dur) {
+          var submenu = container.querySelector('.connectors-submenu');
+          var items = container.querySelectorAll('.sm-item');
+          tl.call(_positionMenus, null, at);
+          tl.to(submenu, { autoAlpha: 1, x: 0, scale: 1, duration: 0.25, ease: 'power3.out' }, at + 0.05);
+          if (items.length) {
+            gsap.set(items, { autoAlpha: 0, x: -6 });
+            tl.to(items, { autoAlpha: 1, x: 0, duration: 0.2, stagger: 0.04, ease: 'power2.out' }, at + 0.12);
+          }
         },
 
         'toggle-item': function(tl, container, action, at, dur) {
-          var idx = action.index != null ? action.index : 0;
-          var toggleEl = container.querySelector('[data-target="toggle-' + idx + '"]');
-          var statusEl = toggleEl ? toggleEl.parentElement.querySelector('.menu-item-status') : null;
+          // Support both index and target name
+          var idx = action.index != null ? action.index : null;
+          var targetName = action.target || '';
+          var toggleEl = null;
+
+          if (idx !== null) {
+            toggleEl = container.querySelector('[data-target="toggle-' + idx + '"]');
+          } else if (targetName) {
+            // Find by connector name/id
+            for (var ti = 0; ti < menuItems.length; ti++) {
+              var tiName = (menuItems[ti].name || menuItems[ti].label || '').toLowerCase();
+              var tiId = (menuItems[ti].id || '').toLowerCase();
+              if (tiName === targetName.toLowerCase() || tiId === targetName.toLowerCase()) {
+                toggleEl = container.querySelector('[data-target="toggle-' + ti + '"]');
+                break;
+              }
+            }
+          }
+
           if (toggleEl) {
             tl.call(function() {
               var isOn = toggleEl.classList.contains('on');
               if (isOn) {
                 toggleEl.classList.remove('on');
-                if (statusEl) {
-                  statusEl.classList.remove('connected');
-                  statusEl.classList.add('disconnected');
-                }
               } else {
                 toggleEl.classList.add('on');
-                if (statusEl) {
-                  statusEl.classList.remove('disconnected');
-                  statusEl.classList.add('connected');
-                }
               }
             }, null, at);
           }
@@ -742,17 +853,10 @@
           var indicator = container.querySelector('.typing-indicator');
           var area = container.querySelector('.messages-area');
           if (!indicator || !area) return;
-          // Position the indicator at the bottom of messages area
-          var areaRect = area.getBoundingClientRect();
           indicator.style.bottom = (container.querySelector('.composer-wrapper').offsetHeight + 8) + 'px';
           tl.to(indicator, { autoAlpha: 1, duration: 0.2 }, at);
-          // Bounce dots
           var dots = indicator.querySelectorAll('.typing-dot');
-          tl.to(dots, {
-            y: -4, duration: 0.3, stagger: 0.1,
-            ease: 'power2.out', yoyo: true, repeat: 3
-          }, at + 0.1);
-          // Hide after duration
+          tl.to(dots, { y: -4, duration: 0.3, stagger: 0.1, ease: 'power2.out', yoyo: true, repeat: 3 }, at + 0.1);
           var typeDur = dur || 1.5;
           tl.to(indicator, { autoAlpha: 0, duration: 0.15 }, at + typeDur);
         },
@@ -761,31 +865,23 @@
           var area = container.querySelector('.messages-area');
           var aColor = data.assistant_avatar_color || '#D97706';
           if (!area) return;
-
-          // Hide typing indicator first
           var indicator = container.querySelector('.typing-indicator');
-          if (indicator) {
-            tl.to(indicator, { autoAlpha: 0, duration: 0.1 }, at);
-          }
-
+          if (indicator) tl.to(indicator, { autoAlpha: 0, duration: 0.1 }, at);
           tl.call(function() {
             var row = document.createElement('div');
             row.className = 'msg-row assistant';
-
             var avatar = document.createElement('div');
             avatar.className = 'msg-avatar assistant';
             avatar.style.background = aColor;
             avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-3.5 7L15 19h-2.5L9 12l3.5-7H15zM10 5L6.5 12 10 19H7.5L4 12 7.5 5H10z" fill="#fff"/></svg>';
             row.appendChild(avatar);
-
-            var content = document.createElement('div');
-            content.className = 'msg-content';
+            var cnt = document.createElement('div');
+            cnt.className = 'msg-content';
             var textEl = document.createElement('div');
             textEl.className = 'msg-text';
             textEl.textContent = action.text || 'Hello! How can I help you today?';
-            content.appendChild(textEl);
-            row.appendChild(content);
-
+            cnt.appendChild(textEl);
+            row.appendChild(cnt);
             area.appendChild(row);
             gsap.from(row, { autoAlpha: 0, y: 12, duration: 0.35, ease: 'power2.out' });
           }, null, at + 0.15);
