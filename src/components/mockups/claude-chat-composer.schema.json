@@ -1,0 +1,154 @@
+{
+  "type": "claude-chat-composer",
+  "label": "Claude Chat Composer",
+  "category": "mockups",
+  "description": "Claude AI chat interface with composer bar, message bubbles, and animated tools/integrations menu. Supports scripted typing, menu interactions, and assistant responses.",
+  "data": {
+    "messages": {
+      "type": "array",
+      "label": "Messages",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "label": "Role",
+            "required": true,
+            "enum": ["user", "assistant"]
+          },
+          "text": {
+            "type": "string",
+            "label": "Message Text",
+            "required": true
+          }
+        }
+      }
+    },
+    "assistant_name": {
+      "type": "string",
+      "label": "Assistant Name",
+      "optional": true,
+      "default": "Claude",
+      "placeholder": "Claude"
+    },
+    "assistant_avatar_color": {
+      "type": "string",
+      "label": "Assistant Avatar Color",
+      "optional": true,
+      "default": "#D97706",
+      "placeholder": "#D97706"
+    },
+    "composer_placeholder": {
+      "type": "string",
+      "label": "Composer Placeholder",
+      "optional": true,
+      "placeholder": "Message Claude..."
+    },
+    "menu_title": {
+      "type": "string",
+      "label": "Menu Title",
+      "optional": true,
+      "default": "Tools & integrations",
+      "placeholder": "Tools & integrations"
+    },
+    "menu_items": {
+      "type": "array",
+      "label": "Menu Items",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "label": "Item Name",
+            "required": true
+          },
+          "icon": {
+            "type": "string",
+            "label": "Icon Emoji",
+            "optional": true,
+            "placeholder": "🔌"
+          },
+          "connected": {
+            "type": "boolean",
+            "label": "Connected",
+            "optional": true,
+            "default": false
+          },
+          "description": {
+            "type": "string",
+            "label": "Description",
+            "optional": true
+          }
+        }
+      }
+    },
+    "show_sidebar": {
+      "type": "boolean",
+      "label": "Show Sidebar",
+      "optional": true,
+      "default": false
+    }
+  },
+  "script_actions": [
+    {
+      "action": "type",
+      "description": "Type text into the composer input field",
+      "params": {
+        "text": "string - Text to type",
+        "speed": "number - Characters per second (default 25)"
+      }
+    },
+    {
+      "action": "click",
+      "description": "Click the send button or plus button",
+      "params": {
+        "target": "string - 'send-button' or 'plus-button'"
+      }
+    },
+    {
+      "action": "open-menu",
+      "description": "Open the tools & integrations menu with slide-up animation"
+    },
+    {
+      "action": "close-menu",
+      "description": "Close the tools & integrations menu"
+    },
+    {
+      "action": "toggle-item",
+      "description": "Toggle a menu item's switch on or off",
+      "params": {
+        "index": "number - Zero-based index of the menu item to toggle"
+      }
+    },
+    {
+      "action": "show-response",
+      "description": "Show an assistant response message",
+      "params": {
+        "text": "string - Response text to display"
+      }
+    },
+    {
+      "action": "show-typing",
+      "description": "Show typing indicator with bouncing dots",
+      "params": {
+        "duration": "number - How long to show typing (default 1.5s)"
+      }
+    }
+  ],
+  "default_cursor_targets": {
+    "chat-input": {
+      "x": "50%",
+      "y": "92%"
+    },
+    "send-button": {
+      "x": "95%",
+      "y": "92%"
+    },
+    "plus-button": {
+      "x": "5%",
+      "y": "92%"
+    }
+  }
+}

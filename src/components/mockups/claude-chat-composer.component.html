@@ -1,0 +1,798 @@
+<template>
+  <div class="claude-chat">
+    <div class="claude-sidebar">
+      <div class="sidebar-header">
+        <svg class="sidebar-logo" width="28" height="20" viewBox="0 0 28 20" fill="none">
+          <path d="M17.5 3L14 10l3.5 7h-3L11 10l3.5-7h3zM10.5 3L7 10l3.5 7h-3L4 10 7.5 3h3z" fill="#D97706"/>
+        </svg>
+        <span class="sidebar-title">Claude</span>
+      </div>
+      <div class="sidebar-conversations"></div>
+      <div class="sidebar-new-chat">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+        <span>New chat</span>
+      </div>
+    </div>
+    <div class="claude-main">
+      <div class="messages-area"></div>
+      <div class="composer-wrapper">
+        <div class="composer-bar">
+          <button class="plus-btn" data-target="plus-button">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="14"/><line x1="4" y1="9" x2="14" y2="9"/></svg>
+          </button>
+          <div class="composer-input" data-target="chat-input" contenteditable="false"></div>
+          <button class="send-btn" data-target="send-button">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5l-0.35 0.35L8 2.5V2.5zM8 2.5v11M3.5 7L8 2.5 12.5 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="composer-footer">
+          <span class="composer-model-label"></span>
+        </div>
+      </div>
+    </div>
+    <div class="plus-menu">
+      <div class="plus-menu-header"></div>
+      <div class="plus-menu-items"></div>
+    </div>
+    <div class="typing-indicator">
+      <div class="typing-avatar"></div>
+      <div class="typing-dots-wrap">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .claude-chat {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    background: #f9f8f6;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+
+  .claude-sidebar {
+    width: 260px;
+    background: #f1efe9;
+    border-right: 1px solid #e5e3dc;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .claude-sidebar.hidden {
+    display: none;
+  }
+
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 20px 14px;
+  }
+
+  .sidebar-logo {
+    flex-shrink: 0;
+  }
+
+  .sidebar-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    letter-spacing: -0.01em;
+  }
+
+  .sidebar-conversations {
+    flex: 1;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  .sidebar-convo-item {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #4a4a4a;
+    cursor: default;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-convo-item.active {
+    background: #e5e3dc;
+    color: #1a1a1a;
+    font-weight: 500;
+  }
+
+  .sidebar-new-chat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid #e5e3dc;
+    font-size: 14px;
+    color: #6b6b6b;
+    cursor: default;
+  }
+
+  /* ── Main area ── */
+
+  .claude-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+  }
+
+  .messages-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 32px 0 16px;
+    overflow: hidden;
+    align-items: center;
+  }
+
+  /* ── Message rows ── */
+
+  .msg-row {
+    width: 100%;
+    max-width: 680px;
+    padding: 16px 32px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .msg-row.user {
+    justify-content: flex-end;
+  }
+
+  .msg-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .msg-avatar.assistant {
+    background: #D97706;
+  }
+
+  .msg-avatar.assistant svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .msg-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    max-width: 85%;
+  }
+
+  .msg-text {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #1a1a1a;
+  }
+
+  .msg-row.user .msg-text {
+    background: #f1efe9;
+    padding: 10px 16px;
+    border-radius: 20px;
+    color: #1a1a1a;
+  }
+
+  .msg-row.assistant .msg-text {
+    color: #2d2d2d;
+  }
+
+  /* ── Composer ── */
+
+  .composer-wrapper {
+    padding: 8px 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .composer-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    max-width: 680px;
+    min-height: 52px;
+    background: #ffffff;
+    border: 1px solid #e0ddd6;
+    border-radius: 26px;
+    padding: 4px 6px 4px 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    position: relative;
+  }
+
+  .plus-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #8b8b8b;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+
+  .plus-btn:hover {
+    background: #f3f2ee;
+  }
+
+  .composer-input {
+    flex: 1;
+    padding: 8px 10px;
+    font-size: 15px;
+    font-family: inherit;
+    color: #1a1a1a;
+    line-height: 1.5;
+    min-height: 24px;
+    outline: none;
+    border: none;
+    background: transparent;
+  }
+
+  .composer-input:empty::before {
+    content: attr(data-placeholder);
+    color: #b0ada5;
+  }
+
+  .send-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .send-btn.ghost {
+    background: transparent;
+    color: #c5c3bd;
+  }
+
+  .send-btn.active {
+    background: #1a1a1a;
+    color: #ffffff;
+  }
+
+  .composer-footer {
+    padding: 6px 0 0;
+    text-align: center;
+  }
+
+  .composer-model-label {
+    font-size: 11px;
+    color: #b0ada5;
+  }
+
+  /* ── Plus menu ── */
+
+  .plus-menu {
+    position: absolute;
+    width: 280px;
+    background: #ffffff;
+    border: 1px solid #e5e3dc;
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+    overflow: hidden;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  .plus-menu-header {
+    padding: 14px 18px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b6b6b;
+    letter-spacing: 0.01em;
+  }
+
+  .plus-menu-items {
+    padding: 0 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: default;
+  }
+
+  .menu-item:hover {
+    background: #f7f6f3;
+  }
+
+  .menu-item-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #f1efe9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+  }
+
+  .menu-item-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .menu-item-name {
+    font-size: 14px;
+    color: #1a1a1a;
+    font-weight: 500;
+  }
+
+  .menu-item-desc {
+    font-size: 12px;
+    color: #8b8b8b;
+    margin-top: 1px;
+  }
+
+  .menu-item-toggle {
+    width: 38px;
+    height: 22px;
+    border-radius: 11px;
+    background: #d8d6d0;
+    position: relative;
+    flex-shrink: 0;
+    cursor: default;
+  }
+
+  .menu-item-toggle.on {
+    background: #16a34a;
+  }
+
+  .menu-item-toggle-knob {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffffff;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    transition: left 0.2s ease;
+  }
+
+  .menu-item-toggle.on .menu-item-toggle-knob {
+    left: 18px;
+  }
+
+  .menu-item-status {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .menu-item-status.connected {
+    background: #16a34a;
+  }
+
+  .menu-item-status.disconnected {
+    background: #d8d6d0;
+  }
+
+  /* ── Typing indicator ── */
+
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 680px;
+    padding: 12px 32px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .typing-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #D97706;
+    flex-shrink: 0;
+  }
+
+  .typing-dots-wrap {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 8px 0;
+  }
+
+  .typing-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #c5c3bd;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var chat = el.querySelector('.claude-chat');
+    var sidebar = el.querySelector('.claude-sidebar');
+    var messagesArea = el.querySelector('.messages-area');
+    var composerWrapper = el.querySelector('.composer-wrapper');
+    var composerBar = el.querySelector('.composer-bar');
+    var composerInput = el.querySelector('.composer-input');
+    var sendBtn = el.querySelector('.send-btn');
+    var plusBtn = el.querySelector('.plus-btn');
+    var plusMenu = el.querySelector('.plus-menu');
+    var plusMenuHeader = el.querySelector('.plus-menu-header');
+    var plusMenuItems = el.querySelector('.plus-menu-items');
+    var typingIndicator = el.querySelector('.typing-indicator');
+    var modelLabel = el.querySelector('.composer-model-label');
+
+    // ── Data defaults ──
+
+    var messages = data.messages || [];
+    var assistantName = data.assistant_name || 'Claude';
+    var avatarColor = data.assistant_avatar_color || '#D97706';
+    var placeholder = data.composer_placeholder || ('Message ' + assistantName + '...');
+    var menuTitle = data.menu_title || 'Tools & integrations';
+    var menuItems = data.menu_items || [];
+    var showSidebar = data.show_sidebar !== undefined ? data.show_sidebar : false;
+
+    // ── Setup ──
+
+    composerInput.setAttribute('data-placeholder', placeholder);
+    sendBtn.className = 'send-btn ghost';
+    modelLabel.textContent = assistantName + ' 4 Sonnet';
+
+    if (!showSidebar) {
+      sidebar.classList.add('hidden');
+    } else {
+      // Populate sidebar conversation stubs
+      var convos = el.querySelector('.sidebar-conversations');
+      var convoLabels = ['Current conversation', 'API integration help', 'Code review notes'];
+      for (var c = 0; c < convoLabels.length; c++) {
+        var ci = document.createElement('div');
+        ci.className = 'sidebar-convo-item' + (c === 0 ? ' active' : '');
+        ci.textContent = convoLabels[c];
+        convos.appendChild(ci);
+      }
+    }
+
+    // ── Build messages ──
+
+    var messageEls = [];
+    for (var i = 0; i < messages.length; i++) {
+      var msg = messages[i];
+      var role = msg.role || 'user';
+      var row = document.createElement('div');
+      row.className = 'msg-row ' + role;
+
+      if (role === 'assistant') {
+        var avatarEl = document.createElement('div');
+        avatarEl.className = 'msg-avatar assistant';
+        avatarEl.style.background = avatarColor;
+        avatarEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-3.5 7L15 19h-2.5L9 12l3.5-7H15zM10 5L6.5 12 10 19H7.5L4 12 7.5 5H10z" fill="#fff"/></svg>';
+        row.appendChild(avatarEl);
+      }
+
+      var content = document.createElement('div');
+      content.className = 'msg-content';
+      var text = document.createElement('div');
+      text.className = 'msg-text';
+      text.textContent = msg.text || '';
+      content.appendChild(text);
+      row.appendChild(content);
+
+      messagesArea.appendChild(row);
+      messageEls.push(row);
+    }
+
+    // ── Build plus menu ──
+
+    plusMenuHeader.textContent = menuTitle;
+    var menuItemEls = [];
+    for (var m = 0; m < menuItems.length; m++) {
+      var mi = menuItems[m];
+      var item = document.createElement('div');
+      item.className = 'menu-item';
+      item.setAttribute('data-target', 'menu-item-' + m);
+
+      var icon = document.createElement('div');
+      icon.className = 'menu-item-icon';
+      icon.textContent = mi.icon || '🔌';
+      item.appendChild(icon);
+
+      var info = document.createElement('div');
+      info.className = 'menu-item-info';
+      var nameEl = document.createElement('div');
+      nameEl.className = 'menu-item-name';
+      nameEl.textContent = mi.name || 'Tool';
+      info.appendChild(nameEl);
+      if (mi.description) {
+        var descEl = document.createElement('div');
+        descEl.className = 'menu-item-desc';
+        descEl.textContent = mi.description;
+        info.appendChild(descEl);
+      }
+      item.appendChild(info);
+
+      var connected = mi.connected !== undefined ? mi.connected : false;
+      var status = document.createElement('div');
+      status.className = 'menu-item-status ' + (connected ? 'connected' : 'disconnected');
+      item.appendChild(status);
+
+      var toggle = document.createElement('div');
+      toggle.className = 'menu-item-toggle' + (connected ? ' on' : '');
+      toggle.setAttribute('data-target', 'toggle-' + m);
+      var knob = document.createElement('div');
+      knob.className = 'menu-item-toggle-knob';
+      toggle.appendChild(knob);
+      item.appendChild(toggle);
+
+      plusMenuItems.appendChild(item);
+      menuItemEls.push({ el: item, toggle: toggle, status: status, connected: connected });
+    }
+
+    // ── Position plus menu above the + button ──
+
+    gsap.set(plusMenu, { autoAlpha: 0, y: 10, scale: 0.97 });
+    gsap.set(typingIndicator, { autoAlpha: 0 });
+
+    // Position menu at bottom-left of main area, above the composer
+    var _positionMenu = function() {
+      var chatRect = chat.getBoundingClientRect();
+      var btnRect = plusBtn.getBoundingClientRect();
+      var menuH = plusMenu.offsetHeight || 200;
+      plusMenu.style.left = (btnRect.left - chatRect.left) + 'px';
+      plusMenu.style.bottom = (chatRect.bottom - btnRect.top + 8) + 'px';
+      plusMenu.style.top = 'auto';
+    };
+
+    // ── Initial states ──
+
+    gsap.set(chat, { autoAlpha: 0 });
+    gsap.set(messageEls, { autoAlpha: 0, y: 16 });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
+
+    // ── Entrance ──
+
+    tl.to(chat, {
+      autoAlpha: 1,
+      duration: speed * 0.6,
+      ease: 'power2.out'
+    }, 0.2);
+
+    // Messages appear one by one
+    var t = 0.2 + speed * 0.6 + 0.2;
+    for (var j = 0; j < messageEls.length; j++) {
+      tl.to(messageEls[j], {
+        autoAlpha: 1, y: 0,
+        duration: 0.35,
+        ease: 'power2.out'
+      }, t);
+      t += 0.25;
+    }
+
+    // ── Exit ──
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to(chat, {
+        autoAlpha: 0,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    // ── Script handling ──
+
+    if (data.script && data.script.length > 0) {
+      var cursorTargets = data.cursor_targets || {
+        'chat-input': { x: '50%', y: '92%' },
+        'send-button': { x: '95%', y: '92%' },
+        'plus-button': { x: '5%', y: '92%' }
+      };
+
+      runScript(tl, el, data.script, cursorTargets, ctx, {
+
+        'type': function(tl, container, action, at, dur) {
+          var input = container.querySelector('[data-target="chat-input"]');
+          if (!input) return;
+          var txt = action.text || '';
+          var spd = action.speed || 25;
+          typeText(tl, input, txt, at, spd);
+          // Activate send button when text is typed
+          var sBtn = container.querySelector('.send-btn');
+          tl.call(function() {
+            sBtn.className = 'send-btn active';
+          }, null, at + 0.1);
+        },
+
+        'click': function(tl, container, action, at, dur) {
+          var target = action.target || 'send-button';
+          if (target === 'send-button' || target === 'send') {
+            var input = container.querySelector('[data-target="chat-input"]');
+            var sBtn = container.querySelector('.send-btn');
+            var area = container.querySelector('.messages-area');
+            if (input && area) {
+              var msgText = input.textContent;
+              tl.call(function() {
+                if (!msgText) return;
+                // Create user message
+                var row = document.createElement('div');
+                row.className = 'msg-row user';
+                var content = document.createElement('div');
+                content.className = 'msg-content';
+                var textEl = document.createElement('div');
+                textEl.className = 'msg-text';
+                textEl.textContent = msgText;
+                content.appendChild(textEl);
+                row.appendChild(content);
+                area.appendChild(row);
+                gsap.from(row, { autoAlpha: 0, y: 12, duration: 0.3, ease: 'power2.out' });
+                // Clear input
+                input.textContent = '';
+                sBtn.className = 'send-btn ghost';
+              }, null, at);
+            }
+          } else if (target === 'plus-button' || target === 'plus') {
+            // Delegate to open-menu
+          }
+        },
+
+        'open-menu': function(tl, container, action, at, dur) {
+          var menu = container.querySelector('.plus-menu');
+          var items = container.querySelectorAll('.menu-item');
+          tl.call(_positionMenu, null, at);
+          tl.to(menu, {
+            autoAlpha: 1, y: 0, scale: 1,
+            duration: 0.3,
+            ease: 'power3.out'
+          }, at + 0.05);
+          // Stagger reveal items
+          if (items.length) {
+            gsap.set(items, { autoAlpha: 0, y: 8 });
+            tl.to(items, {
+              autoAlpha: 1, y: 0,
+              duration: 0.25,
+              stagger: 0.06,
+              ease: 'power2.out'
+            }, at + 0.15);
+          }
+        },
+
+        'close-menu': function(tl, container, action, at, dur) {
+          var menu = container.querySelector('.plus-menu');
+          tl.to(menu, {
+            autoAlpha: 0, y: 10, scale: 0.97,
+            duration: 0.2,
+            ease: 'power2.in'
+          }, at);
+        },
+
+        'toggle-item': function(tl, container, action, at, dur) {
+          var idx = action.index != null ? action.index : 0;
+          var toggleEl = container.querySelector('[data-target="toggle-' + idx + '"]');
+          var statusEl = toggleEl ? toggleEl.parentElement.querySelector('.menu-item-status') : null;
+          if (toggleEl) {
+            tl.call(function() {
+              var isOn = toggleEl.classList.contains('on');
+              if (isOn) {
+                toggleEl.classList.remove('on');
+                if (statusEl) {
+                  statusEl.classList.remove('connected');
+                  statusEl.classList.add('disconnected');
+                }
+              } else {
+                toggleEl.classList.add('on');
+                if (statusEl) {
+                  statusEl.classList.remove('disconnected');
+                  statusEl.classList.add('connected');
+                }
+              }
+            }, null, at);
+          }
+        },
+
+        'show-typing': function(tl, container, action, at, dur) {
+          var indicator = container.querySelector('.typing-indicator');
+          var area = container.querySelector('.messages-area');
+          if (!indicator || !area) return;
+          // Position the indicator at the bottom of messages area
+          var areaRect = area.getBoundingClientRect();
+          indicator.style.bottom = (container.querySelector('.composer-wrapper').offsetHeight + 8) + 'px';
+          tl.to(indicator, { autoAlpha: 1, duration: 0.2 }, at);
+          // Bounce dots
+          var dots = indicator.querySelectorAll('.typing-dot');
+          tl.to(dots, {
+            y: -4, duration: 0.3, stagger: 0.1,
+            ease: 'power2.out', yoyo: true, repeat: 3
+          }, at + 0.1);
+          // Hide after duration
+          var typeDur = dur || 1.5;
+          tl.to(indicator, { autoAlpha: 0, duration: 0.15 }, at + typeDur);
+        },
+
+        'show-response': function(tl, container, action, at, dur) {
+          var area = container.querySelector('.messages-area');
+          var aColor = data.assistant_avatar_color || '#D97706';
+          if (!area) return;
+
+          // Hide typing indicator first
+          var indicator = container.querySelector('.typing-indicator');
+          if (indicator) {
+            tl.to(indicator, { autoAlpha: 0, duration: 0.1 }, at);
+          }
+
+          tl.call(function() {
+            var row = document.createElement('div');
+            row.className = 'msg-row assistant';
+
+            var avatar = document.createElement('div');
+            avatar.className = 'msg-avatar assistant';
+            avatar.style.background = aColor;
+            avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-3.5 7L15 19h-2.5L9 12l3.5-7H15zM10 5L6.5 12 10 19H7.5L4 12 7.5 5H10z" fill="#fff"/></svg>';
+            row.appendChild(avatar);
+
+            var content = document.createElement('div');
+            content.className = 'msg-content';
+            var textEl = document.createElement('div');
+            textEl.className = 'msg-text';
+            textEl.textContent = action.text || 'Hello! How can I help you today?';
+            content.appendChild(textEl);
+            row.appendChild(content);
+
+            area.appendChild(row);
+            gsap.from(row, { autoAlpha: 0, y: 12, duration: 0.35, ease: 'power2.out' });
+          }, null, at + 0.15);
+        }
+      });
+    }
+
+    return tl;
+  }
+</script>
