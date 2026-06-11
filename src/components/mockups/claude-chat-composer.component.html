@@ -513,6 +513,8 @@
           }
         },
         'open-menu': function(tl, ctr, action, at) {
+          var pb = ctr.querySelector('.plus-btn');
+          if (pb) tl.call(function() { pb.classList.add('hovered'); }, null, at);
           var menu = ctr.querySelector('.plus-menu');
           var items = ctr.querySelectorAll('.pm-item');
           tl.call(_posMenus, null, at);
@@ -523,6 +525,10 @@
           }
         },
         'close-menu': function(tl, ctr, action, at) {
+          var pb = ctr.querySelector('.plus-btn');
+          if (pb) tl.call(function() { pb.classList.remove('hovered'); }, null, at);
+          var ci = ctr.querySelector('[data-target="pm-connectors"]');
+          if (ci) tl.call(function() { ci.classList.remove('hovered'); }, null, at);
           tl.to(ctr.querySelector('.connectors-submenu'), { autoAlpha: 0, x: -8, scale: 0.97, duration: 0.15, ease: 'power2.in' }, at);
           tl.to(ctr.querySelector('.plus-menu'), { autoAlpha: 0, y: 10, scale: 0.97, duration: 0.2, ease: 'power2.in' }, at + 0.05);
         },
@@ -545,6 +551,8 @@
           if (ci) tl.call(function() { ci.classList.add('hovered'); }, null, at);
         },
         'show-connectors': function(tl, ctr, action, at) {
+          var ci = ctr.querySelector('[data-target="pm-connectors"]');
+          if (ci) tl.call(function() { ci.classList.add('hovered'); }, null, at);
           var sm = ctr.querySelector('.connectors-submenu');
           var rows = sm.querySelectorAll('.sm-row');
           tl.call(_posMenus, null, at);
