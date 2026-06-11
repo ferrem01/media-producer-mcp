@@ -449,7 +449,7 @@
       };
 
       runScript(tl, el, data.script, cursorTargets, ctx, {
-        'type': function(tl, ctr, action, at) {
+        'type-message': function(tl, ctr, action, at) {
           var input = ctr.querySelector('[data-target="composer-input"]');
           if (!input) return;
           var sb = ctr.querySelector('.send-btn');
@@ -480,7 +480,7 @@
         },
         'tool-use': function(tl, ctr, action, at) {
           tl.call(function() {
-            var row = addToolUse(action.action || 'action', action.service || 'Service');
+            var row = addToolUse(action.tool_name || action.action_name || 'action', action.service || 'Service');
             gsap.from(row, { autoAlpha: 0, y: 8, duration: 0.3, ease: 'power2.out' });
           }, null, at);
         },
