@@ -51,6 +51,23 @@ export async function processReferenceImages(
         var cachePath = path.join(cacheDir, `ref_${i}.${ext}`);
         await fs.writeFile(cachePath, Buffer.from(img._base64Data, "base64"));
         img._cachedPath = cachePath;
+      } else if (img.url.startsWith("file://")) {
+        // Read from local filesystem
+        var filePath = img.url.slice(7); // strip file://
+        var buffer = Buffer.from(await fs.readFile(filePath));
+        if (buffer.length > MAX_IMAGE_BYTES) {
+          throw new Error(
+            `Image too large: ${(buffer.length / 1024 / 1024).toFixed(1)}MB (max 5MB)`
+          );
+        }
+        var mediaType = inferMediaType(filePath) || "image/png";
+        var ext = mediaType.split("/")[1] || "png";
+        if (ext === "jpeg") ext = "jpg";
+        var cachePath = path.join(cacheDir, `ref_${i}.${ext}`);
+        await fs.writeFile(cachePath, buffer);
+        img._cachedPath = cachePath;
+        img._base64Data = buffer.toString("base64");
+        img._mediaType = mediaType;
       } else {
         // Download from URL
         var response = await fetch(img.url, {
