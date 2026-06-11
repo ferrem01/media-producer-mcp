@@ -421,8 +421,8 @@ async function presearchLibrary(prompt: string, referenceImages?: any[]): Promis
   // Extract notable proper nouns and UI terms from prompt
   var words = text.split(/\s+/);
   for (var w of words) {
-    var rclean = rw.replace(/[^a-z0-9-]/g, "");
-    if (rclean.length > 3) keywords.add(rclean);
+    var clean = w.replace(/[^a-z0-9-]/g, "");
+    if (clean.length > 3) keywords.add(clean);
   }
   
   // Extract from reference image labels
