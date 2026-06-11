@@ -37,6 +37,13 @@
       <div class="sidebar">
         <div class="sidebar-items" data-target="sidebar-items"></div>
       </div>
+      <!-- Side panel (opens on sidebar click) -->
+      <div class="side-panel" data-target="side-panel">
+        <div class="side-panel-content" data-target="panel-content"></div>
+        <button class="panel-collapse" data-target="panel-collapse">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#999" stroke-width="1.5" stroke-linecap="round"><path d="M8.5 3L4.5 7l4 4"/></svg>
+        </button>
+      </div>
       <!-- Canvas area -->
       <div class="canvas-area">
         <div class="canvas-viewport">
@@ -142,10 +149,85 @@
   }
   .sb-item:hover, .sb-item.hovered, .sb-item.active { background: #f0edff; }
   .sb-item.active { background: #ede6ff; }
+  .sb-item.active .sb-icon { color: #8B3DFF; }
+  .sb-item.active .sb-label { color: #8B3DFF; font-weight: 500; }
   .sb-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: #1a1a1a; }
   .sb-icon svg { width: 24px; height: 24px; }
   .sb-label { font-size: 10.5px; color: #1a1a1a; font-weight: 400; text-align: center; white-space: nowrap; }
   .sb-item-canva .sb-icon { color: #00C4CC; }
+  .sb-item-canva.active .sb-icon { color: #00C4CC; }
+  /* ── Side panel ── */
+  .side-panel {
+    width: 0; background: #fff; border-right: 1px solid #e0e0e0;
+    flex-shrink: 0; overflow: hidden; position: relative;
+  }
+  .side-panel-content {
+    width: 300px; padding: 16px; display: flex; flex-direction: column; gap: 12px;
+    height: 100%; overflow-y: auto; box-sizing: border-box;
+  }
+  .panel-collapse {
+    position: absolute; top: 50%; right: -1px; transform: translateY(-50%);
+    width: 20px; height: 40px; background: #fff; border: 1px solid #e0e0e0;
+    border-left: none; border-radius: 0 8px 8px 0; display: flex; align-items: center;
+    justify-content: center; cursor: default; z-index: 2; opacity: 0;
+  }
+
+  .sp-search {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    border: 1px solid #e0e0e0; border-radius: 10px; background: #f8f8f8;
+  }
+  .sp-search svg { flex-shrink: 0; color: #999; }
+  .sp-search span { font-size: 14px; color: #999; }
+  .sp-add-text-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px; border-radius: 10px; border: none;
+    background: #8B3DFF; color: #fff; font-size: 14.5px; font-weight: 600;
+    cursor: default; font-family: inherit; width: 100%;
+  }
+  .sp-magic-write-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px; border-radius: 10px; border: 1px solid #e0e0e0;
+    background: #fff; color: #1a1a1a; font-size: 14px; font-weight: 500;
+    cursor: default; font-family: inherit; width: 100%; box-sizing: border-box;
+  }
+  .sp-brand-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 0;
+  }
+  .sp-brand-left { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #1a1a1a; }
+  .sp-brand-edit { font-size: 13px; color: #1a1a1a; font-weight: 500; cursor: default; }
+  .sp-text-preset {
+    padding: 12px 16px; border: 1px solid #e0e0e0; border-radius: 10px;
+    cursor: default; background: #fff;
+  }
+  .sp-text-preset:hover { background: #f8f8f8; }
+  .sp-preset-heading { font-size: 22px; font-weight: 700; color: #1a1a1a; }
+  .sp-preset-subheading { font-size: 16px; font-weight: 500; color: #1a1a1a; }
+  .sp-preset-body { font-size: 13px; font-weight: 400; color: #1a1a1a; }
+  .sp-section-title { font-size: 14px; font-weight: 600; color: #1a1a1a; padding: 4px 0 0; }
+  .sp-page-numbers {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  }
+  .sp-page-thumb {
+    width: 56px; height: 40px; border-radius: 6px; background: linear-gradient(135deg, #FFD54F, #4FC3F7);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #1a1a1a; flex-shrink: 0;
+  }
+  .sp-page-label { font-size: 14px; color: #1a1a1a; }
+  .sp-apps-header {
+    display: flex; align-items: center; justify-content: space-between; padding: 4px 0 0;
+  }
+  .sp-apps-title { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .sp-apps-see-all { font-size: 13px; color: #666; cursor: default; }
+  .sp-apps-row { display: flex; gap: 8px; }
+  .sp-app-card {
+    width: 80px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .sp-app-thumb {
+    width: 76px; height: 60px; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 20px; font-weight: 800; color: #fff;
+  }
+  .sp-app-name { font-size: 11px; color: #1a1a1a; text-align: center; }
   /* ── Editor body ── */
   .editor-body { flex: 1; display: flex; overflow: hidden; }
   /* ── Canvas area ── */
@@ -397,7 +479,6 @@
         'hover-sidebar': function(tl, ctr, action, at) {
           var target = action.target || '';
           var item = ctr.querySelector('[data-target="sb-' + target + '"]');
-          // Remove previous hovers
           var all = ctr.querySelectorAll('.sb-item.hovered');
           tl.call(function() {
             for (var i = 0; i < all.length; i++) all[i].classList.remove('hovered');
@@ -412,6 +493,94 @@
             for (var i = 0; i < all.length; i++) { all[i].classList.remove('active'); all[i].classList.remove('hovered'); }
             if (item) item.classList.add('active');
           }, null, at);
+        },
+        'show-panel': function(tl, ctr, action, at) {
+          var panel = ctr.querySelector('.side-panel');
+          var panelContent = ctr.querySelector('[data-target="panel-content"]');
+          var panelType = action.panel || 'text';
+          tl.call(function() {
+            // Clear previous content
+            panelContent.innerHTML = '';
+            if (panelType === 'text') {
+              // Search bar
+              var search = document.createElement('div');
+              search.className = 'sp-search';
+              search.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M12.5 12.5L16 16"/></svg><span>Search fonts and combinations</span>';
+              panelContent.appendChild(search);
+              // Add a text box button
+              var addBtn = document.createElement('button');
+              addBtn.className = 'sp-add-text-btn';
+              addBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M5 4h8M9 4v10M6.5 14h5"/></svg>Add a text box';
+              panelContent.appendChild(addBtn);
+              // Magic Write button
+              var magicBtn = document.createElement('button');
+              magicBtn.className = 'sp-magic-write-btn';
+              magicBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#8B3DFF" stroke-width="1.4" stroke-linecap="round"><path d="M3 15l1.5-5L13 1.5 16.5 5 8 13.5z"/><path d="M11 4l3 3"/></svg>Magic Write';
+              panelContent.appendChild(magicBtn);
+              // Brand Kit row
+              var brandRow = document.createElement('div');
+              brandRow.className = 'sp-brand-row';
+              brandRow.innerHTML = '<span class="sp-brand-left"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#1a1a1a" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="2" width="6" height="6" rx="1"/><rect x="10" y="2" width="6" height="6" rx="1"/><rect x="2" y="10" width="6" height="6" rx="1"/><rect x="10" y="10" width="6" height="6" rx="1"/></svg>Brand Kit</span><span class="sp-brand-edit">Edit</span>';
+              panelContent.appendChild(brandRow);
+              // Text presets
+              var presets = [
+                { cls: 'sp-preset-heading', text: 'Heading' },
+                { cls: 'sp-preset-subheading', text: 'Subheading' },
+                { cls: 'sp-preset-body', text: 'Body' }
+              ];
+              presets.forEach(function(p) {
+                var box = document.createElement('div');
+                box.className = 'sp-text-preset';
+                var label = document.createElement('span');
+                label.className = p.cls;
+                label.textContent = p.text;
+                box.appendChild(label);
+                panelContent.appendChild(box);
+              });
+              // Dynamic text section
+              var dynTitle = document.createElement('div');
+              dynTitle.className = 'sp-section-title';
+              dynTitle.textContent = 'Dynamic text';
+              panelContent.appendChild(dynTitle);
+              // Page numbers
+              var pageNums = document.createElement('div');
+              pageNums.className = 'sp-page-numbers';
+              pageNums.innerHTML = '<div class="sp-page-thumb"><span>1</span><span style="font-size:10px;margin-left:1px">2</span></div><span class="sp-page-label">Page numbers</span>';
+              panelContent.appendChild(pageNums);
+              // Apps section
+              var appsHeader = document.createElement('div');
+              appsHeader.className = 'sp-apps-header';
+              appsHeader.innerHTML = '<span class="sp-apps-title">Apps</span><span class="sp-apps-see-all">See all</span>';
+              panelContent.appendChild(appsHeader);
+              var appsRow = document.createElement('div');
+              appsRow.className = 'sp-apps-row';
+              var apps = [
+                { name: 'TypeStudio', bg: 'linear-gradient(135deg, #FF6B6B, #4ECDC4)' },
+                { name: 'TypeCraft', bg: 'linear-gradient(135deg, #FF4757, #2F3542)' },
+                { name: 'MotionText', bg: 'linear-gradient(135deg, #A78BFA, #6366F1)' }
+              ];
+              apps.forEach(function(app) {
+                var card = document.createElement('div');
+                card.className = 'sp-app-card';
+                var thumb = document.createElement('div');
+                thumb.className = 'sp-app-thumb';
+                thumb.style.background = app.bg;
+                thumb.textContent = app.name.charAt(0);
+                card.appendChild(thumb);
+                var name = document.createElement('span');
+                name.className = 'sp-app-name';
+                name.textContent = app.name;
+                card.appendChild(name);
+                appsRow.appendChild(card);
+              });
+              panelContent.appendChild(appsRow);
+            }
+          }, null, at);
+          tl.to(panel, { width: 300, duration: 0.3, ease: 'power2.out' }, at + 0.05);
+        },
+        'hide-panel': function(tl, ctr, action, at) {
+          var panel = ctr.querySelector('.side-panel');
+          tl.to(panel, { width: 0, duration: 0.25, ease: 'power2.in' }, at);
         },
         'hover-toolbar': function(tl, ctr, action, at) {
           var target = action.target || '';
