@@ -1,0 +1,231 @@
+{
+  "type": "slack-workspace",
+  "label": "Slack Workspace",
+  "category": "mockups",
+  "description": "Modern Slack desktop simulator with sidebar, channels, DMs, messages, threads, reactions, link unfurls, typing indicators, and animated scripted interactions.",
+  "data": {
+    "workspace_name": {
+      "type": "string",
+      "label": "Workspace Name",
+      "optional": true,
+      "default": "Quotient",
+      "placeholder": "Quotient"
+    },
+    "channel_name": {
+      "type": "string",
+      "label": "Active Channel Name",
+      "optional": true,
+      "default": "product",
+      "placeholder": "product"
+    },
+    "channel_topic": {
+      "type": "string",
+      "label": "Channel Topic",
+      "optional": true,
+      "default": "",
+      "placeholder": "Product discussions and updates"
+    },
+    "channels": {
+      "type": "array",
+      "label": "Sidebar Channels",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "label": "Channel Name", "required": true },
+          "unread_count": { "type": "number", "label": "Unread Count", "optional": true }
+        }
+      }
+    },
+    "direct_messages": {
+      "type": "array",
+      "label": "Direct Messages List",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "label": "Name", "required": true },
+          "avatar_color": { "type": "string", "label": "Avatar Color", "required": true },
+          "online": { "type": "boolean", "label": "Online Status", "optional": true },
+          "initials": { "type": "string", "label": "Initials", "optional": true }
+        }
+      }
+    },
+    "messages": {
+      "type": "array",
+      "label": "Initial Messages",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": { "type": "string", "label": "Role", "required": true, "enum": ["user", "bot"] },
+          "name": { "type": "string", "label": "Sender Name", "required": true },
+          "avatar_color": { "type": "string", "label": "Avatar Color", "required": true },
+          "initials": { "type": "string", "label": "Initials", "optional": true },
+          "text": { "type": "string", "label": "Message Text", "required": true },
+          "timestamp": { "type": "string", "label": "Timestamp", "optional": true },
+          "reactions": {
+            "type": "array",
+            "label": "Reactions",
+            "optional": true,
+            "items": {
+              "type": "object",
+              "properties": {
+                "emoji": { "type": "string", "label": "Emoji" },
+                "count": { "type": "number", "label": "Count" },
+                "active": { "type": "boolean", "label": "Active" }
+              }
+            }
+          },
+          "replies": {
+            "type": "object",
+            "label": "Reply Indicator",
+            "optional": true,
+            "properties": {
+              "count": { "type": "number" },
+              "avatars": { "type": "array", "items": { "type": "object" } },
+              "last_reply": { "type": "string" }
+            }
+          },
+          "unfurl": {
+            "type": "object",
+            "label": "Link Unfurl",
+            "optional": true,
+            "properties": {
+              "color": { "type": "string" },
+              "favicon": { "type": "string" },
+              "site_name": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": "string" },
+              "thumbnail": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "active_channel": {
+      "type": "string",
+      "label": "Highlighted Channel",
+      "optional": true,
+      "default": "product"
+    },
+    "show_thread": {
+      "type": "boolean",
+      "label": "Start with Thread Open",
+      "optional": true,
+      "default": false
+    }
+  },
+  "script_actions": [
+    {
+      "action": "type-message",
+      "description": "Type text into the main channel composer character by character",
+      "params": {
+        "text": "string - Text to type",
+        "speed": "number - Characters per second (default 30)"
+      }
+    },
+    {
+      "action": "send-message",
+      "description": "Send the currently typed text as a user message, clears composer",
+      "params": {
+        "name": "string - Sender name",
+        "avatar_color": "string - Avatar color",
+        "initials": "string - Initials",
+        "timestamp": "string - Message timestamp"
+      }
+    },
+    {
+      "action": "bot-message",
+      "description": "Show a bot or other user message in the channel",
+      "params": {
+        "name": "string - Sender name",
+        "avatar_color": "string - Avatar color",
+        "initials": "string - Initials",
+        "text": "string - Message text",
+        "timestamp": "string - Timestamp"
+      }
+    },
+    {
+      "action": "add-reaction",
+      "description": "Add emoji reaction to a message",
+      "params": {
+        "emoji": "string - Emoji character",
+        "count": "number - Reaction count",
+        "message_index": "number - Message index (-1 for last)",
+        "active": "boolean - Whether reaction is active/highlighted"
+      }
+    },
+    {
+      "action": "open-thread",
+      "description": "Open the thread panel for a specific message",
+      "params": {
+        "message_index": "number - Index of message to thread on"
+      }
+    },
+    {
+      "action": "close-thread",
+      "description": "Close the thread panel"
+    },
+    {
+      "action": "thread-reply",
+      "description": "Add a reply in the open thread panel",
+      "params": {
+        "name": "string - Sender name",
+        "avatar_color": "string - Avatar color",
+        "initials": "string - Initials",
+        "text": "string - Reply text",
+        "timestamp": "string - Timestamp"
+      }
+    },
+    {
+      "action": "type-thread",
+      "description": "Type text into the thread composer",
+      "params": {
+        "text": "string - Text to type",
+        "speed": "number - Characters per second (default 30)"
+      }
+    },
+    {
+      "action": "send-thread",
+      "description": "Send typed text as a thread reply"
+    },
+    {
+      "action": "unfurl-link",
+      "description": "Add a link unfurl card below a message",
+      "params": {
+        "color": "string - Left accent color",
+        "site_name": "string - Site name text",
+        "title": "string - Unfurl title",
+        "description": "string - Unfurl description",
+        "favicon": "string - Favicon URL",
+        "message_index": "number - Message index (-1 for last)"
+      }
+    },
+    {
+      "action": "show-typing-indicator",
+      "description": "Show typing dots in the channel",
+      "params": {
+        "name": "string - Who is typing"
+      }
+    },
+    {
+      "action": "hide-typing-indicator",
+      "description": "Hide the typing indicator"
+    },
+    {
+      "action": "switch-channel",
+      "description": "Switch the active channel in sidebar",
+      "params": {
+        "channel": "string - Channel name to switch to"
+      }
+    }
+  ],
+  "default_cursor_targets": {
+    "composer": { "x": "55%", "y": "92%" },
+    "send-button": { "x": "93%", "y": "95%" },
+    "thread-composer": { "x": "85%", "y": "92%" },
+    "thread-send": { "x": "97%", "y": "95%" },
+    "message-last": { "x": "55%", "y": "50%" }
+  }
+}
