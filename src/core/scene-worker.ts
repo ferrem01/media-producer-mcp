@@ -217,12 +217,13 @@ async function main() {
   var totalFrames = Math.ceil(scene.duration_seconds * args.fps);
   var browser = await chromium.launch({
     args: [
-      "--disable-gpu",
+      "--enable-gpu",
+      "--use-gl=swiftshader",
+      "--enable-webgl",
       "--disable-dev-shm-usage",
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--allow-file-access-from-files",
-      "--single-process",
       "--disable-extensions",
       "--disable-background-networking",
       "--disable-default-apps",

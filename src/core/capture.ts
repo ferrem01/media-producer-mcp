@@ -210,7 +210,6 @@ export async function captureSingleFrame(options: {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--allow-file-access-from-files",
-        "--single-process",
         "--disable-extensions",
         "--disable-background-networking",
         "--disable-default-apps",
