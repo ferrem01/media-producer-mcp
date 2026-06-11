@@ -14,6 +14,7 @@
       </div>
     </div>
     <div class="claude-main">
+      <div class="main-spacer top"></div>
       <div class="messages-area"></div>
       <div class="composer-wrapper">
         <div class="composer-box">
@@ -42,6 +43,7 @@
           <span class="composer-model-label"></span>
         </div>
       </div>
+      <div class="main-spacer bottom"></div>
     </div>
     <!-- Primary + menu -->
     <div class="plus-menu" data-target="plus-menu">
@@ -50,8 +52,7 @@
     <!-- Connectors submenu -->
     <div class="connectors-submenu" data-target="connectors-submenu">
       <div class="submenu-connectors"></div>
-      <div class="submenu-add-from"></div>
-      <div class="submenu-sep"></div>
+      <div class="submenu-sep submenu-sep-top"></div>
       <div class="submenu-footer"></div>
     </div>
     <div class="typing-indicator">
@@ -81,9 +82,10 @@
   .sidebar-convo-item { padding: 8px 12px; border-radius: 8px; font-size: 13px; color: #4a4a4a; cursor: default; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sidebar-convo-item.active { background: #e5e3dc; color: #1a1a1a; font-weight: 500; }
   .sidebar-new-chat { display: flex; align-items: center; gap: 8px; padding: 14px 20px; border-top: 1px solid #e5e3dc; font-size: 14px; color: #6b6b6b; }
-  /* ── Main ── */
+  /* ── Main (centered composer) ── */
   .claude-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
-  .messages-area { flex: 1; display: flex; flex-direction: column; gap: 0; padding: 32px 0 16px; overflow: hidden; align-items: center; }
+  .main-spacer { flex: 1; }
+  .messages-area { display: flex; flex-direction: column; gap: 0; padding: 0 0 16px; overflow: hidden; align-items: center; flex-shrink: 0; }
   .msg-row { width: 100%; max-width: 680px; padding: 16px 32px; display: flex; gap: 14px; align-items: flex-start; }
   .msg-row.user { justify-content: flex-end; }
   .msg-avatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
@@ -93,7 +95,7 @@
   .msg-text { font-size: 15px; line-height: 1.6; color: #1a1a1a; }
   .msg-row.user .msg-text { background: #f1efe9; padding: 10px 16px; border-radius: 20px; }
   .msg-row.assistant .msg-text { color: #2d2d2d; }
-  /* ── Composer (multi-line box) ── */
+  /* ── Composer (multi-line box, centered) ── */
   .composer-wrapper { padding: 8px 24px 16px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
   .composer-box {
     display: flex; flex-direction: column; width: 100%; max-width: 680px; min-height: 148px;
@@ -147,15 +149,15 @@
   .pm-divider { height: 1px; background: #ececec; margin: 4px 12px; }
   /* ── Connectors submenu ── */
   .connectors-submenu {
-    position: absolute; width: 340px; background: #fff;
+    position: absolute; width: 320px; background: #fff;
     border: 1px solid rgba(0,0,0,0.06); border-radius: 20px;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04);
     overflow: hidden; z-index: 101; pointer-events: none;
   }
   .submenu-connectors { padding: 8px 8px 0; display: flex; flex-direction: column; }
-  .submenu-add-from { padding: 0 8px; display: flex; flex-direction: column; }
   .submenu-sep { height: 1px; background: #ececec; margin: 4px 16px; }
-  .submenu-footer { padding: 0 8px 8px; display: flex; flex-direction: column; }
+  .submenu-sep-top { display: none; }
+  .submenu-footer { padding: 8px; display: flex; flex-direction: column; }
   .sm-row {
     display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; cursor: default;
   }
@@ -203,7 +205,6 @@
     var pmContainer = el.querySelector('.plus-menu-items');
     var submenu = el.querySelector('.connectors-submenu');
     var smConnectors = el.querySelector('.submenu-connectors');
-    var smAddFrom = el.querySelector('.submenu-add-from');
     var smFooter = el.querySelector('.submenu-footer');
     var modelSelector = el.querySelector('.model-selector');
     var typingIndicator = el.querySelector('.typing-indicator');
@@ -342,75 +343,55 @@
       'gmail': { bg: '#f1f1f1', text: 'G', textColor: '#EA4335' }
     };
 
-    // ── Build connector rows (all OFF by default) ──
+    // ── Build connector rows only if menu_items provided ──
     var smToggleEls = [];
-    menuItems.forEach(function(mi, idx) {
-      var name = mi.name || mi.label || 'Tool';
-      var row = document.createElement('div');
-      row.className = 'sm-row';
-      row.setAttribute('data-target', 'sm-item-' + idx);
+    if (menuItems.length > 0) {
+      var sepTop = el.querySelector('.submenu-sep-top');
+      if (sepTop) sepTop.style.display = 'block';
 
-      var logo = document.createElement('div');
-      logo.className = 'sm-logo';
-      var ls = logoStyles[name] || { bg: '#9B9490', text: name.charAt(0) };
-      logo.style.background = ls.bg;
-      logo.textContent = ls.text;
-      if (ls.textColor) logo.style.color = ls.textColor;
-      if (ls.fontSize) logo.style.fontSize = ls.fontSize;
-      row.appendChild(logo);
+      menuItems.forEach(function(mi, idx) {
+        var name = mi.name || mi.label || 'Tool';
+        var row = document.createElement('div');
+        row.className = 'sm-row';
+        row.setAttribute('data-target', 'sm-item-' + idx);
 
-      var lb = document.createElement('span');
-      lb.className = 'sm-label';
-      lb.textContent = name;
-      row.appendChild(lb);
+        var logo = document.createElement('div');
+        logo.className = 'sm-logo';
+        var ls = logoStyles[name] || { bg: '#9B9490', text: name.charAt(0) };
+        logo.style.background = ls.bg;
+        logo.textContent = ls.text;
+        if (ls.textColor) logo.style.color = ls.textColor;
+        if (ls.fontSize) logo.style.fontSize = ls.fontSize;
+        row.appendChild(logo);
 
-      // Default to OFF -- only on if explicitly set
-      var enabled = mi.connected === true || mi.enabled === true;
-      var tog = document.createElement('div');
-      tog.className = 'sm-toggle' + (enabled ? ' on' : '');
-      tog.setAttribute('data-target', 'toggle-' + idx);
-      var knob = document.createElement('div');
-      knob.className = 'sm-toggle-knob';
-      tog.appendChild(knob);
-      row.appendChild(tog);
+        var lb = document.createElement('span');
+        lb.className = 'sm-label';
+        lb.textContent = name;
+        row.appendChild(lb);
 
-      smConnectors.appendChild(row);
-      smToggleEls.push({ toggle: tog, enabled: enabled });
-    });
+        var enabled = mi.connected === true || mi.enabled === true;
+        var tog = document.createElement('div');
+        tog.className = 'sm-toggle' + (enabled ? ' on' : '');
+        tog.setAttribute('data-target', 'toggle-' + idx);
+        var knob = document.createElement('div');
+        knob.className = 'sm-toggle-knob';
+        tog.appendChild(knob);
+        row.appendChild(tog);
 
-    // ── "Add from" items ──
-    var addFromItems = menuItems.filter(function(mi) { return mi.add_from !== false; }).slice(0, 2);
-    addFromItems.forEach(function(mi) {
-      var name = mi.name || mi.label || 'Tool';
-      var row = document.createElement('div');
-      row.className = 'sm-row';
+        smConnectors.appendChild(row);
+        smToggleEls.push({ toggle: tog, enabled: enabled });
+      });
+    }
 
-      var logo = document.createElement('div');
-      logo.className = 'sm-logo';
-      var ls = logoStyles[name] || { bg: '#9B9490', text: name.charAt(0) };
-      logo.style.background = ls.bg;
-      logo.textContent = ls.text;
-      if (ls.textColor) logo.style.color = ls.textColor;
-      row.appendChild(logo);
-
-      var lb = document.createElement('span');
-      lb.className = 'sm-label';
-      lb.textContent = 'Add from ' + name;
-      row.appendChild(lb);
-
-      var rt = document.createElement('span');
-      rt.className = 'sm-row-right';
-      rt.textContent = '\u203A';
-      row.appendChild(rt);
-
-      smAddFrom.appendChild(row);
-    });
-
-    // ── Footer items ──
+    // ── Footer items (always shown) ──
     var footerDef = [
-      { label: 'Manage connectors', icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="3" width="14" height="12" rx="2"/><path d="M6 7.5h6M6 10.5h4"/></svg>' },
-      { label: 'Add connector', icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="14"/><line x1="4" y1="9" x2="14" y2="9"/></svg>' },
-      { label: 'Tool access', sub: 'Load tools when needed', icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="5"/><path d="M12 12l3.5 3.5"/></svg>', chevron: true }
+      { label: 'Manage connectors',
+        icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="3"/><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.4 3.4l1.4 1.4M13.2 13.2l1.4 1.4M3.4 14.6l1.4-1.4M13.2 4.8l1.4-1.4"/></svg>' },
+      { label: 'Add connector',
+        icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="9" cy="9" r="6.5"/><line x1="9" y1="6" x2="9" y2="12"/><line x1="6" y1="9" x2="12" y2="9"/></svg>' },
+      { label: 'Tool access', sub: 'Load tools when needed',
+        icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l1.8 1.8-5.8 5.8-2.5.7.7-2.5 5.8-5.8z"/><path d="M9.5 3.5l2 2"/></svg>',
+        chevron: true }
     ];
     footerDef.forEach(function(fd) {
       var row = document.createElement('div');
@@ -466,7 +447,7 @@
       submenu.style.left = (pmR.right - chatR.left - 2) + 'px';
       if (connectorsItemEl) {
         var ciR = connectorsItemEl.getBoundingClientRect();
-        var subH = submenu.offsetHeight || 400;
+        var subH = submenu.offsetHeight || 200;
         submenu.style.bottom = (chatR.bottom - ciR.bottom - subH + 40) + 'px';
       } else {
         submenu.style.bottom = plusMenu.style.bottom;
@@ -493,12 +474,12 @@
     // ── Script actions ──
     if (data.script && data.script.length > 0) {
       var cursorTargets = data.cursor_targets || {
-        'chat-input': { x: '50%', y: '75%' },
-        'send-button': { x: '95%', y: '86%' },
-        'plus-button': { x: '8%', y: '86%' },
-        'mic-button': { x: '90%', y: '86%' },
-        'connectors-item': { x: '22%', y: '60%' },
-        'quotient-toggle': { x: '72%', y: '50%' }
+        'chat-input': { x: '50%', y: '50%' },
+        'send-button': { x: '95%', y: '57%' },
+        'plus-button': { x: '20%', y: '57%' },
+        'mic-button': { x: '90%', y: '57%' },
+        'connectors-item': { x: '28%', y: '35%' },
+        'quotient-toggle': { x: '72%', y: '25%' }
       };
 
       runScript(tl, el, data.script, cursorTargets, ctx, {
