@@ -1,0 +1,168 @@
+<template>
+  <div class="caption-bar">
+    <div class="caption-bar-bg"></div>
+    <span class="caption-text">{{text}}</span>
+  </div>
+</template>
+
+<style scoped>
+  .caption-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .caption-bar-bg {
+    position: absolute;
+    inset: 0;
+    background: var(--caption-bg, rgba(0, 0, 0, 0.75));
+    min-height: var(--caption-bar-height, 80px);
+  }
+
+  .caption-text {
+    position: relative;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    font-weight: 500;
+    font-size: var(--caption-font-size, 22px);
+    color: var(--caption-text-color, #ffffff);
+    text-align: center;
+    line-height: 1.4;
+    max-width: 90%;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    z-index: 1;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var bar = el.querySelector('.caption-bar');
+    var bg = el.querySelector('.caption-bar-bg');
+    var textEl = el.querySelector('.caption-text');
+
+    // Apply configurable styles via CSS custom properties
+    var bgColor = data.bg_color || 'rgba(0,0,0,0.75)';
+    var textColor = data.text_color || '#ffffff';
+    var fontSize = (data.font_size || 22) + 'px';
+    var barHeight = (data.bar_height || 80) + 'px';
+
+    bar.style.setProperty('--caption-bg', bgColor);
+    bar.style.setProperty('--caption-text-color', textColor);
+    bar.style.setProperty('--caption-font-size', fontSize);
+    bar.style.setProperty('--caption-bar-height', barHeight);
+
+    var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.4 : 0.5;
+
+    // Initial states
+    gsap.set(bg, { autoAlpha: 0, y: 10 });
+    gsap.set(textEl, { autoAlpha: 0 });
+
+    // Entrance: slide bar up and fade in
+    tl.to(bg, {
+      autoAlpha: 1,
+      y: 0,
+      duration: speed,
+      ease: 'power2.out'
+    }, 0.1);
+
+    // Fade in initial text (if provided)
+    if (data.text) {
+      tl.to(textEl, {
+        autoAlpha: 1,
+        duration: speed * 0.7,
+        ease: 'power2.out'
+      }, 0.1 + speed * 0.4);
+    }
+
+    // Script actions for mid-scene caption changes
+    var cursorTargets = {};
+
+    var handlers = {
+      'set-caption': function(tl, ctr, action, at) {
+        var t = ctr.querySelector('.caption-text');
+        if (!t) return;
+        var fadeDur = action.fade_duration != null ? action.fade_duration : 0.3;
+
+        // Fade out current text
+        tl.to(t, {
+          autoAlpha: 0,
+          duration: fadeDur * 0.5,
+          ease: 'power2.in'
+        }, at);
+
+        // Swap text content and fade in
+        tl.call(function() {
+          t.textContent = action.text || '';
+        }, null, at + fadeDur * 0.5);
+
+        tl.to(t, {
+          autoAlpha: 1,
+          duration: fadeDur * 0.5,
+          ease: 'power2.out'
+        }, at + fadeDur * 0.5);
+      },
+
+      'clear-caption': function(tl, ctr, action, at) {
+        var t = ctr.querySelector('.caption-text');
+        if (!t) return;
+        var fadeDur = action.fade_duration != null ? action.fade_duration : 0.3;
+
+        tl.to(t, {
+          autoAlpha: 0,
+          duration: fadeDur,
+          ease: 'power2.in'
+        }, at);
+      },
+
+      'highlight-caption': function(tl, ctr, action, at) {
+        var t = ctr.querySelector('.caption-text');
+        if (!t) return;
+        var dur = action.duration != null ? action.duration : 0.6;
+
+        tl.to(t, {
+          textShadow: '0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(255,255,255,0.4)',
+          scale: 1.05,
+          duration: dur * 0.4,
+          ease: 'power2.out'
+        }, at);
+
+        tl.to(t, {
+          textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+          scale: 1,
+          duration: dur * 0.6,
+          ease: 'power2.inOut'
+        }, at + dur * 0.4);
+      }
+    };
+
+    if (data.script && data.script.length > 0) {
+      runScript(tl, el, data.script, cursorTargets, ctx, handlers);
+    }
+
+    // Exit: fade out bar near end of scene
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to(bg, {
+        autoAlpha: 0,
+        y: 10,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to(textEl, {
+        autoAlpha: 0,
+        duration: 0.3,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

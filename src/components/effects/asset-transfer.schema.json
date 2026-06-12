@@ -1,0 +1,107 @@
+{
+  "type": "asset-transfer",
+  "label": "Asset Transfer",
+  "category": "effects",
+  "description": "Animated thumbnail sliding across the screen showing asset transfer between two panels",
+  "data": {
+    "image_url": {
+      "type": "string",
+      "label": "Image URL",
+      "optional": true,
+      "default": "",
+      "description": "URL or path of the image to show as thumbnail"
+    },
+    "image_label": {
+      "type": "string",
+      "label": "Image Label",
+      "optional": true,
+      "default": "asset.png",
+      "description": "Label text displayed below the thumbnail"
+    },
+    "direction": {
+      "type": "string",
+      "label": "Direction",
+      "optional": true,
+      "default": "left-to-right",
+      "enum": ["left-to-right", "right-to-left"],
+      "description": "Slide direction for the initial transfer"
+    },
+    "thumb_size": {
+      "type": "number",
+      "label": "Thumbnail Size",
+      "optional": true,
+      "default": 120,
+      "description": "Thumbnail size in pixels"
+    },
+    "start_delay": {
+      "type": "number",
+      "label": "Start Delay",
+      "optional": true,
+      "default": 0.5,
+      "description": "Seconds before animation starts"
+    },
+    "y_position": {
+      "type": "string",
+      "label": "Vertical Position",
+      "optional": true,
+      "default": "45%",
+      "description": "Vertical position of the thumbnail (CSS value)"
+    }
+  },
+  "script_actions": [
+    {
+      "action": "transfer",
+      "description": "Triggers a transfer animation",
+      "params": {
+        "direction": {
+          "type": "string",
+          "optional": true,
+          "description": "Override slide direction"
+        },
+        "image_url": {
+          "type": "string",
+          "optional": true,
+          "description": "Override image URL for this transfer"
+        },
+        "label": {
+          "type": "string",
+          "optional": true,
+          "description": "Override label text for this transfer"
+        },
+        "delay": {
+          "type": "number",
+          "optional": true,
+          "default": 0,
+          "description": "Additional delay before this transfer starts"
+        }
+      }
+    },
+    {
+      "action": "transfer-back",
+      "description": "Triggers a reverse transfer animation",
+      "params": {
+        "direction": {
+          "type": "string",
+          "optional": true,
+          "description": "Override direction (defaults to reverse of initial direction)"
+        },
+        "image_url": {
+          "type": "string",
+          "optional": true,
+          "description": "Override image URL"
+        },
+        "label": {
+          "type": "string",
+          "optional": true,
+          "description": "Override label text"
+        },
+        "delay": {
+          "type": "number",
+          "optional": true,
+          "default": 0,
+          "description": "Additional delay before this transfer starts"
+        }
+      }
+    }
+  ]
+}

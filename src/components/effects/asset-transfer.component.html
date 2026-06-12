@@ -1,0 +1,269 @@
+<template>
+  <div class="asset-transfer-overlay">
+    <div class="transfer-container">
+      <!-- Thumbnail gets cloned here for each transfer -->
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .asset-transfer-overlay {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    pointer-events: none;
+    padding: 32px;
+  }
+
+  .transfer-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
+  .transfer-thumb {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    will-change: transform, opacity;
+    filter: drop-shadow(0 4px 24px rgba(100, 140, 255, 0));
+  }
+
+  .thumb-card {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
+    background: #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .thumb-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .thumb-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #334155 0%, #1e293b 50%, #0f172a 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .thumb-placeholder svg {
+    width: 40%;
+    height: 40%;
+    opacity: 0.5;
+  }
+
+  .thumb-label {
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+    white-space: nowrap;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.transfer-container');
+    var thumbSize = data.thumb_size || 120;
+    var direction = data.direction || 'left-to-right';
+    var startDelay = data.start_delay != null ? data.start_delay : 0.5;
+    var yPosition = data.y_position || '45%';
+    var imageUrl = data.image_url || '';
+    var imageLabel = data.image_label || 'asset.png';
+
+    function createThumbElement(imgUrl, label, size) {
+      var thumb = document.createElement('div');
+      thumb.className = 'transfer-thumb';
+
+      var card = document.createElement('div');
+      card.className = 'thumb-card';
+      card.style.width = size + 'px';
+      card.style.height = size + 'px';
+
+      if (imgUrl) {
+        var img = document.createElement('img');
+        img.src = imgUrl;
+        img.alt = label;
+        card.appendChild(img);
+      } else {
+        var placeholder = document.createElement('div');
+        placeholder.className = 'thumb-placeholder';
+        placeholder.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
+          '<polyline points="14 2 14 8 20 8"/>' +
+          '<line x1="16" y1="13" x2="8" y2="13"/>' +
+          '<line x1="16" y1="17" x2="8" y2="17"/>' +
+          '<polyline points="10 9 9 9 8 9"/>' +
+          '</svg>';
+        card.appendChild(placeholder);
+      }
+
+      thumb.appendChild(card);
+
+      var labelEl = document.createElement('div');
+      labelEl.className = 'thumb-label';
+      labelEl.textContent = label;
+      thumb.appendChild(labelEl);
+
+      container.appendChild(thumb);
+      return thumb;
+    }
+
+    function animateTransfer(timeline, dir, imgUrl, label, delay, size) {
+      var thumbEl = createThumbElement(imgUrl || imageUrl, label || imageLabel, size || thumbSize);
+
+      // Parse y position
+      var yVal = yPosition;
+      if (typeof yVal === 'string' && yVal.indexOf('%') !== -1) {
+        yVal = parseFloat(yVal) + '%';
+      }
+      thumbEl.style.top = yVal;
+      thumbEl.style.transform = 'translateY(-50%)';
+
+      var containerW = 1920; // reference width
+      var containerH = 1080; // reference height
+      var halfThumb = (size || thumbSize) / 2;
+      // Land on panel centers: left panel ~20%, right panel ~70%
+      var leftCenter = containerW * 0.20 - halfThumb;
+      var rightCenter = containerW * 0.70 - halfThumb;
+      var startX, endX;
+
+      if (dir === 'right-to-left') {
+        startX = rightCenter;
+        endX = leftCenter;
+      } else {
+        startX = leftCenter;
+        endX = rightCenter;
+      }
+
+      var midX = (startX + endX) / 2;
+      var arcHeight = -80; // upward arc in pixels
+
+      // Set initial position
+      gsap.set(thumbEl, {
+        x: startX,
+        opacity: 0,
+        scale: 0.85
+      });
+
+      var dur = 2.2;
+      var at = delay;
+
+      // Fade in
+      timeline.to(thumbEl, {
+        opacity: 1,
+        duration: 0.4,
+        ease: 'power2.out'
+      }, at);
+
+      // Main horizontal motion
+      timeline.to(thumbEl, {
+        x: endX,
+        duration: dur,
+        ease: 'power2.inOut'
+      }, at);
+
+      // Vertical arc (parabolic path using keyframes)
+      timeline.to(thumbEl, {
+        keyframes: [
+          { y: arcHeight * 0.5, duration: dur * 0.25, ease: 'power1.out' },
+          { y: arcHeight, duration: dur * 0.25, ease: 'sine.out' },
+          { y: arcHeight * 0.5, duration: dur * 0.25, ease: 'sine.in' },
+          { y: 0, duration: dur * 0.25, ease: 'power1.in' }
+        ]
+      }, at);
+
+      // Scale pulse: grow to full mid-way, slight shrink at end
+      timeline.to(thumbEl, {
+        keyframes: [
+          { scale: 0.95, duration: dur * 0.2, ease: 'power1.out' },
+          { scale: 1.1, duration: dur * 0.3, ease: 'power2.out' },
+          { scale: 1.05, duration: dur * 0.2, ease: 'sine.inOut' },
+          { scale: 0.95, duration: dur * 0.2, ease: 'power1.in' },
+          { scale: 0.85, duration: dur * 0.1, ease: 'power2.in' }
+        ]
+      }, at);
+
+      // Glow trail: box-shadow animation on the card
+      var card = thumbEl.querySelector('.thumb-card');
+      timeline.fromTo(card, {
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+      }, {
+        keyframes: [
+          { boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px 4px rgba(100, 160, 255, 0.3), 0 0 60px 10px rgba(100, 160, 255, 0.15)', duration: dur * 0.3 },
+          { boxShadow: '0 8px 40px rgba(0, 0, 0, 0.2), 0 0 40px 8px rgba(100, 160, 255, 0.5), 0 0 80px 16px rgba(100, 160, 255, 0.2)', duration: dur * 0.2 },
+          { boxShadow: '0 8px 40px rgba(0, 0, 0, 0.2), 0 0 30px 6px rgba(100, 160, 255, 0.4), 0 0 70px 12px rgba(100, 160, 255, 0.15)', duration: dur * 0.2 },
+          { boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 10px 2px rgba(100, 160, 255, 0.1), 0 0 30px 4px rgba(100, 160, 255, 0.05)', duration: dur * 0.3 }
+        ]
+      }, at);
+
+      // Drop-shadow filter glow on the thumb wrapper
+      timeline.fromTo(thumbEl, {
+        filter: 'drop-shadow(0 4px 24px rgba(100, 140, 255, 0))'
+      }, {
+        keyframes: [
+          { filter: 'drop-shadow(0 4px 30px rgba(100, 140, 255, 0.4))', duration: dur * 0.3 },
+          { filter: 'drop-shadow(0 8px 40px rgba(100, 140, 255, 0.6))', duration: dur * 0.2 },
+          { filter: 'drop-shadow(0 6px 35px rgba(100, 140, 255, 0.3))', duration: dur * 0.2 },
+          { filter: 'drop-shadow(0 4px 24px rgba(100, 140, 255, 0))', duration: dur * 0.3 }
+        ]
+      }, at);
+
+      // Fade out near the end
+      timeline.to(thumbEl, {
+        opacity: 0,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, at + dur - 0.4);
+
+      return dur;
+    }
+
+    // Initial transfer animation using data defaults
+    animateTransfer(tl, direction, imageUrl, imageLabel, startDelay, thumbSize);
+
+    // Run interactive script if provided
+    if (data.script && data.script.length > 0) {
+      runScript(tl, el, data.script, data.cursor_targets || {}, ctx, {
+        'transfer': function(timeline, containerEl, action, at, duration, scriptCtx) {
+          var dir = action.direction || direction;
+          var img = action.image_url || imageUrl;
+          var lbl = action.label || imageLabel;
+          var d = action.delay || 0;
+          animateTransfer(timeline, dir, img, lbl, at + d, thumbSize);
+        },
+        'transfer-back': function(timeline, containerEl, action, at, duration, scriptCtx) {
+          var reverseDir = direction === 'left-to-right' ? 'right-to-left' : 'left-to-right';
+          var dir = action.direction || reverseDir;
+          var img = action.image_url || imageUrl;
+          var lbl = action.label || imageLabel;
+          var d = action.delay || 0;
+          animateTransfer(timeline, dir, img, lbl, at + d, thumbSize);
+        }
+      });
+    }
+
+    return tl;
+  }
+</script>

@@ -66,10 +66,10 @@
     },
     "embed_image_url": {
       "type": "string",
-      "label": "Embed Card Image URL",
+      "label": "Embed Image URL (replaces gradient+UI card)",
       "optional": true,
       "default": "",
-      "placeholder": "https://example.com/card-image.jpg"
+      "placeholder": "https://example.com/image.png"
     },
     "embed_headline": {
       "type": "string",
@@ -154,6 +154,13 @@
     {
       "action": "show-reactions",
       "description": "Animate the engagement buttons appearing"
+    },
+    {
+      "action": "schedule-post",
+      "description": "Animate clicking Schedule and transitioning status from draft to scheduled",
+      "params": {
+        "scheduled_date": "string - Date text for the scheduled status (default 'Jun 12, 2026 at 10:00 AM')"
+      }
     }
   ],
   "default_cursor_targets": {

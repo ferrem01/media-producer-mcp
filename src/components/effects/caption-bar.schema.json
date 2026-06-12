@@ -1,0 +1,62 @@
+{
+  "type": "caption-bar",
+  "label": "Caption Bar",
+  "category": "shared",
+  "description": "Semi-transparent caption bar overlay for subtitles and narration text",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "optional": true,
+      "default": ""
+    },
+    "bg_color": {
+      "type": "string",
+      "label": "Bar Background Color",
+      "optional": true,
+      "default": "rgba(0,0,0,0.75)"
+    },
+    "text_color": {
+      "type": "string",
+      "label": "Text Color",
+      "optional": true,
+      "default": "#ffffff"
+    },
+    "font_size": {
+      "type": "number",
+      "label": "Font Size (px)",
+      "optional": true,
+      "default": 22
+    },
+    "bar_height": {
+      "type": "number",
+      "label": "Bar Height (px)",
+      "optional": true,
+      "default": 80
+    }
+  },
+  "script_actions": [
+    {
+      "action": "set-caption",
+      "description": "Set new caption text with fade transition",
+      "params": {
+        "text": {
+          "type": "string",
+          "required": true
+        },
+        "fade_duration": {
+          "type": "number",
+          "default": 0.3
+        }
+      }
+    },
+    {
+      "action": "clear-caption",
+      "description": "Fade out the caption text"
+    },
+    {
+      "action": "highlight-caption",
+      "description": "Briefly pulse/glow the caption text"
+    }
+  ]
+}
