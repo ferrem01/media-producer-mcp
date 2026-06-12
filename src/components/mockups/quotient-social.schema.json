@@ -1,0 +1,166 @@
+{
+  "type": "quotient-social",
+  "label": "Quotient Social Post",
+  "category": "mockups",
+  "description": "Quotient social post editor/preview showing a LinkedIn-style published post with author info, rich text content, embedded media card, engagement actions, and status bar. Supports animated entrance and optional scripted interactions.",
+  "data": {
+    "post_title": {
+      "type": "string",
+      "label": "Post Title (top bar)",
+      "optional": true,
+      "default": "June 2 Changelog - Max LinkedIn",
+      "placeholder": "June 2 Changelog - Max LinkedIn"
+    },
+    "status": {
+      "type": "string",
+      "label": "Post Status",
+      "optional": true,
+      "default": "published",
+      "enum": ["published", "draft", "scheduled"]
+    },
+    "published_date": {
+      "type": "string",
+      "label": "Published Date",
+      "optional": true,
+      "default": "Jun 2, 2026 at 4:06 PM",
+      "placeholder": "Jun 2, 2026 at 4:06 PM"
+    },
+    "author_name": {
+      "type": "string",
+      "label": "Author Name",
+      "optional": true,
+      "default": "Max Davish",
+      "placeholder": "Max Davish"
+    },
+    "author_avatar_url": {
+      "type": "string",
+      "label": "Author Avatar URL",
+      "optional": true,
+      "default": "",
+      "placeholder": "https://example.com/avatar.jpg"
+    },
+    "author_initials": {
+      "type": "string",
+      "label": "Author Initials (fallback)",
+      "optional": true,
+      "default": "MD",
+      "placeholder": "MD"
+    },
+    "post_text": {
+      "type": "string",
+      "label": "Post Body Text (use \\n\\n for paragraph breaks)",
+      "optional": true,
+      "default": "This week's running story has been about companies blowing past their AI budgets with insane token bills. I heard one about a guy who accidentally racked up a $500k Claude bill.\n\nI have no idea if that's true — it probably isn't — and I think most of these stories are totally overblown. At Quotient, we're some of the most hardcore AI users on the planet and we rarely spend more than a few thousand bucks per person on tokens each month.\n\nThat said, I was a little surprised when I saw a $2,000 Quotient bill last month. Yes, we pay for our own software. It's called eating your own dogfood. Maybe you've heard of it. And apparently we were using it a LOT, because we blew straight through our plan's token allotment.\n\nNot exactly a $500k nightmare. But still — a surprise.\n\nSo we immediately shipped spending caps and usage notifications, so our customers never have surprise bills.\n\nThese kinds of controls are going to be crucial now that software is evolving past the seat-based model. Every company is going to spend more and more on tokens in the future, and I think that's money well spent. We just need to make sure the controls are in place — so nobody ends up like the guy who almost bankrupted his company with a Claude bill."
+    },
+    "char_count": {
+      "type": "number",
+      "label": "Character Count",
+      "optional": true,
+      "default": 1243
+    },
+    "char_limit": {
+      "type": "number",
+      "label": "Character Limit",
+      "optional": true,
+      "default": 3000
+    },
+    "embed_image_url": {
+      "type": "string",
+      "label": "Embed Card Image URL",
+      "optional": true,
+      "default": "",
+      "placeholder": "https://example.com/card-image.jpg"
+    },
+    "embed_headline": {
+      "type": "string",
+      "label": "Embed Card Headline",
+      "optional": true,
+      "default": "Spending Caps",
+      "placeholder": "Spending Caps"
+    },
+    "embed_subtext": {
+      "type": "string",
+      "label": "Embed Card Description",
+      "optional": true,
+      "default": "Set a custom spending cap for your organization and receive notifications as you approach your plan's limits."
+    },
+    "embed_ui_card": {
+      "type": "object",
+      "label": "Embed UI Card (product mockup overlay)",
+      "optional": true,
+      "properties": {
+        "title": { "type": "string", "label": "Card Title", "default": "Spending Cap" },
+        "subtitle": { "type": "string", "label": "Card Subtitle", "default": "Choose how overage on the Pro plan is handled once included usage is exhausted." },
+        "options": {
+          "type": "array",
+          "label": "Radio Options",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "description": { "type": "string" },
+              "selected": { "type": "boolean" },
+              "input_prefix": { "type": "string", "optional": true },
+              "input_value": { "type": "string", "optional": true },
+              "input_suffix": { "type": "string", "optional": true }
+            }
+          }
+        }
+      }
+    },
+    "author_url": {
+      "type": "string",
+      "label": "Author Profile/Article URL",
+      "optional": true,
+      "default": "https://www.getquotient.ai/blog/quotient-changelog-june-2-2026"
+    },
+    "tag_name": {
+      "type": "string",
+      "label": "Tag/Campaign Name",
+      "optional": true,
+      "default": "Quotient Changelog",
+      "placeholder": "Quotient Changelog"
+    },
+    "tag_progress": {
+      "type": "string",
+      "label": "Tag Progress (e.g. 0/1)",
+      "optional": true,
+      "default": "0/1"
+    },
+    "thread_count": {
+      "type": "number",
+      "label": "Thread Count",
+      "optional": true,
+      "default": 2
+    }
+  },
+  "script_actions": [
+    {
+      "action": "scroll-post",
+      "description": "Smoothly scroll the post content area down",
+      "params": {
+        "amount": "number - Pixels to scroll (default 300)",
+        "duration": "number - Scroll duration in seconds (default 2)"
+      }
+    },
+    {
+      "action": "highlight-status",
+      "description": "Pulse the status bar to draw attention"
+    },
+    {
+      "action": "highlight-embed",
+      "description": "Pulse the embedded media card"
+    },
+    {
+      "action": "show-reactions",
+      "description": "Animate the engagement buttons appearing"
+    }
+  ],
+  "default_cursor_targets": {
+    "status-bar": { "x": "50%", "y": "8%" },
+    "post-body": { "x": "50%", "y": "50%" },
+    "embed-card": { "x": "50%", "y": "75%" },
+    "like-btn": { "x": "20%", "y": "88%" },
+    "view-btn": { "x": "92%", "y": "3%" }
+  }
+}
