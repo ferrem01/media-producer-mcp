@@ -1,0 +1,85 @@
+<template>
+  <div class="panel-label">
+    <div class="label-icon" data-target="label-icon"></div>
+    <span class="label-text" data-target="label-text"></span>
+  </div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  .panel-label {
+    width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-family: 'Inter', system-ui, sans-serif;
+    pointer-events: none;
+  }
+
+  .label-icon {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .label-icon img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+  }
+
+  .label-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+    letter-spacing: 0.01em;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var panel = el.querySelector('.panel-label');
+    var iconEl = el.querySelector('.label-icon');
+    var textEl = el.querySelector('.label-text');
+
+    var text = data.text || 'Label';
+    var icon_letter = data.icon_letter || '';
+    var icon_color = data.icon_color || '#6366f1';
+    var icon_url = data.icon_url || '';
+    var text_color = data.text_color || 'rgba(255,255,255,0.9)';
+
+    textEl.textContent = text;
+    textEl.style.color = text_color;
+
+    if (icon_url) {
+      var img = document.createElement('img');
+      img.src = icon_url;
+      iconEl.appendChild(img);
+      iconEl.style.background = 'transparent';
+    } else if (icon_letter) {
+      iconEl.textContent = icon_letter;
+      iconEl.style.background = icon_color;
+    } else {
+      iconEl.style.display = 'none';
+    }
+
+    gsap.set(panel, { autoAlpha: 0, y: -8 });
+    tl.to(panel, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.3);
+
+    if (ctx.duration > 2) {
+      tl.to(panel, { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, ctx.duration - 0.4);
+    }
+
+    return tl;
+  }
+</script>

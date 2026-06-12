@@ -1,0 +1,13 @@
+{
+  "type": "panel-label",
+  "label": "Panel Label",
+  "category": "effects",
+  "description": "Simple icon + text label for identifying panels in split-screen layouts.",
+  "data": {
+    "text": { "type": "string", "label": "Label Text", "default": "Label" },
+    "icon_letter": { "type": "string", "label": "Icon Letter", "optional": true, "default": "" },
+    "icon_color": { "type": "string", "label": "Icon Background Color", "optional": true, "default": "#6366f1" },
+    "icon_url": { "type": "string", "label": "Icon Image URL", "optional": true, "default": "" },
+    "text_color": { "type": "string", "label": "Text Color", "optional": true, "default": "rgba(255,255,255,0.9)" }
+  }
+}
