@@ -1,0 +1,15 @@
+{
+  "type": "split-connector",
+  "label": "Split Connector",
+  "category": "effects",
+  "description": "Visual connector bar showing two labeled panels linked by an animated line with a badge. Used for split-screen layouts to identify left/right panels.",
+  "data": {
+    "left_label": { "type": "string", "label": "Left Label", "default": "Quotient" },
+    "right_label": { "type": "string", "label": "Right Label", "default": "Canva" },
+    "left_letter": { "type": "string", "label": "Left Icon Letter", "default": "Q" },
+    "right_letter": { "type": "string", "label": "Right Icon Letter", "default": "C" },
+    "left_color": { "type": "string", "label": "Left Icon Color", "default": "#6366f1" },
+    "right_color": { "type": "string", "label": "Right Icon Color", "default": "#00C4CC" },
+    "badge_text": { "type": "string", "label": "Badge Text", "default": "Connected" }
+  }
+}

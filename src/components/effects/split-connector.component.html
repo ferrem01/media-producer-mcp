@@ -1,0 +1,183 @@
+<template>
+  <div class="split-connector">
+    <div class="connector-left">
+      <div class="connector-icon left-icon" data-target="left-icon"></div>
+      <span class="connector-label left-label" data-target="left-label"></span>
+    </div>
+    <div class="connector-line-wrapper">
+      <div class="connector-line" data-target="connector-line">
+        <div class="line-track"></div>
+        <div class="line-glow" data-target="line-glow"></div>
+        <div class="connector-badge" data-target="connector-badge">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5.5 9.5a3 3 0 004.24 0l1.5-1.5a3 3 0 00-4.24-4.24l-.88.88"/>
+            <path d="M8.5 4.5a3 3 0 00-4.24 0l-1.5 1.5a3 3 0 004.24 4.24l.88-.88"/>
+          </svg>
+          <span data-target="badge-text">Connected</span>
+        </div>
+      </div>
+    </div>
+    <div class="connector-right">
+      <span class="connector-label right-label" data-target="right-label"></span>
+      <div class="connector-icon right-icon" data-target="right-icon"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  .split-connector {
+    width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    pointer-events: none;
+    padding: 0 40px;
+  }
+
+  .connector-left, .connector-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .connector-icon {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .connector-label {
+    font-size: 17px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .connector-line-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    min-width: 60px;
+  }
+
+  .connector-line {
+    position: relative;
+    width: 100%;
+    height: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .line-track {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.12);
+    border-radius: 1px;
+  }
+
+  .line-glow {
+    position: absolute;
+    inset: -1px 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(99,102,241,0.5) 30%, rgba(99,102,241,0.8) 50%, rgba(99,102,241,0.5) 70%, transparent 100%);
+    border-radius: 2px;
+    filter: blur(2px);
+    opacity: 0;
+  }
+
+  .connector-badge {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15,23,42,0.9);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 20px;
+    padding: 5px 14px 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.75);
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+  }
+
+  .connector-badge svg {
+    color: rgba(99,102,241,0.9);
+    flex-shrink: 0;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var connector = el.querySelector('.split-connector');
+    var leftIcon = el.querySelector('.left-icon');
+    var leftLabel = el.querySelector('.left-label');
+    var rightIcon = el.querySelector('.right-icon');
+    var rightLabel = el.querySelector('.right-label');
+    var lineGlow = el.querySelector('.line-glow');
+    var badge = el.querySelector('.connector-badge');
+    var badgeText = el.querySelector('[data-target="badge-text"]');
+    var lineTrack = el.querySelector('.line-track');
+
+    var leftText = data.left_label || 'Quotient';
+    var rightText = data.right_label || 'Canva';
+    var leftColor = data.left_color || '#6366f1';
+    var rightColor = data.right_color || '#00C4CC';
+    var leftLetter = data.left_letter || 'Q';
+    var rightLetter = data.right_letter || 'C';
+    var badgeLabel = data.badge_text || 'Connected';
+
+    leftLabel.textContent = leftText;
+    rightLabel.textContent = rightText;
+    leftIcon.textContent = leftLetter;
+    leftIcon.style.background = leftColor;
+    rightIcon.textContent = rightLetter;
+    rightIcon.style.background = rightColor;
+    badgeText.textContent = badgeLabel;
+
+    // Initial state
+    gsap.set(connector, { autoAlpha: 0 });
+    gsap.set(lineTrack, { scaleX: 0 });
+    gsap.set(lineGlow, { opacity: 0, scaleX: 0 });
+    gsap.set(badge, { autoAlpha: 0, scale: 0.8 });
+
+    // Entrance
+    tl.to(connector, { autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, 0.2);
+    tl.to(lineTrack, { scaleX: 1, duration: 0.6, ease: 'power2.inOut' }, 0.4);
+    tl.to(lineGlow, { opacity: 1, scaleX: 1, duration: 0.5, ease: 'power2.out' }, 0.7);
+    tl.to(badge, { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2)' }, 0.9);
+
+    // Subtle glow pulse
+    tl.to(lineGlow, {
+      opacity: 0.6,
+      duration: 1.5,
+      yoyo: true,
+      repeat: -1,
+      ease: 'sine.inOut'
+    }, 1.5);
+
+    // Exit
+    if (ctx.duration > 2) {
+      tl.to(connector, { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, ctx.duration - 0.4);
+    }
+
+    return tl;
+  }
+</script>

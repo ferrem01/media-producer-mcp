@@ -68,6 +68,7 @@
     background: #ffffff;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow: hidden;
+    border-radius: 16px;
     color: #0f172a;
   }
 
@@ -222,6 +223,18 @@
   }
   .asset-card-subtitle {
     font-size: 12px; font-weight: 500; color: #10b981;
+  }
+
+  /* Agent image message */
+  .msg-image-row {
+    display: flex;
+    padding: 4px 0;
+  }
+  .msg-image-row img {
+    border-radius: 10px;
+    max-width: 100%;
+    object-fit: cover;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   }
 
   /* ── Scroll-down button ── */
@@ -492,6 +505,23 @@
           tl.call(function() {
             var card = addAssetCard(action.title || 'Untitled', action.subtitle || 'Asset');
             gsap.from(card, { autoAlpha: 0, y: 10, scale: 0.97, duration: 0.35, ease: 'power2.out' });
+          }, null, at);
+        },
+        'agent-image': function(tl, ctr, action, at) {
+          tl.call(function() {
+            var area = ctr.querySelector('.messages-area');
+            if (!area) return;
+            var row = document.createElement('div');
+            row.className = 'msg-row agent msg-image-row';
+            var img = document.createElement('img');
+            img.src = action.src || '';
+            img.alt = action.alt || 'Generated image';
+            img.style.width = action.width || '100%';
+            img.style.maxHeight = action.max_height || '200px';
+            row.appendChild(img);
+            area.appendChild(row);
+            gsap.from(row, { autoAlpha: 0, y: 10, duration: 0.35, ease: 'power2.out' });
+            area.scrollTop = area.scrollHeight;
           }, null, at);
         },
         'show-typing': function(tl, ctr, action, at) {

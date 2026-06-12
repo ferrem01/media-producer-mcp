@@ -100,6 +100,16 @@
       }
     },
     {
+      "action": "agent-image",
+      "description": "Show an image in the chat as an agent message",
+      "params": {
+        "src": "string - Image URL or file path",
+        "alt": "string - Alt text (default 'Generated image')",
+        "width": "string - CSS width (default '100%')",
+        "max_height": "string - CSS max-height (default '200px')"
+      }
+    },
+    {
       "action": "show-typing",
       "description": "Show a typing indicator with animated bouncing dots"
     },
