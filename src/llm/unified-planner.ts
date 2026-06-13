@@ -156,29 +156,70 @@ Compose a scene from pre-built components. Each component has a type and data.
 }
 
 ## Option 5: Sequence Scene (BEST for walkthroughs, multi-step demos, cause-and-effect)
-A sequence is a freeform scene with MULTIPLE BEATS on one continuous GSAP timeline. Elements persist and transform across beats -- no cuts, no transitions. This produces the premium "single take" feel.
+A sequence is a scene with MULTIPLE BEATS and REAL COMPONENTS on one continuous stage. Components persist and transform across beats -- no cuts, no transitions. This produces the premium "single take" feel.
+
+**Component-Based Sequence (PREFERRED):** Use existing library components with choreography.
+The system places all components on stage and orchestrates when each appears, moves, and exits.
+Each component's built-in animation runs at the right beat. You only define the choreography.
 
 {
-  "label": "Product Walkthrough",
-  "duration_seconds": 25,
-  "description": "Full walkthrough of the connector feature in one continuous take",
-  "freeform": true,
+  "label": "Canva Connector Walkthrough",
+  "duration_seconds": 30,
+  "description": "Full walkthrough: chat to Canva to published post",
   "beats": [
-    { "label": "discover", "brief": "A clean workspace. Cursor glides to the plus icon. On click, a menu BLOOMS outward.", "duration_seconds": 6, "voiceover_text": "Start by discovering connectors." },
-    { "label": "connect", "brief": "Menu item highlights. The workspace MORPHS -- a connector panel slides in from the right, the menu collapses.", "duration_seconds": 7, "voiceover_text": "Connect your tools in one click." },
-    { "label": "create", "brief": "The connector panel fills with content. Elements STAGGER in. A preview image SCALES up from a thumbnail.", "duration_seconds": 7, "voiceover_text": "Create directly from the connected app." },
-    { "label": "publish", "brief": "The preview SLIDES to center stage. A success checkmark POPS in. Confetti particles drift down.", "duration_seconds": 5, "voiceover_text": "Publish instantly." }
+    { "label": "chat", "brief": "User types a request in Quotient chat", "duration_seconds": 8, "voiceover_text": "Start with a simple request." },
+    { "label": "connect", "brief": "Chat slides left, Canva editor appears from right", "duration_seconds": 8, "voiceover_text": "The Canva connector activates." },
+    { "label": "design", "brief": "Canva editor generates a design", "duration_seconds": 7, "voiceover_text": "The design assembles itself." },
+    { "label": "publish", "brief": "Both panels slide out, social post preview centers", "duration_seconds": 7, "voiceover_text": "Published. Live. Done." }
   ],
-  "components": [],
+  "components": [
+    { "type": "quotient-chat", "data": { "messages": [...] }, "z_index": 10, "position": { "x": "10%", "y": "10%", "width": "80%", "height": "80%" } },
+    { "type": "canva-editor", "data": { "design_type": "social" }, "z_index": 10, "position": { "x": "55%", "y": "10%", "width": "40%", "height": "80%" } },
+    { "type": "quotient-social", "data": { "platform": "linkedin" }, "z_index": 10, "position": { "x": "20%", "y": "10%", "width": "60%", "height": "80%" } }
+  ],
+  "choreography": [
+    {
+      "label": "chat",
+      "visibleComponents": ["comp_0"],
+      "transitions": { "comp_0": { "enter": { "from": { "opacity": 0, "y": 40 }, "duration": 0.6 } } }
+    },
+    {
+      "label": "connect",
+      "visibleComponents": ["comp_0", "comp_1"],
+      "transitions": {
+        "comp_0": { "move": { "to": { "left": "5%", "width": "40%" }, "duration": 0.8 } },
+        "comp_1": { "enter": { "from": { "opacity": 0, "x": 200 }, "duration": 0.8 } }
+      }
+    },
+    {
+      "label": "design",
+      "visibleComponents": ["comp_0", "comp_1"]
+    },
+    {
+      "label": "publish",
+      "visibleComponents": ["comp_2"],
+      "transitions": {
+        "comp_0": { "exit": { "to": { "opacity": 0, "x": -200 }, "duration": 0.6 } },
+        "comp_1": { "exit": { "to": { "opacity": 0, "x": 200 }, "duration": 0.6 } },
+        "comp_2": { "enter": { "from": { "opacity": 0, "scale": 0.8 }, "duration": 0.8 } }
+      }
+    }
+  ],
   "transition_in": { "type": "none", "duration_seconds": 0 }
 }
+
+**Freeform Sequence (fallback):** When no library components match, use freeform=true with beats.
+The LLM generates one HTML doc with all elements and a multi-beat timeline.
 
 Use sequences when:
 - Multiple related steps should flow as one continuous motion (walkthroughs, demos)
 - Elements should persist and transform (a panel that morphs, a cursor that navigates)
 - The story has cause-and-effect beats that feel choppy as separate scenes
+- You have EXISTING COMPONENTS that should be orchestrated together (STRONGLY PREFER this)
 
-Each beat gets a label (used as GSAP timeline label), a brief (what happens), a duration, and optional voiceover. The freeform generator builds ONE HTML doc with one master timeline where each beat is a labeled section. Total duration_seconds = sum of beat durations.
+Each beat gets a label, a brief (what happens), a duration, and optional voiceover.
+For component-based sequences, also provide choreography with visibility and transitions.
+Total duration_seconds = sum of beat durations.
 
 ## Option 3: Custom Component (escape hatch)
 Single custom HTML component within the standard structure. Use when no template or library component fits.

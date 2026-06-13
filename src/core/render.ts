@@ -15,6 +15,44 @@ import { fork, execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { assembleScene, type ComponentSource } from "./scene-assembler.js";
+import { assembleSequence } from "./sequence-assembler.js";
+
+/**
+ * Choose the right assembler based on scene type.
+ * Sequence scenes (with beats + library components) use the sequence assembler.
+ * Everything else uses the standard scene assembler.
+ */
+async function assembleSceneOrSequence(options: {
+  scene: any;
+  components: ComponentSource[];
+  brandKit: any;
+  canvas: any;
+  gsapDir: string;
+  preview?: boolean;
+  speakerUrl?: string;
+}): Promise<string> {
+  const { scene } = options;
+  // Use sequence assembler when scene has beats AND has real components (not freeform)
+  const hasBeatComponents = scene.beats?.length > 0 &&
+    scene.components.length > 0 &&
+    !scene.components[0].type.startsWith("freeform_");
+
+  if (hasBeatComponents) {
+    console.log(`  [render] Using sequence assembler for "${scene.label || scene.id}" (${scene.beats.length} beats, ${scene.components.length} components)`);
+    return assembleSequence({
+      scene,
+      components: options.components,
+      brandKit: options.brandKit,
+      canvas: options.canvas,
+      gsapDir: options.gsapDir,
+      choreography: scene.choreography,
+      preview: options.preview,
+      speakerUrl: options.speakerUrl,
+    });
+  }
+
+  return assembleScene(options);
+}
 import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, encodeGif, concatSegments } from "./encode.js";
 import { exportPdf } from "./pdf-export.js";
