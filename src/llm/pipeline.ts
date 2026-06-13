@@ -21,6 +21,7 @@ import { generateComponentLLM } from "./component-gen.js";
 import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
 import { planStoryboard } from "./unified-planner.js";
+import { generateCreativeBible, formatCreativeBibleForPlanner, type CreativeBible } from "./concept-director.js";
 import { planRevision, type RevisionPlan, type RevisedComponent } from "./revision-planner.js";
 import { reviseComponent } from "./component-revise.js";
 import { critiqueAndReviseScene } from "./revision-critique.js";
@@ -1294,7 +1295,29 @@ async function runUnifiedPipeline(
     console.log(`  Reference images: ${processedRefs.length} processed`);
   }
 
-  // 2. Plan storyboard (unified planner)
+  // 2. Creative concept stage (generates ONE unifying idea)
+  var creativeBible: CreativeBible | undefined;
+  if (format !== "image") {
+    trace?.beginEvent("concept_director");
+    try {
+      creativeBible = await generateCreativeBible({
+        prompt: richPrompt,
+        format,
+        llmConfig: opts.llmConfig,
+        brandKit,
+        referenceImages: processedRefs,
+      });
+      // Inject creative direction into the prompt for the planner
+      var conceptContext = formatCreativeBibleForPlanner(creativeBible);
+      richPrompt = conceptContext + "\n\n---\n\n" + richPrompt;
+      console.log(`  Creative concept: "${creativeBible.concept}"`);
+    } catch (err) {
+      console.warn("  [concept-director] Failed, continuing without concept:", (err as Error).message);
+    }
+    trace?.endEvent({ concept: creativeBible?.concept });
+  }
+
+  // 3. Plan storyboard (unified planner)
   trace?.beginEvent("plan_storyboard");
   var storyboard = await planStoryboard({
     prompt: richPrompt,

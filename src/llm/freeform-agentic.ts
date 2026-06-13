@@ -379,17 +379,35 @@ Project: ${opts.prompt}
 }
 
 function buildBrandContext(brandKit: BrandKit): string {
-  var lines: string[] = ["## Brand Kit"];
+  var lines: string[] = ["## Brand Kit (MANDATORY -- use these CSS variables)"];
   if (brandKit.colors) {
     lines.push(
-      "Colors (use CSS custom properties var(--mp-color-*) in your CSS):",
+      "The following CSS custom properties are pre-defined in :root.",
+      "You MUST use var(--mp-color-*) in your CSS. Do NOT hardcode hex color values.",
+      "",
+      "Available color tokens:",
     );
     for (var [key, val] of Object.entries(brandKit.colors)) {
-      lines.push(`  --mp-color-${key.replace(/_/g, "-")}: ${val}`);
+      lines.push(`  var(--mp-color-${key.replace(/_/g, "-")})  <- use this`);
     }
+    lines.push(
+      "",
+      "Also available: var(--mp-color-glow), var(--mp-color-cta), var(--mp-color-text-muted)",
+      "",
+      "Examples:",
+      "  background: var(--mp-color-background);",
+      "  color: var(--mp-color-text);",
+      "  border: 1px solid var(--mp-color-primary);",
+      "  box-shadow: 0 0 40px var(--mp-color-glow);",
+      "",
+      "NEVER write raw hex like #6366f1 or #0f172a. Always use the var() token.",
+    );
   }
   if (brandKit.fonts?.length) {
-    lines.push("Fonts:");
+    lines.push(
+      "",
+      "Fonts (also available as var(--mp-font-family)):",
+    );
     for (var f of brandKit.fonts) {
       lines.push(
         `  ${f.family} (weights: ${f.weights?.join(", ") || "400, 700"})`,
@@ -398,9 +416,10 @@ function buildBrandContext(brandKit: BrandKit): string {
   }
   if (brandKit.style) {
     lines.push(
-      `Border radius: ${brandKit.style.border_radius || "12px"}`,
+      "",
+      `Border radius: use var(--mp-border-radius) [default: ${brandKit.style.border_radius || "12px"}]`,
+      `Motion: ${brandKit.style.motion || "cinematic"}`,
     );
-    lines.push(`Motion: ${brandKit.style.motion || "cinematic"}`);
   }
   return lines.join("\n");
 }
