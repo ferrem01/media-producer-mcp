@@ -1430,6 +1430,53 @@ async function runUnifiedPipeline(
     trace?.endEvent({ clips: stockFootageMap.size });
   }
 
+  // 3c. Enforce mandatory behaviors (voiceover, bookend detection)
+  var bookendScenes = new Set<number>();
+  for (let si = 0; si < storyboard.scenes.length; si++) {
+    var planned = storyboard.scenes[si];
+    var labelLower = (planned.label || "").toLowerCase();
+
+    // Detect bookend scenes (intro/outro/title/closing)
+    var isBookend = labelLower.includes("intro") || labelLower.includes("outro") ||
+      (si === 0 && (labelLower.includes("title") || labelLower.includes("opening"))) ||
+      (si === storyboard.scenes.length - 1 && (labelLower.includes("closing") || labelLower.includes("cta") || labelLower.includes("end")));
+
+    // Also detect video-only bookends (brand animations)
+    if (planned.components?.length === 1 && planned.components[0].type === "video") {
+      isBookend = true;
+    }
+
+    if (isBookend) {
+      bookendScenes.add(si);
+    }
+
+    // Enforce voiceover on non-bookend scenes
+    if (!isBookend && !planned.voiceover_text && planned.duration_seconds >= 3) {
+      // Generate voiceover text from the scene description
+      var fallbackVoiceover = planned.description || planned.label || "";
+      if (planned.freeform_brief) {
+        // Extract a concise narration from the brief (first sentence or label)
+        fallbackVoiceover = planned.label?.replace(/^Scene \d+ - /, "") || planned.description || "";
+      }
+      if (planned.beats?.length) {
+        // For sequences, concatenate beat voiceover texts
+        var beatVoiceovers = planned.beats
+          .filter(function(b: any) { return b.voiceover_text; })
+          .map(function(b: any) { return b.voiceover_text; });
+        if (beatVoiceovers.length > 0) {
+          fallbackVoiceover = beatVoiceovers.join(" ");
+        }
+      }
+      if (fallbackVoiceover && fallbackVoiceover.length > 5) {
+        planned.voiceover_text = fallbackVoiceover;
+        console.log(`  [enforce] Scene ${si} "${planned.label}": generated fallback voiceover`);
+      }
+    }
+  }
+  if (bookendScenes.size > 0) {
+    console.log(`  [enforce] Bookend scenes (exempt from critique): ${[...bookendScenes].join(", ")}`);
+  }
+
   // 4. Generate scenes (library + custom in one pass)
   trace?.beginEvent("generate_scenes");
   var compDir = path.join(projectDir(opts.tenant_id, projectId), "components");
@@ -1447,6 +1494,12 @@ async function runUnifiedPipeline(
       batch.push((async () => {
         const planned = storyboard.scenes[i];
         const imageUrl = enrichResult.imageUrls.get(i);
+
+        // Skip critique for bookend scenes (intro/outro)
+        const skipCritique = bookendScenes.has(i);
+        if (skipCritique) {
+          console.log(`  Scene ${i + 1}: bookend scene, skipping critique`);
+        }
 
         const generated = await generateScene({
           scene: planned,
@@ -1493,7 +1546,7 @@ async function runUnifiedPipeline(
             trace,
             customSources: generated.customSources,
             catalog,
-            critique: opts.critique,
+            critique: skipCritique ? false : opts.critique,
             creativity: resolveCreativity(opts),
             critiqueLlmConfig: config.critiqueLlm,
           });
