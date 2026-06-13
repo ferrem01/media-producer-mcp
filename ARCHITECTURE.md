@@ -1,7 +1,7 @@
 # Media Producer MCP -- Architecture
 
 Living document. Updated as the system evolves.
-Last updated: 2026-06-10
+Last updated: 2026-06-13
 
 ## What This Is
 
@@ -38,6 +38,26 @@ Key fields:
 - `components[]` -- the visual elements
 - `transparent_background` -- true for speaker scenes (content overlays the speaker video)
 - `content_region` -- constrains components to a region (e.g. right 42%) so the speaker is visible
+
+### Sequence
+A sequence is a special type of freeform scene with multiple "beats" on one continuous GSAP timeline. Instead of generating separate scenes that get crossfaded together (which produces a slideshow feel), a sequence keeps elements on a persistent stage and transforms them across beats.
+
+Key fields on Scene:
+- `beats[]` -- array of SequenceBeat objects, each with label, brief, duration, and optional voiceover
+- When `beats` is present, the freeform generator writes ONE HTML document with a single master timeline where each beat is a labeled section
+
+```typescript
+interface SequenceBeat {
+  label: string;           // GSAP timeline label
+  brief: string;           // what happens in this beat
+  duration_seconds: number;
+  voiceover_text?: string;
+}
+```
+
+Example: a 4-beat product walkthrough (25s total) generates one HTML file where the UI panel appears in beat 1, morphs in beat 2, fills with content in beat 3, and resolves with a success state in beat 4. No cuts, no transitions -- one continuous take.
+
+Use sequences for: product walkthroughs, multi-step demos, cause-and-effect narratives, any flow where elements should persist and transform.
 
 ### Component
 A self-contained visual element. Each is a `.component.html` file with three sections:
@@ -178,10 +198,11 @@ Prompt → finished project in multiple stages. One unified pipeline for all for
 
 ### Stages
 1. **Expand Prompt** -- thin prompt → rich creative brief with scene count
-2. **Plan Storyboard** (unified planner) -- brief → multi-scene storyboard. Per-scene decision: use a library component or generate a custom one. Picks transitions, sets speaker track flags, assigns content regions.
-3. **Media Enrichment** -- generates hero images (OpenAI gpt-image-1), captures screenshots, resolves assets. Runs between planning and scene generation.
-4. **Scene Generation** -- per scene, either fills data for the chosen library component or generates a custom `.component.html` via LLM
-5. **Critique** -- vision-based review of rendered frames. Can trigger scene revision.
+2. **Creative Concept Director** (NEW) -- generates 3 distinct creative concepts at high temperature (0.9), self-selects the strongest one, outputs a "creative bible" with: the one-line concept, storytelling pattern, visual through-line, emotional arc, and visual style commitments. This bible is injected into the planner's context so all scenes serve ONE cohesive idea. Skipped for image format.
+3. **Plan Storyboard** (unified planner) -- brief + creative bible → multi-scene storyboard. Per-scene decision: freeform, sequence, template, library component, or custom. Picks transitions, sets speaker track flags, assigns content regions.
+4. **Media Enrichment** -- generates hero images (OpenAI gpt-image-1), captures screenshots, resolves assets. Runs between planning and scene generation.
+5. **Scene Generation** -- per scene, either fills data for the chosen library component, generates a custom `.component.html` via LLM, or (for sequences) generates a multi-beat continuous HTML doc
+6. **Critique** -- vision-based review of rendered frames. Can trigger scene revision.
 
 ### Creativity Parameter
 `creativity` (0-1) controls the library vs custom component mix:
@@ -245,8 +266,11 @@ src/
 │   └── scene-worker.ts       # child process frame capture
 ├── llm/
 │   ├── pipeline.ts           # orchestrates all LLM stages
+│   ├── concept-director.ts   # creative concept stage (NEW: generates ONE unifying idea)
 │   ├── prompts.ts            # system prompts per stage
-│   ├── unified-planner.ts    # scene planning
+│   ├── unified-planner.ts    # scene planning (supports sequences)
+│   ├── freeform-agentic.ts   # agentic freeform HTML generation (supports beats)
+│   ├── scene-generator.ts    # routes scenes to appropriate generator
 │   └── template-catalog.ts   # component library metadata
 ├── preview-app/
 │   └── preview-app.ts        # preview SPA (single file, embedded HTML/CSS/JS)
@@ -336,7 +360,11 @@ All strip `http(s)://localhost:<any-port>/` → `/` via regex. External URLs (cd
 
 7. **Format-agnostic project model.** `project.json` works for video, image, slideshow, GIF, email header, etc. The render pipeline adapts based on `format`.
 
-8. **Brand kit as CSS variables.** Components don't hardcode colors or fonts. They use `--mp-color-primary`, `--mp-font-family`, etc. Brand consistency is automatic.
+8. **Brand kit as CSS variables.** Components don't hardcode colors or fonts. They use `--mp-color-primary`, `--mp-font-family`, etc. Brand consistency is automatic. Freeform generator is instructed to use `var(--mp-color-*)` exclusively -- hex values are never shown in the prompt.
+
+9. **Creative concept before scenes.** The concept director runs before the planner and commits to ONE creative idea. Without it, the planner generates disconnected scene ideas that feel like a slide deck. The creative bible (concept + pattern + through-line + emotional arc) is injected into the planner so all scenes serve one cohesive vision.
+
+10. **Sequences for continuity.** When multiple steps should flow as one continuous motion (walkthroughs, demos, cause-and-effect), the planner outputs a "sequence" -- a freeform scene with multiple beats on one persistent stage. The freeform generator writes one HTML doc with one master GSAP timeline, and elements persist and transform across beats. This produces the premium "single take" feel that separate scenes + crossfades cannot achieve.
 n9. **Relative asset URLs only.** All internal asset URLs are stored and served as relative paths (`/assets/...`), never absolute localhost URLs. Enforced at four layers: source generation, data persistence, HTML assembly, and component save. See § "Asset URL Normalization" above.
 
 ---
@@ -367,6 +395,11 @@ Prioritized list of what's next. Updated as things ship.
 
 ### High Priority
 - [x] **Tenant Component Playground** -- three-panel layout with LLM-driven generation, chat iteration, schema-driven form editor, script builder, tenant CRUD. See [PLAYGROUND.md](./PLAYGROUND.md).
+- [x] **Creative concept director** -- generates ONE unifying creative concept before scene planning. 3 concepts at temp 0.9, self-selects best, outputs creative bible.
+- [x] **Sequence scenes** -- multi-beat continuous scenes for product walkthroughs and demos. Planner outputs beats, freeform generator builds one continuous HTML doc.
+- [x] **Deterministic brand CSS injection** -- freeform generator uses var(--mp-color-*) exclusively, no hex values shown in prompt.
+- [ ] **Motion-aware critique** -- sample 5-9 frames across timeline instead of one still at midpoint. Add project-level consistency check across all scenes.
+- [ ] **Code-enforced mandatory behaviors** -- voiceover guaranteed per non-bookend scene, intro/outro exempt from critique, brand theme enforced deterministically.
 - [ ] **Render speed** -- showcase test took 529s for 40s video. Look at parallelizing frame captures further, draft resolution mode, frame skip for previews.
 
 ### Medium Priority

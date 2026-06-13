@@ -44,6 +44,13 @@ export interface AgenticFreeformOpts {
   canvas: Canvas;
   critiqueFeedback?: string;
   referenceImages?: ReferenceImage[];
+  /** When present, this is a sequence scene with multiple beats */
+  beats?: Array<{
+    label: string;
+    brief: string;
+    duration_seconds: number;
+    voiceover_text?: string;
+  }>;
 }
 
 // ── Tool Definitions ──
@@ -375,7 +382,49 @@ ${opts.referenceImages?.length ? buildReferenceImageSummary(opts.referenceImages
 Duration: ${opts.sceneDuration} seconds
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}
 Project: ${opts.prompt}
+${opts.beats?.length ? buildSequenceInstructions(opts.beats) : ""}
 `;
+}
+
+function buildSequenceInstructions(beats: Array<{ label: string; brief: string; duration_seconds: number; voiceover_text?: string }>): string {
+  var lines: string[] = [
+    "",
+    "## SEQUENCE SCENE -- Multi-Beat Continuous Take",
+    "",
+    "This is a SEQUENCE scene. You must create ONE HTML document with a single master GSAP timeline",
+    "that has MULTIPLE BEATS. Elements PERSIST and TRANSFORM across beats -- do NOT rebuild the DOM",
+    "between beats. Use timeline labels to mark each beat.",
+    "",
+    "Key rules for sequences:",
+    "- ONE HTML document, ONE createTimeline function, ONE master timeline",
+    "- Use tl.addLabel('beat-name', startTime) to mark each beat",
+    "- Elements that appear in beat 1 should MORPH/MOVE/TRANSFORM in beat 2, not disappear and reappear",
+    "- The whole point is continuity -- the viewer should feel like one continuous camera take",
+    "- Total duration is the sum of all beat durations",
+    "",
+    "Beats:",
+  ];
+
+  var runningTime = 0;
+  for (var beat of beats) {
+    lines.push(`  ${beat.label} (${runningTime}s - ${runningTime + beat.duration_seconds}s): ${beat.brief}`);
+    runningTime += beat.duration_seconds;
+  }
+
+  lines.push("");
+  lines.push("Example timeline structure:");
+  lines.push("  var tl = gsap.timeline();");
+  for (var i = 0; i < Math.min(beats.length, 3); i++) {
+    var beat = beats[i];
+    var start = beats.slice(0, i).reduce(function(sum, b) { return sum + b.duration_seconds; }, 0);
+    lines.push(`  tl.addLabel('${beat.label}', ${start});`);
+    lines.push(`  // ... animations for ${beat.label} beat ...`);
+  }
+  if (beats.length > 3) {
+    lines.push("  // ... remaining beats ...");
+  }
+
+  return lines.join("\n");
 }
 
 function buildBrandContext(brandKit: BrandKit): string {

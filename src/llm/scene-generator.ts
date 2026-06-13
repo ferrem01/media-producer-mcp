@@ -49,7 +49,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
 
   // ── Freeform scene path ──
-  if (planned.freeform && planned.freeform_brief) {
+  if (planned.freeform && (planned.freeform_brief || planned.beats?.length)) {
     return await generateFreeformScene(opts, planned, sceneId);
   }
 
@@ -146,8 +146,14 @@ async function generateFreeformScene(
 
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (freeform-agentic)`);
 
+  // Build the brief: for sequences, combine beat briefs into one rich brief
+  var effectiveBrief = planned.freeform_brief || planned.description;
+  if (planned.beats?.length) {
+    effectiveBrief = `SEQUENCE: ${planned.beats.map(function(b) { return b.label + ": " + b.brief; }).join(" -> ")}`;
+  }
+
   var sceneHtml = await generateFreeformAgentic({
-    sceneBrief: planned.freeform_brief || planned.description,
+    sceneBrief: effectiveBrief,
     sceneLabel: planned.label,
     sceneDescription: planned.description,
     sceneDuration: planned.duration_seconds || 5,
@@ -159,6 +165,7 @@ async function generateFreeformScene(
     canvas: opts.canvas,
     critiqueFeedback: opts.critiqueFeedback,
     referenceImages: opts.referenceImages,
+    beats: planned.beats,
   });
 
   sceneHtml = stripHtmlFences(sceneHtml);

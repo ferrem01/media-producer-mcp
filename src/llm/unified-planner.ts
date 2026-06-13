@@ -75,6 +75,15 @@ export interface PlannedScene {
   // Freeform scene (full bespoke HTML generation)
   freeform?: boolean;  // true = generate full scene HTML from rich storyboard description
   freeform_brief?: string;  // detailed storyboard-quality scene description
+  // Sequence: multi-beat continuous scene
+  beats?: PlannedBeat[];  // when present, freeform_brief is ignored; beats provide per-beat briefs
+}
+
+export interface PlannedBeat {
+  label: string;
+  brief: string;
+  duration_seconds: number;
+  voiceover_text?: string;
 }
 
 export interface StoryboardResult {
@@ -146,6 +155,31 @@ Compose a scene from pre-built components. Each component has a type and data.
   "transition_in": { "type": "crossfade", "duration_seconds": 0.5 }
 }
 
+## Option 5: Sequence Scene (BEST for walkthroughs, multi-step demos, cause-and-effect)
+A sequence is a freeform scene with MULTIPLE BEATS on one continuous GSAP timeline. Elements persist and transform across beats -- no cuts, no transitions. This produces the premium "single take" feel.
+
+{
+  "label": "Product Walkthrough",
+  "duration_seconds": 25,
+  "description": "Full walkthrough of the connector feature in one continuous take",
+  "freeform": true,
+  "beats": [
+    { "label": "discover", "brief": "A clean workspace. Cursor glides to the plus icon. On click, a menu BLOOMS outward.", "duration_seconds": 6, "voiceover_text": "Start by discovering connectors." },
+    { "label": "connect", "brief": "Menu item highlights. The workspace MORPHS -- a connector panel slides in from the right, the menu collapses.", "duration_seconds": 7, "voiceover_text": "Connect your tools in one click." },
+    { "label": "create", "brief": "The connector panel fills with content. Elements STAGGER in. A preview image SCALES up from a thumbnail.", "duration_seconds": 7, "voiceover_text": "Create directly from the connected app." },
+    { "label": "publish", "brief": "The preview SLIDES to center stage. A success checkmark POPS in. Confetti particles drift down.", "duration_seconds": 5, "voiceover_text": "Publish instantly." }
+  ],
+  "components": [],
+  "transition_in": { "type": "none", "duration_seconds": 0 }
+}
+
+Use sequences when:
+- Multiple related steps should flow as one continuous motion (walkthroughs, demos)
+- Elements should persist and transform (a panel that morphs, a cursor that navigates)
+- The story has cause-and-effect beats that feel choppy as separate scenes
+
+Each beat gets a label (used as GSAP timeline label), a brief (what happens), a duration, and optional voiceover. The freeform generator builds ONE HTML doc with one master timeline where each beat is a labeled section. Total duration_seconds = sum of beat durations.
+
 ## Option 3: Custom Component (escape hatch)
 Single custom HTML component within the standard structure. Use when no template or library component fits.
 
@@ -159,7 +193,7 @@ Single custom HTML component within the standard structure. Use when no template
   "transition_in": { "type": "blur-crossfade", "duration_seconds": 0.5 }
 }
 
-QUALITY RANKING: Freeform > Templates > Library > Custom.
+QUALITY RANKING: Sequence (multi-beat freeform) > Freeform > Templates > Library > Custom.
 Use FREEFORM for scenes that tell a visual story — product demos, UI walkthroughs, interaction sequences, before/after transformations, cause-and-effect cascades, metaphors made visual. These produce the highest quality, most impressive output.
 Use TEMPLATES for standard layouts (big statements, stat displays, simple CTAs).
 Use LIBRARY for data-heavy scenes with standard components.

@@ -126,6 +126,20 @@ export interface ContentRegion {
   offset?: string;
 }
 
+/** A beat within a sequence scene. Each beat is a labeled section of the
+ *  master GSAP timeline. Elements persist and transform across beats,
+ *  producing a continuous single-take feel instead of a slideshow. */
+export interface SequenceBeat {
+  /** Label for this beat (used as GSAP timeline label) */
+  label: string;
+  /** What happens in this beat (motion description) */
+  brief: string;
+  /** Approximate duration in seconds for this beat */
+  duration_seconds: number;
+  /** Optional voiceover text for this beat */
+  voiceover_text?: string;
+}
+
 export interface Scene {
   id: string;
   label?: string;
@@ -141,6 +155,11 @@ export interface Scene {
   transparent_background?: boolean;
   /** Path to stock footage video for scene background */
   background_video?: string;
+  /** When present, this scene is a "sequence" -- a multi-beat continuous take.
+   *  The freeform generator writes one HTML doc with a master timeline that
+   *  has labeled sections for each beat. Elements persist and transform
+   *  across beats instead of being replaced. */
+  beats?: SequenceBeat[];
 }
 
 // ── Audio ──
