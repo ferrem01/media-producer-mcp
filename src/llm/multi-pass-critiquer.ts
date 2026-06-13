@@ -27,6 +27,8 @@ export interface CritiqueSceneOpts {
   critiqueRound?: number;
   /** Additional context about the scene for the critiquer */
   sceneContext?: string;
+  /** Base64-encoded contact sheet (multiple frames) for motion-aware critique */
+  contactSheetBase64?: string;
 }
 
 export interface CritiqueResult {
@@ -83,6 +85,25 @@ export async function critiqueFunctional(opts: CritiqueSceneOpts): Promise<Criti
       image_url: { url: dataUrl },
     },
   ];
+
+  // Append contact sheet for motion-aware critique
+  if (opts.contactSheetBase64) {
+    userContent.push(
+      {
+        type: "text",
+        text: "Below is a CONTACT SHEET showing 6 frames across the timeline. Use it to evaluate animation pacing, element choreography, and the Build-Breathe-Resolve pattern.",
+      },
+      {
+        type: "image_url",
+        image_url: { url: `data:image/png;base64,${opts.contactSheetBase64}` },
+      },
+    );
+  }
+
+  // Add scene context if provided
+  if (opts.sceneContext) {
+    userContent.splice(1, 0, { type: "text", text: opts.sceneContext });
+  }
 
   var raw = await callLLM(opts.llmConfig, [
     { role: "system", content: critiquerSystemPrompt(opts.format) },

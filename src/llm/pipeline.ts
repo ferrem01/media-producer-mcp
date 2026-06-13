@@ -40,6 +40,7 @@ import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
 import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
 import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
+import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleScene, type ComponentSource } from "../core/scene-assembler.js";
 import { captureSingleFrame } from "../core/capture.js";
 import os from "node:os";
@@ -979,12 +980,39 @@ async function critiqueAndRetryScene(opts: {
         });
       }
 
+      // 4a. Generate contact sheet for motion-aware critique (6 frames across timeline)
+      let contactSheetBase64: string | undefined;
+      let contactTimestamps: number[] | undefined;
+      if (!isVideoOnly && currentScene.duration_seconds >= 3) {
+        try {
+          const contactPath = path.join(tmpDir, "contact-sheet.png");
+          const contactResult = await generateContactSheet({
+            htmlPath,
+            width: opts.canvas.width,
+            height: opts.canvas.height,
+            duration: currentScene.duration_seconds,
+            frameCount: 6,
+            outputPath: contactPath,
+          });
+          contactSheetBase64 = contactResult.base64;
+          contactTimestamps = contactResult.timestamps;
+        } catch (e: any) {
+          console.warn(`  Contact sheet generation failed (${e.message}), using single frame`);
+        }
+      }
+
       // 4. Read preview and critique
       const previewBase64 = (await fs.readFile(previewPath)).toString("base64");
       // Add context for video-only scenes so critiquer evaluates appropriately
       const videoContext = isVideoOnly
         ? "This scene contains a pre-rendered video component (brand animation/clip). The video content cannot be modified. Evaluate the video frame for visual quality, brand consistency, and professional appearance. Do NOT penalize for missing headlines, text, messaging, or value propositions - this is an animated brand clip, not a content scene."
         : undefined;
+
+      // Build motion context for the critiquer
+      let motionContext = videoContext || "";
+      if (contactSheetBase64 && contactTimestamps) {
+        motionContext += `\nMOTION REVIEW: A contact sheet with 6 frames across the timeline is attached (timestamps: ${contactTimestamps.map(t => t.toFixed(1) + "s").join(", ")}). Evaluate animation pacing, choreography, and whether the motion feels purposeful. Check that elements animate smoothly and the Build-Breathe-Resolve pattern is followed.`;
+      }
 
       const critiqueResult = await critiqueMultiPass({
         sceneHtml: assembledHtml,
@@ -994,7 +1022,8 @@ async function critiqueAndRetryScene(opts: {
         format: opts.format,
         trace: opts.trace,
         critiqueRound: attempt,
-        sceneContext: videoContext,
+        sceneContext: motionContext || undefined,
+        contactSheetBase64,
       });
 
       lastCritique = critiqueResult;
