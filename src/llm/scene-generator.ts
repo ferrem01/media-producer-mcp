@@ -6,18 +6,11 @@
  * - Custom components: each gets its own LLM call to generate .component.html.
  */
 
-import { callLLM, type LLMConfig } from "./client.js";
-import { sceneComponentSystemPrompt } from "./prompts.js";
-import { reviseComponent } from "./component-revise.js";
-import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
-import { getDesignSkills } from "./freeform-skills.js";
-import { getComponentReferenceLibrary } from "./component-reference.js";
+import type { LLMConfig } from "./client.js";
 import { generateFreeformAgentic } from "./freeform-agentic.js";
-import type { PlannedScene, PlannedComponent } from "./unified-planner.js";
-import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneComponent, SceneTransition } from "../core/types.js";
+import type { PlannedScene } from "./unified-planner.js";
+import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import type { CreativeBible } from "./concept-director.js";
-import fs from "node:fs/promises";
-import path from "node:path";
 
 // ── Types ──
 
@@ -36,8 +29,6 @@ export interface SceneGeneratorOpts {
   critiqueFeedback?: string; // feedback from visual critiquer for retry
   referenceImages?: ReferenceImage[];
   creativeBible?: CreativeBible;
-  /** When true, route ALL scenes through the unified codegen path (freeform with <component> tags) */
-  useCodegen?: boolean;
 }
 
 export interface GeneratedScene {
@@ -52,118 +43,17 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   var planned = opts.scene;
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
 
-  // ── Unified Codegen Path ──
-  // When enabled, ALL scenes go through the freeform-agentic generator
+  // ── Unified Codegen Path (always active) ──
+  // All scenes go through the freeform-agentic generator
   // which can use <component> tags to embed library components.
-  if (opts.useCodegen) {
-    // Build a rich brief from whatever the planner provided
-    var codegenBrief = buildCodegenBrief(planned);
-    var codegenPlanned = {
-      ...planned,
-      freeform: true,
-      freeform_brief: codegenBrief,
-    };
-    console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (unified codegen)`);
-    return await generateFreeformScene(opts, codegenPlanned, sceneId);
-  }
-
-  // ── Legacy paths (used when useCodegen is false) ──
-
-  // ── Freeform scene path ──
-  if (planned.freeform && (planned.freeform_brief || planned.beats?.length)) {
-    return await generateFreeformScene(opts, planned, sceneId);
-  }
-
-  // ── Template scene path ──
-  if (planned.template) {
-    return await generateFromTemplate(opts, planned, sceneId);
-  }
-  var sceneComponents: SceneComponent[] = [];
-  var customSources: Map<string, string> = new Map();
-
-  // Build transition
-  var transition: SceneTransition | undefined;
-  if (planned.transition_in && planned.transition_in.type !== "none") {
-    transition = {
-      type: planned.transition_in.type as SceneTransition["type"],
-      duration_seconds: planned.transition_in.duration_seconds || 0.5,
-    };
-  }
-
-  var libraryCount = 0;
-  var customCount = 0;
-
-  for (var ci = 0; ci < planned.components.length; ci++) {
-    var comp = planned.components[ci];
-
-    if (comp.custom) {
-      // Generate custom component via LLM
-      customCount++;
-      var compName = `custom_${sceneId}_${ci}`;
-      var html = await generateCustomComponent({
-        customPrompt: comp.custom_prompt || planned.description,
-        sceneLabel: planned.label,
-        sceneIndex: opts.sceneIndex,
-        totalScenes: opts.totalScenes,
-        prompt: opts.prompt,
-        format: opts.format,
-        llmConfig: opts.llmConfig,
-        brandKit: opts.brandKit,
-        canvas: opts.canvas,
-        imageUrl: opts.imageUrl,
-        duration: planned.duration_seconds,
-        critiqueFeedback: opts.critiqueFeedback,
-        creativeBible: opts.creativeBible,
-      });
-      customSources.set(compName, html);
-      sceneComponents.push({
-        id: `comp_${ci}`,
-        type: compName,
-        data: {},
-        z_index: comp.z_index ?? (ci + 1) * 10,
-        position: comp.position,
-      });
-    } else {
-      // Library component - use directly
-      libraryCount++;
-      sceneComponents.push({
-        id: `comp_${ci}`,
-        type: comp.type!,
-        data: comp.data || {},
-        z_index: comp.z_index ?? (ci + 1) * 10,
-        position: comp.position,
-      });
-    }
-  }
-
-  // Wire image into appropriate component if available
-  if (opts.imageUrl) {
-    var imgComp = sceneComponents.find(c => c.type === "image-showcase");
-    if (imgComp) {
-      imgComp.data = { ...imgComp.data, src: opts.imageUrl };
-    }
-  }
-
-  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (${libraryCount} library, ${customCount} custom)`);
-
-  var scene: Scene = {
-    id: sceneId,
-    label: planned.label,
-    duration_seconds: planned.duration_seconds || 5,
-    transition_in: transition,
-    components: sceneComponents,
+  var codegenBrief = buildCodegenBrief(planned);
+  var codegenPlanned = {
+    ...planned,
+    freeform: true,
+    freeform_brief: codegenBrief,
   };
-
-  // Carry through sequence fields (beats + choreography) for component-based sequences
-  if ((planned as any).beats?.length) {
-    scene.beats = (planned as any).beats;
-    console.log(`  Scene ${opts.sceneIndex + 1}: sequence with ${scene.beats!.length} beats`);
-  }
-  if ((planned as any).choreography?.length) {
-    scene.choreography = (planned as any).choreography;
-  }
-
-  return { scene, customSources: customSources.size > 0 ? customSources : undefined };
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (unified codegen)`);
+  return await generateFreeformScene(opts, codegenPlanned, sceneId);
 }
 
 // ── Freeform Scene Generation ──
@@ -248,199 +138,6 @@ function buildBrandContext(brandKit: BrandKit): string {
     lines.push(`Motion: ${brandKit.style.motion || "cinematic"}`);
   }
   return lines.join("\n");
-}
-
-// ── Template Scene Generation ──
-
-async function generateFromTemplate(
-  opts: SceneGeneratorOpts,
-  planned: PlannedScene,
-  sceneId: string,
-): Promise<GeneratedScene> {
-  var templateDef = SCENE_TEMPLATES.find(t => t.id === planned.template);
-  if (!templateDef) {
-    console.warn(`  Template "${planned.template}" not found, falling back to custom`);
-    // Fall back to custom generation
-    planned.template = undefined;
-    planned.components = [{
-      custom: true,
-      custom_prompt: planned.description || planned.label,
-      z_index: 10,
-    }];
-    return generateScene(opts);
-  }
-
-  // Load the template HTML
-  var templatePath = path.join(TEMPLATES_DIR, templateDef.file);
-  var templateHtml: string;
-  try {
-    templateHtml = await fs.readFile(templatePath, "utf-8");
-  } catch (e: any) {
-    console.warn(`  Template file not found: ${templatePath}, falling back to custom`);
-    planned.template = undefined;
-    planned.components = [{
-      custom: true,
-      custom_prompt: planned.description || planned.label,
-      z_index: 10,
-    }];
-    return generateScene(opts);
-  }
-
-  var templateData = planned.template_data || {};
-  var compName = `template_${sceneId}`;
-
-  // Check if the template needs content adaptation beyond slot filling
-  // Simple slot data can be passed as component data directly
-  // Complex modifications (layout changes, additional elements) use SEARCH/REPLACE
-  var needsAdaptation = opts.critiqueFeedback;
-
-  var finalHtml = templateHtml;
-
-  if (needsAdaptation && opts.critiqueFeedback) {
-    // Use SEARCH/REPLACE to adapt the template based on critique feedback
-    console.log(`  Scene ${opts.sceneIndex + 1}: adapting template ${planned.template} via SEARCH/REPLACE`);
-    var reviseResult = await reviseComponent({
-      existingSource: templateHtml,
-      instructions: opts.critiqueFeedback,
-      componentName: compName,
-      llmConfig: opts.llmConfig,
-      brandKit: opts.brandKit,
-      canvas: opts.canvas,
-    });
-    finalHtml = reviseResult.source;
-    console.log(`  Template adapted: ${reviseResult.blocksApplied} blocks applied, fullRewrite=${reviseResult.fullRewrite}`);
-  }
-
-  var customSources = new Map<string, string>();
-  customSources.set(compName, finalHtml);
-
-  // Build transition
-  var transition: SceneTransition | undefined;
-  if (planned.transition_in && planned.transition_in.type !== "none") {
-    transition = {
-      type: planned.transition_in.type as SceneTransition["type"],
-      duration_seconds: planned.transition_in.duration_seconds || 0.5,
-    };
-  }
-
-  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (template: ${planned.template})`);
-
-  var scene: Scene = {
-    id: sceneId,
-    label: planned.label,
-    duration_seconds: planned.duration_seconds || templateDef.duration[0],
-    transition_in: transition,
-    components: [{
-      id: "comp_0",
-      type: compName,
-      data: templateData,
-      z_index: 10,
-    }],
-  };
-
-  // Apply speaker template flags
-  if (templateDef.speaker) {
-    if (templateDef.speaker.mode === "full-behind") {
-      scene.transparent_background = true;
-      if (templateDef.speaker.content_side) {
-        scene.content_region = {
-          side: templateDef.speaker.content_side,
-          width: templateDef.speaker.content_width || "42%",
-        };
-      }
-    }
-  }
-
-  return { scene, customSources };
-}
-
-// ── Custom Component Generation ──
-
-interface CustomComponentOpts {
-  customPrompt: string;
-  sceneLabel: string;
-  sceneIndex: number;
-  totalScenes: number;
-  prompt: string;
-  format: OutputFormat;
-  llmConfig: LLMConfig;
-  brandKit: BrandKit;
-  canvas: Canvas;
-  imageUrl?: string;
-  duration: number;
-  critiqueFeedback?: string;
-  creativeBible?: CreativeBible;
-}
-
-async function generateCustomComponent(opts: CustomComponentOpts): Promise<string> {
-  var sceneSystemPrompt = sceneComponentSystemPrompt(opts.format, opts.canvas, opts.brandKit);
-
-  var imageContext = "";
-  if (opts.imageUrl) {
-    imageContext = `\n\nA hero image has been generated for this scene. Use it as the main visual.\nImage URL: ${opts.imageUrl}\nUse an <img> tag with this URL as src. Style it to fill the scene or use as a dramatic background.\nExample: <img src='${opts.imageUrl}' style='width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0'>\nLayer your text/UI ON TOP with z-index and text-shadow for readability.`;
-  }
-
-  // Build brand asset context
-  var brandAssetContext = "";
-  var bgAssets = (opts.brandKit.assets || []).filter(a => a.type === "background");
-  if (bgAssets.length) {
-    brandAssetContext += "\n\nAvailable Brand Backgrounds:\n";
-    for (var bg of bgAssets) {
-      brandAssetContext += `- "${bg.name}": ${bg.url}${bg.tags?.length ? ` [tags: ${bg.tags.join(", ")}]` : ""}\n`;
-    }
-  }
-  if (opts.brandKit.logos?.length) {
-    brandAssetContext += "\nAvailable Brand Logos:\n";
-    for (var logo of opts.brandKit.logos) {
-      brandAssetContext += `- "${logo.name}" (${logo.variant}, ${logo.theme} theme): ${logo.url}\n`;
-    }
-    brandAssetContext += "Pick the right logo variant based on the scene background (dark/light).\n";
-  }
-  if (opts.brandKit.guidelines) {
-    brandAssetContext += `\n\nBrand Guidelines (FOLLOW THESE RULES):\n${opts.brandKit.guidelines}\n`;
-  }
-
-  // Inject creative bible visual style constraints
-  var creativeBibleContext = "";
-  if (opts.creativeBible) {
-    var vs = opts.creativeBible.visualStyle;
-    creativeBibleContext = `\n\n## Creative Direction (MUST FOLLOW)
-Concept: ${opts.creativeBible.concept}
-Color mood: ${vs.colorMood}
-Typography attitude: ${vs.typographyAttitude}
-Motion personality: ${vs.motionPersonality}
-Spatial strategy: ${vs.spatialStrategy}
-Through-line: ${opts.creativeBible.throughLine}`;
-  }
-
-  var scenePrompt = `Generate the HTML for this component:
-
-Scene: ${opts.sceneLabel}
-Duration: ${opts.duration} seconds
-Visual Direction: ${opts.customPrompt}
-${imageContext}${brandAssetContext}
-
-Overall project: ${opts.prompt}${creativeBibleContext}
-Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}.
-
-IMPORTANT LAYOUT RULES:
-- Canvas size: ${opts.canvas.width}x${opts.canvas.height}px. ALL content MUST be visible within these bounds.
-- A background component already exists at z_index 0. Your component root should be transparent (no background property).
-- Use flexbox or CSS grid for layout. Do NOT use absolute positioning with negative values or offsets that push content outside the canvas.
-- Every element in the HTML must be visible in the final render. If you create a CTA button, stat, or headline, it MUST be within the visible canvas area.
-- Test your layout mentally: if the canvas is ${opts.canvas.width}x${opts.canvas.height}, will every element fit? No cut-off text, no hidden buttons, no overflow.
-- Use padding (40-80px from edges) to create breathing room, but keep all content inside.
-- A logo component already exists at z_index 30 in the top-left. Do NOT render your own logo.
-
-${opts.critiqueFeedback ? `\n\nIMPORTANT - PREVIOUS ATTEMPT FEEDBACK:\n${opts.critiqueFeedback}\nFix all issues listed above in this generation.\n\n` : ""}Output ONLY the .component.html source. No JSON wrapping, no markdown fences.
-Start with <template> and end with </script>.`;
-
-  var sceneHtml = await callLLM(opts.llmConfig, [
-    { role: "system", content: sceneSystemPrompt },
-    { role: "user", content: scenePrompt },
-  ], { temperature: 0.5, maxTokens: 8192 });
-
-  return stripHtmlFences(sceneHtml);
 }
 
 // ── Unified Codegen Brief Builder ──

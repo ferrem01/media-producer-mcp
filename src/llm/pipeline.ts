@@ -87,7 +87,6 @@ export interface PipelineOpts {
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // TTS voice (default: nova)
   stockFootage?: boolean;   // default: false. Fetch stock video clips for scene backgrounds.
   backgroundMusic?: boolean;  // default: false. Add background music with voiceover ducking.
-  useCodegen?: boolean;      // default: false. Route all scenes through unified codegen path with <component> tags.
   trace?: TraceBuilder;
 
   /** Reference images for vision-aware generation */
@@ -344,7 +343,6 @@ async function runSceneRevisionPipeline(
     tenantId: opts.tenant_id,
     projectId: project.project_id,
     creativeBible: project.creative_bible as any,
-    useCodegen: opts.useCodegen,
   });
 
   // Preserve the original scene id
@@ -484,7 +482,6 @@ async function runVideoRevisionPipeline(
       tenantId: opts.tenant_id,
       projectId: project.project_id,
       creativeBible: project.creative_bible as any,
-      useCodegen: opts.useCodegen,
     });
 
     if (generated.customSources) {
@@ -894,7 +891,6 @@ async function critiqueAndRetryScene(opts: {
   creativity?: number;
   critiqueLlmConfig?: LLMConfig;
   creativeBible?: any;
-  useCodegen?: boolean;
 }): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
   // Skip critique if disabled
   if (opts.critique === false) {
@@ -1198,7 +1194,6 @@ Output valid JSON only. No markdown fences, no commentary.`;
         tenantId: opts.tenantId,
         projectId: opts.projectId,
         creativeBible: opts.creativeBible,
-        useCodegen: opts.useCodegen,
         critiqueFeedback,
       });
 
@@ -1255,7 +1250,6 @@ Output valid JSON only. No markdown fences, no commentary.`;
         tenantId: opts.tenantId,
         projectId: opts.projectId,
         creativeBible: opts.creativeBible,
-        useCodegen: opts.useCodegen,
         critiqueFeedback: swapFeedback,
       });
 
@@ -1568,7 +1562,6 @@ async function runUnifiedPipeline(
           projectId,
           referenceImages: processedRefs,
           creativeBible,
-          useCodegen: opts.useCodegen,
         });
 
         // Save custom component HTML if needed
