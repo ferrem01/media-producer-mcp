@@ -339,16 +339,17 @@ function buildAgenticSystemPrompt(opts: AgenticFreeformOpts): string {
   return `You are an expert motion graphics designer creating a single video scene as HTML+CSS+GSAP.
 Your output will be captured frame-by-frame by Playwright at ${opts.canvas.width}x${opts.canvas.height} and encoded to video.
 
-## Your Process
+## Your Process (FOLLOW THIS ORDER)
 
-1. SEARCH the component and template library for relevant reference patterns
-2. READ 1-3 sources that are most relevant to this scene's concept
-3. STUDY the CSS patterns (shadows, typography, easing) and GSAP techniques
-4. WRITE your scene HTML, adapting techniques from the references
-5. SUBMIT via the submit_scene tool
+1. SEARCH for components matching your scene's UI elements (search_library with type="components")
+2. For each matching component, READ its source (read_source with kind="component") to learn its data props
+3. BUILD your scene HTML using <component> tags for every matched UI element, filling data props with scene content
+4. SEARCH templates for layout/design inspiration (search_library with type="templates"), READ 1-2
+5. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
+6. SUBMIT via the submit_scene tool
 
-Do NOT copy-paste from references. Adapt their techniques for YOUR scene.
-Always search and read at least one reference before writing.
+CRITICAL: Steps 1-3 come FIRST. Identify and embed components BEFORE writing any custom HTML.
+Only write custom code for things that have NO matching component in the library.
 
 ## Design Skills (FOLLOW THESE RULES)
 
@@ -411,24 +412,72 @@ function createTimeline(el, data, ctx) {
 
 ## Output Format
 
-Your submitted HTML must be a single .scene.html file with exactly three sections:
+Your submitted HTML must be a single .scene.html file with three sections.
+
+### EXAMPLE: A scene using <component> tags (THIS is what good output looks like)
 
 \`\`\`html
 <template>
-  <!-- Scene HTML here. Use <component> tags for library components. -->
+  <div class="scene">
+    <div class="bg"></div>
+
+    <!-- Chat panel: EMBEDDED from library -->
+    <div class="left-panel">
+      <component type="quotient-chat" data='{
+        "conversation_title": "Q3 Campaign",
+        "messages": [
+          {"role": "user", "text": "Write a LinkedIn post about our Q3 results"},
+          {"role": "agent", "text": "Here is a draft post highlighting your Q3 growth metrics..."}
+        ],
+        "user_avatar": "MF",
+        "mode": "panel"
+      }' />
+    </div>
+
+    <!-- Code editor: EMBEDDED from library -->
+    <div class="right-panel">
+      <component type="code-editor" data='{
+        "filename": "post.html",
+        "language": "html",
+        "code": "<article>\n  <h2>Q3 Results</h2>\n</article>",
+        "theme": "dark"
+      }' />
+    </div>
+
+    <!-- Custom connector (no library component for this) -->
+    <div class="beam"></div>
+  </div>
 </template>
 
 <style scoped>
-  /* Custom CSS here (component CSS is auto-injected) */
+  .scene { width: 100%; height: 100%; position: relative; overflow: hidden; }
+  .bg { position: absolute; inset: 0; background: linear-gradient(135deg, #0f172a, #1e1b4b); }
+  .left-panel { position: absolute; left: 40px; top: 40px; width: 45%; height: calc(100% - 80px); }
+  .right-panel { position: absolute; right: 40px; top: 40px; width: 45%; height: calc(100% - 80px); opacity: 0; }
+  .beam { position: absolute; top: 50%; left: 47%; width: 6%; height: 2px; background: #818cf8; opacity: 0; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    // ctx.getComponentTimeline('comp_N') for embedded component timelines
-    // GSAP animation here
+    tl.add(ctx.getComponentTimeline('comp_0'), 0);
+    tl.to(el.querySelector('.beam'), { opacity: 1, scaleX: 2, duration: 0.4 }, 3.5);
+    tl.to(el.querySelector('.right-panel'), { opacity: 1, duration: 0.6 }, 4);
+    tl.add(ctx.getComponentTimeline('comp_1'), 4.5);
     return tl;
   }
+</script>
+\`\`\`
+
+Notice: quotient-chat and code-editor use <component> tags. Only the background, layout, and beam are custom.
+
+### Minimal format (for scenes where NO library components match)
+
+\`\`\`html
+<template><!-- fully custom HTML --></template>
+<style scoped>/* CSS */</style>
+<script>
+  function createTimeline(el, data, ctx) { var tl = gsap.timeline(); return tl; }
 </script>
 \`\`\`
 
