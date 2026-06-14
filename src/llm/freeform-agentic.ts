@@ -61,7 +61,7 @@ const TOOLS: LLMTool[] = [
   {
     name: "search_library",
     description:
-      "Search the component and template library for reference examples relevant to what you're building. Returns names, categories, and descriptions. Use this first to find relevant patterns.",
+      "Search for embeddable components and reference templates. COMPONENTS can be embedded directly in your scene HTML using component tags -- you MUST use them when a match exists instead of rebuilding from scratch. TEMPLATES are design references to study.",
     input_schema: {
       type: "object",
       properties: {
@@ -82,7 +82,7 @@ const TOOLS: LLMTool[] = [
   {
     name: "read_source",
     description:
-      "Read the full HTML source code of a component or template. Study the CSS patterns, GSAP techniques, and layout approaches, then adapt them for your scene.",
+      "Read the source of a component or template. For COMPONENTS: check the data props so you can embed it with a component tag. For TEMPLATES: study the design patterns and adapt techniques.",
     input_schema: {
       type: "object",
       properties: {
@@ -223,16 +223,33 @@ async function executeSearchLibrary(
     return `No results found for "${query}". Try different keywords. Available categories: ${[...new Set(index.map((i) => i.category))].join(", ")}`;
   }
 
+  var componentResults = results.filter(r => r.item.kind === "component");
+  var templateResults = results.filter(r => r.item.kind === "template");
   var lines: string[] = [`Found ${results.length} results for "${query}":\n`];
-  for (var r of results) {
-    var item = r.item;
-    lines.push(
-      `- **${item.name}** (${item.kind}, ${item.category}): ${item.description}`,
-    );
+
+  if (componentResults.length > 0) {
+    lines.push("## EMBEDDABLE COMPONENTS (use <component> tags for these):");
+    for (var r of componentResults) {
+      var item = r.item;
+      lines.push(`- **${item.name}** (${item.category}): ${item.description}`);
+      lines.push(`  EMBED: <component type="${item.name}" data='{...}' />`);
+      lines.push(`  Use read_source(name="${item.name}", kind="component") to see data props`);
+    }
+    lines.push("");
   }
-  lines.push(
-    "\nUse read_source to study any of these. Pass the name and kind.",
-  );
+
+  if (templateResults.length > 0) {
+    lines.push("## REFERENCE TEMPLATES (study for design patterns, do not embed):");
+    for (var r of templateResults) {
+      var item = r.item;
+      lines.push(`- **${item.name}** (template, ${item.category}): ${item.description}`);
+    }
+    lines.push("\nUse read_source to study template design patterns.");
+  }
+
+  if (componentResults.length > 0) {
+    lines.push("\nREMINDER: If any component above matches your scene needs, you MUST use it via <component> tag. Do NOT rebuild it from scratch.");
+  }
   return lines.join("\n");
 }
 
