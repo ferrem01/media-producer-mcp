@@ -40,9 +40,6 @@ import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit, SpeakerTrack } from "./core/types.js";
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
-import { writeScript } from "./llm/script-writer.js";
-import { analyzeAssets } from "./llm/asset-analyzer.js";
-import type { ProjectBrief } from "./core/types.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { captureUrl } from "./core/capture-url.js";
 import { registerBrandExtractTool } from "./tools/brand-extract-tool.js";
@@ -1257,7 +1254,7 @@ export function createMcpServer(): McpServer {
         if (!tokenTenant) return err("Invalid token");
       }
       try {
-        // ── Plan mode: create or revise a creative plan ──
+        // ── Plan mode: run unified pipeline in plan-only mode ──
         if (params.mode === "plan") {
           let llmConfig;
           try {
@@ -1268,79 +1265,71 @@ export function createMcpServer(): McpServer {
 
           const brandKit = await loadBrandKit(params.tenant_id);
 
-          // Build the brief
-          const brief: ProjectBrief = {
-            prompt: params.prompt,
-            ...(params.brief || {}),
-          };
-
-          // Revision: load existing project and its plan
-          let previousRevisionNotes: string[] | undefined;
+          // Build the prompt, incorporating feedback for revisions
+          let planPrompt = params.prompt;
           if (params.project_id && params.feedback) {
             const existingProject = await loadProject(params.tenant_id, params.project_id);
             if (!existingProject) return err("Project not found for plan revision");
             if (existingProject.status !== "planned" && existingProject.status !== "draft") {
               return err(`Cannot revise plan: project is in '${existingProject.status}' state`);
             }
-            previousRevisionNotes = existingProject.plan?.revision_notes;
-            // Use the stored brief if the caller didn't provide a new one
-            if (!params.brief && existingProject.brief) {
-              Object.assign(brief, existingProject.brief);
+            planPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
+            if (existingProject.plan?.narrative) {
+              planPrompt += `\n\n## Previous Plan Narrative\n${existingProject.plan.narrative}`;
             }
           }
 
-          // Run script writer
-          console.log(`  Plan mode: writing script for "${params.prompt.substring(0, 60)}..."`);
-          const plan = await writeScript({
-            brief,
+          console.log(`  Plan mode: running unified pipeline (plan-only) for "${params.prompt.substring(0, 60)}..."`);
+          const pipelineResult = await runGeneratePipeline({
+            prompt: planPrompt,
+            target: (params.target === "component" || params.target === "scene") ? "video" : (params.target || "video") as PipelineTarget,
+            tenant_id: params.tenant_id,
             llmConfig,
-            brandKit,
-            feedback: params.feedback,
-            previousRevisionNotes,
+            brandKit: brandKit || {
+              colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
+              fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
+              style: { border_radius: "12px", motion: "cinematic" as const },
+            },
+            canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+            creativity: params.creativity,
+            project_id: params.project_id,
+            voiceover: params.voiceover,
+            voice: params.voice,
+            sceneCount: params.brief?.target_duration ? Math.max(3, Math.min(10, Math.round((params.brief.target_duration || 45) / 5.5))) : undefined,
+            planOnly: true,
           });
 
-          // Run asset analyzer
-          analyzeAssets({ plan, brief, brandKit });
-
-          // Create or update project
-          if (params.project_id) {
-            // Update existing project
-            const project = await loadProject(params.tenant_id, params.project_id);
-            if (!project) return err("Project not found");
-            project.brief = brief;
-            project.plan = plan;
-            project.status = "planned";
-            project.updated_at = new Date().toISOString();
-            await saveProject(project);
-
-            return ok({
-              status: "planned",
-              project_id: project.project_id,
-              preview_url: previewUrl(params.tenant_id, project.project_id),
-              plan,
-            });
-          } else {
-            // Create new project with the plan
-            const project = await createProject({
-              tenant_id: params.tenant_id,
-              name: brief.prompt.substring(0, 60),
-              format: (params.target === "component" || params.target === "scene") ? "video" : (params.target || "video") as any,
-              preset: "landscape",
-            });
-            project.brief = brief;
-            project.plan = plan;
-            project.status = "planned";
-            project.created_at = new Date().toISOString();
-            project.updated_at = new Date().toISOString();
-            await saveProject(project);
-
-            return ok({
-              status: "planned",
-              project_id: project.project_id,
-              preview_url: previewUrl(params.tenant_id, project.project_id),
-              plan,
-            });
+          if (pipelineResult.status === "error") {
+            return err(`Plan failed: ${pipelineResult.error}`);
           }
+
+          const project = pipelineResult.project!;
+
+          // If updating an existing project, copy the plan over
+          if (params.project_id && params.project_id !== project.project_id) {
+            const origProject = await loadProject(params.tenant_id, params.project_id);
+            if (origProject) {
+              origProject.brief = project.brief;
+              origProject.plan = project.plan;
+              origProject.status = "planned";
+              origProject.updated_at = new Date().toISOString();
+              await saveProject(origProject);
+
+              return ok({
+                status: "planned",
+                project_id: origProject.project_id,
+                preview_url: previewUrl(params.tenant_id, origProject.project_id),
+                plan: origProject.plan,
+              });
+            }
+          }
+
+          return ok({
+            status: "planned",
+            project_id: project.project_id,
+            preview_url: previewUrl(params.tenant_id, project.project_id),
+            plan: project.plan,
+          });
         }
 
         // ── Generate mode: build scenes from an approved plan ──
