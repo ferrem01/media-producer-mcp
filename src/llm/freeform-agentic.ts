@@ -14,8 +14,9 @@ import {
   type LLMTool,
   type LLMContentPart,
 } from "./client.js";
-import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
-import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
+import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
+// Templates disabled -- LLM should use search_library to find components, not browse templates
+// import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./freeform-skills.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
 import type { CreativeBible } from "./concept-director.js";
@@ -61,19 +62,14 @@ const TOOLS: LLMTool[] = [
   {
     name: "search_library",
     description:
-      "Search for embeddable components and reference templates. COMPONENTS can be embedded directly in your scene HTML using component tags -- you MUST use them when a match exists instead of rebuilding from scratch. TEMPLATES are design references to study.",
+      "Search for embeddable components in the library. Components can be embedded directly in your scene HTML using <component> tags. You MUST use them when a match exists instead of rebuilding from scratch.",
     input_schema: {
       type: "object",
       properties: {
         query: {
           type: "string",
           description:
-            "What you're looking for, e.g. 'dashboard metrics chart' or 'cursor animation UI interaction' or 'stat card counter'",
-        },
-        type: {
-          type: "string",
-          enum: ["components", "templates", "all"],
-          description: "Search components, templates, or both",
+            "What you're looking for, e.g. 'dashboard metrics chart' or 'cursor animation UI interaction' or 'stat card counter' or 'chat panel' or 'code editor'",
         },
       },
       required: ["query"],
@@ -82,22 +78,17 @@ const TOOLS: LLMTool[] = [
   {
     name: "read_source",
     description:
-      "Read the source of a component or template. For COMPONENTS: check the data props so you can embed it with a component tag. For TEMPLATES: study the design patterns and adapt techniques.",
+      "Read a component's full source code. Use this to see the data props, HTML structure, CSS, and GSAP timeline so you can embed it with a <component> tag and fill in the data fields correctly.",
     input_schema: {
       type: "object",
       properties: {
         name: {
           type: "string",
           description:
-            "Component type name (e.g. 'chat-simulator', 'dashboard-kpi') or template ID (e.g. 'D1-hero-stat', 'C18-integration-grid')",
-        },
-        kind: {
-          type: "string",
-          enum: ["component", "template"],
-          description: "Whether this is a component or template",
+            "Component type name from search results (e.g. 'chat-simulator', 'dashboard-kpi', 'quotient-chat', 'code-editor')",
         },
       },
-      required: ["name", "kind"],
+      required: ["name"],
     },
   },
   {
@@ -122,7 +113,7 @@ const TOOLS: LLMTool[] = [
 
 interface SearchableItem {
   name: string;
-  kind: "component" | "template";
+  kind: "component";
   category: string;
   description: string;
   keywords: string; // lowercased searchable text
@@ -161,25 +152,7 @@ async function getSearchIndex(): Promise<SearchableItem[]> {
     });
   }
 
-  // Index templates
-  for (var tmpl of SCENE_TEMPLATES) {
-    items.push({
-      name: tmpl.id,
-      kind: "template",
-      category: tmpl.category,
-      description: `${tmpl.name}: ${tmpl.when} ${tmpl.feel}`,
-      keywords: [
-        tmpl.id,
-        tmpl.name,
-        tmpl.category,
-        tmpl.when,
-        tmpl.feel,
-        tmpl.slots.map((s) => s.name).join(" "),
-      ]
-        .join(" ")
-        .toLowerCase(),
-    });
-  }
+  // Templates disabled -- components only
 
   _searchIndex = items;
   return items;
@@ -187,18 +160,13 @@ async function getSearchIndex(): Promise<SearchableItem[]> {
 
 async function executeSearchLibrary(
   query: string,
-  type: string = "all",
+  _type?: string,
 ): Promise<string> {
   var index = await getSearchIndex();
   var queryTerms = query.toLowerCase().split(/\s+/);
 
-  // Filter by type
-  var candidates = index;
-  if (type === "components") {
-    candidates = candidates.filter((i) => i.kind === "component");
-  } else if (type === "templates") {
-    candidates = candidates.filter((i) => i.kind === "template");
-  }
+  // Components only
+  var candidates = index.filter((i) => i.kind === "component");
 
   // Score each item by how many query terms match
   var scored = candidates.map((item) => {
@@ -223,89 +191,67 @@ async function executeSearchLibrary(
     return `No results found for "${query}". Try different keywords. Available categories: ${[...new Set(index.map((i) => i.category))].join(", ")}`;
   }
 
-  var componentResults = results.filter(r => r.item.kind === "component");
-  var templateResults = results.filter(r => r.item.kind === "template");
-  var lines: string[] = [`Found ${results.length} results for "${query}":\n`];
+  var lines: string[] = [`Found ${results.length} components for "${query}":\n`];
 
-  if (componentResults.length > 0) {
-    lines.push("## EMBEDDABLE COMPONENTS (use <component> tags for these):");
-    for (var r of componentResults) {
-      var item = r.item;
-      lines.push(`- **${item.name}** (${item.category}): ${item.description}`);
-      lines.push(`  EMBED: <component type="${item.name}" data='{...}' />`);
-      lines.push(`  Use read_source(name="${item.name}", kind="component") to see data props`);
-    }
-    lines.push("");
+  for (var r of results) {
+    var item = r.item;
+    lines.push(`- **${item.name}** (${item.category}): ${item.description}`);
+    lines.push(`  → EMBED: <component type="${item.name}" data='{...}' />`);
+    lines.push(`  → NEXT: call read_source("${item.name}") to see data props and example usage`);
   }
 
-  if (templateResults.length > 0) {
-    lines.push("## REFERENCE TEMPLATES (study for design patterns, do not embed):");
-    for (var r of templateResults) {
-      var item = r.item;
-      lines.push(`- **${item.name}** (template, ${item.category}): ${item.description}`);
-    }
-    lines.push("\nUse read_source to study template design patterns.");
-  }
-
-  if (componentResults.length > 0) {
-    lines.push("\nREMINDER: If any component above matches your scene needs, you MUST use it via <component> tag. Do NOT rebuild it from scratch.");
-  }
+  lines.push("");
+  lines.push("ACTION REQUIRED: For each component above that matches your scene, call read_source to learn the data fields, then use a <component> tag in your HTML.");
   return lines.join("\n");
 }
 
 async function executeReadSource(
   name: string,
-  kind: string,
+  _kind?: string,
 ): Promise<string> {
-  if (kind === "template") {
-    // Find template by ID
-    var tmpl = SCENE_TEMPLATES.find(
-      (t) => t.id === name || t.id.toLowerCase() === name.toLowerCase(),
-    );
-    if (!tmpl) {
-      // Try partial match
-      tmpl = SCENE_TEMPLATES.find(
-        (t) =>
-          t.id.toLowerCase().includes(name.toLowerCase()) ||
-          t.name.toLowerCase().includes(name.toLowerCase()),
+  // Find component by type name
+  // Walk component directories to find the matching .component.html
+  try {
+    var categories = await fs.readdir(COMPONENTS_ROOT, {
+      withFileTypes: true,
+    });
+    for (var catDir of categories) {
+      if (!catDir.isDirectory() || catDir.name === "shared") continue;
+      var catPath = path.join(COMPONENTS_ROOT, catDir.name);
+      var files = await fs.readdir(catPath);
+      var htmlFile = files.find(
+        (f) =>
+          f === `${name}.component.html` ||
+          f.toLowerCase() === `${name.toLowerCase()}.component.html`,
       );
-    }
-    if (!tmpl) {
-      return `Template "${name}" not found. Use search_library to find available templates.`;
-    }
-    var templatePath = path.join(TEMPLATES_DIR, tmpl.file);
-    try {
-      var source = await fs.readFile(templatePath, "utf-8");
-      return `# Template: ${tmpl.id} - ${tmpl.name}\n# Category: ${tmpl.category}\n# When: ${tmpl.when}\n# Feel: ${tmpl.feel}\n\n${source}`;
-    } catch {
-      return `Template file not found: ${tmpl.file}`;
-    }
-  } else {
-    // Find component by type name
-    // Walk component directories to find the matching .component.html
-    try {
-      var categories = await fs.readdir(COMPONENTS_ROOT, {
-        withFileTypes: true,
-      });
-      for (var catDir of categories) {
-        if (!catDir.isDirectory() || catDir.name === "shared") continue;
-        var catPath = path.join(COMPONENTS_ROOT, catDir.name);
-        var files = await fs.readdir(catPath);
-        var htmlFile = files.find(
+      if (htmlFile) {
+        var filePath = path.join(catPath, htmlFile);
+        var source = await fs.readFile(filePath, "utf-8");
+
+        // Also try to load the schema for a data example
+        var schemaFile = files.find(
           (f) =>
-            f === `${name}.component.html` ||
-            f.toLowerCase() === `${name.toLowerCase()}.component.html`,
+            f === `${name}.schema.json` ||
+            f.toLowerCase() === `${name.toLowerCase()}.schema.json`,
         );
-        if (htmlFile) {
-          var filePath = path.join(catPath, htmlFile);
-          var source = await fs.readFile(filePath, "utf-8");
-          return `# Component: ${name}\n# Category: ${catDir.name}\n# File: ${catDir.name}/${htmlFile}\n# EMBED WITH: <component type="${name}" data='{...}' />\n# Check the createTimeline data parameter for available props.\n\n${source}`;
+        var schemaInfo = "";
+        if (schemaFile) {
+          try {
+            var schemaPath = path.join(catPath, schemaFile);
+            var schemaRaw = await fs.readFile(schemaPath, "utf-8");
+            var schema = JSON.parse(schemaRaw);
+            schemaInfo = `\n\n# DATA SCHEMA (use these fields in your <component> data attribute):\n${JSON.stringify(schema.data || schema.properties || {}, null, 2)}`;
+          } catch {
+            // Schema parse failed, skip
+          }
         }
+
+        return `# Component: ${name}\n# Category: ${catDir.name}\n# File: ${catDir.name}/${htmlFile}\n#\n# HOW TO USE:\n#   <component type="${name}" data='{"field1": "value1", ...}' />\n#\n# Read the createTimeline(el, data, ctx) function to see what data fields are used.\n# Fill the data attribute with your scene's actual content.${schemaInfo}\n\n${source}`;
       }
-      return `Component "${name}" not found. Use search_library to find available components.`;
-    } catch (e: any) {
-      return `Error reading component: ${e.message}`;
     }
+    return `Component "${name}" not found. Use search_library to find available components.`;
+  } catch (e: any) {
+    return `Error reading component: ${e.message}`;
   }
 }
 
@@ -341,14 +287,14 @@ Your output will be captured frame-by-frame by Playwright at ${opts.canvas.width
 
 ## Your Process (FOLLOW THIS ORDER)
 
-1. SEARCH for components matching your scene's UI elements (search_library with type="components")
-2. For each matching component, READ its source (read_source with kind="component") to learn its data props
-3. BUILD your scene HTML using <component> tags for every matched UI element, filling data props with scene content
-4. SEARCH templates for layout/design inspiration (search_library with type="templates"), READ 1-2
-5. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
-6. SUBMIT via the submit_scene tool
+1. SEARCH for components matching your scene's UI elements (search_library)
+2. For EACH matching component, READ its source (read_source) to learn its data props
+3. BUILD your scene HTML using <component> tags for every matched UI element, filling data props with scene-specific content
+4. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
+5. SUBMIT via the submit_scene tool
 
-CRITICAL: Steps 1-3 come FIRST. Identify and embed components BEFORE writing any custom HTML.
+CRITICAL: Steps 1-2 come FIRST. You MUST call read_source on every component you plan to use.
+Do NOT skip read_source -- you need to see the data fields to fill them correctly.
 Only write custom code for things that have NO matching component in the library.
 
 ## Design Skills (FOLLOW THESE RULES)
@@ -357,9 +303,9 @@ ${designSkills}
 
 ## Component Tags (REQUIRED when a library component matches)
 
-MANDATORY RULE: If the scene needs a UI element that exists in the component library below (chat panels, editors,
-dashboards, charts, code editors, kanban boards, etc.), you MUST use a <component> tag. Do NOT rebuild it from scratch.
-Writing custom HTML for something that already exists in the library is a bug.
+MANDATORY RULE: If the scene needs a UI element that exists in the component library (chat panels, editors,
+dashboards, charts, code editors, kanban boards, etc.), you MUST search for it and use a <component> tag.
+Do NOT rebuild it from scratch. Writing custom HTML for something that already exists in the library is a bug.
 
 Use <component> tags for the UI building blocks. Write custom code for:
 - Layout and positioning of components on the canvas
@@ -381,7 +327,7 @@ The result is HYBRID: <component> tags for known UI + custom code for everything
 \`\`\`
 
 ### Rules
-- The \`type\` must match a component from the library catalog below
+- The \`type\` must match a component from the library (use search_library to find it)
 - The \`data\` attribute is a JSON string with the component's data props
 - Components auto-generate internal GSAP timelines
 - Access component timelines in your createTimeline via: ctx.getComponentTimeline('comp_0')
@@ -391,9 +337,11 @@ The result is HYBRID: <component> tags for known UI + custom code for everything
 - You MUST use <component> tags for any UI that matches a library component. This is not optional.
 - If search_library returns a matching component, USE IT via <component> tag. Do not rewrite it from scratch.
 - Write custom code ONLY for layout, transitions, overlays, decorative elements, and truly unique visuals
-- A scene with quotient-chat content MUST use <component type="quotient-chat">
-- A scene with a code editor MUST use <component type="code-editor">
-- A scene with charts MUST use <component type="bar-chart"> or <component type="line-chart">
+- A scene with chat/conversation content MUST search for and use a chat component
+- A scene with a code editor MUST search for and use a code editor component
+- A scene with charts MUST search for and use a chart component
+- A scene with a dashboard MUST search for and use dashboard components
+- ALWAYS call read_source on a component before embedding it, so you fill data fields correctly
 
 ### Timeline Integration
 \`\`\`javascript
@@ -609,81 +557,14 @@ function buildBrandContext(brandKit: BrandKit): string {
 
 const MAX_ITERATIONS = 8;
 
-/**
- * Pre-search the library using keywords from the prompt and reference image labels.
- * Returns suggested components/templates the agent should look at first.
- */
-async function presearchLibrary(prompt: string, referenceImages?: any[]): Promise<string> {
-  // Extract meaningful keywords from the prompt and reference labels
-  var keywords = new Set<string>();
-  var text = prompt.toLowerCase();
-  
-  // Extract notable proper nouns and UI terms from prompt
-  var words = text.split(/\s+/);
-  for (var w of words) {
-    var clean = w.replace(/[^a-z0-9-]/g, "");
-    if (clean.length > 3) keywords.add(clean);
-  }
-  
-  // Extract from reference image labels
-  if (referenceImages?.length) {
-    for (var ref of referenceImages) {
-      if (ref.label) {
-        for (var rw of ref.label.toLowerCase().split(/\s+/)) {
-          var rclean = rw.replace(/[^a-z0-9-]/g, "");
-          if (rclean.length > 3) keywords.add(rclean);
-        }
-      }
-    }
-  }
-
-  // Run searches with the most specific terms first
-  var keyArr = [...keywords];
-  var seen = new Set<string>();
-  var suggestions: string[] = [];
-
-  // Search in batches of 3-4 keywords
-  var queries = [
-    keyArr.filter(k => /^[A-Z]|claude|slack|notion|figma|github|cursor|menu|toggle|compose/i.test(k)).slice(0, 6).join(" "),
-    keyArr.slice(0, 5).join(" "),
-  ].filter(q => q.length > 0);
-
-  for (var q of queries) {
-    var result = await executeSearchLibrary(q, "all");
-    // Parse results to extract names
-    var lines = result.split("\n").filter(l => l.startsWith("- **"));
-    for (var line of lines) {
-      var match = line.match(/\*\*([^*]+)\*\*/);
-      if (match && !seen.has(match[1])) {
-        seen.add(match[1]);
-        suggestions.push(line);
-      }
-    }
-  }
-
-  if (suggestions.length === 0) return "";
-  return "\n## Suggested Library References\n\nBased on the prompt and reference images, these library items are likely relevant:\n" +
-    suggestions.slice(0, 6).join("\n") +
-    "\n\nConsider reading these with read_source before writing your scene. Search for more if needed.\n";
-}
+// presearchLibrary removed -- LLM uses search_library tool directly
 
 export async function generateFreeformAgentic(
   opts: AgenticFreeformOpts,
 ): Promise<string> {
-  // Pre-search library for relevant references
-  var suggestions = await presearchLibrary(opts.prompt || opts.sceneBrief || "", opts.referenceImages);
-  
   var systemPrompt = buildAgenticSystemPrompt(opts);
-  if (suggestions) {
-    systemPrompt += suggestions;
-  }
 
-  // Inject component catalog with schemas for <component> tag usage
-  if (!_componentCatalog) {
-    _componentCatalog = await buildComponentCatalog(COMPONENTS_ROOT);
-  }
-  var catalogPrompt = formatCatalogForPrompt(_componentCatalog);
-  systemPrompt += "\n\n## Available Components for <component> Tags\n\n" + catalogPrompt + "\n";
+  // No catalog dump -- the LLM must use search_library + read_source to discover components
 
   var userPrompt = `Create this scene:
 
@@ -703,8 +584,8 @@ ${opts.sceneBrief}
 - All text MUST have correct spacing. Never concatenate words. Check every text string for missing spaces.
 - Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
 ${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
-CRITICAL: Before writing ANY UI element, check the component catalog. If a matching component exists, use <component type=... data='...' /> -- do NOT rebuild it from scratch. Search the library first, then use <component> tags for matches and write custom code only for the rest.
-Start by searching the library for relevant patterns, then read 1-3 relevant sources before writing your scene.`;
+CRITICAL: Before writing ANY UI element, search the component library. If a matching component exists, call read_source to learn its data props, then use <component type=... data='...' />. Do NOT rebuild from scratch what already exists in the library.
+Start by calling search_library for the main UI elements in this scene. Then call read_source on each match. Only then write your scene HTML.`;
 
   // Build user message: include reference images as vision content if available
   var userContent: string | LLMContentPart[];
@@ -785,12 +666,10 @@ Start by searching the library for relevant patterns, then read 1-3 relevant sou
         if (toolCall.name === "search_library") {
           toolResult = await executeSearchLibrary(
             toolCall.input.query as string,
-            (toolCall.input.type as string) || "all",
           );
         } else if (toolCall.name === "read_source") {
           toolResult = await executeReadSource(
             toolCall.input.name as string,
-            toolCall.input.kind as string,
           );
         } else if (toolCall.name === "submit_scene") {
           var submitResult = executeSubmitScene(
