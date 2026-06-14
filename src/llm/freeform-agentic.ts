@@ -14,7 +14,7 @@ import {
   type LLMTool,
   type LLMContentPart,
 } from "./client.js";
-import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
+import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./freeform-skills.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
@@ -337,22 +337,66 @@ Always search and read at least one reference before writing.
 
 ${designSkills}
 
+## Component Tags (PREFERRED for known UI elements)
+
+You can embed pre-built library components using <component> tags instead of rebuilding them from scratch.
+This gives you battle-tested, high-quality UI elements with zero effort. Focus your creativity on composition,
+layout, and the custom elements around them.
+
+### Syntax
+\`\`\`html
+<component type="quotient-chat" data='{
+  "conversation_title": "My Chat",
+  "messages": [
+    { "role": "user", "text": "Hello" },
+    { "role": "agent", "text": "Hi there!" }
+  ]
+}' />
+\`\`\`
+
+### Rules
+- The \`type\` must match a component from the library catalog below
+- The \`data\` attribute is a JSON string with the component's data props
+- Components auto-generate internal GSAP timelines
+- Access component timelines in your createTimeline via: ctx.getComponentTimeline('comp_0')
+- Component IDs are auto-assigned: comp_0, comp_1, comp_2... in order of appearance
+- You can add \`class\` and \`style\` attributes to the <component> tag for positioning
+- You can mix <component> tags with fully custom HTML/CSS/GSAP in the same scene
+- PREFER <component> tags for any UI that matches a library component (chat panels, editors, dashboards, charts, etc.)
+- Write custom code for layout, transitions between components, overlays, decorative elements, and anything unique
+
+### Timeline Integration
+\`\`\`javascript
+function createTimeline(el, data, ctx) {
+  var tl = gsap.timeline();
+  // ctx.getComponentTimeline('comp_0') returns the component's internal timeline
+  // Add it at a specific time to choreograph when the component animates
+  tl.add(ctx.getComponentTimeline('comp_0'), 0);    // chat animates from t=0
+  tl.add(ctx.getComponentTimeline('comp_1'), 5);    // editor animates from t=5
+  // You can also control component visibility with GSAP
+  gsap.set('[data-comp-id="comp_1"]', { opacity: 0 });
+  tl.to('[data-comp-id="comp_1"]', { opacity: 1, duration: 0.8 }, 5);
+  return tl;
+}
+\`\`\`
+
 ## Output Format
 
-Your submitted HTML must be a single .component.html file with exactly three sections:
+Your submitted HTML must be a single .scene.html file with exactly three sections:
 
 \`\`\`html
 <template>
-  <!-- Full scene HTML here -->
+  <!-- Scene HTML here. Use <component> tags for library components. -->
 </template>
 
 <style scoped>
-  /* Complete CSS here */
+  /* Custom CSS here (component CSS is auto-injected) */
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
+    // ctx.getComponentTimeline('comp_N') for embedded component timelines
     // GSAP animation here
     return tl;
   }
@@ -555,6 +599,13 @@ export async function generateFreeformAgentic(
   if (suggestions) {
     systemPrompt += suggestions;
   }
+
+  // Inject component catalog with schemas for <component> tag usage
+  if (!_componentCatalog) {
+    _componentCatalog = await buildComponentCatalog(COMPONENTS_ROOT);
+  }
+  var catalogPrompt = formatCatalogForPrompt(_componentCatalog);
+  systemPrompt += "\n\n## Available Components for <component> Tags\n\n" + catalogPrompt + "\n";
 
   var userPrompt = `Create this scene:
 

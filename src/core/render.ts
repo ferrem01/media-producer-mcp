@@ -14,7 +14,7 @@ import path from "node:path";
 import { fork, execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
-import { assembleScene, type ComponentSource } from "./scene-assembler.js";
+import { assembleScene, assembleCodegenScene, type ComponentSource } from "./scene-assembler.js";
 import { assembleSequence } from "./sequence-assembler.js";
 
 /**
@@ -49,6 +49,32 @@ async function assembleSceneOrSequence(options: {
       preview: options.preview,
       speakerUrl: options.speakerUrl,
     });
+  }
+
+  // Check if any freeform/custom component source contains <component> tags (unified codegen path)
+  if (scene.components?.length > 0) {
+    for (const comp of scene.components) {
+      if (comp.type.startsWith('freeform_') || comp.type.startsWith('custom_') || comp.type.startsWith('template_')) {
+        const freeformSource = options.components.find(cs => cs.type === comp.type);
+        if (freeformSource && freeformSource.source.includes('<component ')) {
+          console.log(`  [render] Using codegen assembler for "${scene.label || scene.id}" (has <component> tags)`);
+          return assembleCodegenScene({
+            sceneSource: freeformSource.source,
+            componentSources: options.components.filter(cs => cs.type !== comp.type),
+            brandKit: options.brandKit,
+            canvas: options.canvas,
+            duration: scene.duration_seconds || 5,
+            sceneId: scene.id,
+            gsapDir: options.gsapDir,
+            background: scene.background,
+            transparentBackground: scene.transparent_background,
+            backgroundVideo: scene.background_video,
+            preview: options.preview,
+            speakerUrl: options.speakerUrl,
+          });
+        }
+      }
+    }
   }
 
   return assembleScene(options);
