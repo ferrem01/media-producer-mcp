@@ -58,6 +58,97 @@ interface Scene {
 
 ---
 
+## project.json (before and after)
+
+### Before (current)
+```json
+{
+  "project_id": "proj_abc",
+  "name": "Quotient Launch",
+  "format": "video",
+  "canvas": { "width": 1920, "height": 1080, "fps": 30 },
+  "brand_kit": { "..." },
+  "scenes": [
+    {
+      "id": "scene_001",
+      "label": "Product Walkthrough",
+      "duration_seconds": 30,
+      "transition_in": { "type": "crossfade", "duration_seconds": 0.5 },
+      "components": [
+        { "id": "comp_0", "type": "quotient-chat", "data": { "..." }, "z_index": 10 },
+        { "id": "comp_1", "type": "canva-editor", "data": { "..." }, "z_index": 10 },
+        { "id": "comp_2", "type": "quotient-social", "data": { "..." }, "z_index": 10 }
+      ],
+      "beats": [
+        { "label": "chat", "brief": "...", "duration_seconds": 8 },
+        { "label": "connect", "brief": "...", "duration_seconds": 8 },
+        { "label": "publish", "brief": "...", "duration_seconds": 7 }
+      ],
+      "choreography": [
+        { "label": "chat", "startTime": 0, "duration": 8, "visibleComponents": ["comp_0"] },
+        { "label": "connect", "startTime": 8, "duration": 8, "visibleComponents": ["comp_0","comp_1"] },
+        { "label": "publish", "startTime": 16, "duration": 7, "visibleComponents": ["comp_2"] }
+      ],
+      "voiceover_text": "..."
+    }
+  ]
+}
+```
+
+### After (unified codegen)
+```json
+{
+  "project_id": "proj_abc",
+  "name": "Quotient Launch",
+  "format": "video",
+  "canvas": { "width": 1920, "height": 1080, "fps": 30 },
+  "brand_kit": { "..." },
+  "creative_bible": {
+    "concept": "One conversation creates everything",
+    "pattern": "Cause-and-Effect Chain",
+    "throughLine": "A single chat thread triggers a cascade",
+    "emotionalArc": "Curiosity -> amazement -> confidence",
+    "visualStyle": {
+      "colorMood": "Deep navy with indigo/emerald accents",
+      "typographyAttitude": "Clean, confident, minimal",
+      "motionPersonality": "Fluid and purposeful",
+      "spatialStrategy": "Center-stage with reveals"
+    },
+    "directorNote": "..."
+  },
+  "storyboard": {
+    "scenes": [
+      {
+        "label": "Product Walkthrough",
+        "brief": "Show chat, canva, and social in one continuous flow",
+        "duration_seconds": 30,
+        "suggested_components": ["quotient-chat", "canva-editor", "quotient-social"],
+        "voiceover_text": "..."
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scene_001",
+      "label": "Product Walkthrough",
+      "duration_seconds": 30,
+      "transition_in": { "type": "crossfade", "duration_seconds": 0.5 },
+      "source": "scene_001.scene.html",
+      "voiceover_text": "...",
+      "components_used": ["quotient-chat", "canva-editor", "quotient-social"]
+    }
+  ]
+}
+```
+
+### What changed
+- **Added `creative_bible`:** Structured creative direction, persisted (Refactor 1, done)
+- **Added `storyboard`:** Planning context preserved. Scene briefs, suggested components, narrative intent.
+- **Simplified `scenes[]`:** Each scene is a pointer to a `.scene.html` file. No `components[]`, `beats[]`, `choreography[]`, `template`, `freeform` fields. All implementation detail lives in the HTML.
+- **Added `components_used`:** Optional metadata showing which library components are embedded (for quick inspection without opening the HTML).
+
+---
+
 ## `<component>` Tag Spec
 
 ### Syntax
