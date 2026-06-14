@@ -358,6 +358,23 @@ function createTimeline(el, data, ctx) {
 }
 \`\`\`
 
+## Example Workflow (FOLLOW THIS PATTERN)
+
+Here is exactly how you should work through a scene that needs a chat panel:
+
+1. You call: search_library("chat conversation panel")
+   → Result: Found quotient-chat (data-viz): Simulated AI chat conversation...
+   → Result says: call read_source("quotient-chat") to see data props
+
+2. You call: read_source("quotient-chat")
+   → You see the data schema: conversation_title, messages[], user_avatar, mode, accent_color...
+   → You see how createTimeline works internally
+
+3. You write your scene using a <component> tag with the data fields filled in:
+   <component type="quotient-chat" data='{"conversation_title": "Campaign Brief", "messages": [{"role": "user", "text": "Draft a LinkedIn post"}, {"role": "agent", "text": "Here is a compelling draft..."}]}' />
+
+This is NOT optional. If search_library finds a match, you MUST read_source it before writing.
+
 ## Output Format
 
 Your submitted HTML must be a single .scene.html file with three sections.
@@ -610,6 +627,10 @@ Start by calling search_library for the main UI elements in this scene. Then cal
 
   var lastHtml: string | null = null;
 
+  // Track component-first workflow state
+  var searchHits: Set<string> = new Set();   // components found by search_library
+  var readSources: Set<string> = new Set();  // components read via read_source
+
   for (var iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     console.log(
       `  [agentic] Scene ${opts.sceneIndex + 1}: iteration ${iteration + 1}/${MAX_ITERATIONS}`,
@@ -667,10 +688,16 @@ Start by calling search_library for the main UI elements in this scene. Then cal
           toolResult = await executeSearchLibrary(
             toolCall.input.query as string,
           );
+          // Track component names found in search results
+          var nameMatches = toolResult.matchAll(/\*\*([a-z0-9-]+)\*\*/g);
+          for (var m of nameMatches) {
+            searchHits.add(m[1]);
+          }
         } else if (toolCall.name === "read_source") {
           toolResult = await executeReadSource(
             toolCall.input.name as string,
           );
+          readSources.add((toolCall.input.name as string).toLowerCase());
         } else if (toolCall.name === "submit_scene") {
           var submitResult = executeSubmitScene(
             toolCall.input.html as string,
@@ -700,6 +727,19 @@ Start by calling search_library for the main UI elements in this scene. Then cal
         role: "user",
         content: toolResults,
       });
+
+      // Synthetic nudge: if search found components but LLM hasn't read any yet
+      var unreadComponents = Array.from(searchHits).filter(function(n) { return !readSources.has(n); });
+      if (unreadComponents.length > 0 && !response.toolCalls.some(function(tc) { return tc.name === "read_source"; })) {
+        var nudge = "You found matching components: " + unreadComponents.join(", ") + ". You MUST call read_source on each before proceeding. Do NOT write custom HTML for these -- read the source first so you know the data fields.";
+        messages.push({
+          role: "user",
+          content: nudge,
+        });
+        console.log(
+          "  [agentic] Scene " + (opts.sceneIndex + 1) + ": injected read_source nudge for: " + unreadComponents.join(", "),
+        );
+      }
 
       continue;
     }
