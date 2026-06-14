@@ -725,6 +725,7 @@
   <button data-view="overview" class="active">Overview</button>
   <button data-view="generate">Generate Pipeline</button>
   <button data-view="io">Pipeline I/O</button>
+  <button data-view="modes">Generate Modes</button>
   <button data-view="render">Render Pipeline</button>
   <button data-view="scenes">Scenes vs Sequences</button>
   <button data-view="components">Component Library</button>
@@ -1172,6 +1173,152 @@
   ]
 }</pre>
     </div>
+  </div>
+</section>
+
+
+<!-- ════════════════ GENERATE MODES ════════════════ -->
+<section class="view" id="view-modes">
+  <h2>Generate Modes &amp; Project Lifecycle</h2>
+  <p class="description">
+    The <code>generate</code> MCP tool has 3 modes that control how much of the pipeline runs.
+    Understanding these modes explains how data flows into project.json.
+  </p>
+
+  <!-- Mode comparison -->
+  <div style="display:flex; flex-direction:column; gap:16px; margin-bottom:32px;">
+
+    <div class="concept-card" style="border-left:3px solid var(--accent);">
+      <h4 style="color:var(--accent);">📝 mode: "plan"</h4>
+      <p>Runs the script writer only. Creates a high-level creative plan with narrative, scene descriptions, audio direction, and asset requirements. Saves to <code>project.plan</code>. No HTML generated, no rendering.</p>
+      <div class="pipeline-flow" style="margin-top:12px;">
+        <div class="pf-row">
+          <div class="pf-step pf-planner">User prompt</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-llm">Script Writer<br><small>script-writer.ts</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-data">project.plan<br><small>ProjectPlan</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step" style="background:rgba(251,191,36,0.15); border-color:var(--yellow); color:var(--yellow);">status: "planned"<br><small>waiting for review</small></div>
+        </div>
+      </div>
+      <div style="margin-top:10px; font-size:12px; color:var(--text-dim);">
+        <strong>Stored in:</strong> <code>project.plan</code> (separate field)<br>
+        <strong>Contains:</strong> narrative, scene purposes, template suggestions, audio direction, asset needs<br>
+        <strong>Use case:</strong> Review the creative direction before committing to expensive generation
+      </div>
+    </div>
+
+    <div class="concept-card" style="border-left:3px solid var(--orange);">
+      <h4 style="color:var(--orange);">🔧 mode: "generate"</h4>
+      <p>Picks up from an approved plan. Reads <code>project.plan</code>, runs the full generation pipeline (scene building, critique, media enrichment, audio), then renders. Requires a prior <code>plan</code> run.</p>
+      <div class="pipeline-flow" style="margin-top:12px;">
+        <div class="pf-row">
+          <div class="pf-step pf-data">project.plan<br><small>(from prior plan run)</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-llm">Full pipeline<br><small>expand → plan → generate → critique</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-core">project.scenes[]<br><small>Scene[]</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-render">Render<br><small>output.mp4</small></div>
+        </div>
+      </div>
+      <div style="margin-top:10px; font-size:12px; color:var(--text-dim);">
+        <strong>Reads from:</strong> <code>project.plan</code><br>
+        <strong>Writes to:</strong> <code>project.scenes[]</code><br>
+        <strong>Use case:</strong> Build and render after reviewing/editing the plan
+      </div>
+    </div>
+
+    <div class="concept-card" style="border-left:3px solid var(--primary);">
+      <h4 style="color:var(--primary);">🚀 mode: "full" (default)</h4>
+      <p>Runs everything end-to-end in one shot. Expand → concept director → storyboard planner → scene generation → critique → media enrichment → audio → render. No intermediate review step.</p>
+      <div class="pipeline-flow" style="margin-top:12px;">
+        <div class="pf-row">
+          <div class="pf-step pf-planner">User prompt</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-llm">Full pipeline<br><small>all 8 stages</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-core">project.scenes[]<br><small>Scene[]</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-render">Render<br><small>output.mp4</small></div>
+        </div>
+      </div>
+      <div style="margin-top:10px; font-size:12px; color:var(--text-dim);">
+        <strong>Skips:</strong> <code>project.plan</code> entirely<br>
+        <strong>Writes to:</strong> <code>project.scenes[]</code> directly<br>
+        <strong>Use case:</strong> Quick generation when you trust the pipeline
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Where things live in project.json -->
+  <h3>Where Data Lives in project.json</h3>
+  <p class="description">
+    This is a key source of confusion. The storyboard from the unified planner is NOT stored separately -- it gets dissolved into <code>project.scenes[]</code> after generation. The planning context (why each scene was chosen, creative decisions) disappears.
+  </p>
+
+  <div class="seq-diagram" style="padding:20px;">
+    <pre style="font-family:'SF Mono','Fira Code',monospace; font-size:12px; color:var(--text-dim); line-height:1.8;">project.json
+├── project_id, tenant_id, name, format, status
+├── canvas: { width, height, fps }
+├── brand_kit: { colors, fonts, logos }
+│
+├── <span style="color:var(--accent);">brief</span>: ProjectBrief              <span style="color:var(--text-dim);">← from mode:"plan" (user's original prompt)</span>
+│     └── prompt, target, duration...
+│
+├── <span style="color:var(--accent);">plan</span>: ProjectPlan                <span style="color:var(--text-dim);">← from mode:"plan" (script writer output)</span>
+│     ├── narrative: string           <span style="color:var(--text-dim);">  high-level story summary</span>
+│     ├── scenes: PlannedScene[]      <span style="color:var(--text-dim);">  scene purposes + template suggestions</span>
+│     ├── audio: { mood, voice }      <span style="color:var(--text-dim);">  audio direction</span>
+│     └── estimated_duration
+│
+├── <span style="color:var(--primary);">creative_bible</span>: CreativeBible    <span style="color:var(--text-dim);">← from concept director (mode:"full")</span>
+│     ├── concept, pattern            <span style="color:var(--text-dim);">  the big idea + storytelling pattern</span>
+│     ├── throughLine, emotionalArc   <span style="color:var(--text-dim);">  visual continuity + emotional journey</span>
+│     └── visualStyle: { colorMood, typography, motion, spatial }
+│
+├── <span style="color:var(--orange);">scenes</span>: Scene[]                  <span style="color:var(--text-dim);">← from scene generation (the final output)</span>
+│     └── (see Data Model tab)        <span style="color:var(--text-dim);">  components, timing, choreography, HTML</span>
+│
+├── audio: AudioConfig
+├── assets: Asset[]
+└── speaker_track: SpeakerTrack</pre>
+  </div>
+
+  <div class="concept-grid" style="margin-top: 20px;">
+    <div class="concept-card" style="border-left:3px solid var(--red);">
+      <h4 style="color:var(--red);">⚠️ Data Loss Point</h4>
+      <p>When mode:"full" runs, the <code>StoryboardResult</code> from the unified planner is never saved. Each <code>PlannedScene</code> goes through <code>generateScene()</code> and becomes a <code>Scene</code> in <code>project.scenes[]</code>. The planning context -- why each scene was chosen, which pipeline path was selected, the creative rationale -- is lost.</p>
+      <p style="margin-top:8px;">The <code>creative_bible</code> is now preserved (Refactor 1), but the storyboard itself is not.</p>
+    </div>
+    <div class="concept-card" style="border-left:3px solid var(--yellow);">
+      <h4 style="color:var(--yellow);">💡 Two Different PlannedScene Types</h4>
+      <p>Confusingly, there are TWO <code>PlannedScene</code> interfaces:</p>
+      <ul>
+        <li><code>types.ts PlannedScene</code> -- used by the <code>plan</code> mode (script writer). Has <code>purpose</code>, <code>template</code> suggestion, asset needs.</li>
+        <li><code>unified-planner.ts PlannedScene</code> -- used by the <code>full</code> mode (storyboard planner). Has <code>components[]</code>, <code>freeform_brief</code>, <code>beats[]</code>, <code>choreography[]</code>.</li>
+      </ul>
+      <p style="margin-top:8px;">Same name, different shapes, different files. The <code>plan</code> mode and <code>full</code> mode are effectively two separate planning systems.</p>
+    </div>
+  </div>
+
+  <!-- Project Status Lifecycle -->
+  <h3 style="margin-top:24px;">Project Status Lifecycle</h3>
+  <div class="pipeline-flow">
+    <div class="pf-row">
+      <div class="pf-step" style="background:rgba(148,163,184,0.15); border-color:var(--text-dim);">draft<br><small>just created</small></div>
+      <div class="pf-arrow">→</div>
+      <div class="pf-step" style="background:rgba(52,211,153,0.15); border-color:var(--accent);">planned<br><small>plan mode done</small></div>
+      <div class="pf-arrow">→</div>
+      <div class="pf-step" style="background:rgba(251,146,60,0.15); border-color:var(--orange);">rendering<br><small>render in progress</small></div>
+      <div class="pf-arrow">→</div>
+      <div class="pf-step" style="background:rgba(129,140,248,0.15); border-color:var(--primary);">complete<br><small>output ready</small></div>
+    </div>
+  </div>
+  <div style="margin-top:8px; font-size:12px; color:var(--text-dim); text-align:center;">
+    mode:"full" skips "planned" and goes draft → rendering → complete
   </div>
 </section>
 
