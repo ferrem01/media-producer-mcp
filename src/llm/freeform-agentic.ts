@@ -18,6 +18,7 @@ import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js"
 import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./freeform-skills.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
+import type { CreativeBible } from "./concept-director.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,
@@ -44,6 +45,7 @@ export interface AgenticFreeformOpts {
   canvas: Canvas;
   critiqueFeedback?: string;
   referenceImages?: ReferenceImage[];
+  creativeBible?: CreativeBible;
   /** When present, this is a sequence scene with multiple beats */
   beats?: Array<{
     label: string;
@@ -382,7 +384,15 @@ ${opts.referenceImages?.length ? buildReferenceImageSummary(opts.referenceImages
 Duration: ${opts.sceneDuration} seconds
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}
 Project: ${opts.prompt}
-${opts.beats?.length ? buildSequenceInstructions(opts.beats) : ""}
+${opts.creativeBible ? `
+## Creative Direction (MUST FOLLOW)
+Concept: ${opts.creativeBible.concept}
+Color mood: ${opts.creativeBible.visualStyle.colorMood}
+Typography: ${opts.creativeBible.visualStyle.typographyAttitude}
+Motion: ${opts.creativeBible.visualStyle.motionPersonality}
+Spatial: ${opts.creativeBible.visualStyle.spatialStrategy}
+Through-line: ${opts.creativeBible.throughLine}
+` : ""}${opts.beats?.length ? buildSequenceInstructions(opts.beats) : ""}
 `;
 }
 

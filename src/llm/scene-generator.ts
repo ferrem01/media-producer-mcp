@@ -15,6 +15,7 @@ import { getComponentReferenceLibrary } from "./component-reference.js";
 import { generateFreeformAgentic } from "./freeform-agentic.js";
 import type { PlannedScene, PlannedComponent } from "./unified-planner.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneComponent, SceneTransition } from "../core/types.js";
+import type { CreativeBible } from "./concept-director.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -34,6 +35,7 @@ export interface SceneGeneratorOpts {
   projectId: string;
   critiqueFeedback?: string; // feedback from visual critiquer for retry
   referenceImages?: ReferenceImage[];
+  creativeBible?: CreativeBible;
 }
 
 export interface GeneratedScene {
@@ -92,6 +94,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
         imageUrl: opts.imageUrl,
         duration: planned.duration_seconds,
         critiqueFeedback: opts.critiqueFeedback,
+        creativeBible: opts.creativeBible,
       });
       customSources.set(compName, html);
       sceneComponents.push({
@@ -174,6 +177,7 @@ async function generateFreeformScene(
     canvas: opts.canvas,
     critiqueFeedback: opts.critiqueFeedback,
     referenceImages: opts.referenceImages,
+    creativeBible: opts.creativeBible,
     beats: planned.beats,
   });
 
@@ -346,6 +350,7 @@ interface CustomComponentOpts {
   imageUrl?: string;
   duration: number;
   critiqueFeedback?: string;
+  creativeBible?: CreativeBible;
 }
 
 async function generateCustomComponent(opts: CustomComponentOpts): Promise<string> {
@@ -376,6 +381,19 @@ async function generateCustomComponent(opts: CustomComponentOpts): Promise<strin
     brandAssetContext += `\n\nBrand Guidelines (FOLLOW THESE RULES):\n${opts.brandKit.guidelines}\n`;
   }
 
+  // Inject creative bible visual style constraints
+  var creativeBibleContext = "";
+  if (opts.creativeBible) {
+    var vs = opts.creativeBible.visualStyle;
+    creativeBibleContext = `\n\n## Creative Direction (MUST FOLLOW)
+Concept: ${opts.creativeBible.concept}
+Color mood: ${vs.colorMood}
+Typography attitude: ${vs.typographyAttitude}
+Motion personality: ${vs.motionPersonality}
+Spatial strategy: ${vs.spatialStrategy}
+Through-line: ${opts.creativeBible.throughLine}`;
+  }
+
   var scenePrompt = `Generate the HTML for this component:
 
 Scene: ${opts.sceneLabel}
@@ -383,7 +401,7 @@ Duration: ${opts.duration} seconds
 Visual Direction: ${opts.customPrompt}
 ${imageContext}${brandAssetContext}
 
-Overall project: ${opts.prompt}
+Overall project: ${opts.prompt}${creativeBibleContext}
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}.
 
 IMPORTANT LAYOUT RULES:

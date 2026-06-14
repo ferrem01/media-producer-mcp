@@ -357,6 +357,20 @@ export interface Project {
   speaker_track?: SpeakerTrack;
 
   // ── Lifecycle ──
+  /** Creative bible from the concept director (structured, not prose) */
+  creative_bible?: {
+    concept: string;
+    pattern: string;
+    throughLine: string;
+    emotionalArc: string;
+    visualStyle: {
+      colorMood: string;
+      typographyAttitude: string;
+      motionPersonality: string;
+      spatialStrategy: string;
+    };
+    directorNote: string;
+  };
   /** Creative brief from the caller */
   brief?: ProjectBrief;
   /** Creative plan (script + storyboard + asset manifest) */

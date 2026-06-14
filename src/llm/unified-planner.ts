@@ -10,6 +10,7 @@
 
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
+import type { CreativeBible } from "./concept-director.js";
 import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
 import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { COMPOSITION_PLAYBOOK } from "./cinematography.js";
@@ -45,6 +46,7 @@ export interface UnifiedPlannerOpts {
   tenantId: string;
   hasSpeakerTrack?: boolean;
   referenceImages?: ReferenceImage[];
+  creativeBible?: CreativeBible;
 }
 
 export interface PlannedComponent {

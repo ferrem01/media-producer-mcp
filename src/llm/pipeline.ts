@@ -342,6 +342,7 @@ async function runSceneRevisionPipeline(
     canvas,
     tenantId: opts.tenant_id,
     projectId: project.project_id,
+    creativeBible: project.creative_bible as any,
   });
 
   // Preserve the original scene id
@@ -480,6 +481,7 @@ async function runVideoRevisionPipeline(
       imageUrl,
       tenantId: opts.tenant_id,
       projectId: project.project_id,
+      creativeBible: project.creative_bible as any,
     });
 
     if (generated.customSources) {
@@ -512,6 +514,7 @@ async function runVideoRevisionPipeline(
         critique: opts.critique,
         creativity: resolveCreativity(opts),
         critiqueLlmConfig: config.critiqueLlm,
+        creativeBible: project.creative_bible,
       });
       finalVidScene = critiqueResult.scene;
       if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
@@ -526,6 +529,7 @@ async function runVideoRevisionPipeline(
 
   project.scenes = newScenes;
   project.name = storyboard.name || project.name;
+    // creativeBible saved in runUnifiedPipeline
 
   // Merge assets
   if (enrichResult.assets.length > 0) {
@@ -719,6 +723,7 @@ async function runImageRevisionPipeline(
         canvas: useCanvas,
         tenantId: opts.tenant_id,
         projectId: project.project_id,
+        creativeBible: project.creative_bible as any,
       });
 
       if (generated.customSources) {
@@ -885,6 +890,7 @@ async function critiqueAndRetryScene(opts: {
   critique?: boolean;
   creativity?: number;
   critiqueLlmConfig?: LLMConfig;
+  creativeBible?: any;
 }): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
   // Skip critique if disabled
   if (opts.critique === false) {
@@ -1187,6 +1193,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         imageUrl: opts.imageUrl,
         tenantId: opts.tenantId,
         projectId: opts.projectId,
+        creativeBible: opts.creativeBible,
         critiqueFeedback,
       });
 
@@ -1242,6 +1249,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         imageUrl: opts.imageUrl,
         tenantId: opts.tenantId,
         projectId: opts.projectId,
+        creativeBible: opts.creativeBible,
         critiqueFeedback: swapFeedback,
       });
 
@@ -1388,6 +1396,7 @@ async function runUnifiedPipeline(
     tenantId: opts.tenant_id,
     hasSpeakerTrack: !!opts.speaker_source,
     referenceImages: processedRefs,
+    creativeBible,
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
@@ -1412,6 +1421,7 @@ async function runUnifiedPipeline(
     canvas,
     brand_kit: brandKit,
     scenes: [],
+    creative_bible: creativeBible,
   };
 
   // Apply speaker track if provided
@@ -1551,6 +1561,7 @@ async function runUnifiedPipeline(
           tenantId: opts.tenant_id,
           projectId,
           referenceImages: processedRefs,
+          creativeBible,
         });
 
         // Save custom component HTML if needed
@@ -1586,6 +1597,7 @@ async function runUnifiedPipeline(
             critique: skipCritique ? false : opts.critique,
             creativity: resolveCreativity(opts),
             critiqueLlmConfig: config.critiqueLlm,
+            creativeBible,
           });
           finalScene = critiqueResult.scene;
           finalCustomSources = critiqueResult.customSources;
