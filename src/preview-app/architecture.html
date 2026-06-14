@@ -1293,6 +1293,16 @@
       <p>When mode:"full" runs, the <code>StoryboardResult</code> from the unified planner is never saved. Each <code>PlannedScene</code> goes through <code>generateScene()</code> and becomes a <code>Scene</code> in <code>project.scenes[]</code>. The planning context -- why each scene was chosen, which pipeline path was selected, the creative rationale -- is lost.</p>
       <p style="margin-top:8px;">The <code>creative_bible</code> is now preserved (Refactor 1), but the storyboard itself is not.</p>
     </div>
+    <div class="concept-card" style="border-left:3px solid var(--pink);">
+      <h4 style="color:var(--pink);">🔧 Refactor 4: Unify Generate Modes</h4>
+      <p><code>mode:"full"</code> should not be a separate code path. It should run <code>plan &rarr; generate &rarr; render</code> using the exact same pipeline. One PlannedScene type. Storyboard always saved. The mode just controls where to stop:</p>
+      <ul>
+        <li><strong>plan:</strong> stop after planning, save storyboard</li>
+        <li><strong>generate:</strong> pick up from saved storyboard, generate + render</li>
+        <li><strong>full:</strong> run everything end-to-end, same code path</li>
+      </ul>
+      <p style="margin-top:8px;"><strong>Status:</strong> Planned refactor. See ARCHITECTURE.md roadmap.</p>
+    </div>
     <div class="concept-card" style="border-left:3px solid var(--yellow);">
       <h4 style="color:var(--yellow);">💡 Two Different PlannedScene Types</h4>
       <p>Confusingly, there are TWO <code>PlannedScene</code> interfaces:</p>
