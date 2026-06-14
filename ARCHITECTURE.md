@@ -469,7 +469,17 @@ GSAP-based interactive animations. Shared utilities (script-runner.js, cursor.js
 
 Prioritized list of what's next. Updated as things ship.
 
-### High Priority
+### High Priority -- Architecture Refactors
+
+These three refactors address fundamental architecture issues identified 2026-06-14. They should be done before new feature work.
+
+- [ ] **Refactor 1: Fix Pipeline Data Loss** -- CreativeBible from concept-director gets flattened to prose and prepended to the planner prompt. Structured data (colorMood, motionPersonality, spatialStrategy) becomes text the LLM may ignore. Fix: pass CreativeBible as structured data through the entire pipeline. Add validation that planner output respects the bible's constraints. No data should be dropped between expander -> concept director -> planner -> scene generator.
+
+- [ ] **Refactor 2: Unify Scenes and Sequences** -- Sequences are a bolt-on parallel concept with a separate assembler, converter, and types. The real issue was scene-assembler starting all component timelines at t=0. Fix: make choreography[] a first-class optional field on Scene. Extend scene-assembler to handle timed component visibility. Kill sequence-assembler.ts, sequence-converter.ts, and the "sequence" concept. A scene can be any length with optional choreographed timing.
+
+- [ ] **Refactor 3: Hybrid Codegen Path (Components as Building Blocks)** -- Three paths exist but none lets codegen USE library components as embedded building blocks. Library = data binding only. Freeform = all-new HTML, reads components for reference only. Fix: build a hybrid path where the LLM receives actual component source code and embeds it into custom scenes with custom layout, transitions, and elements around it. Components become composable building blocks for codegen.
+
+### High Priority -- Features
 - [x] **Tenant Component Playground** -- three-panel layout with LLM-driven generation, chat iteration, schema-driven form editor, script builder, tenant CRUD. See [PLAYGROUND.md](./PLAYGROUND.md).
 - [x] **Creative concept director** -- generates ONE unifying creative concept before scene planning. 3 concepts at temp 0.9, self-selects best, outputs creative bible.
 - [x] **Sequence scenes** -- multi-beat continuous scenes for product walkthroughs and demos. Planner outputs beats, freeform generator builds one continuous HTML doc.
