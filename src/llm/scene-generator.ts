@@ -36,6 +36,8 @@ export interface SceneGeneratorOpts {
   critiqueFeedback?: string; // feedback from visual critiquer for retry
   referenceImages?: ReferenceImage[];
   creativeBible?: CreativeBible;
+  /** When true, route ALL scenes through the unified codegen path (freeform with <component> tags) */
+  useCodegen?: boolean;
 }
 
 export interface GeneratedScene {
@@ -49,6 +51,23 @@ export interface GeneratedScene {
 export async function generateScene(opts: SceneGeneratorOpts): Promise<GeneratedScene> {
   var planned = opts.scene;
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
+
+  // ── Unified Codegen Path ──
+  // When enabled, ALL scenes go through the freeform-agentic generator
+  // which can use <component> tags to embed library components.
+  if (opts.useCodegen) {
+    // Build a rich brief from whatever the planner provided
+    var codegenBrief = buildCodegenBrief(planned);
+    var codegenPlanned = {
+      ...planned,
+      freeform: true,
+      freeform_brief: codegenBrief,
+    };
+    console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (unified codegen)`);
+    return await generateFreeformScene(opts, codegenPlanned, sceneId);
+  }
+
+  // ── Legacy paths (used when useCodegen is false) ──
 
   // ── Freeform scene path ──
   if (planned.freeform && (planned.freeform_brief || planned.beats?.length)) {
@@ -422,6 +441,80 @@ Start with <template> and end with </script>.`;
   ], { temperature: 0.5, maxTokens: 8192 });
 
   return stripHtmlFences(sceneHtml);
+}
+
+// ── Unified Codegen Brief Builder ──
+
+/**
+ * Build a rich freeform brief from any planned scene type.
+ * Converts template, library component, sequence, or custom scene
+ * descriptions into a brief the freeform-agentic generator can use
+ * with <component> tags.
+ */
+function buildCodegenBrief(planned: any): string {
+  var parts: string[] = [];
+
+  parts.push(`Scene: "${planned.label}"`);
+  parts.push(`Duration: ${planned.duration_seconds || 5} seconds`);
+  if (planned.description) parts.push(`Description: ${planned.description}`);
+
+  // Template scene: tell the LLM to use a component tag or recreate the template look
+  if (planned.template) {
+    parts.push(`\nThis scene should use the "${planned.template}" template style.`);
+    if (planned.template_data) {
+      parts.push(`Content to fill in:`);
+      for (var [key, value] of Object.entries(planned.template_data)) {
+        parts.push(`  - ${key}: ${JSON.stringify(value)}`);
+      }
+    }
+  }
+
+  // Library components: tell the LLM to use <component> tags
+  if (planned.components?.length > 0) {
+    var libComps = planned.components.filter((c: any) => !c.custom && c.type);
+    var customComps = planned.components.filter((c: any) => c.custom);
+
+    if (libComps.length > 0) {
+      parts.push(`\nUse these library components via <component> tags:`);
+      for (var lc of libComps) {
+        var dataStr = lc.data ? ` with data: ${JSON.stringify(lc.data)}` : "";
+        parts.push(`  - <component type="${lc.type}"${dataStr} />`);
+        if (lc.position) parts.push(`    Position: ${JSON.stringify(lc.position)}`);
+      }
+    }
+
+    if (customComps.length > 0) {
+      parts.push(`\nAlso create custom elements:`);
+      for (var cc of customComps) {
+        parts.push(`  - ${cc.custom_prompt || "Custom visual element"}`);
+      }
+    }
+  }
+
+  // Sequence beats: include beat choreography
+  if (planned.beats?.length > 0) {
+    parts.push(`\nThis is a multi-beat sequence (${planned.beats.length} beats, continuous take):`);
+    var runTime = 0;
+    for (var beat of planned.beats) {
+      parts.push(`  Beat "${beat.label}" (${runTime}s - ${runTime + beat.duration_seconds}s): ${beat.brief}`);
+      runTime += beat.duration_seconds;
+    }
+    parts.push(`Use <component> tags for each UI element, then choreograph them with GSAP.`);
+    parts.push(`Show/hide/move components at beat boundaries using ctx.getComponentTimeline().`);
+  }
+
+  // Freeform brief: pass through
+  if (planned.freeform_brief) {
+    parts.push(`\nVisual Direction:\n${planned.freeform_brief}`);
+  }
+
+  // Voiceover hint
+  if (planned.voiceover_text) {
+    parts.push(`\nVoiceover: "${planned.voiceover_text}"`);
+    parts.push(`Time the visual reveals to match the narration pacing.`);
+  }
+
+  return parts.join("\n");
 }
 
 // ── Helpers ──
