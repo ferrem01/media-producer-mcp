@@ -1,7 +1,7 @@
 # Media Producer MCP -- Architecture
 
 Living document. Updated as the system evolves.
-Last updated: 2026-06-13
+Last updated: 2026-06-14
 
 ## What This Is
 
@@ -70,7 +70,79 @@ A self-contained visual element. Each is a `.component.html` file with three sec
 
 Components reference brand kit values via CSS custom properties (`--mp-color-primary`, `--mp-font-family`, etc.). Data is bound via `data-bind` attributes and the `data` object passed to `createTimeline`.
 
-**Component library:** 41+ components across categories (titles, layouts, effects, media, data-viz, CTA, mockups). Both hand-crafted library components and LLM-generated custom components.
+**Component library:** 67 components across categories (titles, layouts, effects, media, data-viz, CTA, mockups). Both hand-crafted library components and LLM-generated custom components.
+
+### Scene Templates
+Pre-composed scene blueprints with premium visuals baked in. Unlike components (individual building blocks), templates are full scene compositions -- proven layouts with components, timing, and GSAP animation already wired together. The planner selects a template, fills content slots, and produces Apple-keynote-quality output without the LLM needing to write CSS or GSAP.
+
+**Template catalog:** 33 templates across 5 categories (defined in `template-catalog.ts`). Each template is a `.scene.html` file in the `templates/` directory.
+
+**How they work:**
+1. Planner picks a template ID based on the narrative moment (e.g. `O1-big-statement` for an opening)
+2. Planner fills the template content slots (e.g. `headline: "The Future of Marketing"`)
+3. Scene generator loads the `.scene.html` file and applies slot values via SEARCH/REPLACE
+4. Result is a fully styled, animated scene without any LLM-generated CSS or GSAP
+
+#### Categories
+
+**OPENINGS (5 templates)**
+| ID | Name | When | Duration |
+|----|------|------|----------|
+| O1-big-statement | Big Statement | Opening scene, one powerful headline | 4-5s |
+| O2-chapter-title | Chapter Title | Section divider between topics | 3-5s |
+| O3-provocation | Provocation | Opening with a question or bold claim | 4-5s |
+| O4-product-hero | Product Hero | Product reveal with 3D device frame | 5-7s |
+| O5-logo-intro | Logo Intro | Brand intro with logo reveal | 3-5s |
+
+**CONTENT (19 templates)**
+| ID | Name | When | Duration |
+|----|------|------|----------|
+| C1-feature-spotlight | Feature Spotlight | Single feature or benefit highlight | 4-6s |
+| C3-feature-grid | Feature Grid | 3-4 features as glassmorphic cards | 5-7s |
+| C5-testimonial | Testimonial | Customer quote, social proof | 5-6s |
+| C6-split-compare | Split Compare | Before/after, old way vs new way | 5-7s |
+| C7-picture-in-picture | Picture-in-Picture | Text with floating product preview | 5-7s |
+| C8-device-mockup | Device Mockup | Product UI in laptop frame | 5-7s |
+| C9-logo-wall | Logo Wall | Customer/partner logo grid | 4-6s |
+| C10-feature-stack | Feature Stack | Numbered vertical feature list | 5-7s |
+| C11-process-steps | Process Steps | 3-step horizontal process flow | 5-7s |
+| C12-icon-list | Icon List | Checklist of benefits with icons | 5-7s |
+| C13-phone-mockup | Phone Mockup | 3D phone with app UI | 5-7s |
+| C14-team-grid | Team Grid | Avatar circles with names/roles | 4-6s |
+| C15-pricing-tiers | Pricing Tiers | Three-column pricing comparison | 5-7s |
+| C16-case-study | Case Study | Data-backed customer story | 5-7s |
+| C17-problem-solution | Problem/Solution | Pain point then solution reveal | 5-7s |
+| C18-integration-grid | Integration Grid | App ecosystem connectivity grid | 5-7s |
+| C19-timeline | Timeline/Roadmap | Horizontal milestone timeline | 5-7s |
+| C20-faq-objection | FAQ/Objection | Question and answer reveal | 5-7s |
+| C21-social-posts | Social Posts Wall | Social proof tweet cards | 5-7s |
+| L1-lower-third | Lower Third | Broadcast-style name card | 4-6s |
+
+**DATA (7 templates)**
+| ID | Name | When | Duration |
+|----|------|------|----------|
+| D1-hero-stat | Hero Stat | Single impressive number reveal | 4-5s |
+| D2-metric-trio | Metric Trio | Three related stats side by side | 5-6s |
+| D3-before-after-stat | Before/After Stat | Impact comparison with arrow | 5-7s |
+| D4-progress-bars | Progress Bars | Animated horizontal bar chart | 5-7s |
+| D5-social-proof-counter | Social Proof Counter | Three big animated count-ups | 5-7s |
+| D6-line-chart | Animated Line Chart | Growth trend line draws itself | 5-7s |
+| D7-bar-chart | Animated Bar Chart | Category comparison bars | 5-7s |
+
+**CLOSING (2 templates)**
+| ID | Name | When | Duration |
+|----|------|------|----------|
+| E1-cta-finale | CTA Finale | Final call to action | 4-5s |
+| E2-recap-grid | Recap Grid | 2x2 key takeaway summary | 5-7s |
+
+**SPEAKER (3 templates)**
+| ID | Name | When | Duration |
+|----|------|------|----------|
+| S1-speaker-spotlight | Speaker Spotlight | Speaker with content panel beside | 5-8s |
+| S2-screencast-pip | Screencast with Speaker | Browser frame + PiP speaker circle | 5-8s |
+| S3-speaker-lowerthird | Speaker with Lower Third | Speaker with broadcast name bar | 4-7s |
+
+Speaker templates require `speaker_source` in project assets. When selected, they automatically set `transparent_background` and `content_region` on the scene.
 
 ### Speaker Track
 The continuous camera/speaker video that plays underneath scene content.
@@ -261,6 +333,7 @@ src/
 │   ├── scene-assembler.ts    # single scene → HTML
 │   ├── composite-assembler.ts # all scenes → single HTML doc
 │   ├── render.ts             # standard render pipeline
+│   ├── sequence-assembler.ts # multi-beat sequence scene assembly
 │   ├── speaker-track.ts      # speaker track render pipeline
 │   ├── capture.ts            # Playwright screenshot capture
 │   └── scene-worker.ts       # child process frame capture
@@ -271,13 +344,16 @@ src/
 │   ├── unified-planner.ts    # scene planning (supports sequences)
 │   ├── freeform-agentic.ts   # agentic freeform HTML generation (supports beats)
 │   ├── scene-generator.ts    # routes scenes to appropriate generator
-│   └── template-catalog.ts   # component library metadata
+│   ├── template-catalog.ts   # scene template catalog (33 templates)
+│   ├── sequence-converter.ts # merges consecutive scenes into sequences
+│   └── catalog.ts            # component library metadata
 ├── preview-app/
 │   └── preview-app.ts        # preview SPA (single file, embedded HTML/CSS/JS)
 ├── playground-app/
 │   └── playground-app.ts     # component playground
 ├── persistence/
 │   └── project.ts            # project CRUD
+├── templates/                # scene template .scene.html files (33)
 ├── server.ts                 # MCP tool definitions
 └── index.ts                  # HTTP server + routes
 ```
