@@ -282,7 +282,7 @@ async function executeReadSource(
         if (htmlFile) {
           var filePath = path.join(catPath, htmlFile);
           var source = await fs.readFile(filePath, "utf-8");
-          return `# Component: ${name}\n# Category: ${catDir.name}\n# File: ${catDir.name}/${htmlFile}\n\n${source}`;
+          return `# Component: ${name}\n# Category: ${catDir.name}\n# File: ${catDir.name}/${htmlFile}\n# EMBED WITH: <component type="${name}" data='{...}' />\n# Check the createTimeline data parameter for available props.\n\n${source}`;
         }
       }
       return `Component "${name}" not found. Use search_library to find available components.`;
@@ -337,11 +337,19 @@ Always search and read at least one reference before writing.
 
 ${designSkills}
 
-## Component Tags (PREFERRED for known UI elements)
+## Component Tags (REQUIRED when a library component matches)
 
-You can embed pre-built library components using <component> tags instead of rebuilding them from scratch.
-This gives you battle-tested, high-quality UI elements with zero effort. Focus your creativity on composition,
-layout, and the custom elements around them.
+MANDATORY RULE: If the scene needs a UI element that exists in the component library below (chat panels, editors,
+dashboards, charts, code editors, kanban boards, etc.), you MUST use a <component> tag. Do NOT rebuild it from scratch.
+Writing custom HTML for something that already exists in the library is a bug.
+
+Use <component> tags for the UI building blocks. Write custom code for:
+- Layout and positioning of components on the canvas
+- Transitions, reveals, and choreography between components
+- Decorative elements (backgrounds, particles, overlays)
+- Anything truly unique that has no library match
+
+The result is HYBRID: <component> tags for known UI + custom code for everything else.
 
 ### Syntax
 \`\`\`html
@@ -362,8 +370,12 @@ layout, and the custom elements around them.
 - Component IDs are auto-assigned: comp_0, comp_1, comp_2... in order of appearance
 - You can add \`class\` and \`style\` attributes to the <component> tag for positioning
 - You can mix <component> tags with fully custom HTML/CSS/GSAP in the same scene
-- PREFER <component> tags for any UI that matches a library component (chat panels, editors, dashboards, charts, etc.)
-- Write custom code for layout, transitions between components, overlays, decorative elements, and anything unique
+- You MUST use <component> tags for any UI that matches a library component. This is not optional.
+- If search_library returns a matching component, USE IT via <component> tag. Do not rewrite it from scratch.
+- Write custom code ONLY for layout, transitions, overlays, decorative elements, and truly unique visuals
+- A scene with quotient-chat content MUST use <component type="quotient-chat">
+- A scene with a code editor MUST use <component type="code-editor">
+- A scene with charts MUST use <component type="bar-chart"> or <component type="line-chart">
 
 ### Timeline Integration
 \`\`\`javascript
@@ -625,6 +637,7 @@ ${opts.sceneBrief}
 - All text MUST have correct spacing. Never concatenate words. Check every text string for missing spaces.
 - Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
 ${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
+CRITICAL: Before writing ANY UI element, check the component catalog. If a matching component exists, use <component type=... data='...' /> -- do NOT rebuild it from scratch. Search the library first, then use <component> tags for matches and write custom code only for the rest.
 Start by searching the library for relevant patterns, then read 1-3 relevant sources before writing your scene.`;
 
   // Build user message: include reference images as vision content if available
