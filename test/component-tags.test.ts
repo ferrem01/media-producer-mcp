@@ -1,0 +1,182 @@
+import { describe, it, expect } from "vitest";
+import { resolveComponentTags, buildComponentTimelineScript } from "../src/core/component-tags.js";
+
+// Minimal component source for testing
+const CHAT_COMPONENT = `
+<template>
+  <div class="chat-panel">
+    <div class="chat-title">{{conversation_title}}</div>
+    <div class="chat-messages"></div>
+  </div>
+</template>
+<style scoped>
+.chat-panel { background: #1e293b; border-radius: 12px; }
+.chat-title { font-size: 14px; font-weight: 600; }
+</style>
+<script>
+function createTimeline(el, data, ctx) {
+  const tl = gsap.timeline();
+  tl.from(el, { opacity: 0, y: 20, duration: 0.6 });
+  return tl;
+}
+</script>
+`;
+
+const EDITOR_COMPONENT = `
+<template>
+  <div class="editor">
+    <div class="toolbar">{{design_type}}</div>
+    <div class="canvas-area"></div>
+  </div>
+</template>
+<style scoped>
+.editor { background: #fff; }
+.toolbar { height: 48px; }
+</style>
+<script>
+function createTimeline(el, data, ctx) {
+  const tl = gsap.timeline();
+  tl.from(el, { opacity: 0, duration: 0.5 });
+  return tl;
+}
+</script>
+`;
+
+function buildSourceMap(): Map<string, string> {
+  const map = new Map<string, string>();
+  map.set("quotient-chat", CHAT_COMPONENT);
+  map.set("canva-editor", EDITOR_COMPONENT);
+  return map;
+}
+
+describe("resolveComponentTags", () => {
+  it("resolves a single component tag", () => {
+    const html = `<div class="scene"><component type="quotient-chat" data='{"conversation_title": "Test Chat"}' /></div>`;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].type).toBe("quotient-chat");
+    expect(result.components[0].id).toBe("comp_0");
+    expect(result.components[0].data).toEqual({ conversation_title: "Test Chat" });
+
+    // HTML should contain the bound template
+    expect(result.html).toContain("Test Chat");
+    expect(result.html).toContain('data-comp-id="comp_0"');
+    expect(result.html).toContain('data-comp-type="quotient-chat"');
+    // Original <component> tag should be gone
+    expect(result.html).not.toContain("<component");
+  });
+
+  it("resolves multiple component tags with auto-incrementing ids", () => {
+    const html = `
+      <div class="scene">
+        <component type="quotient-chat" data='{"conversation_title": "Chat"}' />
+        <component type="canva-editor" data='{"design_type": "social"}' />
+      </div>
+    `;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.components).toHaveLength(2);
+    expect(result.components[0].id).toBe("comp_0");
+    expect(result.components[0].type).toBe("quotient-chat");
+    expect(result.components[1].id).toBe("comp_1");
+    expect(result.components[1].type).toBe("canva-editor");
+
+    expect(result.html).toContain('data-comp-id="comp_0"');
+    expect(result.html).toContain('data-comp-id="comp_1"');
+  });
+
+  it("uses explicit id when provided", () => {
+    const html = `<component type="quotient-chat" id="my-chat" data='{}' />`;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.components[0].id).toBe("my-chat");
+    expect(result.html).toContain('data-comp-id="my-chat"');
+  });
+
+  it("handles component tag without data attribute", () => {
+    const html = `<component type="quotient-chat" />`;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].data).toEqual({});
+  });
+
+  it("preserves custom HTML around component tags", () => {
+    const html = `
+      <div class="custom-wrapper">
+        <h1>My Custom Title</h1>
+        <component type="quotient-chat" data='{}' />
+        <div class="custom-overlay">Custom overlay content</div>
+      </div>
+    `;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.html).toContain("My Custom Title");
+    expect(result.html).toContain("Custom overlay content");
+    expect(result.html).toContain('data-comp-type="quotient-chat"');
+  });
+
+  it("handles unknown component type gracefully", () => {
+    const html = `<component type="nonexistent-widget" data='{}' />`;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.components).toHaveLength(0);
+    expect(result.html).toContain("not found");
+  });
+
+  it("handles component tag missing type attribute", () => {
+    const html = `<component data='{}' />`;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.components).toHaveLength(0);
+    expect(result.html).toContain("missing type");
+  });
+
+  it("generates scoped CSS for each component", () => {
+    const html = `<component type="quotient-chat" data='{}' />`;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.components[0].scopedCss).toContain('[data-cid="comp_0"]');
+    expect(result.components[0].scopedCss).toContain(".chat-panel");
+  });
+
+  it("passes extra class and style to wrapper", () => {
+    const html = `<component type="quotient-chat" class="left-panel" style="width:50%" data='{}' />`;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.html).toContain("left-panel");
+    expect(result.html).toContain('style="width:50%"');
+  });
+
+  it("handles open/close component tag form", () => {
+    const html = `<component type="quotient-chat" data='{"conversation_title": "Test"}'></component>`;
+    const result = resolveComponentTags(html, buildSourceMap());
+
+    expect(result.components).toHaveLength(1);
+    expect(result.html).toContain("Test");
+  });
+});
+
+describe("buildComponentTimelineScript", () => {
+  it("returns empty string for no components", () => {
+    const result = buildComponentTimelineScript([], 10, { width: 1920, height: 1080 });
+    expect(result).toBe("");
+  });
+
+  it("generates timeline registration for components", () => {
+    const html = `<component type="quotient-chat" data='{}' />`;
+    const resolved = resolveComponentTags(html, buildSourceMap());
+
+    const script = buildComponentTimelineScript(
+      resolved.components,
+      10,
+      { width: 1920, height: 1080 },
+    );
+
+    expect(script).toContain("__componentTimelines");
+    expect(script).toContain("createTimeline_comp_0");
+    expect(script).toContain("__getComponentTimeline");
+    expect(script).toContain('data-comp-id="comp_0"');
+  });
+});
