@@ -573,6 +573,145 @@
   .creativity-segment:last-child { border-right: none; }
   .creativity-label { font-size: 12px; font-weight: 600; }
   .creativity-desc { font-size: 10px; opacity: 0.8; }
+
+  /* ── I/O Section ── */
+  .io-flow-summary {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 16px 0 24px;
+    margin-bottom: 8px;
+  }
+  .io-flow-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .io-flow-dim { opacity: 0.5; }
+  .io-flow-label { font-size: 11px; font-weight: 600; color: var(--text-dim); }
+  .io-flow-type { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; color: var(--accent); margin-top: 2px; }
+  .io-flow-arrow { color: var(--border); padding: 0 6px; flex-shrink: 0; font-size: 16px; }
+
+  .io-stage {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .io-stage-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .io-stage-num {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+  .io-stage-file {
+    font-family: 'SF Mono','Fira Code',monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(52,211,153,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 2px;
+  }
+  .io-stage-desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+
+  .io-columns {
+    display: flex;
+    gap: 0;
+    align-items: flex-start;
+    overflow-x: auto;
+  }
+  .io-arrow-col {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 20px;
+    color: var(--border);
+    flex-shrink: 0;
+    min-height: 100px;
+  }
+  .io-block {
+    flex: 1;
+    min-width: 280px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .io-input { border-color: rgba(99,102,241,0.3); }
+  .io-output { border-color: rgba(52,211,153,0.3); }
+
+  .io-block-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .io-input .io-block-label { color: var(--primary); }
+  .io-output .io-block-label { color: var(--accent); }
+
+  .io-code {
+    font-family: 'SF Mono','Fira Code',monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .io-key { color: var(--text); }
+  .io-type { color: var(--cyan); }
+  .io-comment { color: var(--text-dim); opacity: 0.6; }
+
+  .io-example {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .io-example-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .io-example-code {
+    font-family: 'SF Mono','Fira Code',monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    white-space: pre;
+    overflow-x: auto;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  @media (max-width: 700px) {
+    .io-columns { flex-direction: column; }
+    .io-arrow-col { min-height: auto; padding: 8px 0; transform: rotate(90deg); }
+  }
 </style>
 </head>
 <body>
@@ -585,6 +724,7 @@
 <nav id="nav">
   <button data-view="overview" class="active">Overview</button>
   <button data-view="generate">Generate Pipeline</button>
+  <button data-view="io">Pipeline I/O</button>
   <button data-view="render">Render Pipeline</button>
   <button data-view="scenes">Scenes vs Sequences</button>
   <button data-view="components">Component Library</button>
@@ -754,6 +894,287 @@
 
   </div>
 </section>
+
+<!-- ════════════════ PIPELINE I/O ════════════════ -->
+<section class="view" id="view-io">
+  <h2>Pipeline I/O Formats</h2>
+  <p class="description">
+    The exact input and output types for each stage of the generate pipeline. The first two stages refine text.
+    Stage 3 is where it becomes structured data that drives everything downstream.
+  </p>
+
+  <div class="io-flow-summary">
+    <div class="io-flow-item">
+      <div class="io-flow-label">User</div>
+      <div class="io-flow-type">string</div>
+    </div>
+    <div class="io-flow-arrow">→</div>
+    <div class="io-flow-item">
+      <div class="io-flow-label">Expander</div>
+      <div class="io-flow-type">string</div>
+    </div>
+    <div class="io-flow-arrow">→</div>
+    <div class="io-flow-item">
+      <div class="io-flow-label">Concept Director</div>
+      <div class="io-flow-type">CreativeBible</div>
+    </div>
+    <div class="io-flow-arrow">→</div>
+    <div class="io-flow-item">
+      <div class="io-flow-label">Planner</div>
+      <div class="io-flow-type">StoryboardResult</div>
+    </div>
+    <div class="io-flow-arrow">→</div>
+    <div class="io-flow-item">
+      <div class="io-flow-label">Scene Gen</div>
+      <div class="io-flow-type">Scene[]</div>
+    </div>
+    <div class="io-flow-arrow">→</div>
+    <div class="io-flow-item io-flow-dim">
+      <div class="io-flow-label">Critique</div>
+      <div class="io-flow-type">...</div>
+    </div>
+    <div class="io-flow-arrow">→</div>
+    <div class="io-flow-item io-flow-dim">
+      <div class="io-flow-label">project.json</div>
+      <div class="io-flow-type">Project</div>
+    </div>
+  </div>
+
+  <!-- Stage 1: Prompt Expansion -->
+  <div class="io-stage">
+    <div class="io-stage-header">
+      <div class="io-stage-num" style="background:var(--primary-dim);">1</div>
+      <div>
+        <h3 style="margin:0;">Prompt Expansion</h3>
+        <div class="io-stage-file">expander.ts</div>
+      </div>
+    </div>
+    <p class="io-stage-desc">Detects thin prompts (&lt;15 words, no visual/structural cues) and expands them into rich creative briefs. Rich prompts pass through unchanged.</p>
+
+    <div class="io-columns">
+      <div class="io-block io-input">
+        <div class="io-block-label">INPUT: ExpanderOpts</div>
+        <pre class="io-code"><span class="io-key">prompt</span>: <span class="io-type">string</span>          <span class="io-comment">// raw user text</span>
+<span class="io-key">format</span>: <span class="io-type">OutputFormat</span>    <span class="io-comment">// "video" | "image" | "gif" | ...</span>
+<span class="io-key">llmConfig</span>: <span class="io-type">LLMConfig</span>
+<span class="io-key">brandKit</span>?: <span class="io-type">BrandKit</span>     <span class="io-comment">// colors, fonts, logos</span>
+<span class="io-key">sceneCount</span>?: <span class="io-type">number</span>   <span class="io-comment">// optional hint</span>
+<span class="io-key">duration</span>?: <span class="io-type">number</span>     <span class="io-comment">// optional target seconds</span></pre>
+
+        <div class="io-example">
+          <div class="io-example-label">Example input:</div>
+          <pre class="io-example-code">{
+  prompt: "Make a video about Quotient",
+  format: "video"
+}</pre>
+        </div>
+      </div>
+
+      <div class="io-arrow-col">→</div>
+
+      <div class="io-block io-output">
+        <div class="io-block-label">OUTPUT: ExpandedPrompt</div>
+        <pre class="io-code"><span class="io-key">expanded</span>: <span class="io-type">boolean</span>       <span class="io-comment">// true if it was thin</span>
+<span class="io-key">prompt</span>: <span class="io-type">string</span>          <span class="io-comment">// rich creative brief</span>
+<span class="io-key">template</span>?: <span class="io-type">string</span>      <span class="io-comment">// narrative pattern detected</span>
+<span class="io-key">sceneCount</span>?: <span class="io-type">number</span>   <span class="io-comment">// suggested scene count</span></pre>
+
+        <div class="io-example">
+          <div class="io-example-label">Example output:</div>
+          <pre class="io-example-code">{
+  expanded: true,
+  prompt: "Create a 45-second brand video for
+    Quotient, an AI-powered demand marketing
+    platform. Open with a bold statement about
+    the future of marketing. Show the product
+    in action with a walkthrough of the chat
+    interface connecting to Canva. Include
+    3 key metrics. Close with a CTA...",
+  template: "product-launch",
+  sceneCount: 7
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 2: Creative Direction -->
+  <div class="io-stage">
+    <div class="io-stage-header">
+      <div class="io-stage-num" style="background:var(--primary-dim);">2</div>
+      <div>
+        <h3 style="margin:0;">Creative Direction</h3>
+        <div class="io-stage-file">concept-director.ts</div>
+      </div>
+    </div>
+    <p class="io-stage-desc">Generates 3 distinct creative concepts at high temperature (0.9), self-critiques them, picks the strongest one. Outputs a "creative bible" that the planner must follow so all scenes serve ONE cohesive idea.</p>
+
+    <div class="io-columns">
+      <div class="io-block io-input">
+        <div class="io-block-label">INPUT: ConceptDirectorOpts</div>
+        <pre class="io-code"><span class="io-key">prompt</span>: <span class="io-type">string</span>            <span class="io-comment">// expanded prompt from stage 1</span>
+<span class="io-key">format</span>: <span class="io-type">OutputFormat</span>
+<span class="io-key">llmConfig</span>: <span class="io-type">LLMConfig</span>
+<span class="io-key">brandKit</span>: <span class="io-type">BrandKit</span>
+<span class="io-key">referenceImages</span>?: <span class="io-type">ReferenceImage[]</span></pre>
+      </div>
+
+      <div class="io-arrow-col">→</div>
+
+      <div class="io-block io-output">
+        <div class="io-block-label">OUTPUT: CreativeBible</div>
+        <pre class="io-code"><span class="io-key">concept</span>: <span class="io-type">string</span>           <span class="io-comment">// one-line big idea</span>
+<span class="io-key">pattern</span>: <span class="io-type">string</span>           <span class="io-comment">// storytelling pattern</span>
+<span class="io-key">throughLine</span>: <span class="io-type">string</span>       <span class="io-comment">// what persists across scenes</span>
+<span class="io-key">emotionalArc</span>: <span class="io-type">string</span>     <span class="io-comment">// start → middle → end</span>
+<span class="io-key">visualStyle</span>: {
+  <span class="io-key">colorMood</span>: <span class="io-type">string</span>       <span class="io-comment">// e.g. "Dark with electric accents"</span>
+  <span class="io-key">typographyAttitude</span>: <span class="io-type">string</span>
+  <span class="io-key">motionPersonality</span>: <span class="io-type">string</span>
+  <span class="io-key">spatialStrategy</span>: <span class="io-type">string</span>
+}
+<span class="io-key">directorNote</span>: <span class="io-type">string</span>      <span class="io-comment">// 3-5 sentence summary</span></pre>
+
+        <div class="io-example">
+          <div class="io-example-label">Example output:</div>
+          <pre class="io-example-code">{
+  concept: "One conversation creates everything",
+  pattern: "Cause-and-Effect Chain",
+  throughLine: "A single chat thread that
+    triggers a cascade of automated actions",
+  emotionalArc: "Curiosity → amazement → confidence",
+  visualStyle: {
+    colorMood: "Deep navy with indigo/emerald accents",
+    typographyAttitude: "Clean, confident, minimal",
+    motionPersonality: "Fluid and purposeful",
+    spatialStrategy: "Center-stage with reveals"
+  },
+  directorNote: "The entire video follows one
+    conversation. We never leave the chat. Each
+    message triggers a visual response that
+    builds on the last..."
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 3: Storyboard Planning -->
+  <div class="io-stage">
+    <div class="io-stage-header">
+      <div class="io-stage-num" style="background:var(--primary-dim);">3</div>
+      <div>
+        <h3 style="margin:0;">Storyboard Planning</h3>
+        <div class="io-stage-file">unified-planner.ts</div>
+      </div>
+    </div>
+    <p class="io-stage-desc">Plans the full storyboard: per-scene decisions on type (library, template, custom, freeform, sequence), component selection, transitions, timing, and voiceover scripts. This is where text becomes structured data.</p>
+
+    <div class="io-columns">
+      <div class="io-block io-input">
+        <div class="io-block-label">INPUT: UnifiedPlannerOpts</div>
+        <pre class="io-code"><span class="io-key">prompt</span>: <span class="io-type">string</span>              <span class="io-comment">// expanded prompt</span>
+<span class="io-key">format</span>: <span class="io-type">OutputFormat</span>
+<span class="io-key">llmConfig</span>: <span class="io-type">LLMConfig</span>
+<span class="io-key">brandKit</span>: <span class="io-type">BrandKit</span>
+<span class="io-key">canvas</span>: <span class="io-type">Canvas</span>              <span class="io-comment">// { width, height, fps }</span>
+<span class="io-key">componentCatalog</span>: <span class="io-type">ComponentCatalogEntry[]</span>
+                              <span class="io-comment">// all 67 available components</span>
+<span class="io-key">creativity</span>?: <span class="io-type">number</span>         <span class="io-comment">// 0-1 dial</span>
+<span class="io-key">sceneCount</span>?: <span class="io-type">number</span>
+<span class="io-key">hasSpeakerTrack</span>?: <span class="io-type">boolean</span>
+<span class="io-key">referenceImages</span>?: <span class="io-type">ReferenceImage[]</span>
+<span class="io-comment">// + CreativeBible injected into LLM context</span></pre>
+      </div>
+
+      <div class="io-arrow-col">→</div>
+
+      <div class="io-block io-output">
+        <div class="io-block-label">OUTPUT: StoryboardResult</div>
+        <pre class="io-code"><span class="io-key">name</span>: <span class="io-type">string</span>                <span class="io-comment">// project name</span>
+<span class="io-key">scenes</span>: <span class="io-type">PlannedScene[]</span>       <span class="io-comment">// ordered scene list</span></pre>
+
+        <div class="io-block-label" style="margin-top:12px;">PlannedScene</div>
+        <pre class="io-code"><span class="io-key">label</span>: <span class="io-type">string</span>               <span class="io-comment">// "Opening Hook"</span>
+<span class="io-key">duration_seconds</span>: <span class="io-type">number</span>
+<span class="io-key">description</span>: <span class="io-type">string</span>
+<span class="io-key">transition_in</span>?: { <span class="io-key">type</span>, <span class="io-key">duration_seconds</span> }
+<span class="io-key">voiceover_text</span>?: <span class="io-type">string</span>     <span class="io-comment">// TTS script</span>
+<span class="io-key">components</span>: <span class="io-type">PlannedComponent[]</span>
+<span class="io-comment">// One of these scene-type flags:</span>
+<span class="io-key">template</span>?: <span class="io-type">string</span>           <span class="io-comment">// "O1-big-statement"</span>
+<span class="io-key">template_data</span>?: <span class="io-type">Record</span>     <span class="io-comment">// slot values</span>
+<span class="io-key">freeform</span>?: <span class="io-type">boolean</span>
+<span class="io-key">freeform_brief</span>?: <span class="io-type">string</span>    <span class="io-comment">// rich visual brief</span>
+<span class="io-key">beats</span>?: <span class="io-type">PlannedBeat[]</span>       <span class="io-comment">// sequence beats</span></pre>
+
+        <div class="io-block-label" style="margin-top:12px;">PlannedComponent</div>
+        <pre class="io-code"><span class="io-comment">// Library:</span>
+<span class="io-key">type</span>?: <span class="io-type">string</span>               <span class="io-comment">// "stat-card"</span>
+<span class="io-key">data</span>?: <span class="io-type">Record</span>              <span class="io-comment">// component props</span>
+<span class="io-key">position</span>?: { <span class="io-key">x</span>, <span class="io-key">y</span>, <span class="io-key">width</span>, <span class="io-key">height</span> }
+<span class="io-key">z_index</span>?: <span class="io-type">number</span>
+<span class="io-comment">// Custom codegen:</span>
+<span class="io-key">custom</span>?: <span class="io-type">boolean</span>
+<span class="io-key">custom_prompt</span>?: <span class="io-type">string</span>     <span class="io-comment">// visual description</span></pre>
+      </div>
+    </div>
+
+    <div class="io-example" style="margin-top:16px;">
+      <div class="io-example-label">Example StoryboardResult (abbreviated):</div>
+      <pre class="io-example-code">{
+  name: "Quotient x Canva: One Conversation to Published",
+  scenes: [
+    {
+      label: "Intro",
+      duration_seconds: 3,
+      template: "O1-big-statement",
+      template_data: { headline: "One Conversation. Published.", badge: "INTRODUCING" },
+      components: [],
+      transition_in: { type: "crossfade", duration_seconds: 0.5 }
+    },
+    {
+      label: "The Hook",
+      duration_seconds: 5,
+      freeform: true,
+      freeform_brief: "Camera PUSHES through a dark void toward a glowing chat
+        interface. Text cursor blinks. Then a message SNAPS into place...",
+      components: [{ custom: true, custom_prompt: "..." }],
+      voiceover_text: "What if one conversation could do it all?"
+    },
+    {
+      label: "Product Walkthrough",
+      duration_seconds: 24,
+      description: "Continuous sequence: chat → canva → social",
+      beats: [
+        { label: "chat", brief: "Chat interface appears", duration_seconds: 8 },
+        { label: "connect", brief: "Canva editor enters", duration_seconds: 8 },
+        { label: "publish", brief: "Social post preview", duration_seconds: 8 }
+      ],
+      choreography: [
+        { label: "chat", startTime: 0, duration: 8, visibleComponents: ["comp_0"] },
+        { label: "connect", startTime: 8, duration: 8, visibleComponents: ["comp_0","comp_1"] },
+        { label: "publish", startTime: 16, duration: 8, visibleComponents: ["comp_2"] }
+      ],
+      components: [
+        { type: "quotient-chat", data: { ... } },
+        { type: "canva-editor", data: { ... } },
+        { type: "quotient-social", data: { ... } }
+      ]
+    },
+    {
+      label: "CTA",
+      duration_seconds: 5,
+      template: "E1-cta-finale",
+      template_data: { headline: "Start Creating", cta_text: "Try Free" },
+      components: []
+    }
+  ]
+}</pre>
+    </div>
+  </div>
+</section>
+
 
 <!-- ════════════════ RENDER PIPELINE ════════════════ -->
 <section class="view" id="view-render">
