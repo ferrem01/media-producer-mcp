@@ -385,6 +385,106 @@
     border-top: 1px solid var(--border);
     margin-top: 40px;
   }
+
+  /* ── Template cards ── */
+  .template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+  }
+  .template-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    transition: border-color 0.2s;
+  }
+  .template-card:hover { border-color: var(--primary); }
+  .template-card .tmpl-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .template-card .tmpl-id {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    background: rgba(129,140,248,0.12);
+    padding: 2px 7px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .template-card .tmpl-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .template-card .tmpl-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 4px 0 8px;
+    line-height: 1.5;
+  }
+  .template-card .tmpl-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .template-card .tmpl-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .template-explainer {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+    max-width: 800px;
+  }
+  .template-explainer h4 {
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+  .template-explainer .explain-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+  .template-explainer .explain-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .template-explainer .explain-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .template-explainer .explain-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .template-explainer .explain-text {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .template-explainer .explain-flow {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .template-explainer .explain-flow strong { color: var(--text); }
 </style>
 </head>
 <body>
@@ -400,6 +500,7 @@
   <button data-view="render">Render Pipeline</button>
   <button data-view="scenes">Scenes vs Sequences</button>
   <button data-view="components">Component Library</button>
+  <button data-view="templates">Scene Templates</button>
   <button data-view="mcp">MCP Tools</button>
   <button data-view="data">Data Model</button>
 </nav>
@@ -840,6 +941,244 @@
   <div class="component-grid">
     <div class="component-card"><div class="comp-name">utilities.js</div><div class="comp-cat">Shared animation utilities</div></div>
     <div class="component-card"><div class="comp-name">spotlight.js</div><div class="comp-cat">Spotlight animation helper</div></div>
+  </div>
+</section>
+
+
+<!-- ════════════════ SCENE TEMPLATES ════════════════ -->
+<section class="view" id="view-templates">
+  <h2>Scene Templates</h2>
+  <p class="description">
+    37 pre-composed scene blueprints with premium visuals, animation, and timing baked in.
+    The planner selects a template and fills its content slots to produce Apple-keynote-quality output.
+  </p>
+
+  <div class="template-explainer">
+    <h4>Components vs Templates</h4>
+    <div class="explain-grid">
+      <div class="explain-item">
+        <div class="explain-icon">🧩</div>
+        <div>
+          <div class="explain-label">Components = Building Blocks</div>
+          <div class="explain-text">One visual element (a title card, a chart, a logo). Raw ingredients the assembler positions and layers.</div>
+        </div>
+      </div>
+      <div class="explain-item">
+        <div class="explain-icon">🎬</div>
+        <div>
+          <div class="explain-label">Templates = Full Scene Compositions</div>
+          <div class="explain-text">Proven layouts with multiple components, timing, and animation already baked in. Complete scenes, not parts.</div>
+        </div>
+      </div>
+    </div>
+    <div class="explain-flow">
+      <strong>How it works:</strong> The planner picks a template → fills the content slots (headline, stats, quotes, etc.) → gets a polished, ready-to-render scene. No layout decisions, no animation tuning — it's all pre-built.
+    </div>
+  </div>
+
+  <div class="cat-header">🎬 Openings <span class="cat-count">5 templates</span></div>
+  <div class="template-grid">
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">O1</span><span class="tmpl-name">Big Statement</span></div>
+      <div class="tmpl-desc">Apple WWDC-style title card — bold headline with badge and subtitle for maximum impact.</div>
+      <div class="tmpl-meta"><span>⏱ 4–5s</span><span>📋 3 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">O2</span><span class="tmpl-name">Chapter Title</span></div>
+      <div class="tmpl-desc">Section divider with accent line — signals a new chapter or topic transition.</div>
+      <div class="tmpl-meta"><span>⏱ 3–5s</span><span>📋 3 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">O3</span><span class="tmpl-name">Provocation</span></div>
+      <div class="tmpl-desc">TED talk opening question — hooks the audience with a thought-provoking question.</div>
+      <div class="tmpl-meta"><span>⏱ 4–5s</span><span>📋 2 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">O4</span><span class="tmpl-name">Product Hero</span></div>
+      <div class="tmpl-desc">3D device product reveal — dramatic entrance for a product or app launch moment.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">O5</span><span class="tmpl-name">Logo Intro</span></div>
+      <div class="tmpl-desc">Logo reveal with company name — branded opening with logo animation and tagline.</div>
+      <div class="tmpl-meta"><span>⏱ 3–5s</span><span>📋 3 slots</span></div>
+    </div>
+  </div>
+
+  <div class="cat-header">📝 Content <span class="cat-count">20 templates</span></div>
+  <div class="template-grid">
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C1</span><span class="tmpl-name">Feature Spotlight</span></div>
+      <div class="tmpl-desc">Single feature highlight — focused spotlight on one key feature with icon and description.</div>
+      <div class="tmpl-meta"><span>⏱ 4–6s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C3</span><span class="tmpl-name">Feature Grid</span></div>
+      <div class="tmpl-desc">3–4 feature cards in a bento grid — multiple features displayed in a modern grid layout.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 2 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C5</span><span class="tmpl-name">Testimonial</span></div>
+      <div class="tmpl-desc">Customer quote card — social proof with avatar, name, role, and pull quote.</div>
+      <div class="tmpl-meta"><span>⏱ 5–6s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C6</span><span class="tmpl-name">Split Compare</span></div>
+      <div class="tmpl-desc">Before/after side by side — contrast two states or options with labels and icons.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 5 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C7</span><span class="tmpl-name">Picture in Picture</span></div>
+      <div class="tmpl-desc">Text content with floating window — main message plus a PiP visual overlay.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C8</span><span class="tmpl-name">Device Mockup</span></div>
+      <div class="tmpl-desc">Laptop frame product shot — product UI inside a realistic device frame.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C9</span><span class="tmpl-name">Logo Wall</span></div>
+      <div class="tmpl-desc">Trusted-by logo grid — "used by the best" social proof with partner/client logos.</div>
+      <div class="tmpl-meta"><span>⏱ 4–6s</span><span>📋 8 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C10</span><span class="tmpl-name">Feature Stack</span></div>
+      <div class="tmpl-desc">Numbered vertical feature list — sequential walkthrough of features in a clean stack.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 10 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C11</span><span class="tmpl-name">Process Steps</span></div>
+      <div class="tmpl-desc">3-step horizontal process — "how it works" flow with connected steps.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 8 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C12</span><span class="tmpl-name">Icon List</span></div>
+      <div class="tmpl-desc">Checklist with icon badges — bullet points elevated with icons for visual appeal.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 7 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C13</span><span class="tmpl-name">Phone Mockup</span></div>
+      <div class="tmpl-desc">3D phone with UI — mobile app showcase in a realistic phone frame.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C14</span><span class="tmpl-name">Team Grid</span></div>
+      <div class="tmpl-desc">Avatar circles with names — meet the team or advisory board showcase.</div>
+      <div class="tmpl-meta"><span>⏱ 4–6s</span><span>📋 6 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C15</span><span class="tmpl-name">Pricing Tiers</span></div>
+      <div class="tmpl-desc">Three pricing columns — side-by-side plan comparison with feature highlights.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 5 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C16</span><span class="tmpl-name">Case Study</span></div>
+      <div class="tmpl-desc">Data-backed customer story — company result with headline stat and testimonial quote.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 5 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C17</span><span class="tmpl-name">Problem → Solution</span></div>
+      <div class="tmpl-desc">Pain then relief — contrast the problem state with the solution for emotional impact.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 5 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C18</span><span class="tmpl-name">Integration Grid</span></div>
+      <div class="tmpl-desc">6–8 app logo grid — "works with everything" integration ecosystem display.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 11 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C19</span><span class="tmpl-name">Timeline</span></div>
+      <div class="tmpl-desc">Horizontal milestone timeline — company history, roadmap, or project milestones.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 6 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C20</span><span class="tmpl-name">FAQ / Objection</span></div>
+      <div class="tmpl-desc">Q&A reveal — address a common objection or question with a satisfying answer.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">C21</span><span class="tmpl-name">Social Posts</span></div>
+      <div class="tmpl-desc">Social proof tweet cards — real or styled social media posts as testimonials.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 5 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">L1</span><span class="tmpl-name">Lower Third</span></div>
+      <div class="tmpl-desc">Broadcast-style name card — speaker identification bar for presentations and talks.</div>
+      <div class="tmpl-meta"><span>⏱ 4–6s</span><span>📋 4 slots</span></div>
+    </div>
+  </div>
+
+  <div class="cat-header">📊 Data <span class="cat-count">7 templates</span></div>
+  <div class="template-grid">
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">D1</span><span class="tmpl-name">Hero Stat</span></div>
+      <div class="tmpl-desc">Single dramatic number — one big animated counter that dominates the screen.</div>
+      <div class="tmpl-meta"><span>⏱ 4–5s</span><span>📋 5 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">D2</span><span class="tmpl-name">Metric Trio</span></div>
+      <div class="tmpl-desc">Three stats side by side — triple KPI display for impact at a glance.</div>
+      <div class="tmpl-meta"><span>⏱ 5–6s</span><span>📋 1 slot</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">D3</span><span class="tmpl-name">Before / After Stat</span></div>
+      <div class="tmpl-desc">Impact comparison cards — show improvement with before and after values side by side.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 5 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">D4</span><span class="tmpl-name">Progress Bars</span></div>
+      <div class="tmpl-desc">Animated horizontal bars — skill levels, completion rates, or comparison metrics.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 5 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">D5</span><span class="tmpl-name">Social Proof Counter</span></div>
+      <div class="tmpl-desc">Three big count-up numbers — dramatic animated counters for social proof metrics.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">D6</span><span class="tmpl-name">Line Chart</span></div>
+      <div class="tmpl-desc">Animated line graph — growth trends, performance data drawn progressively.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 5 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">D7</span><span class="tmpl-name">Bar Chart</span></div>
+      <div class="tmpl-desc">Animated horizontal bars — category comparisons with animated bar growth.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 6 slots</span></div>
+    </div>
+  </div>
+
+  <div class="cat-header">🎯 Closing <span class="cat-count">2 templates</span></div>
+  <div class="template-grid">
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">E1</span><span class="tmpl-name">CTA Finale</span></div>
+      <div class="tmpl-desc">Final call to action — "get started now" ending with button and link.</div>
+      <div class="tmpl-meta"><span>⏱ 4–5s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">E2</span><span class="tmpl-name">Recap Grid</span></div>
+      <div class="tmpl-desc">2×2 key takeaways — summarize the four main points before closing.</div>
+      <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 6 slots</span></div>
+    </div>
+  </div>
+
+  <div class="cat-header">🎙️ Speaker <span class="cat-count">3 templates</span></div>
+  <div class="template-grid">
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">S1</span><span class="tmpl-name">Speaker Spotlight</span></div>
+      <div class="tmpl-desc">Speaker with content panel — presentation-style layout with speaker area and key content.</div>
+      <div class="tmpl-meta"><span>⏱ 5–8s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">S2</span><span class="tmpl-name">Screencast PiP</span></div>
+      <div class="tmpl-desc">Browser frame with PiP speaker circle — demo walkthrough with speaker overlay.</div>
+      <div class="tmpl-meta"><span>⏱ 5–8s</span><span>📋 4 slots</span></div>
+    </div>
+    <div class="template-card">
+      <div class="tmpl-header"><span class="tmpl-id">S3</span><span class="tmpl-name">Speaker Lower Third</span></div>
+      <div class="tmpl-desc">Speaker with broadcast name bar — full-screen speaker with identification overlay.</div>
+      <div class="tmpl-meta"><span>⏱ 4–7s</span><span>📋 4 slots</span></div>
+    </div>
   </div>
 </section>
 
