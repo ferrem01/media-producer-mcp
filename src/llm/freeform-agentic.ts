@@ -25,6 +25,12 @@ import {
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  searchBlocks,
+  readBlockSource,
+  composeBlocks,
+  formatSearchResults,
+} from "./block-library.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const COMPONENTS_ROOT = path.resolve(__dirname, "..", "components");
@@ -44,6 +50,8 @@ export interface AgenticFreeformOpts {
   canvas: Canvas;
   critiqueFeedback?: string;
   referenceImages?: ReferenceImage[];
+  /** Block types the planner suggests reading first */
+  suggestedBlocks?: string[];
   /** When present, this is a sequence scene with multiple beats */
   beats?: Array<{
     label: string;
@@ -112,6 +120,23 @@ const TOOLS: LLMTool[] = [
         },
       },
       required: ["html"],
+    },
+  },
+  {
+    name: "compose_blocks",
+    description:
+      "Get the full source of multiple blocks for composition into one scene. Returns each block's HTML with a guide on how to inline them into a shared layout with choreographed GSAP timelines. Use this when your scene needs to combine multiple existing UI components (e.g. a chat panel + editor + social post preview).",
+    input_schema: {
+      type: "object",
+      properties: {
+        blocks: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            'Block type names to compose, e.g. ["quotient-chat", "canva-editor"]',
+        },
+      },
+      required: ["blocks"],
     },
   },
 ];
@@ -481,7 +506,22 @@ const MAX_ITERATIONS = 8;
  * Pre-search the library using keywords from the prompt and reference image labels.
  * Returns suggested components/templates the agent should look at first.
  */
-async function presearchLibrary(prompt: string, referenceImages?: any[]): Promise<string> {
+async function presearchLibrary(prompt: string, referenceImages?: any[], suggestedBlocks?: string[]): Promise<string> {
+  // If planner suggested specific blocks, surface them directly
+  if (suggestedBlocks && suggestedBlocks.length > 0) {
+    var suggestedResults = await searchBlocks(suggestedBlocks.join(" "));
+    var matched = suggestedResults.filter(function(b) {
+      return suggestedBlocks.indexOf(b.type) >= 0;
+    });
+    if (matched.length > 0) {
+      var blockNames = matched.map(function(b) { return '"' + b.type + '"'; }).join(", ");
+      return "\n## Suggested Blocks (from planner)\n\n" +
+        "The planner identified these blocks as relevant. Read them with read_source or compose them with compose_blocks:\n" +
+        formatSearchResults(matched) +
+        "\n\nFor multi-block scenes, use compose_blocks([" + blockNames + "]) to get all sources with a composition guide.\n";
+    }
+  }
+
   // Extract meaningful keywords from the prompt and reference labels
   var keywords = new Set<string>();
   var text = prompt.toLowerCase();
@@ -539,7 +579,7 @@ export async function generateFreeformAgentic(
   opts: AgenticFreeformOpts,
 ): Promise<string> {
   // Pre-search library for relevant references
-  var suggestions = await presearchLibrary(opts.prompt || opts.sceneBrief || "", opts.referenceImages);
+  var suggestions = await presearchLibrary(opts.prompt || opts.sceneBrief || "", opts.referenceImages, opts.suggestedBlocks);
   
   var systemPrompt = buildAgenticSystemPrompt(opts);
   if (suggestions) {
@@ -651,6 +691,10 @@ Start by searching the library for relevant patterns, then read 1-3 relevant sou
           toolResult = await executeReadSource(
             toolCall.input.name as string,
             toolCall.input.kind as string,
+          );
+        } else if (toolCall.name === "compose_blocks") {
+          toolResult = await composeBlocks(
+            toolCall.input.blocks as string[],
           );
         } else if (toolCall.name === "submit_scene") {
           var submitResult = executeSubmitScene(
