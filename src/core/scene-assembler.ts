@@ -14,6 +14,7 @@
  */
 
 import { normalizeHtmlUrls } from "./normalize-urls.js";
+import { resolveComponentTags, buildComponentTimelineScript } from "./component-tags.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
 import fs from "node:fs/promises";
@@ -231,6 +232,207 @@ ${componentScripts.join("\n\n")}
   // Expose for Playwright capture
   window.__MP_TIMELINE = master;
   window.__MP_DURATION = ${scene.duration_seconds};
+  window.__MP_READY = true;
+})();
+</script>
+</body>
+</html>`;
+
+  return normalizeHtmlUrls(html);
+}
+
+/**
+ * Assemble a codegen scene (.scene.html with <component> tags).
+ *
+ * This is the unified codegen path: the LLM generates a .scene.html file
+ * that can embed library components via <component> tags alongside custom
+ * HTML/CSS/GSAP. This function resolves those tags, merges styles and
+ * timelines, and produces a self-contained HTML document for Playwright capture.
+ */
+export async function assembleCodegenScene(options: {
+  /** Raw .scene.html source (the codegen output) */
+  sceneSource: string;
+  /** Available component sources for <component> tag resolution */
+  componentSources: ComponentSource[];
+  /** Brand kit for CSS variables */
+  brandKit: BrandKit;
+  /** Canvas dimensions */
+  canvas: Canvas;
+  /** Scene duration in seconds */
+  duration: number;
+  /** Scene id for camera drift seed */
+  sceneId?: string;
+  /** Path to GSAP files directory */
+  gsapDir: string;
+  /** Scene background color */
+  background?: string;
+  /** When true, use transparent background */
+  transparentBackground?: boolean;
+  /** Background video path */
+  backgroundVideo?: string;
+  /** Keep HTTP paths for preview */
+  preview?: boolean;
+  /** Speaker URL for resolving "speaker" references */
+  speakerUrl?: string;
+}): Promise<string> {
+  const {
+    sceneSource, componentSources, brandKit, canvas, duration,
+    sceneId, gsapDir, background, transparentBackground,
+    backgroundVideo, preview, speakerUrl,
+  } = options;
+
+  // 1. Parse the scene source
+  const { parseComponent } = await import("./component-parser.js");
+  const sceneParsed = parseComponent(sceneSource);
+
+  // 2. Build component source map for tag resolution
+  const rawSourceMap = new Map<string, string>();
+  for (const cs of componentSources) {
+    rawSourceMap.set(cs.type, cs.source);
+  }
+
+  // 3. Resolve <component> tags in the scene template
+  const tagResult = resolveComponentTags(
+    sceneParsed.template,
+    rawSourceMap,
+    (data) => resolveAssetUrls(data, preview, speakerUrl),
+  );
+
+  // 4. Collect all CSS: scene CSS + resolved component CSS
+  const allStyles: string[] = [];
+  if (sceneParsed.style) {
+    allStyles.push(`/* ── Scene Styles ── */\n${sceneParsed.style}`);
+  }
+  for (const comp of tagResult.components) {
+    if (comp.scopedCss) {
+      allStyles.push(`/* ${comp.type} (${comp.id}) */\n${comp.scopedCss}`);
+    }
+  }
+
+  // 5. Build component timeline registration script
+  const componentTimelineScript = buildComponentTimelineScript(
+    tagResult.components,
+    duration,
+    canvas,
+  );
+
+  // 6. Generate brand CSS
+  const { css: brandCSS, theme: sceneTheme, hasBgImage } = generateBrandCSS(
+    brandKit, background, preview,
+  );
+
+  // 7. Load GSAP and shared utilities
+  const gsapSource = await loadGsapSource(gsapDir);
+  const sharedSource = await loadSharedUtilities();
+
+  const isTransparent = transparentBackground === true;
+
+  // 8. Assemble final HTML
+  const html = `<!DOCTYPE html>
+<html data-theme="${sceneTheme}">
+<head>
+<meta charset="utf-8">
+${generateFontLinks(brandKit)}
+<style>
+/* ── Brand Kit ── */
+${brandCSS}
+
+${hasBgImage ? `
+.bg-gradient { opacity: 0.65 !important; }
+` : ""}
+
+/* ── Reset ── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: ${canvas.width}px;
+  height: ${canvas.height}px;
+  overflow: hidden;
+  clip-path: inset(0);
+  background: ${isTransparent ? "transparent" : `var(--mp-color-background, ${background || canvas.background || "#000000"})`};
+}
+
+/* ── Component instance containers ── */
+.component-instance {
+  position: relative;
+}
+
+/* ── Safety defaults ── */
+.component-instance * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ── Scene + Component Styles ── */
+${allStyles.join("\n\n")}
+</style>
+<script>
+${gsapSource}
+
+${sharedSource}
+
+// Register GSAP plugins
+if (typeof SplitText !== 'undefined') gsap.registerPlugin(SplitText);
+if (typeof CustomEase !== 'undefined') gsap.registerPlugin(CustomEase);
+if (typeof CustomBounce !== 'undefined') gsap.registerPlugin(CustomBounce);
+if (typeof CustomWiggle !== 'undefined') gsap.registerPlugin(CustomWiggle);
+if (typeof ExpoScaleEase !== 'undefined') gsap.registerPlugin(ExpoScaleEase);
+if (typeof RoughEase !== 'undefined') gsap.registerPlugin(RoughEase);
+if (typeof SlowMo !== 'undefined') gsap.registerPlugin(SlowMo);
+if (typeof MorphSVGPlugin !== 'undefined') gsap.registerPlugin(MorphSVGPlugin);
+if (typeof DrawSVGPlugin !== 'undefined') gsap.registerPlugin(DrawSVGPlugin);
+if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextPlugin);
+</script>
+</head>
+<body>
+<div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
+${isTransparent ? "" : '<div class="mp-ambient"></div>'}
+${backgroundVideo ? `<video class="mp-bg-video" src="file://${backgroundVideo}" autoplay muted loop playsinline style="position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;opacity:0.35;filter:blur(2px) brightness(0.7);"></video>` : ""}
+${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}
+<div class="mp-scene-content" style="position:relative;width:${canvas.width}px;height:${canvas.height}px;">
+${tagResult.html}
+</div>
+</div>
+
+<script>
+(function() {
+  const master = gsap.timeline({ paused: true });
+
+  // ── Camera motion ──
+  var cameraEl = document.querySelector('.mp-camera');
+  if (cameraEl) {
+    var camDur = ${duration};
+    var seed = '${sceneId || "s"}'.split('').reduce(function(a, c) { return a + c.charCodeAt(0); }, 0);
+    var driftX = (seed % 2 === 0 ? 1 : -1) * (4 + (seed % 6));
+    var driftY = (seed % 3 === 0 ? 1 : -1) * (3 + (seed % 5));
+    master.to(cameraEl, { scale: 1.03, x: driftX, y: driftY, duration: camDur, ease: 'none' }, 0);
+  }
+
+  // ── Component timelines ──
+  ${componentTimelineScript}
+
+  // ── Scene timeline (from codegen) ──
+  var sceneCtx = {
+    duration: ${duration},
+    fps: 30,
+    canvas: { width: ${canvas.width}, height: ${canvas.height} },
+    getComponentTimeline: __getComponentTimeline || function(id) { return gsap.timeline(); },
+  };
+
+  // Scene's own createTimeline
+  ${sceneParsed.script}
+
+  var sceneEl = document.querySelector('.mp-scene-content');
+  var sceneTl = createTimeline(sceneEl, {}, sceneCtx);
+  if (sceneTl) master.add(sceneTl, 0);
+
+  // Expose for Playwright capture
+  window.__MP_TIMELINE = master;
+  window.__MP_DURATION = ${duration};
   window.__MP_READY = true;
 })();
 </script>
