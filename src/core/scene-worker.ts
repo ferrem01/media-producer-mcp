@@ -135,15 +135,33 @@ async function main() {
   // Import assembler (dynamic to keep this file self-contained for the worker)
   var { parseComponent, bindTemplate, scopeCSS } = await import("./component-parser.js");
 
-  // Assemble scene HTML
-  var { assembleScene } = await import("./scene-assembler.js");
-  var html = await assembleScene({
-    scene,
-    components,
-    brandKit: project.brand_kit,
-    canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
-    gsapDir: args.gsapDir,
-  });
+  // Assemble scene HTML (use sequence assembler for component-based sequences)
+  var html: string;
+  var hasBeatComponents = scene.beats?.length > 0 &&
+    scene.components.length > 0 &&
+    !scene.components[0].type.startsWith("freeform_");
+
+  if (hasBeatComponents) {
+    console.log(`  [scene-worker] Using sequence assembler (${scene.beats.length} beats, ${scene.components.length} components)`);
+    var { assembleSequence } = await import("./sequence-assembler.js");
+    html = await assembleSequence({
+      scene,
+      components,
+      brandKit: project.brand_kit,
+      canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
+      gsapDir: args.gsapDir,
+      choreography: scene.choreography,
+    });
+  } else {
+    var { assembleScene } = await import("./scene-assembler.js");
+    html = await assembleScene({
+      scene,
+      components,
+      brandKit: project.brand_kit,
+      canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
+      gsapDir: args.gsapDir,
+    });
+  }
 
   // Write HTML
   var framesDir = path.join(args.workDir, "frames");

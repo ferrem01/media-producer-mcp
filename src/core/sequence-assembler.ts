@@ -322,8 +322,8 @@ function buildChoreographyScript(
         var enterEase = beat.transitions?.[comp.id]?.enter?.ease || 'power2.out';
 
         lines.push(`  // Show ${comp.id}`);
-        lines.push(`  master.set(${el}, { visibility: 'visible' }, ${beat.startTime});`);
-        lines.push(`  master.from(${el}, { ...${JSON.stringify(enterFrom)}, duration: ${enterDur}, ease: '${enterEase}' }, ${beat.startTime});`);
+        lines.push(`  master.set(${el}, { visibility: 'visible', opacity: 0 }, ${beat.startTime});`);
+        lines.push(`  master.fromTo(${el}, ${JSON.stringify(enterFrom)}, { opacity: 1, x: 0, y: 0, scale: 1, duration: ${enterDur}, ease: '${enterEase}' }, ${beat.startTime});`);
 
         // Trigger component's internal timeline at beat start
         lines.push(`  (function() {`);
