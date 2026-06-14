@@ -485,6 +485,94 @@
     border-top: 1px solid var(--border);
   }
   .template-explainer .explain-flow strong { color: var(--text); }
+
+  /* ── Pipeline flow ── */
+  .pipeline-flow { margin: 8px 0; overflow-x: auto; }
+  .pf-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    min-width: 600px;
+    padding: 4px 0;
+  }
+  .pf-step {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text);
+    text-align: center;
+    flex: 1;
+    min-width: 120px;
+  }
+  .pf-step small { display: block; color: var(--text-dim); font-size: 10px; margin-top: 2px; }
+  .pf-planner { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+  .pf-data { border-color: var(--accent); background: rgba(52,211,153,0.1); }
+  .pf-llm { border-color: var(--orange); background: rgba(251,146,60,0.1); }
+  .pf-core { border-color: var(--cyan); background: rgba(34,211,238,0.1); }
+  .pf-render { border-color: var(--pink); background: rgba(244,114,182,0.1); }
+  .pf-arrow {
+    color: var(--border);
+    font-size: 16px;
+    padding: 0 6px;
+    flex-shrink: 0;
+  }
+
+  /* ── Pipeline badges ── */
+  .pipeline-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .badge-speed { background: rgba(52,211,153,0.15); color: var(--accent); }
+  .badge-quality { background: rgba(129,140,248,0.15); color: var(--primary); }
+  .badge-llm { background: rgba(251,146,60,0.15); color: var(--orange); }
+
+  /* ── Compare table ── */
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .compare-table th {
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .compare-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── Creativity bar ── */
+  .creativity-bar {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    height: 48px;
+  }
+  .creativity-segment {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border-right: 2px solid var(--bg);
+  }
+  .creativity-segment:last-child { border-right: none; }
+  .creativity-label { font-size: 12px; font-weight: 600; }
+  .creativity-desc { font-size: 10px; opacity: 0.8; }
 </style>
 </head>
 <body>
@@ -501,6 +589,7 @@
   <button data-view="scenes">Scenes vs Sequences</button>
   <button data-view="components">Component Library</button>
   <button data-view="templates">Scene Templates</button>
+  <button data-view="pipelines">Scene Pipelines</button>
   <button data-view="mcp">MCP Tools</button>
   <button data-view="data">Data Model</button>
 </nav>
@@ -1181,6 +1270,280 @@
     </div>
   </div>
 </section>
+
+<!-- ════════════════ SCENE PIPELINES ════════════════ -->
+<section class="view" id="view-pipelines">
+  <h2>Scene Creation Pipelines</h2>
+  <p class="description">
+    The planner decides HOW each scene is built. There are 5 distinct paths through the system,
+    each with different tradeoffs between quality, speed, and creative control.
+  </p>
+
+  <!-- Decision flow -->
+  <div class="concept-card" style="margin-bottom:24px; border-left:3px solid var(--primary);">
+    <h4>🧠 How the Planner Decides</h4>
+    <p>For each scene, the unified planner (<code>unified-planner.ts</code>) picks one of 5 options based on the narrative moment, available components, and the <code>creativity</code> parameter (0-1). The scene generator (<code>scene-generator.ts</code>) then routes to the appropriate pipeline.</p>
+    <div style="margin-top:12px; font-family:'SF Mono','Fira Code',monospace; font-size:12px; color:var(--text-dim); line-height:2;">
+      <div style="color:var(--text);">scene-generator.ts routing:</div>
+      <div>&nbsp;&nbsp;if (planned.freeform &amp;&amp; planned.beats) → <span style="color:var(--pink);">Sequence Pipeline</span></div>
+      <div>&nbsp;&nbsp;if (planned.freeform) → <span style="color:var(--orange);">Freeform Pipeline</span></div>
+      <div>&nbsp;&nbsp;if (planned.template) → <span style="color:var(--accent);">Template Pipeline</span></div>
+      <div>&nbsp;&nbsp;if (comp.custom) → <span style="color:var(--cyan);">Custom Component Pipeline</span></div>
+      <div>&nbsp;&nbsp;else → <span style="color:var(--primary);">Library Component Pipeline</span></div>
+    </div>
+  </div>
+
+  <!-- Pipeline comparison cards -->
+  <div style="display:flex; flex-direction:column; gap:24px;">
+
+    <!-- 1. Library Component -->
+    <div class="concept-card" style="border-left:3px solid var(--primary);">
+      <h4 style="color:var(--primary);">📦 1. Library Component Pipeline</h4>
+      <p style="margin-bottom:12px;">Uses pre-built components from the 67-component library. No LLM generation needed for visuals. Fastest path.</p>
+      
+      <div class="pipeline-flow">
+        <div class="pf-row">
+          <div class="pf-step pf-planner">Planner picks component type</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-data">Fills data props<br><small>(text, colors, config)</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-core">Component parser binds data to template</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-render">Scene assembler builds HTML</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
+        <div class="pipeline-badge badge-speed">⚡ Fastest</div>
+        <div class="pipeline-badge badge-quality">Consistent quality</div>
+        <div class="pipeline-badge badge-llm">No LLM for visuals</div>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
+        <strong>Files:</strong> <code>scene-generator.ts</code> → <code>component-parser.ts</code> → <code>scene-assembler.ts</code><br>
+        <strong>Example:</strong> quotient-chat, bar-chart, hero-reveal, gradient-background<br>
+        <strong>When:</strong> Component exists that matches the scene need. <code>creativity</code> 0.0-0.3 strongly favors this path.
+      </div>
+    </div>
+
+    <!-- 2. Template -->
+    <div class="concept-card" style="border-left:3px solid var(--accent);">
+      <h4 style="color:var(--accent);">🎨 2. Scene Template Pipeline</h4>
+      <p style="margin-bottom:12px;">Uses pre-composed scene blueprints (33 templates). The planner fills content slots. Premium visuals without LLM-generated CSS/GSAP.</p>
+      
+      <div class="pipeline-flow">
+        <div class="pf-row">
+          <div class="pf-step pf-planner">Planner picks template ID</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-data">Fills content slots<br><small>(headline, body, stats)</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-core">Load .scene.html<br>Apply slot values</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-render">Save as project component</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
+        <div class="pipeline-badge badge-speed">⚡ Fast</div>
+        <div class="pipeline-badge badge-quality">Apple-keynote quality</div>
+        <div class="pipeline-badge badge-llm">No LLM for visuals</div>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
+        <strong>Files:</strong> <code>scene-generator.ts</code> → <code>template-catalog.ts</code> → <code>templates/*.scene.html</code><br>
+        <strong>Example:</strong> O1-big-statement, C6-split-compare, D1-hero-stat, E1-cta-finale<br>
+        <strong>When:</strong> A template matches the narrative moment (opening, feature spotlight, CTA, etc.)
+      </div>
+    </div>
+
+    <!-- 3. Custom Component (codegen) -->
+    <div class="concept-card" style="border-left:3px solid var(--cyan);">
+      <h4 style="color:var(--cyan);">🤖 3. Custom Component Pipeline (Codegen)</h4>
+      <p style="margin-bottom:12px;">LLM generates a full custom <code>.component.html</code> file (HTML + CSS + GSAP). Used when no library component or template fits. The generated component follows the same format as library components.</p>
+      
+      <div class="pipeline-flow">
+        <div class="pf-row">
+          <div class="pf-step pf-planner">Planner sets custom=true + prompt</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-llm">LLM generates .component.html<br><small>(template + style + script)</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-core">Save to project components/</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-render">Scene assembler builds HTML</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
+        <div class="pipeline-badge badge-speed">🕐 Medium</div>
+        <div class="pipeline-badge badge-quality">Variable quality</div>
+        <div class="pipeline-badge badge-llm">LLM codegen</div>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
+        <strong>Files:</strong> <code>scene-generator.ts</code> → <code>component-gen.ts</code> → <code>component-generator.ts</code><br>
+        <strong>LLM input:</strong> Scene description, brand kit, GSAP skills, design rules, reference images<br>
+        <strong>Output:</strong> Self-contained .component.html with &lt;template&gt; + &lt;style&gt; + &lt;script&gt;<br>
+        <strong>When:</strong> No template or library component fits. <code>creativity</code> 0.7-1.0 forces this path.
+      </div>
+    </div>
+
+    <!-- 4. Freeform -->
+    <div class="concept-card" style="border-left:3px solid var(--orange);">
+      <h4 style="color:var(--orange);">✍️ 4. Freeform Pipeline</h4>
+      <p style="margin-bottom:12px;">Full bespoke HTML+CSS+GSAP generated from a rich storyboard description. The agentic generator can read library components for reference before writing. Highest creative ceiling.</p>
+      
+      <div class="pipeline-flow">
+        <div class="pf-row">
+          <div class="pf-step pf-planner">Planner writes freeform_brief<br><small>(5+ sentences, motion verbs)</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-llm">Agentic LLM loop<br><small>reads components, writes HTML</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-core">Save as freeform_scene_XXX</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-render">Scene assembler builds HTML</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
+        <div class="pipeline-badge badge-speed">🕐 Slowest</div>
+        <div class="pipeline-badge badge-quality">Highest ceiling</div>
+        <div class="pipeline-badge badge-llm">Agentic LLM (multi-turn)</div>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
+        <strong>Files:</strong> <code>scene-generator.ts</code> → <code>freeform-agentic.ts</code><br>
+        <strong>LLM tools:</strong> search_components, read_component, read_template (reads library for reference before writing)<br>
+        <strong>When:</strong> Complex custom visuals. Brief must describe what the viewer EXPERIENCES with motion verbs, depth layers, choreography.
+      </div>
+    </div>
+
+    <!-- 5. Sequence -->
+    <div class="concept-card" style="border-left:3px solid var(--pink);">
+      <h4 style="color:var(--pink);">🎬 5. Sequence Pipeline</h4>
+      <p style="margin-bottom:12px;">Multi-beat continuous scene using real library components orchestrated on a shared stage. Components enter, move, and exit at choreographed times. Two entry paths: planner outputs a sequence directly, OR the sequence converter merges consecutive component scenes.</p>
+      
+      <div class="pipeline-flow">
+        <div class="pf-row">
+          <div class="pf-step pf-planner">Planner outputs beats[] + choreography[] + components[]</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-data">scene-generator carries through beats + choreography</div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-core">Sequence assembler:<br><small>shared stage, master GSAP timeline, beat labels</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-render">One continuous HTML doc</div>
+        </div>
+      </div>
+
+      <div style="margin-top:8px;">
+        <div style="font-size:12px; color:var(--text-dim); margin-bottom:8px;"><strong>Alternative entry:</strong> If the planner outputs separate scenes that should be a sequence:</div>
+        <div class="pipeline-flow">
+          <div class="pf-row">
+            <div class="pf-step pf-planner">Planner outputs N separate scenes</div>
+            <div class="pf-arrow">→</div>
+            <div class="pf-step pf-llm">sequence-converter detects eligible runs</div>
+            <div class="pf-arrow">→</div>
+            <div class="pf-step pf-core">Merges into 1 sequence with auto-choreography</div>
+            <div class="pf-arrow">→</div>
+            <div class="pf-step pf-render">Sequence assembler</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
+        <div class="pipeline-badge badge-speed">⚡ Fast (uses library components)</div>
+        <div class="pipeline-badge badge-quality">Premium "single take"</div>
+        <div class="pipeline-badge badge-llm">No LLM for visuals</div>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
+        <strong>Files:</strong> <code>scene-generator.ts</code> + <code>sequence-converter.ts</code> → <code>sequence-assembler.ts</code><br>
+        <strong>When:</strong> Product walkthroughs, multi-step demos, cause-and-effect flows. Uses existing library components (quotient-chat, canva-editor, etc.)
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Comparison table -->
+  <h3 style="margin-top:32px;">Pipeline Comparison</h3>
+  <div style="overflow-x:auto;">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Pipeline</th>
+          <th>LLM Codegen?</th>
+          <th>Speed</th>
+          <th>Visual Source</th>
+          <th>Output</th>
+          <th>Best For</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span style="color:var(--primary); font-weight:600;">Library Component</span></td>
+          <td>No</td>
+          <td>⚡ Instant</td>
+          <td>Pre-built .component.html</td>
+          <td>Data-bound component in scene</td>
+          <td>Standard visuals (charts, titles, mockups)</td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--accent); font-weight:600;">Scene Template</span></td>
+          <td>No</td>
+          <td>⚡ Instant</td>
+          <td>Pre-built .scene.html</td>
+          <td>Full scene with slots filled</td>
+          <td>Openings, CTAs, stats, features</td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--cyan); font-weight:600;">Custom Component</span></td>
+          <td>Yes (single-turn)</td>
+          <td>🕐 ~10-20s</td>
+          <td>LLM generates .component.html</td>
+          <td>Bespoke component in scene</td>
+          <td>Unique elements that don't exist in library</td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--orange); font-weight:600;">Freeform</span></td>
+          <td>Yes (multi-turn agentic)</td>
+          <td>🕐 ~20-40s</td>
+          <td>LLM writes full scene HTML</td>
+          <td>Bespoke full scene</td>
+          <td>Complex custom visuals, unique animations</td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--pink); font-weight:600;">Sequence</span></td>
+          <td>No</td>
+          <td>⚡ Fast</td>
+          <td>Library components + choreography</td>
+          <td>Multi-beat continuous scene</td>
+          <td>Product walkthroughs, multi-step demos</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- creativity parameter -->
+  <h3 style="margin-top:32px;">The Creativity Dial</h3>
+  <div class="concept-card" style="max-width:700px;">
+    <p>The <code>creativity</code> parameter (0-1) biases the planner's decisions:</p>
+    <div style="margin-top:12px;">
+      <div class="creativity-bar">
+        <div class="creativity-segment" style="flex:3; background:var(--primary-dim);">
+          <div class="creativity-label">0.0 - 0.3</div>
+          <div class="creativity-desc">Library + Templates</div>
+        </div>
+        <div class="creativity-segment" style="flex:3; background:var(--accent-dim);">
+          <div class="creativity-label">0.4 - 0.6</div>
+          <div class="creativity-desc">Balanced (planner decides)</div>
+        </div>
+        <div class="creativity-segment" style="flex:3; background:var(--orange); opacity:0.8;">
+          <div class="creativity-label">0.7 - 1.0</div>
+          <div class="creativity-desc">All custom / freeform</div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-dim); margin-top:4px;">
+        <span>Faster, more consistent</span>
+        <span>Slower, more unique</span>
+      </div>
+    </div>
+  </div>
+</section>
+
 
 <!-- ════════════════ MCP TOOLS ════════════════ -->
 <section class="view" id="view-mcp">
