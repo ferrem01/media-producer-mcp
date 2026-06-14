@@ -180,11 +180,15 @@ Each component's built-in animation runs at the right beat. You only define the 
   "choreography": [
     {
       "label": "chat",
+      "startTime": 0,
+      "duration": 8,
       "visibleComponents": ["comp_0"],
       "transitions": { "comp_0": { "enter": { "from": { "opacity": 0, "y": 40 }, "duration": 0.6 } } }
     },
     {
       "label": "connect",
+      "startTime": 8,
+      "duration": 8,
       "visibleComponents": ["comp_0", "comp_1"],
       "transitions": {
         "comp_0": { "move": { "to": { "left": "5%", "width": "40%" }, "duration": 0.8 } },
@@ -193,10 +197,14 @@ Each component's built-in animation runs at the right beat. You only define the 
     },
     {
       "label": "design",
+      "startTime": 16,
+      "duration": 7,
       "visibleComponents": ["comp_0", "comp_1"]
     },
     {
       "label": "publish",
+      "startTime": 23,
+      "duration": 7,
       "visibleComponents": ["comp_2"],
       "transitions": {
         "comp_0": { "exit": { "to": { "opacity": 0, "x": -200 }, "duration": 0.6 } },
@@ -219,6 +227,7 @@ Use sequences when:
 
 Each beat gets a label, a brief (what happens), a duration, and optional voiceover.
 For component-based sequences, also provide choreography with visibility and transitions.
+Each choreography entry MUST include "startTime" (cumulative seconds from beat start) and "duration" (seconds). These are required for GSAP timeline positioning.
 Total duration_seconds = sum of beat durations.
 
 ## Option 3: Custom Component (escape hatch)

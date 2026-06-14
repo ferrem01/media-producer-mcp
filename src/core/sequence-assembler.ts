@@ -86,7 +86,7 @@ export async function assembleSequence(options: SequenceAssembleOptions): Promis
   const { css: brandCSS, theme: sceneTheme, hasBgImage } = generateBrandCSS(brandKit, scene.background, preview);
 
   // Build choreography from beats if not provided
-  const choreography = options.choreography || buildAutoChoreography(scene);
+  const choreography = fillMissingStartTimes(options.choreography || buildAutoChoreography(scene), scene);
 
   // Process each component (ALL of them, regardless of beat visibility)
   const componentBlocks: string[] = [];
@@ -259,6 +259,35 @@ ${choreographyScript}
 </html>`;
 
   return normalizeHtmlUrls(html);
+}
+
+/**
+ * Fill in missing startTime/duration on choreography entries.
+ * The LLM planner sometimes omits startTime; we derive it from
+ * cumulative beat durations so the assembler always has valid timing.
+ */
+function fillMissingStartTimes(
+  choreography: SequenceBeatChoreography[],
+  scene: Scene,
+): SequenceBeatChoreography[] {
+  var needsFill = choreography.some(c => c.startTime == null);
+  if (!needsFill) return choreography;
+
+  // Build a label->duration map from scene beats
+  var beatDurations = new Map<string, number>();
+  if (scene.beats) {
+    for (var b of scene.beats) {
+      beatDurations.set(b.label, b.duration_seconds);
+    }
+  }
+
+  var runningTime = 0;
+  return choreography.map(c => {
+    var duration = c.duration ?? beatDurations.get(c.label) ?? 5;
+    var startTime = c.startTime ?? runningTime;
+    runningTime = startTime + duration;
+    return { ...c, startTime, duration };
+  });
 }
 
 /**
