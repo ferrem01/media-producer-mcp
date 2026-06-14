@@ -11,6 +11,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { randomUUID } from "node:crypto";
 import http from "node:http";
+import { fileURLToPath } from "node:url";
 import { createMcpServer } from "./server.js";
 import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
@@ -419,6 +420,20 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // ── Health ──
       if (url === "/health" || url === "/") {
         jsonResponse(res, 200, { status: "ok", service: "media-producer-mcp", version: "0.1.0" });
+        return;
+      }
+
+      // ── Architecture docs (unauthenticated) ──
+      if (urlPath === "/architecture" && method === "GET") {
+        const archPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "preview-app", "architecture.html");
+        try {
+          const archHtml = await fs.readFile(archPath, "utf-8");
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(archHtml);
+        } catch {
+          res.writeHead(404, { "Content-Type": "text/plain" });
+          res.end("Not found");
+        }
         return;
       }
 

@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Media Producer MCP – Architecture</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-2: #334155;
+    --border: #475569;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --primary: #818cf8;
+    --primary-dim: #6366f1;
+    --accent: #34d399;
+    --accent-dim: #10b981;
+    --orange: #fb923c;
+    --pink: #f472b6;
+    --cyan: #22d3ee;
+    --red: #f87171;
+    --yellow: #fbbf24;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+    padding: 40px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  header p {
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  /* ── Nav ── */
+  nav {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 20px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+    border-bottom: 1px solid var(--border);
+  }
+  nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  nav button:hover { border-color: var(--primary); color: var(--text); }
+  nav button.active {
+    background: var(--primary-dim);
+    border-color: var(--primary);
+    color: white;
+  }
+
+  /* ── Sections ── */
+  .view { display: none; padding: 32px 20px; max-width: 1200px; margin: 0 auto; }
+  .view.active { display: block; }
+
+  h2 {
+    font-size: 22px;
+    margin-bottom: 16px;
+    color: var(--primary);
+  }
+  h3 {
+    font-size: 16px;
+    margin: 20px 0 10px;
+    color: var(--accent);
+  }
+
+  .description {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 24px;
+    max-width: 720px;
+  }
+
+  /* ── Pipeline ── */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+  }
+  .pipeline-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    position: relative;
+  }
+  .pipeline-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 40px;
+  }
+  .pipeline-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    background: var(--bg);
+    z-index: 2;
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+  .pipeline-connector {
+    width: 2px;
+    flex: 1;
+    min-height: 20px;
+    background: var(--border);
+  }
+  .pipeline-card {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+  .pipeline-card:hover { border-color: var(--primary); }
+  .pipeline-card .step-name {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pipeline-card .step-file {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(52,211,153,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .pipeline-card .step-desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  /* ── Component grid ── */
+  .component-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .component-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    transition: border-color 0.2s;
+  }
+  .component-card:hover { border-color: var(--accent); }
+  .component-card .comp-name {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .component-card .comp-cat {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ── Category header ── */
+  .cat-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--surface-2);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 20px 0 12px;
+  }
+  .cat-count {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+
+  /* ── Concept cards ── */
+  .concept-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+  .concept-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .concept-card:hover { border-color: var(--primary); }
+  .concept-card h4 {
+    font-size: 16px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .concept-card p {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .concept-card ul {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    padding-left: 18px;
+  }
+  .concept-card li { margin-bottom: 4px; }
+  .concept-card .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-right: 4px;
+    margin-top: 8px;
+    font-weight: 500;
+  }
+  .tag-llm { background: rgba(129,140,248,0.15); color: var(--primary); }
+  .tag-core { background: rgba(52,211,153,0.15); color: var(--accent); }
+  .tag-media { background: rgba(251,146,60,0.15); color: var(--orange); }
+  .tag-data { background: rgba(34,211,238,0.15); color: var(--cyan); }
+
+  /* ── Sequence diagram ── */
+  .seq-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    overflow-x: auto;
+    margin-bottom: 24px;
+  }
+  .seq-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 8px 0;
+    min-width: 700px;
+  }
+  .seq-label {
+    min-width: 100px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-align: right;
+    padding-right: 12px;
+    flex-shrink: 0;
+  }
+  .seq-bar {
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    position: relative;
+    white-space: nowrap;
+    padding: 0 8px;
+  }
+  .seq-arrow {
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-left: 10px solid var(--border);
+    margin: 0 4px;
+    flex-shrink: 0;
+  }
+  .seq-spacer { width: 8px; flex-shrink: 0; }
+
+  /* ── Flow diagram ── */
+  .flow-container {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding: 20px 0;
+  }
+  .flow-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    min-width: 160px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .flow-box .flow-icon { font-size: 24px; margin-bottom: 6px; }
+  .flow-box .flow-title { font-size: 13px; font-weight: 600; }
+  .flow-box .flow-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    font-size: 20px;
+    color: var(--border);
+    padding: 0 8px;
+    flex-shrink: 0;
+  }
+
+  /* ── Data flow colors ── */
+  .c-purple { background: var(--primary-dim); }
+  .c-green { background: var(--accent-dim); }
+  .c-orange { background: rgba(251,146,60,0.8); }
+  .c-pink { background: rgba(244,114,182,0.7); }
+  .c-cyan { background: rgba(34,211,238,0.6); }
+  .c-red { background: rgba(248,113,113,0.7); }
+  .c-yellow { background: rgba(251,191,36,0.7); color: #1e293b; }
+
+  /* ── Beat timeline ── */
+  .beat-timeline {
+    display: flex;
+    gap: 0;
+    margin: 16px 0;
+  }
+  .beat-block {
+    padding: 10px 16px;
+    border-right: 2px solid var(--bg);
+    text-align: center;
+    font-size: 12px;
+    color: white;
+    font-weight: 600;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .beat-block small {
+    font-weight: 400;
+    opacity: 0.7;
+    display: block;
+    margin-top: 4px;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 32px 20px;
+    color: var(--text-dim);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Media Producer MCP</h1>
+  <p>Architecture, pipelines, and concepts</p>
+</header>
+
+<nav id="nav">
+  <button data-view="overview" class="active">Overview</button>
+  <button data-view="generate">Generate Pipeline</button>
+  <button data-view="render">Render Pipeline</button>
+  <button data-view="scenes">Scenes vs Sequences</button>
+  <button data-view="components">Component Library</button>
+  <button data-view="mcp">MCP Tools</button>
+  <button data-view="data">Data Model</button>
+</nav>
+
+<!-- ════════════════ OVERVIEW ════════════════ -->
+<section class="view active" id="view-overview">
+  <h2>System Overview</h2>
+  <p class="description">
+    Media Producer MCP is an AI-powered video/image production server. It takes a text prompt,
+    plans a storyboard, generates or selects visual components, assembles them into HTML+GSAP scenes,
+    captures frames via Playwright, and encodes the final video with ffmpeg.
+  </p>
+
+  <div class="flow-container">
+    <div class="flow-box">
+      <div class="flow-icon">💬</div>
+      <div class="flow-title">User Prompt</div>
+      <div class="flow-sub">via MCP tool</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <div class="flow-icon">🎨</div>
+      <div class="flow-title">Generate Pipeline</div>
+      <div class="flow-sub">LLM planning + scene building</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <div class="flow-icon">📄</div>
+      <div class="flow-title">project.json</div>
+      <div class="flow-sub">Scenes, components, timing</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <div class="flow-icon">🎬</div>
+      <div class="flow-title">Render Pipeline</div>
+      <div class="flow-sub">HTML → frames → video</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <div class="flow-icon">📹</div>
+      <div class="flow-title">output.mp4</div>
+      <div class="flow-sub">Final video/image/GIF</div>
+    </div>
+  </div>
+
+  <h3>Key Layers</h3>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <h4>🧠 LLM Layer</h4>
+      <p>Creative intelligence: prompt expansion, concept direction, storyboard planning, scene generation, critique and revision loops.</p>
+      <span class="tag tag-llm">Anthropic / OpenAI</span>
+    </div>
+    <div class="concept-card">
+      <h4>🧩 Component System</h4>
+      <p>67 pre-built HTML+CSS+GSAP animation components organized by category. Each is a self-contained .component.html file with template, style, and createTimeline() function.</p>
+      <span class="tag tag-core">HTML + GSAP</span>
+    </div>
+    <div class="concept-card">
+      <h4>🔧 Core Engine</h4>
+      <p>Scene assembly, frame capture (Playwright), video encoding (ffmpeg), transitions, and the render queue.</p>
+      <span class="tag tag-core">Playwright + ffmpeg</span>
+    </div>
+    <div class="concept-card">
+      <h4>🎵 Audio Layer</h4>
+      <p>TTS voiceover generation, background music, SFX, audio mixing with ducking support.</p>
+      <span class="tag tag-media">OpenAI TTS</span>
+    </div>
+    <div class="concept-card">
+      <h4>📦 Persistence</h4>
+      <p>Project storage as JSON + file assets. Multi-tenant with tenant isolation. Brand kits stored per tenant.</p>
+      <span class="tag tag-data">/data/media-producer/</span>
+    </div>
+    <div class="concept-card">
+      <h4>🔌 MCP Interface</h4>
+      <p>13 MCP tools exposed via stdio + HTTP. Generate, render, create, get, list, update, brand, audio, upload, capture, job management.</p>
+      <span class="tag tag-core">MCP Protocol</span>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ GENERATE PIPELINE ════════════════ -->
+<section class="view" id="view-generate">
+  <h2>Generate Pipeline</h2>
+  <p class="description">
+    The generate pipeline transforms a user prompt into a complete project with scenes, components, and timing.
+    It runs as a queued background job.
+  </p>
+
+  <div class="pipeline">
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--primary)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">1. Prompt Expansion <span class="step-file">expander.ts</span></div>
+        <div class="step-desc">Detects thin prompts and expands them into rich creative briefs. Rich prompts pass through unchanged. Ensures the planner always has enough detail to work with.</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--primary)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">2. Creative Direction <span class="step-file">concept-director.ts</span></div>
+        <div class="step-desc">Generates 3 distinct creative concepts, self-critiques them, picks the strongest. Outputs a "creative bible" with the big idea, storytelling pattern, visual through-line, emotional arc, and key visual commitments.</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--primary)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">3. Storyboard Planning <span class="step-file">unified-planner.ts</span></div>
+        <div class="step-desc">Plans the full storyboard: decides each scene's type (library component, template, custom freeform, or sequence), assigns components, writes briefs, and sets timing. The planner has 5 options per scene and a component catalog to reference.</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--accent)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">3a. Sequence Conversion <span class="step-file">sequence-converter.ts</span></div>
+        <div class="step-desc">Post-planner pass: detects when multiple consecutive scenes reference the same component types and merges them into a single sequence scene with choreographed beats. Only fires when the planner didn't already output a sequence.</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--orange)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">4. Scene Generation <span class="step-file">scene-generator.ts</span></div>
+        <div class="step-desc">Per-scene generation. Library components pass through with data binding. Custom/freeform scenes get full HTML+GSAP generated by the LLM (via component-gen.ts or freeform-agentic.ts). Sequences carry through beats and choreography.</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--pink)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">5. Visual Critique <span class="step-file">critiquer.ts / multi-pass-critiquer.ts</span></div>
+        <div class="step-desc">Renders a preview frame of each scene, sends it to a vision model for evaluation. Scores the scene and suggests revisions. Multi-pass critique uses contact sheets (6 frames across the timeline) for motion evaluation. Scenes below threshold get revised.</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--cyan)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">6. Media Enrichment <span class="step-file">media-enrichment.ts / image-enrichment.ts</span></div>
+        <div class="step-desc">Enriches scenes with stock footage (Pexels API), AI-generated images (DALL-E/others), and asset references. Replaces placeholder images with real content.</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--yellow)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">7. Audio Generation <span class="step-file">scene-voiceover.ts / music.ts</span></div>
+        <div class="step-desc">Generates TTS voiceover per scene from voiceover_text. Selects background music. Builds audio mix with ducking (voice up, music down during speech).</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--accent)"></div><div class="pipeline-connector" style="display:none"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">8. Save Project <span class="step-file">persistence/project.ts</span></div>
+        <div class="step-desc">Writes project.json with all scenes, components, timing, audio tracks, and metadata. The project is now ready for the render pipeline.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════ RENDER PIPELINE ════════════════ -->
+<section class="view" id="view-render">
+  <h2>Render Pipeline</h2>
+  <p class="description">
+    The render pipeline takes a saved project.json and produces the final output file (MP4, GIF, PNG, or PDF).
+    It runs as a queued background job with parallel scene rendering.
+  </p>
+
+  <div class="pipeline">
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--primary)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">1. Scene Assembly <span class="step-file">scene-assembler.ts / sequence-assembler.ts</span></div>
+        <div class="step-desc">
+          Each scene's components are assembled into a self-contained HTML document. Brand kit becomes CSS variables, components are positioned and layered, GSAP scripts build a master timeline.
+          <br><br>
+          <strong>Standard scenes</strong> use scene-assembler.ts: all component timelines start at t=0.
+          <br>
+          <strong>Sequence scenes</strong> use sequence-assembler.ts: components are placed on a shared stage, a master timeline has labeled beats, components enter/exit/move at choreographed times.
+        </div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--accent)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">2. Frame Capture <span class="step-file">capture.ts / capture-worker.ts</span></div>
+        <div class="step-desc">Playwright loads the assembled HTML, steps through the GSAP timeline frame-by-frame (at the project FPS), and screenshots each frame as PNG. Runs in a worker process. Scenes render in parallel (concurrency: 2).</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--orange)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">3. Scene Encoding <span class="step-file">encode.ts</span></div>
+        <div class="step-desc">ffmpeg encodes each scene's frames into an MP4 segment (H.264). Quality settings, resolution, and frame rate come from the project canvas.</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--pink)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">4. Transitions <span class="step-file">transitions.ts</span></div>
+        <div class="step-desc">
+          Between-scene transitions are rendered as mini HTML scenes. Extract last frame of scene A and first frame of scene B, composite them with a GSAP animation (crossfade, slide, zoom, shader effects), capture, and encode.
+          <br><br>
+          30+ transition types including WebGL shader transitions (crosswarp, ripple, radial, chromatic).
+        </div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--cyan)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">5. Concatenation <span class="step-file">encode.ts</span></div>
+        <div class="step-desc">ffmpeg concatenates all scene segments and transition segments into one continuous video. The concat filter handles different durations seamlessly.</div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--yellow)"></div><div class="pipeline-connector" style="display:none"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">6. Audio Mix <span class="step-file">mixer.ts</span></div>
+        <div class="step-desc">Mixes voiceover, music, and SFX tracks onto the video. Applies ducking (music volume drops during speech) and fade in/out. Outputs the final output.mp4.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════ SCENES vs SEQUENCES ════════════════ -->
+<section class="view" id="view-scenes">
+  <h2>Scenes vs Sequences</h2>
+  <p class="description">
+    The two core composition models. Scenes are the building block; sequences extend scenes with multi-beat choreography.
+  </p>
+
+  <div class="concept-grid" style="margin-bottom: 32px;">
+    <div class="concept-card" style="border-left: 3px solid var(--primary);">
+      <h4>🎞️ Scene (Standard)</h4>
+      <p>A single visual moment. One set of components, all animated simultaneously from t=0.</p>
+      <ul>
+        <li>Components layered by z-index</li>
+        <li>All timelines start together</li>
+        <li>Typically 3-8 seconds</li>
+        <li>Connected by between-scene transitions</li>
+      </ul>
+      <span class="tag tag-core">scene-assembler.ts</span>
+    </div>
+    <div class="concept-card" style="border-left: 3px solid var(--accent);">
+      <h4>🎬 Sequence</h4>
+      <p>A multi-beat continuous take. Components persist across beats, entering and exiting the shared stage at choreographed times.</p>
+      <ul>
+        <li>Shared stage with all components</li>
+        <li>Master GSAP timeline with labeled beats</li>
+        <li>Components enter/exit/move per beat</li>
+        <li>Typically 20-40 seconds</li>
+        <li>No cuts between beats (single take)</li>
+      </ul>
+      <span class="tag tag-core">sequence-assembler.ts</span>
+    </div>
+  </div>
+
+  <h3>How a Sequence Works</h3>
+  <p class="description">A sequence is a scene with <code>beats[]</code> and optional <code>choreography[]</code>. The assembler places all components on stage (hidden), then reveals/moves/hides them at each beat boundary.</p>
+
+  <div class="seq-diagram">
+    <h3 style="margin-top:0">Example: Product Walkthrough</h3>
+    <p style="font-size:12px; color:var(--text-dim); margin-bottom:16px;">3 components, 3 beats, 30 seconds total</p>
+
+    <div class="beat-timeline">
+      <div class="beat-block c-purple" style="flex:8">Beat 1: Chat<small>0s - 8s</small></div>
+      <div class="beat-block c-green" style="flex:8">Beat 2: Connect<small>8s - 16s</small></div>
+      <div class="beat-block c-orange" style="flex:7">Beat 3: Publish<small>16s - 23s</small></div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div class="seq-row">
+        <div class="seq-label">quotient-chat</div>
+        <div class="seq-bar c-purple" style="flex:16; border-radius:6px 0 0 6px;">visible (enters, then slides left)</div>
+        <div class="seq-bar c-red" style="flex:1; font-size:10px;">exit</div>
+        <div style="flex:6"></div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-label">canva-editor</div>
+        <div style="flex:8"></div>
+        <div class="seq-bar c-green" style="flex:8;">visible (enters from right)</div>
+        <div class="seq-bar c-red" style="flex:1; font-size:10px;">exit</div>
+        <div style="flex:6"></div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-label">quotient-social</div>
+        <div style="flex:16"></div>
+        <div class="seq-bar c-orange" style="flex:7;">visible (enters, centered)</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Sequence Data Flow</h3>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <h4>📝 Planner Output</h4>
+      <p>The unified planner outputs a scene with <code>beats[]</code> (label, brief, duration, voiceover) and <code>choreography[]</code> (startTime, duration, visibleComponents, transitions).</p>
+    </div>
+    <div class="concept-card">
+      <h4>🔄 Sequence Converter</h4>
+      <p>Fallback: if the planner outputs separate scenes that should be a sequence, the converter detects consecutive component-eligible scenes and merges them into one sequence with auto-generated choreography.</p>
+    </div>
+    <div class="concept-card">
+      <h4>🏗️ Sequence Assembler</h4>
+      <p>Builds the final HTML. Places all components on a shared stage (hidden). Generates a GSAP master timeline with beat labels. At each beat: show/hide components, trigger enter/exit/move transitions, start component-internal animations.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ COMPONENT LIBRARY ════════════════ -->
+<section class="view" id="view-components">
+  <h2>Component Library</h2>
+  <p class="description">
+    67 reusable HTML+CSS+GSAP animation components. Each is a self-contained .component.html file
+    with a template section (HTML), style section (CSS), and script section (JS with createTimeline function).
+    Components are data-driven via template binding.
+  </p>
+
+  <h3>Component Anatomy</h3>
+  <div class="concept-card" style="max-width:600px; margin-bottom:24px;">
+    <h4>📦 .component.html</h4>
+    <p>Three sections in one file:</p>
+    <ul>
+      <li><strong>&lt;template&gt;</strong> -- HTML structure with <code>{{variable}}</code> bindings</li>
+      <li><strong>&lt;style&gt;</strong> -- Scoped CSS (auto-prefixed per instance)</li>
+      <li><strong>&lt;script&gt;</strong> -- <code>createTimeline(el, data, ctx)</code> returns a GSAP timeline</li>
+    </ul>
+    <p style="margin-top:8px;">The assembler parses these, binds data, scopes styles, and wires timelines into the master GSAP timeline.</p>
+    <span class="tag tag-core">component-parser.ts</span>
+  </div>
+
+  <div class="cat-header">📢 CTAs <span class="cat-count">4 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">cta-card</div><div class="comp-cat">Call-to-action card</div></div>
+    <div class="component-card"><div class="comp-name">pricing-card</div><div class="comp-cat">Pricing display</div></div>
+    <div class="component-card"><div class="comp-name">social-proof</div><div class="comp-cat">Social proof banner</div></div>
+    <div class="component-card"><div class="comp-name">testimonial-card</div><div class="comp-cat">Customer testimonial</div></div>
+  </div>
+
+  <div class="cat-header">📊 Data Viz <span class="cat-count">4 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">bar-chart</div><div class="comp-cat">Animated bar chart</div></div>
+    <div class="component-card"><div class="comp-name">line-chart</div><div class="comp-cat">Animated line chart</div></div>
+    <div class="component-card"><div class="comp-name">metric-dashboard</div><div class="comp-cat">KPI dashboard</div></div>
+    <div class="component-card"><div class="comp-name">progress-bar</div><div class="comp-cat">Animated progress</div></div>
+  </div>
+
+  <div class="cat-header">✨ Effects <span class="cat-count">9 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">asset-transfer</div><div class="comp-cat">Asset transfer animation</div></div>
+    <div class="component-card"><div class="comp-name">caption-bar</div><div class="comp-cat">Caption overlay</div></div>
+    <div class="component-card"><div class="comp-name">depth-blur</div><div class="comp-cat">Depth of field blur</div></div>
+    <div class="component-card"><div class="comp-name">film-polish</div><div class="comp-cat">Film grain + vignette</div></div>
+    <div class="component-card"><div class="comp-name">gradient-background</div><div class="comp-cat">Animated gradient BG</div></div>
+    <div class="component-card"><div class="comp-name">mesh-gradient</div><div class="comp-cat">Mesh gradient BG</div></div>
+    <div class="component-card"><div class="comp-name">panel-label</div><div class="comp-cat">Floating label</div></div>
+    <div class="component-card"><div class="comp-name">particle-field</div><div class="comp-cat">Particle system</div></div>
+    <div class="component-card"><div class="comp-name">split-connector</div><div class="comp-cat">Split screen connector</div></div>
+  </div>
+
+  <div class="cat-header">📐 Layouts <span class="cat-count">10 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">3d-card-flip</div><div class="comp-cat">3D card flip</div></div>
+    <div class="component-card"><div class="comp-name">bento-grid</div><div class="comp-cat">Bento box layout</div></div>
+    <div class="component-card"><div class="comp-name">brady-grid</div><div class="comp-cat">Brady Bunch grid</div></div>
+    <div class="component-card"><div class="comp-name">browser-frame</div><div class="comp-cat">Browser chrome frame</div></div>
+    <div class="component-card"><div class="comp-name">comparison-before-after</div><div class="comp-cat">Before/after slider</div></div>
+    <div class="component-card"><div class="comp-name">device-mockup</div><div class="comp-cat">Device frame</div></div>
+    <div class="component-card"><div class="comp-name">grid-layout</div><div class="comp-cat">CSS grid layout</div></div>
+    <div class="component-card"><div class="comp-name">picture-in-picture</div><div class="comp-cat">PIP overlay</div></div>
+    <div class="component-card"><div class="comp-name">split-screen</div><div class="comp-cat">Split screen</div></div>
+    <div class="component-card"><div class="comp-name">terminal</div><div class="comp-cat">Terminal window</div></div>
+  </div>
+
+  <div class="cat-header">🖼️ Media <span class="cat-count">13 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">app-store-card</div><div class="comp-cat">App store listing</div></div>
+    <div class="component-card"><div class="comp-name">asset-placeholder</div><div class="comp-cat">Placeholder asset</div></div>
+    <div class="component-card"><div class="comp-name">image-showcase</div><div class="comp-cat">Image showcase</div></div>
+    <div class="component-card"><div class="comp-name">image</div><div class="comp-cat">Simple image</div></div>
+    <div class="component-card"><div class="comp-name">integration-logos</div><div class="comp-cat">Logo integration grid</div></div>
+    <div class="component-card"><div class="comp-name">logo-intro</div><div class="comp-cat">Logo intro animation</div></div>
+    <div class="component-card"><div class="comp-name">logo-outro</div><div class="comp-cat">Logo outro animation</div></div>
+    <div class="component-card"><div class="comp-name">logo-row</div><div class="comp-cat">Logo row strip</div></div>
+    <div class="component-card"><div class="comp-name">logo</div><div class="comp-cat">Simple logo</div></div>
+    <div class="component-card"><div class="comp-name">product-screenshot</div><div class="comp-cat">Product screenshot</div></div>
+    <div class="component-card"><div class="comp-name">screencast-frame</div><div class="comp-cat">Screencast frame</div></div>
+    <div class="component-card"><div class="comp-name">screenshot-zoom</div><div class="comp-cat">Screenshot with zoom</div></div>
+    <div class="component-card"><div class="comp-name">video</div><div class="comp-cat">Video embed</div></div>
+  </div>
+
+  <div class="cat-header">💻 Mockups <span class="cat-count">12 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">calendar-view</div><div class="comp-cat">Calendar UI</div></div>
+    <div class="component-card"><div class="comp-name">canva-editor</div><div class="comp-cat">Canva editor mockup</div></div>
+    <div class="component-card"><div class="comp-name">chat-simulator</div><div class="comp-cat">Chat interface</div></div>
+    <div class="component-card"><div class="comp-name">claude-chat-composer</div><div class="comp-cat">Claude chat</div></div>
+    <div class="component-card"><div class="comp-name">code-editor</div><div class="comp-cat">Code editor</div></div>
+    <div class="component-card"><div class="comp-name">dashboard-kpi</div><div class="comp-cat">Dashboard</div></div>
+    <div class="component-card"><div class="comp-name">email-compose</div><div class="comp-cat">Email composer</div></div>
+    <div class="component-card"><div class="comp-name">form-wizard</div><div class="comp-cat">Multi-step form</div></div>
+    <div class="component-card"><div class="comp-name">kanban-board</div><div class="comp-cat">Kanban board</div></div>
+    <div class="component-card"><div class="comp-name">notification-stack</div><div class="comp-cat">Notification stack</div></div>
+    <div class="component-card"><div class="comp-name">quotient-chat</div><div class="comp-cat">Quotient AI chat</div></div>
+    <div class="component-card"><div class="comp-name">quotient-social</div><div class="comp-cat">Quotient social composer</div></div>
+  </div>
+
+  <div class="cat-header">📝 Titles <span class="cat-count">13 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">animated-gradient-text</div><div class="comp-cat">Gradient text</div></div>
+    <div class="component-card"><div class="comp-name">code-block</div><div class="comp-cat">Code snippet</div></div>
+    <div class="component-card"><div class="comp-name">feature-spotlight</div><div class="comp-cat">Feature highlight</div></div>
+    <div class="component-card"><div class="comp-name">hero-reveal</div><div class="comp-cat">Hero text reveal</div></div>
+    <div class="component-card"><div class="comp-name">kinetic-text</div><div class="comp-cat">Kinetic typography</div></div>
+    <div class="component-card"><div class="comp-name">number-counter-row</div><div class="comp-cat">Counter animation</div></div>
+    <div class="component-card"><div class="comp-name">particle-text</div><div class="comp-cat">Particle text</div></div>
+    <div class="component-card"><div class="comp-name">quote-block</div><div class="comp-cat">Quote display</div></div>
+    <div class="component-card"><div class="comp-name">section-header</div><div class="comp-cat">Section header</div></div>
+    <div class="component-card"><div class="comp-name">stat-card</div><div class="comp-cat">Stat callout</div></div>
+    <div class="component-card"><div class="comp-name">text-list</div><div class="comp-cat">Animated list</div></div>
+    <div class="component-card"><div class="comp-name">title-slide</div><div class="comp-cat">Title slide</div></div>
+    <div class="component-card"><div class="comp-name">typewriter</div><div class="comp-cat">Typewriter effect</div></div>
+  </div>
+
+  <div class="cat-header">🔧 Shared <span class="cat-count">2 files</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">utilities.js</div><div class="comp-cat">Shared animation utilities</div></div>
+    <div class="component-card"><div class="comp-name">spotlight.js</div><div class="comp-cat">Spotlight animation helper</div></div>
+  </div>
+</section>
+
+<!-- ════════════════ MCP TOOLS ════════════════ -->
+<section class="view" id="view-mcp">
+  <h2>MCP Tools</h2>
+  <p class="description">
+    The server exposes these tools via the Model Context Protocol (stdio + HTTP at /mcp).
+    Any MCP-compatible client (Claude, Cursor, OpenClaw, etc.) can call them.
+  </p>
+
+  <div class="concept-grid">
+    <div class="concept-card">
+      <h4>🎬 generate</h4>
+      <p>The big one. Takes a prompt and produces a full project. Modes: <code>plan</code> (storyboard only), <code>generate</code> (build from approved plan), <code>full</code> (plan + generate + render).</p>
+      <span class="tag tag-llm">LLM</span><span class="tag tag-core">Core</span>
+    </div>
+    <div class="concept-card">
+      <h4>🎞️ render</h4>
+      <p>Render an existing project to its output format. Queued as a background job.</p>
+      <span class="tag tag-core">Core</span>
+    </div>
+    <div class="concept-card">
+      <h4>📁 create</h4>
+      <p>Create a new empty project with canvas settings and brand kit.</p>
+      <span class="tag tag-data">Persistence</span>
+    </div>
+    <div class="concept-card">
+      <h4>📖 get</h4>
+      <p>Get project details, specific scenes, or list outputs.</p>
+      <span class="tag tag-data">Persistence</span>
+    </div>
+    <div class="concept-card">
+      <h4>📋 list</h4>
+      <p>List projects for a tenant, or list jobs (render/generate).</p>
+      <span class="tag tag-data">Persistence</span>
+    </div>
+    <div class="concept-card">
+      <h4>✏️ update</h4>
+      <p>Update project properties (name, canvas, brand kit).</p>
+      <span class="tag tag-data">Persistence</span>
+    </div>
+    <div class="concept-card">
+      <h4>➕ add</h4>
+      <p>Add a scene to an existing project.</p>
+      <span class="tag tag-data">Persistence</span>
+    </div>
+    <div class="concept-card">
+      <h4>🔀 reorder</h4>
+      <p>Reorder scenes within a project.</p>
+      <span class="tag tag-data">Persistence</span>
+    </div>
+    <div class="concept-card">
+      <h4>🎨 brand</h4>
+      <p>Manage brand kits: create, get, extract from URL.</p>
+      <span class="tag tag-media">Media</span>
+    </div>
+    <div class="concept-card">
+      <h4>📸 capture</h4>
+      <p>Capture a single preview frame from a scene.</p>
+      <span class="tag tag-core">Core</span>
+    </div>
+    <div class="concept-card">
+      <h4>📤 upload</h4>
+      <p>Upload assets (images, videos) to a project.</p>
+      <span class="tag tag-data">Persistence</span>
+    </div>
+    <div class="concept-card">
+      <h4>🎵 audio</h4>
+      <p>Manage audio tracks: add voiceover, music, SFX. Remix audio.</p>
+      <span class="tag tag-media">Media</span>
+    </div>
+    <div class="concept-card">
+      <h4>⏱️ job</h4>
+      <p>Check job status, list jobs, cancel jobs.</p>
+      <span class="tag tag-core">Core</span>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ DATA MODEL ════════════════ -->
+<section class="view" id="view-data">
+  <h2>Data Model</h2>
+  <p class="description">
+    Projects are stored as JSON with associated file assets on disk. Multi-tenant architecture with tenant isolation.
+  </p>
+
+  <h3>File Structure</h3>
+  <div class="concept-card" style="max-width:600px; margin-bottom:24px; font-family:'SF Mono','Fira Code',monospace; font-size:12px;">
+    <pre style="color:var(--text-dim); line-height:1.8;">
+/data/media-producer/
+  └── {tenant-id}/
+      ├── brand-kit/
+      │   ├── brand-kit.json
+      │   └── assets/ (logos, fonts)
+      ├── components/ (tenant-specific components)
+      └── projects/
+          └── proj_{id}/
+              ├── project.json
+              ├── components/ (freeform HTML files)
+              ├── _work/
+              │   ├── scene_0/ (frames, scene.html, scene.mp4)
+              │   ├── scene_1/
+              │   ├── transition_0_1/
+              │   └── ...
+              └── output/
+                  └── output.mp4</pre>
+  </div>
+
+  <h3>Project JSON Shape</h3>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <h4>📋 Project</h4>
+      <ul>
+        <li><code>project_id</code> -- unique identifier</li>
+        <li><code>tenant_id</code> -- tenant isolation</li>
+        <li><code>name</code> -- display name</li>
+        <li><code>format</code> -- video | image | gif | presentation</li>
+        <li><code>canvas</code> -- width, height, fps, preset, background</li>
+        <li><code>brand_kit</code> -- colors, fonts, logos</li>
+        <li><code>scenes[]</code> -- ordered scene list</li>
+        <li><code>audio</code> -- track list + ducking config</li>
+      </ul>
+    </div>
+    <div class="concept-card">
+      <h4>🎞️ Scene</h4>
+      <ul>
+        <li><code>id</code> -- scene identifier</li>
+        <li><code>label</code> -- display name</li>
+        <li><code>duration_seconds</code></li>
+        <li><code>components[]</code> -- positioned components</li>
+        <li><code>transition_in</code> -- entry transition</li>
+        <li><code>beats[]</code> -- (sequences only)</li>
+        <li><code>choreography[]</code> -- (sequences only)</li>
+        <li><code>background</code> -- color or gradient</li>
+        <li><code>voiceover_text</code></li>
+      </ul>
+    </div>
+    <div class="concept-card">
+      <h4>🧩 SceneComponent</h4>
+      <ul>
+        <li><code>id</code> -- instance id (comp_0, comp_1...)</li>
+        <li><code>type</code> -- component type name</li>
+        <li><code>data</code> -- template binding data</li>
+        <li><code>z_index</code> -- layer order</li>
+        <li><code>position</code> -- x, y, width, height (%)</li>
+      </ul>
+    </div>
+    <div class="concept-card">
+      <h4>🎵 SequenceBeat</h4>
+      <ul>
+        <li><code>label</code> -- beat name</li>
+        <li><code>brief</code> -- what happens</li>
+        <li><code>duration_seconds</code></li>
+        <li><code>voiceover_text</code></li>
+      </ul>
+    </div>
+    <div class="concept-card">
+      <h4>💃 Choreography</h4>
+      <ul>
+        <li><code>label</code> -- matches beat label</li>
+        <li><code>startTime</code> -- seconds (cumulative)</li>
+        <li><code>duration</code> -- seconds</li>
+        <li><code>visibleComponents[]</code> -- component ids</li>
+        <li><code>transitions</code> -- enter/exit/move per component</li>
+        <li><code>positions</code> -- position overrides</li>
+      </ul>
+    </div>
+    <div class="concept-card">
+      <h4>🎨 BrandKit</h4>
+      <ul>
+        <li><code>colors</code> -- primary, accent, background, text</li>
+        <li><code>fonts</code> -- heading, body (Google Fonts)</li>
+        <li><code>logos</code> -- primary, secondary, icon</li>
+        <li><code>name</code> -- brand name</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Media Producer MCP &middot; Architecture Reference &middot; Built June 2026
+</footer>
+
+<script>
+  // Tab navigation
+  const nav = document.getElementById('nav');
+  const buttons = nav.querySelectorAll('button');
+  const views = document.querySelectorAll('.view');
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.view;
+      buttons.forEach(b => b.classList.remove('active'));
+      views.forEach(v => v.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('view-' + target).classList.add('active');
+      window.scrollTo(0, 0);
+    });
+  });
+</script>
+</body>
+</html>
