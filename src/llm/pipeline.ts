@@ -22,6 +22,26 @@ import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
 import { planStoryboard } from "./unified-planner.js";
 import { generateCreativeBible, formatCreativeBibleForPlanner, type CreativeBible } from "./concept-director.js";
+import { convertToSequences } from "./sequence-converter.js";
+
+/** Detect known component names mentioned in the user prompt */
+function detectComponentsInPrompt(prompt: string, catalog: ComponentCatalogEntry[]): string[] {
+  var promptLower = prompt.toLowerCase();
+  var SEQUENCE_TYPES = ["quotient-chat", "canva-editor", "quotient-social", "chat-simulator", "browser-frame", "code-editor"];
+  var catalogTypes = new Set(catalog.map(c => c.type));
+  var found: string[] = [];
+
+  for (var type of SEQUENCE_TYPES) {
+    if (!catalogTypes.has(type)) continue;
+    // Check for exact name or space-separated version
+    var spaceName = type.replace(/-/g, " ");
+    if (promptLower.includes(type) || promptLower.includes(spaceName)) {
+      found.push(type);
+    }
+  }
+
+  return found;
+}
 import { planRevision, type RevisionPlan, type RevisedComponent } from "./revision-planner.js";
 import { reviseComponent } from "./component-revise.js";
 import { critiqueAndReviseScene } from "./revision-critique.js";
@@ -1346,6 +1366,14 @@ async function runUnifiedPipeline(
     trace?.endEvent({ concept: creativeBible?.concept });
   }
 
+  // 2b. Detect component names in prompt and inject sequence constraint
+  var detectedComponents = detectComponentsInPrompt(richPrompt, catalog);
+  if (detectedComponents.length >= 2 && format !== "image") {
+    var seqConstraint = `\n\n## MANDATORY SEQUENCE\nThe user has specified these existing library components: ${detectedComponents.join(", ")}.\nYou MUST create a component-based sequence scene using these components with beats and choreography.\nDo NOT use freeform for these components. Do NOT regenerate them as HTML.\nUse the exact component types from the catalog. Output a scene with "beats" and "choreography" arrays.\nThe other scenes (intro, outro, title, CTA) can be any type.`;
+    richPrompt = richPrompt + seqConstraint;
+    console.log(`  [sequence-detect] Found ${detectedComponents.length} components in prompt: ${detectedComponents.join(", ")}`);
+  }
+
   // 3. Plan storyboard (unified planner)
   trace?.beginEvent("plan_storyboard");
   var storyboard = await planStoryboard({
@@ -1362,6 +1390,15 @@ async function runUnifiedPipeline(
     referenceImages: processedRefs,
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
+
+  // 3a. Convert eligible scenes to component-based sequences
+  if (format !== "image") {
+    var preConvertCount = storyboard.scenes.length;
+    storyboard = convertToSequences(storyboard, catalog);
+    if (storyboard.scenes.length !== preConvertCount) {
+      console.log(`  [sequence-converter] Storyboard: ${preConvertCount} scenes -> ${storyboard.scenes.length} scenes (sequences merged)`);
+    }
+  }
 
 
     // Create project shell (reuse tempProjectId from reference image processing if available)

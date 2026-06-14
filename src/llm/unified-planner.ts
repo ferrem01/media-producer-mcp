@@ -346,6 +346,8 @@ Each action needs "action" and "at" (seconds). Optional: "duration", "target" (n
 When using scripts, set scene duration_seconds long enough for the full script to play (last action at + duration + 1s buffer).
 Only add scripts when the scene calls for an interactive demo. Not every mockup needs a script -- static mockups are fine for feature overviews.
 - Output ONLY valid JSON. No commentary.
+- **COMPONENT-BASED SEQUENCES (CRITICAL):** When the user prompt mentions SPECIFIC component names from the catalog (e.g. "quotient-chat", "canva-editor", "quotient-social"), you MUST use a component-based sequence scene with those components, beats, and choreography. Do NOT regenerate these components as freeform HTML. The existing components are high-fidelity and their built-in animations will be triggered automatically at each beat.
+- When a prompt asks for a "walkthrough", "demo flow", "step by step", or "continuous take" involving multiple existing components, ALWAYS use a sequence with choreography.
 
 ${SCENE_PLANNER_DESIGN_RULES}
 

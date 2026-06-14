@@ -132,6 +132,15 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     components: sceneComponents,
   };
 
+  // Carry through sequence fields (beats + choreography) for component-based sequences
+  if ((planned as any).beats?.length) {
+    scene.beats = (planned as any).beats;
+    console.log(`  Scene ${opts.sceneIndex + 1}: sequence with ${scene.beats!.length} beats`);
+  }
+  if ((planned as any).choreography?.length) {
+    scene.choreography = (planned as any).choreography;
+  }
+
   return { scene, customSources: customSources.size > 0 ? customSources : undefined };
 }
 
