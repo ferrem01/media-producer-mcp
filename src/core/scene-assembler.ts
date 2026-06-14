@@ -354,6 +354,8 @@ html, body {
 /* ── Component instance containers ── */
 .component-instance {
   position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 /* ── Safety defaults ── */
@@ -393,7 +395,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
 ${backgroundVideo ? `<video class="mp-bg-video" src="file://${backgroundVideo}" autoplay muted loop playsinline style="position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;opacity:0.35;filter:blur(2px) brightness(0.7);"></video>` : ""}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}
-<div class="mp-scene-content" style="position:relative;width:${canvas.width}px;height:${canvas.height}px;">
+<div class="mp-scene-content" style="position:relative;width:${canvas.width}px;height:${canvas.height}px;z-index:2;">
 ${tagResult.html}
 </div>
 </div>

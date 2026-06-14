@@ -153,7 +153,7 @@ export function resolveComponentTags(
     const classAttr = `component-instance${extraClass ? " " + extraClass : ""}`;
     const styleAttr = extraStyle ? ` style="${extraStyle}"` : "";
     const replacement =
-      `<div class="${classAttr}" data-comp-id="${id}" data-comp-type="${type}"${styleAttr}>\n` +
+      `<div class="${classAttr}" data-cid="${id}" data-comp-id="${id}" data-comp-type="${type}"${styleAttr}>\n` +
       `      ${boundHtml}\n` +
       `    </div>`;
 

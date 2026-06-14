@@ -1,0 +1,98 @@
+<template>
+<div class="walkthrough" style="position:relative;width:100%;height:100%;">
+  <!-- Beat 1: Chat interface appears -->
+  <div class="chat-side" style="position:absolute;left:5%;top:5%;width:90%;height:90%;">
+    <component type="quotient-chat" data='{
+      "conversation_title": "Canva Campaign",
+      "messages": [
+        { "role": "user", "text": "Create a LinkedIn post for our product launch" },
+        { "role": "agent", "text": "I will design that for you. Connecting to Canva..." }
+      ],
+      "user_avatar": "MF",
+      "mode": "panel",
+      "composer_placeholder": "Ask Quotient anything..."
+    }' />
+  </div>
+
+  <!-- Beat 2: Canva editor slides in from right -->
+  <div class="editor-side" style="position:absolute;left:52%;top:5%;width:46%;height:90%;opacity:0;">
+    <component type="canva-editor" data='{
+      "design_type": "social"
+    }' />
+  </div>
+
+  <!-- Custom overlay: step indicator -->
+  <div class="step-indicator" style="position:absolute;bottom:3%;left:50%;transform:translateX(-50%);z-index:100;">
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+  </div>
+</div>
+</template>
+
+<style>
+.walkthrough {
+  font-family: var(--mp-font-family, 'Inter', sans-serif);
+}
+
+.step-indicator {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  transition: background 0.3s;
+}
+
+.step-dot.active {
+  background: var(--mp-color-primary, #6366f1);
+  box-shadow: 0 0 8px var(--mp-color-primary, #6366f1);
+}
+</style>
+
+<script>
+function createTimeline(el, data, ctx) {
+  var tl = gsap.timeline();
+  var chatSide = el.querySelector('.chat-side');
+  var editorSide = el.querySelector('.editor-side');
+  var dots = el.querySelectorAll('.step-dot');
+
+  // Beat 1: Chat enters (0s - 5s)
+  tl.from(chatSide, { opacity: 0, y: 30, duration: 0.8, ease: 'power2.out' });
+
+  // Add chat component's internal timeline at t=0
+  var chatTl = ctx.getComponentTimeline('comp_0');
+  if (chatTl) tl.add(chatTl, 0.5);
+
+  // Beat 2: Chat slides left, editor enters (5s)
+  tl.to(chatSide, {
+    left: '2%',
+    width: '46%',
+    duration: 1,
+    ease: 'power2.inOut'
+  }, 5);
+
+  tl.to(editorSide, {
+    opacity: 1,
+    duration: 0.8,
+    ease: 'power2.out'
+  }, 5.3);
+
+  // Update step indicator
+  tl.to(dots[0], { background: 'rgba(255,255,255,0.3)', boxShadow: 'none', duration: 0.3 }, 5);
+  tl.to(dots[1], { background: 'var(--mp-color-primary, #6366f1)', boxShadow: '0 0 8px var(--mp-color-primary, #6366f1)', duration: 0.3 }, 5);
+
+  // Add editor component's internal timeline at t=5.5
+  var editorTl = ctx.getComponentTimeline('comp_1');
+  if (editorTl) tl.add(editorTl, 5.5);
+
+  return tl;
+}
+</script>
