@@ -302,16 +302,6 @@
     white-space: nowrap;
     padding: 0 8px;
   }
-  .seq-arrow {
-    width: 0;
-    height: 0;
-    border-top: 8px solid transparent;
-    border-bottom: 8px solid transparent;
-    border-left: 10px solid var(--border);
-    margin: 0 4px;
-    flex-shrink: 0;
-  }
-  .seq-spacer { width: 8px; flex-shrink: 0; }
 
   /* ── Flow diagram ── */
   .flow-container {
@@ -530,31 +520,6 @@
   .badge-quality { background: rgba(129,140,248,0.15); color: var(--primary); }
   .badge-llm { background: rgba(251,146,60,0.15); color: var(--orange); }
 
-  /* ── Compare table ── */
-  .compare-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-    margin-top: 12px;
-  }
-  .compare-table th {
-    background: var(--surface-2);
-    color: var(--text-dim);
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 10px 12px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-  }
-  .compare-table td {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    color: var(--text-dim);
-  }
-  .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
-
   /* ── Creativity bar ── */
   .creativity-bar {
     display: flex;
@@ -727,10 +692,10 @@
   <button data-view="io">Pipeline I/O</button>
   <button data-view="modes">Generate Modes</button>
   <button data-view="render">Render Pipeline</button>
-  <button data-view="scenes">Scenes vs Sequences</button>
+  <button data-view="scenes">Unified Codegen</button>
   <button data-view="components">Component Library</button>
   <button data-view="templates">Scene Templates</button>
-  <button data-view="pipelines">Scene Pipelines</button>
+  <button data-view="pipelines">Codegen Pipeline</button>
   <button data-view="mcp">MCP Tools</button>
   <button data-view="data">Data Model</button>
 </nav>
@@ -740,7 +705,7 @@
   <h2>System Overview</h2>
   <p class="description">
     Media Producer MCP is an AI-powered video/image production server. It takes a text prompt,
-    plans a storyboard, generates or selects visual components, assembles them into HTML+GSAP scenes,
+    plans a storyboard, generates visual scenes via LLM codegen, assembles them into HTML+GSAP documents,
     captures frames via Playwright, and encodes the final video with ffmpeg.
   </p>
 
@@ -754,7 +719,7 @@
     <div class="flow-box">
       <div class="flow-icon">🎨</div>
       <div class="flow-title">Generate Pipeline</div>
-      <div class="flow-sub">LLM planning + scene building</div>
+      <div class="flow-sub">LLM planning + codegen</div>
     </div>
     <div class="flow-arrow">→</div>
     <div class="flow-box">
@@ -780,17 +745,17 @@
   <div class="concept-grid">
     <div class="concept-card">
       <h4>🧠 LLM Layer</h4>
-      <p>Creative intelligence: prompt expansion, concept direction, storyboard planning, scene generation, critique and revision loops.</p>
+      <p>Creative intelligence: prompt expansion, concept direction, storyboard planning, scene generation via unified codegen, critique and revision loops.</p>
       <span class="tag tag-llm">Anthropic / OpenAI</span>
     </div>
     <div class="concept-card">
       <h4>🧩 Component System</h4>
-      <p>67 pre-built HTML+CSS+GSAP animation components organized by category. Each is a self-contained .component.html file with template, style, and createTimeline() function.</p>
+      <p>67 pre-built HTML+CSS+GSAP animation components. The codegen LLM can embed them in its output via <code>&lt;component type="..." data='...' /&gt;</code> tags, which the assembler resolves to real HTML/CSS/JS at render time.</p>
       <span class="tag tag-core">HTML + GSAP</span>
     </div>
     <div class="concept-card">
       <h4>🔧 Core Engine</h4>
-      <p>Scene assembly, frame capture (Playwright), video encoding (ffmpeg), transitions, and the render queue.</p>
+      <p>Scene assembly, <code>&lt;component&gt;</code> tag resolution, frame capture (Playwright), video encoding (ffmpeg), transitions, and the render queue.</p>
       <span class="tag tag-core">Playwright + ffmpeg</span>
     </div>
     <div class="concept-card">
@@ -816,7 +781,7 @@
   <h2>Generate Pipeline</h2>
   <p class="description">
     The generate pipeline transforms a user prompt into a complete project with scenes, components, and timing.
-    It runs as a queued background job.
+    It runs as a queued background job. All scenes go through the same unified codegen path.
   </p>
 
   <div class="pipeline">
@@ -833,7 +798,7 @@
       <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--primary)"></div><div class="pipeline-connector"></div></div>
       <div class="pipeline-card">
         <div class="step-name">2. Creative Direction <span class="step-file">concept-director.ts</span></div>
-        <div class="step-desc">Generates 3 distinct creative concepts, self-critiques them, picks the strongest. Outputs a "creative bible" with the big idea, storytelling pattern, visual through-line, emotional arc, and key visual commitments.<br><br><span style="color:var(--accent);">&#x2705; Refactor 1 complete:</span> CreativeBible is now passed as structured data through the entire pipeline (planner, scene generator, custom codegen, freeform). Saved to <code>project.creative_bible</code> in project.json. Previously it was flattened to prose text and lost after the planner.</div>
+        <div class="step-desc">Generates 3 distinct creative concepts, self-critiques them, picks the strongest. Outputs a "creative bible" with the big idea, storytelling pattern, visual through-line, emotional arc, and key visual commitments. The CreativeBible is passed as structured data through the entire pipeline and saved to <code>project.creative_bible</code>.</div>
       </div>
     </div>
 
@@ -841,15 +806,7 @@
       <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--primary)"></div><div class="pipeline-connector"></div></div>
       <div class="pipeline-card">
         <div class="step-name">3. Storyboard Planning <span class="step-file">unified-planner.ts</span></div>
-        <div class="step-desc">Plans the full storyboard: decides each scene's type (library component, template, custom freeform, or sequence), assigns components, writes briefs, and sets timing. The planner has 5 options per scene and a component catalog to reference.</div>
-      </div>
-    </div>
-
-    <div class="pipeline-step">
-      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--accent)"></div><div class="pipeline-connector"></div></div>
-      <div class="pipeline-card">
-        <div class="step-name">3a. Sequence Conversion <span class="step-file">sequence-converter.ts</span></div>
-        <div class="step-desc">Post-planner pass: detects when multiple consecutive scenes reference the same component types and merges them into a single sequence scene with choreographed beats. Only fires when the planner didn't already output a sequence.</div>
+        <div class="step-desc">The single planner used by all generate modes (<code>plan</code>, <code>generate</code>, <code>full</code>). Plans the full storyboard: writes a rich visual brief per scene, sets timing, transitions, and voiceover scripts. Receives the component catalog so it can guide the codegen LLM toward library components. The storyboard is saved to <code>project.storyboard</code> for plan mode review.</div>
       </div>
     </div>
 
@@ -857,7 +814,17 @@
       <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--orange)"></div><div class="pipeline-connector"></div></div>
       <div class="pipeline-card">
         <div class="step-name">4. Scene Generation <span class="step-file">scene-generator.ts</span></div>
-        <div class="step-desc">Per-scene generation. Library components pass through with data binding. Custom/freeform scenes get full HTML+GSAP generated by the LLM (via component-gen.ts or freeform-agentic.ts). Sequences carry through beats and choreography.<br><br><span style="color:var(--accent);">&#x2705; Refactor 1:</span> Custom component and freeform generators now receive the CreativeBible and inject visual style constraints (colorMood, motionPersonality, spatialStrategy) directly into their LLM prompts.</div>
+        <div class="step-desc">
+          Unified codegen pipeline for every scene:
+          <br><br>
+          <strong>1.</strong> <code>buildCodegenBrief()</code> — assembles the scene brief, creative bible, brand kit, and component catalog into a codegen prompt.
+          <br>
+          <strong>2.</strong> Freeform-agentic multi-turn LLM — generates HTML+CSS+GSAP with access to tools: <code>search_library</code> (find components), <code>read_source</code> (read component/template source), and <code>submit_scene</code> (deliver final output).
+          <br>
+          <strong>3.</strong> <code>&lt;component&gt;</code> tag resolution — the assembler resolves any <code>&lt;component type="..." data='...' /&gt;</code> tags in the LLM output to real component HTML/CSS/JS at render time.
+          <br><br>
+          The LLM can write fully custom HTML, embed library components via <code>&lt;component&gt;</code> tags, or mix both in a single scene.
+        </div>
       </div>
     </div>
 
@@ -926,7 +893,7 @@
     </div>
     <div class="io-flow-arrow">→</div>
     <div class="io-flow-item">
-      <div class="io-flow-label">Scene Gen</div>
+      <div class="io-flow-label">Codegen</div>
       <div class="io-flow-type">Scene[]</div>
     </div>
     <div class="io-flow-arrow">→</div>
@@ -1069,7 +1036,7 @@
         <div class="io-stage-file">unified-planner.ts</div>
       </div>
     </div>
-    <p class="io-stage-desc">Plans the full storyboard: per-scene decisions on type (library, template, custom, freeform, sequence), component selection, transitions, timing, and voiceover scripts. This is where text becomes structured data.</p>
+    <p class="io-stage-desc">Plans the full storyboard: per-scene visual briefs for the codegen LLM, transitions, timing, and voiceover scripts. The planner has a component catalog to reference so it can suggest library components in the briefs. This is where text becomes structured data.</p>
 
     <div class="io-columns">
       <div class="io-block io-input">
@@ -1085,7 +1052,7 @@
 <span class="io-key">sceneCount</span>?: <span class="io-type">number</span>
 <span class="io-key">hasSpeakerTrack</span>?: <span class="io-type">boolean</span>
 <span class="io-key">referenceImages</span>?: <span class="io-type">ReferenceImage[]</span>
-<span class="io-comment">// + CreativeBible passed as structured data (Refactor 1)</span></pre>
+<span class="io-key">creativeBible</span>: <span class="io-type">CreativeBible</span> <span class="io-comment">// from concept director</span></pre>
       </div>
 
       <div class="io-arrow-col">→</div>
@@ -1098,26 +1065,10 @@
         <div class="io-block-label" style="margin-top:12px;">PlannedScene</div>
         <pre class="io-code"><span class="io-key">label</span>: <span class="io-type">string</span>               <span class="io-comment">// "Opening Hook"</span>
 <span class="io-key">duration_seconds</span>: <span class="io-type">number</span>
-<span class="io-key">description</span>: <span class="io-type">string</span>
+<span class="io-key">description</span>: <span class="io-type">string</span>          <span class="io-comment">// rich visual brief for codegen</span>
 <span class="io-key">transition_in</span>?: { <span class="io-key">type</span>, <span class="io-key">duration_seconds</span> }
 <span class="io-key">voiceover_text</span>?: <span class="io-type">string</span>     <span class="io-comment">// TTS script</span>
-<span class="io-key">components</span>: <span class="io-type">PlannedComponent[]</span>
-<span class="io-comment">// One of these scene-type flags:</span>
-<span class="io-key">template</span>?: <span class="io-type">string</span>           <span class="io-comment">// "O1-big-statement"</span>
-<span class="io-key">template_data</span>?: <span class="io-type">Record</span>     <span class="io-comment">// slot values</span>
-<span class="io-key">freeform</span>?: <span class="io-type">boolean</span>
-<span class="io-key">freeform_brief</span>?: <span class="io-type">string</span>    <span class="io-comment">// rich visual brief</span>
-<span class="io-key">beats</span>?: <span class="io-type">PlannedBeat[]</span>       <span class="io-comment">// sequence beats</span></pre>
-
-        <div class="io-block-label" style="margin-top:12px;">PlannedComponent</div>
-        <pre class="io-code"><span class="io-comment">// Library:</span>
-<span class="io-key">type</span>?: <span class="io-type">string</span>               <span class="io-comment">// "stat-card"</span>
-<span class="io-key">data</span>?: <span class="io-type">Record</span>              <span class="io-comment">// component props</span>
-<span class="io-key">position</span>?: { <span class="io-key">x</span>, <span class="io-key">y</span>, <span class="io-key">width</span>, <span class="io-key">height</span> }
-<span class="io-key">z_index</span>?: <span class="io-type">number</span>
-<span class="io-comment">// Custom codegen:</span>
-<span class="io-key">custom</span>?: <span class="io-type">boolean</span>
-<span class="io-key">custom_prompt</span>?: <span class="io-type">string</span>     <span class="io-comment">// visual description</span></pre>
+<span class="io-key">freeform_brief</span>?: <span class="io-type">string</span>    <span class="io-comment">// detailed codegen brief</span></pre>
       </div>
     </div>
 
@@ -1129,46 +1080,36 @@
     {
       label: "Intro",
       duration_seconds: 3,
-      template: "O1-big-statement",
-      template_data: { headline: "One Conversation. Published.", badge: "INTRODUCING" },
-      components: [],
+      description: "Bold statement title card",
+      freeform_brief: "Dark background with centered bold white text. Badge
+        appears first with a scale-up, then headline types in below.
+        Use &lt;component type='gradient-background' /&gt; for the BG layer...",
       transition_in: { type: "crossfade", duration_seconds: 0.5 }
     },
     {
       label: "The Hook",
       duration_seconds: 5,
-      freeform: true,
       freeform_brief: "Camera PUSHES through a dark void toward a glowing chat
-        interface. Text cursor blinks. Then a message SNAPS into place...",
-      components: [{ custom: true, custom_prompt: "..." }],
+        interface. Text cursor blinks. Then a message SNAPS into place.
+        Build the chat UI with GSAP entrance animations...",
       voiceover_text: "What if one conversation could do it all?"
     },
     {
       label: "Product Walkthrough",
       duration_seconds: 24,
-      description: "Continuous sequence: chat → canva → social",
-      beats: [
-        { label: "chat", brief: "Chat interface appears", duration_seconds: 8 },
-        { label: "connect", brief: "Canva editor enters", duration_seconds: 8 },
-        { label: "publish", brief: "Social post preview", duration_seconds: 8 }
-      ],
-      choreography: [
-        { label: "chat", startTime: 0, duration: 8, visibleComponents: ["comp_0"] },
-        { label: "connect", startTime: 8, duration: 8, visibleComponents: ["comp_0","comp_1"] },
-        { label: "publish", startTime: 16, duration: 8, visibleComponents: ["comp_2"] }
-      ],
-      components: [
-        { type: "quotient-chat", data: { ... } },
-        { type: "canva-editor", data: { ... } },
-        { type: "quotient-social", data: { ... } }
-      ]
+      description: "Continuous walkthrough: chat → canva → social",
+      freeform_brief: "Three-act scene. Chat interface enters from left (0-8s),
+        slides to make room for Canva editor from right (8-16s). Both exit as
+        social post preview zooms to center (16-24s). Use &lt;component&gt; tags
+        for quotient-chat, canva-editor, quotient-social. Orchestrate with
+        GSAP timeline labels..."
     },
     {
       label: "CTA",
       duration_seconds: 5,
-      template: "E1-cta-finale",
-      template_data: { headline: "Start Creating", cta_text: "Try Free" },
-      components: []
+      freeform_brief: "Final call-to-action. Large headline with a glowing
+        CTA button below. Consider &lt;component type='particle-field' /&gt;
+        as a background layer..."
     }
   ]
 }</pre>
@@ -1182,7 +1123,7 @@
   <h2>Generate Modes &amp; Project Lifecycle</h2>
   <p class="description">
     The <code>generate</code> MCP tool has 3 modes that control how much of the pipeline runs.
-    Understanding these modes explains how data flows into project.json.
+    All three modes use the same unified planner and codegen pipeline.
   </p>
 
   <!-- Mode comparison -->
@@ -1190,33 +1131,35 @@
 
     <div class="concept-card" style="border-left:3px solid var(--accent);">
       <h4 style="color:var(--accent);">📝 mode: "plan"</h4>
-      <p>Runs the script writer only. Creates a high-level creative plan with narrative, scene descriptions, audio direction, and asset requirements. Saves to <code>project.plan</code>. No HTML generated, no rendering.</p>
+      <p>Runs the unified pipeline with <code>planOnly: true</code>. Executes prompt expansion, concept direction, and storyboard planning, then stops. Saves the storyboard to <code>project.storyboard</code> for review. No HTML generated, no rendering.</p>
       <div class="pipeline-flow" style="margin-top:12px;">
         <div class="pf-row">
           <div class="pf-step pf-planner">User prompt</div>
           <div class="pf-arrow">→</div>
-          <div class="pf-step pf-llm">Script Writer<br><small>script-writer.ts</small></div>
+          <div class="pf-step pf-llm">Expand + Concept Director<br><small>expander.ts + concept-director.ts</small></div>
           <div class="pf-arrow">→</div>
-          <div class="pf-step pf-data">project.plan<br><small>ProjectPlan</small></div>
+          <div class="pf-step pf-llm">Unified Planner<br><small>unified-planner.ts</small></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step pf-data">project.storyboard<br><small>StoryboardResult</small></div>
           <div class="pf-arrow">→</div>
           <div class="pf-step" style="background:rgba(251,191,36,0.15); border-color:var(--yellow); color:var(--yellow);">status: "planned"<br><small>waiting for review</small></div>
         </div>
       </div>
       <div style="margin-top:10px; font-size:12px; color:var(--text-dim);">
-        <strong>Stored in:</strong> <code>project.plan</code> (separate field)<br>
-        <strong>Contains:</strong> narrative, scene purposes, template suggestions, audio direction, asset needs<br>
+        <strong>Stored in:</strong> <code>project.storyboard</code> + <code>project.creative_bible</code><br>
+        <strong>Contains:</strong> PlannedScene[] with visual briefs, timing, transitions, voiceover<br>
         <strong>Use case:</strong> Review the creative direction before committing to expensive generation
       </div>
     </div>
 
     <div class="concept-card" style="border-left:3px solid var(--orange);">
       <h4 style="color:var(--orange);">🔧 mode: "generate"</h4>
-      <p>Picks up from an approved plan. Reads <code>project.plan</code>, runs the full generation pipeline (scene building, critique, media enrichment, audio), then renders. Requires a prior <code>plan</code> run.</p>
+      <p>Picks up from a saved storyboard. Reads <code>project.storyboard</code>, runs scene generation (codegen), critique, media enrichment, audio, then renders. Requires a prior <code>plan</code> run.</p>
       <div class="pipeline-flow" style="margin-top:12px;">
         <div class="pf-row">
-          <div class="pf-step pf-data">project.plan<br><small>(from prior plan run)</small></div>
+          <div class="pf-step pf-data">project.storyboard<br><small>(from prior plan run)</small></div>
           <div class="pf-arrow">→</div>
-          <div class="pf-step pf-llm">Full pipeline<br><small>expand → plan → generate → critique</small></div>
+          <div class="pf-step pf-llm">Codegen + Critique<br><small>scene-generator → critiquer</small></div>
           <div class="pf-arrow">→</div>
           <div class="pf-step pf-core">project.scenes[]<br><small>Scene[]</small></div>
           <div class="pf-arrow">→</div>
@@ -1224,7 +1167,7 @@
         </div>
       </div>
       <div style="margin-top:10px; font-size:12px; color:var(--text-dim);">
-        <strong>Reads from:</strong> <code>project.plan</code><br>
+        <strong>Reads from:</strong> <code>project.storyboard</code><br>
         <strong>Writes to:</strong> <code>project.scenes[]</code><br>
         <strong>Use case:</strong> Build and render after reviewing/editing the plan
       </div>
@@ -1232,7 +1175,7 @@
 
     <div class="concept-card" style="border-left:3px solid var(--primary);">
       <h4 style="color:var(--primary);">🚀 mode: "full" (default)</h4>
-      <p>Runs everything end-to-end in one shot. Expand → concept director → storyboard planner → scene generation → critique → media enrichment → audio → render. No intermediate review step.</p>
+      <p>Runs everything end-to-end in one shot. Uses the same unified pipeline: expand → concept director → storyboard planner → codegen → critique → media enrichment → audio → render. No intermediate review step.</p>
       <div class="pipeline-flow" style="margin-top:12px;">
         <div class="pf-row">
           <div class="pf-step pf-planner">User prompt</div>
@@ -1245,7 +1188,7 @@
         </div>
       </div>
       <div style="margin-top:10px; font-size:12px; color:var(--text-dim);">
-        <strong>Skips:</strong> <code>project.plan</code> entirely<br>
+        <strong>Same code path as plan + generate</strong><br>
         <strong>Writes to:</strong> <code>project.scenes[]</code> directly<br>
         <strong>Use case:</strong> Quick generation when you trust the pipeline
       </div>
@@ -1256,7 +1199,8 @@
   <!-- Where things live in project.json -->
   <h3>Where Data Lives in project.json</h3>
   <p class="description">
-    This is a key source of confusion. The storyboard from the unified planner is NOT stored separately -- it gets dissolved into <code>project.scenes[]</code> after generation. The planning context (why each scene was chosen, creative decisions) disappears.
+    The storyboard, creative bible, and generated scenes are all stored as separate fields in project.json.
+    The mode controls which fields get populated and when.
   </p>
 
   <div class="seq-diagram" style="padding:20px;">
@@ -1265,53 +1209,24 @@
 ├── canvas: { width, height, fps }
 ├── brand_kit: { colors, fonts, logos }
 │
-├── <span style="color:var(--accent);">brief</span>: ProjectBrief              <span style="color:var(--text-dim);">← from mode:"plan" (user's original prompt)</span>
+├── <span style="color:var(--accent);">brief</span>: ProjectBrief              <span style="color:var(--text-dim);">← user's original prompt + settings</span>
 │     └── prompt, target, duration...
 │
-├── <span style="color:var(--accent);">plan</span>: ProjectPlan                <span style="color:var(--text-dim);">← from mode:"plan" (script writer output)</span>
-│     ├── narrative: string           <span style="color:var(--text-dim);">  high-level story summary</span>
-│     ├── scenes: PlannedScene[]      <span style="color:var(--text-dim);">  scene purposes + template suggestions</span>
-│     ├── audio: { mood, voice }      <span style="color:var(--text-dim);">  audio direction</span>
-│     └── estimated_duration
-│
-├── <span style="color:var(--primary);">creative_bible</span>: CreativeBible    <span style="color:var(--text-dim);">← from concept director (mode:"full")</span>
+├── <span style="color:var(--primary);">creative_bible</span>: CreativeBible    <span style="color:var(--text-dim);">← from concept director</span>
 │     ├── concept, pattern            <span style="color:var(--text-dim);">  the big idea + storytelling pattern</span>
 │     ├── throughLine, emotionalArc   <span style="color:var(--text-dim);">  visual continuity + emotional journey</span>
 │     └── visualStyle: { colorMood, typography, motion, spatial }
 │
-├── <span style="color:var(--orange);">scenes</span>: Scene[]                  <span style="color:var(--text-dim);">← from scene generation (the final output)</span>
-│     └── (see Data Model tab)        <span style="color:var(--text-dim);">  components, timing, choreography, HTML</span>
+├── <span style="color:var(--accent);">storyboard</span>: StoryboardResult    <span style="color:var(--text-dim);">← from unified planner (saved for plan mode)</span>
+│     ├── name: string
+│     └── scenes: PlannedScene[]      <span style="color:var(--text-dim);">  visual briefs, timing, transitions</span>
+│
+├── <span style="color:var(--orange);">scenes</span>: Scene[]                  <span style="color:var(--text-dim);">← from codegen (the final output)</span>
+│     └── (see Data Model tab)        <span style="color:var(--text-dim);">  HTML, components, timing</span>
 │
 ├── audio: AudioConfig
 ├── assets: Asset[]
 └── speaker_track: SpeakerTrack</pre>
-  </div>
-
-  <div class="concept-grid" style="margin-top: 20px;">
-    <div class="concept-card" style="border-left:3px solid var(--red);">
-      <h4 style="color:var(--red);">⚠️ Data Loss Point</h4>
-      <p>When mode:"full" runs, the <code>StoryboardResult</code> from the unified planner is never saved. Each <code>PlannedScene</code> goes through <code>generateScene()</code> and becomes a <code>Scene</code> in <code>project.scenes[]</code>. The planning context -- why each scene was chosen, which pipeline path was selected, the creative rationale -- is lost.</p>
-      <p style="margin-top:8px;">The <code>creative_bible</code> is now preserved (Refactor 1), but the storyboard itself is not.</p>
-    </div>
-    <div class="concept-card" style="border-left:3px solid var(--pink);">
-      <h4 style="color:var(--pink);">🔧 Refactor 4: Unify Generate Modes</h4>
-      <p><code>mode:"full"</code> should not be a separate code path. It should run <code>plan &rarr; generate &rarr; render</code> using the exact same pipeline. One PlannedScene type. Storyboard always saved. The mode just controls where to stop:</p>
-      <ul>
-        <li><strong>plan:</strong> stop after planning, save storyboard</li>
-        <li><strong>generate:</strong> pick up from saved storyboard, generate + render</li>
-        <li><strong>full:</strong> run everything end-to-end, same code path</li>
-      </ul>
-      <p style="margin-top:8px;"><strong>Status:</strong> Planned refactor. See ARCHITECTURE.md roadmap.</p>
-    </div>
-    <div class="concept-card" style="border-left:3px solid var(--yellow);">
-      <h4 style="color:var(--yellow);">💡 Two Different PlannedScene Types</h4>
-      <p>Confusingly, there are TWO <code>PlannedScene</code> interfaces:</p>
-      <ul>
-        <li><code>types.ts PlannedScene</code> -- used by the <code>plan</code> mode (script writer). Has <code>purpose</code>, <code>template</code> suggestion, asset needs.</li>
-        <li><code>unified-planner.ts PlannedScene</code> -- used by the <code>full</code> mode (storyboard planner). Has <code>components[]</code>, <code>freeform_brief</code>, <code>beats[]</code>, <code>choreography[]</code>.</li>
-      </ul>
-      <p style="margin-top:8px;">Same name, different shapes, different files. The <code>plan</code> mode and <code>full</code> mode are effectively two separate planning systems.</p>
-    </div>
   </div>
 
   <!-- Project Status Lifecycle -->
@@ -1346,13 +1261,9 @@
     <div class="pipeline-step">
       <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--primary)"></div><div class="pipeline-connector"></div></div>
       <div class="pipeline-card">
-        <div class="step-name">1. Scene Assembly <span class="step-file">scene-assembler.ts / sequence-assembler.ts</span></div>
+        <div class="step-name">1. Scene Assembly <span class="step-file">scene-assembler.ts</span></div>
         <div class="step-desc">
-          Each scene's components are assembled into a self-contained HTML document. Brand kit becomes CSS variables, components are positioned and layered, GSAP scripts build a master timeline.
-          <br><br>
-          <strong>Standard scenes</strong> use scene-assembler.ts: all component timelines start at t=0.
-          <br>
-          <strong>Sequence scenes</strong> use sequence-assembler.ts: components are placed on a shared stage, a master timeline has labeled beats, components enter/exit/move at choreographed times.
+          Each scene's codegen HTML is assembled into a self-contained document. Brand kit becomes CSS variables, any <code>&lt;component&gt;</code> tags are resolved to real component HTML/CSS/JS, and GSAP scripts build a master timeline. The assembler handles both fully custom HTML and component-embedded scenes uniformly.
         </div>
       </div>
     </div>
@@ -1404,87 +1315,94 @@
   </div>
 </section>
 
-<!-- ════════════════ SCENES vs SEQUENCES ════════════════ -->
+<!-- ════════════════ UNIFIED CODEGEN ════════════════ -->
 <section class="view" id="view-scenes">
-  <h2>Scenes vs Sequences</h2>
+  <h2>Unified Codegen</h2>
   <p class="description">
-    The two core composition models. Scenes are the building block; sequences extend scenes with multi-beat choreography.
+    Every scene is generated through a single codegen pipeline. The LLM writes full HTML+CSS+GSAP for each scene
+    and can embed library components via <code>&lt;component&gt;</code> tags. Multi-beat choreography is expressed
+    directly in GSAP timeline code.
   </p>
 
   <div class="concept-grid" style="margin-bottom: 32px;">
     <div class="concept-card" style="border-left: 3px solid var(--primary);">
-      <h4>🎞️ Scene (Standard)</h4>
-      <p>A single visual moment. One set of components, all animated simultaneously from t=0.</p>
+      <h4>🎞️ Scene</h4>
+      <p>The fundamental unit of a video. Each scene is a self-contained HTML+CSS+GSAP document produced by the codegen LLM.</p>
       <ul>
-        <li>Components layered by z-index</li>
-        <li>All timelines start together</li>
-        <li>Typically 3-8 seconds</li>
+        <li>Full HTML document with embedded styles and scripts</li>
+        <li>GSAP master timeline controls all animation</li>
+        <li>Can mix custom HTML with <code>&lt;component&gt;</code> tags</li>
+        <li>Typically 3-30 seconds depending on complexity</li>
         <li>Connected by between-scene transitions</li>
       </ul>
       <span class="tag tag-core">scene-assembler.ts</span>
     </div>
     <div class="concept-card" style="border-left: 3px solid var(--accent);">
-      <h4>🎬 Sequence</h4>
-      <p>A multi-beat continuous take. Components persist across beats, entering and exiting the shared stage at choreographed times.</p>
+      <h4>🧩 &lt;component&gt; Tags</h4>
+      <p>The LLM can embed library components in its HTML output using self-closing tags. The assembler resolves these to real component HTML/CSS/JS at render time.</p>
       <ul>
-        <li>Shared stage with all components</li>
-        <li>Master GSAP timeline with labeled beats</li>
-        <li>Components enter/exit/move per beat</li>
-        <li>Typically 20-40 seconds</li>
-        <li>No cuts between beats (single take)</li>
+        <li><code>&lt;component type="stat-card" data='{"value":"10M"}' /&gt;</code></li>
+        <li>Resolved by the assembler before frame capture</li>
+        <li>Component styles are auto-scoped per instance</li>
+        <li>Component timelines wire into the master timeline</li>
+        <li>Mix freely with custom HTML in the same scene</li>
       </ul>
-      <span class="tag tag-core">sequence-assembler.ts</span>
+      <span class="tag tag-core">component-parser.ts</span>
     </div>
   </div>
 
-  <h3>How a Sequence Works</h3>
-  <p class="description">A sequence is a scene with <code>beats[]</code> and optional <code>choreography[]</code>. The assembler places all components on stage (hidden), then reveals/moves/hides them at each beat boundary.</p>
+  <h3>How Multi-Beat Scenes Work</h3>
+  <p class="description">Complex choreography (product walkthroughs, multi-step demos) is expressed directly in GSAP timeline code by the LLM. The LLM writes labeled timeline sections that enter, move, and exit elements at choreographed times.</p>
 
   <div class="seq-diagram">
     <h3 style="margin-top:0">Example: Product Walkthrough</h3>
-    <p style="font-size:12px; color:var(--text-dim); margin-bottom:16px;">3 components, 3 beats, 30 seconds total</p>
+    <p style="font-size:12px; color:var(--text-dim); margin-bottom:16px;">3 library components orchestrated via GSAP timeline labels, 24 seconds total</p>
 
     <div class="beat-timeline">
-      <div class="beat-block c-purple" style="flex:8">Beat 1: Chat<small>0s - 8s</small></div>
-      <div class="beat-block c-green" style="flex:8">Beat 2: Connect<small>8s - 16s</small></div>
-      <div class="beat-block c-orange" style="flex:7">Beat 3: Publish<small>16s - 23s</small></div>
+      <div class="beat-block c-purple" style="flex:8">Chat Phase<small>0s - 8s</small></div>
+      <div class="beat-block c-green" style="flex:8">Connect Phase<small>8s - 16s</small></div>
+      <div class="beat-block c-orange" style="flex:8">Publish Phase<small>16s - 24s</small></div>
     </div>
 
     <div style="margin-top: 16px;">
       <div class="seq-row">
-        <div class="seq-label">quotient-chat</div>
+        <div class="seq-label" style="min-width:160px">&lt;component type="quotient-chat"&gt;</div>
         <div class="seq-bar c-purple" style="flex:16; border-radius:6px 0 0 6px;">visible (enters, then slides left)</div>
         <div class="seq-bar c-red" style="flex:1; font-size:10px;">exit</div>
-        <div style="flex:6"></div>
+        <div style="flex:7"></div>
       </div>
       <div class="seq-row">
-        <div class="seq-label">canva-editor</div>
+        <div class="seq-label" style="min-width:160px">&lt;component type="canva-editor"&gt;</div>
         <div style="flex:8"></div>
         <div class="seq-bar c-green" style="flex:8;">visible (enters from right)</div>
         <div class="seq-bar c-red" style="flex:1; font-size:10px;">exit</div>
-        <div style="flex:6"></div>
+        <div style="flex:7"></div>
       </div>
       <div class="seq-row">
-        <div class="seq-label">quotient-social</div>
+        <div class="seq-label" style="min-width:160px">&lt;component type="quotient-social"&gt;</div>
         <div style="flex:16"></div>
-        <div class="seq-bar c-orange" style="flex:7;">visible (enters, centered)</div>
+        <div class="seq-bar c-orange" style="flex:8;">visible (enters, centered)</div>
       </div>
+    </div>
+
+    <div style="margin-top:16px; font-size:12px; color:var(--text-dim); border-top:1px solid var(--border); padding-top:12px;">
+      <strong>How it's built:</strong> The codegen LLM writes a single HTML scene with three <code>&lt;component&gt;</code> tags and a GSAP timeline that orchestrates their entrance/exit animations. The assembler resolves the component tags and the timeline plays as one continuous take.
     </div>
   </div>
 
-  <h3>Sequence Data Flow</h3>
+  <h3>Codegen Output Structure</h3>
   <div class="concept-grid">
     <div class="concept-card">
-      <h4>📝 Planner Output</h4>
-      <p>The unified planner outputs a scene with <code>beats[]</code> (label, brief, duration, voiceover) and <code>choreography[]</code> (startTime, duration, visibleComponents, transitions).</p>
+      <h4>📝 Planner Brief</h4>
+      <p>The unified planner writes a rich visual brief per scene: what the viewer experiences, which library components to consider, motion descriptions, and timing. This brief drives the codegen LLM.</p>
     </div>
     <div class="concept-card">
-      <h4>🔄 Sequence Converter</h4>
-      <p>Fallback: if the planner outputs separate scenes that should be a sequence, the converter detects consecutive component-eligible scenes and merges them into one sequence with auto-generated choreography.</p>
+      <h4>🤖 LLM Codegen</h4>
+      <p>The freeform-agentic LLM reads the brief, searches the component library, reads component/template source code for reference, then writes complete HTML+CSS+GSAP. It can use <code>&lt;component&gt;</code> tags for library components or write everything from scratch.</p>
     </div>
     <div class="concept-card">
-      <h4>🏗️ Sequence Assembler</h4>
-      <p>Builds the final HTML. Places all components on a shared stage (hidden). Generates a GSAP master timeline with beat labels. At each beat: show/hide components, trigger enter/exit/move transitions, start component-internal animations.</p>
+      <h4>🏗️ Assembler Resolution</h4>
+      <p>At render time, the assembler parses the codegen HTML, finds <code>&lt;component&gt;</code> tags, resolves each to real component HTML/CSS/JS, scopes styles, and wires component timelines into the master GSAP timeline.</p>
     </div>
   </div>
 </section>
@@ -1495,7 +1413,7 @@
   <p class="description">
     67 reusable HTML+CSS+GSAP animation components. Each is a self-contained .component.html file
     with a template section (HTML), style section (CSS), and script section (JS with createTimeline function).
-    Components are data-driven via template binding.
+    Components are data-driven via template binding and embeddable via <code>&lt;component&gt;</code> tags.
   </p>
 
   <h3>Component Anatomy</h3>
@@ -1617,7 +1535,8 @@
   <h2>Scene Templates</h2>
   <p class="description">
     37 pre-composed scene blueprints with premium visuals, animation, and timing baked in.
-    The planner selects a template and fills its content slots to produce Apple-keynote-quality output.
+    Templates exist as source code that the codegen LLM can read via the <code>read_source</code> tool
+    for reference and inspiration when generating scenes.
   </p>
 
   <div class="template-explainer">
@@ -1627,19 +1546,19 @@
         <div class="explain-icon">🧩</div>
         <div>
           <div class="explain-label">Components = Building Blocks</div>
-          <div class="explain-text">One visual element (a title card, a chart, a logo). Raw ingredients the assembler positions and layers.</div>
+          <div class="explain-text">One visual element (a title card, a chart, a logo). Embeddable via <code>&lt;component&gt;</code> tags in codegen output.</div>
         </div>
       </div>
       <div class="explain-item">
         <div class="explain-icon">🎬</div>
         <div>
-          <div class="explain-label">Templates = Full Scene Compositions</div>
-          <div class="explain-text">Proven layouts with multiple components, timing, and animation already baked in. Complete scenes, not parts.</div>
+          <div class="explain-label">Templates = Reference Compositions</div>
+          <div class="explain-text">Proven full-scene layouts with multiple components, timing, and animation. The codegen LLM reads their source for reference when building similar scenes.</div>
         </div>
       </div>
     </div>
     <div class="explain-flow">
-      <strong>How it works:</strong> The planner picks a template → fills the content slots (headline, stats, quotes, etc.) → gets a polished, ready-to-render scene. No layout decisions, no animation tuning — it's all pre-built.
+      <strong>How it works:</strong> The codegen LLM uses <code>read_source</code> to read a template's HTML/CSS/GSAP, then adapts the patterns for the current scene's needs. Templates serve as high-quality reference implementations.
     </div>
   </div>
 
@@ -1761,7 +1680,7 @@
     </div>
     <div class="template-card">
       <div class="tmpl-header"><span class="tmpl-id">C20</span><span class="tmpl-name">FAQ / Objection</span></div>
-      <div class="tmpl-desc">Q&A reveal — address a common objection or question with a satisfying answer.</div>
+      <div class="tmpl-desc">Q&amp;A reveal — address a common objection or question with a satisfying answer.</div>
       <div class="tmpl-meta"><span>⏱ 5–7s</span><span>📋 4 slots</span></div>
     </div>
     <div class="template-card">
@@ -1849,274 +1768,122 @@
   </div>
 </section>
 
-<!-- ════════════════ SCENE PIPELINES ════════════════ -->
+<!-- ════════════════ CODEGEN PIPELINE ════════════════ -->
 <section class="view" id="view-pipelines">
-  <h2>Scene Creation Pipelines</h2>
+  <h2>Codegen Pipeline</h2>
   <p class="description">
-    The planner decides HOW each scene is built. There are 5 distinct paths through the system,
-    each with different tradeoffs between quality, speed, and creative control.
+    Every scene is built through the same unified codegen pipeline. The freeform-agentic LLM generates
+    HTML+CSS+GSAP with optional <code>&lt;component&gt;</code> tags for library components.
   </p>
 
-  <!-- Decision flow -->
+  <!-- Pipeline overview -->
   <div class="concept-card" style="margin-bottom:24px; border-left:3px solid var(--primary);">
-    <h4>🧠 How the Planner Decides</h4>
-    <p>For each scene, the unified planner (<code>unified-planner.ts</code>) picks one of 5 options based on the narrative moment, available components, and the <code>creativity</code> parameter (0-1). The scene generator (<code>scene-generator.ts</code>) then routes to the appropriate pipeline.</p>
-    <div style="margin-top:12px; font-family:'SF Mono','Fira Code',monospace; font-size:12px; color:var(--text-dim); line-height:2;">
-      <div style="color:var(--text);">scene-generator.ts routing:</div>
-      <div>&nbsp;&nbsp;if (planned.freeform &amp;&amp; planned.beats) → <span style="color:var(--pink);">Sequence Pipeline</span></div>
-      <div>&nbsp;&nbsp;if (planned.freeform) → <span style="color:var(--orange);">Freeform Pipeline</span></div>
-      <div>&nbsp;&nbsp;if (planned.template) → <span style="color:var(--accent);">Template Pipeline</span></div>
-      <div>&nbsp;&nbsp;if (comp.custom) → <span style="color:var(--cyan);">Custom Component Pipeline</span></div>
-      <div>&nbsp;&nbsp;else → <span style="color:var(--primary);">Library Component Pipeline</span></div>
+    <h4>🏗️ The Unified Codegen Pipeline</h4>
+    <p>One path for every scene. The planner writes a rich visual brief, the codegen LLM generates the HTML, and the assembler resolves any component tags.</p>
+    <div class="pipeline-flow" style="margin-top:12px;">
+      <div class="pf-row">
+        <div class="pf-step pf-planner">Planner writes<br>visual brief<br><small>unified-planner.ts</small></div>
+        <div class="pf-arrow">→</div>
+        <div class="pf-step pf-data">buildCodegenBrief()<br><small>brief + bible + brand + catalog</small></div>
+        <div class="pf-arrow">→</div>
+        <div class="pf-step pf-llm">Freeform-agentic LLM<br><small>multi-turn with tools</small></div>
+        <div class="pf-arrow">→</div>
+        <div class="pf-step pf-core">HTML with<br>&lt;component&gt; tags</div>
+        <div class="pf-arrow">→</div>
+        <div class="pf-step pf-render">Assembler resolves<br>tags → final HTML</div>
+      </div>
     </div>
   </div>
 
-  <!-- Pipeline comparison cards -->
+  <!-- Pipeline stages -->
   <div style="display:flex; flex-direction:column; gap:24px;">
 
-    <!-- 1. Library Component -->
     <div class="concept-card" style="border-left:3px solid var(--primary);">
-      <h4 style="color:var(--primary);">📦 1. Library Component Pipeline</h4>
-      <p style="margin-bottom:12px;">Uses pre-built components from the 67-component library. No LLM generation needed for visuals. Fastest path.</p>
-      
-      <div class="pipeline-flow">
-        <div class="pf-row">
-          <div class="pf-step pf-planner">Planner picks component type</div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-data">Fills data props<br><small>(text, colors, config)</small></div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-core">Component parser binds data to template</div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-render">Scene assembler builds HTML</div>
-        </div>
-      </div>
-
-      <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
-        <div class="pipeline-badge badge-speed">⚡ Fastest</div>
-        <div class="pipeline-badge badge-quality">Consistent quality</div>
-        <div class="pipeline-badge badge-llm">No LLM for visuals</div>
-      </div>
+      <h4 style="color:var(--primary);">📝 1. Planner Brief</h4>
+      <p style="margin-bottom:12px;">The unified planner writes a rich <code>freeform_brief</code> for each scene. This includes what the viewer experiences, suggested library components, motion descriptions, timing, and visual style guidance from the CreativeBible.</p>
       <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
-        <strong>Files:</strong> <code>scene-generator.ts</code> → <code>component-parser.ts</code> → <code>scene-assembler.ts</code><br>
-        <strong>Example:</strong> quotient-chat, bar-chart, hero-reveal, gradient-background<br>
-        <strong>When:</strong> Component exists that matches the scene need. <code>creativity</code> 0.0-0.3 strongly favors this path.
+        <strong>File:</strong> <code>unified-planner.ts</code><br>
+        <strong>Output:</strong> PlannedScene with <code>freeform_brief</code>, <code>duration_seconds</code>, <code>voiceover_text</code>, <code>transition_in</code>
       </div>
     </div>
 
-    <!-- 2. Template -->
     <div class="concept-card" style="border-left:3px solid var(--accent);">
-      <h4 style="color:var(--accent);">🎨 2. Scene Template Pipeline</h4>
-      <p style="margin-bottom:12px;">Uses pre-composed scene blueprints (33 templates). The planner fills content slots. Premium visuals without LLM-generated CSS/GSAP.</p>
-      
-      <div class="pipeline-flow">
-        <div class="pf-row">
-          <div class="pf-step pf-planner">Planner picks template ID</div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-data">Fills content slots<br><small>(headline, body, stats)</small></div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-core">Load .scene.html<br>Apply slot values</div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-render">Save as project component</div>
-        </div>
-      </div>
-
-      <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
-        <div class="pipeline-badge badge-speed">⚡ Fast</div>
-        <div class="pipeline-badge badge-quality">Apple-keynote quality</div>
-        <div class="pipeline-badge badge-llm">No LLM for visuals</div>
-      </div>
+      <h4 style="color:var(--accent);">📦 2. Build Codegen Brief</h4>
+      <p style="margin-bottom:12px;"><code>buildCodegenBrief()</code> assembles the full context for the LLM: the scene's visual brief, the CreativeBible's visual style constraints, the brand kit (colors, fonts, logos), canvas dimensions, and the component catalog so the LLM knows what's available.</p>
       <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
-        <strong>Files:</strong> <code>scene-generator.ts</code> → <code>template-catalog.ts</code> → <code>templates/*.scene.html</code><br>
-        <strong>Example:</strong> O1-big-statement, C6-split-compare, D1-hero-stat, E1-cta-finale<br>
-        <strong>When:</strong> A template matches the narrative moment (opening, feature spotlight, CTA, etc.)
+        <strong>File:</strong> <code>scene-generator.ts</code><br>
+        <strong>Inputs:</strong> PlannedScene + CreativeBible + BrandKit + Canvas + ComponentCatalog<br>
+        <strong>Output:</strong> Structured prompt for the agentic LLM
       </div>
     </div>
 
-    <!-- 3. Custom Component (codegen) -->
-    <div class="concept-card" style="border-left:3px solid var(--cyan);">
-      <h4 style="color:var(--cyan);">🤖 3. Custom Component Pipeline (Codegen)</h4>
-      <p style="margin-bottom:12px;">LLM generates a full custom <code>.component.html</code> file (HTML + CSS + GSAP). Used when no library component or template fits. The generated component follows the same format as library components.</p>
-      
-      <div class="pipeline-flow">
-        <div class="pf-row">
-          <div class="pf-step pf-planner">Planner sets custom=true + prompt</div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-llm">LLM generates .component.html<br><small>(template + style + script)</small></div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-core">Save to project components/</div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-render">Scene assembler builds HTML</div>
-        </div>
-      </div>
-
-      <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
-        <div class="pipeline-badge badge-speed">🕐 Medium</div>
-        <div class="pipeline-badge badge-quality">Variable quality</div>
-        <div class="pipeline-badge badge-llm">LLM codegen</div>
-      </div>
-      <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
-        <strong>Files:</strong> <code>scene-generator.ts</code> → <code>component-gen.ts</code> → <code>component-generator.ts</code><br>
-        <strong>LLM input:</strong> Scene description, brand kit, GSAP skills, design rules, reference images<br>
-        <strong>Output:</strong> Self-contained .component.html with &lt;template&gt; + &lt;style&gt; + &lt;script&gt;<br>
-        <strong>When:</strong> No template or library component fits. <code>creativity</code> 0.7-1.0 forces this path.
-      </div>
-    </div>
-
-    <!-- 4. Freeform -->
     <div class="concept-card" style="border-left:3px solid var(--orange);">
-      <h4 style="color:var(--orange);">✍️ 4. Freeform Pipeline</h4>
-      <p style="margin-bottom:12px;">Full bespoke HTML+CSS+GSAP generated from a rich storyboard description. The agentic generator can read library components for reference before writing. Highest creative ceiling.</p>
-      
-      <div class="pipeline-flow">
-        <div class="pf-row">
-          <div class="pf-step pf-planner">Planner writes freeform_brief<br><small>(5+ sentences, motion verbs)</small></div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-llm">Agentic LLM loop<br><small>reads components, writes HTML</small></div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-core">Save as freeform_scene_XXX</div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-render">Scene assembler builds HTML</div>
-        </div>
+      <h4 style="color:var(--orange);">🤖 3. Freeform-Agentic LLM</h4>
+      <p style="margin-bottom:12px;">Multi-turn LLM conversation with tool access. The LLM can explore the component library, read component and template source code for reference, then write complete HTML+CSS+GSAP. It delivers the final scene via <code>submit_scene</code>.</p>
+
+      <div style="margin-top:12px; font-family:'SF Mono','Fira Code',monospace; font-size:12px; color:var(--text-dim); line-height:2;">
+        <div style="color:var(--text);">Available tools:</div>
+        <div>&nbsp;&nbsp;<span style="color:var(--accent);">search_library</span> — search the 67-component catalog by keyword</div>
+        <div>&nbsp;&nbsp;<span style="color:var(--accent);">read_source</span> — read a component or template's full source code</div>
+        <div>&nbsp;&nbsp;<span style="color:var(--accent);">submit_scene</span> — deliver the final HTML+CSS+GSAP output</div>
       </div>
 
       <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
-        <div class="pipeline-badge badge-speed">🕐 Slowest</div>
-        <div class="pipeline-badge badge-quality">Highest ceiling</div>
         <div class="pipeline-badge badge-llm">Agentic LLM (multi-turn)</div>
+        <div class="pipeline-badge badge-quality">Highest creative ceiling</div>
       </div>
       <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
-        <strong>Files:</strong> <code>scene-generator.ts</code> → <code>freeform-agentic.ts</code><br>
-        <strong>LLM tools:</strong> search_components, read_component, read_template (reads library for reference before writing)<br>
-        <strong>When:</strong> Complex custom visuals. Brief must describe what the viewer EXPERIENCES with motion verbs, depth layers, choreography.
+        <strong>File:</strong> <code>freeform-agentic.ts</code><br>
+        <strong>Output:</strong> Complete HTML document with optional <code>&lt;component type="..." data='...' /&gt;</code> tags
       </div>
     </div>
 
-    <!-- 5. Sequence -->
-    <div class="concept-card" style="border-left:3px solid var(--pink);">
-      <h4 style="color:var(--pink);">🎬 5. Sequence Pipeline</h4>
-      <p style="margin-bottom:12px;">Multi-beat continuous scene using real library components orchestrated on a shared stage. Components enter, move, and exit at choreographed times. Two entry paths: planner outputs a sequence directly, OR the sequence converter merges consecutive component scenes.</p>
-      
-      <div class="pipeline-flow">
-        <div class="pf-row">
-          <div class="pf-step pf-planner">Planner outputs beats[] + choreography[] + components[]</div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-data">scene-generator carries through beats + choreography</div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-core">Sequence assembler:<br><small>shared stage, master GSAP timeline, beat labels</small></div>
-          <div class="pf-arrow">→</div>
-          <div class="pf-step pf-render">One continuous HTML doc</div>
-        </div>
-      </div>
-
-      <div style="margin-top:8px;">
-        <div style="font-size:12px; color:var(--text-dim); margin-bottom:8px;"><strong>Alternative entry:</strong> If the planner outputs separate scenes that should be a sequence:</div>
-        <div class="pipeline-flow">
-          <div class="pf-row">
-            <div class="pf-step pf-planner">Planner outputs N separate scenes</div>
-            <div class="pf-arrow">→</div>
-            <div class="pf-step pf-llm">sequence-converter detects eligible runs</div>
-            <div class="pf-arrow">→</div>
-            <div class="pf-step pf-core">Merges into 1 sequence with auto-choreography</div>
-            <div class="pf-arrow">→</div>
-            <div class="pf-step pf-render">Sequence assembler</div>
-          </div>
-        </div>
-      </div>
-
-      <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
-        <div class="pipeline-badge badge-speed">⚡ Fast (uses library components)</div>
-        <div class="pipeline-badge badge-quality">Premium "single take"</div>
-        <div class="pipeline-badge badge-llm">No LLM for visuals</div>
-      </div>
+    <div class="concept-card" style="border-left:3px solid var(--cyan);">
+      <h4 style="color:var(--cyan);">🏗️ 4. Component Tag Resolution</h4>
+      <p style="margin-bottom:12px;">The assembler scans the LLM's HTML output for <code>&lt;component&gt;</code> tags and resolves each one: loads the component's <code>.component.html</code>, binds the <code>data</code> attributes, scopes CSS, and injects the component's <code>createTimeline()</code> into the master GSAP timeline.</p>
       <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
-        <strong>Files:</strong> <code>scene-generator.ts</code> + <code>sequence-converter.ts</code> → <code>sequence-assembler.ts</code><br>
-        <strong>When:</strong> Product walkthroughs, multi-step demos, cause-and-effect flows. Uses existing library components (quotient-chat, canva-editor, etc.)
+        <strong>Files:</strong> <code>scene-assembler.ts</code> + <code>component-parser.ts</code><br>
+        <strong>Input:</strong> HTML with <code>&lt;component type="stat-card" data='{"value":"10M"}' /&gt;</code><br>
+        <strong>Output:</strong> Final self-contained HTML document ready for frame capture
       </div>
     </div>
 
   </div>
 
-  <!-- Comparison table -->
-  <h3 style="margin-top:32px;">Pipeline Comparison</h3>
-  <div style="overflow-x:auto;">
-    <table class="compare-table">
-      <thead>
-        <tr>
-          <th>Pipeline</th>
-          <th>LLM Codegen?</th>
-          <th>Speed</th>
-          <th>Visual Source</th>
-          <th>Output</th>
-          <th>Best For</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><span style="color:var(--primary); font-weight:600;">Library Component</span></td>
-          <td>No</td>
-          <td>⚡ Instant</td>
-          <td>Pre-built .component.html</td>
-          <td>Data-bound component in scene</td>
-          <td>Standard visuals (charts, titles, mockups)</td>
-        </tr>
-        <tr>
-          <td><span style="color:var(--accent); font-weight:600;">Scene Template</span></td>
-          <td>No</td>
-          <td>⚡ Instant</td>
-          <td>Pre-built .scene.html</td>
-          <td>Full scene with slots filled</td>
-          <td>Openings, CTAs, stats, features</td>
-        </tr>
-        <tr>
-          <td><span style="color:var(--cyan); font-weight:600;">Custom Component</span></td>
-          <td>Yes (single-turn)</td>
-          <td>🕐 ~10-20s</td>
-          <td>LLM generates .component.html</td>
-          <td>Bespoke component in scene</td>
-          <td>Unique elements that don't exist in library</td>
-        </tr>
-        <tr>
-          <td><span style="color:var(--orange); font-weight:600;">Freeform</span></td>
-          <td>Yes (multi-turn agentic)</td>
-          <td>🕐 ~20-40s</td>
-          <td>LLM writes full scene HTML</td>
-          <td>Bespoke full scene</td>
-          <td>Complex custom visuals, unique animations</td>
-        </tr>
-        <tr>
-          <td><span style="color:var(--pink); font-weight:600;">Sequence</span></td>
-          <td>No</td>
-          <td>⚡ Fast</td>
-          <td>Library components + choreography</td>
-          <td>Multi-beat continuous scene</td>
-          <td>Product walkthroughs, multi-step demos</td>
-        </tr>
-      </tbody>
-    </table>
+  <!-- How library components are used -->
+  <h3 style="margin-top:32px;">How Library Components Are Used</h3>
+  <div class="concept-card" style="max-width:800px; margin-bottom:24px;">
+    <p>Library components are embedded directly in codegen output via <code>&lt;component&gt;</code> tags. The LLM decides when to use them:</p>
+    <ul style="margin-top:12px;">
+      <li><strong>Pure custom:</strong> The LLM writes all HTML/CSS/GSAP from scratch. No component tags.</li>
+      <li><strong>Component-heavy:</strong> The LLM uses multiple <code>&lt;component&gt;</code> tags with custom GSAP to orchestrate them (e.g., product walkthroughs with quotient-chat, canva-editor, etc.)</li>
+      <li><strong>Hybrid:</strong> Mix of custom HTML and component tags in the same scene (e.g., custom layout wrapping library stat-cards).</li>
+    </ul>
+    <p style="margin-top:12px;">The planner's brief guides the LLM toward using library components when they're appropriate, or writing custom code when the scene needs something unique.</p>
   </div>
 
-  <!-- creativity parameter -->
+  <!-- Creativity parameter -->
   <h3 style="margin-top:32px;">The Creativity Dial</h3>
   <div class="concept-card" style="max-width:700px;">
-    <p>The <code>creativity</code> parameter (0-1) biases the planner's decisions:</p>
+    <p>The <code>creativity</code> parameter (0-1) biases the planner's scene descriptions. It influences how the planner writes briefs:</p>
     <div style="margin-top:12px;">
       <div class="creativity-bar">
         <div class="creativity-segment" style="flex:3; background:var(--primary-dim);">
           <div class="creativity-label">0.0 - 0.3</div>
-          <div class="creativity-desc">Library + Templates</div>
+          <div class="creativity-desc">Conventional</div>
         </div>
         <div class="creativity-segment" style="flex:3; background:var(--accent-dim);">
           <div class="creativity-label">0.4 - 0.6</div>
-          <div class="creativity-desc">Balanced (planner decides)</div>
+          <div class="creativity-desc">Balanced</div>
         </div>
         <div class="creativity-segment" style="flex:3; background:var(--orange); opacity:0.8;">
           <div class="creativity-label">0.7 - 1.0</div>
-          <div class="creativity-desc">All custom / freeform</div>
+          <div class="creativity-desc">Experimental</div>
         </div>
       </div>
       <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-dim); margin-top:4px;">
-        <span>Faster, more consistent</span>
-        <span>Slower, more unique</span>
+        <span>Briefs favor library components, proven layouts</span>
+        <span>Briefs encourage custom visuals, unique animations</span>
       </div>
     </div>
   </div>
@@ -2219,7 +1986,7 @@
       └── projects/
           └── proj_{id}/
               ├── project.json
-              ├── components/ (freeform HTML files)
+              ├── components/ (codegen HTML files)
               ├── _work/
               │   ├── scene_0/ (frames, scene.html, scene.mp4)
               │   ├── scene_1/
@@ -2240,20 +2007,19 @@
         <li><code>format</code> -- video | image | gif | presentation</li>
         <li><code>canvas</code> -- width, height, fps, preset, background</li>
         <li><code>brand_kit</code> -- colors, fonts, logos</li>
+        <li><code>creative_bible</code> -- concept, pattern, visual style</li>
+        <li><code>storyboard</code> -- PlannedScene[] from planner</li>
         <li><code>scenes[]</code> -- ordered scene list</li>
         <li><code>audio</code> -- track list + ducking config</li>
-      </ul>
-    </div>
+      </ul>    </div>
     <div class="concept-card">
       <h4>🎞️ Scene</h4>
       <ul>
         <li><code>id</code> -- scene identifier</li>
         <li><code>label</code> -- display name</li>
         <li><code>duration_seconds</code></li>
-        <li><code>components[]</code> -- positioned components</li>
+        <li><code>html</code> -- codegen HTML output</li>
         <li><code>transition_in</code> -- entry transition</li>
-        <li><code>beats[]</code> -- (sequences only)</li>
-        <li><code>choreography[]</code> -- (sequences only)</li>
         <li><code>background</code> -- color or gradient</li>
         <li><code>voiceover_text</code></li>
       </ul>
@@ -2266,26 +2032,6 @@
         <li><code>data</code> -- template binding data</li>
         <li><code>z_index</code> -- layer order</li>
         <li><code>position</code> -- x, y, width, height (%)</li>
-      </ul>
-    </div>
-    <div class="concept-card">
-      <h4>🎵 SequenceBeat</h4>
-      <ul>
-        <li><code>label</code> -- beat name</li>
-        <li><code>brief</code> -- what happens</li>
-        <li><code>duration_seconds</code></li>
-        <li><code>voiceover_text</code></li>
-      </ul>
-    </div>
-    <div class="concept-card">
-      <h4>💃 Choreography</h4>
-      <ul>
-        <li><code>label</code> -- matches beat label</li>
-        <li><code>startTime</code> -- seconds (cumulative)</li>
-        <li><code>duration</code> -- seconds</li>
-        <li><code>visibleComponents[]</code> -- component ids</li>
-        <li><code>transitions</code> -- enter/exit/move per component</li>
-        <li><code>positions</code> -- position overrides</li>
       </ul>
     </div>
     <div class="concept-card">
