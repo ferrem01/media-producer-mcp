@@ -53,14 +53,6 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     return await generateFreeformScene(opts, planned, sceneId);
   }
 
-  // ── Blocks-based unified path ──
-  // When the planner suggests blocks, route through freeform-agentic
-  // with those blocks pre-loaded. This is the new default path.
-  if ((planned as any).suggested_blocks?.length) {
-    console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (blocks: ${(planned as any).suggested_blocks.join(", ")})`);
-    return await generateBlocksScene(opts, planned, sceneId);
-  }
-
   // ── Template scene path ──
   if (planned.template) {
     return await generateFromTemplate(opts, planned, sceneId);
@@ -210,74 +202,6 @@ async function generateFreeformScene(
       z_index: 10,
     }],
   };
-
-  return { scene, customSources };
-}
-
-/**
- * Generate a scene using the blocks-based unified path.
- * Routes through freeform-agentic with suggested blocks pre-loaded.
- */
-async function generateBlocksScene(
-  opts: SceneGeneratorOpts,
-  planned: PlannedScene,
-  sceneId: string,
-): Promise<GeneratedScene> {
-  var compName = `block_${sceneId}`;
-  var suggestedBlocks = (planned as any).suggested_blocks as string[];
-
-  // Build a rich brief that includes beat info if present
-  var effectiveBrief = planned.freeform_brief || planned.description;
-  if (planned.beats?.length) {
-    effectiveBrief = `SEQUENCE: ${planned.beats.map(function(b) { return b.label + ": " + b.brief; }).join(" -> ")}`;
-  }
-
-  var sceneHtml = await generateFreeformAgentic({
-    sceneBrief: effectiveBrief,
-    sceneLabel: planned.label,
-    sceneDescription: planned.description,
-    sceneDuration: planned.duration_seconds || 5,
-    sceneIndex: opts.sceneIndex,
-    totalScenes: opts.totalScenes,
-    prompt: opts.prompt,
-    llmConfig: opts.llmConfig,
-    brandKit: opts.brandKit,
-    canvas: opts.canvas,
-    critiqueFeedback: opts.critiqueFeedback,
-    referenceImages: opts.referenceImages,
-    suggestedBlocks: suggestedBlocks,
-    beats: planned.beats,
-  });
-
-  sceneHtml = stripHtmlFences(sceneHtml);
-
-  var customSources = new Map<string, string>();
-  customSources.set(compName, sceneHtml);
-
-  var transition: SceneTransition | undefined;
-  if (planned.transition_in && planned.transition_in.type !== "none") {
-    transition = {
-      type: planned.transition_in.type as SceneTransition["type"],
-      duration_seconds: planned.transition_in.duration_seconds || 0.5,
-    };
-  }
-
-  var scene: Scene = {
-    id: sceneId,
-    label: planned.label,
-    duration_seconds: planned.duration_seconds || 5,
-    transition_in: transition,
-    components: [{
-      id: "comp_0",
-      type: compName,
-      data: {},
-      z_index: 10,
-    }],
-  };
-
-  if (planned.voiceover_text) {
-    scene.audio_hints = { voiceover_text: planned.voiceover_text };
-  }
 
   return { scene, customSources };
 }

@@ -75,8 +75,6 @@ export interface PlannedScene {
   // Freeform scene (full bespoke HTML generation)
   freeform?: boolean;  // true = generate full scene HTML from rich storyboard description
   freeform_brief?: string;  // detailed storyboard-quality scene description
-  // Blocks: suggest library blocks for codegen to read and compose
-  suggested_blocks?: string[];  // block type names the codegen should study
   // Sequence: multi-beat continuous scene
   beats?: PlannedBeat[];  // when present, freeform_brief is ignored; beats provide per-beat briefs
 }
@@ -217,38 +215,11 @@ Use sequences when:
 - Multiple related steps should flow as one continuous motion (walkthroughs, demos)
 - Elements should persist and transform (a panel that morphs, a cursor that navigates)
 - The story has cause-and-effect beats that feel choppy as separate scenes
+- You have EXISTING COMPONENTS that should be orchestrated together (STRONGLY PREFER this)
 
 Each beat gets a label, a brief (what happens), a duration, and optional voiceover.
+For component-based sequences, also provide choreography with visibility and transitions.
 Total duration_seconds = sum of beat durations.
-
-## Option 6: Blocks Composition (BEST for multi-component scenes — walkthroughs, split-screen demos)
-
-Instead of rigid component data-binding, suggest which library blocks the codegen should study and compose. The system reads the block sources, and the codegen adapts them into one custom scene with full creative control over layout, choreography, and transitions.
-
-{
-  "label": "Canva Connector Walkthrough",
-  "duration_seconds": 30,
-  "description": "Full walkthrough: chat to Canva to published post in one continuous take",
-  "freeform": true,
-  "freeform_brief": "Three panels orchestrated in sequence. Beat 1 (0-8s): Quotient chat fills the frame, user types a request for a LinkedIn post. Beat 2 (8-16s): Chat slides left to 45% width, Canva editor slides in from right showing a design being created. Beat 3 (16-22s): Both panels slide out, LinkedIn social post preview fades up center showing the published result. Beat 4 (22-30s): Post card scales down slightly, stats animate in below.",
-  "suggested_blocks": ["quotient-chat", "canva-editor", "quotient-social"],
-  "beats": [
-    { "label": "chat", "brief": "User types request in Quotient chat", "duration_seconds": 8 },
-    { "label": "design", "brief": "Chat slides left, Canva editor appears", "duration_seconds": 8 },
-    { "label": "publish", "brief": "Panels exit, social post preview centers", "duration_seconds": 6 },
-    { "label": "celebrate", "brief": "Stats animate in", "duration_seconds": 8 }
-  ],
-  "components": [],
-  "voiceover_text": "From idea to published post in one conversation.",
-  "transition_in": { "type": "none", "duration_seconds": 0 }
-}
-
-The key difference from component-based sequences: codegen gets full creative control. It reads the block HTML, adapts it, and writes its own GSAP choreography. No auto-generated choreography, no rigid data-binding. Much higher quality output.
-
-Use blocks composition when:
-- You want to combine 2+ existing UI mockups (quotient-chat, canva-editor, slack-workspace, etc.)
-- The scene needs multi-beat choreography (panels sliding, appearing, transforming)
-- You want the quality of freeform with the reusability of library components
 
 ## Option 3: Custom Component (escape hatch)
 Single custom HTML component within the standard structure. Use when no template or library component fits.
@@ -263,9 +234,7 @@ Single custom HTML component within the standard structure. Use when no template
   "transition_in": { "type": "blur-crossfade", "duration_seconds": 0.5 }
 }
 
-QUALITY RANKING: Blocks Composition > Freeform > Templates > Library > Custom.
-Use BLOCKS COMPOSITION when combining existing UI mockups (quotient-chat, canva-editor, etc.) into multi-step demos.
-Use suggested_blocks to hint which library blocks the codegen should study.
+QUALITY RANKING: Sequence (multi-beat freeform) > Freeform > Templates > Library > Custom.
 Use FREEFORM for scenes that tell a visual story — product demos, UI walkthroughs, interaction sequences, before/after transformations, cause-and-effect cascades, metaphors made visual. These produce the highest quality, most impressive output.
 Use TEMPLATES for standard layouts (big statements, stat displays, simple CTAs).
 Use LIBRARY for data-heavy scenes with standard components.
