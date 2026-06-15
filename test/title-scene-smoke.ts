@@ -35,14 +35,19 @@ function parse(result: any): any {
 async function main() {
   console.log("=== Title Scene Smoke Test ===\n");
 
+  // Run the child server in dev mode (no auth). Auth isn't under test here;
+  // the generate -> render pipeline is. Strip the auth-enabling env vars so
+  // isAuthEnabled() is false and tools don't require a token.
+  const childEnv: Record<string, string> = { ...process.env } as Record<string, string>;
+  delete childEnv.AUTH_TOKENS;
+  delete childEnv.SESSION_SECRET;
+  childEnv.MP_DATA_DIR = path.resolve(__dirname, "../test-output/smoke-test");
+  childEnv.MP_PORT = "0";
+
   const transport = new StdioClientTransport({
     command: "node",
     args: [SERVER_ENTRY],
-    env: {
-      ...process.env,
-      MP_DATA_DIR: path.resolve(__dirname, "../test-output/smoke-test"),
-      MP_PORT: "0",
-    },
+    env: childEnv,
   });
 
   const client = new Client({ name: "smoke-test", version: "1.0.0" }, { capabilities: {} });
