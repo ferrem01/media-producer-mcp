@@ -299,9 +299,19 @@ async function main() {
     for (var frame = 0; frame < totalFrames; frame++) {
       var time = frame / args.fps;
 
-      // Advance GSAP timeline
+      // Advance GSAP timeline. Wrap in try/catch: a fragile component callback
+      // (e.g. setting textContent on a null element) fires during seek and would
+      // otherwise reject this evaluate and crash the entire multi-scene render.
+      // Record the first error so we can warn once after the loop -- but keep
+      // rendering the remaining frames/scenes.
       await page.evaluate((t: number) => {
-        (window as any).__MP_TIMELINE.time(t);
+        try {
+          (window as any).__MP_TIMELINE.time(t);
+        } catch (e: any) {
+          if (!(window as any).__MP_SEEK_ERROR) {
+            (window as any).__MP_SEEK_ERROR = String(e?.message || e);
+          }
+        }
       }, time);
 
       // Update video frame images via data URIs (read from disk on Node side)
@@ -356,6 +366,10 @@ async function main() {
     }
 
     console.log(`  Captured ${totalFrames} frames`);
+    const seekError = await page.evaluate(() => (window as any).__MP_SEEK_ERROR || null);
+    if (seekError) {
+      console.warn(`  WARNING scene ${args.sceneIndex}: a component threw during timeline seek (render continued, frames may be degraded): ${seekError}`);
+    }
     await page.close();
   } finally {
     await browser.close();

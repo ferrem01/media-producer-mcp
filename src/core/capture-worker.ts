@@ -201,9 +201,10 @@ async function main() {
     for (let frame = 0; frame < totalFrames; frame++) {
       const time = frame / args.fps;
 
-      // Advance GSAP timeline
+      // Advance GSAP timeline. Swallow a throwing component callback so one
+      // fragile scene doesn't abort the whole capture.
       await page.evaluate((t: number) => {
-        (window as any).__MP_TIMELINE.time(t);
+        try { (window as any).__MP_TIMELINE.time(t); } catch { /* component callback threw; capture current state */ }
       }, time);
 
       // Update video frame images via file:// paths (not data URIs --

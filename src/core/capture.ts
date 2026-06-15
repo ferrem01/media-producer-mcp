@@ -201,10 +201,11 @@ export async function captureSingleFrame(options: {
       { timeout: 60000 }
     );
 
-    // If a specific time is requested, advance the timeline
+    // If a specific time is requested, advance the timeline. Swallow a throwing
+    // component callback so one fragile scene doesn't abort the capture.
     if (atTime !== undefined && atTime > 0) {
       await page.evaluate((t: number) => {
-        (window as any).__MP_TIMELINE.time(t);
+        try { (window as any).__MP_TIMELINE.time(t); } catch { /* component callback threw; capture current state */ }
       }, atTime);
     }
 
