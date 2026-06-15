@@ -23,11 +23,16 @@ project.json
 ├── project_id, tenant_id, name, format, status
 ├── canvas: { width, height, fps, preset }
 ├── brand_kit: { colors, fonts, logos, assets, style, guidelines }
+├── creative_bible: { concept, pattern, throughLine, emotionalArc, visualStyle }
+├── brief: { prompt, video_type, context, ... }
+├── plan: { narrative, scenes[{ label, visual_notes, components[], voiceover_text, duration_seconds }], audio }
 ├── scenes: Scene[]
 ├── audio: { tracks, ducking }
 ├── assets: Asset[]
 └── speaker_track: { clips[] }
 ```
+
+`creative_bible` (concept director) and `plan` (planner storyboard) are persisted on every generation -- both plan-only and full mode -- so the creative direction and the storyboard (including each scene's suggested library `components`) can be inspected and iterated after the fact, not just used transiently.
 
 ### Scene
 One segment of the timeline. Contains one or more components stacked by z_index.
@@ -196,6 +201,10 @@ Every format shares:
 3. Concat segments (scene + transition + scene + ...) via ffmpeg
 4. Mix audio (voiceover, music, SFX with volume envelope ducking)
 
+**Seek resilience.** Frame capture seeks the master GSAP timeline per frame, which fires component callbacks. A fragile callback in one LLM-generated scene (e.g. setting `textContent` on a null element) is caught per-seek so it can't reject the capture and crash the whole multi-scene render -- the worker records the first error, warns once, and keeps rendering. The bad scene degrades; the video still completes.
+
+**Last-frame extraction.** Transition frames are pulled with an end-relative seek (`-sseof`), not a fixed `duration - 0.05s` offset, so it works at any fps (the old offset landed past the final frame at low fps and produced an empty frame).
+
 ### Speaker Track Render
 1. **Build speaker base** -- concat clips, scale to canvas, apply trim
 2. **Render all scenes as transparent PNGs** -- Playwright captures with `omitBackground: true`
@@ -208,7 +217,9 @@ Key insight: transitions only affect the content layer. The speaker video plays 
 
 ### Scene Assembly
 
-Two assembly paths depending on scene type:
+**Single entry point** (`assembleSceneAuto()`): the one routing decision used by every render path (video, image, deck, gif, social, email) and the critique preview. It detects whether the scene is a codegen scene -- a `scene_`/`freeform_`/`custom_`/`template_` component whose source embeds `<component>` tags -- and, if so, loads the full component library and routes through `assembleCodegenScene`; otherwise it uses `assembleScene`. This replaced three near-identical copies of the routing that had drifted (the image/deck/gif path previously skipped the library load, silently dropping nested library components).
+
+Two underlying assembly paths:
 
 **Standard assembly** (`assembleScene()`): takes a Scene definition with library component references, resolves each component from the library, binds data, scopes CSS, and builds a self-contained HTML document with a master GSAP timeline.
 
@@ -370,14 +381,15 @@ All LLM prompts are format-aware (video/image/deck/gif/social). Visual design ru
 
 ## MCP Tools
 
-13 tools exposed via MCP protocol:
-- **CRUD:** create, get, list, add, update, remove, reorder
-- **Brand:** brand kit management
-- **Render:** trigger renders, job status/wait
-- **Generate:** LLM-powered full project generation
+14 tools exposed via MCP protocol:
+- **CRUD:** create, get, list, add, update, reorder
+- **Brand:** `brand` (get/set brand kit), `extract_brand_from_website` (Playwright design-token extraction → brand kit)
+- **Render:** `render` (trigger renders)
+- **Job:** `job` (status/wait/list for async generate + render jobs)
+- **Generate:** LLM-powered generation; `mode` = plan | generate | full
 - **Capture:** screenshot URLs via Playwright, save as assets
 - **Audio:** TTS generation, track management
-- **Upload:** file upload for assets
+- **Upload:** file upload for assets (project or brand)
 
 ---
 
@@ -401,14 +413,15 @@ All LLM prompts are format-aware (video/image/deck/gif/social). Visual design ru
 src/
 ├── core/
 │   ├── types.ts              # all interfaces
-│   ├── scene-assembler.ts    # single scene → HTML (assembleScene + assembleCodegenScene)
+│   ├── scene-assembler.ts    # scene → HTML (assembleSceneAuto routing + assembleScene + assembleCodegenScene)
 │   ├── composite-assembler.ts # all scenes → single HTML doc
 │   ├── component-tags.ts     # <component> tag resolution for unified codegen
 │   ├── component-parser.ts   # parse .component.html (template/style/script)
 │   ├── render.ts             # standard render pipeline
 │   ├── speaker-track.ts      # speaker track render pipeline
 │   ├── capture.ts            # Playwright screenshot capture
-│   ├── scene-worker.ts       # child process frame capture (routes through codegen assembler)
+│   ├── scene-worker.ts       # child process frame capture (via assembleSceneAuto)
+│   ├── video-path.ts         # resolve video src URLs (file://, localhost, /assets) → fs path
 │   ├── contact-sheet.ts      # multi-frame contact sheet for motion critique
 │   └── normalize-urls.ts     # asset URL normalization
 ├── llm/
@@ -495,9 +508,24 @@ All strip `http(s)://localhost:<any-port>/` to `/` via regex. External URLs (cdn
 - **External URLs:** Full `https://...` (CDN, stock photos, etc.) -- left untouched
 - **Data paths:** `/data/media-producer/...` (server-side only, resolved by `resolveAudioUrl` in preview)
 
+### Render-Time Video Resolution
+
+At render the scene HTML is loaded via `file://`, so a normalized root-relative `/assets/...` video src resolves against the `file://` origin to `file:///assets/...`. `core/video-path.ts` (`resolveVideoPath`, shared by `scene-worker`, `capture`, `capture-worker`) strips `file://`/localhost prefixes and maps `/assets/{tenant}/...` back to the configured data dir (`MP_DATA_DIR`). Without this the renderer can't find videos referenced by their normalized URL and silently drops them.
+
 ### Tests
 
 `test/normalize-urls.test.ts` -- 13 tests covering single URL, deep object, HTML attribute, CSS url(), multiple occurrences, empty/external edge cases.
+
+### MCP End-to-End Smoke Tests
+
+Run the server over stdio and exercise it through real MCP tool calls (`npx tsx test/<name>.ts`). They spawn the built server in dev mode (auth stripped) and poll async jobs via `job` status rather than the SDK's default-timeout `wait`.
+
+- `test/mcp-client.ts` -- connection + tool listing + CRUD.
+- `test/title-scene-smoke.ts` -- generate an image title card.
+- `test/render-smoke.ts` -- render an existing project (PROJECT_ID / RENDER_FORMAT env).
+- `test/video-scene-smoke.ts` -- a scene with a video, via raw `<video>` and `<component type="video">`, referenced by a realistic `/assets/...` URL (guards the video-path resolution).
+- `test/transition-smoke.ts` -- a 2-scene crossfade at 15fps (guards low-fps last-frame extraction).
+- `test/brand-cycle-e2e.ts` -- full cycle: extract brand from a website → upload logo/background → `generate(full)` → `render`; asserts the extracted brand propagates to a valid MP4. Uses network + LLM (slow).
 
 ---
 
