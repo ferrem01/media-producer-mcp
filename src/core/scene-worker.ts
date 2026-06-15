@@ -17,36 +17,13 @@ import { chromium } from "playwright";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import crypto from "node:crypto";
+import { resolveVideoPath } from "./video-path.js";
 
 var execFileAsync = promisify(execFile);
-
-const DATA_DIR = process.env.MP_DATA_DIR || "/data/media-producer";
 
 interface ExtractedVideo {
   framesDir: string;
   totalFrames: number;
-}
-
-function resolveVideoPath(src: string): string {
-  // Reduce to a root-absolute path. The scene HTML is loaded via file://, so a
-  // root-relative /assets/... src resolves against the file:// origin to
-  // file:///assets/...; localhost origins may also appear. Strip both so the
-  // /assets/... mapping below applies regardless of how the URL was rendered.
-  let p = src;
-  if (p.startsWith("file://")) p = p.slice(7);
-  p = p.replace(/^https?:\/\/localhost:\d+/, "");
-
-  // Map normalized /assets/... asset URLs to the configured data dir.
-  let m: RegExpMatchArray | null;
-  if ((m = p.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/)))
-    return path.join(DATA_DIR, m[1], "projects", m[2], "assets", m[3]);
-  if ((m = p.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/)))
-    return path.join(DATA_DIR, m[1], "brand-kit", "assets", m[2]);
-  if ((m = p.match(/^\/assets\/([^/]+)\/assets\/(.+)$/)))
-    return path.join(DATA_DIR, m[1], "assets", m[2]);
-
-  // Absolute filesystem path or external URL -- use as-is.
-  return p;
 }
 
 async function extractVideoFrames(videoPath: string, fps: number): Promise<ExtractedVideo> {

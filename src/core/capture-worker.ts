@@ -19,6 +19,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -44,30 +45,6 @@ interface VideoElementInfo {
   src: string;
   startAt: number;
   index: number;
-}
-
-const DATA_DIR = process.env.MP_DATA_DIR || "/data/media-producer";
-
-/**
- * Convert a video src URL to a filesystem path.
- * Handles file:// URLs, http://localhost URLs, and normalized /assets/... URLs.
- * The scene HTML loads via file://, so a root-relative /assets/... src resolves
- * to file:///assets/...; strip file://localhost and map /assets/... to DATA_DIR.
- */
-function resolveVideoPath(src: string): string {
-  let p = src;
-  if (p.startsWith("file://")) p = p.slice(7);
-  p = p.replace(/^https?:\/\/localhost:\d+/, "");
-
-  let m: RegExpMatchArray | null;
-  if ((m = p.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/)))
-    return path.join(DATA_DIR, m[1], "projects", m[2], "assets", m[3]);
-  if ((m = p.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/)))
-    return path.join(DATA_DIR, m[1], "brand-kit", "assets", m[2]);
-  if ((m = p.match(/^\/assets\/([^/]+)\/assets\/(.+)$/)))
-    return path.join(DATA_DIR, m[1], "assets", m[2]);
-
-  return p;
 }
 
 /**
