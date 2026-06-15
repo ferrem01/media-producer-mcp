@@ -60,22 +60,6 @@ export interface AgenticCodegenOpts {
 
 const TOOLS: LLMTool[] = [
   {
-    name: "read_source",
-    description:
-      "Read a component's full source code. Use this only if you need to understand complex internal behavior or unclear data fields. In most cases, the schemas provided in the brief are sufficient.",
-    input_schema: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description:
-            "Component type name from search results (e.g. 'chat-simulator', 'dashboard-kpi', 'quotient-chat', 'code-editor')",
-        },
-      },
-      required: ["name"],
-    },
-  },
-  {
     name: "submit_scene",
     description:
       "Submit the final scene HTML. Call this when you're ready to output the scene. The HTML must be a complete .component.html with <template>, <style scoped>, and <script> sections.",
@@ -276,8 +260,7 @@ Notice: quotient-chat and code-editor use <component> tags. Only the background,
 3. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
 4. SUBMIT via the submit_scene tool
 
-If the brief lists components with schemas, you have everything you need. Go straight to writing and submit.
-Call read_source only if a component's data schema is missing or unclear.
+You have everything you need in the brief. Go straight to writing and submit in ONE step.
 
 ## Design Skills (FOLLOW THESE RULES)
 
@@ -483,7 +466,7 @@ Read the brief, then write your scene HTML and submit it.`;
 
   // Track component-first workflow state
 
-  var readSources: Set<string> = new Set();  // components read via read_source
+
 
   for (var iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     console.log(
@@ -538,12 +521,7 @@ Read the brief, then write your scene HTML and submit it.`;
 
         var toolResult: string;
 
-        if (toolCall.name === "read_source") {
-          toolResult = await executeReadSource(
-            toolCall.input.name as string,
-          );
-          readSources.add((toolCall.input.name as string).toLowerCase());
-        } else if (toolCall.name === "submit_scene") {
+        if (toolCall.name === "submit_scene") {
           var submitResult = executeSubmitScene(
             toolCall.input.html as string,
           );
@@ -574,7 +552,7 @@ Read the brief, then write your scene HTML and submit it.`;
       });
 
       // Synthetic nudge: if search found components but LLM is about to submit without using them
-      // (No longer requires read_source -- schemas are inline in search results)
+      // Component schemas are provided in the brief; no tool-based discovery needed
 
       continue;
     }
