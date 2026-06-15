@@ -105,7 +105,7 @@ export async function planStoryboard(opts: UnifiedPlannerOpts): Promise<Storyboa
 
 You think in visual STORIES, not slide decks. Every scene should feel like something the viewer wants to watch, not endure.
 
-${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n` : ""}You have FOUR options for each scene:
+${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n` : ""}Every scene follows the same format:
 
 ## Scene Format
 
