@@ -422,7 +422,9 @@ ${tagResult.html}
     duration: ${duration},
     fps: 30,
     canvas: { width: ${canvas.width}, height: ${canvas.height} },
-    getComponentTimeline: __getComponentTimeline || function(id) { return gsap.timeline(); },
+    getComponentTimeline: (typeof __getComponentTimeline !== 'undefined'
+      ? __getComponentTimeline
+      : function(id) { return gsap.timeline(); }),
   };
 
   // Scene's own createTimeline

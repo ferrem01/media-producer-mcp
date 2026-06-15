@@ -244,7 +244,7 @@ async function renderImage(
   if (!scene) throw new Error("No scenes in project");
 
   // Assemble scene HTML
-  const html = await assembleScene({
+  const html = await assembleSceneOrSequence({
     scene,
     components: componentSources,
     brandKit: project.brand_kit,
@@ -1039,7 +1039,7 @@ async function renderDeck(
 
   for (let i = 0; i < project.scenes.length; i++) {
     const scene = project.scenes[i];
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1109,7 +1109,7 @@ async function renderGif(
     const sceneDir = path.join(workDir, `gif_scene_${i}`);
     await fs.mkdir(sceneDir, { recursive: true });
 
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1183,7 +1183,7 @@ async function renderSocial(
   for (const [presetName, dims] of Object.entries(SOCIAL_PRESETS)) {
     const canvas = { ...project.canvas, width: dims.width, height: dims.height };
 
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1240,7 +1240,7 @@ async function renderEmailHeader(
     const sceneDir = path.join(workDir, `email_scene_${i}`);
     await fs.mkdir(sceneDir, { recursive: true });
 
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1279,7 +1279,7 @@ async function renderEmailHeader(
   // 2. Render the static PNG fallback (first scene, hero moment)
   const scene = project.scenes[0];
   if (scene) {
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1337,11 +1337,28 @@ async function loadComponentSources(
   }
 
   const sources: ComponentSource[] = [];
+  const loaded = new Set<string>();
 
-  for (const type of types) {
+  // Resolve component types, including nested <component type="..."> tags that
+  // codegen scene components reference internally (e.g. mesh-gradient,
+  // depth-blur). Without these the codegen assembler can't register their
+  // timelines and the page errors on ctx.getComponentTimeline().
+  const NESTED_TAG_RE = /<component\s+[^>]*\btype=["']([^"']+)["']/g;
+  const queue = [...types];
+  while (queue.length > 0) {
+    const type = queue.shift()!;
+    if (loaded.has(type)) continue;
+    loaded.add(type);
+
     const source = await findComponentSource(type, componentLibDir, extraDirs);
     if (source) {
       sources.push({ type, source });
+      // Discover any nested component types referenced by this source
+      let m: RegExpExecArray | null;
+      NESTED_TAG_RE.lastIndex = 0;
+      while ((m = NESTED_TAG_RE.exec(source)) !== null) {
+        if (!loaded.has(m[1])) queue.push(m[1]);
+      }
     } else {
       console.warn(`  Warning: component type "${type}" not found`);
     }
