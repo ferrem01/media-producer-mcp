@@ -14,12 +14,13 @@ import path from "node:path";
 import { fork, execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
-import { assembleScene, assembleCodegenScene, type ComponentSource } from "./scene-assembler.js";
+import { assembleSceneAuto, type ComponentSource } from "./scene-assembler.js";
 
 /**
- * Choose the right assembler based on scene type.
- * Sequence scenes (with beats + library components) use the sequence assembler.
- * Everything else uses the standard scene assembler.
+ * Choose the right assembler based on scene type and assemble to HTML.
+ * Delegates to assembleSceneAuto, which routes codegen scenes (with <component>
+ * tags) through the codegen assembler (loading the full component library) and
+ * everything else through the standard assembler.
  */
 async function assembleSceneOrSequence(options: {
   scene: any;
@@ -30,35 +31,7 @@ async function assembleSceneOrSequence(options: {
   preview?: boolean;
   speakerUrl?: string;
 }): Promise<string> {
-  const { scene } = options;
-
-  // Check if any scene/custom component source contains <component> tags (unified codegen path)
-  if (scene.components?.length > 0) {
-    for (const comp of scene.components) {
-      if (comp.type.startsWith('scene_') || comp.type.startsWith('freeform_') || comp.type.startsWith('custom_') || comp.type.startsWith('template_')) {
-        const codegenSource = options.components.find(cs => cs.type === comp.type);
-        if (codegenSource && codegenSource.source.includes('<component ')) {
-          console.log(`  [render] Using codegen assembler for "${scene.label || scene.id}" (has <component> tags)`);
-          return assembleCodegenScene({
-            sceneSource: codegenSource.source,
-            componentSources: options.components.filter(cs => cs.type !== comp.type),
-            brandKit: options.brandKit,
-            canvas: options.canvas,
-            duration: scene.duration_seconds || 5,
-            sceneId: scene.id,
-            gsapDir: options.gsapDir,
-            background: scene.background,
-            transparentBackground: scene.transparent_background,
-            backgroundVideo: scene.background_video,
-            preview: options.preview,
-            speakerUrl: options.speakerUrl,
-          });
-        }
-      }
-    }
-  }
-
-  return assembleScene(options);
+  return assembleSceneAuto({ ...options, componentLibDir: config.componentLibDir });
 }
 import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, encodeGif, concatSegments } from "./encode.js";
@@ -244,7 +217,7 @@ async function renderImage(
   if (!scene) throw new Error("No scenes in project");
 
   // Assemble scene HTML
-  const html = await assembleScene({
+  const html = await assembleSceneOrSequence({
     scene,
     components: componentSources,
     brandKit: project.brand_kit,
@@ -1039,7 +1012,7 @@ async function renderDeck(
 
   for (let i = 0; i < project.scenes.length; i++) {
     const scene = project.scenes[i];
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1109,7 +1082,7 @@ async function renderGif(
     const sceneDir = path.join(workDir, `gif_scene_${i}`);
     await fs.mkdir(sceneDir, { recursive: true });
 
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1183,7 +1156,7 @@ async function renderSocial(
   for (const [presetName, dims] of Object.entries(SOCIAL_PRESETS)) {
     const canvas = { ...project.canvas, width: dims.width, height: dims.height };
 
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1240,7 +1213,7 @@ async function renderEmailHeader(
     const sceneDir = path.join(workDir, `email_scene_${i}`);
     await fs.mkdir(sceneDir, { recursive: true });
 
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1279,7 +1252,7 @@ async function renderEmailHeader(
   // 2. Render the static PNG fallback (first scene, hero moment)
   const scene = project.scenes[0];
   if (scene) {
-    const html = await assembleScene({
+    const html = await assembleSceneOrSequence({
       scene,
       components: componentSources,
       brandKit: project.brand_kit,
@@ -1337,11 +1310,28 @@ async function loadComponentSources(
   }
 
   const sources: ComponentSource[] = [];
+  const loaded = new Set<string>();
 
-  for (const type of types) {
+  // Resolve component types, including nested <component type="..."> tags that
+  // codegen scene components reference internally (e.g. mesh-gradient,
+  // depth-blur). Without these the codegen assembler can't register their
+  // timelines and the page errors on ctx.getComponentTimeline().
+  const NESTED_TAG_RE = /<component\s+[^>]*\btype=["']([^"']+)["']/g;
+  const queue = [...types];
+  while (queue.length > 0) {
+    const type = queue.shift()!;
+    if (loaded.has(type)) continue;
+    loaded.add(type);
+
     const source = await findComponentSource(type, componentLibDir, extraDirs);
     if (source) {
       sources.push({ type, source });
+      // Discover any nested component types referenced by this source
+      let m: RegExpExecArray | null;
+      NESTED_TAG_RE.lastIndex = 0;
+      while ((m = NESTED_TAG_RE.exec(source)) !== null) {
+        if (!loaded.has(m[1])) queue.push(m[1]);
+      }
     } else {
       console.warn(`  Warning: component type "${type}" not found`);
     }

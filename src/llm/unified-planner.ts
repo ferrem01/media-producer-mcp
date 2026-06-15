@@ -71,15 +71,6 @@ export interface PlannedScene {
   transition_in?: { type: string; duration_seconds: number };
   hero_image?: string;
   voiceover_text?: string;  // Narration script for this scene (TTS)
-  // Sequence: multi-beat continuous scene
-  beats?: PlannedBeat[];   // optional multi-beat sequence
-}
-
-export interface PlannedBeat {
-  label: string;
-  brief: string;
-  duration_seconds: number;
-  voiceover_text?: string;
 }
 
 export interface StoryboardResult {
@@ -134,30 +125,16 @@ The codegen LLM will receive the component schemas and use <component> tags.
 If no library components fit, leave "components" as an empty array [].
 For scenes with existing UI elements (chat panels, dashboards, code editors), always list the matching library component types.
 
-### Sequences (Multi-Beat Scenes)
-When a scene has multiple related steps that should flow as one continuous motion,
-add "beats" with per-beat briefs:
-
-{
-  "label": "Canva Connector Walkthrough",
-  "duration_seconds": 30,
-  "description": "Full walkthrough: chat to Canva to published post",
-  "brief": "A continuous product demo showing the full flow from chat request to published social post.",
-  "components": ["quotient-chat", "canva-editor", "quotient-social"],
-  "beats": [
-    { "label": "chat", "brief": "User types a request in Quotient chat", "duration_seconds": 8, "voiceover_text": "Start with a simple request." },
-    { "label": "connect", "brief": "Chat slides left, Canva editor appears from right", "duration_seconds": 8, "voiceover_text": "The Canva connector activates." },
-    { "label": "design", "brief": "Canva editor generates a design", "duration_seconds": 7, "voiceover_text": "The design assembles itself." },
-    { "label": "publish", "brief": "Both panels slide out, social post preview centers", "duration_seconds": 7, "voiceover_text": "Published. Live. Done." }
-  ],
-  "transition_in": { "type": "none", "duration_seconds": 0 }
-}
-
-Use sequences when:
-- Multiple related steps should flow as one continuous motion (walkthroughs, demos)
-- Elements should persist and transform (a panel that morphs, a cursor that navigates)
-- The story has cause-and-effect beats that feel choppy as separate scenes
-Total duration_seconds = sum of beat durations.
+### Continuous / Multi-Step Scenes (walkthroughs, demos)
+There is no separate "sequence" type. A continuous multi-step moment — a
+walkthrough, demo flow, step-by-step, or "single take" where elements persist and
+transform — is just a normal scene with a LONGER duration (e.g. 12-30s) and a
+brief that describes the progression as one continuous motion. Write the brief as
+an ordered flow (e.g. "chat panel SLIDES left as the editor DRIFTS in from the
+right, then both resolve into the published post"), list the library components
+involved, and the codegen LLM will choreograph it on one master timeline with
+labeled steps (elements morph/move rather than disappear). Set transition_in to
+"none" for these so the take stays unbroken.
 
 ## Available Components
 
@@ -191,6 +168,7 @@ ${catalogStr}
 ## Rules
 
 - ${sceneCountGuide}
+- **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Its brief must describe the whole flow as an ordered progression (step 1 → step 2 → step 3 …, each as motion: SLIDES, MORPHS, ASSEMBLES), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a plan failure.
 - First scene: transition "none" or omit transition_in.
 - Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, shader-crosswarp, shader-ripple, shader-radial, shader-directional-warp, shader-burn, shader-chromatic, shader-lens-distortion, none.
 - SHADER transitions (shader-*) use WebGL for premium visual effects. Use them for hero transitions between key scenes. shader-crosswarp: warped crossfade, shader-ripple: ripple wave, shader-radial: radial wipe, shader-directional-warp: directional warp morph, shader-burn: warm burn blend, shader-chromatic: RGB split aberration, shader-lens-distortion: gravitational lens. Use 1-3 shader transitions per video for maximum impact. Do not overuse.
@@ -210,7 +188,7 @@ ${catalogStr}
 - For VIDEO: write rich briefs per scene and list matching library components for UI elements.
 - **Interactive Scripts:** Some library components are 🎬 Scriptable. Mention scripting needs in the brief and the codegen LLM will handle the details.
 - Output ONLY valid JSON. No commentary.
-- When a prompt asks for a "walkthrough", "demo flow", "step by step", or "continuous take" involving multiple existing components, use a sequence scene with beats and list those components.
+- When a prompt asks for a "walkthrough", "demo flow", "step by step", or "continuous take" involving multiple existing components, make ONE longer scene (12-30s) with a progression-style brief that lists those components (see "Continuous / Multi-Step Scenes" above) rather than several short scenes.
 
 ${SCENE_PLANNER_DESIGN_RULES}
 

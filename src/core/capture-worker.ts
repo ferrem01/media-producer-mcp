@@ -19,6 +19,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -44,38 +45,6 @@ interface VideoElementInfo {
   src: string;
   startAt: number;
   index: number;
-}
-
-const DATA_DIR = "/data/media-producer";
-
-/**
- * Convert a video src URL to a filesystem path.
- * Handles file:// URLs and http://localhost:3200 URLs.
- */
-function resolveVideoPath(src: string): string {
-  // file:// URL -> strip prefix
-  if (src.startsWith("file://")) {
-    return src.slice(7);
-  }
-
-  // http://localhost:3200/assets/{tenant}/projects/{projectId}/assets/{file}
-  const projMatch = src.match(
-    /^https?:\/\/localhost:\d+\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/
-  );
-  if (projMatch) {
-    return path.join(DATA_DIR, projMatch[1], "projects", projMatch[2], "assets", projMatch[3]);
-  }
-
-  // http://localhost:3200/assets/{tenant}/brand-kit/{rest}
-  const brandMatch = src.match(
-    /^https?:\/\/localhost:\d+\/assets\/([^/]+)\/brand-kit\/(.+)$/
-  );
-  if (brandMatch) {
-    return path.join(DATA_DIR, brandMatch[1], "brand-kit", "assets", brandMatch[2]);
-  }
-
-  // Already a filesystem path
-  return src;
 }
 
 /**
@@ -141,7 +110,11 @@ async function main() {
 
   const browser = await chromium.launch({
     args: [
-      "--disable-gpu",
+      // Shader transitions (gl-transitions) render via WebGL in this worker.
+      // Chromium provides a swiftshader WebGL context even under --disable-gpu,
+      // but make the intent explicit so the context is reliably available.
+      "--use-gl=swiftshader",
+      "--enable-webgl",
       "--disable-dev-shm-usage",
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -152,7 +125,7 @@ async function main() {
   const frameDirsToCleanup = new Set<string>();
 
   try {
-    const page = await browser.newPage();
+    const page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width: args.width, height: args.height });
 
     const fileUrl = `file://${path.resolve(args.htmlPath)}`;
@@ -232,9 +205,10 @@ async function main() {
     for (let frame = 0; frame < totalFrames; frame++) {
       const time = frame / args.fps;
 
-      // Advance GSAP timeline
+      // Advance GSAP timeline. Swallow a throwing component callback so one
+      // fragile scene doesn't abort the whole capture.
       await page.evaluate((t: number) => {
-        (window as any).__MP_TIMELINE.time(t);
+        try { (window as any).__MP_TIMELINE.time(t); } catch { /* component callback threw; capture current state */ }
       }, time);
 
       // Update video frame images via file:// paths (not data URIs --

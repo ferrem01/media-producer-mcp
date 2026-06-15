@@ -181,24 +181,21 @@ export async function extractLastFrame(
 
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
-  // Use ffmpeg to extract the last frame
-  // First get duration
-  const { stdout: durStr } = await execFileAsync("ffprobe", [
-    "-v", "error",
-    "-show_entries", "format=duration",
-    "-of", "default=noprint_wrappers=1:nokey=1",
-    sceneMp4,
-  ]);
-  const duration = parseFloat(durStr.trim());
-
-  // Seek near end and grab last frame
-  const seekTime = Math.max(0, duration - 0.05);
+  // Grab the true last frame in an fps-agnostic way: seek ~1s before the end of
+  // file (-sseof) and decode forward, writing every frame to the same output
+  // path with -update 1 so the final write IS the last frame.
+  //
+  // The previous approach (input-seek to duration - 0.05s) was brittle at low
+  // fps: e.g. a 2s clip at 15fps has its last frame at 1.933s, so seeking to
+  // 1.95s landed past every frame and ffmpeg wrote nothing ("Output file is
+  // empty"), leaving frameA.png missing and the transition step failing with
+  // ENOENT. -sseof has no such dependency on the frame interval.
   await execFileAsync("ffmpeg", [
     "-y",
-    "-ss", String(seekTime),
+    "-sseof", "-1",
     "-i", sceneMp4,
-    "-frames:v", "1",
-    "-s", `${width}x${height}`,
+    "-update", "1",
+    "-vf", `scale=${width}:${height}`,
     outputPath,
   ]);
 
@@ -587,7 +584,7 @@ ${gsapSource}
     '  v_texCoord = a_position * 0.5 + 0.5;',
     '  gl_Position = vec4(a_position, 0.0, 1.0);',
     '}'
-  ].join('\n');
+  ].join('\\n');
 
   // Fragment shader with gl-transitions wrapper
   var fragSrc = [
@@ -606,7 +603,7 @@ ${gsapSource}
     'void main() {',
     '  gl_FragColor = transition(v_texCoord);',
     '}'
-  ].join('\n');
+  ].join('\\n');
 
   // Compile shaders
   function compileShader(src, type) {

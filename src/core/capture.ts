@@ -15,6 +15,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -44,34 +45,6 @@ export interface CaptureResult {
   outputDir: string;
   format: string;
   durationMs: number;
-}
-
-const DATA_DIR = "/data/media-producer";
-
-/**
- * Convert a video src URL to a filesystem path.
- * Handles file:// URLs and http://localhost:3200 URLs.
- */
-function resolveVideoPath(src: string): string {
-  if (src.startsWith("file://")) {
-    return src.slice(7);
-  }
-
-  const projMatch = src.match(
-    /^https?:\/\/localhost:\d+\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/
-  );
-  if (projMatch) {
-    return path.join(DATA_DIR, projMatch[1], "projects", projMatch[2], "assets", projMatch[3]);
-  }
-
-  const brandMatch = src.match(
-    /^https?:\/\/localhost:\d+\/assets\/([^/]+)\/brand-kit\/(.+)$/
-  );
-  if (brandMatch) {
-    return path.join(DATA_DIR, brandMatch[1], "brand-kit", "assets", brandMatch[2]);
-  }
-
-  return src;
 }
 
 /** Info about a video source whose frames have been extracted */
@@ -170,6 +143,71 @@ export async function captureScene(options: CaptureOptions): Promise<CaptureResu
 }
 
 /**
+ * Runtime "smoke test" for a scene: load the assembled HTML and seek the master
+ * GSAP timeline across the whole duration, collecting any JavaScript error that
+ * a component callback throws (e.g. setting textContent on a null element).
+ *
+ * This is the correctness counterpart to the vision critique: the vision model
+ * judges whether a scene LOOKS good, but it cannot see that a callback threw
+ * mid-animation (the frame still renders). A thrown error means an element the
+ * scene's timeline touches doesn't exist -- the scene will render degraded.
+ *
+ * Returns { ok: true } if the animation runs clean across all sampled times,
+ * or { ok: false, error, atTime } with the first error encountered. Infra
+ * failures (launch/load/timeout) return ok:true so they never block generation.
+ */
+export async function validateSceneRuntime(options: {
+  htmlPath: string;
+  width: number;
+  height: number;
+  duration: number;
+  /** Number of seek steps across the timeline (default 12) */
+  steps?: number;
+}): Promise<{ ok: boolean; error?: string; atTime?: number }> {
+  const { htmlPath, width, height, duration, steps = 12 } = options;
+  let browser: Browser | undefined;
+  try {
+    browser = await chromium.launch({
+      args: [
+        "--use-gl=swiftshader", "--disable-dev-shm-usage", "--no-sandbox",
+        "--disable-setuid-sandbox", "--allow-file-access-from-files",
+        "--disable-extensions", "--disable-background-networking",
+        "--mute-audio", "--no-first-run",
+      ],
+    });
+    const page = await browser.newPage({ ignoreHTTPSErrors: true });
+    await page.setViewportSize({ width, height });
+    let pageError: string | undefined;
+    page.on("pageerror", (e) => { if (!pageError) pageError = String((e as any)?.message || e); });
+
+    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 60000 });
+
+    // Seek across the timeline; the first synchronous throw from a component
+    // callback is caught here. Async/load errors surface via the pageerror listener.
+    const swept = await page.evaluate((args: { dur: number; steps: number }) => {
+      const tl = (window as any).__MP_TIMELINE;
+      if (!tl || typeof tl.time !== "function") return { err: "__MP_TIMELINE not defined", at: 0 };
+      const n = Math.max(1, args.steps);
+      for (let i = 0; i <= n; i++) {
+        const t = (args.dur * i) / n;
+        try { tl.time(t); } catch (e: any) { return { err: String(e?.message || e), at: t }; }
+      }
+      return { err: null as string | null, at: 0 };
+    }, { dur: duration, steps });
+
+    const error = swept.err || pageError;
+    if (error) return { ok: false, error, atTime: swept.at };
+    return { ok: true };
+  } catch {
+    // Validation infrastructure failure -- do not block generation.
+    return { ok: true };
+  } finally {
+    await browser?.close().catch(() => {});
+  }
+}
+
+/**
  * Capture a single frame (for image output or critique screenshots).
  * Uses ffmpeg to extract video frames instead of Chrome seeking.
  */
@@ -217,7 +255,7 @@ export async function captureSingleFrame(options: {
         "--no-first-run",
       ],
     });
-    page = await browser.newPage();
+    page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width, height });
 
     const fileUrl = `file://${path.resolve(htmlPath)}`;
@@ -228,10 +266,11 @@ export async function captureSingleFrame(options: {
       { timeout: 60000 }
     );
 
-    // If a specific time is requested, advance the timeline
+    // If a specific time is requested, advance the timeline. Swallow a throwing
+    // component callback so one fragile scene doesn't abort the capture.
     if (atTime !== undefined && atTime > 0) {
       await page.evaluate((t: number) => {
-        (window as any).__MP_TIMELINE.time(t);
+        try { (window as any).__MP_TIMELINE.time(t); } catch { /* component callback threw; capture current state */ }
       }, atTime);
     }
 

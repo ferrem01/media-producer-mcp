@@ -17,23 +17,13 @@ import { chromium } from "playwright";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import crypto from "node:crypto";
+import { resolveVideoPath } from "./video-path.js";
 
 var execFileAsync = promisify(execFile);
-
-const DATA_DIR = "/data/media-producer";
 
 interface ExtractedVideo {
   framesDir: string;
   totalFrames: number;
-}
-
-function resolveVideoPath(src: string): string {
-  if (src.startsWith("file://")) return src.slice(7);
-  const projMatch = src.match(/^https?:\/\/localhost:\d+\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
-  if (projMatch) return path.join(DATA_DIR, projMatch[1], "projects", projMatch[2], "assets", projMatch[3]);
-  const brandMatch = src.match(/^https?:\/\/localhost:\d+\/assets\/([^/]+)\/brand-kit\/(.+)$/);
-  if (brandMatch) return path.join(DATA_DIR, brandMatch[1], "brand-kit", "assets", brandMatch[2]);
-  return src;
 }
 
 async function extractVideoFrames(videoPath: string, fps: number): Promise<ExtractedVideo> {
@@ -135,56 +125,18 @@ async function main() {
   // Import assembler (dynamic to keep this file self-contained for the worker)
   var { parseComponent, bindTemplate, scopeCSS } = await import("./component-parser.js");
 
-  // Assemble scene HTML -- route through codegen assembler if scene has <component> tags
-  var { assembleScene, assembleCodegenScene } = await import("./scene-assembler.js");
-  var html: string;
-
-  var codegenComp = scene.components?.find(
-    (c: any) => c.type.startsWith('scene_') || c.type.startsWith('freeform_') || c.type.startsWith('custom_') || c.type.startsWith('template_')
-  );
-  var codegenSource = codegenComp ? components.find((cs: any) => cs.type === codegenComp.type) : null;
-
-  if (codegenSource && codegenSource.source.includes('<component ')) {
-    // Load all library component sources for <component> tag resolution
-    var libSources: Array<{type: string, source: string}> = [];
-    var componentLibDir = args.componentLibDir || path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../src/components');
-    try {
-      var cats = await fs.readdir(componentLibDir, { withFileTypes: true });
-      for (var cat of cats) {
-        if (!cat.isDirectory() || cat.name === 'shared') continue;
-        var catFiles = await fs.readdir(path.join(componentLibDir, cat.name));
-        for (var cf of catFiles) {
-          if (cf.endsWith('.component.html')) {
-            var libType = cf.replace('.component.html', '');
-            var libSrc = await fs.readFile(path.join(componentLibDir, cat.name, cf), 'utf-8');
-            libSources.push({ type: libType, source: libSrc });
-          }
-        }
-      }
-    } catch (e: any) {
-      console.warn('  [scene-worker] Failed to load library components:', e.message);
-    }
-
-    html = await assembleCodegenScene({
-      sceneSource: codegenSource.source,
-      componentSources: [...libSources, ...components.filter((cs: any) => cs.type !== codegenComp!.type)],
-      brandKit: project.brand_kit,
-      canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
-      duration: scene.duration_seconds || 5,
-      sceneId: scene.id || `scene_${args.sceneIndex}`,
-      gsapDir: args.gsapDir,
-      background: scene.background,
-      transparentBackground: scene.transparent_background,
-    });
-  } else {
-    html = await assembleScene({
-      scene,
-      components,
-      brandKit: project.brand_kit,
-      canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
-      gsapDir: args.gsapDir,
-    });
-  }
+  // Assemble scene HTML -- assembleSceneAuto routes codegen scenes (with
+  // <component> tags) through the codegen assembler + full library load.
+  var { assembleSceneAuto } = await import("./scene-assembler.js");
+  var componentLibDir = args.componentLibDir || path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../src/components');
+  var html: string = await assembleSceneAuto({
+    scene,
+    components,
+    brandKit: project.brand_kit,
+    canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
+    gsapDir: args.gsapDir,
+    componentLibDir,
+  });
 
   // Write HTML
   var framesDir = path.join(args.workDir, "frames");
@@ -278,7 +230,7 @@ async function main() {
   const frameDirsToCleanup = new Set<string>();
 
   try {
-    var page = await browser.newPage();
+    var page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width: args.width, height: args.height });
     await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "networkidle", timeout: 60000 });
     await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 60000 });
@@ -347,9 +299,19 @@ async function main() {
     for (var frame = 0; frame < totalFrames; frame++) {
       var time = frame / args.fps;
 
-      // Advance GSAP timeline
+      // Advance GSAP timeline. Wrap in try/catch: a fragile component callback
+      // (e.g. setting textContent on a null element) fires during seek and would
+      // otherwise reject this evaluate and crash the entire multi-scene render.
+      // Record the first error so we can warn once after the loop -- but keep
+      // rendering the remaining frames/scenes.
       await page.evaluate((t: number) => {
-        (window as any).__MP_TIMELINE.time(t);
+        try {
+          (window as any).__MP_TIMELINE.time(t);
+        } catch (e: any) {
+          if (!(window as any).__MP_SEEK_ERROR) {
+            (window as any).__MP_SEEK_ERROR = String(e?.message || e);
+          }
+        }
       }, time);
 
       // Update video frame images via data URIs (read from disk on Node side)
@@ -404,6 +366,10 @@ async function main() {
     }
 
     console.log(`  Captured ${totalFrames} frames`);
+    const seekError = await page.evaluate(() => (window as any).__MP_SEEK_ERROR || null);
+    if (seekError) {
+      console.warn(`  WARNING scene ${args.sceneIndex}: a component threw during timeline seek (render continued, frames may be degraded): ${seekError}`);
+    }
     await page.close();
   } finally {
     await browser.close();

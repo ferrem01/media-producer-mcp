@@ -35,15 +35,15 @@ import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { fetchStockFootage, generateStockQuery } from "../media/stock-footage.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
-import type { BrandKit, Canvas, OutputFormat, Project, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, Project, ProjectPlan, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
 import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
 import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { generateContactSheet } from "../core/contact-sheet.js";
-import { assembleScene, assembleCodegenScene, type ComponentSource } from "../core/scene-assembler.js";
-import { captureSingleFrame } from "../core/capture.js";
+import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
+import { captureSingleFrame, validateSceneRuntime } from "../core/capture.js";
 import os from "node:os";
 
 // Keep old imports for backwards compat (deprecated functions still exist in their files)
@@ -917,54 +917,17 @@ async function critiqueAndRetryScene(opts: {
         break;
       }
 
-      // 2. Assemble the scene HTML (route through codegen assembler if <component> tags present)
-      let assembledHtml: string;
-      const codegenComp = currentScene.components.find(
-        (c: any) => (c.type.startsWith('scene_') || c.type.startsWith('freeform_') || c.type.startsWith('custom_') || c.type.startsWith('template_'))
-      );
-      const codegenSource = codegenComp ? componentSources.find(cs => cs.type === codegenComp.type) : null;
-      if (codegenSource && codegenSource.source.includes('<component ')) {
-        // Load all library component sources for <component> tag resolution
-        const libSources: ComponentSource[] = [];
-        try {
-          const fsp = await import("node:fs/promises");
-          const pathMod = await import("node:path");
-          const cats = await fsp.readdir(config.componentLibDir, { withFileTypes: true });
-          for (const cat of cats) {
-            if (!cat.isDirectory() || cat.name === 'shared') continue;
-            const files = await fsp.readdir(pathMod.default.join(config.componentLibDir, cat.name));
-            for (const file of files) {
-              if (file.endsWith('.component.html')) {
-                const type = file.replace('.component.html', '');
-                const src = await fsp.readFile(pathMod.default.join(config.componentLibDir, cat.name, file), 'utf-8');
-                libSources.push({ type, source: src });
-              }
-            }
-          }
-        } catch (e: any) {
-          console.warn('  [critique] Failed to load library components:', e.message);
-        }
-        assembledHtml = await assembleCodegenScene({
-          sceneSource: codegenSource.source,
-          componentSources: [...libSources, ...componentSources.filter(cs => cs.type !== codegenComp!.type)],
-          brandKit: opts.brandKit,
-          canvas: opts.canvas,
-          duration: currentScene.duration_seconds || 5,
-          sceneId: currentScene.id || `scene_${opts.sceneIndex}`,
-          gsapDir: config.gsapDir,
-          background: currentScene.background,
-          transparentBackground: currentScene.transparent_background,
-          preview: true,
-        });
-      } else {
-        assembledHtml = await assembleScene({
-          scene: currentScene,
-          components: componentSources,
-          brandKit: opts.brandKit,
-          canvas: opts.canvas,
-          gsapDir: config.gsapDir,
-        });
-      }
+      // 2. Assemble the scene HTML. assembleSceneAuto routes codegen scenes
+      //    (with <component> tags) through the codegen assembler + library load.
+      const assembledHtml = await assembleSceneAuto({
+        scene: currentScene,
+        components: componentSources,
+        brandKit: opts.brandKit,
+        canvas: opts.canvas,
+        gsapDir: config.gsapDir,
+        componentLibDir: config.componentLibDir,
+        preview: true,
+      });
 
       // 3. Write to temp file and capture preview
       const tmpDir = path.join(os.tmpdir(), `critique_${opts.projectId}_${opts.sceneIndex}_${attempt}`);
@@ -973,6 +936,19 @@ async function critiqueAndRetryScene(opts: {
       const previewPath = path.join(tmpDir, "preview.png");
 
       await fs.writeFile(htmlPath, assembledHtml);
+
+      // 3b. Runtime gate: seek the timeline and catch any thrown error. The vision
+      // critique can't see a callback that throws mid-animation (the frame still
+      // renders), so this is what catches the "broken" (vs "ugly") class of bug.
+      const runtime = await validateSceneRuntime({
+        htmlPath,
+        width: opts.canvas.width,
+        height: opts.canvas.height,
+        duration: currentScene.duration_seconds || 5,
+      });
+      if (!runtime.ok) {
+        console.warn(`  Scene ${opts.sceneIndex} runtime error @${(runtime.atTime ?? 0).toFixed(1)}s: ${runtime.error}`);
+      }
 
       // Video-only scene: extract frame directly from video file via ffmpeg
       // (Playwright can't load http:// video in file:// pages due to CORS)
@@ -1085,19 +1061,27 @@ async function critiqueAndRetryScene(opts: {
       // 5. Clean up temp files
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
 
-      // Track best attempt
-      if (critiqueResult.score > bestScore) {
-        bestScore = critiqueResult.score;
+      // Track best attempt. A scene that throws at runtime renders degraded, so
+      // it must never beat a runtime-clean attempt -- apply a large penalty so a
+      // clean scene always wins, even if its visual score is lower.
+      const effectiveScore = runtime.ok ? critiqueResult.score : critiqueResult.score - 100;
+      if (effectiveScore > bestScore) {
+        bestScore = effectiveScore;
         bestScene = currentScene;
         bestCustomSources = currentCustomSources;
         bestCritique = critiqueResult;
       }
 
-      // 6. If score >= 7, accept
-      if (critiqueResult.score >= 7) {
+      // 6. Accept only if the vision score passes AND the scene runs clean.
+      // A runtime error means the scene renders degraded even if it looks fine
+      // in the still frames -- force a revision regardless of the visual score.
+      if (critiqueResult.score >= 7 && runtime.ok) {
         console.log(`  Score ${critiqueResult.score} accepted`);
         opts.trace?.endEvent({ score: critiqueResult.score, accepted: true });
         break;
+      }
+      if (critiqueResult.score >= 7 && !runtime.ok) {
+        console.log(`  Score ${critiqueResult.score} but runtime error present -- forcing revision`);
       }
 
       // 7. Score < 7: surgical re-plan to fix issues
@@ -1108,9 +1092,12 @@ async function critiqueAndRetryScene(opts: {
       const existingPlanJSON = JSON.stringify(currentPlanned, null, 2);
       // Build list of valid library component types for the fix prompt
       const validTypeList = opts.catalog.map(c => c.type).join(', ');
+      const runtimeIssueBlock = !runtime.ok
+        ? `\n\n!! CRITICAL RUNTIME ERROR (must fix): the scene threw "${runtime.error}" when the animation was seeked to ${(runtime.atTime ?? 0).toFixed(1)}s. This is almost always a querySelector/getElementById/GSAP target that returned null and was used without a guard (e.g. el.textContent on a null element). In the regenerated scene, every DOM lookup MUST be null-guarded before use, and every GSAP tween/callback must target an element that actually exists in the template. A scene that throws renders degraded and is unacceptable.\n`
+        : "";
       const fixPrompt = `Fix this scene plan. The rendered output had these problems:
 
-${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}
+${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}${runtimeIssueBlock}
 
 Current plan:
 ${existingPlanJSON}
@@ -1299,6 +1286,37 @@ function buildCritiqueFeedback(critique: CritiqueResult): string {
 
 // ── Unified Pipeline ──
 
+/**
+ * Convert the planner's storyboard into the persisted ProjectPlan shape, so the
+ * plan/storyboard -- including each scene's suggested library component types --
+ * is recorded on the project for inspection and iteration. Used by both the
+ * plan-only and full generation paths so project.plan is always populated.
+ */
+function storyboardToPlan(
+  storyboard: { name: string; scenes: Array<any> },
+  voice?: string,
+): ProjectPlan {
+  return {
+    narrative: storyboard.name,
+    scenes: storyboard.scenes.map((s) => ({
+      label: s.label,
+      purpose: s.description || "",
+      template: "",
+      voiceover_text: s.voiceover_text,
+      duration_seconds: s.duration_seconds,
+      assets: [],
+      visual_notes: s.brief || s.description || "",
+      components: s.components || [],
+    })),
+    audio: {
+      music_mood: "corporate",
+      voice: voice || "nova",
+      pacing: "moderate",
+    },
+    estimated_duration: storyboard.scenes.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0),
+  };
+}
+
 async function runUnifiedPipeline(
   opts: PipelineOpts,
   brandKit: BrandKit,
@@ -1400,34 +1418,14 @@ async function runUnifiedPipeline(
 
   // ── Plan-only mode: save storyboard as plan and return early ──
   if (opts.planOnly) {
-    // Convert storyboard to ProjectPlan format
-    const plan: import("../core/types.js").ProjectPlan = {
-      narrative: storyboard.name,
-      scenes: storyboard.scenes.map(s => ({
-        label: s.label,
-        purpose: s.description || "",
-        template: "",  // templates removed from planner output
-        voiceover_text: s.voiceover_text,
-        duration_seconds: s.duration_seconds,
-        assets: [],
-        visual_notes: s.brief || s.description || "",
-      })),
-      audio: {
-        music_mood: "corporate",
-        voice: (opts.voice as string) || "nova",
-        pacing: "moderate",
-      },
-      estimated_duration: storyboard.scenes.reduce((sum, s) => sum + s.duration_seconds, 0),
-    };
-
-    project.plan = plan;
+    project.plan = storyboardToPlan(storyboard, opts.voice as string);
     project.brief = { prompt: opts.prompt };
     project.status = "planned";
     project.created_at = new Date().toISOString();
     project.updated_at = new Date().toISOString();
     await saveProject(project);
 
-    console.log(`  Plan-only mode: saved plan with ${plan.scenes.length} scenes to project ${projectId}`);
+    console.log(`  Plan-only mode: saved plan with ${project.plan.scenes.length} scenes to project ${projectId}`);
 
     return {
       status: "completed",
@@ -1516,15 +1514,6 @@ async function runUnifiedPipeline(
       if (planned.brief) {
         // Extract a concise narration from the brief (first sentence or label)
         fallbackVoiceover = planned.label?.replace(/^Scene \d+ - /, "") || planned.description || "";
-      }
-      if (planned.beats?.length) {
-        // For sequences, concatenate beat voiceover texts
-        var beatVoiceovers = planned.beats
-          .filter(function(b: any) { return b.voiceover_text; })
-          .map(function(b: any) { return b.voiceover_text; });
-        if (beatVoiceovers.length > 0) {
-          fallbackVoiceover = beatVoiceovers.join(" ");
-        }
       }
       if (fallbackVoiceover && fallbackVoiceover.length > 5) {
         planned.voiceover_text = fallbackVoiceover;
@@ -1874,6 +1863,11 @@ async function runUnifiedPipeline(
     trace?.endEvent();
   }
 
+  // Persist the planner's storyboard (briefs + suggested components) on the
+  // project so it's available for inspection and iteration after a full run,
+  // not just in plan-only mode.
+  project.plan = storyboardToPlan(storyboard, opts.voice as string);
+  project.brief = { prompt: opts.prompt };
   project.status = "generated";
   await saveProject(project);
 

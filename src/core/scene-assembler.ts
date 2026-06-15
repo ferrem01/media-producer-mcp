@@ -42,6 +42,83 @@ export interface AssembleOptions {
   speakerUrl?: string;
 }
 
+/** Component type prefixes that indicate an LLM-generated (codegen) scene. */
+const CODEGEN_TYPE_PREFIXES = ["scene_", "freeform_", "custom_", "template_"];
+
+export interface AssembleSceneAutoOptions extends AssembleOptions {
+  /** Component library dir, used to resolve <component> tags in codegen scenes. */
+  componentLibDir: string;
+}
+
+/**
+ * Load every library component (.component.html) so <component> tags inside a
+ * codegen scene can be resolved. Skips the shared/ utilities dir.
+ */
+export async function loadLibraryComponentSources(componentLibDir: string): Promise<ComponentSource[]> {
+  const out: ComponentSource[] = [];
+  try {
+    const cats = await fs.readdir(componentLibDir, { withFileTypes: true });
+    for (const cat of cats) {
+      if (!cat.isDirectory() || cat.name === "shared") continue;
+      const files = await fs.readdir(path.join(componentLibDir, cat.name));
+      for (const file of files) {
+        if (!file.endsWith(".component.html")) continue;
+        const type = file.replace(".component.html", "");
+        const source = await fs.readFile(path.join(componentLibDir, cat.name, file), "utf-8");
+        out.push({ type, source });
+      }
+    }
+  } catch (e: any) {
+    console.warn(`Failed to load library components from ${componentLibDir}: ${e.message}`);
+  }
+  return out;
+}
+
+/**
+ * Single entry point for assembling a scene to HTML.
+ *
+ * Detects whether the scene is an LLM-generated codegen scene -- a
+ * scene_/freeform_/custom_/template_ component whose source embeds <component>
+ * tags -- and, if so, loads the full component library and routes through
+ * assembleCodegenScene so nested library components resolve. Otherwise it uses
+ * the standard assembleScene path.
+ *
+ * This replaces three near-identical copies of this routing (render.ts,
+ * scene-worker.ts, pipeline.ts) that had drifted: the image/deck/gif/social
+ * path did not load the library, so nested library components were silently
+ * dropped from those formats.
+ */
+export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Promise<string> {
+  const { scene, components, brandKit, canvas, gsapDir, componentLibDir, preview, speakerUrl } = options;
+
+  const codegenComp = (scene.components || []).find((c) =>
+    CODEGEN_TYPE_PREFIXES.some((p) => c.type.startsWith(p)),
+  );
+  const codegenSource = codegenComp
+    ? components.find((cs) => cs.type === codegenComp.type)
+    : undefined;
+
+  if (codegenComp && codegenSource && codegenSource.source.includes("<component ")) {
+    const libSources = await loadLibraryComponentSources(componentLibDir);
+    return assembleCodegenScene({
+      sceneSource: codegenSource.source,
+      componentSources: [...libSources, ...components.filter((cs) => cs.type !== codegenComp.type)],
+      brandKit,
+      canvas,
+      duration: scene.duration_seconds || 5,
+      sceneId: scene.id,
+      gsapDir,
+      background: scene.background,
+      transparentBackground: scene.transparent_background,
+      backgroundVideo: scene.background_video,
+      preview,
+      speakerUrl,
+    });
+  }
+
+  return assembleScene({ scene, components, brandKit, canvas, gsapDir, preview, speakerUrl });
+}
+
 /**
  * Assemble a scene into a self-contained HTML document.
  */
@@ -422,7 +499,9 @@ ${tagResult.html}
     duration: ${duration},
     fps: 30,
     canvas: { width: ${canvas.width}, height: ${canvas.height} },
-    getComponentTimeline: __getComponentTimeline || function(id) { return gsap.timeline(); },
+    getComponentTimeline: (typeof __getComponentTimeline !== 'undefined'
+      ? __getComponentTimeline
+      : function(id) { return gsap.timeline(); }),
   };
 
   // Scene's own createTimeline
@@ -823,7 +902,14 @@ export function buildComponentScript(
       duration: ${duration},
       fps: ${canvas.fps},
       canvas: { width: ${canvas.width}, height: ${canvas.height} },
-      motion: "${options?.motion || "cinematic"}"
+      motion: "${options?.motion || "cinematic"}",
+      // Self-contained components may orchestrate nested sub-component timelines
+      // via ctx.getComponentTimeline(id). Provide the same fallback the scene-level
+      // ctx uses (empty timeline) so a missing/internal id is a no-op rather than
+      // a thrown "ctx.getComponentTimeline is not a function" that blocks __MP_READY.
+      getComponentTimeline: (typeof __getComponentTimeline !== 'undefined'
+        ? __getComponentTimeline
+        : function(id) { return gsap.timeline(); })
     };
 
     // Component's createTimeline function

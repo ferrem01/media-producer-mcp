@@ -23,11 +23,16 @@ project.json
 ├── project_id, tenant_id, name, format, status
 ├── canvas: { width, height, fps, preset }
 ├── brand_kit: { colors, fonts, logos, assets, style, guidelines }
+├── creative_bible: { concept, pattern, throughLine, emotionalArc, visualStyle }
+├── brief: { prompt, video_type, context, ... }
+├── plan: { narrative, scenes[{ label, visual_notes, components[], voiceover_text, duration_seconds }], audio }
 ├── scenes: Scene[]
 ├── audio: { tracks, ducking }
 ├── assets: Asset[]
 └── speaker_track: { clips[] }
 ```
+
+`creative_bible` (concept director) and `plan` (planner storyboard) are persisted on every generation -- both plan-only and full mode -- so the creative direction and the storyboard (including each scene's suggested library `components`) can be inspected and iterated after the fact, not just used transiently.
 
 ### Scene
 One segment of the timeline. Contains one or more components stacked by z_index.
@@ -39,25 +44,12 @@ Key fields:
 - `transparent_background` -- true for speaker scenes (content overlays the speaker video)
 - `content_region` -- constrains components to a region (e.g. right 42%) so the speaker is visible
 
-### Sequence
-A sequence is a special type of scene with multiple "beats" on one continuous GSAP timeline. Instead of generating separate scenes that get crossfaded together (which produces a slideshow feel), a sequence keeps elements on a persistent stage and transforms them across beats.
+### Continuous / Multi-Step Scenes (no separate "sequence" type)
+There is no distinct sequence/`beats` concept -- it was folded into ordinary codegen. A continuous multi-step moment (product walkthrough, demo flow, cause-and-effect) is just a **normal scene with a longer duration and a progression-style brief**. Because every scene is already authored as one self-contained `.component.html` with a single master GSAP timeline, the codegen LLM choreographs the steps itself: elements persist and transform across the scene (via `tl.addLabel(...)`) instead of disappearing between steps. Set `transition_in: "none"` so the take stays unbroken.
 
-Key fields on Scene:
-- `beats[]` -- array of SequenceBeat objects, each with label, brief, duration, and optional voiceover
-- When `beats` is present, the codegen generator writes ONE HTML document with a single master timeline where each beat is a labeled section
+The continuity guidance ("one master timeline; keep elements persistent; build → breathe → resolve") is part of the **general** codegen prompt, so it applies to every scene rather than being gated behind a special type.
 
-```typescript
-interface SequenceBeat {
-  label: string;           // GSAP timeline label
-  brief: string;           // what happens in this beat
-  duration_seconds: number;
-  voiceover_text?: string;
-}
-```
-
-Example: a 4-beat product walkthrough (25s total) generates one HTML file where the UI panel appears in beat 1, morphs in beat 2, fills with content in beat 3, and resolves with a success state in beat 4. No cuts, no transitions -- one continuous take.
-
-Use sequences for: product walkthroughs, multi-step demos, cause-and-effect narratives, any flow where elements should persist and transform.
+Example: a 25s product walkthrough is one scene whose brief reads as an ordered flow — the UI panel appears, morphs, fills with content, then resolves into a success state — and the codegen LLM lays that out on one timeline. No cuts, one continuous take.
 
 ### Component
 A self-contained visual element. Each is a `.component.html` file with three sections:
@@ -196,6 +188,10 @@ Every format shares:
 3. Concat segments (scene + transition + scene + ...) via ffmpeg
 4. Mix audio (voiceover, music, SFX with volume envelope ducking)
 
+**Seek resilience.** Frame capture seeks the master GSAP timeline per frame, which fires component callbacks. A fragile callback in one LLM-generated scene (e.g. setting `textContent` on a null element) is caught per-seek so it can't reject the capture and crash the whole multi-scene render -- the worker records the first error, warns once, and keeps rendering. The bad scene degrades; the video still completes.
+
+**Last-frame extraction.** Transition frames are pulled with an end-relative seek (`-sseof`), not a fixed `duration - 0.05s` offset, so it works at any fps (the old offset landed past the final frame at low fps and produced an empty frame).
+
 ### Speaker Track Render
 1. **Build speaker base** -- concat clips, scale to canvas, apply trim
 2. **Render all scenes as transparent PNGs** -- Playwright captures with `omitBackground: true`
@@ -208,7 +204,9 @@ Key insight: transitions only affect the content layer. The speaker video plays 
 
 ### Scene Assembly
 
-Two assembly paths depending on scene type:
+**Single entry point** (`assembleSceneAuto()`): the one routing decision used by every render path (video, image, deck, gif, social, email) and the critique preview. It detects whether the scene is a codegen scene -- a `scene_`/`freeform_`/`custom_`/`template_` component whose source embeds `<component>` tags -- and, if so, loads the full component library and routes through `assembleCodegenScene`; otherwise it uses `assembleScene`. This replaced three near-identical copies of the routing that had drifted (the image/deck/gif path previously skipped the library load, silently dropping nested library components).
+
+Two underlying assembly paths:
 
 **Standard assembly** (`assembleScene()`): takes a Scene definition with library component references, resolves each component from the library, binds data, scopes CSS, and builds a self-contained HTML document with a master GSAP timeline.
 
@@ -299,7 +297,9 @@ Prompt to finished project in multiple stages. One unified pipeline for all form
 3. **Plan Storyboard** (unified planner) -- brief + creative bible to multi-scene storyboard. Per-scene output: a visual brief describing what the viewer experiences, plus a list of library component types to embed via `<component>` tags. Picks transitions, sets speaker track flags, assigns content regions.
 4. **Media Enrichment** -- generates hero images (OpenAI gpt-image-1), captures screenshots, resolves assets. Runs between planning and scene generation.
 5. **Scene Generation** (unified codegen) -- every scene goes through the same agentic codegen path. The LLM receives the scene brief, component schemas for any suggested library components, design skills, and brand context. It writes a `.component.html` file that can embed library components via `<component>` tags alongside custom HTML/CSS/GSAP. Single tool: `submit_scene`.
-6. **Critique** -- vision-based review of rendered frames. Multi-pass with contact sheet (6 frames across timeline) for motion-aware evaluation. Can trigger scene revision with critique feedback injected into the retry prompt. Hard floor at score < 6 triggers a full template swap.
+6. **Critique** -- two complementary gates per scene:
+   - *Visual* (vision LLM): multi-pass with a contact sheet (6 frames across the timeline) for motion-aware evaluation. Can trigger scene revision with feedback injected into the retry prompt. Hard floor at score < 6 triggers a full template swap.
+   - *Runtime* (`validateSceneRuntime`): seeks the master timeline across the duration in a headless page and catches any thrown error (a callback hitting a null element). The vision model can't see a thrown exception -- the frame still renders -- so this catches "broken" where vision only catches "ugly". A scene is accepted only if the visual score passes **and** it runs clean; a runtime error forces a revision (error injected into the fix prompt) even at a high visual score, and a runtime-broken attempt never wins best-of. The codegen prompt also requires null-guarding every DOM lookup to prevent the error at the source.
 
 ### Unified Codegen Architecture
 
@@ -370,14 +370,15 @@ All LLM prompts are format-aware (video/image/deck/gif/social). Visual design ru
 
 ## MCP Tools
 
-13 tools exposed via MCP protocol:
-- **CRUD:** create, get, list, add, update, remove, reorder
-- **Brand:** brand kit management
-- **Render:** trigger renders, job status/wait
-- **Generate:** LLM-powered full project generation
+14 tools exposed via MCP protocol:
+- **CRUD:** create, get, list, add, update, reorder
+- **Brand:** `brand` (get/set brand kit), `extract_brand_from_website` (Playwright design-token extraction → brand kit)
+- **Render:** `render` (trigger renders)
+- **Job:** `job` (status/wait/list for async generate + render jobs)
+- **Generate:** LLM-powered generation; `mode` = plan | generate | full
 - **Capture:** screenshot URLs via Playwright, save as assets
 - **Audio:** TTS generation, track management
-- **Upload:** file upload for assets
+- **Upload:** file upload for assets (project or brand)
 
 ---
 
@@ -401,14 +402,15 @@ All LLM prompts are format-aware (video/image/deck/gif/social). Visual design ru
 src/
 ├── core/
 │   ├── types.ts              # all interfaces
-│   ├── scene-assembler.ts    # single scene → HTML (assembleScene + assembleCodegenScene)
+│   ├── scene-assembler.ts    # scene → HTML (assembleSceneAuto routing + assembleScene + assembleCodegenScene)
 │   ├── composite-assembler.ts # all scenes → single HTML doc
 │   ├── component-tags.ts     # <component> tag resolution for unified codegen
 │   ├── component-parser.ts   # parse .component.html (template/style/script)
 │   ├── render.ts             # standard render pipeline
 │   ├── speaker-track.ts      # speaker track render pipeline
 │   ├── capture.ts            # Playwright screenshot capture
-│   ├── scene-worker.ts       # child process frame capture (routes through codegen assembler)
+│   ├── scene-worker.ts       # child process frame capture (via assembleSceneAuto)
+│   ├── video-path.ts         # resolve video src URLs (file://, localhost, /assets) → fs path
 │   ├── contact-sheet.ts      # multi-frame contact sheet for motion critique
 │   └── normalize-urls.ts     # asset URL normalization
 ├── llm/
@@ -495,9 +497,24 @@ All strip `http(s)://localhost:<any-port>/` to `/` via regex. External URLs (cdn
 - **External URLs:** Full `https://...` (CDN, stock photos, etc.) -- left untouched
 - **Data paths:** `/data/media-producer/...` (server-side only, resolved by `resolveAudioUrl` in preview)
 
+### Render-Time Video Resolution
+
+At render the scene HTML is loaded via `file://`, so a normalized root-relative `/assets/...` video src resolves against the `file://` origin to `file:///assets/...`. `core/video-path.ts` (`resolveVideoPath`, shared by `scene-worker`, `capture`, `capture-worker`) strips `file://`/localhost prefixes and maps `/assets/{tenant}/...` back to the configured data dir (`MP_DATA_DIR`). Without this the renderer can't find videos referenced by their normalized URL and silently drops them.
+
 ### Tests
 
 `test/normalize-urls.test.ts` -- 13 tests covering single URL, deep object, HTML attribute, CSS url(), multiple occurrences, empty/external edge cases.
+
+### MCP End-to-End Smoke Tests
+
+Run the server over stdio and exercise it through real MCP tool calls (`npx tsx test/<name>.ts`). They spawn the built server in dev mode (auth stripped) and poll async jobs via `job` status rather than the SDK's default-timeout `wait`.
+
+- `test/mcp-client.ts` -- connection + tool listing + CRUD.
+- `test/title-scene-smoke.ts` -- generate an image title card.
+- `test/render-smoke.ts` -- render an existing project (PROJECT_ID / RENDER_FORMAT env).
+- `test/video-scene-smoke.ts` -- a scene with a video, via raw `<video>` and `<component type="video">`, referenced by a realistic `/assets/...` URL (guards the video-path resolution).
+- `test/transition-smoke.ts` -- a 2-scene crossfade at 15fps (guards low-fps last-frame extraction).
+- `test/brand-cycle-e2e.ts` -- full cycle: extract brand from a website → upload logo/background → `generate(full)` → `render`; asserts the extracted brand propagates to a valid MP4. Uses network + LLM (slow).
 
 ---
 
@@ -521,7 +538,7 @@ All strip `http(s)://localhost:<any-port>/` to `/` via regex. External URLs (cdn
 
 9. **Creative concept before scenes.** The concept director runs before the planner and commits to ONE creative idea. Without it, the planner generates disconnected scene ideas that feel like a slide deck. The creative bible (concept + pattern + through-line + emotional arc) is injected into the planner so all scenes serve one cohesive vision.
 
-10. **Sequences for continuity.** When multiple steps should flow as one continuous motion (walkthroughs, demos, cause-and-effect), the planner outputs a "sequence" -- a scene with multiple beats on one persistent stage. The codegen generator writes one HTML doc with one master GSAP timeline, and elements persist and transform across beats. This produces the premium "single take" feel that separate scenes + crossfades cannot achieve.
+10. **Continuity via codegen, not a sequence type.** Multi-step continuous motion (walkthroughs, demos, cause-and-effect) is just a normal scene with a longer duration and a progression brief. Since every scene is one self-contained `.component.html` with a single master GSAP timeline, the codegen LLM keeps elements persistent and transforms them across the scene (timeline labels) to get the "single take" feel. The old `beats[]`/sequence special case was removed -- continuity guidance now lives in the general codegen prompt and applies to all scenes.
 
 11. **Relative asset URLs only.** All internal asset URLs are stored and served as relative paths (`/assets/...`), never absolute localhost URLs. Enforced at four layers: source generation, data persistence, HTML assembly, and component save. See above.
 
@@ -557,7 +574,7 @@ Prioritized list of what's next. Updated as things ship.
 
 - [x] **Refactor 1: Fix Pipeline Data Loss** -- CreativeBible from concept-director gets flattened to prose and prepended to the planner prompt. Structured data (colorMood, motionPersonality, spatialStrategy) becomes text the LLM may ignore. Fix: pass CreativeBible as structured data through the entire pipeline.
 
-- [ ] **Refactor 2: Unify Scenes and Sequences** -- Sequences are a bolt-on parallel concept. The real issue was scene-assembler starting all component timelines at t=0. Fix: make choreography[] a first-class optional field on Scene. Extend scene-assembler to handle timed component visibility. Kill the "sequence" concept. A scene can be any length with optional choreographed timing. *Note: sequence-assembler.ts and sequence-converter.ts were deleted during Refactor 4, but beats[] still exists as a special case in the codegen pipeline rather than being first-class on Scene.*
+- [x] **Refactor 2: Unify Scenes and Sequences** -- The "sequence" concept is gone. Codegen already writes one master GSAP timeline per scene, so a multi-step continuous take is just a normal scene with a longer duration and a progression brief. Removed `Scene.beats`/`SequenceBeat`, the dead `Scene.choreography` field, `PlannedScene.beats`, and the sequence-specific planner/codegen prompt scaffolding; folded the continuity guidance (one timeline, persistent elements, build→breathe→resolve) into the general codegen prompt so it applies to every scene.
 
 - [x] **Refactor 3: Hybrid Codegen Path (Components as Building Blocks)** -- The `<component>` tag system lets the codegen LLM embed library components as building blocks inside custom scenes. Library components are composable, not just data-bindable. Shipped as the unified codegen pipeline.
 
@@ -566,7 +583,7 @@ Prioritized list of what's next. Updated as things ship.
 ### High Priority -- Features
 - [x] **Tenant Component Playground** -- three-panel layout with LLM-driven generation, chat iteration, schema-driven form editor, script builder, tenant CRUD. See [PLAYGROUND.md](./PLAYGROUND.md).
 - [x] **Creative concept director** -- generates ONE unifying creative concept before scene planning. 3 concepts at temp 0.9, self-selects best, outputs creative bible.
-- [x] **Sequence scenes** -- multi-beat continuous scenes for product walkthroughs and demos. Planner outputs beats, codegen generator builds one continuous HTML doc.
+- [x] **Continuous multi-step scenes** -- walkthroughs/demos are a normal scene with a longer duration + progression brief; codegen lays it out on one master timeline. (Superseded the old `beats`/sequence special case; see Refactor 2.)
 - [x] **Deterministic brand CSS injection** -- codegen generator uses var(--mp-color-*) exclusively, no hex values shown in prompt.
 - [ ] **Motion-aware critique** -- sample 5-9 frames across timeline instead of one still at midpoint. Add project-level consistency check across all scenes. *(Contact sheet generation is shipped; project-level consistency check is not yet implemented.)*
 - [ ] **Code-enforced mandatory behaviors** -- voiceover guaranteed per non-bookend scene, intro/outro exempt from critique, brand theme enforced deterministically.

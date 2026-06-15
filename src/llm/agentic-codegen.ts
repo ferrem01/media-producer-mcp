@@ -47,13 +47,6 @@ export interface AgenticCodegenOpts {
   critiqueFeedback?: string;
   referenceImages?: ReferenceImage[];
   creativeBible?: CreativeBible;
-  /** When present, this is a sequence scene with multiple beats */
-  beats?: Array<{
-    label: string;
-    brief: string;
-    duration_seconds: number;
-    voiceover_text?: string;
-  }>;
 }
 
 // ── Tool Definitions ──
@@ -300,6 +293,8 @@ Your submitted HTML must be a single .scene.html file with three sections:
 9. Do NOT use ghost/watermark text (large semi-transparent background words like "DATA", "CONNECT"). Use radial glows, grid patterns, accent lines, or grain for background texture instead.
 10. All text MUST have correct spacing. Never concatenate words.
 11. Use gsap.from() for entrances (elements arrive at their CSS position). IMPORTANT: set initial CSS to the FINAL state (opacity: 1, transform: none). Let GSAP animate FROM the hidden state.
+12. CONTINUITY: build ONE master GSAP timeline for the whole scene. For multi-step scenes, keep elements PERSISTENT -- morph/move/transform them across the scene using tl.addLabel('step-name', time) markers, rather than removing and rebuilding the DOM between steps. Aim for one continuous camera-take feel that BUILDS, BREATHES, then RESOLVES across the duration.
+13. NO RUNTIME ERRORS: the timeline is seeked to arbitrary times during render, which FIRES every callback. Any element you reference MUST exist. NEVER call .textContent/.style/.classList or pass a target to gsap on a querySelector/getElementById result without confirming it is non-null first (e.g. \`var b = el.querySelector('#badge'); if (b) b.textContent = n;\`). Only animate selectors that match elements actually present in your <template>. A scene that throws while seeking is a failure.
 
 ${brandVarsContext}
 ${opts.referenceImages?.length ? buildReferenceImageSummary(opts.referenceImages) + "\nReference images show the target visual design. Your HTML+CSS should match the layout, colors, typography, spacing, and component hierarchy shown in these references.\n" : ""}
@@ -316,49 +311,8 @@ Typography: ${opts.creativeBible.visualStyle.typographyAttitude}
 Motion: ${opts.creativeBible.visualStyle.motionPersonality}
 Spatial: ${opts.creativeBible.visualStyle.spatialStrategy}
 Through-line: ${opts.creativeBible.throughLine}
-` : ""}${opts.beats?.length ? buildSequenceInstructions(opts.beats) : ""}
+` : ""}
 `;
-}
-
-function buildSequenceInstructions(beats: Array<{ label: string; brief: string; duration_seconds: number; voiceover_text?: string }>): string {
-  var lines: string[] = [
-    "",
-    "## SEQUENCE SCENE -- Multi-Beat Continuous Take",
-    "",
-    "This is a SEQUENCE scene. You must create ONE HTML document with a single master GSAP timeline",
-    "that has MULTIPLE BEATS. Elements PERSIST and TRANSFORM across beats -- do NOT rebuild the DOM",
-    "between beats. Use timeline labels to mark each beat.",
-    "",
-    "Key rules for sequences:",
-    "- ONE HTML document, ONE createTimeline function, ONE master timeline",
-    "- Use tl.addLabel('beat-name', startTime) to mark each beat",
-    "- Elements that appear in beat 1 should MORPH/MOVE/TRANSFORM in beat 2, not disappear and reappear",
-    "- The whole point is continuity -- the viewer should feel like one continuous camera take",
-    "- Total duration is the sum of all beat durations",
-    "",
-    "Beats:",
-  ];
-
-  var runningTime = 0;
-  for (var beat of beats) {
-    lines.push(`  ${beat.label} (${runningTime}s - ${runningTime + beat.duration_seconds}s): ${beat.brief}`);
-    runningTime += beat.duration_seconds;
-  }
-
-  lines.push("");
-  lines.push("Example timeline structure:");
-  lines.push("  var tl = gsap.timeline();");
-  for (var i = 0; i < Math.min(beats.length, 3); i++) {
-    var beat = beats[i];
-    var start = beats.slice(0, i).reduce(function(sum, b) { return sum + b.duration_seconds; }, 0);
-    lines.push(`  tl.addLabel('${beat.label}', ${start});`);
-    lines.push(`  // ... animations for ${beat.label} beat ...`);
-  }
-  if (beats.length > 3) {
-    lines.push("  // ... remaining beats ...");
-  }
-
-  return lines.join("\n");
 }
 
 function buildBrandContext(brandKit: BrandKit): string {
