@@ -924,9 +924,29 @@ async function critiqueAndRetryScene(opts: {
       );
       const codegenSource = codegenComp ? componentSources.find(cs => cs.type === codegenComp.type) : null;
       if (codegenSource && codegenSource.source.includes('<component ')) {
+        // Load all library component sources for <component> tag resolution
+        const libSources: ComponentSource[] = [];
+        try {
+          const fsp = await import("node:fs/promises");
+          const pathMod = await import("node:path");
+          const cats = await fsp.readdir(config.componentLibDir, { withFileTypes: true });
+          for (const cat of cats) {
+            if (!cat.isDirectory() || cat.name === 'shared') continue;
+            const files = await fsp.readdir(pathMod.default.join(config.componentLibDir, cat.name));
+            for (const file of files) {
+              if (file.endsWith('.component.html')) {
+                const type = file.replace('.component.html', '');
+                const src = await fsp.readFile(pathMod.default.join(config.componentLibDir, cat.name, file), 'utf-8');
+                libSources.push({ type, source: src });
+              }
+            }
+          }
+        } catch (e: any) {
+          console.warn('  [critique] Failed to load library components:', e.message);
+        }
         assembledHtml = await assembleCodegenScene({
           sceneSource: codegenSource.source,
-          componentSources: componentSources.filter(cs => cs.type !== codegenComp!.type),
+          componentSources: [...libSources, ...componentSources.filter(cs => cs.type !== codegenComp!.type)],
           brandKit: opts.brandKit,
           canvas: opts.canvas,
           duration: currentScene.duration_seconds || 5,
