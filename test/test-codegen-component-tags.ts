@@ -1,14 +1,14 @@
 /**
  * Isolated test: Does the codegen loop produce <component> tags?
  *
- * Calls generateFreeformAgentic with a scene brief that clearly
+ * Calls generateSceneAgentic with a scene brief that clearly
  * needs library components (chat panel, dashboard metrics), then
  * checks if the output HTML contains <component> tags.
  *
  * Usage: npx tsx test/test-codegen-component-tags.ts
  */
 
-import { generateFreeformAgentic } from "../src/llm/freeform-agentic.js";
+import { generateSceneAgentic } from "../src/llm/agentic-codegen.js";
 import { llmConfigFromEnv } from "../src/llm/client.js";
 
 async function main() {
@@ -52,7 +52,7 @@ The chat should appear first, then the dashboard slides in from the right after 
 
   const startTime = Date.now();
 
-  const html = await generateFreeformAgentic({
+  const html = await generateSceneAgentic({
     sceneBrief,
     sceneLabel: "AI Marketing Assistant Demo",
     sceneDescription: "Split-screen chat + dashboard showing AI-powered marketing",

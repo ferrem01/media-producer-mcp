@@ -1,8 +1,8 @@
 /**
- * Agentic Freeform Scene Generator
+ * Agentic Scene Codegen
  *
- * Multi-turn agentic loop for freeform scene generation. The LLM gets tools
- * to search and read our component/template library, studies relevant
+ * Multi-turn agentic loop for scene generation. The LLM gets tools
+ * to search and read our component library, studies relevant
  * references, then writes the scene HTML. Like Claude Code reading files
  * before writing code.
  */
@@ -17,7 +17,7 @@ import {
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
 // Templates disabled -- LLM should use search_library to find components, not browse templates
 // import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
-import { getDesignSkills } from "./freeform-skills.js";
+import { getDesignSkills } from "./design-skills.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
 import type { CreativeBible } from "./concept-director.js";
 import {
@@ -33,7 +33,7 @@ const COMPONENTS_ROOT = path.resolve(__dirname, "..", "components");
 
 // ── Types ──
 
-export interface AgenticFreeformOpts {
+export interface AgenticCodegenOpts {
   sceneBrief: string;
   sceneLabel: string;
   sceneDescription: string;
@@ -316,7 +316,7 @@ function executeSubmitScene(html: string): { valid: boolean; html: string; error
 
 // ── System Prompt Builder ──
 
-function buildAgenticSystemPrompt(opts: AgenticFreeformOpts): string {
+function buildAgenticSystemPrompt(opts: AgenticCodegenOpts): string {
   var designSkills = getDesignSkills();
   var brandVarsContext = buildBrandContext(opts.brandKit);
 
@@ -417,12 +417,18 @@ Notice: quotient-chat and code-editor use <component> tags. Only the background,
 
 ## Your Process
 
+If the brief below already includes component schemas (under "Component Schemas"), go straight to building:
+1. BUILD your scene HTML using <component> tags for every listed component, filling data from the provided schemas
+2. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
+3. SUBMIT via the submit_scene tool
+
+If the brief does NOT include component schemas, discover them first:
 1. SEARCH for components matching your scene's UI elements (search_library) — schemas are included in results
 2. BUILD your scene HTML using <component> tags for every matched UI element, filling data from the schemas
 3. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
 4. SUBMIT via the submit_scene tool
 
-Only call read_source if a data schema from search results is unclear. In most cases, search results give you everything you need.
+Only call read_source if a data schema from search results is unclear. In most cases, search results or the brief give you everything you need.
 
 ## Design Skills (FOLLOW THESE RULES)
 
@@ -575,8 +581,8 @@ const MAX_ITERATIONS = 8;
 
 // presearchLibrary removed -- LLM uses search_library tool directly
 
-export async function generateFreeformAgentic(
-  opts: AgenticFreeformOpts,
+export async function generateSceneAgentic(
+  opts: AgenticCodegenOpts,
 ): Promise<string> {
   var systemPrompt = buildAgenticSystemPrompt(opts);
 
@@ -621,7 +627,7 @@ Start by calling search_library for the main UI elements in this scene, then wri
   ];
 
   console.log(
-    `  [agentic] Scene ${opts.sceneIndex + 1}: starting agentic loop for "${opts.sceneLabel}"`,
+    `  [agentic] Scene ${opts.sceneIndex + 1}: starting codegen for "${opts.sceneLabel}"`,
   );
 
   var lastHtml: string | null = null;
@@ -779,6 +785,6 @@ Start by calling search_library for the main UI elements in this scene, then wri
   }
 
   throw new Error(
-    `Agentic freeform generation failed after ${MAX_ITERATIONS} iterations without producing HTML`,
+    `Agentic codegen failed after ${MAX_ITERATIONS} iterations without producing HTML`,
   );
 }

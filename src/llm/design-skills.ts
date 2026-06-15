@@ -1,9 +1,8 @@
 /**
- * Freeform Skills Loader
+ * Design Skills Loader
  *
  * Loads the visual storytelling guide and design skills document
  * for injection into planner and scene generator prompts.
- * These replace the template-menu approach with skill-guided freeform generation.
  */
 
 import fs from "node:fs";

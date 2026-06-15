@@ -156,7 +156,7 @@ export interface Scene {
   /** Path to stock footage video for scene background */
   background_video?: string;
   /** When present, this scene is a "sequence" -- a multi-beat continuous take.
-   *  The freeform generator writes one HTML doc with a master timeline that
+   *  The scene generator writes one HTML doc with a master timeline that
    *  has labeled sections for each beat. Elements persist and transform
    *  across beats instead of being replaced. */
   beats?: SequenceBeat[];

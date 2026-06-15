@@ -2,7 +2,7 @@
  * Component Reference Library
  *
  * Provides curated production component source code as reference examples
- * for the freeform scene generator. The LLM studies these patterns
+ * for the scene codegen generator. The LLM studies these patterns
  * (shadows, easing, layout, GSAP techniques) and adapts them — it does
  * NOT copy-paste template structure.
  */

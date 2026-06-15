@@ -7,7 +7,9 @@
  */
 
 import type { LLMConfig } from "./client.js";
-import { generateFreeformAgentic } from "./freeform-agentic.js";
+import { generateSceneAgentic } from "./agentic-codegen.js";
+import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
+import { config } from "../config.js";
 import type { PlannedScene } from "./unified-planner.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import type { CreativeBible } from "./concept-director.js";
@@ -44,36 +46,32 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
 
   // ── Unified Codegen Path (always active) ──
-  // All scenes go through the freeform-agentic generator
+  // All scenes go through the agentic codegen generator
   // which can use <component> tags to embed library components.
-  var codegenBrief = buildCodegenBrief(planned);
-  var codegenPlanned = {
-    ...planned,
-    freeform: true,
-    freeform_brief: codegenBrief,
-  };
+  var codegenBrief = await buildCodegenBrief(planned);
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (unified codegen)`);
-  return await generateFreeformScene(opts, codegenPlanned, sceneId);
+  return await generateCodegenScene(opts, planned, codegenBrief, sceneId);
 }
 
 // ── Freeform Scene Generation ──
 
-async function generateFreeformScene(
+async function generateCodegenScene(
   opts: SceneGeneratorOpts,
   planned: PlannedScene,
+  codegenBrief: string,
   sceneId: string,
 ): Promise<GeneratedScene> {
-  var compName = `freeform_${sceneId}`;
+  var compName = `scene_${sceneId}`;
 
-  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (freeform-agentic)`);
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (agentic-codegen)`);
 
   // Build the brief: for sequences, combine beat briefs into one rich brief
-  var effectiveBrief = planned.freeform_brief || planned.description;
-  if (planned.beats?.length) {
+  var effectiveBrief = codegenBrief;
+  if (planned.beats?.length && !effectiveBrief.includes("SEQUENCE")) {
     effectiveBrief = `SEQUENCE: ${planned.beats.map(function(b) { return b.label + ": " + b.brief; }).join(" -> ")}`;
   }
 
-  var sceneHtml = await generateFreeformAgentic({
+  var sceneHtml = await generateSceneAgentic({
     sceneBrief: effectiveBrief,
     sceneLabel: planned.label,
     sceneDescription: planned.description,
@@ -111,7 +109,7 @@ async function generateFreeformScene(
     components: [{
       id: "comp_0",
       type: compName,
-      data: planned.template_data || {},
+      data: {},
       z_index: 10,
     }],
   };
@@ -143,48 +141,63 @@ function buildBrandContext(brandKit: BrandKit): string {
 // ── Unified Codegen Brief Builder ──
 
 /**
- * Build a rich freeform brief from any planned scene type.
+ * Build a rich codegen brief from any planned scene type.
  * Converts template, library component, sequence, or custom scene
- * descriptions into a brief the freeform-agentic generator can use
+ * descriptions into a brief the agentic codegen generator can use
  * with <component> tags.
  */
-function buildCodegenBrief(planned: any): string {
+async function buildCodegenBrief(planned: any): Promise<string> {
   var parts: string[] = [];
 
   parts.push(`Scene: "${planned.label}"`);
   parts.push(`Duration: ${planned.duration_seconds || 5} seconds`);
   if (planned.description) parts.push(`Description: ${planned.description}`);
 
-  // Template scene: tell the LLM to use a component tag or recreate the template look
-  if (planned.template) {
-    parts.push(`\nThis scene should use the "${planned.template}" template style.`);
-    if (planned.template_data) {
-      parts.push(`Content to fill in:`);
-      for (var [key, value] of Object.entries(planned.template_data)) {
-        parts.push(`  - ${key}: ${JSON.stringify(value)}`);
-      }
-    }
+  // Visual brief from the planner
+  if (planned.brief) {
+    parts.push(`\nVisual Direction:\n${planned.brief}`);
   }
 
-  // Library components: tell the LLM to use <component> tags
+  // Component hints: look up schemas from catalog and include them
   if (planned.components?.length > 0) {
-    var libComps = planned.components.filter((c: any) => !c.custom && c.type);
-    var customComps = planned.components.filter((c: any) => c.custom);
-
-    if (libComps.length > 0) {
-      parts.push(`\nUse these library components via <component> tags:`);
-      for (var lc of libComps) {
-        var dataStr = lc.data ? ` with data: ${JSON.stringify(lc.data)}` : "";
-        parts.push(`  - <component type="${lc.type}"${dataStr} />`);
-        if (lc.position) parts.push(`    Position: ${JSON.stringify(lc.position)}`);
-      }
+    var componentTypes: string[] = planned.components;
+    parts.push(`\nUse these library components via <component> tags:`);
+    for (var compType of componentTypes) {
+      parts.push(`  - <component type="${compType}" />`);
     }
 
-    if (customComps.length > 0) {
-      parts.push(`\nAlso create custom elements:`);
-      for (var cc of customComps) {
-        parts.push(`  - ${cc.custom_prompt || "Custom visual element"}`);
+    // Look up component schemas from the catalog so the LLM has them upfront
+    try {
+      var catalog = await buildComponentCatalog(config.componentLibDir);
+      var catalogMap = new Map<string, ComponentCatalogEntry>();
+      for (var entry of catalog) {
+        catalogMap.set(entry.type, entry);
       }
+
+      var schemasFound: string[] = [];
+      for (var ct of componentTypes) {
+        var catalogEntry = catalogMap.get(ct);
+        if (catalogEntry && catalogEntry.data && Object.keys(catalogEntry.data).length > 0) {
+          var schemaLines: string[] = [];
+          schemaLines.push(`### ${ct}`);
+          if (catalogEntry.description) schemaLines.push(catalogEntry.description);
+          schemaLines.push(`Embed: <component type="${ct}" data='{...}' />`);
+          schemaLines.push("Data fields:");
+          for (var [fieldName, field] of Object.entries(catalogEntry.data)) {
+            var reqStr = field.required ? " (required)" : " (optional)";
+            var typeStr = field.type;
+            if (field.items) typeStr += `<${field.items.type}>`;
+            schemaLines.push(`  - ${fieldName}: ${typeStr}${reqStr}`);
+          }
+          schemasFound.push(schemaLines.join("\n"));
+        }
+      }
+
+      if (schemasFound.length > 0) {
+        parts.push(`\n## Component Schemas\n\n${schemasFound.join("\n\n")}`);
+      }
+    } catch (e: any) {
+      console.warn("  [buildCodegenBrief] Failed to load catalog for schemas:", e.message);
     }
   }
 
@@ -198,11 +211,6 @@ function buildCodegenBrief(planned: any): string {
     }
     parts.push(`Use <component> tags for each UI element, then choreograph them with GSAP.`);
     parts.push(`Show/hide/move components at beat boundaries using ctx.getComponentTimeline().`);
-  }
-
-  // Freeform brief: pass through
-  if (planned.freeform_brief) {
-    parts.push(`\nVisual Direction:\n${planned.freeform_brief}`);
   }
 
   // Voiceover hint

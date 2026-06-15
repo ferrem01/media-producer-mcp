@@ -19,7 +19,7 @@
  */
 
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
-import { getStorytellingGuide } from "./freeform-skills.js";
+import { getStorytellingGuide } from "./design-skills.js";
 import type { BrandKit, OutputFormat, ReferenceImage } from "../core/types.js";
 import {
   buildReferenceImageParts,

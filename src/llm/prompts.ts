@@ -394,7 +394,7 @@ ${SCENE_TEMPLATES}
 }
 
 /**
- * DEPRECATED: Was the freeform planner prompt, now replaced by unified-planner.ts.
+ * DEPRECATED: Was the old planner prompt, now replaced by unified-planner.ts.
  * The LLM writes full HTML+CSS+GSAP per scene with complete creative freedom.
  */
 function isLightBackground(brandKit: BrandKit): boolean {

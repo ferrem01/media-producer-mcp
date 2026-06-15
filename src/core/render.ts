@@ -32,15 +32,15 @@ async function assembleSceneOrSequence(options: {
 }): Promise<string> {
   const { scene } = options;
 
-  // Check if any freeform/custom component source contains <component> tags (unified codegen path)
+  // Check if any scene/custom component source contains <component> tags (unified codegen path)
   if (scene.components?.length > 0) {
     for (const comp of scene.components) {
-      if (comp.type.startsWith('freeform_') || comp.type.startsWith('custom_') || comp.type.startsWith('template_')) {
-        const freeformSource = options.components.find(cs => cs.type === comp.type);
-        if (freeformSource && freeformSource.source.includes('<component ')) {
+      if (comp.type.startsWith('scene_') || comp.type.startsWith('freeform_') || comp.type.startsWith('custom_') || comp.type.startsWith('template_')) {
+        const codegenSource = options.components.find(cs => cs.type === comp.type);
+        if (codegenSource && codegenSource.source.includes('<component ')) {
           console.log(`  [render] Using codegen assembler for "${scene.label || scene.id}" (has <component> tags)`);
           return assembleCodegenScene({
-            sceneSource: freeformSource.source,
+            sceneSource: codegenSource.source,
             componentSources: options.components.filter(cs => cs.type !== comp.type),
             brandKit: options.brandKit,
             canvas: options.canvas,
@@ -84,7 +84,7 @@ export interface RenderOptions {
   /** Output file path */
   outputPath: string;
 
-  /** Additional directories to search for component sources (e.g. project-local freeform components) */
+  /** Additional directories to search for component sources (e.g. project-local scene components) */
   extraComponentDirs?: string[];
 
   /** When true, skip scene rendering and only re-apply audio mix to existing output */
@@ -1358,7 +1358,7 @@ async function findComponentSource(
   componentLibDir: string,
   extraDirs?: string[],
 ): Promise<string | null> {
-  // Search extra dirs first (project-local freeform components take priority)
+  // Search extra dirs first (project-local scene components take priority)
   if (extraDirs) {
     for (const dir of extraDirs) {
       try {

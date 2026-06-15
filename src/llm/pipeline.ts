@@ -692,11 +692,8 @@ async function runImageRevisionPipeline(
           label: revisionPlan.label,
           duration_seconds: revisionPlan.duration_seconds,
           description: planned.custom_prompt || opts.prompt,
-          components: [{
-            custom: true,
-            custom_prompt: planned.custom_prompt || opts.prompt,
-            z_index: planned.z_index ?? 10,
-          }],
+          brief: planned.custom_prompt || opts.prompt,
+          components: [],
         },
         sceneIndex: 0,
         totalScenes: 1,
@@ -1117,44 +1114,21 @@ Output valid JSON only. No markdown fences, no commentary.`;
       }
 
       // Validate fix-plan component types against catalog
+      // Validate components: ensure string array of valid types
       const fixValidTypes = new Set(opts.catalog.map(c => c.type));
       fixValidTypes.add('image');
-      const validatedComps: any[] = [];
-      for (const comp of fixedPlan.components) {
-        if (comp.custom) {
-          validatedComps.push(comp);
-        } else if (comp.type && fixValidTypes.has(comp.type)) {
-          validatedComps.push(comp);
-        } else if (comp.type) {
-          console.log(`  Fix-plan: stripping invalid component type "${comp.type}"`);
-        }
-      }
-      fixedPlan.components = validatedComps;
-      if (fixedPlan.components.length === 0) {
-        console.log(`  Fix-plan: all components invalid after validation, keeping best (score ${bestScore})`);
-        break;
+      if (fixedPlan.components && Array.isArray(fixedPlan.components)) {
+        // Normalize: if LLM returned old-style objects, extract type names
+        fixedPlan.components = fixedPlan.components
+          .map((c: any) => typeof c === "string" ? c : (c.type || ""))
+          .filter((t: string) => t.length > 0 && fixValidTypes.has(t));
+      } else {
+        fixedPlan.components = [];
       }
 
-      // Enforce all-custom at high creativity
-      if ((opts.creativity ?? 0) >= 0.7) {
-        const hasCustom = fixedPlan.components.some((c: any) => c.custom);
-        if (hasCustom) {
-          // Strip library components
-          const before = fixedPlan.components.length;
-          fixedPlan.components = fixedPlan.components.filter((c: any) => c.custom);
-          if (fixedPlan.components.length < before) {
-            console.log(`  Critique fix: stripped ${before - fixedPlan.components.length} library components (all-custom mode)`);
-          }
-        } else {
-          // Convert entire plan to one custom component
-          console.log(`  Critique fix: no custom components at high creativity, converting to custom`);
-          const desc = fixedPlan.description || fixedPlan.label || opts.prompt;
-          fixedPlan.components = [{
-            custom: true,
-            custom_prompt: desc,
-            z_index: 10,
-          }];
-        }
+      // Ensure brief exists
+      if (!fixedPlan.brief) {
+        fixedPlan.brief = fixedPlan.description || fixedPlan.label || opts.prompt;
       }
 
       // Use the fixed plan
@@ -1213,12 +1187,9 @@ Output valid JSON only. No markdown fences, no commentary.`;
         label: currentPlanned.label || `Scene ${opts.sceneIndex + 1}`,
         duration_seconds: currentPlanned.duration_seconds || 5,
         description: currentPlanned.description || opts.prompt,
+        brief: `${currentPlanned.description || opts.prompt}\n\nDESIGN MANDATE: Keep it simple. One bold visual idea. Large readable text on a high-contrast background. No more than 10 words visible. Use var(--mp-color-text) on var(--mp-color-background) for guaranteed contrast.`,
         transition_in: currentPlanned.transition_in,
-        components: [{
-          custom: true,
-          custom_prompt: `${currentPlanned.description || opts.prompt}\n\nDESIGN MANDATE: Keep it simple. One bold visual idea. Large readable text on a high-contrast background. No more than 10 words visible. Use var(--mp-color-text) on var(--mp-color-background) for guaranteed contrast.`,
-          z_index: 10,
-        }],
+        components: [],
       };
 
       const swapped = await generateScene({
@@ -1395,11 +1366,11 @@ async function runUnifiedPipeline(
       scenes: storyboard.scenes.map(s => ({
         label: s.label,
         purpose: s.description || "",
-        template: s.template || "",
+        template: "",  // templates removed from planner output
         voiceover_text: s.voiceover_text,
         duration_seconds: s.duration_seconds,
         assets: [],
-        visual_notes: s.freeform_brief || s.description || "",
+        visual_notes: s.brief || s.description || "",
       })),
       audio: {
         music_mood: "corporate",
@@ -1490,7 +1461,7 @@ async function runUnifiedPipeline(
       (si === storyboard.scenes.length - 1 && (labelLower.includes("closing") || labelLower.includes("cta") || labelLower.includes("end")));
 
     // Also detect video-only bookends (brand animations)
-    if (planned.components?.length === 1 && planned.components[0].type === "video") {
+    if (planned.components?.length === 1 && planned.components[0] === "video") {
       isBookend = true;
     }
 
@@ -1502,7 +1473,7 @@ async function runUnifiedPipeline(
     if (!isBookend && !planned.voiceover_text && planned.duration_seconds >= 3) {
       // Generate voiceover text from the scene description
       var fallbackVoiceover = planned.description || planned.label || "";
-      if (planned.freeform_brief) {
+      if (planned.brief) {
         // Extract a concise narration from the brief (first sentence or label)
         fallbackVoiceover = planned.label?.replace(/^Scene \d+ - /, "") || planned.description || "";
       }

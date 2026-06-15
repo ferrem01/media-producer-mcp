@@ -5,7 +5,7 @@
  * Traces are written to tenant-specific JSONL files and a global system file.
  *
  * Modeled after video-producer-mcp's trace system, adapted for media-producer's
- * multi-format pipeline (components, scenes, projects, presentations, freeform).
+ * multi-format pipeline (components, scenes, projects, presentations).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -30,7 +30,7 @@ export type OperationType =
   | "expand"
   | "plan_project"
   | "plan_scene"
-  | "plan_freeform"
+  | "plan_scene_codegen"
   | "component_generate"
   | "critique"
   | "render"

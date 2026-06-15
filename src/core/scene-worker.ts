@@ -84,7 +84,7 @@ interface WorkerArgs {
   format?: string;
   /** Original prompt for critique context */
   originalPrompt?: string;
-  /** Extra directories to search for component sources (e.g. freeform project-local) */
+  /** Extra directories to search for component sources (e.g. project-local scene components) */
   extraComponentDirs?: string[];
   /**
    * When true, capture frames as PNGs with alpha transparency instead of JPEG.
@@ -403,7 +403,7 @@ async function main() {
 }
 
 async function findComponentSource(type: string, libDir: string, extraDirs?: string[]): Promise<string | null> {
-  // Check extra dirs first (project-local freeform components)
+  // Check extra dirs first (project-local scene components)
   if (extraDirs) {
     for (var dir of extraDirs) {
       try {
