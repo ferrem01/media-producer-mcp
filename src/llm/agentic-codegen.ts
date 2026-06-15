@@ -358,6 +358,25 @@ function buildBrandContext(brandKit: BrandKit): string {
       `Motion: ${brandKit.style.motion || "cinematic"}`,
     );
   }
+  if (brandKit.logos?.length) {
+    lines.push(
+      "",
+      "## Brand Logos (render the REAL asset -- never redraw, invent, or approximate the logo)",
+      "When a logo belongs in the scene, render it as a real image element pointing at the EXACT url below:",
+      '  <img src="<url>" alt="logo" style="height:64px;width:auto;display:block;" />',
+      "Available logo variants:",
+    );
+    for (var logo of brandKit.logos) {
+      lines.push(`  - ${logo.name} (${logo.variant}, ${logo.theme} theme): ${logo.url}`);
+    }
+    lines.push(
+      "Placement rules:",
+      "  - Opening, closing, and brand/CTA scenes: feature the 'full' or 'wordmark' variant prominently and animate it in.",
+      "  - Other content scenes: optionally place the 'icon' variant small (~36-48px) in a top or bottom corner as a subtle, low-opacity watermark.",
+      "  - Pick the variant whose theme fits the background: dark background -> 'light' or 'any'; light background -> 'dark' or 'any'.",
+      "  - Animate the logo's container (opacity/scale/position) -- do NOT distort the logo image itself.",
+    );
+  }
   return lines.join("\n");
 }
 
