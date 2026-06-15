@@ -32,6 +32,42 @@ function parse(result: any): any {
   }
 }
 
+/**
+ * Poll a job to completion via short `job status` requests.
+ *
+ * We intentionally do NOT use the `job` tool's `wait` action: that blocks
+ * server-side in a single MCP request for the full duration, which exceeds the
+ * MCP client SDK's default per-request timeout (~60s) on longer renders (e.g.
+ * video). Polling keeps each request short and lets us wait as long as needed.
+ */
+async function pollJob(
+  client: Client,
+  jobId: string,
+  opts: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<any> {
+  const timeoutMs = opts.timeoutMs ?? 600_000;
+  const intervalMs = opts.intervalMs ?? 3_000;
+  const start = Date.now();
+  let lastStep = "";
+  while (Date.now() - start < timeoutMs) {
+    const res = await client.callTool({
+      name: "job",
+      arguments: { action: "status", job_id: jobId },
+    });
+    const job = parse(res);
+    if (job.progress) {
+      const tag = `${job.progress.step} ${job.progress.percent}%`;
+      if (tag !== lastStep) {
+        console.log(`  ...${tag}`);
+        lastStep = tag;
+      }
+    }
+    if (job.status === "completed" || job.status === "failed") return job;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error(`Polling timed out after ${timeoutMs}ms (job ${jobId})`);
+}
+
 async function main() {
   console.log("=== Render Smoke Test ===\n");
   console.log("  project:", PROJECT_ID, RENDER_FORMAT ? `(format override: ${RENDER_FORMAT})` : "");
@@ -62,12 +98,8 @@ async function main() {
     console.log("  ", JSON.stringify(queued));
     if (!queued.job_id) throw new Error("No job_id returned from render: " + JSON.stringify(queued));
 
-    console.log(`\n-- waiting for render job ${queued.job_id} --`);
-    const waited = await client.callTool({
-      name: "job",
-      arguments: { action: "wait", job_id: queued.job_id, timeout_seconds: 300 },
-    });
-    const job = parse(waited);
+    console.log(`\n-- polling render job ${queued.job_id} --`);
+    const job = await pollJob(client, queued.job_id, { timeoutMs: 600_000 });
     console.log("  status:", job.status);
     if (job.progress) console.log("  progress:", JSON.stringify(job.progress));
     if (job.error) console.log("  error:", job.error);
