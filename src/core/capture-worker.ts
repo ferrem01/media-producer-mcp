@@ -46,36 +46,28 @@ interface VideoElementInfo {
   index: number;
 }
 
-const DATA_DIR = "/data/media-producer";
+const DATA_DIR = process.env.MP_DATA_DIR || "/data/media-producer";
 
 /**
  * Convert a video src URL to a filesystem path.
- * Handles file:// URLs and http://localhost:3200 URLs.
+ * Handles file:// URLs, http://localhost URLs, and normalized /assets/... URLs.
+ * The scene HTML loads via file://, so a root-relative /assets/... src resolves
+ * to file:///assets/...; strip file://localhost and map /assets/... to DATA_DIR.
  */
 function resolveVideoPath(src: string): string {
-  // file:// URL -> strip prefix
-  if (src.startsWith("file://")) {
-    return src.slice(7);
-  }
+  let p = src;
+  if (p.startsWith("file://")) p = p.slice(7);
+  p = p.replace(/^https?:\/\/localhost:\d+/, "");
 
-  // http://localhost:3200/assets/{tenant}/projects/{projectId}/assets/{file}
-  const projMatch = src.match(
-    /^https?:\/\/localhost:\d+\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/
-  );
-  if (projMatch) {
-    return path.join(DATA_DIR, projMatch[1], "projects", projMatch[2], "assets", projMatch[3]);
-  }
+  let m: RegExpMatchArray | null;
+  if ((m = p.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/)))
+    return path.join(DATA_DIR, m[1], "projects", m[2], "assets", m[3]);
+  if ((m = p.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/)))
+    return path.join(DATA_DIR, m[1], "brand-kit", "assets", m[2]);
+  if ((m = p.match(/^\/assets\/([^/]+)\/assets\/(.+)$/)))
+    return path.join(DATA_DIR, m[1], "assets", m[2]);
 
-  // http://localhost:3200/assets/{tenant}/brand-kit/{rest}
-  const brandMatch = src.match(
-    /^https?:\/\/localhost:\d+\/assets\/([^/]+)\/brand-kit\/(.+)$/
-  );
-  if (brandMatch) {
-    return path.join(DATA_DIR, brandMatch[1], "brand-kit", "assets", brandMatch[2]);
-  }
-
-  // Already a filesystem path
-  return src;
+  return p;
 }
 
 /**

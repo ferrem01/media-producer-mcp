@@ -20,7 +20,7 @@ import crypto from "node:crypto";
 
 var execFileAsync = promisify(execFile);
 
-const DATA_DIR = "/data/media-producer";
+const DATA_DIR = process.env.MP_DATA_DIR || "/data/media-producer";
 
 interface ExtractedVideo {
   framesDir: string;
@@ -28,12 +28,25 @@ interface ExtractedVideo {
 }
 
 function resolveVideoPath(src: string): string {
-  if (src.startsWith("file://")) return src.slice(7);
-  const projMatch = src.match(/^https?:\/\/localhost:\d+\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
-  if (projMatch) return path.join(DATA_DIR, projMatch[1], "projects", projMatch[2], "assets", projMatch[3]);
-  const brandMatch = src.match(/^https?:\/\/localhost:\d+\/assets\/([^/]+)\/brand-kit\/(.+)$/);
-  if (brandMatch) return path.join(DATA_DIR, brandMatch[1], "brand-kit", "assets", brandMatch[2]);
-  return src;
+  // Reduce to a root-absolute path. The scene HTML is loaded via file://, so a
+  // root-relative /assets/... src resolves against the file:// origin to
+  // file:///assets/...; localhost origins may also appear. Strip both so the
+  // /assets/... mapping below applies regardless of how the URL was rendered.
+  let p = src;
+  if (p.startsWith("file://")) p = p.slice(7);
+  p = p.replace(/^https?:\/\/localhost:\d+/, "");
+
+  // Map normalized /assets/... asset URLs to the configured data dir.
+  let m: RegExpMatchArray | null;
+  if ((m = p.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/)))
+    return path.join(DATA_DIR, m[1], "projects", m[2], "assets", m[3]);
+  if ((m = p.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/)))
+    return path.join(DATA_DIR, m[1], "brand-kit", "assets", m[2]);
+  if ((m = p.match(/^\/assets\/([^/]+)\/assets\/(.+)$/)))
+    return path.join(DATA_DIR, m[1], "assets", m[2]);
+
+  // Absolute filesystem path or external URL -- use as-is.
+  return p;
 }
 
 async function extractVideoFrames(videoPath: string, fps: number): Promise<ExtractedVideo> {
