@@ -823,7 +823,14 @@ export function buildComponentScript(
       duration: ${duration},
       fps: ${canvas.fps},
       canvas: { width: ${canvas.width}, height: ${canvas.height} },
-      motion: "${options?.motion || "cinematic"}"
+      motion: "${options?.motion || "cinematic"}",
+      // Self-contained components may orchestrate nested sub-component timelines
+      // via ctx.getComponentTimeline(id). Provide the same fallback the scene-level
+      // ctx uses (empty timeline) so a missing/internal id is a no-op rather than
+      // a thrown "ctx.getComponentTimeline is not a function" that blocks __MP_READY.
+      getComponentTimeline: (typeof __getComponentTimeline !== 'undefined'
+        ? __getComponentTimeline
+        : function(id) { return gsap.timeline(); })
     };
 
     // Component's createTimeline function
