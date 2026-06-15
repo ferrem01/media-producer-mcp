@@ -68,6 +68,7 @@ async function generateCodegenScene(
   // Build the brief: for sequences, combine beat briefs into one rich brief
   var effectiveBrief = codegenBrief;
   console.log("  [codegen-brief] Scene \"" + planned.label + "\" has " + (planned.components?.length || 0) + " component hints, brief includes schemas: " + effectiveBrief.includes("Component Schemas"));
+  console.log("  [codegen-brief] Full brief length:", effectiveBrief.length, "chars");
   if (planned.beats?.length && !effectiveBrief.includes("SEQUENCE")) {
     effectiveBrief = `SEQUENCE: ${planned.beats.map(function(b) { return b.label + ": " + b.brief; }).join(" -> ")}`;
   }
@@ -188,7 +189,21 @@ async function buildCodegenBrief(planned: any): Promise<string> {
             var reqStr = field.required ? " (required)" : " (optional)";
             var typeStr = field.type;
             if (field.items) typeStr += `<${field.items.type}>`;
-            schemaLines.push(`  - ${fieldName}: ${typeStr}${reqStr}`);
+            var extra = "";
+            if ((field as any).placeholder) extra += ` e.g. "${(field as any).placeholder}"`;
+            if ((field as any).default !== undefined) extra += ` default: ${JSON.stringify((field as any).default)}`;
+            if ((field as any).enum) extra += ` values: ${(field as any).enum.join(", ")}`;
+            schemaLines.push(`  - ${fieldName}: ${typeStr}${reqStr}${extra}`);
+
+            // Include nested object properties for array items
+            if (field.items && (field.items as any).properties) {
+              for (var [propName, prop] of Object.entries((field.items as any).properties)) {
+                var p = prop as any;
+                var propReq = p.required ? " (required)" : "";
+                var propEnum = p.enum ? ` values: ${p.enum.join(", ")}` : "";
+                schemaLines.push(`      - ${propName}: ${p.type}${propReq}${propEnum}`);
+              }
+            }
           }
           schemasFound.push(schemaLines.join("\n"));
         }
