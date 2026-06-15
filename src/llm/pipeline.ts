@@ -35,7 +35,7 @@ import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { fetchStockFootage, generateStockQuery } from "../media/stock-footage.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
-import type { BrandKit, Canvas, OutputFormat, Project, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, Project, ProjectPlan, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
@@ -1262,6 +1262,37 @@ function buildCritiqueFeedback(critique: CritiqueResult): string {
 
 // ── Unified Pipeline ──
 
+/**
+ * Convert the planner's storyboard into the persisted ProjectPlan shape, so the
+ * plan/storyboard -- including each scene's suggested library component types --
+ * is recorded on the project for inspection and iteration. Used by both the
+ * plan-only and full generation paths so project.plan is always populated.
+ */
+function storyboardToPlan(
+  storyboard: { name: string; scenes: Array<any> },
+  voice?: string,
+): ProjectPlan {
+  return {
+    narrative: storyboard.name,
+    scenes: storyboard.scenes.map((s) => ({
+      label: s.label,
+      purpose: s.description || "",
+      template: "",
+      voiceover_text: s.voiceover_text,
+      duration_seconds: s.duration_seconds,
+      assets: [],
+      visual_notes: s.brief || s.description || "",
+      components: s.components || [],
+    })),
+    audio: {
+      music_mood: "corporate",
+      voice: voice || "nova",
+      pacing: "moderate",
+    },
+    estimated_duration: storyboard.scenes.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0),
+  };
+}
+
 async function runUnifiedPipeline(
   opts: PipelineOpts,
   brandKit: BrandKit,
@@ -1363,34 +1394,14 @@ async function runUnifiedPipeline(
 
   // ── Plan-only mode: save storyboard as plan and return early ──
   if (opts.planOnly) {
-    // Convert storyboard to ProjectPlan format
-    const plan: import("../core/types.js").ProjectPlan = {
-      narrative: storyboard.name,
-      scenes: storyboard.scenes.map(s => ({
-        label: s.label,
-        purpose: s.description || "",
-        template: "",  // templates removed from planner output
-        voiceover_text: s.voiceover_text,
-        duration_seconds: s.duration_seconds,
-        assets: [],
-        visual_notes: s.brief || s.description || "",
-      })),
-      audio: {
-        music_mood: "corporate",
-        voice: (opts.voice as string) || "nova",
-        pacing: "moderate",
-      },
-      estimated_duration: storyboard.scenes.reduce((sum, s) => sum + s.duration_seconds, 0),
-    };
-
-    project.plan = plan;
+    project.plan = storyboardToPlan(storyboard, opts.voice as string);
     project.brief = { prompt: opts.prompt };
     project.status = "planned";
     project.created_at = new Date().toISOString();
     project.updated_at = new Date().toISOString();
     await saveProject(project);
 
-    console.log(`  Plan-only mode: saved plan with ${plan.scenes.length} scenes to project ${projectId}`);
+    console.log(`  Plan-only mode: saved plan with ${project.plan.scenes.length} scenes to project ${projectId}`);
 
     return {
       status: "completed",
@@ -1837,6 +1848,11 @@ async function runUnifiedPipeline(
     trace?.endEvent();
   }
 
+  // Persist the planner's storyboard (briefs + suggested components) on the
+  // project so it's available for inspection and iteration after a full run,
+  // not just in plan-only mode.
+  project.plan = storyboardToPlan(storyboard, opts.voice as string);
+  project.brief = { prompt: opts.prompt };
   project.status = "generated";
   await saveProject(project);
 

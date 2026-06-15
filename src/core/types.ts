@@ -309,6 +309,8 @@ export interface PlannedScene {
   assets: PlannedAsset[];
   /** Visual description for the storyboard */
   visual_notes: string;
+  /** Library component types the planner suggested embedding in this scene */
+  components?: string[];
 }
 
 export type PlannedAssetType =
