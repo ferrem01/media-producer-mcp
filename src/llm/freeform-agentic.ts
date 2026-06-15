@@ -78,7 +78,7 @@ const TOOLS: LLMTool[] = [
   {
     name: "read_source",
     description:
-      "Read a component's full source code. Use this to see the data props, HTML structure, CSS, and GSAP timeline so you can embed it with a <component> tag and fill in the data fields correctly.",
+      "Read a component's full source code. Only use this if the data schema from search_library is unclear or you need to understand complex internal behavior. In most cases, the schema from search results is sufficient to fill in data fields.",
     input_schema: {
       type: "object",
       properties: {
@@ -191,17 +191,55 @@ async function executeSearchLibrary(
     return `No results found for "${query}". Try different keywords. Available categories: ${[...new Set(index.map((i) => i.category))].join(", ")}`;
   }
 
+  // Load schemas for matched components
+  if (!_componentCatalog) {
+    _componentCatalog = await buildComponentCatalog(COMPONENTS_ROOT);
+  }
+  var catalogMap = new Map<string, ComponentCatalogEntry>();
+  for (var entry of _componentCatalog) {
+    catalogMap.set(entry.type, entry);
+  }
+
   var lines: string[] = [`Found ${results.length} components for "${query}":\n`];
 
   for (var r of results) {
     var item = r.item;
-    lines.push(`- **${item.name}** (${item.category}): ${item.description}`);
-    lines.push(`  → EMBED: <component type="${item.name}" data='{...}' />`);
-    lines.push(`  → NEXT: call read_source("${item.name}") to see data props and example usage`);
+    var catalogEntry = catalogMap.get(item.name);
+    lines.push(`### ${item.name} (${item.category})`);
+    lines.push(`${item.description}`);
+    lines.push(``);
+    lines.push(`**Embed:** \`<component type="${item.name}" data='{...}' />\``);
+
+    // Inline the data schema so LLM can fill fields immediately
+    if (catalogEntry && catalogEntry.data && Object.keys(catalogEntry.data).length > 0) {
+      lines.push(``);
+      lines.push(`**Data fields:**`);
+      for (var [fieldName, field] of Object.entries(catalogEntry.data)) {
+        var reqStr = field.required ? " (required)" : " (optional)";
+        var typeStr = field.type;
+        if (field.items) typeStr += `<${field.items.type}>`;
+        var extra = "";
+        if (field.placeholder) extra += ` e.g. "${field.placeholder}"`;
+        if ((field as any).default !== undefined) extra += ` default: ${JSON.stringify((field as any).default)}`;
+        if ((field as any).enum) extra += ` values: ${(field as any).enum.join(", ")}`;
+        lines.push(`  - \`${fieldName}\`: ${typeStr}${reqStr}${extra}`);
+
+        // Show nested object properties for array items
+        if (field.items && (field.items as any).properties) {
+          for (var [propName, prop] of Object.entries((field.items as any).properties)) {
+            var p = prop as any;
+            var propReq = p.required ? " (required)" : "";
+            var propEnum = p.enum ? ` values: ${p.enum.join(", ")}` : "";
+            lines.push(`      - \`${propName}\`: ${p.type}${propReq}${propEnum}`);
+          }
+        }
+      }
+    }
+    lines.push(``);
   }
 
   lines.push("");
-  lines.push("ACTION REQUIRED: For each component above that matches your scene, call read_source to learn the data fields, then use a <component> tag in your HTML.");
+  lines.push("You now have the data schemas above. Use <component> tags with the correct data fields. Only call read_source if a schema is unclear.");
   return lines.join("\n");
 }
 
@@ -285,33 +323,15 @@ function buildAgenticSystemPrompt(opts: AgenticFreeformOpts): string {
   return `You are an expert motion graphics designer creating a single video scene as HTML+CSS+GSAP.
 Your output will be captured frame-by-frame by Playwright at ${opts.canvas.width}x${opts.canvas.height} and encoded to video.
 
-## Your Process (FOLLOW THIS ORDER)
+## Component Tags (USE THESE FIRST)
 
-1. SEARCH for components matching your scene's UI elements (search_library)
-2. For EACH matching component, READ its source (read_source) to learn its data props
-3. BUILD your scene HTML using <component> tags for every matched UI element, filling data props with scene-specific content
-4. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
-5. SUBMIT via the submit_scene tool
+Your scene MUST use <component> tags for any UI element that exists in the component library.
+Do NOT rebuild from scratch what already exists. Writing custom HTML for a library component is a bug.
 
-CRITICAL: Steps 1-2 come FIRST. You MUST call read_source on every component you plan to use.
-Do NOT skip read_source -- you need to see the data fields to fill them correctly.
-Only write custom code for things that have NO matching component in the library.
-
-## Design Skills (FOLLOW THESE RULES)
-
-${designSkills}
-
-## Component Tags (REQUIRED when a library component matches)
-
-MANDATORY RULE: If the scene needs a UI element that exists in the component library (chat panels, editors,
-dashboards, charts, code editors, kanban boards, etc.), you MUST search for it and use a <component> tag.
-Do NOT rebuild it from scratch. Writing custom HTML for something that already exists in the library is a bug.
-
-Use <component> tags for the UI building blocks. Write custom code for:
-- Layout and positioning of components on the canvas
-- Transitions, reveals, and choreography between components
-- Decorative elements (backgrounds, particles, overlays)
-- Anything truly unique that has no library match
+### How It Works
+1. Call search_library to find matching components — results include data schemas
+2. Embed matches using \`<component type="name" data='{...}' />\` with the data fields from the schema
+3. Write custom code only for layout, transitions, backgrounds, and elements with no library match
 
 The result is HYBRID: <component> tags for known UI + custom code for everything else.
 
@@ -327,66 +347,32 @@ The result is HYBRID: <component> tags for known UI + custom code for everything
 \`\`\`
 
 ### Rules
-- The \`type\` must match a component from the library (use search_library to find it)
-- The \`data\` attribute is a JSON string with the component's data props
+- The \`type\` must match a component from search_library results
+- The \`data\` attribute is a JSON string — fill fields from the schema returned by search_library
 - Components auto-generate internal GSAP timelines
-- Access component timelines in your createTimeline via: ctx.getComponentTimeline('comp_0')
-- Component IDs are auto-assigned: comp_0, comp_1, comp_2... in order of appearance
+- Access component timelines via: ctx.getComponentTimeline('comp_0')
+- Component IDs are auto-assigned: comp_0, comp_1, comp_2... in DOM order
 - You can add \`class\` and \`style\` attributes to the <component> tag for positioning
-- You can mix <component> tags with fully custom HTML/CSS/GSAP in the same scene
-- You MUST use <component> tags for any UI that matches a library component. This is not optional.
-- If search_library returns a matching component, USE IT via <component> tag. Do not rewrite it from scratch.
-- Write custom code ONLY for layout, transitions, overlays, decorative elements, and truly unique visuals
-- A scene with chat/conversation content MUST search for and use a chat component
-- A scene with a code editor MUST search for and use a code editor component
-- A scene with charts MUST search for and use a chart component
-- A scene with a dashboard MUST search for and use dashboard components
-- ALWAYS call read_source on a component before embedding it, so you fill data fields correctly
+- Chat scenes MUST use a chat component. Dashboard scenes MUST use dashboard components.
+- Code editor scenes MUST use a code editor component. Chart scenes MUST use chart components.
 
 ### Timeline Integration
 \`\`\`javascript
 function createTimeline(el, data, ctx) {
   var tl = gsap.timeline();
-  // ctx.getComponentTimeline('comp_0') returns the component's internal timeline
-  // Add it at a specific time to choreograph when the component animates
   tl.add(ctx.getComponentTimeline('comp_0'), 0);    // chat animates from t=0
   tl.add(ctx.getComponentTimeline('comp_1'), 5);    // editor animates from t=5
-  // You can also control component visibility with GSAP
   gsap.set('[data-comp-id="comp_1"]', { opacity: 0 });
   tl.to('[data-comp-id="comp_1"]', { opacity: 1, duration: 0.8 }, 5);
   return tl;
 }
 \`\`\`
 
-## Example Workflow (FOLLOW THIS PATTERN)
-
-Here is exactly how you should work through a scene that needs a chat panel:
-
-1. You call: search_library("chat conversation panel")
-   → Result: Found quotient-chat (data-viz): Simulated AI chat conversation...
-   → Result says: call read_source("quotient-chat") to see data props
-
-2. You call: read_source("quotient-chat")
-   → You see the data schema: conversation_title, messages[], user_avatar, mode, accent_color...
-   → You see how createTimeline works internally
-
-3. You write your scene using a <component> tag with the data fields filled in:
-   <component type="quotient-chat" data='{"conversation_title": "Campaign Brief", "messages": [{"role": "user", "text": "Draft a LinkedIn post"}, {"role": "agent", "text": "Here is a compelling draft..."}]}' />
-
-This is NOT optional. If search_library finds a match, you MUST read_source it before writing.
-
-## Output Format
-
-Your submitted HTML must be a single .scene.html file with three sections.
-
-### EXAMPLE: A scene using <component> tags (THIS is what good output looks like)
-
+### Example: Hybrid Scene (component tags + custom code)
 \`\`\`html
 <template>
   <div class="scene">
     <div class="bg"></div>
-
-    <!-- Chat panel: EMBEDDED from library -->
     <div class="left-panel">
       <component type="quotient-chat" data='{
         "conversation_title": "Q3 Campaign",
@@ -398,22 +384,16 @@ Your submitted HTML must be a single .scene.html file with three sections.
         "mode": "panel"
       }' />
     </div>
-
-    <!-- Code editor: EMBEDDED from library -->
     <div class="right-panel">
       <component type="code-editor" data='{
         "filename": "post.html",
         "language": "html",
-        "code": "<article>\n  <h2>Q3 Results</h2>\n</article>",
-        "theme": "dark"
+        "code": "<article>\\n  <h2>Q3 Results</h2>\\n</article>"
       }' />
     </div>
-
-    <!-- Custom connector (no library component for this) -->
     <div class="beam"></div>
   </div>
 </template>
-
 <style scoped>
   .scene { width: 100%; height: 100%; position: relative; overflow: hidden; }
   .bg { position: absolute; inset: 0; background: linear-gradient(135deg, #0f172a, #1e1b4b); }
@@ -421,7 +401,6 @@ Your submitted HTML must be a single .scene.html file with three sections.
   .right-panel { position: absolute; right: 40px; top: 40px; width: 45%; height: calc(100% - 80px); opacity: 0; }
   .beam { position: absolute; top: 50%; left: 47%; width: 6%; height: 2px; background: #818cf8; opacity: 0; }
 </style>
-
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
@@ -436,13 +415,33 @@ Your submitted HTML must be a single .scene.html file with three sections.
 
 Notice: quotient-chat and code-editor use <component> tags. Only the background, layout, and beam are custom.
 
-### Minimal format (for scenes where NO library components match)
+## Your Process
+
+1. SEARCH for components matching your scene's UI elements (search_library) — schemas are included in results
+2. BUILD your scene HTML using <component> tags for every matched UI element, filling data from the schemas
+3. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
+4. SUBMIT via the submit_scene tool
+
+Only call read_source if a data schema from search results is unclear. In most cases, search results give you everything you need.
+
+## Design Skills (FOLLOW THESE RULES)
+
+${designSkills}
+
+## Output Format
+
+Your submitted HTML must be a single .scene.html file with three sections:
 
 \`\`\`html
-<template><!-- fully custom HTML --></template>
-<style scoped>/* CSS */</style>
+<template><!-- HTML with <component> tags and custom elements --></template>
+<style scoped>/* CSS for layout, backgrounds, custom elements */</style>
 <script>
-  function createTimeline(el, data, ctx) { var tl = gsap.timeline(); return tl; }
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    // Wire component timelines and add custom animations
+    tl.add(ctx.getComponentTimeline('comp_0'), 0);
+    return tl;
+  }
 </script>
 \`\`\`
 
@@ -601,8 +600,8 @@ ${opts.sceneBrief}
 - All text MUST have correct spacing. Never concatenate words. Check every text string for missing spaces.
 - Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
 ${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
-CRITICAL: Before writing ANY UI element, search the component library. If a matching component exists, call read_source to learn its data props, then use <component type=... data='...' />. Do NOT rebuild from scratch what already exists in the library.
-Start by calling search_library for the main UI elements in this scene. Then call read_source on each match. Only then write your scene HTML.`;
+CRITICAL: Before writing ANY UI element, search the component library first. If a matching component exists, use <component type=... data='...' /> with the data fields from the search results. Do NOT rebuild from scratch.
+Start by calling search_library for the main UI elements in this scene, then write your scene HTML using the component tags and schemas from the results.`;
 
   // Build user message: include reference images as vision content if available
   var userContent: string | LLMContentPart[];
@@ -728,18 +727,8 @@ Start by calling search_library for the main UI elements in this scene. Then cal
         content: toolResults,
       });
 
-      // Synthetic nudge: if search found components but LLM hasn't read any yet
-      var unreadComponents = Array.from(searchHits).filter(function(n) { return !readSources.has(n); });
-      if (unreadComponents.length > 0 && !response.toolCalls.some(function(tc) { return tc.name === "read_source"; })) {
-        var nudge = "You found matching components: " + unreadComponents.join(", ") + ". You MUST call read_source on each before proceeding. Do NOT write custom HTML for these -- read the source first so you know the data fields.";
-        messages.push({
-          role: "user",
-          content: nudge,
-        });
-        console.log(
-          "  [agentic] Scene " + (opts.sceneIndex + 1) + ": injected read_source nudge for: " + unreadComponents.join(", "),
-        );
-      }
+      // Synthetic nudge: if search found components but LLM is about to submit without using them
+      // (No longer requires read_source -- schemas are inline in search results)
 
       continue;
     }
