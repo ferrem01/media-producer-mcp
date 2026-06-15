@@ -68,8 +68,7 @@ export interface BrandAsset {
 export interface BrandKit {
   colors: BrandColors;
   fonts: BrandFont[];
-  logo?: BrandLogo;       // primary logo (backwards compat)
-  logos?: BrandLogo[];     // all logo variants
+  logos?: BrandLogo[];     // all logo variants (full/icon/wordmark, dark/light/any)
   assets?: BrandAsset[];  // brand assets (backgrounds, intros, outros, watermarks, music)
   style?: {
     border_radius?: string;
