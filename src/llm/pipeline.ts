@@ -43,7 +43,7 @@ import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./crit
 import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
-import { captureSingleFrame } from "../core/capture.js";
+import { captureSingleFrame, validateSceneRuntime } from "../core/capture.js";
 import os from "node:os";
 
 // Keep old imports for backwards compat (deprecated functions still exist in their files)
@@ -937,6 +937,19 @@ async function critiqueAndRetryScene(opts: {
 
       await fs.writeFile(htmlPath, assembledHtml);
 
+      // 3b. Runtime gate: seek the timeline and catch any thrown error. The vision
+      // critique can't see a callback that throws mid-animation (the frame still
+      // renders), so this is what catches the "broken" (vs "ugly") class of bug.
+      const runtime = await validateSceneRuntime({
+        htmlPath,
+        width: opts.canvas.width,
+        height: opts.canvas.height,
+        duration: currentScene.duration_seconds || 5,
+      });
+      if (!runtime.ok) {
+        console.warn(`  Scene ${opts.sceneIndex} runtime error @${(runtime.atTime ?? 0).toFixed(1)}s: ${runtime.error}`);
+      }
+
       // Video-only scene: extract frame directly from video file via ffmpeg
       // (Playwright can't load http:// video in file:// pages due to CORS)
       const isVideoOnly = currentScene.components.length === 1 &&
@@ -1048,19 +1061,27 @@ async function critiqueAndRetryScene(opts: {
       // 5. Clean up temp files
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
 
-      // Track best attempt
-      if (critiqueResult.score > bestScore) {
-        bestScore = critiqueResult.score;
+      // Track best attempt. A scene that throws at runtime renders degraded, so
+      // it must never beat a runtime-clean attempt -- apply a large penalty so a
+      // clean scene always wins, even if its visual score is lower.
+      const effectiveScore = runtime.ok ? critiqueResult.score : critiqueResult.score - 100;
+      if (effectiveScore > bestScore) {
+        bestScore = effectiveScore;
         bestScene = currentScene;
         bestCustomSources = currentCustomSources;
         bestCritique = critiqueResult;
       }
 
-      // 6. If score >= 7, accept
-      if (critiqueResult.score >= 7) {
+      // 6. Accept only if the vision score passes AND the scene runs clean.
+      // A runtime error means the scene renders degraded even if it looks fine
+      // in the still frames -- force a revision regardless of the visual score.
+      if (critiqueResult.score >= 7 && runtime.ok) {
         console.log(`  Score ${critiqueResult.score} accepted`);
         opts.trace?.endEvent({ score: critiqueResult.score, accepted: true });
         break;
+      }
+      if (critiqueResult.score >= 7 && !runtime.ok) {
+        console.log(`  Score ${critiqueResult.score} but runtime error present -- forcing revision`);
       }
 
       // 7. Score < 7: surgical re-plan to fix issues
@@ -1071,9 +1092,12 @@ async function critiqueAndRetryScene(opts: {
       const existingPlanJSON = JSON.stringify(currentPlanned, null, 2);
       // Build list of valid library component types for the fix prompt
       const validTypeList = opts.catalog.map(c => c.type).join(', ');
+      const runtimeIssueBlock = !runtime.ok
+        ? `\n\n!! CRITICAL RUNTIME ERROR (must fix): the scene threw "${runtime.error}" when the animation was seeked to ${(runtime.atTime ?? 0).toFixed(1)}s. This is almost always a querySelector/getElementById/GSAP target that returned null and was used without a guard (e.g. el.textContent on a null element). In the regenerated scene, every DOM lookup MUST be null-guarded before use, and every GSAP tween/callback must target an element that actually exists in the template. A scene that throws renders degraded and is unacceptable.\n`
+        : "";
       const fixPrompt = `Fix this scene plan. The rendered output had these problems:
 
-${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}
+${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}${runtimeIssueBlock}
 
 Current plan:
 ${existingPlanJSON}

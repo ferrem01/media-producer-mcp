@@ -294,6 +294,7 @@ Your submitted HTML must be a single .scene.html file with three sections:
 10. All text MUST have correct spacing. Never concatenate words.
 11. Use gsap.from() for entrances (elements arrive at their CSS position). IMPORTANT: set initial CSS to the FINAL state (opacity: 1, transform: none). Let GSAP animate FROM the hidden state.
 12. CONTINUITY: build ONE master GSAP timeline for the whole scene. For multi-step scenes, keep elements PERSISTENT -- morph/move/transform them across the scene using tl.addLabel('step-name', time) markers, rather than removing and rebuilding the DOM between steps. Aim for one continuous camera-take feel that BUILDS, BREATHES, then RESOLVES across the duration.
+13. NO RUNTIME ERRORS: the timeline is seeked to arbitrary times during render, which FIRES every callback. Any element you reference MUST exist. NEVER call .textContent/.style/.classList or pass a target to gsap on a querySelector/getElementById result without confirming it is non-null first (e.g. \`var b = el.querySelector('#badge'); if (b) b.textContent = n;\`). Only animate selectors that match elements actually present in your <template>. A scene that throws while seeking is a failure.
 
 ${brandVarsContext}
 ${opts.referenceImages?.length ? buildReferenceImageSummary(opts.referenceImages) + "\nReference images show the target visual design. Your HTML+CSS should match the layout, colors, typography, spacing, and component hierarchy shown in these references.\n" : ""}
