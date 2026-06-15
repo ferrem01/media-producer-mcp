@@ -694,7 +694,7 @@
   <button data-view="render">Render Pipeline</button>
   <button data-view="scenes">Unified Codegen</button>
   <button data-view="components">Component Library</button>
-  <button data-view="templates">Scene Templates</button>
+  <button data-view="templates">Scene Templates (retired)</button>
   <button data-view="pipelines">Codegen Pipeline</button>
   <button data-view="mcp">MCP Tools</button>
   <button data-view="data">Data Model</button>
@@ -819,7 +819,7 @@
           <br><br>
           <strong>1.</strong> <code>buildCodegenBrief()</code> — assembles the scene brief, creative bible, brand kit, and component catalog into a codegen prompt.
           <br>
-          <strong>2.</strong> Freeform-agentic multi-turn LLM — generates HTML+CSS+GSAP with access to tools: <code>search_library</code> (find components), <code>read_source</code> (read component/template source), and <code>submit_scene</code> (deliver final output).
+          <strong>2.</strong> Freeform-agentic multi-turn LLM — generates HTML+CSS+GSAP with access to tools: <code>search_library</code> (find components with inline data schemas), <code>read_source</code> (optional — read component source for complex cases), and <code>submit_scene</code> (deliver final output). Typical flow: search → submit in 2 iterations.
           <br>
           <strong>3.</strong> <code>&lt;component&gt;</code> tag resolution — the assembler resolves any <code>&lt;component type="..." data='...' /&gt;</code> tags in the LLM output to real component HTML/CSS/JS at render time.
           <br><br>
@@ -1390,15 +1390,56 @@
     </div>
   </div>
 
-  <h3>Codegen Output Structure</h3>
+  <h3>Agentic Codegen Flow</h3>
+  <p class="description">The codegen LLM uses a tool-call loop to search the component library, get data schemas, and build the scene. Typical flow is 2 iterations: search then submit.</p>
+
+  <div class="pipeline">
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--primary)"></div><div class="pipeline-connector"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">Iteration 1: Search <span class="pipeline-badge badge-llm">LLM tool call</span></div>
+        <div class="step-desc">
+          LLM calls <code>search_library("chat conversation panel")</code> and <code>search_library("dashboard KPI metrics")</code>.
+          <br><br>
+          Search results return <strong>inline data schemas</strong> for each matching component: field names, types, required/optional, defaults, enums, and nested object properties. The LLM gets everything it needs to fill in <code>data='{...}'</code> without reading source code.
+        </div>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--accent)"></div><div class="pipeline-connector" style="display:none"></div></div>
+      <div class="pipeline-card">
+        <div class="step-name">Iteration 2: Submit <span class="pipeline-badge badge-llm">LLM tool call</span></div>
+        <div class="step-desc">
+          LLM calls <code>submit_scene({ html: "..." })</code> with the final HTML containing:
+          <ul style="margin-top:8px; padding-left:18px; font-size:13px; color:var(--text-dim);">
+            <li><code>&lt;component type="quotient-chat" data='{...}' /&gt;</code> — embedded from library</li>
+            <li><code>&lt;component type="dashboard-kpi" data='{...}' /&gt;</code> — embedded from library</li>
+            <li>Custom HTML/CSS for layout, backgrounds, transitions, decorative elements</li>
+            <li>GSAP timeline choreographing component entrances via <code>ctx.getComponentTimeline('comp_0')</code></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px; padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:10px; font-size:13px; color:var(--text-dim);">
+    <strong style="color:var(--text);">Optional: read_source</strong> — If a data schema from search results is unclear or the LLM needs to understand complex internal behavior, it can call <code>read_source("component-name")</code> to see the full HTML/CSS/GSAP source. This adds an extra iteration but is rarely needed.
+  </div>
+
+  <h3 style="margin-top:32px;">Codegen Output Structure</h3>
   <div class="concept-grid">
     <div class="concept-card">
       <h4>📝 Planner Brief</h4>
       <p>The unified planner writes a rich visual brief per scene: what the viewer experiences, which library components to consider, motion descriptions, and timing. This brief drives the codegen LLM.</p>
     </div>
     <div class="concept-card">
+      <h4>🔍 search_library</h4>
+      <p>Returns matching components with <strong>inline data schemas</strong>: field names, types, required/optional, defaults, enums, nested properties. The LLM can fill <code>&lt;component&gt;</code> data props directly from search results.</p>
+    </div>
+    <div class="concept-card">
       <h4>🤖 LLM Codegen</h4>
-      <p>The freeform-agentic LLM reads the brief, searches the component library, reads component/template source code for reference, then writes complete HTML+CSS+GSAP. It can use <code>&lt;component&gt;</code> tags for library components or write everything from scratch.</p>
+      <p>The freeform-agentic LLM searches the library, gets schemas inline, then writes hybrid HTML: <code>&lt;component&gt;</code> tags for matched UI + custom code for layout, transitions, and unique elements. Typically 2 iterations.</p>
     </div>
     <div class="concept-card">
       <h4>🏗️ Assembler Resolution</h4>
@@ -1530,35 +1571,35 @@
 </section>
 
 
-<!-- ════════════════ SCENE TEMPLATES ════════════════ -->
+<!-- ════════════════ SCENE TEMPLATES (RETIRED) ════════════════ -->
 <section class="view" id="view-templates">
-  <h2>Scene Templates</h2>
+  <h2>Scene Templates <span style="font-size:14px; color:var(--text-dim); font-weight:400;">(retired)</span></h2>
   <p class="description">
-    37 pre-composed scene blueprints with premium visuals, animation, and timing baked in.
-    Templates exist as source code that the codegen LLM can read via the <code>read_source</code> tool
-    for reference and inspiration when generating scenes.
+    Templates were retired in favor of the component-first codegen approach. The LLM now searches the component library,
+    gets inline data schemas from search results, and embeds components via <code>&lt;component&gt;</code> tags.
+    Templates are no longer exposed to the codegen LLM as a tool option.
   </p>
 
   <div class="template-explainer">
-    <h4>Components vs Templates</h4>
+    <h4>What Replaced Templates</h4>
     <div class="explain-grid">
       <div class="explain-item">
         <div class="explain-icon">🧩</div>
         <div>
-          <div class="explain-label">Components = Building Blocks</div>
-          <div class="explain-text">One visual element (a title card, a chart, a logo). Embeddable via <code>&lt;component&gt;</code> tags in codegen output.</div>
+          <div class="explain-label">Components with Inline Schemas</div>
+          <div class="explain-text"><code>search_library</code> now returns data schemas for each component match. The LLM fills in <code>&lt;component&gt;</code> data props directly without reading source code. Faster, less context, same quality.</div>
         </div>
       </div>
       <div class="explain-item">
-        <div class="explain-icon">🎬</div>
+        <div class="explain-icon">✂️</div>
         <div>
-          <div class="explain-label">Templates = Reference Compositions</div>
-          <div class="explain-text">Proven full-scene layouts with multiple components, timing, and animation. The codegen LLM reads their source for reference when building similar scenes.</div>
+          <div class="explain-label">Template Browsing Removed</div>
+          <div class="explain-text">The old flow let the LLM browse template source code as reference, but this led to the LLM copying patterns instead of using <code>&lt;component&gt;</code> tags. Removing templates forces component-first output.</div>
         </div>
       </div>
     </div>
     <div class="explain-flow">
-      <strong>How it works:</strong> The codegen LLM uses <code>read_source</code> to read a template's HTML/CSS/GSAP, then adapts the patterns for the current scene's needs. Templates serve as high-quality reference implementations.
+      <strong>Current flow:</strong> search_library (with schemas) → submit_scene (with &lt;component&gt; tags + custom code). No template browsing step.
     </div>
   </div>
 
@@ -1819,22 +1860,37 @@
 
     <div class="concept-card" style="border-left:3px solid var(--orange);">
       <h4 style="color:var(--orange);">🤖 3. Freeform-Agentic LLM</h4>
-      <p style="margin-bottom:12px;">Multi-turn LLM conversation with tool access. The LLM can explore the component library, read component and template source code for reference, then write complete HTML+CSS+GSAP. It delivers the final scene via <code>submit_scene</code>.</p>
+      <p style="margin-bottom:12px;">Multi-turn LLM conversation with tool access. The LLM searches the component library (results include inline data schemas), then writes complete HTML+CSS+GSAP using <code>&lt;component&gt;</code> tags for matched UI and custom code for everything else. Typical flow: 2 iterations (search → submit).</p>
 
       <div style="margin-top:12px; font-family:'SF Mono','Fira Code',monospace; font-size:12px; color:var(--text-dim); line-height:2;">
         <div style="color:var(--text);">Available tools:</div>
-        <div>&nbsp;&nbsp;<span style="color:var(--accent);">search_library</span> — search the 67-component catalog by keyword</div>
-        <div>&nbsp;&nbsp;<span style="color:var(--accent);">read_source</span> — read a component or template's full source code</div>
+        <div>&nbsp;&nbsp;<span style="color:var(--accent);">search_library</span> — search the component catalog; returns matches with <strong>inline data schemas</strong> (field names, types, defaults, enums)</div>
+        <div>&nbsp;&nbsp;<span style="color:var(--text-dim);">read_source</span> — <em>optional</em>: read a component's full source code (only needed for complex data shapes)</div>
         <div>&nbsp;&nbsp;<span style="color:var(--accent);">submit_scene</span> — deliver the final HTML+CSS+GSAP output</div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div style="font-size:12px; color:var(--text); font-weight:600; margin-bottom:6px;">Typical 2-iteration flow:</div>
+        <div style="display:flex; gap:0; align-items:center; margin-bottom:8px;">
+          <div style="background:rgba(251,146,60,0.15); border:1px solid var(--orange); border-radius:8px; padding:8px 14px; font-size:12px; text-align:center;">
+            <strong>Iter 1:</strong> search_library<br><small style="color:var(--text-dim);">gets schemas inline</small>
+          </div>
+          <div style="padding:0 8px; color:var(--border);">→</div>
+          <div style="background:rgba(52,211,153,0.15); border:1px solid var(--accent); border-radius:8px; padding:8px 14px; font-size:12px; text-align:center;">
+            <strong>Iter 2:</strong> submit_scene<br><small style="color:var(--text-dim);">hybrid HTML output</small>
+          </div>
+        </div>
       </div>
 
       <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
         <div class="pipeline-badge badge-llm">Agentic LLM (multi-turn)</div>
-        <div class="pipeline-badge badge-quality">Highest creative ceiling</div>
+        <div class="pipeline-badge badge-speed">~73s per scene</div>
+        <div class="pipeline-badge badge-quality">Hybrid: components + custom</div>
       </div>
       <div style="margin-top:8px; font-size:12px; color:var(--text-dim);">
         <strong>File:</strong> <code>freeform-agentic.ts</code><br>
-        <strong>Output:</strong> Complete HTML document with optional <code>&lt;component type="..." data='...' /&gt;</code> tags
+        <strong>System prompt:</strong> Component tags section first, then design skills<br>
+        <strong>Output:</strong> Complete HTML document with <code>&lt;component type="..." data='...' /&gt;</code> tags + custom code
       </div>
     </div>
 
