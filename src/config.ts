@@ -68,11 +68,11 @@ export const config: Config = {
     model: process.env.MP_LLM_MODEL || (llmProvider === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o"),
     apiKey: (llmProvider === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY) || "",
   },
-  renderConcurrency: parseInt(process.env.MP_RENDER_CONCURRENCY || "2", 10),
+  renderConcurrency: parseInt(process.env.MP_RENDER_CONCURRENCY || "4", 10),
   previewQuality: {
     width: 1280,
     height: 720,
-    fps: 24,
+    fps: 15,
   },
   productionQuality: {
     width: 1920,

@@ -142,6 +142,18 @@ async function runRender(
     // don't persist back to project.json
     const projectForRender = JSON.parse(JSON.stringify(project));
 
+    // Preview quality: render fewer frames for fast iteration. Scenes are
+    // px-based, so we DON'T shrink the canvas (that would reflow the layout) --
+    // we only lower the framerate. (Production keeps the full canvas fps.)
+    // Resolution downscaling is handled separately via deviceScaleFactor.
+    if (options?.quality === "preview"
+        && (projectForRender.format === "video" || projectForRender.format === "slideshow")
+        && projectForRender.canvas?.fps > config.previewQuality.fps) {
+      const fullFps = projectForRender.canvas.fps;
+      projectForRender.canvas.fps = config.previewQuality.fps;
+      console.log(`  Preview quality: ${projectForRender.canvas.fps}fps (was ${fullFps}fps)`);
+    }
+
     const renderOpts: RenderOptions = {
       project: projectForRender,
       workDir: path.join(projectDir(job.tenantId, projectId), "_work"),
