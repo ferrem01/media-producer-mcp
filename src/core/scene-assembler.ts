@@ -315,7 +315,7 @@ ${componentScripts.join("\n\n")}
 </body>
 </html>`;
 
-  return normalizeHtmlUrls(html);
+  return resolveHtmlAssetUrls(normalizeHtmlUrls(html), preview);
 }
 
 /**
@@ -520,7 +520,7 @@ ${tagResult.html}
 </body>
 </html>`;
 
-  return normalizeHtmlUrls(html);
+  return resolveHtmlAssetUrls(normalizeHtmlUrls(html), preview);
 }
 
 /**
@@ -540,6 +540,17 @@ export function generateFontLinks(brand: BrandKit): string {
     }
   }
   return links.join("\n");
+}
+
+/**
+ * Convert every /assets/... URL in the final assembled HTML to a resolvable URL
+ * (file:// for render, kept as-is for preview). resolveAssetUrls only handles
+ * component DATA, so raw codegen-written tags like <img src="/assets/.../logo.svg">
+ * would otherwise stay /assets/... and fail to load under the file:// page.
+ */
+export function resolveHtmlAssetUrls(html: string, preview?: boolean): string {
+  if (preview) return html; // preview SPA serves /assets/ over HTTP
+  return html.replace(/\/assets\/[A-Za-z0-9_\-./%]+/g, (m) => resolveAssetPath(m, false));
 }
 
 /**
