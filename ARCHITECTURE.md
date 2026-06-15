@@ -1,7 +1,7 @@
 # Media Producer MCP -- Architecture
 
 Living document. Updated as the system evolves.
-Last updated: 2026-06-14
+Last updated: 2026-06-15
 
 ## What This Is
 
@@ -40,11 +40,11 @@ Key fields:
 - `content_region` -- constrains components to a region (e.g. right 42%) so the speaker is visible
 
 ### Sequence
-A sequence is a special type of freeform scene with multiple "beats" on one continuous GSAP timeline. Instead of generating separate scenes that get crossfaded together (which produces a slideshow feel), a sequence keeps elements on a persistent stage and transforms them across beats.
+A sequence is a special type of scene with multiple "beats" on one continuous GSAP timeline. Instead of generating separate scenes that get crossfaded together (which produces a slideshow feel), a sequence keeps elements on a persistent stage and transforms them across beats.
 
 Key fields on Scene:
 - `beats[]` -- array of SequenceBeat objects, each with label, brief, duration, and optional voiceover
-- When `beats` is present, the freeform generator writes ONE HTML document with a single master timeline where each beat is a labeled section
+- When `beats` is present, the codegen generator writes ONE HTML document with a single master timeline where each beat is a labeled section
 
 ```typescript
 interface SequenceBeat {
@@ -70,12 +70,12 @@ A self-contained visual element. Each is a `.component.html` file with three sec
 
 Components reference brand kit values via CSS custom properties (`--mp-color-primary`, `--mp-font-family`, etc.). Data is bound via `data-bind` attributes and the `data` object passed to `createTimeline`.
 
-**Component library:** 67 components across categories (titles, layouts, effects, media, data-viz, CTA, mockups). Both hand-crafted library components and LLM-generated custom components.
+**Component library:** 69 components across categories (titles, layouts, effects, media, data-viz, CTA, mockups). Both hand-crafted library components and LLM-generated custom components.
 
 ### Scene Templates
 Pre-composed scene blueprints with premium visuals baked in. Unlike components (individual building blocks), templates are full scene compositions -- proven layouts with components, timing, and GSAP animation already wired together. The planner selects a template, fills content slots, and produces Apple-keynote-quality output without the LLM needing to write CSS or GSAP.
 
-**Template catalog:** 33 templates across 5 categories (defined in `template-catalog.ts`). Each template is a `.scene.html` file in the `templates/` directory.
+**Template catalog:** 37 templates across 5 categories (defined in `template-catalog.ts`). Each template is a `.scene.html` file in the `src/templates/` directory.
 
 **How they work:**
 1. Planner picks a template ID based on the narrative moment (e.g. `O1-big-statement` for an opening)
@@ -207,12 +207,37 @@ Every format shares:
 Key insight: transitions only affect the content layer. The speaker video plays through underneath, uninterrupted. The speaker is never sliced or re-encoded per scene.
 
 ### Scene Assembly
-`scene-assembler.ts` takes a scene definition and produces a self-contained HTML document:
-- Resolves component HTML from library (global, tenant, or project level)
-- Binds data to templates
-- Injects brand CSS variables
-- Builds GSAP timeline
-- Handles `source: "speaker"` resolution to actual video URLs
+
+Two assembly paths depending on scene type:
+
+**Standard assembly** (`assembleScene()`): takes a Scene definition with library component references, resolves each component from the library, binds data, scopes CSS, and builds a self-contained HTML document with a master GSAP timeline.
+
+**Codegen assembly** (`assembleCodegenScene()`): takes a single `.scene.html` source from the codegen LLM, resolves any `<component>` tags inside it (see § "Unified Codegen Pipeline" below), injects brand CSS variables and GSAP, and returns a self-contained document. This is the primary assembly path since unified codegen became the only scene generation mode.
+
+Both paths share:
+- Brand CSS variable injection
+- GSAP loading from local files
+- `source: "speaker"` resolution to actual video URLs
+- URL normalization (see § "Asset URL Normalization")
+
+### `<component>` Tag Resolution
+
+The `<component>` tag system (`component-tags.ts`) bridges library components and LLM-generated scenes. The LLM writes scene HTML that can embed library components via declarative tags:
+
+```html
+<component type="stat-card" data='{"value": "10x", "label": "Faster"}' />
+```
+
+Resolution pipeline:
+1. Regex finds all `<component type="..." data='...' />` tags in the scene HTML
+2. For each tag, looks up the component type in the provided source map
+3. Parses the `.component.html` source (template + style + script)
+4. Binds the data attribute JSON to the template
+5. Scopes CSS with a unique instance id (comp_0, comp_1, ...)
+6. Replaces the `<component>` tag with the bound HTML
+7. Collects all component scripts for timeline orchestration
+
+The codegen assembler calls `resolveComponentTags()` and then `buildComponentTimelineScript()` to wire each resolved component's `createTimeline` function into the master scene timeline.
 
 ### Composite Assembly
 `composite-assembler.ts` takes ALL scenes and produces a single HTML document:
@@ -266,15 +291,60 @@ Transport Clock (rAF loop)
 
 ## LLM Pipeline
 
-Prompt → finished project in multiple stages. One unified pipeline for all formats.
+Prompt to finished project in multiple stages. One unified pipeline for all formats.
 
 ### Stages
-1. **Expand Prompt** -- thin prompt → rich creative brief with scene count
-2. **Creative Concept Director** (NEW) -- generates 3 distinct creative concepts at high temperature (0.9), self-selects the strongest one, outputs a "creative bible" with: the one-line concept, storytelling pattern, visual through-line, emotional arc, and visual style commitments. This bible is injected into the planner's context so all scenes serve ONE cohesive idea. Skipped for image format.
-3. **Plan Storyboard** (unified planner) -- brief + creative bible → multi-scene storyboard. Per-scene decision: freeform, sequence, template, library component, or custom. Picks transitions, sets speaker track flags, assigns content regions.
+1. **Expand Prompt** -- thin prompt to rich creative brief with scene count
+2. **Creative Concept Director** -- generates 3 distinct creative concepts at high temperature (0.9), self-selects the strongest one, outputs a "creative bible" with: the one-line concept, storytelling pattern, visual through-line, emotional arc, and visual style commitments. This bible is injected into the planner's context so all scenes serve ONE cohesive idea. Skipped for image format.
+3. **Plan Storyboard** (unified planner) -- brief + creative bible to multi-scene storyboard. Per-scene output: a visual brief describing what the viewer experiences, plus a list of library component types to embed via `<component>` tags. Picks transitions, sets speaker track flags, assigns content regions.
 4. **Media Enrichment** -- generates hero images (OpenAI gpt-image-1), captures screenshots, resolves assets. Runs between planning and scene generation.
-5. **Scene Generation** -- per scene, either fills data for the chosen library component, generates a custom `.component.html` via LLM, or (for sequences) generates a multi-beat continuous HTML doc
-6. **Critique** -- vision-based review of rendered frames. Can trigger scene revision.
+5. **Scene Generation** (unified codegen) -- every scene goes through the same agentic codegen path. The LLM receives the scene brief, component schemas for any suggested library components, design skills, and brand context. It writes a `.component.html` file that can embed library components via `<component>` tags alongside custom HTML/CSS/GSAP. Single tool: `submit_scene`.
+6. **Critique** -- vision-based review of rendered frames. Multi-pass with contact sheet (6 frames across timeline) for motion-aware evaluation. Can trigger scene revision with critique feedback injected into the retry prompt. Hard floor at score < 6 triggers a full template swap.
+
+### Unified Codegen Architecture
+
+All scenes go through one codegen path. There are no separate "freeform", "template", "library", or "custom" modes. The key insight: library components become *embeddable building blocks* inside LLM-generated scenes via `<component>` tags.
+
+```
+Planner Output (per scene)
+├── brief: "A dashboard materializes from data particles..."
+├── components: ["dashboard-kpi", "line-chart"]  // suggested library types
+└── duration_seconds: 6
+
+    ↓
+
+Agentic Codegen (agentic-codegen.ts)
+├── Receives: brief + component schemas + design skills + brand kit
+├── Single tool: submit_scene (no search/read tools)
+├── Writes: .component.html with <component> tags + custom HTML/CSS/GSAP
+└── Output example:
+    <template>
+      <div class="scene">
+        <component type="dashboard-kpi" data='{"value":"$2.4M"}' />
+        <div class="custom-particles">...</div>
+      </div>
+    </template>
+    <style scoped>...</style>
+    <script>function createTimeline(el, data, ctx) { ... }</script>
+
+    ↓
+
+Component Tag Resolution (component-tags.ts)
+├── Finds <component> tags in HTML
+├── Resolves each to library .component.html source
+├── Binds data, scopes CSS, extracts scripts
+└── Returns resolved HTML + component timeline functions
+
+    ↓
+
+Codegen Scene Assembly (scene-assembler.ts → assembleCodegenScene)
+├── Injects brand CSS variables
+├── Loads GSAP + shared utilities
+├── Wires component timelines into master scene timeline
+└── Returns self-contained HTML ready for Playwright capture
+```
+
+The planner's `components` field is a `string[]` of library component type names (e.g. `["stat-card", "gradient-background"]`). These are suggestions, not mandates -- the codegen LLM receives the schemas for those components and decides how to embed them. It can also write fully custom HTML alongside or instead of `<component>` tags.
 
 ### Creativity Parameter
 `creativity` (0-1) controls the library vs custom component mix:
@@ -300,13 +370,14 @@ All LLM prompts are format-aware (video/image/deck/gif/social). Visual design ru
 
 ## MCP Tools
 
-14 tools exposed via MCP protocol:
+13 tools exposed via MCP protocol:
 - **CRUD:** create, get, list, add, update, remove, reorder
 - **Brand:** brand kit management
 - **Render:** trigger renders, job status/wait
 - **Generate:** LLM-powered full project generation
 - **Capture:** screenshot URLs via Playwright, save as assets
 - **Audio:** TTS generation, track management
+- **Upload:** file upload for assets
 
 ---
 
@@ -330,30 +401,40 @@ All LLM prompts are format-aware (video/image/deck/gif/social). Visual design ru
 src/
 ├── core/
 │   ├── types.ts              # all interfaces
-│   ├── scene-assembler.ts    # single scene → HTML
+│   ├── scene-assembler.ts    # single scene → HTML (assembleScene + assembleCodegenScene)
 │   ├── composite-assembler.ts # all scenes → single HTML doc
+│   ├── component-tags.ts     # <component> tag resolution for unified codegen
+│   ├── component-parser.ts   # parse .component.html (template/style/script)
 │   ├── render.ts             # standard render pipeline
-│   ├── sequence-assembler.ts # multi-beat sequence scene assembly
 │   ├── speaker-track.ts      # speaker track render pipeline
 │   ├── capture.ts            # Playwright screenshot capture
-│   └── scene-worker.ts       # child process frame capture
+│   ├── scene-worker.ts       # child process frame capture (routes through codegen assembler)
+│   ├── contact-sheet.ts      # multi-frame contact sheet for motion critique
+│   └── normalize-urls.ts     # asset URL normalization
 ├── llm/
 │   ├── pipeline.ts           # orchestrates all LLM stages
-│   ├── concept-director.ts   # creative concept stage (NEW: generates ONE unifying idea)
+│   ├── concept-director.ts   # creative concept stage (generates ONE unifying idea)
 │   ├── prompts.ts            # system prompts per stage
-│   ├── unified-planner.ts    # scene planning (supports sequences)
-│   ├── freeform-agentic.ts   # agentic freeform HTML generation (supports beats)
-│   ├── scene-generator.ts    # routes scenes to appropriate generator
-│   ├── template-catalog.ts   # scene template catalog (33 templates)
-│   ├── sequence-converter.ts # merges consecutive scenes into sequences
-│   └── catalog.ts            # component library metadata
+│   ├── unified-planner.ts    # scene planning (outputs briefs + component type lists)
+│   ├── agentic-codegen.ts    # agentic scene HTML generation (submit-only, single tool)
+│   ├── scene-generator.ts    # routes all scenes through agentic codegen
+│   ├── design-skills.ts      # visual design rules injected into codegen prompts
+│   ├── template-catalog.ts   # scene template catalog (37 templates)
+│   ├── catalog.ts            # component library metadata
+│   ├── critiquer.ts          # single-pass vision critique
+│   ├── multi-pass-critiquer.ts # motion-aware multi-pass critique + editorial
+│   ├── revision-planner.ts   # revision planning (keep/revise/replace/remove per component)
+│   ├── revision-critique.ts  # revision-aware critique (SEARCH/REPLACE fixes)
+│   ├── component-revise.ts   # surgical SEARCH/REPLACE on existing components
+│   ├── media-enrichment.ts   # hero image generation + asset resolution
+│   └── expander.ts           # prompt expansion
 ├── preview-app/
 │   └── preview-app.ts        # preview SPA (single file, embedded HTML/CSS/JS)
 ├── playground-app/
 │   └── playground-app.ts     # component playground
 ├── persistence/
 │   └── project.ts            # project CRUD
-├── templates/                # scene template .scene.html files (33)
+├── templates/                # scene template .scene.html files (37)
 ├── server.ts                 # MCP tool definitions
 └── index.ts                  # HTTP server + routes
 ```
@@ -392,7 +473,7 @@ Layer 4: Component Save (component-generator)
 | `normalizeAllUrls(value)` | Any JSON value (deep walk) | Project/brand kit save |
 | `normalizeHtmlUrls(html)` | HTML string | Component/scene/composite output |
 
-All strip `http(s)://localhost:<any-port>/` → `/` via regex. External URLs (cdn, https://...) are untouched.
+All strip `http(s)://localhost:<any-port>/` to `/` via regex. External URLs (cdn, https://...) are untouched.
 
 ### Where It's Wired
 
@@ -440,8 +521,11 @@ All strip `http(s)://localhost:<any-port>/` → `/` via regex. External URLs (cd
 
 9. **Creative concept before scenes.** The concept director runs before the planner and commits to ONE creative idea. Without it, the planner generates disconnected scene ideas that feel like a slide deck. The creative bible (concept + pattern + through-line + emotional arc) is injected into the planner so all scenes serve one cohesive vision.
 
-10. **Sequences for continuity.** When multiple steps should flow as one continuous motion (walkthroughs, demos, cause-and-effect), the planner outputs a "sequence" -- a freeform scene with multiple beats on one persistent stage. The freeform generator writes one HTML doc with one master GSAP timeline, and elements persist and transform across beats. This produces the premium "single take" feel that separate scenes + crossfades cannot achieve.
-n9. **Relative asset URLs only.** All internal asset URLs are stored and served as relative paths (`/assets/...`), never absolute localhost URLs. Enforced at four layers: source generation, data persistence, HTML assembly, and component save. See § "Asset URL Normalization" above.
+10. **Sequences for continuity.** When multiple steps should flow as one continuous motion (walkthroughs, demos, cause-and-effect), the planner outputs a "sequence" -- a scene with multiple beats on one persistent stage. The codegen generator writes one HTML doc with one master GSAP timeline, and elements persist and transform across beats. This produces the premium "single take" feel that separate scenes + crossfades cannot achieve.
+
+11. **Relative asset URLs only.** All internal asset URLs are stored and served as relative paths (`/assets/...`), never absolute localhost URLs. Enforced at four layers: source generation, data persistence, HTML assembly, and component save. See above.
+
+12. **Unified codegen, not mode switching.** All scenes go through one agentic codegen path. The LLM writes `.component.html` and can embed library components via `<component>` tags. No separate freeform/template/library/custom code paths. The `creativity` parameter (0-1) biases the planner toward suggesting more or fewer library components, but the generator always has the full toolkit available. This eliminated ~950 lines of dead routing code (script-writer, sequence-assembler, sequence-converter, multi-mode scene generator).
 
 ---
 
@@ -451,7 +535,7 @@ Full documentation: [PLAYGROUND.md](./PLAYGROUND.md)
 
 ### Playground (`/playground`)
 Interactive three-panel tool for browsing, creating, and iterating on components:
-- **Library browser**: 59 built-in components across 7 categories
+- **Library browser**: 69 built-in components across 7 categories
 - **Live preview**: Scaled iframe with GSAP animation, canvas size selector, play/restart
 - **Schema-driven data editor**: Typed form controls (text, number, color picker, enum dropdown, boolean toggle, array builder) generated from component schemas. Form/JSON toggle.
 - **Script builder**: Visual editor for interactive script actions (cursor, typing, camera, UI). Dropdown of standard + custom actions with type-matched param inputs.
@@ -471,34 +555,34 @@ Prioritized list of what's next. Updated as things ship.
 
 ### High Priority -- Architecture Refactors
 
-These three refactors address fundamental architecture issues identified 2026-06-14. They should be done before new feature work.
+- [x] **Refactor 1: Fix Pipeline Data Loss** -- CreativeBible from concept-director gets flattened to prose and prepended to the planner prompt. Structured data (colorMood, motionPersonality, spatialStrategy) becomes text the LLM may ignore. Fix: pass CreativeBible as structured data through the entire pipeline.
 
-- [ ] **Refactor 1: Fix Pipeline Data Loss** -- CreativeBible from concept-director gets flattened to prose and prepended to the planner prompt. Structured data (colorMood, motionPersonality, spatialStrategy) becomes text the LLM may ignore. Fix: pass CreativeBible as structured data through the entire pipeline. Add validation that planner output respects the bible's constraints. No data should be dropped between expander -> concept director -> planner -> scene generator.
+- [ ] **Refactor 2: Unify Scenes and Sequences** -- Sequences are a bolt-on parallel concept. The real issue was scene-assembler starting all component timelines at t=0. Fix: make choreography[] a first-class optional field on Scene. Extend scene-assembler to handle timed component visibility. Kill the "sequence" concept. A scene can be any length with optional choreographed timing. *Note: sequence-assembler.ts and sequence-converter.ts were deleted during Refactor 4, but beats[] still exists as a special case in the codegen pipeline rather than being first-class on Scene.*
 
-- [ ] **Refactor 2: Unify Scenes and Sequences** -- Sequences are a bolt-on parallel concept with a separate assembler, converter, and types. The real issue was scene-assembler starting all component timelines at t=0. Fix: make choreography[] a first-class optional field on Scene. Extend scene-assembler to handle timed component visibility. Kill sequence-assembler.ts, sequence-converter.ts, and the "sequence" concept. A scene can be any length with optional choreographed timing.
+- [x] **Refactor 3: Hybrid Codegen Path (Components as Building Blocks)** -- The `<component>` tag system lets the codegen LLM embed library components as building blocks inside custom scenes. Library components are composable, not just data-bindable. Shipped as the unified codegen pipeline.
 
-- [ ] **Refactor 3: Hybrid Codegen Path (Components as Building Blocks)**
-
-- [ ] **Refactor 4: Unify Generate Modes into One Pipeline** -- mode:"full" currently runs a completely separate code path from mode:"plan" + mode:"generate". Different planning systems, two different PlannedScene types (types.ts vs unified-planner.ts), different data flows. The storyboard from mode:"full" is never saved. Fix: full = plan + generate + render running the same code path in sequence. One PlannedScene type. Storyboard always saved to project.json. The plan step always runs; mode just controls where to stop (plan stops after planning, generate picks up from saved plan, full runs everything). -- Three paths exist but none lets codegen USE library components as embedded building blocks. Library = data binding only. Freeform = all-new HTML, reads components for reference only. Fix: build a hybrid path where the LLM receives actual component source code and embeds it into custom scenes with custom layout, transitions, and elements around it. Components become composable building blocks for codegen.
+- [x] **Refactor 4: Unify Generate Modes into One Pipeline** -- mode:"full" and mode:"plan" + mode:"generate" now share the same code path. One PlannedScene type. Storyboard always saved to project.json. Dead code removed: script-writer.ts, sequence-assembler.ts, sequence-converter.ts, multi-mode scene generator routing. The codegen pipeline is now the only path.
 
 ### High Priority -- Features
 - [x] **Tenant Component Playground** -- three-panel layout with LLM-driven generation, chat iteration, schema-driven form editor, script builder, tenant CRUD. See [PLAYGROUND.md](./PLAYGROUND.md).
 - [x] **Creative concept director** -- generates ONE unifying creative concept before scene planning. 3 concepts at temp 0.9, self-selects best, outputs creative bible.
-- [x] **Sequence scenes** -- multi-beat continuous scenes for product walkthroughs and demos. Planner outputs beats, freeform generator builds one continuous HTML doc.
-- [x] **Deterministic brand CSS injection** -- freeform generator uses var(--mp-color-*) exclusively, no hex values shown in prompt.
-- [ ] **Motion-aware critique** -- sample 5-9 frames across timeline instead of one still at midpoint. Add project-level consistency check across all scenes.
+- [x] **Sequence scenes** -- multi-beat continuous scenes for product walkthroughs and demos. Planner outputs beats, codegen generator builds one continuous HTML doc.
+- [x] **Deterministic brand CSS injection** -- codegen generator uses var(--mp-color-*) exclusively, no hex values shown in prompt.
+- [ ] **Motion-aware critique** -- sample 5-9 frames across timeline instead of one still at midpoint. Add project-level consistency check across all scenes. *(Contact sheet generation is shipped; project-level consistency check is not yet implemented.)*
 - [ ] **Code-enforced mandatory behaviors** -- voiceover guaranteed per non-bookend scene, intro/outro exempt from critique, brand theme enforced deterministically.
 - [ ] **Render speed** -- showcase test took 529s for 40s video. Look at parallelizing frame captures further, draft resolution mode, frame skip for previews.
 
 ### Medium Priority
 - [ ] **Preview SPA polish** -- scene click auto-plays from that point, playback rate (0.5x/1x/2x), keyboard shortcuts (space, arrow keys)
 - [ ] **Preview multi-clip speaker** -- preview SPA only reads `clips[0]`, render pipeline already handles multiple clips
-- [ ] **frameADataUri URL leak** -- old transition HTML was leaking literal JS into img src. Probably dead after Phase 3 cleanup but verify render pipeline doesn't have same issue.
 
 ### Lower Priority
 - [ ] **Auth for preview SPA** -- anyone with the URL can access any tenant's projects. Token param exists but isn't validated. Low priority unless sharing preview links externally.
 
 ### Done / Already Working
+- [x] Unified codegen pipeline (all scenes through one agentic codegen path with `<component>` tags)
+- [x] `<component>` tag resolution engine (component-tags.ts)
+- [x] Single-iteration codegen (submit-only, no search/read tools)
 - [x] GIF export (`renderGif` -- captures all scene frames, encodes via ffmpeg)
 - [x] Social batch export (`renderSocial` -- first scene at multiple social sizes)
 - [x] Deck/PDF export (`renderDeck` -- each scene as PNG slide)
@@ -509,3 +593,4 @@ These three refactors address fundamental architecture issues identified 2026-06
 - [x] Tenant Component Playground (three-panel, LLM generate/iterate, schema form editor, script builder)
 - [x] Script system (GSAP-based: cursor, typing, camera, custom handlers, planner integration)
 - [x] Schema defaults system (contextual sample data generation from component schemas)
+- [x] Dead code cleanup (script-writer.ts, sequence-assembler.ts, sequence-converter.ts removed)
