@@ -71,6 +71,7 @@ export interface PlannedScene {
   transition_in?: { type: string; duration_seconds: number };
   hero_image?: string;
   voiceover_text?: string;  // Narration script for this scene (TTS)
+  broll_query?: string;     // when set, fetch cinematic stock footage as this scene's background
 }
 
 export interface StoryboardResult {
@@ -125,6 +126,13 @@ The codegen LLM will receive the component schemas and use <component> tags.
 If no library components fit, leave "components" as an empty array [].
 For scenes with existing UI elements (chat panels, dashboards, code editors), always list the matching library component types.
 
+### B-Roll (atmospheric stock footage) -- USE IT
+Real footage gives cinematic depth that a flat gradient cannot. For ATMOSPHERIC, ESTABLISHING, EMOTIONAL, or ASPIRATIONAL/LIFESTYLE scenes -- the opening "set the world", a mood beat, a human moment, a "feeling" shot -- you SHOULD add a "broll_query": a SPECIFIC, cinematic stock-footage search phrase that matches the scene's mood and the brand. The clip plays as a darkened, blurred background BEHIND your content (it does not replace the foreground).
+- A brand film, a product launch's emotional opener/closer, or any prompt about a feeling, place, or aspiration almost ALWAYS wants b-roll on at least one scene. Do NOT default to a plain gradient on those moments -- reach for real footage.
+- Good queries are concrete and shot-like: "aerial drone shot of a modern city skyline at golden hour, slow motion", "close-up of hands typing on a laptop, shallow depth of field", "abstract flowing deep-blue ink, macro", "timelapse of clouds over mountains at dawn", "open road through mountains, first-person driving, sunrise".
+- Budget: 1-3 scenes across the video (it should still feel special, not every scene).
+- Do NOT use broll_query on data/metrics, UI/feature, logo, or CTA scenes -- those need a clean generated background. Omit the field entirely on those.
+
 ### Continuous / Multi-Step Scenes (walkthroughs, demos)
 There is no separate "sequence" type. A continuous multi-step moment — a
 walkthrough, demo flow, step-by-step, or "single take" where elements persist and
@@ -152,6 +160,7 @@ ${catalogStr}
       "brief": "A dramatic hero reveal — huge 120px typography saying 'QUOTIENT' SLAMS in from below with SplitText per-character animation (chars stagger 0.03s, back.out ease). Background uses brand colors with ambient glow orbs in the accent color drifting slowly. Subtitle at 24px FADES in below the headline. Floating particles in background add depth. BG: gradient with glow orbs. MG: subtitle text. FG: headline with particle hints.",
       "components": [],
       "voiceover_text": "Introducing Quotient. The future of demand generation.",
+      "broll_query": "abstract flowing deep-blue and violet ink in slow motion, macro, dark background",
       "transition_in": { "type": "none", "duration_seconds": 0 }
     },
     {
@@ -169,6 +178,7 @@ ${catalogStr}
 
 - ${sceneCountGuide}
 - **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Its brief must describe the whole flow as an ordered progression (step 1 → step 2 → step 3 …, each as motion: SLIDES, MORPHS, ASSEMBLES), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a plan failure.
+- B-ROLL: if the prompt is a brand film, or has an emotional/aspirational/lifestyle opener or closer, or any "feeling / place / human moment" scene, you MUST add a "broll_query" (a specific cinematic stock-footage phrase) to at least one such scene -- see the B-Roll section. Don't default those moments to a flat gradient. (Skip b-roll entirely for pure data/UI/feature/logo/CTA videos.)
 - First scene: transition "none" or omit transition_in.
 - Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, shader-crosswarp, shader-ripple, shader-radial, shader-directional-warp, shader-burn, shader-chromatic, shader-lens-distortion, none.
 - SHADER transitions (shader-*) use WebGL for premium visual effects. Use them for hero transitions between key scenes. shader-crosswarp: warped crossfade, shader-ripple: ripple wave, shader-radial: radial wipe, shader-directional-warp: directional warp morph, shader-burn: warm burn blend, shader-chromatic: RGB split aberration, shader-lens-distortion: gravitational lens. Use 1-3 shader transitions per video for maximum impact. Do not overuse.

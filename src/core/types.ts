@@ -276,6 +276,8 @@ export interface PlannedScene {
   visual_notes: string;
   /** Library component types the planner suggested embedding in this scene */
   components?: string[];
+  /** Cinematic stock-footage search phrase; when set, b-roll plays behind the scene */
+  broll_query?: string;
 }
 
 export type PlannedAssetType =
