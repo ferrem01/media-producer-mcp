@@ -42,7 +42,7 @@ import { processReferenceImages } from "./reference-images.js";
 import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
 import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { generateContactSheet } from "../core/contact-sheet.js";
-import { assembleScene, type ComponentSource } from "../core/scene-assembler.js";
+import { assembleScene, assembleCodegenScene, type ComponentSource } from "../core/scene-assembler.js";
 import { captureSingleFrame } from "../core/capture.js";
 import os from "node:os";
 
@@ -917,14 +917,34 @@ async function critiqueAndRetryScene(opts: {
         break;
       }
 
-      // 2. Assemble the scene HTML
-      const assembledHtml = await assembleScene({
-        scene: currentScene,
-        components: componentSources,
-        brandKit: opts.brandKit,
-        canvas: opts.canvas,
-        gsapDir: config.gsapDir,
-      });
+      // 2. Assemble the scene HTML (route through codegen assembler if <component> tags present)
+      let assembledHtml: string;
+      const codegenComp = currentScene.components.find(
+        (c: any) => (c.type.startsWith('scene_') || c.type.startsWith('freeform_') || c.type.startsWith('custom_') || c.type.startsWith('template_'))
+      );
+      const codegenSource = codegenComp ? componentSources.find(cs => cs.type === codegenComp.type) : null;
+      if (codegenSource && codegenSource.source.includes('<component ')) {
+        assembledHtml = await assembleCodegenScene({
+          sceneSource: codegenSource.source,
+          componentSources: componentSources.filter(cs => cs.type !== codegenComp!.type),
+          brandKit: opts.brandKit,
+          canvas: opts.canvas,
+          duration: currentScene.duration_seconds || 5,
+          sceneId: currentScene.id || `scene_${opts.sceneIndex}`,
+          gsapDir: config.gsapDir,
+          background: currentScene.background,
+          transparentBackground: currentScene.transparent_background,
+          preview: true,
+        });
+      } else {
+        assembledHtml = await assembleScene({
+          scene: currentScene,
+          components: componentSources,
+          brandKit: opts.brandKit,
+          canvas: opts.canvas,
+          gsapDir: config.gsapDir,
+        });
+      }
 
       // 3. Write to temp file and capture preview
       const tmpDir = path.join(os.tmpdir(), `critique_${opts.projectId}_${opts.sceneIndex}_${attempt}`);

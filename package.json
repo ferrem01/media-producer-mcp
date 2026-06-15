@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && cp -r src/components/shared dist/components/ && cp -r src/templates dist/ && cp -r src/preview-app dist/",
+    "build": "tsc && cp -r src/components/shared dist/components/ && cp -r src/templates dist/ && cp -r src/preview-app dist/ && cp src/llm/design-skills.md dist/llm/ && cp src/llm/visual-storytelling-guide.md dist/llm/",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.ts",
     "typecheck": "tsc --noEmit",
