@@ -15,7 +15,7 @@ import {
   type LLMContentPart,
 } from "./client.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
-// Templates disabled -- LLM should use search_library to find components, not browse templates
+// Component discovery is handled by the planner. The codegen LLM receives schemas in the brief.
 // import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./design-skills.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
@@ -60,25 +60,9 @@ export interface AgenticCodegenOpts {
 
 const TOOLS: LLMTool[] = [
   {
-    name: "search_library",
-    description:
-      "Search for embeddable components in the library. Components can be embedded directly in your scene HTML using <component> tags. You MUST use them when a match exists instead of rebuilding from scratch.",
-    input_schema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description:
-            "What you're looking for, e.g. 'dashboard metrics chart' or 'cursor animation UI interaction' or 'stat card counter' or 'chat panel' or 'code editor'",
-        },
-      },
-      required: ["query"],
-    },
-  },
-  {
     name: "read_source",
     description:
-      "Read a component's full source code. Only use this if the data schema from search_library is unclear or you need to understand complex internal behavior. In most cases, the schema from search results is sufficient to fill in data fields.",
+      "Read a component's full source code. Use this only if you need to understand complex internal behavior or unclear data fields. In most cases, the schemas provided in the brief are sufficient.",
     input_schema: {
       type: "object",
       properties: {
@@ -109,139 +93,9 @@ const TOOLS: LLMTool[] = [
   },
 ];
 
-// ── Search Index Types ──
-
-interface SearchableItem {
-  name: string;
-  kind: "component";
-  category: string;
-  description: string;
-  keywords: string; // lowercased searchable text
-}
-
 // ── Tool Implementations ──
 
-let _searchIndex: SearchableItem[] | null = null;
 let _componentCatalog: ComponentCatalogEntry[] | null = null;
-
-async function getSearchIndex(): Promise<SearchableItem[]> {
-  if (_searchIndex) return _searchIndex;
-
-  var items: SearchableItem[] = [];
-
-  // Index components from catalog
-  if (!_componentCatalog) {
-    _componentCatalog = await buildComponentCatalog(COMPONENTS_ROOT);
-  }
-
-  for (var comp of _componentCatalog) {
-    items.push({
-      name: comp.type,
-      kind: "component",
-      category: comp.category,
-      description: comp.description || comp.label || "",
-      keywords: [
-        comp.type,
-        comp.category,
-        comp.label || "",
-        comp.description || "",
-        Object.keys(comp.data).join(" "),
-      ]
-        .join(" ")
-        .toLowerCase(),
-    });
-  }
-
-  // Templates disabled -- components only
-
-  _searchIndex = items;
-  return items;
-}
-
-async function executeSearchLibrary(
-  query: string,
-  _type?: string,
-): Promise<string> {
-  var index = await getSearchIndex();
-  var queryTerms = query.toLowerCase().split(/\s+/);
-
-  // Components only
-  var candidates = index.filter((i) => i.kind === "component");
-
-  // Score each item by how many query terms match
-  var scored = candidates.map((item) => {
-    var score = 0;
-    for (var term of queryTerms) {
-      if (item.keywords.includes(term)) {
-        score++;
-        // Bonus for matching in name
-        if (item.name.toLowerCase().includes(term)) score += 2;
-        // Bonus for exact word boundary match
-        if (item.keywords.split(/\s+/).some((w) => w === term)) score++;
-      }
-    }
-    return { item, score };
-  });
-
-  // Sort by score descending, take top 8
-  scored.sort((a, b) => b.score - a.score);
-  var results = scored.filter((s) => s.score > 0).slice(0, 8);
-
-  if (results.length === 0) {
-    return `No results found for "${query}". Try different keywords. Available categories: ${[...new Set(index.map((i) => i.category))].join(", ")}`;
-  }
-
-  // Load schemas for matched components
-  if (!_componentCatalog) {
-    _componentCatalog = await buildComponentCatalog(COMPONENTS_ROOT);
-  }
-  var catalogMap = new Map<string, ComponentCatalogEntry>();
-  for (var entry of _componentCatalog) {
-    catalogMap.set(entry.type, entry);
-  }
-
-  var lines: string[] = [`Found ${results.length} components for "${query}":\n`];
-
-  for (var r of results) {
-    var item = r.item;
-    var catalogEntry = catalogMap.get(item.name);
-    lines.push(`### ${item.name} (${item.category})`);
-    lines.push(`${item.description}`);
-    lines.push(``);
-    lines.push(`**Embed:** \`<component type="${item.name}" data='{...}' />\``);
-
-    // Inline the data schema so LLM can fill fields immediately
-    if (catalogEntry && catalogEntry.data && Object.keys(catalogEntry.data).length > 0) {
-      lines.push(``);
-      lines.push(`**Data fields:**`);
-      for (var [fieldName, field] of Object.entries(catalogEntry.data)) {
-        var reqStr = field.required ? " (required)" : " (optional)";
-        var typeStr = field.type;
-        if (field.items) typeStr += `<${field.items.type}>`;
-        var extra = "";
-        if (field.placeholder) extra += ` e.g. "${field.placeholder}"`;
-        if ((field as any).default !== undefined) extra += ` default: ${JSON.stringify((field as any).default)}`;
-        if ((field as any).enum) extra += ` values: ${(field as any).enum.join(", ")}`;
-        lines.push(`  - \`${fieldName}\`: ${typeStr}${reqStr}${extra}`);
-
-        // Show nested object properties for array items
-        if (field.items && (field.items as any).properties) {
-          for (var [propName, prop] of Object.entries((field.items as any).properties)) {
-            var p = prop as any;
-            var propReq = p.required ? " (required)" : "";
-            var propEnum = p.enum ? ` values: ${p.enum.join(", ")}` : "";
-            lines.push(`      - \`${propName}\`: ${p.type}${propReq}${propEnum}`);
-          }
-        }
-      }
-    }
-    lines.push(``);
-  }
-
-  lines.push("");
-  lines.push("You now have the data schemas above. Use <component> tags with the correct data fields. Only call read_source if a schema is unclear.");
-  return lines.join("\n");
-}
 
 async function executeReadSource(
   name: string,
@@ -287,7 +141,7 @@ async function executeReadSource(
         return `# Component: ${name}\n# Category: ${catDir.name}\n# File: ${catDir.name}/${htmlFile}\n#\n# HOW TO USE:\n#   <component type="${name}" data='{"field1": "value1", ...}' />\n#\n# Read the createTimeline(el, data, ctx) function to see what data fields are used.\n# Fill the data attribute with your scene's actual content.${schemaInfo}\n\n${source}`;
       }
     }
-    return `Component "${name}" not found. Use search_library to find available components.`;
+    return `Component "${name}" not found. Check the component type name in the brief.`;
   } catch (e: any) {
     return `Error reading component: ${e.message}`;
   }
@@ -329,8 +183,8 @@ Your scene MUST use <component> tags for any UI element that exists in the compo
 Do NOT rebuild from scratch what already exists. Writing custom HTML for a library component is a bug.
 
 ### How It Works
-1. Call search_library to find matching components — results include data schemas
-2. Embed matches using \`<component type="name" data='{...}' />\` with the data fields from the schema
+1. Read the component schemas from the brief
+2. Embed components using \`<component type="name" data='{...}' />\` with the data fields from the schema
 3. Write custom code only for layout, transitions, backgrounds, and elements with no library match
 
 The result is HYBRID: <component> tags for known UI + custom code for everything else.
@@ -347,8 +201,8 @@ The result is HYBRID: <component> tags for known UI + custom code for everything
 \`\`\`
 
 ### Rules
-- The \`type\` must match a component from search_library results
-- The \`data\` attribute is a JSON string — fill fields from the schema returned by search_library
+- The \`type\` must match a component listed in the brief
+- The \`data\` attribute is a JSON string — fill fields from the schema provided in the brief
 - Components auto-generate internal GSAP timelines
 - Access component timelines via: ctx.getComponentTimeline('comp_0')
 - Component IDs are auto-assigned: comp_0, comp_1, comp_2... in DOM order
@@ -417,18 +271,13 @@ Notice: quotient-chat and code-editor use <component> tags. Only the background,
 
 ## Your Process
 
-If the brief below already includes component schemas (under "Component Schemas"), go straight to building:
-1. BUILD your scene HTML using <component> tags for every listed component, filling data from the provided schemas
-2. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
-3. SUBMIT via the submit_scene tool
-
-If the brief does NOT include component schemas, discover them first:
-1. SEARCH for components matching your scene's UI elements (search_library) — schemas are included in results
-2. BUILD your scene HTML using <component> tags for every matched UI element, filling data from the schemas
+1. READ the brief below — it includes which components to use and their data schemas
+2. BUILD your scene HTML using <component> tags for every listed component, filling data from the provided schemas
 3. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
 4. SUBMIT via the submit_scene tool
 
-Only call read_source if a data schema from search results is unclear. In most cases, search results or the brief give you everything you need.
+If the brief lists components with schemas, you have everything you need. Go straight to writing and submit.
+Call read_source only if a component's data schema is missing or unclear.
 
 ## Design Skills (FOLLOW THESE RULES)
 
@@ -579,14 +428,14 @@ function buildBrandContext(brandKit: BrandKit): string {
 
 const MAX_ITERATIONS = 8;
 
-// presearchLibrary removed -- LLM uses search_library tool directly
+// Component discovery is handled by the planner; codegen receives schemas in the brief
 
 export async function generateSceneAgentic(
   opts: AgenticCodegenOpts,
 ): Promise<string> {
   var systemPrompt = buildAgenticSystemPrompt(opts);
 
-  // No catalog dump -- the LLM must use search_library + read_source to discover components
+  // Component schemas are provided in the brief by the planner
 
   var userPrompt = `Create this scene:
 
@@ -606,8 +455,8 @@ ${opts.sceneBrief}
 - All text MUST have correct spacing. Never concatenate words. Check every text string for missing spaces.
 - Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
 ${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
-CRITICAL: Before writing ANY UI element, search the component library first. If a matching component exists, use <component type=... data='...' /> with the data fields from the search results. Do NOT rebuild from scratch.
-Start by calling search_library for the main UI elements in this scene, then write your scene HTML using the component tags and schemas from the results.`;
+CRITICAL: If the brief lists components with schemas, use <component type=... data='...' /> tags with the data fields from the schemas. Do NOT rebuild from scratch what the brief says to use as a component.
+Read the brief, then write your scene HTML and submit it.`;
 
   // Build user message: include reference images as vision content if available
   var userContent: string | LLMContentPart[];
@@ -633,7 +482,7 @@ Start by calling search_library for the main UI elements in this scene, then wri
   var lastHtml: string | null = null;
 
   // Track component-first workflow state
-  var searchHits: Set<string> = new Set();   // components found by search_library
+
   var readSources: Set<string> = new Set();  // components read via read_source
 
   for (var iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -689,16 +538,7 @@ Start by calling search_library for the main UI elements in this scene, then wri
 
         var toolResult: string;
 
-        if (toolCall.name === "search_library") {
-          toolResult = await executeSearchLibrary(
-            toolCall.input.query as string,
-          );
-          // Track component names found in search results
-          var nameMatches = toolResult.matchAll(/\*\*([a-z0-9-]+)\*\*/g);
-          for (var m of nameMatches) {
-            searchHits.add(m[1]);
-          }
-        } else if (toolCall.name === "read_source") {
+        if (toolCall.name === "read_source") {
           toolResult = await executeReadSource(
             toolCall.input.name as string,
           );

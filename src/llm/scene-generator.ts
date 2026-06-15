@@ -67,6 +67,7 @@ async function generateCodegenScene(
 
   // Build the brief: for sequences, combine beat briefs into one rich brief
   var effectiveBrief = codegenBrief;
+  console.log("  [codegen-brief] Scene \"" + planned.label + "\" has " + (planned.components?.length || 0) + " component hints, brief includes schemas: " + effectiveBrief.includes("Component Schemas"));
   if (planned.beats?.length && !effectiveBrief.includes("SEQUENCE")) {
     effectiveBrief = `SEQUENCE: ${planned.beats.map(function(b) { return b.label + ": " + b.brief; }).join(" -> ")}`;
   }
