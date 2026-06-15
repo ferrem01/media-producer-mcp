@@ -584,7 +584,7 @@ ${gsapSource}
     '  v_texCoord = a_position * 0.5 + 0.5;',
     '  gl_Position = vec4(a_position, 0.0, 1.0);',
     '}'
-  ].join('\n');
+  ].join('\\n');
 
   // Fragment shader with gl-transitions wrapper
   var fragSrc = [
@@ -603,7 +603,7 @@ ${gsapSource}
     'void main() {',
     '  gl_FragColor = transition(v_texCoord);',
     '}'
-  ].join('\n');
+  ].join('\\n');
 
   // Compile shaders
   function compileShader(src, type) {

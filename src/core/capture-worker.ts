@@ -110,7 +110,11 @@ async function main() {
 
   const browser = await chromium.launch({
     args: [
-      "--disable-gpu",
+      // Shader transitions (gl-transitions) render via WebGL in this worker.
+      // Chromium provides a swiftshader WebGL context even under --disable-gpu,
+      // but make the intent explicit so the context is reliably available.
+      "--use-gl=swiftshader",
+      "--enable-webgl",
       "--disable-dev-shm-usage",
       "--no-sandbox",
       "--disable-setuid-sandbox",
