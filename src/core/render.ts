@@ -14,12 +14,13 @@ import path from "node:path";
 import { fork, execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
-import { assembleScene, assembleCodegenScene, type ComponentSource } from "./scene-assembler.js";
+import { assembleSceneAuto, type ComponentSource } from "./scene-assembler.js";
 
 /**
- * Choose the right assembler based on scene type.
- * Sequence scenes (with beats + library components) use the sequence assembler.
- * Everything else uses the standard scene assembler.
+ * Choose the right assembler based on scene type and assemble to HTML.
+ * Delegates to assembleSceneAuto, which routes codegen scenes (with <component>
+ * tags) through the codegen assembler (loading the full component library) and
+ * everything else through the standard assembler.
  */
 async function assembleSceneOrSequence(options: {
   scene: any;
@@ -30,35 +31,7 @@ async function assembleSceneOrSequence(options: {
   preview?: boolean;
   speakerUrl?: string;
 }): Promise<string> {
-  const { scene } = options;
-
-  // Check if any scene/custom component source contains <component> tags (unified codegen path)
-  if (scene.components?.length > 0) {
-    for (const comp of scene.components) {
-      if (comp.type.startsWith('scene_') || comp.type.startsWith('freeform_') || comp.type.startsWith('custom_') || comp.type.startsWith('template_')) {
-        const codegenSource = options.components.find(cs => cs.type === comp.type);
-        if (codegenSource && codegenSource.source.includes('<component ')) {
-          console.log(`  [render] Using codegen assembler for "${scene.label || scene.id}" (has <component> tags)`);
-          return assembleCodegenScene({
-            sceneSource: codegenSource.source,
-            componentSources: options.components.filter(cs => cs.type !== comp.type),
-            brandKit: options.brandKit,
-            canvas: options.canvas,
-            duration: scene.duration_seconds || 5,
-            sceneId: scene.id,
-            gsapDir: options.gsapDir,
-            background: scene.background,
-            transparentBackground: scene.transparent_background,
-            backgroundVideo: scene.background_video,
-            preview: options.preview,
-            speakerUrl: options.speakerUrl,
-          });
-        }
-      }
-    }
-  }
-
-  return assembleScene(options);
+  return assembleSceneAuto({ ...options, componentLibDir: config.componentLibDir });
 }
 import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, encodeGif, concatSegments } from "./encode.js";

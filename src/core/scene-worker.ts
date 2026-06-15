@@ -125,56 +125,18 @@ async function main() {
   // Import assembler (dynamic to keep this file self-contained for the worker)
   var { parseComponent, bindTemplate, scopeCSS } = await import("./component-parser.js");
 
-  // Assemble scene HTML -- route through codegen assembler if scene has <component> tags
-  var { assembleScene, assembleCodegenScene } = await import("./scene-assembler.js");
-  var html: string;
-
-  var codegenComp = scene.components?.find(
-    (c: any) => c.type.startsWith('scene_') || c.type.startsWith('freeform_') || c.type.startsWith('custom_') || c.type.startsWith('template_')
-  );
-  var codegenSource = codegenComp ? components.find((cs: any) => cs.type === codegenComp.type) : null;
-
-  if (codegenSource && codegenSource.source.includes('<component ')) {
-    // Load all library component sources for <component> tag resolution
-    var libSources: Array<{type: string, source: string}> = [];
-    var componentLibDir = args.componentLibDir || path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../src/components');
-    try {
-      var cats = await fs.readdir(componentLibDir, { withFileTypes: true });
-      for (var cat of cats) {
-        if (!cat.isDirectory() || cat.name === 'shared') continue;
-        var catFiles = await fs.readdir(path.join(componentLibDir, cat.name));
-        for (var cf of catFiles) {
-          if (cf.endsWith('.component.html')) {
-            var libType = cf.replace('.component.html', '');
-            var libSrc = await fs.readFile(path.join(componentLibDir, cat.name, cf), 'utf-8');
-            libSources.push({ type: libType, source: libSrc });
-          }
-        }
-      }
-    } catch (e: any) {
-      console.warn('  [scene-worker] Failed to load library components:', e.message);
-    }
-
-    html = await assembleCodegenScene({
-      sceneSource: codegenSource.source,
-      componentSources: [...libSources, ...components.filter((cs: any) => cs.type !== codegenComp!.type)],
-      brandKit: project.brand_kit,
-      canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
-      duration: scene.duration_seconds || 5,
-      sceneId: scene.id || `scene_${args.sceneIndex}`,
-      gsapDir: args.gsapDir,
-      background: scene.background,
-      transparentBackground: scene.transparent_background,
-    });
-  } else {
-    html = await assembleScene({
-      scene,
-      components,
-      brandKit: project.brand_kit,
-      canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
-      gsapDir: args.gsapDir,
-    });
-  }
+  // Assemble scene HTML -- assembleSceneAuto routes codegen scenes (with
+  // <component> tags) through the codegen assembler + full library load.
+  var { assembleSceneAuto } = await import("./scene-assembler.js");
+  var componentLibDir = args.componentLibDir || path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../src/components');
+  var html: string = await assembleSceneAuto({
+    scene,
+    components,
+    brandKit: project.brand_kit,
+    canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
+    gsapDir: args.gsapDir,
+    componentLibDir,
+  });
 
   // Write HTML
   var framesDir = path.join(args.workDir, "frames");
