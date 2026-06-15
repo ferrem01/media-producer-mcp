@@ -121,7 +121,7 @@ async function main() {
   const frameDirsToCleanup = new Set<string>();
 
   try {
-    const page = await browser.newPage();
+    const page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width: args.width, height: args.height });
 
     const fileUrl = `file://${path.resolve(args.htmlPath)}`;

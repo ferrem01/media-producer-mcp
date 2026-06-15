@@ -230,7 +230,7 @@ async function main() {
   const frameDirsToCleanup = new Set<string>();
 
   try {
-    var page = await browser.newPage();
+    var page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width: args.width, height: args.height });
     await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "networkidle", timeout: 60000 });
     await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 60000 });

@@ -99,7 +99,7 @@ export async function extractBrandFromUrl(url: string): Promise<{
   });
 
   try {
-    var page = await browser.newPage();
+    var page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
 

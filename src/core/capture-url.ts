@@ -29,7 +29,7 @@ export async function captureUrl(opts: CaptureUrlOptions): Promise<CaptureUrlRes
     args: ["--disable-gpu", "--no-sandbox", "--disable-setuid-sandbox", "--allow-file-access-from-files"],
   });
   try {
-    const page = await browser.newPage();
+    const page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({
       width: opts.width || 1920,
       height: opts.height || 1080,

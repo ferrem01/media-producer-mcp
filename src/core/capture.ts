@@ -190,7 +190,7 @@ export async function captureSingleFrame(options: {
         "--no-first-run",
       ],
     });
-    page = await browser.newPage();
+    page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width, height });
 
     const fileUrl = `file://${path.resolve(htmlPath)}`;
