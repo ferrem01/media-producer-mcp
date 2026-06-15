@@ -65,13 +65,9 @@ async function generateCodegenScene(
 
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (agentic-codegen)`);
 
-  // Build the brief: for sequences, combine beat briefs into one rich brief
   var effectiveBrief = codegenBrief;
   console.log("  [codegen-brief] Scene \"" + planned.label + "\" has " + (planned.components?.length || 0) + " component hints, brief includes schemas: " + effectiveBrief.includes("Component Schemas"));
   console.log("  [codegen-brief] Full brief length:", effectiveBrief.length, "chars");
-  if (planned.beats?.length && !effectiveBrief.includes("SEQUENCE")) {
-    effectiveBrief = `SEQUENCE: ${planned.beats.map(function(b) { return b.label + ": " + b.brief; }).join(" -> ")}`;
-  }
 
   var sceneHtml = await generateSceneAgentic({
     sceneBrief: effectiveBrief,
@@ -87,7 +83,6 @@ async function generateCodegenScene(
     critiqueFeedback: opts.critiqueFeedback,
     referenceImages: opts.referenceImages,
     creativeBible: opts.creativeBible,
-    beats: planned.beats,
   });
 
   sceneHtml = stripHtmlFences(sceneHtml);
@@ -215,18 +210,6 @@ async function buildCodegenBrief(planned: any): Promise<string> {
     } catch (e: any) {
       console.warn("  [buildCodegenBrief] Failed to load catalog for schemas:", e.message);
     }
-  }
-
-  // Sequence beats: include beat choreography
-  if (planned.beats?.length > 0) {
-    parts.push(`\nThis is a multi-beat sequence (${planned.beats.length} beats, continuous take):`);
-    var runTime = 0;
-    for (var beat of planned.beats) {
-      parts.push(`  Beat "${beat.label}" (${runTime}s - ${runTime + beat.duration_seconds}s): ${beat.brief}`);
-      runTime += beat.duration_seconds;
-    }
-    parts.push(`Use <component> tags for each UI element, then choreograph them with GSAP.`);
-    parts.push(`Show/hide/move components at beat boundaries using ctx.getComponentTimeline().`);
   }
 
   // Voiceover hint

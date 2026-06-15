@@ -1491,15 +1491,6 @@ async function runUnifiedPipeline(
         // Extract a concise narration from the brief (first sentence or label)
         fallbackVoiceover = planned.label?.replace(/^Scene \d+ - /, "") || planned.description || "";
       }
-      if (planned.beats?.length) {
-        // For sequences, concatenate beat voiceover texts
-        var beatVoiceovers = planned.beats
-          .filter(function(b: any) { return b.voiceover_text; })
-          .map(function(b: any) { return b.voiceover_text; });
-        if (beatVoiceovers.length > 0) {
-          fallbackVoiceover = beatVoiceovers.join(" ");
-        }
-      }
       if (fallbackVoiceover && fallbackVoiceover.length > 5) {
         planned.voiceover_text = fallbackVoiceover;
         console.log(`  [enforce] Scene ${si} "${planned.label}": generated fallback voiceover`);
