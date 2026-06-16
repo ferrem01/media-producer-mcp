@@ -484,7 +484,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
 ${backgroundVideo ? buildBrollBackground(backgroundVideo) : ""}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}
-<div class="mp-scene-content" style="position:relative;width:${canvas.width}px;height:${canvas.height}px;z-index:2;">
+<div class="mp-scene-content" style="position:absolute;top:20px;left:20px;width:${canvas.width}px;height:${canvas.height}px;z-index:2;">
 ${tagResult.html}
 </div>
 </div>
