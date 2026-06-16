@@ -7,11 +7,68 @@
  */
 
 import { z } from "zod";
+import fs from "node:fs/promises";
+import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { extractBrandFromUrl, enhanceWithLLM } from "./brand-extractor.js";
 import { loadBrandKit, saveBrandKit } from "../persistence/brand-kit.js";
 import { llmConfigFromEnv } from "../llm/client.js";
-import type { BrandKit } from "../core/types.js";
+import { config } from "../config.js";
+import type { BrandKit, BrandLogo } from "../core/types.js";
+
+function extFromContentType(ct: string, url: string): string {
+  ct = (ct || "").toLowerCase();
+  if (ct.includes("svg")) return "svg";
+  if (ct.includes("png")) return "png";
+  if (ct.includes("jpeg") || ct.includes("jpg")) return "jpg";
+  if (ct.includes("x-icon") || ct.includes("vnd.microsoft.icon")) return "ico";
+  if (ct.includes("webp")) return "webp";
+  const m = (url || "").split("?")[0].match(/\.(svg|png|jpe?g|ico|webp|gif)$/i);
+  return m ? m[1].toLowerCase().replace("jpeg", "jpg") : "png";
+}
+
+/**
+ * Download the top logo candidates and register them in the brand kit's logos[].
+ * Candidates come ranked from the extractor (header logo > apple-touch-icon > favicon).
+ * og-image banners are skipped as logos. Returns the BrandLogo entries created.
+ */
+async function downloadLogos(
+  tenantId: string,
+  candidates: Array<{ url: string; kind: string; score: number; alt: string; width: number; height: number }>,
+  max = 3,
+): Promise<BrandLogo[]> {
+  const dir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "logo");
+  await fs.mkdir(dir, { recursive: true });
+  const out: BrandLogo[] = [];
+  for (const cand of candidates.filter((c) => c.kind !== "og-image")) {
+    if (out.length >= max) break;
+    try {
+      const res = await fetch(cand.url);
+      if (!res.ok) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length === 0) continue;
+      const ext = extFromContentType(res.headers.get("content-type") || "", cand.url);
+      // Infer variant: square-ish marks are icons; wide ones are full lockups/wordmarks.
+      const aspect = cand.width && cand.height ? cand.width / cand.height : 0;
+      const variant: BrandLogo["variant"] =
+        (/icon|favicon/.test(cand.kind) || (aspect > 0 && aspect < 1.5)) ? "icon"
+        : (aspect >= 3 ? "wordmark" : "full");
+      const name = `extracted-${variant}-${out.length + 1}`;
+      const filename = `${name}.${ext}`;
+      await fs.writeFile(path.join(dir, filename), buf);
+      out.push({
+        name,
+        url: `/assets/${tenantId}/brand-kit/logo/${filename}`,
+        variant,
+        theme: "any",
+        ...(cand.height ? { height: cand.height } : {}),
+      });
+    } catch (e: any) {
+      console.warn(`[extract_brand] logo download failed (${cand.kind} ${cand.url}):`, e.message);
+    }
+  }
+  return out;
+}
 
 function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -118,6 +175,15 @@ export function registerBrandExtractTool(server: McpServer): void {
           }
         }
 
+        // Register extracted logos -- but never clobber logos the user already set/uploaded.
+        if (!kit.logos || kit.logos.length === 0) {
+          const extractedLogos = await downloadLogos(params.tenant_id, result.logos || []);
+          if (extractedLogos.length > 0) {
+            kit.logos = extractedLogos;
+            console.log(`[extract_brand] registered ${extractedLogos.length} logo(s): ${extractedLogos.map((l) => l.name).join(", ")}`);
+          }
+        }
+
         // Save the updated brand kit
         await saveBrandKit(params.tenant_id, kit);
 
@@ -141,6 +207,8 @@ export function registerBrandExtractTool(server: McpServer): void {
             density: designSystem.density,
           },
           patterns: designSystem.patterns,
+          logos: (kit.logos || []).map((l) => ({ name: l.name, variant: l.variant, url: l.url })),
+          logo_candidates_found: (result.logos || []).length,
           enhanced: params.enhance && !!designSystem.guidelines,
           guidelines_preview: designSystem.guidelines
             ? designSystem.guidelines.substring(0, 200) + "..."
