@@ -1308,6 +1308,7 @@ function storyboardToPlan(
       visual_notes: s.brief || s.description || "",
       components: s.components || [],
       broll_query: s.broll_query,
+      hero_image: s.hero_image,
     })),
     audio: {
       music_mood: "corporate",

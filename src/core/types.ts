@@ -278,6 +278,8 @@ export interface PlannedScene {
   components?: string[];
   /** Cinematic stock-footage search phrase; when set, b-roll plays behind the scene */
   broll_query?: string;
+  /** AI-generated still image prompt; when set, a generated image is the scene background (mutually exclusive with broll_query) */
+  hero_image?: string;
 }
 
 export type PlannedAssetType =
