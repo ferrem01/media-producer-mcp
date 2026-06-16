@@ -44,6 +44,8 @@ export interface AgenticCodegenOpts {
   llmConfig: LLMConfig;
   brandKit: BrandKit;
   canvas: Canvas;
+  /** True when real video footage (b-roll) is already placed behind this scene. */
+  hasBackgroundVideo?: boolean;
   critiqueFeedback?: string;
   referenceImages?: ReferenceImage[];
   creativeBible?: CreativeBible;
@@ -299,7 +301,14 @@ Your submitted HTML must be a single .scene.html file with three sections:
 ${brandVarsContext}
 ${opts.referenceImages?.length ? buildReferenceImageSummary(opts.referenceImages) + "\nReference images show the target visual design. Your HTML+CSS should match the layout, colors, typography, spacing, and component hierarchy shown in these references.\n" : ""}
 ## This Scene
-
+${opts.hasBackgroundVideo ? `
+## FOOTAGE-FORWARD SCENE (real video b-roll is already behind your content)
+This scene ALREADY has real cinematic video footage filling the background (placed by the system, with a legibility scrim). It is the hero of the scene -- treat it like a film establishing shot, not wallpaper.
+- DO NOT add any of your own full-screen background: NO gradient-background, mesh-gradient, particle fields, grids, glow orbs, or any element that covers the footage. The footage IS the background.
+- Keep the foreground MINIMAL: a headline/tagline and at most one small supporting element (e.g. a small logo or a thin underline). Lots of negative space -- let the footage breathe.
+- Make text legible over moving video: large, heavy weight, white or near-white, with a soft text-shadow or a small local gradient pad behind the words (not a full-screen overlay).
+- Your root container MUST be transparent (background: transparent) so the footage shows through. Animate the text in/out; do not animate a background.
+` : ""}
 Duration: ${opts.sceneDuration} seconds
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}
 Project: ${opts.prompt}

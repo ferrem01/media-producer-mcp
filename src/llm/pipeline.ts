@@ -1585,6 +1585,7 @@ async function runUnifiedPipeline(
           projectId,
           referenceImages: processedRefs,
           creativeBible,
+          hasBackgroundVideo: stockFootageMap.has(i),
         });
 
         // Save custom component HTML if needed

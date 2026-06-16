@@ -120,6 +120,18 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
 }
 
 /**
+ * Background b-roll markup: the footage as a PROMINENT background (it should read
+ * as real footage, not faint wallpaper) plus a legibility scrim -- a vertical
+ * gradient that darkens the top and bottom (where titles/captions sit) while
+ * letting the footage breathe through the middle. z-index 0 (video) / 1 (scrim),
+ * below scene content (z-index 2+).
+ */
+function buildBrollBackground(videoPath: string): string {
+  return `<video class="mp-bg-video" src="file://${videoPath}" autoplay muted loop playsinline style="position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;opacity:0.92;filter:brightness(0.82) saturate(1.05);"></video>` +
+    `\n<div class="mp-bg-scrim" style="position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,0.45) 0%,rgba(0,0,0,0.12) 28%,rgba(0,0,0,0.12) 60%,rgba(0,0,0,0.62) 100%);"></div>`;
+}
+
+/**
  * Assemble a scene into a self-contained HTML document.
  */
 export async function assembleScene(options: AssembleOptions): Promise<string> {
@@ -278,7 +290,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 <body>
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? '' : '<div class="mp-ambient"></div>'}
-${scene.background_video ? `<video class="mp-bg-video" src="file://${scene.background_video}" autoplay muted loop playsinline style="position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;opacity:0.35;filter:blur(2px) brightness(0.7);"></video>` : ''}
+${scene.background_video ? buildBrollBackground(scene.background_video) : ''}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
 ${buildContentRegionWrapper(scene, componentBlocks)}
 </div>
@@ -470,7 +482,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 <body>
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
-${backgroundVideo ? `<video class="mp-bg-video" src="file://${backgroundVideo}" autoplay muted loop playsinline style="position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;opacity:0.35;filter:blur(2px) brightness(0.7);"></video>` : ""}
+${backgroundVideo ? buildBrollBackground(backgroundVideo) : ""}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}
 <div class="mp-scene-content" style="position:relative;width:${canvas.width}px;height:${canvas.height}px;z-index:2;">
 ${tagResult.html}
