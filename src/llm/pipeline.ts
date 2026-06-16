@@ -1307,6 +1307,8 @@ function storyboardToPlan(
       assets: [],
       visual_notes: s.brief || s.description || "",
       components: s.components || [],
+      broll_query: s.broll_query,
+      hero_image: s.hero_image,
     })),
     audio: {
       music_mood: "corporate",
@@ -1461,18 +1463,37 @@ async function runUnifiedPipeline(
   }
   trace?.endEvent({ images: enrichResult.imageUrls.size });
 
-  // 3b. Stock footage backgrounds (optional)
+  // 3b. Stock footage / b-roll backgrounds.
+  //   - Planner-driven (default): any scene the planner tagged with a broll_query.
+  //   - Global override: opts.stockFootage forces footage on all eligible scenes.
+  // Capped so b-roll stays special (and we don't hammer Pexels).
   var stockFootageMap = new Map<number, string>();
-  if (opts.stockFootage && process.env.PEXELS_API_KEY) {
+  if (process.env.PEXELS_API_KEY) {
     trace?.beginEvent("stock_footage");
     const stockDir = path.join(projectDir(opts.tenant_id, projectId), "stock");
+    const MAX_BROLL = 3;
+    let fetched = 0;
     for (let si = 0; si < storyboard.scenes.length; si++) {
       const planned = storyboard.scenes[si];
-      // Skip intro/outro/breathing scenes and scenes with hero images
+      // Skip scenes that already have a generated hero image.
       if (enrichResult.imageUrls.has(si)) continue;
-      if (planned.label?.toLowerCase().includes('intro') || planned.label?.toLowerCase().includes('outro')) continue;
 
-      const query = generateStockQuery(planned.label, planned.description);
+      // The planner's broll_query wins; otherwise the global flag fetches a
+      // query derived from the scene (skipping intro/outro).
+      let query: string | null = null;
+      if (planned.broll_query) {
+        query = planned.broll_query;
+      } else if (opts.stockFootage
+          && !planned.label?.toLowerCase().includes('intro')
+          && !planned.label?.toLowerCase().includes('outro')) {
+        query = generateStockQuery(planned.label, planned.description);
+      }
+      if (!query) continue;
+      if (fetched >= MAX_BROLL) {
+        console.log(`  B-roll: cap of ${MAX_BROLL} reached, skipping "${planned.label}"`);
+        continue;
+      }
+
       const clip = await fetchStockFootage({
         query,
         minDuration: planned.duration_seconds,
@@ -1481,9 +1502,11 @@ async function runUnifiedPipeline(
       });
       if (clip) {
         stockFootageMap.set(si, clip.localPath);
+        fetched++;
+        console.log(`  B-roll scene ${si} "${planned.label}": "${query}"`);
       }
     }
-    console.log(`  Stock footage: ${stockFootageMap.size} clips fetched`);
+    console.log(`  Stock footage: ${stockFootageMap.size} clip(s) fetched`);
     trace?.endEvent({ clips: stockFootageMap.size });
   }
 
@@ -1563,6 +1586,7 @@ async function runUnifiedPipeline(
           projectId,
           referenceImages: processedRefs,
           creativeBible,
+          hasBackgroundVideo: stockFootageMap.has(i),
         });
 
         // Save custom component HTML if needed

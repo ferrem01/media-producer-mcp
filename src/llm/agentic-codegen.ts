@@ -44,6 +44,10 @@ export interface AgenticCodegenOpts {
   llmConfig: LLMConfig;
   brandKit: BrandKit;
   canvas: Canvas;
+  /** True when real video footage (b-roll) is already placed behind this scene. */
+  hasBackgroundVideo?: boolean;
+  /** URL of a generated hero image to use as this scene's full-bleed still background. */
+  heroImageUrl?: string;
   critiqueFeedback?: string;
   referenceImages?: ReferenceImage[];
   creativeBible?: CreativeBible;
@@ -299,7 +303,24 @@ Your submitted HTML must be a single .scene.html file with three sections:
 ${brandVarsContext}
 ${opts.referenceImages?.length ? buildReferenceImageSummary(opts.referenceImages) + "\nReference images show the target visual design. Your HTML+CSS should match the layout, colors, typography, spacing, and component hierarchy shown in these references.\n" : ""}
 ## This Scene
-
+${opts.hasBackgroundVideo ? `
+## FOOTAGE-FORWARD SCENE (real video b-roll is already behind your content)
+This scene ALREADY has real cinematic video footage filling the background (placed by the system, with a legibility scrim). It is the hero of the scene -- treat it like a film establishing shot, not wallpaper.
+- DO NOT add any of your own full-screen background: NO gradient-background, mesh-gradient, particle fields, grids, glow orbs, or any element that covers the footage. The footage IS the background.
+- Keep the foreground MINIMAL: a headline/tagline and at most one small supporting element (e.g. a small logo or a thin underline). Lots of negative space -- let the footage breathe.
+- Make text legible over moving video: large, heavy weight, white or near-white, with a soft text-shadow or a small local gradient pad behind the words (not a full-screen overlay).
+- Your root container MUST be transparent (background: transparent) so the footage shows through. Animate the text in/out; do not animate a background.
+` : ""}
+${opts.heroImageUrl ? `
+## HERO-IMAGE SCENE (a generated still image is THIS scene's background)
+This scene has a real, cinematic AI-generated image that MUST be the full-bleed background. It is a deliberate STILL -- the calm, composed beat of the video. You MUST draw it.
+- Place it as the FIRST element in your <template>, filling the frame:
+  \`<img class="mp-hero-img" src="${opts.heroImageUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;" />\`
+  (The system rewrites that URL to a local file at render time -- keep it EXACTLY as given.)
+- DO NOT add any of your own full-screen background (NO gradient-background, mesh, particles, grids, glow orbs) -- the image IS the background. Add only a soft legibility scrim if text needs it (e.g. a subtle linear-gradient overlay at z-index:1).
+- Keep the foreground MINIMAL and let the image breathe: a headline/tagline and at most one small supporting element. Lots of negative space.
+- This is a STILL beat: a slow, gentle Ken-Burns drift (scale 1.0 -> 1.06 over the full duration) on the image is welcome, but NOTHING should pop, bounce, or rebuild. Animate text gently (fade/slow rise); do not animate a competing background.
+` : ""}
 Duration: ${opts.sceneDuration} seconds
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}
 Project: ${opts.prompt}
@@ -356,6 +377,25 @@ function buildBrandContext(brandKit: BrandKit): string {
       "",
       `Border radius: use var(--mp-border-radius) [default: ${brandKit.style.border_radius || "12px"}]`,
       `Motion: ${brandKit.style.motion || "cinematic"}`,
+    );
+  }
+  if (brandKit.logos?.length) {
+    lines.push(
+      "",
+      "## Brand Logos (render the REAL asset -- never redraw, invent, or approximate the logo)",
+      "When a logo belongs in the scene, render it as a real image element pointing at the EXACT url below:",
+      '  <img src="<url>" alt="logo" style="height:64px;width:auto;display:block;" />',
+      "Available logo variants:",
+    );
+    for (var logo of brandKit.logos) {
+      lines.push(`  - ${logo.name} (${logo.variant}, ${logo.theme} theme): ${logo.url}`);
+    }
+    lines.push(
+      "Placement rules:",
+      "  - Opening, closing, and brand/CTA scenes: feature the 'full' or 'wordmark' variant prominently and animate it in.",
+      "  - Other content scenes: optionally place the 'icon' variant small (~36-48px) in a top or bottom corner as a subtle, low-opacity watermark.",
+      "  - Pick the variant whose theme fits the background: dark background -> 'light' or 'any'; light background -> 'dark' or 'any'.",
+      "  - Animate the logo's container (opacity/scale/position) -- do NOT distort the logo image itself.",
     );
   }
   return lines.join("\n");

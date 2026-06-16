@@ -31,6 +31,8 @@ export interface SceneGeneratorOpts {
   critiqueFeedback?: string; // feedback from visual critiquer for retry
   referenceImages?: ReferenceImage[];
   creativeBible?: CreativeBible;
+  /** True when this scene has b-roll stock footage as its background. */
+  hasBackgroundVideo?: boolean;
 }
 
 export interface GeneratedScene {
@@ -83,6 +85,8 @@ async function generateCodegenScene(
     critiqueFeedback: opts.critiqueFeedback,
     referenceImages: opts.referenceImages,
     creativeBible: opts.creativeBible,
+    hasBackgroundVideo: opts.hasBackgroundVideo,
+    heroImageUrl: opts.imageUrl,
   });
 
   sceneHtml = stripHtmlFences(sceneHtml);

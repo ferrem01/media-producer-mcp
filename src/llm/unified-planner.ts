@@ -71,6 +71,7 @@ export interface PlannedScene {
   transition_in?: { type: string; duration_seconds: number };
   hero_image?: string;
   voiceover_text?: string;  // Narration script for this scene (TTS)
+  broll_query?: string;     // when set, fetch cinematic stock footage as this scene's background
 }
 
 export interface StoryboardResult {
@@ -125,6 +126,22 @@ The codegen LLM will receive the component schemas and use <component> tags.
 If no library components fit, leave "components" as an empty array [].
 For scenes with existing UI elements (chat panels, dashboards, code editors), always list the matching library component types.
 
+### Background Strategy -- decide this FIRST, per scene, by INTENT
+Before writing any background, decide which of FOUR strategies the moment wants. Do this BEFORE reaching for b-roll -- b-roll is ONE option, not the default for every atmospheric beat:
+1. **B-roll video (broll_query)** -- real-world energy, atmosphere, a place, a human moment that should feel ALIVE and MOVING. Opener "set the world", emotional/aspirational/lifestyle beats WITH motion. Must visibly move (see B-Roll below).
+2. **Generated image (hero_image)** -- a calm, composed, contemplative, or singular striking visual; a beat that should feel STILL and intentional. A photograph never reads as "broken" the way a frozen video does, so this -- NOT a slowed/static video -- is the correct tool for quiet/still/atmospheric moments. Use hero_image when you want the cinematic b-roll *feeling* (real, emotional, beautiful) but the scene should HOLD STILL.
+3. **Motion graphics / mesh (animated background, the default)** -- product, UI, data, abstract, branded scenes. HTML/CSS/GSAP gradients, glow orbs, particles.
+4. **Plain gradient** -- when nothing else is earned.
+**DECISION GATE:** Is this beat moving or still? MOVING/kinetic/alive -> b-roll. STILL/calm/contemplative/composed -> hero_image. If you catch yourself wanting a "slow", "still", "perfectly calm", "stationary camera", "resting", or "barely moving" video, STOP -- that is a hero_image, not a broll_query. A meditative/dawn/quiet/serene opener is almost always a hero_image, NOT slow b-roll.
+
+### B-Roll (atmospheric stock footage) -- when the beat MOVES
+Once the gate above says this beat is MOVING, add a "broll_query": a SPECIFIC, cinematic stock-footage search phrase that matches the scene's mood and the brand. The clip plays as a darkened background BEHIND your content (it does not replace the foreground).
+- A brand film, a product launch's emotional opener/closer, or any prompt about a feeling, place, or aspiration that should feel ALIVE wants b-roll on at least one scene. Do NOT default to a plain gradient on those moving moments -- reach for real footage.
+- MOTION IS MANDATORY: b-roll is a VIDEO clip, so the clip must have clear, continuous on-screen movement -- drifting clouds, flowing or crashing water, a moving/drone/tracking camera, traffic or people in motion, rippling light, blowing grass. NEVER request a static, stationary-camera, locked-off, freeze-frame, or photo-like shot as a broll_query -- a frozen-looking video reads as a broken render. (If the beat should be still, you skipped the gate -- use hero_image.)
+- Good queries are concrete, shot-like, AND describe the movement: "drone flying forward over a rugged coastline, waves crashing below, overcast", "fast timelapse of clouds rolling over mountains at dawn", "first-person driving an open mountain road at sunrise, trees rushing past", "close-up of hands typing on a laptop, fingers moving, shallow depth of field", "macro of flowing deep-blue ink swirling". Prefer normal-speed or sweeping motion; use "slow motion" only when the subject still clearly moves.
+- Budget: 1-3 scenes across the video (it should still feel special, not every scene).
+- Do NOT use broll_query on data/metrics, UI/feature, logo, or CTA scenes -- those need a clean generated background. Omit the field entirely on those.
+
 ### Continuous / Multi-Step Scenes (walkthroughs, demos)
 There is no separate "sequence" type. A continuous multi-step moment — a
 walkthrough, demo flow, step-by-step, or "single take" where elements persist and
@@ -152,6 +169,7 @@ ${catalogStr}
       "brief": "A dramatic hero reveal — huge 120px typography saying 'QUOTIENT' SLAMS in from below with SplitText per-character animation (chars stagger 0.03s, back.out ease). Background uses brand colors with ambient glow orbs in the accent color drifting slowly. Subtitle at 24px FADES in below the headline. Floating particles in background add depth. BG: gradient with glow orbs. MG: subtitle text. FG: headline with particle hints.",
       "components": [],
       "voiceover_text": "Introducing Quotient. The future of demand generation.",
+      "broll_query": "abstract flowing deep-blue and violet ink in slow motion, macro, dark background",
       "transition_in": { "type": "none", "duration_seconds": 0 }
     },
     {
@@ -161,6 +179,16 @@ ${catalogStr}
       "brief": "Two stat cards STAGGER in from below — first '340% ROI Increase' lands with a bounce, then '2.5M Users Reached' follows 0.3s later. Each card has a large animated counter that rolls up to its final number. Subtle gradient background with brand colors. Cards have rounded corners with soft shadows. BG: gradient. FG: stat cards with counter animations.",
       "components": ["stat-card"],
       "transition_in": { "type": "slide-up", "duration_seconds": 0.5 }
+    },
+    {
+      "label": "Scene 3 - Quiet Moment",
+      "duration_seconds": 5,
+      "description": "A still, contemplative beat that should HOLD STILL (uses a generated image, not a video)",
+      "brief": "A serene, composed beat. The hero_image fills the frame as a deliberate still; a single line of 32px text FADES in slowly over it. BG: hero image. FG: one calm line of copy.",
+      "components": [],
+      "voiceover_text": "Find your calm.",
+      "hero_image": "a perfectly still misty mountain lake at dawn, soft violet and amber light, mirror-like reflection, serene and contemplative, cinematic photograph",
+      "transition_in": { "type": "blur-crossfade", "duration_seconds": 0.6 }
     }
   ]
 }
@@ -169,6 +197,7 @@ ${catalogStr}
 
 - ${sceneCountGuide}
 - **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Its brief must describe the whole flow as an ordered progression (step 1 → step 2 → step 3 …, each as motion: SLIDES, MORPHS, ASSEMBLES), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a plan failure.
+- B-ROLL: if the prompt is a brand film, or has an emotional/aspirational/lifestyle opener or closer, or any "feeling / place / human moment" scene, you MUST add a "broll_query" (a specific cinematic stock-footage phrase) to at least one such scene -- see the B-Roll section. Don't default those moments to a flat gradient. (Skip b-roll entirely for pure data/UI/feature/logo/CTA videos.)
 - First scene: transition "none" or omit transition_in.
 - Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, shader-crosswarp, shader-ripple, shader-radial, shader-directional-warp, shader-burn, shader-chromatic, shader-lens-distortion, none.
 - SHADER transitions (shader-*) use WebGL for premium visual effects. Use them for hero transitions between key scenes. shader-crosswarp: warped crossfade, shader-ripple: ripple wave, shader-radial: radial wipe, shader-directional-warp: directional warp morph, shader-burn: warm burn blend, shader-chromatic: RGB split aberration, shader-lens-distortion: gravitational lens. Use 1-3 shader transitions per video for maximum impact. Do not overuse.
@@ -178,7 +207,8 @@ ${catalogStr}
 
 
 - For custom components: custom_prompt must be 3-5 sentences with SPECIFIC visual direction (exact sizes, colors, animation names, layout positions). EXPLICITLY STATE what content the custom component should render and what other library components in the scene already handle.
-- hero_image is OPTIONAL and should be RARE (0-1 per project, not every scene). Only use when a real photograph or illustration would dramatically improve the scene. Most scenes should rely on HTML/CSS/GSAP visuals, not AI images. Skip for: text scenes, stats, code demos, CTAs, dashboards, lists.
+- hero_image is the tool for an INTENTIONAL STILL: a calm/composed/atmospheric beat that wants a real, cinematic visual but should hold still rather than move. It is the correct alternative to a "slow" or "still" b-roll video (a photo looks deliberate; a frozen video looks broken). Reach for it whenever a scene wants the b-roll feeling but stillness -- typically 0-2 per video, not every scene. Most UI/data/branded scenes should still rely on HTML/CSS/GSAP visuals. Skip for: stats, code demos, CTAs, dashboards, lists, logo scenes.
+- hero_image and broll_query are MUTUALLY EXCLUSIVE on a single scene -- pick one (moving footage OR a still image), never both.
 - hero_image prompts describe the IMAGE itself, not the scene layout.
 - Every scene MUST have a components array with at least one component.
 - Think Apple keynote: one powerful idea per scene, cinematic motion, premium aesthetic.

@@ -68,8 +68,7 @@ export interface BrandAsset {
 export interface BrandKit {
   colors: BrandColors;
   fonts: BrandFont[];
-  logo?: BrandLogo;       // primary logo (backwards compat)
-  logos?: BrandLogo[];     // all logo variants
+  logos?: BrandLogo[];     // all logo variants (full/icon/wordmark, dark/light/any)
   assets?: BrandAsset[];  // brand assets (backgrounds, intros, outros, watermarks, music)
   style?: {
     border_radius?: string;
@@ -277,6 +276,10 @@ export interface PlannedScene {
   visual_notes: string;
   /** Library component types the planner suggested embedding in this scene */
   components?: string[];
+  /** Cinematic stock-footage search phrase; when set, b-roll plays behind the scene */
+  broll_query?: string;
+  /** AI-generated still image prompt; when set, a generated image is the scene background (mutually exclusive with broll_query) */
+  hero_image?: string;
 }
 
 export type PlannedAssetType =

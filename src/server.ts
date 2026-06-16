@@ -622,13 +622,26 @@ export function createMcpServer(): McpServer {
       // Set/update brand kit
       const existing = await loadBrandKit(params.tenant_id);
       // Merge logos: append new, replace by name
-      let mergedLogos = existing?.logos || [];
+      let mergedLogos: any[] = existing?.logos || [];
+      const upsertLogo = (newLogo: any) => {
+        const idx = mergedLogos.findIndex((l: any) => l.name === newLogo.name);
+        if (idx >= 0) mergedLogos[idx] = newLogo;
+        else mergedLogos.push(newLogo);
+      };
       if (params.logos) {
-        for (const newLogo of params.logos) {
-          const idx = mergedLogos.findIndex((l: any) => l.name === newLogo.name);
-          if (idx >= 0) mergedLogos[idx] = newLogo as any;
-          else mergedLogos.push(newLogo as any);
-        }
+        for (const newLogo of params.logos) upsertLogo(newLogo);
+      }
+      // Back-compat: the single `logo` param is coerced into the logos array
+      // (the brand kit only carries `logos[]` now -- the planner reads that).
+      if (params.logo) {
+        upsertLogo({
+          name: "primary",
+          url: params.logo.url,
+          variant: "full" as const,
+          theme: "any" as const,
+          height: params.logo.height,
+          placement: params.logo.placement,
+        });
       }
 
       // Merge assets: append new, replace by name+type
@@ -638,26 +651,6 @@ export function createMcpServer(): McpServer {
           const idx = mergedAssets.findIndex((a: any) => a.name === newAsset.name && a.type === newAsset.type);
           if (idx >= 0) mergedAssets[idx] = newAsset as any;
           else mergedAssets.push(newAsset as any);
-        }
-      }
-
-      // Determine primary logo: explicit logo param > first "full" variant in logos > existing
-      let primaryLogo: import("./core/types.js").BrandLogo | undefined = existing?.logo;
-      if (params.logo) {
-        // Coerce old-style logo param into new BrandLogo shape
-        primaryLogo = {
-          name: "primary",
-          url: params.logo.url,
-          variant: "full" as const,
-          theme: "any" as const,
-          height: params.logo.height,
-          placement: params.logo.placement,
-        };
-      }
-      if (mergedLogos.length > 0 && !params.logo) {
-        const fullLogo = mergedLogos.find((l: any) => l.variant === "full");
-        if (fullLogo) {
-          primaryLogo = fullLogo as any;
         }
       }
 
@@ -676,7 +669,6 @@ export function createMcpServer(): McpServer {
         fonts: params.fonts || existing?.fonts || [
           { family: "Inter", source: "google" as const, weights: [400, 500, 600, 700, 800] },
         ],
-        logo: primaryLogo,
         logos: mergedLogos.length > 0 ? mergedLogos : undefined,
         assets: mergedAssets.length > 0 ? mergedAssets : undefined,
         style: {
@@ -834,6 +826,26 @@ export function createMcpServer(): McpServer {
 
           // Return the served URL
           const servedUrl = `/assets/${params.tenant_id}/brand-kit/${assetType}/${filename}`;
+
+          // Auto-register a logo upload into the brand kit's logos[] (the planner
+          // reads logos[], so an uploaded logo must land there to be usable).
+          if (assetType === "logo") {
+            try {
+              const kit = await loadBrandKit(params.tenant_id) || {
+                colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
+                fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
+                style: { border_radius: "12px", motion: "cinematic" as const },
+              };
+              if (!kit.logos) kit.logos = [];
+              const newLogo = { name: params.name, url: servedUrl, variant: "full" as const, theme: "any" as const };
+              const existingIdx = kit.logos.findIndex((l) => l.name === newLogo.name);
+              if (existingIdx >= 0) kit.logos[existingIdx] = newLogo;
+              else kit.logos.push(newLogo);
+              await saveBrandKit(params.tenant_id, kit);
+            } catch (regErr: any) {
+              console.warn("Failed to auto-register brand logo:", regErr.message);
+            }
+          }
 
           // Auto-register in brand kit metadata
           const brandAssetTypes = ["background", "intro", "outro", "watermark", "music"];
