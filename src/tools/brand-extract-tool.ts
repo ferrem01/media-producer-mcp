@@ -9,7 +9,11 @@
 import { z } from "zod";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+
+const execFileP = promisify(execFile);
 import { extractBrandFromUrl, enhanceWithLLM } from "./brand-extractor.js";
 import { loadBrandKit, saveBrandKit } from "../persistence/brand-kit.js";
 import { llmConfigFromEnv } from "../llm/client.js";
@@ -25,6 +29,41 @@ function extFromContentType(ct: string, url: string): string {
   if (ct.includes("webp")) return "webp";
   const m = (url || "").split("?")[0].match(/\.(svg|png|jpe?g|ico|webp|gif)$/i);
   return m ? m[1].toLowerCase().replace("jpeg", "jpg") : "png";
+}
+
+/**
+ * Probe a downloaded logo for its real dimensions and which background theme it
+ * suits. Theme is inferred from the luminance of the logo's INK (opaque pixels):
+ * a dark wordmark -> "light" (use on light bg), a white/light mark -> "dark",
+ * anything mid-range (e.g. a colorful icon) -> "any". Uses ffmpeg/ffprobe only.
+ */
+async function analyzeLogo(filePath: string): Promise<{ width: number; height: number; theme: BrandLogo["theme"] }> {
+  if (/\.svg$/i.test(filePath)) return { width: 0, height: 0, theme: "any" };
+  let width = 0, height = 0;
+  try {
+    const { stdout } = await execFileP("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", filePath]);
+    const m = stdout.trim().match(/(\d+)x(\d+)/);
+    if (m) { width = +m[1]; height = +m[2]; }
+  } catch { /* dims optional */ }
+
+  let theme: BrandLogo["theme"] = "any";
+  try {
+    const yavg = async (vf: string): Promise<number> => {
+      const { stderr } = await execFileP("ffmpeg", ["-i", filePath, "-vf", `${vf},signalstats,metadata=print`, "-frames:v", "1", "-f", "null", "-"], { maxBuffer: 1e8 });
+      const m = (stderr || "").match(/lavfi\.signalstats\.YAVG=([0-9.]+)/);
+      return m ? parseFloat(m[1]) : NaN;
+    };
+    // format=rgba first so palette/opaque PNGs expose a real alpha plane.
+    const meanAlpha = await yavg("format=rgba,alphaextract");           // 0-255: coverage * 255
+    const premultLuma = await yavg("format=rgba,premultiply=inplace=1"); // mean of inkLuma * coverage
+    if (isFinite(meanAlpha) && meanAlpha >= 8 && isFinite(premultLuma)) {
+      const inkLuma = (premultLuma / meanAlpha) * 255;     // luminance of the opaque ink, 0-255
+      if (inkLuma < 100) theme = "light";       // dark ink reads on light backgrounds
+      else if (inkLuma > 155) theme = "dark";   // light ink reads on dark backgrounds
+    }
+  } catch { /* theme detection optional */ }
+
+  return { width, height, theme };
 }
 
 /**
@@ -48,20 +87,25 @@ async function downloadLogos(
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length === 0) continue;
       const ext = extFromContentType(res.headers.get("content-type") || "", cand.url);
-      // Infer variant: square-ish marks are icons; wide ones are full lockups/wordmarks.
-      const aspect = cand.width && cand.height ? cand.width / cand.height : 0;
+      const idx = out.length + 1;
+      const filename = `extracted-${idx}.${ext}`;
+      const filePath = path.join(dir, filename);
+      await fs.writeFile(filePath, buf);
+
+      // Probe the saved file for true dimensions + which background theme it suits.
+      const probe = await analyzeLogo(filePath);
+      const aspect = probe.width && probe.height ? probe.width / probe.height
+        : (cand.width && cand.height ? cand.width / cand.height : 0);
       const variant: BrandLogo["variant"] =
         (/icon|favicon/.test(cand.kind) || (aspect > 0 && aspect < 1.5)) ? "icon"
         : (aspect >= 3 ? "wordmark" : "full");
-      const name = `extracted-${variant}-${out.length + 1}`;
-      const filename = `${name}.${ext}`;
-      await fs.writeFile(path.join(dir, filename), buf);
+      const height = probe.height || cand.height || 0;
       out.push({
-        name,
+        name: `extracted-${variant}-${probe.theme}-${idx}`,
         url: `/assets/${tenantId}/brand-kit/logo/${filename}`,
         variant,
-        theme: "any",
-        ...(cand.height ? { height: cand.height } : {}),
+        theme: probe.theme,
+        ...(height ? { height } : {}),
       });
     } catch (e: any) {
       console.warn(`[extract_brand] logo download failed (${cand.kind} ${cand.url}):`, e.message);
@@ -207,7 +251,7 @@ export function registerBrandExtractTool(server: McpServer): void {
             density: designSystem.density,
           },
           patterns: designSystem.patterns,
-          logos: (kit.logos || []).map((l) => ({ name: l.name, variant: l.variant, url: l.url })),
+          logos: (kit.logos || []).map((l) => ({ name: l.name, variant: l.variant, theme: l.theme, url: l.url })),
           logo_candidates_found: (result.logos || []).length,
           enhanced: params.enhance && !!designSystem.guidelines,
           guidelines_preview: designSystem.guidelines
