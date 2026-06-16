@@ -46,6 +46,8 @@ export interface AgenticCodegenOpts {
   canvas: Canvas;
   /** True when real video footage (b-roll) is already placed behind this scene. */
   hasBackgroundVideo?: boolean;
+  /** URL of a generated hero image to use as this scene's full-bleed still background. */
+  heroImageUrl?: string;
   critiqueFeedback?: string;
   referenceImages?: ReferenceImage[];
   creativeBible?: CreativeBible;
@@ -308,6 +310,16 @@ This scene ALREADY has real cinematic video footage filling the background (plac
 - Keep the foreground MINIMAL: a headline/tagline and at most one small supporting element (e.g. a small logo or a thin underline). Lots of negative space -- let the footage breathe.
 - Make text legible over moving video: large, heavy weight, white or near-white, with a soft text-shadow or a small local gradient pad behind the words (not a full-screen overlay).
 - Your root container MUST be transparent (background: transparent) so the footage shows through. Animate the text in/out; do not animate a background.
+` : ""}
+${opts.heroImageUrl ? `
+## HERO-IMAGE SCENE (a generated still image is THIS scene's background)
+This scene has a real, cinematic AI-generated image that MUST be the full-bleed background. It is a deliberate STILL -- the calm, composed beat of the video. You MUST draw it.
+- Place it as the FIRST element in your <template>, filling the frame:
+  \`<img class="mp-hero-img" src="${opts.heroImageUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;" />\`
+  (The system rewrites that URL to a local file at render time -- keep it EXACTLY as given.)
+- DO NOT add any of your own full-screen background (NO gradient-background, mesh, particles, grids, glow orbs) -- the image IS the background. Add only a soft legibility scrim if text needs it (e.g. a subtle linear-gradient overlay at z-index:1).
+- Keep the foreground MINIMAL and let the image breathe: a headline/tagline and at most one small supporting element. Lots of negative space.
+- This is a STILL beat: a slow, gentle Ken-Burns drift (scale 1.0 -> 1.06 over the full duration) on the image is welcome, but NOTHING should pop, bounce, or rebuild. Animate text gently (fade/slow rise); do not animate a competing background.
 ` : ""}
 Duration: ${opts.sceneDuration} seconds
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}

@@ -144,11 +144,20 @@ async function main() {
     check("at least one scene has b-roll background_video", brollScenes.length > 0, `${brollScenes.length} scene(s)`);
     check("b-roll clip fetched to stock/", stockClips.length > 0, stockClips.join(", "));
 
-    // ── PROOF: HERO IMAGE ──
+    // ── PROOF: HERO IMAGE (generated AND actually drawn into a rendered scene) ──
     const assetsDir = path.join(projDir, "assets");
     const heroImgs = fs.existsSync(assetsDir) ? fs.readdirSync(assetsDir).filter((f) => /^hero_scene_.*\.png$/.test(f)) : [];
     const planHero = (project.plan?.scenes || []).filter((s: any) => s.hero_image);
     check("hero image generated to assets/", heroImgs.length > 0, heroImgs.join(", ") || `(plan requested ${planHero.length})`);
+    // The real proof: the generated image file is referenced in a rendered scene.html.
+    let heroSceneDir: string | null = null;
+    if (heroImgs.length > 0) {
+      for (const d of sceneDirs) {
+        const htmlPath = path.join(workDir, d, "scene.html");
+        if (fs.existsSync(htmlPath) && heroImgs.some((h) => fs.readFileSync(htmlPath, "utf-8").includes(h))) { heroSceneDir = d; break; }
+      }
+    }
+    check("hero image referenced in a rendered scene.html", !!heroSceneDir, heroSceneDir ? `${heroSceneDir} draws the hero image` : "hero image generated but NOT drawn in any scene");
 
     // ── Extract frames so the logo is VISIBLE ──
     console.log("\n-- extracting frames --");
@@ -161,6 +170,17 @@ async function main() {
           await exec("ffmpeg", ["-y", "-ss", String(Math.max(0.05, d * frac)), "-i", sceneMp4, "-frames:v", "1", path.join(FRAMES_OUT, `logo_${i}.png`)]);
         }
         console.log(`   logo frames: ${FRAMES_OUT}/logo_0..2.png (from ${logoSceneDir})`);
+      }
+    }
+    if (heroSceneDir) {
+      const sceneMp4 = path.join(workDir, heroSceneDir, "scene.mp4");
+      if (fs.existsSync(sceneMp4)) {
+        const { stdout } = await exec("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", sceneMp4]);
+        const d = parseFloat(stdout) || 5;
+        for (const [i, frac] of [0.3, 0.6, 0.9].entries()) {
+          await exec("ffmpeg", ["-y", "-ss", String(Math.max(0.05, d * frac)), "-i", sceneMp4, "-frames:v", "1", path.join(FRAMES_OUT, `hero_${i}.png`)]);
+        }
+        console.log(`   hero frames:  ${FRAMES_OUT}/hero_0..2.png (from ${heroSceneDir})`);
       }
     }
     // A frame from the final video for overall context.

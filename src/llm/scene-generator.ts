@@ -86,6 +86,7 @@ async function generateCodegenScene(
     referenceImages: opts.referenceImages,
     creativeBible: opts.creativeBible,
     hasBackgroundVideo: opts.hasBackgroundVideo,
+    heroImageUrl: opts.imageUrl,
   });
 
   sceneHtml = stripHtmlFences(sceneHtml);
