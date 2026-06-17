@@ -7,11 +7,112 @@
  */
 
 import { z } from "zod";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+
+const execFileP = promisify(execFile);
 import { extractBrandFromUrl, enhanceWithLLM } from "./brand-extractor.js";
 import { loadBrandKit, saveBrandKit } from "../persistence/brand-kit.js";
 import { llmConfigFromEnv } from "../llm/client.js";
-import type { BrandKit } from "../core/types.js";
+import { config } from "../config.js";
+import type { BrandKit, BrandLogo } from "../core/types.js";
+
+function extFromContentType(ct: string, url: string): string {
+  ct = (ct || "").toLowerCase();
+  if (ct.includes("svg")) return "svg";
+  if (ct.includes("png")) return "png";
+  if (ct.includes("jpeg") || ct.includes("jpg")) return "jpg";
+  if (ct.includes("x-icon") || ct.includes("vnd.microsoft.icon")) return "ico";
+  if (ct.includes("webp")) return "webp";
+  const m = (url || "").split("?")[0].match(/\.(svg|png|jpe?g|ico|webp|gif)$/i);
+  return m ? m[1].toLowerCase().replace("jpeg", "jpg") : "png";
+}
+
+/**
+ * Probe a downloaded logo for its real dimensions and which background theme it
+ * suits. Theme is inferred from the luminance of the logo's INK (opaque pixels):
+ * a dark wordmark -> "light" (use on light bg), a white/light mark -> "dark",
+ * anything mid-range (e.g. a colorful icon) -> "any". Uses ffmpeg/ffprobe only.
+ */
+async function analyzeLogo(filePath: string): Promise<{ width: number; height: number; theme: BrandLogo["theme"] }> {
+  if (/\.svg$/i.test(filePath)) return { width: 0, height: 0, theme: "any" };
+  let width = 0, height = 0;
+  try {
+    const { stdout } = await execFileP("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", filePath]);
+    const m = stdout.trim().match(/(\d+)x(\d+)/);
+    if (m) { width = +m[1]; height = +m[2]; }
+  } catch { /* dims optional */ }
+
+  let theme: BrandLogo["theme"] = "any";
+  try {
+    const yavg = async (vf: string): Promise<number> => {
+      const { stderr } = await execFileP("ffmpeg", ["-i", filePath, "-vf", `${vf},signalstats,metadata=print`, "-frames:v", "1", "-f", "null", "-"], { maxBuffer: 1e8 });
+      const m = (stderr || "").match(/lavfi\.signalstats\.YAVG=([0-9.]+)/);
+      return m ? parseFloat(m[1]) : NaN;
+    };
+    // format=rgba first so palette/opaque PNGs expose a real alpha plane.
+    const meanAlpha = await yavg("format=rgba,alphaextract");           // 0-255: coverage * 255
+    const premultLuma = await yavg("format=rgba,premultiply=inplace=1"); // mean of inkLuma * coverage
+    if (isFinite(meanAlpha) && meanAlpha >= 8 && isFinite(premultLuma)) {
+      const inkLuma = (premultLuma / meanAlpha) * 255;     // luminance of the opaque ink, 0-255
+      if (inkLuma < 100) theme = "light";       // dark ink reads on light backgrounds
+      else if (inkLuma > 155) theme = "dark";   // light ink reads on dark backgrounds
+    }
+  } catch { /* theme detection optional */ }
+
+  return { width, height, theme };
+}
+
+/**
+ * Download the top logo candidates and register them in the brand kit's logos[].
+ * Candidates come ranked from the extractor (header logo > apple-touch-icon > favicon).
+ * og-image banners are skipped as logos. Returns the BrandLogo entries created.
+ */
+async function downloadLogos(
+  tenantId: string,
+  candidates: Array<{ url: string; kind: string; score: number; alt: string; width: number; height: number }>,
+  max = 3,
+): Promise<BrandLogo[]> {
+  const dir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "logo");
+  await fs.mkdir(dir, { recursive: true });
+  const out: BrandLogo[] = [];
+  for (const cand of candidates.filter((c) => c.kind !== "og-image")) {
+    if (out.length >= max) break;
+    try {
+      const res = await fetch(cand.url);
+      if (!res.ok) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length === 0) continue;
+      const ext = extFromContentType(res.headers.get("content-type") || "", cand.url);
+      const idx = out.length + 1;
+      const filename = `extracted-${idx}.${ext}`;
+      const filePath = path.join(dir, filename);
+      await fs.writeFile(filePath, buf);
+
+      // Probe the saved file for true dimensions + which background theme it suits.
+      const probe = await analyzeLogo(filePath);
+      const aspect = probe.width && probe.height ? probe.width / probe.height
+        : (cand.width && cand.height ? cand.width / cand.height : 0);
+      const variant: BrandLogo["variant"] =
+        (/icon|favicon/.test(cand.kind) || (aspect > 0 && aspect < 1.5)) ? "icon"
+        : (aspect >= 3 ? "wordmark" : "full");
+      const height = probe.height || cand.height || 0;
+      out.push({
+        name: `extracted-${variant}-${probe.theme}-${idx}`,
+        url: `/assets/${tenantId}/brand-kit/logo/${filename}`,
+        variant,
+        theme: probe.theme,
+        ...(height ? { height } : {}),
+      });
+    } catch (e: any) {
+      console.warn(`[extract_brand] logo download failed (${cand.kind} ${cand.url}):`, e.message);
+    }
+  }
+  return out;
+}
 
 function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -118,6 +219,15 @@ export function registerBrandExtractTool(server: McpServer): void {
           }
         }
 
+        // Register extracted logos -- but never clobber logos the user already set/uploaded.
+        if (!kit.logos || kit.logos.length === 0) {
+          const extractedLogos = await downloadLogos(params.tenant_id, result.logos || []);
+          if (extractedLogos.length > 0) {
+            kit.logos = extractedLogos;
+            console.log(`[extract_brand] registered ${extractedLogos.length} logo(s): ${extractedLogos.map((l) => l.name).join(", ")}`);
+          }
+        }
+
         // Save the updated brand kit
         await saveBrandKit(params.tenant_id, kit);
 
@@ -141,6 +251,8 @@ export function registerBrandExtractTool(server: McpServer): void {
             density: designSystem.density,
           },
           patterns: designSystem.patterns,
+          logos: (kit.logos || []).map((l) => ({ name: l.name, variant: l.variant, theme: l.theme, url: l.url })),
+          logo_candidates_found: (result.logos || []).length,
           enhanced: params.enhance && !!designSystem.guidelines,
           guidelines_preview: designSystem.guidelines
             ? designSystem.guidelines.substring(0, 200) + "..."

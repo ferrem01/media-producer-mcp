@@ -41,6 +41,7 @@ import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
 import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
 import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
+import { critiqueCorrectness, formatCorrectnessDefects, type CorrectnessResult } from "./correctness-critique.js";
 import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
 import { captureSingleFrame, validateSceneRuntime } from "../core/capture.js";
@@ -1061,10 +1062,34 @@ async function critiqueAndRetryScene(opts: {
       // 5. Clean up temp files
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
 
+      // 5a. Correctness gate -- a STRICT inspector that fails BROKEN scenes the
+      // aesthetic critique waves through (overlapping/clipped/illegible content,
+      // chips stacked instead of sequenced, stray unrelated UI, a missing required
+      // logo). Only run it when the scene would otherwise be accepted, so we don't
+      // pay for an extra vision call on attempts that are already being revised.
+      let correctness: CorrectnessResult = { pass: true, defects: [] };
+      const aestheticPass = critiqueResult.score >= 7 && runtime.ok;
+      if (aestheticPass && !isVideoOnly) {
+        const briefText = currentPlanned?.brief || currentPlanned?.visual_notes || currentPlanned?.description || currentPlanned?.label || opts.prompt;
+        correctness = await critiqueCorrectness({
+          finalFrameBase64: previewBase64,
+          contactSheetBase64,
+          contactTimestamps,
+          briefText,
+          expectedComponents: Array.isArray(currentPlanned?.components) ? currentPlanned.components.filter((c: any) => typeof c === "string") : undefined,
+          requiresLogo: /\blogo\b/i.test(briefText) && (opts.brandKit?.logos?.length ?? 0) > 0,
+          llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
+        });
+        if (!correctness.pass) {
+          console.log(`  Correctness FAIL (${correctness.defects.length}): ${correctness.defects.map((d) => `[${d.type}] ${d.detail}`).join(" | ")}`);
+        }
+      }
+
       // Track best attempt. A scene that throws at runtime renders degraded, so
       // it must never beat a runtime-clean attempt -- apply a large penalty so a
-      // clean scene always wins, even if its visual score is lower.
-      const effectiveScore = runtime.ok ? critiqueResult.score : critiqueResult.score - 100;
+      // clean scene always wins, even if its visual score is lower. A scene with
+      // correctness defects is likewise penalized so a clean one is preferred.
+      const effectiveScore = (runtime.ok ? critiqueResult.score : critiqueResult.score - 100) - (correctness.pass ? 0 : 50);
       if (effectiveScore > bestScore) {
         bestScore = effectiveScore;
         bestScene = currentScene;
@@ -1072,13 +1097,16 @@ async function critiqueAndRetryScene(opts: {
         bestCritique = critiqueResult;
       }
 
-      // 6. Accept only if the vision score passes AND the scene runs clean.
-      // A runtime error means the scene renders degraded even if it looks fine
-      // in the still frames -- force a revision regardless of the visual score.
-      if (critiqueResult.score >= 7 && runtime.ok) {
+      // 6. Accept only if the vision score passes AND the scene runs clean AND
+      // it has no blocking correctness defects. A pretty-but-broken scene (good
+      // visual score, but overlaps/stray UI/missing logo) is forced to revise.
+      if (aestheticPass && correctness.pass) {
         console.log(`  Score ${critiqueResult.score} accepted`);
         opts.trace?.endEvent({ score: critiqueResult.score, accepted: true });
         break;
+      }
+      if (aestheticPass && !correctness.pass) {
+        console.log(`  Score ${critiqueResult.score} but correctness defects present -- forcing revision`);
       }
       if (critiqueResult.score >= 7 && !runtime.ok) {
         console.log(`  Score ${critiqueResult.score} but runtime error present -- forcing revision`);
@@ -1097,7 +1125,7 @@ async function critiqueAndRetryScene(opts: {
         : "";
       const fixPrompt = `Fix this scene plan. The rendered output had these problems:
 
-${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}${runtimeIssueBlock}
+${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}${runtimeIssueBlock}${formatCorrectnessDefects(correctness.defects)}
 
 Current plan:
 ${existingPlanJSON}
@@ -1164,7 +1192,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
 
       // Fix 1: Feed critique issues directly into the retry prompt so the
       // generator knows what went wrong and can avoid the same mistakes.
-      const critiqueFeedback = buildCritiqueFeedback(critiqueResult);
+      const critiqueFeedback = buildCritiqueFeedback(critiqueResult) + formatCorrectnessDefects(correctness.defects);
 
       const regenerated = await generateScene({
         scene: newPlanned,

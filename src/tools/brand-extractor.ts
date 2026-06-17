@@ -75,6 +75,15 @@ interface RawCardInfo {
   radius: string;
 }
 
+interface RawLogoCandidate {
+  url: string;
+  kind: string;
+  score: number;
+  alt: string;
+  width: number;
+  height: number;
+}
+
 interface RawExtractionResult {
   colors: RawColorEntry[];
   fonts: RawFontEntry[];
@@ -86,6 +95,7 @@ interface RawExtractionResult {
   cards: RawCardInfo[];
   inputs: { border: string; radius: string; bg: string }[];
   sectionGaps: number[];
+  logos: RawLogoCandidate[];
 }
 
 // ── Main extraction function ──
@@ -93,6 +103,7 @@ interface RawExtractionResult {
 export async function extractBrandFromUrl(url: string): Promise<{
   design_system: DesignSystem;
   colors: BrandColors;
+  logos: RawLogoCandidate[];
 }> {
   var browser = await chromium.launch({
     args: ["--disable-gpu", "--no-sandbox", "--disable-setuid-sandbox"],
@@ -308,6 +319,55 @@ export async function extractBrandFromUrl(url: string): Promise<{
         motions.push(motionMap[mk]);
       }
 
+      // ── Logo / brand-mark candidates ──
+      var logos: Array<{ url: string; kind: string; score: number; alt: string; width: number; height: number }> = [];
+      function absUrl(u: string | null): string | null {
+        if (!u) return null;
+        try { return new URL(u, location.href).href; } catch (e) { return null; }
+      }
+      function pushLogo(url: string | null, kind: string, score: number, alt?: string, width?: number, height?: number) {
+        if (!url) return;
+        for (var i = 0; i < logos.length; i++) { if (logos[i].url === url) return; }
+        logos.push({ url: url, kind: kind, score: score, alt: alt || "", width: width || 0, height: height || 0 });
+      }
+      function logoish(el: Element): boolean {
+        var s = ((el.getAttribute("class") || "") + " " + (el.getAttribute("id") || "") + " " +
+          (el.getAttribute("alt") || "") + " " + (el.getAttribute("aria-label") || "")).toLowerCase();
+        return /logo|brand|wordmark/.test(s);
+      }
+      // <img> logos: explicit logo-ish, or any img sitting in the header/nav/home-link near the top
+      Array.prototype.slice.call(document.querySelectorAll("img")).forEach(function (img: HTMLImageElement) {
+        var inHeader = !!img.closest('header, nav, [class*="header" i], [class*="nav" i], [class*="logo" i], a[href="/"], a[href="' + location.origin + '/"]');
+        var isLogo = logoish(img);
+        if (!isLogo && !inHeader) return;
+        var rect = img.getBoundingClientRect();
+        var score = (isLogo ? 100 : 0) + (inHeader ? 50 : 0) + (rect.top < 200 ? 20 : 0);
+        pushLogo(absUrl(img.currentSrc || img.src), isLogo ? "header-logo-img" : "header-img", score, img.getAttribute("alt") || "", img.naturalWidth, img.naturalHeight);
+      });
+      // Inline <svg> logos -> serialize to a data URL
+      Array.prototype.slice.call(document.querySelectorAll("svg")).forEach(function (svg: SVGElement) {
+        if (!logoish(svg) && !svg.closest('a[href="/"], header [class*="logo" i], nav [class*="logo" i], [class*="logo" i]')) return;
+        var rect = svg.getBoundingClientRect();
+        if (rect.width < 16 || rect.height < 8) return;
+        var xml = new XMLSerializer().serializeToString(svg);
+        if (xml.length > 60000) return;
+        if (!/xmlns=/.test(xml)) xml = xml.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+        pushLogo("data:image/svg+xml;utf8," + encodeURIComponent(xml), "header-logo-svg", 90 + (rect.top < 200 ? 20 : 0), "", Math.round(rect.width), Math.round(rect.height));
+      });
+      // apple-touch-icon (clean square mark)
+      Array.prototype.slice.call(document.querySelectorAll('link[rel~="apple-touch-icon"]')).forEach(function (l: HTMLLinkElement) {
+        pushLogo(absUrl(l.getAttribute("href")), "apple-touch-icon", 40);
+      });
+      // og:image (brand banner -- lower priority, often not a clean logo)
+      var ogImg = document.querySelector('meta[property="og:image"], meta[name="og:image"]');
+      if (ogImg) pushLogo(absUrl(ogImg.getAttribute("content")), "og-image", 25);
+      // favicon fallback
+      Array.prototype.slice.call(document.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"]')).forEach(function (l: HTMLLinkElement) {
+        pushLogo(absUrl(l.getAttribute("href")), "favicon", 20);
+      });
+      logos.sort(function (a, b) { return b.score - a.score; });
+      logos = logos.slice(0, 8);
+
       return {
         colors: colors,
         fonts: fonts,
@@ -319,6 +379,7 @@ export async function extractBrandFromUrl(url: string): Promise<{
         cards: cards,
         inputs: inputs,
         sectionGaps: sectionGaps,
+        logos: logos,
       };
     });
 
@@ -361,7 +422,7 @@ export async function extractBrandFromUrl(url: string): Promise<{
       },
     };
 
-    return { design_system: designSystem, colors: brandColors };
+    return { design_system: designSystem, colors: brandColors, logos: typedRaw.logos || [] };
   } finally {
     await browser.close();
   }
