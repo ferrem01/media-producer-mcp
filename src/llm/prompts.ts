@@ -122,7 +122,8 @@ You MUST output a single .component.html file with exactly three sections:
 8. GSAP is available globally. You can use: gsap.to(), gsap.from(), gsap.fromTo(), gsap.set(), gsap.timeline(), and all standard GSAP features.
 
 9. For images, use <img> tags with src from data. The renderer is a real browser so URLs work.
-   For logo.dev logos: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark
+   For COMPANY logos, prefer the 'logo' component (it handles logo.dev, theme, greyscale, and a monogram fallback for unknown domains). For a "trusted by" row or an "integrations" grid, place SEVERAL 'logo' components in a flex row / CSS grid with a heading above. For a single HERO logo, set prominent:true AND give it a LARGE size (e.g. size:480) inside a full-width, centered container so it reads big on the canvas.
+   If you must inline a logo.dev URL, ALWAYS add &fallback=monogram so unknown domains don't render a broken image: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark&fallback=monogram
 
 10. All variables must use 'var' not 'const' or 'let' (broad compatibility).
 
@@ -878,7 +879,8 @@ highlightDraw(tl, el.querySelector('.keyword'), 1.5, 0.5, 'rgba(167,139,250,0.3)
 - rgba(255,255,255,0.03) on a #f8fafc background = INVISIBLE CARD = REJECTED SCENE.
 
 ## Logo Integration
-- For external logos, use logo.dev: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark
+- For company logos, prefer the 'logo' component -- it wraps logo.dev and exposes theme (dark/light/auto), greyscale, format, size, and fallback. Compose a "trusted by" ROW or an "integrations" GRID from several 'logo' components in a flex/grid container with a heading; use prominent:true for a single hero logo.
+- If inlining a logo.dev URL directly, ALWAYS include &fallback=monogram so an unknown domain returns a monogram instead of a broken image: https://img.logo.dev/{domain}?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&theme=dark&fallback=monogram
 - For the brand's own logos, use the URLs provided in the scene prompt.
 - Logos should be crisp, properly sized, and have appropriate spacing.
 

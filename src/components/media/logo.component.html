@@ -1,23 +1,34 @@
 <template>
-  <div class="logo-display">
+  <div class="logo-display {{__prominentClass}}">
     <div class="logo-img-wrap">
-      <img class="logo-img" src="" alt="{{domain}}" />
+      <img class="logo-img" src="{{__logoUrl}}" alt="{{domain}}" onerror="this.style.visibility='hidden'" style="--logo-size:{{size}}px" />
     </div>
     <span class="logo-label">{{label}}</span>
   </div>
 </template>
 
 <style scoped>
+  /* Layout-neutral building block: sizes to its own content so it composes
+     cleanly inside a flex row or grid. Add data.prominent for the full-frame
+     hero treatment (single centered logo with a dramatic reveal). The logo.dev
+     URL is baked into the <img src> at assembly time, so the image loads even
+     if this component's createTimeline (animation) is never invoked. */
   .logo-display {
-    display: flex;
+    display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100%;
-    width: 100%;
+    gap: 12px;
     font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .logo-display.prominent {
+    display: flex;
+    width: 100%;
+    height: 100%;
     gap: 28px;
     padding: 80px;
+    box-sizing: border-box;
   }
 
   .logo-img-wrap {
@@ -27,13 +38,24 @@
   }
 
   .logo-img {
+    width: var(--logo-size, 128px);
+    height: var(--logo-size, 128px);
     object-fit: contain;
+    display: block;
+  }
+
+  /* A hero logo scales up to fill the frame, regardless of the requested size. */
+  .logo-display.prominent .logo-img {
+    width: auto;
+    height: auto;
+    max-width: 48%;
+    max-height: 48%;
   }
 
   .logo-label {
     font-size: 18px;
     font-weight: 400;
-    color: #cbd5e1;
+    color: var(--mp-color-text-muted, #cbd5e1);
     text-align: center;
     letter-spacing: 0.005em;
   }
@@ -46,72 +68,37 @@
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var LOGO_TOKEN = 'pk_B_cdrQLyTkSFPzSMm52goQ';
-
-    var domain = data.domain || 'example.com';
-    var size = data.size || 128;
-    var format = data.format || 'png';
-    var greyscale = data.greyscale || false;
-    var theme = data.theme || 'dark';
-
-    var logoUrl = 'https://img.logo.dev/' + domain
-      + '?token=' + LOGO_TOKEN
-      + '&format=' + format
-      + '&size=' + (size * 2);
-    if (greyscale) logoUrl += '&greyscale=true';
-    if (theme && theme !== 'auto') logoUrl += '&theme=' + theme;
-
-    var img = el.querySelector('.logo-img');
-    img.src = logoUrl;
-    img.style.width = size + 'px';
-    img.style.height = size + 'px';
-
+    // The <img src> is already baked in at assembly time -- this timeline ONLY
+    // animates the reveal. If it is never invoked, the logo still shows (static).
     var wrap = el.querySelector('.logo-img-wrap');
     var label = el.querySelector('.logo-label');
+    if (!wrap) return tl;
 
+    var prominent = !!(data.prominent === true || data.prominent === 'true');
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
 
-    // Dramatic scale + blur entrance with glow
-    gsap.set(wrap, { autoAlpha: 0, scale: 1.1, filter: 'blur(6px)' });
-    gsap.set(label, { autoAlpha: 0, y: 12 });
-
-    tl.to(wrap, {
-      autoAlpha: 1, scale: 1, filter: 'blur(0px)',
-      duration: speed,
-      ease: ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out'
-    }, 0.3);
-
-    // Accent glow on logo
-    tl.fromTo(wrap, {
-      filter: 'blur(0px) drop-shadow(0 0 0px rgba(167, 139, 250, 0))'
-    }, {
-      filter: 'blur(0px) drop-shadow(0 0 30px rgba(167, 139, 250, 0.25))',
-      duration: 0.5,
-      ease: 'power2.out'
-    }, 0.3 + speed * 0.5);
-
-    tl.to(wrap, {
-      filter: 'blur(0px) drop-shadow(0 0 12px rgba(167, 139, 250, 0.1))',
-      duration: 0.4,
-      ease: 'power2.inOut'
-    }, 0.3 + speed * 0.5 + 0.5);
-
-    if (label && label.textContent.trim()) {
-      tl.to(label, {
-        autoAlpha: 1, y: 0,
-        duration: 0.4,
-        ease: 'power2.out'
-      }, 0.3 + speed * 0.6);
-    }
-
-    // Exit
-    if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
-      tl.to([wrap, label], {
-        autoAlpha: 0, scale: 0.95,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, exitAt);
+    if (prominent) {
+      // Dramatic hero reveal (single centered logo).
+      gsap.set(wrap, { autoAlpha: 0, scale: 1.1, filter: 'blur(6px)' });
+      if (label) gsap.set(label, { autoAlpha: 0, y: 12 });
+      tl.to(wrap, { autoAlpha: 1, scale: 1, filter: 'blur(0px)', duration: speed, ease: ctx.motion === 'punchy' ? 'back.out(1.3)' : 'power3.out' }, 0.3);
+      tl.fromTo(wrap,
+        { filter: 'blur(0px) drop-shadow(0 0 0px rgba(167, 139, 250, 0))' },
+        { filter: 'blur(0px) drop-shadow(0 0 30px rgba(167, 139, 250, 0.25))', duration: 0.5, ease: 'power2.out' },
+        0.3 + speed * 0.5);
+      tl.to(wrap, { filter: 'blur(0px) drop-shadow(0 0 12px rgba(167, 139, 250, 0.1))', duration: 0.4, ease: 'power2.inOut' }, 0.3 + speed * 0.5 + 0.5);
+      if (label && label.textContent.trim()) {
+        tl.to(label, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.3 + speed * 0.6);
+      }
+      if (ctx.duration > 2) {
+        tl.to([wrap, label], { autoAlpha: 0, scale: 0.95, duration: 0.4, ease: 'power2.in' }, ctx.duration - 0.6);
+      }
+    } else {
+      // Light composable reveal -- fades/lifts in, good when staggered in a row
+      // or grid (the container/codegen sets the per-item stagger).
+      var targets = label ? [wrap, label] : [wrap];
+      gsap.set(targets, { autoAlpha: 0, y: 10, scale: 0.94 });
+      tl.to(targets, { autoAlpha: 1, y: 0, scale: 1, duration: Math.min(0.5, speed), ease: 'power2.out' }, 0);
     }
 
     return tl;

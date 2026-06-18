@@ -298,6 +298,7 @@ ${buildContentRegionWrapper(scene, componentBlocks)}
 <script>
 (function() {
   const master = gsap.timeline({ paused: true });
+  window.__MP_LOGODEV_TOKEN = ${JSON.stringify(config.logoDevToken)};
 
   // ── Camera motion: subtle Ken Burns zoom + drift ──
   var cameraEl = document.querySelector('.mp-camera');
@@ -492,6 +493,7 @@ ${tagResult.html}
 <script>
 (function() {
   const master = gsap.timeline({ paused: true });
+  window.__MP_LOGODEV_TOKEN = ${JSON.stringify(config.logoDevToken)};
 
   // ── Camera motion ──
   var cameraEl = document.querySelector('.mp-camera');

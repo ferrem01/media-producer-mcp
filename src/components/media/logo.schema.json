@@ -2,13 +2,18 @@
   "type": "logo",
   "label": "Company Logo",
   "category": "media",
-  "description": "Display a company logo from logo.dev by domain name. Supports theme (dark/light), greyscale, and custom sizing.",
+  "description": "A single company logo fetched from logo.dev by domain. A layout-neutral building block: drop several into a flex row for a 'trusted by' strip, or a grid (with a heading) for an 'integrates with' section. Set prominent:true for a single, full-frame, dramatically-revealed hero logo. Exposes the full logo.dev API: theme (dark/light/auto), greyscale, format, size, retina, and fallback (monogram avoids broken images for unknown domains).",
   "data": {
     "domain": {
       "type": "string",
       "label": "Domain",
       "required": true,
-      "placeholder": "apple.com"
+      "placeholder": "stripe.com"
+    },
+    "label": {
+      "type": "string",
+      "label": "Label Text",
+      "optional": true
     },
     "size": {
       "type": "number",
@@ -29,10 +34,31 @@
       "optional": true,
       "default": false
     },
-    "label": {
+    "format": {
       "type": "string",
-      "label": "Label Text",
-      "optional": true
+      "label": "Image format",
+      "optional": true,
+      "enum": ["png", "jpg", "webp"],
+      "default": "png"
+    },
+    "fallback": {
+      "type": "string",
+      "label": "Missing-logo fallback",
+      "optional": true,
+      "enum": ["monogram", "404"],
+      "default": "monogram"
+    },
+    "retina": {
+      "type": "boolean",
+      "label": "Retina (request 2x)",
+      "optional": true,
+      "default": true
+    },
+    "prominent": {
+      "type": "boolean",
+      "label": "Hero treatment (single full-frame logo with dramatic reveal)",
+      "optional": true,
+      "default": false
     }
   }
 }
