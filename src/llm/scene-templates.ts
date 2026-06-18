@@ -375,7 +375,7 @@ mentions the industry or when the content clearly fits a vertical.
 *When to use*: SaaS product showing integrations, API connections, or partner ecosystem.
 *Feel*: Modern SaaS marketing. Connects the dots.
 
-- Layout: integration-logos component centered (60% width) with headline above
+- Layout: a centered (60% width) GRID of 'logo' components (one per integration domain) with a headline above
 - Background: gradient-background, dark
 - Center: Product logo/icon (48px) with connecting lines radiating outward
 - Surrounding: 6-8 integration partner logos arranged in a circle or grid

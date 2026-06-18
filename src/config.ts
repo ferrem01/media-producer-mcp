@@ -50,6 +50,8 @@ export interface Config {
   productionQuality: QualityPreset;
   /** LLM configuration for critique calls (faster/cheaper model) */
   critiqueLlm: LLMConfig;
+  /** logo.dev publishable token used by the logo component for company logos */
+  logoDevToken: string;
 }
 
 const ROOT_DIR = path.dirname(new URL(import.meta.url).pathname);
@@ -84,4 +86,5 @@ export const config: Config = {
     model: process.env.MP_CRITIQUE_MODEL || "claude-haiku-4-5",
     apiKey: process.env.ANTHROPIC_API_KEY || "",
   },
+  logoDevToken: process.env.MP_LOGODEV_TOKEN || "pk_B_cdrQLyTkSFPzSMm52goQ",
 };
