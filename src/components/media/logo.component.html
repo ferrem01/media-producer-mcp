@@ -1,7 +1,7 @@
 <template>
   <div class="logo-display {{__prominentClass}}">
     <div class="logo-img-wrap">
-      <img class="logo-img" src="{{__logoUrl}}" alt="{{domain}}" onerror="this.style.visibility='hidden'" style="width:{{size}}px;height:{{size}}px;" />
+      <img class="logo-img" src="{{__logoUrl}}" alt="{{domain}}" onerror="this.style.visibility='hidden'" style="--logo-size:{{size}}px" />
     </div>
     <span class="logo-label">{{label}}</span>
   </div>
@@ -38,8 +38,18 @@
   }
 
   .logo-img {
+    width: var(--logo-size, 128px);
+    height: var(--logo-size, 128px);
     object-fit: contain;
     display: block;
+  }
+
+  /* A hero logo scales up to fill the frame, regardless of the requested size. */
+  .logo-display.prominent .logo-img {
+    width: auto;
+    height: auto;
+    max-width: 48%;
+    max-height: 48%;
   }
 
   .logo-label {

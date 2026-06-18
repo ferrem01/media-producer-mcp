@@ -173,9 +173,13 @@ export function resolveComponentTags(
     // so it loads regardless of whether the codegen wires its animation timeline.
     if (type === "logo") {
       const ld = resolvedData as Record<string, any>;
+      const isProminent = ld.prominent === true || ld.prominent === "true";
+      // A logo in a row/grid stays compact; a hero (prominent) logo is scaled up
+      // by CSS to fill the frame, so fetch it at high resolution to stay crisp.
       ld.size = Number(ld.size) || 128;
+      if (isProminent) ld.size = Math.max(ld.size, 480);
       ld.__logoUrl = buildLogoDevUrl(ld, config.logoDevToken);
-      ld.__prominentClass = (ld.prominent === true || ld.prominent === "true") ? "prominent" : "";
+      ld.__prominentClass = isProminent ? "prominent" : "";
     }
 
     // Bind data to template
