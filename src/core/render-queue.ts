@@ -166,41 +166,6 @@ async function runRender(
 
     const result = await renderProjectCore(renderOpts);
 
-    // Cross-scene VISUAL editorial review (non-fatal). A storyboard of one frame
-    // per scene is read back from the rendered output and judged as a whole, to
-    // surface defects the per-scene critique cannot see (a logo present in some
-    // scenes but missing in others, one scene that's a broken mess, near-identical
-    // layouts, jarring jumps). Runs BEFORE the job is marked complete so a client
-    // that polls "completed" and disconnects can't kill it mid-review. Advisory:
-    // logged and saved onto the project.
-    if ((project.format === "video" || project.format === "slideshow") && !options?.audioOnly) {
-      try {
-        const { editorialVisionReview } = await import("../llm/editorial-vision.js");
-        const review = await editorialVisionReview({
-          project: projectForRender,
-          workDir: renderOpts.workDir,
-          prompt: project.plan?.narrative || "",
-          llmConfig: config.critiqueLlm,
-        });
-        if (review) {
-          const ed = review.result;
-          console.log(`  Editorial vision review (${review.tiles} scenes): overall=${ed.overall_score} pacing=${ed.pacing_score} variety=${ed.variety_score} coherence=${ed.coherence_score}`);
-          ed.issues.forEach((i) => console.log(`    - ${i}`));
-          (project as any).editorial_review = {
-            overall_score: ed.overall_score,
-            pacing_score: ed.pacing_score,
-            variety_score: ed.variety_score,
-            coherence_score: ed.coherence_score,
-            issues: ed.issues,
-            fixes: ed.fixes,
-            reviewed_at: new Date().toISOString(),
-          };
-        }
-      } catch (e: any) {
-        console.warn(`  Editorial vision review failed (non-fatal): ${e.message}`);
-      }
-    }
-
     // Update job with results
     job.status = "completed";
     job.completedAt = Date.now();
