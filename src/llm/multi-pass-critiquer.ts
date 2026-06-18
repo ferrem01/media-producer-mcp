@@ -252,10 +252,24 @@ export async function critiqueEditorial(opts: {
   llmConfig: LLMConfig;
   format: string;
   trace?: TraceBuilder;
+  /** Storyboard image (one frame per scene, tiled) for a cross-scene VISUAL pass.
+   *  When provided, the critique judges the rendered output, not just metadata. */
+  storyboardBase64?: string;
 }): Promise<EditorialCritiqueResult> {
+  var visualBlock = opts.storyboardBase64 ? `
+
+## VISUAL REVIEW (a storyboard image is attached)
+A storyboard is attached: ONE frame per scene, tiled left-to-right, top-to-bottom, in scene order. Judge the RENDERED output across scenes, not just the metadata. Call out:
+- a REQUIRED brand asset (e.g. the logo) present in some scenes but MISSING in others where it belongs (hero/outro)
+- scenes that look BROKEN or far lower quality than the rest (overlaps, empty/placeholder, clutter) while others are clean
+- visual SAMENESS -- multiple scenes that look near-identical (same layout/composition), even if their component types differ
+- abrupt or jarring visual jumps between adjacent scenes
+Report these as issues with the scene index; they are cross-scene defects the per-scene critique cannot see.` : "";
+
   var systemPrompt = `You are an editorial director reviewing the full structure of a ${opts.format} project. Evaluate the project as a WHOLE, not individual scenes.
 
 ${EDITORIAL_CRITIQUE}
+${visualBlock}
 
 ## Output Format
 
@@ -287,9 +301,17 @@ Rules:
     `Scene ${i + 1}: "${s.label}" | ${s.duration_seconds}s | components: [${s.component_types.join(", ")}] | ~${s.word_count} words | transition: ${s.transition_in?.type || "none"}`
   ).join("\n");
 
+  var userText = `## Original Prompt\n${opts.prompt}\n\n## Storyboard\n${sceneSummary}\n\nEvaluate the full video flow.`;
+  var userContent: string | LLMContentPart[] = opts.storyboardBase64
+    ? [
+        { type: "text", text: userText + "\n\nThe attached storyboard image shows one frame per scene, in order:" },
+        { type: "image_url", image_url: { url: `data:image/png;base64,${opts.storyboardBase64}` } },
+      ]
+    : userText;
+
   var raw = await callLLM(opts.llmConfig, [
     { role: "system", content: systemPrompt },
-    { role: "user", content: `## Original Prompt\n${opts.prompt}\n\n## Storyboard\n${sceneSummary}\n\nEvaluate the full video flow.` },
+    { role: "user", content: userContent },
   ], { temperature: 0.3 });
 
   var result: EditorialCritiqueResult;
