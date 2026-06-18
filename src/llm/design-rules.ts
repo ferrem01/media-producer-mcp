@@ -34,12 +34,12 @@ export const COMPONENT_DESIGN_RULES = `
 - Never place content in the outer 60px border of the canvas.
 - Use percentage-based widths (max-width: 80%) over fixed pixel widths.
 
-### Color & Contrast
-- NEVER place white text (#ffffff) on light backgrounds (#f3f4f6, #e5e7eb, white).
-- NEVER place dark text on dark backgrounds.
-- Default dark theme: text #ffffff on background #0f172a / surface #1e293b.
-- When using browser-frame or device-mockup with light content inside, keep the chrome dark.
-- Use var(--mp-color-text) and var(--mp-color-background) consistently.
+### Color & Contrast (FOLLOW THE BRAND -- never default to dark)
+- MATCH THE BRAND THEME. Use var(--mp-color-background) as the page/scene background and var(--mp-color-text) for text. A light brand (light background) renders LIGHT (dark text on the light brand background); a dark brand renders dark. NEVER hardcode #0f172a / #ffffff -- always use the brand variables.
+- NEVER INVERT THE BRAND: do not use the brand's dark text/ink color as the background to force a dark look. A white-background brand must render on its light background.
+- Ensure contrast either way: never white text on a light background, never dark text on a dark background.
+- On LIGHT backgrounds, cards need a solid surface (var(--mp-color-surface)) or a 1px border + soft shadow to be visible (glassmorphism only works on dark).
+- A dark theme is only correct when the brand itself is dark, or no brand is provided (the fallback).
 
 ### Overflow Prevention
 - Root element: overflow: hidden; width: 100%; height: 100%.
@@ -87,12 +87,11 @@ export const SCENE_PLANNER_DESIGN_RULES = `
 - code-block: max 8-10 lines of code. Short, readable snippets.
 - terminal: max 3 command/output pairs.
 
-### Color/Theme Consistency
-- Default dark theme for all scenes unless the prompt explicitly requests light.
-- background: #0f172a, surface: #1e293b, text: #ffffff.
-- Never use light backgrounds (#f3f4f6, #ffffff, #f9fafb) as the main scene background.
-  These are only acceptable INSIDE browser-frame or device-mockup viewports.
-- When using browser-frame content_html with a light viewport, keep text dark (#1f2937).
+### Color/Theme (FOLLOW THE BRAND -- do NOT default to dark)
+- The scene theme MUST follow the brand. Use the brand's background color as the main scene background and the brand's text color for text (the Brand context states whether the brand is LIGHT or DARK, and the values are var(--mp-color-background) / var(--mp-color-text)). A LIGHT brand -> light scenes; a DARK brand -> dark scenes.
+- NEVER INVERT THE BRAND. Do NOT take a dark brand color (e.g. the brand's text/ink color like #17171c) and use it as the scene background to force a dark theme. A white-background brand renders on its light background, not a dark one. This is the #1 "looks like generic AI" giveaway -- avoid it.
+- Light backgrounds are fully allowed and expected for light brands. On light backgrounds: dark text, and cards with a solid surface or a 1px border + soft shadow so they're visible. On dark backgrounds: light text, subtle glass cards.
+- A dark theme is correct only when the brand is dark, the prompt explicitly asks for dark, or no brand is provided (fallback).
 
 ### Transitions
 - Only use valid types: crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, none.

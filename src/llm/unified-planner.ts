@@ -297,6 +297,25 @@ ${COMPOSITION_PLAYBOOK}`;
     systemPrompt += `\n\n## Brand Guidelines (FOLLOW THESE RULES)\n${opts.brandKit.guidelines}\n`;
   }
 
+  // Inject the brand's resolved THEME so scenes MATCH the brand instead of
+  // defaulting to dark. A light brand must render light -- inverting it (using
+  // the brand's dark ink as a background) is the #1 "looks like AI" giveaway.
+  {
+    const light = isLightBrand(opts.brandKit);
+    const c = opts.brandKit.colors;
+    systemPrompt += `\n\n## Brand Theme (MATCH THIS -- do NOT default to dark)\n`;
+    systemPrompt += `This brand is ${light ? "LIGHT" : "DARK"}. background=${c?.background}, text=${c?.text}, primary=${c?.primary}, accent=${c?.accent}.\n`;
+    if (light) {
+      systemPrompt += `This is a LIGHT, airy, premium aesthetic -- think Linear / Stripe / Notion / Apple light mode -- NOT a dark cinematic look.\n`;
+      systemPrompt += `- Scene and mesh-gradient backgrounds MUST be built from the brand's LIGHT colors: base ${c?.background}, with subtle ${c?.surface} and FAINT ${c?.primary}/${c?.accent} tints. Soft gradient washes on light -- never a dark base.\n`;
+      systemPrompt += `- ${c?.text} is the brand's TEXT color (dark ink). Use it for TEXT ONLY. It must NEVER be a background or mesh-gradient base color -- using a dark color as the background inverts the brand and is the #1 "looks like AI slop" giveaway.\n`;
+      systemPrompt += `- Glow orbs, radial blooms, and "light sources in the dark" are DARK-theme devices -- do NOT use them. For light scenes use soft color washes, a subtle grid, generous whitespace, crisp shadows, and ${c?.primary} accents.\n`;
+      systemPrompt += `- Cards/panels on light backgrounds need a solid ${c?.surface} fill or a 1px border + soft shadow to be visible (glassmorphism only works on dark).\n`;
+    } else {
+      systemPrompt += `Build scenes on the brand's dark background (${c?.background}) with light text (${c?.text}); glow orbs and blooms are appropriate here.\n`;
+    }
+  }
+
   // Inject reference image summary into system prompt
   if (opts.referenceImages?.length) {
     systemPrompt += buildReferenceImageSummary(opts.referenceImages);

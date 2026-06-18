@@ -360,6 +360,20 @@ function buildBrandContext(brandKit: BrandKit): string {
       "",
       "NEVER write raw hex like #6366f1 or #0f172a. Always use the var() token.",
     );
+    // State the brand's theme so the scene matches it instead of defaulting to
+    // dark. A light brand must render light; inverting it (a dark background on a
+    // light brand) is the #1 "looks like generic AI" giveaway.
+    var _bgHex = (brandKit.colors.background || "#0f172a").replace("#", "");
+    if (_bgHex.length === 3) _bgHex = _bgHex.split("").map(c => c + c).join("");
+    var _lum = (0.299 * parseInt(_bgHex.substring(0, 2), 16) + 0.587 * parseInt(_bgHex.substring(2, 4), 16) + 0.114 * parseInt(_bgHex.substring(4, 6), 16)) / 255;
+    var _light = _lum > 0.5;
+    lines.push(
+      "",
+      `THEME: this brand is ${_light ? "LIGHT" : "DARK"}.`,
+      _light
+        ? "The root/scene background MUST be var(--mp-color-background) (a LIGHT color) with var(--mp-color-text) (DARK) text. Do NOT build a dark scene. Do NOT hardcode ANY dark hex anywhere in this scene -- no #17171c, #0f172a, #0d0d1a, #1e293b, etc. -- not for the background, not for cards/panels, not for title treatments. Every surface uses var(--mp-color-surface) (LIGHT); all text uses var(--mp-color-text) (DARK); NEVER white/#fff/#f0eefc text (it's invisible on light). THIS THEME OVERRIDES THE SCENE BRIEF: if the brief names a dark background, a dark card, 'glow orbs on dark', or light text, IGNORE it and render light -- soft washes/tints of var(--mp-color-primary) on var(--mp-color-background), subtle grid, generous whitespace, dark text. Cards need a solid var(--mp-color-surface) fill or a 1px border + soft shadow to be visible (glassmorphism only works on dark)."
+        : "The root/scene background is var(--mp-color-background) (dark) with var(--mp-color-text) (light) text.",
+    );
   }
   if (brandKit.fonts?.length) {
     lines.push(
