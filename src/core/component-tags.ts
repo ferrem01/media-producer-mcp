@@ -11,6 +11,32 @@
  */
 
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
+import { config } from "../config.js";
+
+/**
+ * Build a logo.dev image URL from component data, mirroring the logo component's
+ * exposed params. Done at assembly time so the <img src> is baked into the HTML
+ * and the logo loads unconditionally -- it must NOT depend on the component's
+ * createTimeline (animation) being invoked by the codegen.
+ */
+export function buildLogoDevUrl(data: Record<string, any>, token: string): string {
+  const domain = String(data.domain || "example.com").replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const size = Number(data.size) || 128;
+  const format = data.format || "png";
+  const theme = data.theme || "dark";
+  const greyscale = data.greyscale === true || data.greyscale === "true";
+  const fallback = data.fallback || "monogram";
+  const retina = data.retina !== false && data.retina !== "false";
+  const params = [
+    `token=${encodeURIComponent(token)}`,
+    `format=${format}`,
+    `size=${retina ? size * 2 : size}`,
+  ];
+  if (greyscale) params.push("greyscale=true");
+  if (theme && theme !== "auto") params.push(`theme=${theme}`);
+  if (fallback) params.push(`fallback=${fallback}`);
+  return `https://img.logo.dev/${encodeURIComponent(domain)}?${params.join("&")}`;
+}
 
 export interface ResolvedComponent {
   /** Instance id (comp_0, comp_1, ...) */
@@ -142,6 +168,15 @@ export function resolveComponentTags(
 
     // Resolve asset URLs in data if handler provided
     const resolvedData = resolveAssetUrls ? resolveAssetUrls(data) : data;
+
+    // Logo component: bake the logo.dev URL into the <img src> at assembly time
+    // so it loads regardless of whether the codegen wires its animation timeline.
+    if (type === "logo") {
+      const ld = resolvedData as Record<string, any>;
+      ld.size = Number(ld.size) || 128;
+      ld.__logoUrl = buildLogoDevUrl(ld, config.logoDevToken);
+      ld.__prominentClass = (ld.prominent === true || ld.prominent === "true") ? "prominent" : "";
+    }
 
     // Bind data to template
     const boundHtml = bindTemplate(parsed.template, resolvedData);

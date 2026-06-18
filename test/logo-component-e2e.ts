@@ -121,12 +121,15 @@ async function main() {
         const f = path.join(work, d, "scene.html");
         if (fs.existsSync(f)) {
           const html = fs.readFileSync(f, "utf-8");
-          logoRefs += (html.match(/img\.logo\.dev/g) || []).length;
+          // Assert the logo.dev URL is baked into the <img src> (not just present
+          // in an animation script that may never run) -- this is what makes the
+          // logo actually load.
+          logoRefs += (html.match(/<img[^>]*src="https:\/\/img\.logo\.dev/g) || []).length;
           fallbackRefs += (html.match(/fallback=monogram/g) || []).length;
         }
       }
     }
-    check("logo.dev logos rendered into the video", logoRefs > 0, `${logoRefs} logo.dev refs across scenes`);
+    check("logo.dev URLs baked into <img src> (logos will load)", logoRefs > 0, `${logoRefs} <img src=logo.dev> across scenes`);
     check("monogram fallback applied in rendered output", fallbackRefs > 0, `${fallbackRefs} fallback=monogram refs`);
 
     try {
