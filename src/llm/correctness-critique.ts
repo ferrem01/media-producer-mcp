@@ -41,9 +41,10 @@ You are shown the scene's intended content, the FINAL frame, and a CONTACT SHEET
 - "overlap": text or UI elements collide so content is obscured, doubled, or smashed together (e.g. a headline rendered on top of another headline; a message bubble overlapping a chip). Clean, legible layering is NOT a defect — only collisions that hurt legibility or look accidental.
 - "off_canvas": text or content is clipped/truncated at a panel or frame edge (e.g. sidebar labels showing only "xt", "nd", "ols").
 - "not_sequenced": ordered items (chat messages, tool-call chips, steps) are rendered as a DISORDERED or OVERLAPPING pile — colliding with each other, crammed without separation, scattered, or out of order. IMPORTANT: an orderly, clearly-separated thread/list is FINE even if every message is visible at once — do NOT flag a tidy list just because there is no progressive reveal. Only flag a genuinely messy, colliding, or out-of-order heap.
-- "illegible": text unreadable — low contrast (dark on dark), overlapping other text, or garbled/duplicated characters.
+- "illegible": text unreadable — low contrast (dark on dark OR light/white on light), overlapping other text, or garbled/duplicated characters.
 - "stray_ui": a prominent UI element clearly unrelated to the scene's purpose (e.g. a billing/pricing/settings panel inside a social post).
 - "missing_asset": a REQUIRED asset named below is not visibly present.
+- "off_brand_theme": the scene's theme doesn't match the brand (see BRAND THEME below) — e.g. a dark background/panel or white text on a LIGHT brand. Only report when a BRAND THEME is stated below.
 
 How to decide:
 - Actively look for each defect type. If you can point to a specific element where it happens, report it with a concrete detail (quote the colliding/clipped text).
@@ -66,6 +67,9 @@ export async function critiqueCorrectness(opts: {
   expectedComponents?: string[];
   /** When true, the scene must visibly show the brand logo image. */
   requiresLogo?: boolean;
+  /** The brand's theme. A LIGHT brand must render on a light background with
+   *  dark text; a dark element/white text on a light brand is off-brand. */
+  brandTheme?: "light" | "dark";
   llmConfig: LLMConfig;
 }): Promise<CorrectnessResult> {
   const specLines = [
@@ -75,7 +79,12 @@ export async function critiqueCorrectness(opts: {
     specLines.push(`EXPECTED UI: ${opts.expectedComponents.join(", ")}`);
   }
   if (opts.requiresLogo) {
-    specLines.push(`REQUIRED ASSET: the Quotient brand LOGO IMAGE must be visibly present (a styled text wordmark or a blank placeholder does NOT count -> report "missing_asset").`);
+    specLines.push(`REQUIRED ASSET: the brand LOGO IMAGE must be visibly present (a styled text wordmark or a blank placeholder does NOT count -> report "missing_asset").`);
+  }
+  if (opts.brandTheme === "light") {
+    specLines.push(`BRAND THEME: this is a LIGHT brand -- the scene background MUST be light with DARK text. Report "off_brand_theme" if the scene has a DARK background/panel, or light/white text on a light area (low-contrast), or otherwise reads as a dark-themed scene. A dark scene on a light brand is off-brand.`);
+  } else if (opts.brandTheme === "dark") {
+    specLines.push(`BRAND THEME: this is a DARK brand -- the scene background should be dark with light text. Report "off_brand_theme" only if it jarringly renders light/white against the dark brand.`);
   }
   if (opts.contactSheetBase64 && opts.contactTimestamps?.length) {
     specLines.push(`The contact sheet frames are at: ${opts.contactTimestamps.map((t) => t.toFixed(1) + "s").join(", ")}.`);

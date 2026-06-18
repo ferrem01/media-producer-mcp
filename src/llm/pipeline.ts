@@ -138,6 +138,16 @@ function resolveCreativity(opts: PipelineOpts): number {
   return 0.5;
 }
 
+/** True when the brand's background color is light (relative luminance > 0.5). */
+function brandBackgroundIsLight(brandKit?: BrandKit): boolean {
+  let hex = (brandKit?.colors?.background || "#0f172a").replace("#", "");
+  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+}
+
 /**
  * Run the full generation pipeline.
  */
@@ -1079,6 +1089,7 @@ async function critiqueAndRetryScene(opts: {
           briefText,
           expectedComponents: Array.isArray(currentPlanned?.components) ? currentPlanned.components.filter((c: any) => typeof c === "string") : undefined,
           requiresLogo: /\blogo\b/i.test(briefText) && (opts.brandKit?.logos?.length ?? 0) > 0,
+          brandTheme: brandBackgroundIsLight(opts.brandKit) ? "light" : "dark",
           llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
         });
         if (!correctness.pass) {
