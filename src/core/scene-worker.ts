@@ -235,6 +235,23 @@ async function main() {
     await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "networkidle", timeout: 60000 });
     await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 60000 });
 
+    // Wait for all <img> to finish loading before capturing. External images
+    // (e.g. logo.dev company logos) get their src set by JS *after* page load and
+    // networkidle, so without this they render as broken images in the captured
+    // frames. Capped so a slow/unreachable image can't hang the render.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      const imgs = Array.from(document.querySelectorAll("img")) as HTMLImageElement[];
+      let pending = imgs.filter((img) => !img.complete).length;
+      if (pending === 0) { resolve(); return; }
+      const done = () => { if (--pending <= 0) resolve(); };
+      imgs.forEach((img) => {
+        if (img.complete) return;
+        img.addEventListener("load", done, { once: true });
+        img.addEventListener("error", done, { once: true });
+      });
+      setTimeout(resolve, 10000);
+    }));
+
     // ── Video frame extraction: discover, extract, inject ──
     const videoInfos: { src: string; startAt: number; index: number }[] = await page.evaluate(() => {
       const videos = document.querySelectorAll("video");
