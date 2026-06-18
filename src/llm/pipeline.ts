@@ -42,6 +42,7 @@ import { processReferenceImages } from "./reference-images.js";
 import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
 import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { critiqueCorrectness, formatCorrectnessDefects, type CorrectnessResult } from "./correctness-critique.js";
+import { tileFramesToStoryboard } from "./editorial-vision.js";
 import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
 import { captureSingleFrame, validateSceneRuntime } from "../core/capture.js";
@@ -1719,37 +1720,100 @@ async function runUnifiedPipeline(
     project.assets = [...(project.assets || []), ...enrichResult.assets];
   }
 
-  // Pass 3: Editorial critique (full video flow) -- only for multi-scene video/presentation
+  // Pass 3: Editorial critique (full video flow) -- VISION + PLAN-FIDELITY.
+  // Capture one frame per scene, tile into a storyboard, and ask the critique:
+  // did each rendered scene actually DELIVER what the PLAN intended? Flagged
+  // scenes are regenerated (bounded) with the corrective note fed back to the
+  // codegen, then the whole video is scored again.
   if (opts.critique !== false && format !== "image" && project.scenes.length >= 3) {
     trace?.beginEvent("editorial_critique");
     try {
-      var sceneMeta = project.scenes.map(s => ({
-        label: s.label || "",
-        duration_seconds: s.duration_seconds,
-        transition_in: s.transition_in,
-        component_types: s.components.map(c => c.type),
-        word_count: estimateWordCount(s),
-      }));
-      var editorial = await critiqueEditorial({
-        scenes: sceneMeta,
-        prompt: richPrompt,
-        llmConfig: config.critiqueLlm,
-        format,
-        trace,
-      });
-      console.log(`  Editorial critique: overall=${editorial.overall_score}, pacing=${editorial.pacing_score}, variety=${editorial.variety_score}`);
-      if (editorial.issues.length > 0) {
-        console.log(`    Editorial issues: ${editorial.issues.join(" | ")}`);
-      }
-      if (editorial.fixes.length > 0) {
-        console.log(`    Suggested fixes: ${editorial.fixes.map(f => f.type + ": " + f.detail).join(" | ")}`);
+      const editorialExtraDirs = [compDir, tenantComponentsDir(opts.tenant_id)];
+
+      // Capture one frame per scene, tile a storyboard, and run the plan-aware
+      // vision critique (the storyboard image + each scene's planned intent).
+      const runEditorial = async (): Promise<EditorialCritiqueResult> => {
+        const frameDir = path.join(os.tmpdir(), `editorial_${projectId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`);
+        await fs.mkdir(frameDir, { recursive: true });
+        const framePaths: string[] = [];
+        try {
+          for (let i = 0; i < project.scenes.length; i++) {
+            const sc = project.scenes[i];
+            try {
+              const sources: ComponentSource[] = [];
+              for (const comp of sc.components) {
+                const src = await findComponentSourceForCritique(comp.type, config.componentLibDir, editorialExtraDirs);
+                if (src) sources.push({ type: comp.type, source: src });
+              }
+              if (sources.length === 0) continue;
+              const html = await assembleSceneAuto({ scene: sc, components: sources, brandKit, canvas, gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: true });
+              const hp = path.join(frameDir, `h${i}.html`);
+              await fs.writeFile(hp, html);
+              const fp = path.join(frameDir, `s${i}.png`);
+              await captureSingleFrame({ htmlPath: hp, outputPath: fp, width: canvas.width, height: canvas.height, atTime: (sc.duration_seconds || 5) * 0.55 });
+              framePaths.push(fp);
+            } catch { /* skip a scene that won't assemble */ }
+          }
+          const storyboardBase64 = await tileFramesToStoryboard(framePaths);
+          const sceneMeta = project.scenes.map((s, i) => ({
+            label: s.label || "",
+            duration_seconds: s.duration_seconds,
+            transition_in: s.transition_in,
+            component_types: s.components.map(c => c.type),
+            word_count: estimateWordCount(s),
+            intent: storyboard.scenes[i]?.brief || storyboard.scenes[i]?.description || storyboard.scenes[i]?.label,
+          }));
+          return await critiqueEditorial({ scenes: sceneMeta, prompt: richPrompt, llmConfig: config.critiqueLlm, format, trace, storyboardBase64: storyboardBase64 || undefined });
+        } finally {
+          await fs.rm(frameDir, { recursive: true, force: true }).catch(() => {});
+        }
+      };
+
+      const editorial = await runEditorial();
+      console.log(`  Editorial critique: overall=${editorial.overall_score}, pacing=${editorial.pacing_score}, variety=${editorial.variety_score}, coherence=${editorial.coherence_score}`);
+      if (editorial.issues.length > 0) console.log(`    Editorial issues: ${editorial.issues.join(" | ")}`);
+      if (editorial.fixes.length > 0) console.log(`    Suggested fixes: ${editorial.fixes.map(f => f.type + (f.scene_index != null ? ` (scene ${f.scene_index + 1})` : "") + ": " + f.detail).join(" | ")}`);
+
+      // Structural auto-fixes (transition variety, breathing, durations).
+      const editorialChanges = applyEditorialFixes(project, editorial, brandKit);
+
+      // Plan-fidelity fixes: regenerate scenes that didn't achieve their intent
+      // (bounded), feeding the corrective note back to the codegen.
+      const MAX_EDITORIAL_REGEN = 2;
+      const sceneFixes = (editorial.fixes || []).filter(f => f.type === "fix_scene" && typeof f.scene_index === "number" && f.detail && f.scene_index! >= 0 && f.scene_index! < project.scenes.length);
+      let regen = 0;
+      for (const fix of sceneFixes) {
+        if (regen >= MAX_EDITORIAL_REGEN) break;
+        const idx = fix.scene_index!;
+        const planned = storyboard.scenes[idx];
+        if (!planned) continue;
+        try {
+          const re = await generateScene({
+            scene: planned, sceneIndex: idx, totalScenes: project.scenes.length, prompt: richPrompt, format,
+            llmConfig: opts.llmConfig, brandKit, canvas, imageUrl: enrichResult.imageUrls.get(idx),
+            tenantId: opts.tenant_id, projectId, referenceImages: processedRefs, creativeBible,
+            hasBackgroundVideo: stockFootageMap.has(idx),
+            critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its planned intent. ${fix.detail}`,
+          });
+          if (re.customSources) for (const [n, h] of re.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
+          const newScene = re.scene;
+          if (planned.voiceover_text) { if (!newScene.audio_hints) newScene.audio_hints = {}; newScene.audio_hints.voiceover_text = planned.voiceover_text; }
+          if (stockFootageMap.has(idx)) newScene.background_video = stockFootageMap.get(idx);
+          project.scenes[idx] = newScene;
+          regen++;
+          console.log(`    Editorial: regenerated scene ${idx + 1} to match intent`);
+        } catch (e: any) { console.warn(`    Editorial regen scene ${idx + 1} failed: ${e.message}`); }
       }
 
-      // Fix 3: Auto-apply safe editorial fixes (transition variety + breathing scenes)
-      var editorialChanges = applyEditorialFixes(project, editorial, brandKit);
-      if (editorialChanges > 0) {
-        console.log(`    Applied ${editorialChanges} editorial auto-fix(es)`);
+      if (editorialChanges > 0 || regen > 0) {
         await saveProject(project);
+        console.log(`    Applied ${editorialChanges} structural fix(es), regenerated ${regen} scene(s)`);
+      }
+
+      // Score the whole video again after the fixes (one round, no further regen).
+      if (regen > 0) {
+        const after = await runEditorial();
+        console.log(`  Editorial re-score after fixes: overall=${after.overall_score} (was ${editorial.overall_score}), variety=${after.variety_score}, coherence=${after.coherence_score}`);
       }
     } catch (e: any) {
       console.warn(`  Editorial critique failed (non-fatal): ${e.message}`);
