@@ -1769,8 +1769,7 @@ async function runUnifiedPipeline(
         }
       };
 
-      const editorial = await runEditorial();
-      console.log(`  Editorial critique: overall=${editorial.overall_score}, pacing=${editorial.pacing_score}, variety=${editorial.variety_score}, coherence=${editorial.coherence_score}`);
+      const editorial = await runEditorial();      console.log(`  Editorial critique: overall=${editorial.overall_score}, pacing=${editorial.pacing_score}, variety=${editorial.variety_score}, coherence=${editorial.coherence_score}`);
       if (editorial.issues.length > 0) console.log(`    Editorial issues: ${editorial.issues.join(" | ")}`);
       if (editorial.fixes.length > 0) console.log(`    Suggested fixes: ${editorial.fixes.map(f => f.type + (f.scene_index != null ? ` (scene ${f.scene_index + 1})` : "") + ": " + f.detail).join(" | ")}`);
 
