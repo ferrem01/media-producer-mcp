@@ -252,12 +252,17 @@ export function buildComponentTimelineScript(
   return `
   // ── Component Timeline Registry ──
   var __componentTimelines = {};
+  var __consumedComponentTimelines = {};
   ${registrations.join("\n")}
 
-  // Helper for scene createTimeline to access component timelines
+  // Helper for scene createTimeline to access component timelines.
+  // Records consumption so the assembler can auto-wire any block the scene
+  // embedded but forgot to add (otherwise its animation -- incl. ambient
+  // background loops -- would silently never play).
   function __getComponentTimeline(id) {
     var factory = __componentTimelines[id];
     if (!factory) { console.warn("No component timeline for: " + id); return gsap.timeline(); }
+    __consumedComponentTimelines[id] = true;
     return factory();
   }
   `;
