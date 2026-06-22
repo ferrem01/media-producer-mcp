@@ -18,7 +18,6 @@ import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js"
 // Component discovery is handled by the planner. The codegen LLM receives schemas in the brief.
 // import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./design-skills.js";
-import { buildMotionPresetGuide } from "./motion-presets.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
 import type { CreativeBible } from "./concept-director.js";
 import {
@@ -263,8 +262,6 @@ You have everything you need in the brief. Go straight to writing and submit in 
 ## Design Skills (FOLLOW THESE RULES)
 
 ${designSkills}
-
-${buildMotionPresetGuide()}
 
 ## Output Format
 
