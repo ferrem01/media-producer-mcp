@@ -1,0 +1,50 @@
+{
+  "type": "liquid-glass-desktop",
+  "label": "Liquid Glass Desktop",
+  "category": "system",
+  "description": "macOS-style desktop with a glass menu bar, a floating frosted glass window and a dock of glass icons that magnify in a traveling sweep.",
+  "data": {
+    "appName": {
+      "type": "string",
+      "label": "Active App Name",
+      "optional": true,
+      "placeholder": "Finder"
+    },
+    "time": {
+      "type": "string",
+      "label": "Menu Bar Clock",
+      "optional": true,
+      "placeholder": "Mon 9:41 AM"
+    },
+    "windowTitle": {
+      "type": "string",
+      "label": "Window Title",
+      "optional": true,
+      "placeholder": "Documents"
+    },
+    "sidebar": {
+      "type": "array",
+      "label": "Sidebar Items",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "icon": { "type": "string", "label": "Icon (emoji)", "optional": true },
+          "label": { "type": "string", "label": "Label", "optional": true },
+          "active": { "type": "boolean", "label": "Active", "optional": true }
+        }
+      }
+    },
+    "dock": {
+      "type": "array",
+      "label": "Dock Icons",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "icon": { "type": "string", "label": "Icon (emoji)", "optional": true }
+        }
+      }
+    }
+  }
+}

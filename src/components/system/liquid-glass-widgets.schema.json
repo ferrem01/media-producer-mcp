@@ -1,0 +1,39 @@
+{
+  "type": "liquid-glass-widgets",
+  "label": "Liquid Glass Widgets",
+  "category": "system",
+  "description": "Cluster of Apple-style frosted glass widgets (weather, calendar and activity rings) that assemble in with stagger over a colorful blurred backdrop.",
+  "data": {
+    "weather": {
+      "type": "object",
+      "label": "Weather Widget",
+      "optional": true,
+      "properties": {
+        "location": { "type": "string", "label": "Location", "optional": true },
+        "temp": { "type": "number", "label": "Temperature", "optional": true },
+        "condition": { "type": "string", "label": "Condition", "optional": true },
+        "icon": { "type": "string", "label": "Icon (emoji)", "optional": true }
+      }
+    },
+    "calendar": {
+      "type": "object",
+      "label": "Calendar Widget",
+      "optional": true,
+      "properties": {
+        "day": { "type": "string", "label": "Day", "optional": true },
+        "date": { "type": "number", "label": "Date", "optional": true },
+        "events": { "type": "array", "label": "Events", "optional": true, "items": { "type": "string" } }
+      }
+    },
+    "activity": {
+      "type": "object",
+      "label": "Activity Rings",
+      "optional": true,
+      "properties": {
+        "move": { "type": "number", "label": "Move %", "optional": true },
+        "exercise": { "type": "number", "label": "Exercise %", "optional": true },
+        "stand": { "type": "number", "label": "Stand %", "optional": true }
+      }
+    }
+  }
+}

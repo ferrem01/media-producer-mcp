@@ -1,0 +1,219 @@
+<template>
+  <div class="lg-notif-stage">
+    <div class="lg-blob lg-blob-1"></div>
+    <div class="lg-blob lg-blob-2"></div>
+    <div class="lg-notif-wrap">
+      <div class="lg-notif">
+        <div class="lg-notif-sheen"></div>
+        <div class="lg-notif-icon"></div>
+        <div class="lg-notif-body">
+          <div class="lg-notif-head">
+            <span class="lg-notif-app"></span>
+            <span class="lg-notif-time"></span>
+          </div>
+          <div class="lg-notif-title"></div>
+          <div class="lg-notif-text"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .lg-notif-stage {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    background: linear-gradient(160deg, #1a1830 0%, #0c0b16 100%);
+  }
+
+  .lg-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.8;
+    pointer-events: none;
+  }
+  .lg-blob-1 {
+    width: 720px; height: 720px;
+    top: -200px; left: -120px;
+    background: radial-gradient(circle, var(--mp-color-primary, #6366f1) 0%, transparent 70%);
+  }
+  .lg-blob-2 {
+    width: 640px; height: 640px;
+    bottom: -220px; right: -100px;
+    background: radial-gradient(circle, var(--mp-color-accent, #a78bfa) 0%, transparent 70%);
+  }
+
+  .lg-notif-wrap {
+    margin-top: 90px;
+    width: 760px;
+    max-width: 80%;
+  }
+
+  .lg-notif {
+    position: relative;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    padding: 30px 34px;
+    border-radius: 34px;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .lg-notif-sheen {
+    position: absolute;
+    top: 0; left: -60%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.22) 50%, transparent 100%);
+    pointer-events: none;
+    transform: skewX(-18deg);
+  }
+
+  .lg-notif-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 18px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    color: #fff;
+    background: linear-gradient(150deg, var(--mp-color-primary, #6366f1), var(--mp-color-accent, #a78bfa));
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .lg-notif-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .lg-notif-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .lg-notif-app {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .lg-notif-time {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.5);
+    flex-shrink: 0;
+  }
+
+  .lg-notif-title {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #fff;
+    line-height: 1.15;
+  }
+  .lg-notif-title:empty { display: none; }
+
+  .lg-notif-text {
+    font-size: 22px;
+    color: rgba(255, 255, 255, 0.82);
+    line-height: 1.4;
+  }
+  .lg-notif-text:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+
+    var stage = el.querySelector('.lg-notif-stage');
+    var notif = el.querySelector('.lg-notif');
+    var sheen = el.querySelector('.lg-notif-sheen');
+    var iconEl = el.querySelector('.lg-notif-icon');
+    var appEl = el.querySelector('.lg-notif-app');
+    var timeEl = el.querySelector('.lg-notif-time');
+    var titleEl = el.querySelector('.lg-notif-title');
+    var textEl = el.querySelector('.lg-notif-text');
+    var blob1 = el.querySelector('.lg-blob-1');
+    var blob2 = el.querySelector('.lg-blob-2');
+
+    if (appEl) appEl.textContent = data.app || 'Messages';
+    if (timeEl) timeEl.textContent = data.time || 'now';
+    if (titleEl) titleEl.textContent = data.title || 'New Message';
+    if (textEl) textEl.textContent = data.body || 'You have a new notification waiting for you.';
+    if (iconEl) iconEl.textContent = data.icon || '💬';
+
+    var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.8 : 1.0;
+
+    if (notif) gsap.set(notif, { autoAlpha: 0, y: -120, scale: 0.94 });
+    if (sheen) gsap.set(sheen, { left: '-60%' });
+
+    // Slide down + settle
+    if (notif) {
+      tl.to(notif, {
+        autoAlpha: 1, y: 0, scale: 1,
+        duration: speed * 0.9,
+        ease: ctx.motion === 'punchy' ? 'back.out(1.4)' : 'back.out(1.1)'
+      }, 0.3);
+      // gentle settle bob
+      tl.to(notif, {
+        y: 6,
+        duration: 0.4,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, 0.3 + speed * 0.9);
+    }
+
+    // Specular sheen sweep
+    if (sheen) {
+      tl.fromTo(sheen, { left: '-60%' }, {
+        left: '160%',
+        duration: speed * 1.3,
+        ease: 'power2.inOut'
+      }, 0.3 + speed * 0.6);
+    }
+
+    // Ambient blob drift (bounded loop)
+    if (blob1) {
+      tl.to(blob1, { x: 60, y: 40, duration: 6, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+    }
+    if (blob2) {
+      tl.to(blob2, { x: -50, y: -30, duration: 7, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+    }
+
+    // Exit
+    if (ctx.duration > 2 && notif) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(notif, {
+        autoAlpha: 0, y: -90, scale: 0.96,
+        duration: 0.5,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

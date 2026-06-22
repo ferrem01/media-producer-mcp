@@ -1,0 +1,38 @@
+{
+  "type": "liquid-glass-context-menu",
+  "label": "Liquid Glass Context Menu",
+  "category": "system",
+  "description": "Apple-style frosted glass right-click context menu whose items reveal in a stagger with a colored highlight gliding between them.",
+  "data": {
+    "items": {
+      "type": "array",
+      "label": "Menu Items",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "label": "Label",
+            "optional": true
+          },
+          "icon": {
+            "type": "string",
+            "label": "Icon (emoji)",
+            "optional": true
+          },
+          "shortcut": {
+            "type": "string",
+            "label": "Shortcut",
+            "optional": true
+          },
+          "divider": {
+            "type": "boolean",
+            "label": "Is Divider",
+            "optional": true
+          }
+        }
+      }
+    }
+  }
+}

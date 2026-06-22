@@ -1,0 +1,192 @@
+<template>
+  <div class="mac-notif-stage">
+    <div class="mac-blob mac-blob-1"></div>
+    <div class="mac-blob mac-blob-2"></div>
+    <div class="mac-notif">
+      <div class="mac-notif-sheen"></div>
+      <div class="mac-notif-icon"></div>
+      <div class="mac-notif-body">
+        <div class="mac-notif-title"></div>
+        <div class="mac-notif-sub"></div>
+      </div>
+      <div class="mac-notif-action"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .mac-notif-stage {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', -apple-system, 'SF Pro Display', system-ui, sans-serif);
+    background: linear-gradient(145deg, #2a2740 0%, #131120 100%);
+  }
+
+  .mac-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  .mac-blob-1 {
+    width: 700px; height: 700px;
+    top: -180px; right: -120px;
+    background: radial-gradient(circle, var(--mp-color-accent, #a78bfa) 0%, transparent 70%);
+  }
+  .mac-blob-2 {
+    width: 620px; height: 620px;
+    bottom: -200px; left: -140px;
+    background: radial-gradient(circle, var(--mp-color-primary, #6366f1) 0%, transparent 70%);
+  }
+
+  .mac-notif {
+    position: absolute;
+    top: 60px;
+    right: 60px;
+    width: 600px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    padding: 26px 28px;
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.13);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 26px 70px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+  }
+
+  .mac-notif-sheen {
+    position: absolute;
+    top: 0; left: -60%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%);
+    transform: skewX(-18deg);
+    pointer-events: none;
+  }
+
+  .mac-notif-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    color: #fff;
+    background: linear-gradient(150deg, var(--mp-color-primary, #6366f1), var(--mp-color-accent, #a78bfa));
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .mac-notif-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .mac-notif-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+  }
+  .mac-notif-title:empty { display: none; }
+
+  .mac-notif-sub {
+    font-size: 20px;
+    color: rgba(255, 255, 255, 0.78);
+    line-height: 1.35;
+  }
+  .mac-notif-sub:empty { display: none; }
+
+  .mac-notif-action {
+    flex-shrink: 0;
+    padding: 12px 24px;
+    border-radius: 14px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+  }
+  .mac-notif-action:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+
+    var notif = el.querySelector('.mac-notif');
+    var sheen = el.querySelector('.mac-notif-sheen');
+    var iconEl = el.querySelector('.mac-notif-icon');
+    var titleEl = el.querySelector('.mac-notif-title');
+    var subEl = el.querySelector('.mac-notif-sub');
+    var actionEl = el.querySelector('.mac-notif-action');
+    var blob1 = el.querySelector('.mac-blob-1');
+    var blob2 = el.querySelector('.mac-blob-2');
+
+    if (iconEl) iconEl.textContent = data.icon || '📅';
+    if (titleEl) titleEl.textContent = data.title || 'Calendar';
+    if (subEl) subEl.textContent = data.subtitle || 'Design Review in 10 minutes';
+    if (actionEl) {
+      if (data.action === '' ) actionEl.textContent = '';
+      else actionEl.textContent = data.action || 'View';
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.8 : 1.0;
+
+    if (notif) gsap.set(notif, { autoAlpha: 0, x: 120, scale: 0.95 });
+    if (sheen) gsap.set(sheen, { left: '-60%' });
+
+    if (notif) {
+      // slide in top-right with bounce
+      tl.to(notif, {
+        autoAlpha: 1, x: 0, scale: 1,
+        duration: speed,
+        ease: ctx.motion === 'minimal' ? 'power3.out' : 'back.out(1.6)'
+      }, 0.3);
+      // settle micro-bounce
+      tl.to(notif, {
+        x: -4,
+        duration: 0.5,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, 0.3 + speed);
+    }
+
+    if (sheen) {
+      tl.fromTo(sheen, { left: '-60%' }, {
+        left: '170%',
+        duration: speed * 1.3,
+        ease: 'power2.inOut'
+      }, 0.3 + speed * 0.7);
+    }
+
+    if (blob1) tl.to(blob1, { x: -50, y: 40, duration: 6.5, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+    if (blob2) tl.to(blob2, { x: 50, y: -40, duration: 7.5, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+
+    if (ctx.duration > 2 && notif) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(notif, {
+        autoAlpha: 0, x: 110, scale: 0.96,
+        duration: 0.5,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

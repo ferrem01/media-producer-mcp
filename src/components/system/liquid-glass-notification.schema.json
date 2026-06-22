@@ -1,0 +1,36 @@
+{
+  "type": "liquid-glass-notification",
+  "label": "Liquid Glass Notification",
+  "category": "system",
+  "description": "Apple-style frosted glass notification banner that slides down with app icon, title and body, then a gentle settle and ambient sheen.",
+  "data": {
+    "app": {
+      "type": "string",
+      "label": "App Name",
+      "optional": true,
+      "placeholder": "Messages"
+    },
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "required": true
+    },
+    "body": {
+      "type": "string",
+      "label": "Body Text",
+      "optional": true
+    },
+    "icon": {
+      "type": "string",
+      "label": "Icon (emoji)",
+      "optional": true,
+      "placeholder": "💬"
+    },
+    "time": {
+      "type": "string",
+      "label": "Timestamp",
+      "optional": true,
+      "placeholder": "now"
+    }
+  }
+}
