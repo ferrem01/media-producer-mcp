@@ -1,0 +1,88 @@
+<template>
+  <div class="scanlines">
+    <div class="scanline-layer"></div>
+    <div class="scanline-roll"></div>
+  </div>
+</template>
+
+<style scoped>
+  .scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .scanline-layer {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    mix-blend-mode: overlay;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.5) 0px,
+      rgba(0, 0, 0, 0.5) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    will-change: opacity, transform;
+  }
+
+  .scanline-roll {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 18%;
+    top: -20%;
+    opacity: 0;
+    mix-blend-mode: screen;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 50%,
+      transparent 100%
+    );
+    will-change: transform, opacity;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var layer = el.querySelector('.scanline-layer');
+    var roll = el.querySelector('.scanline-roll');
+
+    var intensity = data.intensity !== undefined ? data.intensity : 0.5;
+    intensity = Math.max(0, Math.min(1, intensity));
+
+    var baseOpacity = 0.08 + intensity * 0.22;
+
+    if (layer) {
+      // Fade the scanlines in.
+      tl.to(layer, { opacity: baseOpacity, duration: 0.6, ease: 'power1.out' }, 0);
+
+      // Very subtle flicker so it reads as a live CRT signal.
+      tl.to(layer, {
+        opacity: baseOpacity * 0.7,
+        duration: 0.12,
+        ease: 'steps(2)',
+        yoyo: true,
+        repeat: -1
+      }, 0.6);
+    }
+
+    if (roll) {
+      // Slow rolling brightness bar drifting down the frame, looping.
+      var rollDur = 5;
+      var rollTl = gsap.timeline({ repeat: -1 });
+      rollTl.fromTo(roll,
+        { yPercent: 0, opacity: 0 },
+        { opacity: 0.5 + intensity * 0.3, duration: rollDur * 0.2, ease: 'power1.in' }, 0);
+      rollTl.to(roll, { yPercent: 700, duration: rollDur, ease: 'none' }, 0);
+      rollTl.to(roll, { opacity: 0, duration: rollDur * 0.2, ease: 'power1.out' }, rollDur * 0.8);
+      tl.add(rollTl, 0.4);
+    }
+
+    return tl;
+  }
+</script>

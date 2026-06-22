@@ -1,0 +1,61 @@
+<template>
+  <div class="shimmer-sweep">
+    <div class="shimmer-band"></div>
+  </div>
+</template>
+
+<style scoped>
+  .shimmer-sweep {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .shimmer-band {
+    position: absolute;
+    top: -50%;
+    left: -60%;
+    width: 50%;
+    height: 200%;
+    opacity: 0;
+    transform: rotate(18deg);
+    mix-blend-mode: screen;
+    will-change: transform, opacity;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var band = el.querySelector('.shimmer-band');
+
+    var color = data.color || 'var(--mp-color-glow, rgba(255,255,255,0.85))';
+    var speed = data.speed !== undefined ? data.speed : 1;
+    if (speed <= 0) speed = 1;
+
+    if (band) {
+      band.style.background =
+        'linear-gradient(90deg, transparent 0%, ' + color + ' 50%, transparent 100%)';
+
+      // One diagonal sweep across the frame, with a soft fade in/out.
+      var sweepDur = 1.6 / speed;
+      // Gap between sweeps so it only catches the light periodically.
+      var gap = Math.max(1.5, 3.5 / speed);
+
+      var sweep = gsap.timeline({ repeat: -1, repeatDelay: gap });
+      sweep.fromTo(band,
+        { xPercent: 0, opacity: 0 },
+        { opacity: 0.5, duration: sweepDur * 0.25, ease: 'power1.in' }, 0);
+      sweep.to(band,
+        { xPercent: 420, duration: sweepDur, ease: 'sine.inOut' }, 0);
+      sweep.to(band,
+        { opacity: 0, duration: sweepDur * 0.3, ease: 'power1.out' }, sweepDur * 0.7);
+
+      // Start the first sweep shortly after the frame settles.
+      tl.add(sweep, 0.4);
+    }
+
+    return tl;
+  }
+</script>

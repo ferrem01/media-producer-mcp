@@ -1,0 +1,22 @@
+{
+  "type": "parallax-zoom",
+  "label": "Parallax Zoom",
+  "category": "effects",
+  "description": "Slow continuous ken-burns-style zoom and parallax drift on a full-bleed layer to give the frame an ambient camera-push feel. Use as a top overlay layer.",
+  "data": {
+    "direction": {
+      "type": "string",
+      "label": "Zoom Direction",
+      "optional": true,
+      "default": "in",
+      "placeholder": "in | out"
+    },
+    "intensity": {
+      "type": "number",
+      "label": "Move Intensity",
+      "optional": true,
+      "default": 0.5,
+      "placeholder": "0.5"
+    }
+  }
+}

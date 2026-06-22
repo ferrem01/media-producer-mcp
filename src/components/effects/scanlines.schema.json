@@ -1,0 +1,15 @@
+{
+  "type": "scanlines",
+  "label": "Scanlines",
+  "category": "effects",
+  "description": "Subtle retro CRT scanline texture with a slow rolling brightness bar and gentle flicker. Use as a top overlay layer.",
+  "data": {
+    "intensity": {
+      "type": "number",
+      "label": "Scanline Intensity",
+      "optional": true,
+      "default": 0.5,
+      "placeholder": "0.5"
+    }
+  }
+}

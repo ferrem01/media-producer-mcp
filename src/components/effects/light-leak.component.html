@@ -1,0 +1,74 @@
+<template>
+  <div class="light-leak"></div>
+</template>
+
+<style scoped>
+  .light-leak {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .leak-blob {
+    position: absolute;
+    border-radius: 50%;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    will-change: transform, opacity;
+    filter: blur(60px);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.light-leak');
+    if (!container) return tl;
+
+    var color = data.color || 'var(--mp-color-accent, #a78bfa)';
+
+    // Two soft leaks drifting in from opposite edges.
+    var leaks = [
+      { x: '-12%', y: '6%',  size: '55%', delay: 0.0, dx: 28, dy: 18, dur: 7 },
+      { x: '70%',  y: '55%', size: '60%', delay: 0.6, dx: -34, dy: -22, dur: 9 }
+    ];
+
+    leaks.forEach(function(cfg, i) {
+      var blob = document.createElement('div');
+      blob.className = 'leak-blob';
+      blob.style.background = 'radial-gradient(circle, ' + color + ' 0%, transparent 70%)';
+      blob.style.width = cfg.size;
+      blob.style.height = cfg.size;
+      blob.style.left = cfg.x;
+      blob.style.top = cfg.y;
+      blob.style.opacity = '0';
+      container.appendChild(blob);
+
+      // Fade the leak in gently.
+      tl.to(blob, { opacity: 0.22 + i * 0.06, duration: 1.2, ease: 'power1.out' }, cfg.delay);
+
+      // Slow ambient drift.
+      tl.to(blob, {
+        x: cfg.dx,
+        y: cfg.dy,
+        scale: 1.12,
+        duration: cfg.dur,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, cfg.delay);
+
+      // Gentle opacity pulse so the leak feels alive.
+      tl.to(blob, {
+        opacity: 0.12 + i * 0.04,
+        duration: cfg.dur * 0.6,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, cfg.delay + 0.4);
+    });
+
+    return tl;
+  }
+</script>

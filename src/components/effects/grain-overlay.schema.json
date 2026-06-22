@@ -1,0 +1,15 @@
+{
+  "type": "grain-overlay",
+  "label": "Grain Overlay",
+  "category": "effects",
+  "description": "Animated film grain noise that flickers subtly over the whole frame for an organic analog finish. Use as a top overlay layer.",
+  "data": {
+    "intensity": {
+      "type": "number",
+      "label": "Grain Intensity",
+      "optional": true,
+      "default": 0.5,
+      "placeholder": "0.5"
+    }
+  }
+}

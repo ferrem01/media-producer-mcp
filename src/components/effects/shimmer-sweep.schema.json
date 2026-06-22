@@ -1,0 +1,21 @@
+{
+  "type": "shimmer-sweep",
+  "label": "Shimmer Sweep",
+  "category": "effects",
+  "description": "Diagonal light sheen that periodically sweeps across the frame like light catching glass. Use as a top overlay layer.",
+  "data": {
+    "color": {
+      "type": "string",
+      "label": "Sheen Color",
+      "optional": true,
+      "placeholder": "var(--mp-color-glow)"
+    },
+    "speed": {
+      "type": "number",
+      "label": "Sweep Speed Multiplier",
+      "optional": true,
+      "default": 1,
+      "placeholder": "1"
+    }
+  }
+}
