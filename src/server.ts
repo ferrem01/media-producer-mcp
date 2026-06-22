@@ -1750,7 +1750,7 @@ export function createMcpServer(): McpServer {
         const domain = params.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
         const prompt = params.prompt
           || `A polished ~${duration}-second product LAUNCH video for ${domain}. Open on a brand hero/title, then 2-4 beats covering the core value props and any proof points, and close on a clear call to action. Use the brand kit (colors, fonts, logo) and match the brand's theme. Premium, confident pacing.`;
-        const pipelineResult: any = await runGeneratePipeline({
+        const pipelineResult = await runGeneratePipeline({
           prompt,
           target: "video" as PipelineTarget,
           tenant_id: params.tenant_id,
@@ -1761,8 +1761,10 @@ export function createMcpServer(): McpServer {
           backgroundMusic: params.background_music ?? false,
           sceneCount: Math.max(3, Math.min(10, Math.round(duration / 5.5))),
         });
-        const projectId = pipelineResult?.projectId || pipelineResult?.project_id;
-        if (!projectId) throw new Error("generation produced no project");
+        if (pipelineResult.status !== "completed" || !pipelineResult.project) {
+          throw new Error("generation failed: " + (pipelineResult.error || "no project produced"));
+        }
+        const projectId = pipelineResult.project.project_id;
         j.projectId = projectId;
 
         // 3. Render (reuses the render queue: preview fps, editorial vision, etc.).
