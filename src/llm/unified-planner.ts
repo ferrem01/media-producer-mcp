@@ -133,11 +133,11 @@ Match scene INTENT to a component category (the catalog has blocks for all of th
 - A hero / title / brand reveal -> hero-reveal, kinetic-text, particle-text, animated-gradient-text, title-slide
 - A spoken/caption line you want to emphasize -> a captions/* style (caption-karaoke, caption-kinetic-slam, caption-neon-glow, ...)
 - Code, terminal, or a dev demo -> code/* (code-typing, code-diff, terminal-run, ...) or code-editor / terminal
-- Social proof, posts, follows, engagement -> social/* (x-post-card, instagram-follow, youtube-lower-third, ...), testimonial-card, social-proof
+- Social proof, posts, follows, engagement, GOING VIRAL, follower/subscriber growth -> social/* are platform UI cards and are the RIGHT tool for these moments (x-post-card, instagram-follow, tiktok-follow, youtube-lower-third, reddit-post-card, spotify-now-playing, linkedin-post-card), plus testimonial-card, social-proof. NOTE: a "followers climbing" / "going viral" beat wants the actual social-platform card (e.g. instagram-follow or youtube-lower-third) -- do NOT reduce it to a plain stat-card; the platform UI IS the point.
 - Location, coverage, routes, "where" -> maps/* (route-map, pin-drop, world-map, bubble-map, ...)
 - Product UI / app flows -> the mockups/* (slack-workspace, dashboard-kpi, chat-simulator, ...) and layouts/* (browser-frame, device-mockup, ...)
 - CTA / closing -> cta-card, pricing-card
-- Film-look finishing on any scene -> add an effects/* overlay (grain-overlay, vignette, light-leak, shimmer-sweep, ...)
+- Film-look finishing -> on 1-2 KEY scenes only, you may add ONE subtle effects/* overlay (grain-overlay, vignette, light-leak, shimmer-sweep). Do NOT add a film-FX overlay to every scene -- it gets heavy. Most scenes need none.
 
 For scenes with existing UI elements (chat panels, dashboards, code editors), ALWAYS list the matching library component types.
 
