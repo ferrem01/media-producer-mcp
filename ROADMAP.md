@@ -23,18 +23,25 @@ One tool/skill: a **URL in → an on-brand rendered launch video out**. We alrea
 have every piece (`extract_brand_from_website` → `generate` → `render`); this is
 orchestration. It's the biggest ease-of-entry win and plays to our brand-extraction
 + brand-theme strengths (HyperFrames' `frame.md` is manual asset-gathering).
-- **Status:** in progress.
+- **Status:** ✅ done — `website_to_video` tool (`src/server.ts`): one async job that
+  extracts+stores the brand kit, generates scenes on it, and renders. Returns a job_id.
 
 ### 2. Curated motion / animation preset library  *(from HyperFrames — fixes our #1 weakness)*
 The codegen *invents* motion each scene → variance (UC1 mess, inconsistent quality).
 A vetted library of named, high-quality **motion/transition presets** the codegen
 **composes from** (instead of improvising) raises consistency + cinematic quality at
 the source, and reduces how often the correctness gate has to catch failures.
+- **Status:** ✅ done — `src/llm/motion-presets.ts` (entrance/emphasis/background/exit
+  recipes); `buildMotionPresetGuide()` injected into the codegen system prompt.
 
 ### 3. Re-runnable generation assets  *(from Palmier)*
 Store every generated asset (hero image, b-roll, logo, scene) with its **prompt +
 model + seed + references** so it's **re-runnable / tweakable in place** —
 "regenerate just this image with a tweak" without rebuilding the whole video.
+- **Status:** ✅ done — `Asset` now carries prompt/model/size/quality/version;
+  `regenerate_asset` tool re-runs one image in place (prompt tweak or size/quality
+  override), versions the file, and re-wires the scene that uses it.
+  (`seed` is N/A for gpt-image-1; stored the full param set instead.)
 
 ---
 
