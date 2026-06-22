@@ -1,0 +1,202 @@
+<template>
+  <div class="tr-root">
+    <div class="tr-frame">
+      <div class="tr-chrome">
+        <div class="tr-dots">
+          <span class="tr-dot tr-dot-close"></span>
+          <span class="tr-dot tr-dot-min"></span>
+          <span class="tr-dot tr-dot-max"></span>
+        </div>
+        <div class="tr-title"></div>
+        <div class="tr-dots-spacer"></div>
+      </div>
+      <div class="tr-body"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .tr-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  .tr-frame {
+    --tr-bg: #0d1117;
+    --tr-chrome-a: #38383c;
+    --tr-chrome-b: #2d2d31;
+    --tr-prompt: #7ee787;
+    --tr-cmd: #e6edf3;
+    --tr-out: #9aa4b2;
+    --tr-title: #8b8b8e;
+    display: flex;
+    flex-direction: column;
+    width: 80%;
+    height: 78%;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .tr-frame.tr-light {
+    --tr-bg: #f6f8fa;
+    --tr-chrome-a: #e7e7ea;
+    --tr-chrome-b: #dadadd;
+    --tr-prompt: #1a7f37;
+    --tr-cmd: #1f2328;
+    --tr-out: #57606a;
+    --tr-title: #6e7781;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  .tr-chrome {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(180deg, var(--tr-chrome-a) 0%, var(--tr-chrome-b) 100%);
+    padding: 0 16px;
+    height: 48px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(0,0,0,0.3);
+  }
+  .tr-dots { display: flex; gap: 8px; flex: 0 0 68px; }
+  .tr-dots-spacer { flex: 0 0 68px; }
+  .tr-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .tr-dot-close { background: #ff5f57; }
+  .tr-dot-min { background: #febc2e; }
+  .tr-dot-max { background: #28c840; }
+  .tr-title {
+    flex: 1; font-size: 13px; color: var(--tr-title);
+    text-align: center; font-weight: 500; letter-spacing: 0.03em;
+  }
+  .tr-title:empty { display: none; }
+
+  .tr-body {
+    flex: 1;
+    background: var(--tr-bg);
+    padding: 26px 28px;
+    overflow: hidden;
+  }
+
+  .tr-line {
+    font-size: 16px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .tr-prompt { color: var(--tr-prompt); text-shadow: 0 0 12px rgba(126,231,135,0.25); }
+  .tr-cmd { color: var(--tr-cmd); }
+  .tr-out { color: var(--tr-out); }
+  .tr-out.tr-accent { color: var(--mp-color-accent, #A78BFA); }
+
+  .tr-cursor {
+    display: inline-block;
+    width: 9px;
+    height: 1.05em;
+    background: var(--tr-prompt);
+    vertical-align: text-bottom;
+    margin-left: 2px;
+    border-radius: 1px;
+    box-shadow: 0 0 12px rgba(126,231,135,0.4);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var frame = el.querySelector('.tr-frame');
+    var body = el.querySelector('.tr-body');
+    var titleEl = el.querySelector('.tr-title');
+    if (!frame || !body) return tl;
+
+    var theme = (data && data.theme) || 'dark';
+    if (theme === 'light') frame.classList.add('tr-light');
+    if (data && data.title) titleEl.textContent = data.title;
+
+    var prompt = (data && data.prompt) || '$';
+    var command = (data && data.command) || 'npm run build';
+    var output = (data && data.output && data.output.length) ? data.output : [
+      '> building project...',
+      'compiled 142 modules in 1.8s',
+      'bundle: 84.2 kB (gzip)',
+      'done ✓'
+    ];
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;
+
+    // command line
+    var cmdLine = document.createElement('div');
+    cmdLine.className = 'tr-line';
+    var promptSpan = document.createElement('span');
+    promptSpan.className = 'tr-prompt';
+    promptSpan.textContent = prompt + ' ';
+    cmdLine.appendChild(promptSpan);
+    var cmdSpan = document.createElement('span');
+    cmdSpan.className = 'tr-cmd';
+    cmdLine.appendChild(cmdSpan);
+    var cursor = document.createElement('span');
+    cursor.className = 'tr-cursor';
+    cmdLine.appendChild(cursor);
+    body.appendChild(cmdLine);
+
+    // output lines
+    var outEls = [];
+    output.forEach(function(text) {
+      var line = document.createElement('div');
+      line.className = 'tr-line';
+      var span = document.createElement('span');
+      span.className = 'tr-out';
+      var t = (text != null ? text : '');
+      if (/done|✓|success|ok\b/i.test(t)) span.className += ' tr-accent';
+      span.textContent = t || ' ';
+      line.appendChild(span);
+      body.appendChild(line);
+      outEls.push(line);
+    });
+
+    gsap.set(frame, { autoAlpha: 0, scale: 1.04, y: 32, filter: 'blur(6px)' });
+    gsap.set(cmdLine, { autoAlpha: 0 });
+    gsap.set(outEls, { autoAlpha: 0, y: 8 });
+
+    tl.to(frame, { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.2);
+
+    // blinking cursor (finite repeats -> finite timeline)
+    var blinkReps = Math.max(2, Math.ceil((ctx.duration || 6) / 0.5));
+    tl.to(cursor, { autoAlpha: 0, duration: 0.5, ease: 'steps(1)', yoyo: true, repeat: blinkReps }, 0.4);
+
+    var holdEnd = ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration;
+    var typeStart = 0.2 + speed + 0.25;
+    tl.set(cmdLine, { autoAlpha: 1 }, typeStart);
+
+    // type command char-by-char
+    var typeBudget = Math.min(1.4, (holdEnd - typeStart) * 0.4);
+    var perChar = command.length ? Math.min(0.06, typeBudget / command.length) : 0;
+    for (var c = 0; c < command.length; c++) {
+      (function(ch, idx) {
+        tl.call(function() { cmdSpan.textContent += ch; }, null, typeStart + idx * perChar);
+      })(command[c], c);
+    }
+    var cmdEnd = typeStart + command.length * perChar;
+
+    // hide cursor at "enter", stream output
+    var outStart = cmdEnd + 0.35;
+    tl.set(cursor, { display: 'none' }, outStart - 0.05);
+
+    var remaining = Math.max(0.5, holdEnd - outStart - 0.2);
+    var perOut = remaining / Math.max(outEls.length, 1);
+    outEls.forEach(function(line, i) {
+      tl.to(line, { autoAlpha: 1, y: 0, duration: Math.min(speed, perOut * 0.8), ease: 'power2.out' }, outStart + i * perOut);
+    });
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(frame, { autoAlpha: 0, scale: 0.97, y: -15, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

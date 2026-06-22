@@ -1,0 +1,32 @@
+{
+  "type": "code-morph",
+  "label": "Code Morph",
+  "category": "code",
+  "description": "Code transitions from a before snippet to an after snippet, cross-fading and sliding only the changed lines.",
+  "data": {
+    "before": {
+      "type": "string",
+      "label": "Before Code",
+      "required": true,
+      "placeholder": "function sum(a, b) {\n  return a + b;\n}"
+    },
+    "after": {
+      "type": "string",
+      "label": "After Code",
+      "required": true,
+      "placeholder": "const sum = (a, b) => a + b;"
+    },
+    "language": {
+      "type": "string",
+      "label": "Language Label",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "default": "dark",
+      "enum": ["dark", "light"]
+    }
+  }
+}

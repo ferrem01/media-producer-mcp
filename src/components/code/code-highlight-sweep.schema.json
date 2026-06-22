@@ -1,0 +1,31 @@
+{
+  "type": "code-highlight-sweep",
+  "label": "Code Highlight Sweep",
+  "category": "code",
+  "description": "A static syntax-highlighted code block where an accent highlight bar sweeps down line-by-line then settles on a target line.",
+  "data": {
+    "code": {
+      "type": "string",
+      "label": "Code",
+      "required": true,
+      "placeholder": "function compute(items) {\n  return sum / total;\n}"
+    },
+    "highlight_line": {
+      "type": "number",
+      "label": "Target Line (1-based)",
+      "optional": true
+    },
+    "language": {
+      "type": "string",
+      "label": "Language Label",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "default": "dark",
+      "enum": ["dark", "light"]
+    }
+  }
+}

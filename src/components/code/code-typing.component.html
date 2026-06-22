@@ -1,0 +1,269 @@
+<template>
+  <div class="ct-root">
+    <div class="ct-window">
+      <div class="ct-bar">
+        <div class="ct-dots">
+          <span class="ct-dot ct-dot-close"></span>
+          <span class="ct-dot ct-dot-min"></span>
+          <span class="ct-dot ct-dot-max"></span>
+        </div>
+        <span class="ct-lang"></span>
+        <div class="ct-dots-spacer"></div>
+      </div>
+      <div class="ct-body">
+        <div class="ct-nums"></div>
+        <pre class="ct-code"></pre>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .ct-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    padding: 80px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  .ct-window {
+    --ct-bg: #0d1117;
+    --ct-bar: rgba(255,255,255,0.05);
+    --ct-border: rgba(255,255,255,0.07);
+    --ct-num: rgba(255,255,255,0.18);
+    --ct-text: #e2e8f0;
+    --ct-kw: #ff7b9c;
+    --ct-str: #9ece6a;
+    --ct-num-tok: #ff9e64;
+    --ct-com: #5c6370;
+    --ct-fn: #7aa2f7;
+    background: var(--ct-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    width: 76%;
+    max-height: 82%;
+    border: 1px solid var(--ct-border);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .ct-window.ct-light {
+    --ct-bg: #fbfbfd;
+    --ct-bar: rgba(0,0,0,0.04);
+    --ct-border: rgba(0,0,0,0.10);
+    --ct-num: rgba(0,0,0,0.25);
+    --ct-text: #1f2430;
+    --ct-kw: #d6336c;
+    --ct-str: #2b8a3e;
+    --ct-num-tok: #d9480f;
+    --ct-com: #868e96;
+    --ct-fn: #1c64f2;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  .ct-bar {
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 18px;
+    background: var(--ct-bar);
+    border-bottom: 1px solid var(--ct-border);
+  }
+
+  .ct-dots { display: flex; align-items: center; gap: 8px; flex: 0 0 68px; }
+  .ct-dots-spacer { flex: 0 0 68px; }
+  .ct-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .ct-dot-close { background: #ff5f57; }
+  .ct-dot-min { background: #febc2e; }
+  .ct-dot-max { background: #28c840; }
+
+  .ct-lang {
+    flex: 1;
+    font-size: 13px;
+    color: var(--ct-num);
+    text-align: center;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+  .ct-lang:empty { display: none; }
+
+  .ct-body { display: flex; overflow: hidden; }
+
+  .ct-nums {
+    display: flex;
+    flex-direction: column;
+    padding: 28px 16px 28px 22px;
+    border-right: 1px solid var(--ct-border);
+    user-select: none;
+    flex-shrink: 0;
+  }
+
+  .ct-num {
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--ct-num);
+    text-align: right;
+    min-width: 22px;
+  }
+
+  .ct-code {
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--ct-text);
+    padding: 28px;
+    margin: 0;
+    overflow: hidden;
+    flex: 1;
+    white-space: pre;
+  }
+
+  .ct-line { display: block; min-height: 1.75em; }
+
+  .tok-kw { color: var(--ct-kw); }
+  .tok-str { color: var(--ct-str); }
+  .tok-num { color: var(--ct-num-tok); }
+  .tok-com { color: var(--ct-com); font-style: italic; }
+  .tok-fn { color: var(--ct-fn); }
+
+  .ct-cursor {
+    display: inline-block;
+    width: 9px;
+    height: 1.05em;
+    background: var(--mp-color-accent, #A78BFA);
+    vertical-align: text-bottom;
+    margin-left: 1px;
+    border-radius: 1px;
+    box-shadow: 0 0 12px rgba(167,139,250,0.5);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var win = el.querySelector('.ct-window');
+    var codeEl = el.querySelector('.ct-code');
+    var numsEl = el.querySelector('.ct-nums');
+    var langEl = el.querySelector('.ct-lang');
+    if (!win || !codeEl || !numsEl) return tl;
+
+    var code = (data && typeof data.code === 'string' && data.code.length) ? data.code
+      : "function greet(name) {\n  // say hello\n  return \"Hi, \" + name;\n}";
+    var language = (data && data.language) || 'js';
+    var theme = (data && data.theme) || 'dark';
+    if (theme === 'light') win.classList.add('ct-light');
+    langEl.textContent = language;
+
+    // lightweight tokenizer -> returns array of {text, cls}
+    var KW = ['function','return','const','let','var','if','else','for','while','import','export','from','class','new','async','await','def','public','private','void','int','string','bool','true','false','null','undefined','this'];
+    function tokenize(line) {
+      var out = [];
+      // whole-line comment
+      var trimmed = line.replace(/^\s*/, '');
+      if (trimmed.indexOf('//') === 0 || trimmed.indexOf('#') === 0) {
+        out.push({ text: line, cls: 'tok-com' });
+        return out;
+      }
+      var re = /(\"[^\"]*\"|'[^']*'|`[^`]*`)|(\/\/.*$)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][A-Za-z0-9_$]*)|(\s+)|([^\sA-Za-z0-9_$]+)/g;
+      var m;
+      while ((m = re.exec(line)) !== null) {
+        if (m[1]) out.push({ text: m[1], cls: 'tok-str' });
+        else if (m[2]) out.push({ text: m[2], cls: 'tok-com' });
+        else if (m[3]) out.push({ text: m[3], cls: 'tok-num' });
+        else if (m[4]) {
+          var cls = KW.indexOf(m[4]) !== -1 ? 'tok-kw' : null;
+          if (!cls) {
+            // function-call heuristic: followed by '('
+            var after = line.slice(re.lastIndex);
+            if (/^\s*\(/.test(after)) cls = 'tok-fn';
+          }
+          out.push({ text: m[4], cls: cls });
+        }
+        else if (m[5]) out.push({ text: m[5], cls: null });
+        else out.push({ text: m[0], cls: null });
+        if (m.index === re.lastIndex) re.lastIndex++;
+      }
+      return out;
+    }
+
+    var lines = code.split('\n');
+    codeEl.innerHTML = '';
+    numsEl.innerHTML = '';
+
+    var lineEls = [];
+    var lineTokens = [];
+    lines.forEach(function(line, i) {
+      var num = document.createElement('span');
+      num.className = 'ct-num';
+      num.textContent = (i + 1).toString();
+      numsEl.appendChild(num);
+
+      var lineEl = document.createElement('span');
+      lineEl.className = 'ct-line';
+      codeEl.appendChild(lineEl);
+      lineEls.push(lineEl);
+      lineTokens.push(tokenize(line));
+    });
+
+    // cursor lives at the end of the currently-typed line
+    var cursor = document.createElement('span');
+    cursor.className = 'ct-cursor';
+
+    gsap.set(win, { autoAlpha: 0, y: 36, scale: 1.04, filter: 'blur(5px)' });
+    gsap.set(numsEl, { autoAlpha: 0 });
+
+    tl.to(win, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out' }, 0.15);
+    tl.to(numsEl, { autoAlpha: 1, duration: 0.4 }, 0.35);
+
+    // blinking cursor (independent, finite repeats so the master timeline stays finite)
+    gsap.set(cursor, { autoAlpha: 1 });
+    var blinkReps = Math.max(2, Math.ceil((ctx.duration || 6) / 0.5));
+    tl.to(cursor, { autoAlpha: 0, duration: 0.5, ease: 'steps(1)', yoyo: true, repeat: blinkReps }, 0.5);
+
+    // total typing budget
+    var holdEnd = ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration;
+    var typeStart = 0.7;
+    var typeBudget = Math.max(1.2, holdEnd - typeStart - 0.3);
+
+    var totalChars = 0;
+    lineTokens.forEach(function(toks) { toks.forEach(function(t) { totalChars += t.text.length; }); totalChars += 1; });
+    if (totalChars < 1) totalChars = 1;
+    var perChar = Math.min(0.05, typeBudget / totalChars);
+
+    var t = typeStart;
+    lineEls.forEach(function(lineEl, li) {
+      var toks = lineTokens[li];
+      (function(lineElRef) {
+        tl.call(function() {
+          if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+          lineElRef.appendChild(cursor);
+        }, null, t);
+      })(lineEl);
+
+      toks.forEach(function(tok) {
+        var span = document.createElement('span');
+        if (tok.cls) span.className = tok.cls;
+        lineEl.insertBefore(span, cursor.parentNode === lineEl ? cursor : null);
+        var chars = tok.text.split('');
+        chars.forEach(function(ch) {
+          (function(c) {
+            tl.call(function() { span.textContent += c; }, null, t);
+          })(ch);
+          t += perChar;
+        });
+      });
+      // line break pause
+      t += perChar * 2;
+    });
+
+    // settle cursor blink continues; exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(win, { autoAlpha: 0, y: -15, scale: 0.97, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

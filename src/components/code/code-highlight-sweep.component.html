@@ -1,0 +1,258 @@
+<template>
+  <div class="cs-root">
+    <div class="cs-window">
+      <div class="cs-bar">
+        <div class="cs-dots">
+          <span class="cs-dot cs-dot-close"></span>
+          <span class="cs-dot cs-dot-min"></span>
+          <span class="cs-dot cs-dot-max"></span>
+        </div>
+        <span class="cs-lang"></span>
+        <div class="cs-dots-spacer"></div>
+      </div>
+      <div class="cs-body">
+        <div class="cs-nums"></div>
+        <div class="cs-code-wrap">
+          <div class="cs-sweep"></div>
+          <pre class="cs-code"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .cs-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    padding: 80px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  .cs-window {
+    --cs-bg: #0d1117;
+    --cs-bar: rgba(255,255,255,0.05);
+    --cs-border: rgba(255,255,255,0.07);
+    --cs-num: rgba(255,255,255,0.18);
+    --cs-text: #e2e8f0;
+    --cs-dim: rgba(226,232,240,0.32);
+    --cs-kw: #ff7b9c;
+    --cs-str: #9ece6a;
+    --cs-num-tok: #ff9e64;
+    --cs-com: #5c6370;
+    --cs-fn: #7aa2f7;
+    background: var(--cs-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    width: 76%;
+    max-height: 82%;
+    border: 1px solid var(--cs-border);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .cs-window.cs-light {
+    --cs-bg: #fbfbfd;
+    --cs-bar: rgba(0,0,0,0.04);
+    --cs-border: rgba(0,0,0,0.10);
+    --cs-num: rgba(0,0,0,0.25);
+    --cs-text: #1f2430;
+    --cs-dim: rgba(31,36,48,0.35);
+    --cs-kw: #d6336c;
+    --cs-str: #2b8a3e;
+    --cs-num-tok: #d9480f;
+    --cs-com: #868e96;
+    --cs-fn: #1c64f2;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  .cs-bar {
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 18px;
+    background: var(--cs-bar);
+    border-bottom: 1px solid var(--cs-border);
+  }
+  .cs-dots { display: flex; align-items: center; gap: 8px; flex: 0 0 68px; }
+  .cs-dots-spacer { flex: 0 0 68px; }
+  .cs-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .cs-dot-close { background: #ff5f57; }
+  .cs-dot-min { background: #febc2e; }
+  .cs-dot-max { background: #28c840; }
+  .cs-lang {
+    flex: 1;
+    font-size: 13px;
+    color: var(--cs-num);
+    text-align: center;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+  .cs-lang:empty { display: none; }
+
+  .cs-body { display: flex; overflow: hidden; }
+
+  .cs-nums {
+    display: flex;
+    flex-direction: column;
+    padding: 28px 16px 28px 22px;
+    border-right: 1px solid var(--cs-border);
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .cs-num {
+    font-size: 16px;
+    line-height: 1.85;
+    color: var(--cs-num);
+    text-align: right;
+    min-width: 22px;
+  }
+
+  .cs-code-wrap {
+    position: relative;
+    flex: 1;
+    padding: 28px;
+    overflow: hidden;
+  }
+
+  .cs-sweep {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1.85em;
+    background: linear-gradient(90deg, rgba(167,139,250,0.18), rgba(167,139,250,0.06));
+    border-left: 3px solid var(--mp-color-accent, #A78BFA);
+    box-shadow: 0 0 30px rgba(167,139,250,0.25);
+    pointer-events: none;
+    top: 28px;
+  }
+
+  .cs-code {
+    font-size: 16px;
+    line-height: 1.85;
+    color: var(--cs-text);
+    margin: 0;
+    position: relative;
+    white-space: pre;
+  }
+
+  .cs-line { display: block; min-height: 1.85em; color: var(--cs-dim); }
+  .cs-line.cs-active { color: var(--cs-text); }
+
+  .tok-kw { color: var(--cs-kw); }
+  .tok-str { color: var(--cs-str); }
+  .tok-num { color: var(--cs-num-tok); }
+  .tok-com { color: var(--cs-com); font-style: italic; }
+  .tok-fn { color: var(--cs-fn); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var win = el.querySelector('.cs-window');
+    var codeEl = el.querySelector('.cs-code');
+    var numsEl = el.querySelector('.cs-nums');
+    var sweep = el.querySelector('.cs-sweep');
+    var langEl = el.querySelector('.cs-lang');
+    if (!win || !codeEl || !numsEl || !sweep) return tl;
+
+    var code = (data && typeof data.code === 'string' && data.code.length) ? data.code
+      : "function compute(items) {\n  const total = items.length;\n  const sum = items.reduce((a,b)=>a+b);\n  return sum / total;\n}";
+    var theme = (data && data.theme) || 'dark';
+    if (theme === 'light') win.classList.add('cs-light');
+    if (data && data.language) langEl.textContent = data.language;
+
+    var KW = ['function','return','const','let','var','if','else','for','while','import','export','from','class','new','async','await','def','public','private','void','int','string','bool','true','false','null','undefined','this'];
+    function tokenize(line) {
+      var out = [];
+      var trimmed = line.replace(/^\s*/, '');
+      if (trimmed.indexOf('//') === 0 || trimmed.indexOf('#') === 0) { out.push({ text: line, cls: 'tok-com' }); return out; }
+      var re = /(\"[^\"]*\"|'[^']*'|`[^`]*`)|(\/\/.*$)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][A-Za-z0-9_$]*)|(\s+)|([^\sA-Za-z0-9_$]+)/g;
+      var m;
+      while ((m = re.exec(line)) !== null) {
+        if (m[1]) out.push({ text: m[1], cls: 'tok-str' });
+        else if (m[2]) out.push({ text: m[2], cls: 'tok-com' });
+        else if (m[3]) out.push({ text: m[3], cls: 'tok-num' });
+        else if (m[4]) {
+          var cls = KW.indexOf(m[4]) !== -1 ? 'tok-kw' : null;
+          if (!cls && /^\s*\(/.test(line.slice(re.lastIndex))) cls = 'tok-fn';
+          out.push({ text: m[4], cls: cls });
+        } else if (m[5]) out.push({ text: m[5], cls: null });
+        else out.push({ text: m[0], cls: null });
+        if (m.index === re.lastIndex) re.lastIndex++;
+      }
+      return out;
+    }
+
+    var lines = code.split('\n');
+    codeEl.innerHTML = '';
+    numsEl.innerHTML = '';
+    var lineEls = [];
+    lines.forEach(function(line, i) {
+      var num = document.createElement('span');
+      num.className = 'cs-num';
+      num.textContent = (i + 1).toString();
+      numsEl.appendChild(num);
+
+      var lineEl = document.createElement('span');
+      lineEl.className = 'cs-line';
+      tokenize(line).forEach(function(tok) {
+        var span = document.createElement('span');
+        if (tok.cls) span.className = tok.cls;
+        span.textContent = tok.text;
+        lineEl.appendChild(span);
+      });
+      if (!line.length) lineEl.textContent = ' ';
+      codeEl.appendChild(lineEl);
+      lineEls.push(lineEl);
+    });
+
+    var n = lineEls.length;
+    var lineHeightPx = 16 * 1.85;
+    var targetLine = (data && data.highlight_line) ? Math.max(1, Math.min(n, data.highlight_line)) : n;
+
+    gsap.set(win, { autoAlpha: 0, y: 36, scale: 1.04, filter: 'blur(5px)' });
+    gsap.set(sweep, { autoAlpha: 0, top: 28 });
+    tl.to(win, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out' }, 0.15);
+
+    var holdEnd = ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration;
+    var sweepStart = 0.8;
+    var sweepBudget = Math.max(1.0, (holdEnd - sweepStart) * 0.7);
+    var perLine = sweepBudget / Math.max(n, 1);
+
+    tl.to(sweep, { autoAlpha: 1, duration: 0.3 }, sweepStart - 0.1);
+
+    // sweep down line-by-line, emphasizing each
+    lineEls.forEach(function(lineEl, i) {
+      var at = sweepStart + i * perLine;
+      tl.to(sweep, { top: 28 + i * lineHeightPx, duration: perLine * 0.8, ease: 'power1.inOut' }, at);
+      (function(le, prev) {
+        tl.call(function() {
+          le.classList.add('cs-active');
+          if (prev && (i + 1) !== targetLine && (i) !== (targetLine - 1)) prev.classList.remove('cs-active');
+        }, null, at);
+      })(lineEl, lineEls[i - 1]);
+    });
+
+    // settle on target line
+    var settleAt = sweepStart + n * perLine + 0.1;
+    tl.to(sweep, { top: 28 + (targetLine - 1) * lineHeightPx, duration: 0.5, ease: 'power2.out' }, settleAt);
+    tl.call(function() {
+      lineEls.forEach(function(le, i) {
+        if (i === targetLine - 1) le.classList.add('cs-active');
+        else le.classList.remove('cs-active');
+      });
+    }, null, settleAt);
+    // gentle pulse on settled bar
+    tl.to(sweep, { boxShadow: '0 0 48px rgba(167,139,250,0.45)', duration: 0.6, yoyo: true, repeat: 2, ease: 'sine.inOut' }, settleAt + 0.5);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(win, { autoAlpha: 0, y: -15, scale: 0.97, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

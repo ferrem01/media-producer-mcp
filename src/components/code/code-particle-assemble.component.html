@@ -1,0 +1,234 @@
+<template>
+  <div class="cp-root">
+    <div class="cp-window">
+      <div class="cp-bar">
+        <div class="cp-dots">
+          <span class="cp-dot cp-dot-close"></span>
+          <span class="cp-dot cp-dot-min"></span>
+          <span class="cp-dot cp-dot-max"></span>
+        </div>
+        <span class="cp-lang"></span>
+        <div class="cp-dots-spacer"></div>
+      </div>
+      <div class="cp-body">
+        <div class="cp-nums"></div>
+        <pre class="cp-code"></pre>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .cp-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    padding: 80px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  .cp-window {
+    --cp-bg: #0d1117;
+    --cp-bar: rgba(255,255,255,0.05);
+    --cp-border: rgba(255,255,255,0.07);
+    --cp-num: rgba(255,255,255,0.18);
+    --cp-text: #e2e8f0;
+    --cp-kw: #ff7b9c;
+    --cp-str: #9ece6a;
+    --cp-num-tok: #ff9e64;
+    --cp-com: #5c6370;
+    --cp-fn: #7aa2f7;
+    background: var(--cp-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    width: 76%;
+    max-height: 82%;
+    border: 1px solid var(--cp-border);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .cp-window.cp-light {
+    --cp-bg: #fbfbfd;
+    --cp-bar: rgba(0,0,0,0.04);
+    --cp-border: rgba(0,0,0,0.10);
+    --cp-num: rgba(0,0,0,0.25);
+    --cp-text: #1f2430;
+    --cp-kw: #d6336c;
+    --cp-str: #2b8a3e;
+    --cp-num-tok: #d9480f;
+    --cp-com: #868e96;
+    --cp-fn: #1c64f2;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  .cp-bar {
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 18px;
+    background: var(--cp-bar);
+    border-bottom: 1px solid var(--cp-border);
+  }
+  .cp-dots { display: flex; align-items: center; gap: 8px; flex: 0 0 68px; }
+  .cp-dots-spacer { flex: 0 0 68px; }
+  .cp-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .cp-dot-close { background: #ff5f57; }
+  .cp-dot-min { background: #febc2e; }
+  .cp-dot-max { background: #28c840; }
+  .cp-lang {
+    flex: 1; font-size: 13px; color: var(--cp-num);
+    text-align: center; letter-spacing: 0.04em; font-weight: 500;
+  }
+  .cp-lang:empty { display: none; }
+
+  .cp-body { display: flex; overflow: hidden; }
+
+  .cp-nums {
+    display: flex;
+    flex-direction: column;
+    padding: 28px 16px 28px 22px;
+    border-right: 1px solid var(--cp-border);
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .cp-num {
+    font-size: 16px;
+    line-height: 1.85;
+    color: var(--cp-num);
+    text-align: right;
+    min-width: 22px;
+  }
+
+  .cp-code {
+    font-size: 16px;
+    line-height: 1.85;
+    color: var(--cp-text);
+    padding: 28px;
+    margin: 0;
+    overflow: hidden;
+    flex: 1;
+    white-space: pre;
+  }
+
+  .cp-line { display: block; min-height: 1.85em; }
+  .cp-tok { display: inline-block; will-change: transform, opacity, filter; }
+
+  .tok-kw { color: var(--cp-kw); }
+  .tok-str { color: var(--cp-str); }
+  .tok-num { color: var(--cp-num-tok); }
+  .tok-com { color: var(--cp-com); font-style: italic; }
+  .tok-fn { color: var(--cp-fn); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var win = el.querySelector('.cp-window');
+    var codeEl = el.querySelector('.cp-code');
+    var numsEl = el.querySelector('.cp-nums');
+    var langEl = el.querySelector('.cp-lang');
+    if (!win || !codeEl || !numsEl) return tl;
+
+    var code = (data && typeof data.code === 'string' && data.code.length) ? data.code
+      : "import { render } from \"engine\";\n\nfunction main() {\n  render(scene);\n}";
+    var theme = (data && data.theme) || 'dark';
+    if (theme === 'light') win.classList.add('cp-light');
+    if (data && data.language) langEl.textContent = data.language;
+
+    var KW = ['function','return','const','let','var','if','else','for','while','import','export','from','class','new','async','await','def','public','private','void','int','string','bool','true','false','null','undefined','this'];
+    function tokenize(line) {
+      var out = [];
+      var trimmed = line.replace(/^\s*/, '');
+      if (trimmed.indexOf('//') === 0 || trimmed.indexOf('#') === 0) { out.push({ text: line, cls: 'tok-com' }); return out; }
+      var re = /(\"[^\"]*\"|'[^']*'|`[^`]*`)|(\/\/.*$)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][A-Za-z0-9_$]*)|(\s+)|([^\sA-Za-z0-9_$]+)/g;
+      var m;
+      while ((m = re.exec(line)) !== null) {
+        if (m[1]) out.push({ text: m[1], cls: 'tok-str' });
+        else if (m[2]) out.push({ text: m[2], cls: 'tok-com' });
+        else if (m[3]) out.push({ text: m[3], cls: 'tok-num' });
+        else if (m[4]) {
+          var cls = KW.indexOf(m[4]) !== -1 ? 'tok-kw' : null;
+          if (!cls && /^\s*\(/.test(line.slice(re.lastIndex))) cls = 'tok-fn';
+          out.push({ text: m[4], cls: cls });
+        } else if (m[5]) out.push({ text: m[5], cls: null });
+        else out.push({ text: m[0], cls: null });
+        if (m.index === re.lastIndex) re.lastIndex++;
+      }
+      return out;
+    }
+
+    var lines = code.split('\n');
+    codeEl.innerHTML = '';
+    numsEl.innerHTML = '';
+
+    // collect token elements (skip pure-whitespace tokens for animation perf)
+    var tokenEls = [];
+    lines.forEach(function(line, li) {
+      var num = document.createElement('span');
+      num.className = 'cp-num';
+      num.textContent = (li + 1).toString();
+      numsEl.appendChild(num);
+
+      var lineEl = document.createElement('span');
+      lineEl.className = 'cp-line';
+      var toks = tokenize(line);
+      if (!toks.length) lineEl.textContent = ' ';
+      toks.forEach(function(tok) {
+        var span = document.createElement('span');
+        span.className = 'cp-tok' + (tok.cls ? ' ' + tok.cls : '');
+        span.textContent = tok.text;
+        lineEl.appendChild(span);
+        // animate only non-whitespace tokens to keep it performant
+        if (/\S/.test(tok.text)) tokenEls.push({ span: span, line: li });
+      });
+      codeEl.appendChild(lineEl);
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.6 : 0.75;
+
+    gsap.set(win, { autoAlpha: 0, scale: 1.04, y: 32, filter: 'blur(6px)' });
+    gsap.set(numsEl, { autoAlpha: 0 });
+
+    // scatter tokens: random offset + blur + transparent
+    tokenEls.forEach(function(item, i) {
+      var ang = (i * 137.5) * Math.PI / 180; // golden-angle scatter, deterministic
+      var dist = 60 + (i % 7) * 22;
+      gsap.set(item.span, {
+        autoAlpha: 0,
+        x: Math.cos(ang) * dist,
+        y: Math.sin(ang) * dist - 10,
+        scale: 0.6,
+        filter: 'blur(6px)',
+        rotation: ((i % 5) - 2) * 6
+      });
+    });
+
+    tl.to(win, { autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.15);
+    tl.to(numsEl, { autoAlpha: 1, duration: 0.5 }, 0.4);
+
+    var holdEnd = ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration;
+    var assembleStart = 0.55;
+    var assembleSpan = Math.max(0.8, (holdEnd - assembleStart) * 0.65);
+    var n = Math.max(tokenEls.length, 1);
+    // group by line so it reads as lines snapping in, but stagger per token within
+    var stagger = assembleSpan / n;
+
+    tokenEls.forEach(function(item, i) {
+      var at = assembleStart + i * stagger;
+      tl.to(item.span, {
+        autoAlpha: 1, x: 0, y: 0, scale: 1, rotation: 0, filter: 'blur(0px)',
+        duration: speed,
+        ease: 'power2.out'
+      }, at);
+    });
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(win, { autoAlpha: 0, y: -15, scale: 0.97, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

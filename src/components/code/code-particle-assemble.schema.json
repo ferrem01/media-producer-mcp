@@ -1,0 +1,26 @@
+{
+  "type": "code-particle-assemble",
+  "label": "Code Particle Assemble",
+  "category": "code",
+  "description": "Code text assembles into place from scattered, blurred tokens that fly in and snap into a syntax-highlighted block.",
+  "data": {
+    "code": {
+      "type": "string",
+      "label": "Code",
+      "required": true,
+      "placeholder": "function main() {\n  render(scene);\n}"
+    },
+    "language": {
+      "type": "string",
+      "label": "Language Label",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "default": "dark",
+      "enum": ["dark", "light"]
+    }
+  }
+}
