@@ -42,7 +42,7 @@ import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { captureUrl } from "./core/capture-url.js";
-import { registerBrandExtractTool } from "./tools/brand-extract-tool.js";
+import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
 // generateImage moved to internal API (not exposed via MCP generate tool)
 
 // ── Shared Zod schemas ──
@@ -1718,6 +1718,83 @@ export function createMcpServer(): McpServer {
 
   // ── Brand extraction tool ──
   registerBrandExtractTool(server);
+
+  // ─────────────────────────────────────────────
+  // website_to_video - one-shot: URL -> on-brand launch video
+  // ─────────────────────────────────────────────
+  server.tool(
+    "website_to_video",
+    "One-shot: turn a website URL into an on-brand, rendered launch video. Extracts the brand kit from the URL (colors, fonts, logos, theme), generates scenes, and renders -- in a single async job. Returns a job_id; poll with get(target='job').",
+    {
+      tenant_id: z.string(),
+      url: z.string().describe("Website URL to brand the video from (e.g. https://getquotient.ai)"),
+      prompt: z.string().optional().describe("Optional creative direction. If omitted, a launch-video brief is derived from the brand."),
+      target_duration: z.number().optional().default(24).describe("Target video length in seconds (default 24)"),
+      voiceover: z.boolean().optional().default(false),
+      background_music: z.boolean().optional().default(false),
+      quality: z.enum(["preview", "production"]).optional().default("preview"),
+      enhance_brand: z.boolean().optional().default(false).describe("Run LLM brand analysis during extraction (slower, richer guidelines)"),
+    },
+    async (params) => {
+      let llmConfig;
+      try { llmConfig = llmConfigFromEnv(); } catch (e: any) { return err(`LLM not configured: ${e.message}`); }
+
+      const job = queueJob("generate", params.tenant_id, async (j) => {
+        // 1. Extract + store the brand kit from the URL.
+        j.progress = { step: "extracting_brand", percent: 5 };
+        const { kit, summary } = await extractAndStoreBrand(params.tenant_id, params.url, params.enhance_brand ?? false);
+
+        // 2. Generate scenes on that brand.
+        j.progress = { step: "generating", percent: 25 };
+        const duration = params.target_duration ?? 24;
+        const domain = params.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+        const prompt = params.prompt
+          || `A polished ~${duration}-second product LAUNCH video for ${domain}. Open on a brand hero/title, then 2-4 beats covering the core value props and any proof points, and close on a clear call to action. Use the brand kit (colors, fonts, logo) and match the brand's theme. Premium, confident pacing.`;
+        const pipelineResult: any = await runGeneratePipeline({
+          prompt,
+          target: "video" as PipelineTarget,
+          tenant_id: params.tenant_id,
+          llmConfig,
+          brandKit: kit,
+          canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: kit.colors?.background || "#0f172a" },
+          voiceover: params.voiceover ?? false,
+          backgroundMusic: params.background_music ?? false,
+          sceneCount: Math.max(3, Math.min(10, Math.round(duration / 5.5))),
+        });
+        const projectId = pipelineResult?.projectId || pipelineResult?.project_id;
+        if (!projectId) throw new Error("generation produced no project");
+        j.projectId = projectId;
+
+        // 3. Render (reuses the render queue: preview fps, editorial vision, etc.).
+        j.progress = { step: "rendering", percent: 70 };
+        const renderJob = queueRender(params.tenant_id, projectId, { quality: params.quality ?? "preview" });
+        // Wait for the render job to finish.
+        for (;;) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const rs = getJobStatus(renderJob.id);
+          if (!rs) continue;
+          if (rs.status === "completed") {
+            j.progress = { step: "complete", percent: 100 };
+            return {
+              status: "completed",
+              project_id: projectId,
+              output_path: rs.outputPath,
+              preview_url: previewUrl(params.tenant_id, projectId),
+              brand: { theme: summary.colors, fonts: summary.typography, logos: summary.logos?.length || 0 },
+            };
+          }
+          if (rs.status === "failed") throw new Error("render failed: " + (rs.error || "unknown"));
+        }
+      });
+      job.projectId = "";
+
+      return ok({
+        status: "queued",
+        job_id: job.id,
+        message: `Building an on-brand launch video from ${params.url}. Poll with get(target='job', job_id='${job.id}').`,
+      });
+    },
+  );
 
   return server;
 }
