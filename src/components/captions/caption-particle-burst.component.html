@@ -86,6 +86,12 @@
     if (wordEls.length > 1 && (wordEls.length - 1) * step + speed > available) {
       step = Math.max(0.08, (available - speed) / Math.max(1, wordEls.length - 1));
     }
+    // Legibility: every word must reach full opacity quickly so no word is left
+    // mid-blur/muted in the early frames (the resting caption must read clean).
+    var entranceEnd = 0.85;
+    if (startAt + (wordEls.length - 1) * step + speed > entranceEnd) {
+      step = Math.max(0.04, (entranceEnd - speed - startAt) / Math.max(1, wordEls.length - 1));
+    }
 
     var sparkCount = ctx.motion === 'minimal' ? 6 : 10;
 

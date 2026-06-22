@@ -88,9 +88,10 @@ async function main() {
           const fp = path.join(outDir, `f${i}.png`); await page.screenshot({ path: fp });
           frames.push(fp);
         }
-        // contact sheet (2x2 tile) + final frame
+        // contact sheet: a horizontal 1x4 time strip (left->right = earlier->later)
+        // so the critique reads it as one element over time, not 4 scattered elements.
         const sheet = path.join(outDir, "contact.png");
-        await ex("ffmpeg", ["-y", "-i", frames[0], "-i", frames[1], "-i", frames[2], "-i", frames[3], "-filter_complex", "[0][1]hstack[t];[2][3]hstack[b];[t][b]vstack,scale=1280:-1", sheet]);
+        await ex("ffmpeg", ["-y", "-i", frames[0], "-i", frames[1], "-i", frames[2], "-i", frames[3], "-filter_complex", "[0][1][2][3]hstack=inputs=4,scale=1920:-1", sheet]);
         const finalB64 = fs.readFileSync(frames[3]).toString("base64");
         const sheetB64 = fs.readFileSync(sheet).toString("base64");
         const brief = `A single motion-graphics component "${it.type}": ${it.brief}. All of its content must be fully ON-CANVAS, legible (readable contrast), and free of overlapping/colliding/clipped text.`;
