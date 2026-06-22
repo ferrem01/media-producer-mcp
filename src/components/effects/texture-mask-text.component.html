@@ -59,6 +59,19 @@
     var text = (typeof data.text === 'string' && data.text) ? data.text : 'BOLD';
     word.textContent = text;
 
+    // Fit-to-width: shrink font-size until the (nowrap) text fits ~90% of the
+    // canvas width, so long strings never clip at the frame edges.
+    var stage = el.querySelector('.texture-mask-text') || el;
+    var maxW = (stage.clientWidth || (ctx && ctx.width) || 1920) * 0.9;
+    var fit = 0;
+    while (word.scrollWidth > maxW && fit < 60) {
+      var cur = parseFloat(getComputedStyle(word).fontSize) || 200;
+      var next = cur * 0.92;
+      if (next < 24) { word.style.fontSize = '24px'; break; }
+      word.style.fontSize = next + 'px';
+      fit++;
+    }
+
     // Optional override of the textured fill.
     if (data.color) {
       word.style.backgroundImage =

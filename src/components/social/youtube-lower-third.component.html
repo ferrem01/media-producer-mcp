@@ -73,7 +73,7 @@
     var subBtn = el.querySelector('.yt-sub-btn');
     var bell = el.querySelector('.yt-bell');
 
-    if (data.channel) channel.textContent = data.channel;
+    if (channel) channel.textContent = data.channel || data.title || data.app || 'Quotient';
     if (data.avatar_color && avatar) avatar.style.background = data.avatar_color;
     var subs = data.subscribers !== undefined ? data.subscribers : 1250000;
 

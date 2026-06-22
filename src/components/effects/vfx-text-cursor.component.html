@@ -81,9 +81,26 @@
       charEls.push(span);
     });
 
+    // Fit-to-width: shrink the line's font-size until the full typed string
+    // (plus caret) fits ~90% of the canvas width, so it never clips the edges.
+    var line = el.querySelector('.vtc-line');
+    if (line) {
+      var stage = el.querySelector('.vfx-text-cursor') || el;
+      var maxW = (stage.clientWidth || (ctx && ctx.width) || 1920) * 0.9;
+      var fit = 0;
+      while (line.scrollWidth > maxW && fit < 60) {
+        var cur = parseFloat(getComputedStyle(line).fontSize) || 150;
+        var next = cur * 0.92;
+        if (next < 20) { line.style.fontSize = '20px'; break; }
+        line.style.fontSize = next + 'px';
+        fit++;
+      }
+    }
+
     // Initial visible state = full text shown (final state). Animate FROM hidden.
-    // Start with all chars hidden and caret at the left.
-    gsap.set(charEls, { opacity: 0 });
+    // Hidden chars collapse (display:none) so the typed prefix stays CENTERED
+    // in the flex container and never appears anchored/clipped at an edge.
+    gsap.set(charEls, { opacity: 0, display: 'none' });
     if (sel) gsap.set(sel, { width: 0, opacity: 0 });
 
     // Blinking caret loop (independent of typing).
@@ -97,11 +114,12 @@
       }, 0);
     }
 
-    // Type each character in.
+    // Type each character in: collapse -> inline + fade so the line keeps
+    // re-centering on its visible content as it grows.
     var t = 0.4;
     var perChar = 0.09;
     charEls.forEach(function (span, i) {
-      tl.to(span, { opacity: 1, duration: 0.01 }, t + i * perChar);
+      tl.set(span, { display: 'inline', opacity: 1 }, t + i * perChar);
     });
     var doneTyping = t + charEls.length * perChar + 0.3;
 

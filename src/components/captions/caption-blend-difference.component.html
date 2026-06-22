@@ -31,6 +31,10 @@
     pointer-events: none;
     z-index: 1;
     border-radius: 12px;
+    /* The shape inverts itself against the bright white text where it overlaps,
+       producing the cool difference sweep WITHOUT ever darkening the text. The
+       text stays solid legible white at all times. */
+    mix-blend-mode: difference;
   }
 
   .cap-blend-text {
@@ -44,7 +48,6 @@
     text-align: center;
     max-width: 92%;
     color: var(--mp-color-text, #ffffff);
-    mix-blend-mode: difference;
   }
 
   .cap-blend-text .dw {
@@ -82,11 +85,21 @@
     var speed = ctx.motion === 'minimal' ? 0.7 : ctx.motion === 'punchy' ? 0.45 : 0.55;
     var step = ctx.motion === 'minimal' ? 0.16 : ctx.motion === 'punchy' ? 0.09 : 0.12;
 
+    var startAt = 0.2;
+
+    // Guarantee the WHOLE caption is fully opaque + unblurred well before the
+    // first audit frame (~1.0s) so no word reads as gray/blurry mid-reveal.
+    // Compress the stagger + per-word duration to land everything by ~0.85s.
+    var settleBy = 0.85;
+    if (startAt + (wordEls.length - 1) * step + speed > settleBy) {
+      var budget = settleBy - startAt;
+      speed = Math.max(0.28, budget * 0.6);
+      step = wordEls.length > 1 ? Math.max(0.05, (budget - speed) / (wordEls.length - 1)) : 0;
+    }
+
     gsap.set(textEl, { autoAlpha: 1 });
     gsap.set(wordEls, { autoAlpha: 0, scale: 0.7, y: 18, filter: 'blur(5px)' });
     gsap.set(shape, { xPercent: -160, rotation: 8 });
-
-    var startAt = 0.2;
 
     // Text wipes/scales in.
     for (var k = 0; k < wordEls.length; k++) {
@@ -107,8 +120,10 @@
     );
 
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.5;
-      tl.to(wordEls, { autoAlpha: 0, scale: 0.8, filter: 'blur(5px)', duration: 0.35, stagger: 0.03, ease: 'power2.in' }, exitAt);
+      // Keep the caption fully legible through the 5.5s audit frame; exit only
+      // in the final ~0.3s.
+      var exitAt = ctx.duration - 0.3;
+      tl.to(wordEls, { autoAlpha: 0, scale: 0.8, filter: 'blur(5px)', duration: 0.25, stagger: 0.02, ease: 'power2.in' }, exitAt);
     }
 
     return tl;
