@@ -40,9 +40,13 @@
 
   .cap-matrix-text .mc.scrambling {
     color: var(--mp-color-accent, #34d399);
+    /* Keep the scramble glyphs BRIGHT/high-contrast on any brand so the
+       mid-decode state reads as intentional matrix glyphs, not muted noise. */
+    filter: brightness(1.5) saturate(1.15);
     text-shadow:
-      0 0 8px var(--mp-color-accent, #34d399),
-      0 0 22px var(--mp-color-glow, rgba(52, 211, 153, 0.7));
+      0 0 6px rgba(255, 255, 255, 0.55),
+      0 0 12px var(--mp-color-accent, #34d399),
+      0 0 26px var(--mp-color-glow, rgba(52, 211, 153, 0.7));
   }
 </style>
 
