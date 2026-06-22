@@ -43,7 +43,7 @@ import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { captureUrl } from "./core/capture-url.js";
 import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
-// generateImage moved to internal API (not exposed via MCP generate tool)
+import { generateImage } from "./media/image-gen.js";
 
 // ── Shared Zod schemas ──
 
@@ -1793,6 +1793,94 @@ export function createMcpServer(): McpServer {
         job_id: job.id,
         message: `Building an on-brand launch video from ${params.url}. Poll with get(target='job', job_id='${job.id}').`,
       });
+    },
+  );
+
+  // ─────────────────────────────────────────────
+  // regenerate_asset - re-run a generated asset in place (roadmap #3)
+  // ─────────────────────────────────────────────
+  server.tool(
+    "regenerate_asset",
+    "Re-run a generated image asset in place using its stored generation params (prompt, model, size, quality) -- optionally with a tweak -- without rebuilding the whole video. Writes a new version, re-wires the scene that uses it, and saves. Re-render the project to see the new asset in the video.",
+    {
+      tenant_id: z.string(),
+      project_id: z.string(),
+      asset_id: z.string().describe("Id of the generated asset to re-run (see project.assets[])"),
+      prompt: z.string().optional().describe("Override prompt. If omitted, reuses the asset's stored prompt verbatim."),
+      prompt_append: z.string().optional().describe("A tweak appended to the stored prompt (e.g. 'make it warmer, more saturated'). Ignored if 'prompt' is given."),
+      size: z.enum(["1024x1024", "1536x1024", "1024x1536", "auto"]).optional().describe("Override image size (defaults to the asset's stored size)."),
+      quality: z.enum(["low", "medium", "high", "auto"]).optional().describe("Override image quality (defaults to the asset's stored quality)."),
+    },
+    async (params) => {
+      try {
+        const project = await loadProject(params.tenant_id, params.project_id);
+        if (!project) return err(`Project not found: ${params.project_id}`);
+        const asset = (project.assets || []).find((a) => a.id === params.asset_id);
+        if (!asset) return err(`Asset not found: ${params.asset_id}`);
+        if (asset.type !== "ai_image") return err(`Asset ${params.asset_id} is type '${asset.type}' -- only ai_image assets are re-runnable.`);
+        if (!asset.prompt && !params.prompt) return err(`Asset ${params.asset_id} has no stored prompt; provide 'prompt' to regenerate it.`);
+
+        const basePrompt = params.prompt ?? asset.prompt ?? "";
+        const prompt = params.prompt
+          ? basePrompt
+          : (params.prompt_append ? `${basePrompt}\n\n${params.prompt_append}` : basePrompt);
+        const size = (params.size ?? asset.size ?? "1536x1024") as any;
+        const quality = (params.quality ?? asset.quality ?? "high") as any;
+        const version = (asset.version ?? 1) + 1;
+
+        // New versioned filename next to the old asset so render caches don't collide.
+        const assetsDir = projectAssetsDir(params.tenant_id, params.project_id);
+        await fs.mkdir(assetsDir, { recursive: true });
+        const oldBase = path.basename(asset.path).replace(/(_v\d+)?(\.[a-z0-9]+)$/i, "");
+        const ext = (path.extname(asset.path) || ".png").toLowerCase();
+        const filename = `${oldBase}_v${version}${ext}`;
+        const outputPath = path.join(assetsDir, filename);
+
+        const result = await generateImage({ prompt, size, quality, outputPath });
+
+        const newUrl = `/assets/${params.tenant_id}/projects/${params.project_id}/assets/${filename}`;
+        const oldUrl = `/assets/${params.tenant_id}/projects/${params.project_id}/assets/${path.basename(asset.path)}`;
+
+        // Update the asset record in place.
+        asset.path = result.path;
+        asset.prompt = prompt;
+        asset.size = size;
+        asset.quality = quality;
+        asset.width = result.width;
+        asset.height = result.height;
+        asset.version = version;
+        asset.created_at = new Date().toISOString();
+
+        // Re-wire any scene component that pointed at the old asset to the new file.
+        let rewired = 0;
+        for (const scene of project.scenes) {
+          for (const comp of scene.components || []) {
+            const src = (comp.data as any)?.src;
+            if (src && (src === oldUrl || src === asset.path || path.basename(String(src)) === path.basename(oldUrl))) {
+              (comp.data as any).src = newUrl;
+              rewired++;
+            }
+          }
+        }
+
+        await saveProject(project);
+
+        return ok({
+          status: "regenerated",
+          asset_id: asset.id,
+          version,
+          prompt,
+          size,
+          quality,
+          path: result.path,
+          url: newUrl,
+          scene_components_rewired: rewired,
+          preview_url: previewUrl(params.tenant_id, params.project_id),
+          note: "Re-render the project to bake the new asset into the video.",
+        });
+      } catch (e: any) {
+        return err(`Asset regeneration failed: ${e.message}`);
+      }
     },
   );
 
