@@ -1,0 +1,93 @@
+<template>
+  <div class="texture-mask-text">
+    <div class="tmt-clip">
+      <div class="tmt-fill"></div>
+      <span class="tmt-word"></span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .texture-mask-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .tmt-clip {
+    position: relative;
+    display: inline-block;
+  }
+
+  .tmt-word {
+    position: relative;
+    display: inline-block;
+    font-family: var(--mp-font-heading, 'Inter', sans-serif);
+    font-weight: 800;
+    font-size: 16vw;
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    text-align: center;
+    white-space: nowrap;
+    color: transparent;
+    background-image:
+      linear-gradient(
+        115deg,
+        var(--mp-color-primary, #6366f1) 0%,
+        var(--mp-color-accent, #a78bfa) 30%,
+        var(--mp-color-glow, #ffffff) 50%,
+        var(--mp-color-secondary, #22d3ee) 70%,
+        var(--mp-color-primary, #6366f1) 100%
+      );
+    background-size: 300% 300%;
+    background-position: 0% 50%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    will-change: background-position, opacity, transform;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var word = el.querySelector('.tmt-word');
+    if (!word) return tl;
+
+    var text = (typeof data.text === 'string' && data.text) ? data.text : 'BOLD';
+    word.textContent = text;
+
+    // Optional override of the textured fill.
+    if (data.color) {
+      word.style.backgroundImage =
+        'linear-gradient(115deg, ' + data.color + ' 0%, var(--mp-color-glow,#fff) 50%, ' + data.color + ' 100%)';
+      word.style.backgroundSize = '300% 300%';
+    }
+
+    // Reveal from hidden (clip up from below + fade).
+    tl.fromTo(word,
+      { opacity: 0, yPercent: 18, scale: 0.94 },
+      { opacity: 1, yPercent: 0, scale: 1, duration: 1.0, ease: 'power3.out' }, 0);
+
+    // Continuously drift the textured fill behind the mask (looping).
+    tl.to(word, {
+      backgroundPosition: '300% 50%',
+      duration: 6,
+      ease: 'none',
+      repeat: -1
+    }, 0.2);
+
+    // Subtle vertical shimmer of the fill for extra life.
+    tl.to(word, {
+      backgroundPositionY: '100%',
+      duration: 4,
+      ease: 'sine.inOut',
+      yoyo: true,
+      repeat: -1
+    }, 0.2);
+
+    return tl;
+  }
+</script>

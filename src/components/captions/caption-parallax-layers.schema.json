@@ -1,0 +1,26 @@
+{
+  "type": "caption-parallax-layers",
+  "label": "Caption - Parallax Layers",
+  "category": "captions",
+  "description": "Caption rendered as stacked depth layers (back, mid, front) that enter and drift at different speeds for a parallax 3D-depth feel.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "DEPTH OF FIELD"
+    },
+    "primary": {
+      "type": "color",
+      "label": "Back Layer Color",
+      "optional": true,
+      "description": "Color of the deepest layer (maps to --mp-color-primary)."
+    },
+    "accent": {
+      "type": "color",
+      "label": "Mid Layer Color",
+      "optional": true,
+      "description": "Color of the middle layer (maps to --mp-color-accent)."
+    }
+  }
+}

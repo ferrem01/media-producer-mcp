@@ -1,0 +1,14 @@
+{
+  "type": "portal",
+  "label": "Portal",
+  "category": "effects",
+  "description": "A glowing ring of energy that opens by scaling and rotating in, with emanating light rays, orbiting sparks and an ambient swirl. Use as a centerpiece overlay.",
+  "data": {
+    "color": {
+      "type": "string",
+      "label": "Energy Color",
+      "optional": true,
+      "placeholder": "var(--mp-color-primary)"
+    }
+  }
+}

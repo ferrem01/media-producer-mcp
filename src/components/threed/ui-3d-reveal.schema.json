@@ -1,0 +1,15 @@
+{
+  "type": "ui-3d-reveal",
+  "label": "UI 3D Reveal",
+  "category": "threed",
+  "description": "A stack of 2-4 UI panels floating in CSS-3D depth that parallax-rotate in from exploded space and assemble into an aligned layered stack.",
+  "data": {
+    "labels": {
+      "type": "array",
+      "label": "Panel Labels",
+      "optional": true,
+      "items": { "type": "string" },
+      "placeholder": "[\"Dashboard\", \"Analytics\", \"Settings\"]"
+    }
+  }
+}

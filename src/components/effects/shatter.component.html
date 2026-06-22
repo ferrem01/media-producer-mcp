@@ -1,0 +1,135 @@
+<template>
+  <div class="shatter"></div>
+</template>
+
+<style scoped>
+  .shatter {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .shard {
+    position: absolute;
+    inset: 0;
+    background: var(--mp-color-surface, rgba(255,255,255,0.06));
+    border: 1px solid var(--mp-color-glow, rgba(255,255,255,0.35));
+    backface-visibility: hidden;
+    will-change: transform, opacity;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.shatter');
+    if (!container) return tl;
+
+    var intensity = data.intensity !== undefined ? data.intensity : 1;
+    if (intensity <= 0) intensity = 1;
+
+    var w = ctx.canvas.width;
+    var h = ctx.canvas.height;
+
+    // Build a Voronoi-ish set of triangular shards around a fracture origin.
+    // Cols/rows scale a little with intensity for denser breaks.
+    var cols = Math.max(3, Math.round(5 * Math.min(intensity, 2)));
+    var rows = Math.max(3, Math.round(3 * Math.min(intensity, 2)));
+
+    // Fracture origin (slightly left of center for a natural impact look).
+    var ox = 46, oy = 50;
+
+    var shards = [];
+
+    function pct(v, total) { return (v / total * 100); }
+
+    // Build a grid of quads, split each into two triangles -> shards.
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        // Jitter the grid corners for an irregular glass look.
+        var jx = (Math.random() - 0.5) * (100 / cols) * 0.5;
+        var jy = (Math.random() - 0.5) * (100 / rows) * 0.5;
+
+        var x0 = (c / cols) * 100;
+        var x1 = ((c + 1) / cols) * 100;
+        var y0 = (r / rows) * 100;
+        var y1 = ((r + 1) / rows) * 100;
+
+        var mx = (x0 + x1) / 2 + jx;
+        var my = (y0 + y1) / 2 + jy;
+
+        // Two triangles per cell sharing the jittered center point.
+        var tris = [
+          [[x0, y0], [x1, y0], [mx, my]],
+          [[x1, y0], [x1, y1], [mx, my]],
+          [[x1, y1], [x0, y1], [mx, my]],
+          [[x0, y1], [x0, y0], [mx, my]]
+        ];
+
+        tris.forEach(function (tri) {
+          var sh = document.createElement('div');
+          sh.className = 'shard';
+          var poly = tri.map(function (p) {
+            return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%';
+          }).join(', ');
+          sh.style.clipPath = 'polygon(' + poly + ')';
+          // Centroid for directional outward motion.
+          var cxp = (tri[0][0] + tri[1][0] + tri[2][0]) / 3;
+          var cyp = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
+          container.appendChild(sh);
+          shards.push({ el: sh, cx: cxp, cy: cyp });
+        });
+      }
+    }
+
+    // Initial visible state = intact frame (all shards in place).
+    gsap.set(container.querySelectorAll('.shard'), { opacity: 1, x: 0, y: 0, rotation: 0, scale: 1 });
+
+    // Brief impact flash / settle, then explode outward + fall away.
+    var breakAt = 0.5;
+
+    // Tiny pre-break tremor.
+    shards.forEach(function (s) {
+      tl.to(s.el, {
+        x: (Math.random() - 0.5) * 4,
+        y: (Math.random() - 0.5) * 4,
+        duration: 0.12,
+        ease: 'rough({ strength: 2, points: 6, clamp: false })',
+        repeat: 3,
+        yoyo: true
+      }, 0.1);
+    });
+
+    shards.forEach(function (s, i) {
+      // Direction from fracture origin outward.
+      var dx = s.cx - ox;
+      var dy = s.cy - oy;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = dx / dist;
+      var ny = dy / dist;
+
+      var push = (0.4 + Math.random() * 0.9) * intensity;
+      var flyX = nx * w * 0.6 * push + (Math.random() - 0.5) * 120;
+      var flyY = ny * h * 0.4 * push + (Math.random() - 0.5) * 100;
+      // Gravity pulls shards down as they scatter.
+      var fallY = flyY + h * 0.7 * (0.5 + Math.random());
+
+      var spin = (Math.random() - 0.5) * 220 * intensity;
+      var dur = 1.4 + Math.random() * 1.0;
+      var stag = breakAt + dist * 0.004;
+
+      tl.to(s.el, {
+        x: flyX,
+        y: fallY,
+        rotation: spin,
+        scale: 0.6 + Math.random() * 0.3,
+        opacity: 0,
+        duration: dur,
+        ease: 'power2.in'
+      }, stag);
+    });
+
+    return tl;
+  }
+</script>

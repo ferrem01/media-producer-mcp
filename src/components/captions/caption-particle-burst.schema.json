@@ -1,0 +1,20 @@
+{
+  "type": "caption-particle-burst",
+  "label": "Caption - Particle Burst",
+  "category": "captions",
+  "description": "Caption whose words pop into place as a burst of accent-colored particle sparks fly inward and converge on each word.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "BURST INTO LIFE"
+    },
+    "accent": {
+      "type": "color",
+      "label": "Accent Color",
+      "optional": true,
+      "description": "Color of the particle sparks (maps to --mp-color-accent)."
+    }
+  }
+}

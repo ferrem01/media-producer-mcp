@@ -1,0 +1,21 @@
+{
+  "type": "device-3d-showcase",
+  "label": "Device 3D Showcase",
+  "category": "threed",
+  "description": "A phone or laptop mockup rendered in CSS-3D that rotates in through real space and settles to a readable angle with a beveled edge and a specular highlight that shifts with rotation.",
+  "data": {
+    "device": {
+      "type": "string",
+      "label": "Device",
+      "optional": true,
+      "enum": ["phone", "laptop"],
+      "default": "phone"
+    },
+    "screenshot": {
+      "type": "string",
+      "label": "Screenshot URL",
+      "optional": true,
+      "placeholder": "https://example.com/screen.png"
+    }
+  }
+}

@@ -1,0 +1,272 @@
+<template>
+  <div class="d3-root">
+    <div class="d3-glow"></div>
+    <div class="d3-stage">
+      <div class="d3-device">
+        <div class="d3-screen">
+          <div class="d3-screen-fallback"></div>
+          <div class="d3-specular"></div>
+        </div>
+        <div class="d3-edge"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .d3-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    box-sizing: border-box;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    perspective: 1200px;
+    position: relative;
+  }
+
+  .d3-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(99, 102, 241, 0.12) 0%,
+      rgba(99, 102, 241, 0.04) 45%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .d3-stage {
+    position: relative;
+    transform-style: preserve-3d;
+    z-index: 1;
+  }
+
+  .d3-device {
+    position: relative;
+    transform-style: preserve-3d;
+    background: linear-gradient(155deg, #34343a 0%, #1c1c20 55%, #0f0f12 100%);
+    box-shadow:
+      0 40px 90px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Phone */
+  .d3-device.d3-phone {
+    width: 300px;
+    height: 610px;
+    border-radius: 46px;
+    padding: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .d3-device.d3-phone::before {
+    content: '';
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 96px;
+    height: 26px;
+    background: #000;
+    border-radius: 14px;
+    z-index: 3;
+  }
+
+  /* Laptop */
+  .d3-device.d3-laptop {
+    width: 720px;
+    height: 460px;
+    border-radius: 16px 16px 6px 6px;
+    padding: 18px 18px 30px 18px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .d3-device.d3-laptop::before {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 0 0 8px 8px;
+    z-index: 3;
+  }
+
+  .d3-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 30px;
+    overflow: hidden;
+    background:
+      linear-gradient(155deg, var(--mp-color-surface, #1e1b4b) 0%, #0b0b14 100%);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+  }
+
+  .d3-device.d3-laptop .d3-screen {
+    border-radius: 6px;
+  }
+
+  .d3-screen-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mp-color-text, #ffffff);
+    background:
+      radial-gradient(circle at 50% 35%, rgba(99, 102, 241, 0.35) 0%, transparent 60%),
+      linear-gradient(155deg, var(--mp-color-primary, #6366f1) 0%, var(--mp-color-surface, #1e1b4b) 100%);
+  }
+
+  .d3-screen-fallback::after {
+    content: '';
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 40px rgba(255, 255, 255, 0.4);
+  }
+
+  /* Specular highlight that shifts with rotation */
+  .d3-specular {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.22) 47%,
+      rgba(255, 255, 255, 0.05) 53%,
+      transparent 70%
+    );
+    mix-blend-mode: screen;
+  }
+
+  /* Beveled edge highlight */
+  .d3-edge {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 2;
+    box-shadow:
+      inset 2px 2px 3px rgba(255, 255, 255, 0.18),
+      inset -2px -2px 5px rgba(0, 0, 0, 0.55);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+
+    var stage = el.querySelector('.d3-stage');
+    var device = el.querySelector('.d3-device');
+    var screen = el.querySelector('.d3-screen');
+    var fallback = el.querySelector('.d3-screen-fallback');
+    var specular = el.querySelector('.d3-specular');
+    var glow = el.querySelector('.d3-glow');
+    if (!stage || !device) return tl;
+
+    var kind = data.device === 'laptop' ? 'laptop' : 'phone';
+    device.classList.add('d3-' + kind);
+
+    if (data.screenshot && screen && fallback) {
+      screen.style.backgroundImage = 'url(' + data.screenshot + ')';
+      screen.style.backgroundSize = 'cover';
+      screen.style.backgroundPosition = 'top center';
+      fallback.style.display = 'none';
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
+
+    // Settle angle: readable but with depth
+    var settleY = kind === 'laptop' ? -14 : -16;
+    var settleX = kind === 'laptop' ? 8 : 6;
+
+    // Initial: hidden, rotated through real space, pushed back in depth
+    gsap.set(stage, {
+      autoAlpha: 0,
+      rotateY: -75,
+      rotateX: 22,
+      z: -420,
+      transformPerspective: 1200
+    });
+    gsap.set(glow, { autoAlpha: 0, scale: 0.5 });
+    if (specular) gsap.set(specular, { xPercent: -60, autoAlpha: 0.0 });
+
+    // Glow blooms first
+    tl.to(glow, { autoAlpha: 1, scale: 1, duration: speed * 0.9, ease: 'power2.out' }, 0.1);
+
+    // Device rotates in through space and settles to a readable angle
+    tl.to(stage, {
+      autoAlpha: 1,
+      rotateY: settleY,
+      rotateX: settleX,
+      z: 0,
+      duration: speed * 1.5,
+      ease: ease
+    }, 0.25);
+
+    // Specular sweep tied to the rotation (lighting feel)
+    if (specular) {
+      tl.to(specular, { autoAlpha: 1, duration: 0.4, ease: 'power1.out' }, 0.4);
+      tl.fromTo(specular,
+        { xPercent: -60 },
+        { xPercent: 60, duration: speed * 1.5, ease: 'power2.inOut' },
+        0.4);
+    }
+
+    var settleAt = 0.25 + speed * 1.5;
+
+    // Gentle ambient orbit (one continuous tasteful 3D move)
+    tl.to(stage, {
+      rotateY: settleY + 10,
+      rotateX: settleX - 4,
+      duration: 3.2,
+      ease: 'sine.inOut',
+      yoyo: true,
+      repeat: -1
+    }, settleAt);
+
+    // Ambient specular drift to match orbit
+    if (specular) {
+      tl.to(specular, {
+        xPercent: 25,
+        duration: 3.2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, settleAt);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(stage, {
+        autoAlpha: 0,
+        rotateY: settleY - 30,
+        z: -200,
+        scale: 0.95,
+        duration: 0.5,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to(glow, { autoAlpha: 0, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

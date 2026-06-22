@@ -1,0 +1,116 @@
+<template>
+  <div class="cap-parallax">
+    <div class="cap-parallax-stack">
+      <div class="cap-parallax-layer pl-back"></div>
+      <div class="cap-parallax-layer pl-mid"></div>
+      <div class="cap-parallax-layer pl-front"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .cap-parallax {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 70px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    position: relative;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  .cap-parallax-stack {
+    position: relative;
+    display: inline-block;
+    max-width: 92%;
+  }
+
+  .cap-parallax-layer {
+    font-size: 100px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .cap-parallax-layer:not(.pl-front) {
+    position: absolute;
+    inset: 0;
+  }
+
+  .pl-back {
+    color: var(--mp-color-primary, #6366f1);
+    opacity: 0.35;
+    filter: blur(3px);
+  }
+
+  .pl-mid {
+    color: var(--mp-color-accent, #a78bfa);
+    opacity: 0.55;
+    filter: blur(1px);
+  }
+
+  .pl-front {
+    position: relative;
+    color: var(--mp-color-text, #ffffff);
+    text-shadow: 0 6px 28px rgba(0, 0, 0, 0.55);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var back = el.querySelector('.pl-back');
+    var mid = el.querySelector('.pl-mid');
+    var front = el.querySelector('.pl-front');
+    if (!front || !back || !mid) return tl;
+
+    var text = (data && data.text) || 'DEPTH OF FIELD';
+
+    if (text.length > 20) {
+      var fs = Math.max(48, Math.round(100 * (20 / text.length) + 14));
+      back.style.fontSize = fs + 'px';
+      mid.style.fontSize = fs + 'px';
+      front.style.fontSize = fs + 'px';
+    }
+
+    back.textContent = text;
+    mid.textContent = text;
+    front.textContent = text;
+
+    var speed = ctx.motion === 'minimal' ? 1.1 : ctx.motion === 'punchy' ? 0.7 : 0.9;
+    var dir = 1; // enter from right
+    var dist = 220;
+
+    // Layers start offscreen at different depths/speeds.
+    gsap.set(back, { autoAlpha: 0, x: dir * dist * 1.6, scale: 1.08 });
+    gsap.set(mid, { autoAlpha: 0, x: dir * dist * 1.0, scale: 1.04 });
+    gsap.set(front, { autoAlpha: 0, x: dir * dist * 0.5, scale: 1.0 });
+
+    var startAt = 0.2;
+
+    // Parallax entrance: back slowest, front fastest -> arrives staggered.
+    tl.to(back, { autoAlpha: 0.35, x: -18, scale: 1.08, duration: speed * 1.5, ease: 'power3.out' }, startAt);
+    tl.to(mid, { autoAlpha: 0.55, x: -8, scale: 1.04, duration: speed * 1.25, ease: 'power3.out' }, startAt + 0.05);
+    tl.to(front, { autoAlpha: 1, x: 0, scale: 1.0, duration: speed, ease: 'power3.out' }, startAt + 0.1);
+
+    // Continuous gentle parallax drift (different speeds) for depth feel.
+    var driftAt = startAt + speed * 1.5;
+    tl.to(back, { x: -34, duration: 3.2, ease: 'sine.inOut', yoyo: true, repeat: -1 }, driftAt);
+    tl.to(mid, { x: -18, duration: 3.2, ease: 'sine.inOut', yoyo: true, repeat: -1 }, driftAt);
+    tl.to(front, { x: -8, duration: 3.2, ease: 'sine.inOut', yoyo: true, repeat: -1 }, driftAt);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(front, { autoAlpha: 0, x: -dir * dist * 0.5, duration: 0.45, ease: 'power2.in' }, exitAt);
+      tl.to(mid, { autoAlpha: 0, x: -dir * dist * 1.0, duration: 0.45, ease: 'power2.in' }, exitAt + 0.04);
+      tl.to(back, { autoAlpha: 0, x: -dir * dist * 1.6, duration: 0.45, ease: 'power2.in' }, exitAt + 0.08);
+    }
+
+    return tl;
+  }
+</script>

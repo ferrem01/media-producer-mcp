@@ -1,0 +1,20 @@
+{
+  "type": "caption-clip-wipe",
+  "label": "Caption - Clip Wipe",
+  "category": "captions",
+  "description": "Clean editorial caption revealed line by line by an accent bar that sweeps across, uncovering the text behind it via a clip-path wipe.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "CLEAN EDITORIAL CUT"
+    },
+    "accent": {
+      "type": "color",
+      "label": "Wipe Bar Color",
+      "optional": true,
+      "description": "Color of the sweeping reveal bar (maps to --mp-color-accent)."
+    }
+  }
+}

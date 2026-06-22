@@ -1,0 +1,25 @@
+{
+  "type": "morph-text",
+  "label": "Morph Text",
+  "category": "effects",
+  "description": "Cycles through a short list of words, morphing each into the next with a cross-fade, blur and scale on a continuous loop. Use for punchy single-word callouts.",
+  "data": {
+    "words": {
+      "type": "array",
+      "label": "Words",
+      "optional": true,
+      "placeholder": "[\"Create\", \"Flow\", \"Ship\"]"
+    },
+    "text": {
+      "type": "string",
+      "label": "Text (single word fallback)",
+      "optional": true
+    },
+    "color": {
+      "type": "string",
+      "label": "Accent Color",
+      "optional": true,
+      "placeholder": "var(--mp-color-primary)"
+    }
+  }
+}

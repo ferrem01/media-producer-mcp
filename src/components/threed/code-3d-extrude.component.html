@@ -1,0 +1,330 @@
+<template>
+  <div class="c3-root">
+    <div class="c3-glow"></div>
+    <div class="c3-stage">
+      <div class="c3-slab">
+        <div class="c3-bar">
+          <span class="c3-dot c3-d1"></span>
+          <span class="c3-dot c3-d2"></span>
+          <span class="c3-dot c3-d3"></span>
+          <span class="c3-lang"></span>
+        </div>
+        <div class="c3-body">
+          <div class="c3-nums"></div>
+          <pre class="c3-code"></pre>
+        </div>
+        <div class="c3-specular"></div>
+        <div class="c3-bevel"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .c3-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    box-sizing: border-box;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    perspective: 1300px;
+    position: relative;
+  }
+
+  .c3-glow {
+    position: absolute;
+    width: 640px;
+    height: 640px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(99, 102, 241, 0.14) 0%,
+      rgba(99, 102, 241, 0.04) 45%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .c3-stage {
+    position: relative;
+    transform-style: preserve-3d;
+    z-index: 1;
+  }
+
+  .c3-slab {
+    --c3-bg: #0d1117;
+    --c3-text: #e2e8f0;
+    --c3-num: rgba(255,255,255,0.2);
+    --c3-kw: #ff7b9c;
+    --c3-str: #9ece6a;
+    --c3-numtok: #ff9e64;
+    --c3-com: #6b7280;
+    --c3-fn: #7aa2f7;
+    position: relative;
+    width: 760px;
+    max-width: 78vw;
+    border-radius: 18px;
+    background: var(--c3-bg);
+    overflow: hidden;
+    transform-style: preserve-3d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 50px 100px rgba(0, 0, 0, 0.6),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .c3-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 46px;
+    padding: 0 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .c3-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .c3-d1 { background: #ff5f57; }
+  .c3-d2 { background: #febc2e; }
+  .c3-d3 { background: #28c840; }
+
+  .c3-lang {
+    margin-left: auto;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+  .c3-lang:empty { display: none; }
+
+  .c3-body {
+    display: flex;
+    padding: 22px 0;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  .c3-nums {
+    display: flex;
+    flex-direction: column;
+    padding: 0 14px 0 22px;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    user-select: none;
+    flex-shrink: 0;
+  }
+
+  .c3-num {
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--c3-num);
+    text-align: right;
+    min-width: 20px;
+  }
+
+  .c3-code {
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--c3-text);
+    padding: 0 28px;
+    margin: 0;
+    white-space: pre;
+    overflow: hidden;
+    flex: 1;
+  }
+
+  .c3-line { display: block; min-height: 1.7em; }
+
+  .tok-kw { color: var(--c3-kw); }
+  .tok-str { color: var(--c3-str); }
+  .tok-num { color: var(--c3-numtok); }
+  .tok-com { color: var(--c3-com); font-style: italic; }
+  .tok-fn { color: var(--c3-fn); }
+
+  .c3-specular {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    background: linear-gradient(
+      118deg,
+      transparent 32%,
+      rgba(255, 255, 255, 0.16) 48%,
+      rgba(255, 255, 255, 0.03) 54%,
+      transparent 72%
+    );
+    mix-blend-mode: screen;
+  }
+
+  .c3-bevel {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 3;
+    box-shadow:
+      inset 2px 2px 4px rgba(255, 255, 255, 0.14),
+      inset -3px -3px 8px rgba(0, 0, 0, 0.6);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+
+    var stage = el.querySelector('.c3-stage');
+    var slab = el.querySelector('.c3-slab');
+    var codeEl = el.querySelector('.c3-code');
+    var numsEl = el.querySelector('.c3-nums');
+    var langEl = el.querySelector('.c3-lang');
+    var specular = el.querySelector('.c3-specular');
+    var glow = el.querySelector('.c3-glow');
+    if (!stage || !slab || !codeEl || !numsEl) return tl;
+
+    var code = (typeof data.code === 'string' && data.code.length) ? data.code
+      : "function greet(name) {\n  // build a friendly message\n  const msg = \"Hello, \" + name;\n  return msg;\n}";
+    var language = data.language || 'js';
+    if (langEl) langEl.textContent = language;
+
+    // lightweight tokenizer -> array of {text, cls}
+    var KW = ['function','return','const','let','var','if','else','for','while','import','export','from','class','new','async','await','def','public','private','void','int','string','bool','true','false','null','undefined','this','print'];
+    function tokenize(line) {
+      var out = [];
+      var trimmed = line.replace(/^\s*/, '');
+      if (trimmed.indexOf('//') === 0 || trimmed.indexOf('#') === 0) {
+        out.push({ text: line, cls: 'tok-com' });
+        return out;
+      }
+      var re = /(\"[^\"]*\"|'[^']*'|`[^`]*`)|(\/\/.*$)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][A-Za-z0-9_$]*)|(\s+)|([^\sA-Za-z0-9_$]+)/g;
+      var m;
+      while ((m = re.exec(line)) !== null) {
+        if (m[1]) out.push({ text: m[1], cls: 'tok-str' });
+        else if (m[2]) out.push({ text: m[2], cls: 'tok-com' });
+        else if (m[3]) out.push({ text: m[3], cls: 'tok-num' });
+        else if (m[4]) {
+          var cls = KW.indexOf(m[4]) !== -1 ? 'tok-kw' : null;
+          if (!cls) {
+            var after = line.slice(re.lastIndex);
+            if (/^\s*\(/.test(after)) cls = 'tok-fn';
+          }
+          out.push({ text: m[4], cls: cls });
+        }
+        else if (m[5]) out.push({ text: m[5], cls: null });
+        else out.push({ text: m[0], cls: null });
+        if (m.index === re.lastIndex) re.lastIndex++;
+      }
+      return out;
+    }
+
+    var lines = code.split('\n');
+    codeEl.innerHTML = '';
+    numsEl.innerHTML = '';
+    var lineEls = [];
+    lines.forEach(function(line, i) {
+      var num = document.createElement('span');
+      num.className = 'c3-num';
+      num.textContent = (i + 1).toString();
+      numsEl.appendChild(num);
+
+      var lineEl = document.createElement('span');
+      lineEl.className = 'c3-line';
+      var toks = tokenize(line);
+      toks.forEach(function(tok) {
+        var span = document.createElement('span');
+        if (tok.cls) span.className = tok.cls;
+        span.textContent = tok.text;
+        lineEl.appendChild(span);
+      });
+      codeEl.appendChild(lineEl);
+      lineEls.push(lineEl);
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
+
+    // Initial: rotated through space, pushed back, hidden
+    gsap.set(stage, {
+      autoAlpha: 0,
+      rotateY: 62,
+      rotateX: -20,
+      z: -460,
+      transformPerspective: 1300
+    });
+    gsap.set(glow, { autoAlpha: 0, scale: 0.5 });
+    gsap.set(lineEls, { autoAlpha: 0, x: -8 });
+    if (specular) gsap.set(specular, { xPercent: 70, autoAlpha: 0 });
+
+    // Glow blooms
+    tl.to(glow, { autoAlpha: 1, scale: 1, duration: speed * 0.9, ease: 'power2.out' }, 0.1);
+
+    // Slab rotates through space and settles flat to readable
+    tl.to(stage, {
+      autoAlpha: 1,
+      rotateY: 0,
+      rotateX: 0,
+      z: 0,
+      duration: speed * 1.5,
+      ease: ease
+    }, 0.25);
+
+    // Specular sweep across the slab as it rotates
+    if (specular) {
+      tl.to(specular, { autoAlpha: 1, duration: 0.4 }, 0.35);
+      tl.fromTo(specular,
+        { xPercent: 70 },
+        { xPercent: -70, duration: speed * 1.5, ease: 'power2.inOut' },
+        0.35);
+    }
+
+    // Code lines reveal once slab is mostly flat
+    var revealAt = 0.25 + speed * 0.9;
+    tl.to(lineEls, {
+      autoAlpha: 1, x: 0,
+      duration: 0.4,
+      stagger: 0.06,
+      ease: 'power2.out'
+    }, revealAt);
+
+    var settleAt = 0.25 + speed * 1.5;
+
+    // Gentle ambient orbit at readable angle
+    tl.to(stage, {
+      rotateY: 7,
+      rotateX: 3,
+      duration: 3.4,
+      ease: 'sine.inOut',
+      yoyo: true,
+      repeat: -1
+    }, settleAt);
+    if (specular) {
+      tl.to(specular, {
+        xPercent: 20,
+        duration: 3.4,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, settleAt);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(stage, {
+        autoAlpha: 0,
+        rotateY: -28,
+        z: -220,
+        scale: 0.96,
+        duration: 0.5,
+        ease: 'power2.in'
+      }, exitAt);
+      tl.to(glow, { autoAlpha: 0, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

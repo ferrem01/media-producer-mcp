@@ -1,0 +1,20 @@
+{
+  "type": "code-3d-extrude",
+  "label": "Code 3D Extrude",
+  "category": "threed",
+  "description": "A slab of syntax-highlighted code on a lit, beveled CSS-3D card that rotates through space and settles flat to a readable angle.",
+  "data": {
+    "code": {
+      "type": "string",
+      "label": "Code",
+      "optional": true,
+      "placeholder": "function greet(name) { ... }"
+    },
+    "language": {
+      "type": "string",
+      "label": "Language",
+      "optional": true,
+      "default": "js"
+    }
+  }
+}

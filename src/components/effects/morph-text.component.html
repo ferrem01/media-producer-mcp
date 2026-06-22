@@ -1,0 +1,109 @@
+<template>
+  <div class="morph-text"></div>
+</template>
+
+<style scoped>
+  .morph-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .morph-word {
+    position: absolute;
+    font-family: var(--mp-font-heading, 'Inter', sans-serif);
+    font-weight: 800;
+    font-size: 12vw;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    text-align: center;
+    white-space: nowrap;
+    color: var(--mp-color-text, #ffffff);
+    will-change: transform, opacity, filter;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.morph-text');
+    if (!container) return tl;
+
+    // Accept words[] or text (string or array). Default so {} renders.
+    var words = data.words;
+    if (!words) {
+      if (Array.isArray(data.text)) words = data.text;
+      else if (typeof data.text === 'string') words = [data.text];
+    }
+    if (!words || !words.length) words = ['Create', 'Flow', 'Ship'];
+
+    var accent = data.color || 'var(--mp-color-primary, #6366f1)';
+
+    var els = words.map(function (word, i) {
+      var span = document.createElement('div');
+      span.className = 'morph-word';
+      span.textContent = word;
+      // First word visible, rest hidden/blurred.
+      if (i === 0) {
+        span.style.opacity = '1';
+        span.style.filter = 'blur(0px)';
+        span.style.transform = 'scale(1)';
+      } else {
+        span.style.opacity = '0';
+        span.style.filter = 'blur(18px)';
+        span.style.transform = 'scale(1.25)';
+      }
+      container.appendChild(span);
+      return span;
+    });
+
+    // Initial reveal of the first word from hidden.
+    tl.fromTo(els[0],
+      { opacity: 0, filter: 'blur(18px)', scale: 0.8 },
+      { opacity: 1, filter: 'blur(0px)', scale: 1, duration: 0.8, ease: 'power2.out' }, 0);
+
+    if (els.length === 1) {
+      // Single word: gentle breathing loop so it still animates over time.
+      tl.to(els[0], {
+        scale: 1.04,
+        duration: 2.2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+        transformOrigin: '50% 50%'
+      }, 0.9);
+      return tl;
+    }
+
+    // Morph sequence: cross-fade + blur + scale between consecutive words, loop.
+    var hold = 1.3;
+    var morph = 0.7;
+    var t = 0.9 + hold;
+
+    var morphTl = gsap.timeline({ repeat: -1 });
+    var loopT = 0;
+    for (var i = 0; i < els.length; i++) {
+      var cur = els[i];
+      var nxt = els[(i + 1) % els.length];
+      // Out: current word blurs/scales up and fades.
+      morphTl.to(cur, {
+        opacity: 0,
+        filter: 'blur(18px)',
+        scale: 1.25,
+        duration: morph,
+        ease: 'power2.in'
+      }, loopT);
+      // In: next word comes from blurred/small to crisp.
+      morphTl.fromTo(nxt,
+        { opacity: 0, filter: 'blur(18px)', scale: 0.78 },
+        { opacity: 1, filter: 'blur(0px)', scale: 1, duration: morph, ease: 'power2.out' }, loopT + morph * 0.35);
+      loopT += hold + morph;
+    }
+
+    tl.add(morphTl, t);
+
+    return tl;
+  }
+</script>

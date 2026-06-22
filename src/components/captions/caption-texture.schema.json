@@ -1,0 +1,26 @@
+{
+  "type": "caption-texture",
+  "label": "Caption - Texture Fill",
+  "category": "captions",
+  "description": "Caption whose letters are filled with a drifting textured gradient (background-clip text) while the words scale and unblur into place.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "TEXTURED TYPE"
+    },
+    "primary": {
+      "type": "color",
+      "label": "Texture Primary",
+      "optional": true,
+      "description": "Primary color of the textured gradient fill (maps to --mp-color-primary)."
+    },
+    "accent": {
+      "type": "color",
+      "label": "Texture Accent",
+      "optional": true,
+      "description": "Accent color of the textured gradient fill (maps to --mp-color-accent)."
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "type": "shatter",
+  "label": "Glass Shatter",
+  "category": "effects",
+  "description": "A full-frame glass break: the frame fractures into triangular shards that fly outward and fall away to reveal what is behind. Use as a transition overlay.",
+  "data": {
+    "intensity": {
+      "type": "number",
+      "label": "Shatter Intensity",
+      "optional": true,
+      "default": 1,
+      "placeholder": "1"
+    }
+  }
+}

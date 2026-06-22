@@ -1,0 +1,14 @@
+{
+  "type": "vfx-text-cursor",
+  "label": "VFX Text Cursor",
+  "category": "effects",
+  "description": "Types out text with a blinking glowing I-beam caret, then sweeps a selection highlight across the word. Use for editor or terminal style title reveals.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Text",
+      "required": true,
+      "placeholder": "render"
+    }
+  }
+}

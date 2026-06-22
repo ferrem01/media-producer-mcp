@@ -1,0 +1,106 @@
+<template>
+  <div class="liquid-background"></div>
+</template>
+
+<style scoped>
+  .liquid-background {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background: var(--mp-color-background, #09090b);
+  }
+
+  .liquid-blob {
+    position: absolute;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    will-change: transform, border-radius, opacity;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.liquid-background');
+    if (!container) return tl;
+
+    var colors = data.colors || [
+      data.color || 'var(--mp-color-primary, #6366f1)',
+      'var(--mp-color-accent, #a78bfa)',
+      'var(--mp-color-secondary, #22d3ee)'
+    ];
+
+    // A few large, soft, slowly morphing blobs drifting like a lava lamp.
+    var blobDefs = [
+      { x: '8%',  y: '18%', size: '62%', blur: 80,  op: 0.5,  dx: 16, dy: -12, dur: 11 },
+      { x: '52%', y: '40%', size: '58%', blur: 90,  op: 0.45, dx: -20, dy: 14, dur: 13 },
+      { x: '30%', y: '58%', size: '66%', blur: 100, op: 0.4,  dx: 14, dy: -18, dur: 15 },
+      { x: '60%', y: '8%',  size: '50%', blur: 75,  op: 0.42, dx: -12, dy: 20, dur: 12 }
+    ];
+
+    var radii = [
+      '42% 58% 60% 40% / 45% 50% 50% 55%',
+      '60% 40% 45% 55% / 55% 45% 60% 40%',
+      '50% 50% 38% 62% / 60% 42% 58% 40%'
+    ];
+
+    var blobs = [];
+    blobDefs.forEach(function (cfg, i) {
+      var blob = document.createElement('div');
+      blob.className = 'liquid-blob';
+      var col = colors[i % colors.length];
+      blob.style.background = 'radial-gradient(circle, ' + col + ' 0%, ' + col + ' 35%, transparent 72%)';
+      blob.style.width = cfg.size;
+      blob.style.height = cfg.size;
+      blob.style.left = cfg.x;
+      blob.style.top = cfg.y;
+      blob.style.filter = 'blur(' + cfg.blur + 'px)';
+      blob.style.borderRadius = radii[i % radii.length];
+      blob.style.opacity = String(cfg.op);
+      container.appendChild(blob);
+      blobs.push({ el: blob, cfg: cfg });
+    });
+
+    // Animate FROM hidden: gentle fade/scale in, then ambient loop.
+    blobs.forEach(function (b, i) {
+      var cfg = b.cfg;
+
+      tl.fromTo(b.el,
+        { opacity: 0, scale: 0.85 },
+        { opacity: cfg.op, scale: 1, duration: 1.6, ease: 'power1.out' }, i * 0.2);
+
+      // Slow drift.
+      tl.to(b.el, {
+        x: cfg.dx + '%',
+        y: cfg.dy + '%',
+        duration: cfg.dur,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, 1.0 + i * 0.3);
+
+      // Morph the border-radius for a liquid wobble.
+      tl.to(b.el, {
+        borderRadius: radii[(i + 1) % radii.length],
+        duration: cfg.dur * 0.7,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, 1.0 + i * 0.4);
+
+      // Slow rotation + scale breathe.
+      tl.to(b.el, {
+        rotation: (i % 2 === 0 ? 1 : -1) * 25,
+        scale: 1.12,
+        duration: cfg.dur * 0.8,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+        transformOrigin: '50% 50%'
+      }, 1.2 + i * 0.25);
+    });
+
+    return tl;
+  }
+</script>
