@@ -120,11 +120,26 @@ Think like a storyboard director. Describe what the viewer EXPERIENCES, not the 
 Use motion verbs (SLAMS, DRIFTS, MORPHS, SNAPS, ASSEMBLES). Include BG/MG/FG layers.
 Describe choreography and timing relationships between elements.
 
-### Picking Components
+### Picking Components -- PREFER THE CATALOG
 List library component types from the catalog that the scene should embed.
 The codegen LLM will receive the component schemas and use <component> tags.
-If no library components fit, leave "components" as an empty array [].
-For scenes with existing UI elements (chat panels, dashboards, code editors), always list the matching library component types.
+**Default to a library component whenever one matches the scene's intent.** A vetted
+block is more consistent and higher-quality than hand-rolled custom code, so reach
+for it FIRST. Only leave "components": [] when the catalog genuinely cannot express
+the moment -- not because custom feels more flexible.
+
+Match scene INTENT to a component category (the catalog has blocks for all of these):
+- Metrics / numbers / results -> stat-card, number-counter-row, metric-dashboard, bar-chart, line-chart, progress-bar
+- A hero / title / brand reveal -> hero-reveal, kinetic-text, particle-text, animated-gradient-text, title-slide
+- A spoken/caption line you want to emphasize -> a captions/* style (caption-karaoke, caption-kinetic-slam, caption-neon-glow, ...)
+- Code, terminal, or a dev demo -> code/* (code-typing, code-diff, terminal-run, ...) or code-editor / terminal
+- Social proof, posts, follows, engagement -> social/* (x-post-card, instagram-follow, youtube-lower-third, ...), testimonial-card, social-proof
+- Location, coverage, routes, "where" -> maps/* (route-map, pin-drop, world-map, bubble-map, ...)
+- Product UI / app flows -> the mockups/* (slack-workspace, dashboard-kpi, chat-simulator, ...) and layouts/* (browser-frame, device-mockup, ...)
+- CTA / closing -> cta-card, pricing-card
+- Film-look finishing on any scene -> add an effects/* overlay (grain-overlay, vignette, light-leak, shimmer-sweep, ...)
+
+For scenes with existing UI elements (chat panels, dashboards, code editors), ALWAYS list the matching library component types.
 
 ### Background Strategy -- decide this FIRST, per scene, by INTENT
 Before writing any background, decide which of FOUR strategies the moment wants. Do this BEFORE reaching for b-roll -- b-roll is ONE option, not the default for every atmospheric beat:
@@ -166,8 +181,8 @@ ${catalogStr}
       "label": "Scene 1 - Hero",
       "duration_seconds": 5,
       "description": "Dramatic hero reveal with product visualization",
-      "brief": "A dramatic hero reveal — huge 120px typography saying 'QUOTIENT' SLAMS in from below with SplitText per-character animation (chars stagger 0.03s, back.out ease). Background uses brand colors with ambient glow orbs in the accent color drifting slowly. Subtitle at 24px FADES in below the headline. Floating particles in background add depth. BG: gradient with glow orbs. MG: subtitle text. FG: headline with particle hints.",
-      "components": [],
+      "brief": "A dramatic hero reveal — the hero-reveal component renders the 'QUOTIENT' headline + subtitle with its SplitText per-character SLAM (chars stagger, back.out ease). Around it, custom code adds ambient glow orbs in the accent color drifting slowly and floating particles for depth. BG: gradient with glow orbs (custom). MG/FG: hero-reveal handles the headline + subtitle.",
+      "components": ["hero-reveal"],
       "voiceover_text": "Introducing Quotient. The future of demand generation.",
       "broll_query": "abstract flowing deep-blue and violet ink in slow motion, macro, dark background",
       "transition_in": { "type": "none", "duration_seconds": 0 }
