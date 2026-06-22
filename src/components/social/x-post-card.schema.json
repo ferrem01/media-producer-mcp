@@ -1,0 +1,62 @@
+{
+  "type": "x-post-card",
+  "label": "X Post Card",
+  "category": "social",
+  "description": "An X (Twitter) post card on a dark theme with avatar, display name, verified check, @handle, post text, and reply/repost/like counts that tick up. Use to show or recreate a tweet as an overlay.",
+  "data": {
+    "name": {
+      "type": "string",
+      "label": "Display Name",
+      "required": true,
+      "placeholder": "Jane Doe"
+    },
+    "handle": {
+      "type": "string",
+      "label": "Handle",
+      "required": true,
+      "placeholder": "@janedoe"
+    },
+    "text": {
+      "type": "string",
+      "label": "Post Text",
+      "required": true,
+      "placeholder": "Just shipped something I'm really proud of."
+    },
+    "verified": {
+      "type": "boolean",
+      "label": "Verified Check",
+      "optional": true,
+      "default": true
+    },
+    "time": {
+      "type": "string",
+      "label": "Timestamp Label",
+      "optional": true,
+      "placeholder": "2h"
+    },
+    "likes": {
+      "type": "number",
+      "label": "Likes",
+      "optional": true,
+      "default": 2400
+    },
+    "reposts": {
+      "type": "number",
+      "label": "Reposts",
+      "optional": true,
+      "default": 318
+    },
+    "replies": {
+      "type": "number",
+      "label": "Replies",
+      "optional": true,
+      "default": 42
+    },
+    "avatar_color": {
+      "type": "string",
+      "label": "Avatar Color/Gradient",
+      "optional": true,
+      "placeholder": "#1d9bf0"
+    }
+  }
+}

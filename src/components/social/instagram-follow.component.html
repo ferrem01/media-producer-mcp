@@ -1,0 +1,121 @@
+<template>
+  <div class="ig-wrap">
+    <div class="ig-chip">
+      <div class="ig-ring">
+        <div class="ig-avatar"></div>
+      </div>
+      <div class="ig-meta">
+        <div class="ig-username"></div>
+        <div class="ig-sub">Instagram</div>
+      </div>
+      <div class="ig-btn">
+        <span class="ig-btn-follow">Follow</span>
+        <span class="ig-btn-following">Following</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .ig-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 60px;
+    box-sizing: border-box;
+  }
+  .ig-chip {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: var(--mp-color-surface, #1a1a1a);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    padding: 18px 22px;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.45);
+    max-width: 480px;
+  }
+  .ig-ring {
+    width: 72px; height: 72px; border-radius: 50%; flex: 0 0 auto;
+    padding: 3px;
+    background: linear-gradient(45deg, #feda75 0%, #fa7e1e 25%, #d62976 50%, #962fbf 75%, #4f5bd5 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ig-avatar {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: linear-gradient(135deg, #c13584 0%, #f56040 100%);
+    border: 3px solid var(--mp-color-surface, #1a1a1a);
+    box-sizing: border-box;
+  }
+  .ig-meta { flex: 1 1 auto; min-width: 0; }
+  .ig-username { font-weight: 700; font-size: 22px; color: var(--mp-color-text, #ffffff); }
+  .ig-sub { font-size: 15px; color: var(--mp-color-text-muted, #a8a8a8); margin-top: 2px; }
+  .ig-btn {
+    position: relative;
+    flex: 0 0 auto;
+    height: 42px;
+    min-width: 120px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 16px;
+    overflow: hidden;
+  }
+  .ig-btn-follow, .ig-btn-following {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ig-btn-follow {
+    color: #ffffff;
+    background: linear-gradient(90deg, #d62976 0%, #962fbf 50%, #4f5bd5 100%);
+  }
+  .ig-btn-following {
+    color: var(--mp-color-text, #ffffff);
+    background: rgba(255,255,255,0.12);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var chip = el.querySelector('.ig-chip');
+    var ring = el.querySelector('.ig-ring');
+    var avatar = el.querySelector('.ig-avatar');
+    var username = el.querySelector('.ig-username');
+    var sub = el.querySelector('.ig-sub');
+    var btnFollow = el.querySelector('.ig-btn-follow');
+    var btnFollowing = el.querySelector('.ig-btn-following');
+
+    if (data.username) username.textContent = (data.username.charAt(0) === '@' ? data.username.slice(1) : data.username);
+    if (data.subtitle && sub) sub.textContent = data.subtitle;
+    if (data.avatar_color && avatar) avatar.style.background = data.avatar_color;
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.65 : 0.8;
+
+    gsap.set(chip, { autoAlpha: 0, y: 40, scale: 1.05, filter: 'blur(4px)' });
+    gsap.set([username, sub], { autoAlpha: 0, x: -14 });
+    gsap.set(btnFollowing, { autoAlpha: 0 });
+
+    tl.to(chip, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.25);
+    tl.from(ring, { scale: 0.5, duration: speed, ease: 'back.out(1.6)', transformOrigin: '50% 50%' }, 0.3);
+    tl.to([username, sub], { autoAlpha: 1, x: 0, duration: speed * 0.7, stagger: 0.07, ease: 'power2.out' }, 0.45);
+
+    // Follow -> Following transition
+    var swapAt = 1.6;
+    tl.to(btnFollow, { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, swapAt);
+    tl.to(btnFollowing, { autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, swapAt + 0.05);
+    tl.fromTo(el.querySelector('.ig-btn'), { scale: 1 }, { scale: 0.9, duration: 0.12, yoyo: true, repeat: 1, ease: 'power2.inOut', transformOrigin: '50% 50%' }, swapAt - 0.05);
+
+    // ambient: gentle ring rotation glow via avatar pulse
+    tl.to(ring, { rotation: 360, duration: 8, ease: 'none', repeat: -1, transformOrigin: '50% 50%' }, swapAt + 0.4);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(chip, { autoAlpha: 0, y: -22, scale: 0.97, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

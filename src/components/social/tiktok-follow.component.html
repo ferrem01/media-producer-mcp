@@ -1,0 +1,110 @@
+<template>
+  <div class="tt-wrap">
+    <div class="tt-stack">
+      <div class="tt-avatar-wrap">
+        <div class="tt-avatar"></div>
+        <div class="tt-follow">
+          <span class="tt-plus">+</span>
+          <svg class="tt-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="tt-heart-wrap">
+        <svg class="tt-heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z"/></svg>
+        <span class="tt-likes">0</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .tt-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 60px;
+    box-sizing: border-box;
+  }
+  .tt-stack { display: flex; flex-direction: column; align-items: center; gap: 26px; }
+  .tt-avatar-wrap { position: relative; width: 110px; height: 110px; }
+  .tt-avatar {
+    width: 110px; height: 110px; border-radius: 50%;
+    background: linear-gradient(135deg, #25f4ee 0%, #fe2c55 100%);
+    border: 2px solid rgba(255,255,255,0.9);
+    box-sizing: border-box;
+  }
+  .tt-follow {
+    position: absolute;
+    bottom: -12px; left: 50%; transform: translateX(-50%);
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #fe2c55;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(254,44,85,0.5);
+  }
+  .tt-plus { color: #fff; font-size: 28px; font-weight: 400; line-height: 1; margin-top: -3px; }
+  .tt-check { position: absolute; width: 20px; height: 20px; }
+  .tt-heart-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .tt-heart { width: 56px; height: 56px; fill: #fe2c55; }
+  .tt-likes { color: var(--mp-color-text, #ffffff); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var avatar = el.querySelector('.tt-avatar');
+    var followBtn = el.querySelector('.tt-follow');
+    var plus = el.querySelector('.tt-plus');
+    var check = el.querySelector('.tt-check');
+    var heart = el.querySelector('.tt-heart');
+    var likesEl = el.querySelector('.tt-likes');
+
+    if (data.avatar_color && avatar) avatar.style.background = data.avatar_color;
+    var likes = data.likes !== undefined ? data.likes : 12500;
+
+    function fmt(n) {
+      n = Math.round(n);
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+      return String(n);
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.65 : 0.8;
+
+    gsap.set(avatar, { autoAlpha: 0, scale: 0.6 });
+    gsap.set(followBtn, { autoAlpha: 0, scale: 0 });
+    gsap.set(check, { autoAlpha: 0, scale: 0.4 });
+    gsap.set(heart, { autoAlpha: 0, scale: 0.4 });
+    gsap.set(likesEl, { autoAlpha: 0, y: 10 });
+
+    tl.to(avatar, { autoAlpha: 1, scale: 1, duration: speed, ease: 'back.out(1.5)', transformOrigin: '50% 50%' }, 0.25);
+
+    // follow button pops in
+    tl.to(followBtn, { autoAlpha: 1, scale: 1, duration: speed * 0.7, ease: 'back.out(2.2)', transformOrigin: '50% 50%' }, 0.6);
+
+    // plus -> check
+    var checkAt = 1.5;
+    tl.to(plus, { autoAlpha: 0, scale: 0.4, duration: 0.2, ease: 'power2.in', transformOrigin: '50% 50%' }, checkAt);
+    tl.to(check, { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2.5)', transformOrigin: '50% 50%' }, checkAt + 0.05);
+    tl.to(followBtn, { scale: 1.25, duration: 0.16, yoyo: true, repeat: 1, ease: 'power2.inOut', transformOrigin: '50% 50%' }, checkAt - 0.02);
+
+    // heart burst + likes
+    var heartAt = checkAt + 0.5;
+    tl.to(heart, { autoAlpha: 1, scale: 1, duration: 0.4, ease: 'back.out(2.4)', transformOrigin: '50% 50%' }, heartAt);
+    tl.to(heart, { scale: 1.3, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.inOut', transformOrigin: '50% 50%' }, heartAt + 0.1);
+    var obj = { val: 0 };
+    tl.to(likesEl, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, heartAt);
+    tl.to(obj, { val: likes, duration: speed * 1.6, ease: 'power2.out', onUpdate: function () { likesEl.textContent = fmt(obj.val); } }, heartAt);
+
+    // ambient: heart heartbeat
+    tl.to(heart, { scale: 1.1, duration: 0.9, ease: 'sine.inOut', yoyo: true, repeat: -1, transformOrigin: '50% 50%' }, heartAt + 1.2);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(el.querySelector('.tt-stack'), { autoAlpha: 0, y: -22, scale: 0.95, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

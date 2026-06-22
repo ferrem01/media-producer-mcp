@@ -1,0 +1,116 @@
+<template>
+  <div class="yt-wrap">
+    <div class="yt-bar">
+      <div class="yt-avatar"></div>
+      <div class="yt-meta">
+        <div class="yt-channel"></div>
+        <div class="yt-subs"><span class="yt-sub-count">0</span> subscribers</div>
+      </div>
+      <div class="yt-actions">
+        <div class="yt-sub-btn">SUBSCRIBE</div>
+        <div class="yt-bell">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5S10.5 3.17 10.5 4v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .yt-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Roboto', 'Inter', system-ui, sans-serif);
+    padding: 60px;
+    box-sizing: border-box;
+  }
+  .yt-bar {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: rgba(15,15,15,0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 16px 22px;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.5);
+    max-width: 600px;
+  }
+  .yt-avatar {
+    width: 64px; height: 64px; border-radius: 50%; flex: 0 0 auto;
+    background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+  }
+  .yt-meta { flex: 1 1 auto; min-width: 0; }
+  .yt-channel { font-weight: 700; font-size: 22px; color: #ffffff; }
+  .yt-subs { font-size: 15px; color: #aaaaaa; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .yt-actions { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+  .yt-sub-btn {
+    background: #ff0000; color: #ffffff;
+    font-weight: 700; font-size: 16px; letter-spacing: 0.02em;
+    height: 42px; line-height: 42px; padding: 0 22px; border-radius: 21px;
+    box-shadow: 0 4px 14px rgba(255,0,0,0.35);
+  }
+  .yt-bell {
+    width: 42px; height: 42px; border-radius: 50%; flex: 0 0 auto;
+    background: rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .yt-bell svg { width: 22px; height: 22px; fill: #ffffff; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var bar = el.querySelector('.yt-bar');
+    var avatar = el.querySelector('.yt-avatar');
+    var channel = el.querySelector('.yt-channel');
+    var subsLine = el.querySelector('.yt-subs');
+    var subCount = el.querySelector('.yt-sub-count');
+    var subBtn = el.querySelector('.yt-sub-btn');
+    var bell = el.querySelector('.yt-bell');
+
+    if (data.channel) channel.textContent = data.channel;
+    if (data.avatar_color && avatar) avatar.style.background = data.avatar_color;
+    var subs = data.subscribers !== undefined ? data.subscribers : 1250000;
+
+    function fmt(n) {
+      n = Math.round(n);
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(0) + 'K';
+      return String(n);
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.65 : 0.8;
+
+    gsap.set(bar, { autoAlpha: 0, x: -60, scale: 1.02, filter: 'blur(4px)' });
+    gsap.set([avatar, channel, subsLine], { autoAlpha: 0, x: -16 });
+    gsap.set([subBtn, bell], { autoAlpha: 0, scale: 0.7 });
+
+    tl.to(bar, { autoAlpha: 1, x: 0, scale: 1, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.25);
+    tl.to([avatar, channel, subsLine], { autoAlpha: 1, x: 0, duration: speed * 0.7, stagger: 0.06, ease: 'power2.out' }, 0.4);
+    tl.to(subBtn, { autoAlpha: 1, scale: 1, duration: speed * 0.7, ease: 'back.out(2)', transformOrigin: '50% 50%' }, 0.75);
+    tl.to(bell, { autoAlpha: 1, scale: 1, duration: speed * 0.7, ease: 'back.out(2)', transformOrigin: '50% 50%' }, 0.85);
+
+    // sub count tick-up
+    var obj = { val: 0 };
+    tl.to(obj, { val: subs, duration: speed * 1.8, ease: 'power2.out', onUpdate: function () { subCount.textContent = fmt(obj.val); } }, 0.7);
+
+    // subscribe button pulse on arrival
+    tl.to(subBtn, { scale: 1.08, duration: 0.16, yoyo: true, repeat: 1, ease: 'power2.inOut', transformOrigin: '50% 50%' }, 1.4);
+
+    // ambient: bell wiggle
+    tl.to(bell.querySelector('svg'), { rotation: 14, duration: 0.12, yoyo: true, repeat: 5, ease: 'sine.inOut', transformOrigin: '50% 10%' }, 1.7);
+    tl.to(subBtn, { scale: 1.03, duration: 1.1, ease: 'sine.inOut', yoyo: true, repeat: -1, transformOrigin: '50% 50%' }, 2.4);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(bar, { autoAlpha: 0, x: -40, scale: 0.98, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

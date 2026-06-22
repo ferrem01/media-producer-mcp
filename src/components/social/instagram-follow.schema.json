@@ -1,0 +1,26 @@
+{
+  "type": "instagram-follow",
+  "label": "Instagram Follow Chip",
+  "category": "social",
+  "description": "An Instagram-style profile chip with a gradient avatar ring, username, and a Follow button that animates into Following. Use to prompt an Instagram follow as an overlay.",
+  "data": {
+    "username": {
+      "type": "string",
+      "label": "Username",
+      "required": true,
+      "placeholder": "@yourbrand"
+    },
+    "subtitle": {
+      "type": "string",
+      "label": "Subtitle",
+      "optional": true,
+      "placeholder": "Instagram"
+    },
+    "avatar_color": {
+      "type": "string",
+      "label": "Avatar Color/Gradient",
+      "optional": true,
+      "placeholder": "#c13584"
+    }
+  }
+}
