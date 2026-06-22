@@ -1,0 +1,23 @@
+{
+  "type": "world-map",
+  "label": "World Map",
+  "category": "maps",
+  "description": "Stylized dot-grid world map where a set of data markers light up in a stagger with pulsing rings at given percentage positions.",
+  "data": {
+    "markers": {
+      "type": "array",
+      "label": "Markers",
+      "optional": true,
+      "items": {
+        "x_pct": { "type": "number", "label": "X Position (%)" },
+        "y_pct": { "type": "number", "label": "Y Position (%)" },
+        "label": { "type": "string", "label": "Label", "optional": true }
+      }
+    },
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "optional": true
+    }
+  }
+}

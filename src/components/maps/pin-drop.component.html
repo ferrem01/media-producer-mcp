@@ -1,0 +1,171 @@
+<template>
+  <div class="pin-drop">
+    <div class="pin-grid"></div>
+    <div class="pin-stage">
+      <span class="pin-ring pin-ring-1"></span>
+      <span class="pin-ring pin-ring-2"></span>
+      <span class="pin-ring pin-ring-3"></span>
+      <div class="pin-marker">
+        <svg viewBox="0 0 24 36" class="pin-shape">
+          <path d="M12 0 C5.4 0 0 5.4 0 12 C0 21 12 36 12 36 C12 36 24 21 24 12 C24 5.4 18.6 0 12 0 Z" />
+          <circle cx="12" cy="12" r="5" class="pin-hole" />
+        </svg>
+      </div>
+      <span class="pin-shadow"></span>
+    </div>
+    <div class="pin-label"></div>
+  </div>
+</template>
+
+<style scoped>
+  .pin-drop {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--mp-color-background, #09090b);
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+  }
+
+  .pin-grid {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.10) 1.4px, transparent 1.6px);
+    background-size: 32px 32px;
+    opacity: 0.45;
+    -webkit-mask-image: radial-gradient(ellipse 70% 70% at center, #000 25%, transparent 78%);
+    mask-image: radial-gradient(ellipse 70% 70% at center, #000 25%, transparent 78%);
+    pointer-events: none;
+  }
+
+  .pin-stage {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pin-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid var(--mp-color-accent, #a78bfa);
+    transform: translate(-50%, -50%);
+  }
+
+  .pin-marker {
+    position: relative;
+    width: 90px;
+    height: 135px;
+    z-index: 2;
+  }
+
+  .pin-shape path {
+    fill: var(--mp-color-primary, #6366f1);
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+  }
+
+  .pin-shape .pin-hole {
+    fill: var(--mp-color-background, #09090b);
+  }
+
+  .pin-shape {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 18px var(--mp-color-primary, #6366f1));
+  }
+
+  .pin-shadow {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    width: 70px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    filter: blur(7px);
+    transform: translateX(-50%);
+    z-index: 1;
+  }
+
+  .pin-label {
+    margin-top: 24px;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--mp-color-text, #ffffff);
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+    z-index: 3;
+  }
+
+  .pin-label:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var grid = el.querySelector('.pin-grid');
+    var marker = el.querySelector('.pin-marker');
+    var shadow = el.querySelector('.pin-shadow');
+    var label = el.querySelector('.pin-label');
+    var rings = el.querySelectorAll('.pin-ring');
+
+    var locationLabel = data.location_label || 'San Francisco';
+    if (label) label.textContent = locationLabel;
+
+    var speed = ctx.motion === 'minimal' ? 0.7 : ctx.motion === 'punchy' ? 1.3 : 1.0;
+
+    if (grid) gsap.set(grid, { autoAlpha: 0 });
+    gsap.set(marker, { y: -340, scale: 0.7, autoAlpha: 0 });
+    gsap.set(shadow, { scaleX: 0.2, autoAlpha: 0 });
+    gsap.set(rings, { scale: 0.4, autoAlpha: 0 });
+    if (label) gsap.set(label, { autoAlpha: 0, y: 18 });
+
+    if (grid) tl.to(grid, { autoAlpha: 0.45, duration: 0.6, ease: 'power2.out' }, 0);
+
+    // Pin drops with a bounce.
+    tl.to(marker, {
+      y: 0, scale: 1, autoAlpha: 1,
+      duration: 0.9 / speed,
+      ease: 'bounce.out'
+    }, 0.3);
+
+    // Shadow appears on landing.
+    tl.to(shadow, { scaleX: 1, autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, 0.3 + 0.65 / speed);
+
+    // Impact squash.
+    tl.to(marker, { scaleX: 1.18, scaleY: 0.85, duration: 0.12, ease: 'power2.out' }, 0.3 + 0.62 / speed);
+    tl.to(marker, { scaleX: 1, scaleY: 1, duration: 0.25, ease: 'elastic.out(1, 0.4)' }, '>');
+
+    // Label fades up.
+    if (label) tl.to(label, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.3 + 0.7 / speed);
+
+    // Concentric pulse rings emanate continuously.
+    var ringStart = 0.3 + 0.7 / speed;
+    rings.forEach(function (ring, i) {
+      tl.fromTo(ring,
+        { scale: 0.4, autoAlpha: 0.8 },
+        { scale: 3.2, autoAlpha: 0, duration: 2.2, ease: 'power2.out', repeat: -1 },
+        ringStart + i * 0.7
+      );
+    });
+
+    // Exit.
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to([marker, shadow, label, grid], { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

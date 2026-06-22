@@ -1,0 +1,20 @@
+{
+  "type": "route-map",
+  "label": "Route Map",
+  "category": "maps",
+  "description": "Stylized dot-grid map with an animated arc that draws between two labeled locations as a dot travels the route and pulsing pins mark both ends.",
+  "data": {
+    "from_label": {
+      "type": "string",
+      "label": "Origin Label",
+      "required": true,
+      "placeholder": "San Francisco"
+    },
+    "to_label": {
+      "type": "string",
+      "label": "Destination Label",
+      "required": true,
+      "placeholder": "New York"
+    }
+  }
+}

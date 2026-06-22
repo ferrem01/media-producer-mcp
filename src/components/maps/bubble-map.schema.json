@@ -1,0 +1,24 @@
+{
+  "type": "bubble-map",
+  "label": "Bubble Map",
+  "category": "maps",
+  "description": "Stylized dot-grid map with proportional data bubbles that scale in at given positions, where bubble area encodes value and the count ticks up.",
+  "data": {
+    "bubbles": {
+      "type": "array",
+      "label": "Bubbles",
+      "optional": true,
+      "items": {
+        "x_pct": { "type": "number", "label": "X Position (%)" },
+        "y_pct": { "type": "number", "label": "Y Position (%)" },
+        "value": { "type": "number", "label": "Value" },
+        "label": { "type": "string", "label": "Label", "optional": true }
+      }
+    },
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "optional": true
+    }
+  }
+}
