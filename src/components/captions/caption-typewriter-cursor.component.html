@@ -1,0 +1,104 @@
+<template>
+  <div class="cap-type">
+    <div class="cap-type-line">
+      <span class="cap-type-text"></span><span class="cap-type-cursor"></span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .cap-type {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    position: relative;
+    background: transparent;
+  }
+
+  .cap-type-line {
+    font-size: 68px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-align: center;
+    max-width: 90%;
+    color: var(--mp-color-text, #ffffff);
+    text-shadow: 0 3px 16px rgba(0, 0, 0, 0.55);
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .cap-type-text {
+    white-space: pre-wrap;
+  }
+
+  .cap-type-cursor {
+    display: inline-block;
+    width: 0.07em;
+    height: 0.95em;
+    margin-left: 0.06em;
+    background: var(--mp-color-accent, #6366f1);
+    box-shadow: 0 0 14px var(--mp-color-glow, rgba(99, 102, 241, 0.6));
+    transform: translateY(0.08em);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var textEl = el.querySelector('.cap-type-text');
+    var cursor = el.querySelector('.cap-type-cursor');
+    var line = el.querySelector('.cap-type-line');
+    if (!textEl || !cursor) return tl;
+
+    var text = (data && data.text) || 'Typing this out…';
+
+    if (text.length > 26 && line) {
+      var fs = Math.max(40, Math.round(68 * (26 / text.length) + 12));
+      line.style.fontSize = fs + 'px';
+    }
+
+    // Final visible state = full text. Start empty and type in.
+    gsap.set(line, { autoAlpha: 1 });
+    textEl.textContent = '';
+
+    // Blinking cursor (independent, runs throughout)
+    gsap.set(cursor, { autoAlpha: 1 });
+    tl.to(cursor, { autoAlpha: 0, duration: 0.45, ease: 'steps(1)', yoyo: true, repeat: -1 }, 0);
+
+    var startAt = 0.25;
+    // Budget the typing across most of the duration
+    var typeWindow = (ctx.duration > 2 ? ctx.duration - 1.0 : ctx.duration * 0.8) - startAt;
+    if (typeWindow < 0.6) typeWindow = Math.max(0.6, ctx.duration * 0.6);
+    var fast = ctx.motion === 'punchy';
+
+    var counter = { n: 0 };
+    tl.to(counter, {
+      n: text.length,
+      duration: typeWindow,
+      ease: fast ? 'power1.out' : 'none',
+      onUpdate: function () {
+        var c = Math.round(counter.n);
+        if (textEl.textContent.length !== c) {
+          textEl.textContent = text.slice(0, c);
+        }
+      }
+    }, startAt);
+
+    // Ensure full text at end of typing
+    tl.call(function () { textEl.textContent = text; }, null, startAt + typeWindow);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.45;
+      tl.to(line, { autoAlpha: 0, y: -14, duration: 0.35, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

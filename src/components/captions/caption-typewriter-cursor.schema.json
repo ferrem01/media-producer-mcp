@@ -1,0 +1,20 @@
+{
+  "type": "caption-typewriter-cursor",
+  "label": "Caption - Typewriter Cursor",
+  "category": "captions",
+  "description": "Caption that types out character-by-character with a blinking accent-colored cursor.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "Typing this out…"
+    },
+    "accent": {
+      "type": "color",
+      "label": "Cursor Color",
+      "optional": true,
+      "description": "Cursor color (maps to --mp-color-accent)."
+    }
+  }
+}

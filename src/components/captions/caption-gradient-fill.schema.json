@@ -1,0 +1,26 @@
+{
+  "type": "caption-gradient-fill",
+  "label": "Caption - Gradient Fill",
+  "category": "captions",
+  "description": "Caption text filled with an animated gradient that gently sweeps across the letters using background-clip.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "Smooth gradient sweep"
+    },
+    "primary": {
+      "type": "color",
+      "label": "Primary Color",
+      "optional": true,
+      "description": "Gradient start/end color (maps to --mp-color-primary)."
+    },
+    "accent": {
+      "type": "color",
+      "label": "Accent Color",
+      "optional": true,
+      "description": "Gradient mid color (maps to --mp-color-accent)."
+    }
+  }
+}

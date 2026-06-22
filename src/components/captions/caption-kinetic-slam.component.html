@@ -1,0 +1,105 @@
+<template>
+  <div class="cap-slam">
+    <div class="cap-slam-line"></div>
+  </div>
+</template>
+
+<style scoped>
+  .cap-slam {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 70px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    position: relative;
+    background: transparent;
+  }
+
+  .cap-slam-line {
+    font-size: 96px;
+    font-weight: 900;
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+    text-align: center;
+    max-width: 92%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.08em 0.26em;
+    color: var(--mp-color-text, #ffffff);
+    text-shadow: 0 6px 26px rgba(0, 0, 0, 0.55);
+  }
+
+  .cap-slam-line .sw {
+    display: inline-block;
+    transform-origin: center center;
+  }
+
+  .cap-slam-line .sw.accent {
+    color: var(--mp-color-accent, #f59e0b);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var line = el.querySelector('.cap-slam-line');
+    if (!line) return tl;
+
+    var text = (data && data.text) || 'BIG BOLD IMPACT';
+    var words = text.split(/\s+/).filter(function (w) { return w.length; });
+
+    line.innerHTML = '';
+    var wordEls = [];
+    for (var i = 0; i < words.length; i++) {
+      var span = document.createElement('span');
+      span.className = 'sw';
+      // accent every other word for rhythm if accent provided implicitly
+      if (i % 2 === 1) span.className += ' accent';
+      span.textContent = words[i];
+      line.appendChild(span);
+      wordEls.push(span);
+    }
+
+    if (text.length > 28) {
+      var fs = Math.max(48, Math.round(96 * (28 / text.length) + 14));
+      line.style.fontSize = fs + 'px';
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.32 : ctx.motion === 'punchy' ? 0.26 : 0.3;
+    var step = ctx.motion === 'minimal' ? 0.16 : ctx.motion === 'punchy' ? 0.24 : 0.2;
+
+    gsap.set(line, { autoAlpha: 1 });
+    gsap.set(wordEls, { autoAlpha: 0, scale: 2.4, filter: 'blur(8px)', y: -10 });
+
+    // Compress slams into available time
+    var startAt = 0.2;
+    var available = (ctx.duration > 2 ? ctx.duration - 0.8 : ctx.duration) - startAt;
+    if (words.length > 1 && startAt + (words.length - 1) * step + speed > startAt + available) {
+      step = Math.max(0.08, (available - speed) / Math.max(1, words.length - 1));
+    }
+
+    for (var k = 0; k < wordEls.length; k++) {
+      var at = startAt + k * step;
+      tl.to(wordEls[k], {
+        autoAlpha: 1, scale: 1, filter: 'blur(0px)', y: 0,
+        duration: speed,
+        ease: 'back.out(2.2)'
+      }, at);
+      // tiny impact shake on landing
+      tl.to(line, { x: 5, duration: 0.04, ease: 'power1.out' }, at + speed * 0.7);
+      tl.to(line, { x: -4, duration: 0.04, ease: 'power1.out' }, at + speed * 0.7 + 0.04);
+      tl.to(line, { x: 0, duration: 0.06, ease: 'power1.out' }, at + speed * 0.7 + 0.08);
+    }
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to(wordEls, { autoAlpha: 0, scale: 0.7, filter: 'blur(6px)', duration: 0.35, stagger: 0.03, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

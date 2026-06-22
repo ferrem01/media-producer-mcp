@@ -1,0 +1,14 @@
+{
+  "type": "caption-glitch-rgb",
+  "label": "Caption - RGB Glitch",
+  "category": "captions",
+  "description": "RGB-split glitch reveal where red and blue channels jitter and offset before resolving into clean text.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "SYSTEM ONLINE"
+    }
+  }
+}

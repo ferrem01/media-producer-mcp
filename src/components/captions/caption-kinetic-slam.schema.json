@@ -1,0 +1,20 @@
+{
+  "type": "caption-kinetic-slam",
+  "label": "Caption - Kinetic Slam",
+  "category": "captions",
+  "description": "Bold uppercase caption where each word slams in oversized with a blur-to-sharp impact and a tiny screen shake.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "BIG BOLD IMPACT"
+    },
+    "accent": {
+      "type": "color",
+      "label": "Accent Color",
+      "optional": true,
+      "description": "Color applied to alternating words (maps to --mp-color-accent)."
+    }
+  }
+}

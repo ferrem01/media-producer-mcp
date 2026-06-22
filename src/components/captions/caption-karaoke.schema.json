@@ -1,0 +1,20 @@
+{
+  "type": "caption-karaoke",
+  "label": "Caption - Karaoke",
+  "category": "captions",
+  "description": "Karaoke-style caption where words highlight one-by-one with a color pill that advances in sync with speech.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "Watch the words light up"
+    },
+    "words": {
+      "type": "array",
+      "label": "Word Timings",
+      "optional": true,
+      "description": "Optional per-word timing overrides: [{ at: seconds, duration: seconds }]. If omitted, words auto-distribute across the clip duration."
+    }
+  }
+}

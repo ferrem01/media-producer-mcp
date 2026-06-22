@@ -1,0 +1,128 @@
+<template>
+  <div class="cap-glitch">
+    <div class="cap-glitch-stack">
+      <span class="cap-g cap-g-r"></span>
+      <span class="cap-g cap-g-b"></span>
+      <span class="cap-g cap-g-main"></span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .cap-glitch {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    position: relative;
+    background: transparent;
+  }
+
+  .cap-glitch-stack {
+    position: relative;
+    text-align: center;
+    max-width: 90%;
+  }
+
+  .cap-g {
+    font-size: 80px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    display: block;
+  }
+
+  .cap-g-main {
+    position: relative;
+    color: var(--mp-color-text, #ffffff);
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+  }
+
+  .cap-g-r,
+  .cap-g-b {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+
+  .cap-g-r {
+    color: #ff003c;
+  }
+
+  .cap-g-b {
+    color: #00e5ff;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var stack = el.querySelector('.cap-glitch-stack');
+    var main = el.querySelector('.cap-g-main');
+    var red = el.querySelector('.cap-g-r');
+    var blue = el.querySelector('.cap-g-b');
+    if (!stack || !main || !red || !blue) return tl;
+
+    var text = (data && data.text) || 'SYSTEM ONLINE';
+    main.textContent = text;
+    red.textContent = text;
+    blue.textContent = text;
+
+    if (text.length > 22) {
+      var fs = Math.max(44, Math.round(80 * (22 / text.length) + 12));
+      main.style.fontSize = fs + 'px';
+      red.style.fontSize = fs + 'px';
+      blue.style.fontSize = fs + 'px';
+    }
+
+    var amp = ctx.motion === 'minimal' ? 8 : ctx.motion === 'punchy' ? 22 : 16;
+
+    // Initial visible/clean state already set by CSS; animate from glitch.
+    gsap.set(stack, { autoAlpha: 0 });
+    gsap.set(main, { x: 0, autoAlpha: 0, skewX: 0 });
+    gsap.set(red, { x: -amp, autoAlpha: 0.9 });
+    gsap.set(blue, { x: amp, autoAlpha: 0.9 });
+
+    tl.to(stack, { autoAlpha: 1, duration: 0.12, ease: 'none' }, 0.1);
+
+    // Jitter the channels in random clipped bursts then resolve
+    var t = 0.12;
+    var bursts = ctx.motion === 'minimal' ? 4 : 7;
+    for (var i = 0; i < bursts; i++) {
+      var rx = (Math.random() - 0.5) * amp * 2.2;
+      var bx = (Math.random() - 0.5) * amp * 2.2;
+      var sk = (Math.random() - 0.5) * 12;
+      var mAlpha = i > bursts - 3 ? 1 : (0.3 + Math.random() * 0.5);
+      tl.set(red, { x: rx }, t);
+      tl.set(blue, { x: bx }, t);
+      tl.set(main, { x: (Math.random() - 0.5) * amp, skewX: sk, autoAlpha: mAlpha }, t);
+      t += 0.06 + Math.random() * 0.05;
+    }
+
+    // Resolve to clean text
+    tl.to(main, { x: 0, skewX: 0, autoAlpha: 1, duration: 0.25, ease: 'power3.out' }, t);
+    tl.to(red, { x: 0, autoAlpha: 0, duration: 0.3, ease: 'power3.out' }, t);
+    tl.to(blue, { x: 0, autoAlpha: 0, duration: 0.3, ease: 'power3.out' }, t);
+
+    // Occasional micro re-glitch to keep it alive
+    var resolved = t + 0.3;
+    if (ctx.duration > resolved + 1.2) {
+      tl.set(red, { x: -amp * 0.5, autoAlpha: 0.7 }, resolved + 1.0);
+      tl.set(blue, { x: amp * 0.5, autoAlpha: 0.7 }, resolved + 1.0);
+      tl.to([red, blue], { x: 0, autoAlpha: 0, duration: 0.18, ease: 'power2.out' }, resolved + 1.06);
+    }
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.4;
+      tl.to(stack, { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

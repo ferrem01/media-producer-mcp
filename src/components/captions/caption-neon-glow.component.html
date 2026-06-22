@@ -1,0 +1,86 @@
+<template>
+  <div class="cap-neon">
+    <div class="cap-neon-text"></div>
+  </div>
+</template>
+
+<style scoped>
+  .cap-neon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    position: relative;
+    background: transparent;
+  }
+
+  .cap-neon-text {
+    font-size: 84px;
+    font-weight: 800;
+    line-height: 1.12;
+    letter-spacing: 0.01em;
+    text-align: center;
+    max-width: 90%;
+    color: var(--mp-color-text, #ffffff);
+    text-shadow:
+      0 0 6px var(--mp-color-accent, #22d3ee),
+      0 0 18px var(--mp-color-accent, #22d3ee),
+      0 0 42px var(--mp-color-glow, rgba(34, 211, 238, 0.75)),
+      0 0 80px var(--mp-color-glow, rgba(34, 211, 238, 0.45));
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var textEl = el.querySelector('.cap-neon-text');
+    if (!textEl) return tl;
+
+    var text = (data && data.text) || 'NEON NIGHTS';
+    textEl.textContent = text;
+
+    if (text.length > 24) {
+      var fs = Math.max(46, Math.round(84 * (24 / text.length) + 12));
+      textEl.style.fontSize = fs + 'px';
+    }
+
+    var litShadow =
+      '0 0 6px var(--mp-color-accent, #22d3ee), 0 0 18px var(--mp-color-accent, #22d3ee), 0 0 42px var(--mp-color-glow, rgba(34,211,238,0.75)), 0 0 80px var(--mp-color-glow, rgba(34,211,238,0.45))';
+    var dimShadow = '0 0 0px rgba(34,211,238,0)';
+
+    // Initial: off
+    gsap.set(textEl, { autoAlpha: 0, textShadow: dimShadow });
+
+    var speed = ctx.motion === 'minimal' ? 0.7 : ctx.motion === 'punchy' ? 0.5 : 0.6;
+
+    // Flicker-on sequence
+    tl.set(textEl, { autoAlpha: 0.15, textShadow: dimShadow }, 0.15);
+    tl.set(textEl, { autoAlpha: 0 }, 0.22);
+    tl.set(textEl, { autoAlpha: 0.55, textShadow: litShadow }, 0.30);
+    tl.set(textEl, { autoAlpha: 0.1 }, 0.36);
+    tl.set(textEl, { autoAlpha: 0.7 }, 0.44);
+    tl.set(textEl, { autoAlpha: 0.2 }, 0.50);
+    tl.to(textEl, { autoAlpha: 1, textShadow: litShadow, duration: speed, ease: 'power2.out' }, 0.56);
+
+    // Sustained glow pulse
+    var pulseAt = 0.56 + speed;
+    tl.to(textEl, {
+      textShadow:
+        '0 0 8px var(--mp-color-accent, #22d3ee), 0 0 26px var(--mp-color-accent, #22d3ee), 0 0 60px var(--mp-color-glow, rgba(34,211,238,0.9)), 0 0 110px var(--mp-color-glow, rgba(34,211,238,0.55))',
+      duration: 1.4,
+      ease: 'sine.inOut',
+      yoyo: true,
+      repeat: -1
+    }, pulseAt);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to(textEl, { autoAlpha: 0, textShadow: dimShadow, duration: 0.4, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>
