@@ -149,6 +149,28 @@ function brandBackgroundIsLight(brandKit?: BrandKit): boolean {
 }
 
 /**
+ * Classify a scene as a "bookend" (intro/outro/title/closing/CTA, or a video-only
+ * brand clip). Bookends skip the aesthetic/editorial critique but still get the
+ * correctness + brand-theme gate (so they can't drift off-brand). Exported so the
+ * detection is unit-testable independent of the pipeline.
+ */
+export function isBookendScene(
+  label: string | undefined,
+  sceneIndex: number,
+  totalScenes: number,
+  componentTypes?: string[],
+): boolean {
+  const labelLower = (label || "").toLowerCase();
+  const byLabel =
+    labelLower.includes("intro") || labelLower.includes("outro") ||
+    (sceneIndex === 0 && (labelLower.includes("title") || labelLower.includes("opening"))) ||
+    (sceneIndex === totalScenes - 1 && (labelLower.includes("closing") || labelLower.includes("cta") || labelLower.includes("end")));
+  // A video-only scene (single video component) is a brand clip -> bookend.
+  const videoOnly = componentTypes?.length === 1 && componentTypes[0] === "video";
+  return byLabel || !!videoOnly;
+}
+
+/**
  * Run the full generation pipeline.
  */
 export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineResult> {
@@ -1563,17 +1585,9 @@ async function runUnifiedPipeline(
   var bookendScenes = new Set<number>();
   for (let si = 0; si < storyboard.scenes.length; si++) {
     var planned = storyboard.scenes[si];
-    var labelLower = (planned.label || "").toLowerCase();
 
-    // Detect bookend scenes (intro/outro/title/closing)
-    var isBookend = labelLower.includes("intro") || labelLower.includes("outro") ||
-      (si === 0 && (labelLower.includes("title") || labelLower.includes("opening"))) ||
-      (si === storyboard.scenes.length - 1 && (labelLower.includes("closing") || labelLower.includes("cta") || labelLower.includes("end")));
-
-    // Also detect video-only bookends (brand animations)
-    if (planned.components?.length === 1 && planned.components[0] === "video") {
-      isBookend = true;
-    }
+    // Detect bookend scenes (intro/outro/title/closing, or a video-only brand clip).
+    var isBookend = isBookendScene(planned.label, si, storyboard.scenes.length, planned.components);
 
     if (isBookend) {
       bookendScenes.add(si);
