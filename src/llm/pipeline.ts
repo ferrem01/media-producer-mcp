@@ -881,12 +881,16 @@ async function critiqueAndRetryScene(opts: {
   customSources?: Map<string, string>;
   catalog: ComponentCatalogEntry[];
   critique?: boolean;
+  /** Bookend mode: skip the aesthetic/editorial critique but STILL run the
+   *  correctness + brand-theme gate (so an intro/outro can't drift off-brand,
+   *  e.g. a dark scene on a light brand) and revise on blocking defects. */
+  correctnessOnly?: boolean;
   creativity?: number;
   critiqueLlmConfig?: LLMConfig;
   creativeBible?: any;
 }): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
-  // Skip critique if disabled
-  if (opts.critique === false) {
+  // Skip critique if disabled (but correctnessOnly still runs the correctness gate).
+  if (opts.critique === false && !opts.correctnessOnly) {
     return { scene: opts.scene, customSources: opts.customSources };
   }
 
@@ -1049,7 +1053,12 @@ async function critiqueAndRetryScene(opts: {
         motionContext += `\nMOTION REVIEW: A contact sheet with 6 frames across the timeline is attached (timestamps: ${contactTimestamps.map(t => t.toFixed(1) + "s").join(", ")}). Evaluate animation pacing, choreography, and whether the motion feels purposeful. Check that elements animate smoothly and the Build-Breathe-Resolve pattern is followed.`;
       }
 
-      const critiqueResult = await critiqueMultiPass({
+      // Bookend mode: skip the aesthetic/editorial critique (intros/outros are
+      // intentionally minimal) but use a synthetic passing score so the
+      // correctness + brand-theme gate below still runs and can force a revision.
+      const critiqueResult = opts.correctnessOnly
+        ? { score: 10, issues: [], suggestions: [] } as CritiqueResult
+        : await critiqueMultiPass({
         sceneHtml: assembledHtml,
         previewImageBase64: previewBase64,
         prompt: opts.prompt,
@@ -1585,7 +1594,7 @@ async function runUnifiedPipeline(
     }
   }
   if (bookendScenes.size > 0) {
-    console.log(`  [enforce] Bookend scenes (exempt from critique): ${[...bookendScenes].join(", ")}`);
+    console.log(`  [enforce] Bookend scenes (correctness/brand-theme gate only): ${[...bookendScenes].join(", ")}`);
   }
 
   // 4. Generate scenes (library + custom in one pass)
@@ -1606,10 +1615,11 @@ async function runUnifiedPipeline(
         const planned = storyboard.scenes[i];
         const imageUrl = enrichResult.imageUrls.get(i);
 
-        // Skip critique for bookend scenes (intro/outro)
+        // Bookend scenes (intro/outro) skip the aesthetic critique but still get
+        // the correctness + brand-theme gate (so they can't drift off-brand).
         const skipCritique = bookendScenes.has(i);
         if (skipCritique) {
-          console.log(`  Scene ${i + 1}: bookend scene, skipping critique`);
+          console.log(`  Scene ${i + 1}: bookend scene, correctness/brand-theme gate only`);
         }
 
         const generated = await generateScene({
@@ -1660,6 +1670,10 @@ async function runUnifiedPipeline(
             customSources: generated.customSources,
             catalog,
             critique: skipCritique ? false : opts.critique,
+            // Bookends skip the aesthetic critique but STILL get the correctness +
+            // brand-theme gate so an intro/outro can't drift off-brand (e.g. dark on a light brand).
+            // (Already inside `if (opts.critique !== false)`, so critique is enabled here.)
+            correctnessOnly: skipCritique,
             creativity: resolveCreativity(opts),
             critiqueLlmConfig: config.critiqueLlm,
             creativeBible,
