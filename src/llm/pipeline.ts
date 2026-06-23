@@ -1616,8 +1616,12 @@ async function runUnifiedPipeline(
   var compDir = path.join(projectDir(opts.tenant_id, projectId), "components");
   await fs.mkdir(compDir, { recursive: true });
 
-  // Parallel scene generation + critique with concurrency pool
-  const SCENE_CONCURRENCY = 3;
+  // Parallel scene generation + critique with concurrency pool.
+  // Quality-neutral speed lever: each scene still runs its full critique/regen
+  // loop; raising concurrency just runs more scenes in parallel. Configurable via
+  // MP_SCENE_CONCURRENCY (default 3) -- raise it if API rate limits + machine
+  // resources allow (more parallel headless-Chrome captures).
+  const SCENE_CONCURRENCY = Math.max(1, parseInt(process.env.MP_SCENE_CONCURRENCY || "3", 10) || 3);
   const sceneResults: Array<{ scene: Scene; customSources?: Map<string, string> }> = new Array(storyboard.scenes.length);
 
   for (let batchStart = 0; batchStart < storyboard.scenes.length; batchStart += SCENE_CONCURRENCY) {
