@@ -1,0 +1,192 @@
+<template>
+  <div class="cd-root">
+    <div class="cd-window">
+      <div class="cd-bar">
+        <div class="cd-dots">
+          <span class="cd-dot cd-dot-close"></span>
+          <span class="cd-dot cd-dot-min"></span>
+          <span class="cd-dot cd-dot-max"></span>
+        </div>
+        <span class="cd-title"></span>
+        <div class="cd-dots-spacer"></div>
+      </div>
+      <div class="cd-body"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .cd-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    padding: 80px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  .cd-window {
+    --cd-bg: #0d1117;
+    --cd-bar: rgba(255,255,255,0.05);
+    --cd-border: rgba(255,255,255,0.07);
+    --cd-text: #c9d1d9;
+    --cd-ctx: #8b949e;
+    --cd-add-bg: rgba(63,185,80,0.16);
+    --cd-add-sign: #3fb950;
+    --cd-del-bg: rgba(248,81,73,0.16);
+    --cd-del-sign: #f85149;
+    background: var(--cd-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    width: 76%;
+    max-height: 82%;
+    border: 1px solid var(--cd-border);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .cd-window.cd-light {
+    --cd-bg: #fbfbfd;
+    --cd-bar: rgba(0,0,0,0.04);
+    --cd-border: rgba(0,0,0,0.10);
+    --cd-text: #24292f;
+    --cd-ctx: #57606a;
+    --cd-add-bg: rgba(46,160,67,0.14);
+    --cd-add-sign: #1a7f37;
+    --cd-del-bg: rgba(207,34,46,0.12);
+    --cd-del-sign: #cf222e;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  .cd-bar {
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 18px;
+    background: var(--cd-bar);
+    border-bottom: 1px solid var(--cd-border);
+  }
+  .cd-dots { display: flex; align-items: center; gap: 8px; flex: 0 0 68px; }
+  .cd-dots-spacer { flex: 0 0 68px; }
+  .cd-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .cd-dot-close { background: #ff5f57; }
+  .cd-dot-min { background: #febc2e; }
+  .cd-dot-max { background: #28c840; }
+  .cd-title {
+    flex: 1;
+    font-size: 13px;
+    color: var(--cd-ctx);
+    text-align: center;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+  .cd-title:empty { display: none; }
+
+  .cd-body {
+    padding: 24px 0;
+    overflow: hidden;
+  }
+
+  .cd-line {
+    display: flex;
+    font-size: 16px;
+    line-height: 1.85;
+    color: var(--cd-text);
+    padding: 0 26px;
+    white-space: pre;
+  }
+  .cd-sign {
+    width: 20px;
+    flex-shrink: 0;
+    opacity: 0.9;
+    user-select: none;
+  }
+  .cd-text { flex: 1; }
+
+  .cd-line.cd-add { background: var(--cd-add-bg); }
+  .cd-line.cd-add .cd-sign { color: var(--cd-add-sign); }
+  .cd-line.cd-del { background: var(--cd-del-bg); }
+  .cd-line.cd-del .cd-sign { color: var(--cd-del-sign); }
+  .cd-line.cd-ctx .cd-sign { color: transparent; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var win = el.querySelector('.cd-window');
+    var body = el.querySelector('.cd-body');
+    var titleEl = el.querySelector('.cd-title');
+    if (!win || !body) return tl;
+
+    var theme = (data && data.theme) || 'dark';
+    if (theme === 'light') win.classList.add('cd-light');
+    if (data && data.title) titleEl.textContent = data.title;
+
+    var lines = (data && data.lines && data.lines.length) ? data.lines : [
+      { text: "const total = items.length;", type: "ctx" },
+      { text: "let sum = 0;", type: "del" },
+      { text: "const sum = items.reduce((a, b) => a + b, 0);", type: "add" },
+      { text: "return sum / total;", type: "ctx" }
+    ];
+
+    var lineEls = [];
+    lines.forEach(function(ln) {
+      var type = ln.type || 'ctx';
+      var lineEl = document.createElement('div');
+      lineEl.className = 'cd-line cd-' + (type === 'add' ? 'add' : type === 'del' ? 'del' : 'ctx');
+
+      var sign = document.createElement('span');
+      sign.className = 'cd-sign';
+      sign.textContent = type === 'add' ? '+' : type === 'del' ? '-' : ' ';
+      lineEl.appendChild(sign);
+
+      var txt = document.createElement('span');
+      txt.className = 'cd-text';
+      txt.textContent = (ln.text != null ? ln.text : '') || ' ';
+      lineEl.appendChild(txt);
+
+      body.appendChild(lineEl);
+      lineEls.push({ el: lineEl, type: type });
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.45 : 0.55;
+    var stagger = ctx.motion === 'minimal' ? 0.06 : 0.1;
+
+    gsap.set(win, { autoAlpha: 0, y: 36, scale: 1.04, filter: 'blur(5px)' });
+    tl.to(win, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out' }, 0.15);
+
+    // context lines fade in first
+    lineEls.forEach(function(item) {
+      if (item.type === 'ctx') gsap.set(item.el, { autoAlpha: 0, x: -10 });
+      else if (item.type === 'add') gsap.set(item.el, { autoAlpha: 0, x: 40, height: 0, overflow: 'hidden' });
+      else gsap.set(item.el, { autoAlpha: 0, x: -40, height: 0, overflow: 'hidden' });
+    });
+
+    var ctxStart = 0.5;
+    var ctxEls = lineEls.filter(function(i){ return i.type === 'ctx'; }).map(function(i){ return i.el; });
+    if (ctxEls.length) {
+      tl.to(ctxEls, { autoAlpha: 1, x: 0, duration: speed, stagger: stagger, ease: 'power2.out' }, ctxStart);
+    }
+
+    // removed lines slide in (red), then added lines slide in (green)
+    var diffStart = ctxStart + 0.4;
+    lineEls.forEach(function(item, idx) {
+      if (item.type === 'del') {
+        tl.to(item.el, { autoAlpha: 1, x: 0, height: 'auto', duration: speed, ease: 'power2.out' }, diffStart + idx * stagger * 1.5);
+      }
+    });
+    var addStart = diffStart + 0.45;
+    lineEls.forEach(function(item, idx) {
+      if (item.type === 'add') {
+        tl.to(item.el, { autoAlpha: 1, x: 0, height: 'auto', duration: speed, ease: 'back.out(1.2)' }, addStart + idx * stagger * 1.5);
+      }
+    });
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(win, { autoAlpha: 0, y: -15, scale: 0.97, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

@@ -1,0 +1,252 @@
+<template>
+  <div class="u3-root">
+    <div class="u3-glow"></div>
+    <div class="u3-stage"></div>
+  </div>
+</template>
+
+<style scoped>
+  .u3-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    box-sizing: border-box;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    perspective: 1400px;
+    position: relative;
+  }
+
+  .u3-glow {
+    position: absolute;
+    width: 680px;
+    height: 680px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(99, 102, 241, 0.14) 0%,
+      rgba(99, 102, 241, 0.04) 45%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .u3-stage {
+    position: relative;
+    width: 440px;
+    height: 320px;
+    transform-style: preserve-3d;
+    z-index: 1;
+  }
+
+  .u3-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 440px;
+    height: 300px;
+    margin-top: -150px;
+    margin-left: -220px;
+    border-radius: 22px;
+    padding: 26px;
+    box-sizing: border-box;
+    background: linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow:
+      0 40px 90px rgba(0, 0, 0, 0.45),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    transform-style: preserve-3d;
+    overflow: hidden;
+  }
+
+  .u3-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      120deg,
+      transparent 35%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 65%
+    );
+    mix-blend-mode: screen;
+  }
+
+  .u3-card-label {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--mp-color-text, #ffffff);
+    margin-bottom: 18px;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+  .u3-card-label:empty { display: none; }
+
+  .u3-bar {
+    height: 14px;
+    border-radius: 7px;
+    margin-bottom: 14px;
+    background: linear-gradient(
+      90deg,
+      var(--mp-color-primary, #6366f1) 0%,
+      var(--mp-color-accent, #a78bfa) 100%
+    );
+    opacity: 0.85;
+  }
+
+  .u3-bar.u3-bar-2 { width: 78%; opacity: 0.5; background: rgba(255,255,255,0.18); }
+  .u3-bar.u3-bar-3 { width: 56%; opacity: 0.4; background: rgba(255,255,255,0.14); }
+
+  .u3-pill-row { display: flex; gap: 12px; margin-top: 22px; }
+  .u3-pill {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .u3-pill.u3-accent {
+    background: linear-gradient(155deg, var(--mp-color-accent, #a78bfa) 0%, var(--mp-color-primary, #6366f1) 100%);
+    box-shadow: 0 0 28px rgba(99, 102, 241, 0.4);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+
+    var stage = el.querySelector('.u3-stage');
+    var glow = el.querySelector('.u3-glow');
+    if (!stage) return tl;
+
+    var labels = (data.labels && data.labels.length) ? data.labels.slice(0, 4)
+      : ['Dashboard', 'Analytics', 'Settings'];
+    // clamp to 2..4 panels
+    if (labels.length < 2) labels.push('Panel');
+
+    var n = labels.length;
+    var cards = [];
+
+    labels.forEach(function(label, i) {
+      var card = document.createElement('div');
+      card.className = 'u3-card';
+
+      var lab = document.createElement('div');
+      lab.className = 'u3-card-label';
+      lab.textContent = label || '';
+      card.appendChild(lab);
+
+      var b1 = document.createElement('div'); b1.className = 'u3-bar u3-bar-1';
+      var b2 = document.createElement('div'); b2.className = 'u3-bar u3-bar-2';
+      var b3 = document.createElement('div'); b3.className = 'u3-bar u3-bar-3';
+      card.appendChild(b1); card.appendChild(b2); card.appendChild(b3);
+
+      var row = document.createElement('div');
+      row.className = 'u3-pill-row';
+      for (var p = 0; p < 3; p++) {
+        var pill = document.createElement('div');
+        pill.className = 'u3-pill' + (p === 0 ? ' u3-accent' : '');
+        row.appendChild(pill);
+      }
+      card.appendChild(row);
+
+      stage.appendChild(card);
+      cards.push(card);
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.7 : 1.0;
+    var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
+
+    // Depth spacing between layers
+    var depthStep = 90;
+
+    // Final aligned positions: stacked in depth, slightly offset for parallax
+    var finalState = cards.map(function(card, i) {
+      var idx = i - (n - 1) / 2;
+      return {
+        z: -i * depthStep,
+        y: idx * 18,
+        x: idx * 26,
+        rotateY: -16,
+        rotateX: 6
+      };
+    });
+
+    // Initial: exploded in space, scattered + hidden
+    cards.forEach(function(card, i) {
+      var f = finalState[i];
+      gsap.set(card, {
+        autoAlpha: 0,
+        z: f.z - 320,
+        x: f.x + (i % 2 === 0 ? -180 : 180),
+        y: f.y + (i % 2 === 0 ? -120 : 130),
+        rotateY: f.rotateY + (i % 2 === 0 ? -55 : 55),
+        rotateX: f.rotateX - 35,
+        scale: 0.8,
+        transformPerspective: 1400
+      });
+    });
+    gsap.set(glow, { autoAlpha: 0, scale: 0.5 });
+
+    tl.to(glow, { autoAlpha: 1, scale: 1, duration: speed * 0.9, ease: 'power2.out' }, 0.1);
+
+    // Panels parallax-rotate in and assemble (staggered, back to front)
+    cards.forEach(function(card, i) {
+      var f = finalState[i];
+      tl.to(card, {
+        autoAlpha: 1,
+        z: f.z,
+        x: f.x,
+        y: f.y,
+        rotateY: f.rotateY,
+        rotateX: f.rotateX,
+        scale: 1,
+        duration: speed * 1.3,
+        ease: ease
+      }, 0.3 + i * 0.18);
+    });
+
+    var settleAt = 0.3 + (n - 1) * 0.18 + speed * 1.3;
+
+    // Gentle ambient orbit of the whole stack
+    tl.to(stage, {
+      rotateY: 12,
+      rotateX: -4,
+      duration: 3.6,
+      ease: 'sine.inOut',
+      yoyo: true,
+      repeat: -1
+    }, settleAt);
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      cards.forEach(function(card, i) {
+        tl.to(card, {
+          autoAlpha: 0,
+          z: '-=160',
+          y: '-=40',
+          scale: 0.94,
+          duration: 0.45,
+          ease: 'power2.in'
+        }, exitAt + i * 0.05);
+      });
+      tl.to(glow, { autoAlpha: 0, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

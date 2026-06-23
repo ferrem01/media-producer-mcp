@@ -1,0 +1,146 @@
+<template>
+  <div class="cap-editorial">
+    <div class="cap-editorial-text"></div>
+  </div>
+</template>
+
+<style scoped>
+  .cap-editorial {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 70px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    position: relative;
+    background: transparent;
+  }
+
+  .cap-editorial-text {
+    font-size: 80px;
+    font-weight: 600;
+    line-height: 1.18;
+    letter-spacing: -0.01em;
+    text-align: center;
+    max-width: 92%;
+    color: var(--mp-color-text, #ffffff);
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .cap-editorial-text .ew {
+    display: inline-block;
+    margin: 0 0.1em;
+    position: relative;
+  }
+
+  .cap-editorial-text .ew.key {
+    color: var(--mp-color-accent, #f43f5e);
+    font-weight: 800;
+  }
+
+  .cap-editorial-text .ew.key .ul {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -0.06em;
+    height: 0.09em;
+    background: var(--mp-color-accent, #f43f5e);
+    border-radius: 2px;
+    transform-origin: left center;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var textEl = el.querySelector('.cap-editorial-text');
+    if (!textEl) return tl;
+
+    var text = (data && data.text) || 'Emphasis on what Matters';
+    var words = text.split(/\s+/).filter(function (w) { return w.length; });
+
+    if (text.length > 26) {
+      var fs = Math.max(44, Math.round(80 * (26 / text.length) + 12));
+      textEl.style.fontSize = fs + 'px';
+    }
+
+    // Determine which words are "key": explicit list or auto every-Nth.
+    var emphasis = (data && data.emphasis) || null;
+    var emphasisSet = null;
+    if (emphasis && emphasis.length) {
+      emphasisSet = {};
+      for (var e = 0; e < emphasis.length; e++) {
+        emphasisSet[String(emphasis[e]).toLowerCase().replace(/[^\w]/g, '')] = true;
+      }
+    }
+    var everyN = (data && data.everyN) || 3;
+
+    function isKey(word, idx) {
+      if (emphasisSet) {
+        var norm = word.toLowerCase().replace(/[^\w]/g, '');
+        return !!emphasisSet[norm];
+      }
+      return words.length > 2 && (idx % everyN === everyN - 1);
+    }
+
+    textEl.innerHTML = '';
+    var wordEls = [];
+    var keyEls = [];
+    var underlines = [];
+    for (var i = 0; i < words.length; i++) {
+      var span = document.createElement('span');
+      span.className = 'ew';
+      span.appendChild(document.createTextNode(words[i]));
+      if (isKey(words[i], i)) {
+        span.className += ' key';
+        var ul = document.createElement('span');
+        ul.className = 'ul';
+        span.appendChild(ul);
+        underlines.push(ul);
+        keyEls.push(span);
+      }
+      textEl.appendChild(span);
+      wordEls.push(span);
+    }
+    if (wordEls.length === 0) return tl;
+
+    var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.38 : 0.48;
+    var step = ctx.motion === 'minimal' ? 0.14 : ctx.motion === 'punchy' ? 0.07 : 0.1;
+
+    gsap.set(textEl, { autoAlpha: 1 });
+    gsap.set(wordEls, { autoAlpha: 0, y: 22, filter: 'blur(4px)' });
+    gsap.set(keyEls, { scale: 1 });
+    gsap.set(underlines, { scaleX: 0 });
+
+    var startAt = 0.2;
+    var available = (ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration) - startAt;
+    if (wordEls.length > 1 && (wordEls.length - 1) * step + speed > available) {
+      step = Math.max(0.05, (available - speed) / Math.max(1, wordEls.length - 1));
+    }
+
+    for (var k = 0; k < wordEls.length; k++) {
+      var wEl = wordEls[k];
+      var at = startAt + k * step;
+      tl.to(wEl, {
+        autoAlpha: 1, y: 0, filter: 'blur(0px)',
+        duration: speed,
+        ease: 'power3.out'
+      }, at);
+      if (wEl.classList.contains('key')) {
+        // emphasis pop + underline draw
+        tl.to(wEl, { scale: 1.12, duration: speed * 0.5, ease: 'back.out(2)' }, at + speed * 0.3);
+        tl.to(wEl, { scale: 1, duration: speed * 0.5, ease: 'sine.inOut' }, at + speed * 0.8);
+        var ul = wEl.querySelector('.ul');
+        if (ul) tl.to(ul, { scaleX: 1, duration: speed * 0.8, ease: 'power2.out' }, at + speed * 0.4);
+      }
+    }
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to(wordEls, { autoAlpha: 0, y: -16, filter: 'blur(4px)', duration: 0.35, stagger: 0.03, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

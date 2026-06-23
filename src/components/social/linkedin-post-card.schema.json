@@ -1,0 +1,44 @@
+{
+  "type": "linkedin-post-card",
+  "label": "LinkedIn Post Card",
+  "category": "social",
+  "description": "A LinkedIn post card with author name, headline, post text, and reaction and comment counts that tick up. Use to show or recreate a LinkedIn post as an overlay.",
+  "data": {
+    "name": {
+      "type": "string",
+      "label": "Author Name",
+      "required": true,
+      "placeholder": "Jane Doe"
+    },
+    "headline": {
+      "type": "string",
+      "label": "Headline",
+      "required": true,
+      "placeholder": "Founder & CEO at Acme"
+    },
+    "text": {
+      "type": "string",
+      "label": "Post Text",
+      "required": true,
+      "placeholder": "Excited to share what we've been building."
+    },
+    "reactions": {
+      "type": "number",
+      "label": "Reactions",
+      "optional": true,
+      "default": 1240
+    },
+    "comments": {
+      "type": "number",
+      "label": "Comments",
+      "optional": true,
+      "default": 86
+    },
+    "avatar_color": {
+      "type": "string",
+      "label": "Avatar Color/Gradient",
+      "optional": true,
+      "placeholder": "#0a66c2"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "type": "grid-pixelate-wipe",
+  "label": "Grid Pixelate Wipe",
+  "category": "effects",
+  "description": "A mosaic wipe where a grid of cells conceals then reveals the frame in a sweeping diagonal stagger. Use as a transition overlay between scenes.",
+  "data": {
+    "cell_size": {
+      "type": "number",
+      "label": "Cell Size (px)",
+      "optional": true,
+      "default": 80,
+      "placeholder": "80"
+    },
+    "color": {
+      "type": "string",
+      "label": "Cell Color",
+      "optional": true,
+      "placeholder": "var(--mp-color-primary)"
+    }
+  }
+}

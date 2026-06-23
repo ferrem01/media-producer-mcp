@@ -1,0 +1,14 @@
+{
+  "type": "caption-weight-shift",
+  "label": "Caption - Weight Shift",
+  "category": "captions",
+  "description": "Caption where each word fades in thin and animates from a light to a bold variable-font weight with a subtle scale settle.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "Light to Bold"
+    }
+  }
+}

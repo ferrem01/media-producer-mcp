@@ -1,0 +1,322 @@
+<template>
+  <div class="fc-root">
+    <div class="fc-stage">
+      <svg class="fc-edges" preserveAspectRatio="none"></svg>
+      <div class="fc-nodes"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .fc-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    box-sizing: border-box;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .fc-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .fc-edges {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .fc-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 18px 24px;
+    min-width: 150px;
+    max-width: 230px;
+    box-sizing: border-box;
+    border-radius: 16px;
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--mp-color-text, #ffffff);
+    background: linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      0 18px 40px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .fc-node.fc-node-first {
+    background: linear-gradient(
+      155deg,
+      rgba(99, 102, 241, 0.4) 0%,
+      rgba(99, 102, 241, 0.15) 100%
+    );
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow:
+      0 18px 44px rgba(99, 102, 241, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  .fc-node.fc-node-last {
+    background: linear-gradient(
+      155deg,
+      var(--mp-color-accent, #a78bfa) 0%,
+      var(--mp-color-primary, #6366f1) 100%
+    );
+    border-color: rgba(167, 139, 250, 0.6);
+    box-shadow:
+      0 18px 44px rgba(167, 139, 250, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+
+    var stage = el.querySelector('.fc-stage');
+    var svg = el.querySelector('.fc-edges');
+    var nodesLayer = el.querySelector('.fc-nodes');
+    if (!stage || !svg || !nodesLayer) return tl;
+
+    var SVGNS = 'http://www.w3.org/2000/svg';
+
+    // Defaults: a sensible 3-node linear flow
+    var nodes = (data.nodes && data.nodes.length) ? data.nodes : [
+      { id: 'a', label: 'Start' },
+      { id: 'b', label: 'Process' },
+      { id: 'c', label: 'Done' }
+    ];
+    var edges;
+    if (data.edges && data.edges.length) {
+      edges = data.edges;
+    } else {
+      // default: chain consecutive nodes
+      edges = [];
+      for (var e = 0; e < nodes.length - 1; e++) {
+        edges.push({ from: nodes[e].id, to: nodes[e + 1].id });
+      }
+    }
+
+    var direction = data.direction === 'vertical' ? 'vertical' : 'horizontal';
+
+    var W = stage.clientWidth || 1760;
+    var H = stage.clientHeight || 920;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+    // ---- Layered layout (longest-path style by BFS depth) ----
+    var idToNode = {};
+    nodes.forEach(function(nd) { idToNode[nd.id] = nd; });
+
+    var depth = {};
+    nodes.forEach(function(nd) { depth[nd.id] = 0; });
+    // iterative relaxation so depth[to] = max(depth[from]+1)
+    for (var iter = 0; iter < nodes.length + 1; iter++) {
+      edges.forEach(function(ed) {
+        if (idToNode[ed.from] && idToNode[ed.to]) {
+          if (depth[ed.to] < depth[ed.from] + 1) depth[ed.to] = depth[ed.from] + 1;
+        }
+      });
+    }
+
+    var maxDepth = 0;
+    nodes.forEach(function(nd) { if (depth[nd.id] > maxDepth) maxDepth = depth[nd.id]; });
+
+    // group nodes by depth (column or row)
+    var byDepth = {};
+    nodes.forEach(function(nd) {
+      var d = depth[nd.id];
+      if (!byDepth[d]) byDepth[d] = [];
+      byDepth[d].push(nd);
+    });
+
+    var marginMain = 0.14;   // along the flow axis
+    var marginCross = 0.12;  // across the flow axis
+    var pos = {}; // id -> {x, y}
+
+    for (var d2 = 0; d2 <= maxDepth; d2++) {
+      var group = byDepth[d2] || [];
+      var mainFrac = maxDepth === 0 ? 0.5 : marginMain + (d2 / maxDepth) * (1 - 2 * marginMain);
+      group.forEach(function(nd, gi) {
+        var count = group.length;
+        var crossFrac = count === 1 ? 0.5
+          : marginCross + (gi / (count - 1)) * (1 - 2 * marginCross);
+        if (direction === 'horizontal') {
+          pos[nd.id] = { x: mainFrac * W, y: crossFrac * H };
+        } else {
+          pos[nd.id] = { x: crossFrac * W, y: mainFrac * H };
+        }
+      });
+    }
+
+    // ---- Build node DOM ----
+    var nodeEls = {};
+    nodes.forEach(function(nd, i) {
+      var p = pos[nd.id];
+      var box = document.createElement('div');
+      box.className = 'fc-node';
+      if (depth[nd.id] === 0) box.className += ' fc-node-first';
+      if (depth[nd.id] === maxDepth && maxDepth > 0) box.className += ' fc-node-last';
+      box.textContent = nd.label != null ? nd.label : nd.id;
+      box.style.left = p.x + 'px';
+      box.style.top = p.y + 'px';
+      nodesLayer.appendChild(box);
+      nodeEls[nd.id] = box;
+    });
+
+    // ---- Build edges (SVG paths + arrowheads) ----
+    var defs = document.createElementNS(SVGNS, 'defs');
+    var marker = document.createElementNS(SVGNS, 'marker');
+    marker.setAttribute('id', 'fc-arrow');
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '8');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '7');
+    marker.setAttribute('markerHeight', '7');
+    marker.setAttribute('orient', 'auto-start-reverse');
+    var arrowPath = document.createElementNS(SVGNS, 'path');
+    arrowPath.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+    arrowPath.setAttribute('fill', 'var(--mp-color-accent, #a78bfa)');
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    var NODE_HALF_W = 90;
+    var NODE_HALF_H = 34;
+
+    function anchorPoint(fromP, toP) {
+      // pick exit/entry points on node borders along the dominant axis
+      var dx = toP.x - fromP.x;
+      var dy = toP.y - fromP.y;
+      var out = { sx: fromP.x, sy: fromP.y, ex: toP.x, ey: toP.y };
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        out.sx = fromP.x + (dx >= 0 ? NODE_HALF_W : -NODE_HALF_W);
+        out.ex = toP.x + (dx >= 0 ? -NODE_HALF_W : NODE_HALF_W);
+      } else {
+        out.sy = fromP.y + (dy >= 0 ? NODE_HALF_H : -NODE_HALF_H);
+        out.ey = toP.y + (dy >= 0 ? -NODE_HALF_H : NODE_HALF_H);
+      }
+      return out;
+    }
+
+    var edgePaths = [];
+    edges.forEach(function(ed) {
+      var fromP = pos[ed.from];
+      var toP = pos[ed.to];
+      if (!fromP || !toP) return;
+      var a = anchorPoint(fromP, toP);
+      // smooth cubic curve
+      var midx = (a.sx + a.ex) / 2;
+      var midy = (a.sy + a.ey) / 2;
+      var c1x, c1y, c2x, c2y;
+      if (direction === 'horizontal') {
+        c1x = midx; c1y = a.sy; c2x = midx; c2y = a.ey;
+      } else {
+        c1x = a.sx; c1y = midy; c2x = a.ex; c2y = midy;
+      }
+      var dStr = 'M ' + a.sx + ' ' + a.sy +
+        ' C ' + c1x + ' ' + c1y + ' ' + c2x + ' ' + c2y + ' ' + a.ex + ' ' + a.ey;
+
+      var path = document.createElementNS(SVGNS, 'path');
+      path.setAttribute('d', dStr);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', 'var(--mp-color-accent, #a78bfa)');
+      path.setAttribute('stroke-width', '3');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('marker-end', 'url(#fc-arrow)');
+      path.style.opacity = '0.85';
+      svg.appendChild(path);
+      edgePaths.push(path);
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.75 : 1.0;
+    var nodeEase = ctx.motion === 'punchy' ? 'back.out(1.6)' : 'back.out(1.2)';
+
+    // Order nodes by depth for sequential pop-in
+    var orderedNodes = nodes.slice().sort(function(a, b) {
+      return depth[a.id] - depth[b.id];
+    });
+
+    // Initial hidden states
+    orderedNodes.forEach(function(nd) {
+      gsap.set(nodeEls[nd.id], { autoAlpha: 0, scale: 0.6, y: '+=14' });
+    });
+    edgePaths.forEach(function(path) {
+      var len = path.getTotalLength ? path.getTotalLength() : 0;
+      if (!len || isNaN(len)) len = 400;
+      path.style.strokeDasharray = len;
+      path.style.strokeDashoffset = len;
+    });
+
+    // Sequence: node pops, then connectors out of it draw on, then next node
+    var step = Math.max(0.32, (speed * 0.55));
+    var t = 0.3;
+
+    orderedNodes.forEach(function(nd, i) {
+      tl.to(nodeEls[nd.id], {
+        autoAlpha: 1, scale: 1, y: '-=14',
+        duration: speed * 0.5,
+        ease: nodeEase
+      }, t);
+
+      // draw edges leaving this node
+      var outIdx = [];
+      edges.forEach(function(ed, ei) {
+        if (ed.from === nd.id && edgePaths[ei]) outIdx.push(ei);
+      });
+      outIdx.forEach(function(ei) {
+        tl.to(edgePaths[ei].style, {
+          strokeDashoffset: 0,
+          duration: speed * 0.5,
+          ease: 'power2.inOut'
+        }, t + speed * 0.3);
+      });
+
+      t += step;
+    });
+
+    // Gentle settle pulse on the last-depth nodes
+    var lastNodes = byDepth[maxDepth] || [];
+    lastNodes.forEach(function(nd) {
+      tl.to(nodeEls[nd.id], {
+        scale: 1.04,
+        duration: 0.9,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, t);
+    });
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(el.querySelector('.fc-stage'), {
+        autoAlpha: 0,
+        duration: 0.45,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

@@ -1,0 +1,20 @@
+{
+  "type": "caption-neon-glow",
+  "label": "Caption - Neon Glow",
+  "category": "captions",
+  "description": "Neon sign caption that flickers on and settles into a sustained pulsing glow in the accent color.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "NEON NIGHTS"
+    },
+    "accent": {
+      "type": "color",
+      "label": "Neon Color",
+      "optional": true,
+      "description": "Glow color (maps to --mp-color-accent)."
+    }
+  }
+}

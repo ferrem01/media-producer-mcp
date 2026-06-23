@@ -1,0 +1,118 @@
+<template>
+  <div class="li-wrap">
+    <div class="li-card">
+      <div class="li-head">
+        <div class="li-avatar"></div>
+        <div class="li-names">
+          <div class="li-name"></div>
+          <div class="li-headline"></div>
+          <div class="li-time">2h &middot; <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zM3 8a5 5 0 016.9-4.6L4.4 9.9A5 5 0 013 8zm5 5a5 5 0 01-2.9-.9l5.5-5.5A5 5 0 018 13z"/></svg></div>
+        </div>
+        <svg class="li-logo" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="4" fill="#0a66c2"/><path fill="#fff" d="M6.94 8.5H4.5V18h2.44V8.5zM5.72 7.4a1.42 1.42 0 100-2.83 1.42 1.42 0 000 2.83zM19.5 18v-5.2c0-2.6-1.4-3.8-3.26-3.8-1.5 0-2.17.83-2.54 1.4V8.5h-2.44V18h2.44v-5c0-1.32.25-2.6 1.88-2.6 1.61 0 1.63 1.5 1.63 2.68V18h2.74z"/></svg>
+      </div>
+      <div class="li-text"></div>
+      <div class="li-stats">
+        <div class="li-reactions">
+          <span class="li-react-icons">&#128077;&#10084;&#65039;</span>
+          <span class="li-react-count">0</span>
+        </div>
+        <div class="li-comments"><span class="li-comment-count">0</span> comments</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .li-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 60px;
+    box-sizing: border-box;
+  }
+  .li-card {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 14px;
+    padding: 24px 28px;
+    max-width: 600px;
+    width: 100%;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.35);
+    color: #1d2226;
+  }
+  .li-head { display: flex; align-items: flex-start; gap: 14px; }
+  .li-avatar {
+    width: 56px; height: 56px; border-radius: 50%; flex: 0 0 auto;
+    background: linear-gradient(135deg, #0a66c2 0%, #004182 100%);
+  }
+  .li-names { flex: 1 1 auto; min-width: 0; }
+  .li-name { font-weight: 700; font-size: 21px; color: #1d2226; }
+  .li-headline { font-size: 15px; color: #5e6670; margin-top: 1px; }
+  .li-time { font-size: 13px; color: #5e6670; margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+  .li-time svg { width: 13px; height: 13px; fill: #5e6670; }
+  .li-logo { width: 30px; height: 30px; flex: 0 0 auto; }
+  .li-text { font-size: 19px; line-height: 1.45; margin: 16px 0 18px; color: #1d2226; }
+  .li-stats { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e8e8e8; padding-top: 12px; }
+  .li-reactions { display: flex; align-items: center; gap: 8px; }
+  .li-react-icons { font-size: 18px; }
+  .li-react-count, .li-comments { font-size: 15px; color: #5e6670; font-variant-numeric: tabular-nums; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.li-card');
+    var avatar = el.querySelector('.li-avatar');
+    var nameEl = el.querySelector('.li-name');
+    var headlineEl = el.querySelector('.li-headline');
+    var textEl = el.querySelector('.li-text');
+    var reactCount = el.querySelector('.li-react-count');
+    var commentCount = el.querySelector('.li-comment-count');
+    var reactIcons = el.querySelector('.li-react-icons');
+
+    if (data.name) nameEl.textContent = data.name;
+    if (data.headline) headlineEl.textContent = data.headline;
+    if (data.text) textEl.textContent = data.text;
+    if (data.avatar_color && avatar) avatar.style.background = data.avatar_color;
+    var reactions = data.reactions !== undefined ? data.reactions : 1240;
+    var comments = data.comments !== undefined ? data.comments : 86;
+
+    function fmt(n) {
+      n = Math.round(n);
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+      return String(n);
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.65 : 0.8;
+
+    gsap.set(card, { autoAlpha: 0, y: 44, scale: 1.03, filter: 'blur(4px)' });
+    gsap.set([avatar, el.querySelector('.li-names'), textEl, el.querySelector('.li-stats')], { autoAlpha: 0, y: 14 });
+
+    tl.to(card, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.25);
+    tl.to([avatar, el.querySelector('.li-names'), textEl, el.querySelector('.li-stats')], {
+      autoAlpha: 1, y: 0, duration: speed * 0.7, stagger: 0.07, ease: 'power2.out'
+    }, 0.4);
+
+    // reaction icons pop
+    tl.from(reactIcons, { scale: 0.4, duration: 0.4, ease: 'back.out(2.2)', transformOrigin: '0% 50%' }, 0.95);
+
+    var rObj = { val: 0 };
+    tl.to(rObj, { val: reactions, duration: speed * 1.8, ease: 'power2.out', onUpdate: function () { reactCount.textContent = fmt(rObj.val); } }, 0.9);
+    var cObj = { val: 0 };
+    tl.to(cObj, { val: comments, duration: speed * 1.8, ease: 'power2.out', onUpdate: function () { commentCount.textContent = fmt(cObj.val); } }, 1.0);
+
+    // ambient: subtle reaction icon breathe
+    tl.to(reactIcons, { scale: 1.08, duration: 1.1, ease: 'sine.inOut', yoyo: true, repeat: -1, transformOrigin: '0% 50%' }, 1.9);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(card, { autoAlpha: 0, y: -24, scale: 0.98, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

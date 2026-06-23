@@ -1,0 +1,118 @@
+<template>
+  <div class="cap-texture">
+    <div class="cap-texture-text"></div>
+  </div>
+</template>
+
+<style scoped>
+  .cap-texture {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 70px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    position: relative;
+    background: transparent;
+  }
+
+  .cap-texture-text {
+    font-size: 100px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    text-align: center;
+    max-width: 92%;
+    /* Solid bright fallback so text is always visible even if clip fails. */
+    color: var(--mp-color-text, #ffffff);
+    filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.5));
+  }
+
+  /* Per-word textured gradient fill, clipped to the glyphs. The lighter
+     stops sit toward the centre so the bulk of the text reads as bright. */
+  .cap-texture-text .tw {
+    background-image:
+      radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.6) 0%, transparent 45%),
+      linear-gradient(115deg,
+        var(--mp-color-accent, #a78bfa) 0%,
+        var(--mp-color-text, #ffffff) 35%,
+        var(--mp-color-text, #ffffff) 65%,
+        var(--mp-color-accent, #a78bfa) 100%);
+    background-size: 220% 220%;
+    background-position: 0% 50%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .cap-texture-text .tw {
+    display: inline-block;
+    margin: 0 0.1em;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var textEl = el.querySelector('.cap-texture-text');
+    if (!textEl) return tl;
+
+    var text = (data && data.text) || 'Make it move';
+    var words = text.split(/\s+/).filter(function (w) { return w.length; });
+
+    if (text.length > 18) {
+      var fs = Math.max(48, Math.round(100 * (18 / text.length) + 16));
+      textEl.style.fontSize = fs + 'px';
+    }
+
+    textEl.innerHTML = '';
+    var wordEls = [];
+    for (var i = 0; i < words.length; i++) {
+      var span = document.createElement('span');
+      span.className = 'tw';
+      span.textContent = words[i];
+      textEl.appendChild(span);
+      wordEls.push(span);
+    }
+    if (wordEls.length === 0) return tl;
+
+    var speed = ctx.motion === 'minimal' ? 0.7 : ctx.motion === 'punchy' ? 0.45 : 0.55;
+    var step = ctx.motion === 'minimal' ? 0.18 : ctx.motion === 'punchy' ? 0.1 : 0.14;
+
+    gsap.set(textEl, { autoAlpha: 1 });
+    gsap.set(wordEls, { autoAlpha: 0, scale: 0.86, y: 16, filter: 'blur(5px)', backgroundPosition: '0% 50%' });
+
+    var startAt = 0.2;
+    var available = (ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration) - startAt;
+    if (wordEls.length > 1 && (wordEls.length - 1) * step + speed > available) {
+      step = Math.max(0.06, (available - speed) / Math.max(1, wordEls.length - 1));
+    }
+
+    for (var k = 0; k < wordEls.length; k++) {
+      tl.to(wordEls[k], {
+        autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+        duration: speed,
+        ease: 'power3.out'
+      }, startAt + k * step);
+    }
+
+    // Continuous drift of the textured gradient across the text.
+    var driftAt = startAt;
+    tl.to(wordEls, {
+      backgroundPosition: '100% 50%',
+      duration: 4.5,
+      ease: 'sine.inOut',
+      yoyo: true,
+      repeat: -1
+    }, driftAt);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to(wordEls, { autoAlpha: 0, scale: 0.88, y: -16, filter: 'blur(5px)', duration: 0.35, stagger: 0.03, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

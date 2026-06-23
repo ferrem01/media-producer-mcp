@@ -1,0 +1,21 @@
+{
+  "type": "magnetic",
+  "label": "Magnetic Field",
+  "category": "effects",
+  "description": "An ambient field of small dots that are continuously attracted toward a glowing focal point as it drifts around the frame. Use as a looping background overlay.",
+  "data": {
+    "color": {
+      "type": "string",
+      "label": "Particle Color",
+      "optional": true,
+      "placeholder": "var(--mp-color-accent)"
+    },
+    "count": {
+      "type": "number",
+      "label": "Particle Count",
+      "optional": true,
+      "default": 80,
+      "placeholder": "80"
+    }
+  }
+}

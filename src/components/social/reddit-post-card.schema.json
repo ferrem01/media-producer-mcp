@@ -1,0 +1,38 @@
+{
+  "type": "reddit-post-card",
+  "label": "Reddit Post Card",
+  "category": "social",
+  "description": "A Reddit post card with subreddit name, post title, an upvote arrow that activates with a rising score, and a comment count. Use to show or recreate a Reddit post as an overlay.",
+  "data": {
+    "subreddit": {
+      "type": "string",
+      "label": "Subreddit",
+      "required": true,
+      "placeholder": "r/technology"
+    },
+    "title": {
+      "type": "string",
+      "label": "Post Title",
+      "required": true,
+      "placeholder": "This new tool changes everything"
+    },
+    "upvotes": {
+      "type": "number",
+      "label": "Upvotes",
+      "optional": true,
+      "default": 8400
+    },
+    "comments": {
+      "type": "number",
+      "label": "Comments",
+      "optional": true,
+      "default": 342
+    },
+    "subreddit_color": {
+      "type": "string",
+      "label": "Subreddit Icon Color",
+      "optional": true,
+      "placeholder": "#ff4500"
+    }
+  }
+}

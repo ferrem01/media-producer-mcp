@@ -1,0 +1,33 @@
+{
+  "type": "caption-editorial-emphasis",
+  "label": "Caption - Editorial Emphasis",
+  "category": "captions",
+  "description": "Magazine-style caption where most words fade in plain while key words pop in accent color with a drawn underline for editorial emphasis.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "Emphasis on what Matters"
+    },
+    "emphasis": {
+      "type": "array",
+      "label": "Emphasis Words",
+      "optional": true,
+      "description": "Specific words to emphasize with accent color and underline. If omitted, every Nth word is emphasized automatically."
+    },
+    "everyN": {
+      "type": "number",
+      "label": "Auto Emphasis Interval",
+      "optional": true,
+      "default": 3,
+      "description": "When no emphasis list is given, emphasize every Nth word."
+    },
+    "accent": {
+      "type": "color",
+      "label": "Emphasis Color",
+      "optional": true,
+      "description": "Color for emphasized words and underlines (maps to --mp-color-accent)."
+    }
+  }
+}

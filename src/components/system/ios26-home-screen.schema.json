@@ -1,0 +1,55 @@
+{
+  "type": "ios26-home-screen",
+  "label": "iOS 26 Home Screen",
+  "category": "system",
+  "description": "iOS-style home screen with a grid of glassy app icons and widgets on a colorful wallpaper; icons stagger and pop in with subtle parallax.",
+  "data": {
+    "time": {
+      "type": "string",
+      "label": "Status Bar Time",
+      "optional": true,
+      "placeholder": "9:41"
+    },
+    "apps": {
+      "type": "array",
+      "label": "App Icons",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "icon": { "type": "string", "label": "Icon (emoji)", "optional": true },
+          "label": { "type": "string", "label": "Label", "optional": true }
+        }
+      }
+    },
+    "dock": {
+      "type": "array",
+      "label": "Dock Icons",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "icon": { "type": "string", "label": "Icon (emoji)", "optional": true }
+        }
+      }
+    },
+    "weather": {
+      "type": "object",
+      "label": "Weather Widget",
+      "optional": true,
+      "properties": {
+        "temp": { "type": "number", "label": "Temperature", "optional": true },
+        "condition": { "type": "string", "label": "Condition", "optional": true }
+      }
+    },
+    "upNext": {
+      "type": "object",
+      "label": "Up Next Widget",
+      "optional": true,
+      "properties": {
+        "title": { "type": "string", "label": "Title", "optional": true },
+        "time": { "type": "string", "label": "Time", "optional": true }
+      }
+    }
+  }
+}

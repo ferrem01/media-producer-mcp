@@ -1,0 +1,14 @@
+{
+  "type": "light-leak",
+  "label": "Light Leak",
+  "category": "effects",
+  "description": "Soft colored light leaks that drift in from the edges and gently shift for an analog film-leak finish. Use as a top overlay layer.",
+  "data": {
+    "color": {
+      "type": "string",
+      "label": "Leak Color",
+      "optional": true,
+      "placeholder": "var(--mp-color-accent)"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "type": "spotify-now-playing",
+  "label": "Spotify Now Playing",
+  "category": "social",
+  "description": "A Spotify now-playing card with album art, track title, artist, an animated equalizer, and a progress bar that advances. Use to show the currently playing track as an overlay.",
+  "data": {
+    "track": {
+      "type": "string",
+      "label": "Track Title",
+      "required": true,
+      "placeholder": "Midnight City"
+    },
+    "artist": {
+      "type": "string",
+      "label": "Artist",
+      "required": true,
+      "placeholder": "M83"
+    },
+    "progress": {
+      "type": "number",
+      "label": "Progress Percent",
+      "optional": true,
+      "default": 72
+    },
+    "art_color": {
+      "type": "string",
+      "label": "Album Art Color/Gradient",
+      "optional": true,
+      "placeholder": "#1db954"
+    }
+  }
+}

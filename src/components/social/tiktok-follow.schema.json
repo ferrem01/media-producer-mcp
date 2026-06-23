@@ -1,0 +1,20 @@
+{
+  "type": "tiktok-follow",
+  "label": "TikTok Follow",
+  "category": "social",
+  "description": "A TikTok-style avatar with the red plus follow button that pops and turns into a check, plus a like-heart burst with a count. Use to prompt a TikTok follow/like as an overlay.",
+  "data": {
+    "likes": {
+      "type": "number",
+      "label": "Likes",
+      "optional": true,
+      "default": 12500
+    },
+    "avatar_color": {
+      "type": "string",
+      "label": "Avatar Color/Gradient",
+      "optional": true,
+      "placeholder": "#fe2c55"
+    }
+  }
+}

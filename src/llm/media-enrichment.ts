@@ -136,19 +136,20 @@ Rules:
     imageRequests.map(async (item) => {
       var imgPath = path.join(assetsDir, `hero_scene_${item.index + 1}.png`);
       console.log(`    Scene ${item.index + 1}: "${item.prompt.substring(0, 60)}..."`);
+      var size = "1536x1024", quality = "high";
       var result = await generateImage({
         prompt: item.prompt,
-        size: "1536x1024",
-        quality: "high",
+        size: size as any,
+        quality: quality as any,
         outputPath: imgPath,
       });
-      return { index: item.index, result, prompt: item.prompt };
+      return { index: item.index, result, prompt: item.prompt, size, quality };
     })
   );
 
   for (var r of results) {
     if (r.status === "fulfilled") {
-      var { index: idx, result: imgResult, prompt: imgPrompt } = r.value;
+      var { index: idx, result: imgResult, prompt: imgPrompt, size: imgSize, quality: imgQuality } = r.value;
       var imgFilename = path.basename(imgResult.path);
       var imgUrl = `/assets/${tenantId}/projects/${projectId}/assets/${imgFilename}`;
 
@@ -167,6 +168,9 @@ Rules:
         width: imgResult.width,
         height: imgResult.height,
         model: "gpt-image-1",
+        size: imgSize,
+        quality: imgQuality,
+        version: 1,
         scene_id: sceneId,
         created_at: new Date().toISOString(),
       };

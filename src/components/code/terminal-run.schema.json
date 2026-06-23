@@ -1,0 +1,38 @@
+{
+  "type": "terminal-run",
+  "label": "Terminal Run",
+  "category": "code",
+  "description": "A terminal that types a single command character-by-character then streams output lines in one after another.",
+  "data": {
+    "command": {
+      "type": "string",
+      "label": "Command",
+      "required": true,
+      "placeholder": "npm run build"
+    },
+    "output": {
+      "type": "array",
+      "label": "Output Lines",
+      "optional": true,
+      "item": { "type": "string" }
+    },
+    "prompt": {
+      "type": "string",
+      "label": "Prompt Symbol",
+      "optional": true,
+      "default": "$"
+    },
+    "title": {
+      "type": "string",
+      "label": "Window Title",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "default": "dark",
+      "enum": ["dark", "light"]
+    }
+  }
+}

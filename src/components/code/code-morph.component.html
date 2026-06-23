@@ -1,0 +1,229 @@
+<template>
+  <div class="cm-root">
+    <div class="cm-window">
+      <div class="cm-bar">
+        <div class="cm-dots">
+          <span class="cm-dot cm-dot-close"></span>
+          <span class="cm-dot cm-dot-min"></span>
+          <span class="cm-dot cm-dot-max"></span>
+        </div>
+        <span class="cm-lang"></span>
+        <div class="cm-dots-spacer"></div>
+      </div>
+      <div class="cm-body">
+        <pre class="cm-code"></pre>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .cm-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    padding: 80px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  .cm-window {
+    --cm-bg: #0d1117;
+    --cm-bar: rgba(255,255,255,0.05);
+    --cm-border: rgba(255,255,255,0.07);
+    --cm-text: #e2e8f0;
+    --cm-num: rgba(255,255,255,0.18);
+    --cm-kw: #ff7b9c;
+    --cm-str: #9ece6a;
+    --cm-num-tok: #ff9e64;
+    --cm-com: #5c6370;
+    --cm-fn: #7aa2f7;
+    background: var(--cm-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    width: 76%;
+    max-height: 82%;
+    border: 1px solid var(--cm-border);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .cm-window.cm-light {
+    --cm-bg: #fbfbfd;
+    --cm-bar: rgba(0,0,0,0.04);
+    --cm-border: rgba(0,0,0,0.10);
+    --cm-text: #1f2430;
+    --cm-num: rgba(0,0,0,0.25);
+    --cm-kw: #d6336c;
+    --cm-str: #2b8a3e;
+    --cm-num-tok: #d9480f;
+    --cm-com: #868e96;
+    --cm-fn: #1c64f2;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  .cm-bar {
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 18px;
+    background: var(--cm-bar);
+    border-bottom: 1px solid var(--cm-border);
+  }
+  .cm-dots { display: flex; align-items: center; gap: 8px; flex: 0 0 68px; }
+  .cm-dots-spacer { flex: 0 0 68px; }
+  .cm-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .cm-dot-close { background: #ff5f57; }
+  .cm-dot-min { background: #febc2e; }
+  .cm-dot-max { background: #28c840; }
+  .cm-lang {
+    flex: 1; font-size: 13px; color: var(--cm-num);
+    text-align: center; letter-spacing: 0.04em; font-weight: 500;
+  }
+  .cm-lang:empty { display: none; }
+
+  .cm-body { padding: 28px; overflow: hidden; }
+
+  .cm-code {
+    font-size: 16px;
+    line-height: 1.85;
+    color: var(--cm-text);
+    margin: 0;
+    white-space: pre;
+  }
+
+  .cm-line { display: block; min-height: 1.85em; position: relative; }
+
+  .tok-kw { color: var(--cm-kw); }
+  .tok-str { color: var(--cm-str); }
+  .tok-num { color: var(--cm-num-tok); }
+  .tok-com { color: var(--cm-com); font-style: italic; }
+  .tok-fn { color: var(--cm-fn); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var win = el.querySelector('.cm-window');
+    var codeEl = el.querySelector('.cm-code');
+    var langEl = el.querySelector('.cm-lang');
+    if (!win || !codeEl) return tl;
+
+    var theme = (data && data.theme) || 'dark';
+    if (theme === 'light') win.classList.add('cm-light');
+    if (data && data.language) langEl.textContent = data.language;
+
+    var before = (data && typeof data.before === 'string' && data.before.length) ? data.before
+      : "function sum(a, b) {\n  var result = a + b;\n  return result;\n}";
+    var after = (data && typeof data.after === 'string' && data.after.length) ? data.after
+      : "const sum = (a, b) => {\n  return a + b;\n}";
+
+    var KW = ['function','return','const','let','var','if','else','for','while','import','export','from','class','new','async','await','def','public','private','void','int','string','bool','true','false','null','undefined','this'];
+    function tokenize(line) {
+      var out = [];
+      var trimmed = line.replace(/^\s*/, '');
+      if (trimmed.indexOf('//') === 0 || trimmed.indexOf('#') === 0) { out.push({ text: line, cls: 'tok-com' }); return out; }
+      var re = /(\"[^\"]*\"|'[^']*'|`[^`]*`)|(\/\/.*$)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][A-Za-z0-9_$]*)|(\s+)|([^\sA-Za-z0-9_$]+)/g;
+      var m;
+      while ((m = re.exec(line)) !== null) {
+        if (m[1]) out.push({ text: m[1], cls: 'tok-str' });
+        else if (m[2]) out.push({ text: m[2], cls: 'tok-com' });
+        else if (m[3]) out.push({ text: m[3], cls: 'tok-num' });
+        else if (m[4]) {
+          var cls = KW.indexOf(m[4]) !== -1 ? 'tok-kw' : null;
+          if (!cls && /^\s*\(/.test(line.slice(re.lastIndex))) cls = 'tok-fn';
+          out.push({ text: m[4], cls: cls });
+        } else if (m[5]) out.push({ text: m[5], cls: null });
+        else out.push({ text: m[0], cls: null });
+        if (m.index === re.lastIndex) re.lastIndex++;
+      }
+      return out;
+    }
+
+    function renderLine(text) {
+      var lineEl = document.createElement('span');
+      lineEl.className = 'cm-line';
+      tokenize(text).forEach(function(tok) {
+        var span = document.createElement('span');
+        if (tok.cls) span.className = tok.cls;
+        span.textContent = tok.text;
+        lineEl.appendChild(span);
+      });
+      if (!text.length) lineEl.textContent = ' ';
+      return lineEl;
+    }
+
+    var beforeLines = before.split('\n');
+    var afterLines = after.split('\n');
+    var maxLines = Math.max(beforeLines.length, afterLines.length);
+
+    // Build paired rows. Each row holds both before+after line states, overlaid.
+    var rows = [];
+    for (var i = 0; i < maxLines; i++) {
+      var bText = i < beforeLines.length ? beforeLines[i] : null;
+      var aText = i < afterLines.length ? afterLines[i] : null;
+      var changed = bText !== aText;
+
+      var beforeEl = bText != null ? renderLine(bText) : null;
+      var afterEl = aText != null ? renderLine(aText) : null;
+      rows.push({ beforeEl: beforeEl, afterEl: afterEl, changed: changed });
+    }
+
+    // Lay out: show before lines first (afterEl absolutely positioned over).
+    codeEl.innerHTML = '';
+    rows.forEach(function(row) {
+      var wrap = document.createElement('span');
+      wrap.className = 'cm-line';
+      wrap.style.position = 'relative';
+      if (row.beforeEl) {
+        row.beforeEl.style.position = 'relative';
+        wrap.appendChild(row.beforeEl);
+      }
+      if (row.afterEl) {
+        row.afterEl.style.position = 'absolute';
+        row.afterEl.style.left = '0';
+        row.afterEl.style.top = '0';
+        wrap.appendChild(row.afterEl);
+      }
+      // ensure wrap has height even if before is null
+      if (!row.beforeEl && row.afterEl) {
+        row.afterEl.style.position = 'relative';
+      }
+      codeEl.appendChild(wrap);
+      row.wrap = wrap;
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.5 : 0.6;
+
+    gsap.set(win, { autoAlpha: 0, y: 36, scale: 1.04, filter: 'blur(5px)' });
+    rows.forEach(function(row) {
+      if (row.afterEl) gsap.set(row.afterEl, { autoAlpha: 0, y: 14 });
+      if (row.beforeEl) gsap.set(row.beforeEl, { autoAlpha: 1 });
+    });
+
+    tl.to(win, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out' }, 0.15);
+
+    // Hold the "before" state, then morph changed lines.
+    var holdEnd = ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration;
+    var morphStart = Math.max(1.0, (holdEnd) * 0.32);
+
+    var changedRows = rows.filter(function(r){ return r.changed; });
+    var stag = 0.08;
+    changedRows.forEach(function(row, idx) {
+      var at = morphStart + idx * stag;
+      if (row.beforeEl) {
+        tl.to(row.beforeEl, { autoAlpha: 0, y: -14, duration: speed, ease: 'power2.in' }, at);
+      }
+      if (row.afterEl) {
+        tl.to(row.afterEl, { autoAlpha: 1, y: 0, duration: speed, ease: 'power2.out' }, at + speed * 0.4);
+      }
+    });
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(win, { autoAlpha: 0, y: -15, scale: 0.97, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

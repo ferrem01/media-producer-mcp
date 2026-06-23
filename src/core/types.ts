@@ -185,6 +185,14 @@ export interface Asset {
   height?: number;
   /** Model used for generation */
   model?: string;
+  /** For AI-generated images: the size passed to the model (re-runnable) */
+  size?: string;
+  /** For AI-generated images: the quality passed to the model (re-runnable) */
+  quality?: string;
+  /** Reference asset ids/urls fed into generation (re-runnable) */
+  references?: string[];
+  /** Regeneration count -- bumped each time the asset is re-run in place */
+  version?: number;
   /** Scene this asset was generated for */
   scene_id?: string;
   /** When the asset was created */

@@ -42,8 +42,8 @@ import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { captureUrl } from "./core/capture-url.js";
-import { registerBrandExtractTool } from "./tools/brand-extract-tool.js";
-// generateImage moved to internal API (not exposed via MCP generate tool)
+import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
+import { generateImage } from "./media/image-gen.js";
 
 // ── Shared Zod schemas ──
 
@@ -1718,6 +1718,173 @@ export function createMcpServer(): McpServer {
 
   // ── Brand extraction tool ──
   registerBrandExtractTool(server);
+
+  // ─────────────────────────────────────────────
+  // website_to_video - one-shot: URL -> on-brand launch video
+  // ─────────────────────────────────────────────
+  server.tool(
+    "website_to_video",
+    "One-shot: turn a website URL into an on-brand, rendered launch video. Extracts the brand kit from the URL (colors, fonts, logos, theme), generates scenes, and renders -- in a single async job. Returns a job_id; poll with get(target='job').",
+    {
+      tenant_id: z.string(),
+      url: z.string().describe("Website URL to brand the video from (e.g. https://getquotient.ai)"),
+      prompt: z.string().optional().describe("Optional creative direction. If omitted, a launch-video brief is derived from the brand."),
+      target_duration: z.number().optional().default(24).describe("Target video length in seconds (default 24)"),
+      voiceover: z.boolean().optional().default(false),
+      background_music: z.boolean().optional().default(false),
+      quality: z.enum(["preview", "production"]).optional().default("preview"),
+      enhance_brand: z.boolean().optional().default(false).describe("Run LLM brand analysis during extraction (slower, richer guidelines)"),
+    },
+    async (params) => {
+      let llmConfig;
+      try { llmConfig = llmConfigFromEnv(); } catch (e: any) { return err(`LLM not configured: ${e.message}`); }
+
+      const job = queueJob("generate", params.tenant_id, async (j) => {
+        // 1. Extract + store the brand kit from the URL.
+        j.progress = { step: "extracting_brand", percent: 5 };
+        const { kit, summary } = await extractAndStoreBrand(params.tenant_id, params.url, params.enhance_brand ?? false);
+
+        // 2. Generate scenes on that brand.
+        j.progress = { step: "generating", percent: 25 };
+        const duration = params.target_duration ?? 24;
+        const domain = params.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+        const prompt = params.prompt
+          || `A polished ~${duration}-second product LAUNCH video for ${domain}. Open on a brand hero/title, then 2-4 beats covering the core value props and any proof points, and close on a clear call to action. Use the brand kit (colors, fonts, logo) and match the brand's theme. Premium, confident pacing.`;
+        const pipelineResult = await runGeneratePipeline({
+          prompt,
+          target: "video" as PipelineTarget,
+          tenant_id: params.tenant_id,
+          llmConfig,
+          brandKit: kit,
+          canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: kit.colors?.background || "#0f172a" },
+          voiceover: params.voiceover ?? false,
+          backgroundMusic: params.background_music ?? false,
+          sceneCount: Math.max(3, Math.min(10, Math.round(duration / 5.5))),
+        });
+        if (pipelineResult.status !== "completed" || !pipelineResult.project) {
+          throw new Error("generation failed: " + (pipelineResult.error || "no project produced"));
+        }
+        const projectId = pipelineResult.project.project_id;
+        j.projectId = projectId;
+
+        // 3. Render (reuses the render queue: preview fps, editorial vision, etc.).
+        j.progress = { step: "rendering", percent: 70 };
+        const renderJob = queueRender(params.tenant_id, projectId, { quality: params.quality ?? "preview" });
+        // Wait for the render job to finish.
+        for (;;) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const rs = getJobStatus(renderJob.id);
+          if (!rs) continue;
+          if (rs.status === "completed") {
+            j.progress = { step: "complete", percent: 100 };
+            return {
+              status: "completed",
+              project_id: projectId,
+              output_path: rs.outputPath,
+              preview_url: previewUrl(params.tenant_id, projectId),
+              brand: { theme: summary.colors, fonts: summary.typography, logos: summary.logos?.length || 0 },
+            };
+          }
+          if (rs.status === "failed") throw new Error("render failed: " + (rs.error || "unknown"));
+        }
+      });
+      job.projectId = "";
+
+      return ok({
+        status: "queued",
+        job_id: job.id,
+        message: `Building an on-brand launch video from ${params.url}. Poll with get(target='job', job_id='${job.id}').`,
+      });
+    },
+  );
+
+  // ─────────────────────────────────────────────
+  // regenerate_asset - re-run a generated asset in place (roadmap #3)
+  // ─────────────────────────────────────────────
+  server.tool(
+    "regenerate_asset",
+    "Re-run a generated image asset in place using its stored generation params (prompt, model, size, quality) -- optionally with a tweak -- without rebuilding the whole video. Writes a new version, re-wires the scene that uses it, and saves. Re-render the project to see the new asset in the video.",
+    {
+      tenant_id: z.string(),
+      project_id: z.string(),
+      asset_id: z.string().describe("Id of the generated asset to re-run (see project.assets[])"),
+      prompt: z.string().optional().describe("Override prompt. If omitted, reuses the asset's stored prompt verbatim."),
+      prompt_append: z.string().optional().describe("A tweak appended to the stored prompt (e.g. 'make it warmer, more saturated'). Ignored if 'prompt' is given."),
+      size: z.enum(["1024x1024", "1536x1024", "1024x1536", "auto"]).optional().describe("Override image size (defaults to the asset's stored size)."),
+      quality: z.enum(["low", "medium", "high", "auto"]).optional().describe("Override image quality (defaults to the asset's stored quality)."),
+    },
+    async (params) => {
+      try {
+        const project = await loadProject(params.tenant_id, params.project_id);
+        if (!project) return err(`Project not found: ${params.project_id}`);
+        const asset = (project.assets || []).find((a) => a.id === params.asset_id);
+        if (!asset) return err(`Asset not found: ${params.asset_id}`);
+        if (asset.type !== "ai_image") return err(`Asset ${params.asset_id} is type '${asset.type}' -- only ai_image assets are re-runnable.`);
+        if (!asset.prompt && !params.prompt) return err(`Asset ${params.asset_id} has no stored prompt; provide 'prompt' to regenerate it.`);
+
+        const basePrompt = params.prompt ?? asset.prompt ?? "";
+        const prompt = params.prompt
+          ? basePrompt
+          : (params.prompt_append ? `${basePrompt}\n\n${params.prompt_append}` : basePrompt);
+        const size = (params.size ?? asset.size ?? "1536x1024") as any;
+        const quality = (params.quality ?? asset.quality ?? "high") as any;
+        const version = (asset.version ?? 1) + 1;
+
+        // New versioned filename next to the old asset so render caches don't collide.
+        const assetsDir = projectAssetsDir(params.tenant_id, params.project_id);
+        await fs.mkdir(assetsDir, { recursive: true });
+        const oldBase = path.basename(asset.path).replace(/(_v\d+)?(\.[a-z0-9]+)$/i, "");
+        const ext = (path.extname(asset.path) || ".png").toLowerCase();
+        const filename = `${oldBase}_v${version}${ext}`;
+        const outputPath = path.join(assetsDir, filename);
+
+        const result = await generateImage({ prompt, size, quality, outputPath });
+
+        const newUrl = `/assets/${params.tenant_id}/projects/${params.project_id}/assets/${filename}`;
+        const oldUrl = `/assets/${params.tenant_id}/projects/${params.project_id}/assets/${path.basename(asset.path)}`;
+
+        // Update the asset record in place.
+        asset.path = result.path;
+        asset.prompt = prompt;
+        asset.size = size;
+        asset.quality = quality;
+        asset.width = result.width;
+        asset.height = result.height;
+        asset.version = version;
+        asset.created_at = new Date().toISOString();
+
+        // Re-wire any scene component that pointed at the old asset to the new file.
+        let rewired = 0;
+        for (const scene of project.scenes) {
+          for (const comp of scene.components || []) {
+            const src = (comp.data as any)?.src;
+            if (src && (src === oldUrl || src === asset.path || path.basename(String(src)) === path.basename(oldUrl))) {
+              (comp.data as any).src = newUrl;
+              rewired++;
+            }
+          }
+        }
+
+        await saveProject(project);
+
+        return ok({
+          status: "regenerated",
+          asset_id: asset.id,
+          version,
+          prompt,
+          size,
+          quality,
+          path: result.path,
+          url: newUrl,
+          scene_components_rewired: rewired,
+          preview_url: previewUrl(params.tenant_id, params.project_id),
+          note: "Re-render the project to bake the new asset into the video.",
+        });
+      } catch (e: any) {
+        return err(`Asset regeneration failed: ${e.message}`);
+      }
+    },
+  );
 
   return server;
 }

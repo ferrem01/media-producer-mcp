@@ -1,0 +1,19 @@
+{
+  "type": "texture-mask-text",
+  "label": "Texture Mask Text",
+  "category": "effects",
+  "description": "Large editorial headline text used as a mask revealing a continuously moving brand-gradient texture behind it. Use for bold title moments.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Headline Text",
+      "required": true,
+      "placeholder": "BOLD"
+    },
+    "color": {
+      "type": "string",
+      "label": "Fill Color Override",
+      "optional": true
+    }
+  }
+}

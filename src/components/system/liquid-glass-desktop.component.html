@@ -1,0 +1,354 @@
+<template>
+  <div class="lgd-stage">
+    <div class="lgd-blob lgd-blob-1"></div>
+    <div class="lgd-blob lgd-blob-2"></div>
+    <div class="lgd-blob lgd-blob-3"></div>
+    <div class="lgd-menubar">
+      <div class="lgd-menubar-left">
+        <span class="lgd-apple"></span>
+        <span class="lgd-menu-item lgd-menu-bold"></span>
+        <span class="lgd-menu-item">File</span>
+        <span class="lgd-menu-item">Edit</span>
+        <span class="lgd-menu-item">View</span>
+        <span class="lgd-menu-item">Window</span>
+      </div>
+      <div class="lgd-menubar-right">
+        <span class="lgd-tray">􀊫 􀙇 􀋲</span>
+        <span class="lgd-clock"></span>
+      </div>
+    </div>
+    <div class="lgd-window">
+      <div class="lgd-window-sheen"></div>
+      <div class="lgd-window-bar">
+        <span class="lgd-traffic lgd-red"></span>
+        <span class="lgd-traffic lgd-yellow"></span>
+        <span class="lgd-traffic lgd-green"></span>
+        <span class="lgd-window-title"></span>
+      </div>
+      <div class="lgd-window-body">
+        <div class="lgd-window-sidebar"></div>
+        <div class="lgd-window-content"></div>
+      </div>
+    </div>
+    <div class="lgd-dock"></div>
+  </div>
+</template>
+
+<style scoped>
+  .lgd-stage {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', -apple-system, 'SF Pro Display', system-ui, sans-serif);
+    background: linear-gradient(160deg, #1c2340 0%, #0a0c18 100%);
+  }
+
+  .lgd-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(110px);
+    opacity: 0.8;
+    pointer-events: none;
+  }
+  .lgd-blob-1 {
+    width: 800px; height: 800px;
+    top: -200px; left: -150px;
+    background: radial-gradient(circle, var(--mp-color-primary, #6366f1) 0%, transparent 70%);
+  }
+  .lgd-blob-2 {
+    width: 760px; height: 760px;
+    bottom: -240px; right: -160px;
+    background: radial-gradient(circle, var(--mp-color-accent, #a78bfa) 0%, transparent 70%);
+  }
+  .lgd-blob-3 {
+    width: 540px; height: 540px;
+    top: 30%; left: 50%;
+    background: radial-gradient(circle, #f0abfc 0%, transparent 70%);
+    opacity: 0.4;
+  }
+
+  .lgd-menubar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 26px;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: inset 0 -1px 0 rgba(255,255,255,0.1), inset 0 1px 0 rgba(255,255,255,0.3);
+    color: #fff;
+    z-index: 4;
+  }
+  .lgd-menubar-left, .lgd-menubar-right {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    font-size: 19px;
+  }
+  .lgd-apple { font-size: 22px; }
+  .lgd-apple::before { content: ''; }
+  .lgd-menu-bold { font-weight: 700; }
+  .lgd-menu-item { opacity: 0.9; }
+  .lgd-tray { font-size: 17px; opacity: 0.85; letter-spacing: 4px; }
+
+  .lgd-window {
+    position: absolute;
+    top: 140px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1100px;
+    height: 620px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow:
+      0 40px 100px rgba(0,0,0,0.55),
+      inset 0 1px 0 rgba(255,255,255,0.4),
+      inset 0 0 0 1px rgba(255,255,255,0.08);
+    overflow: hidden;
+    z-index: 3;
+  }
+  .lgd-window-sheen {
+    position: absolute;
+    top: 0; left: -60%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.14) 50%, transparent 100%);
+    transform: skewX(-18deg);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .lgd-window-bar {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .lgd-traffic { width: 16px; height: 16px; border-radius: 50%; }
+  .lgd-red { background: #ff5f57; }
+  .lgd-yellow { background: #febc2e; }
+  .lgd-green { background: #28c840; }
+  .lgd-window-title {
+    margin-left: 16px;
+    font-size: 19px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+  }
+  .lgd-window-body {
+    display: flex;
+    height: calc(100% - 56px);
+  }
+  .lgd-window-sidebar {
+    width: 280px;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    padding: 22px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .lgd-side-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    font-size: 19px;
+    color: rgba(255,255,255,0.85);
+  }
+  .lgd-side-item.active {
+    background: linear-gradient(150deg, var(--mp-color-primary, #6366f1), var(--mp-color-accent, #a78bfa));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+    color: #fff;
+  }
+  .lgd-window-content {
+    flex: 1;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .lgd-content-row {
+    height: 22px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.14);
+  }
+  .lgd-content-card {
+    height: 130px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.1);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+
+  .lgd-dock {
+    position: absolute;
+    bottom: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: flex-end;
+    gap: 18px;
+    padding: 14px 22px;
+    border-radius: 30px;
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    box-shadow:
+      0 20px 50px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.4),
+      inset 0 0 0 1px rgba(255,255,255,0.1);
+    z-index: 4;
+  }
+  .lgd-dock-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), inset 0 0 0 1px rgba(255,255,255,0.12);
+    transform-origin: bottom center;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+
+    var menubar = el.querySelector('.lgd-menubar');
+    var boldEl = el.querySelector('.lgd-menu-bold');
+    var clockEl = el.querySelector('.lgd-clock');
+    var win = el.querySelector('.lgd-window');
+    var sheen = el.querySelector('.lgd-window-sheen');
+    var winTitle = el.querySelector('.lgd-window-title');
+    var sidebar = el.querySelector('.lgd-window-sidebar');
+    var content = el.querySelector('.lgd-window-content');
+    var dock = el.querySelector('.lgd-dock');
+    var blob1 = el.querySelector('.lgd-blob-1');
+    var blob2 = el.querySelector('.lgd-blob-2');
+    var blob3 = el.querySelector('.lgd-blob-3');
+
+    if (boldEl) boldEl.textContent = data.appName || 'Finder';
+    if (clockEl) clockEl.textContent = data.time || 'Mon 9:41 AM';
+    if (winTitle) winTitle.textContent = data.windowTitle || 'Documents';
+
+    // Sidebar items
+    if (sidebar) {
+      var sideItems = data.sidebar || [
+        { icon: '🏠', label: 'Home' },
+        { icon: '📁', label: 'Documents', active: true },
+        { icon: '⬇️', label: 'Downloads' },
+        { icon: '🖼️', label: 'Pictures' },
+        { icon: '⭐', label: 'Favorites' }
+      ];
+      for (var s = 0; s < sideItems.length; s++) {
+        var si = document.createElement('div');
+        si.className = 'lgd-side-item' + (sideItems[s].active ? ' active' : '');
+        si.innerHTML = '<span>' + (sideItems[s].icon || '•') + '</span><span>' + (sideItems[s].label || '') + '</span>';
+        sidebar.appendChild(si);
+      }
+    }
+
+    // Content placeholder rows + cards
+    var contentEls = [];
+    if (content) {
+      var card1 = document.createElement('div'); card1.className = 'lgd-content-card'; content.appendChild(card1); contentEls.push(card1);
+      for (var r = 0; r < 4; r++) {
+        var row = document.createElement('div');
+        row.className = 'lgd-content-row';
+        row.style.width = (90 - r * 12) + '%';
+        content.appendChild(row);
+        contentEls.push(row);
+      }
+      var card2 = document.createElement('div'); card2.className = 'lgd-content-card'; content.appendChild(card2); contentEls.push(card2);
+    }
+
+    // Dock
+    var dockEls = [];
+    if (dock) {
+      var dockApps = (data.dock && data.dock.length) ? data.dock : [
+        { icon: '🧭' }, { icon: '✉️' }, { icon: '📅' }, { icon: '🎵' },
+        { icon: '📷' }, { icon: '⚙️' }, { icon: '🗑️' }
+      ];
+      for (var d = 0; d < dockApps.length; d++) {
+        var di = document.createElement('div');
+        di.className = 'lgd-dock-icon';
+        di.textContent = dockApps[d].icon || '📱';
+        dock.appendChild(di);
+        dockEls.push(di);
+      }
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 0.9;
+
+    // Initial states
+    if (menubar) gsap.set(menubar, { autoAlpha: 0, y: -52 });
+    if (win) gsap.set(win, { autoAlpha: 0, y: 60, scale: 0.95 });
+    if (sheen) gsap.set(sheen, { left: '-60%' });
+    if (contentEls.length) gsap.set(contentEls, { autoAlpha: 0, x: 20 });
+    if (dock) gsap.set(dock, { autoAlpha: 0, y: 80 });
+    if (dockEls.length) gsap.set(dockEls, { scale: 1 });
+
+    // Menubar slides down
+    if (menubar) tl.to(menubar, { autoAlpha: 1, y: 0, duration: speed * 0.8, ease: 'power3.out' }, 0.1);
+
+    // Window rises in
+    if (win) tl.to(win, { autoAlpha: 1, y: 0, scale: 1, duration: speed, ease: 'back.out(1.2)' }, 0.3);
+
+    // Window content reveals
+    if (contentEls.length) {
+      tl.to(contentEls, { autoAlpha: 1, x: 0, duration: speed * 0.6, stagger: 0.06, ease: 'power3.out' }, 0.6);
+    }
+
+    // Window sheen sweep
+    if (sheen) tl.fromTo(sheen, { left: '-60%' }, { left: '180%', duration: speed * 1.6, ease: 'power2.inOut' }, 0.7);
+
+    // Dock slides up
+    if (dock) tl.to(dock, { autoAlpha: 1, y: 0, duration: speed, ease: 'back.out(1.4)' }, 0.5);
+
+    // Dock magnify sweep — a wave of scale that travels across icons (looping)
+    if (dockEls.length) {
+      var magTl = gsap.timeline({ repeat: -1, repeatDelay: 1.2 });
+      for (var m = 0; m < dockEls.length; m++) {
+        magTl.to(dockEls[m], {
+          scale: 1.5, y: -18,
+          duration: 0.22,
+          ease: 'power2.out'
+        }, m * 0.12);
+        magTl.to(dockEls[m], {
+          scale: 1, y: 0,
+          duration: 0.32,
+          ease: 'power2.inOut'
+        }, m * 0.12 + 0.22);
+      }
+      tl.add(magTl, 0.5 + speed + 0.5);
+    }
+
+    // Ambient drift
+    if (blob1) tl.to(blob1, { x: 60, y: 50, duration: 7, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+    if (blob2) tl.to(blob2, { x: -60, y: -50, duration: 8, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+    if (blob3) tl.to(blob3, { x: -40, y: 40, scale: 1.15, duration: 9, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+
+    // Gentle window float
+    if (win) tl.to(win, { y: -6, duration: 4, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0.3 + speed);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      if (win) tl.to(win, { autoAlpha: 0, y: 40, scale: 0.97, duration: 0.5, ease: 'power2.in' }, exitAt);
+      if (dock) tl.to(dock, { autoAlpha: 0, y: 60, duration: 0.45, ease: 'power2.in' }, exitAt);
+      if (menubar) tl.to(menubar, { autoAlpha: 0, y: -40, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

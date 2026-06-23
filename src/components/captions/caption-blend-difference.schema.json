@@ -1,0 +1,20 @@
+{
+  "type": "caption-blend-difference",
+  "label": "Caption - Blend Difference",
+  "category": "captions",
+  "description": "Caption using mix-blend-mode difference over a moving accent shape, so the text dynamically inverts as the shape sweeps past while the words scale in.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "INVERT THE FRAME"
+    },
+    "accent": {
+      "type": "color",
+      "label": "Shape Color",
+      "optional": true,
+      "description": "Color of the moving shape behind the text (maps to --mp-color-accent)."
+    }
+  }
+}

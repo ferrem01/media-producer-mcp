@@ -1,0 +1,222 @@
+<template>
+  <div class="world-map">
+    <div class="world-grid"></div>
+    <div class="world-markers"></div>
+    <div class="world-title"></div>
+  </div>
+</template>
+
+<style scoped>
+  .world-map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--mp-color-background, #09090b);
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+  }
+
+  .world-grid {
+    position: absolute;
+    inset: 6% 4%;
+  }
+
+  .map-dot {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .map-dot.land {
+    background: var(--mp-color-primary, #6366f1);
+    opacity: 0.55;
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.3);
+  }
+
+  .world-markers {
+    position: absolute;
+    inset: 6% 4%;
+    pointer-events: none;
+  }
+
+  .map-marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .marker-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--mp-color-accent, #a78bfa);
+    box-shadow: 0 0 14px var(--mp-color-accent, #a78bfa), 0 0 0 4px rgba(167, 139, 250, 0.2);
+  }
+
+  .marker-ring {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--mp-color-accent, #a78bfa);
+    transform: translate(-50%, -50%);
+  }
+
+  .marker-label {
+    margin-top: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--mp-color-text, #ffffff);
+    white-space: nowrap;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  }
+
+  .marker-label:empty { display: none; }
+
+  .world-title {
+    position: absolute;
+    top: 6%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    letter-spacing: -0.01em;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
+  }
+
+  .world-title:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var grid = el.querySelector('.world-grid');
+    var markersWrap = el.querySelector('.world-markers');
+    var titleEl = el.querySelector('.world-title');
+
+    if (data.title && titleEl) titleEl.textContent = data.title;
+
+    // Stylized world landmass map: rectangular regions (in 0..100 pct) that
+    // approximate continents. A dot is "land" if it falls inside any region.
+    var regions = [
+      { x0: 8, x1: 26, y0: 18, y1: 42 },   // North America
+      { x0: 20, x1: 30, y0: 44, y1: 78 },  // South America
+      { x0: 44, x1: 56, y0: 16, y1: 38 },  // Europe
+      { x0: 46, x1: 60, y0: 38, y1: 74 },  // Africa
+      { x0: 56, x1: 88, y0: 14, y1: 46 },  // Asia
+      { x0: 78, x1: 90, y0: 60, y1: 74 }   // Australia
+    ];
+
+    function isLand(px, py) {
+      for (var r = 0; r < regions.length; r++) {
+        var g = regions[r];
+        if (px >= g.x0 && px <= g.x1 && py >= g.y0 && py <= g.y1) return true;
+      }
+      return false;
+    }
+
+    // Build dot grid.
+    var cols = 48, rows = 26;
+    var landDots = [];
+    for (var iy = 0; iy < rows; iy++) {
+      for (var ix = 0; ix < cols; ix++) {
+        var px = (ix + 0.5) / cols * 100;
+        var py = (iy + 0.5) / rows * 100;
+        var land = isLand(px, py);
+        var dot = document.createElement('div');
+        dot.className = land ? 'map-dot land' : 'map-dot';
+        dot.style.left = px + '%';
+        dot.style.top = py + '%';
+        grid.appendChild(dot);
+        if (land) landDots.push(dot);
+      }
+    }
+
+    // Markers from data with sensible defaults.
+    var markers = (data.markers && data.markers.length) ? data.markers : [
+      { x_pct: 17, y_pct: 30, label: 'New York' },
+      { x_pct: 49, y_pct: 26, label: 'London' },
+      { x_pct: 72, y_pct: 30, label: 'Tokyo' },
+      { x_pct: 84, y_pct: 67, label: 'Sydney' },
+      { x_pct: 52, y_pct: 56, label: 'Lagos' }
+    ];
+
+    markers.forEach(function (m) {
+      var wrap = document.createElement('div');
+      wrap.className = 'map-marker';
+      wrap.style.left = (m.x_pct != null ? m.x_pct : 50) + '%';
+      wrap.style.top = (m.y_pct != null ? m.y_pct : 50) + '%';
+
+      var ring = document.createElement('span');
+      ring.className = 'marker-ring';
+      var dot = document.createElement('span');
+      dot.className = 'marker-dot';
+      var lab = document.createElement('span');
+      lab.className = 'marker-label';
+      if (m.label) lab.textContent = m.label;
+
+      wrap.appendChild(ring);
+      wrap.appendChild(dot);
+      wrap.appendChild(lab);
+      markersWrap.appendChild(wrap);
+    });
+
+    var markerEls = markersWrap.querySelectorAll('.map-marker');
+    var dots = markersWrap.querySelectorAll('.marker-dot');
+    var rings = markersWrap.querySelectorAll('.marker-ring');
+    var labels = markersWrap.querySelectorAll('.marker-label');
+
+    var speed = ctx.motion === 'minimal' ? 0.7 : ctx.motion === 'punchy' ? 1.3 : 1.0;
+
+    // Initial states.
+    gsap.set(grid.querySelectorAll('.map-dot'), { autoAlpha: 0, scale: 0.4 });
+    gsap.set(markerEls, { autoAlpha: 1 });
+    gsap.set(dots, { scale: 0, autoAlpha: 0 });
+    gsap.set(rings, { scale: 0.5, autoAlpha: 0 });
+    gsap.set(labels, { autoAlpha: 0, y: 10 });
+    if (titleEl && titleEl.textContent.trim()) gsap.set(titleEl, { autoAlpha: 0, y: -16 });
+
+    // Reveal full grid (faint dots) then land dots brighten.
+    tl.to(grid.querySelectorAll('.map-dot'), {
+      autoAlpha: 1, scale: 1,
+      duration: 0.8, ease: 'power2.out',
+      stagger: { each: 0.0015, from: 'center', grid: [rows, cols] }
+    }, 0);
+
+    if (titleEl && titleEl.textContent.trim()) {
+      tl.to(titleEl, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.3);
+    }
+
+    // Markers light up in a stagger.
+    var markerStart = 0.9;
+    var mStagger = (ctx.motion === 'minimal' ? 0.15 : 0.22) / speed;
+    tl.to(dots, { scale: 1, autoAlpha: 1, duration: 0.4 / speed, ease: 'back.out(2)', stagger: mStagger }, markerStart);
+    tl.to(labels, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out', stagger: mStagger }, markerStart + 0.15);
+
+    // Pulse rings emanate continuously from each marker.
+    rings.forEach(function (ring, i) {
+      tl.fromTo(ring,
+        { scale: 0.5, autoAlpha: 0.7 },
+        { scale: 3.4, autoAlpha: 0, duration: 2, ease: 'power2.out', repeat: -1 },
+        markerStart + 0.3 + i * mStagger
+      );
+    });
+
+    // Exit.
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to([grid, markersWrap, titleEl], { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

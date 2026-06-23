@@ -1,0 +1,30 @@
+{
+  "type": "macos-notification",
+  "label": "macOS Notification",
+  "category": "system",
+  "description": "Classic macOS notification toast with app icon, title, subtitle and an action button that slides in from the top-right with a bounce and settles.",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "required": true
+    },
+    "subtitle": {
+      "type": "string",
+      "label": "Subtitle",
+      "optional": true
+    },
+    "icon": {
+      "type": "string",
+      "label": "Icon (emoji)",
+      "optional": true,
+      "placeholder": "📅"
+    },
+    "action": {
+      "type": "string",
+      "label": "Action Button",
+      "optional": true,
+      "placeholder": "View"
+    }
+  }
+}

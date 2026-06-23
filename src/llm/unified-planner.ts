@@ -120,11 +120,26 @@ Think like a storyboard director. Describe what the viewer EXPERIENCES, not the 
 Use motion verbs (SLAMS, DRIFTS, MORPHS, SNAPS, ASSEMBLES). Include BG/MG/FG layers.
 Describe choreography and timing relationships between elements.
 
-### Picking Components
+### Picking Components -- PREFER THE CATALOG
 List library component types from the catalog that the scene should embed.
 The codegen LLM will receive the component schemas and use <component> tags.
-If no library components fit, leave "components" as an empty array [].
-For scenes with existing UI elements (chat panels, dashboards, code editors), always list the matching library component types.
+**Default to a library component whenever one matches the scene's intent.** A vetted
+block is more consistent and higher-quality than hand-rolled custom code, so reach
+for it FIRST. Only leave "components": [] when the catalog genuinely cannot express
+the moment -- not because custom feels more flexible.
+
+Match scene INTENT to a component category (the catalog has blocks for all of these):
+- Metrics / numbers / results -> stat-card, number-counter-row, metric-dashboard, bar-chart, line-chart, progress-bar
+- A hero / title / brand reveal -> hero-reveal, kinetic-text, particle-text, animated-gradient-text, title-slide
+- A spoken/caption line you want to emphasize -> a captions/* style (caption-karaoke, caption-kinetic-slam, caption-neon-glow, ...)
+- Code, terminal, or a dev demo -> code/* (code-typing, code-diff, terminal-run, ...) or code-editor / terminal
+- Social proof, posts, follows, engagement, GOING VIRAL, follower/subscriber growth -> social/* are platform UI cards and are the RIGHT tool for these moments (x-post-card, instagram-follow, tiktok-follow, youtube-lower-third, reddit-post-card, spotify-now-playing, linkedin-post-card), plus testimonial-card, social-proof. NOTE: a "followers climbing" / "going viral" beat wants the actual social-platform card (e.g. instagram-follow or youtube-lower-third) -- do NOT reduce it to a plain stat-card; the platform UI IS the point.
+- Location, coverage, routes, "where" -> maps/* (route-map, pin-drop, world-map, bubble-map, ...)
+- Product UI / app flows -> the mockups/* (slack-workspace, dashboard-kpi, chat-simulator, ...) and layouts/* (browser-frame, device-mockup, ...)
+- CTA / closing -> cta-card, pricing-card
+- Film-look finishing -> on 1-2 KEY scenes only, you may add ONE subtle effects/* overlay (grain-overlay, vignette, light-leak, shimmer-sweep). Do NOT add a film-FX overlay to every scene -- it gets heavy. Most scenes need none.
+
+For scenes with existing UI elements (chat panels, dashboards, code editors), ALWAYS list the matching library component types.
 
 ### Background Strategy -- decide this FIRST, per scene, by INTENT
 Before writing any background, decide which of FOUR strategies the moment wants. Do this BEFORE reaching for b-roll -- b-roll is ONE option, not the default for every atmospheric beat:
@@ -166,8 +181,8 @@ ${catalogStr}
       "label": "Scene 1 - Hero",
       "duration_seconds": 5,
       "description": "Dramatic hero reveal with product visualization",
-      "brief": "A dramatic hero reveal — huge 120px typography saying 'QUOTIENT' SLAMS in from below with SplitText per-character animation (chars stagger 0.03s, back.out ease). Background uses brand colors with ambient glow orbs in the accent color drifting slowly. Subtitle at 24px FADES in below the headline. Floating particles in background add depth. BG: gradient with glow orbs. MG: subtitle text. FG: headline with particle hints.",
-      "components": [],
+      "brief": "A dramatic hero reveal — the hero-reveal component renders the 'QUOTIENT' headline + subtitle with its SplitText per-character SLAM (chars stagger, back.out ease). Around it, custom code adds ambient glow orbs in the accent color drifting slowly and floating particles for depth. BG: gradient with glow orbs (custom). MG/FG: hero-reveal handles the headline + subtitle.",
+      "components": ["hero-reveal"],
       "voiceover_text": "Introducing Quotient. The future of demand generation.",
       "broll_query": "abstract flowing deep-blue and violet ink in slow motion, macro, dark background",
       "transition_in": { "type": "none", "duration_seconds": 0 }
@@ -199,7 +214,7 @@ ${catalogStr}
 - **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Its brief must describe the whole flow as an ordered progression (step 1 → step 2 → step 3 …, each as motion: SLIDES, MORPHS, ASSEMBLES), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a plan failure.
 - B-ROLL: if the prompt is a brand film, or has an emotional/aspirational/lifestyle opener or closer, or any "feeling / place / human moment" scene, you MUST add a "broll_query" (a specific cinematic stock-footage phrase) to at least one such scene -- see the B-Roll section. Don't default those moments to a flat gradient. (Skip b-roll entirely for pure data/UI/feature/logo/CTA videos.)
 - First scene: transition "none" or omit transition_in.
-- Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, shader-crosswarp, shader-ripple, shader-radial, shader-directional-warp, shader-burn, shader-chromatic, shader-lens-distortion, none.
+- Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, whip-pan, cinematic-zoom, shader-crosswarp, shader-ripple, shader-radial, shader-directional-warp, shader-burn, shader-chromatic, shader-lens-distortion, shader-swirl, shader-pixelize, none.
 - SHADER transitions (shader-*) use WebGL for premium visual effects. Use them for hero transitions between key scenes. shader-crosswarp: warped crossfade, shader-ripple: ripple wave, shader-radial: radial wipe, shader-directional-warp: directional warp morph, shader-burn: warm burn blend, shader-chromatic: RGB split aberration, shader-lens-distortion: gravitational lens. Use 1-3 shader transitions per video for maximum impact. Do not overuse.
 - VARY scene types: don't repeat the same layout. Mix hero text, product demos, stats, visual metaphors, grids, CTAs.
 - Never have two identical layout types in a row.

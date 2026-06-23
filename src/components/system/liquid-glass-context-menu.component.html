@@ -1,0 +1,250 @@
+<template>
+  <div class="lg-menu-stage">
+    <div class="lg-blob lg-blob-1"></div>
+    <div class="lg-blob lg-blob-2"></div>
+    <div class="lg-menu">
+      <div class="lg-menu-sheen"></div>
+      <div class="lg-menu-highlight"></div>
+      <div class="lg-menu-list"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .lg-menu-stage {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', -apple-system, system-ui, sans-serif);
+    background: linear-gradient(150deg, #211d38 0%, #0e0c19 100%);
+  }
+
+  .lg-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(95px);
+    opacity: 0.75;
+    pointer-events: none;
+  }
+  .lg-blob-1 {
+    width: 680px; height: 680px;
+    top: -160px; left: -100px;
+    background: radial-gradient(circle, var(--mp-color-primary, #6366f1) 0%, transparent 70%);
+  }
+  .lg-blob-2 {
+    width: 620px; height: 620px;
+    bottom: -200px; right: -120px;
+    background: radial-gradient(circle, var(--mp-color-accent, #a78bfa) 0%, transparent 70%);
+  }
+
+  .lg-menu {
+    position: relative;
+    width: 460px;
+    padding: 14px;
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .lg-menu-sheen {
+    position: absolute;
+    top: 0; left: -60%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
+    transform: skewX(-18deg);
+    pointer-events: none;
+  }
+
+  .lg-menu-highlight {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    height: 58px;
+    border-radius: 16px;
+    background: linear-gradient(150deg, var(--mp-color-primary, #6366f1), var(--mp-color-accent, #a78bfa));
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    pointer-events: none;
+    top: 14px;
+  }
+
+  .lg-menu-list {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .lg-menu-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 58px;
+    padding: 0 18px;
+    border-radius: 16px;
+    color: #fff;
+    z-index: 2;
+  }
+
+  .lg-menu-item-divider {
+    height: 1px;
+    margin: 8px 14px;
+    background: rgba(255, 255, 255, 0.14);
+    flex-shrink: 0;
+  }
+
+  .lg-menu-item-icon {
+    font-size: 24px;
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .lg-menu-item-label {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    flex: 1;
+  }
+
+  .lg-menu-item-shortcut {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.55);
+    flex-shrink: 0;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+
+    var menu = el.querySelector('.lg-menu');
+    var sheen = el.querySelector('.lg-menu-sheen');
+    var highlight = el.querySelector('.lg-menu-highlight');
+    var list = el.querySelector('.lg-menu-list');
+    var blob1 = el.querySelector('.lg-blob-1');
+    var blob2 = el.querySelector('.lg-blob-2');
+
+    var items = (data.items && data.items.length) ? data.items : [
+      { icon: '📋', label: 'Copy', shortcut: '⌘C' },
+      { icon: '✂️', label: 'Cut', shortcut: '⌘X' },
+      { icon: '📥', label: 'Paste', shortcut: '⌘V' },
+      { divider: true },
+      { icon: '🔗', label: 'Share', shortcut: '' },
+      { icon: '⭐', label: 'Add to Favorites', shortcut: '' },
+      { divider: true },
+      { icon: '🗑️', label: 'Delete', shortcut: '⌫' }
+    ];
+
+    var itemEls = [];
+    if (list) {
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        if (it.divider) {
+          var div = document.createElement('div');
+          div.className = 'lg-menu-item-divider';
+          list.appendChild(div);
+          continue;
+        }
+        var row = document.createElement('div');
+        row.className = 'lg-menu-item';
+
+        var ic = document.createElement('div');
+        ic.className = 'lg-menu-item-icon';
+        ic.textContent = it.icon || '•';
+        row.appendChild(ic);
+
+        var lb = document.createElement('div');
+        lb.className = 'lg-menu-item-label';
+        lb.textContent = it.label || '';
+        row.appendChild(lb);
+
+        if (it.shortcut) {
+          var sc = document.createElement('div');
+          sc.className = 'lg-menu-item-shortcut';
+          sc.textContent = it.shortcut;
+          row.appendChild(sc);
+        }
+
+        list.appendChild(row);
+        itemEls.push(row);
+      }
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 0.85;
+
+    if (menu) gsap.set(menu, { autoAlpha: 0, scale: 0.9, transformOrigin: 'top left', y: -10 });
+    if (sheen) gsap.set(sheen, { left: '-60%' });
+    if (highlight) gsap.set(highlight, { autoAlpha: 0 });
+    if (itemEls.length) gsap.set(itemEls, { autoAlpha: 0, x: -16 });
+
+    // Menu pops open
+    if (menu) {
+      tl.to(menu, {
+        autoAlpha: 1, scale: 1, y: 0,
+        duration: speed,
+        ease: 'back.out(1.5)'
+      }, 0.2);
+    }
+
+    // Items stagger in
+    if (itemEls.length) {
+      tl.to(itemEls, {
+        autoAlpha: 1, x: 0,
+        duration: speed * 0.7,
+        stagger: 0.06,
+        ease: 'power3.out'
+      }, 0.35);
+    }
+
+    // Highlight glides between items
+    if (highlight && itemEls.length) {
+      var positions = [];
+      for (var j = 0; j < itemEls.length; j++) {
+        positions.push(itemEls[j].offsetTop + 14);
+      }
+      gsap.set(highlight, { top: (positions[0] || 14) });
+      var revealAt = 0.35 + itemEls.length * 0.06 + speed * 0.4;
+      tl.to(highlight, { autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, revealAt);
+
+      // glide loop through a few items (bounded sequence, then repeat)
+      var glideTargets = [];
+      var maxStops = Math.min(positions.length, 4);
+      for (var k = 0; k < maxStops; k++) glideTargets.push(positions[k]);
+      // Build a sub-timeline that loops
+      var glideTl = gsap.timeline({ repeat: -1, yoyo: true });
+      for (var g = 1; g < glideTargets.length; g++) {
+        glideTl.to(highlight, { top: glideTargets[g], duration: 0.55, ease: 'power2.inOut' });
+        glideTl.to(highlight, {}, '+=0.5');
+      }
+      tl.add(glideTl, revealAt + 0.3);
+    }
+
+    // Sheen sweep
+    if (sheen) {
+      tl.fromTo(sheen, { left: '-60%' }, { left: '170%', duration: speed * 1.4, ease: 'power2.inOut' }, 0.5);
+    }
+
+    if (blob1) tl.to(blob1, { x: 50, y: 40, duration: 6, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+    if (blob2) tl.to(blob2, { x: -50, y: -40, duration: 7, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+
+    if (ctx.duration > 2 && menu) {
+      var exitAt = ctx.duration - 0.55;
+      tl.to(menu, { autoAlpha: 0, scale: 0.94, y: -8, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

@@ -1,0 +1,81 @@
+<template>
+  <div class="grid-pixelate-wipe"></div>
+</template>
+
+<style scoped>
+  .grid-pixelate-wipe {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    display: grid;
+  }
+
+  .pixel-cell {
+    will-change: transform, opacity;
+    transform-origin: 50% 50%;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.grid-pixelate-wipe');
+    if (!container) return tl;
+
+    var color = data.color || 'var(--mp-color-primary, #6366f1)';
+    var cellSize = data.cell_size !== undefined ? data.cell_size : 80;
+    if (cellSize < 8) cellSize = 8;
+
+    var w = ctx.canvas.width;
+    var h = ctx.canvas.height;
+
+    var cols = Math.max(2, Math.round(w / cellSize));
+    var rows = Math.max(2, Math.round(h / cellSize));
+
+    container.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    container.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)';
+
+    // Build cells. Initial state = filled (the wipe conceals the frame), then
+    // cells drop away in a diagonal stagger to reveal what's behind.
+    var cells = [];
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var cell = document.createElement('div');
+        cell.className = 'pixel-cell';
+        cell.style.background = color;
+        cell.style.opacity = '1';
+        container.appendChild(cell);
+        cells.push({ el: cell, r: r, c: c });
+      }
+    }
+
+    var maxDiag = (cols - 1) + (rows - 1) || 1;
+    var wipeDur = 1.4;
+
+    // Conceal-in: cells scale up from 0 in a diagonal sweep (first half).
+    cells.forEach(function (cell) {
+      var diag = cell.c + cell.r;
+      var dly = (diag / maxDiag) * 0.9;
+      tl.fromTo(cell.el,
+        { scale: 0, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(2)' }, dly + 0.05 * Math.random());
+    });
+
+    // Hold briefly fully concealed, then reveal: cells scale/fade out in the
+    // opposite diagonal order to expose the underlying frame.
+    var revealStart = 1.6;
+    cells.forEach(function (cell) {
+      var diag = (cols - 1 - cell.c) + (rows - 1 - cell.r);
+      var dly = (diag / maxDiag) * wipeDur;
+      tl.to(cell.el, {
+        scale: 0,
+        opacity: 0,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, revealStart + dly + 0.04 * Math.random());
+    });
+
+    return tl;
+  }
+</script>

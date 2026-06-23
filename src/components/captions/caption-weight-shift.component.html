@@ -1,0 +1,121 @@
+<template>
+  <div class="cap-weight">
+    <div class="cap-weight-text"></div>
+  </div>
+</template>
+
+<style scoped>
+  .cap-weight {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 70px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    position: relative;
+    background: transparent;
+  }
+
+  .cap-weight-text {
+    font-size: 96px;
+    line-height: 1.06;
+    letter-spacing: -0.01em;
+    text-align: center;
+    max-width: 92%;
+    color: var(--mp-color-text, #ffffff);
+    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    font-weight: 800;
+    font-variation-settings: 'wght' 800;
+  }
+
+  .cap-weight-text .ww {
+    display: inline-block;
+    margin: 0 0.12em;
+    transform-origin: center bottom;
+    font-weight: inherit;
+    font-variation-settings: inherit;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var textEl = el.querySelector('.cap-weight-text');
+    if (!textEl) return tl;
+
+    var text = (data && data.text) || 'Light to Bold';
+    var words = text.split(/\s+/).filter(function (w) { return w.length; });
+
+    if (text.length > 22) {
+      var fs = Math.max(48, Math.round(96 * (22 / text.length) + 14));
+      textEl.style.fontSize = fs + 'px';
+    }
+
+    textEl.innerHTML = '';
+    var wordEls = [];
+    for (var i = 0; i < words.length; i++) {
+      var span = document.createElement('span');
+      span.className = 'ww';
+      span.textContent = words[i];
+      textEl.appendChild(span);
+      wordEls.push(span);
+    }
+    if (wordEls.length === 0) return tl;
+
+    var speed = ctx.motion === 'minimal' ? 0.85 : ctx.motion === 'punchy' ? 0.55 : 0.7;
+    var step = ctx.motion === 'minimal' ? 0.22 : ctx.motion === 'punchy' ? 0.12 : 0.16;
+
+    gsap.set(textEl, { autoAlpha: 1 });
+
+    var startAt = 0.2;
+    var available = (ctx.duration > 2 ? ctx.duration - 0.7 : ctx.duration) - startAt;
+    if (wordEls.length > 1 && (wordEls.length - 1) * step + speed > available) {
+      step = Math.max(0.06, (available - speed) / Math.max(1, wordEls.length - 1));
+    }
+
+    for (var k = 0; k < wordEls.length; k++) {
+      var wEl = wordEls[k];
+      var at = startAt + k * step;
+
+      // Start thin, slightly raised, blurred.
+      gsap.set(wEl, {
+        autoAlpha: 0,
+        scale: 0.92,
+        y: 18,
+        fontWeight: 100,
+        fontVariationSettings: "'wght' 100",
+        filter: 'blur(4px)'
+      });
+
+      var weightObj = { w: 100 };
+      tl.to(wEl, {
+        autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+        duration: speed,
+        ease: 'power3.out'
+      }, at);
+      tl.to(weightObj, {
+        w: 800,
+        duration: speed,
+        ease: 'power2.out',
+        onUpdate: (function (target, obj) {
+          return function () {
+            var ww = Math.round(obj.w);
+            target.style.fontWeight = ww;
+            target.style.fontVariationSettings = "'wght' " + ww;
+          };
+        })(wEl, weightObj)
+      }, at);
+      // subtle overshoot settle
+      tl.to(wEl, { scale: 1.04, duration: speed * 0.4, ease: 'sine.out' }, at);
+      tl.to(wEl, { scale: 1, duration: speed * 0.6, ease: 'sine.inOut' }, at + speed * 0.4);
+    }
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to(wordEls, { autoAlpha: 0, y: -16, filter: 'blur(4px)', duration: 0.35, stagger: 0.04, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

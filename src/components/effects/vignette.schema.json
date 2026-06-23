@@ -1,0 +1,21 @@
+{
+  "type": "vignette",
+  "label": "Vignette",
+  "category": "effects",
+  "description": "Soft darkened-edge vignette that breathes slightly to draw the eye toward the center of the frame. Use as a top overlay layer.",
+  "data": {
+    "intensity": {
+      "type": "number",
+      "label": "Vignette Intensity",
+      "optional": true,
+      "default": 0.5,
+      "placeholder": "0.5"
+    },
+    "color": {
+      "type": "string",
+      "label": "Edge Color",
+      "optional": true,
+      "placeholder": "rgba(0,0,0,1)"
+    }
+  }
+}

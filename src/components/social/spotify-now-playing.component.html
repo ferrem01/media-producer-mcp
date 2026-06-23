@@ -1,0 +1,125 @@
+<template>
+  <div class="sp-wrap">
+    <div class="sp-card">
+      <div class="sp-art">
+        <div class="sp-eq">
+          <span class="sp-bar"></span>
+          <span class="sp-bar"></span>
+          <span class="sp-bar"></span>
+          <span class="sp-bar"></span>
+        </div>
+      </div>
+      <div class="sp-info">
+        <div class="sp-now">
+          <svg class="sp-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.871 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.78.78 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 11-.452-1.493c3.632-1.102 8.147-.568 11.233 1.329a.78.78 0 01.256 1.073zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.935.935 0 11-.542-1.79c3.532-1.072 9.404-.865 13.115 1.338a.936.936 0 01-.954 1.61z"/></svg>
+          <span class="sp-now-label">Now Playing</span>
+        </div>
+        <div class="sp-track"></div>
+        <div class="sp-artist"></div>
+        <div class="sp-progress"><div class="sp-progress-fill"></div></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .sp-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 60px;
+    box-sizing: border-box;
+  }
+  .sp-card {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    background: #121212;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 18px;
+    padding: 22px;
+    max-width: 560px;
+    width: 100%;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.5);
+  }
+  .sp-art {
+    width: 110px; height: 110px; border-radius: 10px; flex: 0 0 auto;
+    background: linear-gradient(135deg, #1db954 0%, #0a5c2a 100%);
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 16px; box-sizing: border-box;
+  }
+  .sp-eq { display: flex; align-items: flex-end; gap: 5px; height: 40px; }
+  .sp-bar {
+    width: 7px; height: 30%; background: rgba(255,255,255,0.92); border-radius: 3px;
+    transform-origin: bottom;
+  }
+  .sp-info { flex: 1 1 auto; min-width: 0; }
+  .sp-now { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .sp-logo { width: 22px; height: 22px; fill: #1db954; }
+  .sp-now-label { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #1db954; }
+  .sp-track { font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.2; }
+  .sp-artist { font-size: 17px; color: #b3b3b3; margin: 4px 0 14px; }
+  .sp-progress { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.18); overflow: hidden; }
+  .sp-progress-fill { height: 100%; width: 0%; background: #1db954; border-radius: 3px; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.sp-card');
+    var art = el.querySelector('.sp-art');
+    var track = el.querySelector('.sp-track');
+    var artist = el.querySelector('.sp-artist');
+    var bars = el.querySelectorAll('.sp-bar');
+    var fill = el.querySelector('.sp-progress-fill');
+    var info = el.querySelector('.sp-info');
+
+    if (data.track) track.textContent = data.track;
+    if (data.artist) artist.textContent = data.artist;
+    if (data.art_color && art) art.style.background = data.art_color;
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.65 : 0.8;
+
+    gsap.set(card, { autoAlpha: 0, y: 44, scale: 1.03, filter: 'blur(4px)' });
+    gsap.set(art, { autoAlpha: 0, scale: 0.8 });
+    gsap.set([el.querySelector('.sp-now'), track, artist, el.querySelector('.sp-progress')], { autoAlpha: 0, x: -14 });
+
+    tl.to(card, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.25);
+    tl.to(art, { autoAlpha: 1, scale: 1, duration: speed * 0.8, ease: 'back.out(1.5)', transformOrigin: '50% 50%' }, 0.35);
+    tl.to([el.querySelector('.sp-now'), track, artist, el.querySelector('.sp-progress')], {
+      autoAlpha: 1, x: 0, duration: speed * 0.7, stagger: 0.07, ease: 'power2.out'
+    }, 0.45);
+
+    // equalizer bars dance (ambient, looping)
+    bars.forEach(function (b, i) {
+      tl.to(b, {
+        scaleY: 2.6 + (i % 2) * 0.6,
+        duration: 0.34 + i * 0.05,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+        transformOrigin: 'bottom'
+      }, 0.9 + i * 0.08);
+    });
+
+    // progress bar advances across the clip
+    var prog = { v: 0 };
+    var fillDur = ctx.duration > 2 ? (ctx.duration - 1.2) : 4;
+    tl.to(prog, {
+      v: data.progress !== undefined ? data.progress : 72,
+      duration: fillDur,
+      ease: 'none',
+      onUpdate: function () { fill.style.width = prog.v + '%'; }
+    }, 0.9);
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(card, { autoAlpha: 0, y: -24, scale: 0.98, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

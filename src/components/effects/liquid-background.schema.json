@@ -1,0 +1,19 @@
+{
+  "type": "liquid-background",
+  "label": "Liquid Background",
+  "category": "effects",
+  "description": "A gentle full-bleed lava-lamp background of large soft brand-color blobs that slowly morph and drift. Use as an ambient background layer.",
+  "data": {
+    "color": {
+      "type": "string",
+      "label": "Primary Blob Color",
+      "optional": true,
+      "placeholder": "var(--mp-color-primary)"
+    },
+    "colors": {
+      "type": "array",
+      "label": "Blob Colors",
+      "optional": true
+    }
+  }
+}

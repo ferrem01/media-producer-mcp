@@ -30,6 +30,8 @@ export type TransitionType =
   | "wipe-down"
   | "iris"
   | "push"
+  | "whip-pan"
+  | "cinematic-zoom"
   // Shader transitions (WebGL)
   | "shader-crosswarp"
   | "shader-ripple"
@@ -37,7 +39,9 @@ export type TransitionType =
   | "shader-directional-warp"
   | "shader-burn"
   | "shader-chromatic"
-  | "shader-lens-distortion";
+  | "shader-lens-distortion"
+  | "shader-swirl"
+  | "shader-pixelize";
 
 /** Check if a transition type uses WebGL shaders */
 function isShaderTransition(type: string): boolean {
@@ -378,6 +382,21 @@ export function getTransitionScript(type: string, duration: number, width: numbe
   tl.to(imgA, { xPercent: -100, duration: dur, ease: 'power2.inOut' }, 0);
   tl.to(imgB, { xPercent: 0, duration: dur, ease: 'power2.inOut' }, 0);`;
 
+    case "whip-pan":
+      return `
+  // Fast horizontal whip with motion blur: A blurs off one side as B whips in.
+  var halfW = dur * 0.5;
+  gsap.set(imgB, { xPercent: 120, filter: 'blur(0px)' });
+  tl.to(imgA, { xPercent: -120, filter: 'blur(18px)', duration: halfW, ease: 'power3.in' }, 0);
+  tl.fromTo(imgB, { xPercent: 120, filter: 'blur(18px)' }, { xPercent: 0, filter: 'blur(0px)', duration: halfW, ease: 'power3.out' }, halfW * 0.85);`;
+
+    case "cinematic-zoom":
+      return `
+  // Slow cinematic push: A scales up and dissolves while B settles back from a slight over-scale.
+  gsap.set(imgB, { scale: 1.18, autoAlpha: 0, filter: 'blur(6px)' });
+  tl.to(imgA, { scale: 1.35, autoAlpha: 0, filter: 'blur(4px)', duration: dur, ease: 'power2.inOut' }, 0);
+  tl.to(imgB, { scale: 1, autoAlpha: 1, filter: 'blur(0px)', duration: dur, ease: 'power2.out' }, dur * 0.15);`;
+
     default:
       // Fall back to crossfade for unknown types
       console.warn(`Unknown transition type "${type}", falling back to crossfade`);
@@ -513,6 +532,39 @@ const SHADER_LIBRARY: Record<string, { glsl: string; uniforms?: Record<string, s
           getToColor(distortedUV),
           smoothstep(0.3, 0.7, progress)
         );
+      }`,
+  },
+  "shader-swirl": {
+    glsl: `
+      // Author: Sergey Kosarevsky | License: MIT (gl-transitions)
+      vec4 transition(vec2 UV) {
+        float Radius = 1.0;
+        float T = progress;
+        vec2 UVtwisted = UV;
+        float CurrentRadius = length(UV - vec2(0.5));
+        if (CurrentRadius < Radius) {
+          float ScaleP = 1.0 - CurrentRadius / Radius;
+          float Twist = (T <= 0.5 ? T : 1.0 - T) * 2.0;
+          float Angle = ScaleP * Twist * 8.0;
+          float s = sin(Angle);
+          float c = cos(Angle);
+          vec2 d = UV - vec2(0.5);
+          UVtwisted = vec2(dot(d, vec2(c, -s)), dot(d, vec2(s, c))) + vec2(0.5);
+        }
+        return mix(getFromColor(UVtwisted), getToColor(UVtwisted), T);
+      }`,
+  },
+  "shader-pixelize": {
+    glsl: `
+      // Author: gre | License: MIT (gl-transitions) -- mosaic/pixelate dissolve
+      vec4 transition(vec2 uv) {
+        float d = min(progress, 1.0 - progress);
+        float steps = 50.0;
+        float dist = ceil(d * steps) / steps;
+        vec2 squaresMin = vec2(20.0);
+        vec2 squareSize = 2.0 * dist / squaresMin;
+        vec2 p = dist > 0.0 ? (floor(uv / squareSize) + 0.5) * squareSize : uv;
+        return mix(getFromColor(p), getToColor(p), progress);
       }`,
   },
 };

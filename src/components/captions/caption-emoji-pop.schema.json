@@ -1,0 +1,27 @@
+{
+  "type": "caption-emoji-pop",
+  "label": "Caption - Emoji Pop",
+  "category": "captions",
+  "description": "Caption with an emoji that pops and bounces in with a particle burst alongside the text.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "Let’s go!"
+    },
+    "emoji": {
+      "type": "string",
+      "label": "Emoji",
+      "optional": true,
+      "default": "🎉",
+      "placeholder": "🎉"
+    },
+    "accent": {
+      "type": "color",
+      "label": "Burst Color",
+      "optional": true,
+      "description": "Particle burst color (maps to --mp-color-accent)."
+    }
+  }
+}

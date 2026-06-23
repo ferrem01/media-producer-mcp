@@ -1,0 +1,121 @@
+<template>
+  <div class="cap-karaoke">
+    <div class="cap-line"></div>
+  </div>
+</template>
+
+<style scoped>
+  .cap-karaoke {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 80px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    position: relative;
+    background: transparent;
+  }
+
+  .cap-line {
+    font-size: 72px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-align: center;
+    max-width: 88%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.12em 0.28em;
+    text-shadow: 0 3px 18px rgba(0, 0, 0, 0.55);
+  }
+
+  .cap-line .kw {
+    display: inline-block;
+    position: relative;
+    padding: 0.04em 0.18em;
+    border-radius: 0.22em;
+    color: var(--mp-color-text, #ffffff);
+  }
+
+  .cap-line .kw-pill {
+    position: absolute;
+    inset: 0;
+    border-radius: 0.22em;
+    background: var(--mp-color-primary, #6366f1);
+    z-index: -1;
+    transform-origin: left center;
+    box-shadow: 0 0 28px var(--mp-color-glow, rgba(99, 102, 241, 0.55));
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var line = el.querySelector('.cap-line');
+    if (!line) return tl;
+
+    var text = (data && data.text) || 'Watch the words light up';
+    var words = text.split(/\s+/).filter(function (w) { return w.length; });
+
+    line.innerHTML = '';
+    var wordEls = [];
+    var pills = [];
+    for (var i = 0; i < words.length; i++) {
+      var span = document.createElement('span');
+      span.className = 'kw';
+      var pill = document.createElement('span');
+      pill.className = 'kw-pill';
+      span.appendChild(pill);
+      span.appendChild(document.createTextNode(words[i]));
+      line.appendChild(span);
+      wordEls.push(span);
+      pills.push(pill);
+    }
+
+    // Auto-scale font down for long captions
+    var totalChars = text.length;
+    if (totalChars > 40) {
+      var fs = Math.max(40, Math.round(72 * (40 / totalChars) + 18));
+      line.style.fontSize = fs + 'px';
+    }
+
+    var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.5;
+
+    // Initial: words present but dim, pills collapsed
+    gsap.set(line, { autoAlpha: 0, y: 24 });
+    gsap.set(wordEls, { autoAlpha: 0.32 });
+    gsap.set(pills, { scaleX: 0, autoAlpha: 0 });
+
+    tl.to(line, { autoAlpha: 1, y: 0, duration: speed, ease: 'power3.out' }, 0.15);
+
+    // Distribute highlight across available duration
+    var custom = (data && data.words && data.words.length) ? data.words : null;
+    var startAt = 0.45;
+    var endBudget = (ctx.duration > 2 ? ctx.duration - 0.9 : ctx.duration) - startAt;
+    if (endBudget < 1) endBudget = Math.max(1, ctx.duration * 0.7);
+    var per = endBudget / Math.max(1, words.length);
+
+    for (var k = 0; k < wordEls.length; k++) {
+      var at = startAt + k * per;
+      var dur = per * 0.9;
+      if (custom && custom[k] && typeof custom[k].at === 'number') {
+        at = custom[k].at;
+        dur = (custom[k].duration != null) ? custom[k].duration : dur;
+      }
+      tl.to(pills[k], { scaleX: 1, autoAlpha: 1, duration: Math.min(dur, 0.45), ease: 'power2.out' }, at);
+      tl.to(wordEls[k], { autoAlpha: 1, color: '#ffffff', duration: 0.2, ease: 'power1.out' }, at);
+      // pop the active word slightly
+      tl.to(wordEls[k], { scale: 1.06, duration: 0.12, ease: 'power2.out' }, at);
+      tl.to(wordEls[k], { scale: 1, duration: 0.18, ease: 'power2.inOut' }, at + 0.12);
+    }
+
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.5;
+      tl.to(line, { autoAlpha: 0, y: -18, duration: 0.4, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

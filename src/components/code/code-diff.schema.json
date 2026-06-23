@@ -1,0 +1,29 @@
+{
+  "type": "code-diff",
+  "label": "Code Diff",
+  "category": "code",
+  "description": "A code diff view where added (green +) and removed (red -) lines slide and highlight in over context lines.",
+  "data": {
+    "lines": {
+      "type": "array",
+      "label": "Diff Lines",
+      "required": true,
+      "item": {
+        "text": { "type": "string", "label": "Line Text" },
+        "type": { "type": "string", "label": "Line Type", "enum": ["add", "del", "ctx"], "default": "ctx" }
+      }
+    },
+    "title": {
+      "type": "string",
+      "label": "Filename / Title",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "default": "dark",
+      "enum": ["dark", "light"]
+    }
+  }
+}

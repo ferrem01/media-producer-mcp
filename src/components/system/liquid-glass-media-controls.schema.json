@@ -1,0 +1,18 @@
+{
+  "type": "liquid-glass-media-controls",
+  "label": "Liquid Glass Media Controls",
+  "category": "system",
+  "description": "Apple-style frosted glass now-playing widget with album art, track and artist, an advancing scrubber, play/skip buttons and an animated equalizer.",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "Track Title",
+      "required": true
+    },
+    "artist": {
+      "type": "string",
+      "label": "Artist",
+      "optional": true
+    }
+  }
+}

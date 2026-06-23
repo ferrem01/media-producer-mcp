@@ -1,0 +1,26 @@
+{
+  "type": "youtube-lower-third",
+  "label": "YouTube Subscribe Lower Third",
+  "category": "social",
+  "description": "A YouTube subscribe lower-third with channel avatar, channel name, a red SUBSCRIBE button with a notification bell, and a subscriber count that ticks up. Use to prompt a YouTube subscribe as an overlay.",
+  "data": {
+    "channel": {
+      "type": "string",
+      "label": "Channel Name",
+      "required": true,
+      "placeholder": "Your Channel"
+    },
+    "subscribers": {
+      "type": "number",
+      "label": "Subscriber Count",
+      "optional": true,
+      "default": 1250000
+    },
+    "avatar_color": {
+      "type": "string",
+      "label": "Avatar Color/Gradient",
+      "optional": true,
+      "placeholder": "#ff0000"
+    }
+  }
+}

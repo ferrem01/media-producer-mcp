@@ -1,0 +1,14 @@
+{
+  "type": "pin-drop",
+  "label": "Pin Drop",
+  "category": "maps",
+  "description": "A single location pin drops in with a bounce over a dotted-grid backdrop, casting concentric pulse rings beneath a location label.",
+  "data": {
+    "location_label": {
+      "type": "string",
+      "label": "Location Label",
+      "required": true,
+      "placeholder": "San Francisco"
+    }
+  }
+}

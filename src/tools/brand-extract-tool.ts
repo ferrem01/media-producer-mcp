@@ -123,6 +123,83 @@ function err(msg: string) {
 }
 
 /**
+ * Extract a brand from a live URL, build/merge the tenant brand kit (colors,
+ * fonts, design system, downloaded logos), save it, and return a summary.
+ * Shared by the extract_brand_from_website tool and the website_to_video one-shot.
+ */
+export async function extractAndStoreBrand(tenantId: string, url: string, enhance: boolean): Promise<{ kit: BrandKit; summary: any }> {
+  var result = await extractBrandFromUrl(url);
+  var designSystem = result.design_system;
+  var extractedColors = result.colors;
+
+  if (enhance) {
+    try {
+      var llmConfig = llmConfigFromEnv();
+      var heroScreenshot = designSystem.screenshots?.hero || "";
+      var enhanced = await enhanceWithLLM(designSystem, heroScreenshot, llmConfig);
+      designSystem.guidelines = enhanced.guidelines;
+      designSystem.patterns = enhanced.patterns;
+    } catch (llmErr: any) {
+      console.warn("[extract_brand] LLM enhancement failed:", llmErr.message);
+    }
+  }
+
+  var storedDesignSystem = { ...designSystem };
+  delete storedDesignSystem.screenshots;
+
+  var existing = await loadBrandKit(tenantId);
+  var kit: BrandKit;
+  if (existing) {
+    var isDefaultColors = existing.colors.primary === "#5B21B6" && existing.colors.background === "#0f172a";
+    kit = { ...existing, colors: isDefaultColors ? extractedColors : existing.colors, design_system: storedDesignSystem };
+    if (existing.fonts?.length === 1 && existing.fonts[0].family === "Inter") {
+      var extractedFonts = [];
+      if (designSystem.typography.font_heading) {
+        extractedFonts.push({ family: designSystem.typography.font_heading, source: "google" as const, weights: [parseInt(designSystem.typography.heading_weight) || 700] });
+      }
+      if (designSystem.typography.font_body && designSystem.typography.font_body !== designSystem.typography.font_heading) {
+        extractedFonts.push({ family: designSystem.typography.font_body, source: "google" as const, weights: [parseInt(designSystem.typography.body_weight) || 400, 500, 600, 700] });
+      }
+      if (extractedFonts.length > 0) kit.fonts = extractedFonts;
+    }
+  } else {
+    kit = {
+      colors: extractedColors,
+      fonts: [{ family: designSystem.typography.font_heading || "Inter", source: "google" as const, weights: [parseInt(designSystem.typography.heading_weight) || 700] }],
+      style: { border_radius: designSystem.radius.md, motion: "cinematic" as const },
+      design_system: storedDesignSystem,
+    };
+    if (designSystem.typography.font_body && designSystem.typography.font_body !== designSystem.typography.font_heading) {
+      kit.fonts.push({ family: designSystem.typography.font_body, source: "google" as const, weights: [parseInt(designSystem.typography.body_weight) || 400, 500, 600, 700] });
+    }
+  }
+
+  if (!kit.logos || kit.logos.length === 0) {
+    const extractedLogos = await downloadLogos(tenantId, result.logos || []);
+    if (extractedLogos.length > 0) {
+      kit.logos = extractedLogos;
+      console.log(`[extract_brand] registered ${extractedLogos.length} logo(s): ${extractedLogos.map((l) => l.name).join(", ")}`);
+    }
+  }
+
+  await saveBrandKit(tenantId, kit);
+
+  var summary = {
+    status: "extracted", url,
+    extracted_at: designSystem.extracted_at,
+    colors: { primary_bg: designSystem.color_roles.primary_bg, primary_action: designSystem.color_roles.primary_action, text_primary: designSystem.color_roles.text_primary },
+    typography: { heading_font: designSystem.typography.font_heading, body_font: designSystem.typography.font_body, heading_weight: designSystem.typography.heading_weight },
+    spacing: { base_unit: designSystem.spacing.base_unit, density: designSystem.density },
+    patterns: designSystem.patterns,
+    logos: (kit.logos || []).map((l) => ({ name: l.name, variant: l.variant, theme: l.theme, url: l.url })),
+    logo_candidates_found: (result.logos || []).length,
+    enhanced: enhance && !!designSystem.guidelines,
+    guidelines_preview: designSystem.guidelines ? designSystem.guidelines.substring(0, 200) + "..." : undefined,
+  };
+  return { kit, summary };
+}
+
+/**
  * Register the extract_brand_from_website tool on an MCP server.
  */
 export function registerBrandExtractTool(server: McpServer): void {
@@ -136,129 +213,7 @@ export function registerBrandExtractTool(server: McpServer): void {
     },
     async (params) => {
       try {
-        // Extract design tokens from the website
-        var result = await extractBrandFromUrl(params.url);
-        var designSystem = result.design_system;
-        var extractedColors = result.colors;
-
-        // Optionally enhance with LLM
-        if (params.enhance) {
-          try {
-            var llmConfig = llmConfigFromEnv();
-            var heroScreenshot = designSystem.screenshots?.hero || "";
-            var enhanced = await enhanceWithLLM(designSystem, heroScreenshot, llmConfig);
-            designSystem.guidelines = enhanced.guidelines;
-            designSystem.patterns = enhanced.patterns;
-          } catch (llmErr: any) {
-            // LLM enhancement is non-fatal -- log and continue
-            console.warn("[extract_brand] LLM enhancement failed:", llmErr.message);
-          }
-        }
-
-        // Strip screenshot data from stored design system (too large for brand-kit.json)
-        var storedDesignSystem = { ...designSystem };
-        delete storedDesignSystem.screenshots;
-
-        // Load existing brand kit (if any) and merge
-        var existing = await loadBrandKit(params.tenant_id);
-        var kit: BrandKit;
-
-        if (existing) {
-          // Merge: don't overwrite existing colors/fonts unless they were default/empty
-          var isDefaultColors = existing.colors.primary === "#5B21B6" && existing.colors.background === "#0f172a";
-          kit = {
-            ...existing,
-            colors: isDefaultColors ? extractedColors : existing.colors,
-            design_system: storedDesignSystem,
-          };
-          // If no fonts were set (only default Inter), use extracted fonts
-          if (existing.fonts?.length === 1 && existing.fonts[0].family === "Inter") {
-            var extractedFonts = [];
-            if (designSystem.typography.font_heading) {
-              extractedFonts.push({
-                family: designSystem.typography.font_heading,
-                source: "google" as const,
-                weights: [parseInt(designSystem.typography.heading_weight) || 700],
-              });
-            }
-            if (designSystem.typography.font_body && designSystem.typography.font_body !== designSystem.typography.font_heading) {
-              extractedFonts.push({
-                family: designSystem.typography.font_body,
-                source: "google" as const,
-                weights: [parseInt(designSystem.typography.body_weight) || 400, 500, 600, 700],
-              });
-            }
-            if (extractedFonts.length > 0) {
-              kit.fonts = extractedFonts;
-            }
-          }
-        } else {
-          // Create new brand kit from extracted data
-          kit = {
-            colors: extractedColors,
-            fonts: [
-              {
-                family: designSystem.typography.font_heading || "Inter",
-                source: "google" as const,
-                weights: [parseInt(designSystem.typography.heading_weight) || 700],
-              },
-            ],
-            style: {
-              border_radius: designSystem.radius.md,
-              motion: "cinematic" as const,
-            },
-            design_system: storedDesignSystem,
-          };
-          // Add body font if different from heading
-          if (designSystem.typography.font_body && designSystem.typography.font_body !== designSystem.typography.font_heading) {
-            kit.fonts.push({
-              family: designSystem.typography.font_body,
-              source: "google" as const,
-              weights: [parseInt(designSystem.typography.body_weight) || 400, 500, 600, 700],
-            });
-          }
-        }
-
-        // Register extracted logos -- but never clobber logos the user already set/uploaded.
-        if (!kit.logos || kit.logos.length === 0) {
-          const extractedLogos = await downloadLogos(params.tenant_id, result.logos || []);
-          if (extractedLogos.length > 0) {
-            kit.logos = extractedLogos;
-            console.log(`[extract_brand] registered ${extractedLogos.length} logo(s): ${extractedLogos.map((l) => l.name).join(", ")}`);
-          }
-        }
-
-        // Save the updated brand kit
-        await saveBrandKit(params.tenant_id, kit);
-
-        // Build summary for response
-        var summary = {
-          status: "extracted",
-          url: params.url,
-          extracted_at: designSystem.extracted_at,
-          colors: {
-            primary_bg: designSystem.color_roles.primary_bg,
-            primary_action: designSystem.color_roles.primary_action,
-            text_primary: designSystem.color_roles.text_primary,
-          },
-          typography: {
-            heading_font: designSystem.typography.font_heading,
-            body_font: designSystem.typography.font_body,
-            heading_weight: designSystem.typography.heading_weight,
-          },
-          spacing: {
-            base_unit: designSystem.spacing.base_unit,
-            density: designSystem.density,
-          },
-          patterns: designSystem.patterns,
-          logos: (kit.logos || []).map((l) => ({ name: l.name, variant: l.variant, theme: l.theme, url: l.url })),
-          logo_candidates_found: (result.logos || []).length,
-          enhanced: params.enhance && !!designSystem.guidelines,
-          guidelines_preview: designSystem.guidelines
-            ? designSystem.guidelines.substring(0, 200) + "..."
-            : undefined,
-        };
-
+        const { summary } = await extractAndStoreBrand(params.tenant_id, params.url, params.enhance ?? false);
         return ok(summary);
       } catch (e: any) {
         return err("Brand extraction failed: " + e.message);

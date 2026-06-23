@@ -1,0 +1,64 @@
+<template>
+  <div class="vignette-overlay">
+    <div class="vignette-ring"></div>
+  </div>
+</template>
+
+<style scoped>
+  .vignette-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .vignette-ring {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var ring = el.querySelector('.vignette-ring');
+
+    var intensity = data.intensity !== undefined ? data.intensity : 0.5;
+    intensity = Math.max(0, Math.min(1, intensity));
+
+    var color = data.color || 'rgba(0,0,0,1)';
+
+    // Darkness at the very edge scales with intensity (kept soft).
+    var edgeAlpha = (0.18 + intensity * 0.42).toFixed(3);
+    // Tint a copy of the chosen color at the computed alpha.
+    function tint(a) {
+      // color may be rgb()/rgba()/hex; wrap with a radial gradient using opacity instead.
+      return color;
+    }
+
+    if (ring) {
+      ring.style.background =
+        'radial-gradient(ellipse at center, transparent 50%, ' + color + ' 130%)';
+      ring.style.opacity = '0';
+
+      // Fade the vignette in to its base strength.
+      tl.to(ring, { opacity: Number(edgeAlpha), duration: 0.7, ease: 'power1.out' }, 0);
+
+      // Gentle ambient "breathing": the vignette subtly tightens and releases.
+      var lo = Number(edgeAlpha) * 0.82;
+      var hi = Number(edgeAlpha);
+      tl.to(ring, {
+        opacity: lo,
+        scale: 1.04,
+        duration: 4,
+        ease: 'sine.inOut',
+        transformOrigin: 'center center',
+        yoyo: true,
+        repeat: -1
+      }, 0.7);
+    }
+
+    return tl;
+  }
+</script>

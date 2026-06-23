@@ -525,6 +525,22 @@ ${tagResult.html}
   var sceneTl = createTimeline(sceneEl, {}, sceneCtx);
   if (sceneTl) master.add(sceneTl, 0);
 
+  // ── Auto-wire dropped component timelines ──
+  // The scene's createTimeline is supposed to add each embedded <component>'s
+  // timeline via ctx.getComponentTimeline(id). When it forgets (common), the
+  // block renders but its motion -- including ambient background loops -- never
+  // plays. Add any registered-but-unconsumed component timeline at t=0 so every
+  // embedded block animates regardless of whether the codegen wired it.
+  if (typeof __componentTimelines !== 'undefined') {
+    for (var __cid in __componentTimelines) {
+      if (__consumedComponentTimelines[__cid]) continue;
+      try {
+        var __autoTl = __componentTimelines[__cid]();
+        if (__autoTl) master.add(__autoTl, 0);
+      } catch (e) { console.warn("Auto-wire failed for " + __cid + ": " + e.message); }
+    }
+  }
+
   // Expose for Playwright capture
   window.__MP_TIMELINE = master;
   window.__MP_DURATION = ${duration};

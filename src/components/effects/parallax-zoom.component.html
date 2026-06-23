@@ -1,0 +1,73 @@
+<template>
+  <div class="parallax-zoom">
+    <div class="parallax-layer"></div>
+  </div>
+</template>
+
+<style scoped>
+  .parallax-zoom {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .parallax-layer {
+    position: absolute;
+    inset: -8%;
+    width: 116%;
+    height: 116%;
+    opacity: 0;
+    will-change: transform;
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 30% 30%, var(--mp-color-primary, #6366f1) 0%, transparent 55%),
+      radial-gradient(circle at 70% 70%, var(--mp-color-accent, #a78bfa) 0%, transparent 55%);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var layer = el.querySelector('.parallax-layer');
+
+    var direction = data.direction === 'out' ? 'out' : 'in';
+    var intensity = data.intensity !== undefined ? data.intensity : 0.5;
+    intensity = Math.max(0, Math.min(1, intensity));
+
+    // Subtle ambient tint so the camera move is visible without dominating.
+    var tintAlpha = 0.05 + intensity * 0.08;
+
+    // Scale travel and drift scale with intensity but stay gentle.
+    var scaleDelta = 0.06 + intensity * 0.10;
+    var driftX = (10 + intensity * 22);
+    var driftY = (6 + intensity * 14);
+
+    var fromScale = direction === 'in' ? 1.0 : 1.0 + scaleDelta;
+    var toScale = direction === 'in' ? 1.0 + scaleDelta : 1.0;
+
+    // Span a slow push across most of the scene, then ease back (ambient loop).
+    var pushDur = Math.max(3, ctx.duration * 0.9);
+
+    if (layer) {
+      layer.style.opacity = String(tintAlpha);
+      gsap.set(layer, { scale: fromScale, x: -driftX, y: -driftY });
+
+      // Fade the ambient layer in.
+      tl.fromTo(layer, { opacity: 0 }, { opacity: tintAlpha, duration: 0.8, ease: 'power1.out' }, 0);
+
+      // Continuous slow zoom + parallax drift, yoyo so it never snaps.
+      tl.to(layer, {
+        scale: toScale,
+        x: driftX,
+        y: driftY,
+        duration: pushDur,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, 0);
+    }
+
+    return tl;
+  }
+</script>

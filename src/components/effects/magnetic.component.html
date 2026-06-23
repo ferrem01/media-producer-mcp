@@ -1,0 +1,145 @@
+<template>
+  <div class="magnetic">
+    <div class="magnetic-focal"></div>
+  </div>
+</template>
+
+<style scoped>
+  .magnetic {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .magnetic-dot {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  .magnetic-focal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 90px;
+    height: 90px;
+    margin: -45px 0 0 -45px;
+    border-radius: 50%;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    will-change: transform, opacity;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var container = el.querySelector('.magnetic');
+    var focal = el.querySelector('.magnetic-focal');
+    if (!container) return tl;
+
+    var color = data.color || 'var(--mp-color-accent, #a78bfa)';
+    var glow = 'var(--mp-color-glow, rgba(255,255,255,0.9))';
+    var count = data.count !== undefined ? data.count : 80;
+    if (count < 1) count = 1;
+
+    var w = ctx.canvas.width;
+    var h = ctx.canvas.height;
+
+    // Moving focal point keyframes (the "magnet"), as fractions of canvas.
+    var path = [
+      { x: 0.30, y: 0.40 },
+      { x: 0.68, y: 0.30 },
+      { x: 0.72, y: 0.68 },
+      { x: 0.35, y: 0.66 },
+      { x: 0.30, y: 0.40 }
+    ];
+
+    // Glowing focal node.
+    if (focal) {
+      focal.style.background = 'radial-gradient(circle, ' + glow + ' 0%, ' + color + ' 45%, transparent 72%)';
+      focal.style.left = (path[0].x * 100) + '%';
+      focal.style.top = (path[0].y * 100) + '%';
+      focal.style.opacity = '0.85';
+
+      var legDur = 3.2;
+      var focalTl = gsap.timeline({ repeat: -1 });
+      for (var p = 1; p < path.length; p++) {
+        focalTl.to(focal, {
+          left: (path[p].x * 100) + '%',
+          top: (path[p].y * 100) + '%',
+          duration: legDur,
+          ease: 'sine.inOut'
+        });
+      }
+      tl.add(focalTl, 0);
+      tl.to(focal, {
+        scale: 1.25,
+        opacity: 0.6,
+        duration: 1.6,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+        transformOrigin: '50% 50%'
+      }, 0);
+    }
+
+    // Field particles. Each has a home position and is tugged toward the focal.
+    var dots = [];
+    for (var i = 0; i < count; i++) {
+      var dot = document.createElement('div');
+      dot.className = 'magnetic-dot';
+      var sz = 3 + Math.random() * 5;
+      var hx = Math.random() * w;
+      var hy = Math.random() * h;
+      dot.style.width = sz + 'px';
+      dot.style.height = sz + 'px';
+      dot.style.left = hx + 'px';
+      dot.style.top = hy + 'px';
+      dot.style.background = color;
+      dot.style.boxShadow = '0 0 8px ' + color;
+      dot.style.opacity = String(0.35 + Math.random() * 0.4);
+      container.appendChild(dot);
+      dots.push({ el: dot, hx: hx, hy: hy });
+    }
+
+    // Build a focal position function in px over a single loop to derive pull.
+    // We approximate attraction by tweening each dot between its home and a
+    // point biased toward each focal waypoint, on a synced loop.
+    var legDur2 = 3.2;
+    var totalLoop = legDur2 * (path.length - 1);
+
+    dots.forEach(function (d, idx) {
+      var dotTl = gsap.timeline({ repeat: -1 });
+      // Strength of pull: closer dots pulled harder; add per-dot variance.
+      var pullVar = 0.45 + Math.random() * 0.4;
+      for (var p = 1; p < path.length; p++) {
+        var fx = path[p].x * w;
+        var fy = path[p].y * h;
+        // Target: move a fraction of the way from home toward focal.
+        var tx = d.hx + (fx - d.hx) * pullVar;
+        var ty = d.hy + (fy - d.hy) * pullVar;
+        dotTl.to(d.el, {
+          left: tx + 'px',
+          top: ty + 'px',
+          duration: legDur2,
+          ease: 'power1.inOut'
+        });
+      }
+      tl.add(dotTl, 0);
+
+      // Subtle twinkle.
+      tl.to(d.el, {
+        opacity: 0.15 + Math.random() * 0.3,
+        duration: 1 + Math.random() * 2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1
+      }, Math.random() * 2);
+    });
+
+    return tl;
+  }
+</script>

@@ -186,6 +186,7 @@ The result is HYBRID: <component> tags for known UI + custom code for everything
 - The \`data\` attribute is a JSON string — fill fields from the schema provided in the brief
 - Components auto-generate internal GSAP timelines
 - Access component timelines via: ctx.getComponentTimeline('comp_0')
+- **WIRE EVERY COMPONENT YOU EMBED.** For each <component> in your template, you MUST call \`tl.add(ctx.getComponentTimeline('comp_N'), <time>)\` in createTimeline. If you don't, the block's animation -- including ambient background motion -- never plays and the frame sits dead-static. This applies to backgrounds too (gradient-background, mesh-gradient, depth-blur all have ambient loops): wire them at t=0.
 - Component IDs are auto-assigned: comp_0, comp_1, comp_2... in DOM order
 - You can add \`class\` and \`style\` attributes to the <component> tag for positioning
 - Chat scenes MUST use a chat component. Dashboard scenes MUST use dashboard components.
@@ -248,7 +249,7 @@ function createTimeline(el, data, ctx) {
 </script>
 \`\`\`
 
-Notice: quotient-chat and code-editor use <component> tags. Only the background, layout, and beam are custom.
+Notice: quotient-chat and code-editor use <component> tags, and BOTH timelines are wired (comp_0 at 0, comp_1 at 4.5). Only the background, layout, and beam are custom.
 
 ## Your Process
 

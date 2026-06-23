@@ -1,0 +1,196 @@
+<template>
+  <div class="route-map">
+    <div class="route-grid"></div>
+    <svg class="route-svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet">
+      <path class="route-arc" d="M 180 380 Q 500 60 820 300" fill="none" />
+      <circle class="route-traveler" r="9" cx="0" cy="0" />
+    </svg>
+    <div class="route-pin route-pin-from">
+      <span class="pin-dot"></span>
+      <span class="pin-ring"></span>
+      <span class="pin-label"></span>
+    </div>
+    <div class="route-pin route-pin-to">
+      <span class="pin-dot"></span>
+      <span class="pin-ring"></span>
+      <span class="pin-label"></span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .route-map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--mp-color-background, #09090b);
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+  }
+
+  .route-grid {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.10) 1.4px, transparent 1.6px);
+    background-size: 30px 30px;
+    opacity: 0.5;
+    -webkit-mask-image: radial-gradient(ellipse 75% 75% at center, #000 30%, transparent 80%);
+    mask-image: radial-gradient(ellipse 75% 75% at center, #000 30%, transparent 80%);
+    pointer-events: none;
+  }
+
+  .route-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .route-arc {
+    stroke: var(--mp-color-primary, #6366f1);
+    stroke-width: 4;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px var(--mp-color-primary, #6366f1));
+  }
+
+  .route-traveler {
+    fill: var(--mp-color-accent, #a78bfa);
+    filter: drop-shadow(0 0 10px var(--mp-color-accent, #a78bfa));
+  }
+
+  .route-pin {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+  }
+
+  .pin-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--mp-color-accent, #a78bfa);
+    box-shadow: 0 0 16px var(--mp-color-accent, #a78bfa), 0 0 0 4px rgba(167, 139, 250, 0.18);
+  }
+
+  .pin-ring {
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--mp-color-accent, #a78bfa);
+  }
+
+  .pin-label {
+    margin-top: 14px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--mp-color-text, #ffffff);
+    white-space: nowrap;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  }
+
+  .pin-label:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+
+    var grid = el.querySelector('.route-grid');
+    var arc = el.querySelector('.route-arc');
+    var traveler = el.querySelector('.route-traveler');
+    var pinFrom = el.querySelector('.route-pin-from');
+    var pinTo = el.querySelector('.route-pin-to');
+    var labelFrom = el.querySelector('.route-pin-from .pin-label');
+    var labelTo = el.querySelector('.route-pin-to .pin-label');
+
+    var fromLabel = data.from_label || 'San Francisco';
+    var toLabel = data.to_label || 'New York';
+    if (labelFrom) labelFrom.textContent = fromLabel;
+    if (labelTo) labelTo.textContent = toLabel;
+
+    // Endpoints in viewBox coords (matches path M / endpoint).
+    var p0 = { x: 180, y: 380 };
+    var pc = { x: 500, y: 60 };
+    var p1 = { x: 820, y: 300 };
+
+    // Place pins by percentage of viewBox so they track at any size.
+    if (pinFrom) { pinFrom.style.left = (p0.x / 1000 * 100) + '%'; pinFrom.style.top = (p0.y / 600 * 100) + '%'; }
+    if (pinTo) { pinTo.style.left = (p1.x / 1000 * 100) + '%'; pinTo.style.top = (p1.y / 600 * 100) + '%'; }
+
+    var speed = ctx.motion === 'minimal' ? 0.7 : ctx.motion === 'punchy' ? 1.3 : 1.0;
+
+    // Prepare arc draw-on via stroke-dashoffset.
+    var len = 1000;
+    if (arc && arc.getTotalLength) { try { len = arc.getTotalLength(); } catch (e) {} }
+    gsap.set(arc, { strokeDasharray: len, strokeDashoffset: len, autoAlpha: 1 });
+    gsap.set([traveler], { autoAlpha: 0 });
+    gsap.set([pinFrom, pinTo], { autoAlpha: 0, scale: 0 });
+    if (grid) gsap.set(grid, { autoAlpha: 0 });
+
+    var rings = el.querySelectorAll('.pin-ring');
+    gsap.set(rings, { scale: 1, autoAlpha: 0 });
+
+    // Quadratic bezier point helper.
+    function bez(t) {
+      var mt = 1 - t;
+      var x = mt * mt * p0.x + 2 * mt * t * pc.x + t * t * p1.x;
+      var y = mt * mt * p0.y + 2 * mt * t * pc.y + t * t * p1.y;
+      return { x: x, y: y };
+    }
+
+    if (grid) tl.to(grid, { autoAlpha: 0.5, duration: 0.6, ease: 'power2.out' }, 0);
+
+    // From-pin drops in.
+    tl.to(pinFrom, { autoAlpha: 1, scale: 1, duration: 0.5 / speed, ease: 'back.out(2)' }, 0.2);
+
+    // Arc draws on.
+    tl.to(arc, { strokeDashoffset: 0, duration: 1.4 / speed, ease: 'power2.inOut' }, 0.5);
+
+    // Traveler rides the arc in sync with the draw.
+    var pos = { t: 0 };
+    tl.to(pos, {
+      t: 1,
+      duration: 1.4 / speed,
+      ease: 'power2.inOut',
+      onStart: function () { gsap.set(traveler, { autoAlpha: 1 }); },
+      onUpdate: function () {
+        var pt = bez(pos.t);
+        traveler.setAttribute('cx', pt.x);
+        traveler.setAttribute('cy', pt.y);
+      }
+    }, 0.5);
+
+    // To-pin lands as traveler arrives.
+    tl.to(pinTo, { autoAlpha: 1, scale: 1, duration: 0.5 / speed, ease: 'back.out(2)' }, 1.7);
+    tl.to(traveler, { autoAlpha: 0, duration: 0.3 }, 1.9);
+
+    // Ambient pulse rings at both pins.
+    tl.to(rings, {
+      scale: 3.2,
+      autoAlpha: 0,
+      duration: 1.8,
+      ease: 'power2.out',
+      stagger: 0.4,
+      repeat: -1,
+      onRepeat: function () { gsap.set(rings, { scale: 1, autoAlpha: 0.7 }); }
+    }, 1.9);
+    gsap.set(rings, { autoAlpha: 0.7 });
+
+    // Exit.
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to([pinFrom, pinTo, arc, grid], { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

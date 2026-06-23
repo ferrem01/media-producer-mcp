@@ -1,0 +1,20 @@
+{
+  "type": "caption-matrix-decode",
+  "label": "Caption - Matrix Decode",
+  "category": "captions",
+  "description": "Caption where each character scrambles through random glyphs in an accent glow before resolving to the real letter, decoding left to right.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "Caption Text",
+      "required": true,
+      "placeholder": "SYSTEM ONLINE"
+    },
+    "accent": {
+      "type": "color",
+      "label": "Accent Color",
+      "optional": true,
+      "description": "Color of the scrambling glyphs while decoding (maps to --mp-color-accent)."
+    }
+  }
+}

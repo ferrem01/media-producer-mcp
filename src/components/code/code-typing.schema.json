@@ -1,0 +1,27 @@
+{
+  "type": "code-typing",
+  "label": "Code Typing",
+  "category": "code",
+  "description": "Animated code editor that types code in character-by-character with a blinking cursor, line numbers, syntax coloring and window chrome.",
+  "data": {
+    "code": {
+      "type": "string",
+      "label": "Code",
+      "required": true,
+      "placeholder": "function greet(name) {\n  return \"Hi, \" + name;\n}"
+    },
+    "language": {
+      "type": "string",
+      "label": "Language Label",
+      "optional": true,
+      "default": "js"
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "default": "dark",
+      "enum": ["dark", "light"]
+    }
+  }
+}

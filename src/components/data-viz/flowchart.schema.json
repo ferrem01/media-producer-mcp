@@ -1,0 +1,39 @@
+{
+  "type": "flowchart",
+  "label": "Flowchart",
+  "category": "data-viz",
+  "description": "An animated flowchart whose boxed nodes pop in and arrowed connectors draw on in sequence, laid out left-to-right or top-down from nodes and edges.",
+  "data": {
+    "nodes": {
+      "type": "array",
+      "label": "Nodes",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "label": "Edges",
+      "optional": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" }
+        }
+      }
+    },
+    "direction": {
+      "type": "string",
+      "label": "Direction",
+      "optional": true,
+      "enum": ["horizontal", "vertical"],
+      "default": "horizontal"
+    }
+  }
+}
