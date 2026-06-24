@@ -10,8 +10,9 @@
  * They look at the same image, so this folds all three lenses into ONE call that
  * returns the same signals critiqueAndRetryScene consumes: an aesthetic `score`,
  * `issues`/`suggestions` for the fix prompt, and a typed `defects[]` list (with
- * `pass` = no defects). Quality-neutral in intent (same checks), ~1/3 the
- * round-trips. Opt-in via MP_CONSOLIDATED_CRITIQUE so it can be A/B'd.
+ * `pass` = no defects). ~1/3 the round-trips, and benchmarked to be MORE thorough
+ * than the old gated 3-call flow (it always checks defects, not only at score>=7).
+ * This is THE per-scene critique; `videoOnly` adjusts the prompt for brand clips.
  */
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import type { CorrectnessDefect, CorrectnessResult } from "./correctness-critique.js";
@@ -55,9 +56,13 @@ export async function critiqueConsolidated(opts: {
   expectedComponents?: string[];
   requiresLogo?: boolean;
   brandTheme?: "light" | "dark";
+  /** This scene is a pre-rendered brand video clip whose content can't be edited:
+   *  judge visual quality but don't penalize for missing headlines/text/value-props. */
+  videoOnly?: boolean;
   llmConfig: LLMConfig;
 }): Promise<ConsolidatedCritiqueResult> {
   const spec: string[] = [`SCENE PURPOSE / BRIEF:\n${opts.briefText}`];
+  if (opts.videoOnly) spec.push(`NOTE: this scene is a pre-rendered brand video clip (animation), not a content scene. Evaluate visual quality, brand consistency, and polish, but do NOT penalize for missing headlines, text, messaging, or value props, and do NOT report "missing_asset" for content -- the video cannot be modified.`);
   if (opts.expectedComponents?.length) spec.push(`EXPECTED UI: ${opts.expectedComponents.join(", ")}`);
   if (opts.requiresLogo) spec.push(`REQUIRED ASSET: the brand LOGO IMAGE must be visibly present (a styled text wordmark or blank placeholder does NOT count -> "missing_asset").`);
   if (opts.brandTheme === "light") spec.push(`BRAND THEME: LIGHT brand -- background MUST be light with DARK text. Report "off_brand_theme" for a dark background/panel or light text on a light area.`);
