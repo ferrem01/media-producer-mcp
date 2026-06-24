@@ -39,9 +39,10 @@ import type { BrandKit, Canvas, OutputFormat, Project, ProjectPlan, ReferenceIma
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
-import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
-import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
-import { critiqueCorrectness, formatCorrectnessDefects, type CorrectnessResult } from "./correctness-critique.js";
+import { type CritiqueResult } from "./critiquer.js";
+import { critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
+import { formatCorrectnessDefects, type CorrectnessResult } from "./correctness-critique.js";
+import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
 import { tileFramesToStoryboard } from "./editorial-vision.js";
 import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
@@ -1078,58 +1079,51 @@ async function critiqueAndRetryScene(opts: {
         motionContext += `\nMOTION REVIEW: A contact sheet with 6 frames across the timeline is attached (timestamps: ${contactTimestamps.map(t => t.toFixed(1) + "s").join(", ")}). Evaluate animation pacing, choreography, and whether the motion feels purposeful. Check that elements animate smoothly and the Build-Breathe-Resolve pattern is followed.`;
       }
 
-      // Bookend mode: skip the aesthetic/editorial critique (intros/outros are
-      // intentionally minimal) but use a synthetic passing score so the
-      // correctness + brand-theme gate below still runs and can force a revision.
-      const critiqueResult = opts.correctnessOnly
-        ? { score: 10, issues: [], suggestions: [] } as CritiqueResult
-        : await critiqueMultiPass({
-        sceneHtml: assembledHtml,
+      // Per-scene critique: ONE consolidated vision call that does functional
+      // (readability/contrast/layout) + premium ("does it feel expensive") +
+      // correctness (overlap/off_canvas/illegible/stray_ui/missing_asset/
+      // off_brand_theme) on the same frame. Replaces what used to be 2-3 separate
+      // round-trips. Bookends (correctnessOnly) ignore the aesthetic score and gate
+      // only on defects; video-only brand clips are scored but not defect-gated
+      // (their content can't be regenerated).
+      const briefForCon = currentPlanned?.brief || currentPlanned?.visual_notes || currentPlanned?.description || currentPlanned?.label || opts.prompt;
+      const con = await critiqueConsolidated({
         previewImageBase64: previewBase64,
-        prompt: opts.prompt,
-        llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
-        format: opts.format,
-        trace: opts.trace,
-        critiqueRound: attempt,
-        sceneContext: motionContext || undefined,
         contactSheetBase64,
+        contactTimestamps,
+        briefText: briefForCon,
+        sceneHtml: assembledHtml,
+        expectedComponents: Array.isArray(currentPlanned?.components) ? currentPlanned.components.filter((c: any) => typeof c === "string") : undefined,
+        requiresLogo: /\blogo\b/i.test(briefForCon) && (opts.brandKit?.logos?.length ?? 0) > 0,
+        brandTheme: brandBackgroundIsLight(opts.brandKit) ? "light" : "dark",
+        videoOnly: !!isVideoOnly,
+        llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
       });
+      // Bookends are intentionally minimal -> don't revise on aesthetic score, only
+      // on hard defects (e.g. a dark intro/outro on a light brand).
+      const critiqueResult: CritiqueResult = {
+        score: opts.correctnessOnly ? 10 : con.score,
+        issues: con.issues,
+        suggestions: con.suggestions,
+      };
+      // Video-only clips can't have their content regenerated -> never defect-gate them.
+      const correctness: CorrectnessResult = isVideoOnly
+        ? { pass: true, defects: [] }
+        : consolidatedCorrectness(con);
 
       lastCritique = critiqueResult;
-      console.log(`  Critique scene ${opts.sceneIndex} attempt ${attempt}: score=${critiqueResult.score}, issues=${critiqueResult.issues.length}`);
+      console.log(`  Critique scene ${opts.sceneIndex} attempt ${attempt}: score=${critiqueResult.score}, issues=${critiqueResult.issues.length}, defects=${correctness.defects.length}`);
       if (critiqueResult.issues.length > 0) {
         console.log(`    Issues: ${critiqueResult.issues.join(" | ")}`);
       }
-      if (critiqueResult.suggestions.length > 0) {
-        console.log(`    Suggestions: ${critiqueResult.suggestions.join(" | ")}`);
+      if (!correctness.pass) {
+        console.log(`  Correctness FAIL (${correctness.defects.length}): ${correctness.defects.map((d) => `[${d.type}] ${d.detail}`).join(" | ")}`);
       }
 
-      // 5. Clean up temp files
+      // Clean up temp files
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
 
-      // 5a. Correctness gate -- a STRICT inspector that fails BROKEN scenes the
-      // aesthetic critique waves through (overlapping/clipped/illegible content,
-      // chips stacked instead of sequenced, stray unrelated UI, a missing required
-      // logo). Only run it when the scene would otherwise be accepted, so we don't
-      // pay for an extra vision call on attempts that are already being revised.
-      let correctness: CorrectnessResult = { pass: true, defects: [] };
       const aestheticPass = critiqueResult.score >= 7 && runtime.ok;
-      if (aestheticPass && !isVideoOnly) {
-        const briefText = currentPlanned?.brief || currentPlanned?.visual_notes || currentPlanned?.description || currentPlanned?.label || opts.prompt;
-        correctness = await critiqueCorrectness({
-          finalFrameBase64: previewBase64,
-          contactSheetBase64,
-          contactTimestamps,
-          briefText,
-          expectedComponents: Array.isArray(currentPlanned?.components) ? currentPlanned.components.filter((c: any) => typeof c === "string") : undefined,
-          requiresLogo: /\blogo\b/i.test(briefText) && (opts.brandKit?.logos?.length ?? 0) > 0,
-          brandTheme: brandBackgroundIsLight(opts.brandKit) ? "light" : "dark",
-          llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
-        });
-        if (!correctness.pass) {
-          console.log(`  Correctness FAIL (${correctness.defects.length}): ${correctness.defects.map((d) => `[${d.type}] ${d.detail}`).join(" | ")}`);
-        }
-      }
 
       // Track best attempt. A scene that throws at runtime renders degraded, so
       // it must never beat a runtime-clean attempt -- apply a large penalty so a
