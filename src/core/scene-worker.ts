@@ -19,6 +19,15 @@ import { promisify } from "node:util";
 import crypto from "node:crypto";
 import { resolveVideoPath } from "./video-path.js";
 
+// Resilience: this worker is forked with stdio:"inherit" and logs progress
+// heavily. Under concurrent load the parent's pipe buffer can fill, and a write
+// to stdout/stderr then throws EPIPE as an UNHANDLED 'error' event -- which would
+// crash the worker mid-render and fail the whole render. A broken pipe on a LOG
+// line must never kill a render: attach error handlers so failed log writes are
+// silently dropped and the actual rendering work continues.
+process.stdout.on("error", (err: NodeJS.ErrnoException) => { if (err && err.code === "EPIPE") return; });
+process.stderr.on("error", (err: NodeJS.ErrnoException) => { if (err && err.code === "EPIPE") return; });
+
 var execFileAsync = promisify(execFile);
 
 interface ExtractedVideo {
