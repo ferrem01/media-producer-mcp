@@ -42,6 +42,7 @@ import { processReferenceImages } from "./reference-images.js";
 import { critiqueScene as critiqueSinglePass, type CritiqueResult } from "./critiquer.js";
 import { critiqueScene as critiqueMultiPass, critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { critiqueCorrectness, formatCorrectnessDefects, type CorrectnessResult } from "./correctness-critique.js";
+import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
 import { tileFramesToStoryboard } from "./editorial-vision.js";
 import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
@@ -1081,19 +1082,42 @@ async function critiqueAndRetryScene(opts: {
       // Bookend mode: skip the aesthetic/editorial critique (intros/outros are
       // intentionally minimal) but use a synthetic passing score so the
       // correctness + brand-theme gate below still runs and can force a revision.
-      const critiqueResult = opts.correctnessOnly
-        ? { score: 10, issues: [], suggestions: [] } as CritiqueResult
-        : await critiqueMultiPass({
-        sceneHtml: assembledHtml,
-        previewImageBase64: previewBase64,
-        prompt: opts.prompt,
-        llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
-        format: opts.format,
-        trace: opts.trace,
-        critiqueRound: attempt,
-        sceneContext: motionContext || undefined,
-        contactSheetBase64,
-      });
+      // One-call consolidated critique (functional + premium + correctness on the
+      // SAME frame) when enabled -- ~1/3 the round-trips. Bookends (correctnessOnly)
+      // and video-only scenes keep their dedicated paths.
+      const useConsolidated = !!process.env.MP_CONSOLIDATED_CRITIQUE && !opts.correctnessOnly && !isVideoOnly;
+      let correctness: CorrectnessResult = { pass: true, defects: [] };
+      let critiqueResult: CritiqueResult;
+      if (useConsolidated) {
+        const briefForCon = currentPlanned?.brief || currentPlanned?.visual_notes || currentPlanned?.description || currentPlanned?.label || opts.prompt;
+        const con = await critiqueConsolidated({
+          previewImageBase64: previewBase64,
+          contactSheetBase64,
+          contactTimestamps,
+          briefText: briefForCon,
+          sceneHtml: assembledHtml,
+          expectedComponents: Array.isArray(currentPlanned?.components) ? currentPlanned.components.filter((c: any) => typeof c === "string") : undefined,
+          requiresLogo: /\blogo\b/i.test(briefForCon) && (opts.brandKit?.logos?.length ?? 0) > 0,
+          brandTheme: brandBackgroundIsLight(opts.brandKit) ? "light" : "dark",
+          llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
+        });
+        critiqueResult = { score: con.score, issues: con.issues, suggestions: con.suggestions };
+        correctness = consolidatedCorrectness(con);
+      } else {
+        critiqueResult = opts.correctnessOnly
+          ? { score: 10, issues: [], suggestions: [] } as CritiqueResult
+          : await critiqueMultiPass({
+            sceneHtml: assembledHtml,
+            previewImageBase64: previewBase64,
+            prompt: opts.prompt,
+            llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
+            format: opts.format,
+            trace: opts.trace,
+            critiqueRound: attempt,
+            sceneContext: motionContext || undefined,
+            contactSheetBase64,
+          });
+      }
 
       lastCritique = critiqueResult;
       console.log(`  Critique scene ${opts.sceneIndex} attempt ${attempt}: score=${critiqueResult.score}, issues=${critiqueResult.issues.length}`);
@@ -1112,9 +1136,8 @@ async function critiqueAndRetryScene(opts: {
       // chips stacked instead of sequenced, stray unrelated UI, a missing required
       // logo). Only run it when the scene would otherwise be accepted, so we don't
       // pay for an extra vision call on attempts that are already being revised.
-      let correctness: CorrectnessResult = { pass: true, defects: [] };
       const aestheticPass = critiqueResult.score >= 7 && runtime.ok;
-      if (aestheticPass && !isVideoOnly) {
+      if (!useConsolidated && aestheticPass && !isVideoOnly) {
         const briefText = currentPlanned?.brief || currentPlanned?.visual_notes || currentPlanned?.description || currentPlanned?.label || opts.prompt;
         correctness = await critiqueCorrectness({
           finalFrameBase64: previewBase64,
