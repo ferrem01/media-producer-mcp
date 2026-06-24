@@ -90,6 +90,26 @@ function previewUrl(tenantId: string, projectId: string): string {
   return `${config.publicUrl}/preview?tenant=${encodeURIComponent(tenantId)}&project=${encodeURIComponent(projectId)}`;
 }
 
+/** Human ETA suffix from seconds-remaining. */
+function fmtEta(s?: number): string {
+  if (!s || s <= 0) return "";
+  return s < 60 ? `~${s}s left` : `~${Math.round(s / 60)}m left`;
+}
+
+/**
+ * Build an onProgress callback for runGeneratePipeline that maps the pipeline's
+ * 0-100 generation progress into a job's [lo,hi] percent band and writes a live
+ * step/detail/ETA onto the job (so callers see per-scene progress, not a frozen bar).
+ */
+function genProgress(j: { progress?: { step: string; percent: number; detail?: string; etaSeconds?: number } }, lo: number, hi: number) {
+  return (p: { step: string; percent: number; detail?: string; etaSeconds?: number }) => {
+    const clamped = Math.max(0, Math.min(100, p.percent));
+    const percent = Math.round(lo + (clamped / 100) * (hi - lo));
+    const eta = fmtEta(p.etaSeconds);
+    j.progress = { step: p.step, percent, detail: [p.detail, eta].filter(Boolean).join(" · ") || undefined, etaSeconds: p.etaSeconds };
+  };
+}
+
 /** Enrich a job object with preview_url when tenant and project are known. */
 function jobWithPreview(job: Record<string, unknown>): Record<string, unknown> {
   const tenantId = job.tenantId as string | undefined;
@@ -1375,6 +1395,7 @@ export function createMcpServer(): McpServer {
                 target: "video",
                 tenant_id: params.tenant_id,
                 llmConfig,
+                onProgress: genProgress(j, 10, 95),
                 brandKit: brandKit || project.brand_kit,
                 canvas: project.canvas,
                 creativity: params.creativity,
@@ -1527,6 +1548,7 @@ export function createMcpServer(): McpServer {
               target: params.target as PipelineTarget,
               tenant_id: params.tenant_id,
               llmConfig,
+              onProgress: genProgress(j, 10, 95),
               brandKit: brandKit || {
                 colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
                 fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
@@ -1755,6 +1777,7 @@ export function createMcpServer(): McpServer {
           target: "video" as PipelineTarget,
           tenant_id: params.tenant_id,
           llmConfig,
+          onProgress: genProgress(j, 25, 68),  // render takes it from 70 -> 100
           brandKit: kit,
           canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: kit.colors?.background || "#0f172a" },
           voiceover: params.voiceover ?? false,

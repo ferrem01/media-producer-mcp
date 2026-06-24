@@ -13,7 +13,7 @@ export interface Job {
   tenantId: string;
   projectId?: string;
   status: "queued" | "running" | "completed" | "failed";
-  progress?: { step: string; percent: number };
+  progress?: { step: string; percent: number; detail?: string; etaSeconds?: number };
   startedAt?: number;
   completedAt?: number;
   result?: unknown;

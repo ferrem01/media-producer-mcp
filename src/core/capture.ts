@@ -17,6 +17,54 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { resolveVideoPath } from "./video-path.js";
 
+// ── Headless-browser pool ───────────────────────────────────────────────────
+// In-process captures (per-scene critique frames + runtime validation) used to
+// COLD-LAUNCH a fresh Chromium per call (~1-2s each) -- on a multi-scene video
+// with retries that is dozens of launches. Reuse ONE long-lived browser and just
+// open/close a page per capture. Quality-neutral; Playwright supports many
+// concurrent pages on one browser. The pool self-heals if the browser dies, and
+// callers fall back to a one-off launch if pooling ever fails.
+const BROWSER_ARGS = [
+  "--enable-gpu", "--use-gl=swiftshader", "--enable-webgl",
+  "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox",
+  "--allow-file-access-from-files", "--disable-extensions",
+  "--disable-background-networking", "--disable-default-apps",
+  "--mute-audio", "--no-first-run",
+];
+let pooledBrowser: Browser | undefined;
+let pooledBrowserPromise: Promise<Browser> | undefined;
+let pooledLaunches = 0;
+
+/** Number of times the pool actually launched a browser (for tests/telemetry). */
+export function pooledLaunchCount(): number { return pooledLaunches; }
+
+async function getPooledBrowser(): Promise<Browser> {
+  if (pooledBrowser?.isConnected()) return pooledBrowser;
+  if (pooledBrowserPromise) return pooledBrowserPromise;
+  pooledBrowserPromise = chromium.launch({ args: BROWSER_ARGS })
+    .then((b) => {
+      pooledLaunches++;
+      pooledBrowser = b;
+      b.on("disconnected", () => { if (pooledBrowser === b) { pooledBrowser = undefined; } });
+      pooledBrowserPromise = undefined;
+      return b;
+    })
+    .catch((e) => { pooledBrowserPromise = undefined; throw e; });
+  return pooledBrowserPromise;
+}
+
+/** Close the pooled browser (call on shutdown; safe to call when none exists). */
+export async function closePooledBrowser(): Promise<void> {
+  const b = pooledBrowser;
+  pooledBrowser = undefined;
+  pooledBrowserPromise = undefined;
+  await b?.close().catch(() => {});
+}
+
+// Best-effort cleanup so the pooled browser doesn't outlive the process.
+process.once("exit", () => { try { pooledBrowser?.close(); } catch { /* */ } });
+
+
 const execFileAsync = promisify(execFile);
 
 export interface CaptureOptions {
@@ -165,17 +213,13 @@ export async function validateSceneRuntime(options: {
   steps?: number;
 }): Promise<{ ok: boolean; error?: string; atTime?: number }> {
   const { htmlPath, width, height, duration, steps = 12 } = options;
-  let browser: Browser | undefined;
+  let page: Page | undefined;
+  let ownBrowser: Browser | undefined;
   try {
-    browser = await chromium.launch({
-      args: [
-        "--use-gl=swiftshader", "--disable-dev-shm-usage", "--no-sandbox",
-        "--disable-setuid-sandbox", "--allow-file-access-from-files",
-        "--disable-extensions", "--disable-background-networking",
-        "--mute-audio", "--no-first-run",
-      ],
-    });
-    const page = await browser.newPage({ ignoreHTTPSErrors: true });
+    let browser: Browser;
+    try { browser = await getPooledBrowser(); }
+    catch { ownBrowser = await chromium.launch({ args: BROWSER_ARGS }); browser = ownBrowser; }
+    page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width, height });
     let pageError: string | undefined;
     page.on("pageerror", (e) => { if (!pageError) pageError = String((e as any)?.message || e); });
@@ -203,7 +247,8 @@ export async function validateSceneRuntime(options: {
     // Validation infrastructure failure -- do not block generation.
     return { ok: true };
   } finally {
-    await browser?.close().catch(() => {});
+    await page?.close().catch(() => {});
+    await ownBrowser?.close().catch(() => {});
   }
 }
 
@@ -234,27 +279,14 @@ export async function captureSingleFrame(options: {
     atTime,
   } = options;
 
-  let browser: Browser | undefined;
+  let ownBrowser: Browser | undefined;
   let page: Page | undefined;
   const tempDirs = new Set<string>();
 
   try {
-    browser = await chromium.launch({
-      args: [
-        "--enable-gpu",
-        "--use-gl=swiftshader",
-        "--enable-webgl",
-        "--disable-dev-shm-usage",
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--allow-file-access-from-files",
-        "--disable-extensions",
-        "--disable-background-networking",
-        "--disable-default-apps",
-        "--mute-audio",
-        "--no-first-run",
-      ],
-    });
+    let browser: Browser;
+    try { browser = await getPooledBrowser(); }
+    catch { ownBrowser = await chromium.launch({ args: BROWSER_ARGS }); browser = ownBrowser; }
     page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width, height });
 
@@ -380,7 +412,7 @@ export async function captureSingleFrame(options: {
     console.log(`  Captured single frame: ${outputPath}`);
   } finally {
     if (page) await page.close().catch(() => {});
-    if (browser) await browser.close().catch(() => {});
+    if (ownBrowser) await ownBrowser.close().catch(() => {});  // only close a one-off; keep the pool alive
     // Cleanup temp dirs
     for (const dir of tempDirs) {
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
