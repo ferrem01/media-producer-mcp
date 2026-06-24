@@ -1873,11 +1873,12 @@ async function runUnifiedPipeline(
         console.log(`    Applied ${editorialChanges} structural fix(es), regenerated ${regen} scene(s)`);
       }
 
-      // Score the whole video again after the fixes (one round, no further regen).
-      if (regen > 0) {
-        const after = await runEditorial();
-        console.log(`  Editorial re-score after fixes: overall=${after.overall_score} (was ${editorial.overall_score}), variety=${after.variety_score}, coherence=${after.coherence_score}`);
-      }
+      // NOTE: we deliberately do NOT re-run runEditorial() to "re-score" after
+      // regen. That second pass re-rendered every scene frame + made another large
+      // vision call, and its result was ONLY logged -- never acted on (there is no
+      // further regen round regardless of the new score). It cost ~80-150s on
+      // exactly the slowest runs (the ones that regenerate a scene) for a cosmetic
+      // log line, so dropping it is behavior-neutral and saves real time.
     } catch (e: any) {
       console.warn(`  Editorial critique failed (non-fatal): ${e.message}`);
     }
