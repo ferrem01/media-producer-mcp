@@ -70,6 +70,9 @@ export interface PipelineOpts {
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // TTS voice (default: nova)
   stockFootage?: boolean;   // default: false. Fetch stock video clips for scene backgrounds.
   backgroundMusic?: boolean;  // default: false. Add background music with voiceover ducking.
+  /** Streams fine-grained generation progress (phase + percent + per-scene detail
+   *  + rough ETA) so a caller can surface a live status instead of a frozen bar. */
+  onProgress?: (p: { step: string; percent: number; detail?: string; etaSeconds?: number }) => void;
   trace?: TraceBuilder;
 
   /** Reference images for vision-aware generation */
@@ -1441,6 +1444,7 @@ async function runUnifiedPipeline(
   // 2. Creative concept stage (generates ONE unifying idea)
   var creativeBible: CreativeBible | undefined;
   if (format !== "image") {
+    opts.onProgress?.({ step: "concept", percent: 8, detail: "Designing the creative direction" });
     trace?.beginEvent("concept_director");
     try {
       creativeBible = await generateCreativeBible({
@@ -1520,6 +1524,7 @@ async function runUnifiedPipeline(
   }
 
   // 3. Media enrichment (images, future: video, music)
+  opts.onProgress?.({ step: "media", percent: 16, detail: "Preparing imagery & assets" });
   trace?.beginEvent("media_enrichment");
   var enrichResult = await enrichProjectMedia({
     storyboard,
@@ -1624,6 +1629,14 @@ async function runUnifiedPipeline(
   const SCENE_CONCURRENCY = Math.max(1, parseInt(process.env.MP_SCENE_CONCURRENCY || "3", 10) || 3);
   const sceneResults: Array<{ scene: Scene; customSources?: Map<string, string> }> = new Array(storyboard.scenes.length);
 
+  // Per-scene progress + ETA. Scene generation spans 20%->75% of the bar; each
+  // scene that finishes nudges it forward and re-estimates time remaining from
+  // the average per-scene wall-clock so far (the bulk of the wait lives here).
+  const totalScenes = storyboard.scenes.length;
+  const sceneStart = Date.now();
+  let scenesDone = 0;
+  opts.onProgress?.({ step: "scenes", percent: 20, detail: `Generating ${totalScenes} scene${totalScenes === 1 ? "" : "s"}` });
+
   for (let batchStart = 0; batchStart < storyboard.scenes.length; batchStart += SCENE_CONCURRENCY) {
     const batchEnd = Math.min(batchStart + SCENE_CONCURRENCY, storyboard.scenes.length);
     const batch: Promise<void>[] = [];
@@ -1706,6 +1719,18 @@ async function runUnifiedPipeline(
         }
 
         sceneResults[i] = { scene: finalScene, customSources: finalCustomSources };
+
+        // Nudge progress forward + re-estimate ETA as each scene lands.
+        scenesDone++;
+        const elapsed = (Date.now() - sceneStart) / 1000;
+        const remaining = totalScenes - scenesDone;
+        const eta = scenesDone > 0 && remaining > 0 ? Math.round((elapsed / scenesDone) * remaining) : undefined;
+        opts.onProgress?.({
+          step: "scenes",
+          percent: Math.round(20 + 55 * (scenesDone / totalScenes)),
+          detail: `Scene ${scenesDone}/${totalScenes} ready`,
+          etaSeconds: eta,
+        });
       })());
     }
 
@@ -1769,6 +1794,7 @@ async function runUnifiedPipeline(
   // scenes are regenerated (bounded) with the corrective note fed back to the
   // codegen, then the whole video is scored again.
   if (opts.critique !== false && format !== "image" && project.scenes.length >= 3) {
+    opts.onProgress?.({ step: "editorial", percent: 80, detail: "Reviewing the full storyboard for plan fidelity" });
     trace?.beginEvent("editorial_critique");
     try {
       const editorialExtraDirs = [compDir, tenantComponentsDir(opts.tenant_id)];
