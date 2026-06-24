@@ -193,6 +193,7 @@ async function callAnthropic(
     body.temperature = options.temperature;
   }
 
+  var __t0 = Date.now();
   var response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -210,7 +211,12 @@ async function callAnthropic(
 
   var data = await response.json() as {
     content: Array<{ type: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
+  if (process.env.MP_LLM_TIMING) {
+    var u = data.usage || {};
+    process.stderr.write(`[llm-timing] callLLM model=${config.model} in=${u.input_tokens ?? "?"}tok out=${u.output_tokens ?? "?"}tok dur=${((Date.now() - __t0) / 1000).toFixed(1)}s\n`);
+  }
 
   var result = data.content
     .filter((block) => block.type === "text" && block.text)
@@ -251,6 +257,7 @@ async function callAnthropicAgentic(
     body.temperature = options.temperature;
   }
 
+  var __t0 = Date.now();
   var response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -269,7 +276,12 @@ async function callAnthropicAgentic(
   var data = await response.json() as {
     content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }>;
     stop_reason: string;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
+  if (process.env.MP_LLM_TIMING) {
+    var u = data.usage || {};
+    process.stderr.write(`[llm-timing] AGENTIC(codegen) model=${config.model} in=${u.input_tokens ?? "?"}tok out=${u.output_tokens ?? "?"}tok dur=${((Date.now() - __t0) / 1000).toFixed(1)}s stop=${data.stop_reason}\n`);
+  }
 
   var text: string | null = null;
   var toolCalls: LLMToolCall[] = [];
