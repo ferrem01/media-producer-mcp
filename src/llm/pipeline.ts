@@ -1156,7 +1156,54 @@ async function critiqueAndRetryScene(opts: {
 
       opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false });
 
-      // 8. Surgical re-plan: direct LLM call to fix the existing plan JSON
+      // 7b. SURGICAL PATCH fast-path. For LOCAL visual defects (contrast/overlap/
+      // clipping/off-brand) on a single custom scene component, edit the existing
+      // HTML with minimal SEARCH/REPLACE blocks instead of re-emitting the whole
+      // scene. Benchmarked ~16x faster on one fix (~80 output tokens vs ~6k for a
+      // full regen) because generation is output-bound. Structural problems --
+      // runtime errors, missing/stray components, a catastrophic score -- still take
+      // the full re-plan path below; reviseComponent itself falls back to a full
+      // rewrite if SEARCH/REPLACE can't apply, so a patch attempt never makes it worse.
+      const PATCHABLE_DEFECTS = new Set(["overlap", "illegible", "off_canvas", "off_brand_theme"]);
+      const customEntries = currentCustomSources ? [...currentCustomSources.entries()] : [];
+      const canPatch =
+        runtime.ok &&
+        customEntries.length === 1 &&
+        critiqueResult.score >= 4 &&
+        correctness.defects.length > 0 &&
+        correctness.defects.every((d) => PATCHABLE_DEFECTS.has(d.type));
+      if (canPatch) {
+        const [patchType, patchSource] = customEntries[0];
+        const patchInstructions =
+          "Fix these specific defects with the MINIMAL change; keep the layout, content, and animations otherwise intact:\n" +
+          correctness.defects.map((d, i) => `${i + 1}. [${d.type}] ${d.detail}`).join("\n") +
+          (critiqueResult.issues.length ? `\n\nAlso address if trivial: ${critiqueResult.issues.join("; ")}` : "");
+        opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_patch`);
+        try {
+          const revised = await reviseComponent({
+            existingSource: patchSource,
+            instructions: patchInstructions,
+            componentName: patchType,
+            llmConfig: opts.llmConfig,
+            brandKit: opts.brandKit,
+            canvas: opts.canvas,
+          });
+          // Copy the Map (bestCustomSources may alias it) so a patch can't clobber
+          // a previously-tracked best attempt.
+          currentCustomSources = new Map(currentCustomSources);
+          currentCustomSources.set(patchType, revised.source);
+          await fs.writeFile(path.join(opts.compDir, `${patchType}.component.html`), revised.source);
+          console.log(`  Critique: surgical patch on ${patchType} (${revised.blocksApplied} block(s)${revised.fullRewrite ? ", full-rewrite fallback" : ""})`);
+          opts.trace?.endEvent({ patched: true, blocks: revised.blocksApplied, fullRewrite: revised.fullRewrite });
+          continue; // re-assemble + re-critique the patched scene next iteration
+        } catch (e: any) {
+          console.warn(`  Surgical patch failed, falling back to full re-plan: ${e.message}`);
+          opts.trace?.endEvent({ error: e.message });
+          // fall through to the full re-plan path below
+        }
+      }
+
+      // 8. Full re-plan: direct LLM call to fix the existing plan JSON
       const existingPlanJSON = JSON.stringify(currentPlanned, null, 2);
       // Build list of valid library component types for the fix prompt
       const validTypeList = opts.catalog.map(c => c.type).join(', ');
