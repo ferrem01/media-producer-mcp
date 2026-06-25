@@ -1171,7 +1171,9 @@ async function critiqueAndRetryScene(opts: {
       // patching this scene and escalate to a full regen (a fresh design may do what
       // surgical tweaks can't). reviseComponent also self-falls-back to a full
       // rewrite if SEARCH/REPLACE can't apply, so a patch never makes things worse.
-      const STRUCTURAL_DEFECTS = new Set(["missing_asset", "stray_ui", "not_sequenced"]);
+      // off_brand_theme = a whole-scene color problem; surgical SEARCH/REPLACE can't
+      // reliably flip it, so route it to a full regen (with the correct theme) too.
+      const STRUCTURAL_DEFECTS = new Set(["missing_asset", "stray_ui", "not_sequenced", "off_brand_theme"]);
       const customEntries = currentCustomSources ? [...currentCustomSources.entries()] : [];
       const lastPatchImproved = patchAnchor < 0 || critiqueResult.score > patchAnchor;
       const canPatch =
