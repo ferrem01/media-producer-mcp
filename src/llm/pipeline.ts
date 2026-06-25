@@ -930,6 +930,10 @@ async function critiqueAndRetryScene(opts: {
   let bestCustomSources = opts.customSources;
   let bestScore = 0;
   let bestCritique: CritiqueResult | undefined;
+  // Surgical-patch improvement guard: the score at which we last patched (-1 = the
+  // last fix was a full regen / none yet). Used to escalate to a full regen if a
+  // patch fails to raise the score.
+  let patchAnchor = -1;
 
   const extraDirs = [
     opts.compDir,
@@ -1156,7 +1160,64 @@ async function critiqueAndRetryScene(opts: {
 
       opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false });
 
-      // 8. Surgical re-plan: direct LLM call to fix the existing plan JSON
+      // 7b. SURGICAL PATCH fast-path. Most retries are driven by a low aesthetic
+      // score (or local visual defects: contrast/overlap/clip/off-brand), not by
+      // structural problems. For those, edit the existing scene HTML with minimal
+      // SEARCH/REPLACE blocks instead of re-emitting the whole scene -- benchmarked
+      // ~16x faster on one fix (~80 output tokens vs ~6k) since generation is
+      // output-bound. STRUCTURAL defects (missing/stray components), runtime errors,
+      // and catastrophic scores still take the full re-plan path below.
+      // Improvement-guard: if the previous patch did NOT raise the score, stop
+      // patching this scene and escalate to a full regen (a fresh design may do what
+      // surgical tweaks can't). reviseComponent also self-falls-back to a full
+      // rewrite if SEARCH/REPLACE can't apply, so a patch never makes things worse.
+      // off_brand_theme = a whole-scene color problem; surgical SEARCH/REPLACE can't
+      // reliably flip it, so route it to a full regen (with the correct theme) too.
+      const STRUCTURAL_DEFECTS = new Set(["missing_asset", "stray_ui", "not_sequenced", "off_brand_theme"]);
+      const customEntries = currentCustomSources ? [...currentCustomSources.entries()] : [];
+      const lastPatchImproved = patchAnchor < 0 || critiqueResult.score > patchAnchor;
+      const canPatch =
+        runtime.ok &&
+        customEntries.length === 1 &&
+        critiqueResult.score >= 4 &&
+        !correctness.defects.some((d) => STRUCTURAL_DEFECTS.has(d.type)) &&
+        lastPatchImproved;
+      if (canPatch) {
+        const [patchType, patchSource] = customEntries[0];
+        const patchProblems = [
+          ...correctness.defects.map((d) => `[${d.type}] ${d.detail}`),
+          ...critiqueResult.issues,
+        ];
+        const patchInstructions =
+          "Improve this scene by fixing these problems with MINIMAL, targeted edits. Keep the content, layout structure, and animations otherwise intact:\n" +
+          patchProblems.map((p, i) => `${i + 1}. ${p}`).join("\n");
+        patchAnchor = critiqueResult.score; // remember the pre-patch score for the guard
+        opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_patch`);
+        try {
+          const revised = await reviseComponent({
+            existingSource: patchSource,
+            instructions: patchInstructions,
+            componentName: patchType,
+            llmConfig: opts.llmConfig,
+            brandKit: opts.brandKit,
+            canvas: opts.canvas,
+          });
+          // Copy the Map (bestCustomSources may alias it) so a patch can't clobber
+          // a previously-tracked best attempt.
+          currentCustomSources = new Map(currentCustomSources);
+          currentCustomSources.set(patchType, revised.source);
+          await fs.writeFile(path.join(opts.compDir, `${patchType}.component.html`), revised.source);
+          console.log(`  Critique: surgical patch on ${patchType} (${revised.blocksApplied} block(s)${revised.fullRewrite ? ", full-rewrite fallback" : ""})`);
+          opts.trace?.endEvent({ patched: true, blocks: revised.blocksApplied, fullRewrite: revised.fullRewrite });
+          continue; // re-assemble + re-critique the patched scene next iteration
+        } catch (e: any) {
+          console.warn(`  Surgical patch failed, falling back to full re-plan: ${e.message}`);
+          opts.trace?.endEvent({ error: e.message });
+          // fall through to the full re-plan path below
+        }
+      }
+
+      // 8. Full re-plan: direct LLM call to fix the existing plan JSON
       const existingPlanJSON = JSON.stringify(currentPlanned, null, 2);
       // Build list of valid library component types for the fix prompt
       const validTypeList = opts.catalog.map(c => c.type).join(', ');
@@ -1259,6 +1320,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
 
       currentScene = regenerated.scene;
       currentCustomSources = regenerated.customSources;
+      patchAnchor = -1; // a full regen resets the patch-improvement guard
 
     } catch (e: any) {
       console.error(`  Critique scene ${opts.sceneIndex} attempt ${attempt} failed: ${e.message}`);
