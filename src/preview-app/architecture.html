@@ -831,8 +831,8 @@
     <div class="pipeline-step">
       <div class="pipeline-line"><div class="pipeline-dot" style="border-color:var(--pink)"></div><div class="pipeline-connector"></div></div>
       <div class="pipeline-card">
-        <div class="step-name">5. Visual Critique <span class="step-file">critiquer.ts / multi-pass-critiquer.ts</span></div>
-        <div class="step-desc">Renders a preview frame of each scene, sends it to a vision model for evaluation. Scores the scene and suggests revisions. Multi-pass critique uses contact sheets (6 frames across the timeline) for motion evaluation. Scenes below threshold get revised.</div>
+        <div class="step-name">5. Visual Critique <span class="step-file">consolidated-critique.ts</span></div>
+        <div class="step-desc">Renders a preview frame (+ a contact sheet for motion) of each scene and runs ONE consolidated vision call that scores it on three lenses at once — functional (readability/contrast/layout), premium ("does it feel expensive"), and a hard-defect gate (overlap / off-canvas / illegible / stray-UI / missing-asset / off-brand-theme). Scenes below threshold or with defects are revised. On a retry, LOCAL fixes are applied as surgical SEARCH/REPLACE edits to the existing scene HTML (~16× faster than a full regen); structural problems and off-brand themes still get a full re-plan. A final editorial pass reviews the whole storyboard for plan fidelity.</div>
       </div>
     </div>
 
@@ -1441,9 +1441,12 @@
 <section class="view" id="view-components">
   <h2>Component Library</h2>
   <p class="description">
-    67 reusable HTML+CSS+GSAP animation components. Each is a self-contained .component.html file
+    125+ reusable HTML+CSS+GSAP animation components. Each is a self-contained .component.html file
     with a template section (HTML), style section (CSS), and script section (JS with createTimeline function).
     Components are data-driven via template binding and embeddable via <code>&lt;component&gt;</code> tags.
+    Recent additions: <strong>social</strong> overlays, <strong>maps</strong>, Apple <strong>Liquid Glass</strong> system UI,
+    CSS-<strong>3D</strong>, an expanded <strong>captions</strong> &amp; <strong>code</strong> set, and more <strong>effects</strong>.
+    (The authoritative, always-current list is the live catalog the server builds from <code>src/components/</code>.)
   </p>
 
   <h3>Component Anatomy</h3>
@@ -1467,15 +1470,16 @@
     <div class="component-card"><div class="comp-name">testimonial-card</div><div class="comp-cat">Customer testimonial</div></div>
   </div>
 
-  <div class="cat-header">📊 Data Viz <span class="cat-count">4 components</span></div>
+  <div class="cat-header">📊 Data Viz <span class="cat-count">5 components</span></div>
   <div class="component-grid">
     <div class="component-card"><div class="comp-name">bar-chart</div><div class="comp-cat">Animated bar chart</div></div>
     <div class="component-card"><div class="comp-name">line-chart</div><div class="comp-cat">Animated line chart</div></div>
     <div class="component-card"><div class="comp-name">metric-dashboard</div><div class="comp-cat">KPI dashboard</div></div>
     <div class="component-card"><div class="comp-name">progress-bar</div><div class="comp-cat">Animated progress</div></div>
+    <div class="component-card"><div class="comp-name">flowchart</div><div class="comp-cat">Animated nodes + connectors</div></div>
   </div>
 
-  <div class="cat-header">✨ Effects <span class="cat-count">9 components</span></div>
+  <div class="cat-header">✨ Effects <span class="cat-count">23 components</span></div>
   <div class="component-grid">
     <div class="component-card"><div class="comp-name">asset-transfer</div><div class="comp-cat">Asset transfer animation</div></div>
     <div class="component-card"><div class="comp-name">caption-bar</div><div class="comp-cat">Caption overlay</div></div>
@@ -1486,6 +1490,20 @@
     <div class="component-card"><div class="comp-name">panel-label</div><div class="comp-cat">Floating label</div></div>
     <div class="component-card"><div class="comp-name">particle-field</div><div class="comp-cat">Particle system</div></div>
     <div class="component-card"><div class="comp-name">split-connector</div><div class="comp-cat">Split screen connector</div></div>
+    <div class="component-card"><div class="comp-name">grain-overlay</div><div class="comp-cat">Film grain overlay</div></div>
+    <div class="component-card"><div class="comp-name">vignette</div><div class="comp-cat">Breathing vignette</div></div>
+    <div class="component-card"><div class="comp-name">parallax-zoom</div><div class="comp-cat">Ambient parallax push</div></div>
+    <div class="component-card"><div class="comp-name">shimmer-sweep</div><div class="comp-cat">Light shimmer sweep</div></div>
+    <div class="component-card"><div class="comp-name">light-leak</div><div class="comp-cat">Drifting light leaks</div></div>
+    <div class="component-card"><div class="comp-name">scanlines</div><div class="comp-cat">Retro scanlines</div></div>
+    <div class="component-card"><div class="comp-name">portal</div><div class="comp-cat">Glowing portal rings</div></div>
+    <div class="component-card"><div class="comp-name">shatter</div><div class="comp-cat">Shatter/fracture</div></div>
+    <div class="component-card"><div class="comp-name">magnetic</div><div class="comp-cat">Magnetic dot field</div></div>
+    <div class="component-card"><div class="comp-name">morph-text</div><div class="comp-cat">Word morph cycle</div></div>
+    <div class="component-card"><div class="comp-name">grid-pixelate-wipe</div><div class="comp-cat">Pixelate wipe</div></div>
+    <div class="component-card"><div class="comp-name">texture-mask-text</div><div class="comp-cat">Texture-masked text</div></div>
+    <div class="component-card"><div class="comp-name">vfx-text-cursor</div><div class="comp-cat">Typed text + caret</div></div>
+    <div class="component-card"><div class="comp-name">liquid-background</div><div class="comp-cat">Lava-lamp liquid BG</div></div>
   </div>
 
   <div class="cat-header">📐 Layouts <span class="cat-count">10 components</span></div>
@@ -1550,6 +1568,73 @@
     <div class="component-card"><div class="comp-name">text-list</div><div class="comp-cat">Animated list</div></div>
     <div class="component-card"><div class="comp-name">title-slide</div><div class="comp-cat">Title slide</div></div>
     <div class="component-card"><div class="comp-name">typewriter</div><div class="comp-cat">Typewriter effect</div></div>
+  </div>
+
+  <div class="cat-header">💬 Captions <span class="cat-count">15 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">caption-karaoke</div><div class="comp-cat">Word-by-word highlight</div></div>
+    <div class="component-card"><div class="comp-name">caption-kinetic-slam</div><div class="comp-cat">Kinetic slam</div></div>
+    <div class="component-card"><div class="comp-name">caption-neon-glow</div><div class="comp-cat">Neon glow</div></div>
+    <div class="component-card"><div class="comp-name">caption-glitch-rgb</div><div class="comp-cat">RGB glitch</div></div>
+    <div class="component-card"><div class="comp-name">caption-gradient-fill</div><div class="comp-cat">Animated gradient fill</div></div>
+    <div class="component-card"><div class="comp-name">caption-emoji-pop</div><div class="comp-cat">Emoji pop</div></div>
+    <div class="component-card"><div class="comp-name">caption-typewriter-cursor</div><div class="comp-cat">Typewriter + cursor</div></div>
+    <div class="component-card"><div class="comp-name">caption-matrix-decode</div><div class="comp-cat">Matrix glyph decode</div></div>
+    <div class="component-card"><div class="comp-name">caption-particle-burst</div><div class="comp-cat">Particle burst-in</div></div>
+    <div class="component-card"><div class="comp-name">caption-weight-shift</div><div class="comp-cat">Variable-font weight morph</div></div>
+    <div class="component-card"><div class="comp-name">caption-parallax-layers</div><div class="comp-cat">Parallax depth layers</div></div>
+    <div class="component-card"><div class="comp-name">caption-clip-wipe</div><div class="comp-cat">Clip-path wipe reveal</div></div>
+    <div class="component-card"><div class="comp-name">caption-blend-difference</div><div class="comp-cat">Difference-blend sweep</div></div>
+    <div class="component-card"><div class="comp-name">caption-editorial-emphasis</div><div class="comp-cat">Editorial word emphasis</div></div>
+    <div class="component-card"><div class="comp-name">caption-texture</div><div class="comp-cat">Textured gradient text</div></div>
+  </div>
+
+  <div class="cat-header">📱 Social <span class="cat-count">7 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">x-post-card</div><div class="comp-cat">X / Twitter post</div></div>
+    <div class="component-card"><div class="comp-name">instagram-follow</div><div class="comp-cat">Instagram follow</div></div>
+    <div class="component-card"><div class="comp-name">tiktok-follow</div><div class="comp-cat">TikTok follow</div></div>
+    <div class="component-card"><div class="comp-name">youtube-lower-third</div><div class="comp-cat">YouTube subscribe lower-third</div></div>
+    <div class="component-card"><div class="comp-name">reddit-post-card</div><div class="comp-cat">Reddit post</div></div>
+    <div class="component-card"><div class="comp-name">spotify-now-playing</div><div class="comp-cat">Spotify now-playing</div></div>
+    <div class="component-card"><div class="comp-name">linkedin-post-card</div><div class="comp-cat">LinkedIn post</div></div>
+  </div>
+
+  <div class="cat-header">🗺️ Maps <span class="cat-count">5 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">route-map</div><div class="comp-cat">Animated route arc</div></div>
+    <div class="component-card"><div class="comp-name">pin-drop</div><div class="comp-cat">Location pin drop</div></div>
+    <div class="component-card"><div class="comp-name">world-map</div><div class="comp-cat">Dot-grid world map</div></div>
+    <div class="component-card"><div class="comp-name">us-map</div><div class="comp-cat">Dot-grid US map</div></div>
+    <div class="component-card"><div class="comp-name">bubble-map</div><div class="comp-cat">Value-scaled data bubbles</div></div>
+  </div>
+
+  <div class="cat-header">🪟 System / Liquid Glass <span class="cat-count">7 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">ios26-home-screen</div><div class="comp-cat">iOS 26 home screen</div></div>
+    <div class="component-card"><div class="comp-name">liquid-glass-desktop</div><div class="comp-cat">macOS glass desktop</div></div>
+    <div class="component-card"><div class="comp-name">liquid-glass-widgets</div><div class="comp-cat">Glass widgets</div></div>
+    <div class="component-card"><div class="comp-name">liquid-glass-notification</div><div class="comp-cat">Glass notification</div></div>
+    <div class="component-card"><div class="comp-name">liquid-glass-context-menu</div><div class="comp-cat">Glass context menu</div></div>
+    <div class="component-card"><div class="comp-name">liquid-glass-media-controls</div><div class="comp-cat">Glass media controls</div></div>
+    <div class="component-card"><div class="comp-name">macos-notification</div><div class="comp-cat">macOS notification toast</div></div>
+  </div>
+
+  <div class="cat-header">🧊 3D <span class="cat-count">3 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">device-3d-showcase</div><div class="comp-cat">CSS-3D device rotate-in</div></div>
+    <div class="component-card"><div class="comp-name">code-3d-extrude</div><div class="comp-cat">3D extruded code slab</div></div>
+    <div class="component-card"><div class="comp-name">ui-3d-reveal</div><div class="comp-cat">Layered 3D UI reveal</div></div>
+  </div>
+
+  <div class="cat-header">💻 Code <span class="cat-count">6 components</span></div>
+  <div class="component-grid">
+    <div class="component-card"><div class="comp-name">code-typing</div><div class="comp-cat">Type-on code</div></div>
+    <div class="component-card"><div class="comp-name">code-diff</div><div class="comp-cat">Added/removed diff</div></div>
+    <div class="component-card"><div class="comp-name">code-highlight-sweep</div><div class="comp-cat">Highlight sweep</div></div>
+    <div class="component-card"><div class="comp-name">code-morph</div><div class="comp-cat">Before/after morph</div></div>
+    <div class="component-card"><div class="comp-name">terminal-run</div><div class="comp-cat">Terminal command run</div></div>
+    <div class="component-card"><div class="comp-name">code-particle-assemble</div><div class="comp-cat">Particle assemble</div></div>
   </div>
 
   <div class="cat-header">🔧 Shared <span class="cat-count">2 files</span></div>
@@ -1953,6 +2038,16 @@
       <span class="tag tag-core">Core</span>
     </div>
     <div class="concept-card">
+      <h4>🚀 website_to_video</h4>
+      <p>One-shot: a URL in → an on-brand rendered launch video out. Extracts the brand kit from the site (colors, fonts, logo, theme), generates scenes on it, and renders — in a single async job.</p>
+      <span class="tag tag-llm">LLM</span><span class="tag tag-core">Core</span>
+    </div>
+    <div class="concept-card">
+      <h4>🖼️ regenerate_asset</h4>
+      <p>Re-run a generated image asset in place from its stored prompt/model/size/quality — optionally with a tweak — without rebuilding the whole video. Versions the file and re-wires the scene that uses it.</p>
+      <span class="tag tag-llm">LLM</span><span class="tag tag-media">Media</span>
+    </div>
+    <div class="concept-card">
       <h4>📁 create</h4>
       <p>Create a new empty project with canvas settings and brand kit.</p>
       <span class="tag tag-data">Persistence</span>
@@ -1985,6 +2080,11 @@
     <div class="concept-card">
       <h4>🎨 brand</h4>
       <p>Manage brand kits: create, get, extract from URL.</p>
+      <span class="tag tag-media">Media</span>
+    </div>
+    <div class="concept-card">
+      <h4>🌐 extract_brand_from_website</h4>
+      <p>Extract design tokens (colors, typography, spacing, radius, motion, patterns) and logos from a live URL via Playwright; optionally LLM-enhanced. Merges into the tenant's brand kit.</p>
       <span class="tag tag-media">Media</span>
     </div>
     <div class="concept-card">
