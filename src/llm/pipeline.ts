@@ -930,6 +930,10 @@ async function critiqueAndRetryScene(opts: {
   let bestCustomSources = opts.customSources;
   let bestScore = 0;
   let bestCritique: CritiqueResult | undefined;
+  // Surgical-patch improvement guard: the score at which we last patched (-1 = the
+  // last fix was a full regen / none yet). Used to escalate to a full regen if a
+  // patch fails to raise the score.
+  let patchAnchor = -1;
 
   const extraDirs = [
     opts.compDir,
@@ -1156,28 +1160,36 @@ async function critiqueAndRetryScene(opts: {
 
       opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false });
 
-      // 7b. SURGICAL PATCH fast-path. For LOCAL visual defects (contrast/overlap/
-      // clipping/off-brand) on a single custom scene component, edit the existing
-      // HTML with minimal SEARCH/REPLACE blocks instead of re-emitting the whole
-      // scene. Benchmarked ~16x faster on one fix (~80 output tokens vs ~6k for a
-      // full regen) because generation is output-bound. Structural problems --
-      // runtime errors, missing/stray components, a catastrophic score -- still take
-      // the full re-plan path below; reviseComponent itself falls back to a full
-      // rewrite if SEARCH/REPLACE can't apply, so a patch attempt never makes it worse.
-      const PATCHABLE_DEFECTS = new Set(["overlap", "illegible", "off_canvas", "off_brand_theme"]);
+      // 7b. SURGICAL PATCH fast-path. Most retries are driven by a low aesthetic
+      // score (or local visual defects: contrast/overlap/clip/off-brand), not by
+      // structural problems. For those, edit the existing scene HTML with minimal
+      // SEARCH/REPLACE blocks instead of re-emitting the whole scene -- benchmarked
+      // ~16x faster on one fix (~80 output tokens vs ~6k) since generation is
+      // output-bound. STRUCTURAL defects (missing/stray components), runtime errors,
+      // and catastrophic scores still take the full re-plan path below.
+      // Improvement-guard: if the previous patch did NOT raise the score, stop
+      // patching this scene and escalate to a full regen (a fresh design may do what
+      // surgical tweaks can't). reviseComponent also self-falls-back to a full
+      // rewrite if SEARCH/REPLACE can't apply, so a patch never makes things worse.
+      const STRUCTURAL_DEFECTS = new Set(["missing_asset", "stray_ui", "not_sequenced"]);
       const customEntries = currentCustomSources ? [...currentCustomSources.entries()] : [];
+      const lastPatchImproved = patchAnchor < 0 || critiqueResult.score > patchAnchor;
       const canPatch =
         runtime.ok &&
         customEntries.length === 1 &&
         critiqueResult.score >= 4 &&
-        correctness.defects.length > 0 &&
-        correctness.defects.every((d) => PATCHABLE_DEFECTS.has(d.type));
+        !correctness.defects.some((d) => STRUCTURAL_DEFECTS.has(d.type)) &&
+        lastPatchImproved;
       if (canPatch) {
         const [patchType, patchSource] = customEntries[0];
+        const patchProblems = [
+          ...correctness.defects.map((d) => `[${d.type}] ${d.detail}`),
+          ...critiqueResult.issues,
+        ];
         const patchInstructions =
-          "Fix these specific defects with the MINIMAL change; keep the layout, content, and animations otherwise intact:\n" +
-          correctness.defects.map((d, i) => `${i + 1}. [${d.type}] ${d.detail}`).join("\n") +
-          (critiqueResult.issues.length ? `\n\nAlso address if trivial: ${critiqueResult.issues.join("; ")}` : "");
+          "Improve this scene by fixing these problems with MINIMAL, targeted edits. Keep the content, layout structure, and animations otherwise intact:\n" +
+          patchProblems.map((p, i) => `${i + 1}. ${p}`).join("\n");
+        patchAnchor = critiqueResult.score; // remember the pre-patch score for the guard
         opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_patch`);
         try {
           const revised = await reviseComponent({
@@ -1306,6 +1318,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
 
       currentScene = regenerated.scene;
       currentCustomSources = regenerated.customSources;
+      patchAnchor = -1; // a full regen resets the patch-improvement guard
 
     } catch (e: any) {
       console.error(`  Critique scene ${opts.sceneIndex} attempt ${attempt} failed: ${e.message}`);
