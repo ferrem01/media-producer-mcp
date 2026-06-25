@@ -62,45 +62,62 @@ model + seed + references** so it's **re-runnable / tweakable in place** —
 
 ---
 
-## Generation performance — the ~20-min problem (from the timing deep dive)
+## Generation performance — the ~20-min problem (timing deep dive)
 
-A multi-scene generate runs ~15–24 min. Traces show the cost is **call volume ×
-serialization on a CPU-bound (4-core) box**, NOT one heavy call. Per video:
-planner + concept-director, then per scene a codegen (Sonnet ~15–30s) + critique
-+ any retries (each retry = another full codegen+capture+critique), then the
-**editorial pass**. Render itself is fine (~2 min).
+A multi-scene generate ran ~22 min; after the work below the best measured run is
+**~17 min**. The **root cause is that generation is OUTPUT-BOUND**: per-call token
+instrumentation (`MP_LLM_TIMING`) showed the codegen emits **4–6k output tokens per
+scene at ~80 tok/s ≈ 50–70s**, and that cost recurs on every retry and editorial
+regen. Input size barely affects latency (a 42k-token planner call took the same
+~35s as a 9.6k-token call). On a 4-core box the headless-Chrome captures are also
+CPU-bound. Render itself is fine (~2 min).
 
 ### ✅ Shipped
 - **Browser pooling** — reuse one headless Chrome instead of cold-launching per
   capture (~seconds → ~100ms/capture). PR #10.
 - **Consolidated per-scene critique** — 3 vision calls → 1 (functional+premium+
-  correctness in one call). ~2× at the call level + more thorough; deleted the old
-  3-pass path. PR #11. *(Real but small at the whole-generation level — swamped by variance.)*
+  correctness in one call); deleted the old 3-pass path. ~2× at the call level +
+  more thorough. PR #11.
+- **Editorial: drop the wasted post-regen re-score** — it re-rendered every frame +
+  made a second big vision call only to `console.log` a score nothing used.
+  ~80–150s back on the slowest runs, zero quality impact. PR #12.
+- **Surgical SEARCH/REPLACE patching in the critique loop** — a retry patches the
+  existing scene HTML with minimal blocks instead of re-emitting the whole ~6k-token
+  scene. Benchmarked **~16× faster** on a local fix (84 output tokens vs 5,935;
+  3.8s vs 61.7s). Covers score-driven "premium feel" retries + local visual defects;
+  `off_brand_theme`/structural defects/runtime errors route to a full regen; an
+  improvement-guard escalates to regen if a patch doesn't raise the score. PR #13.
 - **Configurable scene concurrency** (`MP_SCENE_CONCURRENCY`) — pays off on more
   cores; on a 4-core box raising it oversubscribes CPU and is slower. PR #8/#10.
 - **Per-scene progress + ETA** so the long wait is communicative. PR #10.
+- **`MP_LLM_TIMING`** diagnostic (per-call in/out tokens + duration). PR #13.
 
-### 🔬 Editorial pass deep-dive findings (biggest single chunk: 160–300s, ~20% of a run)
-`runEditorial()` = render every scene's frame → tile a storyboard → ONE big-image
-vision call → regenerate up to 2 flagged scenes → **then run the whole pass AGAIN
-to "re-score."**
-- **🅰 FREE WIN — the re-score is pure waste:** after regen it re-renders all frames
-  + makes a second large vision call, and the result is **only `console.log`'d**
-  (never used for a decision). Removing it saves ~80–150s on exactly the slowest
-  runs (the ones that regenerate a scene), zero quality impact. *Do this first.*
-- **🅱 Downscale the storyboard image** before the vision call — latency scales with
-  image size; the tiled N-frame storyboard is large. Quality-neutral.
-- **🅲 Reuse per-scene frames** already captured in the per-scene loop instead of
-  re-rendering them for the storyboard.
-- **🅳 `quality: "preview"` mode** that skips/lightens the editorial pass (keep it for
-  production). Biggest cut for the iteration loop; small quality tradeoff.
-- **🅴 Cap editorial regen 2 → 1** (fewer codegen regens).
+### ❌ Investigated and ruled OUT (don't chase these)
+- **Compact/trimmed planner catalog** — input size doesn't drive latency, so it's a
+  *cost* win, not speed; and the planner uses the field info to brief well.
+- **Cap codegen `max_tokens`** — scenes stop naturally at 4–6k (`stop=tool_use`, never
+  hitting the 16k ceiling), so a cap can't speed the typical scene — it only
+  truncates (breaks) the rare large one.
+- **Lower the retry cap** — retries are already capped (2); the cost is legitimate
+  work, not a runaway.
+- **A planner search/lookup tool** — would add per-lookup round-trips (~10s each) →
+  slower, not faster.
 
-### Other timing levers (tradeoffs / infra)
-- **Per-scene render cache** — re-rendering re-renders ALL scenes; a content-hash
-  cache would make iteration *re-renders* near-instant (skip unchanged scenes).
+### Remaining levers (tradeoffs / infra)
+- **🅳 `quality: "preview"` mode** — skip/lighten the **editorial pass** (still the
+  single biggest block at ~160–220s) for previews; keep it for production. Biggest
+  remaining cut; small quality tradeoff.
+- **Downscale the storyboard image** before the editorial vision call (quality-neutral).
+- **Reuse per-scene frames** in editorial instead of re-rendering them.
+- **Per-scene render cache** — re-render skips unchanged scenes (fast iteration re-renders).
 - **More CPU cores** — the only quality-neutral way to make concurrency help.
-- **Cap per-scene retries** / **fewer scenes** — bounded quality tradeoffs.
+- **Fewer/shorter scenes** — bounded quality tradeoff.
+
+### The honest floor
+Generation is fundamentally **output-bound**: when scenes genuinely need a full regen,
+and for the editorial pass, you're paying real token-generation time at ~80 tok/s.
+Cracking ~17 → ~10 min needs the **tradeoff** levers above (preview mode, fewer
+scenes) or **more compute** — not another free win.
 
 ### Iteration story (confirmed good — keep it)
 Follow-on edits are NOT 20 min: plan edits (add/remove/reorder scene) are instant;
