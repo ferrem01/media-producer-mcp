@@ -126,6 +126,75 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown): 
   res.end(JSON.stringify(body));
 }
 
+const SERVICE_VERSION = "0.1.0";
+
+function escHtml(s: string): string {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Root landing page served at `/`. Surfaces the MCP endpoint URL, live health,
+ * and the list of registered tools -- generated DYNAMICALLY from the live MCP
+ * server (`_registeredTools`) so it can never go stale as tools are added/removed.
+ */
+function renderMcpLanding(server: unknown): string {
+  let tools: Array<{ name: string; description: string }> = [];
+  try {
+    const reg = (server as { _registeredTools?: Record<string, { description?: string; enabled?: boolean }> })._registeredTools || {};
+    tools = Object.entries(reg)
+      .filter(([, t]) => t.enabled !== false)
+      .map(([name, t]) => ({ name, description: (t.description || "").trim() }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch { /* fall back to empty list */ }
+
+  const mcpUrl = `${config.publicUrl}/mcp`;
+  const rows = tools.map((t) =>
+    `<tr><td><code>${escHtml(t.name)}</code></td><td>${escHtml(t.description) || "<span class=muted>—</span>"}</td></tr>`
+  ).join("\n");
+
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Media Producer MCP</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background: #0b0b14; color: #e7e7ef; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 40px 24px 64px; }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: 26px; margin: 0; letter-spacing: -0.01em; }
+  .status { color: #34d399; font-weight: 600; font-size: 14px; }
+  .ver { color: #8f8f9f; font-size: 13px; }
+  .endpoint { margin: 22px 0; padding: 14px 16px; background: #15151f; border: 1px solid #262633; border-radius: 12px; }
+  .endpoint .label { color: #8f8f9f; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #1e1e2b; padding: 2px 7px; border-radius: 6px; font-size: 13.5px; }
+  .endpoint code { font-size: 15px; }
+  nav { margin: 8px 0 28px; display: flex; gap: 8px; flex-wrap: wrap; }
+  nav a { color: #a78bfa; text-decoration: none; font-size: 14px; padding: 6px 12px; border: 1px solid #262633; border-radius: 8px; }
+  nav a:hover { background: #15151f; }
+  h2 { font-size: 16px; margin: 28px 0 12px; color: #c4c4d4; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #1e1e2b; vertical-align: top; }
+  th { color: #8f8f9f; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+  td:first-child { white-space: nowrap; }
+  .muted { color: #6b6b7b; }
+</style></head>
+<body><div class="wrap">
+  <header><h1>Media Producer MCP</h1><span class="status">● healthy</span><span class="ver">v${SERVICE_VERSION}</span></header>
+  <p class="muted">AI-powered video &amp; image production server — prompt in, on-brand rendered media out.</p>
+  <div class="endpoint"><div class="label">MCP endpoint</div><code>${escHtml(mcpUrl)}</code></div>
+  <nav>
+    <a href="/architecture">Architecture &amp; docs</a>
+    <a href="/preview">Preview SPA</a>
+    <a href="/playground">Playground</a>
+    <a href="/health">Health (JSON)</a>
+  </nav>
+  <h2>Tools <span class="muted">(${tools.length})</span></h2>
+  <table><thead><tr><th>Tool</th><th>Description</th></tr></thead><tbody>
+${rows}
+  </tbody></table>
+</div></body></html>`;
+}
+
+
 
 // ── MCP HTTP transport session map ──
 const mcpTransports: Record<string, StreamableHTTPServerTransport> = {};
@@ -418,8 +487,13 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Health ──
-      if (url === "/health" || url === "/") {
-        jsonResponse(res, 200, { status: "ok", service: "media-producer-mcp", version: "0.1.0" });
+      if (urlPath === "/health") {
+        jsonResponse(res, 200, { status: "ok", service: "media-producer-mcp", version: SERVICE_VERSION });
+        return;
+      }
+      if (urlPath === "/" || url === "/") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+        res.end(renderMcpLanding(server));
         return;
       }
 
