@@ -110,25 +110,12 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
       gsapDir,
       background: scene.background,
       transparentBackground: scene.transparent_background,
-      backgroundVideo: scene.background_video,
       preview,
       speakerUrl,
     });
   }
 
   return assembleScene({ scene, components, brandKit, canvas, gsapDir, preview, speakerUrl });
-}
-
-/**
- * Background b-roll markup: the footage as a PROMINENT background (it should read
- * as real footage, not faint wallpaper) plus a legibility scrim -- a vertical
- * gradient that darkens the top and bottom (where titles/captions sit) while
- * letting the footage breathe through the middle. z-index 0 (video) / 1 (scrim),
- * below scene content (z-index 2+).
- */
-function buildBrollBackground(videoPath: string): string {
-  return `<video class="mp-bg-video" src="file://${videoPath}" autoplay muted loop playsinline style="position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;opacity:0.92;filter:brightness(0.82) saturate(1.05);"></video>` +
-    `\n<div class="mp-bg-scrim" style="position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,0.45) 0%,rgba(0,0,0,0.12) 28%,rgba(0,0,0,0.12) 60%,rgba(0,0,0,0.62) 100%);"></div>`;
 }
 
 /**
@@ -290,7 +277,6 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 <body>
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? '' : '<div class="mp-ambient"></div>'}
-${scene.background_video ? buildBrollBackground(scene.background_video) : ''}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
 ${buildContentRegionWrapper(scene, componentBlocks)}
 </div>
@@ -358,8 +344,6 @@ export async function assembleCodegenScene(options: {
   background?: string;
   /** When true, use transparent background */
   transparentBackground?: boolean;
-  /** Background video path */
-  backgroundVideo?: string;
   /** Keep HTTP paths for preview */
   preview?: boolean;
   /** Speaker URL for resolving "speaker" references */
@@ -368,7 +352,7 @@ export async function assembleCodegenScene(options: {
   const {
     sceneSource, componentSources, brandKit, canvas, duration,
     sceneId, gsapDir, background, transparentBackground,
-    backgroundVideo, preview, speakerUrl,
+    preview, speakerUrl,
   } = options;
 
   // 1. Parse the scene source
@@ -483,7 +467,6 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 <body>
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
-${backgroundVideo ? buildBrollBackground(backgroundVideo) : ""}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}
 <div class="mp-scene-content" style="position:absolute;top:20px;left:20px;width:${canvas.width}px;height:${canvas.height}px;z-index:2;">
 ${tagResult.html}

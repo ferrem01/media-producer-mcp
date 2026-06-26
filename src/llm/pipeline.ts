@@ -1596,17 +1596,20 @@ async function runUnifiedPipeline(
 
   // 3b. Stock footage / b-roll backgrounds -- planner-decided per scene.
   // The planner tags scenes with a broll_query when real motion footage belongs
-  // behind them; we fetch a matching Pexels clip for each. Capped so b-roll stays
-  // intentional (and we don't hammer Pexels). Only gated by PEXELS_API_KEY.
-  var stockFootageMap = new Map<number, string>();
+  // behind them; we fetch a matching Pexels clip into the project's assets dir and
+  // hand its URL to the codegen, which PLACES it as the scene background itself
+  // (exactly like a hero image -- the agent owns the composition, no special
+  // injection). Capped so b-roll stays intentional. Gated by PEXELS_API_KEY.
+  var brollUrlMap = new Map<number, string>();
   if (process.env.PEXELS_API_KEY) {
     trace?.beginEvent("stock_footage");
-    const stockDir = path.join(projectDir(opts.tenant_id, projectId), "stock");
+    const assetsDir = path.join(projectDir(opts.tenant_id, projectId), "assets");
+    await fs.mkdir(assetsDir, { recursive: true });
     const MAX_BROLL = 5;
     let fetched = 0;
     for (let si = 0; si < storyboard.scenes.length; si++) {
       const planned = storyboard.scenes[si];
-      // Skip scenes that already have a generated hero image.
+      // A scene gets b-roll OR a hero image, never both.
       if (enrichResult.imageUrls.has(si)) continue;
 
       const query: string | null = planned.broll_query || null;
@@ -1616,20 +1619,21 @@ async function runUnifiedPipeline(
         continue;
       }
 
+      const filename = `broll_scene_${si}.mp4`;
       const clip = await fetchStockFootage({
         query,
         minDuration: planned.duration_seconds,
-        outputDir: stockDir,
-        filename: `stock_scene_${si}.mp4`,
+        outputDir: assetsDir,
+        filename,
       });
       if (clip) {
-        stockFootageMap.set(si, clip.localPath);
+        brollUrlMap.set(si, `/assets/${opts.tenant_id}/projects/${projectId}/assets/${filename}`);
         fetched++;
         console.log(`  B-roll scene ${si} "${planned.label}": "${query}"`);
       }
     }
-    console.log(`  Stock footage: ${stockFootageMap.size} clip(s) fetched`);
-    trace?.endEvent({ clips: stockFootageMap.size });
+    console.log(`  Stock footage: ${brollUrlMap.size} clip(s) fetched`);
+    trace?.endEvent({ clips: brollUrlMap.size });
   }
 
   // 3c. Enforce mandatory behaviors (voiceover, bookend detection)
@@ -1713,7 +1717,7 @@ async function runUnifiedPipeline(
           projectId,
           referenceImages: processedRefs,
           creativeBible,
-          hasBackgroundVideo: stockFootageMap.has(i),
+          brollVideoUrl: brollUrlMap.get(i),
         });
 
         // Save custom component HTML if needed
@@ -1790,10 +1794,6 @@ async function runUnifiedPipeline(
     if (planned.voiceover_text) {
       if (!scene.audio_hints) scene.audio_hints = {};
       scene.audio_hints.voiceover_text = planned.voiceover_text;
-    }
-    // Attach stock footage path as scene background video
-    if (stockFootageMap.has(si)) {
-      scene.background_video = stockFootageMap.get(si);
     }
     project.scenes.push(scene);
   }
@@ -1907,13 +1907,12 @@ async function runUnifiedPipeline(
             scene: planned, sceneIndex: idx, totalScenes: project.scenes.length, prompt: richPrompt, format,
             llmConfig: opts.llmConfig, brandKit, canvas, imageUrl: enrichResult.imageUrls.get(idx),
             tenantId: opts.tenant_id, projectId, referenceImages: processedRefs, creativeBible,
-            hasBackgroundVideo: stockFootageMap.has(idx),
+            brollVideoUrl: brollUrlMap.get(idx),
             critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its planned intent. ${fix.detail}`,
           });
           if (re.customSources) for (const [n, h] of re.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
           const newScene = re.scene;
           if (planned.voiceover_text) { if (!newScene.audio_hints) newScene.audio_hints = {}; newScene.audio_hints.voiceover_text = planned.voiceover_text; }
-          if (stockFootageMap.has(idx)) newScene.background_video = stockFootageMap.get(idx);
           project.scenes[idx] = newScene;
           regen++;
           console.log(`    Editorial: regenerated scene ${idx + 1} to match intent`);

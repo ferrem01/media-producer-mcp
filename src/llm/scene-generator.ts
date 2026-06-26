@@ -31,8 +31,8 @@ export interface SceneGeneratorOpts {
   critiqueFeedback?: string; // feedback from visual critiquer for retry
   referenceImages?: ReferenceImage[];
   creativeBible?: CreativeBible;
-  /** True when this scene has b-roll stock footage as its background. */
-  hasBackgroundVideo?: boolean;
+  /** URL of a b-roll stock clip for the agent to place as this scene's background. */
+  brollVideoUrl?: string;
 }
 
 export interface GeneratedScene {
@@ -85,7 +85,7 @@ async function generateCodegenScene(
     critiqueFeedback: opts.critiqueFeedback,
     referenceImages: opts.referenceImages,
     creativeBible: opts.creativeBible,
-    hasBackgroundVideo: opts.hasBackgroundVideo,
+    brollVideoUrl: opts.brollVideoUrl,
     heroImageUrl: opts.imageUrl,
   });
 

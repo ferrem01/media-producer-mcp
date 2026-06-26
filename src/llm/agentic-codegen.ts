@@ -44,8 +44,8 @@ export interface AgenticCodegenOpts {
   llmConfig: LLMConfig;
   brandKit: BrandKit;
   canvas: Canvas;
-  /** True when real video footage (b-roll) is already placed behind this scene. */
-  hasBackgroundVideo?: boolean;
+  /** URL of a b-roll stock clip to place as this scene's full-bleed video background. */
+  brollVideoUrl?: string;
   /** URL of a generated hero image to use as this scene's full-bleed still background. */
   heroImageUrl?: string;
   critiqueFeedback?: string;
@@ -304,13 +304,16 @@ Your submitted HTML must be a single .scene.html file with three sections:
 ${brandVarsContext}
 ${opts.referenceImages?.length ? buildReferenceImageSummary(opts.referenceImages) + "\nReference images show the target visual design. Your HTML+CSS should match the layout, colors, typography, spacing, and component hierarchy shown in these references.\n" : ""}
 ## This Scene
-${opts.hasBackgroundVideo ? `
-## FOOTAGE-FORWARD SCENE (real video b-roll is already behind your content)
-This scene ALREADY has real cinematic video footage filling the background (placed by the system, with a legibility scrim). It is the hero of the scene -- treat it like a film establishing shot, not wallpaper.
-- DO NOT add any of your own full-screen background: NO gradient-background, mesh-gradient, particle fields, grids, glow orbs, or any element that covers the footage. The footage IS the background.
-- Keep the foreground MINIMAL: a headline/tagline and at most one small supporting element (e.g. a small logo or a thin underline). Lots of negative space -- let the footage breathe.
-- Make text legible over moving video: large, heavy weight, white or near-white, with a soft text-shadow or a small local gradient pad behind the words (not a full-screen overlay).
-- Your root container MUST be transparent (background: transparent) so the footage shows through. Animate the text in/out; do not animate a background.
+${opts.brollVideoUrl ? `
+## FOOTAGE-FORWARD SCENE (place real video b-roll as this scene's background)
+This scene has a real cinematic video clip that MUST be the full-bleed background -- a film establishing shot, the hero of the scene. YOU place it (just like any video).
+- Place it as the FIRST element in your <template>, filling the frame:
+  \`<video class="mp-broll" src="${opts.brollVideoUrl}" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;"></video>\`
+  (Keep the src EXACTLY as given -- the system resolves it to the real file at render time and an http URL in preview.)
+- Add a soft legibility scrim ABOVE the video at z-index:1 (e.g. a subtle vertical linear-gradient darkening the top and bottom where text sits), so captions stay readable while the footage breathes through the middle.
+- DO NOT add any OTHER full-screen background (NO gradient-background, mesh, particles, grids, glow orbs) -- the footage IS the background. Keep your root container transparent.
+- Keep the foreground MINIMAL: a headline/tagline and at most one small supporting element. Lots of negative space. Place foreground content at z-index:2+.
+- Make text legible over moving video: large, heavy weight, white or near-white, with a soft text-shadow. Animate the text in/out; do not animate the footage.
 ` : ""}
 ${opts.heroImageUrl ? `
 ## HERO-IMAGE SCENE (a generated still image is THIS scene's background)
