@@ -136,23 +136,6 @@ async function main() {
       { timeout: 15000 }
     );
 
-    // ── Deterministic GSAP clock ──
-    // Stop GSAP's real-time ticker so animations never free-run between
-    // screenshots. Without this, anything not on the master timeline (idle
-    // floats, loose pulses the codegen wrote) advances by a variable amount of
-    // wall-clock time per frame and jitters. We instead drive the global clock
-    // to each frame's exact time in the loop below, so EVERY animation renders
-    // frame-accurately -- the canonical GSAP offline-render approach.
-    await page.evaluate(() => {
-      try {
-        const g = (window as any).gsap;
-        if (g && g.ticker && g.updateRoot) {
-          g.ticker.lagSmoothing(0);
-          g.ticker.remove(g.updateRoot); // stop the rAF-driven auto-advance; we drive time per frame
-        }
-      } catch { /* gsap may be absent on a purely static scene */ }
-    });
-
     // ── Phase 1: Discover video elements ──
     const videoInfos: VideoElementInfo[] = await page.evaluate(() => {
       const videos = document.querySelectorAll("video");
@@ -222,15 +205,12 @@ async function main() {
     for (let frame = 0; frame < totalFrames; frame++) {
       const time = frame / args.fps;
 
-      // Advance to this frame's exact time. First drive the GLOBAL clock so
-      // every animation (incl. loose ones not on the master) is sampled at t,
-      // then pin the paused master timeline to t. Swallow a throwing component
-      // callback so one fragile scene doesn't abort the whole capture.
+      // Seek the master timeline to this frame's exact time. The scene assembler
+      // folds every animation (incl. loose tweens the components created) onto
+      // the master, so this single deterministic seek renders the whole frame
+      // accurately. Swallow a throwing component callback so one fragile scene
+      // doesn't abort the whole capture.
       await page.evaluate((t: number) => {
-        try {
-          const g = (window as any).gsap;
-          if (g && g.updateRoot) g.updateRoot(t); // render the entire GSAP root at absolute time t
-        } catch { /* */ }
         try { (window as any).__MP_TIMELINE.time(t); } catch { /* component callback threw; capture current state */ }
       }, time);
 

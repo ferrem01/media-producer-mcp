@@ -1,73 +1,65 @@
 /**
- * Proves the deterministic-clock render fix used by capture-worker.ts.
+ * Proves the render-determinism fix (scene-assembler.ts): loose GSAP animations
+ * the codegen creates outside the master timeline are FOLDED onto the master at
+ * assembly time, so the renderer's single `master.time(t)` seek renders every
+ * animation frame-accurately. Without it, loose tweens free-run on wall-clock
+ * time between screenshots and jitter in the captured video.
  *
- * A loose GSAP animation (one NOT added to the master timeline -- e.g. an idle
- * pulse the codegen wrote) must, during render, advance SMOOTHLY frame to frame
- * and identically every run. Otherwise it free-runs on wall-clock time between
- * screenshots and jitters in the captured video.
- *
- * The fix: stop GSAP's rAF ticker (ticker.remove(updateRoot)) and per frame call
- * updateRoot(frame/fps) so the whole root renders at the exact frame time.
+ * Mirrors what the assembler emits: a master timeline, some loose tweens, then
+ * the re-parent loop. Asserts the same frame-time renders byte-identically.
  *
  * Usage: node test/render-determinism.mjs
  */
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const gsap = fs.readFileSync(path.resolve(__dirname, "../node_modules/gsap/dist/gsap.min.js"), "utf8");
-const FPS = 30, FRAMES = 24;
 
-const HTML = `<!doctype html><body style="margin:0"><div id="logo"></div>
-<script>${gsap}</script><script>
-  var master = gsap.timeline({ paused: true });
-  master.from('#logo', { y: 200, duration: 1 }, 0);
-  // loose pulse -- intentionally NOT on the master timeline (this is what jitters)
-  gsap.to('#logo', { scale: 1.5, repeat: -1, yoyo: true, duration: 0.8, ease: 'sine.inOut' });
-  window.__MP_TIMELINE = master; window.__MP_READY = true;
-</script></body>`;
-fs.writeFileSync("/tmp/render-determinism.html", HTML);
-
-async function series(useFix) {
-  const browser = await chromium.launch({ args: ["--no-sandbox"] });
-  const page = await browser.newPage();
-  await page.goto("file:///tmp/render-determinism.html", { waitUntil: "networkidle" });
-  await page.waitForFunction(() => window.__MP_READY === true);
-  if (useFix) await page.evaluate(() => {
-    const g = window.gsap; g.ticker.lagSmoothing(0); g.ticker.remove(g.updateRoot);
+// The re-parent snippet exactly as scene-assembler.ts injects it.
+const REPARENT = `try {
+  gsap.globalTimeline.getChildren(false, true, true).forEach(function (a) {
+    if (a !== master && a.parent === gsap.globalTimeline) { master.add(a, a.startTime()); }
   });
-  const out = [];
-  for (let f = 0; f < FRAMES; f++) {
-    const t = f / FPS;
-    await page.evaluate(({ t, useFix }) => {
-      if (useFix && window.gsap.updateRoot) window.gsap.updateRoot(t);
-      try { window.__MP_TIMELINE.time(t); } catch {}
-    }, { t, useFix });
-    await page.screenshot({ type: "jpeg", quality: 90 }); // force a render, like the real loop
-    out.push(Number(Number(await page.evaluate(() => window.gsap.getProperty('#logo', 'scale'))).toFixed(3)));
-  }
+} catch (e) {}`;
+
+function html(withFix) {
+  return `<!doctype html><body style="margin:0;width:1920px;height:1080px;background:#0b0b14">
+  <div id="logo" style="position:absolute;left:910px;top:490px;width:100px;height:100px;background:#fff"></div>
+  <script>${gsap}</script><script>(function(){
+    var master = gsap.timeline({ paused: true });
+    master.from('#logo', { y: 200, duration: 1 }, 0);
+    // loose tweens the "components" created (NOT on master) -- what jitters
+    gsap.to('#logo', { scale: 1.5, repeat: -1, yoyo: true, duration: 0.8, ease: 'sine.inOut' });
+    gsap.to('#logo', { rotation: 360, repeat: -1, duration: 2, ease: 'none' });
+    ${withFix ? REPARENT : ""}
+    window.__MP_TIMELINE = master; window.__MP_READY = true;
+  })();</script></body>`;
+}
+
+async function run(withFix) {
+  fs.writeFileSync("/tmp/rd.html", html(withFix));
+  const browser = await chromium.launch({ args: ["--no-sandbox"] });
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  await page.goto("file:///tmp/rd.html", { waitUntil: "networkidle" });
+  await page.waitForFunction(() => window.__MP_READY === true);
+  const at = async (t) => { await page.evaluate((t) => { try { window.__MP_TIMELINE.time(t); } catch {} }, t);
+    return crypto.createHash("md5").update(await page.screenshot({ type: "png" })).digest("hex"); };
+  const h1 = await at(2.0);
+  for (const t of [2.1, 2.2, 2.3, 2.4, 2.5]) await at(t); // real frames in between (forces rAF)
+  const h2 = await at(2.0);
+  const s = []; for (const t of [2.0, 2.2, 2.4]) s.push(await at(t)); // must still differ (animates)
   await browser.close();
-  return out;
+  return { sameT: h1 === h2, animates: new Set(s).size > 1 };
 }
 
-const a = await series(true);
-const b = await series(true);
-
-const reproducible = a.join() === b.join();
-// the loose tween isn't frozen: it actually moves
-const animates = new Set(a).size > 3;
-// and moves smoothly: only a couple direction reversals (at the pulse peaks), not jittery
-let reversals = 0;
-for (let i = 2; i < a.length; i++) {
-  const d1 = a[i - 1] - a[i - 2], d2 = a[i] - a[i - 1];
-  if (d1 * d2 < 0 && Math.abs(d2) > 0.02) reversals++;
-}
-const smooth = reversals <= 3;
-
-console.log("scale series:", a.join(" "));
-console.log(`reproducible run-to-run: ${reproducible} | animates: ${animates} | smooth (reversals=${reversals}): ${smooth}`);
-const pass = reproducible && animates && smooth;
-console.log(`=== render determinism: ${pass ? "PASS" : "FAIL"} ===`);
+const off = await run(false);
+const on = await run(true);
+console.log("WITHOUT re-parent: same-frame identical?", off.sameT);
+console.log("WITH re-parent:    same-frame identical?", on.sameT, "| animates:", on.animates);
+const pass = on.sameT && on.animates && !off.sameT;
+console.log(`\n=== render determinism: ${pass ? "PASS" : "FAIL"} ===`);
 process.exit(pass ? 0 : 1);
