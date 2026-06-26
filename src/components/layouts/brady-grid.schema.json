@@ -1,0 +1,35 @@
+{
+  "type": "brady-grid",
+  "label": "Brady Grid",
+  "category": "layouts",
+  "description": "Brady Bunch-style 3x3 grid that tiles a single video across up to nine cells, each with an optional start offset and label. Good for team intros or montage moments.",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "Grid Title",
+      "optional": true,
+      "placeholder": "The Quotient Team"
+    },
+    "src": {
+      "type": "string",
+      "label": "Video Source URL",
+      "required": true
+    },
+    "labels": {
+      "type": "array",
+      "label": "Cell Labels",
+      "optional": true
+    },
+    "start_at": {
+      "type": "number",
+      "label": "Default Start Time (seconds)",
+      "optional": true,
+      "default": 0
+    },
+    "offsets": {
+      "type": "array",
+      "label": "Per-Cell Start Offsets (seconds)",
+      "optional": true
+    }
+  }
+}

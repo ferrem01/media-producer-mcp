@@ -8,6 +8,7 @@
 
 import fs from "node:fs/promises";
 import { normalizeHtmlUrls } from "./normalize-urls.js";
+import { writeComponentSchema } from "./component-schema.js";
 import path from "node:path";
 import { config } from "../config.js";
 import { assembleScene } from "./scene-assembler.js";
@@ -101,7 +102,13 @@ export async function saveGeneratedComponent(
   await fs.mkdir(tenantCompDir, { recursive: true });
 
   const filePath = path.join(tenantCompDir, `${type}.component.html`);
-  await fs.writeFile(filePath, normalizeHtmlUrls(source));
+  const normalized = normalizeHtmlUrls(source);
+  await fs.writeFile(filePath, normalized);
+
+  // Pair it with a schema so the planner can actually see + select it.
+  // (Without this, generated components render-if-referenced but are invisible
+  // to the catalog the planner orders from.)
+  await writeComponentSchema(tenantCompDir, type, category, normalized);
 
   return filePath;
 }

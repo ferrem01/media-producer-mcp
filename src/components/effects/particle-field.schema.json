@@ -1,0 +1,32 @@
+{
+  "type": "particle-field",
+  "label": "Particle Field",
+  "category": "effects",
+  "description": "Ambient animated particle system for use as a decorative background layer. Particles drift across the canvas and optionally connect to nearby particles with thin lines. Place behind content (lower z-index).",
+  "data": {
+    "color": {
+      "type": "string",
+      "label": "Particle Color",
+      "optional": true,
+      "default": "#A78BFA"
+    },
+    "count": {
+      "type": "number",
+      "label": "Particle Count",
+      "optional": true,
+      "default": 60
+    },
+    "speed": {
+      "type": "number",
+      "label": "Drift Speed",
+      "optional": true,
+      "default": 1
+    },
+    "connected": {
+      "type": "boolean",
+      "label": "Connect Particles With Lines",
+      "optional": true,
+      "default": true
+    }
+  }
+}

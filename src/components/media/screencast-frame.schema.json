@@ -1,0 +1,24 @@
+{
+  "type": "screencast-frame",
+  "label": "Screencast Frame",
+  "category": "media",
+  "description": "Displays a screen recording (video) or screenshot (still image) inside a clean device-style viewport frame. Provide video_url for a clip or image_url for a still.",
+  "data": {
+    "video_url": {
+      "type": "string",
+      "label": "Video URL",
+      "optional": true
+    },
+    "image_url": {
+      "type": "string",
+      "label": "Image URL",
+      "optional": true
+    },
+    "video_start_at": {
+      "type": "number",
+      "label": "Video Start Time (seconds)",
+      "optional": true,
+      "default": 0
+    }
+  }
+}

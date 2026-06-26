@@ -18,6 +18,7 @@ import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
+import { writeComponentSchema } from "./core/component-schema.js";
 import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit } from "./persistence/brand-kit.js";
@@ -821,20 +822,8 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           await fs.mkdir(saveDir, { recursive: true });
           await fs.writeFile(path.join(saveDir, `${type}.component.html`), source, "utf-8");
 
-          // Try to extract schema from the component and save a basic schema
-          const parsed = parseComponent(source);
-          const schema = {
-            type,
-            category,
-            label: type.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
-            description: "Custom component",
-            data: parsed.schema || {},
-          };
-          await fs.writeFile(
-            path.join(saveDir, `${type}.schema.json`),
-            JSON.stringify(schema, null, 2),
-            "utf-8",
-          );
+          // Pair it with a schema so the planner can see + select it.
+          await writeComponentSchema(saveDir, type, category, source);
 
           jsonResponse(res, 200, { ok: true });
         } catch (err) {
