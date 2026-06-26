@@ -289,7 +289,7 @@ RULES:
 - Text: None. Zero words. This is a visual palette cleanser.
 - Animation: Continuous ambient motion. Gradients shift, particles drift, light plays.
 - Duration: 2-3s
-- Note: ONLY use if the video is 6+ scenes. Short videos should skip this.
+- Note: use when the video is 4+ scenes (a brief ambient/atmosphere beat adds cinematic breathing room). Very short 1-3 scene videos should skip this.
 
 ---
 

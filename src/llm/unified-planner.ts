@@ -12,7 +12,7 @@ import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js
 import type { CreativeBible } from "./concept-director.js";
 import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
 import { SCENE_TEMPLATES } from "./scene-templates.js";
-import { COMPOSITION_PLAYBOOK } from "./cinematography.js";
+import { COMPOSITION_PLAYBOOK, PACING_PLAYBOOK } from "./cinematography.js";
 import { getStorytellingGuide } from "./design-skills.js";
 import { formatTemplateCatalogForPrompt } from "./template-catalog.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage } from "../core/types.js";
@@ -241,7 +241,11 @@ ${templateCatalogStr}
 
 ${SCENE_TEMPLATES}
 
-${COMPOSITION_PLAYBOOK}`;
+${COMPOSITION_PLAYBOOK}
+
+## Pacing & Narrative Arc (apply to the WHOLE sequence, every time)
+This applies to EVERY video regardless of how detailed the prompt is -- do not let every scene sit at the same energy. Order the scenes with a deliberate HIGH->low->HIGH rhythm and a clear emotional arc, and name the arc you're using.
+${PACING_PLAYBOOK}`;
 
   // Inject brand asset info into the system prompt if available
   var brandAssetsSection = "";

@@ -33,7 +33,7 @@ import { loadProject, saveProject } from "../persistence/project.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
-import { fetchStockFootage, generateStockQuery } from "../media/stock-footage.js";
+import { fetchStockFootage } from "../media/stock-footage.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
 import type { BrandKit, Canvas, OutputFormat, Project, ProjectPlan, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
@@ -69,7 +69,6 @@ export interface PipelineOpts {
   creativity?: number;      // default: 0.5 (0-1, biases library vs custom)
   voiceover?: boolean;      // default: false. Generate TTS voiceover per scene.
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // TTS voice (default: nova)
-  stockFootage?: boolean;   // default: false. Fetch stock video clips for scene backgrounds.
   backgroundMusic?: boolean;  // default: false. Add background music with voiceover ducking.
   /** Streams fine-grained generation progress (phase + percent + per-scene detail
    *  + rough ETA) so a caller can surface a live status instead of a frozen bar. */
@@ -1595,31 +1594,22 @@ async function runUnifiedPipeline(
   }
   trace?.endEvent({ images: enrichResult.imageUrls.size });
 
-  // 3b. Stock footage / b-roll backgrounds.
-  //   - Planner-driven (default): any scene the planner tagged with a broll_query.
-  //   - Global override: opts.stockFootage forces footage on all eligible scenes.
-  // Capped so b-roll stays special (and we don't hammer Pexels).
+  // 3b. Stock footage / b-roll backgrounds -- planner-decided per scene.
+  // The planner tags scenes with a broll_query when real motion footage belongs
+  // behind them; we fetch a matching Pexels clip for each. Capped so b-roll stays
+  // intentional (and we don't hammer Pexels). Only gated by PEXELS_API_KEY.
   var stockFootageMap = new Map<number, string>();
   if (process.env.PEXELS_API_KEY) {
     trace?.beginEvent("stock_footage");
     const stockDir = path.join(projectDir(opts.tenant_id, projectId), "stock");
-    const MAX_BROLL = 3;
+    const MAX_BROLL = 5;
     let fetched = 0;
     for (let si = 0; si < storyboard.scenes.length; si++) {
       const planned = storyboard.scenes[si];
       // Skip scenes that already have a generated hero image.
       if (enrichResult.imageUrls.has(si)) continue;
 
-      // The planner's broll_query wins; otherwise the global flag fetches a
-      // query derived from the scene (skipping intro/outro).
-      let query: string | null = null;
-      if (planned.broll_query) {
-        query = planned.broll_query;
-      } else if (opts.stockFootage
-          && !planned.label?.toLowerCase().includes('intro')
-          && !planned.label?.toLowerCase().includes('outro')) {
-        query = generateStockQuery(planned.label, planned.description);
-      }
+      const query: string | null = planned.broll_query || null;
       if (!query) continue;
       if (fetched >= MAX_BROLL) {
         console.log(`  B-roll: cap of ${MAX_BROLL} reached, skipping "${planned.label}"`);
