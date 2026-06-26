@@ -1663,7 +1663,7 @@ async function runUnifiedPipeline(
     }
   }
   if (bookendScenes.size > 0) {
-    console.log(`  [enforce] Bookend scenes (correctness/brand-theme gate only): ${[...bookendScenes].join(", ")}`);
+    console.log(`  [enforce] Bookend scenes (skip mandatory voiceover): ${[...bookendScenes].join(", ")}`);
   }
 
   // 4. Generate scenes (library + custom in one pass)
@@ -1696,11 +1696,18 @@ async function runUnifiedPipeline(
         const planned = storyboard.scenes[i];
         const imageUrl = enrichResult.imageUrls.get(i);
 
-        // Bookend scenes (intro/outro) skip the aesthetic critique but still get
-        // the correctness + brand-theme gate (so they can't drift off-brand).
-        const skipCritique = bookendScenes.has(i);
+        // Only a video-only brand clip skips the aesthetic critique -- its frames
+        // can't be regenerated, so there's nothing to revise. A *content* bookend
+        // (a codegen intro/outro with text/CTA) gets the FULL critique like any
+        // other scene, so composition defects -- overlapping or duplicated text --
+        // score low and get revised instead of shipping. (Previously every
+        // label-based bookend forced the aesthetic score to 10 and ignored it,
+        // which let messy outros through.)
+        const plannedComps = Array.isArray(planned.components)
+          ? planned.components.filter((c: any) => typeof c === "string") : [];
+        const skipCritique = plannedComps.length === 1 && plannedComps[0] === "video";
         if (skipCritique) {
-          console.log(`  Scene ${i + 1}: bookend scene, correctness/brand-theme gate only`);
+          console.log(`  Scene ${i + 1}: brand video clip, correctness gate only`);
         }
 
         const generated = await generateScene({
