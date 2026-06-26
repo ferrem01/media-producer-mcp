@@ -305,6 +305,19 @@ ${buildContentRegionWrapper(scene, componentBlocks)}
 
 ${componentScripts.join("\n\n")}
 
+  // Fold any orphan animations the components created (loose gsap.to/from not
+  // added to the master) ONTO the master, so the renderer -- which seeks the
+  // master deterministically -- captures them frame-accurately instead of
+  // letting them free-run and jitter between frames. (The Studio preview is
+  // unaffected: it plays the composite document, not this per-scene one.)
+  try {
+    gsap.globalTimeline.getChildren(false, true, true).forEach(function (a) {
+      if (a !== master && a.parent === gsap.globalTimeline) {
+        master.add(a, a.startTime());
+      }
+    });
+  } catch (e) {}
+
   // Expose for Playwright capture
   window.__MP_TIMELINE = master;
   window.__MP_DURATION = ${scene.duration_seconds};
@@ -523,6 +536,19 @@ ${tagResult.html}
       } catch (e) { console.warn("Auto-wire failed for " + __cid + ": " + e.message); }
     }
   }
+
+  // Fold any orphan animations the components created (loose gsap.to/from not
+  // added to the master) ONTO the master, so the renderer -- which seeks the
+  // master deterministically -- captures them frame-accurately instead of
+  // letting them free-run and jitter between frames. (The Studio preview is
+  // unaffected: it plays the composite document, not this per-scene one.)
+  try {
+    gsap.globalTimeline.getChildren(false, true, true).forEach(function (a) {
+      if (a !== master && a.parent === gsap.globalTimeline) {
+        master.add(a, a.startTime());
+      }
+    });
+  } catch (e) {}
 
   // Expose for Playwright capture
   window.__MP_TIMELINE = master;
