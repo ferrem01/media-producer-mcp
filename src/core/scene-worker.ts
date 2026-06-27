@@ -247,7 +247,14 @@ async function main() {
   try {
     var page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width: args.width, height: args.height });
-    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "networkidle", timeout: 60000 });
+    // Use "load", NOT "networkidle": a full-bleed autoplay/loop <video> (b-roll)
+    // keeps the network "active" so networkidle never settles -> 60s page.goto
+    // timeout -> scene fails. Readiness is guaranteed deterministically below
+    // (fonts.ready, the __MP_READY GSAP signal, and the explicit <img> wait), so
+    // networkidle buys nothing but fragility.
+    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "load", timeout: 60000 });
+    // Ensure web fonts are loaded before capture (networkidle used to cover this).
+    await page.evaluate(() => (document as any).fonts?.ready).catch(() => {});
     await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 60000 });
 
     // Wait for all <img> to finish loading before capturing. External images
