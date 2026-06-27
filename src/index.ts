@@ -1293,7 +1293,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             + "Keep the scene's original intent and duration.";
         const job = queueJob("generate", tenantId, async (j) => {
           j.projectId = projectId;
-          j.progress = { step: "regenerating_scene", percent: 5 };
+          j.progress = { step: "starting", percent: 5, detail: "Starting" };
           const result = await runGeneratePipeline({
             prompt,
             target: "scene",

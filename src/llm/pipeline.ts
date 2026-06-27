@@ -336,6 +336,7 @@ async function runSceneRevisionPipeline(
     (briefBlock ? `\n\nScene brief (the intent this scene must fulfill):\n${briefBlock}` : "") +
     `\n\nCurrent scene:\n${sceneContext}`;
 
+  opts.onProgress?.({ step: "planning", percent: 10, detail: "Planning the scene" });
   trace?.beginEvent("scene_revision_plan");
   const storyboard = await planStoryboard({
     prompt: revisionPrompt,
@@ -355,6 +356,7 @@ async function runSceneRevisionPipeline(
   }
 
   // Generate the revised scene
+  opts.onProgress?.({ step: "generating", percent: 40, detail: "Generating the scene" });
   trace?.beginEvent("scene_revision_generate");
   const compDir = path.join(projectDir(opts.tenant_id, project.project_id), "components");
   await fs.mkdir(compDir, { recursive: true });
@@ -388,6 +390,7 @@ async function runSceneRevisionPipeline(
   // Critique loop (skip if opts.critique === false)
   let finalRevScene = generated.scene;
   if (opts.critique !== false) {
+    opts.onProgress?.({ step: "critiquing", percent: 70, detail: "Reviewing & polishing" });
     const critiqueResult = await critiqueAndRetryScene({
       scene: generated.scene,
       planned,
@@ -425,6 +428,7 @@ async function runSceneRevisionPipeline(
   project.scenes[sceneIndex] = finalRevScene;
   await saveProject(project);
   trace?.endEvent();
+  opts.onProgress?.({ step: "done", percent: 100, detail: "Finalizing" });
 
   return {
     status: "completed",
