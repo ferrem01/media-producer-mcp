@@ -1101,6 +1101,9 @@ async function critiqueAndRetryScene(opts: {
         requiresLogo: /\blogo\b/i.test(briefForCon) && (opts.brandKit?.logos?.length ?? 0) > 0,
         brandTheme: brandBackgroundIsLight(opts.brandKit) ? "light" : "dark",
         videoOnly: !!isVideoOnly,
+        // Footage / hero-image background: light text over a scrim is correct then,
+        // so the theme rule must not false-flag it as off_brand_theme.
+        mediaBackground: /<video[\s>]|class="[^"]*\bmp-(broll|hero-img)\b|class="[^"]*broll/i.test(assembledHtml),
         llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
       });
       // Bookends are intentionally minimal -> don't revise on aesthetic score, only
