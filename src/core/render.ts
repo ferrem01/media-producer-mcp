@@ -369,7 +369,8 @@ async function renderSingleSceneWorker(
     // lost to the server console. Keep only the tail to bound memory.
     const child = fork(workerPath, [argsPath], {
       execArgv: [],
-      stdio: ["inherit", "inherit", "pipe"],
+      // fork() requires an "ipc" entry in the stdio array.
+      stdio: ["inherit", "inherit", "pipe", "ipc"],
     });
     let stderrTail = "";
     if (child.stderr) {
@@ -763,7 +764,7 @@ async function renderSceneTransparentFrames(
   );
 
   await new Promise<void>((resolve, reject) => {
-    const child = fork(workerPath, [argsPath], { execArgv: [], stdio: ["inherit", "inherit", "pipe"] });
+    const child = fork(workerPath, [argsPath], { execArgv: [], stdio: ["inherit", "inherit", "pipe", "ipc"] });
     let stderrTail = "";
     if (child.stderr) {
       child.stderr.on("data", (chunk: Buffer) => {
