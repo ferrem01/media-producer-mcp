@@ -2194,11 +2194,32 @@ export function getPreviewHtml(): string {
     };
   }
 
-  function studioMeaningful(el, doc) {
-    if (!el || el === doc.body || el === doc.documentElement) return null;
-    if (el.id === '__studio_hi' || el.id === '__studio_busy') return null;
-    if (el.getAttribute && el.getAttribute('data-scene-id') != null) return null; // scene root, too broad
-    return el;
+  // Geometric hit-test: find the smallest VISIBLE element under (x,y), ignoring
+  // pointer-events (captions over b-roll set pointer-events:none, so native
+  // hit-testing falls through to the full-bleed <video>). Strongly prefers an
+  // element that directly holds text, so hovering a caption word selects the word.
+  function studioHitTest(doc, x, y) {
+    var win = doc.defaultView || window;
+    var all = doc.querySelectorAll('body *');
+    var best = null, bestScore = Infinity;
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.id === '__studio_hi' || el.id === '__studio_busy') continue;
+      if (el.getAttribute && el.getAttribute('data-scene-id') != null) continue; // scene root, too broad
+      var cs;
+      try { cs = win.getComputedStyle(el); } catch (e) { continue; }
+      if (!cs || cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) === 0) continue;
+      var r = el.getBoundingClientRect();
+      if (r.width < 3 || r.height < 3) continue;
+      if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+      var hasOwnText = false;
+      for (var n = 0; n < el.childNodes.length; n++) {
+        if (el.childNodes[n].nodeType === 3 && (el.childNodes[n].textContent || '').trim()) { hasOwnText = true; break; }
+      }
+      var score = (r.width * r.height) - (hasOwnText ? 1e12 : 0); // text-bearing wins; else smallest area
+      if (score < bestScore) { bestScore = score; best = el; }
+    }
+    return best;
   }
 
   // Attach hover/click/right-click selection to the (same-origin) iframe document.
@@ -2220,20 +2241,22 @@ export function getPreviewHtml(): string {
       hi.style.width = r.width + 'px'; hi.style.height = r.height + 'px';
       hi.style.display = 'block';
     }
+    var _lastMove = 0;
     doc.addEventListener('mousemove', function(e) {
       if (studio.busy) return;
-      var el = studioMeaningful(e.target, doc);
+      var now = +new Date(); if (now - _lastMove < 30) return; _lastMove = now;
+      var el = studioHitTest(doc, e.clientX, e.clientY);
       if (el) showHi(el); else hi.style.display = 'none';
     }, true);
     doc.addEventListener('mouseleave', function() { hi.style.display = 'none'; }, true);
     doc.addEventListener('click', function(e) {
-      var el = studioMeaningful(e.target, doc);
+      var el = studioHitTest(doc, e.clientX, e.clientY);
       if (!el) return;
       e.preventDefault(); e.stopPropagation();
       studioSelect(el, doc);
     }, true);
     doc.addEventListener('contextmenu', function(e) {
-      var el = studioMeaningful(e.target, doc);
+      var el = studioHitTest(doc, e.clientX, e.clientY);
       if (!el) return;
       e.preventDefault();
       studioSelect(el, doc);
