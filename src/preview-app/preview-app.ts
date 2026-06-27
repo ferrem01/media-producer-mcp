@@ -2447,11 +2447,21 @@ export function getPreviewHtml(): string {
         { scene_id: sceneId, instruction: instruction, element: element })
       .then(function(res) {
         done();
+        console.log('[studio] revise response:', res);
         if (!res || res.ok === false) { studioStatus('Failed: ' + ((res && res.error) || 'unknown'), 'err'); return; }
         var defs = res.defects || [];
         var n = res.blocks_applied != null ? res.blocks_applied : (res.blocksApplied || 0);
-        if (defs.length) studioStatus('Updated \\u26a0 ' + defs.length + ' issue(s): ' + defs.map(function(d) { return d.detail; }).join('; '), 'warn');
-        else studioStatus('Updated \\u2713 (' + n + ' edit' + (n === 1 ? '' : 's') + ')', 'ok');
+        var full = res.full_rewrite != null ? res.full_rewrite : res.fullRewrite;
+        // Always report how much actually changed at the source so a no-op
+        // (0 edits) is visible rather than reading as "nothing happened".
+        var edits = full ? 'rewrote scene' : (n + ' edit' + (n === 1 ? '' : 's'));
+        if (n === 0 && !full) {
+          studioStatus('No change applied \\u2014 the revise did not match anything. Try rephrasing, or use Regenerate scene.', 'warn');
+        } else if (defs.length) {
+          studioStatus('Updated (' + edits + ') \\u26a0 ' + defs.length + ' issue(s): ' + defs.map(function(d) { return d.detail; }).join('; '), 'warn');
+        } else {
+          studioStatus('Updated \\u2713 (' + edits + ')', 'ok');
+        }
         document.getElementById('rv-input').value = '';
         studioReload();
       })
