@@ -284,6 +284,14 @@ async function main() {
       console.log(`  Found ${videoInfos.length} video element(s), ${uniqueSrcs.length} unique source(s)`);
 
       for (const src of uniqueSrcs) {
+        // Only treat real video files as videos. A <video> whose src was dropped
+        // (e.g. a remote clip that failed to localize) has src="", and v.src then
+        // resolves to the document URL (.../scene.html) -- without this guard that
+        // gets handed to ffmpeg as a "video" and crashes the render on the HTML.
+        if (!/\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(src)) {
+          console.warn(`  Skipping non-video <video> src: ${src.slice(0, 80)}`);
+          continue;
+        }
         const videoPath = resolveVideoPath(src);
         try { await fs.access(videoPath); } catch {
           console.warn(`  Warning: Video file not found: ${videoPath} (src: ${src})`);
