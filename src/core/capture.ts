@@ -476,13 +476,27 @@ export async function captureSingleFrame(options: {
             return er.left <= cx && er.right >= cx && er.top <= cy && er.bottom >= cy;
           };
           const overVideo = footageEls.some(covers);
-          // Backing = any non-footage element (the text's own bg, an ancestor, or a
-          // dedicated scrim/panel div) with a meaningful bg covering the text center.
+          // Backing = the legibility "treatment" actually being present. Recognize
+          // ALL the techniques we offer, so we don't falsely flag treated text:
+          //  - a non-footage element (text bg, ancestor, or scrim/panel div) with a
+          //    meaningful bg covering the text center -- INCLUDING ::before/::after
+          //    pseudo-element scrims (a very common way to do it);
+          //  - the footage itself graded/darkened via a filter (technique C) -- the
+          //    contrast sampling then validates against the graded frame.
           let hasBacking = false;
           if (overVideo) {
-            hasBacking = allEls.some((e) =>
-              !footageEls.includes(e) && covers(e) && meaningfulBg(getComputedStyle(e))
-            );
+            const footageGraded = footageEls.some((f) => {
+              const fcs = getComputedStyle(f);
+              const filt = fcs.filter || (fcs as any).webkitFilter || "";
+              return !!filt && filt !== "none";
+            });
+            const backs = (e: Element) => {
+              if (footageEls.includes(e) || !covers(e)) return false;
+              return meaningfulBg(getComputedStyle(e))
+                || meaningfulBg(getComputedStyle(e, "::before"))
+                || meaningfulBg(getComputedStyle(e, "::after"));
+            };
+            hasBacking = footageGraded || allEls.some(backs);
           }
           out.push({
             text: txt.slice(0, 60), color: cs.color, fontSize: fs,

@@ -78,6 +78,41 @@ function ok(name, cond) { results.push(cond); console.log(`${cond ? "PASS" : "FA
   ok("passes text protected by a panel", !d.some(x => /Protected by a panel/.test(x.text)));
 }
 
+// Case 6: text protected by a ::before pseudo-element scrim must NOT be flagged
+// (a very common way to do it -- the detector must see pseudo-elements).
+{
+  const HTML = `<!doctype html><html><head><style>
+    html,body{margin:0;width:1920px;height:1080px;overflow:hidden}
+    .mp-broll{position:absolute;inset:0;width:100%;height:100%;background:#7a7f8a;z-index:0}
+    .cap{position:absolute;top:780px;left:560px;width:800px;text-align:center;color:#fff;font:800 64px sans-serif;z-index:2}
+    .cap::before{content:"";position:absolute;inset:-18px;background:rgba(10,14,30,0.62);border-radius:14px;z-index:-1}
+  </style></head><body>
+    <div class="mp-broll"></div>
+    <div class="cap">Protected by a pseudo scrim</div>
+    <script>window.__MP_TIMELINE={time:function(){}}; window.__MP_READY=true;</script>
+  </body></html>`;
+  fs.writeFileSync("/tmp/tc6.html", HTML);
+  const d = await measureTextContrast({ htmlPath: "/tmp/tc6.html", width: 1920, height: 1080, atTimes: [0] });
+  ok("passes text protected by a ::before pseudo scrim", !d.some(x => /pseudo scrim/.test(x.text) && x.reason === "no-backing"));
+}
+
+// Case 7: bare text over footage that is itself graded via a filter (technique C)
+// must NOT be flagged no-backing -- contrast sampling validates the graded frame.
+{
+  const HTML = `<!doctype html><html><head><style>
+    html,body{margin:0;width:1920px;height:1080px;overflow:hidden}
+    .mp-broll{position:absolute;inset:0;width:100%;height:100%;background:#7a7f8a;filter:brightness(0.4);z-index:0}
+    .cap{position:absolute;top:780px;left:0;right:0;text-align:center;color:#fff;font:800 64px sans-serif;z-index:2}
+  </style></head><body>
+    <div class="mp-broll"></div>
+    <div class="cap">Bare text over graded footage</div>
+    <script>window.__MP_TIMELINE={time:function(){}}; window.__MP_READY=true;</script>
+  </body></html>`;
+  fs.writeFileSync("/tmp/tc7.html", HTML);
+  const d = await measureTextContrast({ htmlPath: "/tmp/tc7.html", width: 1920, height: 1080, atTimes: [0] });
+  ok("passes bare text over filter-graded footage (technique C)", !d.some(x => /graded footage/.test(x.text) && x.reason === "no-backing"));
+}
+
 const pass = results.every(Boolean);
 console.log(`\n=== legibility gate: ${pass ? "PASS" : "FAIL"} ===`);
 process.exit(pass ? 0 : 1);
