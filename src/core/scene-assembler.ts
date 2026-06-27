@@ -589,7 +589,14 @@ export function generateFontLinks(brand: BrandKit): string {
  */
 export function resolveHtmlAssetUrls(html: string, preview?: boolean): string {
   if (preview) return html; // preview SPA serves /assets/ over HTTP
-  return html.replace(/\/assets\/[A-Za-z0-9_\-./%]+/g, (m) => resolveAssetPath(m, false));
+  // Only match RELATIVE /assets/ URLs. The negative lookbehind skips /assets/
+  // substrings that are already part of an absolute URL (e.g. the inner
+  // /assets/ of a file:///data/.../brand-kit/assets/... path that resolveAssetUrls
+  // already produced for component data). Without this guard, re-resolving that
+  // inner segment hits resolveAssetPath's http fallback and concatenates an http
+  // URL onto the file:// prefix, corrupting the path and hanging the render.
+  // Relative URLs are always preceded by a delimiter ("/'/(/=/space) or start.
+  return html.replace(/(?<![A-Za-z0-9_\-./%:])\/assets\/[A-Za-z0-9_\-./%]+/g, (m) => resolveAssetPath(m, false));
 }
 
 /**
