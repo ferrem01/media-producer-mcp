@@ -113,9 +113,18 @@
     var buttonGlow = el.querySelector('.cta-button-glow');
 
     if (data.button_color) {
-      button.style.background = 'linear-gradient(135deg, ' + data.button_color + ' 0%, ' + data.button_color + 'cc 100%)';
-      buttonGlow.style.background = data.button_color;
-      button.style.boxShadow = '0 0 30px ' + data.button_color + '40, 0 8px 24px ' + data.button_color + '25, inset 0 1px 0 rgba(255,255,255,0.15)';
+      // button_color may be a plain hex (#6366f1) OR a CSS var()/named color.
+      // Only the hex form can have an alpha suffix appended; doing 'var(--x)cc'
+      // produces INVALID CSS and drops the whole background -> a no-fill button.
+      var bc = String(data.button_color).trim();
+      var isHex = /^#[0-9a-fA-F]{6}$/.test(bc);
+      button.style.background = isHex
+        ? 'linear-gradient(135deg, ' + bc + ' 0%, ' + bc + 'cc 100%)'
+        : bc; // var()/named -> solid fill
+      buttonGlow.style.background = bc;
+      button.style.boxShadow = isHex
+        ? '0 0 30px ' + bc + '40, 0 8px 24px ' + bc + '25, inset 0 1px 0 rgba(255,255,255,0.15)'
+        : '0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.15)';
     }
 
     var speed = ctx.motion === 'minimal' ? 0.45 : ctx.motion === 'punchy' ? 0.6 : 0.75;

@@ -799,6 +799,19 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
     vars.push(`  --mp-color-text-muted: ${brand.colors?.text_muted || '#64748b'};`);
   }
 
+  // Always provide a theme-aware surface + hairline border so component cards
+  // and borders are visible on BOTH light and dark scenes even when the brand
+  // kit doesn't define them. (Components reference var(--mp-color-surface) /
+  // var(--mp-color-border); without these defaults they'd fall back to the
+  // dark-theme literals baked into the component and vanish on a light brand.)
+  const _colorsAny = (brand.colors || {}) as unknown as Record<string, unknown>;
+  if (!_colorsAny.surface) {
+    vars.push(`  --mp-color-surface: ${sceneIsDark ? '#1b2030' : '#ffffff'};`);
+  }
+  if (!_colorsAny.border) {
+    vars.push(`  --mp-color-border: ${sceneIsDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)'};`);
+  }
+
   // Scene-level background override
   if (sceneBackground) {
     vars.push(`  --mp-color-background: ${sceneBackground};`);
