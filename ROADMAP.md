@@ -130,5 +130,23 @@ a single-scene revision regenerates only that scene and **skips the editorial pa
 
 ## Known loose ends (pre-existing)
 - Edge-seam class fix (paint root/body with the scene bg so any revealed sliver is invisible).
-- Correctness gate on bookend (intro/outro) scenes.
+- Correctness gate on bookend (intro/outro) scenes — bookends ignore the aesthetic
+  score and gate only on hard defects, so rough-but-not-"defective" bookends ship.
 - Delete the dead `template` field on `PlannedScene`.
+
+## Backlog — open follow-ups (b-roll / legibility / theme work)
+- **Codegen first-pass layout quality (overlap / off-canvas clipping).** The
+  critique *catches* overlap/clipping/missing-element and regenerates, but that's
+  the bulk of the retry cost. Improving first-pass layout (safe areas, no text on
+  the subject, no edge clipping) is the biggest lever on both quality and latency.
+- **Chrome-component theme sweep** — `browser-frame`, `device-mockup` still use
+  dark-theme literals. Need care (chrome vs brand surface) vs. the content
+  components already swept. Lower frequency.
+- **Verify cta-card button with a `var()` button_color.** The JS no-fill bug
+  (appending an alpha hex to a `var()`) is fixed, but the last verify run used a
+  hex color, so the `var()` path hasn't been seen end-to-end on a render.
+- **Confirm `missing_asset` isn't a false positive on animated-out elements.** The
+  vision critique judges a late frame; an element that legitimately animates out
+  before then can be wrongly flagged "missing".
+- **Generation latency (~12 min) is output-bound** — see "Generation performance"
+  above; preview quality only speeds the render half, not generation.
