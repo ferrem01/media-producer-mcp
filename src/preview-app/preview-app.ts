@@ -2353,11 +2353,20 @@ export function getPreviewHtml(): string {
   // Re-fetch the composite and actually re-render it (hot-swap), preserving time.
   function studioReload() {
     var p = state.currentProject; if (!p) return;
-    var t = state.masterTime || 0;
+    var idx = state.currentSceneIndex;
+    // Clear stale selection (the old element is gone after a re-render).
+    studio.sel = null;
+    if (studio.selBox) studio.selBox.style.display = 'none';
     loadComposite(p).then(function() {
-      if (initComposite()) {
-        waitForCompositeReady(function(masterTl) { if (masterTl) { masterTl.time(t); masterTl.pause(); } });
-      }
+      if (!initComposite()) return;
+      waitForCompositeReady(function() {
+        // Re-attach selection to the fresh document (defensive; the write hook
+        // may have run before the body was ready).
+        try { var d = els.previewIframe.contentDocument; if (d) studioAttach(d); } catch (e) {}
+        // Land on a clean, visible scene-start frame (a paused video shows
+        // frame 0 cleanly; a mid-scene seek can render black until played).
+        if (idx >= 0) selectScene(idx);
+      });
     });
   }
 
