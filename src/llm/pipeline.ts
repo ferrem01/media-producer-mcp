@@ -35,7 +35,7 @@ import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { fetchStockFootage } from "../media/stock-footage.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
-import type { BrandKit, Canvas, OutputFormat, Project, ProjectPlan, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, PlannedScene, Project, ProjectPlan, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
@@ -324,10 +324,17 @@ async function runSceneRevisionPipeline(
   }
 
   const existingScene = project.scenes[sceneIndex];
+  const plannedScene = project.plan?.scenes?.[sceneIndex];
 
-  // Serialize existing scene as context for the planner
+  // Serialize existing scene as context for the planner, and pin the scene's
+  // brief (Studio-edited override, else the original storyboard plan) so the
+  // rebuild fulfills the scene's actual intent — not just its label.
   const sceneContext = serializeSceneContext(existingScene);
-  const revisionPrompt = `Revise the following scene based on these instructions: ${opts.prompt}\n\nCurrent scene:\n${sceneContext}`;
+  const briefBlock = formatSceneBrief(existingScene, plannedScene);
+  const revisionPrompt =
+    `Revise the following scene based on these instructions: ${opts.prompt}` +
+    (briefBlock ? `\n\nScene brief (the intent this scene must fulfill):\n${briefBlock}` : "") +
+    `\n\nCurrent scene:\n${sceneContext}`;
 
   trace?.beginEvent("scene_revision_plan");
   const storyboard = await planStoryboard({
@@ -812,6 +819,19 @@ async function runImageRevisionPipeline(
 }
 
 // ── Serialization Helpers ──
+
+/** Format a scene's brief for the revision prompt: the Studio-edited override
+ *  (scene.brief) takes precedence over the original storyboard plan entry. */
+function formatSceneBrief(scene: Scene, planned?: PlannedScene): string {
+  const purpose = scene.brief?.purpose ?? planned?.purpose;
+  const script = scene.brief?.script ?? planned?.voiceover_text;
+  const visual = scene.brief?.visual_notes ?? planned?.visual_notes;
+  const lines: string[] = [];
+  if (purpose) lines.push(`Purpose: ${purpose}`);
+  if (script) lines.push(`Script: ${script}`);
+  if (visual) lines.push(`Visual notes: ${visual}`);
+  return lines.join("\n");
+}
 
 function serializeSceneContext(scene: Scene): string {
   const lines: string[] = [];

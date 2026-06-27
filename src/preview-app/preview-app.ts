@@ -216,40 +216,30 @@ export function getPreviewHtml(): string {
   }
 
   /* Component Layers */
-  #layers-panel {
+  #storyboard-panel {
     border-right: 1px solid #e5e7eb;
     overflow-y: auto;
   }
-  #layers-panel .panel-header {
+  #storyboard-panel .panel-header {
     font-size: 10px; font-weight: 600; text-transform: uppercase;
     letter-spacing: 0.05em; color: #9ca3af;
     padding: 10px 12px 8px;
     border-bottom: 1px solid #f3f4f6;
   }
-  .layer-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 5px 12px; cursor: pointer; font-size: 12px;
-    transition: all 0.15s ease;
-    border-left: 3px solid transparent;
+  #storyboard-body { padding: 8px 12px; }
+  .sb-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+  .sb-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: #9ca3af;
   }
-  .layer-item:hover { background: #f9fafb; }
-  .layer-item.active {
-    background: #eef2ff;
-    border-left-color: #6366f1;
-    color: #6366f1;
+  .sb-input {
+    width: 100%; box-sizing: border-box; resize: vertical;
+    padding: 6px 8px; font-size: 12px; font-family: inherit; line-height: 1.35;
+    border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; color: #111827;
   }
-  
-
-  .layer-type {
-    flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 11px;
-  }
-  .layer-z {
-    font-size: 10px; color: #9ca3af;
-    background: #f3f4f6; padding: 1px 6px; border-radius: 10px;
-    flex-shrink: 0;
-    font-family: 'JetBrains Mono', 'SF Mono', monospace;
-  }
+  .sb-input:focus { outline: none; border-color: #6366f1; }
+  .sb-actions { display: flex; gap: 6px; margin-top: 4px; }
+  .sb-hint { font-size: 10px; color: #64748b; margin-top: 4px; }
 
   /* Prop Editor */
   #props-panel {
@@ -420,7 +410,9 @@ export function getPreviewHtml(): string {
   #revise-panel { padding: 10px 12px; font-size: 12px; color: #cbd5e1; display: flex; flex-direction: column; gap: 8px; }
   #revise-panel .rv-sel { font-size: 11px; color: #94a3b8; min-height: 16px; }
   #revise-panel .rv-sel b { color: #e2e8f0; }
-  #revise-panel .rv-scope { display: flex; gap: 4px; }
+  #revise-panel .rv-scope-row { display: flex; align-items: center; gap: 8px; }
+  #revise-panel .rv-scope-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #9ca3af; flex: 0 0 auto; }
+  #revise-panel .rv-scope { display: flex; gap: 4px; flex: 1; }
   #revise-panel .rv-scope button { flex: 1; padding: 5px 8px; font-size: 11px; border: 1px solid #334155; background: #1e293b; color: #94a3b8; border-radius: 6px; cursor: pointer; }
   #revise-panel .rv-scope button.active { background: #6366f1; color: #fff; border-color: #6366f1; }
   #revise-panel textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 46px; padding: 7px 9px; font-size: 12px; font-family: inherit; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; }
@@ -480,27 +472,46 @@ export function getPreviewHtml(): string {
   </div>
 
   <div id="bottom-panels">
-    <div id="layers-panel">
-      <div class="panel-header">Component Layers</div>
-      <div id="layer-list"><div class="empty-state">No scene selected</div></div>
+    <div id="storyboard-panel">
+      <div class="panel-header">Storyboard &mdash; this scene</div>
+      <div id="storyboard-body">
+        <div class="sb-row">
+          <label class="sb-label" for="sb-purpose">Purpose</label>
+          <textarea id="sb-purpose" class="sb-input" rows="2" placeholder="What this scene communicates"></textarea>
+        </div>
+        <div class="sb-row">
+          <label class="sb-label" for="sb-script">Script</label>
+          <textarea id="sb-script" class="sb-input" rows="2" placeholder="Voiceover / on-screen script"></textarea>
+        </div>
+        <div class="sb-row">
+          <label class="sb-label" for="sb-visual">Visual notes</label>
+          <textarea id="sb-visual" class="sb-input" rows="2" placeholder="Layout, motion, imagery"></textarea>
+        </div>
+        <div class="sb-actions">
+          <button class="rv-go" id="sb-save" style="flex:0 0 auto;background:#334155;" title="Save this brief to the scene (without rebuilding)">Save brief</button>
+          <button class="rv-go" id="sb-regen" style="flex:1;" title="Rebuild this scene from scratch (planner + generate + critique) to fulfill the brief above. Slow.">Regenerate from this brief</button>
+        </div>
+        <div class="sb-hint">Regenerate rebuilds this scene from scratch (slow) to fulfill the brief. Use it when a revise can't fix a broken or empty scene.</div>
+        <div class="rv-status" id="sb-status"></div>
+      </div>
     </div>
     <div id="props-panel">
-      <div class="panel-header">Revise</div>
+      <div class="panel-header">Revise &mdash; tweak what's there</div>
       <div id="revise-panel">
         <div class="rv-sel" id="rv-sel">Click an element in the scene, or revise the whole scene.</div>
-        <div class="rv-scope">
-          <button id="rv-scope-el" class="active">This element</button>
-          <button id="rv-scope-scene">Whole scene</button>
+        <div class="rv-scope-row">
+          <span class="rv-scope-label">Apply to</span>
+          <div class="rv-scope">
+            <button id="rv-scope-el" class="active">This element</button>
+            <button id="rv-scope-scene">Whole scene</button>
+          </div>
         </div>
         <textarea id="rv-input" placeholder="What should change? e.g. make this bigger, use the brand green, move it off her face"></textarea>
         <div style="display:flex;gap:6px;">
           <button class="rv-go" id="rv-go" style="flex:1;">Revise</button>
           <button class="rv-go" id="rv-undo" style="flex:0 0 auto;background:#334155;" title="Undo the last revise on this scene">Undo</button>
         </div>
-        <div style="display:flex;gap:6px;margin-top:6px;">
-          <button class="rv-go" id="rv-regen" style="flex:1;background:#334155;" title="Rebuild this whole scene from scratch (planner + generate + critique). Slower than a revise; use when a scene is fundamentally broken or empty.">Regenerate scene</button>
-        </div>
-        <div class="rv-hint" style="font-size:10px;color:#64748b;margin-top:4px;">Regenerate rebuilds the scene from scratch (slow). Use it when a revise can't fix a broken or empty scene. Optional: type guidance above first.</div>
+        <div class="rv-hint" style="font-size:10px;color:#64748b;margin-top:4px;">Revise makes a surgical edit and keeps the rest of the scene. To rebuild a broken or empty scene, use Regenerate on the left.</div>
         <div class="rv-status" id="rv-status"></div>
       </div>
     </div>
@@ -557,7 +568,9 @@ export function getPreviewHtml(): string {
     sceneIndicator: document.getElementById('scene-indicator'),
     bufferOverlay: document.getElementById('buffer-overlay'),
     audioIndicator: document.getElementById('audio-indicator'),
-    layerList: document.getElementById('layer-list'),
+    sbPurpose: document.getElementById('sb-purpose'),
+    sbScript: document.getElementById('sb-script'),
+    sbVisual: document.getElementById('sb-visual'),
     propEditor: document.getElementById('prop-editor')
   };
 
@@ -1495,40 +1508,31 @@ export function getPreviewHtml(): string {
 
   // ── Component Layers ──
 
+  // The left bottom panel is the editable Storyboard for the current scene.
+  // (renderLayers/clearLayers keep their names so the existing scene-change call
+  // sites refresh the brief; there is one codegen component per scene now, so a
+  // component-layer list conveyed nothing.) Values come from the scene's edited
+  // brief, falling back to the original storyboard plan entry.
   function renderLayers() {
+    if (!els.sbPurpose) return;
     var project = state.currentProject;
-    var scene = project && project.scenes[state.currentSceneIndex];
-    if (!scene || !scene.components || !scene.components.length) {
-      els.layerList.innerHTML = '<div class="empty-state">No components</div>';
-      return;
-    }
-
-    var comps = scene.components.map(function(c, i) { return { comp: c, originalIndex: i }; });
-    comps.sort(function(a, b) { return (b.comp.z_index || 0) - (a.comp.z_index || 0); });
-
-    var html = '';
-    comps.forEach(function(item) {
-      var c = item.comp;
-      var active = item.originalIndex === state.currentComponentIndex;
-      html += '<div class="layer-item' + (active ? ' active' : '') + '" data-index="' + item.originalIndex + '">'
-        + '<span class="layer-type">' + escHtml(c.type) + '</span>'
-        + '<span class="layer-z">z:' + (c.z_index || 0) + '</span>'
-        + '</div>';
-    });
-    els.layerList.innerHTML = html;
-
-    els.layerList.querySelectorAll('.layer-item').forEach(function(el) {
-      el.addEventListener('click', function() {
-        state.currentComponentIndex = parseInt(el.dataset.index, 10);
-        renderLayers();
-        renderProps();
-      });
-    });
+    var idx = state.currentSceneIndex;
+    var scene = project && idx >= 0 && project.scenes[idx];
+    if (!scene) { clearLayers(); return; }
+    var planned = (project.plan && project.plan.scenes && project.plan.scenes[idx]) || {};
+    var brief = scene.brief || {};
+    // Don't clobber a value the user is actively typing into.
+    var active = document.activeElement;
+    if (els.sbPurpose !== active) els.sbPurpose.value = brief.purpose != null ? brief.purpose : (planned.purpose || '');
+    if (els.sbScript !== active) els.sbScript.value = brief.script != null ? brief.script : (planned.voiceover_text || '');
+    if (els.sbVisual !== active) els.sbVisual.value = brief.visual_notes != null ? brief.visual_notes : (planned.visual_notes || '');
   }
 
   function clearLayers() {
     state.currentComponentIndex = -1;
-    els.layerList.innerHTML = '<div class="empty-state">No scene selected</div>';
+    if (els.sbPurpose) els.sbPurpose.value = '';
+    if (els.sbScript) els.sbScript.value = '';
+    if (els.sbVisual) els.sbVisual.value = '';
   }
 
   // ── Smart Prop Editor ──
@@ -2438,7 +2442,8 @@ export function getPreviewHtml(): string {
     studio.busy = true;
     document.getElementById('rv-go').disabled = true;
     document.getElementById('rv-input').disabled = true;
-    var regenBtn = document.getElementById('rv-regen'); if (regenBtn) regenBtn.disabled = true;
+    var sbRegenR = document.getElementById('sb-regen'); if (sbRegenR) sbRegenR.disabled = true;
+    var sbSaveR = document.getElementById('sb-save'); if (sbSaveR) sbSaveR.disabled = true;
     studioStatus('Revising\\u2026 (' + (studio.scope === 'scene' ? 'whole scene' : 'element') + ')', '');
     studioBusyOverlay(true);
 
@@ -2446,7 +2451,8 @@ export function getPreviewHtml(): string {
       studio.busy = false;
       document.getElementById('rv-go').disabled = false;
       document.getElementById('rv-input').disabled = false;
-      var rb = document.getElementById('rv-regen'); if (rb) rb.disabled = false;
+      var sr = document.getElementById('sb-regen'); if (sr) sr.disabled = false;
+      var ss = document.getElementById('sb-save'); if (ss) ss.disabled = false;
       studioBusyOverlay(false);
     }
     api('POST', '/revise/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id),
@@ -2508,13 +2514,15 @@ export function getPreviewHtml(): string {
     studio.busy = true;
     document.getElementById('rv-undo').disabled = true;
     document.getElementById('rv-go').disabled = true;
-    var regenBtnU = document.getElementById('rv-regen'); if (regenBtnU) regenBtnU.disabled = true;
+    var sbRegenU = document.getElementById('sb-regen'); if (sbRegenU) sbRegenU.disabled = true;
+    var sbSaveU = document.getElementById('sb-save'); if (sbSaveU) sbSaveU.disabled = true;
     studioStatus('Undoing\\u2026', '');
     function done() {
       studio.busy = false;
       document.getElementById('rv-undo').disabled = false;
       document.getElementById('rv-go').disabled = false;
-      var rb = document.getElementById('rv-regen'); if (rb) rb.disabled = false;
+      var sr = document.getElementById('sb-regen'); if (sr) sr.disabled = false;
+      var ss = document.getElementById('sb-save'); if (ss) ss.disabled = false;
     }
     api('POST', '/revise/undo/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { scene_id: sceneId })
       .then(function(res) {
@@ -2528,45 +2536,85 @@ export function getPreviewHtml(): string {
       .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
   }
 
+  // Status line for the Storyboard panel (mirrors studioStatus, separate element).
+  function sbStatus(msg, cls) {
+    var s = document.getElementById('sb-status');
+    if (!s) return;
+    s.className = 'rv-status' + (cls ? ' ' + cls : '');
+    s.textContent = msg;
+  }
+
+  // Read the editable storyboard fields into a brief payload.
+  function studioReadBrief() {
+    return {
+      purpose: (els.sbPurpose && els.sbPurpose.value) || '',
+      script: (els.sbScript && els.sbScript.value) || '',
+      visual_notes: (els.sbVisual && els.sbVisual.value) || '',
+    };
+  }
+
+  // Enable/disable every scene-mutating control at once (revise + storyboard).
+  function studioToggleControls(disabled) {
+    ['sb-save', 'sb-regen', 'rv-go', 'rv-undo'].forEach(function(id) {
+      var b = document.getElementById(id); if (b) b.disabled = disabled;
+    });
+  }
+
+  // Save the storyboard brief to the scene without rebuilding.
+  function studioSaveBrief() {
+    if (studio.busy) return;
+    var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
+    if (!sceneId) { sbStatus('Select or load a scene first.', 'warn'); return; }
+    var p = state.currentProject; if (!p) { sbStatus('Load a project first.', 'warn'); return; }
+    var brief = studioReadBrief();
+    studioToggleControls(true);
+    sbStatus('Saving brief\\u2026', '');
+    var bodyS = { scene_id: sceneId, purpose: brief.purpose, script: brief.script, visual_notes: brief.visual_notes };
+    api('POST', '/scene-plan/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), bodyS)
+      .then(function(res) {
+        studioToggleControls(false);
+        if (!res || res.ok === false) { sbStatus('Save failed: ' + ((res && res.error) || 'unknown'), 'err'); return; }
+        // Reflect the saved brief back into the in-memory project so it survives scene switches.
+        var sc = p.scenes && p.scenes.find ? p.scenes.find(function(s) { return s.id === sceneId; }) : null;
+        if (sc) sc.brief = res.brief || brief;
+        sbStatus('Brief saved \\u2713', 'ok');
+      })
+      .catch(function(e) { studioToggleControls(false); sbStatus('Error: ' + e.message, 'err'); });
+  }
+
   // Regenerate the whole scene from scratch (heavy planner+generate+critique
-  // pipeline, run as an async job). Unlike Revise (a surgical patch), this can
-  // rebuild a scene that is fundamentally broken or empty.
+  // pipeline, run as an async job) to fulfill the storyboard brief. Unlike
+  // Revise (a surgical patch), this rebuilds a broken or empty scene.
   function studioRegenerate() {
     if (studio.busy) return;
     var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
-    if (!sceneId) { studioStatus('Select or load a scene first.', 'warn'); return; }
-    var p = state.currentProject; if (!p) { studioStatus('Load a project first.', 'warn'); return; }
+    if (!sceneId) { sbStatus('Select or load a scene first.', 'warn'); return; }
+    var p = state.currentProject; if (!p) { sbStatus('Load a project first.', 'warn'); return; }
     if (!window.confirm('Rebuild this entire scene from scratch? This replaces the current scene and can take a minute or two.')) return;
-    var instruction = (document.getElementById('rv-input').value || '').trim();
+    var brief = studioReadBrief();
 
     studio.busy = true;
-    document.getElementById('rv-regen').disabled = true;
-    document.getElementById('rv-go').disabled = true;
-    document.getElementById('rv-undo').disabled = true;
-    document.getElementById('rv-input').disabled = true;
+    studioToggleControls(true);
     studioBusyOverlay(true, 'Regenerating\\u2026');
-    studioStatus('Regenerating scene\\u2026 this can take a minute or two.', '');
+    sbStatus('Regenerating scene\\u2026 this can take a minute or two.', '');
 
     function finish() {
       studio.busy = false;
-      document.getElementById('rv-regen').disabled = false;
-      document.getElementById('rv-go').disabled = false;
-      document.getElementById('rv-undo').disabled = false;
-      document.getElementById('rv-input').disabled = false;
+      studioToggleControls(false);
       studioBusyOverlay(false);
     }
 
-    api('POST', '/regenerate/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id),
-        { scene_id: sceneId, instruction: instruction })
+    var body = { scene_id: sceneId, purpose: brief.purpose, script: brief.script, visual_notes: brief.visual_notes };
+    api('POST', '/regenerate/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), body)
       .then(function(res) {
         if (!res || res.ok === false || !res.job_id) {
           finish();
-          studioStatus('Failed to start: ' + ((res && res.error) || 'unknown'), 'err');
+          sbStatus('Failed to start: ' + ((res && res.error) || 'unknown'), 'err');
           return;
         }
         pollRegenJob(res.job_id, finish);
       })
-      .catch(function(e) { finish(); studioStatus('Error: ' + e.message, 'err'); });
+      .catch(function(e) { finish(); sbStatus('Error: ' + e.message, 'err'); });
   }
 
   // Poll a regenerate job to completion, streaming progress into the status line.
@@ -2575,39 +2623,39 @@ export function getPreviewHtml(): string {
     var maxMs = 10 * 60 * 1000;
     function tick() {
       api('/jobs/' + encodeURIComponent(jobId)).then(function(job) {
-        if (!job) { finish(); studioStatus('Job not found.', 'err'); return; }
+        if (!job) { finish(); sbStatus('Job not found.', 'err'); return; }
         if (job.status === 'completed') {
           finish();
-          studioStatus('Scene regenerated \\u2713', 'ok');
-          document.getElementById('rv-input').value = '';
+          sbStatus('Scene regenerated \\u2713', 'ok');
           studioReload();
           return;
         }
         if (job.status === 'failed') {
           finish();
-          studioStatus('Regenerate failed: ' + (job.error || 'unknown'), 'err');
+          sbStatus('Regenerate failed: ' + (job.error || 'unknown'), 'err');
           return;
         }
         var pr = job.progress || {};
         var pct = pr.percent != null ? (' ' + pr.percent + '%') : '';
         var det = pr.detail ? (' \\u2014 ' + pr.detail) : (pr.step ? (' \\u2014 ' + pr.step) : '');
-        studioStatus('Regenerating scene\\u2026' + pct + det, '');
-        if (Date.now() - started > maxMs) { finish(); studioStatus('Still working\\u2026 taking longer than expected; check back shortly.', 'warn'); return; }
+        sbStatus('Regenerating scene\\u2026' + pct + det, '');
+        if (Date.now() - started > maxMs) { finish(); sbStatus('Still working\\u2026 taking longer than expected; check back shortly.', 'warn'); return; }
         setTimeout(tick, 2000);
       }).catch(function(e) {
-        if (Date.now() - started > maxMs) { finish(); studioStatus('Error polling job: ' + e.message, 'err'); return; }
+        if (Date.now() - started > maxMs) { finish(); sbStatus('Error polling job: ' + e.message, 'err'); return; }
         setTimeout(tick, 3000);
       });
     }
     tick();
   }
 
-  // Wire the Revise panel controls
+  // Wire the Revise + Storyboard panel controls
   document.getElementById('rv-scope-el').addEventListener('click', function() { studioSetScope('element'); });
   document.getElementById('rv-scope-scene').addEventListener('click', function() { studioSetScope('scene'); });
   document.getElementById('rv-go').addEventListener('click', studioRevise);
   document.getElementById('rv-undo').addEventListener('click', studioUndo);
-  document.getElementById('rv-regen').addEventListener('click', studioRegenerate);
+  document.getElementById('sb-save').addEventListener('click', studioSaveBrief);
+  document.getElementById('sb-regen').addEventListener('click', studioRegenerate);
   document.getElementById('rv-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); studioRevise(); }
   });

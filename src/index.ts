@@ -129,6 +129,15 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown): 
   res.end(JSON.stringify(body));
 }
 
+/** Extract editable scene-brief fields from a request body, or null if none present. */
+function pickSceneBrief(body: any): { purpose?: string; script?: string; visual_notes?: string } | null {
+  const out: { purpose?: string; script?: string; visual_notes?: string } = {};
+  if (typeof body?.purpose === "string") out.purpose = body.purpose;
+  if (typeof body?.script === "string") out.script = body.script;
+  if (typeof body?.visual_notes === "string") out.visual_notes = body.visual_notes;
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 const SERVICE_VERSION = "0.1.0";
 
 function escHtml(s: string): string {
@@ -1266,8 +1275,15 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         catch (e: any) { jsonResponse(res, 500, { error: `LLM not configured: ${e.message}` }); return; }
         const project = await loadProject(tenantId, projectId);
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        if (!project.scenes.some((s: any) => s.id === sceneId)) {
-          jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return;
+        const regenScene = project.scenes.find((s: any) => s.id === sceneId);
+        if (!regenScene) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
+        // Persist any edited brief from the body BEFORE queueing, so the pipeline
+        // (which reloads the project from disk) rebuilds against the new intent.
+        const briefPatch = pickSceneBrief(body);
+        if (briefPatch) {
+          regenScene.brief = { ...(regenScene.brief || {}), ...briefPatch };
+          project.updated_at = new Date().toISOString();
+          await saveProject(project);
         }
         const brandKit = await loadBrandKit(tenantId);
         const prompt = instruction
@@ -1306,6 +1322,25 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           return { ok: true, scene_id: sceneId };
         });
         jsonResponse(res, 202, { ok: true, job_id: job.id });
+        return;
+      }
+
+      // ── API: Save a scene's editable brief (Studio storyboard panel) ──
+      const scenePlanMatch = url.match(/^\/api\/scene-plan\/([^/]+)\/([^/]+)$/);
+      if (scenePlanMatch && method === "POST") {
+        const [, tenantId, projectId] = scenePlanMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const sceneId = (body.scene_id || body.sceneId) as string;
+        if (!sceneId) { jsonResponse(res, 400, { error: "scene_id is required" }); return; }
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const scene = project.scenes.find((s: any) => s.id === sceneId);
+        if (!scene) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
+        const briefPatch = pickSceneBrief(body);
+        scene.brief = { ...(scene.brief || {}), ...(briefPatch || {}) };
+        project.updated_at = new Date().toISOString();
+        await saveProject(project);
+        jsonResponse(res, 200, { ok: true, brief: scene.brief });
         return;
       }
 
