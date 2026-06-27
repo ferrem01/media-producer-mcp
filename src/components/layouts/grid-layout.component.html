@@ -23,8 +23,8 @@
   }
 
   .grid-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--mp-color-surface, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--mp-color-border, rgba(127,127,127,0.2));
     border-radius: 16px;
     padding: 36px 32px;
     display: flex;
@@ -70,7 +70,7 @@
 
   .card-description {
     font-size: 14px;
-    color: #94a3b8;
+    color: var(--mp-color-text-muted, #94a3b8);
     line-height: 1.5;
     letter-spacing: 0.005em;
   }

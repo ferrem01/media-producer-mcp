@@ -55,8 +55,8 @@
     justify-content: center;
     padding: 48px 40px;
     text-align: center;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--mp-color-surface, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--mp-color-border, rgba(127,127,127,0.2));
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     box-shadow:
@@ -97,7 +97,7 @@
   .face-description {
     font-size: 17px;
     font-weight: 400;
-    color: #94a3b8;
+    color: var(--mp-color-text-muted, #94a3b8);
     margin-top: 16px;
     line-height: 1.45;
   }
