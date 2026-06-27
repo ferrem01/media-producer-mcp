@@ -21,6 +21,7 @@ import { generateComponent, saveGeneratedComponent } from "./core/component-gene
 import { writeComponentSchema } from "./core/component-schema.js";
 import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
 import { reviseScene, undoScene } from "./llm/scene-revise.js";
+import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
@@ -28,7 +29,7 @@ import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
 import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
-import { getJob, listAllJobs } from "./core/job-queue.js";
+import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleScene, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
@@ -1245,6 +1246,66 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         } catch (e: any) {
           jsonResponse(res, 500, { error: e?.message || String(e) });
         }
+        return;
+      }
+
+      // ── API: Regenerate a scene (heavy planner+generate+critique rebuild) ──
+      // Unlike /api/revise (a surgical SEARCH/REPLACE patch on the existing
+      // source), this rebuilds the scene from scratch via runSceneRevisionPipeline.
+      // It's slow (planner → generate → critique, ~minutes), so it runs as an
+      // async job; the client polls /api/jobs/{id} and reloads when it completes.
+      const regenMatch = url.match(/^\/api\/regenerate\/([^/]+)\/([^/]+)$/);
+      if (regenMatch && method === "POST") {
+        const [, tenantId, projectId] = regenMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const sceneId = (body.scene_id || body.sceneId) as string;
+        const instruction = ((body.instruction || body.prompt || "") as string).trim();
+        if (!sceneId) { jsonResponse(res, 400, { error: "scene_id is required" }); return; }
+        let llmCfg;
+        try { llmCfg = llmConfigFromEnv(); }
+        catch (e: any) { jsonResponse(res, 500, { error: `LLM not configured: ${e.message}` }); return; }
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        if (!project.scenes.some((s: any) => s.id === sceneId)) {
+          jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return;
+        }
+        const brandKit = await loadBrandKit(tenantId);
+        const prompt = instruction
+          || "Rebuild this scene from scratch so it is visually complete and on-brand: "
+            + "every element must be visible and populated (no empty placeholders or blank panels), "
+            + "with clear visual hierarchy and legible text that animates in. "
+            + "Keep the scene's original intent and duration.";
+        const job = queueJob("generate", tenantId, async (j) => {
+          j.projectId = projectId;
+          j.progress = { step: "regenerating_scene", percent: 5 };
+          const result = await runGeneratePipeline({
+            prompt,
+            target: "scene",
+            tenant_id: tenantId,
+            project_id: projectId,
+            sceneId,
+            llmConfig: llmCfg,
+            brandKit: brandKit || project.brand_kit,
+            canvas: project.canvas,
+            onProgress: (p) => {
+              const clamped = Math.max(0, Math.min(100, p.percent));
+              const eta = p.etaSeconds && p.etaSeconds > 0
+                ? (p.etaSeconds < 60 ? `~${p.etaSeconds}s left` : `~${Math.round(p.etaSeconds / 60)}m left`)
+                : "";
+              j.progress = {
+                step: p.step,
+                percent: Math.round(5 + (clamped / 100) * 90),
+                detail: [p.detail, eta].filter(Boolean).join(" · ") || undefined,
+                etaSeconds: p.etaSeconds,
+              };
+            },
+          });
+          if (result.status !== "completed") {
+            throw new Error(result.error || "Scene regeneration failed");
+          }
+          return { ok: true, scene_id: sceneId };
+        });
+        jsonResponse(res, 202, { ok: true, job_id: job.id });
         return;
       }
 

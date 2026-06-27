@@ -497,6 +497,10 @@ export function getPreviewHtml(): string {
           <button class="rv-go" id="rv-go" style="flex:1;">Revise</button>
           <button class="rv-go" id="rv-undo" style="flex:0 0 auto;background:#334155;" title="Undo the last revise on this scene">Undo</button>
         </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="rv-go" id="rv-regen" style="flex:1;background:#334155;" title="Rebuild this whole scene from scratch (planner + generate + critique). Slower than a revise; use when a scene is fundamentally broken or empty.">Regenerate scene</button>
+        </div>
+        <div class="rv-hint" style="font-size:10px;color:#64748b;margin-top:4px;">Regenerate rebuilds the scene from scratch (slow). Use it when a revise can't fix a broken or empty scene. Optional: type guidance above first.</div>
         <div class="rv-status" id="rv-status"></div>
       </div>
     </div>
@@ -2329,7 +2333,7 @@ export function getPreviewHtml(): string {
   }
   document.addEventListener('click', function() { var m = document.getElementById('studio-ctx'); if (m) m.style.display = 'none'; });
 
-  function studioBusyOverlay(on) {
+  function studioBusyOverlay(on, label) {
     var sel = studio.sel; if (!sel || !sel._doc) return;
     var doc = sel._doc, ov = doc.getElementById('__studio_busy');
     if (!on) { if (ov) ov.remove(); return; }
@@ -2341,7 +2345,7 @@ export function getPreviewHtml(): string {
       left = r.left + sx; top = r.top + sy; w = r.width; h = r.height;
     }
     ov.style.cssText = 'position:absolute;left:' + left + 'px;top:' + top + 'px;width:' + w + 'px;height:' + h + 'px;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(10,12,24,0.55);backdrop-filter:blur(2px);color:#fff;font:600 18px sans-serif;border-radius:6px;';
-    ov.textContent = 'Revising\\u2026';
+    ov.textContent = label || 'Revising\\u2026';
   }
 
   function studioStatus(msg, cls) {
@@ -2434,6 +2438,7 @@ export function getPreviewHtml(): string {
     studio.busy = true;
     document.getElementById('rv-go').disabled = true;
     document.getElementById('rv-input').disabled = true;
+    var regenBtn = document.getElementById('rv-regen'); if (regenBtn) regenBtn.disabled = true;
     studioStatus('Revising\\u2026 (' + (studio.scope === 'scene' ? 'whole scene' : 'element') + ')', '');
     studioBusyOverlay(true);
 
@@ -2441,6 +2446,7 @@ export function getPreviewHtml(): string {
       studio.busy = false;
       document.getElementById('rv-go').disabled = false;
       document.getElementById('rv-input').disabled = false;
+      var rb = document.getElementById('rv-regen'); if (rb) rb.disabled = false;
       studioBusyOverlay(false);
     }
     api('POST', '/revise/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id),
@@ -2502,11 +2508,13 @@ export function getPreviewHtml(): string {
     studio.busy = true;
     document.getElementById('rv-undo').disabled = true;
     document.getElementById('rv-go').disabled = true;
+    var regenBtnU = document.getElementById('rv-regen'); if (regenBtnU) regenBtnU.disabled = true;
     studioStatus('Undoing\\u2026', '');
     function done() {
       studio.busy = false;
       document.getElementById('rv-undo').disabled = false;
       document.getElementById('rv-go').disabled = false;
+      var rb = document.getElementById('rv-regen'); if (rb) rb.disabled = false;
     }
     api('POST', '/revise/undo/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { scene_id: sceneId })
       .then(function(res) {
@@ -2515,9 +2523,83 @@ export function getPreviewHtml(): string {
         if (!res.restored) { studioStatus('Nothing to undo.', 'warn'); return; }
         var rem = res.remaining || 0;
         studioStatus('Reverted \\u2713 (' + rem + ' earlier revision' + (rem === 1 ? '' : 's') + ' left)', 'ok');
-        if (state.currentProject) loadComposite(state.currentProject);
+        studioReload();
       })
       .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
+  }
+
+  // Regenerate the whole scene from scratch (heavy planner+generate+critique
+  // pipeline, run as an async job). Unlike Revise (a surgical patch), this can
+  // rebuild a scene that is fundamentally broken or empty.
+  function studioRegenerate() {
+    if (studio.busy) return;
+    var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
+    if (!sceneId) { studioStatus('Select or load a scene first.', 'warn'); return; }
+    var p = state.currentProject; if (!p) { studioStatus('Load a project first.', 'warn'); return; }
+    if (!window.confirm('Rebuild this entire scene from scratch? This replaces the current scene and can take a minute or two.')) return;
+    var instruction = (document.getElementById('rv-input').value || '').trim();
+
+    studio.busy = true;
+    document.getElementById('rv-regen').disabled = true;
+    document.getElementById('rv-go').disabled = true;
+    document.getElementById('rv-undo').disabled = true;
+    document.getElementById('rv-input').disabled = true;
+    studioBusyOverlay(true, 'Regenerating\\u2026');
+    studioStatus('Regenerating scene\\u2026 this can take a minute or two.', '');
+
+    function finish() {
+      studio.busy = false;
+      document.getElementById('rv-regen').disabled = false;
+      document.getElementById('rv-go').disabled = false;
+      document.getElementById('rv-undo').disabled = false;
+      document.getElementById('rv-input').disabled = false;
+      studioBusyOverlay(false);
+    }
+
+    api('POST', '/regenerate/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id),
+        { scene_id: sceneId, instruction: instruction })
+      .then(function(res) {
+        if (!res || res.ok === false || !res.job_id) {
+          finish();
+          studioStatus('Failed to start: ' + ((res && res.error) || 'unknown'), 'err');
+          return;
+        }
+        pollRegenJob(res.job_id, finish);
+      })
+      .catch(function(e) { finish(); studioStatus('Error: ' + e.message, 'err'); });
+  }
+
+  // Poll a regenerate job to completion, streaming progress into the status line.
+  function pollRegenJob(jobId, finish) {
+    var started = Date.now();
+    var maxMs = 10 * 60 * 1000;
+    function tick() {
+      api('/jobs/' + encodeURIComponent(jobId)).then(function(job) {
+        if (!job) { finish(); studioStatus('Job not found.', 'err'); return; }
+        if (job.status === 'completed') {
+          finish();
+          studioStatus('Scene regenerated \\u2713', 'ok');
+          document.getElementById('rv-input').value = '';
+          studioReload();
+          return;
+        }
+        if (job.status === 'failed') {
+          finish();
+          studioStatus('Regenerate failed: ' + (job.error || 'unknown'), 'err');
+          return;
+        }
+        var pr = job.progress || {};
+        var pct = pr.percent != null ? (' ' + pr.percent + '%') : '';
+        var det = pr.detail ? (' \\u2014 ' + pr.detail) : (pr.step ? (' \\u2014 ' + pr.step) : '');
+        studioStatus('Regenerating scene\\u2026' + pct + det, '');
+        if (Date.now() - started > maxMs) { finish(); studioStatus('Still working\\u2026 taking longer than expected; check back shortly.', 'warn'); return; }
+        setTimeout(tick, 2000);
+      }).catch(function(e) {
+        if (Date.now() - started > maxMs) { finish(); studioStatus('Error polling job: ' + e.message, 'err'); return; }
+        setTimeout(tick, 3000);
+      });
+    }
+    tick();
   }
 
   // Wire the Revise panel controls
@@ -2525,6 +2607,7 @@ export function getPreviewHtml(): string {
   document.getElementById('rv-scope-scene').addEventListener('click', function() { studioSetScope('scene'); });
   document.getElementById('rv-go').addEventListener('click', studioRevise);
   document.getElementById('rv-undo').addEventListener('click', studioUndo);
+  document.getElementById('rv-regen').addEventListener('click', studioRegenerate);
   document.getElementById('rv-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); studioRevise(); }
   });
