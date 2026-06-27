@@ -129,7 +129,10 @@ async function main() {
     await page.setViewportSize({ width: args.width, height: args.height });
 
     const fileUrl = `file://${path.resolve(args.htmlPath)}`;
-    await page.goto(fileUrl, { waitUntil: "networkidle" });
+    // "load", not "networkidle": an autoplay/loop <video> keeps the network busy
+    // so networkidle never settles. Readiness comes from __MP_READY below.
+    await page.goto(fileUrl, { waitUntil: "load", timeout: 60000 });
+    await page.evaluate(() => (document as any).fonts?.ready).catch(() => {});
 
     await page.waitForFunction(
       () => (window as any).__MP_READY === true,
