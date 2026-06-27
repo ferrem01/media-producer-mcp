@@ -1399,7 +1399,14 @@ export function getPreviewHtml(): string {
       iframe.srcdoc = html;
     }
     updatePreviewScale();
-    try { if (typeof studioAttach === 'function') studioAttach(iframe.contentDocument); } catch(e) {}
+    // Attach Studio selection to the (same-origin) iframe doc; retry until body exists.
+    (function attachStudioHook(tries) {
+      try {
+        var d = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+        if (d && d.body) { if (typeof studioAttach === 'function') studioAttach(d); return; }
+      } catch(e) { console.warn('[studio] attach error', e); return; }
+      if (tries > 0) setTimeout(function(){ attachStudioHook(tries - 1); }, 60);
+    })(20);
 
     // Show once content is ready (videos + speaker bg)
     function reveal() { iframe.style.opacity = '1'; }
@@ -2198,6 +2205,8 @@ export function getPreviewHtml(): string {
   function studioAttach(doc) {
     if (!doc || doc.__studioAttached) return;
     doc.__studioAttached = true;
+    // Make it obvious the scene is clickable for revising.
+    try { doc.body.style.cursor = 'crosshair'; } catch(e) {}
     var hi = doc.createElement('div');
     hi.id = '__studio_hi';
     hi.style.cssText = 'position:absolute;pointer-events:none;z-index:2147483646;border:2px solid #6366f1;border-radius:4px;background:rgba(99,102,241,0.12);display:none;box-sizing:border-box;';
@@ -2284,6 +2293,17 @@ export function getPreviewHtml(): string {
     s.textContent = msg;
   }
 
+  // Re-fetch the composite and actually re-render it (hot-swap), preserving time.
+  function studioReload() {
+    var p = state.currentProject; if (!p) return;
+    var t = state.masterTime || 0;
+    loadComposite(p).then(function() {
+      if (initComposite()) {
+        waitForCompositeReady(function(masterTl) { if (masterTl) { masterTl.time(t); masterTl.pause(); } });
+      }
+    });
+  }
+
   function studioRevise() {
     if (studio.busy) return;
     var instruction = (document.getElementById('rv-input').value || '').trim();
@@ -2319,7 +2339,7 @@ export function getPreviewHtml(): string {
         if (defs.length) studioStatus('Updated \\u26a0 ' + defs.length + ' issue(s): ' + defs.map(function(d) { return d.detail; }).join('; '), 'warn');
         else studioStatus('Updated \\u2713 (' + n + ' edit' + (n === 1 ? '' : 's') + ')', 'ok');
         document.getElementById('rv-input').value = '';
-        if (state.currentProject) loadComposite(state.currentProject);
+        studioReload();
       })
       .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
   }
@@ -2345,7 +2365,7 @@ export function getPreviewHtml(): string {
         if (!res.restored) { studioStatus('Nothing to undo.', 'warn'); return; }
         var rem = res.remaining || 0;
         studioStatus('Reverted \\u2713 (' + rem + ' earlier revision' + (rem === 1 ? '' : 's') + ' left)', 'ok');
-        if (state.currentProject) loadComposite(state.currentProject);
+        studioReload();
       })
       .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
   }
