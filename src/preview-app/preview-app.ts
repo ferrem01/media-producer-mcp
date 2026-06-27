@@ -2228,17 +2228,31 @@ export function getPreviewHtml(): string {
     doc.__studioAttached = true;
     // Make it obvious the scene is clickable for revising.
     try { doc.body.style.cursor = 'crosshair'; } catch(e) {}
-    var hi = doc.createElement('div');
-    hi.id = '__studio_hi';
-    hi.style.cssText = 'position:absolute;pointer-events:none;z-index:2147483646;border:2px solid #6366f1;border-radius:4px;background:rgba(99,102,241,0.12);display:none;box-sizing:border-box;';
-    doc.body.appendChild(hi);
-
-    function showHi(el) {
+    function boxRect(el) {
       var r = el.getBoundingClientRect();
       var sx = (doc.documentElement.scrollLeft || doc.body.scrollLeft || 0);
       var sy = (doc.documentElement.scrollTop || doc.body.scrollTop || 0);
-      hi.style.left = (r.left + sx) + 'px'; hi.style.top = (r.top + sy) + 'px';
-      hi.style.width = r.width + 'px'; hi.style.height = r.height + 'px';
+      return { left: r.left + sx, top: r.top + sy, w: r.width, h: r.height };
+    }
+    // Hover box (dashed, light)
+    var hi = doc.createElement('div');
+    hi.id = '__studio_hi';
+    hi.style.cssText = 'position:absolute;pointer-events:none;z-index:2147483646;border:2px dashed #818cf8;border-radius:4px;background:rgba(99,102,241,0.07);display:none;box-sizing:border-box;';
+    doc.body.appendChild(hi);
+    // Persistent SELECTION box (solid + glow + label) -- stays on the clicked element
+    var selb = doc.createElement('div');
+    selb.id = '__studio_sel';
+    selb.style.cssText = 'position:absolute;pointer-events:none;z-index:2147483645;border:2px solid #6366f1;border-radius:4px;background:rgba(99,102,241,0.10);box-shadow:0 0 0 2px rgba(99,102,241,0.25),0 0 14px rgba(99,102,241,0.35);display:none;box-sizing:border-box;';
+    var selLabel = doc.createElement('div');
+    selLabel.style.cssText = 'position:absolute;top:-21px;left:-2px;max-width:320px;overflow:hidden;text-overflow:ellipsis;padding:1px 7px;font:600 11px sans-serif;color:#fff;background:#6366f1;border-radius:4px;white-space:nowrap;';
+    selb.appendChild(selLabel);
+    doc.body.appendChild(selb);
+    studio.hoverBox = hi; studio.selBox = selb; studio.selLabel = selLabel; studio.boxRect = boxRect; studio.boxDoc = doc;
+
+    function showHi(el) {
+      var b = boxRect(el);
+      hi.style.left = b.left + 'px'; hi.style.top = b.top + 'px';
+      hi.style.width = b.w + 'px'; hi.style.height = b.h + 'px';
       hi.style.display = 'block';
     }
     var _lastMove = 0;
@@ -2247,6 +2261,7 @@ export function getPreviewHtml(): string {
       var now = +new Date(); if (now - _lastMove < 30) return; _lastMove = now;
       var el = studioHitTest(doc, e.clientX, e.clientY);
       if (el) showHi(el); else hi.style.display = 'none';
+      studioPositionSel();
     }, true);
     doc.addEventListener('mouseleave', function() { hi.style.display = 'none'; }, true);
     doc.addEventListener('click', function(e) {
@@ -2271,8 +2286,27 @@ export function getPreviewHtml(): string {
     var label = studio.sel.compType || studio.sel.tagName || 'element';
     var txt = studio.sel.text ? ' \\u2014 "' + escHtml(studio.sel.text.slice(0, 40)) + '"' : '';
     document.getElementById('rv-sel').innerHTML = 'Selected: <b>' + escHtml(label) + '</b>' + txt;
+    if (studio.selLabel) studio.selLabel.textContent = label + (studio.sel.text ? ' \\u2014 ' + studio.sel.text.slice(0, 32) : '');
     studioSetScope('element');
+    studioPositionSel();
     var inp = document.getElementById('rv-input'); if (inp) inp.focus();
+  }
+
+  // Keep the persistent selection box on the selected element (if it's in the
+  // currently attached doc and still on screen).
+  function studioPositionSel() {
+    var s = studio.selBox;
+    if (!s) return;
+    var sel = studio.sel;
+    if (!sel || !sel._el || sel._doc !== studio.boxDoc || !sel._el.isConnected || !studio.boxRect) {
+      s.style.display = 'none';
+      return;
+    }
+    var b = studio.boxRect(sel._el);
+    if (b.w < 1 || b.h < 1) { s.style.display = 'none'; return; }
+    s.style.left = b.left + 'px'; s.style.top = b.top + 'px';
+    s.style.width = b.w + 'px'; s.style.height = b.h + 'px';
+    s.style.display = 'block';
   }
 
   function studioSetScope(scope) {
