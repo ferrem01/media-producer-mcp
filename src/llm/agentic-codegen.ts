@@ -128,7 +128,7 @@ async function executeReadSource(
   }
 }
 
-function executeSubmitScene(html: string): { valid: boolean; html: string; error?: string } {
+export function executeSubmitScene(html: string): { valid: boolean; html: string; error?: string } {
   var hasTemplate = /<template[^>]*>/i.test(html);
   var hasStyle = /<style[^>]*>/i.test(html);
   var hasScript = /<script[^>]*>/i.test(html);
@@ -144,6 +144,21 @@ function executeSubmitScene(html: string): { valid: boolean; html: string; error
   // Warn but accept if no style
   if (!hasStyle) {
     console.warn("  [agentic] submit_scene: no <style> section (acceptable but unusual)");
+  }
+
+  // Reject remote media URLs. Every legitimate asset (b-roll, hero image, logo)
+  // is handed to the agent as a LOCAL /assets/... path; a remote http(s) media
+  // URL means the agent invented one (e.g. a Pexels clip from training) when no
+  // local clip was provided. Remote media breaks render -- a streaming <video>
+  // stalls networkidle, dead URLs 403 -- so it must never reach the scene HTML.
+  // (Font/GSAP CDN URLs have no media extension and are unaffected.)
+  var remoteMedia = html.match(/https?:\/\/[^\s"'`)<>]+\.(?:mp4|webm|mov|m4v|ogv|jpg|jpeg|png|webp|gif|avif)(?:[?#][^\s"'`)<>]*)?/i);
+  if (remoteMedia) {
+    return {
+      valid: false,
+      html,
+      error: `Remote media URL not allowed: "${remoteMedia[0].slice(0, 80)}". Never reference external URLs for video or images. Use ONLY the local asset paths provided in the brief (the b-roll/hero/logo /assets/... paths). If this scene was given no footage or image, do NOT invent one -- compose the background with brand colors, gradients, and typography instead. Resubmit.`,
+    };
   }
 
   return { valid: true, html };
@@ -325,6 +340,10 @@ This scene has a real, cinematic AI-generated image that MUST be the full-bleed 
 - Keep the foreground MINIMAL and let the image breathe: a headline/tagline and at most one small supporting element. Lots of negative space.
 - This is a STILL beat: a slow, gentle Ken-Burns drift (scale 1.0 -> 1.06 over the full duration) on the image is welcome, but NOTHING should pop, bounce, or rebuild. Animate text gently (fade/slow rise); do not animate a competing background.
 ` : ""}
+## ASSETS: LOCAL PATHS ONLY (hard rule)
+NEVER reference an external/remote URL (http://, https://) for a video, image, or any media. The ONLY media you may use are the local /assets/... paths explicitly handed to you above (b-roll, hero image, logos). Do NOT invent stock-footage URLs (Pexels, Unsplash, etc.) -- remote media breaks the renderer.
+${!opts.brollVideoUrl && !opts.heroImageUrl ? `This scene was given NO footage or hero image. Even if the brief mentions "real footage" or "b-roll", do NOT add a <video> with an external src -- compose the background entirely from brand colors, gradients, and typography.` : ""}
+
 Duration: ${opts.sceneDuration} seconds
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}
 Project: ${opts.prompt}
