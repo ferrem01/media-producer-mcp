@@ -18,6 +18,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import crypto from "node:crypto";
 import { resolveVideoPath } from "./video-path.js";
+import { localizeRemoteMedia } from "./remote-media.js";
 
 // Resilience: this worker is forked with stdio:"inherit" and logs progress
 // heavily. Under concurrent load the parent's pipe buffer can fill, and a write
@@ -147,10 +148,15 @@ async function main() {
     componentLibDir,
   });
 
-  // Write HTML
+  // Download any remote media (e.g. a directly-embedded Pexels clip) to local
+  // files and rewrite to file:// -- otherwise a streaming remote <video> stalls
+  // networkidle and page.goto times out, failing the scene.
   var framesDir = path.join(args.workDir, "frames");
-  var htmlPath = path.join(args.workDir, "scene.html");
   await fs.mkdir(framesDir, { recursive: true });
+  html = await localizeRemoteMedia(html, args.workDir);
+
+  // Write HTML
+  var htmlPath = path.join(args.workDir, "scene.html");
   await fs.writeFile(htmlPath, html);
 
   // ── Critique loop ──
