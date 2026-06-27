@@ -2370,6 +2370,32 @@ export function getPreviewHtml(): string {
       .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
   }
 
+  function studioUndo() {
+    if (studio.busy) return;
+    var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
+    if (!sceneId) { studioStatus('Select a scene first.', 'warn'); return; }
+    var p = state.currentProject; if (!p) { studioStatus('Load a project first.', 'warn'); return; }
+    studio.busy = true;
+    document.getElementById('rv-undo').disabled = true;
+    document.getElementById('rv-go').disabled = true;
+    studioStatus('Undoing\\u2026', '');
+    function done() {
+      studio.busy = false;
+      document.getElementById('rv-undo').disabled = false;
+      document.getElementById('rv-go').disabled = false;
+    }
+    api('POST', '/revise/undo/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { scene_id: sceneId })
+      .then(function(res) {
+        done();
+        if (!res || res.ok === false) { studioStatus('Undo failed: ' + ((res && res.error) || 'unknown'), 'err'); return; }
+        if (!res.restored) { studioStatus('Nothing to undo.', 'warn'); return; }
+        var rem = res.remaining || 0;
+        studioStatus('Reverted \\u2713 (' + rem + ' earlier revision' + (rem === 1 ? '' : 's') + ' left)', 'ok');
+        if (state.currentProject) loadComposite(state.currentProject);
+      })
+      .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
+  }
+
   // Wire the Revise panel controls
   document.getElementById('rv-scope-el').addEventListener('click', function() { studioSetScope('element'); });
   document.getElementById('rv-scope-scene').addEventListener('click', function() { studioSetScope('scene'); });
