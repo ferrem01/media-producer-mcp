@@ -51,6 +51,24 @@ model + seed + references** so it's **re-runnable / tweakable in place** —
 
 ---
 
+## Flagship UX — Studio + click-to-revise  *(big project, not yet specced)*
+Rename **`preview` → `Studio`** and rework it for the codegen video model (the old
+preview's component-property/data editing is obsolete — scenes are codegen now, there
+are no editable "component properties").
+
+The killer interaction: in Studio, **pause playback, click/highlight a rendered
+element in the scene, right-click → "Revise,"** type the change, and it runs a
+**targeted revise scoped to that element** (passes its component id/type + current
+source + a cropped screenshot for context). Direct manipulation — point at the thing
+you don't like, fix just that. This is our "no frame-by-frame review… but when you
+DO want a tweak, point at it" story, and it leans on what we already have:
+- `reviseComponent` / surgical SEARCH-REPLACE patch path already does scoped revises;
+- assembled scenes already tag elements with `data-comp-id` / `data-cid`, so a clicked
+  element is identifiable back to its source.
+Mostly a **Studio UI + wiring** project, not new generation infra. **TODO: write a
+SPEC** (preview→Studio rename, element-pick + context-menu, revise wiring, scope of
+revise = element vs scene).
+
 ## Second tier — widen the moat
 4. **Deepen the autonomous quality loop:** de-duplicating keyframe-snapped storyboard
    sampler for editorial (Palmier); ✅ run the correctness gate on **bookend** scenes (done);
