@@ -63,19 +63,32 @@ are no "component properties" to edit. So:
 
 **Gap:** `reviseComponent` is internal-only — no HTTP endpoint or MCP tool. Studio needs one.
 
-## 4. Core interaction & flow
+## 4. Core interaction & flow (states must be unmistakable)
 
-1. **Pause** (existing play/pause). The current frame is the editing surface.
-2. **Select.** Click an element in the iframe; Studio highlights the nearest meaningful
-   element (outline + dims). Hover shows the selectable box.
-3. **Right-click → context menu** ("Revise…", "Revise whole scene…", maybe "Copy text").
-4. **Prompt.** A small input: "make this bigger / move it off her face / use the brand
-   green / fix the contrast". Submit.
-5. **Revise (scoped).** Studio sends the **element context** + the instruction to a new
-   revise endpoint, which runs `reviseComponent` against the **scene's codegen source**.
-6. **Hot-swap.** Re-assemble just that scene and refresh the iframe in place (seconds,
-   no full MP4 render). Re-run the per-scene **legibility/correctness gate** and surface
-   any new defect inline. Full render happens only on export, unchanged.
+The UI must make the current state obvious at every step — what's selected, that
+you're composing a revision, and **that work is happening in the background** (never a
+frozen UI).
+
+1. **Pause.** The current frame is the editing surface.
+2. **Select (highlight).** Hover shows a selectable box; click highlights the element
+   with a clear outline + a small label ("caption" / "card" / "button"). The selection
+   stays visibly highlighted while you compose.
+3. **Choose scope** — a toggle on the Revise box (and the same two as right-click items):
+   - **"This element"** (default) — revise the thing you highlighted.
+   - **"Whole scene"** — change the whole scene from one instruction, without
+     de-selecting. (e.g. "make this scene calmer", "switch to a two-column layout".)
+4. **Type the revision + Enter.** A focused input next to the selection: "make this
+   bigger / move it off her face / use the brand green." Enter submits.
+5. **Working state — clearly articulated (key requirement).** On Enter: the input locks,
+   the selected element (or the whole scene) gets an unmistakable **"Revising…" overlay**
+   — shimmer + spinner + the instruction echoed back + an elapsed/typical-time hint — and
+   a status line reflects progress. It is **non-blocking**: you can scrub or inspect other
+   scenes while it runs. It must read at a glance as "working in the background," not
+   stuck.
+6. **Apply + confirm.** When the patch returns, the scene **hot-swaps** in place (no MP4
+   render). The overlay flips to a brief **"Updated ✓"**, and the fast gates (legibility +
+   runtime) re-run with the result inline ("contrast 5.2:1 ✓" / "⚠ now 2.1:1"). Full
+   render only on export.
 
 ## 5. Scope of a revise (key design decision)
 
@@ -93,6 +106,16 @@ Two element classes:
 **Decision for v1: always revise the scene's codegen source** via `reviseComponent`,
 scoped by the clicked element's context. Simplest, safe (no cross-scene mutation), and
 reuses the surgical patch path. Component-library editing is a later add.
+
+### Element vs whole-scene (the scope toggle)
+Both scopes go through the **same fast patch path** (`reviseComponent` on the scene
+source) — the difference is only how much context we pin:
+- **This element** (default): SEARCH/REPLACE scoped by the clicked element's context.
+- **Whole scene**: same call, **no element scoping** — the instruction applies
+  scene-wide ("calmer", "two-column layout", "bigger type everywhere").
+- **Regenerate scene** (separate, heavier action, offered explicitly — not the default):
+  escalates to `runSceneRevisionPipeline` (planner + generate + critique) for a full
+  "redo this scene from scratch". Slower; reserved for when a patch can't get there.
 
 ## 6. Element context payload
 
@@ -135,9 +158,15 @@ the matched markup.
   hover/click, finds the nearest `[data-comp-id]`-or-meaningful element, draws a
   highlight, and on `contextmenu` postMessages the selection up. Parent renders the
   context menu + prompt (reuse the existing `liquid-glass-context-menu` aesthetic).
-- **Replace** the empty **prop editor** panel with a **Revise panel**: shows the current
-  selection, the instruction box, a "Revise" button, recent revises for the scene, and
-  the gate result (e.g. "contrast now 5.2:1 ✓").
+- **Replace** the empty **prop editor** panel with a **Revise panel**: the current
+  selection (with its label), a **This element / Whole scene** scope toggle, the
+  instruction box, a "Revise" button, a **live in-progress state** while a revise runs
+  (status line + the element/scene overlay described in §4.5), recent revises for the
+  scene, and the gate result (e.g. "contrast now 5.2:1 ✓").
+- **In-progress articulation is a first-class UI concern, not an afterthought.** Every
+  revise has an obvious working state on the affected element/scene, an echoed
+  instruction, and a clear done/✓ (or ⚠ defect) transition. The user should never wonder
+  whether their Enter registered.
 - Keep timeline, play/pause, scene list. The **layers panel** can become a flat list of
   selectable elements per scene (nice-to-have).
 
@@ -151,25 +180,41 @@ the matched markup.
 ## 10. Phased plan
 
 - **Phase 1 — Backend:** `POST /api/revise` + `revise` MCP tool wrapping `reviseComponent`
-  on the scene source; re-assemble + return updated HTML; re-run the per-scene gate.
-  (No UI yet — drive it with a curl payload to prove the loop.)
-- **Phase 2 — Selection + context menu:** in-iframe selection script + postMessage;
-  parent context menu + prompt; wire to `/api/revise`; hot-swap the scene in the iframe.
-- **Phase 3 — Studio shell:** rename, Revise panel replacing the prop editor, gate
-  results inline, remove the obsolete component-PATCH path.
-- **Phase 4 — Polish:** revise history/undo, element-list layers panel, "revise whole
-  scene" path (routes to `runSceneRevisionPipeline`).
+  on the scene source; supports both **element-scoped** and **whole-scene** instructions
+  (same call, more/less context); re-assemble + return updated HTML; re-run the fast
+  gates; version the prior scene source. (No UI yet — drive it with a curl payload to
+  prove the loop.)
+- **Phase 2 — Selection + context menu + working state:** in-iframe selection script +
+  postMessage; highlight; **This element / Whole scene** scope toggle; right-click menu;
+  instruction box; wire to `/api/revise`; the **"Revising…" overlay / done-✓** states
+  (§4.5); hot-swap the scene in the iframe.
+- **Phase 3 — Studio shell:** rename `preview` → Studio, Revise panel replacing the prop
+  editor, gate results inline, remove the obsolete component-PATCH path.
+- **Phase 4 — Polish:** revise history/undo UI, element-list layers panel, and a distinct
+  **"Regenerate scene"** action (the heavier `runSceneRevisionPipeline` path).
 
-## 11. Open questions
+## 11. Resolved decisions
 
-- **Revise latency** — a surgical patch is fast (~seconds, ~80 output tokens) but is it
-  fast enough to feel "live"? Show a spinner on the selection; keep it non-blocking.
-- **Undo** — keep N prior scene-source versions per scene (we already version assets;
-  do the same for scene sources) so a revise is reversible.
-- **Selection granularity** — snap to the nearest `[data-comp-id]`, or allow selecting
-  any leaf element? Propose: leaf element by default, with the context payload also
-  carrying the enclosing component so the LLM has both.
-- **Gate-on-revise** — block the swap if the revise *introduces* a defect, or swap and
-  warn? Propose: swap + warn (don't block the user's intent).
-- **Conflict with playback** — revise mutates source; re-init the GSAP master cleanly on
-  hot-swap (reuse the existing `__MP_READY` handshake).
+- **Selection granularity** → **leaf element + component context.** Select the exact
+  element clicked; also send its enclosing component in the context payload so the LLM
+  has both precision and structure.
+- **Gate-on-revise** → **swap + warn.** Apply the change immediately; re-run the fast
+  gates and surface any new defect inline. Never block the user's intent.
+- **Undo** → **version the scene source per revise** (reuse the asset-versioning
+  pattern) so every revise is reversible; show a small history in the Revise panel.
+- **v1 revise scope (library components)** → **scene source only.** Patch this scene's
+  copy; tweaking one CTA never mutates the shared library component. Editing the library
+  component is a separate, later action.
+- **Latency / live feel** → **async, non-blocking** with the §4.5 working overlay.
+  Surgical patches are ~seconds; full vision critique is NOT run on a point revise.
+- **Checks run on a revise** → only the **fast deterministic gates** (legibility +
+  runtime), not the full vision critique (kept for generation/export).
+- **Playback conflict on hot-swap** → re-init the GSAP master via the existing
+  `__MP_READY` handshake when the scene source is swapped.
+
+## 12. Still open
+
+- **Revise history depth / storage** — how many prior scene-source versions to keep, and
+  where (project dir vs a `_revisions/` sidecar).
+- **"Whole scene" vs "Regenerate scene" affordance** — how prominently to surface the
+  heavier `runSceneRevisionPipeline` path so users don't reach for it by default.
