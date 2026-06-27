@@ -325,10 +325,26 @@ This scene has a real cinematic video clip that MUST be the full-bleed backgroun
 - Place it as the FIRST element in your <template>, filling the frame:
   \`<video class="mp-broll" src="${opts.brollVideoUrl}" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;"></video>\`
   (Keep the src EXACTLY as given -- the system resolves it to the real file at render time and an http URL in preview.)
-- Add a soft legibility scrim ABOVE the video at z-index:1 (e.g. a subtle vertical linear-gradient darkening the top and bottom where text sits), so captions stay readable while the footage breathes through the middle.
 - DO NOT add any OTHER full-screen background (NO gradient-background, mesh, particles, grids, glow orbs) -- the footage IS the background. Keep your root container transparent.
 - Keep the foreground MINIMAL: a headline/tagline and at most one small supporting element. Lots of negative space. Place foreground content at z-index:2+.
-- Make text legible over moving video: large, heavy weight, white or near-white, with a soft text-shadow. Animate the text in/out; do not animate the footage.
+
+### TEXT OVER VIDEO -- legibility treatment is MANDATORY
+The footage MOVES, so the brightness behind the text changes every frame. You CANNOT rely on the clip being dark/light enough where the words happen to sit -- part of the text will wash out on some frames. Every text run over the video MUST have a backing that travels with it and reads on EVERY frame. Pick ONE of these three techniques (whichever fits the look) and execute it fully:
+
+  (A) ANCHORED SCRIM -- a contained dark gradient behind the text block (NOT a thin global top/bottom vignette). Size it to the caption with generous padding so the darkening extends ~1 line beyond the text on all sides. e.g. a div at z-index:1 positioned where the text sits:
+      \`background: radial-gradient(ellipse at center, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.45) 55%, transparent 80%);\`
+
+  (B) FROSTED / SOLID CAPTION PANEL -- the text lives inside a card directly behind it:
+      \`background: rgba(10,14,30,0.58); backdrop-filter: blur(10px); border-radius: 14px; padding: 22px 34px;\`
+
+  (C) GRADE THE FOOTAGE during the text beat -- calm the whole clip so it becomes a backdrop: a full-frame overlay at z-index:1 (e.g. \`background: rgba(8,10,24,0.5);\` or a brand-tinted gradient), or a filter on the video (\`filter: brightness(0.55) saturate(0.9);\`).
+
+PLUS, always (regardless of A/B/C):
+- White / near-white text (#ffffff or #f5f7ff), heavy weight (700-800).
+- A real text-shadow for edge definition: \`text-shadow: 0 2px 12px rgba(0,0,0,0.7);\`
+- The backing must cover the text's FULL box -- all lines, including descenders -- not just a band.
+- NEVER place bare text on the footage with no backing, and NEVER use dark text over footage. Light text + a real backing only.
+- Animate the text in/out; do not animate the footage.
 ` : ""}
 ${opts.heroImageUrl ? `
 ## HERO-IMAGE SCENE (a generated still image is THIS scene's background)

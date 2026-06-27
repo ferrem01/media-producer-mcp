@@ -55,6 +55,29 @@ function ok(name, cond) { results.push(cond); console.log(`${cond ? "PASS" : "FA
   ok("flags dark text washed over the dark third (avg would pass)", d.length > 0);
 }
 
+// Case 4+5: text-over-video TREATMENT check. A full-bleed `.mp-broll` element
+// stands in for footage. Bare text over it (no backing) must be flagged
+// "no-backing"; text inside a panel/scrim must pass.
+{
+  const HTML = `<!doctype html><html><head><style>
+    html,body{margin:0;width:1920px;height:1080px;overflow:hidden}
+    .mp-broll{position:absolute;inset:0;width:100%;height:100%;background:#7a7f8a;z-index:0}
+    .bare{position:absolute;top:820px;left:0;right:0;text-align:center;color:#fff;font:800 64px sans-serif;z-index:2}
+    .panel{position:absolute;top:300px;left:560px;width:800px;background:rgba(10,14,30,0.6);border-radius:14px;padding:24px;z-index:2}
+    .panel .t{color:#fff;font:800 64px sans-serif;text-align:center}
+  </style></head><body>
+    <div class="mp-broll"></div>
+    <div class="bare">Bare text on moving footage</div>
+    <div class="panel"><div class="t">Protected by a panel</div></div>
+    <script>window.__MP_TIMELINE={time:function(){}}; window.__MP_READY=true;</script>
+  </body></html>`;
+  fs.writeFileSync("/tmp/tc45.html", HTML);
+  const d = await measureTextContrast({ htmlPath: "/tmp/tc45.html", width: 1920, height: 1080, atTimes: [0] });
+  console.log("  video-treatment defects:", JSON.stringify(d));
+  ok("flags bare text over footage as no-backing", d.some(x => /Bare text/.test(x.text) && x.reason === "no-backing"));
+  ok("passes text protected by a panel", !d.some(x => /Protected by a panel/.test(x.text)));
+}
+
 const pass = results.every(Boolean);
 console.log(`\n=== legibility gate: ${pass ? "PASS" : "FAIL"} ===`);
 process.exit(pass ? 0 : 1);

@@ -28,6 +28,9 @@ export interface ContrastDefect {
   fontSize: number;
   contrast: number;   // measured ratio, e.g. 1.3
   threshold: number;  // ratio it needed to pass, e.g. 4.5
+  /** Why it failed: low measured contrast, or (for text over video) no
+   *  legibility treatment (scrim/panel) behind it. */
+  reason: "low-contrast" | "no-backing";
 }
 
 function srgbToLinear(c: number): number {
@@ -127,13 +130,25 @@ export async function measureTextContrast(opts: {
       for (const t of textElements) {
         const tc = parseRgb(t.color);
         if (!tc) continue;
+        const threshold = t.fontSize >= 24 ? 3.0 : 4.5; // large vs body text
+
+        // Text-over-video without a backing: the footage moves, so static-frame
+        // contrast can't guarantee legibility on every frame -- require the
+        // protection treatment (scrim/panel) regardless of how this frame samples.
+        if (t.overVideo && !t.hasBacking && !byText.has(t.text)) {
+          byText.set(t.text, {
+            text: t.text, fontSize: Math.round(t.fontSize),
+            contrast: 0, threshold, reason: "no-backing",
+          });
+          continue;
+        }
+
         // Grid-sample the backdrop behind the text and measure WORST-CASE local
         // contrast, not the average. Over busy footage the average hides washout;
         // a caption is illegible if a meaningful fraction of its run is low-contrast.
         const cells = await sampleRegionGrid(backdropPath, t.x, t.y, t.w, t.h, 12, 3);
         if (!cells || cells.length === 0) continue;
         const tl = relLuminance(tc.r, tc.g, tc.b);
-        const threshold = t.fontSize >= 24 ? 3.0 : 4.5; // large vs body text
         let worst = Infinity;
         let below = 0;
         for (const cell of cells) {
@@ -145,10 +160,10 @@ export async function measureTextContrast(opts: {
         if (washFraction >= WASH_FRACTION) {
           const defect: ContrastDefect = {
             text: t.text, fontSize: Math.round(t.fontSize),
-            contrast: Math.round(worst * 100) / 100, threshold,
+            contrast: Math.round(worst * 100) / 100, threshold, reason: "low-contrast",
           };
           const prev = byText.get(t.text);
-          if (!prev || defect.contrast < prev.contrast) byText.set(t.text, defect);
+          if (!prev || prev.reason === "low-contrast" && defect.contrast < prev.contrast) byText.set(t.text, defect);
         }
       }
     }

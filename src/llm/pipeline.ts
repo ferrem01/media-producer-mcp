@@ -1131,11 +1131,19 @@ async function critiqueAndRetryScene(opts: {
             atTimes: [dur * 0.35, dur * 0.6, dur * 0.85],
           });
           for (const d of contrastDefects) {
-            correctness.defects.push({
-              type: "illegible",
-              detail: `Text "${d.text}" is unreadable over its background -- measured contrast ${d.contrast}:1, needs >= ${d.threshold}:1. Use a higher-contrast text color (lighter over dark, darker over light) or put a solid/scrim pad directly behind the text.`,
-            });
-            critiqueResult.issues.push(`Illegible text "${d.text}" (contrast ${d.contrast}:1, needs ${d.threshold}:1)`);
+            if (d.reason === "no-backing") {
+              correctness.defects.push({
+                type: "illegible",
+                detail: `Text "${d.text}" sits directly over moving video with NO legibility treatment. The footage brightness changes every frame, so part of the text WILL wash out. Add a backing that travels with the text: (A) an anchored scrim sized to the text block, (B) a frosted/solid caption panel behind it, or (C) darken/grade the footage during this beat -- plus white/near-white heavy text with a soft text-shadow.`,
+              });
+              critiqueResult.issues.push(`Text "${d.text}" over video has no legibility backing (scrim/panel)`);
+            } else {
+              correctness.defects.push({
+                type: "illegible",
+                detail: `Text "${d.text}" is unreadable over its background -- measured contrast ${d.contrast}:1, needs >= ${d.threshold}:1. Use a higher-contrast text color (lighter over dark, darker over light) or put a solid/scrim pad directly behind the text.`,
+              });
+              critiqueResult.issues.push(`Illegible text "${d.text}" (contrast ${d.contrast}:1, needs ${d.threshold}:1)`);
+            }
           }
           if (contrastDefects.length > 0) {
             correctness.pass = false;
