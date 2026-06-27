@@ -94,49 +94,67 @@ export async function measureTextContrast(opts: {
   htmlPath: string;
   width: number;
   height: number;
-  atTime: number;
+  /** Times (seconds) to probe. Captions animate in/out, so a single probe can
+   *  miss text that isn't at full opacity at that instant -- probe several. */
+  atTimes: number[];
 }): Promise<ContrastDefect[]> {
   const tmpDir = path.join(os.tmpdir(), `contrast_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true });
-  const backdropPath = path.join(tmpDir, "backdrop.png");
 
+  // A caption only needs to be illegible at ONE moment it's on-screen to be a
+  // defect, so probe multiple times and keep the worst (lowest-contrast) finding
+  // per text run. The probe itself only collects fully-visible text (opacity
+  // >= 0.85), so a caption mid-fade at one time is simply caught at another.
+  const byText = new Map<string, ContrastDefect>();
   try {
-    const { textElements } = await captureSingleFrame({
-      htmlPath: opts.htmlPath,
-      outputPath: backdropPath,
-      width: opts.width,
-      height: opts.height,
-      atTime: opts.atTime,
-      contrastProbe: true,
-    });
-    if (!textElements || textElements.length === 0) return [];
-
-    const defects: ContrastDefect[] = [];
-    for (const t of textElements) {
-      const tc = parseRgb(t.color);
-      if (!tc) continue;
-      // Grid-sample the backdrop behind the text and measure WORST-CASE local
-      // contrast, not the average. Over busy footage the average hides washout;
-      // a caption is illegible if a meaningful fraction of its run is low-contrast.
-      const cells = await sampleRegionGrid(backdropPath, t.x, t.y, t.w, t.h, 12, 3);
-      if (!cells || cells.length === 0) continue;
-      const tl = relLuminance(tc.r, tc.g, tc.b);
-      const threshold = t.fontSize >= 24 ? 3.0 : 4.5; // large vs body text
-      let worst = Infinity;
-      let below = 0;
-      for (const cell of cells) {
-        const ratio = contrastRatio(tl, relLuminance(cell.r, cell.g, cell.b));
-        if (ratio < worst) worst = ratio;
-        if (ratio < threshold) below++;
+    for (let i = 0; i < opts.atTimes.length; i++) {
+      const backdropPath = path.join(tmpDir, `backdrop_${i}.png`);
+      let textElements;
+      try {
+        ({ textElements } = await captureSingleFrame({
+          htmlPath: opts.htmlPath,
+          outputPath: backdropPath,
+          width: opts.width,
+          height: opts.height,
+          atTime: opts.atTimes[i],
+          contrastProbe: true,
+        }));
+      } catch {
+        continue; // a single bad probe shouldn't sink the whole gate
       }
-      const washFraction = below / cells.length;
-      if (washFraction >= WASH_FRACTION) {
-        defects.push({ text: t.text, fontSize: Math.round(t.fontSize), contrast: Math.round(worst * 100) / 100, threshold });
+      if (!textElements || textElements.length === 0) continue;
+
+      for (const t of textElements) {
+        const tc = parseRgb(t.color);
+        if (!tc) continue;
+        // Grid-sample the backdrop behind the text and measure WORST-CASE local
+        // contrast, not the average. Over busy footage the average hides washout;
+        // a caption is illegible if a meaningful fraction of its run is low-contrast.
+        const cells = await sampleRegionGrid(backdropPath, t.x, t.y, t.w, t.h, 12, 3);
+        if (!cells || cells.length === 0) continue;
+        const tl = relLuminance(tc.r, tc.g, tc.b);
+        const threshold = t.fontSize >= 24 ? 3.0 : 4.5; // large vs body text
+        let worst = Infinity;
+        let below = 0;
+        for (const cell of cells) {
+          const ratio = contrastRatio(tl, relLuminance(cell.r, cell.g, cell.b));
+          if (ratio < worst) worst = ratio;
+          if (ratio < threshold) below++;
+        }
+        const washFraction = below / cells.length;
+        if (washFraction >= WASH_FRACTION) {
+          const defect: ContrastDefect = {
+            text: t.text, fontSize: Math.round(t.fontSize),
+            contrast: Math.round(worst * 100) / 100, threshold,
+          };
+          const prev = byText.get(t.text);
+          if (!prev || defect.contrast < prev.contrast) byText.set(t.text, defect);
+        }
       }
     }
-    return defects;
+    return [...byText.values()];
   } catch {
-    return [];
+    return [...byText.values()];
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
