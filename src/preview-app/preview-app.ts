@@ -2362,8 +2362,20 @@ export function getPreviewHtml(): string {
     studio.sel = null;
     if (studio.selBox) studio.selBox.style.display = 'none';
     loadComposite(p).then(function() {
-      if (!initComposite()) return;
+      // CRITICAL: document.write reuses the iframe window, so the PREVIOUS
+      // document's __MP_READY/__MP_TIMELINE are still set when we rewrite.
+      // Without clearing them, waitForCompositeReady can fire against the OLD
+      // (now-detached) timeline; we then seek a dead timeline and the new
+      // composite sits at master-time 0 (the blank intro frame). Clear first so
+      // we wait for the genuinely-new document. (This is why loadProject — which
+      // runs against a fresh iframe — works but a re-load went blank.)
+      try {
+        var w0 = els.previewIframe.contentWindow;
+        if (w0) { w0.__MP_READY = false; w0.__MP_TIMELINE = null; w0.__MP_SCENE_META = null; }
+      } catch (e) {}
+      if (!initComposite()) { console.warn('[studio] reload: no composite html'); return; }
       waitForCompositeReady(function(masterTl) {
+        console.log('[studio] reload ready; timeline=', !!masterTl);
         // Re-attach selection to the fresh document (defensive; the write hook
         // may have run before the body was ready).
         try { var d = els.previewIframe.contentDocument; if (d) studioAttach(d); } catch (e) {}
@@ -2386,6 +2398,7 @@ export function getPreviewHtml(): string {
         var settled = sceneStart + Math.min(0.6, sceneDur > 0 ? sceneDur * 0.4 : 0.6);
         var target = Math.max(keepTime, settled);
         if (sceneDur > 0) target = Math.min(target, sceneStart + sceneDur - 0.05);
+        console.log('[studio] reload seek: scene', si, 'start', sceneStart, 'target', target, 'keepTime', keepTime);
         if (masterTl) { masterTl.time(target); masterTl.pause(); }
         state.masterTime = target;
         els.slider.value = state.totalDuration > 0 ? Math.round((target / state.totalDuration) * 1000) : 0;
