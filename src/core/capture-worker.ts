@@ -53,9 +53,11 @@ interface VideoElementInfo {
  */
 async function extractVideoFrames(
   videoPath: string,
-  fps: number
+  fps: number,
+  width: number,
+  height: number
 ): Promise<ExtractedVideo> {
-  const hash = crypto.createHash("md5").update(videoPath).digest("hex").slice(0, 12);
+  const hash = crypto.createHash("md5").update(`${videoPath}|${fps}|${width}x${height}`).digest("hex").slice(0, 12);
   const framesDir = `/tmp/vframes_${hash}`;
 
   // If already extracted (shared src), just count frames
@@ -72,13 +74,17 @@ async function extractVideoFrames(
 
   await fs.mkdir(framesDir, { recursive: true });
 
-  console.log(`  Extracting frames from ${path.basename(videoPath)} at ${fps}fps...`);
+  console.log(`  Extracting frames from ${path.basename(videoPath)} at ${fps}fps, max ${width}x${height}...`);
+  // Downscale to canvas size (never upscale); quiet ffmpeg so real errors aren't
+  // buried in progress spam. Source-res (e.g. UHD) extraction is slow and fills
+  // /tmp -- the frames are shown at canvas size anyway.
   await execFileAsync("ffmpeg", [
+    "-loglevel", "error", "-nostats", "-y",
     "-i", videoPath,
-    "-vf", `fps=${fps}`,
+    "-vf", `fps=${fps},scale='min(${width},iw)':-2`,
     "-start_number", "0",
     `${framesDir}/frame-%06d.png`,
-  ], { timeout: 120_000 });
+  ], { timeout: 180_000, maxBuffer: 1 << 20 });
 
   const files = await fs.readdir(framesDir);
   const totalFrames = files.filter((f) => f.endsWith(".png")).length;
@@ -169,7 +175,7 @@ async function main() {
           continue;
         }
 
-        const extracted = await extractVideoFrames(videoPath, args.fps);
+        const extracted = await extractVideoFrames(videoPath, args.fps, args.width, args.height);
         extractionMap.set(src, extracted);
         frameDirsToCleanup.add(extracted.framesDir);
       }
