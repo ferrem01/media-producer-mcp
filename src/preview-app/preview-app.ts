@@ -11,7 +11,7 @@ export function getPreviewHtml(): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Media Producer</title>
+<title>Studio — Media Producer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -441,7 +441,7 @@ export function getPreviewHtml(): string {
 <body>
 <div id="app">
   <header>
-    <h1>Media Producer</h1>
+    <h1>Studio</h1>
     <div class="header-controls">
       <label>Tenant</label>
       <input id="tenant-input" type="text" placeholder="tenant-id" style="width:120px;">
@@ -1621,6 +1621,7 @@ export function getPreviewHtml(): string {
   }
 
   function renderProps() {
+    if (!els.propEditor) return; // obsolete prop editor removed; Revise panel handles edits
     var project = state.currentProject;
     var scene = project && project.scenes[state.currentSceneIndex];
     var comp = scene && scene.components && scene.components[state.currentComponentIndex];
@@ -1841,6 +1842,8 @@ export function getPreviewHtml(): string {
   }
 
   function clearProps() {
+    // Obsolete data-driven prop editor (replaced by the Revise panel). No-op now.
+    if (!els.propEditor) return;
     els.propEditor.innerHTML = '<div class="empty-state">Select a component</div>';
   }
   // ── Save prop to server and reload preview ──

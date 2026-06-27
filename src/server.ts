@@ -86,9 +86,9 @@ function err(msg: string) {
   return { content: [{ type: "text" as const, text: msg }], isError: true as const };
 }
 
-/** Build the preview SPA URL for a tenant + project. */
+/** Build the Studio SPA URL for a tenant + project. */
 function previewUrl(tenantId: string, projectId: string): string {
-  return `${config.publicUrl}/preview?tenant=${encodeURIComponent(tenantId)}&project=${encodeURIComponent(projectId)}`;
+  return `${config.publicUrl}/studio?tenant=${encodeURIComponent(tenantId)}&project=${encodeURIComponent(projectId)}`;
 }
 
 /** Human ETA suffix from seconds-remaining. */
