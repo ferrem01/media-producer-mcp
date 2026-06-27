@@ -20,7 +20,7 @@ import { buildComponentCatalog } from "./llm/catalog.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema } from "./core/component-schema.js";
 import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
-import { reviseScene } from "./llm/scene-revise.js";
+import { reviseScene, undoScene } from "./llm/scene-revise.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
@@ -1202,6 +1202,22 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           project_id: projectId,
           tenant_id: tenantId,
         });
+        return;
+      }
+
+      // ── API: Undo last revise on a scene ──
+      const undoMatch = url.match(/^\/api\/revise\/undo\/([^/]+)\/([^/]+)$/);
+      if (undoMatch && method === "POST") {
+        const [, tenantId, projectId] = undoMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const sceneId = (body.scene_id || body.sceneId) as string;
+        if (!sceneId) { jsonResponse(res, 400, { error: "scene_id is required" }); return; }
+        try {
+          const result = await undoScene({ tenantId, projectId, sceneId });
+          jsonResponse(res, result.ok ? 200 : 400, result);
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
         return;
       }
 

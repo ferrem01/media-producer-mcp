@@ -55,6 +55,9 @@ export interface ReviseSceneResult {
   sceneHtml?: string;
   /** Fast-gate findings (empty = clean). */
   defects?: { type: string; detail: string }[];
+  /** Undo only: whether a prior version was restored, and how many remain. */
+  restored?: boolean;
+  remaining?: number;
 }
 
 /** Read a component source, searching project → tenant → library dirs. */
@@ -216,4 +219,51 @@ export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneRes
     sceneHtml,
     defects,
   };
+}
+
+/** Undo: restore the most recent versioned source for a scene's codegen component. */
+export async function undoScene(opts: { tenantId: string; projectId: string; sceneId: string }): Promise<ReviseSceneResult> {
+  const project = await loadProject(opts.tenantId, opts.projectId);
+  if (!project) return { ok: false, error: `Project ${opts.projectId} not found` };
+  const scene = project.scenes.find((s: any) => s.id === opts.sceneId);
+  if (!scene) return { ok: false, error: `Scene ${opts.sceneId} not found in project ${opts.projectId}` };
+  const codegenComp = scene.components.find((c: any) => CODEGEN_PREFIXES.some((p) => c.type.startsWith(p)));
+  if (!codegenComp) return { ok: false, error: `Scene ${opts.sceneId} has no codegen component` };
+  const type = codegenComp.type;
+
+  const compDir = path.join(projectDir(opts.tenantId, opts.projectId), "components");
+  const revDir = path.join(compDir, "_revisions");
+  const suffix = ".component.html";
+  let files: string[] = [];
+  try { files = await fs.readdir(revDir); } catch { /* none */ }
+  const mine = files
+    .filter((f) => f.startsWith(type + ".") && f.endsWith(suffix))
+    .map((f) => ({ f, ts: parseInt(f.slice(type.length + 1, -suffix.length), 10) || 0 }))
+    .sort((a, b) => b.ts - a.ts);
+
+  if (mine.length === 0) return { ok: true, componentType: type, restored: false, remaining: 0 };
+
+  const latest = mine[0];
+  const restoredSource = await fs.readFile(path.join(revDir, latest.f), "utf-8");
+  await fs.writeFile(path.join(compDir, `${type}${suffix}`), restoredSource);
+  await fs.unlink(path.join(revDir, latest.f)).catch(() => {});
+
+  // Re-assemble the restored scene for the iframe.
+  const sources: { type: string; source: string }[] = [];
+  for (const c of scene.components as any[]) {
+    if (sources.some((s) => s.type === c.type)) continue;
+    const src = await loadSource(c.type, opts.tenantId, opts.projectId);
+    if (src != null) sources.push({ type: c.type, source: src });
+  }
+  let sceneHtml: string | undefined;
+  try {
+    sceneHtml = await assembleSceneAuto({
+      scene, components: sources, brandKit: project.brand_kit, canvas: project.canvas,
+      gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: true,
+    });
+  } catch (e: any) {
+    console.warn(`  [undo] preview assembly failed: ${e?.message || e}`);
+  }
+
+  return { ok: true, componentType: type, restored: true, remaining: mine.length - 1, sceneHtml };
 }
