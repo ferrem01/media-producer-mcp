@@ -336,23 +336,56 @@ async function runSceneRevisionPipeline(
     (briefBlock ? `\n\nScene brief (the intent this scene must fulfill):\n${briefBlock}` : "") +
     `\n\nCurrent scene:\n${sceneContext}`;
 
-  opts.onProgress?.({ step: "planning", percent: 10, detail: "Planning the scene" });
-  trace?.beginEvent("scene_revision_plan");
-  const storyboard = await planStoryboard({
-    prompt: revisionPrompt,
-    format: project.format || "video",
-    llmConfig: opts.llmConfig,
-    brandKit,
-    canvas,
-    componentCatalog: catalog,
-    sceneCount: 1,
-    creativity: resolveCreativity(opts),
-    tenantId: opts.tenant_id,
-  });
-  trace?.endEvent({ scenes: storyboard.scenes.length });
+  // Build the scene the generator will render. When we have an explicit brief
+  // (Studio-edited override, else the original storyboard plan), use it VERBATIM
+  // as the generation spec instead of re-running the planner: planStoryboard
+  // paraphrases the brief into its own brief/description, and buildCodegenBrief
+  // then generates from THAT — so the rebuild drifts from what the storyboard
+  // actually said. Only fall back to the planner when there is no brief at all.
+  const briefPurpose = existingScene.brief?.purpose ?? plannedScene?.purpose;
+  const briefScript = existingScene.brief?.script ?? plannedScene?.voiceover_text;
+  const briefVisual = existingScene.brief?.visual_notes ?? plannedScene?.visual_notes;
+  const instr = opts.prompt?.trim();
+  let planned: any;
 
-  if (storyboard.scenes.length === 0) {
-    return { status: "error", target: "scene", error: "Planner returned no scenes for revision" };
+  if (briefPurpose || briefScript || briefVisual) {
+    opts.onProgress?.({ step: "planning", percent: 10, detail: "Using the storyboard brief" });
+    // buildCodegenBrief surfaces `description` -> "Description" and `brief` ->
+    // "Visual Direction" verbatim, so map the user's words straight in.
+    planned = {
+      label: existingScene.label || plannedScene?.label || `Scene ${sceneIndex + 1}`,
+      duration_seconds: existingScene.duration_seconds || plannedScene?.duration_seconds || 5,
+      description: [briefPurpose, instr ? `Additional instruction: ${instr}` : ""].filter(Boolean).join("\n"),
+      brief: briefVisual || "",
+      purpose: briefPurpose || "",
+      visual_notes: briefVisual || "",
+      voiceover_text: briefScript || "",
+      components: plannedScene?.components || [],
+      broll_query: plannedScene?.broll_query,
+      hero_image: plannedScene?.hero_image,
+      template: plannedScene?.template,
+      assets: plannedScene?.assets || [],
+      transition_in: existingScene.transition_in,
+    };
+  } else {
+    opts.onProgress?.({ step: "planning", percent: 10, detail: "Planning the scene" });
+    trace?.beginEvent("scene_revision_plan");
+    const storyboard = await planStoryboard({
+      prompt: revisionPrompt,
+      format: project.format || "video",
+      llmConfig: opts.llmConfig,
+      brandKit,
+      canvas,
+      componentCatalog: catalog,
+      sceneCount: 1,
+      creativity: resolveCreativity(opts),
+      tenantId: opts.tenant_id,
+    });
+    trace?.endEvent({ scenes: storyboard.scenes.length });
+    if (storyboard.scenes.length === 0) {
+      return { status: "error", target: "scene", error: "Planner returned no scenes for revision" };
+    }
+    planned = storyboard.scenes[0];
   }
 
   // Generate the revised scene
@@ -361,7 +394,6 @@ async function runSceneRevisionPipeline(
   const compDir = path.join(projectDir(opts.tenant_id, project.project_id), "components");
   await fs.mkdir(compDir, { recursive: true });
 
-  const planned = storyboard.scenes[0];
   const generated = await generateScene({
     scene: planned,
     sceneIndex,

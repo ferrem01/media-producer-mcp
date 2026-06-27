@@ -446,23 +446,36 @@ export function getPreviewHtml(): string {
     40% { opacity: 1; transform: scale(1); }
   }
 
-  /* ── Studio revise UI ── */
-  #revise-panel { padding: 10px 12px; font-size: 12px; color: #cbd5e1; display: flex; flex-direction: column; gap: 8px; }
-  #revise-panel .rv-sel { font-size: 11px; color: #94a3b8; min-height: 16px; }
-  #revise-panel .rv-sel b { color: #e2e8f0; }
+  /* ── Studio revise UI (light, consistent with the rest of the app) ── */
+  #revise-panel { padding: 10px 12px; font-size: 12px; color: #374151; display: flex; flex-direction: column; gap: 8px; }
+  #revise-panel .rv-sel { font-size: 11px; color: #6b7280; min-height: 16px; }
+  #revise-panel .rv-sel b { color: #111827; }
   #revise-panel .rv-scope-row { display: flex; align-items: center; gap: 8px; }
   #revise-panel .rv-scope-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #9ca3af; flex: 0 0 auto; }
   #revise-panel .rv-scope { display: flex; gap: 4px; flex: 1; }
-  #revise-panel .rv-scope button { flex: 1; padding: 5px 8px; font-size: 11px; border: 1px solid #334155; background: #1e293b; color: #94a3b8; border-radius: 6px; cursor: pointer; }
+  #revise-panel .rv-scope button { flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 500; border: 1px solid #d1d5db; background: #fff; color: #6b7280; border-radius: 7px; cursor: pointer; transition: all 0.12s ease; }
+  #revise-panel .rv-scope button:hover { background: #f9fafb; }
   #revise-panel .rv-scope button.active { background: #6366f1; color: #fff; border-color: #6366f1; }
-  #revise-panel textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 46px; padding: 7px 9px; font-size: 12px; font-family: inherit; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; }
+  #revise-panel textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 46px; padding: 8px 10px; font-size: 12px; font-family: inherit; background: #fff; color: #111827; border: 1px solid #d1d5db; border-radius: 8px; }
+  #revise-panel textarea:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
   #revise-panel textarea:disabled { opacity: 0.5; }
-  #revise-panel .rv-go { padding: 7px 12px; font-size: 12px; font-weight: 600; background: #6366f1; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
-  #revise-panel .rv-go:disabled { opacity: 0.5; cursor: default; }
-  #revise-panel .rv-status { font-size: 11px; min-height: 16px; }
-  #revise-panel .rv-status.ok { color: #34d399; }
-  #revise-panel .rv-status.warn { color: #fbbf24; }
-  #revise-panel .rv-status.err { color: #f87171; }
+  #revise-panel .rv-status, .sb-actions ~ .rv-status, #sb-status { font-size: 11px; min-height: 16px; }
+  .rv-status.ok { color: #059669; }
+  .rv-status.warn { color: #d97706; }
+  .rv-status.err { color: #dc2626; }
+
+  /* Shared button system (used by both Revise + Storyboard panels) */
+  .rv-go {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 8px 14px; font-size: 12px; font-weight: 600; font-family: inherit;
+    background: #6366f1; color: #fff; border: 1px solid #6366f1; border-radius: 8px;
+    cursor: pointer; transition: all 0.12s ease; white-space: nowrap;
+  }
+  .rv-go:hover { background: #4f46e5; border-color: #4f46e5; }
+  .rv-go:disabled { opacity: 0.5; cursor: default; }
+  /* Secondary (Edit brief, Undo): clearly a button on a light surface */
+  .rv-go.secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+  .rv-go.secondary:hover { background: #f9fafb; border-color: #9ca3af; }
   #studio-ctx { position: fixed; z-index: 9999; display: none; min-width: 180px; padding: 5px; border-radius: 10px;
     background: rgba(15,18,30,0.92); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.10); box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
   #studio-ctx button { display: block; width: 100%; text-align: left; padding: 7px 10px; font-size: 12px; color: #e2e8f0; background: none; border: none; border-radius: 6px; cursor: pointer; }
@@ -517,7 +530,7 @@ export function getPreviewHtml(): string {
       <div id="storyboard-body">
         <div id="sb-preview" class="sb-preview"><div class="sb-prev-text empty">No scene selected</div></div>
         <div class="sb-actions">
-          <button class="rv-go" id="sb-edit" style="flex:0 0 auto;background:#334155;" title="Open the brief in a larger editor">Edit brief</button>
+          <button class="rv-go secondary" id="sb-edit" style="flex:0 0 auto;" title="Open the brief in a larger editor">Edit brief</button>
           <button class="rv-go" id="sb-regen" style="flex:1;" title="Rebuild this scene from scratch (planner + generate + critique) to fulfill the brief. Slow.">Regenerate from this brief</button>
         </div>
         <div class="sb-hint">Regenerate rebuilds this scene from scratch (slow) to fulfill the brief. Edit the brief for more room to read and write.</div>
@@ -538,7 +551,7 @@ export function getPreviewHtml(): string {
         <textarea id="rv-input" placeholder="What should change? e.g. make this bigger, use the brand green, move it off her face"></textarea>
         <div style="display:flex;gap:6px;">
           <button class="rv-go" id="rv-go" style="flex:1;">Revise</button>
-          <button class="rv-go" id="rv-undo" style="flex:0 0 auto;background:#334155;" title="Undo the last revise on this scene">Undo</button>
+          <button class="rv-go secondary" id="rv-undo" style="flex:0 0 auto;" title="Undo the last revise on this scene">Undo</button>
         </div>
         <div class="rv-hint" style="font-size:10px;color:#64748b;margin-top:4px;">Revise makes a surgical edit and keeps the rest of the scene. To rebuild a broken or empty scene, use Regenerate on the left.</div>
         <div class="rv-status" id="rv-status"></div>
@@ -2274,8 +2287,23 @@ export function getPreviewHtml(): string {
 
   // Attach hover/click/right-click selection to the (same-origin) iframe document.
   function studioAttach(doc) {
-    if (!doc || doc.__studioAttached) return;
-    doc.__studioAttached = true;
+    if (!doc || !doc.body) return;
+    // Idempotent: document.write reuses the SAME document object across reloads,
+    // so a one-shot guard flag would persist while the body (and our overlay
+    // boxes) get wiped -- leaving the scene unselectable after a revise/regen.
+    // Tear down any prior wiring and rebuild against the fresh body every time.
+    try {
+      var prev = doc.__studioHandlers;
+      if (prev) {
+        doc.removeEventListener('mousemove', prev.move, true);
+        doc.removeEventListener('mouseleave', prev.leave, true);
+        doc.removeEventListener('click', prev.click, true);
+        doc.removeEventListener('contextmenu', prev.ctx, true);
+      }
+    } catch (e) {}
+    try { var oh = doc.getElementById('__studio_hi'); if (oh) oh.remove(); } catch (e) {}
+    try { var os = doc.getElementById('__studio_sel'); if (os) os.remove(); } catch (e) {}
+
     // Make it obvious the scene is clickable for revising.
     try { doc.body.style.cursor = 'crosshair'; } catch(e) {}
     function boxRect(el) {
@@ -2306,21 +2334,21 @@ export function getPreviewHtml(): string {
       hi.style.display = 'block';
     }
     var _lastMove = 0;
-    doc.addEventListener('mousemove', function(e) {
+    function onMove(e) {
       if (studio.busy) return;
       var now = +new Date(); if (now - _lastMove < 30) return; _lastMove = now;
       var el = studioHitTest(doc, e.clientX, e.clientY);
       if (el) showHi(el); else hi.style.display = 'none';
       studioPositionSel();
-    }, true);
-    doc.addEventListener('mouseleave', function() { hi.style.display = 'none'; }, true);
-    doc.addEventListener('click', function(e) {
+    }
+    function onLeave() { hi.style.display = 'none'; }
+    function onClick(e) {
       var el = studioHitTest(doc, e.clientX, e.clientY);
       if (!el) return;
       e.preventDefault(); e.stopPropagation();
       studioSelect(el, doc);
-    }, true);
-    doc.addEventListener('contextmenu', function(e) {
+    }
+    function onCtx(e) {
       var el = studioHitTest(doc, e.clientX, e.clientY);
       if (!el) return;
       e.preventDefault();
@@ -2328,7 +2356,12 @@ export function getPreviewHtml(): string {
       var ifr = els.previewIframe, rect = ifr.getBoundingClientRect();
       var sxr = rect.width / (ifr.width || 1920), syr = rect.height / (ifr.height || 1080);
       studioShowCtx(rect.left + e.clientX * sxr, rect.top + e.clientY * syr);
-    }, true);
+    }
+    doc.addEventListener('mousemove', onMove, true);
+    doc.addEventListener('mouseleave', onLeave, true);
+    doc.addEventListener('click', onClick, true);
+    doc.addEventListener('contextmenu', onCtx, true);
+    doc.__studioHandlers = { move: onMove, leave: onLeave, click: onClick, ctx: onCtx };
   }
 
   function studioSelect(el, doc) {
@@ -2741,7 +2774,20 @@ export function getPreviewHtml(): string {
           finish();
           sbStatus('Scene regenerated \\u2713', 'ok');
           var ms = document.getElementById('sm-modal-status'); if (ms) { ms.className = 'sm-status ok'; ms.textContent = 'Scene regenerated \\u2713 \\u2014 updating preview\\u2026'; }
-          setTimeout(function() { studioModalClose(); studioReload(); }, 700);
+          // The scene changed on disk; refresh the in-memory project so the
+          // storyboard panel + scene metadata match, then hot-swap the preview.
+          setTimeout(function() {
+            studioModalClose();
+            var pp = state.currentProject;
+            if (pp && pp.project_id) {
+              api('/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(pp.project_id))
+                .then(function(fresh) { if (fresh && fresh.project_id) state.currentProject = fresh; })
+                .catch(function() {})
+                .then(function() { studioReload(); });
+            } else {
+              studioReload();
+            }
+          }, 700);
           return;
         }
         if (job.status === 'failed') {
