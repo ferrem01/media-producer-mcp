@@ -493,7 +493,10 @@ export function getPreviewHtml(): string {
           <button id="rv-scope-scene">Whole scene</button>
         </div>
         <textarea id="rv-input" placeholder="What should change? e.g. make this bigger, use the brand green, move it off her face"></textarea>
-        <button class="rv-go" id="rv-go">Revise</button>
+        <div style="display:flex;gap:6px;">
+          <button class="rv-go" id="rv-go" style="flex:1;">Revise</button>
+          <button class="rv-go" id="rv-undo" style="flex:0 0 auto;background:#334155;" title="Undo the last revise on this scene">Undo</button>
+        </div>
         <div class="rv-status" id="rv-status"></div>
       </div>
     </div>
@@ -2321,10 +2324,37 @@ export function getPreviewHtml(): string {
       .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
   }
 
+  function studioUndo() {
+    if (studio.busy) return;
+    var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
+    if (!sceneId) { studioStatus('Select a scene first.', 'warn'); return; }
+    var p = state.currentProject; if (!p) { studioStatus('Load a project first.', 'warn'); return; }
+    studio.busy = true;
+    document.getElementById('rv-undo').disabled = true;
+    document.getElementById('rv-go').disabled = true;
+    studioStatus('Undoing\\u2026', '');
+    function done() {
+      studio.busy = false;
+      document.getElementById('rv-undo').disabled = false;
+      document.getElementById('rv-go').disabled = false;
+    }
+    api('POST', '/revise/undo/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { scene_id: sceneId })
+      .then(function(res) {
+        done();
+        if (!res || res.ok === false) { studioStatus('Undo failed: ' + ((res && res.error) || 'unknown'), 'err'); return; }
+        if (!res.restored) { studioStatus('Nothing to undo.', 'warn'); return; }
+        var rem = res.remaining || 0;
+        studioStatus('Reverted \\u2713 (' + rem + ' earlier revision' + (rem === 1 ? '' : 's') + ' left)', 'ok');
+        if (state.currentProject) loadComposite(state.currentProject);
+      })
+      .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
+  }
+
   // Wire the Revise panel controls
   document.getElementById('rv-scope-el').addEventListener('click', function() { studioSetScope('element'); });
   document.getElementById('rv-scope-scene').addEventListener('click', function() { studioSetScope('scene'); });
   document.getElementById('rv-go').addEventListener('click', studioRevise);
+  document.getElementById('rv-undo').addEventListener('click', studioUndo);
   document.getElementById('rv-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); studioRevise(); }
   });
