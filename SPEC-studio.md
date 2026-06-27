@@ -15,6 +15,21 @@ This is the natural UI for our bet ("on-brand, correct video from a prompt — n
 frame-by-frame review"): you don't review frames, but when you *do* want a tweak,
 you point at the thing and say it in words. Direct manipulation, not a property grid.
 
+## 1a. Scope & boundaries — Playground vs Studio
+
+There are **two separate environments**; this spec touches only the second.
+
+- **Playground** (`/playground`, `src/playground-app/`, `/playground/api/components/*`)
+  — the **component-creation** tool: author tenant components, schemas, scripts, preview
+  a single component. **Out of scope. Unchanged. Not renamed.**
+- **Preview** (`/preview`, `src/preview-app/`, `/api/preview-scene|composite`,
+  `updateComponent` PATCH at `src/index.ts:579`) — the **video viewer/editor** for a
+  generated project. **This is what we migrate and rename to Studio**, and rework for the
+  codegen video model.
+
+So "drop the component-property editor / the component PATCH" below means the
+**Preview's video-scene** editing — *not* the Playground's component editing.
+
 ## 2. Why now — the model changed
 
 The old preview assumed a **data-driven** model: scenes were component instances with
