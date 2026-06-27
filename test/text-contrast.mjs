@@ -33,7 +33,7 @@ function ok(name, cond) { results.push(cond); console.log(`${cond ? "PASS" : "FA
            <div class="line good">Your marketing finally clear</div>`,
   });
   fs.writeFileSync("/tmp/tc1.html", HTML);
-  const d = await measureTextContrast({ htmlPath: "/tmp/tc1.html", width: 1920, height: 1080, atTime: 0 });
+  const d = await measureTextContrast({ htmlPath: "/tmp/tc1.html", width: 1920, height: 1080, atTimes: [0] });
   ok("flags navy-on-near-black", d.some(x => /Every marketer/.test(x.text)));
   ok("passes white-on-near-black", !d.some(x => /finally clear/.test(x.text)));
 }
@@ -50,7 +50,7 @@ function ok(name, cond) { results.push(cond); console.log(`${cond ? "PASS" : "FA
     body: `<div class="line washed">Every morning the same chaos too many tools</div>`,
   });
   fs.writeFileSync("/tmp/tc3.html", HTML);
-  const d = await measureTextContrast({ htmlPath: "/tmp/tc3.html", width: 1920, height: 1080, atTime: 0 });
+  const d = await measureTextContrast({ htmlPath: "/tmp/tc3.html", width: 1920, height: 1080, atTimes: [0] });
   console.log("  busy-bg defects:", JSON.stringify(d));
   ok("flags dark text washed over the dark third (avg would pass)", d.length > 0);
 }

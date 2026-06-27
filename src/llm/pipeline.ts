@@ -1121,11 +1121,14 @@ async function critiqueAndRetryScene(opts: {
       // general, any scene. Video-only brand clips are skipped (can't be revised).
       if (!isVideoOnly) {
         try {
+          const dur = currentScene.duration_seconds || 5;
           const contrastDefects = await measureTextContrast({
             htmlPath,
             width: opts.canvas.width,
             height: opts.canvas.height,
-            atTime: (currentScene.duration_seconds || 5) * 0.9,
+            // Probe several moments: captions animate in/out, so a single sample
+            // misses text that isn't fully on-screen at that instant.
+            atTimes: [dur * 0.35, dur * 0.6, dur * 0.85],
           });
           for (const d of contrastDefects) {
             correctness.defects.push({
