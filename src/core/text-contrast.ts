@@ -47,26 +47,43 @@ function parseRgb(s: string): { r: number; g: number; b: number } | null {
   return { r: +m[0], g: +m[1], b: +m[2] };
 }
 
-/** Average RGB of a rectangular region of an image, via ffmpeg crop -> 1x1. */
-async function avgRegionColor(
-  imagePath: string, x: number, y: number, w: number, h: number,
-): Promise<{ r: number; g: number; b: number } | null> {
+/**
+ * Sample a rectangular region of an image as a grid of cell-average colors, via
+ * ffmpeg crop -> scale to cols x rows (area averaging). Returns one {r,g,b} per
+ * cell. A grid (rather than a single 1x1 average) lets the caller measure
+ * WORST-CASE local contrast: a caption can average "fine" while big chunks of it
+ * are washed out over busy footage (bright windows + mid table + dark chairs).
+ */
+async function sampleRegionGrid(
+  imagePath: string, x: number, y: number, w: number, h: number, cols: number, rows: number,
+): Promise<Array<{ r: number; g: number; b: number }> | null> {
   if (w < 1 || h < 1) return null;
+  const c = Math.max(1, Math.min(cols, Math.floor(w)));
+  const r = Math.max(1, Math.min(rows, Math.floor(h)));
   try {
     const { stdout } = await execFileAsync(
       "ffmpeg",
       ["-v", "error", "-i", imagePath, "-vf",
-        `crop=${w}:${h}:${x}:${y},scale=1:1:flags=area`,
+        `crop=${w}:${h}:${x}:${y},scale=${c}:${r}:flags=area`,
         "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
       { encoding: "buffer", maxBuffer: 1 << 20 },
     );
     const buf = stdout as unknown as Buffer;
-    if (buf.length < 3) return null;
-    return { r: buf[0], g: buf[1], b: buf[2] };
+    if (buf.length < c * r * 3) return null;
+    const cells: Array<{ r: number; g: number; b: number }> = [];
+    for (let i = 0; i < c * r; i++) {
+      cells.push({ r: buf[i * 3], g: buf[i * 3 + 1], b: buf[i * 3 + 2] });
+    }
+    return cells;
   } catch {
     return null;
   }
 }
+
+/** Fraction of the text box that must be below contrast for the text to count
+ *  as illegible. Tolerates a stray dark/bright patch (e.g. behind a space) while
+ *  catching text that's washed across a meaningful portion of its run. */
+const WASH_FRACTION = 0.3;
 
 /**
  * Return a list of text elements whose contrast against their rendered backdrop
@@ -98,12 +115,23 @@ export async function measureTextContrast(opts: {
     for (const t of textElements) {
       const tc = parseRgb(t.color);
       if (!tc) continue;
-      const bg = await avgRegionColor(backdropPath, t.x, t.y, t.w, t.h);
-      if (!bg) continue;
-      const ratio = contrastRatio(relLuminance(tc.r, tc.g, tc.b), relLuminance(bg.r, bg.g, bg.b));
+      // Grid-sample the backdrop behind the text and measure WORST-CASE local
+      // contrast, not the average. Over busy footage the average hides washout;
+      // a caption is illegible if a meaningful fraction of its run is low-contrast.
+      const cells = await sampleRegionGrid(backdropPath, t.x, t.y, t.w, t.h, 12, 3);
+      if (!cells || cells.length === 0) continue;
+      const tl = relLuminance(tc.r, tc.g, tc.b);
       const threshold = t.fontSize >= 24 ? 3.0 : 4.5; // large vs body text
-      if (ratio < threshold) {
-        defects.push({ text: t.text, fontSize: Math.round(t.fontSize), contrast: Math.round(ratio * 100) / 100, threshold });
+      let worst = Infinity;
+      let below = 0;
+      for (const cell of cells) {
+        const ratio = contrastRatio(tl, relLuminance(cell.r, cell.g, cell.b));
+        if (ratio < worst) worst = ratio;
+        if (ratio < threshold) below++;
+      }
+      const washFraction = below / cells.length;
+      if (washFraction >= WASH_FRACTION) {
+        defects.push({ text: t.text, fontSize: Math.round(t.fontSize), contrast: Math.round(worst * 100) / 100, threshold });
       }
     }
     return defects;
