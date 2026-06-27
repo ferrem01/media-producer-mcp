@@ -20,6 +20,7 @@ import { buildComponentCatalog } from "./llm/catalog.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema } from "./core/component-schema.js";
 import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
+import { reviseScene } from "./llm/scene-revise.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
@@ -1218,6 +1219,33 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           project_id: projectId,
           tenant_id: tenantId,
         });
+        return;
+      }
+
+      // ── API: Revise a scene (Studio direct-manipulation revise) ──
+      const reviseMatch = url.match(/^\/api\/revise\/([^/]+)\/([^/]+)$/);
+      if (reviseMatch && method === "POST") {
+        const [, tenantId, projectId] = reviseMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const sceneId = (body.scene_id || body.sceneId) as string;
+        const instruction = (body.instruction || body.prompt) as string;
+        const element = body.element as any;
+        if (!sceneId || !instruction) {
+          jsonResponse(res, 400, { error: "scene_id and instruction are required" });
+          return;
+        }
+        let llmCfg;
+        try { llmCfg = llmConfigFromEnv(); }
+        catch (e: any) { jsonResponse(res, 500, { error: `LLM not configured: ${e.message}` }); return; }
+        try {
+          const result = await reviseScene({
+            tenantId, projectId, sceneId, instruction, element,
+            llmConfig: llmCfg, skipGates: body.skip_gates === true,
+          });
+          jsonResponse(res, result.ok ? 200 : 400, result);
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
         return;
       }
 
