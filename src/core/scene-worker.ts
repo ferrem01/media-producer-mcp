@@ -36,8 +36,11 @@ interface ExtractedVideo {
   totalFrames: number;
 }
 
-async function extractVideoFrames(videoPath: string, fps: number): Promise<ExtractedVideo> {
-  const hash = crypto.createHash("md5").update(videoPath).digest("hex").slice(0, 12);
+async function extractVideoFrames(videoPath: string, fps: number, width: number, height: number): Promise<ExtractedVideo> {
+  // Key the cache on dimensions/fps too: extracting at a different size must not
+  // reuse a previous run's frames (and a failed run's partial frames at the old
+  // size won't be picked up after we change extraction params).
+  const hash = crypto.createHash("md5").update(`${videoPath}|${fps}|${width}x${height}`).digest("hex").slice(0, 12);
   const framesDir = `/tmp/vframes_${hash}`;
   try {
     const existing = await fs.readdir(framesDir);
@@ -48,8 +51,19 @@ async function extractVideoFrames(videoPath: string, fps: number): Promise<Extra
     }
   } catch { /* will create */ }
   await fs.mkdir(framesDir, { recursive: true });
-  console.log(`  Extracting frames from ${path.basename(videoPath)} at ${fps}fps...`);
-  await execFileAsync("ffmpeg", ["-i", videoPath, "-vf", `fps=${fps}`, "-start_number", "0", `${framesDir}/frame-%06d.png`], { timeout: 120_000 });
+  console.log(`  Extracting frames from ${path.basename(videoPath)} at ${fps}fps, max ${width}x${height}...`);
+  // Downscale to the canvas size during extraction (never upscale). A source UHD
+  // clip extracted at full res is slow (0.15x) and produces multi-MB PNGs that
+  // blow the 120s timeout / fill /tmp; the frames are displayed at canvas size
+  // anyway. -loglevel error + -nostats keep ffmpeg's progress spam out of stderr
+  // so a real failure is actually visible in the captured worker error.
+  await execFileAsync("ffmpeg", [
+    "-loglevel", "error", "-nostats", "-y",
+    "-i", videoPath,
+    "-vf", `fps=${fps},scale='min(${width},iw)':-2`,
+    "-start_number", "0",
+    `${framesDir}/frame-%06d.png`,
+  ], { timeout: 180_000, maxBuffer: 1 << 20 });
   const files = await fs.readdir(framesDir);
   const totalFrames = files.filter((f) => f.endsWith(".png")).length;
   console.log(`  Extracted ${totalFrames} frames from ${path.basename(videoPath)}`);
@@ -304,7 +318,7 @@ async function main() {
           console.warn(`  Warning: Video file not found: ${videoPath} (src: ${src})`);
           continue;
         }
-        const extracted = await extractVideoFrames(videoPath, args.fps);
+        const extracted = await extractVideoFrames(videoPath, args.fps, args.width, args.height);
         extractionMap.set(src, extracted);
         frameDirsToCleanup.add(extracted.framesDir);
       }
