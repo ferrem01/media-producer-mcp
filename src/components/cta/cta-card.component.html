@@ -23,45 +23,35 @@
     box-sizing: border-box;
   }
 
+  /* Theme-aware: a SOLID brand surface (not translucent-white glass, which is
+     invisible on a light brand) + a neutral hairline border that reads on both
+     light and dark, and a soft neutral shadow for separation. */
   .cta-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--mp-color-surface, #ffffff);
+    border: 1px solid var(--mp-color-border, rgba(127, 127, 127, 0.2));
     border-radius: 24px;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     padding: 64px 72px;
     max-width: 620px;
     width: 100%;
     text-align: center;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 25px 60px rgba(0, 0, 0, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
     position: relative;
     overflow: hidden;
-  }
-
-  .cta-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, transparent 40%);
-    pointer-events: none;
   }
 
   .cta-headline {
     font-size: 48px;
     font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
+    color: var(--mp-color-text, #0f172a);
     margin: 0 0 20px 0;
     line-height: 1.1;
     letter-spacing: -0.03em;
-    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3), 0 0 40px rgba(167, 139, 250, 0.1);
   }
 
+  /* Brand muted text, not a hardcoded light gray that vanishes on a light card. */
   .cta-description {
     font-size: 20px;
-    color: #cbd5e1;
+    color: var(--mp-color-text-muted, #64748b);
     margin: 0 0 40px 0;
     line-height: 1.5;
     letter-spacing: 0.005em;
@@ -80,19 +70,22 @@
     position: absolute;
     inset: -8px;
     border-radius: 22px;
-    background: var(--mp-color-accent, #A78BFA);
+    background: var(--mp-color-cta, var(--mp-color-primary, #6366f1));
     filter: blur(20px);
     opacity: 0.25;
     pointer-events: none;
   }
 
+  /* A CTA button is a saturated brand color with WHITE text -- never the brand
+     text color (which is dark on a light brand -> low-contrast on the button),
+     and never --mp-color-accent alone (can resolve light -> invisible fill). */
   .cta-button {
     position: relative;
     display: inline-block;
     font-size: 16px;
     font-weight: 600;
-    color: var(--mp-color-text, #ffffff);
-    background: linear-gradient(135deg, var(--mp-color-accent, #A78BFA) 0%, #8b5cf6 100%);
+    color: #ffffff;
+    background: var(--mp-color-cta, var(--mp-color-primary, #6366f1));
     height: 56px;
     line-height: 56px;
     padding: 0 48px;
