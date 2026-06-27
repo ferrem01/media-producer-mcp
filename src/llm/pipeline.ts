@@ -47,6 +47,7 @@ import { tileFramesToStoryboard } from "./editorial-vision.js";
 import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
 import { captureSingleFrame, validateSceneRuntime } from "../core/capture.js";
+import { measureTextContrast } from "../core/text-contrast.js";
 import os from "node:os";
 
 // Keep old imports for backwards compat (deprecated functions still exist in their files)
@@ -1113,6 +1114,34 @@ async function critiqueAndRetryScene(opts: {
       const correctness: CorrectnessResult = isVideoOnly
         ? { pass: true, defects: [] }
         : consolidatedCorrectness(con);
+
+      // Programmatic legibility gate: measure each text element's REAL contrast
+      // against the pixels rendered behind it. Catches illegible text the vision
+      // model misses (dark caption over b-roll, light-on-light, faded copy) --
+      // general, any scene. Video-only brand clips are skipped (can't be revised).
+      if (!isVideoOnly) {
+        try {
+          const contrastDefects = await measureTextContrast({
+            htmlPath,
+            width: opts.canvas.width,
+            height: opts.canvas.height,
+            atTime: (currentScene.duration_seconds || 5) * 0.9,
+          });
+          for (const d of contrastDefects) {
+            correctness.defects.push({
+              type: "illegible",
+              detail: `Text "${d.text}" is unreadable over its background -- measured contrast ${d.contrast}:1, needs >= ${d.threshold}:1. Use a higher-contrast text color (lighter over dark, darker over light) or put a solid/scrim pad directly behind the text.`,
+            });
+            critiqueResult.issues.push(`Illegible text "${d.text}" (contrast ${d.contrast}:1, needs ${d.threshold}:1)`);
+          }
+          if (contrastDefects.length > 0) {
+            correctness.pass = false;
+            console.log(`  Legibility gate: ${contrastDefects.length} low-contrast text element(s) -- forcing revision`);
+          }
+        } catch (e: any) {
+          console.warn(`  Legibility gate skipped: ${e?.message || e}`);
+        }
+      }
 
       lastCritique = critiqueResult;
       console.log(`  Critique scene ${opts.sceneIndex} attempt ${attempt}: score=${critiqueResult.score}, issues=${critiqueResult.issues.length}, defects=${correctness.defects.length}`);
