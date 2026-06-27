@@ -415,6 +415,27 @@ export function getPreviewHtml(): string {
     0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
     40% { opacity: 1; transform: scale(1); }
   }
+
+  /* ── Studio revise UI ── */
+  #revise-panel { padding: 10px 12px; font-size: 12px; color: #cbd5e1; display: flex; flex-direction: column; gap: 8px; }
+  #revise-panel .rv-sel { font-size: 11px; color: #94a3b8; min-height: 16px; }
+  #revise-panel .rv-sel b { color: #e2e8f0; }
+  #revise-panel .rv-scope { display: flex; gap: 4px; }
+  #revise-panel .rv-scope button { flex: 1; padding: 5px 8px; font-size: 11px; border: 1px solid #334155; background: #1e293b; color: #94a3b8; border-radius: 6px; cursor: pointer; }
+  #revise-panel .rv-scope button.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+  #revise-panel textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 46px; padding: 7px 9px; font-size: 12px; font-family: inherit; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; }
+  #revise-panel textarea:disabled { opacity: 0.5; }
+  #revise-panel .rv-go { padding: 7px 12px; font-size: 12px; font-weight: 600; background: #6366f1; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+  #revise-panel .rv-go:disabled { opacity: 0.5; cursor: default; }
+  #revise-panel .rv-status { font-size: 11px; min-height: 16px; }
+  #revise-panel .rv-status.ok { color: #34d399; }
+  #revise-panel .rv-status.warn { color: #fbbf24; }
+  #revise-panel .rv-status.err { color: #f87171; }
+  #studio-ctx { position: fixed; z-index: 9999; display: none; min-width: 180px; padding: 5px; border-radius: 10px;
+    background: rgba(15,18,30,0.92); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.10); box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+  #studio-ctx button { display: block; width: 100%; text-align: left; padding: 7px 10px; font-size: 12px; color: #e2e8f0; background: none; border: none; border-radius: 6px; cursor: pointer; }
+  #studio-ctx button:hover { background: rgba(99,102,241,0.25); }
+  #studio-ctx .ctx-sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,0.08); }
 </style>
 </head>
 <body>
@@ -464,11 +485,22 @@ export function getPreviewHtml(): string {
       <div id="layer-list"><div class="empty-state">No scene selected</div></div>
     </div>
     <div id="props-panel">
-      <div class="panel-header">Prop Editor</div>
-      <div id="prop-editor"><div class="empty-state">Select a component</div></div>
+      <div class="panel-header">Revise</div>
+      <div id="revise-panel">
+        <div class="rv-sel" id="rv-sel">Click an element in the scene, or revise the whole scene.</div>
+        <div class="rv-scope">
+          <button id="rv-scope-el" class="active">This element</button>
+          <button id="rv-scope-scene">Whole scene</button>
+        </div>
+        <textarea id="rv-input" placeholder="What should change? e.g. make this bigger, use the brand green, move it off her face"></textarea>
+        <button class="rv-go" id="rv-go">Revise</button>
+        <div class="rv-status" id="rv-status"></div>
+      </div>
     </div>
   </div>
 </div>
+
+<div id="studio-ctx"></div>
 
 <script>
 (function() {
@@ -1364,6 +1396,7 @@ export function getPreviewHtml(): string {
       iframe.srcdoc = html;
     }
     updatePreviewScale();
+    try { if (typeof studioAttach === 'function') studioAttach(iframe.contentDocument); } catch(e) {}
 
     // Show once content is ready (videos + speaker bg)
     function reveal() { iframe.style.opacity = '1'; }
@@ -2114,6 +2147,184 @@ export function getPreviewHtml(): string {
     els.tenantInput.value = tenantParam;
     loadProjects();
   }
+
+  // ─────────────────────────────────────────────
+  // Studio: element selection + direct-manipulation revise
+  // ─────────────────────────────────────────────
+  var studio = { sel: null, scope: 'element', busy: false };
+
+  function studioCurrentSceneId() {
+    var p = state.currentProject, i = state.currentSceneIndex;
+    if (p && p.scenes && p.scenes[i]) return p.scenes[i].id;
+    return null;
+  }
+
+  // Walk up from a clicked element to gather scene id + component context.
+  function studioContextOf(el, doc) {
+    var sceneId = null, compType = null, compId = null, node = el;
+    while (node && node !== doc.body) {
+      if (node.getAttribute) {
+        if (!sceneId) { var s = node.getAttribute('data-scene-id'); if (s) sceneId = s; }
+        if (!compType) { var t = node.getAttribute('data-comp-type'); if (t) compType = t; }
+        if (!compId) { var c = node.getAttribute('data-comp-id'); if (c) compId = c; }
+      }
+      node = node.parentElement;
+    }
+    if (!sceneId) sceneId = studioCurrentSceneId();
+    var cls = (el.className && typeof el.className === 'string') ? el.className.split(/\\s+/).filter(Boolean) : [];
+    return {
+      sceneId: sceneId, compType: compType, compId: compId,
+      tagName: (el.tagName || '').toLowerCase(), classList: cls,
+      text: (el.textContent || '').trim().slice(0, 80),
+      outerHTMLSnippet: (el.outerHTML || '').slice(0, 600),
+      _el: el, _doc: doc
+    };
+  }
+
+  function studioMeaningful(el, doc) {
+    if (!el || el === doc.body || el === doc.documentElement) return null;
+    if (el.id === '__studio_hi' || el.id === '__studio_busy') return null;
+    if (el.getAttribute && el.getAttribute('data-scene-id') != null) return null; // scene root, too broad
+    return el;
+  }
+
+  // Attach hover/click/right-click selection to the (same-origin) iframe document.
+  function studioAttach(doc) {
+    if (!doc || doc.__studioAttached) return;
+    doc.__studioAttached = true;
+    var hi = doc.createElement('div');
+    hi.id = '__studio_hi';
+    hi.style.cssText = 'position:absolute;pointer-events:none;z-index:2147483646;border:2px solid #6366f1;border-radius:4px;background:rgba(99,102,241,0.12);display:none;box-sizing:border-box;';
+    doc.body.appendChild(hi);
+
+    function showHi(el) {
+      var r = el.getBoundingClientRect();
+      var sx = (doc.documentElement.scrollLeft || doc.body.scrollLeft || 0);
+      var sy = (doc.documentElement.scrollTop || doc.body.scrollTop || 0);
+      hi.style.left = (r.left + sx) + 'px'; hi.style.top = (r.top + sy) + 'px';
+      hi.style.width = r.width + 'px'; hi.style.height = r.height + 'px';
+      hi.style.display = 'block';
+    }
+    doc.addEventListener('mousemove', function(e) {
+      if (studio.busy) return;
+      var el = studioMeaningful(e.target, doc);
+      if (el) showHi(el); else hi.style.display = 'none';
+    }, true);
+    doc.addEventListener('mouseleave', function() { hi.style.display = 'none'; }, true);
+    doc.addEventListener('click', function(e) {
+      var el = studioMeaningful(e.target, doc);
+      if (!el) return;
+      e.preventDefault(); e.stopPropagation();
+      studioSelect(el, doc);
+    }, true);
+    doc.addEventListener('contextmenu', function(e) {
+      var el = studioMeaningful(e.target, doc);
+      if (!el) return;
+      e.preventDefault();
+      studioSelect(el, doc);
+      var ifr = els.previewIframe, rect = ifr.getBoundingClientRect();
+      var sxr = rect.width / (ifr.width || 1920), syr = rect.height / (ifr.height || 1080);
+      studioShowCtx(rect.left + e.clientX * sxr, rect.top + e.clientY * syr);
+    }, true);
+  }
+
+  function studioSelect(el, doc) {
+    studio.sel = studioContextOf(el, doc);
+    var label = studio.sel.compType || studio.sel.tagName || 'element';
+    var txt = studio.sel.text ? ' \\u2014 "' + escHtml(studio.sel.text.slice(0, 40)) + '"' : '';
+    document.getElementById('rv-sel').innerHTML = 'Selected: <b>' + escHtml(label) + '</b>' + txt;
+    studioSetScope('element');
+    var inp = document.getElementById('rv-input'); if (inp) inp.focus();
+  }
+
+  function studioSetScope(scope) {
+    studio.scope = scope;
+    document.getElementById('rv-scope-el').classList.toggle('active', scope === 'element');
+    document.getElementById('rv-scope-scene').classList.toggle('active', scope === 'scene');
+  }
+
+  function studioShowCtx(x, y) {
+    var m = document.getElementById('studio-ctx');
+    m.innerHTML = '';
+    function item(label, fn) { var b = document.createElement('button'); b.textContent = label; b.onclick = function() { m.style.display = 'none'; fn(); }; m.appendChild(b); }
+    item('Revise this element\\u2026', function() { studioSetScope('element'); document.getElementById('rv-input').focus(); });
+    item('Revise whole scene\\u2026', function() { studioSetScope('scene'); document.getElementById('rv-input').focus(); });
+    var sep = document.createElement('div'); sep.className = 'ctx-sep'; m.appendChild(sep);
+    item('Cancel', function() {});
+    m.style.left = Math.max(4, Math.min(x, window.innerWidth - 190)) + 'px';
+    m.style.top = Math.max(4, Math.min(y, window.innerHeight - 130)) + 'px';
+    m.style.display = 'block';
+  }
+  document.addEventListener('click', function() { var m = document.getElementById('studio-ctx'); if (m) m.style.display = 'none'; });
+
+  function studioBusyOverlay(on) {
+    var sel = studio.sel; if (!sel || !sel._doc) return;
+    var doc = sel._doc, ov = doc.getElementById('__studio_busy');
+    if (!on) { if (ov) ov.remove(); return; }
+    if (!ov) { ov = doc.createElement('div'); ov.id = '__studio_busy'; doc.body.appendChild(ov); }
+    var left = 0, top = 0, w = (doc.documentElement.clientWidth || 1920), h = (doc.documentElement.clientHeight || 1080);
+    if (studio.scope === 'element' && sel._el) {
+      var r = sel._el.getBoundingClientRect();
+      var sx = (doc.documentElement.scrollLeft || 0), sy = (doc.documentElement.scrollTop || 0);
+      left = r.left + sx; top = r.top + sy; w = r.width; h = r.height;
+    }
+    ov.style.cssText = 'position:absolute;left:' + left + 'px;top:' + top + 'px;width:' + w + 'px;height:' + h + 'px;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(10,12,24,0.55);backdrop-filter:blur(2px);color:#fff;font:600 18px sans-serif;border-radius:6px;';
+    ov.textContent = 'Revising\\u2026';
+  }
+
+  function studioStatus(msg, cls) {
+    var s = document.getElementById('rv-status');
+    s.className = 'rv-status' + (cls ? ' ' + cls : '');
+    s.textContent = msg;
+  }
+
+  function studioRevise() {
+    if (studio.busy) return;
+    var instruction = (document.getElementById('rv-input').value || '').trim();
+    if (!instruction) { studioStatus('Type what to change first.', 'warn'); return; }
+    var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
+    if (!sceneId) { studioStatus('Select an element or load a scene first.', 'warn'); return; }
+    var p = state.currentProject;
+    if (!p) { studioStatus('Load a project first.', 'warn'); return; }
+    var element = (studio.scope === 'element' && studio.sel) ? {
+      tagName: studio.sel.tagName, classList: studio.sel.classList, text: studio.sel.text,
+      outerHTMLSnippet: studio.sel.outerHTMLSnippet, compType: studio.sel.compType
+    } : undefined;
+
+    studio.busy = true;
+    document.getElementById('rv-go').disabled = true;
+    document.getElementById('rv-input').disabled = true;
+    studioStatus('Revising\\u2026 (' + (studio.scope === 'scene' ? 'whole scene' : 'element') + ')', '');
+    studioBusyOverlay(true);
+
+    function done() {
+      studio.busy = false;
+      document.getElementById('rv-go').disabled = false;
+      document.getElementById('rv-input').disabled = false;
+      studioBusyOverlay(false);
+    }
+    api('POST', '/revise/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id),
+        { scene_id: sceneId, instruction: instruction, element: element })
+      .then(function(res) {
+        done();
+        if (!res || res.ok === false) { studioStatus('Failed: ' + ((res && res.error) || 'unknown'), 'err'); return; }
+        var defs = res.defects || [];
+        var n = res.blocks_applied != null ? res.blocks_applied : (res.blocksApplied || 0);
+        if (defs.length) studioStatus('Updated \\u26a0 ' + defs.length + ' issue(s): ' + defs.map(function(d) { return d.detail; }).join('; '), 'warn');
+        else studioStatus('Updated \\u2713 (' + n + ' edit' + (n === 1 ? '' : 's') + ')', 'ok');
+        document.getElementById('rv-input').value = '';
+        if (state.currentProject) loadComposite(state.currentProject);
+      })
+      .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
+  }
+
+  // Wire the Revise panel controls
+  document.getElementById('rv-scope-el').addEventListener('click', function() { studioSetScope('element'); });
+  document.getElementById('rv-scope-scene').addEventListener('click', function() { studioSetScope('scene'); });
+  document.getElementById('rv-go').addEventListener('click', studioRevise);
+  document.getElementById('rv-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); studioRevise(); }
+  });
 })();
 </script>
 </body>
