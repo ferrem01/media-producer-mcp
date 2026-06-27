@@ -364,13 +364,30 @@ async function renderSingleSceneWorker(
   );
 
   await new Promise<void>((resolve, reject) => {
+    // Pipe stderr (keep stdout inherited so progress logs still stream) so a
+    // worker crash surfaces its actual reason in the job error instead of being
+    // lost to the server console. Keep only the tail to bound memory.
     const child = fork(workerPath, [argsPath], {
       execArgv: [],
-      stdio: "inherit",
+      stdio: ["inherit", "inherit", "pipe"],
     });
+    let stderrTail = "";
+    if (child.stderr) {
+      child.stderr.on("data", (chunk: Buffer) => {
+        process.stderr.write(chunk); // still echo to server console
+        stderrTail = (stderrTail + chunk.toString()).slice(-4000);
+      });
+    }
     child.on("exit", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`Scene worker exited with code ${code}`));
+      else {
+        const label = scene.label ? ` "${scene.label}"` : "";
+        const tail = stderrTail.trim();
+        reject(new Error(
+          `Scene worker for scene ${sceneIndex + 1}${label} exited with code ${code}` +
+          (tail ? `:\n${tail}` : "")
+        ));
+      }
     });
     child.on("error", reject);
   });
@@ -746,10 +763,23 @@ async function renderSceneTransparentFrames(
   );
 
   await new Promise<void>((resolve, reject) => {
-    const child = fork(workerPath, [argsPath], { execArgv: [], stdio: "inherit" });
+    const child = fork(workerPath, [argsPath], { execArgv: [], stdio: ["inherit", "inherit", "pipe"] });
+    let stderrTail = "";
+    if (child.stderr) {
+      child.stderr.on("data", (chunk: Buffer) => {
+        process.stderr.write(chunk);
+        stderrTail = (stderrTail + chunk.toString()).slice(-4000);
+      });
+    }
     child.on("exit", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`Scene worker exited with code ${code} for scene ${sceneIndex}`));
+      else {
+        const tail = stderrTail.trim();
+        reject(new Error(
+          `Scene worker exited with code ${code} for scene ${sceneIndex}` +
+          (tail ? `:\n${tail}` : "")
+        ));
+      }
     });
     child.on("error", reject);
   });
