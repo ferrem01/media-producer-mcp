@@ -256,6 +256,17 @@ export async function validateSceneRuntime(options: {
  * Capture a single frame (for image output or critique screenshots).
  * Uses ffmpeg to extract video frames instead of Chrome seeking.
  */
+export interface TextElementMetric {
+  /** Sample of the element's text (for reporting) */
+  text: string;
+  /** Computed text color, e.g. "rgb(26, 34, 64)" */
+  color: string;
+  /** Computed font-size in px */
+  fontSize: number;
+  /** Bounding box in viewport pixels (clamped to the canvas) */
+  x: number; y: number; w: number; h: number;
+}
+
 export async function captureSingleFrame(options: {
   htmlPath: string;
   outputPath: string;
@@ -267,7 +278,11 @@ export async function captureSingleFrame(options: {
   omitBackground?: boolean;
   /** Time in seconds to capture at (default: 0 for static, or midpoint) */
   atTime?: number;
-}): Promise<void> {
+  /** Legibility probe: collect significant text elements, then HIDE their glyphs
+   *  so the screenshot is the clean backdrop behind the text. Returns the
+   *  collected metrics so the caller can measure text-vs-backdrop contrast. */
+  contrastProbe?: boolean;
+}): Promise<{ textElements?: TextElementMetric[] }> {
   const {
     htmlPath,
     outputPath,
@@ -277,7 +292,9 @@ export async function captureSingleFrame(options: {
     omitBackground = false,
     quality,
     atTime,
+    contrastProbe = false,
   } = options;
+  let textElements: TextElementMetric[] | undefined;
 
   let ownBrowser: Browser | undefined;
   let page: Page | undefined;
@@ -397,6 +414,53 @@ export async function captureSingleFrame(options: {
       );
     }
 
+    // Legibility probe: record significant text elements (color/size/box), then
+    // hide their glyphs so the screenshot below is the pure backdrop behind them.
+    if (contrastProbe) {
+      textElements = await page.evaluate(({ vw, vh }) => {
+        function effectiveOpacity(el: Element | null): number {
+          let o = 1;
+          for (let e: Element | null = el; e && e !== document.body; e = e.parentElement) {
+            const op = parseFloat(getComputedStyle(e).opacity);
+            if (!isNaN(op)) o *= op;
+          }
+          return o;
+        }
+        const out: any[] = [];
+        document.querySelectorAll("body *").forEach((el) => {
+          const txt = Array.from(el.childNodes)
+            .filter((n) => n.nodeType === 3)
+            .map((n) => n.textContent || "")
+            .join("").trim();
+          if (txt.length < 2) return;
+          const cs = getComputedStyle(el);
+          if (cs.visibility === "hidden" || cs.display === "none") return;
+          const fs = parseFloat(cs.fontSize) || 0;
+          if (fs < 14) return;
+          if (effectiveOpacity(el) < 0.85) return; // skip mid-fade text
+          const r = el.getBoundingClientRect();
+          if (r.width < 8 || r.height < 6) return;
+          if (r.x > vw || r.y > vh || r.x + r.width < 0 || r.y + r.height < 0) return; // off-canvas
+          const x = Math.max(0, Math.round(r.x)), y = Math.max(0, Math.round(r.y));
+          out.push({
+            text: txt.slice(0, 60), color: cs.color, fontSize: fs,
+            x, y, w: Math.round(Math.min(r.width, vw - x)), h: Math.round(Math.min(r.height, vh - y)),
+          });
+        });
+        return out;
+      }, { vw: width, vh: height });
+
+      await page.evaluate(() => {
+        document.querySelectorAll("body *").forEach((el) => {
+          const txt = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent || "").join("").trim();
+          if (txt.length >= 2) {
+            (el as HTMLElement).style.setProperty("color", "transparent", "important");
+            (el as HTMLElement).style.setProperty("text-shadow", "none", "important");
+          }
+        });
+      });
+    }
+
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
     const screenshotOpts: any = {
@@ -418,4 +482,5 @@ export async function captureSingleFrame(options: {
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   }
+  return { textElements };
 }
