@@ -265,6 +265,11 @@ export interface TextElementMetric {
   fontSize: number;
   /** Bounding box in viewport pixels (clamped to the canvas) */
   x: number; y: number; w: number; h: number;
+  /** True if this text sits over a full-bleed video/footage element. */
+  overVideo: boolean;
+  /** True if a meaningful backing (scrim/panel/opaque bg) sits between the text
+   *  and the footage -- the legibility "treatment". Only meaningful when overVideo. */
+  hasBacking: boolean;
 }
 
 export async function captureSingleFrame(options: {
@@ -426,6 +431,29 @@ export async function captureSingleFrame(options: {
           }
           return o;
         }
+        // Full-bleed footage elements. By probe time a <video> may already be
+        // swapped for an <img data-start-at> still, so match both, plus b-roll class.
+        function isFullBleed(el: Element): boolean {
+          const r = el.getBoundingClientRect();
+          return r.width >= vw * 0.6 && r.height >= vh * 0.6;
+        }
+        const footageEls = Array.from(
+          document.querySelectorAll("video, img[data-start-at], .mp-broll, [class*='broll']")
+        ).filter(isFullBleed);
+        // A "meaningful backing" = an opaque-ish color bg, a gradient/image bg, or
+        // a backdrop blur. A flimsy <0.25-alpha tint does not count as treatment.
+        function meaningfulBg(cs: CSSStyleDeclaration): boolean {
+          const bc = cs.backgroundColor || "";
+          const m = bc.match(/rgba?\(([^)]+)\)/);
+          let alpha = 0;
+          if (m) { const p = m[1].split(",").map((s) => parseFloat(s)); alpha = p.length >= 4 ? p[3] : (p.length === 3 ? 1 : 0); }
+          const hasColor = alpha >= 0.25;
+          const hasImg = !!cs.backgroundImage && cs.backgroundImage !== "none";
+          const bf = (cs as any).backdropFilter || (cs as any).webkitBackdropFilter || "";
+          const hasBlur = !!bf && bf !== "none";
+          return hasColor || hasImg || hasBlur;
+        }
+        const allEls = Array.from(document.querySelectorAll("body *"));
         const out: any[] = [];
         document.querySelectorAll("body *").forEach((el) => {
           const txt = Array.from(el.childNodes)
@@ -442,9 +470,24 @@ export async function captureSingleFrame(options: {
           if (r.width < 8 || r.height < 6) return;
           if (r.x > vw || r.y > vh || r.x + r.width < 0 || r.y + r.height < 0) return; // off-canvas
           const x = Math.max(0, Math.round(r.x)), y = Math.max(0, Math.round(r.y));
+          const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+          const covers = (e: Element) => {
+            const er = e.getBoundingClientRect();
+            return er.left <= cx && er.right >= cx && er.top <= cy && er.bottom >= cy;
+          };
+          const overVideo = footageEls.some(covers);
+          // Backing = any non-footage element (the text's own bg, an ancestor, or a
+          // dedicated scrim/panel div) with a meaningful bg covering the text center.
+          let hasBacking = false;
+          if (overVideo) {
+            hasBacking = allEls.some((e) =>
+              !footageEls.includes(e) && covers(e) && meaningfulBg(getComputedStyle(e))
+            );
+          }
           out.push({
             text: txt.slice(0, 60), color: cs.color, fontSize: fs,
             x, y, w: Math.round(Math.min(r.width, vw - x)), h: Math.round(Math.min(r.height, vh - y)),
+            overVideo, hasBacking,
           });
         });
         return out;
