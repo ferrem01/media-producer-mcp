@@ -26,7 +26,7 @@ import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
-import { listProjects, loadProject, saveProject, updateComponent, addScene, removeScene, reorderScenes } from "./persistence/project.js";
+import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs } from "./core/job-queue.js";
 import { assembleScene, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
@@ -185,7 +185,7 @@ function renderMcpLanding(server: unknown): string {
   <div class="endpoint"><div class="label">MCP endpoint</div><code>${escHtml(mcpUrl)}</code></div>
   <nav>
     <a href="/architecture">Architecture &amp; docs</a>
-    <a href="/preview">Preview SPA</a>
+    <a href="/studio">Studio</a>
     <a href="/playground">Playground</a>
     <a href="/health">Health (JSON)</a>
   </nav>
@@ -546,8 +546,8 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
-      // ── Preview SPA ──
-      if (url.startsWith("/preview")) {
+      // ── Studio SPA (formerly "preview"; /preview kept as an alias) ──
+      if (url.startsWith("/studio") || url.startsWith("/preview")) {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(previewHtml);
         return;
@@ -575,25 +575,8 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
-      // ── API: Update component props ──
-      const compMatch = url.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)\/components\/([^/]+)$/);
-      if (compMatch && method === "PATCH") {
-        const [, tenantId, projectId, sceneId, componentId] = compMatch.map(decodeURIComponent);
-        const body = await parseBody(req);
-        const updated = await updateComponent(
-          tenantId,
-          projectId,
-          sceneId,
-          componentId,
-          { data: body.data as Record<string, unknown> },
-        );
-        if (!updated) {
-          jsonResponse(res, 404, { error: "Component not found" });
-          return;
-        }
-        jsonResponse(res, 200, updated);
-        return;
-      }
+      // (Removed: PATCH /scenes/{id}/components/{id} — the data-driven component
+      //  property editor. Scenes are codegen now; edits go through /api/revise.)
 
       // ── API: Add scene ──
       const addSceneMatch = url.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes$/);
