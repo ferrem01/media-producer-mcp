@@ -33,6 +33,7 @@ import { TraceBuilder } from "./trace/index.js";
 // generateComponent / saveGeneratedComponent used by pipeline internally
 import { runGeneratePipeline, type PipelineTarget } from "./llm/pipeline.js";
 import { llmConfigFromEnv } from "./llm/client.js";
+import { reviseScene } from "./llm/scene-revise.js";
 import { config } from "./config.js";
 import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
 import path from "node:path";
@@ -708,6 +709,54 @@ export function createMcpServer(): McpServer {
   // ─────────────────────────────────────────────
   // render - Render project or scene preview
   // ─────────────────────────────────────────────
+
+  server.tool(
+    "revise",
+    "Surgically revise ONE scene from a natural-language instruction. Patches the scene's codegen source (fast SEARCH/REPLACE), versions the prior source, and re-runs the fast legibility/runtime gates. Pass `element` to scope the change to a selected element; omit it to revise the whole scene. For a full from-scratch redo of a scene use generate with target='scene'.",
+    {
+      tenant_id: z.string(),
+      project_id: z.string(),
+      scene_id: z.string().describe("The scene to revise"),
+      instruction: z.string().describe("What to change, in plain language"),
+      element: z.object({
+        tagName: z.string().optional(),
+        classList: z.array(z.string()).optional(),
+        text: z.string().optional(),
+        outerHTMLSnippet: z.string().optional(),
+        compType: z.string().optional(),
+      }).optional().describe("The selected element's context (omit for a whole-scene revise)"),
+      skip_gates: z.boolean().optional().describe("Skip the fast legibility/runtime gates (faster)"),
+      token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
+    },
+    async (params) => {
+      if (isAuthEnabled()) {
+        if (!params.token) return err("Authentication required: provide a token");
+        if (!validateToken(params.token)) return err("Invalid token");
+      }
+      let llmConfig;
+      try { llmConfig = llmConfigFromEnv(); } catch (e: any) { return err(`LLM not configured: ${e.message}`); }
+      const result = await reviseScene({
+        tenantId: params.tenant_id,
+        projectId: params.project_id,
+        sceneId: params.scene_id,
+        instruction: params.instruction,
+        element: params.element,
+        llmConfig,
+        skipGates: params.skip_gates,
+      });
+      if (!result.ok) return err(result.error || "Revise failed");
+      // Don't echo the full scene HTML back to the model (it's large); summarize.
+      return ok({
+        ok: true,
+        component_type: result.componentType,
+        revision_id: result.revisionId,
+        blocks_applied: result.blocksApplied,
+        full_rewrite: result.fullRewrite,
+        defects: result.defects,
+        scene_html_bytes: result.sceneHtml?.length ?? 0,
+      });
+    },
+  );
 
   server.tool(
     "render",
