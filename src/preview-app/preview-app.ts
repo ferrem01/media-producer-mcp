@@ -2359,13 +2359,34 @@ export function getPreviewHtml(): string {
     if (studio.selBox) studio.selBox.style.display = 'none';
     loadComposite(p).then(function() {
       if (!initComposite()) return;
-      waitForCompositeReady(function() {
+      waitForCompositeReady(function(masterTl) {
         // Re-attach selection to the fresh document (defensive; the write hook
         // may have run before the body was ready).
         try { var d = els.previewIframe.contentDocument; if (d) studioAttach(d); } catch (e) {}
-        // Land on a clean, visible scene-start frame (a paused video shows
-        // frame 0 cleanly; a mid-scene seek can render black until played).
-        if (idx >= 0) selectScene(idx);
+        // Mirror loadProject's reveal sequence so the swapped scene is actually
+        // shown (without it the wrapper stays hidden / buffer overlay sticks and
+        // the canvas reads as blank after a revise).
+        var si = idx >= 0 ? idx : 0;
+        state.currentSceneIndex = si;
+        state.currentComponentIndex = -1;
+        if (p.scenes && p.scenes[si]) state.duration = p.scenes[si].duration_seconds || 0;
+        updateActiveScene(si);
+        renderLayers();
+        updateSceneIndicator();
+        if (masterTl) { masterTl.time(0.001); }
+        state.masterTime = 0;
+        els.slider.value = 0;
+        updateTimeDisplay(0);
+        els.previewPlaceholder.style.display = 'none';
+        els.previewWrapper.style.display = '';
+        els.bufferOverlay.style.display = 'flex';
+        waitForMediaReady().then(function() {
+          els.slider.disabled = false;
+          els.playBtn.disabled = false;
+          els.bufferOverlay.style.display = 'none';
+          // Land on a clean, visible scene-start frame after media is ready.
+          if (idx >= 0) selectScene(idx);
+        });
       });
     });
   }
