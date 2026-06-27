@@ -165,6 +165,12 @@ async function main() {
       console.log(`  Found ${videoInfos.length} video element(s), ${uniqueSrcs.length} unique source(s)`);
 
       for (const src of uniqueSrcs) {
+        // Empty/dropped <video> src resolves to the document URL (.../scene.html);
+        // guard so it isn't handed to ffmpeg as a "video".
+        if (!/\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(src)) {
+          console.warn(`  Skipping non-video <video> src: ${src.slice(0, 80)}`);
+          continue;
+        }
         const videoPath = resolveVideoPath(src);
 
         // Verify the file exists

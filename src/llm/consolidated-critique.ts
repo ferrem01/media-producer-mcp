@@ -59,13 +59,18 @@ export async function critiqueConsolidated(opts: {
   /** This scene is a pre-rendered brand video clip whose content can't be edited:
    *  judge visual quality but don't penalize for missing headlines/text/value-props. */
   videoOnly?: boolean;
+  /** The scene's background is real footage or a photographic hero image. Light
+   *  text over a scrim is then CORRECT regardless of brand theme, so the theme
+   *  rule must not flag it. */
+  mediaBackground?: boolean;
   llmConfig: LLMConfig;
 }): Promise<ConsolidatedCritiqueResult> {
   const spec: string[] = [`SCENE PURPOSE / BRIEF:\n${opts.briefText}`];
   if (opts.videoOnly) spec.push(`NOTE: this scene is a pre-rendered brand video clip (animation), not a content scene. Evaluate visual quality, brand consistency, and polish, but do NOT penalize for missing headlines, text, messaging, or value props, and do NOT report "missing_asset" for content -- the video cannot be modified.`);
   if (opts.expectedComponents?.length) spec.push(`EXPECTED UI: ${opts.expectedComponents.join(", ")}`);
   if (opts.requiresLogo) spec.push(`REQUIRED ASSET: the brand LOGO IMAGE must be visibly present (a styled text wordmark or blank placeholder does NOT count -> "missing_asset").`);
-  if (opts.brandTheme === "light") spec.push(`BRAND THEME: LIGHT brand -- background MUST be light with DARK text. Report "off_brand_theme" for a dark background/panel or light text on a light area.`);
+  if (opts.mediaBackground) spec.push(`NOTE: this scene's background is real footage / a photographic hero image -- NOT a brand surface. Light text over a scrim/darkened footage is CORRECT and expected here; do NOT report "off_brand_theme" for the footage background or for light captions over it. Only flag a theme problem if a COMPOSED UI surface (a card/panel, not the footage) inverts the brand.`);
+  else if (opts.brandTheme === "light") spec.push(`BRAND THEME: LIGHT brand -- background MUST be light with DARK text. Report "off_brand_theme" for a dark background/panel or light text on a light area.`);
   else if (opts.brandTheme === "dark") spec.push(`BRAND THEME: DARK brand -- background should be dark with light text. Report "off_brand_theme" only if it jarringly renders light against the dark brand.`);
   if (opts.sceneHtml) spec.push(`SCENE HTML (for reference):\n\`\`\`html\n${opts.sceneHtml.slice(0, 4000)}\n\`\`\``);
   if (opts.contactSheetBase64 && opts.contactTimestamps?.length) spec.push(`Contact-sheet frames are at: ${opts.contactTimestamps.map((t) => t.toFixed(1) + "s").join(", ")}.`);

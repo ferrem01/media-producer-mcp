@@ -348,6 +348,13 @@ export async function captureSingleFrame(options: {
 
       for (const vInfo of videoInfos) {
         if (!vInfo.src) continue;
+        // A <video> whose src was dropped/empty has v.src resolve to the document
+        // URL (.../scene.html); without this guard that gets handed to ffmpeg as a
+        // "video" and fails with "Invalid data found" (seen on intro/outro clips).
+        if (!/\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(vInfo.src)) {
+          console.warn(`  Skipping non-video <video> src: ${vInfo.src.slice(0, 80)}`);
+          continue;
+        }
         const videoPath = resolveVideoPath(vInfo.src);
 
         try {

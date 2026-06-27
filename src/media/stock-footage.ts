@@ -86,12 +86,15 @@ export async function fetchStockFootage(opts: StockFootageOpts): Promise<StockFo
 
     const video = suitable.length > 0 ? suitable[0] : videos[0];
 
-    // Find the best quality file (prefer HD, fallback to SD)
-    const files = video.video_files || [];
-    const hdFile = files.find((f: any) => f.width >= targetWidth && f.quality === "hd") 
-      || files.find((f: any) => f.width >= 1280 && f.quality === "hd")
-      || files.find((f: any) => f.quality === "hd")
-      || files[0];
+    // Pick the best rendition by RESOLUTION, deterministically. Pexels returns
+    // several renditions per video (e.g. 640x360, 1280x720, 1920x1080); the old
+    // quality-string find-chain could fall through to files[0] and grab the tiny
+    // 640x360 one. Sort by width and take the smallest rendition >= target (so we
+    // downscale, never upscale); if none reach target, take the largest available.
+    const files = (video.video_files || [])
+      .filter((f: any) => f.link && f.width && f.height)
+      .sort((a: any, b: any) => a.width - b.width);
+    const hdFile = files.find((f: any) => f.width >= targetWidth) || files[files.length - 1];
 
     if (!hdFile?.link) {
       console.warn("  Stock footage: no downloadable file found");

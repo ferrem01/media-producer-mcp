@@ -322,6 +322,7 @@ ${opts.referenceImages?.length ? buildReferenceImageSummary(opts.referenceImages
 ${opts.brollVideoUrl ? `
 ## FOOTAGE-FORWARD SCENE (place real video b-roll as this scene's background)
 This scene has a real cinematic video clip that MUST be the full-bleed background -- a film establishing shot, the hero of the scene. YOU place it (just like any video).
+- THEME EXCEPTION: the LIGHT-brand "light background / dark text only" rule above is for COMPOSED surfaces. Here the background is real footage, so white/near-white text over a scrim is CORRECT and expected -- it is NOT a theme violation. Do not force dark text or a light background onto the footage.
 - Place it as the FIRST element in your <template>, filling the frame:
   \`<video class="mp-broll" src="${opts.brollVideoUrl}" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;"></video>\`
   (Keep the src EXACTLY as given -- the system resolves it to the real file at render time and an http URL in preview.)
@@ -349,6 +350,7 @@ PLUS, always (regardless of A/B/C):
 ${opts.heroImageUrl ? `
 ## HERO-IMAGE SCENE (a generated still image is THIS scene's background)
 This scene has a real, cinematic AI-generated image that MUST be the full-bleed background. It is a deliberate STILL -- the calm, composed beat of the video. You MUST draw it.
+- THEME EXCEPTION: the LIGHT-brand "light background / dark text only" rule above is for COMPOSED surfaces. Here the background is a real photo, so light text over a scrim is CORRECT and expected -- it is NOT a theme violation.
 - Place it as the FIRST element in your <template>, filling the frame:
   \`<img class="mp-hero-img" src="${opts.heroImageUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;" />\`
   (The system rewrites that URL to a local file at render time -- keep it EXACTLY as given.)
