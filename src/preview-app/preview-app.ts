@@ -2354,6 +2354,10 @@ export function getPreviewHtml(): string {
   function studioReload() {
     var p = state.currentProject; if (!p) return;
     var idx = state.currentSceneIndex;
+    // Remember where the playhead was so we can land back on a CONTENT-VISIBLE
+    // frame after the swap (seeking to a scene's first frame shows blank because
+    // the GSAP intro animations start everything at opacity:0 / off-screen).
+    var keepTime = state.masterTime || 0;
     // Clear stale selection (the old element is gone after a re-render).
     studio.sel = null;
     if (studio.selBox) studio.selBox.style.display = 'none';
@@ -2373,10 +2377,19 @@ export function getPreviewHtml(): string {
         updateActiveScene(si);
         renderLayers();
         updateSceneIndicator();
-        if (masterTl) { masterTl.time(0.001); }
-        state.masterTime = 0;
-        els.slider.value = 0;
-        updateTimeDisplay(0);
+        // Compute a settled, content-visible time inside the revised scene:
+        // prefer the user's prior playhead, but never the blank intro frame.
+        var meta = null;
+        try { meta = els.previewIframe.contentWindow.__MP_SCENE_META; } catch (e) {}
+        var sceneStart = (meta && meta[si]) ? meta[si].start : sceneOffset(si);
+        var sceneDur = (p.scenes && p.scenes[si]) ? (p.scenes[si].duration_seconds || 0) : 0;
+        var settled = sceneStart + Math.min(0.6, sceneDur > 0 ? sceneDur * 0.4 : 0.6);
+        var target = Math.max(keepTime, settled);
+        if (sceneDur > 0) target = Math.min(target, sceneStart + sceneDur - 0.05);
+        if (masterTl) { masterTl.time(target); masterTl.pause(); }
+        state.masterTime = target;
+        els.slider.value = state.totalDuration > 0 ? Math.round((target / state.totalDuration) * 1000) : 0;
+        updateTimeDisplay(target);
         els.previewPlaceholder.style.display = 'none';
         els.previewWrapper.style.display = '';
         els.bufferOverlay.style.display = 'flex';
@@ -2384,8 +2397,9 @@ export function getPreviewHtml(): string {
           els.slider.disabled = false;
           els.playBtn.disabled = false;
           els.bufferOverlay.style.display = 'none';
-          // Land on a clean, visible scene-start frame after media is ready.
-          if (idx >= 0) selectScene(idx);
+          // Re-assert the settled frame after media is ready (a late-loading
+          // video can reset the GSAP render; keep the content visible).
+          if (masterTl) { masterTl.time(target); masterTl.pause(); }
         });
       });
     });
