@@ -3,9 +3,9 @@
  *
  * Per-scene critique now lives in consolidated-critique.ts (one vision call doing
  * functional + premium + correctness). This module keeps the EDITORIAL pass:
- * a cross-scene, plan-fidelity review that runs ONCE after all scenes are
+ * a cross-scene, storyboard-fidelity review that runs ONCE after all scenes are
  * generated -- judging pacing, variety, coherence, and whether each rendered
- * scene delivered its planned intent (using a tiled storyboard image).
+ * scene delivered its intended outcome (using a tiled storyboard image).
  */
 
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
@@ -28,8 +28,8 @@ export interface EditorialCritiqueResult {
 /**
  * Editorial critique (full video flow). Runs ONCE after all scenes are generated.
  * Evaluates pacing, variety, narrative arc, coherence, and -- when a storyboard
- * image is provided -- per-scene plan fidelity (did each rendered frame deliver
- * the plan's intent?).
+ * image is provided -- per-scene storyboard fidelity (did each rendered frame deliver
+ * the storyboard's intent?).
  */
 export async function critiqueEditorial(opts: {
   scenes: Array<{
@@ -38,7 +38,7 @@ export async function critiqueEditorial(opts: {
     transition_in?: { type: string; duration_seconds: number };
     component_types: string[];
     word_count: number;
-    /** What the PLAN intended this scene to be/show (purpose + brief). */
+    /** What the STORYBOARD intended this scene to be/show (purpose + brief). */
     intent?: string;
   }>;
   prompt: string;
@@ -55,7 +55,7 @@ export async function critiqueEditorial(opts: {
 You are shown a storyboard: one rendered frame per scene, tiled left-to-right, top-to-bottom, in scene order. Judge the RENDERED output, not just the metadata.
 
 ### Plan fidelity (MOST IMPORTANT)
-Each scene below has an "intent:" -- what the PLAN set out to achieve for that scene. For EACH scene, compare its rendered frame against its intent and decide: did the scene actually DELIVER what the plan intended? Flag any scene whose frame does NOT achieve its intent -- e.g. the plan said "show a grid of search results" but the frame is empty/wrong, or "reveal the logo" but no logo is visible, or "the Canva editor adds a headline" but nothing was added. BE CONSERVATIVE: emit a "fix_scene" fix ONLY when a scene CLEARLY and OBVIOUSLY fails to deliver its intent -- it is empty, broken, shows the wrong thing, or is missing the central element the plan called for. If a scene delivers its intent, do NOT flag it even if it could be more polished. A solid video should produce ZERO fix_scene fixes; regenerating a scene that already works risks making it worse, so reserve fix_scene for real misses. For each genuine miss, emit { "type": "fix_scene", "scene_index": N, "detail": "<what's missing vs the intent and how to fix it>" }.
+Each scene below has an "intent:" -- what the STORYBOARD set out to achieve for that scene. For EACH scene, compare its rendered frame against its intent and decide: did the scene actually DELIVER what the storyboard intended? Flag any scene whose frame does NOT achieve its intent -- e.g. the storyboard said "show a grid of search results" but the frame is empty/wrong, or "reveal the logo" but no logo is visible, or "the Canva editor adds a headline" but nothing was added. BE CONSERVATIVE: emit a "fix_scene" fix ONLY when a scene CLEARLY and OBVIOUSLY fails to deliver its intent -- it is empty, broken, shows the wrong thing, or is missing the central element the storyboard called for. If a scene delivers its intent, do NOT flag it even if it could be more polished. A solid video should produce ZERO fix_scene fixes; regenerating a scene that already works risks making it worse, so reserve fix_scene for real misses. For each genuine miss, emit { "type": "fix_scene", "scene_index": N, "detail": "<what's missing vs the intent and how to fix it>" }.
 
 ### Cross-scene coherence
 Also call out cross-scene defects the per-scene critique cannot see:

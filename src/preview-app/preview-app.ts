@@ -1562,7 +1562,7 @@ export function getPreviewHtml(): string {
   // component-layer list conveyed nothing.) Values come from the scene's edited
   // brief, falling back to the original storyboard plan entry.
   // Map a StoryboardScene (project.storyboard.scenes[idx]) into the editor's field shape.
-  function planToBrief(ps) {
+  function storyboardSceneToFields(ps) {
     ps = ps || {};
     return {
       purpose: ps.purpose || '',
@@ -1582,7 +1582,7 @@ export function getPreviewHtml(): string {
     var scene = project && idx >= 0 && project.scenes[idx];
     if (!scene) { clearLayers(); return; }
     var planned = (project.storyboard && project.storyboard.scenes && project.storyboard.scenes[idx]) || {};
-    studio.brief = planToBrief(planned);
+    studio.brief = storyboardSceneToFields(planned);
     renderBriefPreview();
   }
 
@@ -2705,7 +2705,7 @@ export function getPreviewHtml(): string {
     var st = document.getElementById('sm-edit-status');
     var saveBtn = document.getElementById('sm-save'); if (saveBtn) saveBtn.disabled = true;
     if (st) { st.className = 'sm-status'; st.textContent = 'Saving\\u2026'; }
-    api('POST', '/scene-plan/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), bodyS)
+    api('POST', '/storyboard-scene/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), bodyS)
       .then(function(res) {
         if (!res || res.ok === false) {
           if (st) { st.className = 'sm-status err'; st.textContent = 'Save failed: ' + ((res && res.error) || 'unknown'); }
@@ -2714,12 +2714,12 @@ export function getPreviewHtml(): string {
         }
         // Keep the in-memory plan in sync so it survives scene switches without reload.
         var idx = p.scenes ? p.scenes.findIndex(function(s) { return s.id === sceneId; }) : -1;
-        if (idx >= 0 && res.planned) {
+        if (idx >= 0 && res.scene) {
           if (!p.storyboard) p.storyboard = { narrative: '', scenes: [], audio: {}, estimated_duration: 0 };
           if (!p.storyboard.scenes) p.storyboard.scenes = [];
-          p.storyboard.scenes[idx] = res.planned;
+          p.storyboard.scenes[idx] = res.scene;
         }
-        studio.brief = planToBrief(res.planned);
+        studio.brief = storyboardSceneToFields(res.scene);
         renderBriefPreview();
         studioModalClose();
         sbStatus('Storyboard saved \\u2713', 'ok');

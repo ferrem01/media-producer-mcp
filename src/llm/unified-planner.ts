@@ -1,7 +1,7 @@
 /**
  * Unified Planner
  *
- * Plans a storyboard with one codegen pipeline. For each scene, the planner
+ * Builds a storyboard with one codegen pipeline. For each scene, the storyboard builder
  * writes a visual brief (what the viewer experiences) and lists which library
  * components to embed. The codegen LLM receives the brief + component schemas
  * and builds the scene HTML.
@@ -93,7 +93,7 @@ export async function planStoryboard(opts: UnifiedPlannerOpts): Promise<Storyboa
 
   var storytellingGuide = getStorytellingGuide();
 
-  var systemPrompt = `You are a creative director planning a ${opts.format} project.
+  var systemPrompt = `You are a creative director storyboarding a ${opts.format} project.
 
 You think in visual STORIES, not slide decks. Every scene should feel like something the viewer wants to watch, not endure.
 
@@ -211,7 +211,7 @@ ${catalogStr}
 ## Rules
 
 - ${sceneCountGuide}
-- **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Its brief must describe the whole flow as an ordered progression (step 1 → step 2 → step 3 …, each as motion: SLIDES, MORPHS, ASSEMBLES), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a plan failure.
+- **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Its brief must describe the whole flow as an ordered progression (step 1 → step 2 → step 3 …, each as motion: SLIDES, MORPHS, ASSEMBLES), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a storyboard failure.
 - B-ROLL: if the prompt is a brand film, or has an emotional/aspirational/lifestyle opener or closer, or any "feeling / place / human moment" scene, you MUST add a "broll_query" (a specific cinematic stock-footage phrase) to at least one such scene -- see the B-Roll section. Don't default those moments to a flat gradient. (Skip b-roll entirely for pure data/UI/feature/logo/CTA videos.)
 - First scene: transition "none" or omit transition_in.
 - Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, whip-pan, cinematic-zoom, shader-crosswarp, shader-ripple, shader-radial, shader-directional-warp, shader-burn, shader-chromatic, shader-lens-distortion, shader-swirl, shader-pixelize, none.
@@ -227,7 +227,7 @@ ${catalogStr}
 - hero_image prompts describe the IMAGE itself, not the scene layout.
 - Every scene MUST have a components array with at least one component.
 - Think Apple keynote: one powerful idea per scene, cinematic motion, premium aesthetic.
-- MANDATORY: For EACH scene (except intro/outro/breathing), you MUST include a "voiceover_text" field with narration that FITS the scene duration. Missing voiceover is a plan failure. CRITICAL: at ~150 words per minute, a 5-second scene fits ~12 words (1 short sentence), a 6-second scene fits ~15 words, a 7-second scene fits ~17 words. NEVER write more words than the scene duration allows. Keep narration punchy -- one idea per scene. Skip voiceover_text for intro/outro brand asset scenes and breathing pauses.
+- MANDATORY: For EACH scene (except intro/outro/breathing), you MUST include a "voiceover_text" field with narration that FITS the scene duration. Missing voiceover is a storyboard failure. CRITICAL: at ~150 words per minute, a 5-second scene fits ~12 words (1 short sentence), a 6-second scene fits ~15 words, a 7-second scene fits ~17 words. NEVER write more words than the scene duration allows. Keep narration punchy -- one idea per scene. Skip voiceover_text for intro/outro brand asset scenes and breathing pauses.
 - For IMAGE format: write a comprehensive brief covering the entire visual composition. List components only if library UI elements fit.
 - For PRESENTATION/DECK format: treat each slide as a self-contained visual composition. Write a detailed brief per slide.
 - For VIDEO: write rich briefs per scene and list matching library components for UI elements.
@@ -382,7 +382,7 @@ Prefer Speaker templates over regular templates when the speaker should be visib
   var storyboard = parseJsonResponse(raw);
 
   if (!storyboard.scenes || storyboard.scenes.length === 0) {
-    throw new Error("Unified planner returned no scenes");
+    throw new Error("Storyboard builder returned no scenes");
   }
 
   // Build a set of valid library component types for validation
@@ -418,7 +418,7 @@ Prefer Speaker templates over regular templates when the speaker should be visib
   for (var scene of storyboard.scenes) {
     componentHints += scene.components.length;
   }
-  console.log(`  Unified planner: ${storyboard.scenes.length} scenes, ${componentHints} component hints`);
+  console.log(`  Storyboard builder: ${storyboard.scenes.length} scenes, ${componentHints} component hints`);
 
   return storyboard as StoryboardResult;
 }
@@ -444,6 +444,6 @@ function parseJsonResponse(raw: string): any {
     if (first >= 0 && last > first) {
       return JSON.parse(trimmed.substring(first, last + 1));
     }
-    throw new Error(`Invalid JSON from unified planner: ${trimmed.substring(0, 300)}`);
+    throw new Error(`Invalid JSON from storyboard builder: ${trimmed.substring(0, 300)}`);
   }
 }
