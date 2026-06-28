@@ -111,8 +111,7 @@ export async function loadProject(tenantId: string, projectId: string): Promise<
 
 /**
  * Ensure the project has a storyboard whose `scenes[]` aligns 1:1 by index with the
- * realized `scenes[]`, creating a minimal storyboard / entries as needed. Also migrates
- * any legacy per-scene `brief` (the old SceneBrief) into the storyboard entry.
+ * realized `scenes[]`, creating a minimal storyboard / entries as needed.
  * Returns the StoryboardScene for the given index (the single source of truth that
  * Studio edits and Regenerate reads).
  */
@@ -139,15 +138,6 @@ export function ensureStoryboardScene(project: Project, sceneIndex: number): Sto
         visual_notes: "",
         components: [],
       };
-    }
-    // Migrate a legacy SceneBrief (purpose/script/visual_notes) onto the storyboard entry.
-    const legacy = (sc as any).brief;
-    if (legacy) {
-      const ps = sb.scenes[i];
-      if (!ps.purpose && legacy.purpose) ps.purpose = legacy.purpose;
-      if (!ps.voiceover_text && legacy.script) ps.voiceover_text = legacy.script;
-      if (!ps.visual_notes && legacy.visual_notes) ps.visual_notes = legacy.visual_notes;
-      delete (sc as any).brief;
     }
   }
   return sb.scenes[sceneIndex];

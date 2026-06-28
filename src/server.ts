@@ -1308,26 +1308,6 @@ export function createMcpServer(): McpServer {
       speaker_trim_start: z.number().optional().describe("Trim: only use speaker video from this timestamp"),
       speaker_trim_end: z.number().optional().describe("Trim: stop using speaker video at this timestamp"),
       mode: z.enum(["storyboard", "full"]).optional().default("full").describe("'storyboard' = produce just the storyboard for review (stops there). 'full' (default) = produce the scenes: build from an existing storyboard if the project has one, else create the storyboard first. Rendering the final video is the separate render tool."),
-      brief: z.object({
-        video_type: z.enum(["product_launch", "feature_announcement", "customer_story", "how_to", "promo", "explainer", "case_study", "brand"]).optional(),
-        context: z.object({
-          messaging: z.string().optional(),
-          audience: z.string().optional(),
-          key_points: z.array(z.string()).optional(),
-          proof_points: z.array(z.string()).optional(),
-          tone: z.string().optional(),
-          industry: z.string().optional(),
-        }).optional(),
-        target_duration: z.number().optional(),
-        style_references: z.array(z.object({ url: z.string(), note: z.string().optional() })).optional(),
-        do_not_include: z.array(z.string()).optional(),
-        available_assets: z.array(z.object({
-          description: z.string(),
-          type: z.enum(["screen_recording", "camera_video", "photo", "screenshot", "logo", "illustration", "other"]),
-          path: z.string().optional(),
-          url: z.string().optional(),
-        })).optional(),
-      }).optional().describe("Structured brief with marketing context. Enhances the prompt with audience, messaging, and asset info."),
       feedback: z.string().optional().describe("Natural language feedback to revise an existing storyboard. Requires project_id with a project in the storyboard state."),
       reference_images: z.array(z.object({
         url: z.string().describe("HTTPS URL or base64 data URI (data:image/...)"),
@@ -1387,7 +1367,6 @@ export function createMcpServer(): McpServer {
             project_id: params.project_id,
             voiceover: params.voiceover,
             voice: params.voice,
-            sceneCount: params.brief?.target_duration ? Math.max(3, Math.min(10, Math.round((params.brief.target_duration || 45) / 5.5))) : undefined,
             storyboardOnly: true,
           });
 
@@ -1401,7 +1380,7 @@ export function createMcpServer(): McpServer {
           if (params.project_id && params.project_id !== project.project_id) {
             const origProject = await loadProject(params.tenant_id, params.project_id);
             if (origProject) {
-              origProject.brief = project.brief;
+              origProject.prompt = project.prompt;
               origProject.storyboard = project.storyboard;
               origProject.status = "storyboard";
               origProject.updated_at = new Date().toISOString();
@@ -1435,7 +1414,7 @@ export function createMcpServer(): McpServer {
 
           // Use the storyboard's script as the prompt for the unified pipeline
           // Build a rich prompt from the storyboard's narrative + scene details
-          const storyboardPrompt = buildPromptFromStoryboard(project.storyboard, project.brief);
+          const storyboardPrompt = buildPromptFromStoryboard(project.storyboard);
 
           let llmConfig;
           try {
@@ -2011,8 +1990,8 @@ async function listComponentCatalog(): Promise<Array<{ type: string; category: s
  * Build a rich prompt from a storyboard for the unified pipeline.
  * Converts the storyboard's script into a format the storyboard builder understands.
  */
-function buildPromptFromStoryboard(storyboard: import("./core/types.js").Storyboard, brief?: import("./core/types.js").ProjectBrief): string {
-  let prompt = brief?.prompt || storyboard.narrative;
+function buildPromptFromStoryboard(storyboard: import("./core/types.js").Storyboard): string {
+  let prompt = storyboard.narrative;
   prompt += "\n\n## Script (FOLLOW THIS EXACTLY)\n";
   prompt += `Narrative: ${storyboard.narrative}\n\n`;
 
@@ -2054,13 +2033,6 @@ function buildPromptFromStoryboard(storyboard: import("./core/types.js").Storybo
 
   prompt += `Music mood: ${storyboard.audio.music_mood}\n`;
   prompt += `Pacing: ${storyboard.audio.pacing}\n`;
-
-  // Add marketing context if available
-  if (brief?.context) {
-    const ctx = brief.context;
-    if (ctx.messaging) prompt += `\n## Messaging\n${ctx.messaging}\n`;
-    if (ctx.tone) prompt += `\nTone: ${ctx.tone}\n`;
-  }
 
   return prompt;
 }

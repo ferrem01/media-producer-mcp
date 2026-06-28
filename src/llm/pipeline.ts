@@ -1331,7 +1331,7 @@ Current storyboard:
 ${existingSceneJSON}
 
 Canvas: ${opts.canvas.width}x${opts.canvas.height}
-Original brief: ${opts.prompt}
+Original prompt: ${opts.prompt}
 
 VALID library component types (use ONLY these exact names, or use custom: true):
 ${validTypeList}, image
@@ -1644,7 +1644,7 @@ async function runUnifiedPipeline(
   // ── Storyboard-only mode: save storyboard and return early ──
   if (opts.storyboardOnly) {
     project.storyboard = storyboardToSaved(storyboard, opts.voice as string);
-    project.brief = { prompt: opts.prompt };
+    project.prompt = opts.prompt;
     project.status = "storyboard";
     project.created_at = new Date().toISOString();
     project.updated_at = new Date().toISOString();
@@ -2198,7 +2198,7 @@ async function runUnifiedPipeline(
   // project so it's available for inspection and iteration after a full run,
   // not just in storyboard-only mode.
   project.storyboard = storyboardToSaved(storyboard, opts.voice as string);
-  project.brief = { prompt: opts.prompt };
+  project.prompt = opts.prompt;
   project.status = "generated";
   await saveProject(project);
 

@@ -240,7 +240,7 @@ export function getPreviewHtml(): string {
   .sb-input:focus { outline: none; border-color: #6366f1; }
   .sb-actions { display: flex; gap: 6px; margin-top: 4px; }
   .sb-hint { font-size: 10px; color: #64748b; margin-top: 4px; }
-  /* Compact read-only brief preview (full editing happens in the dialog). */
+  /* Compact read-only storyboard preview (full editing happens in the dialog). */
   .sb-preview { max-height: 86px; overflow-y: auto; margin-bottom: 8px; }
   .sb-prev-row { margin-bottom: 6px; }
   .sb-prev-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #9ca3af; }
@@ -477,7 +477,7 @@ export function getPreviewHtml(): string {
   }
   .rv-go:hover { background: #4f46e5; border-color: #4f46e5; }
   .rv-go:disabled { opacity: 0.5; cursor: default; }
-  /* Secondary (Edit brief, Undo): clearly a button on a light surface */
+  /* Secondary (Edit storyboard, Undo): clearly a button on a light surface */
   .rv-go.secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
   .rv-go.secondary:hover { background: #f9fafb; border-color: #9ca3af; }
   #studio-ctx { position: fixed; z-index: 9999; display: none; min-width: 180px; padding: 5px; border-radius: 10px;
@@ -534,10 +534,10 @@ export function getPreviewHtml(): string {
       <div id="storyboard-body">
         <div id="sb-preview" class="sb-preview"><div class="sb-prev-text empty">No scene selected</div></div>
         <div class="sb-actions">
-          <button class="rv-go secondary" id="sb-edit" style="flex:0 0 auto;" title="Open the brief in a larger editor">Edit brief</button>
-          <button class="rv-go" id="sb-regen" style="flex:1;" title="Rebuild this scene from scratch (storyboard builder + generate + critique) to fulfill the brief. Slow.">Regenerate from this brief</button>
+          <button class="rv-go secondary" id="sb-edit" style="flex:0 0 auto;" title="Open the storyboard in a larger editor">Edit storyboard</button>
+          <button class="rv-go" id="sb-regen" style="flex:1;" title="Rebuild this scene from scratch (storyboard builder + generate + critique) to fulfill the storyboard. Slow.">Regenerate from this storyboard</button>
         </div>
-        <div class="sb-hint">Regenerate rebuilds this scene from scratch (slow) to fulfill the brief. Edit the brief for more room to read and write.</div>
+        <div class="sb-hint">Regenerate rebuilds this scene from scratch (slow) to fulfill the storyboard. Edit the storyboard for more room to read and write.</div>
         <div class="rv-status" id="sb-status"></div>
       </div>
     </div>
@@ -1558,9 +1558,9 @@ export function getPreviewHtml(): string {
 
   // The left bottom panel is the editable Storyboard for the current scene.
   // (renderLayers/clearLayers keep their names so the existing scene-change call
-  // sites refresh the brief; there is one codegen component per scene now, so a
+  // sites refresh the storyboard; there is one codegen component per scene now, so a
   // component-layer list conveyed nothing.) Values come from the scene's edited
-  // brief, falling back to the original storyboard entry.
+  // storyboard fields, falling back to the original storyboard entry.
   // Map a StoryboardScene (project.storyboard.scenes[idx]) into the editor's field shape.
   function storyboardSceneToFields(ps) {
     ps = ps || {};
@@ -1582,13 +1582,13 @@ export function getPreviewHtml(): string {
     var scene = project && idx >= 0 && project.scenes[idx];
     if (!scene) { clearLayers(); return; }
     var storyboardScene = (project.storyboard && project.storyboard.scenes && project.storyboard.scenes[idx]) || {};
-    studio.brief = storyboardSceneToFields(storyboardScene);
-    renderBriefPreview();
+    studio.sb = storyboardSceneToFields(storyboardScene);
+    renderStoryboardPreview();
   }
 
-  function renderBriefPreview() {
+  function renderStoryboardPreview() {
     if (!els.sbPreview) return;
-    var b = studio.brief || {};
+    var b = studio.sb || {};
     function row(label, text) {
       var has = text && ('' + text).trim();
       return '<div class="sb-prev-row"><div class="sb-prev-label">' + label + '</div>'
@@ -1607,7 +1607,7 @@ export function getPreviewHtml(): string {
 
   function clearLayers() {
     state.currentComponentIndex = -1;
-    studio.brief = { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [] };
+    studio.sb = { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [] };
     if (els.sbPreview) els.sbPreview.innerHTML = '<div class="sb-prev-text empty">No scene selected</div>';
   }
 
@@ -2248,7 +2248,7 @@ export function getPreviewHtml(): string {
   // ─────────────────────────────────────────────
   // Studio: element selection + direct-manipulation revise
   // ─────────────────────────────────────────────
-  var studio = { sel: null, scope: 'element', busy: false, brief: { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [] } };
+  var studio = { sel: null, scope: 'element', busy: false, sb: { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [] } };
 
   function studioCurrentSceneId() {
     var p = state.currentProject, i = state.currentSceneIndex;
@@ -2664,7 +2664,7 @@ export function getPreviewHtml(): string {
   function openStoryboardEditor() {
     var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
     if (!sceneId) { sbStatus('Select or load a scene first.', 'warn'); return; }
-    var b = studio.brief || {};
+    var b = studio.sb || {};
     var html =
       '<h3 class="sm-title">Edit scene storyboard</h3>' +
       '<p class="sm-desc">This is the storyboard for this scene. Save to keep it; Regenerate rebuilds the scene to fulfill it.</p>' +
@@ -2684,12 +2684,12 @@ export function getPreviewHtml(): string {
       '</div>';
     studioModalOpen(html);
     document.getElementById('sm-cancel').addEventListener('click', studioModalClose);
-    document.getElementById('sm-save').addEventListener('click', function() { saveBriefFromModal(sceneId); });
+    document.getElementById('sm-save').addEventListener('click', function() { saveStoryboardFromModal(sceneId); });
   }
 
   function modalVal(id) { var el = document.getElementById(id); return el ? (el.value || '') : ''; }
 
-  function saveBriefFromModal(sceneId) {
+  function saveStoryboardFromModal(sceneId) {
     var p = state.currentProject; if (!p) return;
     var durRaw = modalVal('sm-duration').trim();
     var bodyS = {
@@ -2719,8 +2719,8 @@ export function getPreviewHtml(): string {
           if (!p.storyboard.scenes) p.storyboard.scenes = [];
           p.storyboard.scenes[idx] = res.scene;
         }
-        studio.brief = storyboardSceneToFields(res.scene);
-        renderBriefPreview();
+        studio.sb = storyboardSceneToFields(res.scene);
+        renderStoryboardPreview();
         studioModalClose();
         sbStatus('Storyboard saved \\u2713', 'ok');
       })
@@ -2731,7 +2731,7 @@ export function getPreviewHtml(): string {
   }
 
   // Regenerate the whole scene from scratch (heavy storyboard builder+generate+critique
-  // pipeline, run as an async job) to fulfill the storyboard brief, with a
+  // pipeline, run as an async job) to fulfill the storyboard, with a
   // prominent progress dialog. Unlike Revise (a surgical patch), this rebuilds
   // a broken or empty scene.
   function studioRegenerate() {
@@ -2747,7 +2747,7 @@ export function getPreviewHtml(): string {
     var startedAt = Date.now();
     studioModalOpen(
       '<h3 class="sm-title">Regenerating scene</h3>' +
-      '<p class="sm-desc">Rebuilding from the brief: storyboard builder \\u2192 generate \\u2192 critique. You can hide this \\u2014 it keeps running in the background.</p>' +
+      '<p class="sm-desc">Rebuilding from the storyboard: storyboard builder \\u2192 generate \\u2192 critique. You can hide this \\u2014 it keeps running in the background.</p>' +
       '<div class="sm-progress-bar"><div class="sm-progress-fill" id="sm-fill" style="width:5%"></div></div>' +
       '<div class="sm-phase" id="sm-phase">Starting\\u2026</div>' +
       '<div class="sm-sub" id="sm-elapsed">0s elapsed</div>' +

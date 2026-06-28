@@ -82,7 +82,7 @@
 <body>
 <header>
   <h1>Media Producer MCP</h1>
-  <p>On-brand video, generated from a brief. An LLM acts as the whole studio — creative director,
+  <p>On-brand video, generated from a prompt. An LLM acts as the whole studio — creative director,
      storyboard artist, animator, editor — turning a prompt into a rendered, on-brand video,
      with a vision-in-the-loop quality system and a direct-manipulation editor (Studio).</p>
 </header>
@@ -95,7 +95,7 @@
     <p class="lead">One generation run maps to the roles of a real production studio. Each step has a clear
        owner, a clear input, and a clear output — and crucially each step happens <em>once</em>, in order.</p>
     <div class="flow">
-      <div class="node">Brief</div><div class="arrow">→</div>
+      <div class="node">Prompt</div><div class="arrow">→</div>
       <div class="node">Creative Director</div><div class="arrow">→</div>
       <div class="node">Storyboard Builder</div><div class="arrow">→</div>
       <div class="node">Media</div><div class="arrow">→</div>
@@ -118,10 +118,10 @@
     <div class="stage">
       <div class="num">0</div>
       <div class="card">
-        <div class="title">Brief <span class="role">you</span></div>
+        <div class="title">Prompt <span class="role">you</span></div>
         <div class="desc">What you want — usually just a prompt, optionally with audience, tone, key points,
           target duration, do-not-include, and available assets.</div>
-        <div class="io"><b>type:</b> <code>ProjectBrief</code> &nbsp;·&nbsp; the prompt is a field inside the brief.</div>
+        <div class="io"><b>input:</b> a single <code>prompt</code> string — say what you want; the Creative Director fills the rest.</div>
       </div>
     </div>
 
@@ -129,11 +129,11 @@
       <div class="num">1</div>
       <div class="card">
         <div class="title">Creative Director <span class="role">director</span> <span class="file">creative-director.ts</span></div>
-        <div class="desc">Reads the <b>raw brief</b> and, as the expert, commits to <b>one</b> idea. On a thin brief
-          ("a launch video for this feature") it fills the gaps with expertise; on a detailed brief it honors the
+        <div class="desc">Reads the <b>raw prompt</b> and, as the expert, commits to <b>one</b> idea. On a thin prompt
+          ("a launch video for this feature") it fills the gaps with expertise; on a detailed prompt it honors the
           specifics. It also decides the scene count. There is <em>no</em> separate "expand/develop" pre-step — the
           director sees your actual words.</div>
-        <div class="io"><b>in:</b> brief &nbsp; <b>out:</b> <code>Treatment</code> — concept, storytelling
+        <div class="io"><b>in:</b> prompt &nbsp; <b>out:</b> <code>Treatment</code> — concept, storytelling
           pattern, visual through-line, emotional arc, color/type/motion commitments, scene count.</div>
       </div>
     </div>
@@ -144,7 +144,7 @@
         <div class="title">Storyboard Builder <span class="role">storyboard artist</span> <span class="file">storyboard-builder.ts</span></div>
         <div class="desc">Turns the treatment into a scene-by-scene breakdown. The treatment is injected into its
           prompt, so every scene serves the one idea.</div>
-        <div class="io"><b>in:</b> brief + treatment &nbsp; <b>out:</b> <code>Storyboard</code> — narrative +
+        <div class="io"><b>in:</b> prompt + treatment &nbsp; <b>out:</b> <code>Storyboard</code> — narrative +
           <code>StoryboardScene[]</code> (per scene: purpose, visual notes, voiceover script, suggested
           components, b-roll query <em>or</em> hero-image prompt, duration, transition).</div>
       </div>
@@ -189,12 +189,12 @@
       <div class="card">
         <div class="title">Audio &amp; Save <span class="file">audio/scene-voiceover.ts · persistence/project.ts</span></div>
         <div class="desc">Generates per-scene voiceover (TTS) and background music when requested, then persists the
-          full project (brief, treatment, storyboard, scenes, assets, audio).</div>
+          full project (prompt, treatment, storyboard, scenes, assets, audio).</div>
       </div>
     </div>
 
     <div class="note">
-      <b>Single pass, in order:</b> Brief → Director → Storyboard → Media → Codegen → Critique. Media runs
+      <b>Single pass, in order:</b> Prompt → Director → Storyboard → Media → Codegen → Critique. Media runs
       <em>before</em> codegen (so codegen can place the b-roll/hero). The only loop is Critique → re-codegen a
       failing scene. Rendering to MP4 is the separate <code>render</code> tool.
     </div>
@@ -275,11 +275,11 @@
   <section>
     <h2>Data model <span class="sub">— src/core/types.ts</span></h2>
     <p class="lead">A <code>Project</code> carries the whole lifecycle. The three creative artifacts are distinct:
-      the <b>Brief</b> (the ask) → the <b>Treatment</b> (the vision) → the <b>Storyboard</b> (the scene breakdown) →
+      the <b>Prompt</b> (the ask) → the <b>Treatment</b> (the vision) → the <b>Storyboard</b> (the scene breakdown) →
       the realized <b>Scenes</b> (codegen).</p>
     <table>
       <tr><th>Type</th><th>What it is</th></tr>
-      <tr><td><code>ProjectBrief</code></td><td>The input: prompt + audience / tone / key points / duration / assets. <code>project.brief</code></td></tr>
+      <tr><td><code>prompt</code></td><td>The input — what you want. Stored flat as <code>project.prompt</code>.</td></tr>
       <tr><td><code>Treatment</code></td><td>The Creative Director's vision: concept, pattern, through-line, emotional arc, visual style, scene count. <code>project.treatment</code></td></tr>
       <tr><td><code>Storyboard</code></td><td>The blueprint: narrative + <code>StoryboardScene[]</code> + audio direction. <code>project.storyboard</code></td></tr>
       <tr><td><code>StoryboardScene</code></td><td>One scene's blueprint: purpose, visual_notes, voiceover_text, components, broll_query, hero_image, duration, template, assets.</td></tr>
@@ -317,8 +317,8 @@
     <h2>Vocabulary</h2>
     <p class="lead">One consistent language end to end (the same words in code, data, prompts, and the tools).</p>
     <ul class="tight">
-      <li><b>Brief</b> — the ask (your prompt + context). The kickoff document.</li>
-      <li><b>Creative Director</b> — the step/role that turns a brief into a vision.</li>
+      <li><b>Prompt</b> — the ask: what you want. The Creative Director turns it into a vision.</li>
+      <li><b>Creative Director</b> — the step/role that turns a prompt into a vision.</li>
       <li><b>Treatment</b> — the Creative Director's output: the one unifying concept + look/feel.</li>
       <li><b>Storyboard / Storyboard Builder</b> — the scene-by-scene blueprint, and the role that writes it.</li>
       <li><b>Codegen</b> — turning a storyboard scene into real HTML/CSS/GSAP.</li>
@@ -329,6 +329,6 @@
 
 </main>
 
-<footer>Media Producer MCP — generated video from a brief · HTML + GSAP + Playwright + ffmpeg</footer>
+<footer>Media Producer MCP — generated video from a prompt · HTML + GSAP + Playwright + ffmpeg</footer>
 </body>
 </html>
