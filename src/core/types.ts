@@ -197,52 +197,6 @@ export interface Asset {
   created_at?: string;
 }
 
-// ── Brief ──
-
-export interface ProjectBrief {
-  /** The core ask */
-  prompt: string;
-  /** Video type -- drives narrative structure */
-  video_type?: "product_launch" | "feature_announcement" | "customer_story"
-    | "how_to" | "promo" | "explainer" | "case_study" | "brand";
-  /** Marketing context from the caller */
-  context?: BriefContext;
-  /** Target duration in seconds */
-  target_duration?: number;
-  /** Reference videos the caller likes */
-  style_references?: StyleReference[];
-  /** Things to avoid */
-  do_not_include?: string[];
-  /** Assets the caller already has */
-  available_assets?: AvailableAsset[];
-}
-
-export interface BriefContext {
-  /** Company/product positioning, value props, messaging */
-  messaging?: string;
-  /** Target audience */
-  audience?: string;
-  /** Key points to cover */
-  key_points?: string[];
-  /** Customer quotes, stats, proof points */
-  proof_points?: string[];
-  /** Tone of voice */
-  tone?: string;
-  /** Industry vertical */
-  industry?: string;
-}
-
-export interface StyleReference {
-  url: string;
-  note?: string;
-}
-
-export interface AvailableAsset {
-  description: string;
-  type: "screen_recording" | "camera_video" | "photo" | "screenshot" | "logo" | "illustration" | "other";
-  path?: string;
-  url?: string;
-}
 
 // ── Storyboard ──
 
@@ -348,9 +302,9 @@ export interface Project {
     };
     directorNote: string;
   };
-  /** Creative brief from the caller */
-  brief?: ProjectBrief;
-  /** The storyboard (script + storyboard + asset manifest) */
+  /** The original prompt that kicked off generation (the ask). */
+  prompt?: string;
+  /** The storyboard (script + scene breakdown + asset manifest) */
   storyboard?: Storyboard;
   created_at?: string;
   updated_at?: string;

@@ -1,7 +1,7 @@
 /**
  * Creative Director
  *
- * Runs FIRST. Takes the raw brief and -- as the expert -- commits to ONE strong
+ * Runs FIRST. Takes the raw prompt and -- as the expert -- commits to ONE strong
  * creative idea for the entire video. Without this, the storyboard builder generates
  * 8 mediocre scene ideas without a unifying concept.
  *
@@ -82,16 +82,16 @@ Bad concepts (these are NOT concepts, they are slide decks):
 ${storytellingGuide ? `## Storytelling Patterns You Can Use\n\n${storytellingGuide}\n\n` : ""}
 ${brandContext}
 
-## The Brief You Receive
+## The Prompt You Receive
 
-The brief may be a single thin line ("a product launch video for our new feature") or a detailed spec. EITHER WAY, you are the expert and you direct it:
-- **Thin brief:** make confident, smart creative choices to fill every gap. Decide the story, the structure, and the best way to tell it. The user is leaning on YOUR expertise -- do not water it down or ask for more; commit.
-- **Detailed brief:** honor its specifics (required points, tone, assets), and elevate them with your direction.
+The prompt may be a single thin line ("a product launch video for our new feature") or a detailed spec. EITHER WAY, you are the expert and you direct it:
+- **Thin prompt:** make confident, smart creative choices to fill every gap. Decide the story, the structure, and the best way to tell it. The user is leaning on YOUR expertise -- do not water it down or ask for more; commit.
+- **Detailed prompt:** honor its specifics (required points, tone, assets), and elevate them with your direction.
 You never just execute a request -- you decide what makes the strongest video for it.
 
 ## Your Task
 
-Given the project brief, generate THREE distinct creative concepts. Each concept should:
+Given the prompt, generate THREE distinct creative concepts. Each concept should:
 1. Be expressible in ONE sentence
 2. Name the specific storytelling PATTERN it uses
 3. Describe what VISUALLY persists or transforms across the video (the through-line)
