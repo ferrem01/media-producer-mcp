@@ -93,6 +93,16 @@ describe.skipIf(!HAVE_DIST)("MCP OAuth discovery (HTTP)", () => {
     expect(m.scopes_supported).toContain("offline_access");
   });
 
+  it("discovery honors the reverse proxy's forwarded host/proto", async () => {
+    const r = await req("GET", "/.well-known/oauth-authorization-server", {
+      headers: { "x-forwarded-host": "mcp.example.test", "x-forwarded-proto": "https" },
+    });
+    expect(r.status).toBe(200);
+    const m = JSON.parse(r.body);
+    expect(m.issuer).toBe("https://mcp.example.test");
+    expect(m.token_endpoint).toBe("https://mcp.example.test/token");
+  });
+
   it("DCR /register issues a client_id", async () => {
     const r = await req("POST", "/register", {
       headers: { "content-type": "application/json" },

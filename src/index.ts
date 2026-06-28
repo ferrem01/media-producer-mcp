@@ -120,6 +120,24 @@ function parseBody(req: http.IncomingMessage): Promise<Record<string, unknown>> 
 }
 
 /**
+ * Resolve the server's public origin for OAuth discovery + the WWW-Authenticate
+ * challenge. Prefer the reverse proxy's forwarded headers (so the docs match the
+ * exact HTTPS host the request arrived on), then an explicit MP_PUBLIC_URL, then
+ * the Host header. This keeps the connector working behind any TLS terminator
+ * without having to hand-set MP_PUBLIC_URL.
+ */
+function publicOrigin(req: http.IncomingMessage): string {
+  const first = (h?: string | string[]) => (Array.isArray(h) ? h[0] : h || "").split(",")[0].trim();
+  const fwdHost = first(req.headers["x-forwarded-host"]);
+  const fwdProto = first(req.headers["x-forwarded-proto"]);
+  if (fwdHost) return `${fwdProto || "https"}://${fwdHost}`;
+  if (process.env.MP_PUBLIC_URL) return process.env.MP_PUBLIC_URL.replace(/\/+$/, "");
+  const host = first(req.headers["host"]);
+  if (host) return `${fwdProto || "http"}://${host}`;
+  return config.publicUrl;
+}
+
+/**
  * Send JSON response.
  */
 function jsonResponse(res: http.ServerResponse, status: number, body: unknown): void {
@@ -353,7 +371,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           if (!token || !validateToken(token)) {
             res.writeHead(401, {
               "Content-Type": "application/json",
-              "WWW-Authenticate": wwwAuthenticateChallenge(config.publicUrl),
+              "WWW-Authenticate": wwwAuthenticateChallenge(publicOrigin(req)),
             });
             res.end(JSON.stringify({ error: "Authentication required" }));
             return;
@@ -571,12 +589,12 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
 
       // RFC 9728 protected-resource metadata (Claude follows the 401's WWW-Authenticate here).
       if (urlPath === "/.well-known/oauth-protected-resource" && method === "GET") {
-        jsonResponse(res, 200, protectedResourceMetadata(config.publicUrl));
+        jsonResponse(res, 200, protectedResourceMetadata(publicOrigin(req)));
         return;
       }
       // RFC 8414 authorization-server metadata (+ openid-configuration alias some clients probe).
       if ((urlPath === "/.well-known/oauth-authorization-server" || urlPath === "/.well-known/openid-configuration") && method === "GET") {
-        jsonResponse(res, 200, authorizationServerMetadata(config.publicUrl));
+        jsonResponse(res, 200, authorizationServerMetadata(publicOrigin(req)));
         return;
       }
       // RFC 7591 Dynamic Client Registration.
