@@ -7,6 +7,7 @@ import { randomBytes, createHash } from "node:crypto";
 import { findOrCreateTenant, getTenant } from "./tenant-store.js";
 import { createRefreshToken, rotateRefreshToken } from "./refresh-tokens.js";
 import { signToken, verifyToken } from "./jwt.js";
+import { redirectUriAllowed, getRegisteredClient } from "./mcp-oauth.js";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
@@ -109,6 +110,17 @@ export async function handleGoogleLogin(req: IncomingMessage, res: ServerRespons
   const clientState = query.get("state") || undefined;
   const codeChallenge = query.get("code_challenge") || undefined;
   const codeChallengeMethod = query.get("code_challenge_method") || undefined;
+  const clientId = query.get("client_id") || undefined;
+
+  // Validate the redirect URI against the registered client (loopback is
+  // port-agnostic per RFC 8252; the Claude hosted callback is always allowed).
+  if (clientRedirectUri) {
+    const registered = clientId ? getRegisteredClient(clientId)?.redirect_uris : undefined;
+    if (!redirectUriAllowed(clientRedirectUri, registered)) {
+      jsonReply(res, 400, { error: "invalid_request", error_description: "redirect_uri not allowed" });
+      return;
+    }
+  }
 
   const internalState = randomBytes(16).toString("hex");
 
