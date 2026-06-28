@@ -54,7 +54,7 @@ export async function critiqueEditorial(opts: {
 ## VISUAL REVIEW (a storyboard image is attached -- ONE frame per scene, in order)
 You are shown a storyboard: one rendered frame per scene, tiled left-to-right, top-to-bottom, in scene order. Judge the RENDERED output, not just the metadata.
 
-### Plan fidelity (MOST IMPORTANT)
+### Storyboard fidelity (MOST IMPORTANT)
 Each scene below has an "intent:" -- what the STORYBOARD set out to achieve for that scene. For EACH scene, compare its rendered frame against its intent and decide: did the scene actually DELIVER what the storyboard intended? Flag any scene whose frame does NOT achieve its intent -- e.g. the storyboard said "show a grid of search results" but the frame is empty/wrong, or "reveal the logo" but no logo is visible, or "the Canva editor adds a headline" but nothing was added. BE CONSERVATIVE: emit a "fix_scene" fix ONLY when a scene CLEARLY and OBVIOUSLY fails to deliver its intent -- it is empty, broken, shows the wrong thing, or is missing the central element the storyboard called for. If a scene delivers its intent, do NOT flag it even if it could be more polished. A solid video should produce ZERO fix_scene fixes; regenerating a scene that already works risks making it worse, so reserve fix_scene for real misses. For each genuine miss, emit { "type": "fix_scene", "scene_index": N, "detail": "<what's missing vs the intent and how to fix it>" }.
 
 ### Cross-scene coherence

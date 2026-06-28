@@ -653,7 +653,7 @@ export function createMcpServer(): McpServer {
         for (const newLogo of params.logos) upsertLogo(newLogo);
       }
       // Back-compat: the single `logo` param is coerced into the logos array
-      // (the brand kit only carries `logos[]` now -- the planner reads that).
+      // (the brand kit only carries `logos[]` now -- the storyboard builder reads that).
       if (params.logo) {
         upsertLogo({
           name: "primary",
@@ -896,7 +896,7 @@ export function createMcpServer(): McpServer {
           // Return the served URL
           const servedUrl = `/assets/${params.tenant_id}/brand-kit/${assetType}/${filename}`;
 
-          // Auto-register a logo upload into the brand kit's logos[] (the planner
+          // Auto-register a logo upload into the brand kit's logos[] (the storyboard builder
           // reads logos[], so an uploaded logo must land there to be usable).
           if (assetType === "logo") {
             try {
@@ -1322,7 +1322,7 @@ export function createMcpServer(): McpServer {
         role: z.enum(["ui_reference", "style_reference", "brand_reference", "screenshot"]),
         label: z.string().optional().describe("Human label for this reference, e.g. 'Claude chat UI'"),
       })).max(10).optional().describe(
-        "Reference images the LLM can see while planning and generating scenes. " +
+        "Reference images the LLM can see while building the storyboard and generating scenes. " +
         "Use for UI screenshots, style references, or brand materials."
       ),
     },
@@ -1346,22 +1346,22 @@ export function createMcpServer(): McpServer {
           const brandKit = await loadBrandKit(params.tenant_id);
 
           // Build the prompt, incorporating feedback for revisions
-          let planPrompt = params.prompt;
+          let storyboardPrompt = params.prompt;
           if (params.project_id && params.feedback) {
             const existingProject = await loadProject(params.tenant_id, params.project_id);
             if (!existingProject) return err("Project not found for storyboard revision");
             if (existingProject.status !== "storyboarded" && existingProject.status !== "draft") {
               return err(`Cannot revise storyboard: project is in '${existingProject.status}' state`);
             }
-            planPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
+            storyboardPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
             if (existingProject.storyboard?.narrative) {
-              planPrompt += `\n\n## Previous Plan Narrative\n${existingProject.storyboard.narrative}`;
+              storyboardPrompt += `\n\n## Previous Storyboard Narrative\n${existingProject.storyboard.narrative}`;
             }
           }
 
           console.log(`  Storyboard mode: running unified pipeline (storyboard-only) for "${params.prompt.substring(0, 60)}..."`);
           const pipelineResult = await runGeneratePipeline({
-            prompt: planPrompt,
+            prompt: storyboardPrompt,
             target: (params.target === "component" || params.target === "scene") ? "video" : (params.target || "video") as PipelineTarget,
             tenant_id: params.tenant_id,
             llmConfig,
@@ -1414,7 +1414,7 @@ export function createMcpServer(): McpServer {
 
         // ── Build from an existing approved storyboard ──
         // In full mode, if the project has already been storyboarded (and possibly
-        // edited), build the scenes from THAT storyboard instead of planning a new
+        // edited), build the scenes from THAT storyboard instead of storyboarding a new
         // one. Anything else (no project, a draft project, or a revision via `id`)
         // falls through to the fresh storyboard+scenes run below.
         if (params.project_id && !params.id) {
@@ -1423,7 +1423,7 @@ export function createMcpServer(): McpServer {
 
           // Use the storyboard's script as the prompt for the unified pipeline
           // Build a rich prompt from the storyboard's narrative + scene details
-          const planPrompt = buildPromptFromStoryboard(project.storyboard, project.brief);
+          const storyboardPrompt = buildPromptFromStoryboard(project.storyboard, project.brief);
 
           let llmConfig;
           try {
@@ -1434,11 +1434,11 @@ export function createMcpServer(): McpServer {
 
           const brandKit = await loadBrandKit(params.tenant_id);
           const job = queueJob("generate", params.tenant_id, async (j) => {
-            const trace = new TraceBuilder("generate", params.tenant_id, "", planPrompt);
+            const trace = new TraceBuilder("generate", params.tenant_id, "", storyboardPrompt);
             try {
               j.progress = { step: "generating_from_storyboard", percent: 10 };
               const pipelineResult = await runGeneratePipeline({
-                prompt: planPrompt,
+                prompt: storyboardPrompt,
                 target: "video",
                 tenant_id: params.tenant_id,
                 llmConfig,
@@ -1997,7 +1997,7 @@ async function listComponentCatalog(): Promise<Array<{ type: string; category: s
 
 /**
  * Build a rich prompt from a storyboard for the unified pipeline.
- * Converts the storyboard's script into a format the unified planner understands.
+ * Converts the storyboard's script into a format the storyboard builder understands.
  */
 function buildPromptFromStoryboard(storyboard: import("./core/types.js").Storyboard, brief?: import("./core/types.js").ProjectBrief): string {
   let prompt = brief?.prompt || storyboard.narrative;
@@ -2017,7 +2017,7 @@ function buildPromptFromStoryboard(storyboard: import("./core/types.js").Storybo
     if (s.assets && s.assets.length > 0) {
       for (const asset of s.assets) {
         if (asset.status === "provided" && asset.path) {
-          // Real asset -- tell the planner to use it
+          // Real asset -- tell the storyboard builder to use it
           if (asset.type === "screen_recording" || asset.type === "camera_video") {
             prompt += `  ASSET: Use video component with src="${asset.path}"\n`;
           } else if (asset.type === "screenshot" || asset.type === "photo" || asset.type === "product_shot") {

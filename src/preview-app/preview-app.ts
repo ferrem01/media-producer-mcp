@@ -535,7 +535,7 @@ export function getPreviewHtml(): string {
         <div id="sb-preview" class="sb-preview"><div class="sb-prev-text empty">No scene selected</div></div>
         <div class="sb-actions">
           <button class="rv-go secondary" id="sb-edit" style="flex:0 0 auto;" title="Open the brief in a larger editor">Edit brief</button>
-          <button class="rv-go" id="sb-regen" style="flex:1;" title="Rebuild this scene from scratch (planner + generate + critique) to fulfill the brief. Slow.">Regenerate from this brief</button>
+          <button class="rv-go" id="sb-regen" style="flex:1;" title="Rebuild this scene from scratch (storyboard builder + generate + critique) to fulfill the brief. Slow.">Regenerate from this brief</button>
         </div>
         <div class="sb-hint">Regenerate rebuilds this scene from scratch (slow) to fulfill the brief. Edit the brief for more room to read and write.</div>
         <div class="rv-status" id="sb-status"></div>
@@ -1560,7 +1560,7 @@ export function getPreviewHtml(): string {
   // (renderLayers/clearLayers keep their names so the existing scene-change call
   // sites refresh the brief; there is one codegen component per scene now, so a
   // component-layer list conveyed nothing.) Values come from the scene's edited
-  // brief, falling back to the original storyboard plan entry.
+  // brief, falling back to the original storyboard entry.
   // Map a StoryboardScene (project.storyboard.scenes[idx]) into the editor's field shape.
   function storyboardSceneToFields(ps) {
     ps = ps || {};
@@ -1581,8 +1581,8 @@ export function getPreviewHtml(): string {
     var idx = state.currentSceneIndex;
     var scene = project && idx >= 0 && project.scenes[idx];
     if (!scene) { clearLayers(); return; }
-    var planned = (project.storyboard && project.storyboard.scenes && project.storyboard.scenes[idx]) || {};
-    studio.brief = storyboardSceneToFields(planned);
+    var storyboardScene = (project.storyboard && project.storyboard.scenes && project.storyboard.scenes[idx]) || {};
+    studio.brief = storyboardSceneToFields(storyboardScene);
     renderBriefPreview();
   }
 
@@ -2660,14 +2660,14 @@ export function getPreviewHtml(): string {
     });
   }
 
-  // Open the roomy storyboard editor dialog (the scene's full plan entry).
+  // Open the roomy storyboard editor dialog (the scene's full storyboard entry).
   function openStoryboardEditor() {
     var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
     if (!sceneId) { sbStatus('Select or load a scene first.', 'warn'); return; }
     var b = studio.brief || {};
     var html =
       '<h3 class="sm-title">Edit scene storyboard</h3>' +
-      '<p class="sm-desc">This is the plan for this scene. Save to keep it; Regenerate rebuilds the scene to fulfill it.</p>' +
+      '<p class="sm-desc">This is the storyboard for this scene. Save to keep it; Regenerate rebuilds the scene to fulfill it.</p>' +
       '<div class="sm-field"><label>Purpose</label><textarea id="sm-purpose" placeholder="What this scene communicates">' + escHtml(b.purpose || '') + '</textarea></div>' +
       '<div class="sm-field"><label>Script (voiceover / on-screen)</label><textarea id="sm-script" placeholder="The narration or on-screen copy">' + escHtml(b.script || '') + '</textarea></div>' +
       '<div class="sm-field"><label>Visual notes</label><textarea id="sm-visual" style="min-height:130px;" placeholder="Layout, motion, imagery, hierarchy">' + escHtml(b.visual_notes || '') + '</textarea></div>' +
@@ -2712,7 +2712,7 @@ export function getPreviewHtml(): string {
           if (saveBtn) saveBtn.disabled = false;
           return;
         }
-        // Keep the in-memory plan in sync so it survives scene switches without reload.
+        // Keep the in-memory storyboard in sync so it survives scene switches without reload.
         var idx = p.scenes ? p.scenes.findIndex(function(s) { return s.id === sceneId; }) : -1;
         if (idx >= 0 && res.scene) {
           if (!p.storyboard) p.storyboard = { narrative: '', scenes: [], audio: {}, estimated_duration: 0 };
@@ -2730,7 +2730,7 @@ export function getPreviewHtml(): string {
       });
   }
 
-  // Regenerate the whole scene from scratch (heavy planner+generate+critique
+  // Regenerate the whole scene from scratch (heavy storyboard builder+generate+critique
   // pipeline, run as an async job) to fulfill the storyboard brief, with a
   // prominent progress dialog. Unlike Revise (a surgical patch), this rebuilds
   // a broken or empty scene.
@@ -2747,7 +2747,7 @@ export function getPreviewHtml(): string {
     var startedAt = Date.now();
     studioModalOpen(
       '<h3 class="sm-title">Regenerating scene</h3>' +
-      '<p class="sm-desc">Rebuilding from the brief: planner \\u2192 generate \\u2192 critique. You can hide this \\u2014 it keeps running in the background.</p>' +
+      '<p class="sm-desc">Rebuilding from the brief: storyboard builder \\u2192 generate \\u2192 critique. You can hide this \\u2014 it keeps running in the background.</p>' +
       '<div class="sm-progress-bar"><div class="sm-progress-fill" id="sm-fill" style="width:5%"></div></div>' +
       '<div class="sm-phase" id="sm-phase">Starting\\u2026</div>' +
       '<div class="sm-sub" id="sm-elapsed">0s elapsed</div>' +
@@ -2769,7 +2769,7 @@ export function getPreviewHtml(): string {
       clearInterval(elapsedTimer);
     }
 
-    // Regenerate rebuilds from the SAVED storyboard plan; edits are persisted via
+    // Regenerate rebuilds from the SAVED storyboard; edits are persisted via
     // the editor's Save, so we only need to identify the scene here.
     var body = { scene_id: sceneId };
     api('POST', '/regenerate/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), body)

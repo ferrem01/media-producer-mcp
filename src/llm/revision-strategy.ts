@@ -1,8 +1,8 @@
 /**
- * Revision Planner
+ * Revision Strategist
  *
- * Dedicated planner for revising existing scenes. Unlike the unified planner
- * (which creates from scratch), this planner:
+ * Dedicated storyboard builder for revising existing scenes. Unlike the storyboard builder
+ * (which creates from scratch), this storyboard builder:
  * 1. Receives the exact existing components with their HTML source
  * 2. Assigns a strategy to each: keep / revise / replace / remove
  * 3. Can add new components
@@ -67,8 +67,8 @@ export interface RevisionStrategyOpts {
 }
 
 /**
- * Plan a revision for an existing scene.
- * The planner sees the actual HTML source of custom components so it can
+ * Strategize a revision for an existing scene.
+ * The storyboard builder sees the actual HTML source of custom components so it can
  * make informed decisions about what to keep vs change.
  */
 export async function strategizeRevision(opts: RevisionStrategyOpts): Promise<SceneRevisionSpec> {
@@ -91,7 +91,7 @@ ${componentContext}
 ## Revision Request
 ${opts.prompt}
 
-Return the revision plan as JSON.`;
+Return the revision strategy as JSON.`;
 
   const raw = await callLLM(opts.llmConfig, [
     { role: "system", content: systemPrompt },
@@ -161,7 +161,7 @@ function buildRevisionSystemPrompt(
     brandAssetsSection += `\nBrand Guidelines:\n${brandKit.guidelines}\n`;
   }
 
-  return `You are a scene REVISION planner. You are NOT creating from scratch -- you are surgically editing an existing scene.
+  return `You are a scene REVISION strategist. You are NOT creating from scratch -- you are surgically editing an existing scene.
 
 ## YOUR ROLE
 You receive an existing scene with its components (including the full HTML source of any custom components).
@@ -277,26 +277,26 @@ function parseRevisionStrategy(
     if (first >= 0 && last > first) {
       parsed = JSON.parse(trimmed.substring(first, last + 1));
     } else {
-      throw new Error(`Invalid JSON from revision planner: ${trimmed.substring(0, 300)}`);
+      throw new Error(`Invalid JSON from revision strategist: ${trimmed.substring(0, 300)}`);
     }
   }
 
   // Validate
   if (!parsed.components || !Array.isArray(parsed.components)) {
-    throw new Error("Revision plan missing components array");
+    throw new Error("Revision strategy missing components array");
   }
 
   // Ensure all existing components are accounted for
   const existingIds = new Set(existingComponents.map(c => c.id));
-  const plannedIds = new Set(
+  const strategyIds = new Set(
     parsed.components
       .filter((c: any) => c.original_id)
       .map((c: any) => c.original_id),
   );
 
-  // Any existing component not in the plan gets "keep" by default
+  // Any existing component not in the strategy gets "keep" by default
   for (const existing of existingComponents) {
-    if (!plannedIds.has(existing.id)) {
+    if (!strategyIds.has(existing.id)) {
       parsed.components.push({
         original_id: existing.id,
         type: existing.type,

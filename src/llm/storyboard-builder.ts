@@ -1,5 +1,5 @@
 /**
- * Unified Planner
+ * Unified Storyboard builder
  *
  * Builds a storyboard with one codegen pipeline. For each scene, the storyboard builder
  * writes a visual brief (what the viewer experiences) and lists which library
@@ -48,7 +48,7 @@ export interface StoryboardBuilderOpts {
   treatment?: Treatment;
 }
 
-export interface PlannedComponent {
+export interface StoryboardComponent {
   // Library component
   type?: string;  // e.g. "stat-card", "gradient-background"
   data?: Record<string, unknown>;
@@ -80,7 +80,7 @@ export interface StoryboardResult {
 }
 
 /**
- * Plan a storyboard with per-component library/custom decisions.
+ * Build a storyboard with per-component library/custom decisions.
  */
 export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<StoryboardResult> {
   var catalogStr = formatCatalogForPrompt(opts.componentCatalog);

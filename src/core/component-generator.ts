@@ -105,9 +105,9 @@ export async function saveGeneratedComponent(
   const normalized = normalizeHtmlUrls(source);
   await fs.writeFile(filePath, normalized);
 
-  // Pair it with a schema so the planner can actually see + select it.
+  // Pair it with a schema so the storyboard builder can actually see + select it.
   // (Without this, generated components render-if-referenced but are invisible
-  // to the catalog the planner orders from.)
+  // to the catalog the storyboard builder orders from.)
   await writeComponentSchema(tenantCompDir, type, category, normalized);
 
   return filePath;

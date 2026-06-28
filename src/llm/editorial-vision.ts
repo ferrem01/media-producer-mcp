@@ -3,8 +3,8 @@
  *
  * The editorial critique (Pass 3) judges the whole video. To let it SEE the
  * result, we tile one frame per scene into a single storyboard image and hand
- * that to the (vision-capable) critiqueEditorial alongside the plan -- so it can
- * judge whether the rendered scenes actually delivered what the plan intended.
+ * that to the (vision-capable) critiqueEditorial alongside the storyboard -- so it can
+ * judge whether the rendered scenes actually delivered what the storyboard intended.
  */
 
 import { execFile } from "node:child_process";

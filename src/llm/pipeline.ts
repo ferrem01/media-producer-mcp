@@ -5,7 +5,7 @@
  * calls this. Routes by target format.
  *
  * All multi-scene formats (video, presentation, image, scene) go through
- * the unified pipeline: one planner decides per-scene whether to use library
+ * the unified pipeline: one storyboard builder decides per-scene whether to use library
  * components or generate custom HTML. A `creativity` parameter (0-1) biases
  * the decision.
  */
@@ -65,7 +65,7 @@ export interface PipelineOpts {
   // Pipeline-internal defaults (not exposed to MCP callers)
   critique?: boolean;       // default: true
   maxRevisions?: number;    // default: 2
-  sceneCount?: number;      // planner decides if not set
+  sceneCount?: number;      // storyboard builder decides if not set
   generateImages?: boolean; // default: true
   creativity?: number;      // default: 0.5 (0-1, biases library vs custom)
   voiceover?: boolean;      // default: false. Generate TTS voiceover per scene.
@@ -94,7 +94,7 @@ export interface PipelineOpts {
   speaker_trim_start?: number;
   speaker_trim_end?: number;
 
-  // Plan-only mode: run concept director + unified planner, save plan, stop before scene generation
+  // Storyboard-only mode: run concept director + storyboard builder, save storyboard, stop before scene generation
   storyboardOnly?: boolean;
 }
 
@@ -324,54 +324,54 @@ async function runSceneRevisionPipeline(
   }
 
   const existingScene = project.scenes[sceneIndex];
-  const plannedScene = project.storyboard?.scenes?.[sceneIndex];
+  const storyboardScene = project.storyboard?.scenes?.[sceneIndex];
 
-  // Serialize existing scene as context for the planner, and pin the scene's
-  // brief (Studio-edited override, else the original storyboard plan) so the
+  // Serialize existing scene as context for the storyboard builder, and pin the scene's
+  // brief (Studio-edited override, else the original storyboard) so the
   // rebuild fulfills the scene's actual intent — not just its label.
   const sceneContext = serializeSceneContext(existingScene);
-  const briefBlock = formatSceneBrief(plannedScene);
+  const briefBlock = formatSceneBrief(storyboardScene);
   const revisionPrompt =
     `Revise the following scene based on these instructions: ${opts.prompt}` +
     (briefBlock ? `\n\nScene brief (the intent this scene must fulfill):\n${briefBlock}` : "") +
     `\n\nCurrent scene:\n${sceneContext}`;
 
   // Build the scene the generator will render. When we have an explicit brief
-  // (Studio-edited override, else the original storyboard plan), use it VERBATIM
-  // as the generation spec instead of re-running the planner: buildStoryboard
+  // (Studio-edited override, else the original storyboard), use it VERBATIM
+  // as the generation spec instead of re-running the storyboard builder: buildStoryboard
   // paraphrases the brief into its own brief/description, and buildCodegenBrief
   // then generates from THAT — so the rebuild drifts from what the storyboard
-  // actually said. Only fall back to the planner when there is no brief at all.
-  // The plan entry (project.storyboard.scenes[idx]) is the single source of truth that
+  // actually said. Only fall back to the storyboard builder when there is no brief at all.
+  // The storyboard entry (project.storyboard.scenes[idx]) is the single source of truth that
   // Studio edits; use it verbatim so the rebuild matches the storyboard.
-  const briefPurpose = plannedScene?.purpose;
-  const briefScript = plannedScene?.voiceover_text;
-  const briefVisual = plannedScene?.visual_notes;
+  const briefPurpose = storyboardScene?.purpose;
+  const briefScript = storyboardScene?.voiceover_text;
+  const briefVisual = storyboardScene?.visual_notes;
   const instr = opts.prompt?.trim();
-  let planned: any;
+  let draft: any;
 
   if (briefPurpose || briefScript || briefVisual) {
-    opts.onProgress?.({ step: "planning", percent: 10, detail: "Using the storyboard brief" });
+    opts.onProgress?.({ step: "storyboarding", percent: 10, detail: "Using the storyboard brief" });
     // buildCodegenBrief surfaces `description` -> "Description" and `brief` ->
     // "Visual Direction" verbatim, so map the user's words straight in.
-    planned = {
-      label: existingScene.label || plannedScene?.label || `Scene ${sceneIndex + 1}`,
-      duration_seconds: plannedScene?.duration_seconds || existingScene.duration_seconds || 5,
+    draft = {
+      label: existingScene.label || storyboardScene?.label || `Scene ${sceneIndex + 1}`,
+      duration_seconds: storyboardScene?.duration_seconds || existingScene.duration_seconds || 5,
       description: [briefPurpose, instr ? `Additional instruction: ${instr}` : ""].filter(Boolean).join("\n"),
       brief: briefVisual || "",
       purpose: briefPurpose || "",
       visual_notes: briefVisual || "",
       voiceover_text: briefScript || "",
-      components: plannedScene?.components || [],
-      broll_query: plannedScene?.broll_query,
-      hero_image: plannedScene?.hero_image,
-      template: plannedScene?.template,
-      assets: plannedScene?.assets || [],
+      components: storyboardScene?.components || [],
+      broll_query: storyboardScene?.broll_query,
+      hero_image: storyboardScene?.hero_image,
+      template: storyboardScene?.template,
+      assets: storyboardScene?.assets || [],
       transition_in: existingScene.transition_in,
     };
   } else {
-    opts.onProgress?.({ step: "planning", percent: 10, detail: "Planning the scene" });
-    trace?.beginEvent("scene_revision_plan");
+    opts.onProgress?.({ step: "storyboarding", percent: 10, detail: "Storyboarding the scene" });
+    trace?.beginEvent("scene_revision");
     const storyboard = await buildStoryboard({
       prompt: revisionPrompt,
       format: project.format || "video",
@@ -385,9 +385,9 @@ async function runSceneRevisionPipeline(
     });
     trace?.endEvent({ scenes: storyboard.scenes.length });
     if (storyboard.scenes.length === 0) {
-      return { status: "error", target: "scene", error: "Planner returned no scenes for revision" };
+      return { status: "error", target: "scene", error: "Storyboard builder returned no scenes for revision" };
     }
-    planned = storyboard.scenes[0];
+    draft = storyboard.scenes[0];
   }
 
   // Generate the revised scene
@@ -397,7 +397,7 @@ async function runSceneRevisionPipeline(
   await fs.mkdir(compDir, { recursive: true });
 
   const generated = await generateScene({
-    scene: planned,
+    scene: draft,
     sceneIndex,
     totalScenes: project.scenes.length,
     prompt: revisionPrompt,
@@ -427,7 +427,7 @@ async function runSceneRevisionPipeline(
     opts.onProgress?.({ step: "critiquing", percent: 70, detail: "Reviewing & polishing" });
     const critiqueResult = await critiqueAndRetryScene({
       scene: generated.scene,
-      planned,
+      draft,
       sceneIndex,
       totalScenes: project.scenes.length,
       prompt: revisionPrompt,
@@ -489,7 +489,7 @@ async function runVideoRevisionPipeline(
   const projectContext = serializeProjectContext(project);
   const revisionPrompt = `Revise this video based on these instructions: ${opts.prompt}\n\nCurrent project:\n${projectContext}`;
 
-  trace?.beginEvent("video_revision_plan");
+  trace?.beginEvent("video_revision");
   const storyboard = await buildStoryboard({
     prompt: revisionPrompt,
     format: project.format || "video",
@@ -533,11 +533,11 @@ async function runVideoRevisionPipeline(
 
   const newScenes: Scene[] = [];
   for (let i = 0; i < storyboard.scenes.length; i++) {
-    const planned = storyboard.scenes[i];
+    const draft = storyboard.scenes[i];
     const imageUrl = enrichResult.imageUrls.get(i);
 
     const generated = await generateScene({
-      scene: planned,
+      scene: draft,
       sceneIndex: i,
       totalScenes: storyboard.scenes.length,
       prompt: revisionPrompt,
@@ -562,7 +562,7 @@ async function runVideoRevisionPipeline(
     if (opts.critique !== false) {
       const critiqueResult = await critiqueAndRetryScene({
         scene: generated.scene,
-        planned,
+        draft,
         sceneIndex: i,
         totalScenes: storyboard.scenes.length,
         prompt: revisionPrompt,
@@ -665,9 +665,9 @@ async function runImageRevisionPipeline(
     }
   } catch { /* no tenant components */ }
 
-  // Use the revision planner (NOT the unified planner)
-  trace?.beginEvent("image_revision_plan");
-  console.log(`  [revision] Planning revision for image project ${opts.project_id}`);
+  // Use the revision strategist (NOT the storyboard builder)
+  trace?.beginEvent("image_revision");
+  console.log(`  [revision] Strategizing revision for image project ${opts.project_id}`);
   console.log(`  [revision] Existing components: ${existingScene.components.map(c => c.type).join(", ")}`);
   console.log(`  [revision] Custom sources available: ${[...customSources.keys()].join(", ") || "none"}`);
 
@@ -689,34 +689,34 @@ async function runImageRevisionPipeline(
     summary: revisionStrategy.revision_summary,
   });
 
-  console.log(`  [revision] Plan: ${revisionStrategy.revision_summary}`);
+  console.log(`  [revision] Strategy: ${revisionStrategy.revision_summary}`);
   for (const comp of revisionStrategy.components) {
     console.log(`    ${comp.original_id || "NEW"} (${comp.type}): ${comp.strategy}${comp.revise_instructions ? " - " + comp.revise_instructions.substring(0, 80) : ""}`);
   }
 
-  // Execute the revision plan
+  // Execute the revision strategy
   trace?.beginEvent("image_revision_execute");
   await fs.mkdir(compDir, { recursive: true });
   const newComponents: import("../core/types.js").SceneComponent[] = [];
   const newCustomSources = new Map<string, string>();
 
   for (let ci = 0; ci < revisionStrategy.components.length; ci++) {
-    const planned = revisionStrategy.components[ci];
+    const comp = revisionStrategy.components[ci];
 
-    if (planned.strategy === "remove") {
-      console.log(`  [revision] Removing ${planned.type}`);
+    if (comp.strategy === "remove") {
+      console.log(`  [revision] Removing ${comp.type}`);
       continue;
     }
 
-    if (planned.strategy === "keep") {
+    if (comp.strategy === "keep") {
       // Pass through unchanged
-      const existing = existingScene.components.find(c => c.id === planned.original_id);
+      const existing = existingScene.components.find(c => c.id === comp.original_id);
       if (existing) {
-        // Apply any data/position updates from the plan
+        // Apply any data/position updates from the strategy
         const comp = { ...existing };
-        if (planned.data) comp.data = planned.data;
-        if (planned.position) comp.position = planned.position;
-        if (planned.z_index !== undefined) comp.z_index = planned.z_index;
+        if (comp.data) comp.data = comp.data;
+        if (comp.position) comp.position = comp.position;
+        if (comp.z_index !== undefined) comp.z_index = comp.z_index;
         newComponents.push(comp);
         // Preserve custom source
         if (customSources.has(comp.type)) {
@@ -726,56 +726,56 @@ async function runImageRevisionPipeline(
       continue;
     }
 
-    if (planned.strategy === "revise") {
+    if (comp.strategy === "revise") {
       // Surgical SEARCH/REPLACE on existing custom component
-      const existingSource = customSources.get(planned.type);
+      const existingSource = customSources.get(comp.type);
       if (!existingSource) {
-        console.log(`  [revision] Cannot revise ${planned.type}: no HTML source found, treating as keep`);
-        const existing = existingScene.components.find(c => c.id === planned.original_id);
+        console.log(`  [revision] Cannot revise ${comp.type}: no HTML source found, treating as keep`);
+        const existing = existingScene.components.find(c => c.id === comp.original_id);
         if (existing) newComponents.push(existing);
         continue;
       }
 
-      console.log(`  [revision] Revising ${planned.type} via SEARCH/REPLACE`);
+      console.log(`  [revision] Revising ${comp.type} via SEARCH/REPLACE`);
       const reviseResult = await reviseComponent({
         existingSource,
-        instructions: planned.revise_instructions || opts.prompt,
-        componentName: planned.type,
+        instructions: comp.revise_instructions || opts.prompt,
+        componentName: comp.type,
         llmConfig: opts.llmConfig,
         brandKit: useBrandKit,
         canvas: useCanvas,
       });
 
-      console.log(`  [revision] ${planned.type}: ${reviseResult.blocksApplied} blocks applied, fullRewrite=${reviseResult.fullRewrite}`);
+      console.log(`  [revision] ${comp.type}: ${reviseResult.blocksApplied} blocks applied, fullRewrite=${reviseResult.fullRewrite}`);
 
       // Save revised HTML
-      await fs.writeFile(path.join(compDir, `${planned.type}.component.html`), reviseResult.source);
-      newCustomSources.set(planned.type, reviseResult.source);
+      await fs.writeFile(path.join(compDir, `${comp.type}.component.html`), reviseResult.source);
+      newCustomSources.set(comp.type, reviseResult.source);
 
-      const existing = existingScene.components.find(c => c.id === planned.original_id);
+      const existing = existingScene.components.find(c => c.id === comp.original_id);
       if (existing) {
         const comp = { ...existing };
-        if (planned.data) comp.data = planned.data;
-        if (planned.position) comp.position = planned.position;
-        if (planned.z_index !== undefined) comp.z_index = planned.z_index;
+        if (comp.data) comp.data = comp.data;
+        if (comp.position) comp.position = comp.position;
+        if (comp.z_index !== undefined) comp.z_index = comp.z_index;
         newComponents.push(comp);
       }
       continue;
     }
 
-    if (planned.strategy === "replace") {
+    if (comp.strategy === "replace") {
       // Full regeneration of custom component
-      console.log(`  [revision] Replacing ${planned.type} with new custom component`);
-      const compName = planned.original_id
-        ? planned.type
+      console.log(`  [revision] Replacing ${comp.type} with new custom component`);
+      const compName = comp.original_id
+        ? comp.type
         : `custom_${existingScene.id}_${ci}`;
 
       const generated = await generateScene({
         scene: {
           label: revisionStrategy.label,
           duration_seconds: revisionStrategy.duration_seconds,
-          description: planned.custom_prompt || opts.prompt,
-          brief: planned.custom_prompt || opts.prompt,
+          description: comp.custom_prompt || opts.prompt,
+          brief: comp.custom_prompt || opts.prompt,
           components: [],
         },
         sceneIndex: 0,
@@ -859,11 +859,11 @@ async function runImageRevisionPipeline(
 // ── Serialization Helpers ──
 
 /** Format a scene's brief for the revision prompt: the Studio-edited override
- *  (scene.brief) takes precedence over the original storyboard plan entry. */
-function formatSceneBrief(planned?: StoryboardScene): string {
-  const purpose = planned?.purpose;
-  const script = planned?.voiceover_text;
-  const visual = planned?.visual_notes;
+ *  (scene.brief) takes precedence over the original storyboard entry. */
+function formatSceneBrief(draft?: StoryboardScene): string {
+  const purpose = draft?.purpose;
+  const script = draft?.voiceover_text;
+  const visual = draft?.visual_notes;
   const lines: string[] = [];
   if (purpose) lines.push(`Purpose: ${purpose}`);
   if (script) lines.push(`Script: ${script}`);
@@ -948,7 +948,7 @@ async function findComponentSourceForCritique(
 
 async function critiqueAndRetryScene(opts: {
   scene: Scene;
-  planned: any;
+  draft: any;
   sceneIndex: number;
   totalScenes: number;
   prompt: string;
@@ -980,7 +980,7 @@ async function critiqueAndRetryScene(opts: {
 
   let currentScene = opts.scene;
   let currentCustomSources = opts.customSources;
-  let currentPlanned = opts.planned;
+  let currentDraft = opts.draft;
   let lastCritique: CritiqueResult | undefined;
 
   // Track best attempt by score
@@ -1148,14 +1148,14 @@ async function critiqueAndRetryScene(opts: {
       // round-trips. Bookends (correctnessOnly) ignore the aesthetic score and gate
       // only on defects; video-only brand clips are scored but not defect-gated
       // (their content can't be regenerated).
-      const briefForCon = currentPlanned?.brief || currentPlanned?.visual_notes || currentPlanned?.description || currentPlanned?.label || opts.prompt;
+      const briefForCon = currentDraft?.brief || currentDraft?.visual_notes || currentDraft?.description || currentDraft?.label || opts.prompt;
       const con = await critiqueConsolidated({
         previewImageBase64: previewBase64,
         contactSheetBase64,
         contactTimestamps,
         briefText: briefForCon,
         sceneHtml: assembledHtml,
-        expectedComponents: Array.isArray(currentPlanned?.components) ? currentPlanned.components.filter((c: any) => typeof c === "string") : undefined,
+        expectedComponents: Array.isArray(currentDraft?.components) ? currentDraft.components.filter((c: any) => typeof c === "string") : undefined,
         requiresLogo: /\blogo\b/i.test(briefForCon) && (opts.brandKit?.logos?.length ?? 0) > 0,
         brandTheme: brandBackgroundIsLight(opts.brandKit) ? "light" : "dark",
         videoOnly: !!isVideoOnly,
@@ -1256,7 +1256,7 @@ async function critiqueAndRetryScene(opts: {
         console.log(`  Score ${critiqueResult.score} but runtime error present -- forcing revision`);
       }
 
-      // 7. Score < 7: surgical re-plan to fix issues
+      // 7. Score < 7: surgical re-storyboard to fix issues
 
       opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false });
 
@@ -1266,7 +1266,7 @@ async function critiqueAndRetryScene(opts: {
       // SEARCH/REPLACE blocks instead of re-emitting the whole scene -- benchmarked
       // ~16x faster on one fix (~80 output tokens vs ~6k) since generation is
       // output-bound. STRUCTURAL defects (missing/stray components), runtime errors,
-      // and catastrophic scores still take the full re-plan path below.
+      // and catastrophic scores still take the full re-storyboard path below.
       // Improvement-guard: if the previous patch did NOT raise the score, stop
       // patching this scene and escalate to a full regen (a fresh design may do what
       // surgical tweaks can't). reviseComponent also self-falls-back to a full
@@ -1311,25 +1311,25 @@ async function critiqueAndRetryScene(opts: {
           opts.trace?.endEvent({ patched: true, blocks: revised.blocksApplied, fullRewrite: revised.fullRewrite });
           continue; // re-assemble + re-critique the patched scene next iteration
         } catch (e: any) {
-          console.warn(`  Surgical patch failed, falling back to full re-plan: ${e.message}`);
+          console.warn(`  Surgical patch failed, falling back to full re-storyboard: ${e.message}`);
           opts.trace?.endEvent({ error: e.message });
-          // fall through to the full re-plan path below
+          // fall through to the full re-storyboard path below
         }
       }
 
-      // 8. Full re-plan: direct LLM call to fix the existing plan JSON
-      const existingPlanJSON = JSON.stringify(currentPlanned, null, 2);
+      // 8. Full re-storyboard: direct LLM call to fix the existing storyboard JSON
+      const existingSceneJSON = JSON.stringify(currentDraft, null, 2);
       // Build list of valid library component types for the fix prompt
       const validTypeList = opts.catalog.map(c => c.type).join(', ');
       const runtimeIssueBlock = !runtime.ok
         ? `\n\n!! CRITICAL RUNTIME ERROR (must fix): the scene threw "${runtime.error}" when the animation was seeked to ${(runtime.atTime ?? 0).toFixed(1)}s. This is almost always a querySelector/getElementById/GSAP target that returned null and was used without a guard (e.g. el.textContent on a null element). In the regenerated scene, every DOM lookup MUST be null-guarded before use, and every GSAP tween/callback must target an element that actually exists in the template. A scene that throws renders degraded and is unacceptable.\n`
         : "";
-      const fixPrompt = `Fix this scene plan. The rendered output had these problems:
+      const fixPrompt = `Fix this scene storyboard. The rendered output had these problems:
 
 ${critiqueResult.issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}${runtimeIssueBlock}${formatCorrectnessDefects(correctness.defects)}
 
-Current plan:
-${existingPlanJSON}
+Current storyboard:
+${existingSceneJSON}
 
 Canvas: ${opts.canvas.width}x${opts.canvas.height}
 Original brief: ${opts.prompt}
@@ -1350,7 +1350,7 @@ ${(opts.creativity ?? 0) >= 0.7 ? "\n- CRITICAL: At this creativity level, use O
 
 Output valid JSON only. No markdown fences, no commentary.`;
 
-      let fixedPlan: any;
+      let fixedScene: any;
       try {
         const { callLLM } = await import("./client.js");
         const fixRaw = await callLLM(opts.critiqueLlmConfig || opts.llmConfig, [
@@ -1358,45 +1358,45 @@ Output valid JSON only. No markdown fences, no commentary.`;
         ], { temperature: 0.3, maxTokens: 4096 });
         const trimmed = fixRaw.trim();
         const jsonMatch = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
-        fixedPlan = JSON.parse(jsonMatch ? jsonMatch[1].trim() : trimmed);
+        fixedScene = JSON.parse(jsonMatch ? jsonMatch[1].trim() : trimmed);
       } catch (e: any) {
-        console.log(`  Critique fix-plan failed to parse: ${e.message}, keeping best (score ${bestScore})`);
+        console.log(`  Critique fix-storyboard failed to parse: ${e.message}, keeping best (score ${bestScore})`);
         break;
       }
 
-      if (!fixedPlan || !fixedPlan.components || fixedPlan.components.length === 0) {
-        console.log(`  Critique fix-plan returned empty, keeping best (score ${bestScore})`);
+      if (!fixedScene || !fixedScene.components || fixedScene.components.length === 0) {
+        console.log(`  Critique fix-storyboard returned empty, keeping best (score ${bestScore})`);
         break;
       }
 
-      // Validate fix-plan component types against catalog
+      // Validate fix-storyboard component types against catalog
       // Validate components: ensure string array of valid types
       const fixValidTypes = new Set(opts.catalog.map(c => c.type));
       fixValidTypes.add('image');
-      if (fixedPlan.components && Array.isArray(fixedPlan.components)) {
+      if (fixedScene.components && Array.isArray(fixedScene.components)) {
         // Normalize: if LLM returned old-style objects, extract type names
-        fixedPlan.components = fixedPlan.components
+        fixedScene.components = fixedScene.components
           .map((c: any) => typeof c === "string" ? c : (c.type || ""))
           .filter((t: string) => t.length > 0 && fixValidTypes.has(t));
       } else {
-        fixedPlan.components = [];
+        fixedScene.components = [];
       }
 
       // Ensure brief exists
-      if (!fixedPlan.brief) {
-        fixedPlan.brief = fixedPlan.description || fixedPlan.label || opts.prompt;
+      if (!fixedScene.brief) {
+        fixedScene.brief = fixedScene.description || fixedScene.label || opts.prompt;
       }
 
-      // Use the fixed plan
-      const newPlanned = fixedPlan;
-      currentPlanned = newPlanned;
+      // Use the fixed storyboard
+      const newDraft = fixedScene;
+      currentDraft = newDraft;
 
       // Fix 1: Feed critique issues directly into the retry prompt so the
       // generator knows what went wrong and can avoid the same mistakes.
       const critiqueFeedback = buildCritiqueFeedback(critiqueResult) + formatCorrectnessDefects(correctness.defects);
 
       const regenerated = await generateScene({
-        scene: newPlanned,
+        scene: newDraft,
         sceneIndex: opts.sceneIndex,
         totalScenes: opts.totalScenes,
         prompt: opts.prompt,
@@ -1440,17 +1440,17 @@ Output valid JSON only. No markdown fences, no commentary.`;
         ? buildCritiqueFeedback(bestCritique)
         : "Previous attempts had low quality scores. Start fresh with a simpler, bolder design.";
 
-      const swapPlan = {
-        label: currentPlanned.label || `Scene ${opts.sceneIndex + 1}`,
-        duration_seconds: currentPlanned.duration_seconds || 5,
-        description: currentPlanned.description || opts.prompt,
-        brief: `${currentPlanned.description || opts.prompt}\n\nDESIGN MANDATE: Keep it simple. One bold visual idea. Large readable text on a high-contrast background. No more than 10 words visible. Use var(--mp-color-text) on var(--mp-color-background) for guaranteed contrast.`,
-        transition_in: currentPlanned.transition_in,
+      const swapScene = {
+        label: currentDraft.label || `Scene ${opts.sceneIndex + 1}`,
+        duration_seconds: currentDraft.duration_seconds || 5,
+        description: currentDraft.description || opts.prompt,
+        brief: `${currentDraft.description || opts.prompt}\n\nDESIGN MANDATE: Keep it simple. One bold visual idea. Large readable text on a high-contrast background. No more than 10 words visible. Use var(--mp-color-text) on var(--mp-color-background) for guaranteed contrast.`,
+        transition_in: currentDraft.transition_in,
         components: [],
       };
 
       const swapped = await generateScene({
-        scene: swapPlan,
+        scene: swapScene,
         sceneIndex: opts.sceneIndex,
         totalScenes: opts.totalScenes,
         prompt: opts.prompt,
@@ -1517,10 +1517,10 @@ function buildCritiqueFeedback(critique: CritiqueResult): string {
 // ── Unified Pipeline ──
 
 /**
- * Convert the planner's storyboard into the persisted Storyboard shape, so the
- * plan/storyboard -- including each scene's suggested library component types --
+ * Convert the storyboard builder's storyboard into the persisted Storyboard shape, so the
+ * storyboard -- including each scene's suggested library component types --
  * is recorded on the project for inspection and iteration. Used by both the
- * plan-only and full generation paths so project.storyboard is always populated.
+ * storyboard-only and full generation paths so project.storyboard is always populated.
  */
 function storyboardToSaved(
   storyboard: { name: string; scenes: Array<any> },
@@ -1610,7 +1610,7 @@ async function runUnifiedPipeline(
         brandKit,
         referenceImages: processedRefs,
       });
-      // Inject creative direction into the prompt for the planner
+      // Inject creative direction into the prompt for the storyboard builder
       var conceptContext = formatTreatmentForStoryboard(treatment);
       richPrompt = conceptContext + "\n\n---\n\n" + richPrompt;
       console.log(`  Creative concept: "${treatment.concept}"`);
@@ -1649,7 +1649,7 @@ async function runUnifiedPipeline(
     treatment: treatment,
   };
 
-  // ── Plan-only mode: save storyboard as plan and return early ──
+  // ── Storyboard-only mode: save storyboard and return early ──
   if (opts.storyboardOnly) {
     project.storyboard = storyboardToSaved(storyboard, opts.voice as string);
     project.brief = { prompt: opts.prompt };
@@ -1658,7 +1658,7 @@ async function runUnifiedPipeline(
     project.updated_at = new Date().toISOString();
     await saveProject(project);
 
-    console.log(`  Plan-only mode: saved plan with ${project.storyboard.scenes.length} scenes to project ${projectId}`);
+    console.log(`  Storyboard-only mode: saved storyboard with ${project.storyboard.scenes.length} scenes to project ${projectId}`);
 
     return {
       status: "completed",
@@ -1695,8 +1695,8 @@ async function runUnifiedPipeline(
   }
   trace?.endEvent({ images: enrichResult.imageUrls.size });
 
-  // 3b. Stock footage / b-roll backgrounds -- planner-decided per scene.
-  // The planner tags scenes with a broll_query when real motion footage belongs
+  // 3b. Stock footage / b-roll backgrounds -- storyboard builder-decided per scene.
+  // The storyboard builder tags scenes with a broll_query when real motion footage belongs
   // behind them; we fetch a matching Pexels clip into the project's assets dir and
   // hand its URL to the codegen, which PLACES it as the scene background itself
   // (exactly like a hero image -- the agent owns the composition, no special
@@ -1709,28 +1709,28 @@ async function runUnifiedPipeline(
     const MAX_BROLL = 5;
     let fetched = 0;
     for (let si = 0; si < storyboard.scenes.length; si++) {
-      const planned = storyboard.scenes[si];
+      const draft = storyboard.scenes[si];
       // A scene gets b-roll OR a hero image, never both.
       if (enrichResult.imageUrls.has(si)) continue;
 
-      const query: string | null = planned.broll_query || null;
+      const query: string | null = draft.broll_query || null;
       if (!query) continue;
       if (fetched >= MAX_BROLL) {
-        console.log(`  B-roll: cap of ${MAX_BROLL} reached, skipping "${planned.label}"`);
+        console.log(`  B-roll: cap of ${MAX_BROLL} reached, skipping "${draft.label}"`);
         continue;
       }
 
       const filename = `broll_scene_${si}.mp4`;
       const clip = await fetchStockFootage({
         query,
-        minDuration: planned.duration_seconds,
+        minDuration: draft.duration_seconds,
         outputDir: assetsDir,
         filename,
       });
       if (clip) {
         brollUrlMap.set(si, `/assets/${opts.tenant_id}/projects/${projectId}/assets/${filename}`);
         fetched++;
-        console.log(`  B-roll scene ${si} "${planned.label}": "${query}"`);
+        console.log(`  B-roll scene ${si} "${draft.label}": "${query}"`);
       }
     }
     console.log(`  Stock footage: ${brollUrlMap.size} clip(s) fetched`);
@@ -1740,26 +1740,26 @@ async function runUnifiedPipeline(
   // 3c. Enforce mandatory behaviors (voiceover, bookend detection)
   var bookendScenes = new Set<number>();
   for (let si = 0; si < storyboard.scenes.length; si++) {
-    var planned = storyboard.scenes[si];
+    var draft = storyboard.scenes[si];
 
     // Detect bookend scenes (intro/outro/title/closing, or a video-only brand clip).
-    var isBookend = isBookendScene(planned.label, si, storyboard.scenes.length, planned.components);
+    var isBookend = isBookendScene(draft.label, si, storyboard.scenes.length, draft.components);
 
     if (isBookend) {
       bookendScenes.add(si);
     }
 
     // Enforce voiceover on non-bookend scenes
-    if (!isBookend && !planned.voiceover_text && planned.duration_seconds >= 3) {
+    if (!isBookend && !draft.voiceover_text && draft.duration_seconds >= 3) {
       // Generate voiceover text from the scene description
-      var fallbackVoiceover = planned.description || planned.label || "";
-      if (planned.brief) {
+      var fallbackVoiceover = draft.description || draft.label || "";
+      if (draft.brief) {
         // Extract a concise narration from the brief (first sentence or label)
-        fallbackVoiceover = planned.label?.replace(/^Scene \d+ - /, "") || planned.description || "";
+        fallbackVoiceover = draft.label?.replace(/^Scene \d+ - /, "") || draft.description || "";
       }
       if (fallbackVoiceover && fallbackVoiceover.length > 5) {
-        planned.voiceover_text = fallbackVoiceover;
-        console.log(`  [enforce] Scene ${si} "${planned.label}": generated fallback voiceover`);
+        draft.voiceover_text = fallbackVoiceover;
+        console.log(`  [enforce] Scene ${si} "${draft.label}": generated fallback voiceover`);
       }
     }
   }
@@ -1794,7 +1794,7 @@ async function runUnifiedPipeline(
 
     for (let i = batchStart; i < batchEnd; i++) {
       batch.push((async () => {
-        const planned = storyboard.scenes[i];
+        const draft = storyboard.scenes[i];
         const imageUrl = enrichResult.imageUrls.get(i);
 
         // Only a video-only brand clip skips the aesthetic critique -- its frames
@@ -1804,15 +1804,15 @@ async function runUnifiedPipeline(
         // score low and get revised instead of shipping. (Previously every
         // label-based bookend forced the aesthetic score to 10 and ignored it,
         // which let messy outros through.)
-        const plannedComps = Array.isArray(planned.components)
-          ? planned.components.filter((c: any) => typeof c === "string") : [];
-        const skipCritique = plannedComps.length === 1 && plannedComps[0] === "video";
+        const draftComps = Array.isArray(draft.components)
+          ? draft.components.filter((c: any) => typeof c === "string") : [];
+        const skipCritique = draftComps.length === 1 && draftComps[0] === "video";
         if (skipCritique) {
           console.log(`  Scene ${i + 1}: brand video clip, correctness gate only`);
         }
 
         const generated = await generateScene({
-          scene: planned,
+          scene: draft,
           sceneIndex: i,
           totalScenes: storyboard.scenes.length,
           prompt: richPrompt,
@@ -1842,7 +1842,7 @@ async function runUnifiedPipeline(
         if (opts.critique !== false) {
           const critiqueResult = await critiqueAndRetryScene({
             scene: generated.scene,
-            planned,
+            draft,
             sceneIndex: i,
             totalScenes: storyboard.scenes.length,
             prompt: richPrompt,
@@ -1895,13 +1895,13 @@ async function runUnifiedPipeline(
     await Promise.all(batch);
   }
 
-  // Add scenes in order, carrying over voiceover text and stock footage from planner
+  // Add scenes in order, carrying over voiceover text and stock footage from storyboard builder
   for (let si = 0; si < sceneResults.length; si++) {
     const scene = sceneResults[si].scene;
-    const planned = storyboard.scenes[si];
-    if (planned.voiceover_text) {
+    const draft = storyboard.scenes[si];
+    if (draft.voiceover_text) {
       if (!scene.audio_hints) scene.audio_hints = {};
-      scene.audio_hints.voiceover_text = planned.voiceover_text;
+      scene.audio_hints.voiceover_text = draft.voiceover_text;
     }
     project.scenes.push(scene);
   }
@@ -1942,19 +1942,19 @@ async function runUnifiedPipeline(
     project.assets = [...(project.assets || []), ...enrichResult.assets];
   }
 
-  // Pass 3: Editorial critique (full video flow) -- VISION + PLAN-FIDELITY.
+  // Pass 3: Editorial critique (full video flow) -- VISION + STORYBOARD-FIDELITY.
   // Capture one frame per scene, tile into a storyboard, and ask the critique:
-  // did each rendered scene actually DELIVER what the PLAN intended? Flagged
+  // did each rendered scene actually DELIVER what the STORYBOARD intended? Flagged
   // scenes are regenerated (bounded) with the corrective note fed back to the
   // codegen, then the whole video is scored again.
   if (opts.critique !== false && format !== "image" && project.scenes.length >= 3) {
-    opts.onProgress?.({ step: "editorial", percent: 80, detail: "Reviewing the full storyboard for plan fidelity" });
+    opts.onProgress?.({ step: "editorial", percent: 80, detail: "Reviewing the full storyboard for storyboard fidelity" });
     trace?.beginEvent("editorial_critique");
     try {
       const editorialExtraDirs = [compDir, tenantComponentsDir(opts.tenant_id)];
 
-      // Capture one frame per scene, tile a storyboard, and run the plan-aware
-      // vision critique (the storyboard image + each scene's planned intent).
+      // Capture one frame per scene, tile a storyboard, and run the storyboard-aware
+      // vision critique (the storyboard image + each scene's draft intent).
       const runEditorial = async (): Promise<EditorialCritiqueResult> => {
         const frameDir = path.join(os.tmpdir(), `editorial_${projectId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`);
         await fs.mkdir(frameDir, { recursive: true });
@@ -2000,7 +2000,7 @@ async function runUnifiedPipeline(
       // Structural auto-fixes (transition variety, breathing, durations).
       const editorialChanges = applyEditorialFixes(project, editorial, brandKit);
 
-      // Plan-fidelity fixes: regenerate scenes that didn't achieve their intent
+      // Storyboard-fidelity fixes: regenerate scenes that didn't achieve their intent
       // (bounded), feeding the corrective note back to the codegen.
       const MAX_EDITORIAL_REGEN = 2;
       const sceneFixes = (editorial.fixes || []).filter(f => f.type === "fix_scene" && typeof f.scene_index === "number" && f.detail && f.scene_index! >= 0 && f.scene_index! < project.scenes.length);
@@ -2008,19 +2008,19 @@ async function runUnifiedPipeline(
       for (const fix of sceneFixes) {
         if (regen >= MAX_EDITORIAL_REGEN) break;
         const idx = fix.scene_index!;
-        const planned = storyboard.scenes[idx];
-        if (!planned) continue;
+        const draft = storyboard.scenes[idx];
+        if (!draft) continue;
         try {
           const re = await generateScene({
-            scene: planned, sceneIndex: idx, totalScenes: project.scenes.length, prompt: richPrompt, format,
+            scene: draft, sceneIndex: idx, totalScenes: project.scenes.length, prompt: richPrompt, format,
             llmConfig: opts.llmConfig, brandKit, canvas, imageUrl: enrichResult.imageUrls.get(idx),
             tenantId: opts.tenant_id, projectId, referenceImages: processedRefs, treatment,
             brollVideoUrl: brollUrlMap.get(idx),
-            critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its planned intent. ${fix.detail}`,
+            critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its draft intent. ${fix.detail}`,
           });
           if (re.customSources) for (const [n, h] of re.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
           const newScene = re.scene;
-          if (planned.voiceover_text) { if (!newScene.audio_hints) newScene.audio_hints = {}; newScene.audio_hints.voiceover_text = planned.voiceover_text; }
+          if (draft.voiceover_text) { if (!newScene.audio_hints) newScene.audio_hints = {}; newScene.audio_hints.voiceover_text = draft.voiceover_text; }
           project.scenes[idx] = newScene;
           regen++;
           console.log(`    Editorial: regenerated scene ${idx + 1} to match intent`);
@@ -2202,9 +2202,9 @@ async function runUnifiedPipeline(
     trace?.endEvent();
   }
 
-  // Persist the planner's storyboard (briefs + suggested components) on the
+  // Persist the storyboard builder's storyboard (briefs + suggested components) on the
   // project so it's available for inspection and iteration after a full run,
-  // not just in plan-only mode.
+  // not just in storyboard-only mode.
   project.storyboard = storyboardToSaved(storyboard, opts.voice as string);
   project.brief = { prompt: opts.prompt };
   project.status = "generated";

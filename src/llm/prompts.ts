@@ -141,7 +141,7 @@ ${COMPONENT_EXEMPLARS}`;
 }
 
 /**
- * System prompt for planning a single scene.
+ * System prompt for storyboarding a single scene.
  * Includes the available component catalog so the LLM knows what to pick from.
  */
 export function sceneStoryboardSystemPrompt(componentCatalog: string): string {
@@ -207,7 +207,7 @@ ${SCENE_STORYBOARD_DESIGN_RULES}`;
 }
 
 /**
- * System prompt for planning a full multi-scene project.
+ * System prompt for storyboarding a full multi-scene project.
  */
 export function projectStoryboardSystemPrompt(componentCatalog: string): string {
   return `You are a project storyboard director for a media production system. Your job is to storyboard a full multi-scene project (video, presentation) by creating a storyboard.

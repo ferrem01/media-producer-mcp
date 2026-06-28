@@ -2,7 +2,7 @@
  * Reference Image Processing
  *
  * Downloads, validates, caches, and base64-encodes reference images
- * so the LLM planner and scene generator can SEE visual references
+ * so the LLM storyboard builder and scene generator can SEE visual references
  * instead of hallucinating from text descriptions.
  */
 
@@ -125,7 +125,7 @@ function inferMediaType(url: string): string | null {
 
 /**
  * Build LLM content parts (image blocks) for reference images.
- * Used to inject into planner and agentic generator messages.
+ * Used to inject into storyboard builder and agentic generator messages.
  */
 export function buildReferenceImageParts(
   images: ReferenceImage[],
