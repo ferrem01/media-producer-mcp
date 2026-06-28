@@ -12,7 +12,7 @@ import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEnt
 import { config } from "../config.js";
 import type { DraftScene } from "./storyboard-builder.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
-import type { Treatment } from "./concept-director.js";
+import type { Treatment } from "./creative-director.js";
 
 // ── Types ──
 

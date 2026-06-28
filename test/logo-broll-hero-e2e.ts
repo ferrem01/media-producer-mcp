@@ -17,7 +17,7 @@
  *   - BROLL: a scene carries background_video and a clip exists in stock/.
  *   - HERO:  a generated assets/hero_scene_*.png exists.
  *
- * Slow (LLM plan + codegen + image gen + Pexels + render). Run in the background.
+ * Slow (LLM storyboard + codegen + image gen + Pexels + render). Run in the background.
  */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";

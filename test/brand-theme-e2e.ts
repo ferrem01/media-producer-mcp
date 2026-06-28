@@ -8,7 +8,7 @@
  * it flags `off_brand_theme` on a dark frame for a light brand, and passes a
  * light frame.
  *
- * Slow (LLM plan/codegen + render). Run in the background.
+ * Slow (LLM storyboard/codegen + render). Run in the background.
  */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";

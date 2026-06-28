@@ -1,7 +1,7 @@
 /**
  * Component schema pairing tests.
  *
- * A saved component must be paired with a `{type}.schema.json` so the planner
+ * A saved component must be paired with a `{type}.schema.json` so the storyboard builder
  * catalog can see it. These tests lock in the deriving + pairing behavior.
  */
 
@@ -43,7 +43,7 @@ describe("deriveDataFields", () => {
 });
 
 describe("buildComponentSchema", () => {
-  it("produces a planner-visible schema with type/label/category/data", () => {
+  it("produces a storyboard-builder-visible schema with type/label/category/data", () => {
     const schema = buildComponentSchema("can-you-pricing", "custom", SAMPLE);
     expect(schema.type).toBe("can-you-pricing");
     expect(schema.label).toBe("Can You Pricing");

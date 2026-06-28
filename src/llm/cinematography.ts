@@ -2,7 +2,7 @@
  * Cinematography Playbook
  *
  * Professional video pacing, rhythm, and composition rules.
- * Injected into the expander and storyboard builder to ensure every video
+ * Injected into the storyboard builder to ensure every video
  * has cinematic structure -- not just good individual scenes, but a
  * coherent visual narrative.
  *
@@ -11,8 +11,8 @@
  */
 
 /**
- * Pacing and narrative arc rules for the expander.
- * The expander uses these to structure the creative brief.
+ * Pacing and narrative arc rules for the storyboard builder.
+ * The creative director + storyboard builder use these to structure the video.
  */
 export const PACING_PLAYBOOK = `
 ## Cinematography: Pacing & Narrative Arcs

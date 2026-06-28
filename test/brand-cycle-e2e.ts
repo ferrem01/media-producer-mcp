@@ -5,7 +5,7 @@
  *   1. extract_brand_from_website(cushion.so, enhance) -> colors/fonts/guidelines
  *   2. upload(brand, logo)  + brand(logo=...)          -> register Cushion's logo
  *   3. upload(brand, background)                        -> Cushion hero image asset
- *   4. generate(mode="full", target="video")           -> plan + build scenes  (async job)
+ *   4. generate(mode="full", target="video")           -> storyboard + build scenes  (async job)
  *   5. render(quality="preview")                        -> MP4                  (async job)
  *
  * Asserts the brand kit actually picked up Cushion's design (a design_system was
@@ -13,7 +13,7 @@
  * project carries that brand kit through to a valid rendered MP4. The "does it
  * LOOK like Cushion" judgement is left to the extracted frames (printed paths).
  *
- * Uses the network (cushion.so) and the LLM (Anthropic plan/codegen, OpenAI TTS,
+ * Uses the network (cushion.so) and the LLM (Anthropic storyboard/codegen, OpenAI TTS,
  * Jamendo music). Slow -- run in the background.
  */
 
@@ -130,7 +130,7 @@ async function main() {
     const bgAsset = (kit?.assets || []).find((a: any) => a.type === "background");
     check("background asset registered", !!bgAsset, bgAsset?.url || "");
 
-    // 4. generate(full): plan + build scenes (async job).
+    // 4. generate(full): storyboard + build scenes (async job).
     console.log("\n-- 4. generate(mode=full, target=video) --");
     const gen = parse(await client.callTool({
       name: "generate",

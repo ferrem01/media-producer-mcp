@@ -2,7 +2,7 @@
  * Isolated test: Can the codegen LLM generate a scene with component tags
  * when given pre-supplied schemas and NO search_library tool?
  *
- * Simulates what happens when the planner provides component hints
+ * Simulates what happens when the storyboard builder provides component hints
  * and schemas are inlined in the brief. The LLM should go straight
  * to writing and submitting.
  *
@@ -21,7 +21,7 @@ async function main() {
   console.log(`LLM: ${llmConfig.provider} / ${llmConfig.model}\n`);
 
   // 1. Build a brief exactly like buildCodegenBrief would
-  //    Simulating planner output: components: ["quotient-chat", "dashboard-kpi"]
+  //    Simulating storyboard builder output: components: ["quotient-chat", "dashboard-kpi"]
 
   var catalog = await buildComponentCatalog(config.componentLibDir);
   var catalogMap = new Map();

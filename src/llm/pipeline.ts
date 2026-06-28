@@ -18,10 +18,9 @@ const execFileAsync = promisify(execFile);
 import { v4 as uuid } from "uuid";
 import type { LLMConfig } from "./client.js";
 import { generateComponentLLM } from "./component-gen.js";
-import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
 import { buildStoryboard } from "./storyboard-builder.js";
-import { generateTreatment, formatTreatmentForStoryboard, type Treatment } from "./concept-director.js";
+import { generateTreatment, formatTreatmentForStoryboard, type Treatment } from "./creative-director.js";
 
 import { strategizeRevision, type SceneRevisionSpec, type RevisedComponent } from "./revision-strategy.js";
 import { reviseComponent } from "./component-revise.js";
@@ -1565,21 +1564,11 @@ async function runUnifiedPipeline(
     opts.sceneCount = 1;
   }
 
-  // 1. Expand prompt
-  trace?.beginEvent("expand_prompt");
-  var expanded = await expandPrompt({
-    prompt: opts.prompt,
-    format,
-    llmConfig: opts.llmConfig,
-    brandKit,
-    sceneCount: opts.sceneCount,
-  });
-  var richPrompt = expanded.prompt;
-  var sceneCount = format === "image" ? 1 : (expanded.sceneCount || opts.sceneCount);
-  trace?.endEvent({ expanded: expanded.expanded });
-  if (expanded.expanded) {
-    console.log("  Prompt expanded");
-  }
+  // The Creative Director (below) takes the RAW brief directly -- there is no
+  // separate "expand" step -- so a thin one-liner reaches the expert intact,
+  // without a lossy paraphrase hop in between.
+  var richPrompt = opts.prompt;
+  var sceneCount = format === "image" ? 1 : opts.sceneCount;
 
   // 1b. Download and cache reference images
   var processedRefs: ReferenceImage[] | undefined;
@@ -1597,14 +1586,15 @@ async function runUnifiedPipeline(
     console.log(`  Reference images: ${processedRefs.length} processed`);
   }
 
-  // 2. Creative concept stage (generates ONE unifying idea)
+  // Creative Director: reads the raw brief, fills the gaps as the expert,
+  // commits to ONE concept + look, and decides the scene count.
   var treatment: Treatment | undefined;
   if (format !== "image") {
     opts.onProgress?.({ step: "concept", percent: 8, detail: "Designing the creative direction" });
-    trace?.beginEvent("concept_director");
+    trace?.beginEvent("creative_director");
     try {
       treatment = await generateTreatment({
-        prompt: richPrompt,
+        prompt: opts.prompt,
         format,
         llmConfig: opts.llmConfig,
         brandKit,
@@ -1612,10 +1602,12 @@ async function runUnifiedPipeline(
       });
       // Inject creative direction into the prompt for the storyboard builder
       var conceptContext = formatTreatmentForStoryboard(treatment);
-      richPrompt = conceptContext + "\n\n---\n\n" + richPrompt;
-      console.log(`  Creative concept: "${treatment.concept}"`);
+      richPrompt = conceptContext + "\n\n---\n\n" + opts.prompt;
+      // Honor an explicit caller scene count; otherwise use the director's call.
+      if (!sceneCount && treatment.sceneCount) sceneCount = treatment.sceneCount;
+      console.log(`  Creative direction: "${treatment.concept}" (${treatment.sceneCount || "?"} scenes)`);
     } catch (err) {
-      console.warn("  [concept-director] Failed, continuing without concept:", (err as Error).message);
+      console.warn("  [creative-director] Failed, continuing without a treatment:", (err as Error).message);
     }
     trace?.endEvent({ concept: treatment?.concept });
   }

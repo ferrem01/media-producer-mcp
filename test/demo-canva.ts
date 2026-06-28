@@ -1,6 +1,6 @@
 /**
  * Demo: Run "Quotient x Canva product video" through the full pipeline.
- * Shows each step: expand → plan → scene plan → render
+ * Shows each step: creative direction → storyboard → codegen → render
  */
 
 import path from "node:path";
@@ -8,7 +8,6 @@ import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { config } from "../src/config.js";
 import { runGeneratePipeline } from "../src/llm/pipeline.js";
-import { expandPrompt } from "../src/llm/expander.js";
 import { buildComponentCatalog, formatCatalogForPrompt } from "../src/llm/catalog.js";
 import { renderProject } from "../src/core/render.js";
 import { projectDir, projectOutputDir } from "../src/persistence/paths.js";
@@ -62,24 +61,8 @@ async function main() {
   const catalog = await buildComponentCatalog(config.componentLibDir);
   console.log(`  ${catalog.length} components available across ${new Set(catalog.map(c => c.category)).size} categories\n`);
 
-  // Step 2: Expand the prompt (if thin)
-  console.log("── Step 2: Prompt Expansion ──");
-  const expanded = await expandPrompt({
-    prompt: PROMPT,
-    format: "video",
-    llmConfig,
-    brandKit: BRAND_KIT,
-  });
-  console.log(`  Expanded: ${expanded.expanded}`);
-  if (expanded.expanded) {
-    console.log(`  Original: "${PROMPT}"`);
-    console.log(`  Expanded to:\n${expanded.prompt.split('\n').map(l => '    ' + l).join('\n')}\n`);
-  } else {
-    console.log(`  Prompt is rich enough, passing through.\n`);
-  }
-
-  // Step 3: Run the full pipeline
-  console.log("── Step 3: Full Pipeline (project planning + scene planning) ──");
+  // Step 2: Run the full pipeline (the Creative Director takes the raw brief).
+  console.log("── Step 2: Full Pipeline (creative direction + storyboard) ──");
   const result = await runGeneratePipeline({
     prompt: PROMPT,
     target: "video",

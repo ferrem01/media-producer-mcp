@@ -19,7 +19,7 @@ import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js"
 // import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./design-skills.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
-import type { Treatment } from "./concept-director.js";
+import type { Treatment } from "./creative-director.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,

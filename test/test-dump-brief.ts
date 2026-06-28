@@ -1,6 +1,6 @@
 /**
  * Dump the codegen brief that buildCodegenBrief produces for a
- * simulated planner output with components.
+ * simulated storyboard builder output with components.
  * Compares it to the isolated test brief.
  */
 
@@ -14,7 +14,7 @@ async function main() {
     catalogMap.set(entry.type, entry);
   }
 
-  // Simulate what the planner returns for a scene
+  // Simulate what the storyboard builder returns for a scene
   var planned = {
     label: "Scene 3 - The Blueprint Begins",
     duration_seconds: 8,

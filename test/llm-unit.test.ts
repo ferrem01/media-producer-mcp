@@ -19,7 +19,6 @@ import {
   sceneStoryboardSystemPrompt,
   projectStoryboardSystemPrompt,
   critiquerSystemPrompt,
-  expanderSystemPrompt,
 } from "../src/llm/prompts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -178,40 +177,5 @@ describe("system prompts", () => {
     expect(prompt).toContain("suggestions");
   });
 
-  it("expanderSystemPrompt includes narrative templates", () => {
-    const prompt = expanderSystemPrompt();
-    expect(prompt).toContain("Product Launch");
-    expect(prompt).toContain("Feature Announcement");
-    expect(prompt).toContain("Scene Recipes");
-    expect(prompt).toContain("creative brief");
-  });
 });
 
-// ── Expander thin prompt detection ──
-
-describe("prompt expansion detection", () => {
-  // We can't call expandPrompt without an LLM, but we can test the isThinPrompt logic
-  // by importing it. Since it's not exported, we'll test indirectly through the module behavior.
-  // For now, test the heuristic expectations:
-
-  it("short prompts should be considered thin", () => {
-    // These are heuristics we expect the expander to catch
-    const thinPrompts = [
-      "make a video for Quotient",
-      "product demo",
-      "Acme Corp overview",
-      "pricing page video",
-      "show our features",
-    ];
-    for (const p of thinPrompts) {
-      const words = p.trim().split(/\s+/).length;
-      expect(words).toBeLessThan(15); // our threshold
-    }
-  });
-
-  it("rich prompts should have enough detail", () => {
-    const richPrompt = "Create a product launch video for Quotient with a dark gradient background. Start with a logo intro, then show a browser frame mockup of the dashboard with animated stats. Include a scene with a bar chart showing monthly growth data. End with a CTA card and logo outro.";
-    const words = richPrompt.trim().split(/\s+/).length;
-    expect(words).toBeGreaterThanOrEqual(30);
-  });
-});
