@@ -138,19 +138,6 @@ export interface Scene {
   content_region?: ContentRegion;
   /** When true, the scene background is rendered transparently (used with full-behind overlays). */
   transparent_background?: boolean;
-  /** Studio-editable per-scene brief. Overrides the original plan entry as the
-   *  intent that drives a "Regenerate scene". Seeded from project.plan on first edit. */
-  brief?: SceneBrief;
-}
-
-/** Editable storyboard/brief for a single scene (Studio). */
-export interface SceneBrief {
-  /** What this scene should communicate. */
-  purpose?: string;
-  /** Voiceover / on-screen script. */
-  script?: string;
-  /** Visual direction (layout, motion, imagery). */
-  visual_notes?: string;
 }
 
 // ── Audio ──

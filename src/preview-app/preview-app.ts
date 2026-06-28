@@ -269,6 +269,10 @@ export function getPreviewHtml(): string {
     border: 1px solid #334155; background: #1e293b; color: #e2e8f0;
   }
   .sm-field textarea:focus { outline: none; border-color: #6366f1; }
+  .sm-field input { width: 100%; box-sizing: border-box; padding: 9px 12px; font: 13px/1.4 inherit; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; }
+  .sm-field input:focus { outline: none; border-color: #6366f1; }
+  .sm-row2 { display: flex; gap: 12px; }
+  .sm-row2 .sm-field { flex: 1; }
   .sm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
   .sm-btn { padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; }
   .sm-btn:disabled { opacity: 0.5; cursor: default; }
@@ -1557,6 +1561,20 @@ export function getPreviewHtml(): string {
   // sites refresh the brief; there is one codegen component per scene now, so a
   // component-layer list conveyed nothing.) Values come from the scene's edited
   // brief, falling back to the original storyboard plan entry.
+  // Map a PlannedScene (project.plan.scenes[idx]) into the editor's field shape.
+  function planToBrief(ps) {
+    ps = ps || {};
+    return {
+      purpose: ps.purpose || '',
+      script: ps.voiceover_text || '',
+      visual_notes: ps.visual_notes || '',
+      duration_seconds: (typeof ps.duration_seconds === 'number') ? ps.duration_seconds : '',
+      broll_query: ps.broll_query || '',
+      hero_image: ps.hero_image || '',
+      components: Array.isArray(ps.components) ? ps.components : [],
+    };
+  }
+
   function renderLayers() {
     if (!els.sbPreview) return;
     var project = state.currentProject;
@@ -1564,12 +1582,7 @@ export function getPreviewHtml(): string {
     var scene = project && idx >= 0 && project.scenes[idx];
     if (!scene) { clearLayers(); return; }
     var planned = (project.plan && project.plan.scenes && project.plan.scenes[idx]) || {};
-    var brief = scene.brief || {};
-    studio.brief = {
-      purpose: brief.purpose != null ? brief.purpose : (planned.purpose || ''),
-      script: brief.script != null ? brief.script : (planned.voiceover_text || ''),
-      visual_notes: brief.visual_notes != null ? brief.visual_notes : (planned.visual_notes || ''),
-    };
+    studio.brief = planToBrief(planned);
     renderBriefPreview();
   }
 
@@ -1577,16 +1590,24 @@ export function getPreviewHtml(): string {
     if (!els.sbPreview) return;
     var b = studio.brief || {};
     function row(label, text) {
-      var has = text && text.trim();
+      var has = text && ('' + text).trim();
       return '<div class="sb-prev-row"><div class="sb-prev-label">' + label + '</div>'
         + '<div class="sb-prev-text' + (has ? '' : ' empty') + '">' + escHtml(has ? text : '\\u2014') + '</div></div>';
     }
-    els.sbPreview.innerHTML = row('Purpose', b.purpose) + row('Script', b.script) + row('Visual notes', b.visual_notes);
+    var meta = [];
+    if (b.duration_seconds) meta.push(b.duration_seconds + 's');
+    if (b.components && b.components.length) meta.push(b.components.length + ' component' + (b.components.length === 1 ? '' : 's'));
+    if (b.broll_query) meta.push('b-roll');
+    else if (b.hero_image) meta.push('hero image');
+    var metaHtml = meta.length
+      ? '<div class="sb-prev-row"><div class="sb-prev-label">Setup</div><div class="sb-prev-text">' + escHtml(meta.join(' \\u00b7 ')) + '</div></div>'
+      : '';
+    els.sbPreview.innerHTML = row('Purpose', b.purpose) + row('Script', b.script) + row('Visual notes', b.visual_notes) + metaHtml;
   }
 
   function clearLayers() {
     state.currentComponentIndex = -1;
-    studio.brief = { purpose: '', script: '', visual_notes: '' };
+    studio.brief = { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [] };
     if (els.sbPreview) els.sbPreview.innerHTML = '<div class="sb-prev-text empty">No scene selected</div>';
   }
 
@@ -2227,7 +2248,7 @@ export function getPreviewHtml(): string {
   // ─────────────────────────────────────────────
   // Studio: element selection + direct-manipulation revise
   // ─────────────────────────────────────────────
-  var studio = { sel: null, scope: 'element', busy: false, brief: { purpose: '', script: '', visual_notes: '' } };
+  var studio = { sel: null, scope: 'element', busy: false, brief: { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [] } };
 
   function studioCurrentSceneId() {
     var p = state.currentProject, i = state.currentSceneIndex;
@@ -2632,12 +2653,6 @@ export function getPreviewHtml(): string {
     if (back) back.style.display = 'none';
   }
 
-  // Current brief comes from studio.brief (kept in sync by renderLayers + editor).
-  function studioReadBrief() {
-    var b = studio.brief || {};
-    return { purpose: b.purpose || '', script: b.script || '', visual_notes: b.visual_notes || '' };
-  }
-
   // Enable/disable every scene-mutating control at once (revise + storyboard).
   function studioToggleControls(disabled) {
     ['sb-edit', 'sb-regen', 'rv-go', 'rv-undo'].forEach(function(id) {
@@ -2645,38 +2660,51 @@ export function getPreviewHtml(): string {
     });
   }
 
-  // Open the roomy storyboard editor dialog; save from inside it.
+  // Open the roomy storyboard editor dialog (the scene's full plan entry).
   function openStoryboardEditor() {
     var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
     if (!sceneId) { sbStatus('Select or load a scene first.', 'warn'); return; }
     var b = studio.brief || {};
     var html =
-      '<h3 class="sm-title">Edit scene brief</h3>' +
-      '<p class="sm-desc">This brief drives Regenerate. Describe what the scene should communicate, the script, and the visual direction.</p>' +
+      '<h3 class="sm-title">Edit scene storyboard</h3>' +
+      '<p class="sm-desc">This is the plan for this scene. Save to keep it; Regenerate rebuilds the scene to fulfill it.</p>' +
       '<div class="sm-field"><label>Purpose</label><textarea id="sm-purpose" placeholder="What this scene communicates">' + escHtml(b.purpose || '') + '</textarea></div>' +
-      '<div class="sm-field"><label>Script</label><textarea id="sm-script" placeholder="Voiceover / on-screen script">' + escHtml(b.script || '') + '</textarea></div>' +
-      '<div class="sm-field"><label>Visual notes</label><textarea id="sm-visual" style="min-height:130px;" placeholder="Layout, motion, imagery">' + escHtml(b.visual_notes || '') + '</textarea></div>' +
+      '<div class="sm-field"><label>Script (voiceover / on-screen)</label><textarea id="sm-script" placeholder="The narration or on-screen copy">' + escHtml(b.script || '') + '</textarea></div>' +
+      '<div class="sm-field"><label>Visual notes</label><textarea id="sm-visual" style="min-height:130px;" placeholder="Layout, motion, imagery, hierarchy">' + escHtml(b.visual_notes || '') + '</textarea></div>' +
+      '<div class="sm-row2">' +
+        '<div class="sm-field"><label>Duration (seconds)</label><input id="sm-duration" type="number" min="1" step="0.5" value="' + escAttr('' + (b.duration_seconds || '')) + '"></div>' +
+        '<div class="sm-field"><label>B-roll search</label><input id="sm-broll" type="text" placeholder="e.g. team collaborating in office" value="' + escAttr(b.broll_query || '') + '"></div>' +
+      '</div>' +
+      '<div class="sm-field"><label>Hero image prompt</label><input id="sm-hero" type="text" placeholder="AI background image (leave blank if using b-roll)" value="' + escAttr(b.hero_image || '') + '"></div>' +
+      '<div class="sm-field"><label>Components (comma-separated)</label><input id="sm-components" type="text" placeholder="e.g. cta-card, stat-grid" value="' + escAttr((b.components || []).join(', ')) + '"></div>' +
       '<div class="sm-status" id="sm-edit-status"></div>' +
       '<div class="sm-actions">' +
         '<button class="sm-btn" id="sm-cancel">Cancel</button>' +
-        '<button class="sm-btn primary" id="sm-save">Save brief</button>' +
+        '<button class="sm-btn primary" id="sm-save">Save storyboard</button>' +
       '</div>';
     studioModalOpen(html);
     document.getElementById('sm-cancel').addEventListener('click', studioModalClose);
     document.getElementById('sm-save').addEventListener('click', function() { saveBriefFromModal(sceneId); });
   }
 
+  function modalVal(id) { var el = document.getElementById(id); return el ? (el.value || '') : ''; }
+
   function saveBriefFromModal(sceneId) {
     var p = state.currentProject; if (!p) return;
-    var brief = {
-      purpose: (document.getElementById('sm-purpose') || {}).value || '',
-      script: (document.getElementById('sm-script') || {}).value || '',
-      visual_notes: (document.getElementById('sm-visual') || {}).value || '',
+    var durRaw = modalVal('sm-duration').trim();
+    var bodyS = {
+      scene_id: sceneId,
+      purpose: modalVal('sm-purpose'),
+      script: modalVal('sm-script'),
+      visual_notes: modalVal('sm-visual'),
+      broll_query: modalVal('sm-broll'),
+      hero_image: modalVal('sm-hero'),
+      components: modalVal('sm-components').split(',').map(function(c) { return c.trim(); }).filter(Boolean),
     };
+    if (durRaw && !isNaN(parseFloat(durRaw))) bodyS.duration_seconds = parseFloat(durRaw);
     var st = document.getElementById('sm-edit-status');
     var saveBtn = document.getElementById('sm-save'); if (saveBtn) saveBtn.disabled = true;
     if (st) { st.className = 'sm-status'; st.textContent = 'Saving\\u2026'; }
-    var bodyS = { scene_id: sceneId, purpose: brief.purpose, script: brief.script, visual_notes: brief.visual_notes };
     api('POST', '/scene-plan/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), bodyS)
       .then(function(res) {
         if (!res || res.ok === false) {
@@ -2684,12 +2712,17 @@ export function getPreviewHtml(): string {
           if (saveBtn) saveBtn.disabled = false;
           return;
         }
-        studio.brief = res.brief || brief;
-        var sc = p.scenes && p.scenes.find ? p.scenes.find(function(s) { return s.id === sceneId; }) : null;
-        if (sc) sc.brief = res.brief || brief;
+        // Keep the in-memory plan in sync so it survives scene switches without reload.
+        var idx = p.scenes ? p.scenes.findIndex(function(s) { return s.id === sceneId; }) : -1;
+        if (idx >= 0 && res.planned) {
+          if (!p.plan) p.plan = { narrative: '', scenes: [], audio: {}, estimated_duration: 0 };
+          if (!p.plan.scenes) p.plan.scenes = [];
+          p.plan.scenes[idx] = res.planned;
+        }
+        studio.brief = planToBrief(res.planned);
         renderBriefPreview();
         studioModalClose();
-        sbStatus('Brief saved \\u2713', 'ok');
+        sbStatus('Storyboard saved \\u2713', 'ok');
       })
       .catch(function(e) {
         if (st) { st.className = 'sm-status err'; st.textContent = 'Error: ' + e.message; }
@@ -2707,7 +2740,6 @@ export function getPreviewHtml(): string {
     if (!sceneId) { sbStatus('Select or load a scene first.', 'warn'); return; }
     var p = state.currentProject; if (!p) { sbStatus('Load a project first.', 'warn'); return; }
     if (!window.confirm('Rebuild this entire scene from scratch? This replaces the current scene and can take a minute or two.')) return;
-    var brief = studioReadBrief();
 
     studio.busy = true;
     studioToggleControls(true);
@@ -2737,7 +2769,9 @@ export function getPreviewHtml(): string {
       clearInterval(elapsedTimer);
     }
 
-    var body = { scene_id: sceneId, purpose: brief.purpose, script: brief.script, visual_notes: brief.visual_notes };
+    // Regenerate rebuilds from the SAVED storyboard plan; edits are persisted via
+    // the editor's Save, so we only need to identify the scene here.
+    var body = { scene_id: sceneId };
     api('POST', '/regenerate/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), body)
       .then(function(res) {
         if (!res || res.ok === false || !res.job_id) {
