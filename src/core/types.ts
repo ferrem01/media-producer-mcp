@@ -317,7 +317,7 @@ export interface PlannedAsset {
 
 // ── Project ──
 
-export type ProjectStatus = "draft" | "planned" | "generated" | "rendering" | "rendered" | "failed";
+export type ProjectStatus = "draft" | "storyboarded" | "generated" | "rendering" | "rendered" | "failed";
 
 export interface Project {
   project_id: string;

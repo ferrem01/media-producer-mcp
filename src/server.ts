@@ -307,7 +307,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "update",
-    "Update a project, scene, component, or plan. Infers target from which IDs are provided. Use provide_asset to upload assets for a planned scene. Use plan to directly edit the creative plan.",
+    "Update a project, scene, component, or storyboard. Infers target from which IDs are provided. Use provide_asset to upload assets for a storyboard scene. Use storyboard to directly edit the storyboard.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
@@ -323,7 +323,7 @@ export function createMcpServer(): McpServer {
         fps: z.number().optional(),
         background: z.string().optional(),
       }).optional(),
-      status: z.enum(["draft", "planned", "generated", "rendering", "rendered", "failed"]).optional(),
+      status: z.enum(["draft", "storyboarded", "generated", "rendering", "rendered", "failed"]).optional(),
 
       // Scene-level updates
       label: z.string().optional(),
@@ -350,8 +350,8 @@ export function createMcpServer(): McpServer {
         })).optional(),
       }).optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time."),
 
-      // Plan modifications (direct edits, no LLM)
-      plan: z.object({
+      // Storyboard modifications (direct edits, no LLM)
+      storyboard: z.object({
         narrative: z.string().optional(),
         estimated_duration: z.number().optional(),
         audio: z.object({
@@ -368,50 +368,50 @@ export function createMcpServer(): McpServer {
           duration_seconds: z.number().optional(),
           visual_notes: z.string().optional(),
         })).optional(),
-        remove_scenes: z.array(z.number()).optional().describe("Indices of planned scenes to remove"),
+        remove_scenes: z.array(z.number()).optional().describe("Indices of storyboard scenes to remove"),
         reorder_scenes: z.array(z.number()).optional().describe("Current indices in desired order"),
-      }).optional().describe("Direct plan edits. Partial updates -- only fields you pass get changed. Works in planned state."),
+      }).optional().describe("Direct storyboard edits. Partial updates -- only fields you pass get changed. Works in storyboarded state."),
 
       // Asset provision
       provide_asset: z.object({
         scene_index: z.number(),
         asset_index: z.number(),
         path: z.string(),
-      }).optional().describe("Provide an asset for a planned scene. Updates status from 'needed' to 'provided'."),
+      }).optional().describe("Provide an asset for a storyboard scene. Updates status from 'needed' to 'provided'."),
     },
     async (params) => {
-      // ── Plan modifications ──
-      if (params.plan || params.provide_asset) {
+      // ── Storyboard modifications ──
+      if (params.storyboard || params.provide_asset) {
         const project = await loadProject(params.tenant_id, params.project_id);
         if (!project) return err("Project not found");
 
-        if (params.plan) {
+        if (params.storyboard) {
           if (!project.storyboard) {
-            // Create a new plan from scratch
+            // Create a new storyboard from scratch
             project.storyboard = {
-              narrative: params.plan.narrative || "",
+              narrative: params.storyboard.narrative || "",
               scenes: [],
               audio: {
-                music_mood: params.plan.audio?.music_mood || "corporate",
-                voice: params.plan.audio?.voice || "nova",
-                pacing: (params.plan.audio?.pacing as any) || "moderate",
+                music_mood: params.storyboard.audio?.music_mood || "corporate",
+                voice: params.storyboard.audio?.voice || "nova",
+                pacing: (params.storyboard.audio?.pacing as any) || "moderate",
               },
-              estimated_duration: params.plan.estimated_duration || 0,
+              estimated_duration: params.storyboard.estimated_duration || 0,
             };
           }
 
           // Merge top-level fields
-          if (params.plan.narrative !== undefined) project.storyboard.narrative = params.plan.narrative;
-          if (params.plan.estimated_duration !== undefined) project.storyboard.estimated_duration = params.plan.estimated_duration;
-          if (params.plan.audio) {
-            if (params.plan.audio.music_mood !== undefined) project.storyboard.audio.music_mood = params.plan.audio.music_mood;
-            if (params.plan.audio.voice !== undefined) project.storyboard.audio.voice = params.plan.audio.voice;
-            if (params.plan.audio.pacing !== undefined) project.storyboard.audio.pacing = params.plan.audio.pacing;
+          if (params.storyboard.narrative !== undefined) project.storyboard.narrative = params.storyboard.narrative;
+          if (params.storyboard.estimated_duration !== undefined) project.storyboard.estimated_duration = params.storyboard.estimated_duration;
+          if (params.storyboard.audio) {
+            if (params.storyboard.audio.music_mood !== undefined) project.storyboard.audio.music_mood = params.storyboard.audio.music_mood;
+            if (params.storyboard.audio.voice !== undefined) project.storyboard.audio.voice = params.storyboard.audio.voice;
+            if (params.storyboard.audio.pacing !== undefined) project.storyboard.audio.pacing = params.storyboard.audio.pacing;
           }
 
           // Remove scenes (process before adds/updates, use descending order)
-          if (params.plan.remove_scenes?.length) {
-            const toRemove = [...params.plan.remove_scenes].sort((a, b) => b - a);
+          if (params.storyboard.remove_scenes?.length) {
+            const toRemove = [...params.storyboard.remove_scenes].sort((a, b) => b - a);
             for (const idx of toRemove) {
               if (idx >= 0 && idx < project.storyboard.scenes.length) {
                 project.storyboard.scenes.splice(idx, 1);
@@ -420,8 +420,8 @@ export function createMcpServer(): McpServer {
           }
 
           // Reorder scenes
-          if (params.plan.reorder_scenes?.length) {
-            const order = params.plan.reorder_scenes;
+          if (params.storyboard.reorder_scenes?.length) {
+            const order = params.storyboard.reorder_scenes;
             const reordered = order
               .filter(i => i >= 0 && i < project.storyboard!.scenes.length)
               .map(i => project.storyboard!.scenes[i]);
@@ -431,8 +431,8 @@ export function createMcpServer(): McpServer {
           }
 
           // Update or append scenes
-          if (params.plan.scenes?.length) {
-            for (const sceneUpdate of params.plan.scenes) {
+          if (params.storyboard.scenes?.length) {
+            for (const sceneUpdate of params.storyboard.scenes) {
               if (sceneUpdate.index !== undefined && sceneUpdate.index < project.storyboard.scenes.length) {
                 // Update existing scene
                 const existing = project.storyboard.scenes[sceneUpdate.index];
@@ -462,12 +462,12 @@ export function createMcpServer(): McpServer {
             (sum, s) => sum + s.duration_seconds, 0
           );
 
-          project.status = "planned";
+          project.status = "storyboarded";
         }
 
         // Asset provision
         if (params.provide_asset) {
-          if (!project.storyboard) return err("Project has no plan");
+          if (!project.storyboard) return err("Project has no storyboard");
           const { scene_index, asset_index, path } = params.provide_asset;
           if (scene_index < 0 || scene_index >= project.storyboard.scenes.length) {
             return err(`Invalid scene_index: ${scene_index}`);
@@ -482,7 +482,7 @@ export function createMcpServer(): McpServer {
 
         project.updated_at = new Date().toISOString();
         await saveProject(project);
-        return ok({ status: "updated", project_id: project.project_id, plan: project.storyboard });
+        return ok({ status: "updated", project_id: project.project_id, storyboard: project.storyboard });
       }
 
       // ── Property updates (status, name, canvas, scene/component props) ──
@@ -783,10 +783,10 @@ export function createMcpServer(): McpServer {
 
       // Status gating
       if (project.status === "draft") {
-        return err("Project needs a plan first. Run generate with mode='plan' to create a creative plan.");
+        return err("Project needs a storyboard first. Run generate with mode='storyboard' to create a storyboard.");
       }
-      if (project.status === "planned") {
-        return err("Project has a plan but scenes haven't been generated yet. Run generate with mode='generate' to build scenes from the plan.");
+      if (project.status === "storyboarded") {
+        return err("Project has a storyboard but scenes haven't been generated yet. Run generate with mode='generate' to build scenes from the storyboard.");
       }
 
       // Scene preview
@@ -1277,10 +1277,10 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "generate",
-    "Generate media from a natural language prompt. Use mode='plan' to get a creative plan with script, storyboard, and asset requirements for review. Use mode='generate' to build scenes from an approved plan. Use mode='full' (default) to plan, generate, and render in one shot. Recommended flow: plan -> review/iterate -> provide assets -> generate -> preview/edit -> render.",
+    "Generate media from a natural language prompt. Use mode='storyboard' to get a storyboard with script, storyboard, and asset requirements for review. Use mode='generate' to build scenes from an approved storyboard. Use mode='full' (default) to storyboard, generate, and render in one shot. Recommended flow: storyboard -> review/iterate -> provide assets -> generate -> preview/edit -> render.",
     {
       tenant_id: z.string(),
-      prompt: z.string().default("").describe("Description of what to generate. Optional for mode='generate' (uses plan narrative)."),
+      prompt: z.string().default("").describe("Description of what to generate. Optional for mode='generate' (uses storyboard narrative)."),
       target: z.enum(["component", "scene", "video", "image", "presentation"]).optional().default("video").describe("What to generate (default: video)"),
       id: z.string().optional().describe("ID of existing content to revise. Component: component name. Scene: scene_id (requires project_id). Video/image/presentation: project_id."),
       project_id: z.string().optional().describe("Project ID (required for scene revision)"),
@@ -1295,7 +1295,7 @@ export function createMcpServer(): McpServer {
       speaker_start: z.number().optional().describe("Start offset in seconds into the speaker video (skip dead air at start)"),
       speaker_trim_start: z.number().optional().describe("Trim: only use speaker video from this timestamp"),
       speaker_trim_end: z.number().optional().describe("Trim: stop using speaker video at this timestamp"),
-      mode: z.enum(["plan", "generate", "full"]).optional().default("full").describe("'plan' = create a creative plan for review. 'generate' = build scenes from an approved plan. 'full' = plan + generate + render in one shot (default, current behavior)."),
+      mode: z.enum(["storyboard", "generate", "full"]).optional().default("full").describe("'storyboard' = create a storyboard for review. 'generate' = build scenes from an approved storyboard. 'full' = storyboard + generate + render in one shot (default, current behavior)."),
       brief: z.object({
         video_type: z.enum(["product_launch", "feature_announcement", "customer_story", "how_to", "promo", "explainer", "case_study", "brand"]).optional(),
         context: z.object({
@@ -1316,7 +1316,7 @@ export function createMcpServer(): McpServer {
           url: z.string().optional(),
         })).optional(),
       }).optional().describe("Structured brief with marketing context. Enhances the prompt with audience, messaging, and asset info."),
-      feedback: z.string().optional().describe("Natural language feedback to revise an existing plan. Requires project_id with a planned project."),
+      feedback: z.string().optional().describe("Natural language feedback to revise an existing storyboard. Requires project_id with a storyboarded project."),
       reference_images: z.array(z.object({
         url: z.string().describe("HTTPS URL or base64 data URI (data:image/...)"),
         role: z.enum(["ui_reference", "style_reference", "brand_reference", "screenshot"]),
@@ -1334,8 +1334,8 @@ export function createMcpServer(): McpServer {
         if (!tokenTenant) return err("Invalid token");
       }
       try {
-        // ── Plan mode: run unified pipeline in plan-only mode ──
-        if (params.mode === "plan") {
+        // ── Storyboard mode: run unified pipeline in storyboard-only mode ──
+        if (params.mode === "storyboard") {
           let llmConfig;
           try {
             llmConfig = llmConfigFromEnv();
@@ -1349,9 +1349,9 @@ export function createMcpServer(): McpServer {
           let planPrompt = params.prompt;
           if (params.project_id && params.feedback) {
             const existingProject = await loadProject(params.tenant_id, params.project_id);
-            if (!existingProject) return err("Project not found for plan revision");
-            if (existingProject.status !== "planned" && existingProject.status !== "draft") {
-              return err(`Cannot revise plan: project is in '${existingProject.status}' state`);
+            if (!existingProject) return err("Project not found for storyboard revision");
+            if (existingProject.status !== "storyboarded" && existingProject.status !== "draft") {
+              return err(`Cannot revise storyboard: project is in '${existingProject.status}' state`);
             }
             planPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
             if (existingProject.storyboard?.narrative) {
@@ -1359,7 +1359,7 @@ export function createMcpServer(): McpServer {
             }
           }
 
-          console.log(`  Plan mode: running unified pipeline (plan-only) for "${params.prompt.substring(0, 60)}..."`);
+          console.log(`  Storyboard mode: running unified pipeline (storyboard-only) for "${params.prompt.substring(0, 60)}..."`);
           const pipelineResult = await runGeneratePipeline({
             prompt: planPrompt,
             target: (params.target === "component" || params.target === "scene") ? "video" : (params.target || "video") as PipelineTarget,
@@ -1380,51 +1380,51 @@ export function createMcpServer(): McpServer {
           });
 
           if (pipelineResult.status === "error") {
-            return err(`Plan failed: ${pipelineResult.error}`);
+            return err(`Storyboard failed: ${pipelineResult.error}`);
           }
 
           const project = pipelineResult.project!;
 
-          // If updating an existing project, copy the plan over
+          // If updating an existing project, copy the storyboard over
           if (params.project_id && params.project_id !== project.project_id) {
             const origProject = await loadProject(params.tenant_id, params.project_id);
             if (origProject) {
               origProject.brief = project.brief;
               origProject.storyboard = project.storyboard;
-              origProject.status = "planned";
+              origProject.status = "storyboarded";
               origProject.updated_at = new Date().toISOString();
               await saveProject(origProject);
 
               return ok({
-                status: "planned",
+                status: "storyboarded",
                 project_id: origProject.project_id,
                 preview_url: previewUrl(params.tenant_id, origProject.project_id),
-                plan: origProject.storyboard,
+                storyboard: origProject.storyboard,
               });
             }
           }
 
           return ok({
-            status: "planned",
+            status: "storyboarded",
             project_id: project.project_id,
             preview_url: previewUrl(params.tenant_id, project.project_id),
-            plan: project.storyboard,
+            storyboard: project.storyboard,
           });
         }
 
-        // ── Generate mode: build scenes from an approved plan ──
+        // ── Generate mode: build scenes from an approved storyboard ──
         if (params.mode === "generate") {
           if (!params.project_id) return err("project_id required for generate mode");
           const project = await loadProject(params.tenant_id, params.project_id);
           if (!project) return err("Project not found");
-          if (!project.storyboard) return err("Project has no plan. Run generate with mode='plan' first.");
-          if (project.status !== "planned") {
-            return err(`Cannot generate: project is in '${project.status}' state (expected 'planned')`);
+          if (!project.storyboard) return err("Project has no storyboard. Run generate with mode='storyboard' first.");
+          if (project.status !== "storyboarded") {
+            return err(`Cannot generate: project is in '${project.status}' state (expected 'storyboarded')`);
           }
 
-          // Use the plan's script as the prompt for the unified pipeline
-          // Build a rich prompt from the plan's narrative + scene details
-          const planPrompt = buildPromptFromPlan(project.storyboard, project.brief);
+          // Use the storyboard's script as the prompt for the unified pipeline
+          // Build a rich prompt from the storyboard's narrative + scene details
+          const planPrompt = buildPromptFromStoryboard(project.storyboard, project.brief);
 
           let llmConfig;
           try {
@@ -1437,7 +1437,7 @@ export function createMcpServer(): McpServer {
           const job = queueJob("generate", params.tenant_id, async (j) => {
             const trace = new TraceBuilder("generate", params.tenant_id, "", planPrompt);
             try {
-              j.progress = { step: "generating_from_plan", percent: 10 };
+              j.progress = { step: "generating_from_storyboard", percent: 10 };
               const pipelineResult = await runGeneratePipeline({
                 prompt: planPrompt,
                 target: "video",
@@ -1454,7 +1454,7 @@ export function createMcpServer(): McpServer {
                 sceneCount: project.storyboard!.scenes.length,
               });
 
-              // Copy generated scenes, audio, and assets from the new project back to the original planned project
+              // Copy generated scenes, audio, and assets from the new project back to the original storyboarded project
               // Use the in-memory project object from pipelineResult instead of re-loading from disk
               // to avoid race conditions where disk write hasn't completed yet
               const generatedProject = (pipelineResult as any)?.project;
@@ -1523,7 +1523,7 @@ export function createMcpServer(): McpServer {
             job_id: job.id,
             project_id: project.project_id,
             preview_url: previewUrl(params.tenant_id, project.project_id),
-            message: "Generating scenes from plan. Use get(target='job', job_id='" + job.id + "') to check status.",
+            message: "Generating scenes from storyboard. Use get(target='job', job_id='" + job.id + "') to check status.",
           });
         }
 
@@ -1995,16 +1995,16 @@ async function listComponentCatalog(): Promise<Array<{ type: string; category: s
 }
 
 /**
- * Build a rich prompt from a plan for the unified pipeline.
- * Converts the plan's script into a format the unified planner understands.
+ * Build a rich prompt from a storyboard for the unified pipeline.
+ * Converts the storyboard's script into a format the unified planner understands.
  */
-function buildPromptFromPlan(plan: import("./core/types.js").Storyboard, brief?: import("./core/types.js").ProjectBrief): string {
-  let prompt = brief?.prompt || plan.narrative;
+function buildPromptFromStoryboard(storyboard: import("./core/types.js").Storyboard, brief?: import("./core/types.js").ProjectBrief): string {
+  let prompt = brief?.prompt || storyboard.narrative;
   prompt += "\n\n## Script (FOLLOW THIS EXACTLY)\n";
-  prompt += `Narrative: ${plan.narrative}\n\n`;
+  prompt += `Narrative: ${storyboard.narrative}\n\n`;
 
-  for (let i = 0; i < plan.scenes.length; i++) {
-    const s = plan.scenes[i];
+  for (let i = 0; i < storyboard.scenes.length; i++) {
+    const s = storyboard.scenes[i];
     prompt += `Scene ${i + 1}: "${s.label}"\n`;
     prompt += `  Purpose: ${s.purpose}\n`;
     prompt += `  Template: ${s.template}\n`;
@@ -2039,8 +2039,8 @@ function buildPromptFromPlan(plan: import("./core/types.js").Storyboard, brief?:
   prompt += `\n## Asset Placeholder Rule\n`;
   prompt += `When a scene has a MISSING ASSET directive, you MUST use the "asset-placeholder" component type with the specified text and asset_type in the data object. Do NOT attempt to generate HTML mockups, fake dashboards, or UI simulations. Use the asset-placeholder component exactly as directed.\n\n`;
 
-  prompt += `Music mood: ${plan.audio.music_mood}\n`;
-  prompt += `Pacing: ${plan.audio.pacing}\n`;
+  prompt += `Music mood: ${storyboard.audio.music_mood}\n`;
+  prompt += `Pacing: ${storyboard.audio.pacing}\n`;
 
   // Add marketing context if available
   if (brief?.context) {

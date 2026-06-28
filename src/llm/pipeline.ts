@@ -1653,7 +1653,7 @@ async function runUnifiedPipeline(
   if (opts.storyboardOnly) {
     project.storyboard = storyboardToSaved(storyboard, opts.voice as string);
     project.brief = { prompt: opts.prompt };
-    project.status = "planned";
+    project.status = "storyboarded";
     project.created_at = new Date().toISOString();
     project.updated_at = new Date().toISOString();
     await saveProject(project);
