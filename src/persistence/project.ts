@@ -8,7 +8,7 @@
 import fs from "node:fs/promises";
 import { normalizeAllUrls } from "../core/normalize-urls.js";
 import { v4 as uuidv4 } from "uuid";
-import type { Project, OutputFormat, Canvas, BrandKit, Scene } from "../core/types.js";
+import type { Project, OutputFormat, Canvas, BrandKit, Scene, ProjectPlan, PlannedScene } from "../core/types.js";
 import { RESOLUTION_DIMENSIONS, type ResolutionPreset } from "../core/types.js";
 import {
   projectsDir,
@@ -107,6 +107,50 @@ export async function loadProject(tenantId: string, projectId: string): Promise<
   } catch {
     return null;
   }
+}
+
+/**
+ * Ensure the project has a `plan` whose `scenes[]` aligns 1:1 by index with the
+ * realized `scenes[]`, creating a minimal plan / entries as needed. Also migrates
+ * any legacy per-scene `brief` (the old SceneBrief) into the plan entry.
+ * Returns the PlannedScene for the given index (the single source of truth that
+ * Studio edits and Regenerate reads).
+ */
+export function ensurePlannedScene(project: Project, sceneIndex: number): PlannedScene {
+  if (!project.plan) {
+    project.plan = {
+      narrative: "",
+      scenes: [],
+      audio: { music_mood: "", voice: "nova", pacing: "moderate" },
+      estimated_duration: project.scenes.reduce((s, sc) => s + (sc.duration_seconds || 0), 0),
+    } as ProjectPlan;
+  }
+  const plan = project.plan;
+  for (let i = 0; i < project.scenes.length; i++) {
+    const sc = project.scenes[i];
+    if (!plan.scenes[i]) {
+      plan.scenes[i] = {
+        label: sc.label || `Scene ${i + 1}`,
+        purpose: "",
+        template: "",
+        voiceover_text: "",
+        duration_seconds: sc.duration_seconds || 5,
+        assets: [],
+        visual_notes: "",
+        components: [],
+      };
+    }
+    // Migrate a legacy SceneBrief (purpose/script/visual_notes) onto the plan entry.
+    const legacy = (sc as any).brief;
+    if (legacy) {
+      const ps = plan.scenes[i];
+      if (!ps.purpose && legacy.purpose) ps.purpose = legacy.purpose;
+      if (!ps.voiceover_text && legacy.script) ps.voiceover_text = legacy.script;
+      if (!ps.visual_notes && legacy.visual_notes) ps.visual_notes = legacy.visual_notes;
+      delete (sc as any).brief;
+    }
+  }
+  return plan.scenes[sceneIndex];
 }
 
 export async function listProjects(tenantId: string): Promise<Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number }>> {

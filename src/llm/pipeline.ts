@@ -330,7 +330,7 @@ async function runSceneRevisionPipeline(
   // brief (Studio-edited override, else the original storyboard plan) so the
   // rebuild fulfills the scene's actual intent — not just its label.
   const sceneContext = serializeSceneContext(existingScene);
-  const briefBlock = formatSceneBrief(existingScene, plannedScene);
+  const briefBlock = formatSceneBrief(plannedScene);
   const revisionPrompt =
     `Revise the following scene based on these instructions: ${opts.prompt}` +
     (briefBlock ? `\n\nScene brief (the intent this scene must fulfill):\n${briefBlock}` : "") +
@@ -342,9 +342,11 @@ async function runSceneRevisionPipeline(
   // paraphrases the brief into its own brief/description, and buildCodegenBrief
   // then generates from THAT — so the rebuild drifts from what the storyboard
   // actually said. Only fall back to the planner when there is no brief at all.
-  const briefPurpose = existingScene.brief?.purpose ?? plannedScene?.purpose;
-  const briefScript = existingScene.brief?.script ?? plannedScene?.voiceover_text;
-  const briefVisual = existingScene.brief?.visual_notes ?? plannedScene?.visual_notes;
+  // The plan entry (project.plan.scenes[idx]) is the single source of truth that
+  // Studio edits; use it verbatim so the rebuild matches the storyboard.
+  const briefPurpose = plannedScene?.purpose;
+  const briefScript = plannedScene?.voiceover_text;
+  const briefVisual = plannedScene?.visual_notes;
   const instr = opts.prompt?.trim();
   let planned: any;
 
@@ -354,7 +356,7 @@ async function runSceneRevisionPipeline(
     // "Visual Direction" verbatim, so map the user's words straight in.
     planned = {
       label: existingScene.label || plannedScene?.label || `Scene ${sceneIndex + 1}`,
-      duration_seconds: existingScene.duration_seconds || plannedScene?.duration_seconds || 5,
+      duration_seconds: plannedScene?.duration_seconds || existingScene.duration_seconds || 5,
       description: [briefPurpose, instr ? `Additional instruction: ${instr}` : ""].filter(Boolean).join("\n"),
       brief: briefVisual || "",
       purpose: briefPurpose || "",
@@ -858,10 +860,10 @@ async function runImageRevisionPipeline(
 
 /** Format a scene's brief for the revision prompt: the Studio-edited override
  *  (scene.brief) takes precedence over the original storyboard plan entry. */
-function formatSceneBrief(scene: Scene, planned?: PlannedScene): string {
-  const purpose = scene.brief?.purpose ?? planned?.purpose;
-  const script = scene.brief?.script ?? planned?.voiceover_text;
-  const visual = scene.brief?.visual_notes ?? planned?.visual_notes;
+function formatSceneBrief(planned?: PlannedScene): string {
+  const purpose = planned?.purpose;
+  const script = planned?.voiceover_text;
+  const visual = planned?.visual_notes;
   const lines: string[] = [];
   if (purpose) lines.push(`Purpose: ${purpose}`);
   if (script) lines.push(`Script: ${script}`);

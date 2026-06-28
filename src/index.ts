@@ -27,7 +27,7 @@ import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
-import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes } from "./persistence/project.js";
+import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes, ensurePlannedScene } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleScene, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
@@ -129,13 +129,23 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown): 
   res.end(JSON.stringify(body));
 }
 
-/** Extract editable scene-brief fields from a request body, or null if none present. */
-function pickSceneBrief(body: any): { purpose?: string; script?: string; visual_notes?: string } | null {
-  const out: { purpose?: string; script?: string; visual_notes?: string } = {};
-  if (typeof body?.purpose === "string") out.purpose = body.purpose;
-  if (typeof body?.script === "string") out.script = body.script;
-  if (typeof body?.visual_notes === "string") out.visual_notes = body.visual_notes;
-  return Object.keys(out).length > 0 ? out : null;
+/** Apply Studio-editable storyboard fields from a request body onto a PlannedScene
+ *  (in place). `script` maps to voiceover_text; components accepts an array or a
+ *  comma-separated string. Only provided fields are touched. */
+function applyPlannedFields(ps: any, body: any): void {
+  if (typeof body?.purpose === "string") ps.purpose = body.purpose;
+  if (typeof body?.script === "string") ps.voiceover_text = body.script;
+  if (typeof body?.visual_notes === "string") ps.visual_notes = body.visual_notes;
+  if (typeof body?.broll_query === "string") ps.broll_query = body.broll_query.trim() || undefined;
+  if (typeof body?.hero_image === "string") ps.hero_image = body.hero_image.trim() || undefined;
+  if (body?.duration_seconds != null && !isNaN(Number(body.duration_seconds))) {
+    ps.duration_seconds = Math.max(1, Number(body.duration_seconds));
+  }
+  if (Array.isArray(body?.components)) {
+    ps.components = body.components.filter((c: any) => typeof c === "string" && c.trim()).map((c: string) => c.trim());
+  } else if (typeof body?.components === "string") {
+    ps.components = body.components.split(",").map((c: string) => c.trim()).filter(Boolean);
+  }
 }
 
 const SERVICE_VERSION = "0.1.0";
@@ -1275,16 +1285,14 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         catch (e: any) { jsonResponse(res, 500, { error: `LLM not configured: ${e.message}` }); return; }
         const project = await loadProject(tenantId, projectId);
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        const regenScene = project.scenes.find((s: any) => s.id === sceneId);
-        if (!regenScene) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
-        // Persist any edited brief from the body BEFORE queueing, so the pipeline
-        // (which reloads the project from disk) rebuilds against the new intent.
-        const briefPatch = pickSceneBrief(body);
-        if (briefPatch) {
-          regenScene.brief = { ...(regenScene.brief || {}), ...briefPatch };
-          project.updated_at = new Date().toISOString();
-          await saveProject(project);
-        }
+        const regenIdx = project.scenes.findIndex((s: any) => s.id === sceneId);
+        if (regenIdx === -1) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
+        // Persist any edited storyboard fields onto the plan BEFORE queueing, so the
+        // pipeline (which reloads the project from disk) rebuilds against the new plan.
+        const regenPlanned = ensurePlannedScene(project, regenIdx);
+        applyPlannedFields(regenPlanned, body);
+        project.updated_at = new Date().toISOString();
+        await saveProject(project);
         const brandKit = await loadBrandKit(tenantId);
         const prompt = instruction
           || "Rebuild this scene from scratch so it is visually complete and on-brand: "
@@ -1325,7 +1333,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
-      // ── API: Save a scene's editable brief (Studio storyboard panel) ──
+      // ── API: Save a scene's storyboard plan entry (Studio storyboard panel) ──
       const scenePlanMatch = url.match(/^\/api\/scene-plan\/([^/]+)\/([^/]+)$/);
       if (scenePlanMatch && method === "POST") {
         const [, tenantId, projectId] = scenePlanMatch.map(decodeURIComponent);
@@ -1334,13 +1342,13 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (!sceneId) { jsonResponse(res, 400, { error: "scene_id is required" }); return; }
         const project = await loadProject(tenantId, projectId);
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        const scene = project.scenes.find((s: any) => s.id === sceneId);
-        if (!scene) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
-        const briefPatch = pickSceneBrief(body);
-        scene.brief = { ...(scene.brief || {}), ...(briefPatch || {}) };
+        const idx = project.scenes.findIndex((s: any) => s.id === sceneId);
+        if (idx === -1) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
+        const planned = ensurePlannedScene(project, idx);
+        applyPlannedFields(planned, body);
         project.updated_at = new Date().toISOString();
         await saveProject(project);
-        jsonResponse(res, 200, { ok: true, brief: scene.brief });
+        jsonResponse(res, 200, { ok: true, planned });
         return;
       }
 
