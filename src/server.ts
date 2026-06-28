@@ -586,9 +586,11 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "brand",
-    "Get or set a tenant's brand kit (colors, fonts, logo, style, assets). Pass no fields to get the current brand kit. Pass fields to update.",
+    "Get, set, or extract a tenant's brand kit (colors, fonts, logo, style, assets). Pass a url to extract + store the brand kit from a website. Pass no fields to get the current brand kit. Pass fields to update.",
     {
       tenant_id: z.string(),
+      url: z.string().optional().describe("Extract + store the brand kit from this website URL (colors, fonts, logos, theme) -- no video is generated."),
+      enhance: z.boolean().optional().describe("Run LLM brand analysis during URL extraction (slower, richer guidelines)."),
       colors: z.object({
         primary: z.string().optional(),
         secondary: z.string().optional(),
@@ -632,6 +634,16 @@ export function createMcpServer(): McpServer {
       guidelines: z.string().optional().describe("Free-form brand rules for the AI (e.g. logo placement, color usage, tone). Injected into generation prompts."),
     },
     async (params) => {
+      // Extract + store the brand kit from a URL (no video generated).
+      if (params.url) {
+        try {
+          const { kit, summary } = await extractAndStoreBrand(params.tenant_id, params.url, params.enhance ?? false);
+          return ok({ status: "brand_extracted", tenant_id: params.tenant_id, source_url: params.url, brand_kit: kit, summary });
+        } catch (e: any) {
+          return err(`Brand extraction failed for ${params.url}: ${e?.message || e}`);
+        }
+      }
+
       const hasUpdates = params.colors || params.fonts || params.logo || params.logos || params.assets || params.style || params.guidelines;
 
       if (!hasUpdates) {
