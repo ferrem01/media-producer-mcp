@@ -8,9 +8,9 @@
  * Flow:
  *   1. Generate 3 distinct creative concepts (high temperature)
  *   2. Self-critique and pick the strongest one
- *   3. Output a "creative bible" that the planner must follow
+ *   3. Output a "treatment" that the storyboard step must follow
  *
- * The creative bible includes:
+ * The treatment includes:
  *   - The one-line "big idea"
  *   - The storytelling pattern (from the visual storytelling guide)
  *   - The visual through-line (what persists/transforms across scenes)
@@ -36,7 +36,7 @@ export interface ConceptDirectorOpts {
   referenceImages?: ReferenceImage[];
 }
 
-export interface CreativeBible {
+export interface Treatment {
   /** The one-line concept that unifies the entire video */
   concept: string;
   /** The storytelling pattern being used */
@@ -60,7 +60,7 @@ export interface CreativeBible {
  * Generate the creative bible for a project.
  * This is the missing "human creative director" step.
  */
-export async function generateCreativeBible(opts: ConceptDirectorOpts): Promise<CreativeBible> {
+export async function generateTreatment(opts: ConceptDirectorOpts): Promise<Treatment> {
   var storytellingGuide = getStorytellingGuide();
 
   var brandContext = buildBrandSummary(opts.brandKit);
@@ -172,7 +172,7 @@ Then pick the STRONGEST concept and explain why.
 /**
  * Format the creative bible as context for the unified planner.
  */
-export function formatCreativeBibleForPlanner(bible: CreativeBible): string {
+export function formatTreatmentForPlanner(bible: Treatment): string {
   return `## Creative Direction (FOLLOW THIS -- every scene must serve this concept)
 
 **THE CONCEPT:** ${bible.concept}

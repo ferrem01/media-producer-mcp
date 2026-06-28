@@ -244,28 +244,28 @@ export interface AvailableAsset {
   url?: string;
 }
 
-// ── Plan ──
+// ── Storyboard ──
 
-export interface ProjectPlan {
+export interface Storyboard {
   /** Narrative summary */
   narrative: string;
   /** Scene-by-scene plan */
-  scenes: PlannedScene[];
+  scenes: StoryboardScene[];
   /** Audio direction */
-  audio: PlanAudioDirection;
+  audio: StoryboardAudioDirection;
   /** Estimated total duration */
   estimated_duration: number;
   /** Feedback that shaped this plan */
   revision_notes?: string[];
 }
 
-export interface PlanAudioDirection {
+export interface StoryboardAudioDirection {
   music_mood: string;
   voice: string;
   pacing: "slow" | "moderate" | "fast";
 }
 
-export interface PlannedScene {
+export interface StoryboardScene {
   /** Scene label */
   label: string;
   /** What this scene communicates */
@@ -335,7 +335,7 @@ export interface Project {
 
   // ── Lifecycle ──
   /** Creative bible from the concept director (structured, not prose) */
-  creative_bible?: {
+  treatment?: {
     concept: string;
     pattern: string;
     throughLine: string;
@@ -351,7 +351,7 @@ export interface Project {
   /** Creative brief from the caller */
   brief?: ProjectBrief;
   /** Creative plan (script + storyboard + asset manifest) */
-  plan?: ProjectPlan;
+  storyboard?: Storyboard;
   created_at?: string;
   updated_at?: string;
 }

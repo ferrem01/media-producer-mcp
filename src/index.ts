@@ -27,7 +27,7 @@ import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
-import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes, ensurePlannedScene } from "./persistence/project.js";
+import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes, ensureStoryboardScene } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleScene, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
@@ -129,7 +129,7 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown): 
   res.end(JSON.stringify(body));
 }
 
-/** Apply Studio-editable storyboard fields from a request body onto a PlannedScene
+/** Apply Studio-editable storyboard fields from a request body onto a StoryboardScene
  *  (in place). `script` maps to voiceover_text; components accepts an array or a
  *  comma-separated string. Only provided fields are touched. */
 function applyPlannedFields(ps: any, body: any): void {
@@ -1289,7 +1289,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (regenIdx === -1) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
         // Persist any edited storyboard fields onto the plan BEFORE queueing, so the
         // pipeline (which reloads the project from disk) rebuilds against the new plan.
-        const regenPlanned = ensurePlannedScene(project, regenIdx);
+        const regenPlanned = ensureStoryboardScene(project, regenIdx);
         applyPlannedFields(regenPlanned, body);
         project.updated_at = new Date().toISOString();
         await saveProject(project);
@@ -1344,7 +1344,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         const idx = project.scenes.findIndex((s: any) => s.id === sceneId);
         if (idx === -1) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
-        const planned = ensurePlannedScene(project, idx);
+        const planned = ensureStoryboardScene(project, idx);
         applyPlannedFields(planned, body);
         project.updated_at = new Date().toISOString();
         await saveProject(project);

@@ -11,8 +11,8 @@
 
 import type {
   ProjectBrief,
-  ProjectPlan,
-  PlannedScene,
+  Storyboard,
+  StoryboardScene,
   PlannedAsset,
   PlannedAssetType,
   PlannedAssetPriority,
@@ -21,7 +21,7 @@ import type {
 } from "../core/types.js";
 
 export interface AssetAnalyzerOptions {
-  plan: ProjectPlan;
+  plan: Storyboard;
   brief: ProjectBrief;
   brandKit?: BrandKit | null;
 }
@@ -40,7 +40,7 @@ const CTA_TEMPLATES = new Set(["E1", "E4"]);
  * Analyze asset needs for each scene in the plan.
  * Mutates plan.scenes[].assets in place and returns the plan.
  */
-export function analyzeAssets(opts: AssetAnalyzerOptions): ProjectPlan {
+export function analyzeAssets(opts: AssetAnalyzerOptions): Storyboard {
   const { plan, brief, brandKit } = opts;
   const availableAssets = brief.available_assets || [];
 
@@ -58,7 +58,7 @@ export function analyzeAssets(opts: AssetAnalyzerOptions): ProjectPlan {
 }
 
 function analyzeScene(
-  scene: PlannedScene,
+  scene: StoryboardScene,
   availableAssets: AvailableAsset[],
   brandKit?: BrandKit | null,
 ): PlannedAsset[] {
@@ -234,7 +234,7 @@ function findMatchingAsset(
 /**
  * Extract a visual hint from a scene for asset descriptions.
  */
-function extractVisualHint(scene: PlannedScene): string {
+function extractVisualHint(scene: StoryboardScene): string {
   // Take the first meaningful clause from visual_notes
   const notes = scene.visual_notes;
   if (!notes) return scene.purpose;
@@ -245,6 +245,6 @@ function extractVisualHint(scene: PlannedScene): string {
 /**
  * Build an AI image generation prompt from a scene.
  */
-function buildImagePrompt(scene: PlannedScene): string {
+function buildImagePrompt(scene: StoryboardScene): string {
   return `Professional marketing visual for a scene titled "${scene.label}". ${scene.visual_notes}. Modern, clean, premium feel. Dark background with subtle gradients. No text in the image.`;
 }

@@ -8,7 +8,7 @@
 import fs from "node:fs/promises";
 import { normalizeAllUrls } from "../core/normalize-urls.js";
 import { v4 as uuidv4 } from "uuid";
-import type { Project, OutputFormat, Canvas, BrandKit, Scene, ProjectPlan, PlannedScene } from "../core/types.js";
+import type { Project, OutputFormat, Canvas, BrandKit, Scene, Storyboard, StoryboardScene } from "../core/types.js";
 import { RESOLUTION_DIMENSIONS, type ResolutionPreset } from "../core/types.js";
 import {
   projectsDir,
@@ -113,19 +113,19 @@ export async function loadProject(tenantId: string, projectId: string): Promise<
  * Ensure the project has a `plan` whose `scenes[]` aligns 1:1 by index with the
  * realized `scenes[]`, creating a minimal plan / entries as needed. Also migrates
  * any legacy per-scene `brief` (the old SceneBrief) into the plan entry.
- * Returns the PlannedScene for the given index (the single source of truth that
+ * Returns the StoryboardScene for the given index (the single source of truth that
  * Studio edits and Regenerate reads).
  */
-export function ensurePlannedScene(project: Project, sceneIndex: number): PlannedScene {
-  if (!project.plan) {
-    project.plan = {
+export function ensureStoryboardScene(project: Project, sceneIndex: number): StoryboardScene {
+  if (!project.storyboard) {
+    project.storyboard = {
       narrative: "",
       scenes: [],
       audio: { music_mood: "", voice: "nova", pacing: "moderate" },
       estimated_duration: project.scenes.reduce((s, sc) => s + (sc.duration_seconds || 0), 0),
-    } as ProjectPlan;
+    } as Storyboard;
   }
-  const plan = project.plan;
+  const plan = project.storyboard;
   for (let i = 0; i < project.scenes.length; i++) {
     const sc = project.scenes[i];
     if (!plan.scenes[i]) {

@@ -19,7 +19,7 @@ import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js"
 // import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./design-skills.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
-import type { CreativeBible } from "./concept-director.js";
+import type { Treatment } from "./concept-director.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,
@@ -50,7 +50,7 @@ export interface AgenticCodegenOpts {
   heroImageUrl?: string;
   critiqueFeedback?: string;
   referenceImages?: ReferenceImage[];
-  creativeBible?: CreativeBible;
+  treatment?: Treatment;
 }
 
 // ── Tool Definitions ──
@@ -365,14 +365,14 @@ ${!opts.brollVideoUrl && !opts.heroImageUrl ? `This scene was given NO footage o
 Duration: ${opts.sceneDuration} seconds
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}
 Project: ${opts.prompt}
-${opts.creativeBible ? `
+${opts.treatment ? `
 ## Creative Direction (MUST FOLLOW)
-Concept: ${opts.creativeBible.concept}
-Color mood: ${opts.creativeBible.visualStyle.colorMood}
-Typography: ${opts.creativeBible.visualStyle.typographyAttitude}
-Motion: ${opts.creativeBible.visualStyle.motionPersonality}
-Spatial: ${opts.creativeBible.visualStyle.spatialStrategy}
-Through-line: ${opts.creativeBible.throughLine}
+Concept: ${opts.treatment.concept}
+Color mood: ${opts.treatment.visualStyle.colorMood}
+Typography: ${opts.treatment.visualStyle.typographyAttitude}
+Motion: ${opts.treatment.visualStyle.motionPersonality}
+Spatial: ${opts.treatment.visualStyle.spatialStrategy}
+Through-line: ${opts.treatment.throughLine}
 ` : ""}
 `;
 }
