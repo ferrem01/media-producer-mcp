@@ -132,7 +132,7 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown): 
 /** Apply Studio-editable storyboard fields from a request body onto a StoryboardScene
  *  (in place). `script` maps to voiceover_text; components accepts an array or a
  *  comma-separated string. Only provided fields are touched. */
-function applyPlannedFields(ps: any, body: any): void {
+function applyStoryboardFields(ps: any, body: any): void {
   if (typeof body?.purpose === "string") ps.purpose = body.purpose;
   if (typeof body?.script === "string") ps.voiceover_text = body.script;
   if (typeof body?.visual_notes === "string") ps.visual_notes = body.visual_notes;
@@ -1289,8 +1289,8 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (regenIdx === -1) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
         // Persist any edited storyboard fields onto the plan BEFORE queueing, so the
         // pipeline (which reloads the project from disk) rebuilds against the new plan.
-        const regenPlanned = ensureStoryboardScene(project, regenIdx);
-        applyPlannedFields(regenPlanned, body);
+        const regenStoryboardScene = ensureStoryboardScene(project, regenIdx);
+        applyStoryboardFields(regenStoryboardScene, body);
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         const brandKit = await loadBrandKit(tenantId);
@@ -1334,9 +1334,9 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: Save a scene's storyboard plan entry (Studio storyboard panel) ──
-      const scenePlanMatch = url.match(/^\/api\/scene-plan\/([^/]+)\/([^/]+)$/);
-      if (scenePlanMatch && method === "POST") {
-        const [, tenantId, projectId] = scenePlanMatch.map(decodeURIComponent);
+      const storyboardSceneMatch = url.match(/^\/api\/storyboard-scene\/([^/]+)\/([^/]+)$/);
+      if (storyboardSceneMatch && method === "POST") {
+        const [, tenantId, projectId] = storyboardSceneMatch.map(decodeURIComponent);
         const body = await parseBody(req);
         const sceneId = (body.scene_id || body.sceneId) as string;
         if (!sceneId) { jsonResponse(res, 400, { error: "scene_id is required" }); return; }
@@ -1344,11 +1344,11 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         const idx = project.scenes.findIndex((s: any) => s.id === sceneId);
         if (idx === -1) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
-        const planned = ensureStoryboardScene(project, idx);
-        applyPlannedFields(planned, body);
+        const storyboardScene = ensureStoryboardScene(project, idx);
+        applyStoryboardFields(storyboardScene, body);
         project.updated_at = new Date().toISOString();
         await saveProject(project);
-        jsonResponse(res, 200, { ok: true, planned });
+        jsonResponse(res, 200, { ok: true, scene: storyboardScene });
         return;
       }
 

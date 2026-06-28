@@ -1,8 +1,8 @@
 /**
  * Creative Concept Director
  *
- * Runs BEFORE the unified planner. Its job is to commit to ONE strong
- * creative idea for the entire video. Without this, the planner generates
+ * Runs BEFORE the storyboard builder. Its job is to commit to ONE strong
+ * creative idea for the entire video. Without this, the storyboard builder generates
  * 8 mediocre scene ideas without a unifying concept.
  *
  * Flow:
@@ -52,7 +52,7 @@ export interface Treatment {
     motionPersonality: string;
     spatialStrategy: string;
   };
-  /** 3-5 sentence summary the planner can use as creative direction */
+  /** 3-5 sentence summary the storyboard builder can use as creative direction */
   directorNote: string;
 }
 
@@ -65,7 +65,7 @@ export async function generateTreatment(opts: ConceptDirectorOpts): Promise<Trea
 
   var brandContext = buildBrandSummary(opts.brandKit);
 
-  var systemPrompt = `You are a creative director at a top motion design studio. Your job is to come up with ONE brilliant creative concept for a video, NOT to plan scenes.
+  var systemPrompt = `You are a creative director at a top motion design studio. Your job is to come up with ONE brilliant creative concept for a video, NOT to storyboard scenes.
 
 You think in concepts, not slides. A concept is the single unifying idea that makes a video memorable. Examples of strong concepts:
 - "The feature assembles itself piece by piece, like a machine being built in real-time"
@@ -110,7 +110,7 @@ Then pick the STRONGEST concept and explain why.
   ],
   "selected": 0,
   "selectionReason": "Why this concept is strongest",
-  "directorNote": "3-5 sentence creative direction summary that a scene planner should follow"
+  "directorNote": "3-5 sentence creative direction summary that the storyboard should follow"
 }
 
 ## Rules
@@ -170,7 +170,7 @@ Then pick the STRONGEST concept and explain why.
 }
 
 /**
- * Format the creative bible as context for the unified planner.
+ * Format the creative bible as context for the storyboard builder.
  */
 export function formatTreatmentForPlanner(bible: Treatment): string {
   return `## Creative Direction (FOLLOW THIS -- every scene must serve this concept)
@@ -189,7 +189,7 @@ export function formatTreatmentForPlanner(bible: Treatment): string {
 
 **Director's Note:** ${bible.directorNote}
 
-IMPORTANT: Every scene you plan must serve this ONE concept. Do not generate disconnected scene ideas. The visual through-line (${bible.throughLine}) should be present or referenced in most scenes. The emotional arc should progress across the scene sequence.`;
+IMPORTANT: Every scene in the storyboard must serve this ONE concept. Do not generate disconnected scene ideas. The visual through-line (${bible.throughLine}) should be present or referenced in most scenes. The emotional arc should progress across the scene sequence.`;
 }
 
 // ── Helpers ──

@@ -147,8 +147,8 @@ async function main() {
     // ── PROOF: HERO IMAGE (generated AND actually drawn into a rendered scene) ──
     const assetsDir = path.join(projDir, "assets");
     const heroImgs = fs.existsSync(assetsDir) ? fs.readdirSync(assetsDir).filter((f) => /^hero_scene_.*\.png$/.test(f)) : [];
-    const planHero = (project.plan?.scenes || []).filter((s: any) => s.hero_image);
-    check("hero image generated to assets/", heroImgs.length > 0, heroImgs.join(", ") || `(plan requested ${planHero.length})`);
+    const storyboardHero = (project.storyboard?.scenes || []).filter((s: any) => s.hero_image);
+    check("hero image generated to assets/", heroImgs.length > 0, heroImgs.join(", ") || `(storyboard requested ${storyboardHero.length})`);
     // The real proof: the generated image file is referenced in a rendered scene.html.
     let heroSceneDir: string | null = null;
     if (heroImgs.length > 0) {

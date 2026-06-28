@@ -24,10 +24,10 @@ const BANNED = /\b(static shot|locked[- ]?off|camera (is )?stationary|stationary
 
 async function plan(label, prompt) {
   const r = J(await c.callTool(
-    { name: "generate", arguments: { tenant_id: "bp", mode: "plan", target: "video", prompt, voiceover: false, brief: { video_type: "brand", target_duration: 18 } } },
+    { name: "generate", arguments: { tenant_id: "bp", mode: "storyboard", target: "video", prompt, voiceover: false, brief: { video_type: "brand", target_duration: 18 } } },
     undefined, { timeout: 300000 }));
-  if (r.status !== "planned") { console.log(`!! ${label}: plan failed`, r.error || JSON.stringify(r).slice(0,200)); return []; }
-  const scenes = r.plan.scenes;
+  if (r.status !== "storyboarded") { console.log(`!! ${label}: storyboard failed`, r.error || JSON.stringify(r).slice(0,200)); return []; }
+  const scenes = r.storyboard.scenes;
   console.log(`\n=== ${label} (${scenes.length} scenes) ===`);
   scenes.forEach((s, i) => {
     const tags = [];

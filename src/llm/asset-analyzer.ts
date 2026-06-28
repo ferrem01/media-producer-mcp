@@ -1,9 +1,9 @@
 /**
  * Asset Analyzer
  *
- * Examines each planned scene and determines what assets would make it
+ * Examines each storyboarded scene and determines what assets would make it
  * great vs. what it can generate or mock. Populates the PlannedAsset[]
- * on each scene in the plan.
+ * on each scene in the storyboard.
  *
  * Mostly rule-based (fast, no LLM call needed). Uses template hints and
  * scene purpose to determine asset types and priorities.
@@ -21,7 +21,7 @@ import type {
 } from "../core/types.js";
 
 export interface AssetAnalyzerOptions {
-  plan: Storyboard;
+  storyboard: Storyboard;
   brief: ProjectBrief;
   brandKit?: BrandKit | null;
 }
@@ -37,24 +37,24 @@ const BREATHING_TEMPLATES = new Set(["B1", "B2", "B3"]);
 const CTA_TEMPLATES = new Set(["E1", "E4"]);
 
 /**
- * Analyze asset needs for each scene in the plan.
- * Mutates plan.scenes[].assets in place and returns the plan.
+ * Analyze asset needs for each scene in the storyboard.
+ * Mutates storyboard.scenes[].assets in place and returns the storyboard.
  */
 export function analyzeAssets(opts: AssetAnalyzerOptions): Storyboard {
-  const { plan, brief, brandKit } = opts;
+  const { storyboard, brief, brandKit } = opts;
   const availableAssets = brief.available_assets || [];
 
-  for (const scene of plan.scenes) {
+  for (const scene of storyboard.scenes) {
     scene.assets = analyzeScene(scene, availableAssets, brandKit);
   }
 
-  const totalAssets = plan.scenes.reduce((sum, s) => sum + s.assets.length, 0);
-  const needed = plan.scenes.reduce((sum, s) => sum + s.assets.filter(a => a.status === "needed").length, 0);
-  const provided = plan.scenes.reduce((sum, s) => sum + s.assets.filter(a => a.status === "provided").length, 0);
+  const totalAssets = storyboard.scenes.reduce((sum, s) => sum + s.assets.length, 0);
+  const needed = storyboard.scenes.reduce((sum, s) => sum + s.assets.filter(a => a.status === "needed").length, 0);
+  const provided = storyboard.scenes.reduce((sum, s) => sum + s.assets.filter(a => a.status === "provided").length, 0);
 
   console.log(`  Asset analyzer: ${totalAssets} assets identified (${needed} needed, ${provided} pre-matched)`);
 
-  return plan;
+  return storyboard;
 }
 
 function analyzeScene(
