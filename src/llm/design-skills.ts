@@ -2,7 +2,7 @@
  * Design Skills Loader
  *
  * Loads the visual storytelling guide and design skills document
- * for injection into planner and scene generator prompts.
+ * for injection into storyboard builder and scene generator prompts.
  */
 
 import fs from "node:fs";
@@ -15,8 +15,8 @@ let _storytellingGuide: string | null = null;
 let _designSkills: string | null = null;
 
 /**
- * Load the visual storytelling guide (injected into planner context).
- * Teaches the planner to think like a creative director.
+ * Load the visual storytelling guide (injected into storyboard builder context).
+ * Teaches the storyboard builder to think like a creative director.
  */
 export function getStorytellingGuide(): string {
   if (!_storytellingGuide) {

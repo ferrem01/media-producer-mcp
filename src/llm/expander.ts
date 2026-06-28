@@ -2,7 +2,7 @@
  * Prompt Expander
  *
  * The creative director layer. Detects thin prompts and expands them
- * into rich creative briefs before they hit the scene/project planner.
+ * into rich creative briefs before they hit the storyboard builder.
  *
  * Rich prompts pass through unchanged.
  */

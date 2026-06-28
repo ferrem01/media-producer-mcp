@@ -2,7 +2,7 @@
  * Cinematography Playbook
  *
  * Professional video pacing, rhythm, and composition rules.
- * Injected into the expander and unified planner to ensure every video
+ * Injected into the expander and storyboard builder to ensure every video
  * has cinematic structure -- not just good individual scenes, but a
  * coherent visual narrative.
  *
@@ -104,7 +104,7 @@ This creates RHYTHM. Without it, everything feels the same and nothing stands ou
 `;
 
 /**
- * Visual composition and rhythm rules for the planner.
+ * Visual composition and rhythm rules for the storyboard builder.
  * Ensures variety, balance, and professional visual flow.
  */
 export const COMPOSITION_PLAYBOOK = `

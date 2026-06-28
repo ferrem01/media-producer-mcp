@@ -15,7 +15,7 @@ import {
   type LLMContentPart,
 } from "./client.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
-// Component discovery is handled by the planner. The codegen LLM receives schemas in the brief.
+// Component discovery is handled by the storyboard builder. The codegen LLM receives schemas in the brief.
 // import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./design-skills.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
@@ -460,14 +460,14 @@ function buildBrandContext(brandKit: BrandKit): string {
 
 const MAX_ITERATIONS = 8;
 
-// Component discovery is handled by the planner; codegen receives schemas in the brief
+// Component discovery is handled by the storyboard builder; codegen receives schemas in the brief
 
 export async function generateSceneAgentic(
   opts: AgenticCodegenOpts,
 ): Promise<string> {
   var systemPrompt = buildAgenticSystemPrompt(opts);
 
-  // Component schemas are provided in the brief by the planner
+  // Component schemas are provided in the brief by the storyboard builder
 
   var userPrompt = `Create this scene:
 

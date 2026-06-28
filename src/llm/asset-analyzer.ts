@@ -2,7 +2,7 @@
  * Asset Analyzer
  *
  * Examines each storyboarded scene and determines what assets would make it
- * great vs. what it can generate or mock. Populates the PlannedAsset[]
+ * great vs. what it can generate or mock. Populates the AssetRequirement[]
  * on each scene in the storyboard.
  *
  * Mostly rule-based (fast, no LLM call needed). Uses template hints and
@@ -13,9 +13,9 @@ import type {
   ProjectBrief,
   Storyboard,
   StoryboardScene,
-  PlannedAsset,
-  PlannedAssetType,
-  PlannedAssetPriority,
+  AssetRequirement,
+  AssetRequirementType,
+  AssetRequirementPriority,
   BrandKit,
   AvailableAsset,
 } from "../core/types.js";
@@ -61,8 +61,8 @@ function analyzeScene(
   scene: StoryboardScene,
   availableAssets: AvailableAsset[],
   brandKit?: BrandKit | null,
-): PlannedAsset[] {
-  const assets: PlannedAsset[] = [];
+): AssetRequirement[] {
+  const assets: AssetRequirement[] = [];
   const template = scene.template.split("-")[0].toUpperCase(); // e.g., "P1" from "P1-product-frame"
   const templateFull = scene.template.split(" ")[0]; // Handle "D1-hero-stat + C4-testimonial"
   const purposeLower = scene.purpose.toLowerCase();
@@ -170,9 +170,9 @@ function analyzeScene(
  * Try to match an asset need to a caller-provided available asset.
  */
 function makeAsset(
-  base: Omit<PlannedAsset, "status"> & { status?: PlannedAssetStatus },
+  base: Omit<AssetRequirement, "status"> & { status?: AssetRequirementStatus },
   availableAssets: AvailableAsset[],
-): PlannedAsset {
+): AssetRequirement {
   // Try to find a matching available asset
   const match = findMatchingAsset(base.description, base.type, availableAssets);
 
@@ -181,23 +181,23 @@ function makeAsset(
       ...base,
       status: "provided",
       path: match.path || undefined,
-    } as PlannedAsset;
+    } as AssetRequirement;
   }
 
   return {
     ...base,
     status: base.type === "ai_image" ? "generating" : "needed",
-  } as PlannedAsset;
+  } as AssetRequirement;
 }
 
-type PlannedAssetStatus = "needed" | "provided" | "generating" | "generated" | "fallback";
+type AssetRequirementStatus = "needed" | "provided" | "generating" | "generated" | "fallback";
 
 /**
  * Simple keyword matching between an asset need and available assets.
  */
 function findMatchingAsset(
   description: string,
-  type: PlannedAssetType,
+  type: AssetRequirementType,
   availableAssets: AvailableAsset[],
 ): AvailableAsset | null {
   if (availableAssets.length === 0) return null;

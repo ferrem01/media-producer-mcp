@@ -2,7 +2,7 @@
  * Visual Design Rules
  *
  * Ported from video-producer-mcp's skills/codegen/ directory.
- * Injected into component generator and scene planner prompts
+ * Injected into component generator and storyboard builder prompts
  * to prevent overflow, contrast, and spacing issues.
  */
 
@@ -55,10 +55,10 @@ export const COMPONENT_DESIGN_RULES = `
 `;
 
 /**
- * Rules for the scene planner (what data to pass to components).
+ * Rules for the storyboard builder (what data to pass to components).
  */
-export const SCENE_PLANNER_DESIGN_RULES = `
-## Visual Design Rules for Scene Planning
+export const SCENE_STORYBOARD_DESIGN_RULES = `
+## Visual Design Rules for Scene Storyboarding
 
 ### Content Length
 - Title text: max 5-8 words. "Quotient x Canva Integration" not "Quotient and Canva have partnered to create a seamless integration for marketing teams."
@@ -108,7 +108,7 @@ export const SCENE_PLANNER_DESIGN_RULES = `
 ### Interactive Mockups (Script System)
 - When the prompt asks for a product demo, UI walkthrough, or interactive mockup, the component should use the script system.
 - Include a "script" array and "cursor_targets" in the component data.
-- The scene planner should flag these as needing custom components with script support.
+- The storyboard builder should flag these as needing custom components with script support.
 - Give scripted scenes longer durations (8-15s) to allow for cursor movement and typing.
 - Examples of scripted scenes: chat interfaces, form fill demos, dashboard interactions, app walkthroughs.
 
@@ -193,7 +193,7 @@ Score each scene against these criteria:
 
 /**
  * Premium design philosophy -- what separates "correct" from "Apple-level."
- * Injected into expander + scene planner + critiquer to raise the ceiling.
+ * Injected into expander + storyboard builder + critiquer to raise the ceiling.
  */
 export const PREMIUM_DESIGN_PHILOSOPHY = `
 ## What Makes Video Feel Premium

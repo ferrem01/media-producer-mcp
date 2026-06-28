@@ -110,9 +110,9 @@ export async function loadProject(tenantId: string, projectId: string): Promise<
 }
 
 /**
- * Ensure the project has a `plan` whose `scenes[]` aligns 1:1 by index with the
- * realized `scenes[]`, creating a minimal plan / entries as needed. Also migrates
- * any legacy per-scene `brief` (the old SceneBrief) into the plan entry.
+ * Ensure the project has a storyboard whose `scenes[]` aligns 1:1 by index with the
+ * realized `scenes[]`, creating a minimal storyboard / entries as needed. Also migrates
+ * any legacy per-scene `brief` (the old SceneBrief) into the storyboard entry.
  * Returns the StoryboardScene for the given index (the single source of truth that
  * Studio edits and Regenerate reads).
  */
@@ -125,11 +125,11 @@ export function ensureStoryboardScene(project: Project, sceneIndex: number): Sto
       estimated_duration: project.scenes.reduce((s, sc) => s + (sc.duration_seconds || 0), 0),
     } as Storyboard;
   }
-  const plan = project.storyboard;
+  const sb = project.storyboard;
   for (let i = 0; i < project.scenes.length; i++) {
     const sc = project.scenes[i];
-    if (!plan.scenes[i]) {
-      plan.scenes[i] = {
+    if (!sb.scenes[i]) {
+      sb.scenes[i] = {
         label: sc.label || `Scene ${i + 1}`,
         purpose: "",
         template: "",
@@ -140,17 +140,17 @@ export function ensureStoryboardScene(project: Project, sceneIndex: number): Sto
         components: [],
       };
     }
-    // Migrate a legacy SceneBrief (purpose/script/visual_notes) onto the plan entry.
+    // Migrate a legacy SceneBrief (purpose/script/visual_notes) onto the storyboard entry.
     const legacy = (sc as any).brief;
     if (legacy) {
-      const ps = plan.scenes[i];
+      const ps = sb.scenes[i];
       if (!ps.purpose && legacy.purpose) ps.purpose = legacy.purpose;
       if (!ps.voiceover_text && legacy.script) ps.voiceover_text = legacy.script;
       if (!ps.visual_notes && legacy.visual_notes) ps.visual_notes = legacy.visual_notes;
       delete (sc as any).brief;
     }
   }
-  return plan.scenes[sceneIndex];
+  return sb.scenes[sceneIndex];
 }
 
 export async function listProjects(tenantId: string): Promise<Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number }>> {

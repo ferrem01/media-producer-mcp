@@ -28,9 +28,9 @@ const PRUNE_INTERVAL_MS = 60 * 60 * 1000; // prune at most once per hour
 export type OperationType =
   | "generate"
   | "expand"
-  | "plan_project"
-  | "plan_scene"
-  | "plan_scene_codegen"
+  | "storyboard_project"
+  | "storyboard_scene"
+  | "storyboard_scene_codegen"
   | "component_generate"
   | "critique"
   | "render"
@@ -53,7 +53,7 @@ export interface PipelineTrace {
   prompt: string;
   canvas?: { width: number; height: number; fps: number };
   has_brand_kit: boolean;
-  planner?: { scene_count: number; components: string[]; format: string };
+  storyboard?: { scene_count: number; components: string[]; format: string };
   component_gen?: { type: string; source_length: number; llm_duration_ms: number };
   critiques: Array<{ round: number; score: number; issues: number; revised: boolean; accepted: boolean }>;
   render?: {
@@ -162,8 +162,8 @@ export class TraceBuilder {
     return this;
   }
 
-  setPlanner(plan: { scene_count: number; components: string[]; format: string }): this {
-    this.trace.planner = plan;
+  setStoryboard(data: { scene_count: number; components: string[]; format: string }): this {
+    this.trace.storyboard = data;
     return this;
   }
 

@@ -3,9 +3,9 @@
  *
  * Every component on disk is meant to be a pair: `{type}.component.html`
  * (the renderable template) and `{type}.schema.json` (the machine-readable
- * interface the planner/codegen catalog is built from). Without the schema,
+ * interface the storyboard builder/codegen catalog is built from). Without the schema,
  * a component renders fine when referenced by type but is INVISIBLE to the
- * planner -- it never gets proposed.
+ * storyboard builder -- it never gets proposed.
  *
  * This module is the single source of truth for turning a component's source
  * into that schema, so the generator and the playground stay consistent.
@@ -35,7 +35,7 @@ function titleCase(type: string): string {
  * Derive the `data` field map from a component's source by scanning for the
  * three ways a component reads data: `{{mustache}}` placeholders, `data.field`
  * / `data["field"]` references in the script, and `data-bind="field"` attrs.
- * Each discovered field becomes an optional string field (the planner mainly
+ * Each discovered field becomes an optional string field (the storyboard builder mainly
  * needs to know the field *exists* and its name).
  */
 export function deriveDataFields(source: string): Record<string, unknown> {
@@ -90,7 +90,7 @@ export function buildComponentSchema(
 
 /**
  * Write `{type}.schema.json` next to the component in `dir`. This is what keeps
- * a saved component visible to the planner. Safe to call right after writing
+ * a saved component visible to the storyboard builder. Safe to call right after writing
  * the `.component.html`.
  */
 export async function writeComponentSchema(

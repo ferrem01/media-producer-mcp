@@ -74,7 +74,7 @@ export interface BrandKit {
     border_radius?: string;
     motion?: "minimal" | "punchy" | "cinematic";
   };
-  guidelines?: string;    // free-form brand rules injected into planner/generator prompts
+  guidelines?: string;    // free-form brand rules injected into storyboard builder/generator prompts
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // preferred TTS voice
   design_system?: DesignSystem;
 }
@@ -249,13 +249,13 @@ export interface AvailableAsset {
 export interface Storyboard {
   /** Narrative summary */
   narrative: string;
-  /** Scene-by-scene plan */
+  /** Scene-by-scene storyboard */
   scenes: StoryboardScene[];
   /** Audio direction */
   audio: StoryboardAudioDirection;
   /** Estimated total duration */
   estimated_duration: number;
-  /** Feedback that shaped this plan */
+  /** Feedback that shaped this storyboard */
   revision_notes?: string[];
 }
 
@@ -277,10 +277,10 @@ export interface StoryboardScene {
   /** Duration */
   duration_seconds: number;
   /** What this scene needs to look great */
-  assets: PlannedAsset[];
+  assets: AssetRequirement[];
   /** Visual description for the storyboard */
   visual_notes: string;
-  /** Library component types the planner suggested embedding in this scene */
+  /** Library component types the storyboard builder suggested embedding in this scene */
   components?: string[];
   /** Cinematic stock-footage search phrase; when set, b-roll plays behind the scene */
   broll_query?: string;
@@ -288,23 +288,23 @@ export interface StoryboardScene {
   hero_image?: string;
 }
 
-export type PlannedAssetType =
+export type AssetRequirementType =
   | "screen_recording" | "camera_video" | "photo" | "screenshot"
   | "product_shot" | "ai_image" | "illustration" | "stock_footage" | "mockup";
 
-export type PlannedAssetStatus = "needed" | "provided" | "generating" | "generated" | "fallback";
+export type AssetRequirementStatus = "needed" | "provided" | "generating" | "generated" | "fallback";
 
-export type PlannedAssetPriority = "critical" | "recommended" | "nice_to_have";
+export type AssetRequirementPriority = "critical" | "recommended" | "nice_to_have";
 
-export interface PlannedAsset {
+export interface AssetRequirement {
   /** What this asset is for */
   description: string;
   /** Asset type */
-  type: PlannedAssetType;
+  type: AssetRequirementType;
   /** Current status */
-  status: PlannedAssetStatus;
+  status: AssetRequirementStatus;
   /** How much this affects quality */
-  priority: PlannedAssetPriority;
+  priority: AssetRequirementPriority;
   /** What MCP does if this isn't provided */
   fallback: string;
   /** Path to the asset (when provided or generated) */
@@ -350,7 +350,7 @@ export interface Project {
   };
   /** Creative brief from the caller */
   brief?: ProjectBrief;
-  /** Creative plan (script + storyboard + asset manifest) */
+  /** The storyboard (script + storyboard + asset manifest) */
   storyboard?: Storyboard;
   created_at?: string;
   updated_at?: string;

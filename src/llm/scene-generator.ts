@@ -10,14 +10,14 @@ import type { LLMConfig } from "./client.js";
 import { generateSceneAgentic } from "./agentic-codegen.js";
 import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import { config } from "../config.js";
-import type { PlannerScene } from "./unified-planner.js";
+import type { DraftScene } from "./storyboard-builder.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import type { Treatment } from "./concept-director.js";
 
 // ── Types ──
 
 export interface SceneGeneratorOpts {
-  scene: PlannerScene;
+  scene: DraftScene;
   sceneIndex: number;
   totalScenes: number;
   prompt: string;           // original project prompt
@@ -44,38 +44,38 @@ export interface GeneratedScene {
  * Generate a single scene with mixed library, custom, or template components.
  */
 export async function generateScene(opts: SceneGeneratorOpts): Promise<GeneratedScene> {
-  var planned = opts.scene;
+  var draft = opts.scene;
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
 
   // ── Unified Codegen Path (always active) ──
   // All scenes go through the agentic codegen generator
   // which can use <component> tags to embed library components.
-  var codegenBrief = await buildCodegenBrief(planned);
-  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (unified codegen)`);
-  return await generateCodegenScene(opts, planned, codegenBrief, sceneId);
+  var codegenBrief = await buildCodegenBrief(draft);
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (unified codegen)`);
+  return await generateCodegenScene(opts, draft, codegenBrief, sceneId);
 }
 
 // ── Freeform Scene Generation ──
 
 async function generateCodegenScene(
   opts: SceneGeneratorOpts,
-  planned: PlannerScene,
+  draft: DraftScene,
   codegenBrief: string,
   sceneId: string,
 ): Promise<GeneratedScene> {
   var compName = `scene_${sceneId}`;
 
-  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${planned.label}" (agentic-codegen)`);
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (agentic-codegen)`);
 
   var effectiveBrief = codegenBrief;
-  console.log("  [codegen-brief] Scene \"" + planned.label + "\" has " + (planned.components?.length || 0) + " component hints, brief includes schemas: " + effectiveBrief.includes("Component Schemas"));
+  console.log("  [codegen-brief] Scene \"" + draft.label + "\" has " + (draft.components?.length || 0) + " component hints, brief includes schemas: " + effectiveBrief.includes("Component Schemas"));
   console.log("  [codegen-brief] Full brief length:", effectiveBrief.length, "chars");
 
   var sceneHtml = await generateSceneAgentic({
     sceneBrief: effectiveBrief,
-    sceneLabel: planned.label,
-    sceneDescription: planned.description,
-    sceneDuration: planned.duration_seconds || 5,
+    sceneLabel: draft.label,
+    sceneDescription: draft.description,
+    sceneDuration: draft.duration_seconds || 5,
     sceneIndex: opts.sceneIndex,
     totalScenes: opts.totalScenes,
     prompt: opts.prompt,
@@ -95,17 +95,17 @@ async function generateCodegenScene(
   customSources.set(compName, sceneHtml);
 
   var transition: SceneTransition | undefined;
-  if (planned.transition_in && planned.transition_in.type !== "none") {
+  if (draft.transition_in && draft.transition_in.type !== "none") {
     transition = {
-      type: planned.transition_in.type as SceneTransition["type"],
-      duration_seconds: planned.transition_in.duration_seconds || 0.5,
+      type: draft.transition_in.type as SceneTransition["type"],
+      duration_seconds: draft.transition_in.duration_seconds || 0.5,
     };
   }
 
   var scene: Scene = {
     id: sceneId,
-    label: planned.label,
-    duration_seconds: planned.duration_seconds || 5,
+    label: draft.label,
+    duration_seconds: draft.duration_seconds || 5,
     transition_in: transition,
     components: [{
       id: "comp_0",
@@ -142,26 +142,26 @@ function buildBrandContext(brandKit: BrandKit): string {
 // ── Unified Codegen Brief Builder ──
 
 /**
- * Build a rich codegen brief from any planned scene type.
+ * Build a rich codegen brief from any draft scene type.
  * Converts template, library component, sequence, or custom scene
  * descriptions into a brief the agentic codegen generator can use
  * with <component> tags.
  */
-async function buildCodegenBrief(planned: any): Promise<string> {
+async function buildCodegenBrief(draft: any): Promise<string> {
   var parts: string[] = [];
 
-  parts.push(`Scene: "${planned.label}"`);
-  parts.push(`Duration: ${planned.duration_seconds || 5} seconds`);
-  if (planned.description) parts.push(`Description: ${planned.description}`);
+  parts.push(`Scene: "${draft.label}"`);
+  parts.push(`Duration: ${draft.duration_seconds || 5} seconds`);
+  if (draft.description) parts.push(`Description: ${draft.description}`);
 
-  // Visual brief from the planner
-  if (planned.brief) {
-    parts.push(`\nVisual Direction:\n${planned.brief}`);
+  // Visual brief from the storyboard
+  if (draft.brief) {
+    parts.push(`\nVisual Direction:\n${draft.brief}`);
   }
 
   // Component hints: look up schemas from catalog and include them
-  if (planned.components?.length > 0) {
-    var componentTypes: string[] = planned.components;
+  if (draft.components?.length > 0) {
+    var componentTypes: string[] = draft.components;
     parts.push(`\nUse these library components via <component> tags:`);
     for (var compType of componentTypes) {
       parts.push(`  - <component type="${compType}" />`);
@@ -217,8 +217,8 @@ async function buildCodegenBrief(planned: any): Promise<string> {
   }
 
   // Voiceover hint
-  if (planned.voiceover_text) {
-    parts.push(`\nVoiceover: "${planned.voiceover_text}"`);
+  if (draft.voiceover_text) {
+    parts.push(`\nVoiceover: "${draft.voiceover_text}"`);
     parts.push(`Time the visual reveals to match the narration pacing.`);
   }
 

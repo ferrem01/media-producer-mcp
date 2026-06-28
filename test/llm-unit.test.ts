@@ -16,8 +16,8 @@ import { extractComponentSource, deriveTypeName } from "../src/llm/component-gen
 import { buildComponentCatalog, formatCatalogForPrompt } from "../src/llm/catalog.js";
 import {
   componentSystemPrompt,
-  scenePlannerSystemPrompt,
-  projectPlannerSystemPrompt,
+  sceneStoryboardSystemPrompt,
+  projectStoryboardSystemPrompt,
   critiquerSystemPrompt,
   expanderSystemPrompt,
 } from "../src/llm/prompts.js";
@@ -158,15 +158,15 @@ describe("system prompts", () => {
     expect(prompt).toContain("paused");
   });
 
-  it("scenePlannerSystemPrompt includes catalog placeholder", () => {
-    const prompt = scenePlannerSystemPrompt("## Components\n- title-slide\n- code-block");
+  it("sceneStoryboardSystemPrompt includes catalog placeholder", () => {
+    const prompt = sceneStoryboardSystemPrompt("## Components\n- title-slide\n- code-block");
     expect(prompt).toContain("title-slide");
     expect(prompt).toContain("code-block");
     expect(prompt).toContain("JSON");
   });
 
-  it("projectPlannerSystemPrompt includes catalog", () => {
-    const prompt = projectPlannerSystemPrompt("## Components\n- title-slide");
+  it("projectStoryboardSystemPrompt includes catalog", () => {
+    const prompt = projectStoryboardSystemPrompt("## Components\n- title-slide");
     expect(prompt).toContain("title-slide");
     expect(prompt).toContain("storyboard");
   });

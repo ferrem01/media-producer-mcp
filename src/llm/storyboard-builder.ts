@@ -1,5 +1,5 @@
 /**
- * Unified Planner
+ * Unified Storyboard builder
  *
  * Builds a storyboard with one codegen pipeline. For each scene, the storyboard builder
  * writes a visual brief (what the viewer experiences) and lists which library
@@ -10,7 +10,7 @@
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import type { Treatment } from "./concept-director.js";
-import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
+import { SCENE_STORYBOARD_DESIGN_RULES } from "./design-rules.js";
 import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { COMPOSITION_PLAYBOOK, PACING_PLAYBOOK } from "./cinematography.js";
 import { getStorytellingGuide } from "./design-skills.js";
@@ -33,7 +33,7 @@ function isLightBrand(brandKit: BrandKit): boolean {
 
 // ── Types ──
 
-export interface UnifiedPlannerOpts {
+export interface StoryboardBuilderOpts {
   prompt: string;
   format: OutputFormat;
   llmConfig: LLMConfig;
@@ -48,7 +48,7 @@ export interface UnifiedPlannerOpts {
   treatment?: Treatment;
 }
 
-export interface PlannedComponent {
+export interface StoryboardComponent {
   // Library component
   type?: string;  // e.g. "stat-card", "gradient-background"
   data?: Record<string, unknown>;
@@ -62,7 +62,7 @@ export interface PlannedComponent {
   template_data?: Record<string, unknown>;  // content for template slots
 }
 
-export interface PlannerScene {
+export interface DraftScene {
   label: string;
   duration_seconds: number;
   description: string;
@@ -76,13 +76,13 @@ export interface PlannerScene {
 
 export interface StoryboardResult {
   name: string;
-  scenes: PlannerScene[];
+  scenes: DraftScene[];
 }
 
 /**
- * Plan a storyboard with per-component library/custom decisions.
+ * Build a storyboard with per-component library/custom decisions.
  */
-export async function planStoryboard(opts: UnifiedPlannerOpts): Promise<StoryboardResult> {
+export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<StoryboardResult> {
   var catalogStr = formatCatalogForPrompt(opts.componentCatalog);
 
   var sceneCountGuide = opts.sceneCount
@@ -235,7 +235,7 @@ ${catalogStr}
 - Output ONLY valid JSON. No commentary.
 - When a prompt asks for a "walkthrough", "demo flow", "step by step", or "continuous take" involving multiple existing components, make ONE longer scene (12-30s) with a progression-style brief that lists those components (see "Continuous / Multi-Step Scenes" above) rather than several short scenes.
 
-${SCENE_PLANNER_DESIGN_RULES}
+${SCENE_STORYBOARD_DESIGN_RULES}
 
 ${templateCatalogStr}
 

@@ -2,7 +2,7 @@
  * Image Enrichment
  *
  * Pipeline-level step that scans a project's scenes and generates AI hero
- * images where needed. Works for any project regardless of how it was planned
+ * images where needed. Works for any project regardless of how it was storyboarded
  * Handles hero image generation for any pipeline target.
  * since HTML references them during generation.
  */
@@ -24,7 +24,7 @@ export interface ImageEnrichmentOpts {
 
 /**
  * Scan a project's scenes and generate AI images where needed.
- * Works for any project regardless of how it was planned.
+ * Works for any project regardless of how it was storyboarded.
  *
  * Asks the LLM which scenes would benefit from a hero image, generates them,
  * and wires the results into the scene components + project assets.

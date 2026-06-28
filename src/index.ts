@@ -900,7 +900,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           await fs.mkdir(saveDir, { recursive: true });
           await fs.writeFile(path.join(saveDir, `${type}.component.html`), source, "utf-8");
 
-          // Pair it with a schema so the planner can see + select it.
+          // Pair it with a schema so the storyboard builder can see + select it.
           await writeComponentSchema(saveDir, type, category, source);
 
           jsonResponse(res, 200, { ok: true });
@@ -1268,10 +1268,10 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
-      // ── API: Regenerate a scene (heavy planner+generate+critique rebuild) ──
+      // ── API: Regenerate a scene (heavy storyboard builder+generate+critique rebuild) ──
       // Unlike /api/revise (a surgical SEARCH/REPLACE patch on the existing
       // source), this rebuilds the scene from scratch via runSceneRevisionPipeline.
-      // It's slow (planner → generate → critique, ~minutes), so it runs as an
+      // It's slow (storyboard builder → generate → critique, ~minutes), so it runs as an
       // async job; the client polls /api/jobs/{id} and reloads when it completes.
       const regenMatch = url.match(/^\/api\/regenerate\/([^/]+)\/([^/]+)$/);
       if (regenMatch && method === "POST") {
@@ -1287,8 +1287,8 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         const regenIdx = project.scenes.findIndex((s: any) => s.id === sceneId);
         if (regenIdx === -1) { jsonResponse(res, 404, { error: `Scene ${sceneId} not found` }); return; }
-        // Persist any edited storyboard fields onto the plan BEFORE queueing, so the
-        // pipeline (which reloads the project from disk) rebuilds against the new plan.
+        // Persist any edited storyboard fields onto the storyboard BEFORE queueing, so the
+        // pipeline (which reloads the project from disk) rebuilds against the new storyboard.
         const regenStoryboardScene = ensureStoryboardScene(project, regenIdx);
         applyStoryboardFields(regenStoryboardScene, body);
         project.updated_at = new Date().toISOString();
@@ -1333,7 +1333,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
-      // ── API: Save a scene's storyboard plan entry (Studio storyboard panel) ──
+      // ── API: Save a scene's storyboard entry (Studio storyboard panel) ──
       const storyboardSceneMatch = url.match(/^\/api\/storyboard-scene\/([^/]+)\/([^/]+)$/);
       if (storyboardSceneMatch && method === "POST") {
         const [, tenantId, projectId] = storyboardSceneMatch.map(decodeURIComponent);
