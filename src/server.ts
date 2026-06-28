@@ -1355,55 +1355,59 @@ export function createMcpServer(): McpServer {
             }
           }
 
-          console.log(`  Storyboard mode: running unified pipeline (storyboard-only) for "${params.prompt.substring(0, 60)}..."`);
-          const pipelineResult = await runGeneratePipeline({
-            prompt: storyboardPrompt,
-            target: (params.target === "component" || params.target === "scene") ? "video" : (params.target || "video") as PipelineTarget,
-            tenant_id: params.tenant_id,
-            llmConfig,
-            brandKit: brandKit || {
-              colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
-              fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
-              style: { border_radius: "12px", motion: "cinematic" as const },
-            },
-            canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
-            creativity: params.creativity,
-            project_id: params.project_id,
-            voiceover: params.voiceover,
-            voice: params.voice,
-            storyboardOnly: true,
+          // Storyboarding runs the creative director + storyboard builder (two LLM
+          // passes) -- well over a connector's tool timeout -- so run it as an async
+          // job and return a job_id to poll, same as full generation.
+          const sbTarget = (params.target === "component" || params.target === "scene") ? "video" : (params.target || "video") as PipelineTarget;
+          const sbJob = queueJob("generate", params.tenant_id, async (j) => {
+            j.progress = { step: "storyboarding", percent: 10 };
+            const pipelineResult = await runGeneratePipeline({
+              prompt: storyboardPrompt,
+              target: sbTarget,
+              tenant_id: params.tenant_id,
+              llmConfig,
+              onProgress: genProgress(j, 10, 95),
+              brandKit: brandKit || {
+                colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
+                fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
+                style: { border_radius: "12px", motion: "cinematic" as const },
+              },
+              canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+              creativity: params.creativity,
+              project_id: params.project_id,
+              voiceover: params.voiceover,
+              voice: params.voice,
+              storyboardOnly: true,
+            });
+            if (pipelineResult.status === "error") throw new Error(pipelineResult.error || "Storyboard failed");
+            let project = pipelineResult.project!;
+
+            // If updating an existing project, copy the storyboard over.
+            if (params.project_id && params.project_id !== project.project_id) {
+              const origProject = await loadProject(params.tenant_id, params.project_id);
+              if (origProject) {
+                origProject.prompt = project.prompt;
+                origProject.storyboard = project.storyboard;
+                origProject.status = "storyboard";
+                origProject.updated_at = new Date().toISOString();
+                await saveProject(origProject);
+                project = origProject;
+              }
+            }
+            j.projectId = project.project_id;
+            j.progress = { step: "complete", percent: 100 };
+            return {
+              status: "storyboard",
+              project_id: project.project_id,
+              preview_url: previewUrl(params.tenant_id, project.project_id),
+              storyboard: project.storyboard,
+            };
           });
 
-          if (pipelineResult.status === "error") {
-            return err(`Storyboard failed: ${pipelineResult.error}`);
-          }
-
-          const project = pipelineResult.project!;
-
-          // If updating an existing project, copy the storyboard over
-          if (params.project_id && params.project_id !== project.project_id) {
-            const origProject = await loadProject(params.tenant_id, params.project_id);
-            if (origProject) {
-              origProject.prompt = project.prompt;
-              origProject.storyboard = project.storyboard;
-              origProject.status = "storyboard";
-              origProject.updated_at = new Date().toISOString();
-              await saveProject(origProject);
-
-              return ok({
-                status: "storyboard",
-                project_id: origProject.project_id,
-                preview_url: previewUrl(params.tenant_id, origProject.project_id),
-                storyboard: origProject.storyboard,
-              });
-            }
-          }
-
           return ok({
-            status: "storyboard",
-            project_id: project.project_id,
-            preview_url: previewUrl(params.tenant_id, project.project_id),
-            storyboard: project.storyboard,
+            status: "queued",
+            job_id: sbJob.id,
+            message: `Building the storyboard. Poll with get(target='job', job_id='${sbJob.id}') or job(action='wait', job_id='${sbJob.id}').`,
           });
         }
 
