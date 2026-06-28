@@ -741,9 +741,9 @@ export function createMcpServer(): McpServer {
       token: z.string().optional().describe("Auth token (required when AUTH_TOKENS is configured)"),
     },
     async (params) => {
-      if (isAuthEnabled()) {
-        if (!params.token) return err("Authentication required: provide a token");
-        if (!validateToken(params.token)) return err("Invalid token");
+      // Transport already enforces auth; per-tool `token` is optional (validate if present).
+      if (isAuthEnabled() && params.token && !validateToken(params.token)) {
+        return err("Invalid token");
       }
       let llmConfig;
       try { llmConfig = llmConfigFromEnv(); } catch (e: any) { return err(`LLM not configured: ${e.message}`); }
@@ -785,10 +785,12 @@ export function createMcpServer(): McpServer {
     },
     async (params) => {
       // Auth check
-      if (isAuthEnabled()) {
-        if (!params.token) return err("Authentication required: provide a token");
-        const tokenTenant = validateToken(params.token);
-        if (!tokenTenant) return err("Invalid token");
+      // The /mcp transport already enforces auth (Bearer) before any tool runs,
+      // so the per-tool `token` arg is optional — connectors authenticate at the
+      // transport, not by passing a token argument. Validate it only if supplied
+      // (back-compat for static-token / curl callers).
+      if (isAuthEnabled() && params.token && !validateToken(params.token)) {
+        return err("Invalid token");
       }
       const project = await loadProject(params.tenant_id, params.project_id);
       if (!project) return err("Project not found");
@@ -1320,10 +1322,12 @@ export function createMcpServer(): McpServer {
     },
     async (params) => {
       // Auth check
-      if (isAuthEnabled()) {
-        if (!params.token) return err("Authentication required: provide a token");
-        const tokenTenant = validateToken(params.token);
-        if (!tokenTenant) return err("Invalid token");
+      // The /mcp transport already enforces auth (Bearer) before any tool runs,
+      // so the per-tool `token` arg is optional — connectors authenticate at the
+      // transport, not by passing a token argument. Validate it only if supplied
+      // (back-compat for static-token / curl callers).
+      if (isAuthEnabled() && params.token && !validateToken(params.token)) {
+        return err("Invalid token");
       }
       try {
         // ── Storyboard mode: run unified pipeline in storyboard-only mode ──
@@ -1714,10 +1718,12 @@ export function createMcpServer(): McpServer {
     },
     async (params) => {
       // Auth check
-      if (isAuthEnabled()) {
-        if (!params.token) return err("Authentication required: provide a token");
-        const tokenTenant = validateToken(params.token);
-        if (!tokenTenant) return err("Invalid token");
+      // The /mcp transport already enforces auth (Bearer) before any tool runs,
+      // so the per-tool `token` arg is optional — connectors authenticate at the
+      // transport, not by passing a token argument. Validate it only if supplied
+      // (back-compat for static-token / curl callers).
+      if (isAuthEnabled() && params.token && !validateToken(params.token)) {
+        return err("Invalid token");
       }
 
       const timestamp = Date.now();
