@@ -21,7 +21,7 @@ import { generateComponentLLM } from "./component-gen.js";
 import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
 import { planStoryboard } from "./unified-planner.js";
-import { generateCreativeBible, formatCreativeBibleForPlanner, type CreativeBible } from "./concept-director.js";
+import { generateTreatment, formatTreatmentForPlanner, type Treatment } from "./concept-director.js";
 
 import { planRevision, type RevisionPlan, type RevisedComponent } from "./revision-planner.js";
 import { reviseComponent } from "./component-revise.js";
@@ -35,7 +35,7 @@ import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { fetchStockFootage } from "../media/stock-footage.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
-import type { BrandKit, Canvas, OutputFormat, PlannedScene, Project, ProjectPlan, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, StoryboardScene, Project, Storyboard, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
@@ -95,7 +95,7 @@ export interface PipelineOpts {
   speaker_trim_end?: number;
 
   // Plan-only mode: run concept director + unified planner, save plan, stop before scene generation
-  planOnly?: boolean;
+  storyboardOnly?: boolean;
 }
 
 export interface PipelineResult {
@@ -324,7 +324,7 @@ async function runSceneRevisionPipeline(
   }
 
   const existingScene = project.scenes[sceneIndex];
-  const plannedScene = project.plan?.scenes?.[sceneIndex];
+  const plannedScene = project.storyboard?.scenes?.[sceneIndex];
 
   // Serialize existing scene as context for the planner, and pin the scene's
   // brief (Studio-edited override, else the original storyboard plan) so the
@@ -342,7 +342,7 @@ async function runSceneRevisionPipeline(
   // paraphrases the brief into its own brief/description, and buildCodegenBrief
   // then generates from THAT — so the rebuild drifts from what the storyboard
   // actually said. Only fall back to the planner when there is no brief at all.
-  // The plan entry (project.plan.scenes[idx]) is the single source of truth that
+  // The plan entry (project.storyboard.scenes[idx]) is the single source of truth that
   // Studio edits; use it verbatim so the rebuild matches the storyboard.
   const briefPurpose = plannedScene?.purpose;
   const briefScript = plannedScene?.voiceover_text;
@@ -407,7 +407,7 @@ async function runSceneRevisionPipeline(
     canvas,
     tenantId: opts.tenant_id,
     projectId: project.project_id,
-    creativeBible: project.creative_bible as any,
+    treatment: project.treatment as any,
   });
 
   // Preserve the original scene id
@@ -548,7 +548,7 @@ async function runVideoRevisionPipeline(
       imageUrl,
       tenantId: opts.tenant_id,
       projectId: project.project_id,
-      creativeBible: project.creative_bible as any,
+      treatment: project.treatment as any,
     });
 
     if (generated.customSources) {
@@ -581,7 +581,7 @@ async function runVideoRevisionPipeline(
         critique: opts.critique,
         creativity: resolveCreativity(opts),
         critiqueLlmConfig: config.critiqueLlm,
-        creativeBible: project.creative_bible,
+        treatment: project.treatment,
       });
       finalVidScene = critiqueResult.scene;
       if (critiqueResult.customSources && critiqueResult.customSources !== generated.customSources) {
@@ -596,7 +596,7 @@ async function runVideoRevisionPipeline(
 
   project.scenes = newScenes;
   project.name = storyboard.name || project.name;
-    // creativeBible saved in runUnifiedPipeline
+    // treatment saved in runUnifiedPipeline
 
   // Merge assets
   if (enrichResult.assets.length > 0) {
@@ -787,7 +787,7 @@ async function runImageRevisionPipeline(
         canvas: useCanvas,
         tenantId: opts.tenant_id,
         projectId: project.project_id,
-        creativeBible: project.creative_bible as any,
+        treatment: project.treatment as any,
       });
 
       if (generated.customSources) {
@@ -860,7 +860,7 @@ async function runImageRevisionPipeline(
 
 /** Format a scene's brief for the revision prompt: the Studio-edited override
  *  (scene.brief) takes precedence over the original storyboard plan entry. */
-function formatSceneBrief(planned?: PlannedScene): string {
+function formatSceneBrief(planned?: StoryboardScene): string {
   const purpose = planned?.purpose;
   const script = planned?.voiceover_text;
   const visual = planned?.visual_notes;
@@ -971,7 +971,7 @@ async function critiqueAndRetryScene(opts: {
   correctnessOnly?: boolean;
   creativity?: number;
   critiqueLlmConfig?: LLMConfig;
-  creativeBible?: any;
+  treatment?: any;
 }): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
   // Skip critique if disabled (but correctnessOnly still runs the correctness gate).
   if (opts.critique === false && !opts.correctnessOnly) {
@@ -1407,7 +1407,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         imageUrl: opts.imageUrl,
         tenantId: opts.tenantId,
         projectId: opts.projectId,
-        creativeBible: opts.creativeBible,
+        treatment: opts.treatment,
         critiqueFeedback,
       });
 
@@ -1461,7 +1461,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         imageUrl: opts.imageUrl,
         tenantId: opts.tenantId,
         projectId: opts.projectId,
-        creativeBible: opts.creativeBible,
+        treatment: opts.treatment,
         critiqueFeedback: swapFeedback,
       });
 
@@ -1517,15 +1517,15 @@ function buildCritiqueFeedback(critique: CritiqueResult): string {
 // ── Unified Pipeline ──
 
 /**
- * Convert the planner's storyboard into the persisted ProjectPlan shape, so the
+ * Convert the planner's storyboard into the persisted Storyboard shape, so the
  * plan/storyboard -- including each scene's suggested library component types --
  * is recorded on the project for inspection and iteration. Used by both the
- * plan-only and full generation paths so project.plan is always populated.
+ * plan-only and full generation paths so project.storyboard is always populated.
  */
-function storyboardToPlan(
+function storyboardToSaved(
   storyboard: { name: string; scenes: Array<any> },
   voice?: string,
-): ProjectPlan {
+): Storyboard {
   return {
     narrative: storyboard.name,
     scenes: storyboard.scenes.map((s) => ({
@@ -1598,12 +1598,12 @@ async function runUnifiedPipeline(
   }
 
   // 2. Creative concept stage (generates ONE unifying idea)
-  var creativeBible: CreativeBible | undefined;
+  var treatment: Treatment | undefined;
   if (format !== "image") {
     opts.onProgress?.({ step: "concept", percent: 8, detail: "Designing the creative direction" });
     trace?.beginEvent("concept_director");
     try {
-      creativeBible = await generateCreativeBible({
+      treatment = await generateTreatment({
         prompt: richPrompt,
         format,
         llmConfig: opts.llmConfig,
@@ -1611,13 +1611,13 @@ async function runUnifiedPipeline(
         referenceImages: processedRefs,
       });
       // Inject creative direction into the prompt for the planner
-      var conceptContext = formatCreativeBibleForPlanner(creativeBible);
+      var conceptContext = formatTreatmentForPlanner(treatment);
       richPrompt = conceptContext + "\n\n---\n\n" + richPrompt;
-      console.log(`  Creative concept: "${creativeBible.concept}"`);
+      console.log(`  Creative concept: "${treatment.concept}"`);
     } catch (err) {
       console.warn("  [concept-director] Failed, continuing without concept:", (err as Error).message);
     }
-    trace?.endEvent({ concept: creativeBible?.concept });
+    trace?.endEvent({ concept: treatment?.concept });
   }
   var storyboard = await planStoryboard({
     prompt: richPrompt,
@@ -1631,7 +1631,7 @@ async function runUnifiedPipeline(
     tenantId: opts.tenant_id,
     hasSpeakerTrack: !!opts.speaker_source,
     referenceImages: processedRefs,
-    creativeBible,
+    treatment,
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
@@ -1646,19 +1646,19 @@ async function runUnifiedPipeline(
     canvas,
     brand_kit: brandKit,
     scenes: [],
-    creative_bible: creativeBible,
+    treatment: treatment,
   };
 
   // ── Plan-only mode: save storyboard as plan and return early ──
-  if (opts.planOnly) {
-    project.plan = storyboardToPlan(storyboard, opts.voice as string);
+  if (opts.storyboardOnly) {
+    project.storyboard = storyboardToSaved(storyboard, opts.voice as string);
     project.brief = { prompt: opts.prompt };
     project.status = "planned";
     project.created_at = new Date().toISOString();
     project.updated_at = new Date().toISOString();
     await saveProject(project);
 
-    console.log(`  Plan-only mode: saved plan with ${project.plan.scenes.length} scenes to project ${projectId}`);
+    console.log(`  Plan-only mode: saved plan with ${project.storyboard.scenes.length} scenes to project ${projectId}`);
 
     return {
       status: "completed",
@@ -1824,7 +1824,7 @@ async function runUnifiedPipeline(
           tenantId: opts.tenant_id,
           projectId,
           referenceImages: processedRefs,
-          creativeBible,
+          treatment,
           brollVideoUrl: brollUrlMap.get(i),
         });
 
@@ -1865,7 +1865,7 @@ async function runUnifiedPipeline(
             correctnessOnly: skipCritique,
             creativity: resolveCreativity(opts),
             critiqueLlmConfig: config.critiqueLlm,
-            creativeBible,
+            treatment,
           });
           finalScene = critiqueResult.scene;
           finalCustomSources = critiqueResult.customSources;
@@ -2014,7 +2014,7 @@ async function runUnifiedPipeline(
           const re = await generateScene({
             scene: planned, sceneIndex: idx, totalScenes: project.scenes.length, prompt: richPrompt, format,
             llmConfig: opts.llmConfig, brandKit, canvas, imageUrl: enrichResult.imageUrls.get(idx),
-            tenantId: opts.tenant_id, projectId, referenceImages: processedRefs, creativeBible,
+            tenantId: opts.tenant_id, projectId, referenceImages: processedRefs, treatment,
             brollVideoUrl: brollUrlMap.get(idx),
             critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its planned intent. ${fix.detail}`,
           });
@@ -2205,7 +2205,7 @@ async function runUnifiedPipeline(
   // Persist the planner's storyboard (briefs + suggested components) on the
   // project so it's available for inspection and iteration after a full run,
   // not just in plan-only mode.
-  project.plan = storyboardToPlan(storyboard, opts.voice as string);
+  project.storyboard = storyboardToSaved(storyboard, opts.voice as string);
   project.brief = { prompt: opts.prompt };
   project.status = "generated";
   await saveProject(project);

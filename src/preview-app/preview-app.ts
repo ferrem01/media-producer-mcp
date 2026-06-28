@@ -1561,7 +1561,7 @@ export function getPreviewHtml(): string {
   // sites refresh the brief; there is one codegen component per scene now, so a
   // component-layer list conveyed nothing.) Values come from the scene's edited
   // brief, falling back to the original storyboard plan entry.
-  // Map a PlannedScene (project.plan.scenes[idx]) into the editor's field shape.
+  // Map a StoryboardScene (project.storyboard.scenes[idx]) into the editor's field shape.
   function planToBrief(ps) {
     ps = ps || {};
     return {
@@ -1581,7 +1581,7 @@ export function getPreviewHtml(): string {
     var idx = state.currentSceneIndex;
     var scene = project && idx >= 0 && project.scenes[idx];
     if (!scene) { clearLayers(); return; }
-    var planned = (project.plan && project.plan.scenes && project.plan.scenes[idx]) || {};
+    var planned = (project.storyboard && project.storyboard.scenes && project.storyboard.scenes[idx]) || {};
     studio.brief = planToBrief(planned);
     renderBriefPreview();
   }
@@ -2715,9 +2715,9 @@ export function getPreviewHtml(): string {
         // Keep the in-memory plan in sync so it survives scene switches without reload.
         var idx = p.scenes ? p.scenes.findIndex(function(s) { return s.id === sceneId; }) : -1;
         if (idx >= 0 && res.planned) {
-          if (!p.plan) p.plan = { narrative: '', scenes: [], audio: {}, estimated_duration: 0 };
-          if (!p.plan.scenes) p.plan.scenes = [];
-          p.plan.scenes[idx] = res.planned;
+          if (!p.storyboard) p.storyboard = { narrative: '', scenes: [], audio: {}, estimated_duration: 0 };
+          if (!p.storyboard.scenes) p.storyboard.scenes = [];
+          p.storyboard.scenes[idx] = res.planned;
         }
         studio.brief = planToBrief(res.planned);
         renderBriefPreview();

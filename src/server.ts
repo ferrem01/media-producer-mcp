@@ -386,9 +386,9 @@ export function createMcpServer(): McpServer {
         if (!project) return err("Project not found");
 
         if (params.plan) {
-          if (!project.plan) {
+          if (!project.storyboard) {
             // Create a new plan from scratch
-            project.plan = {
+            project.storyboard = {
               narrative: params.plan.narrative || "",
               scenes: [],
               audio: {
@@ -401,20 +401,20 @@ export function createMcpServer(): McpServer {
           }
 
           // Merge top-level fields
-          if (params.plan.narrative !== undefined) project.plan.narrative = params.plan.narrative;
-          if (params.plan.estimated_duration !== undefined) project.plan.estimated_duration = params.plan.estimated_duration;
+          if (params.plan.narrative !== undefined) project.storyboard.narrative = params.plan.narrative;
+          if (params.plan.estimated_duration !== undefined) project.storyboard.estimated_duration = params.plan.estimated_duration;
           if (params.plan.audio) {
-            if (params.plan.audio.music_mood !== undefined) project.plan.audio.music_mood = params.plan.audio.music_mood;
-            if (params.plan.audio.voice !== undefined) project.plan.audio.voice = params.plan.audio.voice;
-            if (params.plan.audio.pacing !== undefined) project.plan.audio.pacing = params.plan.audio.pacing;
+            if (params.plan.audio.music_mood !== undefined) project.storyboard.audio.music_mood = params.plan.audio.music_mood;
+            if (params.plan.audio.voice !== undefined) project.storyboard.audio.voice = params.plan.audio.voice;
+            if (params.plan.audio.pacing !== undefined) project.storyboard.audio.pacing = params.plan.audio.pacing;
           }
 
           // Remove scenes (process before adds/updates, use descending order)
           if (params.plan.remove_scenes?.length) {
             const toRemove = [...params.plan.remove_scenes].sort((a, b) => b - a);
             for (const idx of toRemove) {
-              if (idx >= 0 && idx < project.plan.scenes.length) {
-                project.plan.scenes.splice(idx, 1);
+              if (idx >= 0 && idx < project.storyboard.scenes.length) {
+                project.storyboard.scenes.splice(idx, 1);
               }
             }
           }
@@ -423,19 +423,19 @@ export function createMcpServer(): McpServer {
           if (params.plan.reorder_scenes?.length) {
             const order = params.plan.reorder_scenes;
             const reordered = order
-              .filter(i => i >= 0 && i < project.plan!.scenes.length)
-              .map(i => project.plan!.scenes[i]);
-            if (reordered.length === project.plan.scenes.length) {
-              project.plan.scenes = reordered;
+              .filter(i => i >= 0 && i < project.storyboard!.scenes.length)
+              .map(i => project.storyboard!.scenes[i]);
+            if (reordered.length === project.storyboard.scenes.length) {
+              project.storyboard.scenes = reordered;
             }
           }
 
           // Update or append scenes
           if (params.plan.scenes?.length) {
             for (const sceneUpdate of params.plan.scenes) {
-              if (sceneUpdate.index !== undefined && sceneUpdate.index < project.plan.scenes.length) {
+              if (sceneUpdate.index !== undefined && sceneUpdate.index < project.storyboard.scenes.length) {
                 // Update existing scene
-                const existing = project.plan.scenes[sceneUpdate.index];
+                const existing = project.storyboard.scenes[sceneUpdate.index];
                 if (sceneUpdate.label !== undefined) existing.label = sceneUpdate.label;
                 if (sceneUpdate.purpose !== undefined) existing.purpose = sceneUpdate.purpose;
                 if (sceneUpdate.template !== undefined) existing.template = sceneUpdate.template;
@@ -444,7 +444,7 @@ export function createMcpServer(): McpServer {
                 if (sceneUpdate.visual_notes !== undefined) existing.visual_notes = sceneUpdate.visual_notes;
               } else {
                 // Append new scene
-                project.plan.scenes.push({
+                project.storyboard.scenes.push({
                   label: sceneUpdate.label || "New Scene",
                   purpose: sceneUpdate.purpose || "",
                   template: sceneUpdate.template || "C1",
@@ -458,7 +458,7 @@ export function createMcpServer(): McpServer {
           }
 
           // Recalculate estimated duration
-          project.plan.estimated_duration = project.plan.scenes.reduce(
+          project.storyboard.estimated_duration = project.storyboard.scenes.reduce(
             (sum, s) => sum + s.duration_seconds, 0
           );
 
@@ -467,12 +467,12 @@ export function createMcpServer(): McpServer {
 
         // Asset provision
         if (params.provide_asset) {
-          if (!project.plan) return err("Project has no plan");
+          if (!project.storyboard) return err("Project has no plan");
           const { scene_index, asset_index, path } = params.provide_asset;
-          if (scene_index < 0 || scene_index >= project.plan.scenes.length) {
+          if (scene_index < 0 || scene_index >= project.storyboard.scenes.length) {
             return err(`Invalid scene_index: ${scene_index}`);
           }
-          const scene = project.plan.scenes[scene_index];
+          const scene = project.storyboard.scenes[scene_index];
           if (asset_index < 0 || asset_index >= scene.assets.length) {
             return err(`Invalid asset_index: ${asset_index}`);
           }
@@ -482,7 +482,7 @@ export function createMcpServer(): McpServer {
 
         project.updated_at = new Date().toISOString();
         await saveProject(project);
-        return ok({ status: "updated", project_id: project.project_id, plan: project.plan });
+        return ok({ status: "updated", project_id: project.project_id, plan: project.storyboard });
       }
 
       // ── Property updates (status, name, canvas, scene/component props) ──
@@ -1354,8 +1354,8 @@ export function createMcpServer(): McpServer {
               return err(`Cannot revise plan: project is in '${existingProject.status}' state`);
             }
             planPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
-            if (existingProject.plan?.narrative) {
-              planPrompt += `\n\n## Previous Plan Narrative\n${existingProject.plan.narrative}`;
+            if (existingProject.storyboard?.narrative) {
+              planPrompt += `\n\n## Previous Plan Narrative\n${existingProject.storyboard.narrative}`;
             }
           }
 
@@ -1376,7 +1376,7 @@ export function createMcpServer(): McpServer {
             voiceover: params.voiceover,
             voice: params.voice,
             sceneCount: params.brief?.target_duration ? Math.max(3, Math.min(10, Math.round((params.brief.target_duration || 45) / 5.5))) : undefined,
-            planOnly: true,
+            storyboardOnly: true,
           });
 
           if (pipelineResult.status === "error") {
@@ -1390,7 +1390,7 @@ export function createMcpServer(): McpServer {
             const origProject = await loadProject(params.tenant_id, params.project_id);
             if (origProject) {
               origProject.brief = project.brief;
-              origProject.plan = project.plan;
+              origProject.storyboard = project.storyboard;
               origProject.status = "planned";
               origProject.updated_at = new Date().toISOString();
               await saveProject(origProject);
@@ -1399,7 +1399,7 @@ export function createMcpServer(): McpServer {
                 status: "planned",
                 project_id: origProject.project_id,
                 preview_url: previewUrl(params.tenant_id, origProject.project_id),
-                plan: origProject.plan,
+                plan: origProject.storyboard,
               });
             }
           }
@@ -1408,7 +1408,7 @@ export function createMcpServer(): McpServer {
             status: "planned",
             project_id: project.project_id,
             preview_url: previewUrl(params.tenant_id, project.project_id),
-            plan: project.plan,
+            plan: project.storyboard,
           });
         }
 
@@ -1417,14 +1417,14 @@ export function createMcpServer(): McpServer {
           if (!params.project_id) return err("project_id required for generate mode");
           const project = await loadProject(params.tenant_id, params.project_id);
           if (!project) return err("Project not found");
-          if (!project.plan) return err("Project has no plan. Run generate with mode='plan' first.");
+          if (!project.storyboard) return err("Project has no plan. Run generate with mode='plan' first.");
           if (project.status !== "planned") {
             return err(`Cannot generate: project is in '${project.status}' state (expected 'planned')`);
           }
 
           // Use the plan's script as the prompt for the unified pipeline
           // Build a rich prompt from the plan's narrative + scene details
-          const planPrompt = buildPromptFromPlan(project.plan, project.brief);
+          const planPrompt = buildPromptFromPlan(project.storyboard, project.brief);
 
           let llmConfig;
           try {
@@ -1450,8 +1450,8 @@ export function createMcpServer(): McpServer {
                 project_id: project.project_id,
                 voiceover: true,
                 backgroundMusic: true,
-                voice: project.plan!.audio.voice as any,
-                sceneCount: project.plan!.scenes.length,
+                voice: project.storyboard!.audio.voice as any,
+                sceneCount: project.storyboard!.scenes.length,
               });
 
               // Copy generated scenes, audio, and assets from the new project back to the original planned project
@@ -1998,7 +1998,7 @@ async function listComponentCatalog(): Promise<Array<{ type: string; category: s
  * Build a rich prompt from a plan for the unified pipeline.
  * Converts the plan's script into a format the unified planner understands.
  */
-function buildPromptFromPlan(plan: import("./core/types.js").ProjectPlan, brief?: import("./core/types.js").ProjectBrief): string {
+function buildPromptFromPlan(plan: import("./core/types.js").Storyboard, brief?: import("./core/types.js").ProjectBrief): string {
   let prompt = brief?.prompt || plan.narrative;
   prompt += "\n\n## Script (FOLLOW THIS EXACTLY)\n";
   prompt += `Narrative: ${plan.narrative}\n\n`;

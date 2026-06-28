@@ -9,7 +9,7 @@
 
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
-import type { CreativeBible } from "./concept-director.js";
+import type { Treatment } from "./concept-director.js";
 import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
 import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { COMPOSITION_PLAYBOOK, PACING_PLAYBOOK } from "./cinematography.js";
@@ -45,7 +45,7 @@ export interface UnifiedPlannerOpts {
   tenantId: string;
   hasSpeakerTrack?: boolean;
   referenceImages?: ReferenceImage[];
-  creativeBible?: CreativeBible;
+  treatment?: Treatment;
 }
 
 export interface PlannedComponent {
@@ -62,7 +62,7 @@ export interface PlannedComponent {
   template_data?: Record<string, unknown>;  // content for template slots
 }
 
-export interface PlannedScene {
+export interface PlannerScene {
   label: string;
   duration_seconds: number;
   description: string;
@@ -76,7 +76,7 @@ export interface PlannedScene {
 
 export interface StoryboardResult {
   name: string;
-  scenes: PlannedScene[];
+  scenes: PlannerScene[];
 }
 
 /**

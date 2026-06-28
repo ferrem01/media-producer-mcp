@@ -10,14 +10,14 @@ import type { LLMConfig } from "./client.js";
 import { generateSceneAgentic } from "./agentic-codegen.js";
 import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import { config } from "../config.js";
-import type { PlannedScene } from "./unified-planner.js";
+import type { PlannerScene } from "./unified-planner.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
-import type { CreativeBible } from "./concept-director.js";
+import type { Treatment } from "./concept-director.js";
 
 // ── Types ──
 
 export interface SceneGeneratorOpts {
-  scene: PlannedScene;
+  scene: PlannerScene;
   sceneIndex: number;
   totalScenes: number;
   prompt: string;           // original project prompt
@@ -30,7 +30,7 @@ export interface SceneGeneratorOpts {
   projectId: string;
   critiqueFeedback?: string; // feedback from visual critiquer for retry
   referenceImages?: ReferenceImage[];
-  creativeBible?: CreativeBible;
+  treatment?: Treatment;
   /** URL of a b-roll stock clip for the agent to place as this scene's background. */
   brollVideoUrl?: string;
 }
@@ -59,7 +59,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
 
 async function generateCodegenScene(
   opts: SceneGeneratorOpts,
-  planned: PlannedScene,
+  planned: PlannerScene,
   codegenBrief: string,
   sceneId: string,
 ): Promise<GeneratedScene> {
@@ -84,7 +84,7 @@ async function generateCodegenScene(
     canvas: opts.canvas,
     critiqueFeedback: opts.critiqueFeedback,
     referenceImages: opts.referenceImages,
-    creativeBible: opts.creativeBible,
+    treatment: opts.treatment,
     brollVideoUrl: opts.brollVideoUrl,
     heroImageUrl: opts.imageUrl,
   });
