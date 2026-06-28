@@ -1277,7 +1277,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "generate",
-    "Generate media from a natural language prompt. Use mode='storyboard' to produce just the storyboard (script + per-scene plan + asset requirements) for review. Use mode='full' (default) to produce the scenes: if the project already has a storyboard it builds from that (honoring your edits), otherwise it creates the storyboard first, then builds. Rendering to a final video is a separate step (the render tool). Recommended flow: storyboard -> review/edit -> full -> preview/edit -> render.",
+    "Generate media from a natural language prompt. Use mode='storyboard' to produce just the storyboard (script + per-scene breakdown + asset requirements) for review. Use mode='full' (default) to produce the scenes: if the project already has a storyboard it builds from that (honoring your edits), otherwise it creates the storyboard first, then builds. Rendering to a final video is a separate step (the render tool). Recommended flow: storyboard -> review/edit -> full -> preview/edit -> render.",
     {
       tenant_id: z.string(),
       prompt: z.string().default("").describe("Description of what to generate. Optional when the project already has a storyboard (uses its narrative)."),
