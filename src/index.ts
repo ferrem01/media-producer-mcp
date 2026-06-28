@@ -36,6 +36,7 @@ import { assembleComposite, type CompositeComponentSource } from "./core/composi
 import path from "node:path";
 import { setupWebSocket } from "./ws.js";
 import { authMiddleware, extractToken, validateToken, isAuthEnabled } from "./auth/auth.js";
+import { protectedResourceMetadata, authorizationServerMetadata, registerClient, wwwAuthenticateChallenge } from "./auth/mcp-oauth.js";
 import { readTraces, dailyDigest } from "./trace/index.js";
 import { generateImage } from "./media/image-gen.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
@@ -344,11 +345,16 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
 
       // ── MCP Streamable HTTP transport ──
       if (urlPath === "/mcp") {
-        // Validate auth
+        // Validate auth. An unauthenticated /mcp MUST be a 401 carrying a
+        // WWW-Authenticate challenge that points at the protected-resource
+        // metadata — Claude ignores the challenge on a 200, so it has to be 401.
         if (isAuthEnabled()) {
           const token = extractToken(req);
           if (!token || !validateToken(token)) {
-            res.writeHead(401, { "Content-Type": "application/json" });
+            res.writeHead(401, {
+              "Content-Type": "application/json",
+              "WWW-Authenticate": wwwAuthenticateChallenge(config.publicUrl),
+            });
             res.end(JSON.stringify({ error: "Authentication required" }));
             return;
           }
@@ -391,7 +397,20 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
             return;
           }
 
-          // Bad request
+          // A session id we don't recognize (e.g. the in-memory map was cleared
+          // by a restart) MUST be a 404 so the client re-initializes -- otherwise
+          // the conversation wedges with "Connected" but no working tools.
+          if (sessionId && !mcpTransports[sessionId]) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+              jsonrpc: "2.0",
+              error: { code: -32001, message: "Session not found" },
+              id: null,
+            }));
+            return;
+          }
+
+          // No session id and not an initialize.
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({
             jsonrpc: "2.0",
@@ -403,27 +422,42 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
 
         if (method === "GET") {
           const sessionId = req.headers["mcp-session-id"] as string | undefined;
-          if (!sessionId || !mcpTransports[sessionId]) {
-            res.writeHead(400, { "Content-Type": "text/plain" });
-            res.end("Invalid or missing session ID");
+          // Unknown session -> 404 so the client re-initializes (restart recovery).
+          if (sessionId && !mcpTransports[sessionId]) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32001, message: "Session not found" }, id: null }));
             return;
           }
+          // No session -> there is no SSE stream to open. 405 (never 404).
+          if (!sessionId) {
+            res.writeHead(405, { "Content-Type": "text/plain", "Allow": "POST, DELETE" });
+            res.end("Method Not Allowed: open a session via initialize first");
+            return;
+          }
+          // Valid session: long-lived SSE stream -- don't let the idle socket
+          // timeout kill it.
+          req.socket.setTimeout(0);
           await mcpTransports[sessionId].handleRequest(req, res);
           return;
         }
 
         if (method === "DELETE") {
           const sessionId = req.headers["mcp-session-id"] as string | undefined;
-          if (!sessionId || !mcpTransports[sessionId]) {
+          if (sessionId && !mcpTransports[sessionId]) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32001, message: "Session not found" }, id: null }));
+            return;
+          }
+          if (!sessionId) {
             res.writeHead(400, { "Content-Type": "text/plain" });
-            res.end("Invalid or missing session ID");
+            res.end("Missing session ID");
             return;
           }
           await mcpTransports[sessionId].handleRequest(req, res);
           return;
         }
 
-        res.writeHead(405, { "Content-Type": "text/plain" });
+        res.writeHead(405, { "Content-Type": "text/plain", "Allow": "GET, POST, DELETE, OPTIONS" });
         res.end("Method not allowed");
         return;
       }
@@ -533,9 +567,30 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
-      // ── OAuth routes (unauthenticated) ──
+      // ── OAuth discovery + DCR for MCP connectors (unauthenticated) ──
 
-      if (urlPath === "/auth/google/login" && method === "GET") {
+      // RFC 9728 protected-resource metadata (Claude follows the 401's WWW-Authenticate here).
+      if (urlPath === "/.well-known/oauth-protected-resource" && method === "GET") {
+        jsonResponse(res, 200, protectedResourceMetadata(config.publicUrl));
+        return;
+      }
+      // RFC 8414 authorization-server metadata (+ openid-configuration alias some clients probe).
+      if ((urlPath === "/.well-known/oauth-authorization-server" || urlPath === "/.well-known/openid-configuration") && method === "GET") {
+        jsonResponse(res, 200, authorizationServerMetadata(config.publicUrl));
+        return;
+      }
+      // RFC 7591 Dynamic Client Registration.
+      if (urlPath === "/register" && method === "POST") {
+        let regBody: any = {};
+        try { regBody = await parseBody(req); } catch { /* empty/invalid -> defaults */ }
+        jsonResponse(res, 201, registerClient(regBody));
+        return;
+      }
+
+      // ── OAuth routes (unauthenticated) ──
+      // Standard endpoint names (what the discovery doc advertises) + the
+      // existing /auth/* paths kept as aliases.
+      if ((urlPath === "/authorize" || urlPath === "/auth/google/login") && method === "GET") {
         await handleGoogleLogin(req, res);
         return;
       }
@@ -543,7 +598,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         await handleGoogleCallback(req, res);
         return;
       }
-      if (urlPath === "/auth/token" && method === "POST") {
+      if ((urlPath === "/token" || urlPath === "/auth/token") && method === "POST") {
         await handleTokenExchange(req, res);
         return;
       }
