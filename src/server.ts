@@ -323,7 +323,7 @@ export function createMcpServer(): McpServer {
         fps: z.number().optional(),
         background: z.string().optional(),
       }).optional(),
-      status: z.enum(["draft", "storyboarded", "generated", "rendering", "rendered", "failed"]).optional(),
+      status: z.enum(["draft", "storyboard", "generated", "rendering", "rendered", "failed"]).optional(),
 
       // Scene-level updates
       label: z.string().optional(),
@@ -370,7 +370,7 @@ export function createMcpServer(): McpServer {
         })).optional(),
         remove_scenes: z.array(z.number()).optional().describe("Indices of storyboard scenes to remove"),
         reorder_scenes: z.array(z.number()).optional().describe("Current indices in desired order"),
-      }).optional().describe("Direct storyboard edits. Partial updates -- only fields you pass get changed. Works in storyboarded state."),
+      }).optional().describe("Direct storyboard edits. Partial updates -- only fields you pass get changed. Works in the storyboard state."),
 
       // Asset provision
       provide_asset: z.object({
@@ -462,7 +462,7 @@ export function createMcpServer(): McpServer {
             (sum, s) => sum + s.duration_seconds, 0
           );
 
-          project.status = "storyboarded";
+          project.status = "storyboard";
         }
 
         // Asset provision
@@ -785,7 +785,7 @@ export function createMcpServer(): McpServer {
       if (project.status === "draft") {
         return err("Project needs a storyboard first. Run generate with mode='storyboard' to create a storyboard.");
       }
-      if (project.status === "storyboarded") {
+      if (project.status === "storyboard") {
         return err("Project has a storyboard but scenes haven't been generated yet. Run generate with mode='full' to build scenes from the storyboard.");
       }
 
@@ -1316,7 +1316,7 @@ export function createMcpServer(): McpServer {
           url: z.string().optional(),
         })).optional(),
       }).optional().describe("Structured brief with marketing context. Enhances the prompt with audience, messaging, and asset info."),
-      feedback: z.string().optional().describe("Natural language feedback to revise an existing storyboard. Requires project_id with a storyboarded project."),
+      feedback: z.string().optional().describe("Natural language feedback to revise an existing storyboard. Requires project_id with a project in the storyboard state."),
       reference_images: z.array(z.object({
         url: z.string().describe("HTTPS URL or base64 data URI (data:image/...)"),
         role: z.enum(["ui_reference", "style_reference", "brand_reference", "screenshot"]),
@@ -1350,7 +1350,7 @@ export function createMcpServer(): McpServer {
           if (params.project_id && params.feedback) {
             const existingProject = await loadProject(params.tenant_id, params.project_id);
             if (!existingProject) return err("Project not found for storyboard revision");
-            if (existingProject.status !== "storyboarded" && existingProject.status !== "draft") {
+            if (existingProject.status !== "storyboard" && existingProject.status !== "draft") {
               return err(`Cannot revise storyboard: project is in '${existingProject.status}' state`);
             }
             storyboardPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
@@ -1391,12 +1391,12 @@ export function createMcpServer(): McpServer {
             if (origProject) {
               origProject.brief = project.brief;
               origProject.storyboard = project.storyboard;
-              origProject.status = "storyboarded";
+              origProject.status = "storyboard";
               origProject.updated_at = new Date().toISOString();
               await saveProject(origProject);
 
               return ok({
-                status: "storyboarded",
+                status: "storyboard",
                 project_id: origProject.project_id,
                 preview_url: previewUrl(params.tenant_id, origProject.project_id),
                 storyboard: origProject.storyboard,
@@ -1405,7 +1405,7 @@ export function createMcpServer(): McpServer {
           }
 
           return ok({
-            status: "storyboarded",
+            status: "storyboard",
             project_id: project.project_id,
             preview_url: previewUrl(params.tenant_id, project.project_id),
             storyboard: project.storyboard,
@@ -1419,7 +1419,7 @@ export function createMcpServer(): McpServer {
         // falls through to the fresh storyboard+scenes run below.
         if (params.project_id && !params.id) {
           const project = await loadProject(params.tenant_id, params.project_id);
-          if (project && project.storyboard && project.status === "storyboarded") {
+          if (project && project.storyboard && project.status === "storyboard") {
 
           // Use the storyboard's script as the prompt for the unified pipeline
           // Build a rich prompt from the storyboard's narrative + scene details
