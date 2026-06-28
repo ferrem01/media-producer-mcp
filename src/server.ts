@@ -786,7 +786,7 @@ export function createMcpServer(): McpServer {
         return err("Project needs a storyboard first. Run generate with mode='storyboard' to create a storyboard.");
       }
       if (project.status === "storyboarded") {
-        return err("Project has a storyboard but scenes haven't been generated yet. Run generate with mode='generate' to build scenes from the storyboard.");
+        return err("Project has a storyboard but scenes haven't been generated yet. Run generate with mode='full' to build scenes from the storyboard.");
       }
 
       // Scene preview
@@ -1277,10 +1277,10 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "generate",
-    "Generate media from a natural language prompt. Use mode='storyboard' to get a storyboard with script, storyboard, and asset requirements for review. Use mode='generate' to build scenes from an approved storyboard. Use mode='full' (default) to storyboard, generate, and render in one shot. Recommended flow: storyboard -> review/iterate -> provide assets -> generate -> preview/edit -> render.",
+    "Generate media from a natural language prompt. Use mode='storyboard' to produce just the storyboard (script + per-scene plan + asset requirements) for review. Use mode='full' (default) to produce the scenes: if the project already has a storyboard it builds from that (honoring your edits), otherwise it creates the storyboard first, then builds. Rendering to a final video is a separate step (the render tool). Recommended flow: storyboard -> review/edit -> full -> preview/edit -> render.",
     {
       tenant_id: z.string(),
-      prompt: z.string().default("").describe("Description of what to generate. Optional for mode='generate' (uses storyboard narrative)."),
+      prompt: z.string().default("").describe("Description of what to generate. Optional when the project already has a storyboard (uses its narrative)."),
       target: z.enum(["component", "scene", "video", "image", "presentation"]).optional().default("video").describe("What to generate (default: video)"),
       id: z.string().optional().describe("ID of existing content to revise. Component: component name. Scene: scene_id (requires project_id). Video/image/presentation: project_id."),
       project_id: z.string().optional().describe("Project ID (required for scene revision)"),
@@ -1295,7 +1295,7 @@ export function createMcpServer(): McpServer {
       speaker_start: z.number().optional().describe("Start offset in seconds into the speaker video (skip dead air at start)"),
       speaker_trim_start: z.number().optional().describe("Trim: only use speaker video from this timestamp"),
       speaker_trim_end: z.number().optional().describe("Trim: stop using speaker video at this timestamp"),
-      mode: z.enum(["storyboard", "generate", "full"]).optional().default("full").describe("'storyboard' = create a storyboard for review. 'generate' = build scenes from an approved storyboard. 'full' = storyboard + generate + render in one shot (default, current behavior)."),
+      mode: z.enum(["storyboard", "full"]).optional().default("full").describe("'storyboard' = produce just the storyboard for review (stops there). 'full' (default) = produce the scenes: build from an existing storyboard if the project has one, else create the storyboard first. Rendering the final video is the separate render tool."),
       brief: z.object({
         video_type: z.enum(["product_launch", "feature_announcement", "customer_story", "how_to", "promo", "explainer", "case_study", "brand"]).optional(),
         context: z.object({
@@ -1412,15 +1412,14 @@ export function createMcpServer(): McpServer {
           });
         }
 
-        // ── Generate mode: build scenes from an approved storyboard ──
-        if (params.mode === "generate") {
-          if (!params.project_id) return err("project_id required for generate mode");
+        // ── Build from an existing approved storyboard ──
+        // In full mode, if the project has already been storyboarded (and possibly
+        // edited), build the scenes from THAT storyboard instead of planning a new
+        // one. Anything else (no project, a draft project, or a revision via `id`)
+        // falls through to the fresh storyboard+scenes run below.
+        if (params.project_id && !params.id) {
           const project = await loadProject(params.tenant_id, params.project_id);
-          if (!project) return err("Project not found");
-          if (!project.storyboard) return err("Project has no storyboard. Run generate with mode='storyboard' first.");
-          if (project.status !== "storyboarded") {
-            return err(`Cannot generate: project is in '${project.status}' state (expected 'storyboarded')`);
-          }
+          if (project && project.storyboard && project.status === "storyboarded") {
 
           // Use the storyboard's script as the prompt for the unified pipeline
           // Build a rich prompt from the storyboard's narrative + scene details
@@ -1484,14 +1483,14 @@ export function createMcpServer(): McpServer {
                         for (const entry of entries) {
                           await fs.copyFile(path.join(srcSub, entry), path.join(dstSub, entry));
                         }
-                        console.log(`  Generate mode: copied ${entries.length} ${subdir} files`);
+                        console.log(`  Build-from-storyboard: copied ${entries.length} ${subdir} files`);
                       }
                     } catch {
                       // Directory may not exist, skip
                     }
                   }
 
-                  console.log(`  Generate mode: copied ${generatedProject.scenes.length} scenes from ${newProjectId} to ${params.project_id}`);
+                  console.log(`  Build-from-storyboard: copied ${generatedProject.scenes.length} scenes from ${newProjectId} to ${params.project_id}`);
                 }
               } else {
                 // Pipeline wrote to the same project
@@ -1525,6 +1524,8 @@ export function createMcpServer(): McpServer {
             preview_url: previewUrl(params.tenant_id, project.project_id),
             message: "Generating scenes from storyboard. Use get(target='job', job_id='" + job.id + "') to check status.",
           });
+          }
+          // No approved storyboard on this project -> fall through to a fresh run.
         }
 
         // ── Full mode (default) and revision mode below ──
