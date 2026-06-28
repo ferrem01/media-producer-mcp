@@ -277,7 +277,7 @@ export interface StoryboardScene {
   /** Duration */
   duration_seconds: number;
   /** What this scene needs to look great */
-  assets: PlannedAsset[];
+  assets: AssetRequirement[];
   /** Visual description for the storyboard */
   visual_notes: string;
   /** Library component types the planner suggested embedding in this scene */
@@ -288,23 +288,23 @@ export interface StoryboardScene {
   hero_image?: string;
 }
 
-export type PlannedAssetType =
+export type AssetRequirementType =
   | "screen_recording" | "camera_video" | "photo" | "screenshot"
   | "product_shot" | "ai_image" | "illustration" | "stock_footage" | "mockup";
 
-export type PlannedAssetStatus = "needed" | "provided" | "generating" | "generated" | "fallback";
+export type AssetRequirementStatus = "needed" | "provided" | "generating" | "generated" | "fallback";
 
-export type PlannedAssetPriority = "critical" | "recommended" | "nice_to_have";
+export type AssetRequirementPriority = "critical" | "recommended" | "nice_to_have";
 
-export interface PlannedAsset {
+export interface AssetRequirement {
   /** What this asset is for */
   description: string;
   /** Asset type */
-  type: PlannedAssetType;
+  type: AssetRequirementType;
   /** Current status */
-  status: PlannedAssetStatus;
+  status: AssetRequirementStatus;
   /** How much this affects quality */
-  priority: PlannedAssetPriority;
+  priority: AssetRequirementPriority;
   /** What MCP does if this isn't provided */
   fallback: string;
   /** Path to the asset (when provided or generated) */

@@ -172,7 +172,7 @@ Then pick the STRONGEST concept and explain why.
 /**
  * Format the creative bible as context for the storyboard builder.
  */
-export function formatTreatmentForPlanner(bible: Treatment): string {
+export function formatTreatmentForStoryboard(bible: Treatment): string {
   return `## Creative Direction (FOLLOW THIS -- every scene must serve this concept)
 
 **THE CONCEPT:** ${bible.concept}

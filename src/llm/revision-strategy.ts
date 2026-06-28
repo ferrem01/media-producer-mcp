@@ -12,7 +12,7 @@
 
 import { callLLM, type LLMConfig } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
-import { SCENE_PLANNER_DESIGN_RULES } from "./design-rules.js";
+import { SCENE_STORYBOARD_DESIGN_RULES } from "./design-rules.js";
 import type { BrandKit, Canvas, OutputFormat, SceneComponent } from "../core/types.js";
 
 // ── Types ──
@@ -39,7 +39,7 @@ export interface RevisedComponent {
   custom_prompt?: string;
 }
 
-export interface RevisionPlan {
+export interface SceneRevisionSpec {
   label: string;
   duration_seconds: number;
   components: RevisedComponent[];
@@ -47,7 +47,7 @@ export interface RevisionPlan {
   revision_summary: string;
 }
 
-export interface RevisionPlannerOpts {
+export interface RevisionStrategyOpts {
   /** User's revision instructions */
   prompt: string;
   /** Existing scene components with their props */
@@ -71,7 +71,7 @@ export interface RevisionPlannerOpts {
  * The planner sees the actual HTML source of custom components so it can
  * make informed decisions about what to keep vs change.
  */
-export async function planRevision(opts: RevisionPlannerOpts): Promise<RevisionPlan> {
+export async function strategizeRevision(opts: RevisionStrategyOpts): Promise<SceneRevisionSpec> {
   const catalogStr = formatCatalogForPrompt(opts.componentCatalog);
 
   // Build existing component context with actual HTML source
@@ -98,7 +98,7 @@ Return the revision plan as JSON.`;
     { role: "user", content: userPrompt },
   ], { temperature: 0.3, maxTokens: 8192 });
 
-  return parseRevisionPlan(raw, opts.existingComponents, opts.sceneDuration);
+  return parseRevisionStrategy(raw, opts.existingComponents, opts.sceneDuration);
 }
 
 // ── Prompt Construction ──
@@ -246,16 +246,16 @@ ${brandAssetsSection}
 - For "replace": include custom=true and custom_prompt.
 - Output ONLY valid JSON. No commentary.
 
-${SCENE_PLANNER_DESIGN_RULES}`;
+${SCENE_STORYBOARD_DESIGN_RULES}`;
 }
 
 // ── Parsing ──
 
-function parseRevisionPlan(
+function parseRevisionStrategy(
   raw: string,
   existingComponents: SceneComponent[],
   defaultDuration: number,
-): RevisionPlan {
+): SceneRevisionSpec {
   let trimmed = raw.trim();
 
   // Strip markdown fences

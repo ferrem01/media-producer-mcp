@@ -15,7 +15,7 @@ import { config } from "../src/config.js";
 import type { LLMConfig } from "../src/llm/client.js";
 import { generateComponentLLM, extractComponentSource } from "../src/llm/component-gen.js";
 import { expandPrompt } from "../src/llm/expander.js";
-import { planScene } from "../src/llm/scene-planner.js";
+import { draftScene } from "../src/llm/scene-drafter.js";
 import { planProject } from "../src/llm/project-planner.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "../src/llm/catalog.js";
 import { runGeneratePipeline } from "../src/llm/pipeline.js";
@@ -142,7 +142,7 @@ describe.skipIf(SKIP)("prompt expander", () => {
 
 describe.skipIf(SKIP)("scene planner", () => {
   it("plans a scene using library components", async () => {
-    const result = await planScene({
+    const result = await draftScene({
       prompt: "A title scene introducing Quotient with a purple gradient background, the company name in large text, and the tagline 'AI-Powered Demand Marketing' below it",
       llmConfig,
       componentCatalog: catalog,
@@ -164,7 +164,7 @@ describe.skipIf(SKIP)("scene planner", () => {
   }, 60_000);
 
   it("returns custom components when library doesn't fit", async () => {
-    const result = await planScene({
+    const result = await draftScene({
       prompt: "A realistic Slack channel view showing messages from team members discussing a product launch, with typing indicators and emoji reactions",
       llmConfig,
       componentCatalog: catalog,

@@ -5,7 +5,7 @@
  * The component prompt was extracted from src/core/component-generator.ts (DRY).
  */
 
-import { COMPONENT_DESIGN_RULES, SCENE_PLANNER_DESIGN_RULES, CRITIQUER_DESIGN_RULES, PREMIUM_DESIGN_PHILOSOPHY, AMATEUR_TELLS } from "./design-rules.js";
+import { COMPONENT_DESIGN_RULES, SCENE_STORYBOARD_DESIGN_RULES, CRITIQUER_DESIGN_RULES, PREMIUM_DESIGN_PHILOSOPHY, AMATEUR_TELLS } from "./design-rules.js";
 import { GSAP_ANIMATION_SKILLS } from "./gsap-skills.js";
 import { SCRIPT_SYSTEM_SKILLS } from "./script-skills.js";
 import { COMPONENT_EXEMPLARS } from "./exemplars.js";
@@ -16,7 +16,7 @@ import type { BrandKit, Canvas, DesignSystem } from "../core/types.js";
 /**
  * System prompt for generating .component.html files.
  * This is THE canonical component generation prompt -- used by both
- * direct component generation and the scene planner's custom fallback.
+ * direct component generation and the storyboard step's custom fallback.
  */
 export function componentSystemPrompt(format: string = "video"): string {
   var formatRules = componentFormatRules(format);
@@ -144,8 +144,8 @@ ${COMPONENT_EXEMPLARS}`;
  * System prompt for planning a single scene.
  * Includes the available component catalog so the LLM knows what to pick from.
  */
-export function scenePlannerSystemPrompt(componentCatalog: string): string {
-  return `You are a scene planner for a media production system. Your job is to plan a single scene by selecting components from the library and filling in their data fields.
+export function sceneStoryboardSystemPrompt(componentCatalog: string): string {
+  return `You are a scene storyboard artist for a media production system. Your job is to storyboard a single scene by selecting components from the library and filling in their data fields.
 
 ## Available Components
 
@@ -203,14 +203,14 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 10. Always include a background component (gradient-background or mesh-gradient) at z_index 0.
 11. Use the correct transition types: crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, none. Do NOT use slide_left, zoom_in, scale_up.
 
-${SCENE_PLANNER_DESIGN_RULES}`;
+${SCENE_STORYBOARD_DESIGN_RULES}`;
 }
 
 /**
  * System prompt for planning a full multi-scene project.
  */
-export function projectPlannerSystemPrompt(componentCatalog: string): string {
-  return `You are a project planner for a media production system. Your job is to plan a full multi-scene project (video, presentation) by creating a storyboard.
+export function projectStoryboardSystemPrompt(componentCatalog: string): string {
+  return `You are a project storyboard director for a media production system. Your job is to storyboard a full multi-scene project (video, presentation) by creating a storyboard.
 
 ## Available Components
 
@@ -248,14 +248,14 @@ You MUST output valid JSON (no markdown fences, no commentary) with this structu
 ## Rules
 
 1. Break the content into logical scenes (typically 3-8 for a video, more for a presentation).
-2. Each scene prompt should be detailed enough for the scene planner to select components and fill data.
+2. Each scene prompt should be detailed enough for the storyboard step to select components and fill data.
 3. For videos: aim for 3-5 second scenes, total 15-60 seconds.
 4. For presentations: one slide per scene, 5-7 seconds each.
 5. First scene should be an intro/title. Last scene should be a CTA or summary.
 6. Use transitions between scenes (crossfade is default, vary for visual interest).
 7. Output ONLY the JSON object. No explanation.
 
-${SCENE_PLANNER_DESIGN_RULES}`;
+${SCENE_STORYBOARD_DESIGN_RULES}`;
 }
 
 /**
@@ -395,7 +395,7 @@ ${SCENE_TEMPLATES}
 }
 
 /**
- * DEPRECATED: Was the old planner prompt, now replaced by unified-planner.ts.
+ * DEPRECATED: Was the old storyboard prompt, now replaced by storyboard-builder.ts.
  * The LLM writes full HTML+CSS+GSAP per scene with complete creative freedom.
  */
 function isLightBackground(brandKit: BrandKit): boolean {
@@ -498,8 +498,8 @@ function getBrandStyleGuide(brandKit: BrandKit): string {
 - For contrast issues: adjust TEXT color (use var(--mp-color-text) or lighter shades), never lighten the background`;
 }
 
-/** @deprecated Use unified planner instead. Kept temporarily for export compat. */
-export function freeformPlannerSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
+/** @deprecated Use the storyboard builder instead. Kept temporarily for export compat. */
+export function freeformStoryboardSystemPrompt(format: string, canvas: Canvas, brandKit: BrandKit): string {
   var formatRules = componentFormatRules(format);
   var brandVars = buildBrandVarsList(brandKit);
   var brandStyleGuide = getBrandStyleGuide(brandKit);

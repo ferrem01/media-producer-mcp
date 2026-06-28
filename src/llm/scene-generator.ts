@@ -10,14 +10,14 @@ import type { LLMConfig } from "./client.js";
 import { generateSceneAgentic } from "./agentic-codegen.js";
 import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import { config } from "../config.js";
-import type { PlannerScene } from "./unified-planner.js";
+import type { DraftScene } from "./storyboard-builder.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import type { Treatment } from "./concept-director.js";
 
 // ── Types ──
 
 export interface SceneGeneratorOpts {
-  scene: PlannerScene;
+  scene: DraftScene;
   sceneIndex: number;
   totalScenes: number;
   prompt: string;           // original project prompt
@@ -59,7 +59,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
 
 async function generateCodegenScene(
   opts: SceneGeneratorOpts,
-  planned: PlannerScene,
+  planned: DraftScene,
   codegenBrief: string,
   sceneId: string,
 ): Promise<GeneratedScene> {

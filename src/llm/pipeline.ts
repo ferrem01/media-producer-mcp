@@ -20,10 +20,10 @@ import type { LLMConfig } from "./client.js";
 import { generateComponentLLM } from "./component-gen.js";
 import { expandPrompt } from "./expander.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
-import { planStoryboard } from "./unified-planner.js";
-import { generateTreatment, formatTreatmentForPlanner, type Treatment } from "./concept-director.js";
+import { buildStoryboard } from "./storyboard-builder.js";
+import { generateTreatment, formatTreatmentForStoryboard, type Treatment } from "./concept-director.js";
 
-import { planRevision, type RevisionPlan, type RevisedComponent } from "./revision-planner.js";
+import { strategizeRevision, type SceneRevisionSpec, type RevisedComponent } from "./revision-strategy.js";
 import { reviseComponent } from "./component-revise.js";
 import { critiqueAndReviseScene } from "./revision-critique.js";
 import { generateScene } from "./scene-generator.js";
@@ -338,7 +338,7 @@ async function runSceneRevisionPipeline(
 
   // Build the scene the generator will render. When we have an explicit brief
   // (Studio-edited override, else the original storyboard plan), use it VERBATIM
-  // as the generation spec instead of re-running the planner: planStoryboard
+  // as the generation spec instead of re-running the planner: buildStoryboard
   // paraphrases the brief into its own brief/description, and buildCodegenBrief
   // then generates from THAT — so the rebuild drifts from what the storyboard
   // actually said. Only fall back to the planner when there is no brief at all.
@@ -372,7 +372,7 @@ async function runSceneRevisionPipeline(
   } else {
     opts.onProgress?.({ step: "planning", percent: 10, detail: "Planning the scene" });
     trace?.beginEvent("scene_revision_plan");
-    const storyboard = await planStoryboard({
+    const storyboard = await buildStoryboard({
       prompt: revisionPrompt,
       format: project.format || "video",
       llmConfig: opts.llmConfig,
@@ -490,7 +490,7 @@ async function runVideoRevisionPipeline(
   const revisionPrompt = `Revise this video based on these instructions: ${opts.prompt}\n\nCurrent project:\n${projectContext}`;
 
   trace?.beginEvent("video_revision_plan");
-  const storyboard = await planStoryboard({
+  const storyboard = await buildStoryboard({
     prompt: revisionPrompt,
     format: project.format || "video",
     llmConfig: opts.llmConfig,
@@ -671,7 +671,7 @@ async function runImageRevisionPipeline(
   console.log(`  [revision] Existing components: ${existingScene.components.map(c => c.type).join(", ")}`);
   console.log(`  [revision] Custom sources available: ${[...customSources.keys()].join(", ") || "none"}`);
 
-  const revisionPlan = await planRevision({
+  const revisionStrategy = await strategizeRevision({
     prompt: opts.prompt,
     existingComponents: existingScene.components,
     customSources,
@@ -685,12 +685,12 @@ async function runImageRevisionPipeline(
     tenantId: opts.tenant_id,
   });
   trace?.endEvent({
-    strategies: revisionPlan.components.map(c => `${c.type}:${c.strategy}`),
-    summary: revisionPlan.revision_summary,
+    strategies: revisionStrategy.components.map(c => `${c.type}:${c.strategy}`),
+    summary: revisionStrategy.revision_summary,
   });
 
-  console.log(`  [revision] Plan: ${revisionPlan.revision_summary}`);
-  for (const comp of revisionPlan.components) {
+  console.log(`  [revision] Plan: ${revisionStrategy.revision_summary}`);
+  for (const comp of revisionStrategy.components) {
     console.log(`    ${comp.original_id || "NEW"} (${comp.type}): ${comp.strategy}${comp.revise_instructions ? " - " + comp.revise_instructions.substring(0, 80) : ""}`);
   }
 
@@ -700,8 +700,8 @@ async function runImageRevisionPipeline(
   const newComponents: import("../core/types.js").SceneComponent[] = [];
   const newCustomSources = new Map<string, string>();
 
-  for (let ci = 0; ci < revisionPlan.components.length; ci++) {
-    const planned = revisionPlan.components[ci];
+  for (let ci = 0; ci < revisionStrategy.components.length; ci++) {
+    const planned = revisionStrategy.components[ci];
 
     if (planned.strategy === "remove") {
       console.log(`  [revision] Removing ${planned.type}`);
@@ -772,8 +772,8 @@ async function runImageRevisionPipeline(
 
       const generated = await generateScene({
         scene: {
-          label: revisionPlan.label,
-          duration_seconds: revisionPlan.duration_seconds,
+          label: revisionStrategy.label,
+          duration_seconds: revisionStrategy.duration_seconds,
           description: planned.custom_prompt || opts.prompt,
           brief: planned.custom_prompt || opts.prompt,
           components: [],
@@ -808,8 +808,8 @@ async function runImageRevisionPipeline(
   // Build the revised scene
   const revisedScene: Scene = {
     id: existingScene.id,
-    label: revisionPlan.label || existingScene.label,
-    duration_seconds: revisionPlan.duration_seconds || existingScene.duration_seconds,
+    label: revisionStrategy.label || existingScene.label,
+    duration_seconds: revisionStrategy.duration_seconds || existingScene.duration_seconds,
     transition_in: existingScene.transition_in,
     components: newComponents,
     background: existingScene.background,
@@ -1611,7 +1611,7 @@ async function runUnifiedPipeline(
         referenceImages: processedRefs,
       });
       // Inject creative direction into the prompt for the planner
-      var conceptContext = formatTreatmentForPlanner(treatment);
+      var conceptContext = formatTreatmentForStoryboard(treatment);
       richPrompt = conceptContext + "\n\n---\n\n" + richPrompt;
       console.log(`  Creative concept: "${treatment.concept}"`);
     } catch (err) {
@@ -1619,7 +1619,7 @@ async function runUnifiedPipeline(
     }
     trace?.endEvent({ concept: treatment?.concept });
   }
-  var storyboard = await planStoryboard({
+  var storyboard = await buildStoryboard({
     prompt: richPrompt,
     format,
     llmConfig: opts.llmConfig,

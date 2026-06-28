@@ -57,7 +57,7 @@ export const COMPONENT_DESIGN_RULES = `
 /**
  * Rules for the scene planner (what data to pass to components).
  */
-export const SCENE_PLANNER_DESIGN_RULES = `
+export const SCENE_STORYBOARD_DESIGN_RULES = `
 ## Visual Design Rules for Scene Planning
 
 ### Content Length
