@@ -4,7 +4,7 @@
  * Bookend (intro/outro/title/CTA) scenes used to be fully exempt from critique,
  * so a dark intro/outro on a LIGHT brand could slip through. They now run the
  * correctness + brand-theme gate (`correctnessOnly` mode). This test isolates the
- * two halves of that path so it doesn't depend on the planner producing a dark
+ * two halves of that path so it doesn't depend on the storyboard builder producing a dark
  * bookend (which the brand-aware codegen now resists):
  *
  *   A. DETECTION  -- a scene labeled "Outro"/"Intro"/"Title"/"Closing CTA" (and a

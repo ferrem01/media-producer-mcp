@@ -1,7 +1,7 @@
 /**
- * Creative Concept Director
+ * Creative Director
  *
- * Runs BEFORE the storyboard builder. Its job is to commit to ONE strong
+ * Runs FIRST. Takes the raw brief and -- as the expert -- commits to ONE strong
  * creative idea for the entire video. Without this, the storyboard builder generates
  * 8 mediocre scene ideas without a unifying concept.
  *
@@ -54,6 +54,8 @@ export interface Treatment {
   };
   /** 3-5 sentence summary the storyboard builder can use as creative direction */
   directorNote: string;
+  /** Recommended number of scenes (the director decides the structure). */
+  sceneCount?: number;
 }
 
 /**
@@ -80,6 +82,13 @@ Bad concepts (these are NOT concepts, they are slide decks):
 ${storytellingGuide ? `## Storytelling Patterns You Can Use\n\n${storytellingGuide}\n\n` : ""}
 ${brandContext}
 
+## The Brief You Receive
+
+The brief may be a single thin line ("a product launch video for our new feature") or a detailed spec. EITHER WAY, you are the expert and you direct it:
+- **Thin brief:** make confident, smart creative choices to fill every gap. Decide the story, the structure, and the best way to tell it. The user is leaning on YOUR expertise -- do not water it down or ask for more; commit.
+- **Detailed brief:** honor its specifics (required points, tone, assets), and elevate them with your direction.
+You never just execute a request -- you decide what makes the strongest video for it.
+
 ## Your Task
 
 Given the project brief, generate THREE distinct creative concepts. Each concept should:
@@ -89,7 +98,7 @@ Given the project brief, generate THREE distinct creative concepts. Each concept
 4. Describe the emotional arc (what the viewer feels at start vs middle vs end)
 5. Commit to a visual style (color mood, typography attitude, motion personality, spatial strategy)
 
-Then pick the STRONGEST concept and explain why.
+Then pick the STRONGEST concept, explain why, and decide the optimal number of scenes for this piece (4-6 for short-form, 6-9 for standard, 8-12 for a deep dive -- scale to the content and pacing).
 
 ## Output Format (valid JSON, no markdown fences)
 
@@ -110,6 +119,7 @@ Then pick the STRONGEST concept and explain why.
   ],
   "selected": 0,
   "selectionReason": "Why this concept is strongest",
+  "sceneCount": 6,
   "directorNote": "3-5 sentence creative direction summary that the storyboard should follow"
 }
 
@@ -134,7 +144,7 @@ Then pick the STRONGEST concept and explain why.
     userContent = userPrompt;
   }
 
-  console.log("  [concept-director] Generating creative concepts...");
+  console.log("  [creative-director] Generating creative concepts...");
 
   var raw = await callLLM(opts.llmConfig, [
     { role: "system", content: systemPrompt },
@@ -150,9 +160,9 @@ Then pick the STRONGEST concept and explain why.
   var selectedIndex = result.selected ?? 0;
   var selected = result.concepts[selectedIndex];
 
-  console.log(`  [concept-director] Generated ${result.concepts.length} concepts, selected #${selectedIndex + 1}: "${selected.idea}"`);
-  console.log(`  [concept-director] Pattern: ${selected.pattern}`);
-  console.log(`  [concept-director] Through-line: ${selected.throughLine}`);
+  console.log(`  [creative-director] Generated ${result.concepts.length} concepts, selected #${selectedIndex + 1}: "${selected.idea}"`);
+  console.log(`  [creative-director] Pattern: ${selected.pattern}`);
+  console.log(`  [creative-director] Through-line: ${selected.throughLine}`);
 
   return {
     concept: selected.idea,
@@ -166,6 +176,7 @@ Then pick the STRONGEST concept and explain why.
       spatialStrategy: "layered depth with focus pulls",
     },
     directorNote: result.directorNote || `Concept: ${selected.idea}. Pattern: ${selected.pattern}. Through-line: ${selected.throughLine}.`,
+    sceneCount: typeof result.sceneCount === "number" ? result.sceneCount : undefined,
   };
 }
 

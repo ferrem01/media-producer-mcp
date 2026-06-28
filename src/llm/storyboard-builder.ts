@@ -9,7 +9,7 @@
 
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
-import type { Treatment } from "./concept-director.js";
+import type { Treatment } from "./creative-director.js";
 import { SCENE_STORYBOARD_DESIGN_RULES } from "./design-rules.js";
 import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { COMPOSITION_PLAYBOOK, PACING_PLAYBOOK } from "./cinematography.js";

@@ -12,7 +12,7 @@
  * mockup components (quotient-chat, canva-editor, quotient-social) -- not custom
  * UI -- and a valid MP4. Frames are extracted for a visual quality read.
  *
- * Slow (live brand extraction + LLM plan/codegen + image gen + TTS + render).
+ * Slow (live brand extraction + LLM storyboard/codegen + image gen + TTS + render).
  * Run in the background.  Brand kit is pulled from getquotient.ai.
  */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -88,7 +88,7 @@ async function main() {
     const kit = JSON.parse(fs.readFileSync(path.join(DD, TENANT, "brand-kit", "brand-kit.json"), "utf-8"));
     check("brand kit extracted (non-default primary)", !!kit.colors?.primary && kit.colors.primary !== "#5B21B6", `primary=${kit.colors?.primary}, logos=${(kit.logos || []).length}`);
 
-    // 2. Generate (full): plan + scenes.
+    // 2. Generate (full): storyboard + scenes.
     console.log("\n-- 2. generate(full, video) --");
     const g = J(await c.callTool({ name: "generate", arguments: { tenant_id: TENANT, mode: "full", target: "video", prompt: PROMPT, voiceover: true, background_music: true, brief: { video_type: "product_launch", target_duration: 40 } } }));
     const gj = await pollJob(c, g.job_id, 1_800_000);

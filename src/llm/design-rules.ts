@@ -193,7 +193,7 @@ Score each scene against these criteria:
 
 /**
  * Premium design philosophy -- what separates "correct" from "Apple-level."
- * Injected into expander + storyboard builder + critiquer to raise the ceiling.
+ * Injected into the creative director + storyboard builder + critiquer to raise the ceiling.
  */
 export const PREMIUM_DESIGN_PHILOSOPHY = `
 ## What Makes Video Feel Premium
