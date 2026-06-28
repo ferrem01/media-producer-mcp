@@ -11,7 +11,22 @@ import { redirectUriAllowed, getRegisteredClient } from "./mcp-oauth.js";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
-const OAUTH_CALLBACK_URL = process.env.OAUTH_CALLBACK_URL || "http://159.203.115.164:3200/auth/google/callback";
+
+/**
+ * The Google redirect URI. Prefer an explicit OAUTH_CALLBACK_URL (it must be
+ * registered in the Google console), else derive it from the request's public
+ * origin (forwarded headers) so it matches the HTTPS host in use. The derived
+ * value is deterministic, so register `https://<host>/auth/google/callback`.
+ */
+function callbackUrl(req: IncomingMessage): string {
+  if (process.env.OAUTH_CALLBACK_URL) return process.env.OAUTH_CALLBACK_URL;
+  const first = (h?: string | string[]) => (Array.isArray(h) ? h[0] : h || "").split(",")[0].trim();
+  const fwdHost = first(req.headers["x-forwarded-host"]);
+  const fwdProto = first(req.headers["x-forwarded-proto"]);
+  const host = fwdHost || first(req.headers["host"]);
+  const proto = fwdProto || (fwdHost ? "https" : "http");
+  return `${proto}://${host}/auth/google/callback`;
+}
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -136,7 +151,7 @@ export async function handleGoogleLogin(req: IncomingMessage, res: ServerRespons
 
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: OAUTH_CALLBACK_URL,
+    redirect_uri: callbackUrl(req),
     response_type: "code",
     scope: "email profile",
     access_type: "offline",
@@ -174,7 +189,7 @@ export async function handleGoogleCallback(req: IncomingMessage, res: ServerResp
         client_secret: GOOGLE_CLIENT_SECRET,
         code,
         grant_type: "authorization_code",
-        redirect_uri: OAUTH_CALLBACK_URL,
+        redirect_uri: callbackUrl(req),
       }),
     });
 
