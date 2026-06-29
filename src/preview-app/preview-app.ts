@@ -920,7 +920,12 @@ export function getPreviewHtml(): string {
     var prevOffset = clip.lastOffset;
     clip.lastOffset = offset;
 
-    var isPlayingVideo = (el.tagName === 'VIDEO') && !el.paused;
+    // Seeking a *playing* media element re-buffers and glitches the output, so
+    // we never micro-correct playing audio OR video -- only hard-sync on a large
+    // jump. (Previously audio was micro-seeked every few frames at clip start,
+    // where play() latency briefly inflates drift -> seconds of garbled stutter
+    // until it stabilized.) A clean clock advances on its own once playing.
+    var isPlayingMedia = !el.paused && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO');
 
     // Tier 1: Hard sync (>500ms drift)
     var firstTick = prevOffset === null;
@@ -929,8 +934,8 @@ export function getPreviewHtml(): string {
       el.currentTime = target;
       clip.driftSamples = 0;
     }
-    // Tier 2: Strict sync (>40ms, 2 consecutive -- skip for playing videos to avoid stutter)
-    else if (!isPlayingVideo && drift > STRICT_SYNC_THRESHOLD) {
+    // Tier 2: Strict sync (>40ms, 2 consecutive -- skip for playing media to avoid stutter)
+    else if (!isPlayingMedia && drift > STRICT_SYNC_THRESHOLD) {
       clip.driftSamples = (clip.driftSamples || 0) + 1;
       if (clip.driftSamples >= STRICT_REQUIRED_SAMPLES) {
         el.currentTime = target;
@@ -938,7 +943,7 @@ export function getPreviewHtml(): string {
       }
     }
     // Tier 3: Force sync (>20ms, on seek/play/pause transitions only)
-    else if (!isPlayingVideo && state.forceSync && drift > FORCE_SYNC_THRESHOLD) {
+    else if (!isPlayingMedia && state.forceSync && drift > FORCE_SYNC_THRESHOLD) {
       el.currentTime = target;
     }
     else {
