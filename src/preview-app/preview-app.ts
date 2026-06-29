@@ -1001,6 +1001,10 @@ export function getPreviewHtml(): string {
       // staggered per scene). Looping music spans the whole timeline.
       audio._startTime = typeof track.start_time === 'number' ? track.start_time : 0;
 
+      // Kick off buffering now (on project load) so the first clip is decoded
+      // well before the user hits play -- avoids a cold-start garble on scene 1.
+      try { audio.load(); } catch (e) {}
+
       state.audioElements.push(audio);
       count++;
     });
