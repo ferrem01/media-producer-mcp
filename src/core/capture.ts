@@ -278,6 +278,36 @@ export interface TextElementMetric {
   hasBacking: boolean;
 }
 
+/** A candidate "surface" (card/window/panel) measured for separation from the
+ *  page background -- used to catch ghost panels that vanish into the backdrop. */
+export interface SurfaceMetric {
+  /** Short descriptor for reporting (tag + first text/class). */
+  label: string;
+  x: number; y: number; w: number; h: number;
+  /** Computed background-color, e.g. "rgb(245, 245, 247)". */
+  bg: string;
+  /** Thickest border edge in px. */
+  borderWidth: number;
+  /** Computed border color. */
+  borderColor: string;
+  /** True if box-shadow is set (a real elevation cue). */
+  hasShadow: boolean;
+}
+
+/** Layout/composition measurements for the deterministic design gate. */
+export interface LayoutProbeResult {
+  vw: number; vh: number;
+  /** Base page background color (body, falling back to html). */
+  pageBg: string;
+  /** Candidate panels/cards/windows to check for surface separation. */
+  surfaces: SurfaceMetric[];
+  /** Bounding boxes of all visible, meaningful content (text/img/svg/button/panel). */
+  contentBoxes: Array<{ x: number; y: number; w: number; h: number }>;
+  /** True if a near-full-bleed element carries a gradient or image fill -- i.e.
+   *  empty regions are richly filled (a colorful backdrop), not flat dead space. */
+  hasRichFullBleedBg: boolean;
+}
+
 export async function captureSingleFrame(options: {
   htmlPath: string;
   outputPath: string;
@@ -293,7 +323,10 @@ export async function captureSingleFrame(options: {
    *  so the screenshot is the clean backdrop behind the text. Returns the
    *  collected metrics so the caller can measure text-vs-backdrop contrast. */
   contrastProbe?: boolean;
-}): Promise<{ textElements?: TextElementMetric[] }> {
+  /** Layout probe: collect surfaces + content bounding boxes so the caller can
+   *  measure surface separation (ghost panels) and content coverage (dead zones). */
+  layoutProbe?: boolean;
+}): Promise<{ textElements?: TextElementMetric[]; layout?: LayoutProbeResult }> {
   const {
     htmlPath,
     outputPath,
@@ -304,8 +337,10 @@ export async function captureSingleFrame(options: {
     quality,
     atTime,
     contrastProbe = false,
+    layoutProbe = false,
   } = options;
   let textElements: TextElementMetric[] | undefined;
+  let layout: LayoutProbeResult | undefined;
 
   let ownBrowser: Browser | undefined;
   let page: Page | undefined;
@@ -531,6 +566,92 @@ export async function captureSingleFrame(options: {
       });
     }
 
+    // Layout probe: collect surfaces (candidate panels) + content boxes + whether
+    // a rich full-bleed background fills the empty space. Pure geometry/styles --
+    // no pixel reads -- so the caller can deterministically gate ghost panels and
+    // dead zones.
+    if (layoutProbe) {
+      layout = await page.evaluate(({ vw, vh }) => {
+        const area = vw * vh;
+        const visible = (cs: CSSStyleDeclaration) =>
+          cs.visibility !== "hidden" && cs.display !== "none" && parseFloat(cs.opacity || "1") >= 0.5;
+        const onCanvas = (r: DOMRect) =>
+          r.width >= 8 && r.height >= 6 && r.x < vw && r.y < vh && r.x + r.width > 0 && r.y + r.height > 0;
+        const alphaOf = (col: string) => {
+          const m = col.match(/rgba?\(([^)]+)\)/);
+          if (!m) return 0;
+          const p = m[1].split(",").map((s) => parseFloat(s));
+          return p.length >= 4 ? p[3] : (p.length === 3 ? 1 : 0);
+        };
+        const richFill = (cs: CSSStyleDeclaration) => {
+          const bi = cs.backgroundImage || "";
+          return bi !== "none" && (bi.includes("gradient") || bi.includes("url("));
+        };
+
+        const bodyCs = getComputedStyle(document.body);
+        let pageBg = bodyCs.backgroundColor;
+        if (alphaOf(pageBg) < 0.5) {
+          const htmlBg = getComputedStyle(document.documentElement).backgroundColor;
+          if (alphaOf(htmlBg) >= 0.5) pageBg = htmlBg;
+        }
+
+        const els = Array.from(document.querySelectorAll("body *"));
+        let hasRichFullBleedBg = false;
+        const surfaces: any[] = [];
+        const contentBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
+
+        for (const el of els) {
+          const cs = getComputedStyle(el);
+          if (!visible(cs)) continue;
+          const r = el.getBoundingClientRect();
+          if (!onCanvas(r)) continue;
+          const aFrac = (r.width * r.height) / area;
+          const box = {
+            x: Math.max(0, Math.round(r.x)), y: Math.max(0, Math.round(r.y)),
+            w: Math.round(Math.min(r.width, vw)), h: Math.round(Math.min(r.height, vh)),
+          };
+
+          // Near-full-bleed element that paints the whole frame (gradient/image
+          // fill, or a canvas/svg/video/img backdrop) -> empty space is filled.
+          const fullBleed = r.width >= vw * 0.9 && r.height >= vh * 0.9;
+          const paintsFrame = richFill(cs) ||
+            ["canvas", "svg", "video", "img"].includes(el.tagName.toLowerCase());
+          if (fullBleed && paintsFrame) hasRichFullBleedBg = true;
+
+          // Content boxes: anything that visibly occupies space and reads as content.
+          const tag = el.tagName.toLowerCase();
+          const directText = Array.from(el.childNodes)
+            .filter((n) => n.nodeType === 3).map((n) => n.textContent || "").join("").trim();
+          const isMedia = tag === "img" || tag === "svg" || tag === "video" || tag === "canvas";
+          const isButton = tag === "button" || (el.getAttribute("role") === "button");
+          const hasOwnFill = alphaOf(cs.backgroundColor) >= 0.5 || richFill(cs);
+          const fontSize = parseFloat(cs.fontSize) || 0;
+          if ((directText.length >= 2 && fontSize >= 14) || isMedia || isButton) {
+            contentBoxes.push(box);
+          }
+
+          // Surfaces: mid-sized filled containers (panels/cards/windows). Skip the
+          // full-bleed background layer and tiny chips.
+          const isPanelSized = aFrac >= 0.01 && aFrac < 0.6 && r.width >= 120 && r.height >= 70;
+          const notFullBleed = !(r.width >= vw * 0.9 && r.height >= vh * 0.9);
+          if (isPanelSized && notFullBleed && hasOwnFill && !richFill(cs)) {
+            const bw = Math.max(
+              parseFloat(cs.borderTopWidth) || 0, parseFloat(cs.borderRightWidth) || 0,
+              parseFloat(cs.borderBottomWidth) || 0, parseFloat(cs.borderLeftWidth) || 0,
+            );
+            const label = `${tag}${el.className && typeof el.className === "string" ? "." + el.className.split(/\s+/)[0] : ""}` +
+              (directText ? ` "${directText.slice(0, 24)}"` : "");
+            surfaces.push({
+              label: label.slice(0, 48), x: box.x, y: box.y, w: box.w, h: box.h,
+              bg: cs.backgroundColor, borderWidth: bw, borderColor: cs.borderTopColor,
+              hasShadow: !!cs.boxShadow && cs.boxShadow !== "none",
+            });
+          }
+        }
+        return { vw, vh, pageBg, surfaces, contentBoxes, hasRichFullBleedBg };
+      }, { vw: width, vh: height });
+    }
+
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
     const screenshotOpts: any = {
@@ -552,5 +673,5 @@ export async function captureSingleFrame(options: {
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   }
-  return { textElements };
+  return { textElements, layout };
 }

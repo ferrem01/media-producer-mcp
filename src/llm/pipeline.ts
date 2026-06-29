@@ -47,6 +47,7 @@ import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
 import { captureSingleFrame, validateSceneRuntime } from "../core/capture.js";
 import { measureTextContrast } from "../core/text-contrast.js";
+import { measureLayout } from "../core/layout-metrics.js";
 import os from "node:os";
 
 // Keep old imports for backwards compat (deprecated functions still exist in their files)
@@ -1211,6 +1212,32 @@ async function critiqueAndRetryScene(opts: {
           }
         } catch (e: any) {
           console.warn(`  Legibility gate skipped: ${e?.message || e}`);
+        }
+
+        // Layout gate: deterministically MEASURE surface separation (ghost panels)
+        // and content coverage (dead/empty frames) -- the quantitative rules the
+        // codegen prompt under-executes. Each violation becomes a blocking defect
+        // with a specific corrective number that feeds the regen.
+        try {
+          const dur = currentScene.duration_seconds || 5;
+          const layoutDefects = await measureLayout({
+            htmlPath,
+            width: opts.canvas.width,
+            height: opts.canvas.height,
+            atTimes: [dur * 0.45, dur * 0.7, dur * 0.9],
+          });
+          for (const d of layoutDefects) {
+            correctness.defects.push({ type: d.type, detail: d.detail });
+            critiqueResult.issues.push(d.type === "invisible_surface"
+              ? "A panel/card has near-zero separation from the background (ghost panel)"
+              : "Large empty/flat region -- the frame reads as sparse/dead");
+          }
+          if (layoutDefects.length > 0) {
+            correctness.pass = false;
+            console.log(`  Layout gate: ${layoutDefects.length} defect(s) [${layoutDefects.map((d) => d.type).join(", ")}] -- forcing revision`);
+          }
+        } catch (e: any) {
+          console.warn(`  Layout gate skipped: ${e?.message || e}`);
         }
       }
 
