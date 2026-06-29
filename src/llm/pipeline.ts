@@ -2098,10 +2098,17 @@ async function runUnifiedPipeline(
         duration_seconds: s.duration_seconds,
       }));
 
+      // Map the storyboard's pacing to a TTS speed. The model's default (1.0)
+      // runs brisk -- especially on short, punchy lines -- so a "moderate" read
+      // is intentionally a touch under 1.0 for a more measured delivery.
+      const pacing = (project.storyboard?.audio?.pacing || "moderate") as string;
+      const voSpeed = pacing === "fast" ? 1.0 : pacing === "slow" ? 0.85 : 0.92;
+
       const voicePaths = await generateSceneVoiceovers({
         scenes: voiceoverInputs,
         voice: opts.voice || project.brand_kit?.voice || "nova",
         model: "tts-1-hd",
+        speed: voSpeed,
         outputDir: voDir,
         apiKey: process.env.OPENAI_API_KEY || "",
       });

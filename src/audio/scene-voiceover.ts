@@ -18,6 +18,7 @@ export interface SceneVoiceoverOptions {
   scenes: SceneVoiceoverInput[];
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
   model?: "tts-1" | "tts-1-hd";
+  speed?: number; // 0.25-4.0; <1 is a more measured delivery
   outputDir: string;
   apiKey: string;
 }
@@ -51,6 +52,7 @@ export async function generateSceneVoiceovers(
       text,
       voice: opts.voice,
       model: opts.model,
+      speed: opts.speed,
       outputPath,
       apiKey: opts.apiKey,
     });
