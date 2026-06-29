@@ -42,6 +42,7 @@ import type { Scene, SceneComponent, BrandKit, SpeakerTrack } from "./core/types
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
+import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
 import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
 import { generateImage } from "./media/image-gen.js";
@@ -86,9 +87,21 @@ function err(msg: string) {
   return { content: [{ type: "text" as const, text: msg }], isError: true as const };
 }
 
-/** Build the Studio SPA URL for a tenant + project. */
-function previewUrl(tenantId: string, projectId: string): string {
-  return `${config.publicUrl}/studio?tenant=${encodeURIComponent(tenantId)}&project=${encodeURIComponent(projectId)}`;
+/** Build the Studio SPA URL for a tenant + project.
+ *  When auth is enabled, every Studio/API route is token-gated, so embed a
+ *  tenant-scoped token in the link — otherwise the URL 401s on open. The token
+ *  is a non-expiring JWT (when SESSION_SECRET is set) or a static AUTH_TOKENS
+ *  entry the caller passed; without either, the link is plain (dev mode). */
+function previewUrl(tenantId: string, projectId: string, token?: string): string {
+  let url = `${config.publicUrl}/studio?tenant=${encodeURIComponent(tenantId)}&project=${encodeURIComponent(projectId)}`;
+  if (isAuthEnabled()) {
+    let t = token;
+    if (!t && process.env.SESSION_SECRET) {
+      try { t = signToken({ email: "studio@media-producer", tenant_id: tenantId }); } catch { /* leave unauthenticated */ }
+    }
+    if (t) url += `&token=${encodeURIComponent(t)}`;
+  }
+  return url;
 }
 
 /** Human ETA suffix from seconds-remaining. */
