@@ -640,14 +640,14 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Studio SPA (formerly "preview"; /preview kept as an alias) ──
-      if (url.startsWith("/studio") || url.startsWith("/preview")) {
+      if (urlPath.startsWith("/studio") || urlPath.startsWith("/preview")) {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(previewHtml);
         return;
       }
 
       // ── API: List projects ──
-      const listMatch = url.match(/^\/api\/projects\/([^/]+)$/);
+      const listMatch = urlPath.match(/^\/api\/projects\/([^/]+)$/);
       if (listMatch && method === "GET") {
         const tenantId = decodeURIComponent(listMatch[1]);
         const projects = await listProjects(tenantId);
@@ -656,7 +656,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── API: Get project ──
-      const getMatch = url.match(/^\/api\/projects\/([^/]+)\/([^/]+)$/);
+      const getMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)$/);
       if (getMatch && method === "GET") {
         const [, tenantId, projectId] = getMatch.map(decodeURIComponent);
         const project = await loadProject(tenantId, projectId);
@@ -672,7 +672,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       //  property editor. Scenes are codegen now; edits go through /api/revise.)
 
       // ── API: Add scene ──
-      const addSceneMatch = url.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes$/);
+      const addSceneMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes$/);
       if (addSceneMatch && method === "POST") {
         const [, tenantId, projectId] = addSceneMatch.map(decodeURIComponent);
         const body = await parseBody(req);
@@ -691,7 +691,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── API: Delete scene ──
-      const deleteSceneMatch = url.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)$/);
+      const deleteSceneMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)$/);
       if (deleteSceneMatch && method === "DELETE") {
         const [, tenantId, projectId, sceneId] = deleteSceneMatch.map(decodeURIComponent);
         const updated = await removeScene(tenantId, projectId, sceneId);
@@ -704,7 +704,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── API: Reorder scenes ──
-      const reorderMatch = url.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/reorder$/);
+      const reorderMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/reorder$/);
       if (reorderMatch && method === "PATCH") {
         const [, tenantId, projectId] = reorderMatch.map(decodeURIComponent);
         const body = await parseBody(req);
@@ -723,7 +723,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── API: Scene thumbnail ──
-      const thumbMatch = url.match(/^\/api\/scene-thumbnail\/([^/]+)\/([^/]+)\/([^/]+)$/);
+      const thumbMatch = urlPath.match(/^\/api\/scene-thumbnail\/([^/]+)\/([^/]+)\/([^/]+)$/);
       if (thumbMatch && method === "GET") {
         const [, tenantId, projectId, sceneId] = thumbMatch.map(decodeURIComponent);
         const project = await loadProject(tenantId, projectId);
@@ -757,7 +757,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── API: Preview scene (assembled HTML) ──
-      const sceneMatch = url.match(/^\/api\/preview-scene\/([^/]+)\/([^/]+)\/([^/]+)$/);
+      const sceneMatch = urlPath.match(/^\/api\/preview-scene\/([^/]+)\/([^/]+)\/([^/]+)$/);
       if (sceneMatch && method === "GET") {
         const [, tenantId, projectId, sceneId] = sceneMatch.map(decodeURIComponent);
         const project = await loadProject(tenantId, projectId);
@@ -795,7 +795,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
 
 
       // ── API: Preview composite (all scenes in one HTML document) ──
-      const compositeMatch = url.match(/^\/api\/preview-composite\/([^/]+)\/([^/]+)$/);
+      const compositeMatch = urlPath.match(/^\/api\/preview-composite\/([^/]+)\/([^/]+)$/);
       if (compositeMatch && method === "GET") {
         const [, tenantId, projectId] = compositeMatch.map(decodeURIComponent);
         const project = await loadProject(tenantId, projectId);
@@ -839,14 +839,14 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Playground API: Component catalog ──
-      if (url === "/playground/api/components/catalog" && method === "GET") {
+      if (urlPath === "/playground/api/components/catalog" && method === "GET") {
         const catalog = await buildComponentCatalog(config.componentLibDir);
         jsonResponse(res, 200, catalog);
         return;
       }
 
       // ── Playground API: Component source ──
-      const sourceMatch = url.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/source$/);
+      const sourceMatch = urlPath.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/source$/);
       if (sourceMatch && method === "GET") {
         const [, category, type] = sourceMatch.map(decodeURIComponent);
         const filePath = path.join(config.componentLibDir, category, `${type}.component.html`);
@@ -864,7 +864,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Playground API: Component schema ──
-      const schemaMatch = url.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/schema$/);
+      const schemaMatch = urlPath.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/schema$/);
       if (schemaMatch && method === "GET") {
         const [, category, type] = schemaMatch.map(decodeURIComponent);
         const filePath = path.join(config.componentLibDir, category, `${type}.schema.json`);
@@ -879,7 +879,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Playground API: Component defaults (generate sample data from schema) ──
-      const defaultsMatch = url.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/defaults$/);
+      const defaultsMatch = urlPath.match(/^\/playground\/api\/components\/([^/]+)\/([^/]+)\/defaults$/);
       if (defaultsMatch && method === "GET") {
         const [, dCategory, dType] = defaultsMatch.map(decodeURIComponent);
         const schemaPath = path.join(config.componentLibDir, dCategory, dType + ".schema.json");
@@ -895,7 +895,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Playground API: Preview component ──
-      if (url === "/playground/api/components/preview" && method === "POST") {
+      if (urlPath === "/playground/api/components/preview" && method === "POST") {
         const body = await parseBody(req);
         const source = body.source as string;
         const data = (body.data || {}) as Record<string, unknown>;
@@ -949,7 +949,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Playground API: Save component (supports tenant-scoped save) ──
-      if (url === "/playground/api/components/save" && method === "POST") {
+      if (urlPath === "/playground/api/components/save" && method === "POST") {
         const body = await parseBody(req);
         const type = body.type as string;
         const saveTenantId = body.tenant_id as string;
@@ -984,7 +984,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Playground API: Generate component from prompt ──
-      if (url === "/playground/api/generate" && method === "POST") {
+      if (urlPath === "/playground/api/generate" && method === "POST") {
         const body = await parseBody(req);
         const prompt = body.prompt as string;
         const tenantId = body.tenant_id as string;
@@ -1025,7 +1025,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Playground API: Iterate on component ──
-      if (url === "/playground/api/iterate" && method === "POST") {
+      if (urlPath === "/playground/api/iterate" && method === "POST") {
         const body = await parseBody(req);
         const currentSource = body.source as string;
         const instruction = body.instruction as string;
@@ -1070,7 +1070,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── Playground API: Get tenant brand kit ──
-      const brandKitMatch = url.match(/^\/playground\/api\/brand-kit\/([^/]+)$/);
+      const brandKitMatch = urlPath.match(/^\/playground\/api\/brand-kit\/([^/]+)$/);
       if (brandKitMatch && method === "GET") {
         const tid = decodeURIComponent(brandKitMatch[1]);
         try {
@@ -1083,7 +1083,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── Playground API: Get tenant component source ──
-      const tenantSourceMatch = url.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/source$/);
+      const tenantSourceMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/source$/);
       if (tenantSourceMatch && method === "GET") {
         const [, tid, compType] = tenantSourceMatch.map(decodeURIComponent);
         // Search all category subdirs
@@ -1108,7 +1108,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── Playground API: Delete tenant component ──
-      const tenantDeleteMatch = url.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)$/);
+      const tenantDeleteMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)$/);
       if (tenantDeleteMatch && method === "DELETE") {
         const [, tid, compType] = tenantDeleteMatch.map(decodeURIComponent);
         const tenantCompDir = path.join(config.dataDir, tid, "components");
@@ -1133,7 +1133,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
             // ── Playground API: List tenant custom components ──
-      const tenantCompMatch = url.match(/^\/playground\/api\/tenant-components\/([^/]+)$/);
+      const tenantCompMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)$/);
       if (tenantCompMatch && method === "GET") {
         const tid = decodeURIComponent(tenantCompMatch[1]);
         const tenantCompDir = path.join(config.dataDir, tid, "components");
@@ -1164,7 +1164,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── Playground API: Get tenant component source ──
-      const tenantCompSrcMatch = url.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/source$/);
+      const tenantCompSrcMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/source$/);
       if (tenantCompSrcMatch && method === "GET") {
         const [, tid, compType] = tenantCompSrcMatch.map(decodeURIComponent);
         const tenantCompDir = path.join(config.dataDir, tid, "components");
@@ -1193,7 +1193,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── Playground API: Generate component via LLM ──
-      if (url === "/playground/api/generate" && method === "POST") {
+      if (urlPath === "/playground/api/generate" && method === "POST") {
         const body = await parseBody(req);
         const prompt = body.prompt as string;
         const tid = body.tenant_id as string;
@@ -1236,7 +1236,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── Playground API: Revise component via LLM ──
-      if (url === "/playground/api/revise" && method === "POST") {
+      if (urlPath === "/playground/api/revise" && method === "POST") {
         const body = await parseBody(req);
         const prompt = body.prompt as string;
         const source = body.source as string;
@@ -1280,7 +1280,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: Trigger render ──
-      const renderMatch = url.match(/^\/api\/render\/([^/]+)\/([^/]+)$/);
+      const renderMatch = urlPath.match(/^\/api\/render\/([^/]+)\/([^/]+)$/);
       if (renderMatch && method === "POST") {
         const [, tenantId, projectId] = renderMatch.map(decodeURIComponent);
         const project = await loadProject(tenantId, projectId);
@@ -1299,7 +1299,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: Undo last revise on a scene ──
-      const undoMatch = url.match(/^\/api\/revise\/undo\/([^/]+)\/([^/]+)$/);
+      const undoMatch = urlPath.match(/^\/api\/revise\/undo\/([^/]+)\/([^/]+)$/);
       if (undoMatch && method === "POST") {
         const [, tenantId, projectId] = undoMatch.map(decodeURIComponent);
         const body = await parseBody(req);
@@ -1315,7 +1315,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: Revise a scene (Studio direct-manipulation revise) ──
-      const reviseMatch = url.match(/^\/api\/revise\/([^/]+)\/([^/]+)$/);
+      const reviseMatch = urlPath.match(/^\/api\/revise\/([^/]+)\/([^/]+)$/);
       if (reviseMatch && method === "POST") {
         const [, tenantId, projectId] = reviseMatch.map(decodeURIComponent);
         const body = await parseBody(req);
@@ -1346,7 +1346,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       // source), this rebuilds the scene from scratch via runSceneRevisionPipeline.
       // It's slow (storyboard builder → generate → critique, ~minutes), so it runs as an
       // async job; the client polls /api/jobs/{id} and reloads when it completes.
-      const regenMatch = url.match(/^\/api\/regenerate\/([^/]+)\/([^/]+)$/);
+      const regenMatch = urlPath.match(/^\/api\/regenerate\/([^/]+)\/([^/]+)$/);
       if (regenMatch && method === "POST") {
         const [, tenantId, projectId] = regenMatch.map(decodeURIComponent);
         const body = await parseBody(req);
@@ -1407,7 +1407,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: Save a scene's storyboard entry (Studio storyboard panel) ──
-      const storyboardSceneMatch = url.match(/^\/api\/storyboard-scene\/([^/]+)\/([^/]+)$/);
+      const storyboardSceneMatch = urlPath.match(/^\/api\/storyboard-scene\/([^/]+)\/([^/]+)$/);
       if (storyboardSceneMatch && method === "POST") {
         const [, tenantId, projectId] = storyboardSceneMatch.map(decodeURIComponent);
         const body = await parseBody(req);
@@ -1427,7 +1427,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
 
       // ── API: Get job status ──
       // ── API: List jobs ──
-      const jobsListMatch = url.match(/^\/api\/jobs\/?$/);
+      const jobsListMatch = urlPath.match(/^\/api\/jobs\/?$/);
       if (jobsListMatch && method === "GET") {
         const jobParams = new URL(url, "http://localhost").searchParams;
         const typeFilter = jobParams.get("type") as "render" | "generate" | undefined;
@@ -1445,7 +1445,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
-      const jobMatch = url.match(/^\/api\/jobs\/([^/]+)$/);
+      const jobMatch = urlPath.match(/^\/api\/jobs\/([^/]+)$/);
       if (jobMatch && method === "GET") {
         const jobId = decodeURIComponent(jobMatch[1]);
         const job = getJob(jobId);
@@ -1458,7 +1458,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: Wait for job completion (long-poll) ──
-      const jobWaitMatch = url.match(/^\/api\/jobs\/([^/]+)\/wait/);
+      const jobWaitMatch = urlPath.match(/^\/api\/jobs\/([^/]+)\/wait/);
       if (jobWaitMatch && method === "GET") {
         const jobId = decodeURIComponent(jobWaitMatch[1]);
         const urlParams = new URL(url, "http://localhost").searchParams;
@@ -1496,7 +1496,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: List jobs for tenant ──
-      const jobsMatch = url.match(/^\/api\/jobs\/?$/);
+      const jobsMatch = urlPath.match(/^\/api\/jobs\/?$/);
       if (jobsMatch && method === "GET") {
         const jobParams = new URL(url, `http://localhost`).searchParams;
         const tenantFilter = jobParams.get('tenant_id') || undefined;
@@ -1506,7 +1506,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: Get traces for tenant ──
-      const tracesMatch = url.match(/^\/api\/traces\/([^/]+)$/);
+      const tracesMatch = urlPath.match(/^\/api\/traces\/([^/]+)$/);
       if (tracesMatch && method === "GET") {
         authMiddleware(req, res, () => {
           const tenantId = decodeURIComponent(tracesMatch[1]);
@@ -1522,7 +1522,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: Get trace digest for tenant ──
-      const digestMatch = url.match(/^\/api\/traces\/([^/]+)\/digest$/);
+      const digestMatch = urlPath.match(/^\/api\/traces\/([^/]+)\/digest$/);
       if (digestMatch && method === "GET") {
         authMiddleware(req, res, () => {
           const params = new URL(url, "http://localhost").searchParams;
@@ -1540,7 +1540,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
 
 
       // ── API: Generate AI Image ──
-      const genImageMatch = url.match(/^\/api\/generate-image\/([^/]+)$/);
+      const genImageMatch = urlPath.match(/^\/api\/generate-image\/([^/]+)$/);
       if (genImageMatch && method === "POST") {
         const tenantId = decodeURIComponent(genImageMatch[1]);
         const body = await parseBody(req);

@@ -35,9 +35,12 @@ export async function generateSceneVoiceovers(
 
   for (let i = 0; i < opts.scenes.length; i++) {
     const scene = opts.scenes[i];
-    const text = scene.voiceover_text || scene.label;
+    // Narrate ONLY explicit script text. Never fall back to the scene label --
+    // a label is an editorial name ("Visual Pause", "Scene 5 — Logo + CTA"),
+    // not narration, and an auto-inserted pause scene has no script by design.
+    const text = scene.voiceover_text;
 
-    if (!text) {
+    if (!text || !text.trim()) {
       results.push("");
       continue;
     }
