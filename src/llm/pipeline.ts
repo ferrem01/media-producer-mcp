@@ -1989,11 +1989,13 @@ async function runUnifiedPipeline(
       if (editorial.issues.length > 0) console.log(`    Editorial issues: ${editorial.issues.join(" | ")}`);
       if (editorial.fixes.length > 0) console.log(`    Suggested fixes: ${editorial.fixes.map(f => f.type + (f.scene_index != null ? ` (scene ${f.scene_index + 1})` : "") + ": " + f.detail).join(" | ")}`);
 
-      // Structural auto-fixes (transition variety, breathing, durations).
-      const editorialChanges = applyEditorialFixes(project, editorial, brandKit);
-
-      // Storyboard-fidelity fixes: regenerate scenes that didn't achieve their intent
-      // (bounded), feeding the corrective note back to the codegen.
+      // Storyboard-fidelity fixes FIRST: regenerate scenes that didn't achieve
+      // their intent (bounded), feeding the corrective note back to the codegen.
+      // This MUST run before any structural fix that inserts/reorders scenes
+      // (e.g. add_breathing): the critique's scene_index values are computed
+      // against the current ordering, so regenerating by index after a splice
+      // would land on the wrong scene -- overwriting an inserted scene and
+      // stamping it with a colliding scene id (a duplicated scene).
       const MAX_EDITORIAL_REGEN = 2;
       const sceneFixes = (editorial.fixes || []).filter(f => f.type === "fix_scene" && typeof f.scene_index === "number" && f.detail && f.scene_index! >= 0 && f.scene_index! < project.scenes.length);
       let regen = 0;
@@ -2019,6 +2021,10 @@ async function runUnifiedPipeline(
         } catch (e: any) { console.warn(`    Editorial regen scene ${idx + 1} failed: ${e.message}`); }
       }
 
+      // Structural auto-fixes (transition variety, breathing, durations) -- applied
+      // AFTER the index-based scene regen so the two never disagree on indices.
+      const editorialChanges = applyEditorialFixes(project, editorial, brandKit);
+
       if (editorialChanges > 0 || regen > 0) {
         await saveProject(project);
         console.log(`    Applied ${editorialChanges} structural fix(es), regenerated ${regen} scene(s)`);
@@ -2034,6 +2040,22 @@ async function runUnifiedPipeline(
       console.warn(`  Editorial critique failed (non-fatal): ${e.message}`);
     }
     trace?.endEvent();
+  }
+
+  // Defense-in-depth: a scene id must be unique (component files + the timeline
+  // are keyed by it). Drop any accidental duplicate before audio/render so a
+  // future reordering bug can never ship a doubled scene.
+  {
+    const seenIds = new Set<string>();
+    const deduped = project.scenes.filter((s) => {
+      if (seenIds.has(s.id)) return false;
+      seenIds.add(s.id);
+      return true;
+    });
+    if (deduped.length !== project.scenes.length) {
+      console.warn(`  Dropped ${project.scenes.length - deduped.length} duplicate scene(s) by id`);
+      project.scenes = deduped;
+    }
   }
 
   // ── Proactive scene duration sync ──
