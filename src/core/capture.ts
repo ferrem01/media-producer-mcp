@@ -31,6 +31,12 @@ const BROWSER_ARGS = [
   "--disable-background-networking", "--disable-default-apps",
   "--mute-audio", "--no-first-run",
 ];
+// Optional explicit Chromium path (e.g. constrained CI/remote envs where the
+// bundled Playwright revision isn't downloaded). Honors MP_CHROMIUM_PATH.
+const LAUNCH_OPTS = {
+  args: BROWSER_ARGS,
+  ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+};
 let pooledBrowser: Browser | undefined;
 let pooledBrowserPromise: Promise<Browser> | undefined;
 let pooledLaunches = 0;
@@ -41,7 +47,7 @@ export function pooledLaunchCount(): number { return pooledLaunches; }
 async function getPooledBrowser(): Promise<Browser> {
   if (pooledBrowser?.isConnected()) return pooledBrowser;
   if (pooledBrowserPromise) return pooledBrowserPromise;
-  pooledBrowserPromise = chromium.launch({ args: BROWSER_ARGS })
+  pooledBrowserPromise = chromium.launch(LAUNCH_OPTS)
     .then((b) => {
       pooledLaunches++;
       pooledBrowser = b;
@@ -218,7 +224,7 @@ export async function validateSceneRuntime(options: {
   try {
     let browser: Browser;
     try { browser = await getPooledBrowser(); }
-    catch { ownBrowser = await chromium.launch({ args: BROWSER_ARGS }); browser = ownBrowser; }
+    catch { ownBrowser = await chromium.launch(LAUNCH_OPTS); browser = ownBrowser; }
     page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width, height });
     let pageError: string | undefined;
@@ -308,7 +314,7 @@ export async function captureSingleFrame(options: {
   try {
     let browser: Browser;
     try { browser = await getPooledBrowser(); }
-    catch { ownBrowser = await chromium.launch({ args: BROWSER_ARGS }); browser = ownBrowser; }
+    catch { ownBrowser = await chromium.launch(LAUNCH_OPTS); browser = ownBrowser; }
     page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width, height });
 
