@@ -205,6 +205,13 @@ export function getPreviewHtml(): string {
   }
   .audio-indicator.has-audio { color: #6366f1; }
 
+  .vol-control {
+    display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+  }
+  .vol-control .vol-icon { font-size: 13px; color: #6b7280; }
+  .vol-control .vol-icon.muted { color: #cbd5e1; }
+  #vol-slider { width: 70px; cursor: pointer; accent-color: #6366f1; }
+
   /* Bottom panels */
   #bottom-panels {
     grid-column: 2;
@@ -524,6 +531,10 @@ export function getPreviewHtml(): string {
       <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
       <span class="audio-indicator" id="audio-indicator"></span>
+      <span class="vol-control" title="Volume">
+        <span class="vol-icon" id="vol-icon">&#9834;</span>
+        <input type="range" id="vol-slider" min="0" max="100" value="100" step="1">
+      </span>
       <span class="scene-indicator" id="scene-indicator"></span>
     </div>
   </div>
@@ -587,6 +598,7 @@ export function getPreviewHtml(): string {
     audioElements: [],
     audioDuckingInterval: null,
     musicStarted: false,
+    masterVolume: 1,
     // Master clock
     masterTime: 0,
     lastTickTime: 0,
@@ -618,6 +630,8 @@ export function getPreviewHtml(): string {
     sceneIndicator: document.getElementById('scene-indicator'),
     bufferOverlay: document.getElementById('buffer-overlay'),
     audioIndicator: document.getElementById('audio-indicator'),
+    volSlider: document.getElementById('vol-slider'),
+    volIcon: document.getElementById('vol-icon'),
     sbPreview: document.getElementById('sb-preview'),
     propEditor: document.getElementById('prop-editor')
   };
@@ -740,14 +754,15 @@ export function getPreviewHtml(): string {
       });
     }
 
-    // 2. Audio elements (music, voiceover, sfx)
+    // 2. Audio elements (music, voiceover, sfx). A non-looping clip plays only
+    //    within [start, start+clipDuration]; looping music spans the timeline.
     state.audioElements.forEach(function(audio) {
       state.mediaClips.push({
         el: audio,
         kind: 'audio',
         trackType: audio._trackType || 'sfx',
         loop: !!audio.loop,
-        start: 0,
+        start: audio._startTime || 0,
         end: totalDur,
         offset: 0,
         lastOffset: null,
@@ -877,21 +892,22 @@ export function getPreviewHtml(): string {
 
       // ── Audio: global timeline ──
       if (clip.kind === 'audio') {
-        var target;
+        var dur = el.duration;
+        if (!dur || !isFinite(dur)) continue;
         if (clip.loop) {
-          var dur = el.duration;
-          if (!dur || !isFinite(dur)) continue;
-          target = time % dur;
+          // Looping music: spans the whole timeline.
+          syncElement(clip, el, time % dur, playing, false);
         } else {
-          var dur = el.duration;
-          if (!dur || !isFinite(dur)) continue;
-          if (time >= dur) {
+          // Voiceover/sfx: only audible inside its window on the global
+          // timeline. Source position is time relative to the clip's start.
+          var local = time - (clip.start || 0);
+          if (local < 0 || local >= dur) {
             if (!el.paused) el.pause();
+            clip.lastOffset = null;
             continue;
           }
-          target = Math.min(time, dur);
+          syncElement(clip, el, local, playing, false);
         }
-        syncElement(clip, el, target, playing, false);
         continue;
       }
     }
@@ -976,6 +992,9 @@ export function getPreviewHtml(): string {
       audio._fadeIn = track.fade_in || 0;
       audio._fadeOut = track.fade_out || 0;
       audio._baseVolume = audio.volume;
+      // When on the global timeline this track begins (voiceover clips are
+      // staggered per scene). Looping music spans the whole timeline.
+      audio._startTime = typeof track.start_time === 'number' ? track.start_time : 0;
 
       state.audioElements.push(audio);
       count++;
@@ -1004,26 +1023,23 @@ export function getPreviewHtml(): string {
     }
   }
 
-  // Start or resume audio. Never resets currentTime on resume.
+  // Effective per-track volume = the track's mixed level scaled by the master
+  // volume the user controls in the transport bar.
+  function effVolume(audio) {
+    var mv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
+    return (audio._baseVolume != null ? audio._baseVolume : 1) * mv;
+  }
+
+  // Start or resume audio. Per-clip play/pause + seek is owned by syncMedia
+  // (which knows each clip's window); playAudio only unlocks playback within the
+  // user gesture and sets levels. It never forces currentTime -- doing so made
+  // every staggered voiceover restart from 0 and overlap.
   function playAudio() {
-    if (state.musicStarted) {
-      // RESUME: just call play() on all paused tracks. No currentTime reset.
-      state.audioElements.forEach(function(audio) {
-        if (audio.paused) audio.play().catch(function() {});
-      });
-      startDucking();
-      return;
-    }
-
-    // FIRST PLAY: start everything from the beginning
     state.audioElements.forEach(function(audio) {
-      audio.currentTime = 0;
-      audio.volume = audio._baseVolume;
-
-      // Apply fade-in if configured
-      if (audio._fadeIn > 0) {
+      // Apply fade-in (music) or the track's level, scaled by master volume.
+      if (!state.musicStarted && audio._fadeIn > 0) {
+        var targetVol = effVolume(audio);
         audio.volume = 0;
-        var targetVol = audio._baseVolume;
         var fadeSteps = Math.ceil(audio._fadeIn * 20);
         var step = 0;
         var fadeInterval = setInterval(function() {
@@ -1031,9 +1047,12 @@ export function getPreviewHtml(): string {
           audio.volume = Math.min(targetVol, (step / fadeSteps) * targetVol);
           if (step >= fadeSteps) clearInterval(fadeInterval);
         }, 50);
+      } else {
+        audio.volume = effVolume(audio);
       }
-
-      audio.play().catch(function() {});
+      // Unlock the element within the gesture; syncMedia pauses out-of-window
+      // clips synchronously on the same tick, so nothing overlaps audibly.
+      if (audio.paused) audio.play().catch(function() {});
     });
     state.musicStarted = true;
     startDucking();
@@ -1061,6 +1080,7 @@ export function getPreviewHtml(): string {
     if (!p || !p.audio || !p.audio.ducking) return;
     var duckedVolume = p.audio.ducking.ducked_volume || 0.12;
 
+    var mv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
     state.audioDuckingInterval = setInterval(function() {
       var voActive = false;
       state.audioElements.forEach(function(audio) {
@@ -1069,9 +1089,10 @@ export function getPreviewHtml(): string {
         }
       });
 
+      var curMv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
       state.audioElements.forEach(function(audio) {
         if (audio._trackType === 'music') {
-          audio.volume = voActive ? duckedVolume : audio._baseVolume;
+          audio.volume = (voActive ? duckedVolume : audio._baseVolume) * curMv;
         }
       });
     }, 100);
@@ -1084,7 +1105,7 @@ export function getPreviewHtml(): string {
     }
     state.audioElements.forEach(function(audio) {
       if (audio._trackType === 'music') {
-        audio.volume = audio._baseVolume;
+        audio.volume = effVolume(audio);
       }
     });
   }
@@ -2222,6 +2243,21 @@ export function getPreviewHtml(): string {
   });
   els.playBtn.addEventListener('click', togglePlay);
   els.slider.addEventListener('input', function() { scrub(parseInt(els.slider.value, 10)); });
+  if (els.volSlider) {
+    els.volSlider.addEventListener('input', function() {
+      var v = parseInt(els.volSlider.value, 10);
+      if (isNaN(v)) v = 100;
+      state.masterVolume = v / 100;
+      // Live-apply: non-music directly; music too when the ducking loop isn't
+      // running (when it is, it re-reads masterVolume every tick).
+      state.audioElements.forEach(function(audio) {
+        if (audio._trackType !== 'music' || !state.audioDuckingInterval) {
+          audio.volume = effVolume(audio);
+        }
+      });
+      if (els.volIcon) els.volIcon.className = state.masterVolume === 0 ? 'vol-icon muted' : 'vol-icon';
+    });
+  }
 
   // Global error handler - show errors visually
   window.addEventListener('error', function(e) {
