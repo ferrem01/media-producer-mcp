@@ -13,7 +13,8 @@
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 
 export interface CorrectnessDefect {
-  /** overlap | off_canvas | not_sequenced | illegible | stray_ui | missing_asset | other */
+  /** overlap | off_canvas | not_sequenced | illegible | invisible_surface | empty_skeleton |
+   *  dropped_element | dead_frame | intent_mismatch | stray_ui | missing_asset | off_brand_theme | other */
   type: string;
   detail: string;
 }
@@ -123,5 +124,5 @@ export function formatCorrectnessDefects(defects: CorrectnessDefect[]): string {
   if (!defects.length) return "";
   return "\n\n!! CORRECTNESS DEFECTS (must fix -- the scene is BROKEN, not just imperfect):\n" +
     defects.map((d, i) => `${i + 1}. [${d.type}] ${d.detail}`).join("\n") +
-    "\nThese are blocking: overlapping/clipped/illegible content, elements stacked instead of sequenced in order, stray unrelated UI, or a missing required asset. Lay elements out so nothing collides, sequence ordered items one at a time, keep everything on-canvas and legible, remove anything not asked for, and ensure required assets are visibly present.\n";
+    "\nThese are blocking: overlapping/clipped/illegible content, washed-out/invisible surfaces, empty skeleton placeholders, elements the brief named but you dropped, dead/empty frame regions, a layout whose energy contradicts the brief's intent, elements stacked instead of sequenced in order, stray unrelated UI, or a missing required asset. Lay elements out so nothing collides; give every panel a clearly distinct value from the background with a visible border and shadow; fill UI with believable specific content (never blank placeholder bars); render every element the brief names; fill the frame and match the brief's stated density and mood; sequence ordered items one at a time; keep everything on-canvas and legible; remove anything not asked for; and ensure required assets are visibly present.\n";
 }

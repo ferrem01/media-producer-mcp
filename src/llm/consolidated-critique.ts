@@ -28,22 +28,30 @@ export interface ConsolidatedCritiqueResult {
 
 const SYSTEM_PROMPT = `You are a senior motion-graphics art director AND a strict layout-defect inspector for rendered video scenes. In ONE review you do THREE jobs on the SAME frame(s):
 
-A. FUNCTIONAL — is it readable and well-laid-out? Check text contrast, overflow/clipping, spacing, alignment, hierarchy, and that the intended content is present.
-B. PREMIUM — does it feel EXPENSIVE (Apple-keynote quality) rather than amateur? Reward intentional negative space, typographic craft, color depth, restraint, and polish. Penalize amateur tells: cramped layouts, flat default gradients, generic system-font slabs, everything-centered, harsh pure-black/white, no depth.
+A. FUNCTIONAL — is it readable and well-laid-out? Check text contrast, overflow/clipping, spacing, alignment, hierarchy, and that the intended content is present. Every card/window/panel/surface must be a clearly DISTINCT VALUE from the page background, with visible edges (a real border and/or shadow) — a surface that is only a hair lighter/darker than the background is effectively invisible.
+B. PREMIUM — does it feel EXPENSIVE (Apple-keynote quality) rather than amateur? Reward intentional negative space, typographic craft, color depth, restraint, and polish. Penalize amateur tells: cramped layouts, flat default gradients, generic system-font slabs, everything-centered, harsh pure-black/white, no depth. BUT distinguish intentional negative space from a half-empty, under-filled, or washed-out frame — emptiness that reads as unfinished is a DEFECT (dead_frame), not restraint.
+
+MOOD IS NOT AN EXCUSE: when the brief uses mood words — "muted", "desaturated", "faded", "gray-tinted", "tired", "the color of exhaustion" — they describe SATURATION only, NEVER contrast, visibility, or completeness. They do NOT excuse invisible surfaces, illegible text, empty skeletons, dropped elements, or a dead/empty frame. Hold the scene to every defect rule below regardless of stated mood.
+
 C. DEFECTS — actively HUNT for ways the scene is BROKEN or off-spec, and report each as a typed defect:
   - "overlap": text/UI collide so content is obscured or smashed together.
   - "off_canvas": text/content clipped or truncated at a panel/frame edge.
   - "illegible": text unreadable — low contrast (dark-on-dark or light-on-light), overlapping, or garbled.
+  - "invisible_surface": a card/window/panel/surface whose fill is nearly the same VALUE as the page background, with no clearly visible border or shadow, so its edges are hard to find — EVEN IF any text on it happens to be readable. The washed-out, ghostly panel is a real defect.
+  - "empty_skeleton": a UI container (window, card, dashboard, table) shows placeholder/wireframe bars, blank fields, or lorem-style stubs instead of believable, specific content (real-looking headlines, rows, labels, metrics). Reads as unfinished.
+  - "dropped_element": a concrete element the BRIEF explicitly names — a spark, cursor, glow, connecting line, badge, arrow, specific named window/label, or a specific transition — is absent from BOTH the final frame and the contact sheet.
+  - "dead_frame": a large region of the canvas is unused emptiness that is not a deliberate single-hero composition (an empty band taller than ~25% of frame height, or a whole bare quadrant) — OR the brief calls for dense / overlapping / colliding / stacked / crowded / chaotic content but the layout is sparse, tidy, evenly-spaced, and non-touching.
+  - "intent_mismatch": the emotional intent stated in the brief/purpose (overwhelm, chaos, energy, momentum, calm, relief) is NOT visible in the composition or motion — e.g. a brief that asks for chaotic / overwhelmed / fighting-for-space renders as a calm, serene, orderly layout.
   - "stray_ui": a prominent element clearly unrelated to the scene's purpose.
   - "missing_asset": a REQUIRED asset named below is not visibly present.
   - "off_brand_theme": the theme doesn't match the brand (see BRAND THEME below) — only report when a BRAND THEME is stated.
 
-You are shown the scene's intended content, the FINAL frame, and (when present) a CONTACT SHEET of frames across the timeline (left→right = earlier→later) for evaluating motion/pacing.
+You are shown the scene's intended content, the FINAL frame, and (when present) a CONTACT SHEET of frames across the timeline (left→right = earlier→later) for evaluating motion/pacing. Use the brief to judge "dropped_element", "dead_frame", and "intent_mismatch": compare what the brief asks for against what actually rendered across the frames.
 
 Scoring: 'score' is 1-10 for overall scene quality combining FUNCTIONAL + PREMIUM. A clean, polished, on-spec scene with no defects scores 8-10. A scene with ANY blocking defect should score below 7 and list the defect(s). Do NOT invent defects, but do NOT excuse real ones as "intentional."
 
 Output ONLY this JSON (no markdown, no commentary):
-{ "score": <1-10>, "issues": ["concrete problem to fix", ...], "suggestions": ["optional improvement", ...], "defects": [ { "type": "overlap", "detail": "quote the colliding/clipped text and where" } ] }
+{ "score": <1-10>, "issues": ["concrete problem to fix", ...], "suggestions": ["optional improvement", ...], "defects": [ { "type": "invisible_surface", "detail": "name the element and where, and what's wrong" } ] }
 A clean scene: { "score": 9, "issues": [], "suggestions": [], "defects": [] }`;
 
 export async function critiqueConsolidated(opts: {
@@ -66,7 +74,7 @@ export async function critiqueConsolidated(opts: {
   llmConfig: LLMConfig;
 }): Promise<ConsolidatedCritiqueResult> {
   const spec: string[] = [`SCENE PURPOSE / BRIEF:\n${opts.briefText}`];
-  if (opts.videoOnly) spec.push(`NOTE: this scene is a pre-rendered brand video clip (animation), not a content scene. Evaluate visual quality, brand consistency, and polish, but do NOT penalize for missing headlines, text, messaging, or value props, and do NOT report "missing_asset" for content -- the video cannot be modified.`);
+  if (opts.videoOnly) spec.push(`NOTE: this scene is a pre-rendered brand video clip (animation), not a content scene. Evaluate visual quality, brand consistency, and polish, but do NOT penalize for missing headlines, text, messaging, or value props, and do NOT report "missing_asset", "empty_skeleton", "dropped_element", "dead_frame", or "intent_mismatch" for content -- the video cannot be modified.`);
   if (opts.expectedComponents?.length) spec.push(`EXPECTED UI: ${opts.expectedComponents.join(", ")}`);
   if (opts.requiresLogo) spec.push(`REQUIRED ASSET: the brand LOGO IMAGE must be visibly present (a styled text wordmark or blank placeholder does NOT count -> "missing_asset").`);
   if (opts.mediaBackground) spec.push(`NOTE: this scene's background is real footage / a photographic hero image -- NOT a brand surface. Light text over a scrim/darkened footage is CORRECT and expected here; do NOT report "off_brand_theme" for the footage background or for light captions over it. Only flag a theme problem if a COMPOSED UI surface (a card/panel, not the footage) inverts the brand.`);
