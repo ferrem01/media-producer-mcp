@@ -481,10 +481,31 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       }
 
       // ── Static asset serving for project/tenant assets ──
-      const assetMatch = urlPath.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
+      // Serve project media (images/b-roll under assets/, TTS under voiceover/,
+      // mixed audio under audio/). The browser loads these via <audio>/<img>/<video>
+      // which can't send an auth header, so this stays on the unauthenticated asset
+      // path -- restricted to the media subdirs (never project.json / _work).
+      const assetMatch = urlPath.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/((?:assets|voiceover|audio)\/.+)$/);
       if (assetMatch && (method === "GET" || method === "HEAD")) {
-        const [, assetTenantId, assetProjectId, assetPath] = assetMatch.map(decodeURIComponent);
-        const fullPath = path.join(config.dataDir, assetTenantId, "projects", assetProjectId, "assets", assetPath);
+        const [, assetTenantId, assetProjectId, assetSubPath] = assetMatch.map(decodeURIComponent);
+        if (assetSubPath.includes("..")) { res.writeHead(403); res.end("Forbidden"); return; }
+        const fullPath = path.join(config.dataDir, assetTenantId, "projects", assetProjectId, assetSubPath);
+        try {
+          await streamFile(req, res, fullPath);
+        } catch {
+          res.writeHead(404);
+          res.end("Asset not found");
+        }
+        return;
+      }
+
+      // Serve system-cached media (e.g. royalty-free background music under
+      // _system/cache/). Same unauthenticated rationale as project media above.
+      const systemAssetMatch = urlPath.match(/^\/assets\/_system\/(.+)$/);
+      if (systemAssetMatch && (method === "GET" || method === "HEAD")) {
+        const sysPath = decodeURIComponent(systemAssetMatch[1]);
+        if (sysPath.includes("..")) { res.writeHead(403); res.end("Forbidden"); return; }
+        const fullPath = path.join(config.dataDir, "_system", sysPath);
         try {
           await streamFile(req, res, fullPath);
         } catch {
