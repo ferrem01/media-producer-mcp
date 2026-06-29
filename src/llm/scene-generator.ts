@@ -74,7 +74,7 @@ async function generateCodegenScene(
   var sceneHtml = await generateSceneAgentic({
     sceneBrief: effectiveBrief,
     sceneLabel: draft.label,
-    sceneDescription: draft.description,
+    sceneDescription: (draft as any).purpose || (draft as any).visual_notes || draft.description,
     sceneDuration: draft.duration_seconds || 5,
     sceneIndex: opts.sceneIndex,
     totalScenes: opts.totalScenes,
@@ -151,12 +151,16 @@ async function buildCodegenBrief(draft: any): Promise<string> {
   var parts: string[] = [];
 
   parts.push(`Scene: "${draft.label}"`);
+  // What this scene must communicate (its job in the story).
+  const purpose = draft.purpose || draft.description;
+  if (purpose) parts.push(`Purpose: ${purpose}`);
   parts.push(`Duration: ${draft.duration_seconds || 5} seconds`);
-  if (draft.description) parts.push(`Description: ${draft.description}`);
 
-  // Visual brief from the storyboard
-  if (draft.brief) {
-    parts.push(`\nVisual Direction:\n${draft.brief}`);
+  // Visual direction from the storyboard -- how this scene should look and move.
+  // (Field was renamed brief -> visual_notes; keep the old names as fallbacks.)
+  const visualDirection = draft.visual_notes || draft.brief || draft.description;
+  if (visualDirection) {
+    parts.push(`\nVisual Direction:\n${visualDirection}`);
   }
 
   // Component hints: look up schemas from catalog and include them
