@@ -2276,36 +2276,12 @@ function applyEditorialFixes(
     }
   }
 
-  // --- add_breathing: inject a visual pause before the last scene (CTA) ---
-  // Only if editorial flagged it and there isn't already a short breathing scene
-  const needsBreathing = editorial.fixes.some(f => f.type === "add_breathing");
-  if (needsBreathing && scenes.length >= 4) {
-    // Check the second-to-last scene isn't already very short (a breathing scene)
-    const preCta = scenes[scenes.length - 2];
-    if (preCta.duration_seconds > 2.5) {
-      const breathingScene: Scene = {
-        id: `scene_breathing_${Date.now()}`,
-        label: "Visual Pause",
-        duration_seconds: 2,
-        transition_in: { type: "blur-crossfade", duration_seconds: 0.8 },
-        components: [{
-          id: "comp_0",
-          type: "gradient-background",
-          data: {
-            color_start: brandKit.colors?.background || "#0f172a",
-            color_end: brandKit.colors?.surface || "#1e293b",
-            direction: "135deg",
-          },
-          z_index: 0,
-          position: { x: 0, y: 0, width: "100%", height: "100%" },
-        }],
-      };
-      // Insert before the last scene
-      scenes.splice(scenes.length - 1, 0, breathingScene);
-      console.log(`    Breathing scene injected before CTA`);
-      changes++;
-    }
-  }
+  // NOTE: we deliberately do NOT inject a "breathing"/visual-pause scene. It
+  // added a content-less gradient beat nobody asked for, and -- because it went
+  // into project.scenes but not project.storyboard.scenes -- it shifted every
+  // later scene's storyboard mapping by one (the pause borrowed the CTA's
+  // storyboard; the real CTA showed none). Editorial fixes must never change the
+  // scene count, so scenes stay 1:1 with the storyboard.
 
   return changes;
 }
