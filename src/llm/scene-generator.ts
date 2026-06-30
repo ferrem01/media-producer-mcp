@@ -50,9 +50,9 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   // ── Unified Codegen Path (always active) ──
   // All scenes go through the agentic codegen generator
   // which can use <component> tags to embed library components.
-  var codegenBrief = await buildCodegenBrief(draft);
+  var codegenSpec = await buildCodegenSpec(draft);
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (unified codegen)`);
-  return await generateCodegenScene(opts, draft, codegenBrief, sceneId);
+  return await generateCodegenScene(opts, draft, codegenSpec, sceneId);
 }
 
 // ── Freeform Scene Generation ──
@@ -60,21 +60,21 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
 async function generateCodegenScene(
   opts: SceneGeneratorOpts,
   draft: DraftScene,
-  codegenBrief: string,
+  codegenSpec: string,
   sceneId: string,
 ): Promise<GeneratedScene> {
   var compName = `scene_${sceneId}`;
 
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (agentic-codegen)`);
 
-  var effectiveBrief = codegenBrief;
-  console.log("  [codegen-brief] Scene \"" + draft.label + "\" has " + (draft.components?.length || 0) + " component hints, brief includes schemas: " + effectiveBrief.includes("Component Schemas"));
-  console.log("  [codegen-brief] Full brief length:", effectiveBrief.length, "chars");
+  var effectiveSpec = codegenSpec;
+  console.log("  [codegen-spec] Scene \"" + draft.label + "\" has " + (draft.components?.length || 0) + " component hints, spec includes schemas: " + effectiveSpec.includes("Component Schemas"));
+  console.log("  [codegen-spec] Full spec length:", effectiveSpec.length, "chars");
 
   var sceneHtml = await generateSceneAgentic({
-    sceneBrief: effectiveBrief,
+    sceneSpec: effectiveSpec,
     sceneLabel: draft.label,
-    sceneDescription: draft.description,
+    sceneDescription: draft.purpose || draft.visual_notes,
     sceneDuration: draft.duration_seconds || 5,
     sceneIndex: opts.sceneIndex,
     totalScenes: opts.totalScenes,
@@ -139,24 +139,27 @@ function buildBrandContext(brandKit: BrandKit): string {
   return lines.join("\n");
 }
 
-// ── Unified Codegen Brief Builder ──
+// ── Unified Codegen Spec Builder ──
 
 /**
- * Build a rich codegen brief from any draft scene type.
+ * Build a rich codegen spec from any draft scene type.
  * Converts template, library component, sequence, or custom scene
- * descriptions into a brief the agentic codegen generator can use
+ * notes into a spec the agentic codegen generator can use
  * with <component> tags.
  */
-async function buildCodegenBrief(draft: any): Promise<string> {
+async function buildCodegenSpec(draft: any): Promise<string> {
   var parts: string[] = [];
 
   parts.push(`Scene: "${draft.label}"`);
+  // What this scene must communicate (its job in the story).
+  const purpose = draft.purpose;
+  if (purpose) parts.push(`Purpose: ${purpose}`);
   parts.push(`Duration: ${draft.duration_seconds || 5} seconds`);
-  if (draft.description) parts.push(`Description: ${draft.description}`);
 
-  // Visual brief from the storyboard
-  if (draft.brief) {
-    parts.push(`\nVisual Direction:\n${draft.brief}`);
+  // Visual direction from the storyboard -- how this scene should look and move.
+  const visualDirection = draft.visual_notes || draft.purpose;
+  if (visualDirection) {
+    parts.push(`\nVisual Direction:\n${visualDirection}`);
   }
 
   // Component hints: look up schemas from catalog and include them
@@ -212,7 +215,7 @@ async function buildCodegenBrief(draft: any): Promise<string> {
         parts.push(`\n## Component Schemas\n\n${schemasFound.join("\n\n")}`);
       }
     } catch (e: any) {
-      console.warn("  [buildCodegenBrief] Failed to load catalog for schemas:", e.message);
+      console.warn("  [buildCodegenSpec] Failed to load catalog for schemas:", e.message);
     }
   }
 

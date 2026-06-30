@@ -2,8 +2,8 @@
  * Unified Storyboard builder
  *
  * Builds a storyboard with one codegen pipeline. For each scene, the storyboard builder
- * writes a visual brief (what the viewer experiences) and lists which library
- * components to embed. The codegen LLM receives the brief + component schemas
+ * writes visual notes (what the viewer experiences) and lists which library
+ * components to embed. The codegen LLM receives the visual notes + component schemas
  * and builds the scene HTML.
  */
 
@@ -65,8 +65,8 @@ export interface StoryboardComponent {
 export interface DraftScene {
   label: string;
   duration_seconds: number;
-  description: string;
-  brief: string;           // visual direction (what the viewer experiences, motion verbs, depth layers)
+  purpose: string;         // what this scene communicates -- its job in the story
+  visual_notes: string;    // visual direction (what the viewer experiences, motion verbs, depth layers)
   components: string[];    // library component types to embed, e.g. ["quotient-chat", "dashboard-kpi"]
   transition_in?: { type: string; duration_seconds: number };
   hero_image?: string;
@@ -101,20 +101,20 @@ ${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n`
 
 ## Scene Format
 
-Each scene has a brief (visual direction) and a list of component types from the catalog.
+Each scene has visual notes (the visual direction) and a list of component types from the catalog.
 
 {
   "label": "Scene 1 - Connector Discovery",
   "duration_seconds": 5,
-  "description": "User discovers and activates the connector feature",
-  "brief": "A clean workspace fills the frame — warm off-white background with subtle grid lines pulsing faintly. A cursor GLIDES from below toward a plus icon at center. On click, a circular button BLOOMS outward with a soft shadow spreading beneath it. The circle MORPHS into a rounded card panel. Menu items STAGGER in from the right — each row has a thin icon, label text, and a chevron. The cursor DRIFTS to Connectors, which highlights with a warm rounded fill. BG: subtle grid with breathing glow. MG: UI card with menu items. FG: cursor with drop shadow, particle hints.",
+  "purpose": "User discovers and activates the connector feature",
+  "visual_notes": "A clean workspace fills the frame — warm off-white background with subtle grid lines pulsing faintly. A cursor GLIDES from below toward a plus icon at center. On click, a circular button BLOOMS outward with a soft shadow spreading beneath it. The circle MORPHS into a rounded card panel. Menu items STAGGER in from the right — each row has a thin icon, label text, and a chevron. The cursor DRIFTS to Connectors, which highlights with a warm rounded fill. BG: subtle grid with breathing glow. MG: UI card with menu items. FG: cursor with drop shadow, particle hints.",
   "components": [],
   "voiceover_text": "Discover the connector that changes everything.",
   "transition_in": { "type": "none", "duration_seconds": 0 }
 }
 
-### Writing Great Briefs
-Briefs MUST be 5+ sentences with specific motion verbs, depth layers (BG/MG/FG), and choreography.
+### Writing Great Visual Notes
+Visual notes MUST be 5+ sentences with specific motion verbs, depth layers (BG/MG/FG), and choreography.
 NOT "show the feature" — describe what HAPPENS frame by frame.
 Think like a storyboard director. Describe what the viewer EXPERIENCES, not the layout.
 Use motion verbs (SLAMS, DRIFTS, MORPHS, SNAPS, ASSEMBLES). Include BG/MG/FG layers.
@@ -161,7 +161,7 @@ Once the gate above says this beat is MOVING, add a "broll_query": a SPECIFIC, c
 There is no separate "sequence" type. A continuous multi-step moment — a
 walkthrough, demo flow, step-by-step, or "single take" where elements persist and
 transform — is just a normal scene with a LONGER duration (e.g. 12-30s) and a
-brief that describes the progression as one continuous motion. Write the brief as
+visual notes that describe the progression as one continuous motion. Write the notes as
 an ordered flow (e.g. "chat panel SLIDES left as the editor DRIFTS in from the
 right, then both resolve into the published post"), list the library components
 involved, and the codegen LLM will choreograph it on one master timeline with
@@ -180,8 +180,8 @@ ${catalogStr}
     {
       "label": "Scene 1 - Hero",
       "duration_seconds": 5,
-      "description": "Dramatic hero reveal with product visualization",
-      "brief": "A dramatic hero reveal — the hero-reveal component renders the 'QUOTIENT' headline + subtitle with its SplitText per-character SLAM (chars stagger, back.out ease). Around it, custom code adds ambient glow orbs in the accent color drifting slowly and floating particles for depth. BG: gradient with glow orbs (custom). MG/FG: hero-reveal handles the headline + subtitle.",
+      "purpose": "Dramatic hero reveal with product visualization",
+      "visual_notes": "A dramatic hero reveal — the hero-reveal component renders the 'QUOTIENT' headline + subtitle with its SplitText per-character SLAM (chars stagger, back.out ease). Around it, custom code adds ambient glow orbs in the accent color drifting slowly and floating particles for depth. BG: gradient with glow orbs (custom). MG/FG: hero-reveal handles the headline + subtitle.",
       "components": ["hero-reveal"],
       "voiceover_text": "Introducing Quotient. The future of demand generation.",
       "broll_query": "abstract flowing deep-blue and violet ink in slow motion, macro, dark background",
@@ -190,16 +190,16 @@ ${catalogStr}
     {
       "label": "Scene 2 - Key Stats",
       "duration_seconds": 4,
-      "description": "Show impressive metrics with animated stat cards",
-      "brief": "Two stat cards STAGGER in from below — first '340% ROI Increase' lands with a bounce, then '2.5M Users Reached' follows 0.3s later. Each card has a large animated counter that rolls up to its final number. Subtle gradient background with brand colors. Cards have rounded corners with soft shadows. BG: gradient. FG: stat cards with counter animations.",
+      "purpose": "Show impressive metrics with animated stat cards",
+      "visual_notes": "Two stat cards STAGGER in from below — first '340% ROI Increase' lands with a bounce, then '2.5M Users Reached' follows 0.3s later. Each card has a large animated counter that rolls up to its final number. Subtle gradient background with brand colors. Cards have rounded corners with soft shadows. BG: gradient. FG: stat cards with counter animations.",
       "components": ["stat-card"],
       "transition_in": { "type": "slide-up", "duration_seconds": 0.5 }
     },
     {
       "label": "Scene 3 - Quiet Moment",
       "duration_seconds": 5,
-      "description": "A still, contemplative beat that should HOLD STILL (uses a generated image, not a video)",
-      "brief": "A serene, composed beat. The hero_image fills the frame as a deliberate still; a single line of 32px text FADES in slowly over it. BG: hero image. FG: one calm line of copy.",
+      "purpose": "A still, contemplative beat that should HOLD STILL (uses a generated image, not a video)",
+      "visual_notes": "A serene, composed beat. The hero_image fills the frame as a deliberate still; a single line of 32px text FADES in slowly over it. BG: hero image. FG: one calm line of copy.",
       "components": [],
       "voiceover_text": "Find your calm.",
       "hero_image": "a perfectly still misty mountain lake at dawn, soft violet and amber light, mirror-like reflection, serene and contemplative, cinematic photograph",
@@ -211,7 +211,7 @@ ${catalogStr}
 ## Rules
 
 - ${sceneCountGuide}
-- **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Its brief must describe the whole flow as an ordered progression (step 1 → step 2 → step 3 …, each as motion: SLIDES, MORPHS, ASSEMBLES), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a storyboard failure.
+- **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Its visual notes must describe the whole flow as an ordered progression (step 1 → step 2 → step 3 …, each as motion: SLIDES, MORPHS, ASSEMBLES), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a storyboard failure.
 - B-ROLL: if the prompt is a brand film, or has an emotional/aspirational/lifestyle opener or closer, or any "feeling / place / human moment" scene, you MUST add a "broll_query" (a specific cinematic stock-footage phrase) to at least one such scene -- see the B-Roll section. Don't default those moments to a flat gradient. (Skip b-roll entirely for pure data/UI/feature/logo/CTA videos.)
 - First scene: transition "none" or omit transition_in.
 - Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, whip-pan, cinematic-zoom, shader-crosswarp, shader-ripple, shader-radial, shader-directional-warp, shader-burn, shader-chromatic, shader-lens-distortion, shader-swirl, shader-pixelize, none.
@@ -228,12 +228,12 @@ ${catalogStr}
 - Every scene MUST have a components array with at least one component.
 - Think Apple keynote: one powerful idea per scene, cinematic motion, premium aesthetic.
 - MANDATORY: For EACH scene (except intro/outro/breathing), you MUST include a "voiceover_text" field with narration that FITS the scene duration. Missing voiceover is a storyboard failure. CRITICAL: at ~150 words per minute, a 5-second scene fits ~12 words (1 short sentence), a 6-second scene fits ~15 words, a 7-second scene fits ~17 words. NEVER write more words than the scene duration allows. Keep narration punchy -- one idea per scene. Skip voiceover_text for intro/outro brand asset scenes and breathing pauses.
-- For IMAGE format: write a comprehensive brief covering the entire visual composition. List components only if library UI elements fit.
-- For PRESENTATION/DECK format: treat each slide as a self-contained visual composition. Write a detailed brief per slide.
-- For VIDEO: write rich briefs per scene and list matching library components for UI elements.
-- **Interactive Scripts:** Some library components are 🎬 Scriptable. Mention scripting needs in the brief and the codegen LLM will handle the details.
+- For IMAGE format: write comprehensive visual notes covering the entire visual composition. List components only if library UI elements fit.
+- For PRESENTATION/DECK format: treat each slide as a self-contained visual composition. Write detailed visual notes per slide.
+- For VIDEO: write rich visual notes per scene and list matching library components for UI elements.
+- **Interactive Scripts:** Some library components are 🎬 Scriptable. Mention scripting needs in the visual notes and the codegen LLM will handle the details.
 - Output ONLY valid JSON. No commentary.
-- When a prompt asks for a "walkthrough", "demo flow", "step by step", or "continuous take" involving multiple existing components, make ONE longer scene (12-30s) with a progression-style brief that lists those components (see "Continuous / Multi-Step Scenes" above) rather than several short scenes.
+- When a prompt asks for a "walkthrough", "demo flow", "step by step", or "continuous take" involving multiple existing components, make ONE longer scene (12-30s) with progression-style visual notes that list those components (see "Continuous / Multi-Step Scenes" above) rather than several short scenes.
 
 ${SCENE_STORYBOARD_DESIGN_RULES}
 
@@ -338,7 +338,7 @@ ${PACING_PLAYBOOK}`;
   // Inject reference image summary into system prompt
   if (opts.referenceImages?.length) {
     systemPrompt += buildReferenceImageSummary(opts.referenceImages);
-    systemPrompt += "\nReference images are provided. Study them carefully and write brief descriptions that match the visual design, layout, spacing, and style shown in these references.\n";
+    systemPrompt += "\nReference images are provided. Study them carefully and write visual notes that match the visual design, layout, spacing, and style shown in these references.\n";
   }
 
   // Inject speaker track mode instructions if applicable
@@ -408,10 +408,14 @@ Prefer Speaker templates over regular templates when the speaker should be visib
     }
     scene.components = validated;
 
-    // Ensure brief exists
-    if (!scene.brief) {
-      scene.brief = scene.description || scene.label || "";
+    // Never silently ship a scene with no visual direction. The prompt asks the
+    // model for visual_notes/purpose; if visual_notes is missing, warn loudly
+    // (so it's visible, not swallowed) and fall back to purpose/label.
+    if (!scene.visual_notes) {
+      console.warn(`  Scene "${scene.label}": storyboard returned no visual_notes -- falling back to purpose/label.`);
+      scene.visual_notes = scene.purpose || scene.label || "";
     }
+    if (!scene.purpose) scene.purpose = scene.label || "";
   }
 
   var componentHints = 0;

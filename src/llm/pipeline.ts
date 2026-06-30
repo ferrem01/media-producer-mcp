@@ -47,6 +47,7 @@ import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
 import { captureSingleFrame, validateSceneRuntime } from "../core/capture.js";
 import { measureTextContrast } from "../core/text-contrast.js";
+import { measureLayout } from "../core/layout-metrics.js";
 import os from "node:os";
 
 // Keep old imports for backwards compat (deprecated functions still exist in their files)
@@ -326,41 +327,39 @@ async function runSceneRevisionPipeline(
   const storyboardScene = project.storyboard?.scenes?.[sceneIndex];
 
   // Serialize existing scene as context for the storyboard builder, and pin the scene's
-  // brief (Studio-edited override, else the original storyboard) so the
+  // visual notes (Studio-edited override, else the original storyboard) so the
   // rebuild fulfills the scene's actual intent — not just its label.
   const sceneContext = serializeSceneContext(existingScene);
-  const briefBlock = formatSceneBrief(storyboardScene);
+  const notesBlock = formatSceneNotes(storyboardScene);
   const revisionPrompt =
     `Revise the following scene based on these instructions: ${opts.prompt}` +
-    (briefBlock ? `\n\nScene brief (the intent this scene must fulfill):\n${briefBlock}` : "") +
+    (notesBlock ? `\n\nScene spec (the intent this scene must fulfill):\n${notesBlock}` : "") +
     `\n\nCurrent scene:\n${sceneContext}`;
 
-  // Build the scene the generator will render. When we have an explicit brief
-  // (Studio-edited override, else the original storyboard), use it VERBATIM
+  // Build the scene the generator will render. When we have explicit visual notes
+  // (Studio-edited override, else the original storyboard), use them VERBATIM
   // as the generation spec instead of re-running the storyboard builder: buildStoryboard
-  // paraphrases the brief into its own brief/description, and buildCodegenBrief
+  // paraphrases them into its own visual_notes/purpose, and buildCodegenSpec
   // then generates from THAT — so the rebuild drifts from what the storyboard
-  // actually said. Only fall back to the storyboard builder when there is no brief at all.
+  // actually said. Only fall back to the storyboard builder when there is nothing at all.
   // The storyboard entry (project.storyboard.scenes[idx]) is the single source of truth that
   // Studio edits; use it verbatim so the rebuild matches the storyboard.
-  const briefPurpose = storyboardScene?.purpose;
-  const briefScript = storyboardScene?.voiceover_text;
-  const briefVisual = storyboardScene?.visual_notes;
+  const purposeText = storyboardScene?.purpose;
+  const scriptText = storyboardScene?.voiceover_text;
+  const visualText = storyboardScene?.visual_notes;
   const instr = opts.prompt?.trim();
   let draft: any;
 
-  if (briefPurpose || briefScript || briefVisual) {
-    opts.onProgress?.({ step: "storyboarding", percent: 10, detail: "Using the storyboard brief" });
-    // buildCodegenBrief surfaces `description` -> "Description" and `brief` ->
+  if (purposeText || scriptText || visualText) {
+    opts.onProgress?.({ step: "storyboarding", percent: 10, detail: "Using the storyboard spec" });
+    // buildCodegenSpec surfaces purpose -> "Purpose" and visual_notes ->
     // "Visual Direction" verbatim, so map the user's words straight in.
     draft = {
       label: existingScene.label || storyboardScene?.label || `Scene ${sceneIndex + 1}`,
       duration_seconds: storyboardScene?.duration_seconds || existingScene.duration_seconds || 5,
-      description: [briefPurpose, instr ? `Additional instruction: ${instr}` : ""].filter(Boolean).join("\n"),
-      brief: briefVisual || "",
-      purpose: briefPurpose || "",
-      visual_notes: briefVisual || "",
-      voiceover_text: briefScript || "",
+      purpose: [purposeText, instr ? `Additional instruction: ${instr}` : ""].filter(Boolean).join("\n"),
+      visual_notes: visualText || "",
+      voiceover_text: scriptText || "",
       components: storyboardScene?.components || [],
       broll_query: storyboardScene?.broll_query,
       hero_image: storyboardScene?.hero_image,
@@ -773,8 +772,8 @@ async function runImageRevisionPipeline(
         scene: {
           label: revisionStrategy.label,
           duration_seconds: revisionStrategy.duration_seconds,
-          description: comp.custom_prompt || opts.prompt,
-          brief: comp.custom_prompt || opts.prompt,
+          purpose: comp.custom_prompt || opts.prompt,
+          visual_notes: comp.custom_prompt || opts.prompt,
           components: [],
         },
         sceneIndex: 0,
@@ -857,9 +856,9 @@ async function runImageRevisionPipeline(
 
 // ── Serialization Helpers ──
 
-/** Format a scene's brief for the revision prompt: the Studio-edited override
- *  (scene.brief) takes precedence over the original storyboard entry. */
-function formatSceneBrief(draft?: StoryboardScene): string {
+/** Format a scene's visual notes for the revision prompt: the Studio-edited
+ *  override takes precedence over the original storyboard entry. */
+function formatSceneNotes(draft?: StoryboardScene): string {
   const purpose = draft?.purpose;
   const script = draft?.voiceover_text;
   const visual = draft?.visual_notes;
@@ -1147,15 +1146,15 @@ async function critiqueAndRetryScene(opts: {
       // round-trips. Bookends (correctnessOnly) ignore the aesthetic score and gate
       // only on defects; video-only brand clips are scored but not defect-gated
       // (their content can't be regenerated).
-      const briefForCon = currentDraft?.brief || currentDraft?.visual_notes || currentDraft?.description || currentDraft?.label || opts.prompt;
+      const specForCon = currentDraft?.visual_notes || currentDraft?.purpose || currentDraft?.label || opts.prompt;
       const con = await critiqueConsolidated({
         previewImageBase64: previewBase64,
         contactSheetBase64,
         contactTimestamps,
-        briefText: briefForCon,
+        specText: specForCon,
         sceneHtml: assembledHtml,
         expectedComponents: Array.isArray(currentDraft?.components) ? currentDraft.components.filter((c: any) => typeof c === "string") : undefined,
-        requiresLogo: /\blogo\b/i.test(briefForCon) && (opts.brandKit?.logos?.length ?? 0) > 0,
+        requiresLogo: /\blogo\b/i.test(specForCon) && (opts.brandKit?.logos?.length ?? 0) > 0,
         brandTheme: brandBackgroundIsLight(opts.brandKit) ? "light" : "dark",
         videoOnly: !!isVideoOnly,
         // Footage / hero-image background: light text over a scrim is correct then,
@@ -1211,6 +1210,32 @@ async function critiqueAndRetryScene(opts: {
           }
         } catch (e: any) {
           console.warn(`  Legibility gate skipped: ${e?.message || e}`);
+        }
+
+        // Layout gate: deterministically MEASURE surface separation (ghost panels)
+        // and content coverage (dead/empty frames) -- the quantitative rules the
+        // codegen prompt under-executes. Each violation becomes a blocking defect
+        // with a specific corrective number that feeds the regen.
+        try {
+          const dur = currentScene.duration_seconds || 5;
+          const layoutDefects = await measureLayout({
+            htmlPath,
+            width: opts.canvas.width,
+            height: opts.canvas.height,
+            atTimes: [dur * 0.45, dur * 0.7, dur * 0.9],
+          });
+          for (const d of layoutDefects) {
+            correctness.defects.push({ type: d.type, detail: d.detail });
+            critiqueResult.issues.push(d.type === "invisible_surface"
+              ? "A panel/card has near-zero separation from the background (ghost panel)"
+              : "Large empty/flat region -- the frame reads as sparse/dead");
+          }
+          if (layoutDefects.length > 0) {
+            correctness.pass = false;
+            console.log(`  Layout gate: ${layoutDefects.length} defect(s) [${layoutDefects.map((d) => d.type).join(", ")}] -- forcing revision`);
+          }
+        } catch (e: any) {
+          console.warn(`  Layout gate skipped: ${e?.message || e}`);
         }
       }
 
@@ -1381,9 +1406,9 @@ Output valid JSON only. No markdown fences, no commentary.`;
         fixedScene.components = [];
       }
 
-      // Ensure brief exists
-      if (!fixedScene.brief) {
-        fixedScene.brief = fixedScene.description || fixedScene.label || opts.prompt;
+      // Never ship a fixed scene with no visual direction.
+      if (!fixedScene.visual_notes) {
+        fixedScene.visual_notes = fixedScene.purpose || fixedScene.label || opts.prompt;
       }
 
       // Use the fixed storyboard
@@ -1442,8 +1467,8 @@ Output valid JSON only. No markdown fences, no commentary.`;
       const swapScene = {
         label: currentDraft.label || `Scene ${opts.sceneIndex + 1}`,
         duration_seconds: currentDraft.duration_seconds || 5,
-        description: currentDraft.description || opts.prompt,
-        brief: `${currentDraft.description || opts.prompt}\n\nDESIGN MANDATE: Keep it simple. One bold visual idea. Large readable text on a high-contrast background. No more than 10 words visible. Use var(--mp-color-text) on var(--mp-color-background) for guaranteed contrast.`,
+        purpose: currentDraft.purpose || opts.prompt,
+        visual_notes: `${currentDraft.purpose || opts.prompt}\n\nDESIGN MANDATE: Keep it simple. One bold visual idea. Large readable text on a high-contrast background. No more than 10 words visible. Use var(--mp-color-text) on var(--mp-color-background) for guaranteed contrast.`,
         transition_in: currentDraft.transition_in,
         components: [],
       };
@@ -1529,12 +1554,12 @@ function storyboardToSaved(
     narrative: storyboard.name,
     scenes: storyboard.scenes.map((s) => ({
       label: s.label,
-      purpose: s.description || "",
+      purpose: s.purpose || "",
       template: "",
       voiceover_text: s.voiceover_text,
       duration_seconds: s.duration_seconds,
       assets: [],
-      visual_notes: s.brief || s.description || "",
+      visual_notes: s.visual_notes || "",
       components: s.components || [],
       broll_query: s.broll_query,
       hero_image: s.hero_image,
@@ -1564,7 +1589,7 @@ async function runUnifiedPipeline(
     opts.sceneCount = 1;
   }
 
-  // The Creative Director (below) takes the RAW brief directly -- there is no
+  // The Creative Director (below) takes the RAW prompt directly -- there is no
   // separate "expand" step -- so a thin one-liner reaches the expert intact,
   // without a lossy paraphrase hop in between.
   var richPrompt = opts.prompt;
@@ -1586,7 +1611,7 @@ async function runUnifiedPipeline(
     console.log(`  Reference images: ${processedRefs.length} processed`);
   }
 
-  // Creative Director: reads the raw brief, fills the gaps as the expert,
+  // Creative Director: reads the raw prompt, fills the gaps as the expert,
   // commits to ONE concept + look, and decides the scene count.
   var treatment: Treatment | undefined;
   if (format !== "image") {
@@ -1743,11 +1768,11 @@ async function runUnifiedPipeline(
 
     // Enforce voiceover on non-bookend scenes
     if (!isBookend && !draft.voiceover_text && draft.duration_seconds >= 3) {
-      // Generate voiceover text from the scene description
-      var fallbackVoiceover = draft.description || draft.label || "";
-      if (draft.brief) {
-        // Extract a concise narration from the brief (first sentence or label)
-        fallbackVoiceover = draft.label?.replace(/^Scene \d+ - /, "") || draft.description || "";
+      // Generate voiceover text from the scene's purpose
+      var fallbackVoiceover = draft.purpose || draft.label || "";
+      if (draft.visual_notes) {
+        // Extract a concise narration (first sentence or label)
+        fallbackVoiceover = draft.label?.replace(/^Scene \d+ - /, "") || draft.purpose || "";
       }
       if (fallbackVoiceover && fallbackVoiceover.length > 5) {
         draft.voiceover_text = fallbackVoiceover;
@@ -1976,7 +2001,7 @@ async function runUnifiedPipeline(
             transition_in: s.transition_in,
             component_types: s.components.map(c => c.type),
             word_count: estimateWordCount(s),
-            intent: storyboard.scenes[i]?.brief || storyboard.scenes[i]?.description || storyboard.scenes[i]?.label,
+            intent: storyboard.scenes[i]?.visual_notes || storyboard.scenes[i]?.purpose || storyboard.scenes[i]?.label,
           }));
           return await critiqueEditorial({ scenes: sceneMeta, prompt: richPrompt, llmConfig: config.critiqueLlm, format, trace, storyboardBase64: storyboardBase64 || undefined });
         } finally {
@@ -2223,7 +2248,7 @@ async function runUnifiedPipeline(
     trace?.endEvent();
   }
 
-  // Persist the storyboard builder's storyboard (briefs + suggested components) on the
+  // Persist the storyboard builder's storyboard (visual notes + suggested components) on the
   // project so it's available for inspection and iteration after a full run,
   // not just in storyboard-only mode.
   project.storyboard = storyboardToSaved(storyboard, opts.voice as string);

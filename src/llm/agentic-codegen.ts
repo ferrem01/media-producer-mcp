@@ -15,7 +15,7 @@ import {
   type LLMContentPart,
 } from "./client.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
-// Component discovery is handled by the storyboard builder. The codegen LLM receives schemas in the brief.
+// Component discovery is handled by the storyboard builder. The codegen LLM receives schemas in the spec.
 // import { SCENE_TEMPLATES, TEMPLATES_DIR } from "./template-catalog.js";
 import { getDesignSkills } from "./design-skills.js";
 import type { BrandKit, Canvas, ReferenceImage } from "../core/types.js";
@@ -34,7 +34,7 @@ const COMPONENTS_ROOT = path.resolve(__dirname, "..", "components");
 // ── Types ──
 
 export interface AgenticCodegenOpts {
-  sceneBrief: string;
+  sceneSpec: string;
   sceneLabel: string;
   sceneDescription: string;
   sceneDuration: number;
@@ -122,7 +122,7 @@ async function executeReadSource(
         return `# Component: ${name}\n# Category: ${catDir.name}\n# File: ${catDir.name}/${htmlFile}\n#\n# HOW TO USE:\n#   <component type="${name}" data='{"field1": "value1", ...}' />\n#\n# Read the createTimeline(el, data, ctx) function to see what data fields are used.\n# Fill the data attribute with your scene's actual content.${schemaInfo}\n\n${source}`;
       }
     }
-    return `Component "${name}" not found. Check the component type name in the brief.`;
+    return `Component "${name}" not found. Check the component type name in the spec.`;
   } catch (e: any) {
     return `Error reading component: ${e.message}`;
   }
@@ -157,7 +157,7 @@ export function executeSubmitScene(html: string): { valid: boolean; html: string
     return {
       valid: false,
       html,
-      error: `Remote media URL not allowed: "${remoteMedia[0].slice(0, 80)}". Never reference external URLs for video or images. Use ONLY the local asset paths provided in the brief (the b-roll/hero/logo /assets/... paths). If this scene was given no footage or image, do NOT invent one -- compose the background with brand colors, gradients, and typography instead. Resubmit.`,
+      error: `Remote media URL not allowed: "${remoteMedia[0].slice(0, 80)}". Never reference external URLs for video or images. Use ONLY the local asset paths provided in the spec (the b-roll/hero/logo /assets/... paths). If this scene was given no footage or image, do NOT invent one -- compose the background with brand colors, gradients, and typography instead. Resubmit.`,
     };
   }
 
@@ -173,13 +173,29 @@ function buildAgenticSystemPrompt(opts: AgenticCodegenOpts): string {
   return `You are an expert motion graphics designer creating a single video scene as HTML+CSS+GSAP.
 Your output will be captured frame-by-frame by Playwright at ${opts.canvas.width}x${opts.canvas.height} and encoded to video.
 
+## NON-NEGOTIABLES (these override everything below — and any mood words in the visual notes)
+
+These are the failures that make a scene look broken. Violate none of them.
+
+1. **LEGIBILITY OVER MOOD — INCLUDING SURFACES.** The visual notes' mood words — "muted", "desaturated", "faded", "gray-tinted", "tired", "the color of exhaustion" — describe SATURATION and fill color, NEVER contrast or visibility. This applies to CONTAINERS as much as text: every card / window / panel / surface must be a clearly distinct VALUE from the page background — pull from the brand surface color, or shift its lightness at least ~8% off the background — and carry a visible border (≥1.5px in a mid-value color, NOT a 4–8%-opacity hairline) and a real multi-layer shadow. A panel that is only a hair lighter/darker than the background is INVISIBLE and is the #1 failure. Body/label text ≥4.5:1 contrast; headlines and key shapes read instantly. If a viewer would squint to find a panel's edges or read a word, the scene has FAILED.
+
+2. **FILL THE WHOLE FRAME — NO DEAD ZONES.** Content must be distributed across the entire ${opts.canvas.width}×${opts.canvas.height} canvas, not pooled in one region. No empty band taller than ~25% of the frame height, and no whole quadrant left bare. Fill ≥70% of the frame. AND when the visual notes say dense / overlapping / colliding / stacked / chaotic, the elements MUST actually overlap and crowd each other — tidy, evenly-spaced, non-touching islands are a failure even if they're large. If it says one bold hero, make it genuinely big and centered with intent. Timid, half-empty, clustered-in-a-corner layouts fail.
+
+3. **REAL CONTENT, NEVER SKELETONS.** UI windows, cards, dashboards, and panels must contain believable, specific content — real-looking headlines, rows, labels, metrics drawn from the product. Empty placeholder bars and wireframe skeletons read as unfinished and are a failure.
+
+4. **RENDER EVERY ELEMENT THE VISUAL NOTES NAME.** If the visual notes name a concrete element or beat — a spark, a cursor, a glow, a connecting line, a badge, a specific transition — it MUST appear in the scene. You decide HOW it looks and moves, but you may NOT silently drop a specified element. Missing called-for elements is a failure.
+
+5. **MAKE THE EMOTION VISIBLE.** The scene's Purpose names a feeling (overwhelm, relief, momentum, confidence). That feeling must be legible in the composition and the motion — not merely labeled. Chaos must look chaotic; calm must look calm.
+
+Design for a viewer watching a finished video, not a designer reading a spec.
+
 ## Component Tags (USE THESE FIRST)
 
 Your scene MUST use <component> tags for any UI element that exists in the component library.
 Do NOT rebuild from scratch what already exists. Writing custom HTML for a library component is a bug.
 
 ### How It Works
-1. Read the component schemas from the brief
+1. Read the component schemas from the spec
 2. Embed components using \`<component type="name" data='{...}' />\` with the data fields from the schema
 3. Write custom code only for layout, transitions, backgrounds, and elements with no library match
 
@@ -197,8 +213,8 @@ The result is HYBRID: <component> tags for known UI + custom code for everything
 \`\`\`
 
 ### Rules
-- The \`type\` must match a component listed in the brief
-- The \`data\` attribute is a JSON string — fill fields from the schema provided in the brief
+- The \`type\` must match a component listed in the spec
+- The \`data\` attribute is a JSON string — fill fields from the schema provided in the spec
 - Components auto-generate internal GSAP timelines
 - Access component timelines via: ctx.getComponentTimeline('comp_0')
 - **WIRE EVERY COMPONENT YOU EMBED.** For each <component> in your template, you MUST call \`tl.add(ctx.getComponentTimeline('comp_N'), <time>)\` in createTimeline. If you don't, the block's animation -- including ambient background motion -- never plays and the frame sits dead-static. This applies to backgrounds too (gradient-background, mesh-gradient, depth-blur all have ambient loops): wire them at t=0.
@@ -268,12 +284,12 @@ Notice: quotient-chat and code-editor use <component> tags, and BOTH timelines a
 
 ## Your Process
 
-1. READ the brief below — it includes which components to use and their data schemas
+1. READ the spec below — it includes which components to use and their data schemas
 2. BUILD your scene HTML using <component> tags for every listed component, filling data from the provided schemas
 3. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
 4. SUBMIT via the submit_scene tool
 
-You have everything you need in the brief. Go straight to writing and submit in ONE step.
+You have everything you need in the spec. Go straight to writing and submit in ONE step.
 
 ## Design Skills (FOLLOW THESE RULES)
 
@@ -360,7 +376,7 @@ This scene has a real, cinematic AI-generated image that MUST be the full-bleed 
 ` : ""}
 ## ASSETS: LOCAL PATHS ONLY (hard rule)
 NEVER reference an external/remote URL (http://, https://) for a video, image, or any media. The ONLY media you may use are the local /assets/... paths explicitly handed to you above (b-roll, hero image, logos). Do NOT invent stock-footage URLs (Pexels, Unsplash, etc.) -- remote media breaks the renderer.
-${!opts.brollVideoUrl && !opts.heroImageUrl ? `This scene was given NO footage or hero image. Even if the brief mentions "real footage" or "b-roll", do NOT add a <video> with an external src -- compose the background entirely from brand colors, gradients, and typography.` : ""}
+${!opts.brollVideoUrl && !opts.heroImageUrl ? `This scene was given NO footage or hero image. Even if the visual notes mention "real footage" or "b-roll", do NOT add a <video> with an external src -- compose the background entirely from brand colors, gradients, and typography.` : ""}
 
 Duration: ${opts.sceneDuration} seconds
 Scene ${opts.sceneIndex + 1} of ${opts.totalScenes}
@@ -412,7 +428,7 @@ function buildBrandContext(brandKit: BrandKit): string {
       "",
       `THEME: this brand is ${_light ? "LIGHT" : "DARK"}.`,
       _light
-        ? "The root/scene background MUST be var(--mp-color-background) (a LIGHT color) with var(--mp-color-text) (DARK) text. Do NOT build a dark scene. Do NOT hardcode ANY dark hex anywhere in this scene -- no #17171c, #0f172a, #0d0d1a, #1e293b, etc. -- not for the background, not for cards/panels, not for title treatments. Every surface uses var(--mp-color-surface) (LIGHT); all text uses var(--mp-color-text) (DARK); NEVER white/#fff/#f0eefc text (it's invisible on light). THIS THEME OVERRIDES THE SCENE BRIEF: if the brief names a dark background, a dark card, 'glow orbs on dark', or light text, IGNORE it and render light -- soft washes/tints of var(--mp-color-primary) on var(--mp-color-background), subtle grid, generous whitespace, dark text. Cards need a solid var(--mp-color-surface) fill or a 1px border + soft shadow to be visible (glassmorphism only works on dark)."
+        ? "The root/scene background MUST be var(--mp-color-background) (a LIGHT color) with var(--mp-color-text) (DARK) text. Do NOT build a dark scene. Do NOT hardcode ANY dark hex anywhere in this scene -- no #17171c, #0f172a, #0d0d1a, #1e293b, etc. -- not for the background, not for cards/panels, not for title treatments. Every surface uses var(--mp-color-surface) (LIGHT); all text uses var(--mp-color-text) (DARK); NEVER white/#fff/#f0eefc text (it's invisible on light). THIS THEME OVERRIDES THE SCENE'S VISUAL NOTES: if the visual notes name a dark background, a dark card, 'glow orbs on dark', or light text, IGNORE it and render light -- soft washes/tints of var(--mp-color-primary) on var(--mp-color-background), subtle grid, generous whitespace, dark text. Cards need a solid var(--mp-color-surface) fill or a 1px border + soft shadow to be visible (glassmorphism only works on dark)."
         : "The root/scene background is var(--mp-color-background) (dark) with var(--mp-color-text) (light) text.",
     );
   }
@@ -460,26 +476,26 @@ function buildBrandContext(brandKit: BrandKit): string {
 
 const MAX_ITERATIONS = 8;
 
-// Component discovery is handled by the storyboard builder; codegen receives schemas in the brief
+// Component discovery is handled by the storyboard builder; codegen receives schemas in the spec
 
 export async function generateSceneAgentic(
   opts: AgenticCodegenOpts,
 ): Promise<string> {
   var systemPrompt = buildAgenticSystemPrompt(opts);
 
-  // Component schemas are provided in the brief by the storyboard builder
+  // Component schemas are provided in the spec by the storyboard builder
 
   var userPrompt = `Create this scene:
 
 Label: ${opts.sceneLabel}
 Description: ${opts.sceneDescription}
 
-## Storyboard Brief
+## Scene Spec
 
-${opts.sceneBrief}
+${opts.sceneSpec}
 
 ## Requirements
-- Follow the storyboard brief closely. Every motion verb in the brief should map to a GSAP tween.
+- Follow the scene spec closely. Every motion verb in the visual notes should map to a GSAP tween.
 - Create a visually stunning, polished scene. This is motion graphics, not a web page.
 - Use the design skills rules: multi-layer shadows, varied easing, video-scale typography (64px+ headlines), background depth.
 - Fill the frame. Two focal points minimum. Anchor to edges, not center-float.
@@ -487,8 +503,8 @@ ${opts.sceneBrief}
 - All text MUST have correct spacing. Never concatenate words. Check every text string for missing spaces.
 - Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
 ${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
-CRITICAL: If the brief lists components with schemas, use <component type=... data='...' /> tags with the data fields from the schemas. Do NOT rebuild from scratch what the brief says to use as a component.
-Read the brief, then write your scene HTML and submit it.`;
+CRITICAL: If the spec lists components with schemas, use <component type=... data='...' /> tags with the data fields from the schemas. Do NOT rebuild from scratch what the spec says to use as a component.
+Read the spec, then write your scene HTML and submit it.`;
 
   // Build user message: include reference images as vision content if available
   var userContent: string | LLMContentPart[];
@@ -601,7 +617,7 @@ Read the brief, then write your scene HTML and submit it.`;
       });
 
       // Synthetic nudge: if search found components but LLM is about to submit without using them
-      // Component schemas are provided in the brief; no tool-based discovery needed
+      // Component schemas are provided in the spec; no tool-based discovery needed
 
       continue;
     }
