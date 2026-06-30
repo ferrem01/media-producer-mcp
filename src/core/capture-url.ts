@@ -27,6 +27,9 @@ export interface CaptureUrlResult {
 export async function captureUrl(opts: CaptureUrlOptions): Promise<CaptureUrlResult> {
   const browser = await chromium.launch({
     args: ["--disable-gpu", "--no-sandbox", "--disable-setuid-sandbox", "--allow-file-access-from-files"],
+    // Honor an explicit Chromium path in constrained/remote envs whose bundled
+    // Playwright revision isn't downloaded (mirrors capture.ts LAUNCH_OPTS).
+    ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
   });
   try {
     const page = await browser.newPage({ ignoreHTTPSErrors: true });
