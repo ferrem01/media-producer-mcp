@@ -178,7 +178,7 @@ export function buildReferenceImageSummary(
 
   lines.push("");
   lines.push(
-    "When writing scene brief descriptions or HTML, explicitly reference these images: " +
+    "When writing scene visual notes or HTML, explicitly reference these images: " +
     '"Match the layout from reference image 1", "Use the color palette from reference 2", etc.'
   );
 

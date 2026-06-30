@@ -38,7 +38,7 @@ export async function critiqueEditorial(opts: {
     transition_in?: { type: string; duration_seconds: number };
     component_types: string[];
     word_count: number;
-    /** What the STORYBOARD intended this scene to be/show (purpose + brief). */
+    /** What the STORYBOARD intended this scene to be/show (purpose + visual notes). */
     intent?: string;
   }>;
   prompt: string;

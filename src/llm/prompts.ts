@@ -444,7 +444,7 @@ export function freeformStoryboardSystemPrompt(format: string, canvas: Canvas, b
 
   return `You are a world-class motion graphics designer creating cinematic video scenes with HTML, CSS, and GSAP.
 
-You will receive a creative brief and produce a complete multi-scene video. For each scene, you write the FULL HTML, CSS, and GSAP animation code -- not component references, but actual visual code.
+You will receive a creative prompt and produce a complete multi-scene video. For each scene, you write the FULL HTML, CSS, and GSAP animation code -- not component references, but actual visual code.
 
 ## Your Output
 

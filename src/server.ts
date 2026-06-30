@@ -1812,7 +1812,7 @@ export function createMcpServer(): McpServer {
     {
       tenant_id: z.string(),
       url: z.string().describe("Website URL to brand the video from (e.g. https://getquotient.ai)"),
-      prompt: z.string().optional().describe("Optional creative direction. If omitted, a launch-video brief is derived from the brand."),
+      prompt: z.string().optional().describe("Optional creative direction. If omitted, launch-video direction is derived from the brand."),
       target_duration: z.number().optional().default(24).describe("Target video length in seconds (default 24)"),
       voiceover: z.boolean().optional().default(false),
       background_music: z.boolean().optional().default(false),
