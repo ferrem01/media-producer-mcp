@@ -254,6 +254,9 @@ async function main() {
       "--mute-audio",
       "--no-first-run",
     ],
+    // Honor an explicit Chromium path in constrained/remote envs whose bundled
+    // Playwright revision isn't downloaded (mirrors capture.ts LAUNCH_OPTS).
+    ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
   });
 
   const frameDirsToCleanup = new Set<string>();
