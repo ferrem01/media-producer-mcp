@@ -290,8 +290,8 @@
       if (fallback) fallback.style.display = 'none';
     }
 
-    // ── Light bar (edge-on beauty) -- a contained clean edge, not full-length ──
-    if (lightbar) lightbar.style.height = Math.round(h * 0.58) + 'px';
+    // Light bar retired -- the pane's OWN glowing thickness is the edge now.
+    if (lightbar) lightbar.style.display = 'none';
 
     // ── Caption ──
     if (caption) {
@@ -306,31 +306,29 @@
     var restX = 3;
     var rotDur = 2.7 * base;
 
-    // ── Initial state: slab HIDDEN and only partly rotated, so the raw edge-on
-    // silhouette is never seen -- the clean light bar is the sole opener. ──
+    // ── The slab is a REAL thick glass pane. It starts JUST PAST edge-on
+    // (rotateY 93deg), so its face is turned away and hidden (backface-hidden)
+    // and only its glowing beveled THICKNESS is visible -- a lit edge in the
+    // void. It then rotates continuously through 90deg to its resting angle: as
+    // it crosses 90deg the face turns toward camera and the UI is revealed. One
+    // physical turn -- no decorative line, no crossfade. ──
+    var startY = 93;
     gsap.set(stage, { transformPerspective: 1700 });
-    gsap.set(slab, { rotateY: 72, rotateX: 0, z: -40, scale: 0.94, autoAlpha: 0, transformOrigin: '50% 50%' });
-    if (rim) gsap.set(rim, { autoAlpha: 0.15 });
+    gsap.set(slab, { rotateY: startY, rotateX: 1, z: -30, scale: 0.9, autoAlpha: 1, transformOrigin: '50% 50%' });
+    if (rim) gsap.set(rim, { autoAlpha: 1 });          // the edge is lit from the first frame
     if (specular) gsap.set(specular, { autoAlpha: 0, xPercent: -60 });
     if (glow) gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
-    if (lightbar) gsap.set(lightbar, { autoAlpha: 0, scaleY: 0.7 });
     if (caption) gsap.set(caption, { autoAlpha: 0, y: 12 });
 
-    // Beauty beat: the light bar ignites and holds edge-on
-    if (lightbar) {
-      tl.to(lightbar, { autoAlpha: 1, scaleY: 1, duration: 0.5 * base, ease: 'power2.out' }, 0.1);
-    }
+    // Ambient glow blooms behind the edge immediately.
     if (glow) {
-      tl.to(glow, { autoAlpha: 1, scale: 1, duration: 1.1 * base, ease: 'power2.out' }, 0.2);
+      tl.to(glow, { autoAlpha: 1, scale: 1, duration: 1.2 * base, ease: 'power2.out' }, 0.0);
     }
 
-    var pivotAt = 0.7 * base;
+    var pivotAt = 0.6 * base;   // brief hold on the glowing edge before it turns
 
-    // The slab fades in FROM the light bar right as the pivot begins, so the
-    // opener reads as a clean glowing edge that opens into the panel.
-    tl.to(slab, { autoAlpha: 1, duration: 0.35 * base, ease: 'power1.out' }, pivotAt);
-
-    // The pivot: edge-on -> face-on, weighted and inevitable
+    // The pivot: the whole pane rotates edge-on -> face-on in one weighted move,
+    // crossing 90deg so the face is revealed mid-turn.
     tl.to(slab, {
       rotateY: restY,
       rotateX: restX,
@@ -339,15 +337,6 @@
       duration: rotDur,
       ease: 'power3.out'
     }, pivotAt);
-
-    // Light bar hands off to the face as it opens
-    if (lightbar) {
-      tl.to(lightbar, { autoAlpha: 0, duration: 0.6 * base, ease: 'power2.in' }, pivotAt + 0.15);
-    }
-    // Rim glow blooms in as the beveled face turns toward camera
-    if (rim) {
-      tl.to(rim, { autoAlpha: 1, duration: rotDur * 0.7, ease: 'power2.out' }, pivotAt + 0.1);
-    }
     // Specular rake across the screen, tied to the rotation
     if (specular) {
       tl.to(specular, { autoAlpha: 1, duration: 0.4, ease: 'power1.out' }, pivotAt + 0.2);
