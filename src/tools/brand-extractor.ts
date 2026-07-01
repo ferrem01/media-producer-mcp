@@ -434,6 +434,211 @@ export async function extractBrandFromUrl(url: string): Promise<{
   }
 }
 
+// ── Site image harvesting (crawl + collect) ──
+
+export interface RawImageCandidate {
+  url: string;              // absolute image URL
+  page: string;             // page URL it was found on
+  alt: string;              // alt text / aria-label (hint for captioning)
+  width: number;            // rendered/natural width in px
+  height: number;           // rendered/natural height in px
+  kind: "img" | "background";
+  area: number;             // width * height (ranking signal)
+}
+
+export interface HarvestOptions {
+  /** How many link-hops beyond the entry page to crawl (0 = entry only). Clamped 0-2. */
+  depth?: number;
+  /** Max number of interior pages to visit in total (across all depth). */
+  maxPages?: number;
+  /** Max image candidates to return after ranking. */
+  maxImages?: number;
+  /** Minimum width AND height (px) for an image to be considered content (skips icons). */
+  minSize?: number;
+}
+
+/**
+ * Decide whether an image URL is worth harvesting as brand imagery.
+ * Rejects data URIs, SVGs (vision models need raster), tracking pixels, and
+ * common sprite/icon/favicon patterns. Pure + unit-testable.
+ */
+export function isHarvestableImageUrl(u: string): boolean {
+  if (!u) return false;
+  if (u.startsWith("data:")) return false;
+  if (!/^https?:\/\//i.test(u)) return false;
+  var lower = u.split("?")[0].toLowerCase();
+  if (/\.svg$/.test(lower)) return false;
+  if (/\.(gif|ico)$/.test(lower)) return false;
+  if (/(sprite|favicon|pixel|tracking|1x1|spacer|blank)\b/.test(lower)) return false;
+  // Must look like a raster image by extension OR have no extension (CDN-served).
+  if (/\.[a-z0-9]{2,4}$/.test(lower) && !/\.(png|jpe?g|webp|avif)$/.test(lower)) return false;
+  return true;
+}
+
+/**
+ * From a list of same-origin candidate links, pick the interior pages most
+ * likely to hold product imagery. Prioritizes product/feature/solution-style
+ * paths, drops legal/auth/utility pages, dedupes by pathname, caps at `max`.
+ * Pure + unit-testable.
+ */
+export function pickCrawlLinks(links: string[], origin: string, max: number): string[] {
+  var PRIORITY = /(product|feature|solution|use-?case|platform|tour|overview|how-it-works|gallery|showcase|customers|integrations)/i;
+  var SKIP = /(privacy|terms|legal|cookie|login|sign-?in|sign-?up|register|contact|careers|jobs|support|status|\.pdf$|\.zip$|\/blog|\/docs?\b|\/api\b)/i;
+  var seen: Record<string, boolean> = {};
+  var prioritized: string[] = [];
+  var rest: string[] = [];
+  for (var raw of links) {
+    var href = raw;
+    try {
+      var parsed = new URL(raw, origin);
+      if (parsed.origin !== origin) continue;
+      parsed.hash = "";
+      parsed.search = "";
+      href = parsed.href;
+      var pathname = parsed.pathname.replace(/\/$/, "");
+      if (pathname === "" || pathname === "/") continue; // skip the home page itself
+      var key = pathname.toLowerCase();
+      if (seen[key]) continue;
+      seen[key] = true;
+      if (SKIP.test(href)) continue;
+      if (PRIORITY.test(href)) prioritized.push(href);
+      else rest.push(href);
+    } catch { /* ignore malformed hrefs */ }
+  }
+  return prioritized.concat(rest).slice(0, Math.max(0, max));
+}
+
+/**
+ * Dedupe image candidates by URL and rank largest-first, keeping the top N.
+ * Pure + unit-testable.
+ */
+export function rankImageCandidates(images: RawImageCandidate[], maxImages: number): RawImageCandidate[] {
+  var byUrl: Record<string, RawImageCandidate> = {};
+  for (var img of images) {
+    if (!isHarvestableImageUrl(img.url)) continue;
+    var existing = byUrl[img.url];
+    if (!existing || img.area > existing.area) byUrl[img.url] = img;
+  }
+  return Object.keys(byUrl)
+    .map((k) => byUrl[k])
+    .sort((a, b) => b.area - a.area)
+    .slice(0, Math.max(0, maxImages));
+}
+
+/** Scrape one already-loaded page for content images, background images, and links. */
+async function scrapePageAssets(page: import("playwright").Page, minSize: number): Promise<{ images: Array<{ url: string; alt: string; width: number; height: number; kind: "img" | "background" }>; links: string[] }> {
+  return await page.evaluate((minSizeArg: number) => {
+    function absUrl(u: string | null): string | null {
+      if (!u) return null;
+      try { return new URL(u, location.href).href; } catch (e) { return null; }
+    }
+    var images: Array<{ url: string; alt: string; width: number; height: number; kind: string }> = [];
+    var pushed: Record<string, boolean> = {};
+    function add(url: string | null, alt: string, w: number, h: number, kind: string) {
+      if (!url || pushed[url]) return;
+      if (w < minSizeArg || h < minSizeArg) return;
+      pushed[url] = true;
+      images.push({ url: url, alt: alt || "", width: Math.round(w), height: Math.round(h), kind: kind });
+    }
+    // Content <img> elements (use natural size; fall back to rendered rect).
+    Array.prototype.slice.call(document.querySelectorAll("img")).forEach(function (img: HTMLImageElement) {
+      var rect = img.getBoundingClientRect();
+      var w = img.naturalWidth || rect.width;
+      var h = img.naturalHeight || rect.height;
+      add(absUrl(img.currentSrc || img.src), img.getAttribute("alt") || img.getAttribute("aria-label") || "", w, h, "img");
+    });
+    // CSS background-image on reasonably large elements (heroes/section backdrops).
+    Array.prototype.slice.call(document.querySelectorAll("div,section,header,figure,a,span")).forEach(function (el: Element) {
+      var rect = el.getBoundingClientRect();
+      if (rect.width < minSizeArg || rect.height < minSizeArg) return;
+      var bg = getComputedStyle(el).backgroundImage;
+      if (!bg || bg === "none" || bg.indexOf("url(") < 0) return;
+      var m = bg.match(/url\((['"]?)(.*?)\1\)/);
+      if (!m) return;
+      add(absUrl(m[2]), (el.getAttribute("aria-label") || ""), rect.width, rect.height, "background");
+    });
+    // Same-origin links for crawling.
+    var links: string[] = [];
+    var linkSeen: Record<string, boolean> = {};
+    Array.prototype.slice.call(document.querySelectorAll("a[href]")).forEach(function (a: HTMLAnchorElement) {
+      var href = absUrl(a.getAttribute("href"));
+      if (!href || linkSeen[href]) return;
+      linkSeen[href] = true;
+      links.push(href);
+    });
+    return { images: images as any, links: links };
+  }, minSize);
+}
+
+/**
+ * Crawl a site (entry page + up to `depth` hops into interior pages) and collect
+ * ranked brand-image candidates. Does not download or caption — that happens in
+ * the tool layer. Returns [] on failure rather than throwing, so brand extraction
+ * (which always precedes this) is never blocked by imagery harvesting.
+ */
+export async function harvestSiteImages(url: string, opts: HarvestOptions = {}): Promise<RawImageCandidate[]> {
+  var depth = Math.max(0, Math.min(2, opts.depth ?? 1));
+  var maxPages = Math.max(0, opts.maxPages ?? 5);
+  var maxImages = Math.max(1, opts.maxImages ?? 8);
+  var minSize = Math.max(1, opts.minSize ?? 200);
+
+  var browser = await chromium.launch({
+    args: ["--disable-gpu", "--no-sandbox", "--disable-setuid-sandbox"],
+    ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+  });
+
+  var origin: string;
+  try { origin = new URL(url).origin; } catch { origin = url; }
+  var all: RawImageCandidate[] = [];
+  var visited: Record<string, boolean> = {};
+
+  async function scrape(pageUrl: string): Promise<string[]> {
+    var page = await browser.newPage({ ignoreHTTPSErrors: true });
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(pageUrl, { waitUntil: "networkidle", timeout: 30000 });
+      await new Promise((r) => setTimeout(r, 1500));
+      var res = await scrapePageAssets(page, minSize);
+      for (var img of res.images) {
+        all.push({ url: img.url, page: pageUrl, alt: img.alt, width: img.width, height: img.height, kind: img.kind, area: img.width * img.height });
+      }
+      return res.links;
+    } catch (e: any) {
+      console.warn(`[harvest] scrape failed for ${pageUrl}:`, e.message);
+      return [];
+    } finally {
+      await page.close().catch(() => {});
+    }
+  }
+
+  try {
+    visited[url] = true;
+    var entryLinks = await scrape(url);
+    if (depth > 0 && maxPages > 0) {
+      var toVisit = pickCrawlLinks(entryLinks, origin, maxPages).filter((l) => !visited[l]);
+      for (var link of toVisit) {
+        if (visited[link]) continue;
+        visited[link] = true;
+        var childLinks = await scrape(link);
+        // depth 2: crawl one further hop from each interior page, still capped by maxPages total.
+        if (depth > 1 && Object.keys(visited).length < maxPages + 1) {
+          var deeper = pickCrawlLinks(childLinks, origin, maxPages).filter((l) => !visited[l]);
+          for (var d of deeper) {
+            if (Object.keys(visited).length >= maxPages + 1) break;
+            if (visited[d]) continue;
+            visited[d] = true;
+            await scrape(d);
+          }
+        }
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+
+  return rankImageCandidates(all, maxImages);
+}
+
 // ── LLM Enhancement ──
 
 export async function enhanceWithLLM(
