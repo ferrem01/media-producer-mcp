@@ -604,6 +604,9 @@ export function createMcpServer(): McpServer {
       tenant_id: z.string(),
       url: z.string().optional().describe("Extract + store the brand kit from this website URL (colors, fonts, logos, theme) -- no video is generated."),
       enhance: z.boolean().optional().describe("Run LLM brand analysis during URL extraction (slower, richer guidelines)."),
+      include_images: z.boolean().optional().describe("During URL extraction, also crawl the site (entry + interior product/feature pages), download product/background imagery, caption each with a vision LLM, and store them as described brand assets."),
+      crawl_depth: z.number().int().min(0).max(2).optional().describe("Link-hops beyond the entry page to crawl for imagery (0=entry only, max 2). Only used with include_images."),
+      max_images: z.number().int().min(1).max(40).optional().describe("Max images to keep, ranked largest-first. Only used with include_images."),
       colors: z.object({
         primary: z.string().optional(),
         secondary: z.string().optional(),
@@ -634,12 +637,14 @@ export function createMcpServer(): McpServer {
       assets: z.array(z.object({
         name: z.string(),
         url: z.string(),
-        type: z.enum(["background", "intro", "outro", "watermark", "music"]).describe("Asset type"),
+        type: z.enum(["background", "intro", "outro", "watermark", "music", "product", "screenshot", "image"]).describe("Asset type"),
+        description: z.string().optional().describe("Model-readable caption so the AI can pick the right asset"),
         tags: z.array(z.string()).optional(),
+        source_url: z.string().optional().describe("Original image/page URL the asset came from"),
         width: z.number().optional(),
         height: z.number().optional(),
         duration: z.number().optional().describe("Duration in seconds (video/audio assets)"),
-      })).optional().describe("Brand assets (backgrounds, intros, outros, watermarks, music)"),
+      })).optional().describe("Brand assets (backgrounds, intros, outros, watermarks, music, and harvested product/screenshot/image assets)"),
       style: z.object({
         border_radius: z.string().optional(),
         motion: z.enum(["minimal", "punchy", "cinematic"]).optional(),
@@ -650,7 +655,11 @@ export function createMcpServer(): McpServer {
       // Extract + store the brand kit from a URL (no video generated).
       if (params.url) {
         try {
-          const { kit, summary } = await extractAndStoreBrand(params.tenant_id, params.url, params.enhance ?? false);
+          const { kit, summary } = await extractAndStoreBrand(params.tenant_id, params.url, params.enhance ?? false, {
+            includeImages: params.include_images ?? false,
+            depth: params.crawl_depth,
+            maxImages: params.max_images,
+          });
           return ok({ status: "brand_extracted", tenant_id: params.tenant_id, source_url: params.url, brand_kit: kit, summary });
         } catch (e: any) {
           return err(`Brand extraction failed for ${params.url}: ${e?.message || e}`);

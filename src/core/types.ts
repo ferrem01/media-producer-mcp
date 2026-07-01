@@ -53,13 +53,20 @@ export interface BrandLogo {
   placement?: string;
 }
 
-export type BrandAssetType = "background" | "intro" | "outro" | "watermark" | "music";
+export type BrandAssetType =
+  | "background" | "intro" | "outro" | "watermark" | "music"
+  // Harvested imagery (extract_brand_from_website with include_images):
+  | "product"      // product/UI screenshots, device shots, feature imagery
+  | "screenshot"   // app/dashboard captures
+  | "image";       // generic brand/marketing imagery (photos, illustrations, heroes)
 
 export interface BrandAsset {
   name: string;           // e.g. "hero-gradient", "logo-bouncy-wink"
   url: string;            // served URL
   type: BrandAssetType;   // asset category
+  description?: string;   // model-readable caption so the LLM can pick the right asset
   tags?: string[];        // e.g. ["hero", "dark", "abstract"]
+  source_url?: string;    // original image URL (or page) the asset was harvested from
   width?: number;
   height?: number;
   duration?: number;      // seconds, for video/audio assets

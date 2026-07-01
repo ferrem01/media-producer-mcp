@@ -14,11 +14,11 @@ import { promisify } from "node:util";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const execFileP = promisify(execFile);
-import { extractBrandFromUrl, enhanceWithLLM } from "./brand-extractor.js";
+import { extractBrandFromUrl, enhanceWithLLM, harvestSiteImages, type RawImageCandidate, type HarvestOptions } from "./brand-extractor.js";
 import { loadBrandKit, saveBrandKit } from "../persistence/brand-kit.js";
-import { llmConfigFromEnv } from "../llm/client.js";
+import { llmConfigFromEnv, callLLM, type LLMConfig, type LLMContentPart } from "../llm/client.js";
 import { config } from "../config.js";
-import type { BrandKit, BrandLogo } from "../core/types.js";
+import type { BrandKit, BrandLogo, BrandAsset, BrandAssetType } from "../core/types.js";
 
 function extFromContentType(ct: string, url: string): string {
   ct = (ct || "").toLowerCase();
@@ -114,6 +114,152 @@ async function downloadLogos(
   return out;
 }
 
+/** Probe a raster image file for its pixel dimensions via ffprobe. Best-effort. */
+async function probeImageSize(filePath: string): Promise<{ width: number; height: number }> {
+  try {
+    const { stdout } = await execFileP("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", filePath]);
+    const m = stdout.trim().match(/(\d+)x(\d+)/);
+    if (m) return { width: +m[1], height: +m[2] };
+  } catch { /* dims optional */ }
+  return { width: 0, height: 0 };
+}
+
+/** Build the caption LLM config: prefer a cheap Haiku model for Anthropic. */
+function captionLLMConfig(): LLMConfig {
+  const base = llmConfigFromEnv();
+  if (base.provider === "anthropic") {
+    return { ...base, model: process.env.MP_CAPTION_MODEL || "claude-haiku-4-5-20251001" };
+  }
+  return base; // OpenAI: keep the configured (vision-capable) model
+}
+
+interface ImageCaption {
+  description: string;
+  tags: string[];
+  type: "product" | "screenshot" | "image";
+  skip: boolean;
+}
+
+const CAPTION_SYSTEM = `You label images harvested from a company's website so a video-generation model can later pick the right visual. Given ONE image, respond with ONLY valid JSON (no markdown fences):
+{
+  "description": "one factual sentence (<=160 chars) describing what the image shows and how it could be used in a video",
+  "tags": ["3-6 lowercase keywords: subject, colors, mood, orientation"],
+  "type": "product" | "screenshot" | "image",
+  "skip": true | false
+}
+Rules: type "screenshot" = app/dashboard/UI captures; "product" = product/device/feature shots; "image" = photos, illustrations, hero/marketing imagery. Set skip=true ONLY for junk: logos, icons, tiny decorative slivers, ads, or blank/placeholder images.`;
+
+/** Caption a single harvested image with a vision LLM. Returns null on failure. */
+async function captionImage(cfg: LLMConfig, cand: RawImageCandidate, dataUrl: string): Promise<ImageCaption | null> {
+  const parts: LLMContentPart[] = [
+    { type: "image_url", image_url: { url: dataUrl } },
+    { type: "text", text: `Alt/label hint: ${cand.alt || "(none)"}. Rendered size: ${cand.width}x${cand.height}. Source kind: ${cand.kind}.` },
+  ];
+  try {
+    const raw = await callLLM(cfg, [{ role: "user", content: parts }], { systemPrompt: CAPTION_SYSTEM, maxTokens: 400, temperature: 0.2 });
+    let cleaned = raw.trim();
+    const fence = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    if (fence) cleaned = fence[1].trim();
+    const parsed = JSON.parse(cleaned) as Partial<ImageCaption>;
+    if (!parsed || typeof parsed.description !== "string") return null;
+    return {
+      description: parsed.description.slice(0, 240),
+      tags: Array.isArray(parsed.tags) ? parsed.tags.map(String).slice(0, 8) : [],
+      type: parsed.type === "product" || parsed.type === "screenshot" ? parsed.type : "image",
+      skip: parsed.skip === true,
+    };
+  } catch (e: any) {
+    console.warn(`[harvest] caption failed for ${cand.url}:`, e.message);
+    return null;
+  }
+}
+
+/** Map a caption + candidate kind to a stored BrandAsset type. */
+function resolveAssetType(caption: ImageCaption, cand: RawImageCandidate): BrandAssetType {
+  if (caption.type === "product" || caption.type === "screenshot") return caption.type;
+  // A generic image that was a large CSS background is most useful as a "background".
+  if (cand.kind === "background") return "background";
+  return "image";
+}
+
+/**
+ * Crawl the site, download harvested images, caption each with a vision LLM, and
+ * merge them into kit.assets[]. Best-effort: never throws (imagery is additive).
+ * Returns the BrandAsset entries added.
+ */
+export async function harvestAndStoreAssets(
+  tenantId: string,
+  url: string,
+  kit: BrandKit,
+  opts: HarvestOptions = {},
+): Promise<BrandAsset[]> {
+  let candidates: RawImageCandidate[] = [];
+  try {
+    candidates = await harvestSiteImages(url, opts);
+  } catch (e: any) {
+    console.warn("[harvest] site crawl failed:", e.message);
+    return [];
+  }
+  if (candidates.length === 0) return [];
+
+  let cfg: LLMConfig;
+  try { cfg = captionLLMConfig(); } catch (e: any) {
+    console.warn("[harvest] no LLM configured for captioning; skipping image harvest:", e.message);
+    return [];
+  }
+
+  const dir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "images");
+  await fs.mkdir(dir, { recursive: true });
+
+  // URLs already stored so re-runs don't duplicate assets.
+  const existingSources = new Set((kit.assets || []).map((a) => a.source_url).filter(Boolean) as string[]);
+  const added: BrandAsset[] = [];
+
+  for (const cand of candidates) {
+    if (existingSources.has(cand.url)) continue;
+    try {
+      const res = await fetch(cand.url);
+      if (!res.ok) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length === 0) continue;
+      const ct = res.headers.get("content-type") || "";
+      const ext = extFromContentType(ct, cand.url);
+      if (!/^(png|jpg|webp)$/.test(ext)) continue; // vision-friendly rasters only
+
+      // Caption from the bytes (base64) when small enough; else from the source URL.
+      const mediaType = ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+      const dataUrl = buf.length <= 4_000_000 ? `data:${mediaType};base64,${buf.toString("base64")}` : cand.url;
+      const caption = await captionImage(cfg, cand, dataUrl);
+      if (!caption || caption.skip) continue;
+
+      const idx = (kit.assets?.length || 0) + added.length + 1;
+      const filename = `image-${idx}.${ext}`;
+      const filePath = path.join(dir, filename);
+      await fs.writeFile(filePath, buf);
+      const dims = await probeImageSize(filePath);
+
+      added.push({
+        name: `harvested-${caption.type}-${idx}`,
+        url: `/assets/${tenantId}/brand-kit/images/${filename}`,
+        type: resolveAssetType(caption, cand),
+        description: caption.description,
+        tags: caption.tags,
+        source_url: cand.url,
+        ...(dims.width ? { width: dims.width } : cand.width ? { width: cand.width } : {}),
+        ...(dims.height ? { height: dims.height } : cand.height ? { height: cand.height } : {}),
+      });
+    } catch (e: any) {
+      console.warn(`[harvest] image download/caption failed (${cand.url}):`, e.message);
+    }
+  }
+
+  if (added.length > 0) {
+    kit.assets = (kit.assets || []).concat(added);
+    console.log(`[extract_brand] harvested ${added.length} image asset(s): ${added.map((a) => a.name).join(", ")}`);
+  }
+  return added;
+}
+
 function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
 }
@@ -127,7 +273,17 @@ function err(msg: string) {
  * fonts, design system, downloaded logos), save it, and return a summary.
  * Shared by the extract_brand_from_website tool and the website_to_video one-shot.
  */
-export async function extractAndStoreBrand(tenantId: string, url: string, enhance: boolean): Promise<{ kit: BrandKit; summary: any }> {
+export interface ImageHarvestConfig extends HarvestOptions {
+  /** When true, crawl the site and harvest+caption imagery into kit.assets[]. */
+  includeImages?: boolean;
+}
+
+export async function extractAndStoreBrand(
+  tenantId: string,
+  url: string,
+  enhance: boolean,
+  imageHarvest: ImageHarvestConfig = {},
+): Promise<{ kit: BrandKit; summary: any }> {
   var result = await extractBrandFromUrl(url);
   var designSystem = result.design_system;
   var extractedColors = result.colors;
@@ -182,6 +338,17 @@ export async function extractAndStoreBrand(tenantId: string, url: string, enhanc
     }
   }
 
+  // Optionally crawl the site and harvest+caption product/background imagery.
+  var harvestedAssets: BrandAsset[] = [];
+  if (imageHarvest.includeImages) {
+    harvestedAssets = await harvestAndStoreAssets(tenantId, url, kit, {
+      depth: imageHarvest.depth,
+      maxPages: imageHarvest.maxPages,
+      maxImages: imageHarvest.maxImages,
+      minSize: imageHarvest.minSize,
+    });
+  }
+
   await saveBrandKit(tenantId, kit);
 
   var summary = {
@@ -195,6 +362,10 @@ export async function extractAndStoreBrand(tenantId: string, url: string, enhanc
     logo_candidates_found: (result.logos || []).length,
     enhanced: enhance && !!designSystem.guidelines,
     guidelines_preview: designSystem.guidelines ? designSystem.guidelines.substring(0, 200) + "..." : undefined,
+    images_harvested: imageHarvest.includeImages ? harvestedAssets.length : undefined,
+    assets: imageHarvest.includeImages
+      ? harvestedAssets.map((a) => ({ name: a.name, type: a.type, description: a.description, url: a.url }))
+      : undefined,
   };
   return { kit, summary };
 }
@@ -205,15 +376,24 @@ export async function extractAndStoreBrand(tenantId: string, url: string, enhanc
 export function registerBrandExtractTool(server: McpServer): void {
   server.tool(
     "extract_brand_from_website",
-    "Extract design tokens (colors, typography, spacing, radius, shadows, motion, patterns) from a live website URL. Optionally enhances with LLM analysis. Merges extracted design system into the tenant's brand kit.",
+    "Extract design tokens (colors, typography, spacing, radius, shadows, motion, patterns) from a live website URL. Optionally enhances with LLM analysis. With include_images, also crawls the site (entry page + interior product/feature pages), downloads product/background imagery, captions each with a vision LLM, and stores them as described brand assets. Merges everything into the tenant's brand kit.",
     {
       tenant_id: z.string().describe("Tenant identifier"),
       url: z.string().describe("Website URL to extract brand from"),
       enhance: z.boolean().optional().default(false).describe("Run LLM analysis on extracted tokens for guidelines and refined patterns"),
+      include_images: z.boolean().optional().default(false).describe("Crawl the site and harvest+caption product/background imagery into the brand kit's assets (slower, uses vision LLM tokens)"),
+      crawl_depth: z.number().int().min(0).max(2).optional().default(1).describe("How many link-hops beyond the entry page to crawl for imagery (0=entry only, max 2). Only used with include_images."),
+      max_pages: z.number().int().min(0).max(20).optional().default(5).describe("Max interior pages to visit while harvesting imagery. Only used with include_images."),
+      max_images: z.number().int().min(1).max(40).optional().default(8).describe("Max images to keep, ranked largest-first. Only used with include_images."),
     },
     async (params) => {
       try {
-        const { summary } = await extractAndStoreBrand(params.tenant_id, params.url, params.enhance ?? false);
+        const { summary } = await extractAndStoreBrand(params.tenant_id, params.url, params.enhance ?? false, {
+          includeImages: params.include_images ?? false,
+          depth: params.crawl_depth,
+          maxPages: params.max_pages,
+          maxImages: params.max_images,
+        });
         return ok(summary);
       } catch (e: any) {
         return err("Brand extraction failed: " + e.message);
