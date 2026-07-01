@@ -482,10 +482,15 @@ export function isHarvestableImageUrl(u: string): boolean {
  * Pure + unit-testable.
  */
 export function pickCrawlLinks(links: string[], origin: string, max: number): string[] {
-  var PRIORITY = /(product|feature|solution|use-?case|platform|tour|overview|how-it-works|gallery|showcase|customers|integrations)/i;
+  // Tier 1: pages most likely to hold real product/UI imagery — ranked first so a
+  // flood of tier-2 pages (e.g. dozens of /integrations/*) can't crowd them out of
+  // the page budget. Tier 2: still relevant but screenshot-light. Everything else last.
+  var TIER1 = /(product|feature|solution|use-?case|platform|tour|demo|how-it-works|showcase|gallery|overview)/i;
+  var TIER2 = /(integrations?|customers|templates|pricing)/i;
   var SKIP = /(privacy|terms|legal|cookie|login|sign-?in|sign-?up|register|contact|careers|jobs|support|status|\.pdf$|\.zip$|\/blog|\/docs?\b|\/api\b)/i;
   var seen: Record<string, boolean> = {};
-  var prioritized: string[] = [];
+  var tier1: string[] = [];
+  var tier2: string[] = [];
   var rest: string[] = [];
   for (var raw of links) {
     var href = raw;
@@ -501,26 +506,49 @@ export function pickCrawlLinks(links: string[], origin: string, max: number): st
       if (seen[key]) continue;
       seen[key] = true;
       if (SKIP.test(href)) continue;
-      if (PRIORITY.test(href)) prioritized.push(href);
+      if (TIER1.test(href)) tier1.push(href);
+      else if (TIER2.test(href)) tier2.push(href);
       else rest.push(href);
     } catch { /* ignore malformed hrefs */ }
   }
-  return prioritized.concat(rest).slice(0, Math.max(0, max));
+  return tier1.concat(tier2, rest).slice(0, Math.max(0, max));
 }
 
 /**
  * Dedupe image candidates by URL and rank largest-first, keeping the top N.
  * Pure + unit-testable.
  */
+/**
+ * Canonical identity for an image URL, used to dedupe the SAME underlying image
+ * served through different URLs: `www` vs apex host, size/query variants, and
+ * Next.js image-optimizer wrappers (`/_next/image?url=<real>&w=...`). Returns
+ * `host-without-www + pathname` (lowercased), so a raw asset and its optimized
+ * variants collapse to one key. Pure + unit-testable.
+ */
+export function canonicalImageKey(u: string): string {
+  try {
+    var parsed = new URL(u);
+    // Unwrap Next.js (and similar) image optimizers that carry the real URL in ?url=.
+    if (/\/_next\/image$/i.test(parsed.pathname)) {
+      var inner = parsed.searchParams.get("url");
+      if (inner) return canonicalImageKey(new URL(inner, parsed.origin).href);
+    }
+    return (parsed.host.replace(/^www\./i, "") + parsed.pathname.replace(/\/$/, "")).toLowerCase();
+  } catch {
+    return u;
+  }
+}
+
 export function rankImageCandidates(images: RawImageCandidate[], maxImages: number): RawImageCandidate[] {
-  var byUrl: Record<string, RawImageCandidate> = {};
+  var byKey: Record<string, RawImageCandidate> = {};
   for (var img of images) {
     if (!isHarvestableImageUrl(img.url)) continue;
-    var existing = byUrl[img.url];
-    if (!existing || img.area > existing.area) byUrl[img.url] = img;
+    var key = canonicalImageKey(img.url);
+    var existing = byKey[key];
+    if (!existing || img.area > existing.area) byKey[key] = img;
   }
-  return Object.keys(byUrl)
-    .map((k) => byUrl[k])
+  return Object.keys(byKey)
+    .map((k) => byKey[k])
     .sort((a, b) => b.area - a.area)
     .slice(0, Math.max(0, maxImages));
 }
@@ -570,6 +598,37 @@ async function scrapePageAssets(page: import("playwright").Page, minSize: number
   }, minSize);
 }
 
+/** Extract every <loc> URL from a sitemap or sitemap-index XML body. Pure + testable. */
+export function parseSitemapLocs(xml: string): string[] {
+  var locs: string[] = [];
+  var re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
+  var m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) !== null) locs.push(m[1].trim());
+  return locs;
+}
+
+/**
+ * Best-effort fetch of a site's sitemap to discover interior pages that aren't
+ * linked in the entry page's rendered DOM (e.g. behind hover/mega-menus). Handles
+ * sitemap-index files by fetching a few child sitemaps. Same-origin URLs only;
+ * never throws (returns [] on any failure).
+ */
+export async function fetchSitemapUrls(origin: string, maxChildSitemaps = 5): Promise<string[]> {
+  var get = async (u: string): Promise<string> => {
+    try { var r = await fetch(u); return r.ok ? await r.text() : ""; } catch { return ""; }
+  };
+  var root = await get(origin.replace(/\/$/, "") + "/sitemap.xml");
+  if (!root) return [];
+  var urls: string[] = [];
+  if (/<sitemapindex/i.test(root)) {
+    var children = parseSitemapLocs(root).slice(0, maxChildSitemaps);
+    for (var c of children) urls.push(...parseSitemapLocs(await get(c)));
+  } else {
+    urls = parseSitemapLocs(root);
+  }
+  return urls.filter((u) => { try { return new URL(u).origin === origin; } catch { return false; } });
+}
+
 /**
  * Crawl a site (entry page + up to `depth` hops into interior pages) and collect
  * ranked brand-image candidates. Does not download or caption — that happens in
@@ -615,7 +674,11 @@ export async function harvestSiteImages(url: string, opts: HarvestOptions = {}):
     visited[url] = true;
     var entryLinks = await scrape(url);
     if (depth > 0 && maxPages > 0) {
-      var toVisit = pickCrawlLinks(entryLinks, origin, maxPages).filter((l) => !visited[l]);
+      // Merge DOM-discovered links with sitemap URLs so interior pages hidden
+      // behind hover/mega-menus (not server-rendered as anchors) are still found.
+      var sitemapLinks = await fetchSitemapUrls(origin).catch(() => [] as string[]);
+      var discovered = entryLinks.concat(sitemapLinks);
+      var toVisit = pickCrawlLinks(discovered, origin, maxPages).filter((l) => !visited[l]);
       for (var link of toVisit) {
         if (visited[link]) continue;
         visited[link] = true;
