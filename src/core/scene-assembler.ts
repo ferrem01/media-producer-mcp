@@ -263,8 +263,8 @@ img, video {
 /* ── Component Styles ── */
 ${componentStyles.join("\n\n")}
 </style>
-<script>
-${threeSource ? `// ── three.js (bundled: three + addons, global THREE) ──\n${threeSource}\n\n` : ""}${gsapSource}
+${threeSource ? `<!-- three.js (bundled: three + addons, global THREE). MUST be its own\n     <script>: the bundle opens with "use strict", and concatenating it with the\n     GSAP block below would make that block strict too -- a GSAP plugin's UMD\n     shim assigns the getter-only window.window (a silent no-op in sloppy mode),\n     which throws in strict mode and would abort gsap + the whole scene. -->\n<script>\n${threeSource}\n</script>\n` : ""}<script>
+${gsapSource}
 
 ${sharedSource}
 
@@ -470,8 +470,8 @@ img, video {
 /* ── Scene + Component Styles ── */
 ${allStyles.join("\n\n")}
 </style>
-<script>
-${threeSource ? `// ── three.js (bundled: three + addons, global THREE) ──\n${threeSource}\n\n` : ""}${gsapSource}
+${threeSource ? `<!-- three.js (bundled: three + addons, global THREE). MUST be its own\n     <script>: the bundle opens with "use strict", and concatenating it with the\n     GSAP block below would make that block strict too -- a GSAP plugin's UMD\n     shim assigns the getter-only window.window (a silent no-op in sloppy mode),\n     which throws in strict mode and would abort gsap + the whole scene. -->\n<script>\n${threeSource}\n</script>\n` : ""}<script>
+${gsapSource}
 
 ${sharedSource}
 
