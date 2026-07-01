@@ -26,12 +26,15 @@
     width: 100%;
     height: 100%;
     box-sizing: border-box;
+    /* Own pure-black stage so nothing bleeds through behind the slab. Set
+       data.backdrop="transparent" to composite over another layer instead. */
+    background: #000000;
     font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
     perspective: 1700px;
     /* Fallbacks; overridden inline by the script from data + brand. */
     --els-glow: var(--mp-color-primary, #393bf5);
-    --els-glow-soft: rgba(57, 59, 245, 0.55);
-    --els-glow-faint: rgba(57, 59, 245, 0.16);
+    --els-glow-soft: rgba(57, 59, 245, 0.6);
+    --els-glow-faint: rgba(57, 59, 245, 0.18);
     --els-crest: #dfe2ff;
   }
 
@@ -123,13 +126,14 @@
     border-radius: inherit;
     pointer-events: none;
     z-index: 3;
-    border: 1.5px solid var(--els-crest);
+    border: 2px solid var(--els-crest);
     box-shadow:
-      0 0 70px 10px var(--els-glow-soft),
-      0 0 26px 3px var(--els-glow),
-      inset 2px 2px 4px rgba(255, 255, 255, 0.28),
-      inset -2px -3px 8px rgba(0, 0, 0, 0.6),
-      inset 0 0 14px var(--els-glow-faint);
+      0 0 95px 16px var(--els-glow-soft),
+      0 0 40px 6px var(--els-glow),
+      0 0 8px 1px var(--els-crest),
+      inset 2px 2px 4px rgba(255, 255, 255, 0.32),
+      inset -2px -3px 9px rgba(0, 0, 0, 0.6),
+      inset 0 0 18px var(--els-glow-faint);
   }
 
   /* Specular highlight that sweeps across the screen during the rotation */
@@ -235,9 +239,13 @@
     var crestHex = lighten(glowHex, 0.78);
     if (root) {
       root.style.setProperty('--els-glow', glowHex);
-      root.style.setProperty('--els-glow-soft', rgba(glowHex, 0.55));
-      root.style.setProperty('--els-glow-faint', rgba(glowHex, 0.16));
+      root.style.setProperty('--els-glow-soft', rgba(glowHex, 0.6));
+      root.style.setProperty('--els-glow-faint', rgba(glowHex, 0.18));
       root.style.setProperty('--els-crest', crestHex);
+      // Escape hatch: composite over another layer instead of a black stage.
+      if (String(data.backdrop || '').toLowerCase() === 'transparent') {
+        root.style.background = 'transparent';
+      }
     }
 
     // ── Size the slab from the image aspect ratio ──
@@ -247,7 +255,7 @@
       return 16 / 9;
     }
     var ar = parseAspect(data.aspect_ratio);
-    var maxW = 1080, maxH = 720;
+    var maxW = 1000, maxH = 690;
     var w = maxW, h = w / ar;
     if (h > maxH) { h = maxH; w = h * ar; }
     var radius = Math.max(12, Math.round(Math.min(w, h) * 0.03));
@@ -269,9 +277,9 @@
         var bright = 1 - depthT;                 // brighter near the face crest
         // near-face layers glow bright (the lit bevel crest), deep layers go dark
         layer.style.transform = 'translateZ(' + (-i * step) + 'px)';
-        layer.style.background = rgba(glowHex, 0.10 + bright * 0.30);
-        layer.style.boxShadow = 'inset 0 0 ' + (6 + bright * 10) + 'px ' + rgba(crestHex, 0.10 + bright * 0.35)
-          + ', 0 0 ' + (bright * 8) + 'px ' + rgba(glowHex, bright * 0.5);
+        layer.style.background = rgba(glowHex, 0.16 + bright * 0.42);
+        layer.style.boxShadow = 'inset 0 0 ' + (7 + bright * 13) + 'px ' + rgba(crestHex, 0.14 + bright * 0.45)
+          + ', 0 0 ' + (bright * 12) + 'px ' + rgba(glowHex, bright * 0.7);
         extrude.appendChild(layer);
       }
     }
@@ -343,8 +351,9 @@
 
     var settleAt = pivotAt + rotDur;
 
-    // Slow macro push-in toward the UI (camera dolly with inertia)
-    tl.to(slab, { scale: 1.08, duration: 3.2, ease: 'none' }, settleAt);
+    // Slow macro push-in toward the UI (camera dolly with inertia) -- kept
+    // modest so the slab stays comfortably framed at the end.
+    tl.to(slab, { scale: 1.045, duration: 3.2, ease: 'none' }, settleAt);
     // Gentle ambient orbit so the rim-light keeps shifting
     tl.to(slab, {
       rotateY: restY + 6, rotateX: restX - 2,
