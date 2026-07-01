@@ -549,25 +549,73 @@ export function createMcpServer(): McpServer {
         }
       }
 
-      // ── Existing update logic (removals) ──
+      // No update fields matched. Deletion is intentionally NOT performed here:
+      // this tool used to fall through to removing the project/scene/component,
+      // which silently destroyed data on a no-op update. Use the `delete` tool.
+      return err(
+        "No update fields were provided, so nothing was changed. To remove a project, scene, or component, use the `delete` tool.",
+      );
+    },
+  );
 
-      // Remove component
+  // ─────────────────────────────────────────────
+  // delete - Remove a project, scene, component, or brand asset
+  // ─────────────────────────────────────────────
+
+  server.tool(
+    "delete",
+    "Delete a project, scene, component, or brand asset. Infers the target from the IDs you provide: project_id + scene_id + component_id removes a component; project_id + scene_id removes a scene; project_id alone deletes the whole project. Set target='brand' with asset_names to remove brand assets from the tenant kit. This is the safe, explicit counterpart to add/update.",
+    {
+      tenant_id: z.string(),
+      target: z.enum(["project", "brand"]).optional().describe("Defaults to project-scoped deletion. Set 'brand' to remove brand assets by name."),
+      project_id: z.string().optional(),
+      scene_id: z.string().optional().describe("With project_id, removes this scene. With component_id too, removes that component."),
+      component_id: z.string().optional().describe("With project_id + scene_id, removes this component."),
+      asset_names: z.union([z.array(z.string()), z.string()]).optional().describe("For target='brand': the brand asset name(s) to remove. Accepts an array, a comma-separated string, or a JSON array string."),
+    },
+    async (params) => {
+      // Normalize asset_names: tolerate array, comma-separated string, or a
+      // JSON-array string (some MCP clients serialize array params as strings).
+      const toNames = (v: unknown): string[] => {
+        if (Array.isArray(v)) return v.map(String);
+        if (typeof v === "string") {
+          const s = v.trim();
+          if (s.startsWith("[")) {
+            try { const p = JSON.parse(s); if (Array.isArray(p)) return p.map(String); } catch { /* fall through */ }
+          }
+          return s.split(",").map((x) => x.trim()).filter(Boolean);
+        }
+        return [];
+      };
+
+      // ── Brand asset removal ──
+      if (params.target === "brand") {
+        const names = toNames(params.asset_names);
+        if (names.length === 0) return err("Provide asset_names to remove from the brand kit.");
+        const kit = await loadBrandKit(params.tenant_id);
+        if (!kit) return err("No brand kit configured");
+        const before = (kit.assets || []).length;
+        const toRemove = new Set(names);
+        kit.assets = (kit.assets || []).filter((a) => !toRemove.has(a.name));
+        const removed = before - (kit.assets?.length || 0);
+        if (removed === 0) return err(`No matching brand assets found for: ${names.join(", ")}`);
+        await saveBrandKit(params.tenant_id, kit);
+        return ok({ removed: "brand_assets", count: removed, names });
+      }
+
+      // ── Project-scoped deletion (target inferred from IDs) ──
+      if (!params.project_id) return err("project_id is required (or set target='brand' with asset_names).");
+
       if (params.scene_id && params.component_id) {
-        const project = await removeComponent(
-          params.tenant_id, params.project_id, params.scene_id, params.component_id,
-        );
+        const project = await removeComponent(params.tenant_id, params.project_id, params.scene_id, params.component_id);
         if (!project) return err("Project, scene, or component not found");
         return ok({ removed: "component", component_id: params.component_id });
       }
-
-      // Remove scene
       if (params.scene_id) {
         const project = await removeScene(params.tenant_id, params.project_id, params.scene_id);
         if (!project) return err("Project or scene not found");
         return ok({ removed: "scene", scene_id: params.scene_id });
       }
-
-      // Remove project
       const deleted = await deleteProject(params.tenant_id, params.project_id);
       if (!deleted) return err("Project not found");
       return ok({ removed: "project", project_id: params.project_id });
