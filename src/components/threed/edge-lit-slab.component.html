@@ -1,0 +1,373 @@
+<template>
+  <div class="els-root">
+    <div class="els-glow"></div>
+    <div class="els-stage">
+      <div class="els-slab">
+        <div class="els-extrude"></div>
+        <div class="els-face">
+          <div class="els-screen"></div>
+          <div class="els-screen-fallback"></div>
+          <div class="els-rim"></div>
+          <div class="els-specular"></div>
+        </div>
+      </div>
+      <div class="els-lightbar"></div>
+    </div>
+    <div class="els-caption"></div>
+  </div>
+</template>
+
+<style scoped>
+  .els-root {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    perspective: 1700px;
+    /* Fallbacks; overridden inline by the script from data + brand. */
+    --els-glow: var(--mp-color-primary, #393bf5);
+    --els-glow-soft: rgba(57, 59, 245, 0.55);
+    --els-glow-faint: rgba(57, 59, 245, 0.16);
+    --els-crest: #dfe2ff;
+  }
+
+  /* Ambient glow pool behind the slab */
+  .els-glow {
+    position: absolute;
+    width: 66%;
+    height: 66%;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--els-glow-soft) 0%, var(--els-glow-faint) 40%, transparent 70%);
+    filter: blur(30px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .els-stage {
+    position: relative;
+    transform-style: preserve-3d;
+    z-index: 1;
+  }
+
+  .els-slab {
+    position: relative;
+    transform-style: preserve-3d;
+    will-change: transform;
+    /* width/height set inline by the script from the image aspect ratio */
+  }
+
+  /* Extruded thickness — a stack of rounded-rect frames offset in Z (built in JS). */
+  .els-extrude {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    pointer-events: none;
+  }
+  .els-layer {
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+
+  .els-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    backface-visibility: hidden;
+    transform: translateZ(0.1px);
+    background: #05060d;
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.6),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+  }
+
+  .els-screen {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: top center;
+    background-repeat: no-repeat;
+  }
+
+  .els-screen-fallback {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 50% 32%, var(--els-glow-soft) 0%, transparent 60%),
+      linear-gradient(155deg, var(--mp-color-surface, #12132a) 0%, #05060d 100%);
+  }
+  .els-screen-fallback::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 72px;
+    height: 72px;
+    margin: -36px 0 0 -36px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 44px rgba(255, 255, 255, 0.4);
+  }
+
+  /* The lit beveled rim (bright crest + inset bevel), around the face edge */
+  .els-rim {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 3;
+    border: 1.5px solid var(--els-crest);
+    box-shadow:
+      0 0 70px 10px var(--els-glow-soft),
+      0 0 26px 3px var(--els-glow),
+      inset 2px 2px 4px rgba(255, 255, 255, 0.28),
+      inset -2px -3px 8px rgba(0, 0, 0, 0.6),
+      inset 0 0 14px var(--els-glow-faint);
+  }
+
+  /* Specular highlight that sweeps across the screen during the rotation */
+  .els-specular {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(
+      112deg,
+      transparent 34%,
+      rgba(255, 255, 255, 0.24) 48%,
+      rgba(255, 255, 255, 0.06) 54%,
+      transparent 70%
+    );
+    mix-blend-mode: screen;
+  }
+
+  /* Edge-on "beauty" bar — the glowing beveled edge seen before the pivot */
+  .els-lightbar {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    border-radius: 8px;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--els-glow) 22%,
+      var(--els-crest) 50%,
+      var(--els-glow) 78%,
+      transparent 100%
+    );
+    box-shadow:
+      0 0 90px 22px var(--els-glow-soft),
+      0 0 34px 8px var(--els-glow),
+      0 0 12px 2px var(--els-crest);
+    pointer-events: none;
+    z-index: 4;
+    /* height set inline by the script to match the slab */
+  }
+
+  .els-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 8%;
+    text-align: center;
+    font-family: var(--mp-font-heading, var(--mp-font-family, 'Inter', sans-serif));
+    font-weight: 500;
+    font-size: 26px;
+    letter-spacing: 0.16em;
+    color: rgba(255, 255, 255, 0.82);
+    z-index: 5;
+    pointer-events: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    ctx = ctx || {};
+
+    var root = el.querySelector('.els-root');
+    var stage = el.querySelector('.els-stage');
+    var slab = el.querySelector('.els-slab');
+    var extrude = el.querySelector('.els-extrude');
+    var face = el.querySelector('.els-face');
+    var screen = el.querySelector('.els-screen');
+    var fallback = el.querySelector('.els-screen-fallback');
+    var rim = el.querySelector('.els-rim');
+    var specular = el.querySelector('.els-specular');
+    var glow = el.querySelector('.els-glow');
+    var lightbar = el.querySelector('.els-lightbar');
+    var caption = el.querySelector('.els-caption');
+    if (!slab || !stage) return tl;
+
+    // ── Resolve colors ──
+    function hexToRgb(hex) {
+      var h = String(hex || '').trim().replace('#', '');
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      var n = parseInt(h, 16);
+      if (isNaN(n) || h.length !== 6) return null;
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+    }
+    function rgba(hex, a) {
+      var c = hexToRgb(hex);
+      if (!c) return 'rgba(57,59,245,' + a + ')';
+      return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + a + ')';
+    }
+    function lighten(hex, amt) {
+      var c = hexToRgb(hex);
+      if (!c) return '#dfe2ff';
+      var f = function (v) { return Math.round(v + (255 - v) * amt); };
+      var toHex = function (v) { return ('0' + v.toString(16)).slice(-2); };
+      return '#' + toHex(f(c.r)) + toHex(f(c.g)) + toHex(f(c.b));
+    }
+
+    var brandPrimary = (getComputedStyle(root).getPropertyValue('--mp-color-primary') || '').trim();
+    var glowHex = (data.glow_color && String(data.glow_color).trim()) || brandPrimary || '#393bf5';
+    var crestHex = lighten(glowHex, 0.78);
+    if (root) {
+      root.style.setProperty('--els-glow', glowHex);
+      root.style.setProperty('--els-glow-soft', rgba(glowHex, 0.55));
+      root.style.setProperty('--els-glow-faint', rgba(glowHex, 0.16));
+      root.style.setProperty('--els-crest', crestHex);
+    }
+
+    // ── Size the slab from the image aspect ratio ──
+    function parseAspect(s) {
+      var m = String(s || '').match(/([\d.]+)\s*[\/:xX]\s*([\d.]+)/);
+      if (m) { var a = parseFloat(m[1]); var b = parseFloat(m[2]); if (a > 0 && b > 0) return a / b; }
+      return 16 / 9;
+    }
+    var ar = parseAspect(data.aspect_ratio);
+    var maxW = 1080, maxH = 720;
+    var w = maxW, h = w / ar;
+    if (h > maxH) { h = maxH; w = h * ar; }
+    var radius = Math.max(12, Math.round(Math.min(w, h) * 0.03));
+    slab.style.width = Math.round(w) + 'px';
+    slab.style.height = Math.round(h) + 'px';
+    if (face) face.style.borderRadius = radius + 'px';
+    if (rim) rim.style.borderRadius = radius + 'px';
+
+    // ── Build the extruded thickness (stacked Z-offset frames) ──
+    var DEPTH = 26;          // total thickness in px
+    var LAYERS = 16;
+    if (extrude) {
+      var step = DEPTH / LAYERS;
+      for (var i = 1; i <= LAYERS; i++) {
+        var layer = document.createElement('div');
+        layer.className = 'els-layer';
+        layer.style.borderRadius = radius + 'px';
+        var depthT = i / LAYERS;                 // 0..1 from face to back
+        var bright = 1 - depthT;                 // brighter near the face crest
+        // near-face layers glow bright (the lit bevel crest), deep layers go dark
+        layer.style.transform = 'translateZ(' + (-i * step) + 'px)';
+        layer.style.background = rgba(glowHex, 0.10 + bright * 0.30);
+        layer.style.boxShadow = 'inset 0 0 ' + (6 + bright * 10) + 'px ' + rgba(crestHex, 0.10 + bright * 0.35)
+          + ', 0 0 ' + (bright * 8) + 'px ' + rgba(glowHex, bright * 0.5);
+        extrude.appendChild(layer);
+      }
+    }
+
+    // ── Screenshot on the face ──
+    if (data.screenshot && screen) {
+      screen.style.backgroundImage = 'url("' + String(data.screenshot).replace(/"/g, '&quot;') + '")';
+      if (fallback) fallback.style.display = 'none';
+    }
+
+    // ── Light bar (edge-on beauty) sized to the slab height ──
+    if (lightbar) lightbar.style.height = Math.round(h * 0.92) + 'px';
+
+    // ── Caption ──
+    if (caption) {
+      if (data.caption) { caption.textContent = data.caption; }
+      else { caption.style.display = 'none'; }
+    }
+
+    // ── Motion tuning ──
+    var motion = ctx.motion || 'cinematic';
+    var base = motion === 'punchy' ? 0.85 : motion === 'minimal' ? 1.2 : 1.0;
+    var restY = (typeof data.rest_angle === 'number') ? data.rest_angle : -8;
+    var restX = 3;
+    var rotDur = 2.7 * base;
+
+    // ── Initial state: slab edge-on, only the glowing bar visible ──
+    gsap.set(stage, { transformPerspective: 1700 });
+    gsap.set(slab, { rotateY: 90, rotateX: 0, z: -40, scale: 0.94, autoAlpha: 1, transformOrigin: '50% 50%' });
+    if (rim) gsap.set(rim, { autoAlpha: 0.15 });
+    if (specular) gsap.set(specular, { autoAlpha: 0, xPercent: -60 });
+    if (glow) gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
+    if (lightbar) gsap.set(lightbar, { autoAlpha: 0, scaleY: 0.7 });
+    if (caption) gsap.set(caption, { autoAlpha: 0, y: 12 });
+
+    // Beauty beat: the light bar ignites and holds edge-on
+    if (lightbar) {
+      tl.to(lightbar, { autoAlpha: 1, scaleY: 1, duration: 0.5 * base, ease: 'power2.out' }, 0.1);
+    }
+    if (glow) {
+      tl.to(glow, { autoAlpha: 1, scale: 1, duration: 1.1 * base, ease: 'power2.out' }, 0.2);
+    }
+
+    var pivotAt = 0.55 * base;
+
+    // The pivot: edge-on -> face-on, weighted and inevitable
+    tl.to(slab, {
+      rotateY: restY,
+      rotateX: restX,
+      z: 0,
+      scale: 1.0,
+      duration: rotDur,
+      ease: 'power3.out'
+    }, pivotAt);
+
+    // Light bar hands off to the face as it opens
+    if (lightbar) {
+      tl.to(lightbar, { autoAlpha: 0, duration: 0.6 * base, ease: 'power2.in' }, pivotAt + 0.15);
+    }
+    // Rim glow blooms in as the beveled face turns toward camera
+    if (rim) {
+      tl.to(rim, { autoAlpha: 1, duration: rotDur * 0.7, ease: 'power2.out' }, pivotAt + 0.1);
+    }
+    // Specular rake across the screen, tied to the rotation
+    if (specular) {
+      tl.to(specular, { autoAlpha: 1, duration: 0.4, ease: 'power1.out' }, pivotAt + 0.2);
+      tl.fromTo(specular, { xPercent: -60 }, { xPercent: 60, duration: rotDur, ease: 'power2.inOut' }, pivotAt + 0.2);
+    }
+
+    var settleAt = pivotAt + rotDur;
+
+    // Slow macro push-in toward the UI (camera dolly with inertia)
+    tl.to(slab, { scale: 1.08, duration: 3.2, ease: 'none' }, settleAt);
+    // Gentle ambient orbit so the rim-light keeps shifting
+    tl.to(slab, {
+      rotateY: restY + 6, rotateX: restX - 2,
+      duration: 3.4, ease: 'sine.inOut', yoyo: true, repeat: -1
+    }, settleAt);
+    if (specular) {
+      tl.to(specular, { xPercent: 28, duration: 3.4, ease: 'sine.inOut', yoyo: true, repeat: -1 }, settleAt);
+    }
+
+    // Caption arrives late, like a signature
+    if (caption && data.caption) {
+      var capAt = Math.max(settleAt, (ctx.duration || 6.5) - 1.6);
+      tl.to(caption, { autoAlpha: 1, y: 0, duration: 1.0, ease: 'power2.out' }, capAt);
+    }
+
+    // Exit
+    if (ctx.duration && ctx.duration > 2.5) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(slab, { autoAlpha: 0, rotateY: restY - 22, z: -160, duration: 0.5, ease: 'power2.in' }, exitAt);
+      if (glow) tl.to(glow, { autoAlpha: 0, duration: 0.45, ease: 'power2.in' }, exitAt);
+      if (caption) tl.to(caption, { autoAlpha: 0, duration: 0.4 }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

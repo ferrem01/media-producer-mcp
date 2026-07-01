@@ -1,0 +1,33 @@
+{
+  "type": "edge-lit-slab",
+  "label": "Edge-Lit Slab",
+  "category": "threed",
+  "description": "A product screenshot revealed as a thick 3D slab: it begins edge-on as a single glowing, beveled bar of light in a black void, then pivots to face the camera -- the electric rim-light raking across its beveled edges and a specular highlight sweeping the screen -- before a slow macro push-in. Dark, premium, Apple/Framer-style product reveal. Provide screenshot (image URL) and an aspect_ratio matching the image so it fills the slab with no cropping. Best on a pure-black background.",
+  "data": {
+    "screenshot": {
+      "type": "string",
+      "label": "Screenshot / UI image URL for the slab face",
+      "optional": true,
+      "placeholder": "https://example.com/dashboard.png"
+    },
+    "aspect_ratio": {
+      "type": "string",
+      "label": "Card face aspect ratio (W / H) -- match the screenshot to avoid cropping",
+      "optional": true,
+      "default": "16 / 9",
+      "placeholder": "1200 / 648"
+    },
+    "glow_color": {
+      "type": "string",
+      "label": "Edge glow color (hex). Defaults to the brand primary color.",
+      "optional": true,
+      "placeholder": "#393bf5"
+    },
+    "caption": {
+      "type": "string",
+      "label": "Optional lower caption that fades in late",
+      "optional": true,
+      "placeholder": "Flows that run themselves."
+    }
+  }
+}
