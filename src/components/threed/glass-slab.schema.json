@@ -1,0 +1,33 @@
+{
+  "type": "glass-slab",
+  "label": "Glass Slab (WebGL)",
+  "category": "threed",
+  "description": "A true 3D glass pane rendered in WebGL (three.js): a beveled slab with a glowing edge and a real specular that shifts with rotation. It begins edge-on -- you see its lit glass thickness in a black void -- then rotates continuously through 90 degrees to reveal the UI screenshot on its face, with real bloom on the glowing edges. Photoreal Framer/Apple-style product reveal. Provide screenshot (image URL) and an aspect_ratio matching it. Best on pure black. Heavier to render than the CSS edge-lit-slab.",
+  "data": {
+    "screenshot": {
+      "type": "string",
+      "label": "Screenshot / UI image URL for the glass face",
+      "optional": true,
+      "placeholder": "https://example.com/dashboard.png"
+    },
+    "aspect_ratio": {
+      "type": "string",
+      "label": "Face aspect ratio (W / H) -- match the screenshot",
+      "optional": true,
+      "default": "16 / 9",
+      "placeholder": "1200 / 648"
+    },
+    "glow_color": {
+      "type": "string",
+      "label": "Edge glow / glass tint color (hex). Defaults to brand primary.",
+      "optional": true,
+      "placeholder": "#393bf5"
+    },
+    "caption": {
+      "type": "string",
+      "label": "Optional lower caption that fades in late",
+      "optional": true,
+      "placeholder": "Flows that run themselves."
+    }
+  }
+}

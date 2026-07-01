@@ -40,6 +40,8 @@ export interface Config {
   componentLibDir: string;
   /** Path to GSAP vendor files */
   gsapDir: string;
+  /** Path to three.js vendor bundle (three + addons, global THREE) */
+  threeDir: string;
   /** LLM configuration */
   llm: LLMConfig;
   /** Number of scenes to render in parallel (default 2) */
@@ -65,6 +67,7 @@ export const config: Config = {
   // Point to src/components (HTML files aren't copied by tsc to dist/)
   componentLibDir: process.env.MP_COMPONENT_LIB_DIR || path.resolve(ROOT_DIR, "../src/components"),
   gsapDir: process.env.MP_GSAP_DIR || path.resolve(ROOT_DIR, "../vendor/gsap"),
+  threeDir: process.env.MP_THREE_DIR || path.resolve(ROOT_DIR, "../vendor/three"),
   llm: {
     provider: llmProvider,
     model: process.env.MP_LLM_MODEL || (llmProvider === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o"),
