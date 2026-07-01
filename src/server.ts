@@ -650,6 +650,7 @@ export function createMcpServer(): McpServer {
         motion: z.enum(["minimal", "punchy", "cinematic"]).optional(),
       }).optional(),
       guidelines: z.string().optional().describe("Free-form brand rules for the AI (e.g. logo placement, color usage, tone). Injected into generation prompts."),
+      remove_assets: z.array(z.string()).optional().describe("Names of existing brand assets to remove from the kit (e.g. to prune duplicates)."),
     },
     async (params) => {
       // Extract + store the brand kit from a URL (no video generated).
@@ -666,7 +667,7 @@ export function createMcpServer(): McpServer {
         }
       }
 
-      const hasUpdates = params.colors || params.fonts || params.logo || params.logos || params.assets || params.style || params.guidelines;
+      const hasUpdates = params.colors || params.fonts || params.logo || params.logos || params.assets || params.style || params.guidelines || (params.remove_assets && params.remove_assets.length > 0);
 
       if (!hasUpdates) {
         // Get brand kit
@@ -707,6 +708,11 @@ export function createMcpServer(): McpServer {
           if (idx >= 0) mergedAssets[idx] = newAsset as any;
           else mergedAssets.push(newAsset as any);
         }
+      }
+      // Remove assets by name (e.g. pruning duplicates).
+      if (params.remove_assets && params.remove_assets.length > 0) {
+        const toRemove = new Set(params.remove_assets);
+        mergedAssets = mergedAssets.filter((a: any) => !toRemove.has(a.name));
       }
 
       const kit: BrandKit = {

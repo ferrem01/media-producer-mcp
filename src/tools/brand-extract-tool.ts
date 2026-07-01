@@ -14,7 +14,7 @@ import { promisify } from "node:util";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const execFileP = promisify(execFile);
-import { extractBrandFromUrl, enhanceWithLLM, harvestSiteImages, type RawImageCandidate, type HarvestOptions } from "./brand-extractor.js";
+import { extractBrandFromUrl, enhanceWithLLM, harvestSiteImages, canonicalImageKey, type RawImageCandidate, type HarvestOptions } from "./brand-extractor.js";
 import { loadBrandKit, saveBrandKit } from "../persistence/brand-kit.js";
 import { llmConfigFromEnv, callLLM, type LLMConfig, type LLMContentPart } from "../llm/client.js";
 import { config } from "../config.js";
@@ -211,12 +211,15 @@ export async function harvestAndStoreAssets(
   const dir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "images");
   await fs.mkdir(dir, { recursive: true });
 
-  // URLs already stored so re-runs don't duplicate assets.
-  const existingSources = new Set((kit.assets || []).map((a) => a.source_url).filter(Boolean) as string[]);
+  // Canonical keys of already-stored assets so re-runs don't duplicate the same
+  // underlying image served via www/apex, size variants, or Next.js optimizer URLs.
+  const existingKeys = new Set(
+    (kit.assets || []).map((a) => (a.source_url ? canonicalImageKey(a.source_url) : "")).filter(Boolean),
+  );
   const added: BrandAsset[] = [];
 
   for (const cand of candidates) {
-    if (existingSources.has(cand.url)) continue;
+    if (existingKeys.has(canonicalImageKey(cand.url))) continue;
     try {
       const res = await fetch(cand.url);
       if (!res.ok) continue;
@@ -248,6 +251,7 @@ export async function harvestAndStoreAssets(
         ...(dims.width ? { width: dims.width } : cand.width ? { width: cand.width } : {}),
         ...(dims.height ? { height: dims.height } : cand.height ? { height: cand.height } : {}),
       });
+      existingKeys.add(canonicalImageKey(cand.url));
     } catch (e: any) {
       console.warn(`[harvest] image download/caption failed (${cand.url}):`, e.message);
     }
