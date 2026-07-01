@@ -51,6 +51,14 @@
     var W = (ctx.canvas && ctx.canvas.width) || 1920;
     var H = (ctx.canvas && ctx.canvas.height) || 1080;
 
+    // Software WebGL (SwiftShader) has no GPU: full-1080p bloom compile+render is
+    // synchronous and can blow the 30s __MP_READY budget. Render internally at a
+    // capped resolution and let CSS upscale the canvas to fill the frame.
+    var RES_MAX = 1280;
+    var rscale = Math.min(1, RES_MAX / Math.max(W, H));
+    var RW = Math.max(2, Math.round(W * rscale));
+    var RH = Math.max(2, Math.round(H * rscale));
+
     // ── Colors ──
     function hexToRgb(hex) {
       var h = String(hex || '').trim().replace('#', '');
@@ -74,9 +82,10 @@
     var ar = parseAspect(data.aspect_ratio);
 
     // ── Renderer ──
+    try {
     var renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(1);                 // SwiftShader software WebGL -- keep it at 1
-    renderer.setSize(W, H, false);
+    renderer.setSize(RW, RH, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
@@ -149,7 +158,7 @@
     // ── Bloom on the glowing edges ──
     var composer = new THREE.EffectComposer(renderer);
     composer.addPass(new THREE.RenderPass(scene, camera));
-    var bloom = new THREE.UnrealBloomPass(new THREE.Vector2(W, H), 0.9, 0.5, 0.55);
+    var bloom = new THREE.UnrealBloomPass(new THREE.Vector2(RW, RH), 0.9, 0.5, 0.55);
     composer.addPass(bloom);
 
     // ── Caption (DOM overlay) ──
@@ -200,6 +209,12 @@
     if (captionEl && data.caption) {
       var capAt = Math.max(holdDur + rotDur, (ctx.duration || 6.5) - 1.6);
       tl.to(captionEl, { autoAlpha: 1, y: 0, duration: 1.0, ease: 'power2.out' }, capAt);
+    }
+    } catch (e) {
+      // WebGL setup/render failed under software rasterization: degrade to an
+      // empty (black) timeline rather than hanging the readiness probe.
+      if (typeof console !== 'undefined') console.warn('[glass-slab] WebGL failed:', e && e.message);
+      return tl;
     }
 
     return tl;
