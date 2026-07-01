@@ -1,0 +1,207 @@
+<template>
+  <div class="gls-root">
+    <div class="gls-mount"></div>
+    <div class="gls-caption"></div>
+  </div>
+</template>
+
+<style scoped>
+  .gls-root {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #000000;
+    overflow: hidden;
+    font-family: var(--mp-font-heading, var(--mp-font-family, 'Inter', system-ui, sans-serif));
+  }
+  .gls-mount {
+    position: absolute;
+    inset: 0;
+  }
+  .gls-mount canvas { display: block; width: 100%; height: 100%; }
+  .gls-caption {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 8%;
+    text-align: center;
+    font-weight: 500;
+    font-size: 26px;
+    letter-spacing: 0.16em;
+    color: rgba(255,255,255,0.85);
+    z-index: 5;
+    pointer-events: none;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    ctx = ctx || {};
+
+    var mount = el.querySelector('.gls-mount');
+    var captionEl = el.querySelector('.gls-caption');
+
+    // If three.js failed to load, degrade gracefully to an empty timeline.
+    if (typeof THREE === 'undefined' || !mount) {
+      if (typeof console !== 'undefined') console.warn('[glass-slab] THREE not available');
+      return tl;
+    }
+
+    var W = (ctx.canvas && ctx.canvas.width) || 1920;
+    var H = (ctx.canvas && ctx.canvas.height) || 1080;
+
+    // ── Colors ──
+    function hexToRgb(hex) {
+      var h = String(hex || '').trim().replace('#', '');
+      if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+      var n = parseInt(h, 16);
+      if (isNaN(n) || h.length !== 6) return null;
+      return { r:((n>>16)&255)/255, g:((n>>8)&255)/255, b:(n&255)/255 };
+    }
+    var rootStyle = getComputedStyle(el.querySelector('.gls-root') || el);
+    var brandPrimary = (rootStyle.getPropertyValue('--mp-color-primary') || '').trim();
+    var glowHex = (data.glow_color && String(data.glow_color).trim()) || brandPrimary || '#393bf5';
+    var g = hexToRgb(glowHex) || { r:0.22, g:0.23, b:0.96 };
+    var glowColor = new THREE.Color(g.r, g.g, g.b);
+
+    // ── Aspect ──
+    function parseAspect(s) {
+      var m = String(s || '').match(/([\d.]+)\s*[\/:xX]\s*([\d.]+)/);
+      if (m) { var a=parseFloat(m[1]), b=parseFloat(m[2]); if (a>0&&b>0) return a/b; }
+      return 16/9;
+    }
+    var ar = parseAspect(data.aspect_ratio);
+
+    // ── Renderer ──
+    var renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);                 // SwiftShader software WebGL -- keep it at 1
+    renderer.setSize(W, H, false);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.setClearColor(0x000000, 1);
+    mount.appendChild(renderer.domElement);
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(34, W / H, 0.1, 100);
+    var CAM_Z = 5.0;
+    camera.position.set(0, 0, CAM_Z);
+
+    // ── The glass pane (rounded, beveled) ──
+    var paneW = 3.4;
+    var paneH = paneW / ar;
+    var depth = 0.16;
+    var radius = 0.07;
+    var glassGeo = THREE.RoundedBoxGeometry
+      ? new THREE.RoundedBoxGeometry(paneW, paneH, depth, 5, radius)
+      : new THREE.BoxGeometry(paneW, paneH, depth);
+    // No transmission pass (flaky/slow under SwiftShader) -- the glass reads via
+    // clearcoat gloss + emissive glow + real specular + bloom.
+    var glassMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(0x05060d),
+      metalness: 0.0,
+      roughness: 0.14,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.06,
+      reflectivity: 0.6,
+      emissive: glowColor,
+      emissiveIntensity: 1.6,   // the glowing edge/tint that bloom picks up
+      transparent: false
+    });
+    var glass = new THREE.Mesh(glassGeo, glassMat);
+
+    // ── The screen (screenshot) sitting just in front of the glass face ──
+    var screenW = paneW * 0.93, screenH = paneH * 0.93;
+    var screenGeo = new THREE.PlaneGeometry(screenW, screenH);
+    var screenMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x0a0b18) });
+    var screenMesh = new THREE.Mesh(screenGeo, screenMat);
+    screenMesh.position.z = depth / 2 + 0.012;
+
+    // Load the screenshot as the screen texture (async; face isn't visible until
+    // the pane crosses 90deg, by which time the local fetch has resolved).
+    if (data.screenshot) {
+      var loader = new THREE.TextureLoader();
+      loader.setCrossOrigin('anonymous');
+      loader.load(String(data.screenshot), function (tex) {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 1;
+        screenMat.map = tex;
+        screenMat.color = new THREE.Color(0xffffff);
+        screenMat.needsUpdate = true;
+      });
+    }
+
+    var slab = new THREE.Group();
+    slab.add(glass);
+    slab.add(screenMesh);
+    scene.add(slab);
+
+    // ── Lighting: real specular that shifts as the pane turns ──
+    scene.add(new THREE.AmbientLight(0x223055, 0.6));
+    var key = new THREE.DirectionalLight(0xbcc6ff, 2.2);
+    key.position.set(-3, 2.5, 4);
+    scene.add(key);
+    var rim = new THREE.PointLight(glowColor, 3.0, 20);
+    rim.position.set(0, 0, 2.2);
+    scene.add(rim);
+
+    // ── Bloom on the glowing edges ──
+    var composer = new THREE.EffectComposer(renderer);
+    composer.addPass(new THREE.RenderPass(scene, camera));
+    var bloom = new THREE.UnrealBloomPass(new THREE.Vector2(W, H), 0.9, 0.5, 0.55);
+    composer.addPass(bloom);
+
+    // ── Caption (DOM overlay) ──
+    if (captionEl) {
+      if (data.caption) { captionEl.textContent = data.caption; gsap.set(captionEl, { autoAlpha: 0, y: 12 }); }
+      else { captionEl.style.display = 'none'; }
+    }
+
+    // ── Motion (all a pure function of the tweened proxy `state.t`) ──
+    var motion = ctx.motion || 'cinematic';
+    var base = motion === 'punchy' ? 0.85 : motion === 'minimal' ? 1.2 : 1.0;
+    var holdDur = 0.6 * base;                 // edge-on beauty hold
+    var rotDur = 2.7 * base;                  // the turn
+    var startY = Math.PI / 2 + 0.10;          // just past edge-on (face turned away)
+    var restY = -0.14;                        // ~ -8deg resting angle
+    function easeOutCubic(p) { return 1 - Math.pow(1 - p, 3); }
+    function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+
+    function applyState(t) {
+      // rotation: hold edge-on, then one continuous weighted turn
+      var rp = easeOutCubic(clamp01((t - holdDur) / rotDur));
+      slab.rotation.y = startY + (restY - startY) * rp;
+      slab.rotation.x = 0.05 * (1 - rp) + 0.03;
+      slab.rotation.z = -0.01 * rp;
+      // scale settle + slow macro push-in after the turn
+      var settleAt = holdDur + rotDur;
+      var pushP = clamp01((t - settleAt) / 3.2);
+      var s = 0.92 + 0.08 * rp;
+      slab.scale.setScalar(s);
+      camera.position.z = CAM_Z - 0.35 * pushP;
+      // rim light drifts with the turn to keep the specular alive
+      rim.position.x = -1.6 * (1 - rp);
+      composer.render();
+    }
+
+    // The single driving tween: seeking the master timeline to t sets state.t and
+    // fires onUpdate -> applyState -> composer.render(). Deterministic per frame.
+    var state = { t: 0 };
+    applyState(0);
+    tl.to(state, {
+      t: (ctx.duration || 6.5),
+      duration: (ctx.duration || 6.5),
+      ease: 'none',
+      onUpdate: function () { applyState(state.t); }
+    }, 0);
+
+    // Caption fades in late, like a signature.
+    if (captionEl && data.caption) {
+      var capAt = Math.max(holdDur + rotDur, (ctx.duration || 6.5) - 1.6);
+      tl.to(captionEl, { autoAlpha: 1, y: 0, duration: 1.0, ease: 'power2.out' }, capAt);
+    }
+
+    return tl;
+  }
+</script>

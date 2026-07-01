@@ -36,6 +36,8 @@ export interface AssembleOptions {
   canvas: Canvas;
   /** Path to GSAP files directory */
   gsapDir: string;
+  /** Path to the three.js vendor bundle dir (defaults to config.threeDir) */
+  threeDir?: string;
   /** When true, keep /assets/ HTTP paths instead of converting to file:// (for preview SPA) */
   preview?: boolean;
   /** HTTP URL for the speaker video (used in preview to resolve "speaker" references) */
@@ -180,6 +182,11 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   // Read GSAP source (bundled locally)
   const gsapSource = await loadGsapSource(options.gsapDir);
 
+  // three.js is heavy (~660KB) -- only inline it when a component actually uses
+  // it (references the global THREE).
+  const usesThree = componentScripts.some((s) => s.includes("THREE"));
+  const threeSource = usesThree ? await loadThreeSource(options.threeDir || config.threeDir) : "";
+
   // Read shared script utilities
   const sharedSource = await loadSharedUtilities();
 
@@ -257,7 +264,7 @@ img, video {
 ${componentStyles.join("\n\n")}
 </style>
 <script>
-${gsapSource}
+${threeSource ? `// ── three.js (bundled: three + addons, global THREE) ──\n${threeSource}\n\n` : ""}${gsapSource}
 
 ${sharedSource}
 
@@ -412,6 +419,10 @@ export async function assembleCodegenScene(options: {
   const gsapSource = await loadGsapSource(gsapDir);
   const sharedSource = await loadSharedUtilities();
 
+  // Inline three.js only when the codegen scene or a used component references it.
+  const usesThree = sceneSource.includes("THREE") || componentSources.some((c) => c.source.includes("THREE"));
+  const threeSource = usesThree ? await loadThreeSource(config.threeDir) : "";
+
   const isTransparent = transparentBackground === true;
 
   // 8. Assemble final HTML
@@ -460,7 +471,7 @@ img, video {
 ${allStyles.join("\n\n")}
 </style>
 <script>
-${gsapSource}
+${threeSource ? `// ── three.js (bundled: three + addons, global THREE) ──\n${threeSource}\n\n` : ""}${gsapSource}
 
 ${sharedSource}
 
@@ -1001,6 +1012,22 @@ export function buildComponentScript(
  * Load GSAP source from the local gsap directory.
  * Falls back to a CDN URL in script tag if local files not found.
  */
+/**
+ * Load the vendored three.js bundle (a single IIFE that defines global THREE
+ * plus the addons we bundled: EffectComposer, RenderPass, UnrealBloomPass,
+ * ShaderPass, RoundedBoxGeometry). Returns "" if the bundle is absent, so
+ * scenes without WebGL components are unaffected.
+ */
+export async function loadThreeSource(threeDir: string): Promise<string> {
+  const filePath = path.join(threeDir, "three.min.js");
+  try {
+    return await fs.readFile(filePath, "utf-8");
+  } catch {
+    console.warn(`three.js bundle not found: ${filePath}`);
+    return "";
+  }
+}
+
 export async function loadGsapSource(gsapDir: string): Promise<string> {
   const files = [
     "gsap.min.js",
