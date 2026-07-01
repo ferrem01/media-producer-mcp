@@ -290,8 +290,8 @@
       if (fallback) fallback.style.display = 'none';
     }
 
-    // ── Light bar (edge-on beauty) sized to the slab height ──
-    if (lightbar) lightbar.style.height = Math.round(h * 0.92) + 'px';
+    // ── Light bar (edge-on beauty) -- a contained clean edge, not full-length ──
+    if (lightbar) lightbar.style.height = Math.round(h * 0.58) + 'px';
 
     // ── Caption ──
     if (caption) {
@@ -306,9 +306,10 @@
     var restX = 3;
     var rotDur = 2.7 * base;
 
-    // ── Initial state: slab edge-on, only the glowing bar visible ──
+    // ── Initial state: slab HIDDEN and only partly rotated, so the raw edge-on
+    // silhouette is never seen -- the clean light bar is the sole opener. ──
     gsap.set(stage, { transformPerspective: 1700 });
-    gsap.set(slab, { rotateY: 90, rotateX: 0, z: -40, scale: 0.94, autoAlpha: 1, transformOrigin: '50% 50%' });
+    gsap.set(slab, { rotateY: 72, rotateX: 0, z: -40, scale: 0.94, autoAlpha: 0, transformOrigin: '50% 50%' });
     if (rim) gsap.set(rim, { autoAlpha: 0.15 });
     if (specular) gsap.set(specular, { autoAlpha: 0, xPercent: -60 });
     if (glow) gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
@@ -323,7 +324,11 @@
       tl.to(glow, { autoAlpha: 1, scale: 1, duration: 1.1 * base, ease: 'power2.out' }, 0.2);
     }
 
-    var pivotAt = 0.55 * base;
+    var pivotAt = 0.7 * base;
+
+    // The slab fades in FROM the light bar right as the pivot begins, so the
+    // opener reads as a clean glowing edge that opens into the panel.
+    tl.to(slab, { autoAlpha: 1, duration: 0.35 * base, ease: 'power1.out' }, pivotAt);
 
     // The pivot: edge-on -> face-on, weighted and inevitable
     tl.to(slab, {
