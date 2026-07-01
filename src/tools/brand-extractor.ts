@@ -243,8 +243,11 @@ export async function extractBrandFromUrl(url: string): Promise<{
 
         // Transitions
         if (style.transitionDuration && style.transitionDuration !== "0s") {
-          var durations = style.transitionDuration.split(",").map(function(d) { return d.trim(); });
-          var easings = (style.transitionTimingFunction || "ease").split(",").map(function(e) { return e.trim(); });
+          // Split on top-level commas only, so timing functions with internal
+          // commas (cubic-bezier(...), steps(...)) are not shattered.
+          var splitTopLevel = function(s: string) { return s.split(/,(?![^(]*\))/).map(function(x: string) { return x.trim(); }); };
+          var durations = splitTopLevel(style.transitionDuration);
+          var easings = splitTopLevel(style.transitionTimingFunction || "ease");
           for (var t = 0; t < durations.length; t++) {
             var mKey = durations[t] + "|" + (easings[t] || easings[0]);
             if (motionMap[mKey]) {
