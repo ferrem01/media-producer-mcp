@@ -1475,9 +1475,11 @@ Output valid JSON only. No markdown fences, no commentary.`;
       let fixedScene: any;
       try {
         const { callLLM } = await import("./client.js");
+        // A single scene's fixed JSON can still carry a full beats array
+        // (label/duration/action/voiceover x4-6) -- 4096 is tight for that.
         const fixRaw = await callLLM(opts.critiqueLlmConfig || opts.llmConfig, [
           { role: "user", content: fixPrompt },
-        ], { temperature: 0.3, maxTokens: 4096 });
+        ], { temperature: 0.3, maxTokens: 8192 });
         fixedScene = parseLlmJson(fixRaw, "fix-storyboard");
       } catch (e: any) {
         console.log(`  Critique fix-storyboard failed to parse: ${e.message}, keeping best (score ${bestScore})`);

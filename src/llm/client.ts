@@ -228,6 +228,7 @@ async function callAnthropic(
 
   var data = await postAnthropic(config.apiKey, body) as {
     content: Array<{ type: string; text?: string }>;
+    stop_reason?: string;
   };
 
   var result = data.content
@@ -237,6 +238,18 @@ async function callAnthropic(
 
   if (!result) {
     throw new Error("Anthropic returned empty response");
+  }
+
+  // A response cut off by the token budget is NOT a usable partial result for
+  // JSON-shaped callers (a storyboard truncated mid-scene is invalid JSON,
+  // full stop) -- fail loudly and specifically here rather than let it surface
+  // hundreds of characters downstream as a mystifying "Invalid JSON" error
+  // that has to be reverse-engineered from where the text happens to stop.
+  if (data.stop_reason === "max_tokens") {
+    throw new Error(
+      `Anthropic response truncated: hit max_tokens (${body.max_tokens}) before finishing. ` +
+      `Raise maxTokens for this call. (${result.length} chars returned)`
+    );
   }
 
   return result;
