@@ -16,7 +16,8 @@
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { resolveComponentTags, buildComponentTimelineScript } from "./component-tags.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
-import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
+import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types.js";
+import { beatTimeline } from "./beats.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -109,6 +110,7 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
       canvas,
       duration: scene.duration_seconds || 5,
       sceneId: scene.id,
+      beats: scene.beats,
       gsapDir,
       background: scene.background,
       transparentBackground: scene.transparent_background,
@@ -358,6 +360,9 @@ export async function assembleCodegenScene(options: {
   duration: number;
   /** Scene id for camera drift seed */
   sceneId?: string;
+  /** Beat timeline (continuous-take scenes) -- exposed on ctx.beats so scene
+   *  and component timelines can sync their phases to the beat structure. */
+  beats?: SceneBeat[];
   /** Path to GSAP files directory */
   gsapDir: string;
   /** Scene background color */
@@ -371,9 +376,17 @@ export async function assembleCodegenScene(options: {
 }): Promise<string> {
   const {
     sceneSource, componentSources, brandKit, canvas, duration,
-    sceneId, gsapDir, background, transparentBackground,
+    sceneId, beats, gsapDir, background, transparentBackground,
     preview, speakerUrl,
   } = options;
+
+  // Beat timeline for ctx.beats: resolved (start, end) segments so scene and
+  // component timelines can anchor phases to beats instead of guessing.
+  const ctxBeatsJson = beats && beats.length >= 2
+    ? JSON.stringify(beatTimeline(beats).map((b) => ({
+        label: b.label, start: b.start_seconds, end: b.end_seconds,
+      })))
+    : "[]";
 
   // 1. Parse the scene source
   const { parseComponent } = await import("./component-parser.js");
@@ -408,6 +421,9 @@ export async function assembleCodegenScene(options: {
     tagResult.components,
     duration,
     canvas,
+    beats && beats.length >= 2
+      ? beatTimeline(beats).map((b) => ({ label: b.label, start: b.start_seconds, end: b.end_seconds }))
+      : undefined,
   );
 
   // 6. Generate brand CSS
@@ -520,6 +536,8 @@ ${tagResult.html}
     duration: ${duration},
     fps: 30,
     canvas: { width: ${canvas.width}, height: ${canvas.height} },
+    // Beat timeline: [{label, start, end}] -- the scene's internal shot clock.
+    beats: ${ctxBeatsJson},
     getComponentTimeline: (typeof __getComponentTimeline !== 'undefined'
       ? __getComponentTimeline
       : function(id) { return gsap.timeline(); }),

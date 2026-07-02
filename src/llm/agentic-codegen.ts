@@ -319,7 +319,8 @@ Your submitted HTML must be a single .scene.html file with three sections:
 1. The createTimeline(el, data, ctx) function:
    - el: the component's root DOM element
    - data: JSON data object
-   - ctx: { duration, fps, canvas: {width, height}, motion }
+   - ctx: { duration, fps, canvas: {width, height}, motion, beats }
+   - ctx.beats: the scene's beat timeline as [{label, start, end}] in seconds ([] when the scene has no beats). When the spec includes a Beat Sheet, anchor each beat's animations at its ctx.beats start time and call tl.addLabel('beat_N', start) for each.
    - Must return a GSAP timeline (NOT paused)
 2. Canvas: ${opts.canvas.width}x${opts.canvas.height}px. ALL content MUST be visible.
 3. GSAP is available globally. You can use: gsap.to(), gsap.from(), gsap.fromTo(), gsap.set(), gsap.timeline().

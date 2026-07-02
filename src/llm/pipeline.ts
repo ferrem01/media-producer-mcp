@@ -34,7 +34,9 @@ import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { fetchStockFootage } from "../media/stock-footage.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
-import type { BrandKit, Canvas, OutputFormat, StoryboardScene, Project, Storyboard, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, StoryboardScene, Project, Storyboard, ReferenceImage, Scene, SceneBeat, SceneTransition } from "../core/types.js";
+import { beatMidpoints, formatBeatSheet, rescaleBeats } from "../core/beats.js";
+import { measureBeatActivity } from "../core/beat-gate.js";
 import { TraceBuilder } from "../trace/index.js";
 import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
@@ -1113,18 +1115,28 @@ async function critiqueAndRetryScene(opts: {
         });
       }
 
-      // 4a. Generate contact sheet for motion-aware critique (6 frames across timeline)
+      // 4a. Generate contact sheet for motion-aware critique. Scenes with a
+      // beat timeline sample each beat's MIDPOINT (plus open/close moments) so
+      // every beat's content is seen fully on screen; other scenes spread 6
+      // frames evenly.
       let contactSheetBase64: string | undefined;
       let contactTimestamps: number[] | undefined;
+      const sceneBeats: SceneBeat[] | undefined =
+        Array.isArray(currentDraft?.beats) && currentDraft.beats.length >= 2 ? currentDraft.beats : undefined;
       if (!isVideoOnly && currentScene.duration_seconds >= 3) {
         try {
           const contactPath = path.join(tmpDir, "contact-sheet.png");
+          const dur = currentScene.duration_seconds;
+          const beatSample = sceneBeats
+            ? [dur * 0.06, ...beatMidpoints(sceneBeats), dur * 0.97].slice(0, 9)
+            : undefined;
           const contactResult = await generateContactSheet({
             htmlPath,
             width: opts.canvas.width,
             height: opts.canvas.height,
-            duration: currentScene.duration_seconds,
+            duration: dur,
             frameCount: 6,
+            timestamps: beatSample,
             outputPath: contactPath,
           });
           contactSheetBase64 = contactResult.base64;
@@ -1154,7 +1166,11 @@ async function critiqueAndRetryScene(opts: {
       // round-trips. Bookends (correctnessOnly) ignore the aesthetic score and gate
       // only on defects; video-only brand clips are scored but not defect-gated
       // (their content can't be regenerated).
-      const specForCon = currentDraft?.visual_notes || currentDraft?.purpose || currentDraft?.label || opts.prompt;
+      // The critique spec = the world (visual notes) + the shot clock (beat
+      // sheet). Detectors verify dropped elements per beat; the taste judge
+      // reads the intended progression against the beat-midpoint contact sheet.
+      let specForCon = currentDraft?.visual_notes || currentDraft?.purpose || currentDraft?.label || opts.prompt;
+      if (sceneBeats) specForCon += `\n\n${formatBeatSheet(sceneBeats)}`;
       const requiresLogo = /\blogo\b/i.test(specForCon) && (opts.brandKit?.logos?.length ?? 0) > 0;
       const brandTheme: "light" | "dark" = brandBackgroundIsLight(opts.brandKit) ? "light" : "dark";
       // Footage / hero-image background: light text over a scrim is correct then,
@@ -1284,6 +1300,31 @@ async function critiqueAndRetryScene(opts: {
           }
         } catch (e: any) {
           console.warn(`  Layout gate skipped: ${e?.message || e}`);
+        }
+
+        // Dead-beat gate: on scenes with a beat timeline, MEASURE that each
+        // beat visibly changed the frame (pixel diff between consecutive beat
+        // midpoints). A beat where nothing happens is the slideshow feel the
+        // beat system exists to kill -- blocking, with the exact beat named.
+        if (sceneBeats) {
+          try {
+            const beatDefects = await measureBeatActivity({
+              htmlPath,
+              width: opts.canvas.width,
+              height: opts.canvas.height,
+              beats: sceneBeats,
+            });
+            for (const d of beatDefects) {
+              correctness.defects.push({ type: d.type, detail: d.detail });
+              critiqueResult.issues.push(d.detail);
+            }
+            if (beatDefects.length > 0) {
+              correctness.pass = false;
+              console.log(`  Beat gate: ${beatDefects.length} dead beat(s) -- forcing revision`);
+            }
+          } catch (e: any) {
+            console.warn(`  Beat gate skipped: ${e?.message || e}`);
+          }
         }
       }
 
@@ -1616,6 +1657,7 @@ function storyboardToSaved(
       components: s.components || [],
       broll_query: s.broll_query,
       hero_image: s.hero_image,
+      beats: Array.isArray(s.beats) && s.beats.length >= 2 ? s.beats : undefined,
     })),
     audio: {
       music_mood: "corporate",
@@ -2284,6 +2326,9 @@ async function runUnifiedPipeline(
                 project.scenes[i].duration_seconds = Math.ceil(needed);
               }
               console.log(`  Voiceover: extended scene ${i} from ${oldDur}s to ${project.scenes[i].duration_seconds}s (clip: ${clipDur.toFixed(1)}s${beatMap ? ", bar-aligned" : ""})`);
+              // Beats follow the scene: stretch the beat timeline to the new length.
+              const sb = project.scenes[i].beats;
+              if (Array.isArray(sb) && sb.length >= 2) rescaleBeats(sb, project.scenes[i].duration_seconds);
             }
           } catch {
             voDurations[i] = 0;
@@ -2470,7 +2515,7 @@ function segmentTransitionSeconds(
 }
 
 function quantizeScenesToBars(
-  scenes: Array<{ label?: string; duration_seconds: number; transition_in?: { type?: string; duration_seconds?: number } }>,
+  scenes: Array<{ label?: string; duration_seconds: number; beats?: SceneBeat[]; transition_in?: { type?: string; duration_seconds?: number } }>,
   barSec: number,
 ): void {
   if (!(barSec > 0)) return;
@@ -2490,6 +2535,9 @@ function quantizeScenesToBars(
       s.duration_seconds = newDur;
       changes++;
     }
+    // Beats follow the scene: rescale so the beat timeline still fills the
+    // (possibly re-quantized) scene exactly.
+    if (Array.isArray(s.beats) && s.beats.length >= 2) rescaleBeats(s.beats, s.duration_seconds);
   }
   if (changes === 0) console.log("  Beat grid: scene durations already on the bar grid");
 }

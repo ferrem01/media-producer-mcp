@@ -23,6 +23,10 @@ export interface ContactSheetOpts {
   duration: number;
   /** Number of frames to capture (default: 6) */
   frameCount?: number;
+  /** Explicit capture timestamps (seconds). Overrides the even spread AND
+   *  frameCount -- used to sample beat midpoints on scenes with a beat
+   *  timeline, so the critique sees each beat's content fully on screen. */
+  timestamps?: number[];
   /** Output path for the contact sheet (PNG) */
   outputPath: string;
 }
@@ -45,12 +49,20 @@ export async function generateContactSheet(opts: ContactSheetOpts): Promise<Cont
   var tmpDir = path.join(os.tmpdir(), `contact_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
   await fs.mkdir(tmpDir, { recursive: true });
 
-  // Calculate frame timestamps: evenly distributed, avoid 0s (empty) and very end
   var timestamps: number[] = [];
-  for (var i = 0; i < frameCount; i++) {
-    // Spread from 10% to 95% of duration
-    var t = opts.duration * (0.1 + (0.85 * i / (frameCount - 1)));
-    timestamps.push(Math.round(t * 100) / 100);
+  if (opts.timestamps && opts.timestamps.length >= 2) {
+    // Explicit sampling (beat midpoints): clamp into the scene and sort.
+    timestamps = opts.timestamps
+      .map((t) => Math.round(Math.min(Math.max(t, 0.05), opts.duration * 0.98) * 100) / 100)
+      .sort((a, b) => a - b);
+    frameCount = timestamps.length;
+  } else {
+    // Calculate frame timestamps: evenly distributed, avoid 0s (empty) and very end
+    for (var i = 0; i < frameCount; i++) {
+      // Spread from 10% to 95% of duration
+      var t = opts.duration * (0.1 + (0.85 * i / (frameCount - 1)));
+      timestamps.push(Math.round(t * 100) / 100);
+    }
   }
 
   // Capture each frame

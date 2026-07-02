@@ -39,6 +39,7 @@ import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/pa
 import path from "node:path";
 import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit, SpeakerTrack } from "./core/types.js";
+import { normalizeBeats } from "./core/beats.js";
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
@@ -76,6 +77,14 @@ const componentSchema = z.object({
   z_index: z.number().optional(),
   enter: animationSchema,
   exit: animationSchema,
+});
+
+/** A beat: one thought inside a scene's continuous take (see SceneBeat). */
+const beatSchema = z.object({
+  label: z.string(),
+  duration_seconds: z.number(),
+  action: z.string(),
+  voiceover_text: z.string().optional(),
 });
 
 
@@ -259,6 +268,7 @@ export function createMcpServer(): McpServer {
         duration_seconds: z.number(),
         background: z.string().optional(),
         transition_in: transitionSchema,
+        beats: z.array(beatSchema).optional().describe("Beat timeline: the scene's internal thoughts (continuous-take scenes)"),
         components: z.array(componentSchema).default([]),
       }).optional(),
       position: z.number().optional().describe("Insert position for scene (0-based, appends if omitted)"),
@@ -343,6 +353,7 @@ export function createMcpServer(): McpServer {
       duration_seconds: z.number().optional(),
       background: z.string().optional(),
       transition_in: transitionSchema,
+      beats: z.array(beatSchema).optional().describe("Replace the scene's beat timeline"),
 
       // Component-level updates
       data: z.record(z.unknown()).optional(),
@@ -526,6 +537,12 @@ export function createMcpServer(): McpServer {
           if (params.duration_seconds !== undefined) { scene.duration_seconds = params.duration_seconds; updated = true; }
           if (params.background !== undefined) { scene.background = params.background; updated = true; }
           if (params.transition_in !== undefined) { scene.transition_in = params.transition_in; updated = true; }
+          if (params.beats !== undefined) {
+            // Normalize against the scene's (possibly just-updated) duration;
+            // an empty array clears the beat timeline.
+            scene.beats = normalizeBeats(params.beats, scene.duration_seconds || 5);
+            updated = true;
+          }
           if (params.speaker_track !== undefined) { project.speaker_track = params.speaker_track as any; updated = true; }
         }
 

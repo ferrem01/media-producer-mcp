@@ -167,11 +167,16 @@ export function getPreviewHtml(): string {
   .play-btn:hover { background: #4338ca; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
   .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .play-btn svg { fill: #fff; }
+  #slider-wrap { position: relative; flex: 1; display: flex; align-items: center; }
   #timeline-slider {
     flex: 1; -webkit-appearance: none; appearance: none;
     height: 3px; background: #e5e7eb; border-radius: 3px;
     outline: none; cursor: pointer;
   }
+  /* Beat/scene markers over the timeline: scene cuts are strong ticks, beats are soft ticks. */
+  #beat-ticks { position: absolute; inset: 0; pointer-events: none; }
+  .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #a5b4fc; opacity: 0.75; border-radius: 1px; }
+  .beat-tick.scene-cut { width: 2px; height: 13px; background: #6366f1; opacity: 0.9; }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -250,6 +255,8 @@ export function getPreviewHtml(): string {
   /* Compact read-only storyboard preview (full editing happens in the dialog). */
   .sb-preview { max-height: 86px; overflow-y: auto; margin-bottom: 8px; }
   .sb-prev-row { margin-bottom: 6px; }
+  .sb-beat-line { margin-bottom: 3px; }
+  .sb-beat-line .sb-beat-time { font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 10px; color: #6366f1; }
   .sb-prev-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #9ca3af; }
   .sb-prev-text { font-size: 12px; color: #374151; line-height: 1.35; white-space: pre-wrap; }
   .sb-prev-text.empty { color: #9ca3af; font-style: italic; }
@@ -528,7 +535,10 @@ export function getPreviewHtml(): string {
           <polygon points="3,1 12,7 3,13"/>
         </svg>
       </button>
-      <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
+      <span id="slider-wrap">
+        <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
+        <div id="beat-ticks"></div>
+      </span>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
       <span class="audio-indicator" id="audio-indicator"></span>
       <span class="vol-control" title="Volume">
@@ -697,6 +707,42 @@ export function getPreviewHtml(): string {
       offset += p.scenes[i].duration_seconds || 0;
     }
     return offset;
+  }
+
+  // Render scene-cut + beat markers over the global timeline slider.
+  // Scene boundaries are strong ticks; each scene's beat starts are soft ticks.
+  function renderBeatTicks() {
+    var wrap = document.getElementById('beat-ticks');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    var p = state.currentProject;
+    if (!p || !p.scenes || !p.scenes.length) return;
+    var total = 0;
+    p.scenes.forEach(function(s) { total += s.duration_seconds || 0; });
+    if (!(total > 0)) return;
+    var offset = 0;
+    p.scenes.forEach(function(s, si) {
+      if (si > 0) {
+        var cut = document.createElement('div');
+        cut.className = 'beat-tick scene-cut';
+        cut.style.left = ((offset / total) * 100).toFixed(2) + '%';
+        cut.title = 'Scene ' + (si + 1);
+        wrap.appendChild(cut);
+      }
+      var beats = s.beats || (p.storyboard && p.storyboard.scenes && p.storyboard.scenes[si] && p.storyboard.scenes[si].beats) || [];
+      var bt = offset;
+      beats.forEach(function(b, bi) {
+        if (bi > 0) {
+          var tick = document.createElement('div');
+          tick.className = 'beat-tick';
+          tick.style.left = ((bt / total) * 100).toFixed(2) + '%';
+          tick.title = (b.label || ('beat ' + (bi + 1)));
+          wrap.appendChild(tick);
+        }
+        bt += (b.duration_seconds || 0);
+      });
+      offset += s.duration_seconds || 0;
+    });
   }
 
 
@@ -1382,15 +1428,19 @@ export function getPreviewHtml(): string {
     project.scenes.forEach(function(scene, i) {
       var active = i === state.currentSceneIndex;
       var label = scene.label || ('Scene ' + (i + 1));
+      var beatCount = (scene.beats && scene.beats.length)
+        || (project.storyboard && project.storyboard.scenes && project.storyboard.scenes[i] && project.storyboard.scenes[i].beats && project.storyboard.scenes[i].beats.length)
+        || 0;
       html += '<div class="scene-item' + (active ? ' active' : '') + '" data-index="' + i + '">'
         + '<div class="scene-thumb" data-scene-id="' + escHtml(scene.id) + '"></div>'
         + '<div class="scene-info">'
         + '<div class="scene-label">' + (i + 1) + '. ' + escHtml(label) + '</div>'
-        + '<span class="scene-dur">' + (scene.duration_seconds || 0).toFixed(1) + 's</span>'
+        + '<span class="scene-dur">' + (scene.duration_seconds || 0).toFixed(1) + 's' + (beatCount ? ' \\u00b7 ' + beatCount + ' beats' : '') + '</span>'
         + '</div>'
         + '</div>';
     });
     els.sceneList.innerHTML = html;
+    renderBeatTicks();
 
     els.sceneList.querySelectorAll('.scene-item').forEach(function(el) {
       el.addEventListener('click', function() {
@@ -1602,7 +1652,31 @@ export function getPreviewHtml(): string {
       broll_query: ps.broll_query || '',
       hero_image: ps.hero_image || '',
       components: Array.isArray(ps.components) ? ps.components : [],
+      beats: Array.isArray(ps.beats) ? ps.beats : [],
     };
+  }
+
+  // Serialize beats for the editor textarea: one per line, "label | seconds | action | voiceover".
+  function beatsToText(beats) {
+    return (beats || []).map(function(b) {
+      var parts = [b.label || '', (b.duration_seconds != null ? b.duration_seconds : ''), b.action || ''];
+      if (b.voiceover_text) parts.push(b.voiceover_text);
+      return parts.join(' | ');
+    }).join('\n');
+  }
+
+  // Parse the editor textarea back into beats. Lines: "label | seconds | action | voiceover".
+  function textToBeats(text) {
+    var beats = [];
+    (text || '').split('\n').forEach(function(line) {
+      if (!line.trim()) return;
+      var parts = line.split('|').map(function(p) { return p.trim(); });
+      if (parts.length < 3) return;
+      var b = { label: parts[0], duration_seconds: parseFloat(parts[1]) || 0, action: parts[2] };
+      if (parts[3]) b.voiceover_text = parts.slice(3).join(' | ');
+      beats.push(b);
+    });
+    return beats;
   }
 
   function renderLayers() {
@@ -1632,12 +1706,22 @@ export function getPreviewHtml(): string {
     var metaHtml = meta.length
       ? '<div class="sb-prev-row"><div class="sb-prev-label">Setup</div><div class="sb-prev-text">' + escHtml(meta.join(' \\u00b7 ')) + '</div></div>'
       : '';
-    els.sbPreview.innerHTML = row('Purpose', b.purpose) + row('Script', b.script) + row('Visual notes', b.visual_notes) + metaHtml;
+    // Beat timeline: the scene's internal shot clock, one line per beat.
+    var beatsHtml = '';
+    if (b.beats && b.beats.length) {
+      var t = 0;
+      var lines = b.beats.map(function(beat, i) {
+        var start = t; t += (beat.duration_seconds || 0);
+        return '<div class="sb-beat-line"><span class="sb-beat-time">' + start.toFixed(1) + 's</span> <b>' + escHtml(beat.label || ('beat ' + (i + 1))) + '</b> \\u2014 ' + escHtml(beat.action || '') + '</div>';
+      }).join('');
+      beatsHtml = '<div class="sb-prev-row"><div class="sb-prev-label">Beats (' + b.beats.length + ')</div><div class="sb-prev-text">' + lines + '</div></div>';
+    }
+    els.sbPreview.innerHTML = row('Purpose', b.purpose) + row('Script', b.script) + row('Visual notes', b.visual_notes) + beatsHtml + metaHtml;
   }
 
   function clearLayers() {
     state.currentComponentIndex = -1;
-    studio.sb = { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [] };
+    studio.sb = { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [], beats: [] };
     if (els.sbPreview) els.sbPreview.innerHTML = '<div class="sb-prev-text empty">No scene selected</div>';
   }
 
@@ -2293,7 +2377,7 @@ export function getPreviewHtml(): string {
   // ─────────────────────────────────────────────
   // Studio: element selection + direct-manipulation revise
   // ─────────────────────────────────────────────
-  var studio = { sel: null, scope: 'element', busy: false, sb: { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [] } };
+  var studio = { sel: null, scope: 'element', busy: false, sb: { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [], beats: [] } };
 
   function studioCurrentSceneId() {
     var p = state.currentProject, i = state.currentSceneIndex;
@@ -2715,7 +2799,8 @@ export function getPreviewHtml(): string {
       '<p class="sm-desc">This is the storyboard for this scene. Save to keep it; Regenerate rebuilds the scene to fulfill it.</p>' +
       '<div class="sm-field"><label>Purpose</label><textarea id="sm-purpose" placeholder="What this scene communicates">' + escHtml(b.purpose || '') + '</textarea></div>' +
       '<div class="sm-field"><label>Script (voiceover / on-screen)</label><textarea id="sm-script" placeholder="The narration or on-screen copy">' + escHtml(b.script || '') + '</textarea></div>' +
-      '<div class="sm-field"><label>Visual notes</label><textarea id="sm-visual" style="min-height:130px;" placeholder="Layout, motion, imagery, hierarchy">' + escHtml(b.visual_notes || '') + '</textarea></div>' +
+      '<div class="sm-field"><label>Visual notes (the WORLD: setting, layers, what persists)</label><textarea id="sm-visual" style="min-height:130px;" placeholder="Layout, motion, imagery, hierarchy">' + escHtml(b.visual_notes || '') + '</textarea></div>' +
+      '<div class="sm-field"><label>Beats (what HAPPENS, in order \\u2014 one per line: label | seconds | action | voiceover)</label><textarea id="sm-beats" style="min-height:110px;font-family:ui-monospace,monospace;font-size:12px;" placeholder="the approach | 4 | Cursor GLIDES toward the plus icon | It starts with one click.">' + escHtml(beatsToText(b.beats)) + '</textarea></div>' +
       '<div class="sm-row2">' +
         '<div class="sm-field"><label>Duration (seconds)</label><input id="sm-duration" type="number" min="1" step="0.5" value="' + escAttr('' + (b.duration_seconds || '')) + '"></div>' +
         '<div class="sm-field"><label>B-roll search</label><input id="sm-broll" type="text" placeholder="e.g. team collaborating in office" value="' + escAttr(b.broll_query || '') + '"></div>' +
@@ -2745,6 +2830,7 @@ export function getPreviewHtml(): string {
       broll_query: modalVal('sm-broll'),
       hero_image: modalVal('sm-hero'),
       components: modalVal('sm-components').split(',').map(function(c) { return c.trim(); }).filter(Boolean),
+      beats: textToBeats(modalVal('sm-beats')),
     };
     if (durRaw && !isNaN(parseFloat(durRaw))) bodyS.duration_seconds = parseFloat(durRaw);
     var st = document.getElementById('sm-edit-status');

@@ -114,6 +114,29 @@ export interface SceneComponent {
 
 // ── Scenes ──
 
+/**
+ * A beat: one thought inside a scene's continuous take.
+ *
+ * The film layer's editorial rule is "cut = new world, beat = new thought": a
+ * scene is ONE persistent world (one HTML document, one master timeline), and
+ * beats are the moments the idea advances INSIDE it -- elements morph, move,
+ * and re-light rather than being torn down. Beats are authored by the
+ * storyboard (on the music bar grid when one exists), rendered by codegen as
+ * labeled segments of the master timeline, and verified by the critique loop
+ * (contact-sheet frames sample beat midpoints; a beat that produces no visual
+ * change is a "dead beat" defect).
+ */
+export interface SceneBeat {
+  /** Short name for the moment, e.g. "the pile-up", "the reveal". */
+  label: string;
+  /** Beat length in seconds (authored in bars when a beat grid exists). */
+  duration_seconds: number;
+  /** What HAPPENS during this beat -- motion verbs, what transforms. */
+  action: string;
+  /** Narration for this beat (concatenated into the scene voiceover). */
+  voiceover_text?: string;
+}
+
 export interface SceneTransition {
   type: "crossfade" | "blur-crossfade" | "slide-reveal" | "zoom-through" | "glitch-cut" | "morph-wipe" | "scale-rotate" | "curtain" | "wipe-left" | "wipe-right" | "slide-up" | "slide-down" | "iris" | "glass-turn" | "none";
   duration_seconds: number;
@@ -139,6 +162,9 @@ export interface Scene {
   background?: string;
   transition_in?: SceneTransition;
   components: SceneComponent[];
+  /** The scene's internal beat timeline (continuous-take scenes). Offsets are
+   *  implicit: beat N starts where beat N-1 ended, beat 0 starts at 0. */
+  beats?: SceneBeat[];
   audio_hints?: SceneAudioHints;
   /** When set, all components are constrained to this region of the frame.
    *  Used with speaker track so content appears beside the speaker. */
@@ -260,6 +286,8 @@ export interface StoryboardScene {
   broll_query?: string;
   /** AI-generated still image prompt; when set, a generated image is the scene background (mutually exclusive with broll_query) */
   hero_image?: string;
+  /** The scene's internal beat timeline (continuous-take scenes). */
+  beats?: SceneBeat[];
 }
 
 export type AssetRequirementType =

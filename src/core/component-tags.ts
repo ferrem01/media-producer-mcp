@@ -221,8 +221,11 @@ export function buildComponentTimelineScript(
   components: ResolvedComponent[],
   sceneDuration: number,
   canvas: { width: number; height: number },
+  /** Resolved beat segments ([{label, start, end}]) exposed as ctx.beats. */
+  beats?: Array<{ label: string; start: number; end: number }>,
 ): string {
   if (components.length === 0) return "";
+  const beatsJson = JSON.stringify(beats || []);
 
   const registrations: string[] = [];
 
@@ -244,6 +247,7 @@ export function buildComponentTimelineScript(
         duration: ${sceneDuration},
         fps: 30,
         canvas: { width: ${canvas.width}, height: ${canvas.height} },
+        beats: ${beatsJson},
       };
       return ${fnName}(el, data, ctx);
     };`);

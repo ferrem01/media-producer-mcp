@@ -12,6 +12,7 @@ import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEnt
 import { config } from "../config.js";
 import type { DraftScene } from "./storyboard-builder.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
+import { formatBeatSheet } from "../core/beats.js";
 import type { Treatment } from "./creative-director.js";
 
 // ── Types ──
@@ -107,6 +108,7 @@ async function generateCodegenScene(
     label: draft.label,
     duration_seconds: draft.duration_seconds || 5,
     transition_in: transition,
+    beats: Array.isArray(draft.beats) && draft.beats.length >= 2 ? draft.beats : undefined,
     components: [{
       id: "comp_0",
       type: compName,
@@ -160,6 +162,14 @@ async function buildCodegenSpec(draft: any): Promise<string> {
   const visualDirection = draft.visual_notes || draft.purpose;
   if (visualDirection) {
     parts.push(`\nVisual Direction:\n${visualDirection}`);
+  }
+
+  // Beat sheet: the scene's internal timeline (continuous-take scenes). The
+  // visual notes describe the WORLD; the beats are the shot clock of what
+  // HAPPENS in it. Rendered as explicit time segments the master timeline
+  // must follow (with tl.addLabel at each beat start).
+  if (Array.isArray(draft.beats) && draft.beats.length >= 2) {
+    parts.push(`\n${formatBeatSheet(draft.beats)}`);
   }
 
   // Component hints: look up schemas from catalog and include them
