@@ -187,6 +187,8 @@ These are the failures that make a scene look broken. Violate none of them.
 
 5. **MAKE THE EMOTION VISIBLE.** The scene's Purpose names a feeling (overwhelm, relief, momentum, confidence). That feeling must be legible in the composition and the motion — not merely labeled. Chaos must look chaotic; calm must look calm.
 
+6. **BRAND THEME IS NOT NEGOTIABLE.** This brand is ${isLightBrand(opts.brandKit) ? "LIGHT" : "DARK"}. ${isLightBrand(opts.brandKit) ? "Every composed surface (root background, cards, panels) renders LIGHT with DARK text -- no exceptions." : "Every composed surface renders DARK with LIGHT text -- no exceptions."} Visual notes and creative-direction "color mood" language ("night", "dawn", "dark warm background", "glow orbs on black", "moody") describe LIGHTING and ACCENT COLOR ONLY -- they NEVER license inverting the base theme. The single exception is real footage/photo backgrounds (see FOOTAGE-FORWARD / HERO-IMAGE sections below if present) -- a composed CSS background is not footage and must obey the brand theme. If you catch yourself writing a dark hex for a ${isLightBrand(opts.brandKit) ? "root background or card fill" : "text color"} on this brand, stop and re-read this rule -- that is the single most common failure in this system.
+
 Design for a viewer watching a finished video, not a designer reading a spec.
 
 ## Component Tags (USE THESE FIRST)
@@ -393,6 +395,14 @@ Through-line: ${opts.treatment.throughLine}
 `;
 }
 
+/** True if the brand's background color is light (luminance > 0.5). */
+function isLightBrand(brandKit: BrandKit): boolean {
+  var bgHex = (brandKit.colors?.background || "#0f172a").replace("#", "");
+  if (bgHex.length === 3) bgHex = bgHex.split("").map(c => c + c).join("");
+  var lum = (0.299 * parseInt(bgHex.substring(0, 2), 16) + 0.587 * parseInt(bgHex.substring(2, 4), 16) + 0.114 * parseInt(bgHex.substring(4, 6), 16)) / 255;
+  return lum > 0.5;
+}
+
 function buildBrandContext(brandKit: BrandKit): string {
   var lines: string[] = ["## Brand Kit (MANDATORY -- use these CSS variables)"];
   if (brandKit.colors) {
@@ -420,10 +430,7 @@ function buildBrandContext(brandKit: BrandKit): string {
     // State the brand's theme so the scene matches it instead of defaulting to
     // dark. A light brand must render light; inverting it (a dark background on a
     // light brand) is the #1 "looks like generic AI" giveaway.
-    var _bgHex = (brandKit.colors.background || "#0f172a").replace("#", "");
-    if (_bgHex.length === 3) _bgHex = _bgHex.split("").map(c => c + c).join("");
-    var _lum = (0.299 * parseInt(_bgHex.substring(0, 2), 16) + 0.587 * parseInt(_bgHex.substring(2, 4), 16) + 0.114 * parseInt(_bgHex.substring(4, 6), 16)) / 255;
-    var _light = _lum > 0.5;
+    var _light = isLightBrand(brandKit);
     lines.push(
       "",
       `THEME: this brand is ${_light ? "LIGHT" : "DARK"}.`,
@@ -431,6 +438,19 @@ function buildBrandContext(brandKit: BrandKit): string {
         ? "The root/scene background MUST be var(--mp-color-background) (a LIGHT color) with var(--mp-color-text) (DARK) text. Do NOT build a dark scene. Do NOT hardcode ANY dark hex anywhere in this scene -- no #17171c, #0f172a, #0d0d1a, #1e293b, etc. -- not for the background, not for cards/panels, not for title treatments. Every surface uses var(--mp-color-surface) (LIGHT); all text uses var(--mp-color-text) (DARK); NEVER white/#fff/#f0eefc text (it's invisible on light). THIS THEME OVERRIDES THE SCENE'S VISUAL NOTES: if the visual notes name a dark background, a dark card, 'glow orbs on dark', or light text, IGNORE it and render light -- soft washes/tints of var(--mp-color-primary) on var(--mp-color-background), subtle grid, generous whitespace, dark text. Cards need a solid var(--mp-color-surface) fill or a 1px border + soft shadow to be visible (glassmorphism only works on dark)."
         : "The root/scene background is var(--mp-color-background) (dark) with var(--mp-color-text) (light) text.",
     );
+    if (_light) {
+      lines.push(
+        "",
+        "WORKED EXAMPLE -- visual notes say \"a dark, pre-dawn cityscape, quiet and moody, warm cream text drifting in\":",
+        "  WRONG (theme inversion -- do not do this):",
+        "    .scene { background: #0a0e1a; }  .headline { color: #fdf6e3; }",
+        "  RIGHT (same mood, correct theme -- dawn/mood becomes a warm ACCENT wash and gradient art on a light base, not the base itself):",
+        "    .scene { background: var(--mp-color-background); }",
+        "    .dawn-wash { position:absolute; inset:0; background: radial-gradient(ellipse at 20% 80%, rgba(251,191,36,0.14), transparent 60%); }",
+        "    .headline { color: var(--mp-color-text); }",
+        "  The 'pre-dawn / moody / warm' feeling now lives in the radial wash, a muted amber accent line, and soft shadows -- not in a black canvas.",
+      );
+    }
   }
   if (brandKit.fonts?.length) {
     lines.push(
@@ -494,6 +514,7 @@ Description: ${opts.sceneDescription}
 
 ${opts.sceneSpec}
 
+${!opts.brollVideoUrl && !opts.heroImageUrl ? `REMINDER before you write CSS: this brand is ${isLightBrand(opts.brandKit) ? "LIGHT -- render a light background with dark text, no matter what mood words appear above" : "DARK -- render a dark background with light text"}. Any "night", "dawn", "dark", "moody", or "glow on black" language above describes an ACCENT wash / gradient art, not the base surface color.\n` : ""}
 ## Requirements
 - Follow the scene spec closely. Every motion verb in the visual notes should map to a GSAP tween.
 - Create a visually stunning, polished scene. This is motion graphics, not a web page.
