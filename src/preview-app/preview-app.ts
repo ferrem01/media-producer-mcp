@@ -125,8 +125,9 @@ export function getPreviewHtml(): string {
   .scene-dur {
     font-size: 10px; color: #9ca3af;
     background: #f3f4f6; padding: 1px 6px; border-radius: 10px;
-    margin-top: 2px; display: inline-block;
+    display: inline-block;
   }
+  .scene-meta-row { margin-top: 3px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
   .empty-state {
     display: flex; align-items: center; justify-content: center;
     height: 100%; color: #9ca3af; font-size: 12px; text-align: center; padding: 16px;
@@ -263,6 +264,19 @@ export function getPreviewHtml(): string {
   .sb-prev-row { margin-bottom: 6px; }
   .sb-beat-line { margin-bottom: 3px; }
   .sb-beat-line .sb-beat-time { font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 10px; color: #6366f1; }
+  /* Critique verdict badges -- the observability gap: a scene that exhausted
+     its revision budget and shipped still-defective ships with this visible
+     instead of only in server logs. */
+  .scene-quality-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; }
+  .scene-quality-badge.qb-pass { background: rgba(16,185,129,0.15); color: #10b981; }
+  .scene-quality-badge.qb-warn { background: rgba(245,158,11,0.16); color: #f59e0b; }
+  .sb-quality-block { margin-bottom: 10px; padding: 8px 10px; border-radius: 8px; }
+  .sb-quality-block.qb-pass { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); }
+  .sb-quality-block.qb-warn { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); }
+  .sb-quality-head { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+  .sb-quality-head.qb-pass { color: #10b981; }
+  .sb-quality-head.qb-warn { color: #f59e0b; }
+  .sb-quality-defect { font-size: 11px; color: #cbd5e1; margin-bottom: 2px; line-height: 1.35; }
   .sb-prev-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #9ca3af; }
   .sb-prev-text { font-size: 12px; color: #374151; line-height: 1.35; white-space: pre-wrap; }
   .sb-prev-text.empty { color: #9ca3af; font-style: italic; }
@@ -1479,11 +1493,24 @@ export function getPreviewHtml(): string {
       var beatCount = (scene.beats && scene.beats.length)
         || (project.storyboard && project.storyboard.scenes && project.storyboard.scenes[i] && project.storyboard.scenes[i].beats && project.storyboard.scenes[i].beats.length)
         || 0;
+      var q = scene.quality;
+      var badgeHtml = '';
+      if (q) {
+        if (q.passed) {
+          badgeHtml = '<span class="scene-quality-badge qb-pass" title="Passed critique clean">\\u2713 clean</span>';
+        } else {
+          var n = (q.unresolved_defects || []).length;
+          badgeHtml = '<span class="scene-quality-badge qb-warn" title="' + escAttr((q.unresolved_defects || []).join('\\n')) + '">\\u26a0 shipped with ' + n + ' unresolved</span>';
+        }
+      }
       html += '<div class="scene-item' + (active ? ' active' : '') + '" data-index="' + i + '">'
         + '<div class="scene-thumb" data-scene-id="' + escHtml(scene.id) + '"></div>'
         + '<div class="scene-info">'
         + '<div class="scene-label">' + (i + 1) + '. ' + escHtml(label) + '</div>'
+        + '<div class="scene-meta-row">'
         + '<span class="scene-dur">' + (scene.duration_seconds || 0).toFixed(1) + 's' + (beatCount ? ' \\u00b7 ' + beatCount + ' beats' : '') + '</span>'
+        + badgeHtml
+        + '</div>'
         + '</div>'
         + '</div>';
     });
@@ -1799,12 +1826,29 @@ export function getPreviewHtml(): string {
     if (!scene) { clearLayers(); return; }
     var storyboardScene = (project.storyboard && project.storyboard.scenes && project.storyboard.scenes[idx]) || {};
     studio.sb = storyboardSceneToFields(storyboardScene);
+    studio.sb.quality = scene.quality || null;
     renderStoryboardPreview();
   }
 
   function renderStoryboardPreview() {
     if (!els.sbPreview) return;
     var b = studio.sb || {};
+    // Critique verdict: what shipped and why. This is the observability the
+    // studio previously had none of -- a scene that lost its fight with the
+    // critic (exhausted its revision budget) is now visible here, not just
+    // in server logs, so it can be targeted with Revise/Regenerate directly.
+    var qualityHtml = '';
+    if (b.quality) {
+      var q = b.quality;
+      var cls = q.passed ? 'qb-pass' : 'qb-warn';
+      var head = q.passed
+        ? '\\u2713 Passed critique clean (score ' + q.score + ', ' + q.attempts + ' attempt' + (q.attempts === 1 ? '' : 's') + ')'
+        : '\\u26a0 Shipped with ' + (q.unresolved_defects || []).length + ' unresolved defect' + ((q.unresolved_defects || []).length === 1 ? '' : 's') + ' (score ' + q.score + ', ' + q.attempts + ' attempt' + (q.attempts === 1 ? '' : 's') + ')';
+      var defectsHtml = (q.unresolved_defects || []).map(function(d) {
+        return '<div class="sb-quality-defect">\\u2022 ' + escHtml(d) + '</div>';
+      }).join('');
+      qualityHtml = '<div class="sb-quality-block ' + cls + '"><div class="sb-quality-head ' + cls + '">' + head + '</div>' + defectsHtml + '</div>';
+    }
     function row(label, text) {
       var has = text && ('' + text).trim();
       return '<div class="sb-prev-row"><div class="sb-prev-label">' + label + '</div>'
@@ -1828,12 +1872,12 @@ export function getPreviewHtml(): string {
       }).join('');
       beatsHtml = '<div class="sb-prev-row"><div class="sb-prev-label">Beats (' + b.beats.length + ')</div><div class="sb-prev-text">' + lines + '</div></div>';
     }
-    els.sbPreview.innerHTML = row('Purpose', b.purpose) + row('Script', b.script) + row('Visual notes', b.visual_notes) + beatsHtml + metaHtml;
+    els.sbPreview.innerHTML = qualityHtml + row('Purpose', b.purpose) + row('Script', b.script) + row('Visual notes', b.visual_notes) + beatsHtml + metaHtml;
   }
 
   function clearLayers() {
     state.currentComponentIndex = -1;
-    studio.sb = { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [], beats: [] };
+    studio.sb = { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [], beats: [], quality: null };
     if (els.sbPreview) els.sbPreview.innerHTML = '<div class="sb-prev-text empty">No scene selected</div>';
   }
 
@@ -2489,7 +2533,7 @@ export function getPreviewHtml(): string {
   // ─────────────────────────────────────────────
   // Studio: element selection + direct-manipulation revise
   // ─────────────────────────────────────────────
-  var studio = { sel: null, scope: 'element', busy: false, sb: { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [], beats: [] } };
+  var studio = { sel: null, scope: 'element', busy: false, sb: { purpose: '', script: '', visual_notes: '', duration_seconds: '', broll_query: '', hero_image: '', components: [], beats: [], quality: null } };
 
   function studioCurrentSceneId() {
     var p = state.currentProject, i = state.currentSceneIndex;

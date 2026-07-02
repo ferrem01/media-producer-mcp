@@ -42,7 +42,7 @@ import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
 import { type CritiqueResult } from "./critiquer.js";
 import { critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
-import { formatCorrectnessDefects, type CorrectnessResult } from "./correctness-critique.js";
+import { formatCorrectnessDefects, type CorrectnessResult, type CorrectnessDefect } from "./correctness-critique.js";
 import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
 import { runFocusedDetectors } from "./focused-detectors.js";
 import { tileFramesToStoryboard } from "./editorial-vision.js";
@@ -996,6 +996,11 @@ async function critiqueAndRetryScene(opts: {
   let bestCustomSources = opts.customSources;
   let bestScore = -Infinity;
   let bestCritique: CritiqueResult | undefined;
+  // Persisted alongside the best attempt so the shipped scene can carry its
+  // own verdict (SceneQuality) -- observability without excavating logs.
+  let bestDefects: CorrectnessDefect[] = [];
+  let bestPassed = false;
+  let attemptsRun = 0;
   // Surgical-patch improvement guard: the score at which we last patched (-1 = the
   // last fix was a full regen / none yet). Used to escalate to a full regen if a
   // patch fails to raise the score.
@@ -1008,6 +1013,7 @@ async function critiqueAndRetryScene(opts: {
 
   for (let attempt = 0; attempt < opts.maxRetries; attempt++) {
     opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_attempt_${attempt}`);
+    attemptsRun = attempt + 1;
 
     try {
       // 1. Collect component sources for this scene
@@ -1352,6 +1358,8 @@ async function critiqueAndRetryScene(opts: {
         bestScene = currentScene;
         bestCustomSources = currentCustomSources;
         bestCritique = critiqueResult;
+        bestDefects = correctness.defects;
+        bestPassed = aestheticPass && correctness.pass;
       }
 
       // 6. Accept only if the vision score passes AND the scene runs clean AND
@@ -1589,6 +1597,17 @@ Output valid JSON only. No markdown fences, no commentary.`;
 
       console.log(`  Template swap complete for scene ${opts.sceneIndex}`);
       opts.trace?.endEvent({ swapped: true, previousBest: bestScore });
+      // The swap itself is never re-critiqued (it's the last-resort fallback),
+      // so it can't be marked "passed" -- record what drove the swap.
+      swapped.scene.quality = {
+        score: bestScore,
+        attempts: attemptsRun,
+        passed: false,
+        unresolved_defects: [
+          `[template_swap] Best attempt scored ${bestScore} (< 6 floor) after ${attemptsRun} attempt(s); shipped a hard-floor template swap, not re-verified by critique.`,
+          ...bestDefects.map((d) => `[${d.type}] ${d.detail}`),
+        ],
+      };
       return { scene: swapped.scene, customSources: swapped.customSources, critiqueResult: bestCritique };
     } catch (e: any) {
       console.warn(`  Template swap failed (non-fatal): ${e.message}`);
@@ -1600,6 +1619,12 @@ Output valid JSON only. No markdown fences, no commentary.`;
   // EFFECTIVE score (penalized for runtime errors and blocking defects), so a
   // gate-clean attempt always beats a prettier-but-defective later one.
   if (bestScore > -Infinity) {
+    bestScene.quality = {
+      score: bestScore,
+      attempts: attemptsRun,
+      passed: bestPassed,
+      unresolved_defects: bestPassed ? [] : bestDefects.map((d) => `[${d.type}] ${d.detail}`),
+    };
     return { scene: bestScene, customSources: bestCustomSources, critiqueResult: bestCritique };
   }
   return { scene: currentScene, customSources: currentCustomSources, critiqueResult: lastCritique };
