@@ -167,7 +167,13 @@ export function getPreviewHtml(): string {
   .play-btn:hover { background: #4338ca; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
   .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .play-btn svg { fill: #fff; }
-  #slider-wrap { position: relative; flex: 1; display: flex; align-items: center; }
+  #slider-wrap { position: relative; flex: 1; display: flex; align-items: center; height: 30px; }
+  /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
+  #audio-lanes { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; pointer-events: none; }
+  .audio-lane-seg { position: absolute; height: 4px; border-radius: 2px; pointer-events: auto; }
+  .audio-lane-seg.music { top: 0; background: linear-gradient(90deg, rgba(99,102,241,0.15), rgba(99,102,241,0.55) 12%, rgba(99,102,241,0.55)); }
+  .audio-lane-seg.voiceover { top: 5px; background: #f59e0b; opacity: 0.75; }
+  .audio-lane-seg.sfx { top: 5px; background: #10b981; opacity: 0.6; }
   #timeline-slider {
     flex: 1; -webkit-appearance: none; appearance: none;
     height: 3px; background: #e5e7eb; border-radius: 3px;
@@ -288,6 +294,16 @@ export function getPreviewHtml(): string {
   .sm-row2 { display: flex; gap: 12px; }
   .sm-row2 .sm-field { flex: 1; }
   .sm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+  /* Structured beat rows in the storyboard editor */
+  .sm-beat-row { display: grid; grid-template-columns: 110px 62px 1fr 180px auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .sm-beat-row input { width: 100%; box-sizing: border-box; padding: 7px 9px; font: 12px/1.3 inherit; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; }
+  .sm-beat-row input:focus { outline: none; border-color: #6366f1; }
+  .sbr-btns { display: flex; gap: 2px; }
+  .sbr-btns button { width: 22px; height: 26px; border: 1px solid #334155; background: #1e293b; color: #94a3b8; border-radius: 5px; cursor: pointer; font-size: 12px; padding: 0; }
+  .sbr-btns button:hover { border-color: #6366f1; color: #e2e8f0; }
+  .sm-beat-head { display: grid; grid-template-columns: 110px 62px 1fr 180px auto; gap: 6px; margin-bottom: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+  #sm-beat-add { margin-top: 2px; }
+  .sm-beat-total { font-size: 11px; color: #94a3b8; margin-left: 10px; }
   .sm-btn { padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; }
   .sm-btn:disabled { opacity: 0.5; cursor: default; }
   .sm-btn.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
@@ -538,6 +554,7 @@ export function getPreviewHtml(): string {
       <span id="slider-wrap">
         <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
         <div id="beat-ticks"></div>
+        <div id="audio-lanes"></div>
       </span>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
       <span class="audio-indicator" id="audio-indicator"></span>
@@ -1063,6 +1080,37 @@ export function getPreviewHtml(): string {
       els.audioIndicator.className = 'audio-indicator';
     }
     buildMediaClips();
+    renderAudioLanes();
+    // Clip widths need each track's real duration -- re-render as metadata lands.
+    state.audioElements.forEach(function(audio) {
+      audio.addEventListener('loadedmetadata', renderAudioLanes);
+    });
+  }
+
+  // Draw music coverage + voiceover/sfx clip windows under the timeline slider,
+  // so where the music starts (and any silent gaps) is VISIBLE in the studio.
+  function renderAudioLanes() {
+    var wrap = document.getElementById('audio-lanes');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    var total = state.totalDuration || calcTotalDuration();
+    if (!(total > 0) || !state.audioElements.length) return;
+    state.audioElements.forEach(function(audio) {
+      var start = audio._startTime || 0;
+      var dur = (audio.duration && isFinite(audio.duration)) ? audio.duration : 0;
+      // Looping music covers from its start to the end of the film.
+      var end = audio.loop ? total : (dur > 0 ? Math.min(start + dur, total) : total);
+      if (end <= start) return;
+      var seg = document.createElement('div');
+      seg.className = 'audio-lane-seg ' + (audio._trackType || 'sfx');
+      seg.style.left = ((start / total) * 100).toFixed(2) + '%';
+      seg.style.width = (((end - start) / total) * 100).toFixed(2) + '%';
+      var name = (audio._trackId || audio._trackType || 'audio');
+      seg.title = name + ': ' + start.toFixed(1) + 's \\u2192 ' + end.toFixed(1) + 's'
+        + (audio._fadeIn ? ' (fade-in ' + audio._fadeIn + 's)' : '')
+        + (audio.loop ? ' (loops)' : '');
+      wrap.appendChild(seg);
+    });
   }
 
   function destroyAudio() {
@@ -1441,6 +1489,7 @@ export function getPreviewHtml(): string {
     });
     els.sceneList.innerHTML = html;
     renderBeatTicks();
+    renderAudioLanes();
 
     els.sceneList.querySelectorAll('.scene-item').forEach(function(el) {
       el.addEventListener('click', function() {
@@ -1656,27 +1705,90 @@ export function getPreviewHtml(): string {
     };
   }
 
-  // Serialize beats for the editor textarea: one per line, "label | seconds | action | voiceover".
-  function beatsToText(beats) {
-    return (beats || []).map(function(b) {
-      var parts = [b.label || '', (b.duration_seconds != null ? b.duration_seconds : ''), b.action || ''];
-      if (b.voiceover_text) parts.push(b.voiceover_text);
-      return parts.join(' | ');
-    }).join('\\n');
+  // ── Structured beat editor (rows of label / seconds / action / voiceover) ──
+
+  function beatRowHtml(b) {
+    b = b || {};
+    return '<div class="sm-beat-row">' +
+      '<input class="sbr-label" placeholder="label" value="' + escAttr(b.label || '') + '">' +
+      '<input class="sbr-secs" type="number" min="0.5" step="0.5" placeholder="s" value="' + escAttr(b.duration_seconds != null && b.duration_seconds !== '' ? '' + b.duration_seconds : '') + '">' +
+      '<input class="sbr-action" placeholder="what HAPPENS -- motion verbs, what transforms" value="' + escAttr(b.action || '') + '">' +
+      '<input class="sbr-vo" placeholder="voiceover (optional)" value="' + escAttr(b.voiceover_text || '') + '">' +
+      '<span class="sbr-btns">' +
+        '<button type="button" class="sbr-up" title="Move up">\\u2191</button>' +
+        '<button type="button" class="sbr-down" title="Move down">\\u2193</button>' +
+        '<button type="button" class="sbr-del" title="Remove beat">\\u00d7</button>' +
+      '</span></div>';
   }
 
-  // Parse the editor textarea back into beats. Lines: "label | seconds | action | voiceover".
-  function textToBeats(text) {
+  // Read every row as-is (no filtering) -- used for reorder/remove so indexes hold.
+  function readBeatRowsRaw() {
     var beats = [];
-    (text || '').split('\\n').forEach(function(line) {
-      if (!line.trim()) return;
-      var parts = line.split('|').map(function(p) { return p.trim(); });
-      if (parts.length < 3) return;
-      var b = { label: parts[0], duration_seconds: parseFloat(parts[1]) || 0, action: parts[2] };
-      if (parts[3]) b.voiceover_text = parts.slice(3).join(' | ');
-      beats.push(b);
+    document.querySelectorAll('#sm-beat-rows .sm-beat-row').forEach(function(row) {
+      beats.push({
+        label: row.querySelector('.sbr-label').value.trim(),
+        duration_seconds: parseFloat(row.querySelector('.sbr-secs').value) || 0,
+        action: row.querySelector('.sbr-action').value.trim(),
+        voiceover_text: row.querySelector('.sbr-vo').value.trim()
+      });
     });
     return beats;
+  }
+
+  // Beats for saving: drop rows with no action, tidy fields.
+  function readBeatRowsForSave() {
+    var out = [];
+    readBeatRowsRaw().forEach(function(b) {
+      if (!b.action) return;
+      var beat = { label: b.label || ('beat ' + (out.length + 1)), duration_seconds: b.duration_seconds, action: b.action };
+      if (b.voiceover_text) beat.voiceover_text = b.voiceover_text;
+      out.push(beat);
+    });
+    return out;
+  }
+
+  function renderBeatRows(beats) {
+    var host = document.getElementById('sm-beat-rows');
+    if (!host) return;
+    host.innerHTML = (beats || []).map(beatRowHtml).join('');
+    updateBeatTotal();
+  }
+
+  function updateBeatTotal() {
+    var el = document.getElementById('sm-beat-total');
+    if (!el) return;
+    var sum = 0;
+    readBeatRowsRaw().forEach(function(b) { sum += b.duration_seconds || 0; });
+    el.textContent = sum > 0 ? 'beats total: ' + (Math.round(sum * 10) / 10) + 's (rescaled to fit the scene on save)' : '';
+  }
+
+  function wireBeatEditor(initialBeats) {
+    renderBeatRows(initialBeats);
+    var host = document.getElementById('sm-beat-rows');
+    var addBtn = document.getElementById('sm-beat-add');
+    if (addBtn) addBtn.addEventListener('click', function() {
+      var beats = readBeatRowsRaw();
+      beats.push({ label: '', duration_seconds: '', action: '', voiceover_text: '' });
+      renderBeatRows(beats);
+    });
+    if (!host) return;
+    host.addEventListener('click', function(e) {
+      var btn = e.target.closest ? e.target.closest('button') : null;
+      if (!btn) return;
+      var row = e.target.closest('.sm-beat-row');
+      var rows = Array.prototype.slice.call(host.querySelectorAll('.sm-beat-row'));
+      var i = rows.indexOf(row);
+      if (i < 0) return;
+      var beats = readBeatRowsRaw();
+      if (btn.className.indexOf('sbr-del') >= 0) beats.splice(i, 1);
+      else if (btn.className.indexOf('sbr-up') >= 0 && i > 0) { var t = beats[i - 1]; beats[i - 1] = beats[i]; beats[i] = t; }
+      else if (btn.className.indexOf('sbr-down') >= 0 && i < beats.length - 1) { var t2 = beats[i + 1]; beats[i + 1] = beats[i]; beats[i] = t2; }
+      else return;
+      renderBeatRows(beats);
+    });
+    host.addEventListener('input', function(e) {
+      if (e.target.className && e.target.className.indexOf('sbr-secs') >= 0) updateBeatTotal();
+    });
   }
 
   function renderLayers() {
@@ -2800,7 +2912,11 @@ export function getPreviewHtml(): string {
       '<div class="sm-field"><label>Purpose</label><textarea id="sm-purpose" placeholder="What this scene communicates">' + escHtml(b.purpose || '') + '</textarea></div>' +
       '<div class="sm-field"><label>Script (voiceover / on-screen)</label><textarea id="sm-script" placeholder="The narration or on-screen copy">' + escHtml(b.script || '') + '</textarea></div>' +
       '<div class="sm-field"><label>Visual notes (the WORLD: setting, layers, what persists)</label><textarea id="sm-visual" style="min-height:130px;" placeholder="Layout, motion, imagery, hierarchy">' + escHtml(b.visual_notes || '') + '</textarea></div>' +
-      '<div class="sm-field"><label>Beats (what HAPPENS, in order \\u2014 one per line: label | seconds | action | voiceover)</label><textarea id="sm-beats" style="min-height:110px;font-family:ui-monospace,monospace;font-size:12px;" placeholder="the approach | 4 | Cursor GLIDES toward the plus icon | It starts with one click.">' + escHtml(beatsToText(b.beats)) + '</textarea></div>' +
+      '<div class="sm-field"><label>Beats (what HAPPENS, in order \\u2014 one thought per beat)</label>' +
+        '<div class="sm-beat-head"><span>Label</span><span>Secs</span><span>Action</span><span>Voiceover</span><span></span></div>' +
+        '<div id="sm-beat-rows"></div>' +
+        '<div><button type="button" class="sm-btn" id="sm-beat-add">+ Add beat</button><span class="sm-beat-total" id="sm-beat-total"></span></div>' +
+      '</div>' +
       '<div class="sm-row2">' +
         '<div class="sm-field"><label>Duration (seconds)</label><input id="sm-duration" type="number" min="1" step="0.5" value="' + escAttr('' + (b.duration_seconds || '')) + '"></div>' +
         '<div class="sm-field"><label>B-roll search</label><input id="sm-broll" type="text" placeholder="e.g. team collaborating in office" value="' + escAttr(b.broll_query || '') + '"></div>' +
@@ -2813,6 +2929,7 @@ export function getPreviewHtml(): string {
         '<button class="sm-btn primary" id="sm-save">Save storyboard</button>' +
       '</div>';
     studioModalOpen(html);
+    wireBeatEditor(b.beats || []);
     document.getElementById('sm-cancel').addEventListener('click', studioModalClose);
     document.getElementById('sm-save').addEventListener('click', function() { saveStoryboardFromModal(sceneId); });
   }
@@ -2830,7 +2947,7 @@ export function getPreviewHtml(): string {
       broll_query: modalVal('sm-broll'),
       hero_image: modalVal('sm-hero'),
       components: modalVal('sm-components').split(',').map(function(c) { return c.trim(); }).filter(Boolean),
-      beats: textToBeats(modalVal('sm-beats')),
+      beats: readBeatRowsForSave(),
     };
     if (durRaw && !isNaN(parseFloat(durRaw))) bodyS.duration_seconds = parseFloat(durRaw);
     var st = document.getElementById('sm-edit-status');

@@ -95,7 +95,7 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
   var sceneCountGuide = opts.sceneCount
     ? `Exactly ${opts.sceneCount} scenes.`
     : (opts.format === "video"
-      ? "2-5 scenes. FEWER, LONGER scenes with beats beat many short ones: a scene is a WORLD, and you only cut when the world changes (see CUT vs BEAT). A typical 30-45s film is 3-4 scenes: an opening world, one or two long living middles (12-24s each, 3-6 beats), a closing CTA world. Do NOT emit a new scene for every idea -- advance ideas with beats inside a persistent scene."
+      ? "3-4 scenes for films up to 45s -- this is a HARD budget, not a suggestion (5 only for 60s+). A scene is a WORLD and you only cut when the world changes (see CUT vs BEAT). The shape of a 30-45s film: an opening world, one or two long living middles (12-24s each, 4-6 beats), a closing CTA world. Before you output, AUDIT your scene list: if two consecutive scenes share the same setting/canvas/metaphor, they are ONE world -- merge them into one scene and turn each of their moments into a beat. Emitting a new scene for every idea is the #1 storyboard failure."
       : "5-8 scenes (scale to content complexity).");
 
   var templateCatalogStr = formatTemplateCatalogForPrompt();
@@ -131,7 +131,7 @@ Each scene has visual notes (the visual direction) and a list of component types
 A CUT (new scene) is earned ONLY when the WORLD changes: a different location/metaphor, the arc's emotional pivot, or the intro/outro bookends. Everything else is a BEAT: the idea advances INSIDE a persistent world -- elements morph, move, re-light, and re-arrange, but the world survives. A video that cuts on every new thought reads as a slideshow; a film holds its world and lets the thoughts move through it.
 
 Beat authoring rules:
-- Any scene longer than ~8s MUST have "beats": 3-6 of them, each 2-8s${opts.beatGrid ? ` (author "duration_bars" instead of "duration_seconds": 1-2 bars each; one bar = ${opts.beatGrid.barSec.toFixed(2)}s)` : ""}. Short bookend scenes (intro/outro/breathing, <=8s) need no beats.
+- Any scene longer than ~8s MUST have "beats": aim for 4-6 (minimum 3), each 2-6s${opts.beatGrid ? ` (author "duration_bars" instead of "duration_seconds": 1-2 bars each; one bar = ${opts.beatGrid.barSec.toFixed(2)}s)` : ""}. Short bookend scenes (intro/outro/breathing, <=8s) need no beats. If a scene only has 2 beats, ask whether it is really a separate world or two beats belonging to a neighboring scene.
 - Beat durations must sum to the scene's duration_seconds.
 - Each beat's "action" describes a VISIBLE change with motion verbs -- something enters, transforms, or re-arranges. A beat where nothing visibly changes is a storyboard failure.
 - Each beat may carry its own short "voiceover_text" (~2.5 words/second of beat); the scene's voiceover_text is their concatenation.

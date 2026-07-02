@@ -662,10 +662,14 @@ export async function captureSingleFrame(options: {
           }
 
           // Surfaces: mid-sized filled containers (panels/cards/windows). Skip the
-          // full-bleed background layer and tiny chips.
+          // full-bleed background layer and tiny chips. Include panels whose fill
+          // is only PARTIALLY opaque (alpha 0.06-0.5): a ghost card with a 20%
+          // white wash is still a panel ATTEMPT and must be measured -- skipping
+          // it is how invisible cards slip the gate entirely.
           const isPanelSized = aFrac >= 0.01 && aFrac < 0.6 && r.width >= 120 && r.height >= 70;
           const notFullBleed = !(r.width >= vw * 0.9 && r.height >= vh * 0.9);
-          if (isPanelSized && notFullBleed && hasOwnFill && !richFill(cs)) {
+          const hasFillAttempt = alphaOf(cs.backgroundColor) >= 0.06 || richFill(cs);
+          if (isPanelSized && notFullBleed && hasFillAttempt && !richFill(cs)) {
             const bw = Math.max(
               parseFloat(cs.borderTopWidth) || 0, parseFloat(cs.borderRightWidth) || 0,
               parseFloat(cs.borderBottomWidth) || 0, parseFloat(cs.borderLeftWidth) || 0,
@@ -675,7 +679,22 @@ export async function captureSingleFrame(options: {
             surfaces.push({
               label: label.slice(0, 48), x: box.x, y: box.y, w: box.w, h: box.h,
               bg: cs.backgroundColor, borderWidth: bw, borderColor: cs.borderTopColor,
-              hasShadow: !!cs.boxShadow && cs.boxShadow !== "none",
+              // A shadow only counts as an elevation cue when it's VISIBLE:
+              // ghost panels declare box-shadows at 3-8% alpha that satisfy
+              // "has a shadow" while reading as nothing. Require real alpha.
+              hasShadow: (() => {
+                const bs = cs.boxShadow;
+                if (!bs || bs === "none") return false;
+                let maxA = 0;
+                const re = /rgba?\(([^)]+)\)/g;
+                let m: RegExpExecArray | null;
+                while ((m = re.exec(bs))) {
+                  const parts = m[1].split(",");
+                  const a = parts.length >= 4 ? parseFloat(parts[3]) : 1;
+                  if (a > maxA) maxA = a;
+                }
+                return maxA >= 0.12;
+              })(),
             });
           }
         }

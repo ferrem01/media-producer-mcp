@@ -2407,13 +2407,18 @@ async function runUnifiedPipeline(
             // duck_track/trigger_track by id) -- the old freeform shape here
             // meant auto-generated ducking silently never fired.
             // "voiceover" as trigger_track = duck against ALL voiceover clips.
+            // Ducking depth: 0.04 dove the music to near-silence on every VO
+            // line and back up in the gaps -- with per-scene VO clips that
+            // reads as the music (and the mix) "coming in and out". 0.35 keeps
+            // the bed audible under narration; a longer release smooths the
+            // recovery between clips.
             project.audio.ducking = {
               enabled: true,
               duck_track: "bgm",
               trigger_track: "voiceover",
-              ducked_volume: 0.04,
+              ducked_volume: 0.35,
               attack: 0.3,
-              release: 0.8,
+              release: 1.4,
             };
 
             console.log(`  Background music: added with ducking (0.12 -> 0.04 during voiceover)`);
