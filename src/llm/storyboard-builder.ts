@@ -17,6 +17,7 @@ import { getStorytellingGuide } from "./design-skills.js";
 import { formatTemplateCatalogForPrompt } from "./template-catalog.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, SceneBeat } from "../core/types.js";
 import { normalizeBeats, beatsVoiceover } from "../core/beats.js";
+import { parseLlmJson } from "./json-repair.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,
@@ -475,24 +476,5 @@ Prefer Speaker templates over regular templates when the speaker should be visib
 // ── Helpers ──
 
 function parseJsonResponse(raw: string): any {
-  var trimmed = raw.trim();
-
-  if (trimmed.startsWith('```')) {
-    var firstNewline = trimmed.indexOf('\n');
-    if (firstNewline > -1) trimmed = trimmed.substring(firstNewline + 1);
-    var lastFence = trimmed.lastIndexOf('```');
-    if (lastFence > -1) trimmed = trimmed.substring(0, lastFence);
-    trimmed = trimmed.trim();
-  }
-
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    var first = trimmed.indexOf('{');
-    var last = trimmed.lastIndexOf('}');
-    if (first >= 0 && last > first) {
-      return JSON.parse(trimmed.substring(first, last + 1));
-    }
-    throw new Error(`Invalid JSON from storyboard builder: ${trimmed.substring(0, 300)}`);
-  }
+  return parseLlmJson(raw, "storyboard builder");
 }
