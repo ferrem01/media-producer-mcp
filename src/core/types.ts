@@ -155,6 +155,9 @@ export interface AudioTrack {
   source: string;
   volume: number;
   start_time?: number;
+  /** Skip this many seconds of the source before it starts playing (e.g.
+   *  align a music track's first downbeat with video t=0). */
+  trim_start?: number;
   loop?: boolean;
   fade_in?: number;
   fade_out?: number;
@@ -172,6 +175,16 @@ export interface AudioDucking {
 export interface AudioConfig {
   tracks: AudioTrack[];
   ducking?: AudioDucking;
+  /** Beat grid of the background music (music-first timeline). Scene cuts are
+   *  quantized to this grid at storyboard time; stored for debugging and for
+   *  downstream beat-aware animation. */
+  beat_map?: {
+    bpm: number;
+    beat_sec: number;
+    bar_sec: number;
+    first_downbeat_sec: number;
+    confidence: number;
+  };
 }
 
 // ── Assets ──

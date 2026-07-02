@@ -46,6 +46,9 @@ export interface StoryboardBuilderOpts {
   hasSpeakerTrack?: boolean;
   referenceImages?: ReferenceImage[];
   treatment?: Treatment;
+  /** Beat grid of the pre-selected background music (music-first timeline).
+   *  When set, scene durations should be authored in whole bars. */
+  beatGrid?: { bpm: number; barSec: number };
 }
 
 export interface StoryboardComponent {
@@ -245,7 +248,14 @@ ${COMPOSITION_PLAYBOOK}
 
 ## Pacing & Narrative Arc (apply to the WHOLE sequence, every time)
 This applies to EVERY video regardless of how detailed the prompt is -- do not let every scene sit at the same energy. Order the scenes with a deliberate HIGH->low->HIGH rhythm and a clear emotional arc, and name the arc you're using.
-${PACING_PLAYBOOK}`;
+${PACING_PLAYBOOK}${opts.beatGrid ? `
+
+## MUSIC GRID (the film is cut to the beat -- author durations in BARS)
+The background music is already chosen: ${opts.beatGrid.bpm} BPM, so ONE BAR = ${opts.beatGrid.barSec.toFixed(2)}s.
+Professional edits cut on downbeats. Set every scene's duration_seconds to a WHOLE number of bars:
+${[2, 3, 4].map((b) => `- ${b} bars = ${(b * opts.beatGrid!.barSec).toFixed(2)}s`).join("\n")}
+Short punch scenes = 2 bars, standard scenes = 3-4 bars, hero/breathing scenes = 4-6 bars.
+Durations will be snapped to the bar grid after you submit -- authoring on-grid keeps your pacing intent intact.` : ""}`;
 
   // Inject brand asset info into the system prompt if available
   var brandAssetsSection = "";
