@@ -168,6 +168,39 @@ function buildAnthropicMessages(
   return { systemPrompt, apiMessages };
 }
 
+/** The Claude 5 family (sonnet/opus/haiku-5, fable, mythos) deprecates the
+ *  `temperature` param -- sending it is a hard 400. (claude-haiku-4-5 is the
+ *  4.5 model and still accepts it, hence the anchored family-then-5 match.) */
+function modelAcceptsTemperature(model: string): boolean {
+  return !/^claude-(sonnet|opus|haiku|fable|mythos)-5/.test(model);
+}
+
+/** POST to the Anthropic messages API. If the model rejects `temperature` as
+ *  deprecated (Claude 5 family and beyond), retry once without it -- so a new
+ *  model id set via MP_LLM_MODEL can never brick the pipeline on this param. */
+async function postAnthropic(apiKey: string, body: Record<string, unknown>): Promise<unknown> {
+  for (var attempt = 0; attempt < 2; attempt++) {
+    var response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+    });
+    if (response.ok) return response.json();
+    var errorText = await response.text();
+    if (attempt === 0 && response.status === 400 && body.temperature !== undefined
+        && /temperature.*deprecated/i.test(errorText)) {
+      delete body.temperature;
+      continue;
+    }
+    throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
+  }
+  throw new Error("Anthropic API error: retry loop exhausted");
+}
+
 async function callAnthropic(
   config: LLMConfig,
   messages: LLMMessage[],
@@ -189,26 +222,11 @@ async function callAnthropic(
     body.system = systemPrompt;
   }
 
-  if (options?.temperature !== undefined) {
+  if (options?.temperature !== undefined && modelAcceptsTemperature(config.model)) {
     body.temperature = options.temperature;
   }
 
-  var response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": config.apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    var errorText = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
-  }
-
-  var data = await response.json() as {
+  var data = await postAnthropic(config.apiKey, body) as {
     content: Array<{ type: string; text?: string }>;
   };
 
@@ -247,26 +265,11 @@ async function callAnthropicAgentic(
     body.system = systemPrompt;
   }
 
-  if (options?.temperature !== undefined) {
+  if (options?.temperature !== undefined && modelAcceptsTemperature(config.model)) {
     body.temperature = options.temperature;
   }
 
-  var response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": config.apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    var errorText = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
-  }
-
-  var data = await response.json() as {
+  var data = await postAnthropic(config.apiKey, body) as {
     content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }>;
     stop_reason: string;
   };
