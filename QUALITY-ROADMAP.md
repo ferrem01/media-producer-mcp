@@ -147,6 +147,21 @@ above. Current wiring (`src/config.ts`):
 
 ### Hygiene / correctness backlog
 - [x] Ducking schema bug (silently dead in auto pipeline) — fixed.
+- [x] **Critique enforcement gaps** (found via the first full-stack film: shipped
+      scenes had illegible + off-canvas text): (1) the hard-floor template swap
+      was bypassed for defect-carrying scenes — the −50 defect penalty made their
+      effective score negative, `bestScore > 0` never matched, and the pipeline
+      silently shipped the LAST attempt; (2) off-canvas text had NO deterministic
+      gate — the contrast probe literally skipped off-viewport elements, leaving
+      truncation to the vision critic (which reads crops as art direction);
+      (3) permanently dim text (opacity 0.5–0.85) was never measured — the
+      mid-fade skip hid it at every sample. All three fixed: effective-score
+      tracking from −∞, clipped-text gate (canvas edge + overflow-hidden
+      ancestors, partial clips only), and alpha-composited contrast for dim text.
+- [ ] Remaining critique gaps (not yet gated deterministically): text visible
+      only outside the 3 sampled timestamps; text rendered inside canvas/WebGL;
+      per-scene revision budget is still 2 — consider a cheap gates-only extra
+      retry when only deterministic defects remain.
 - [ ] Whole-video revision (`runVideoRevisionPipeline`) rebuilds the storyboard from
       scratch and **drops the treatment** → revisions drift. Make revision a diff:
       approved fields immutable unless explicitly reopened; re-attach treatment.

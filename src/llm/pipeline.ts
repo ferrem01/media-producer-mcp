@@ -984,10 +984,14 @@ async function critiqueAndRetryScene(opts: {
   let currentDraft = opts.draft;
   let lastCritique: CritiqueResult | undefined;
 
-  // Track best attempt by score
+  // Track best attempt by EFFECTIVE score (visual score minus runtime/defect
+  // penalties). Starts at -Infinity so even all-defective runs record a best --
+  // with the old init of 0, a run where every attempt failed the gates
+  // (effective score negative) recorded nothing, silently bypassed the hard
+  // floor below, and shipped the LAST attempt with its defects intact.
   let bestScene = opts.scene;
   let bestCustomSources = opts.customSources;
-  let bestScore = 0;
+  let bestScore = -Infinity;
   let bestCritique: CritiqueResult | undefined;
   // Surgical-patch improvement guard: the score at which we last patched (-1 = the
   // last fix was a full regen / none yet). Used to escalate to a full regen if a
@@ -1193,7 +1197,13 @@ async function critiqueAndRetryScene(opts: {
             atTimes: [dur * 0.35, dur * 0.6, dur * 0.85],
           });
           for (const d of contrastDefects) {
-            if (d.reason === "no-backing") {
+            if (d.reason === "clipped") {
+              correctness.defects.push({
+                type: "off_canvas",
+                detail: `Text "${d.text}" is truncated -- ${Math.round((d.clippedFraction ?? 0) * 100)}% of it is cut off by the canvas edge or an overflow-hidden container. Every text run must be FULLY inside its container and the frame: shrink the font, wrap the line, reposition the block, or widen the container.`,
+              });
+              critiqueResult.issues.push(`Clipped text "${d.text}" (${Math.round((d.clippedFraction ?? 0) * 100)}% cut off)`);
+            } else if (d.reason === "no-backing") {
               correctness.defects.push({
                 type: "illegible",
                 detail: `Text "${d.text}" sits directly over moving video with NO legibility treatment. The footage brightness changes every frame, so part of the text WILL wash out. Add a backing that travels with the text: (A) an anchored scrim sized to the text block, (B) a frosted/solid caption panel behind it, or (C) darken/grade the footage during this beat -- plus white/near-white heavy text with a soft text-shadow.`,
@@ -1456,10 +1466,13 @@ Output valid JSON only. No markdown fences, no commentary.`;
     }
   }
 
-  // Fix 2: Hard floor -- if best score < 6 after all retries, do a full
-  // template swap: force a single custom component with explicit "avoid these
-  // mistakes" instructions. This prevents shipping garbage scenes.
-  if (bestScore > 0 && bestScore < 6 && opts.maxRetries > 0) {
+  // Fix 2: Hard floor -- if the best EFFECTIVE score is < 6 after all retries
+  // (low visual score, runtime error, or blocking defects like illegible /
+  // clipped text), do a full template swap: force a single custom component
+  // with explicit "avoid these mistakes" instructions. This prevents shipping
+  // garbage scenes. Defect-penalized attempts have NEGATIVE effective scores
+  // and need this net the most.
+  if (bestScore < 6 && bestScore > -Infinity && opts.maxRetries > 0) {
     console.log(`  Hard floor triggered: best score ${bestScore} < 6, attempting full template swap`);
     opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_template_swap`);
     try {
@@ -1507,8 +1520,10 @@ Output valid JSON only. No markdown fences, no commentary.`;
     }
   }
 
-  // Return the best-scoring attempt, not the last one
-  if (bestScore > 0 && bestScore >= (lastCritique?.score ?? 0)) {
+  // Return the best-scoring attempt, not the last one. bestScore is the
+  // EFFECTIVE score (penalized for runtime errors and blocking defects), so a
+  // gate-clean attempt always beats a prettier-but-defective later one.
+  if (bestScore > -Infinity) {
     return { scene: bestScene, customSources: bestCustomSources, critiqueResult: bestCritique };
   }
   return { scene: currentScene, customSources: currentCustomSources, critiqueResult: lastCritique };

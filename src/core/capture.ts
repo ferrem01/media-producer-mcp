@@ -276,6 +276,13 @@ export interface TextElementMetric {
   /** True if a meaningful backing (scrim/panel/opaque bg) sits between the text
    *  and the footage -- the legibility "treatment". Only meaningful when overVideo. */
   hasBacking: boolean;
+  /** Effective opacity (element and ancestors multiplied). Text between 0.5 and
+   *  0.85 is reported (dim-but-visible) so contrast can composite it; below 0.5
+   *  is skipped as mid-fade/decorative. */
+  opacity: number;
+  /** Fraction (0-1) of the text's area cut off by the canvas edge or an
+   *  overflow-hidden ancestor. Nonzero = truncated text ("xt", half a headline). */
+  clippedFraction: number;
 }
 
 /** A candidate "surface" (card/window/panel) measured for separation from the
@@ -513,10 +520,33 @@ export async function captureSingleFrame(options: {
           if (cs.visibility === "hidden" || cs.display === "none") return;
           const fs = parseFloat(cs.fontSize) || 0;
           if (fs < 14) return;
-          if (effectiveOpacity(el) < 0.85) return; // skip mid-fade text
+          // Skip mid-fade text (opacity gate) -- but keep DIM text (0.5-0.85):
+          // permanently low-opacity captions are a low-contrast classic, and
+          // skipping them made them invisible to the gate at every sample. The
+          // opacity is reported so contrast is measured on the composited color.
+          const elOpacity = effectiveOpacity(el);
+          if (elOpacity < 0.5) return;
           const r = el.getBoundingClientRect();
           if (r.width < 8 || r.height < 6) return;
-          if (r.x > vw || r.y > vh || r.x + r.width < 0 || r.y + r.height < 0) return; // off-canvas
+          if (r.x >= vw || r.y >= vh || r.x + r.width <= 0 || r.y + r.height <= 0) return; // fully off-canvas: never visible
+          // Clipped-text measurement: how much of this text run is cut off by
+          // the canvas or by an overflow-hidden ancestor (component containers
+          // are overflow:hidden, so sidebar labels clipped to "xt" land here).
+          let clipLeft = 0, clipTop = 0, clipRight = vw, clipBottom = vh;
+          for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+            const acs = getComputedStyle(a);
+            if (/(hidden|clip|scroll|auto)/.test(acs.overflow + acs.overflowX + acs.overflowY)) {
+              const ar = a.getBoundingClientRect();
+              clipLeft = Math.max(clipLeft, ar.left);
+              clipTop = Math.max(clipTop, ar.top);
+              clipRight = Math.min(clipRight, ar.right);
+              clipBottom = Math.min(clipBottom, ar.bottom);
+            }
+          }
+          const visW = Math.max(0, Math.min(r.right, clipRight) - Math.max(r.left, clipLeft));
+          const visH = Math.max(0, Math.min(r.bottom, clipBottom) - Math.max(r.top, clipTop));
+          const area = r.width * r.height;
+          const clippedFraction = area > 0 ? 1 - (visW * visH) / area : 0;
           const x = Math.max(0, Math.round(r.x)), y = Math.max(0, Math.round(r.y));
           const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
           const covers = (e: Element) => {
@@ -550,6 +580,7 @@ export async function captureSingleFrame(options: {
             text: txt.slice(0, 60), color: cs.color, fontSize: fs,
             x, y, w: Math.round(Math.min(r.width, vw - x)), h: Math.round(Math.min(r.height, vh - y)),
             overVideo, hasBacking,
+            opacity: elOpacity, clippedFraction: Math.round(clippedFraction * 100) / 100,
           });
         });
         return out;
