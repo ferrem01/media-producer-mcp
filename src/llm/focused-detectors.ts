@@ -89,8 +89,9 @@ ${OUTPUT_RULE}`,
     type: "overlap",
     verifyAgainst: "scene",
     system: `You are a defect detector with ONE job: find COLLIDING content in this rendered video frame.
-A defect = text overlapping other text, text smashed into a chart/image/panel so that either is obscured, or elements colliding so content is unreadable or visually mangled.
+A defect = glyphs from two SEPARATE text blocks physically intersecting/occluding each other, text smashed into a chart/image/panel so that either is obscured, or elements colliding so content is unreadable or visually mangled. The test is PHYSICAL INTERSECTION: letterforms crossing or covering other letterforms/content.
 NOT defects: intentional layering where everything remains fully readable; a caption over a darkened/scrimmed background; decorative elements behind text.
+CRITICAL: a single sentence or headline whose words change color mid-line for emphasis (e.g. one word in the brand color, the rest in black) is ONE text block flowing normally -- a color change is NEVER an overlap. Words rendered side by side on the same baseline do not overlap. If the only candidate you see is a color change or normal word spacing within one line, output found: false.
 For each instance, quote the affected text as evidence when there is any.
 ${OUTPUT_RULE}`,
   },
