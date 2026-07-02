@@ -23,11 +23,13 @@ export interface AudioTrackInput {
 }
 
 export interface DuckingOptions {
-  duckTrack: string;     // path of track to duck (usually music)
-  triggerTrack: string;  // path of track that triggers ducking (usually voiceover)
-  duckedVolume: number;  // volume when ducked (0.08-0.15)
-  attack: number;        // seconds to duck down
-  release: number;       // seconds to recover
+  duckTrack: string;       // path of track to duck (usually music)
+  /** Paths of tracks that trigger ducking. Voiceover is usually one clip per
+   *  scene, so ducking must cover EVERY clip's window, not just the first. */
+  triggerTracks: string[];
+  duckedVolume: number;    // volume when ducked (0.08-0.15)
+  attack: number;          // seconds to duck down
+  release: number;         // seconds to recover
 }
 
 export interface MixOptions {
@@ -102,67 +104,79 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
   }
 
   // If ducking is enabled, apply volume-envelope ducking
-  // Instead of sidechain compress (unreliable), we detect the trigger track
-  // duration and apply a time-based volume curve to the duck track.
+  // Instead of sidechain compress (unreliable), we detect each trigger track's
+  // window and apply a time-based volume curve to the duck track covering ALL
+  // trigger windows (voiceover is one clip per scene, so there are many).
   if (opts.ducking) {
     const duckIdx = opts.tracks.findIndex(t => t.path === opts.ducking!.duckTrack);
-    const triggerIdx = opts.tracks.findIndex(t => t.path === opts.ducking!.triggerTrack);
+    const triggerIdxs = opts.ducking.triggerTracks
+      .map(p => opts.tracks.findIndex(t => t.path === p))
+      .filter(i => i >= 0);
 
-    console.log("  Ducking: duckIdx=" + duckIdx + " triggerIdx=" + triggerIdx);
+    console.log("  Ducking: duckIdx=" + duckIdx + " triggers=" + triggerIdxs.length);
 
-    if (duckIdx >= 0 && triggerIdx >= 0) {
+    if (duckIdx >= 0 && triggerIdxs.length > 0) {
       const duckLabel = `track${duckIdx}`;
-      const triggerTrack = opts.tracks[triggerIdx];
-
-      // Get trigger track duration by probing the file
-      let triggerDuration = opts.totalDuration;
-      try {
-        const probeResult = await execFileAsync("ffprobe", [
-          "-v", "quiet", "-show_entries", "format=duration",
-          "-of", "csv=p=0", triggerTrack.path
-        ]);
-        const parsed = parseFloat(probeResult.stdout.trim());
-        if (!isNaN(parsed) && parsed > 0) triggerDuration = parsed;
-      } catch { /* use total duration as fallback */ }
-
-      const attack = opts.ducking.attack || 0.3;
-      const release = opts.ducking.release || 1.8;
       const duckedVol = opts.ducking.duckedVolume;
-      const startTime = triggerTrack.startTime || 0;
-      const endTime = startTime + triggerDuration;
 
-      // Volume envelope: ducked during voiceover, normal otherwise
-      // Use afade-style ramps at boundaries
-      const duckStart = Math.max(0, startTime);
-      const duckEnd = Math.min(endTime, opts.totalDuration);
-      const rampDown = duckStart; // start ramping down
-      const rampUp = duckEnd;     // start ramping up
+      // Compute each trigger's [start, end] window by probing its duration
+      const windows: Array<{ start: number; end: number }> = [];
+      for (const ti of triggerIdxs) {
+        const triggerTrack = opts.tracks[ti];
+        let triggerDuration = opts.totalDuration;
+        try {
+          const probeResult = await execFileAsync("ffprobe", [
+            "-v", "quiet", "-show_entries", "format=duration",
+            "-of", "csv=p=0", triggerTrack.path
+          ]);
+          const parsed = parseFloat(probeResult.stdout.trim());
+          if (!isNaN(parsed) && parsed > 0) triggerDuration = parsed;
+        } catch { /* use total duration as fallback */ }
 
-      // Replace the duck track's filter to include volume envelope
-      // Remove the existing filter for this track and rebuild with ducking
-      const origFilter = filterParts.find(f => f.includes("[" + duckLabel + "]"));
-      if (origFilter) {
-        const idx = filterParts.indexOf(origFilter);
-        // Add volume envelope: low during voiceover, normal before/after
-        // Using volume filter with enable expression
-        const envelopeFilter = origFilter.replace(
-          "[" + duckLabel + "]",
-          "[" + duckLabel + "_pre]"
-        );
-        filterParts[idx] = envelopeFilter;
-
-        // Apply ducking envelope: volume drops to duckedVol during trigger, with smooth ramps
-        filterParts.push(
-          "[" + duckLabel + "_pre]" +
-          "volume='" + duckedVol + "':enable='between(t," + duckStart.toFixed(2) + "," + duckEnd.toFixed(2) + ")'," +
-          "volume='1':enable='not(between(t," + duckStart.toFixed(2) + "," + duckEnd.toFixed(2) + "))'" +
-          "[" + duckLabel + "]"
-        );
+        const start = Math.max(0, triggerTrack.startTime || 0);
+        const end = Math.min(start + triggerDuration, opts.totalDuration);
+        if (end > start) windows.push({ start, end });
       }
 
-      console.log("  Ducking: vol=" + duckedVol + " during " + duckStart.toFixed(1) + "s-" + duckEnd.toFixed(1) + "s");
+      // Merge overlapping/adjacent windows so the enable expression stays small
+      windows.sort((a, b) => a.start - b.start);
+      const merged: Array<{ start: number; end: number }> = [];
+      for (const w of windows) {
+        const last = merged[merged.length - 1];
+        if (last && w.start <= last.end + 0.25) last.end = Math.max(last.end, w.end);
+        else merged.push({ ...w });
+      }
+
+      if (merged.length > 0) {
+        // In ffmpeg enable expressions, `+` acts as OR (any nonzero term enables)
+        const enableExpr = merged
+          .map(w => "between(t," + w.start.toFixed(2) + "," + w.end.toFixed(2) + ")")
+          .join("+");
+
+        // Replace the duck track's filter to include the volume envelope
+        const origFilter = filterParts.find(f => f.includes("[" + duckLabel + "]"));
+        if (origFilter) {
+          const idx = filterParts.indexOf(origFilter);
+          const envelopeFilter = origFilter.replace(
+            "[" + duckLabel + "]",
+            "[" + duckLabel + "_pre]"
+          );
+          filterParts[idx] = envelopeFilter;
+
+          filterParts.push(
+            "[" + duckLabel + "_pre]" +
+            "volume='" + duckedVol + "':enable='" + enableExpr + "'" +
+            "[" + duckLabel + "]"
+          );
+        }
+
+        console.log(
+          "  Ducking: vol=" + duckedVol + " during " +
+          merged.map(w => w.start.toFixed(1) + "s-" + w.end.toFixed(1) + "s").join(", ")
+        );
+      }
     } else {
-      console.warn("  Ducking: track index not found (duck=" + duckIdx + " trigger=" + triggerIdx + ")");
+      console.warn("  Ducking: track not found (duck=" + duckIdx + " triggers=" + triggerIdxs.length + ")");
     }
   }
 

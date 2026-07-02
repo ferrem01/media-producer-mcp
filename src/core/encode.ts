@@ -122,6 +122,46 @@ export async function concatSegments(segments: string[], outputPath: string): Pr
 }
 
 /**
+ * Apply a film-level color grade to a finished video. One consistent pass over
+ * the whole film -- per-scene HTML can't provide cross-scene grade consistency.
+ *
+ * The "cinematic" preset is deliberately subtle: a soft S-curve with gently
+ * lifted blacks and protected highlights, a small saturation/contrast lift,
+ * and fine temporal grain. It should read as "finished", never as a filter.
+ */
+export async function applyFilmGrade(
+  inputPath: string,
+  outputPath: string,
+  preset: "cinematic" = "cinematic",
+): Promise<string> {
+  const GRADES: Record<string, string> = {
+    cinematic: [
+      "curves=all='0/0.012 0.28/0.268 0.72/0.735 1/0.995'",
+      "eq=saturation=1.05:contrast=1.02",
+      "noise=alls=3:allf=t",
+    ].join(","),
+  };
+  const vf = GRADES[preset] || GRADES.cinematic;
+
+  const args = [
+    "-y",
+    "-i", inputPath,
+    "-vf", vf,
+    ...WEB_ENCODE_ARGS,
+    "-an",
+    outputPath,
+  ];
+
+  try {
+    await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
+    return outputPath;
+  } catch (error: unknown) {
+    const stderr = (error as { stderr?: string }).stderr || "";
+    throw new Error(`ffmpeg film grade failed: ${stderr.substring(0, 500)}`);
+  }
+}
+
+/**
  * Simple concat without transitions.
  */
 async function concatSimple(scenes: string[], outputPath: string): Promise<string> {

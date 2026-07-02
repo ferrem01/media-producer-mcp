@@ -34,7 +34,7 @@ async function assembleSceneOrSequence(options: {
   return assembleSceneAuto({ ...options, componentLibDir: config.componentLibDir });
 }
 import { captureScene, captureSingleFrame } from "./capture.js";
-import { encodeScene, encodeGif, concatSegments } from "./encode.js";
+import { encodeScene, encodeGif, concatSegments, applyFilmGrade } from "./encode.js";
 import { exportPdf } from "./pdf-export.js";
 import { renderTransition, extractFirstFrame, extractLastFrame, getTransitionScript, loadGsapMinimal } from "./transitions.js";
 // Critique now runs during generate, not render
@@ -44,6 +44,40 @@ import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
 import { buildSpeakerBase, compositeContentOverlay } from "./speaker-track.js";
 import { projectAssetsDir } from "../persistence/paths.js";
+
+/**
+ * Resolve a project's ducking config into mixer options.
+ *
+ * `trigger_track` may be a single track id, or the sentinel "voiceover" to
+ * duck against ALL voiceover tracks (the auto pipeline generates one VO clip
+ * per scene, so ducking must cover every window). As a safety net, if the
+ * named trigger id doesn't exist but voiceover tracks do, we duck against
+ * those rather than silently skipping.
+ */
+function resolveDucking(project: Project): Parameters<typeof mixAudio>[0]["ducking"] {
+  const d = project.audio?.ducking;
+  if (!d?.enabled || !project.audio) return undefined;
+
+  const duckTrackObj = project.audio.tracks.find((t) => t.id === d.duck_track);
+  let triggers = project.audio.tracks.filter((t) => t.id === d.trigger_track);
+  if (triggers.length === 0) {
+    triggers = project.audio.tracks.filter((t) => t.type === "voiceover");
+  }
+
+  if (!duckTrackObj || triggers.length === 0) {
+    console.warn("  Ducking: track IDs not found, skipping ducking");
+    return undefined;
+  }
+
+  console.log(`  Ducking: ${duckTrackObj.id} ducked by ${triggers.map((t) => t.id).join(", ")}`);
+  return {
+    duckTrack: duckTrackObj.source,
+    triggerTracks: triggers.map((t) => t.source),
+    duckedVolume: d.ducked_volume,
+    attack: d.attack ?? 0.3,
+    release: d.release ?? 0.5,
+  };
+}
 
 export interface RenderOptions {
   /** The project to render */
@@ -163,20 +197,7 @@ async function renderAudioOnly(
       loop: t.loop,
     }));
 
-    let duckingOpts: Parameters<typeof mixAudio>[0]["ducking"] = undefined;
-    if (project.audio.ducking?.enabled) {
-      const duckTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.duck_track);
-      const triggerTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.trigger_track);
-      if (duckTrackObj && triggerTrackObj) {
-        duckingOpts = {
-          duckTrack: duckTrackObj.source,
-          triggerTrack: triggerTrackObj.source,
-          duckedVolume: project.audio.ducking.ducked_volume,
-          attack: project.audio.ducking.attack ?? 0.3,
-          release: project.audio.ducking.release ?? 0.5,
-        };
-      }
-    }
+    const duckingOpts = resolveDucking(project);
 
     await mixAudio({
       videoPath: outputPath,
@@ -662,20 +683,7 @@ async function renderVideoWithSpeakerTrack(
       loop: t.loop,
     }));
 
-    let duckingOpts: Parameters<typeof mixAudio>[0]["ducking"] = undefined;
-    if (project.audio.ducking?.enabled) {
-      const duckTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.duck_track);
-      const triggerTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.trigger_track);
-      if (duckTrackObj && triggerTrackObj) {
-        duckingOpts = {
-          duckTrack: duckTrackObj.source,
-          triggerTrack: triggerTrackObj.source,
-          duckedVolume: project.audio.ducking.ducked_volume,
-          attack: project.audio.ducking.attack ?? 0.3,
-          release: project.audio.ducking.release ?? 0.5,
-        };
-      }
-    }
+    const duckingOpts = resolveDucking(project);
 
     await mixAudio({
       videoPath: outputPath,
@@ -964,6 +972,20 @@ async function renderVideo(
     await fs.copyFile(sceneMp4s[0], outputPath);
   }
 
+  // ── Film grade: one consistent color pass over the whole film ──
+  // Runs on the silent concat (before audio mux, which stream-copies video).
+  if (project.film_grade && project.film_grade !== "none") {
+    console.log(`\n  Film grade: applying "${project.film_grade}" pass...`);
+    const gradedPath = outputPath.replace(/\.mp4$/, "-graded.mp4");
+    try {
+      await applyFilmGrade(outputPath, gradedPath, project.film_grade);
+      await fs.rename(gradedPath, outputPath);
+    } catch (e: any) {
+      console.warn(`  Film grade failed (non-fatal, using ungraded video): ${e.message}`);
+      await fs.rm(gradedPath, { force: true }).catch(() => {});
+    }
+  }
+
   // ── Audio mixing ──
   const totalDuration = project.scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
 
@@ -982,23 +1004,7 @@ async function renderVideo(
     }));
 
     // Resolve ducking track IDs to file paths (mixer matches by path)
-    let duckingOpts: Parameters<typeof mixAudio>[0]["ducking"] = undefined;
-    if (project.audio.ducking?.enabled) {
-      const duckTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.duck_track);
-      const triggerTrackObj = project.audio.tracks.find((t) => t.id === project.audio!.ducking!.trigger_track);
-      if (duckTrackObj && triggerTrackObj) {
-        duckingOpts = {
-          duckTrack: duckTrackObj.source,
-          triggerTrack: triggerTrackObj.source,
-          duckedVolume: project.audio.ducking.ducked_volume,
-          attack: project.audio.ducking.attack ?? 0.3,
-          release: project.audio.ducking.release ?? 0.5,
-        };
-        console.log("  Ducking: " + duckTrackObj.id + " ducked by " + triggerTrackObj.id);
-      } else {
-        console.warn("  Ducking: track IDs not found, skipping ducking");
-      }
-    }
+    const duckingOpts = resolveDucking(project);
 
     await mixAudio({
       videoPath: outputPath,

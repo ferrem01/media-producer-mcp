@@ -147,11 +147,15 @@ async function runRender(
     // we only lower the framerate. (Production keeps the full canvas fps.)
     // Resolution downscaling is handled separately via deviceScaleFactor.
     if (options?.quality === "preview"
-        && (projectForRender.format === "video" || projectForRender.format === "slideshow")
-        && projectForRender.canvas?.fps > config.previewQuality.fps) {
-      const fullFps = projectForRender.canvas.fps;
-      projectForRender.canvas.fps = config.previewQuality.fps;
-      console.log(`  Preview quality: ${projectForRender.canvas.fps}fps (was ${fullFps}fps)`);
+        && (projectForRender.format === "video" || projectForRender.format === "slideshow")) {
+      if (projectForRender.canvas?.fps > config.previewQuality.fps) {
+        const fullFps = projectForRender.canvas.fps;
+        projectForRender.canvas.fps = config.previewQuality.fps;
+        console.log(`  Preview quality: ${projectForRender.canvas.fps}fps (was ${fullFps}fps)`);
+      }
+      // Skip the film-grade re-encode in previews -- it costs a full-video
+      // encode pass and previews are about iteration speed, not finish.
+      projectForRender.film_grade = "none";
     }
 
     const renderOpts: RenderOptions = {
