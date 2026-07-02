@@ -26,12 +26,19 @@ const execFileAsync = promisify(execFile);
 export interface ContrastDefect {
   text: string;
   fontSize: number;
-  contrast: number;   // measured ratio, e.g. 1.3
+  contrast: number;   // measured ratio, e.g. 1.3 (0 for no-backing/clipped)
   threshold: number;  // ratio it needed to pass, e.g. 4.5
-  /** Why it failed: low measured contrast, or (for text over video) no
-   *  legibility treatment (scrim/panel) behind it. */
-  reason: "low-contrast" | "no-backing";
+  /** Why it failed: low measured contrast, (for text over video) no legibility
+   *  treatment behind it, or the text run is truncated by the canvas edge /
+   *  an overflow-hidden container. */
+  reason: "low-contrast" | "no-backing" | "clipped";
+  /** For reason "clipped": fraction (0-1) of the text area that is cut off. */
+  clippedFraction?: number;
 }
+
+/** Text cut off by more than this fraction of its area is a defect. Small
+ *  values are rounding/bleed; half-missing headlines and "xt" labels are not. */
+const CLIP_FRACTION = 0.08;
 
 function srgbToLinear(c: number): number {
   const s = c / 255;
@@ -132,6 +139,26 @@ export async function measureTextContrast(opts: {
         if (!tc) continue;
         const threshold = t.fontSize >= 24 ? 3.0 : 4.5; // large vs body text
 
+        // Truncated text: cut off by the canvas edge or an overflow-hidden
+        // container ("xt", half a headline). Deterministic -- previously this
+        // was left to the vision critic, which reads crops as art direction.
+        // Only fully-opaque text counts (dim oversized backdrop words are a
+        // deliberate design device), and only PARTIAL clips: text that is
+        // essentially fully hidden (>= 98%, e.g. off-stage carousel items in an
+        // overflow-hidden container) is not a visible artifact.
+        const clipped = t.clippedFraction ?? 0;
+        if (clipped >= CLIP_FRACTION && clipped < 0.98 && (t.opacity ?? 1) >= 0.85) {
+          const prev = byText.get(t.text);
+          if (!prev || (prev.reason === "clipped" && clipped > (prev.clippedFraction ?? 0))) {
+            byText.set(t.text, {
+              text: t.text, fontSize: Math.round(t.fontSize),
+              contrast: 0, threshold, reason: "clipped",
+              clippedFraction: clipped,
+            });
+          }
+          continue;
+        }
+
         // Text-over-video without a backing: the footage moves, so static-frame
         // contrast can't guarantee legibility on every frame -- require the
         // protection treatment (scrim/panel) regardless of how this frame samples.
@@ -148,11 +175,18 @@ export async function measureTextContrast(opts: {
         // a caption is illegible if a meaningful fraction of its run is low-contrast.
         const cells = await sampleRegionGrid(backdropPath, t.x, t.y, t.w, t.h, 12, 3);
         if (!cells || cells.length === 0) continue;
-        const tl = relLuminance(tc.r, tc.g, tc.b);
+        // Dim text (opacity 0.5-0.85) renders alpha-composited over the
+        // backdrop, so measure the contrast of the COMPOSITED color per cell --
+        // a white caption at opacity 0.6 over a mid-gray bloom is exactly the
+        // low-contrast case that skipping dim text used to hide.
+        const op = Math.min(1, Math.max(0, t.opacity ?? 1));
         let worst = Infinity;
         let below = 0;
         for (const cell of cells) {
-          const ratio = contrastRatio(tl, relLuminance(cell.r, cell.g, cell.b));
+          const er = tc.r * op + cell.r * (1 - op);
+          const eg = tc.g * op + cell.g * (1 - op);
+          const eb = tc.b * op + cell.b * (1 - op);
+          const ratio = contrastRatio(relLuminance(er, eg, eb), relLuminance(cell.r, cell.g, cell.b));
           if (ratio < worst) worst = ratio;
           if (ratio < threshold) below++;
         }
