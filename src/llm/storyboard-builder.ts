@@ -7,7 +7,7 @@
  * and builds the scene HTML.
  */
 
-import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
+import { callLLMAgentic, type LLMConfig, type LLMContentPart, type LLMMessage, type LLMTool } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import type { Treatment } from "./creative-director.js";
 import { SCENE_STORYBOARD_DESIGN_RULES } from "./design-rules.js";
@@ -17,7 +17,6 @@ import { getStorytellingGuide } from "./design-skills.js";
 import { formatTemplateCatalogForPrompt } from "./template-catalog.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, SceneBeat } from "../core/types.js";
 import { normalizeBeats, beatsVoiceover } from "../core/beats.js";
-import { parseLlmJson } from "./json-repair.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,
@@ -32,6 +31,63 @@ function isLightBrand(brandKit: BrandKit): boolean {
   var b = parseInt(hex.substring(4, 6), 16);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
 }
+
+// ── Tool Definitions ──
+//
+// Incremental storyboard authoring: NEVER ask for the whole film's JSON in one
+// response (the failure class that truncated a beats-heavy storyboard mid-scene
+// even at 16384 tokens). Each add_scene call only needs to hold ONE scene, so
+// no single turn's size scales with the number of scenes or beats in the film.
+
+const BEAT_TOOL_SCHEMA = {
+  type: "object",
+  properties: {
+    label: { type: "string", description: "Short name for the beat, e.g. 'the approach'" },
+    duration_seconds: { type: "number", description: "Beat length in seconds (omit if using duration_bars)" },
+    duration_bars: { type: "number", description: "Beat length in music bars (only when a music grid is in effect)" },
+    action: { type: "string", description: "What HAPPENS during this beat -- motion verbs, what transforms" },
+    voiceover_text: { type: "string", description: "Narration for this beat (optional)" },
+  },
+  required: ["action"],
+};
+
+const SCENE_TOOL_SCHEMA = {
+  type: "object",
+  properties: {
+    label: { type: "string" },
+    duration_seconds: { type: "number" },
+    purpose: { type: "string", description: "What this scene communicates -- its job in the story" },
+    visual_notes: { type: "string", description: "The WORLD: setting, layers, what persists (5+ sentences, motion verbs, BG/MG/FG)" },
+    components: { type: "array", items: { type: "string" }, description: "Library component types from the catalog" },
+    beats: { type: "array", items: BEAT_TOOL_SCHEMA, description: "The scene's internal beat timeline (required for scenes longer than ~8s)" },
+    transition_in: {
+      type: "object",
+      properties: { type: { type: "string" }, duration_seconds: { type: "number" } },
+      description: "How this scene transitions in from the previous one",
+    },
+    voiceover_text: { type: "string", description: "Scene narration (concatenation of beat narration when the scene has beats)" },
+    broll_query: { type: "string", description: "Cinematic stock-footage search phrase (mutually exclusive with hero_image)" },
+    hero_image: { type: "string", description: "AI-generated still image prompt (mutually exclusive with broll_query)" },
+  },
+  required: ["label", "duration_seconds", "purpose", "visual_notes"],
+};
+
+const TOOLS: LLMTool[] = [
+  {
+    name: "add_scene",
+    description: "Add ONE scene to the storyboard, in order. Call this once per scene -- never batch multiple scenes into one call.",
+    input_schema: SCENE_TOOL_SCHEMA,
+  },
+  {
+    name: "finish_storyboard",
+    description: "Call this once every scene has been added via add_scene. Supplies the overall film title.",
+    input_schema: {
+      type: "object",
+      properties: { name: { type: "string", description: "The project/film title" } },
+      required: ["name"],
+    },
+  },
+];
 
 // ── Types ──
 
@@ -107,11 +163,7 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
 
 You think in visual STORIES, not slide decks. Every scene should feel like something the viewer wants to watch, not endure.
 
-${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n` : ""}Every scene follows the same format:
-
-## Scene Format
-
-Each scene has visual notes (the visual direction) and a list of component types from the catalog.
+${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n` : ""}You build the storyboard by calling the add_scene tool ONCE PER SCENE (in order), then finish_storyboard when every scene is added. Never describe the storyboard in prose -- use the tools. Each scene has visual notes (the visual direction) and a list of component types from the catalog. Below is the SHAPE of one add_scene call's parameters:
 
 {
   "label": "Scene 1 - Connector Discovery",
@@ -197,41 +249,47 @@ labeled steps (elements morph/move rather than disappear). Set transition_in to
 
 ${catalogStr}
 
-## Output Format (valid JSON, no markdown fences)
+## How You Submit The Storyboard
 
-{
-  "name": "Project Title",
-  "scenes": [
-    {
-      "label": "Scene 1 - Hero",
-      "duration_seconds": 5,
-      "purpose": "Dramatic hero reveal with product visualization",
-      "visual_notes": "A dramatic hero reveal — the hero-reveal component renders the 'QUOTIENT' headline + subtitle with its SplitText per-character SLAM (chars stagger, back.out ease). Around it, custom code adds ambient glow orbs in the accent color drifting slowly and floating particles for depth. BG: gradient with glow orbs (custom). MG/FG: hero-reveal handles the headline + subtitle.",
-      "components": ["hero-reveal"],
-      "voiceover_text": "Introducing Quotient. The future of demand generation.",
-      "broll_query": "abstract flowing deep-blue and violet ink in slow motion, macro, dark background",
-      "transition_in": { "type": "none", "duration_seconds": 0 }
-    },
-    {
-      "label": "Scene 2 - Key Stats",
-      "duration_seconds": 4,
-      "purpose": "Show impressive metrics with animated stat cards",
-      "visual_notes": "Two stat cards STAGGER in from below — first '340% ROI Increase' lands with a bounce, then '2.5M Users Reached' follows 0.3s later. Each card has a large animated counter that rolls up to its final number. Subtle gradient background with brand colors. Cards have rounded corners with soft shadows. BG: gradient. FG: stat cards with counter animations.",
-      "components": ["stat-card"],
-      "transition_in": { "type": "slide-up", "duration_seconds": 0.5 }
-    },
-    {
-      "label": "Scene 3 - Quiet Moment",
-      "duration_seconds": 5,
-      "purpose": "A still, contemplative beat that should HOLD STILL (uses a generated image, not a video)",
-      "visual_notes": "A serene, composed beat. The hero_image fills the frame as a deliberate still; a single line of 32px text FADES in slowly over it. BG: hero image. FG: one calm line of copy.",
-      "components": [],
-      "voiceover_text": "Find your calm.",
-      "hero_image": "a perfectly still misty mountain lake at dawn, soft violet and amber light, mirror-like reflection, serene and contemplative, cinematic photograph",
-      "transition_in": { "type": "blur-crossfade", "duration_seconds": 0.6 }
-    }
-  ]
-}
+Call add_scene ONCE for each scene, in order, with parameters matching the Scene Format
+shown earlier. After the LAST scene has been added, call finish_storyboard with the film's
+overall title as "name". Never batch the whole storyboard into one call and never describe
+scenes in prose -- each scene is its own add_scene call, so no single response ever has to
+hold the entire storyboard.
+
+Three example scenes (each of these would be ONE add_scene call):
+
+\`\`\`
+add_scene({
+  "label": "Scene 1 - Hero", "duration_seconds": 5,
+  "purpose": "Dramatic hero reveal with product visualization",
+  "visual_notes": "A dramatic hero reveal — the hero-reveal component renders the 'QUOTIENT' headline + subtitle with its SplitText per-character SLAM (chars stagger, back.out ease). Around it, custom code adds ambient glow orbs in the accent color drifting slowly and floating particles for depth. BG: gradient with glow orbs (custom). MG/FG: hero-reveal handles the headline + subtitle.",
+  "components": ["hero-reveal"],
+  "voiceover_text": "Introducing Quotient. The future of demand generation.",
+  "broll_query": "abstract flowing deep-blue and violet ink in slow motion, macro, dark background",
+  "transition_in": { "type": "none", "duration_seconds": 0 }
+})
+
+add_scene({
+  "label": "Scene 2 - Key Stats", "duration_seconds": 4,
+  "purpose": "Show impressive metrics with animated stat cards",
+  "visual_notes": "Two stat cards STAGGER in from below — first '340% ROI Increase' lands with a bounce, then '2.5M Users Reached' follows 0.3s later. Each card has a large animated counter that rolls up to its final number. Subtle gradient background with brand colors. Cards have rounded corners with soft shadows. BG: gradient. FG: stat cards with counter animations.",
+  "components": ["stat-card"],
+  "transition_in": { "type": "slide-up", "duration_seconds": 0.5 }
+})
+
+add_scene({
+  "label": "Scene 3 - Quiet Moment", "duration_seconds": 5,
+  "purpose": "A still, contemplative beat that should HOLD STILL (uses a generated image, not a video)",
+  "visual_notes": "A serene, composed beat. The hero_image fills the frame as a deliberate still; a single line of 32px text FADES in slowly over it. BG: hero image. FG: one calm line of copy.",
+  "components": [],
+  "voiceover_text": "Find your calm.",
+  "hero_image": "a perfectly still misty mountain lake at dawn, soft violet and amber light, mirror-like reflection, serene and contemplative, cinematic photograph",
+  "transition_in": { "type": "blur-crossfade", "duration_seconds": 0.6 }
+})
+
+finish_storyboard({ "name": "Project Title" })
+\`\`\`
 
 ## Rules
 
@@ -258,7 +316,7 @@ ${catalogStr}
 - For PRESENTATION/DECK format: treat each slide as a self-contained visual composition. Write detailed visual notes per slide.
 - For VIDEO: write rich visual notes per scene and list matching library components for UI elements.
 - **Interactive Scripts:** Some library components are 🎬 Scriptable. Mention scripting needs in the visual notes and the codegen LLM will handle the details.
-- Output ONLY valid JSON. No commentary.
+- Use add_scene / finish_storyboard -- never describe the storyboard in prose or markdown.
 - When a prompt asks for a "walkthrough", "demo flow", "step by step", or "continuous take" involving multiple existing components, make ONE longer scene (12-30s) with progression-style visual notes that list those components (see "Continuous / Multi-Step Scenes" above) rather than several short scenes.
 
 ${SCENE_STORYBOARD_DESIGN_RULES}
@@ -407,78 +465,142 @@ Prefer Speaker templates over regular templates when the speaker should be visib
     userContent = userPrompt;
   }
 
-  // Beats roughly triple a scene's JSON footprint (label/duration/action/
-  // voiceover per beat, 4-6 beats/scene) -- 8192 was sized for flat scenes and
-  // truncated mid-storyboard on a real beats-heavy run. Headroom matches the
-  // agentic codegen call's cap.
-  var raw = await callLLM(opts.llmConfig, [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userContent },
-  ], { temperature: 0.5, maxTokens: 16384 });
-
-  var storyboard = parseJsonResponse(raw);
-
-  if (!storyboard.scenes || storyboard.scenes.length === 0) {
-    throw new Error("Storyboard builder returned no scenes");
-  }
-
   // Build a set of valid library component types for validation
   var validTypes = new Set(opts.componentCatalog.map((c: ComponentCatalogEntry) => c.type));
   validTypes.add("image");
 
-  // Validate and normalize each scene
-  for (var scene of storyboard.scenes) {
-    // Ensure components is a string array
+  /**
+   * Normalize one add_scene call's input in place and return the correction
+   * notes (if any) so the model sees what changed -- e.g. "removed unknown
+   * component types: X, Y" -- and can self-correct, instead of validation
+   * happening silently after the fact with no feedback loop.
+   */
+  function normalizeScene(scene: any): string[] {
+    var notes: string[] = [];
+
     if (!scene.components || !Array.isArray(scene.components)) {
       scene.components = [];
     }
-    // Normalize: if LLM returned old-style objects, extract type names
     scene.components = scene.components
       .map((c: any) => typeof c === "string" ? c : (c.type || ""))
       .filter((t: string) => t.length > 0);
-
-    // Filter to valid component types only
     var validated = scene.components.filter((t: string) => validTypes.has(t));
     if (validated.length < scene.components.length) {
       var removed = scene.components.filter((t: string) => !validTypes.has(t));
-      console.warn(`  Scene "${scene.label}": removed unknown component types: ${removed.join(", ")}`);
+      notes.push(`removed unknown component type(s): ${removed.join(", ")}`);
     }
     scene.components = validated;
 
-    // Never silently ship a scene with no visual direction. The prompt asks the
-    // model for visual_notes/purpose; if visual_notes is missing, warn loudly
-    // (so it's visible, not swallowed) and fall back to purpose/label.
     if (!scene.visual_notes) {
-      console.warn(`  Scene "${scene.label}": storyboard returned no visual_notes -- falling back to purpose/label.`);
       scene.visual_notes = scene.purpose || scene.label || "";
+      notes.push("no visual_notes given -- fell back to purpose/label (write real visual_notes next time)");
     }
     if (!scene.purpose) scene.purpose = scene.label || "";
 
-    // Beats: convert bars -> seconds, drop unusable entries, rescale to fill the
-    // scene exactly. A scene with < 2 usable beats is just a scene (beats: undefined).
-    const beats: SceneBeat[] | undefined = normalizeBeats(scene.beats, scene.duration_seconds || 5, opts.beatGrid?.barSec);
+    var beats: SceneBeat[] | undefined = normalizeBeats(scene.beats, scene.duration_seconds || 5, opts.beatGrid?.barSec);
     scene.beats = beats;
     if (beats) {
-      // Scene voiceover is the single TTS source of truth; when the model only
-      // narrated per-beat, concatenate for the scene.
       if (!scene.voiceover_text) scene.voiceover_text = beatsVoiceover(beats);
-      console.log(`  Scene "${scene.label}": ${beats.length} beats [${beats.map((b: SceneBeat) => `${b.label} ${b.duration_seconds}s`).join(" | ")}]`);
     } else if ((scene.duration_seconds || 5) > 10) {
-      console.warn(`  Scene "${scene.label}": ${scene.duration_seconds}s with no usable beats -- long scenes should carry a beat timeline.`);
+      notes.push(`${scene.duration_seconds}s with no usable beats -- long scenes should carry a beat timeline (>=2 beats)`);
     }
+    return notes;
+  }
+
+  var messages: LLMMessage[] = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userContent },
+  ];
+
+  var scenes: any[] = [];
+  var name: string | undefined;
+  var finished = false;
+
+  // Generous headroom: the model may add scenes sequentially (1 add_scene per
+  // turn) or batch several in parallel within one turn -- either pattern
+  // completes well within this budget.
+  var maxIterations = Math.max(16, (opts.sceneCount || 8) * 3 + 6);
+
+  for (var iteration = 0; iteration < maxIterations && !finished; iteration++) {
+    if (iteration >= Math.floor(maxIterations * 0.8) && scenes.length > 0) {
+      messages.push({
+        role: "user",
+        content: `IMPORTANT: You have ${maxIterations - iteration} turns left. Call finish_storyboard NOW with the ${scenes.length} scene(s) you've added.`,
+      });
+    }
+
+    var response = await callLLMAgentic(opts.llmConfig, messages, TOOLS, { temperature: 0.5, maxTokens: 8192 });
+
+    // Each add_scene call now only holds ONE scene, so a single turn hitting
+    // max_tokens should be rare -- still fail loudly rather than silently
+    // accept a truncated scene.
+    if (response.stopReason === "max_tokens") {
+      throw new Error(
+        `Storyboard builder response truncated: hit max_tokens (8192) mid-turn after ${scenes.length} scene(s) added. A single add_scene call was too large -- write shorter visual_notes/beats per call.`
+      );
+    }
+
+    if (response.toolCalls.length === 0) {
+      // No tools called -- nudge back toward the tools rather than accepting prose.
+      if (response.text) {
+        messages.push({ role: "assistant", content: response.text });
+      }
+      messages.push({
+        role: "user",
+        content: scenes.length > 0
+          ? `Please continue: call add_scene for any remaining scenes, then finish_storyboard. (${scenes.length} scene(s) added so far.)`
+          : "Please call add_scene to add the first scene -- do not describe it in prose.",
+      });
+      continue;
+    }
+
+    var assistantContent: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }> = [];
+    if (response.text) assistantContent.push({ type: "text", text: response.text });
+    for (var tc of response.toolCalls) {
+      assistantContent.push({ type: "tool_use", id: tc.id, name: tc.name, input: tc.input });
+    }
+    messages.push({ role: "assistant", content: assistantContent as any });
+
+    var toolResults: LLMContentPart[] = [];
+    for (var toolCall of response.toolCalls) {
+      var toolResult: string;
+
+      if (toolCall.name === "add_scene") {
+        var scene: any = { ...toolCall.input };
+        var notes = normalizeScene(scene);
+        scenes.push(scene);
+        console.log(`  Scene ${scenes.length}: "${scene.label}" (${scene.duration_seconds}s${scene.beats ? `, ${scene.beats.length} beats` : ""})`);
+        toolResult = `scene ${scenes.length} added: "${scene.label}"` + (notes.length ? ` -- ${notes.join("; ")}` : "");
+      } else if (toolCall.name === "finish_storyboard") {
+        if (scenes.length === 0) {
+          toolResult = "Cannot finish yet -- no scenes added. Call add_scene at least once first.";
+        } else if (opts.sceneCount && scenes.length !== opts.sceneCount) {
+          toolResult = `Cannot finish yet -- exactly ${opts.sceneCount} scenes required, but ${scenes.length} added so far. Add or remove scenes to match.`;
+        } else {
+          name = String(toolCall.input.name || opts.prompt.slice(0, 60));
+          finished = true;
+          toolResult = "accepted";
+        }
+      } else {
+        toolResult = `Unknown tool: ${toolCall.name}`;
+      }
+
+      toolResults.push({ type: "tool_result", tool_use_id: toolCall.id, content: toolResult });
+    }
+    messages.push({ role: "user", content: toolResults });
+  }
+
+  if (scenes.length === 0) {
+    throw new Error("Storyboard builder returned no scenes");
+  }
+  if (!finished) {
+    console.warn(`  Storyboard builder: max iterations (${maxIterations}) reached with ${scenes.length} scene(s) and no finish_storyboard call -- using what was added.`);
+    name = name || opts.prompt.slice(0, 60);
   }
 
   var componentHints = 0;
-  for (var scene of storyboard.scenes) {
-    componentHints += scene.components.length;
-  }
-  console.log(`  Storyboard builder: ${storyboard.scenes.length} scenes, ${componentHints} component hints`);
+  for (var s of scenes) componentHints += s.components.length;
+  console.log(`  Storyboard builder: ${scenes.length} scenes, ${componentHints} component hints`);
 
-  return storyboard as StoryboardResult;
-}
-
-// ── Helpers ──
-
-function parseJsonResponse(raw: string): any {
-  return parseLlmJson(raw, "storyboard builder");
+  return { name: name!, scenes } as StoryboardResult;
 }
