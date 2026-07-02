@@ -55,22 +55,53 @@ export interface AgenticCodegenOpts {
 
 // ── Tool Definitions ──
 
+// Incremental submission: NEVER ask for the whole scene document in one tool
+// call (the failure class that truncated a beats-heavy scene mid-tag). Each
+// tool call only needs to hold ONE section, and a long GSAP timeline can be
+// built up across several append_script calls -- the same pattern Claude Code
+// uses to write a large file (Write once, then many small Edits) rather than
+// emitting the entire thing in a single turn.
 const TOOLS: LLMTool[] = [
   {
-    name: "submit_scene",
-    description:
-      "Submit the final scene HTML. Call this when you're ready to output the scene. The HTML must be a complete .component.html with <template>, <style scoped>, and <script> sections.",
+    name: "write_template",
+    description: "Write the scene's <template> section: the HTML markup, including any <component> tags. Call this ONCE with the complete markup (just the inner content -- do not include the <template> tags themselves).",
     input_schema: {
       type: "object",
-      properties: {
-        html: {
-          type: "string",
-          description:
-            "Complete .component.html source with <template>, <style scoped>, and <script> sections",
-        },
-      },
+      properties: { html: { type: "string", description: "HTML markup for inside <template>...</template>" } },
       required: ["html"],
     },
+  },
+  {
+    name: "write_style",
+    description: "Write the scene's <style scoped> section: all CSS. Call this ONCE with the complete stylesheet (just the inner content -- do not include the <style> tags themselves).",
+    input_schema: {
+      type: "object",
+      properties: { css: { type: "string", description: "CSS for inside <style scoped>...</style>" } },
+      required: ["css"],
+    },
+  },
+  {
+    name: "write_script",
+    description: "Write (or restart) the scene's <script> section -- the createTimeline(el, data, ctx) function and any helpers (just the inner content -- do not include <script> tags). For a scene with MANY beats, write the setup plus the first beat or two here, then call append_script repeatedly to add the rest, ONE OR TWO BEATS AT A TIME. Never try to fit an entire long multi-beat timeline in a single call.",
+    input_schema: {
+      type: "object",
+      properties: { js: { type: "string", description: "JavaScript for inside <script>...</script>" } },
+      required: ["js"],
+    },
+  },
+  {
+    name: "append_script",
+    description: "Append more JavaScript to the END of the <script> section already written by write_script/append_script -- use this to continue a long GSAP timeline across multiple calls (e.g. one call per remaining beat) instead of writing it all at once.",
+    input_schema: {
+      type: "object",
+      properties: { js: { type: "string", description: "JavaScript to append immediately after everything written so far" } },
+      required: ["js"],
+    },
+  },
+  {
+    name: "finish_scene",
+    description: "Call this when write_template, write_style, and write_script (plus any append_script calls) are all done and the scene is complete and ready to render. This assembles and validates the final document.",
+    input_schema: { type: "object", properties: {} },
   },
 ];
 
@@ -289,9 +320,19 @@ Notice: quotient-chat and code-editor use <component> tags, and BOTH timelines a
 1. READ the spec below — it includes which components to use and their data schemas
 2. BUILD your scene HTML using <component> tags for every listed component, filling data from the provided schemas
 3. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
-4. SUBMIT via the submit_scene tool
+4. SUBMIT via write_template, write_style, write_script (+ append_script if needed), then finish_scene
 
-You have everything you need in the spec. Go straight to writing and submit in ONE step.
+You have everything you need in the spec. Go straight to writing.
+
+## Submitting: write in SECTIONS, not one giant block
+
+Call write_template (markup) and write_style (CSS) once each, then write_script for the
+createTimeline function. For a scene with SEVERAL BEATS, do NOT try to write the whole
+multi-beat timeline in one write_script call -- write the setup plus the first beat or two,
+then call append_script one or two more beats at a time until the timeline is complete.
+Only call finish_scene once template, style, and the full script are all written -- it
+assembles and validates the document. This keeps every individual call small regardless of
+how long or beat-heavy the scene is; there is no size penalty for using more calls.
 
 ## Design Skills (FOLLOW THESE RULES)
 
@@ -299,7 +340,10 @@ ${designSkills}
 
 ## Output Format
 
-Your submitted HTML must be a single .scene.html file with three sections:
+Once assembled from write_template + write_style + write_script/append_script, the scene
+is a single .scene.html document with three sections -- this is the SHAPE of the content
+you write into each tool call (do not include the outer tags yourselves, just the content
+that goes inside them):
 
 \`\`\`html
 <template><!-- HTML with <component> tags and custom elements --></template>
@@ -495,7 +539,12 @@ function buildBrandContext(brandKit: BrandKit): string {
 
 // ── Main Agentic Loop ──
 
-const MAX_ITERATIONS = 8;
+// Incremental submission (write_template/write_style/write_script/append_script/
+// finish_scene) trades one big tool call for several small ones -- a typical
+// scene now takes 2-4 turns to complete instead of 1, and a long multi-beat
+// scene may use several append_script turns. More headroom than the old
+// single-tool-call flow needed.
+const MAX_ITERATIONS = 14;
 
 // Component discovery is handled by the storyboard builder; codegen receives schemas in the spec
 
@@ -526,7 +575,7 @@ ${!opts.brollVideoUrl && !opts.heroImageUrl ? `REMINDER before you write CSS: th
 - Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
 ${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
 CRITICAL: If the spec lists components with schemas, use <component type=... data='...' /> tags with the data fields from the schemas. Do NOT rebuild from scratch what the spec says to use as a component.
-Read the spec, then write your scene HTML and submit it.`;
+Read the spec, then write your scene using write_template / write_style / write_script (+ append_script for a long multi-beat timeline), then finish_scene.`;
 
   // Build user message: include reference images as vision content if available
   var userContent: string | LLMContentPart[];
@@ -551,42 +600,41 @@ Read the spec, then write your scene HTML and submit it.`;
 
   var lastHtml: string | null = null;
 
-  // Track component-first workflow state
-
-
+  // Incremental accumulator: no single tool call ever needs to hold the whole
+  // document. write_script/append_script build .script up across many small
+  // calls (the beats-heavy-scene failure mode this replaces).
+  var parts = { template: "", style: "", script: "" };
+  function assembleHtml(): string {
+    return `<template>\n${parts.template}\n</template>\n<style scoped>\n${parts.style}\n</style>\n<script>\n${parts.script}\n</script>`;
+  }
 
   for (var iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     console.log(
       `  [agentic] Scene ${opts.sceneIndex + 1}: iteration ${iteration + 1}/${MAX_ITERATIONS}`,
     );
 
-    // After iteration 5, inject urgency to submit
-    if (iteration >= 5 && !lastHtml) {
+    // After iteration 8, inject urgency to finish
+    if (iteration >= 8 && !lastHtml) {
       messages.push({
         role: "user",
-        content: `IMPORTANT: You have ${MAX_ITERATIONS - iteration} iterations remaining. You MUST call submit_scene with your HTML now. Stop searching and write the scene. If you have studied enough references, write and submit the HTML immediately.`,
+        content: `IMPORTANT: You have ${MAX_ITERATIONS - iteration} iterations remaining. Finish writing NOW: whatever sections you haven't written yet, write them (use append_script for any remaining beats), then call finish_scene immediately. Do not start over -- build on what you've already written.`,
       });
     }
 
-    // A beats-heavy continuous-take scene (one persistent world, 12-24s, 4-6
-    // beats each wiring its own timeline segment) genuinely needs more HTML/
-    // CSS/GSAP than a flat 5s scene ever did -- 16384 truncated a real
-    // multi-beat scene's submit_scene call mid-tag.
     var response = await callLLMAgentic(
       opts.llmConfig,
       messages,
       TOOLS,
-      { temperature: 0.6, maxTokens: 32000 },
+      { temperature: 0.6, maxTokens: 8192 },
     );
 
-    // A response cut off by the token budget mid tool-call means submit_scene's
-    // html argument is truncated mid-tag -- fail loudly here (a beat sheet +
-    // rich visual notes can make one scene's spec large) rather than let it
-    // surface later as a mystifying "Missing required sections" or assembly
-    // error with no hint that the real cause was truncation.
+    // Each tool call now only holds ONE section (or one beat's worth of
+    // appended script), so a single turn hitting max_tokens should be rare --
+    // still fail loudly and specifically if it happens rather than silently
+    // accept a truncated chunk into the accumulator.
     if (response.stopReason === "max_tokens") {
       throw new Error(
-        `Agentic codegen response truncated: hit max_tokens (32000) before finishing scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). Raise maxTokens or shorten the scene spec.`
+        `Agentic codegen response truncated: hit max_tokens (8192) mid-turn on scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). A single write_*/append_script call was too large -- write smaller chunks (e.g. one beat per append_script call).`
       );
     }
 
@@ -615,6 +663,8 @@ Read the spec, then write your scene HTML and submit it.`;
 
       // Execute each tool and collect results
       var toolResults: LLMContentPart[] = [];
+      var finished = false;
+      var finishedHtml = "";
 
       for (var toolCall of response.toolCalls) {
         console.log(
@@ -623,19 +673,37 @@ Read the spec, then write your scene HTML and submit it.`;
 
         var toolResult: string;
 
-        if (toolCall.name === "submit_scene") {
-          var submitResult = executeSubmitScene(
-            toolCall.input.html as string,
-          );
-          if (submitResult.valid) {
-            console.log(
-              `  [agentic] Scene ${opts.sceneIndex + 1}: ✅ scene submitted after ${iteration + 1} iterations`,
-            );
-            return submitResult.html;
+        if (toolCall.name === "write_template") {
+          parts.template = String(toolCall.input.html || "");
+          toolResult = `template received (${parts.template.length} chars)`;
+        } else if (toolCall.name === "write_style") {
+          parts.style = String(toolCall.input.css || "");
+          toolResult = `style received (${parts.style.length} chars)`;
+        } else if (toolCall.name === "write_script") {
+          parts.script = String(toolCall.input.js || "");
+          toolResult = `script chunk received (${parts.script.length} chars so far)`;
+        } else if (toolCall.name === "append_script") {
+          parts.script += String(toolCall.input.js || "");
+          toolResult = `appended (script is now ${parts.script.length} chars total)`;
+        } else if (toolCall.name === "finish_scene") {
+          if (!parts.template || !parts.script) {
+            var missing = [!parts.template && "write_template", !parts.script && "write_script"].filter(Boolean).join(" and ");
+            toolResult = `Cannot finish yet -- ${missing} not called. Write the missing section(s) first, then call finish_scene again.`;
+          } else {
+            var assembled = assembleHtml();
+            var submitResult = executeSubmitScene(assembled);
+            if (submitResult.valid) {
+              console.log(
+                `  [agentic] Scene ${opts.sceneIndex + 1}: ✅ scene finished after ${iteration + 1} iterations (template ${parts.template.length}, style ${parts.style.length}, script ${parts.script.length} chars)`,
+              );
+              finished = true;
+              finishedHtml = submitResult.html;
+              toolResult = "accepted";
+            } else {
+              toolResult = submitResult.error || "Invalid scene";
+              lastHtml = assembled; // keep as a fallback in case max iterations hits
+            }
           }
-          toolResult = submitResult.error || "Invalid submission";
-          // Save the HTML in case we hit max iterations
-          lastHtml = submitResult.html;
         } else {
           toolResult = `Unknown tool: ${toolCall.name}`;
         }
@@ -647,19 +715,19 @@ Read the spec, then write your scene HTML and submit it.`;
         });
       }
 
+      if (finished) return finishedHtml;
+
       // Add user message with tool results
       messages.push({
         role: "user",
         content: toolResults,
       });
 
-      // Synthetic nudge: if search found components but LLM is about to submit without using them
-      // Component schemas are provided in the spec; no tool-based discovery needed
-
       continue;
     }
 
-    // No tool calls - check if the response contains HTML directly
+    // No tool calls - check if the response contains HTML directly (rare
+    // fallback if the model ignores the tools entirely).
     if (response.text) {
       var text = response.text.trim();
       // Strip markdown fences if present
@@ -678,7 +746,7 @@ Read the spec, then write your scene HTML and submit it.`;
         return text;
       }
 
-      // Text but no HTML - prompt to submit
+      // Text but no HTML - prompt to use the tools
       lastHtml = text;
       messages.push({
         role: "assistant",
@@ -687,7 +755,7 @@ Read the spec, then write your scene HTML and submit it.`;
       messages.push({
         role: "user",
         content:
-          "Please submit your scene HTML using the submit_scene tool. The HTML must include <template>, <style scoped>, and <script> sections.",
+          "Please write your scene using write_template, write_style, write_script (and append_script for a long timeline), then finish_scene.",
       });
     }
   }
@@ -696,6 +764,15 @@ Read the spec, then write your scene HTML and submit it.`;
   console.warn(
     `  [agentic] Scene ${opts.sceneIndex + 1}: ⚠️ max iterations (${MAX_ITERATIONS}) reached`,
   );
+
+  // Prefer whatever got assembled in the accumulator over a stray text blob --
+  // it's more likely to be a coherent (if incomplete) document.
+  if (parts.template && parts.script) {
+    console.log(
+      `  [agentic] Scene ${opts.sceneIndex + 1}: using accumulated sections (template ${parts.template.length}, style ${parts.style.length}, script ${parts.script.length} chars)`,
+    );
+    return assembleHtml();
+  }
 
   if (lastHtml) {
     console.log(
