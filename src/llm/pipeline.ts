@@ -42,6 +42,7 @@ import { type CritiqueResult } from "./critiquer.js";
 import { critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { formatCorrectnessDefects, type CorrectnessResult } from "./correctness-critique.js";
 import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
+import { runFocusedDetectors } from "./focused-detectors.js";
 import { tileFramesToStoryboard } from "./editorial-vision.js";
 import { generateContactSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
@@ -1154,6 +1155,31 @@ async function critiqueAndRetryScene(opts: {
       // only on defects; video-only brand clips are scored but not defect-gated
       // (their content can't be regenerated).
       const specForCon = currentDraft?.visual_notes || currentDraft?.purpose || currentDraft?.label || opts.prompt;
+      const requiresLogo = /\blogo\b/i.test(specForCon) && (opts.brandKit?.logos?.length ?? 0) > 0;
+      const brandTheme: "light" | "dark" = brandBackgroundIsLight(opts.brandKit) ? "light" : "dark";
+      // Footage / hero-image background: light text over a scrim is correct then,
+      // so the theme rule must not false-flag it as off_brand_theme.
+      const mediaBackground = /<video[\s>]|class="[^"]*\bmp-(broll|hero-img)\b|class="[^"]*broll/i.test(assembledHtml);
+
+      // Layered critique funnel, Layers 1+2 in PARALLEL over the same frames:
+      //   Layer 1: focused single-purpose defect detectors on the cheap model
+      //            (a broad rubric satisfices -- it reports the 2-3 most salient
+      //            problems and passes the rest; one-job detection calls keep
+      //            recall high and their failures independent).
+      //   Layer 2: ONE holistic taste judge on the stronger taste model --
+      //            score + intent match only, no mechanical defect hunting.
+      // Layer 0 (deterministic pixel/geometry gates) runs below.
+      const detectorsPromise = runFocusedDetectors({
+        previewImageBase64: previewBase64,
+        contactSheetBase64,
+        specText: specForCon,
+        sceneHtml: assembledHtml,
+        brandTheme,
+        requiresLogo,
+        videoOnly: !!isVideoOnly,
+        mediaBackground,
+        llmConfig: opts.critiqueLlmConfig || config.critiqueLlm,
+      });
       const con = await critiqueConsolidated({
         previewImageBase64: previewBase64,
         contactSheetBase64,
@@ -1161,14 +1187,13 @@ async function critiqueAndRetryScene(opts: {
         specText: specForCon,
         sceneHtml: assembledHtml,
         expectedComponents: Array.isArray(currentDraft?.components) ? currentDraft.components.filter((c: any) => typeof c === "string") : undefined,
-        requiresLogo: /\blogo\b/i.test(specForCon) && (opts.brandKit?.logos?.length ?? 0) > 0,
-        brandTheme: brandBackgroundIsLight(opts.brandKit) ? "light" : "dark",
+        requiresLogo,
+        brandTheme,
         videoOnly: !!isVideoOnly,
-        // Footage / hero-image background: light text over a scrim is correct then,
-        // so the theme rule must not false-flag it as off_brand_theme.
-        mediaBackground: /<video[\s>]|class="[^"]*\bmp-(broll|hero-img)\b|class="[^"]*broll/i.test(assembledHtml),
-        llmConfig: opts.critiqueLlmConfig || opts.llmConfig,
+        mediaBackground,
+        llmConfig: config.tasteLlm.apiKey ? config.tasteLlm : (opts.critiqueLlmConfig || opts.llmConfig),
       });
+      const detectors = await detectorsPromise;
       // Bookends are intentionally minimal -> don't revise on aesthetic score, only
       // on hard defects (e.g. a dark intro/outro on a light brand).
       const critiqueResult: CritiqueResult = {
@@ -1176,10 +1201,19 @@ async function critiqueAndRetryScene(opts: {
         issues: con.issues,
         suggestions: con.suggestions,
       };
-      // Video-only clips can't have their content regenerated -> never defect-gate them.
+      // Video-only clips can't have their content regenerated -> never defect-gate
+      // them (runFocusedDetectors is also a no-op for videoOnly).
       const correctness: CorrectnessResult = isVideoOnly
         ? { pass: true, defects: [] }
         : consolidatedCorrectness(con);
+      if (!isVideoOnly && detectors.defects.length > 0) {
+        for (const d of detectors.defects) {
+          correctness.defects.push(d);
+          critiqueResult.issues.push(`[${d.type}] ${d.detail}`);
+        }
+        correctness.pass = false;
+        console.log(`  Detectors: ${detectors.defects.length} defect(s) [${detectors.defects.map((d) => d.type).join(", ")}]`);
+      }
 
       // Programmatic legibility gate: measure each text element's REAL contrast
       // against the pixels rendered behind it. Catches illegible text the vision
