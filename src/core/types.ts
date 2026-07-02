@@ -155,6 +155,24 @@ export interface ContentRegion {
   offset?: string;
 }
 
+/**
+ * The critique loop's final verdict on a scene, persisted so it's visible
+ * without excavating server logs. `passed` distinguishes a scene that
+ * satisfied the aesthetic score + every gate from one that exhausted its
+ * revision budget and shipped its best (still-defective) attempt anyway --
+ * the latter is exactly what the studio should badge for a targeted `revise`.
+ */
+export interface SceneQuality {
+  /** Effective score of the attempt that shipped (may be < 0: runtime/defect penalized). */
+  score: number;
+  /** How many generation attempts this scene went through. */
+  attempts: number;
+  /** True if the shipped attempt passed the aesthetic threshold AND all gates clean. */
+  passed: boolean;
+  /** "[type] detail" for every defect still present on the shipped attempt. Empty when passed. */
+  unresolved_defects: string[];
+}
+
 export interface Scene {
   id: string;
   label?: string;
@@ -165,6 +183,9 @@ export interface Scene {
   /** The scene's internal beat timeline (continuous-take scenes). Offsets are
    *  implicit: beat N starts where beat N-1 ended, beat 0 starts at 0. */
   beats?: SceneBeat[];
+  /** Critique loop's final verdict on this scene (see SceneQuality). Absent
+   *  when critique was skipped. */
+  quality?: SceneQuality;
   audio_hints?: SceneAudioHints;
   /** When set, all components are constrained to this region of the frame.
    *  Used with speaker track so content appears beside the speaker. */
