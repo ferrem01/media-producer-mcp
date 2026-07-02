@@ -407,10 +407,14 @@ Prefer Speaker templates over regular templates when the speaker should be visib
     userContent = userPrompt;
   }
 
+  // Beats roughly triple a scene's JSON footprint (label/duration/action/
+  // voiceover per beat, 4-6 beats/scene) -- 8192 was sized for flat scenes and
+  // truncated mid-storyboard on a real beats-heavy run. Headroom matches the
+  // agentic codegen call's cap.
   var raw = await callLLM(opts.llmConfig, [
     { role: "system", content: systemPrompt },
     { role: "user", content: userContent },
-  ], { temperature: 0.5, maxTokens: 8192 });
+  ], { temperature: 0.5, maxTokens: 16384 });
 
   var storyboard = parseJsonResponse(raw);
 

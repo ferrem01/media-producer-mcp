@@ -575,6 +575,17 @@ Read the spec, then write your scene HTML and submit it.`;
       { temperature: 0.6, maxTokens: 16384 },
     );
 
+    // A response cut off by the token budget mid tool-call means submit_scene's
+    // html argument is truncated mid-tag -- fail loudly here (a beat sheet +
+    // rich visual notes can make one scene's spec large) rather than let it
+    // surface later as a mystifying "Missing required sections" or assembly
+    // error with no hint that the real cause was truncation.
+    if (response.stopReason === "max_tokens") {
+      throw new Error(
+        `Agentic codegen response truncated: hit max_tokens (16384) before finishing scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). Raise maxTokens or shorten the scene spec.`
+      );
+    }
+
     // Process tool calls
     if (response.toolCalls.length > 0) {
       // Build the assistant message content (text + tool_use blocks)
