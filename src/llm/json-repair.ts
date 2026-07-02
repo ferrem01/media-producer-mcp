@@ -80,29 +80,62 @@ function extractJsonSpan(raw: string): string | null {
  * Parse an LLM's JSON response, tolerating the common failure modes: a code
  * fence wrapper, and raw control characters inside string values. Tries, in
  * order: fenced-stripped as-is, sanitized, extracted-span as-is, extracted-span
- * sanitized. Throws with a truncated snippet of the original text if all fail.
+ * sanitized.
+ *
+ * On total failure, the thrown error carries the REAL underlying SyntaxError
+ * (message + position) plus a window of text around that position, not just
+ * the first 300 characters of a possibly-thousands-of-characters response --
+ * a truncated-at-the-start error is nearly useless when the break is deep
+ * inside a large storyboard (this bit us: the first version of this function
+ * printed a clean-looking opening brace and nothing about where it actually
+ * broke).
  */
 export function parseLlmJson(raw: string, context?: string): any {
   const stripped = stripFence(raw);
+  const span = extractJsonSpan(stripped);
 
-  const attempts: Array<() => any> = [
-    () => JSON.parse(stripped),
-    () => JSON.parse(escapeControlCharsInStrings(stripped)),
-    () => {
-      const span = extractJsonSpan(stripped);
-      if (!span) throw new Error("no JSON span found");
-      return JSON.parse(span);
-    },
-    () => {
-      const span = extractJsonSpan(stripped);
-      if (!span) throw new Error("no JSON span found");
-      return JSON.parse(escapeControlCharsInStrings(span));
-    },
+  const attempts: Array<{ label: string; text: string }> = [
+    { label: "raw", text: stripped },
+    { label: "sanitized", text: escapeControlCharsInStrings(stripped) },
+    ...(span ? [{ label: "span", text: span }] : []),
+    ...(span ? [{ label: "span+sanitized", text: escapeControlCharsInStrings(span) }] : []),
   ];
 
-  for (const attempt of attempts) {
-    try { return attempt(); } catch { /* try the next strategy */ }
+  let lastError: unknown;
+  let lastText = stripped;
+  for (const a of attempts) {
+    try { return JSON.parse(a.text); }
+    catch (e) { lastError = e; lastText = a.text; }
   }
+
   const label = context ? ` from ${context}` : "";
-  throw new Error(`Invalid JSON${label}: ${stripped.substring(0, 300)}`);
+  const msg = lastError instanceof Error ? lastError.message : String(lastError);
+
+  // V8's JSON.parse error format varies by Node version: older versions say
+  // "...at position N" (a plain offset); newer versions embed a "...snippet..."
+  // context window directly in the message instead. Handle both so the thrown
+  // error is actually diagnostic regardless of which Node runs this.
+  let around = "";
+  const posMatch = msg.match(/position (\d+)/);
+  if (posMatch) {
+    const pos = parseInt(posMatch[1], 10);
+    const start = Math.max(0, pos - 150);
+    const end = Math.min(lastText.length, pos + 150);
+    around = ` | around position ${pos}: ${JSON.stringify(lastText.slice(start, end))}`;
+  } else {
+    // Newer-V8 format embeds a snippet like: ..."broken text" is not valid JSON
+    const snippetMatch = msg.match(/\.\.\.("(?:[^"\\]|\\.)*")/);
+    if (snippetMatch) {
+      try {
+        const needle = JSON.parse(snippetMatch[1]);
+        const idx = lastText.indexOf(needle);
+        if (idx >= 0) {
+          const start = Math.max(0, idx - 150);
+          const end = Math.min(lastText.length, idx + needle.length + 150);
+          around = ` | around position ${idx}: ${JSON.stringify(lastText.slice(start, end))}`;
+        }
+      } catch { /* snippet wasn't valid JSON itself -- skip */ }
+    }
+  }
+  throw new Error(`Invalid JSON${label}: ${msg}${around} | full text (${stripped.length} chars, first 2000 shown): ${stripped.slice(0, 2000)}`);
 }
