@@ -57,11 +57,19 @@ reachable Apple target is keynote-style feature graphics, not film footage.
 
 ### Pillar 1 — Music-first timeline (rhythm) `P0`
 Pick the track **before** storyboarding. Rhythm is the #1 perceived-quality signal.
-- [ ] Beat-map selected tracks: BPM + onsets (librosa/aubio sidecar, cache per track).
-- [ ] Hand the storyboard a beat grid; quantize scene durations to bars.
-- [ ] Snap cut points (scene boundaries + transition midpoints) to downbeats.
+- [x] Beat-map selected tracks: dependency-free analyzer (`src/audio/beat-map.ts`,
+      ffmpeg PCM → onset envelope → autocorrelation tempo with octave correction →
+      joint tempo+phase grid fit → downbeat rotation). Cached per track. Validated
+      on synthetic click tracks: BPM within 0.05, downbeats within ~30ms.
+- [x] Music-first pipeline order: track selected + beat-mapped after the creative
+      director, BEFORE the storyboard; beat grid injected into the storyboard
+      prompt ("author durations in whole bars").
+- [x] Quantize cuts to downbeats: each (transition_in + scene) segment snapped to
+      whole bars (`quantizeScenesToBars`), track head-trimmed so beat 1 = video
+      t=0 (`trim_start` on the bgm track), VO extensions round up to the next bar.
 - [ ] Anchor each scene's Build→Breathe→Resolve phases to beats (pass beat offsets
-      in `ctx` so component timelines can sync).
+      in `ctx` so component timelines can sync — `project.audio.beat_map` is
+      already stored for this).
 - [x] Fix ducking: auto-pipeline wrote a config shape render never read
       (`pipeline.ts` vs `render.ts`); ducking now covers **every** VO clip window,
       not just the first (`mixer.ts` multi-trigger enable expression).

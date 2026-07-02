@@ -1639,6 +1639,48 @@ async function runUnifiedPipeline(
     }
     trace?.endEvent({ concept: treatment?.concept });
   }
+
+  // ── Music-first timeline (QUALITY-ROADMAP Pillar 1) ──
+  // Professional edits pick the track FIRST and cut to it. When background
+  // music is on, select the track and beat-map it BEFORE storyboarding: the
+  // storyboard authors durations against the beat grid, and a deterministic
+  // pass below quantizes every scene to whole bars so cuts land on downbeats.
+  var musicTrack: import("../audio/music.js").MusicTrack | null = null;
+  var beatMap: import("../audio/beat-map.js").BeatMap | undefined;
+  if (opts.backgroundMusic && (format === "video" || format === "slideshow")) {
+    trace?.beginEvent("music_first");
+    try {
+      const { selectMusic } = await import("../audio/music.js");
+      const mood = pickMusicMood(richPrompt);
+      const estDuration = (sceneCount || 6) * 5.5;
+      console.log(`  Music-first: searching for "${mood}" mood...`);
+      musicTrack = await selectMusic({
+        mood,
+        brandKit,
+        tenantId: opts.tenant_id,
+        minDuration: Math.max(30, Math.floor(estDuration * 0.8)),
+      });
+      if (musicTrack) {
+        const { analyzeBeats } = await import("../audio/beat-map.js");
+        const map = await analyzeBeats(musicTrack.path);
+        if (map.confidence >= 0.2) {
+          beatMap = map;
+          console.log(
+            `  Music-first: "${musicTrack.title}" by ${musicTrack.artist} -- ` +
+            `${map.bpm} BPM, bar=${map.barSec}s, downbeat@${map.firstDownbeatSec}s (conf ${map.confidence})`
+          );
+        } else {
+          console.log(`  Music-first: "${musicTrack.title}" beat grid too uncertain (conf ${map.confidence}), cutting unquantized`);
+        }
+      }
+    } catch (e: any) {
+      console.warn(`  Music-first selection failed (non-fatal): ${e.message}`);
+      musicTrack = null;
+      beatMap = undefined;
+    }
+    trace?.endEvent({ bpm: beatMap?.bpm });
+  }
+
   var storyboard = await buildStoryboard({
     prompt: richPrompt,
     format,
@@ -1652,6 +1694,7 @@ async function runUnifiedPipeline(
     hasSpeakerTrack: !!opts.speaker_source,
     referenceImages: processedRefs,
     treatment,
+    beatGrid: beatMap ? { bpm: beatMap.bpm, barSec: beatMap.barSec } : undefined,
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
@@ -1662,6 +1705,13 @@ async function runUnifiedPipeline(
   // enforce it deterministically: rewrite every caption-* component in the
   // draft to the majority caption style.
   unifyCaptionStyle(storyboard.scenes);
+
+  // ── Beat quantization: every cut lands on a downbeat ──
+  // Each segment (incoming transition + scene) is snapped to a whole number of
+  // bars, so cumulative cut points fall exactly on the track's bar grid.
+  if (beatMap) {
+    quantizeScenesToBars(storyboard.scenes, beatMap.barSec);
+  }
 
     // Create project shell (reuse tempProjectId from reference image processing if available)
   var projectId = tempProjectId || `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
@@ -2170,11 +2220,20 @@ async function runUnifiedPipeline(
             const clipDur = parseFloat(probe.stdout.trim()) || 0;
             voDurations[i] = clipDur;
 
-            // Extend scene duration if voiceover is longer (add 0.5s buffer)
+            // Extend scene duration if voiceover is longer (add 0.5s buffer).
+            // When a beat grid exists, extend to the next BAR boundary of the
+            // (transition + scene) segment so later cuts stay on the grid.
             if (clipDur > project.scenes[i].duration_seconds) {
               const oldDur = project.scenes[i].duration_seconds;
-              project.scenes[i].duration_seconds = Math.ceil(clipDur + 0.5);
-              console.log(`  Voiceover: extended scene ${i} from ${oldDur}s to ${project.scenes[i].duration_seconds}s (clip: ${clipDur.toFixed(1)}s)`);
+              const needed = clipDur + 0.5;
+              if (beatMap) {
+                const trans = segmentTransitionSeconds(project.scenes[i], i);
+                const bars = Math.max(1, Math.ceil((needed + trans) / beatMap.barSec - 1e-6));
+                project.scenes[i].duration_seconds = Math.round((bars * beatMap.barSec - trans) * 100) / 100;
+              } else {
+                project.scenes[i].duration_seconds = Math.ceil(needed);
+              }
+              console.log(`  Voiceover: extended scene ${i} from ${oldDur}s to ${project.scenes[i].duration_seconds}s (clip: ${clipDur.toFixed(1)}s${beatMap ? ", bar-aligned" : ""})`);
             }
           } catch {
             voDurations[i] = 0;
@@ -2205,25 +2264,21 @@ async function runUnifiedPipeline(
       // ── Background music with ducking ──
       if (opts.backgroundMusic) {
         try {
-          const { selectMusic } = await import("../audio/music.js");
-
-          // Determine mood from prompt
-          const promptLower = richPrompt.toLowerCase();
-          let mood = "corporate";
-          if (promptLower.includes("exciting") || promptLower.includes("launch") || promptLower.includes("announcement")) mood = "upbeat";
-          else if (promptLower.includes("calm") || promptLower.includes("elegant") || promptLower.includes("premium")) mood = "calm";
-          else if (promptLower.includes("tech") || promptLower.includes("ai") || promptLower.includes("data")) mood = "electronic";
-          else if (promptLower.includes("emotion") || promptLower.includes("story") || promptLower.includes("inspire")) mood = "inspiring";
-
-          console.log(`  Background music: searching for "${mood}" mood...`);
-
-          const totalDuration = project.scenes.reduce((sum: number, s: any) => sum + s.duration_seconds, 0);
-          const track = await selectMusic({
-            mood,
-            brandKit,
-            tenantId: opts.tenant_id,
-            minDuration: Math.max(30, Math.floor(totalDuration * 0.8)),
-          });
+          // Prefer the track selected up front by the music-first pass (the
+          // storyboard was cut to ITS beat grid); fall back to selecting here.
+          let track = musicTrack;
+          if (!track) {
+            const { selectMusic } = await import("../audio/music.js");
+            const mood = pickMusicMood(richPrompt);
+            console.log(`  Background music: searching for "${mood}" mood...`);
+            const totalDuration = project.scenes.reduce((sum: number, s: any) => sum + s.duration_seconds, 0);
+            track = await selectMusic({
+              mood,
+              brandKit,
+              tenantId: opts.tenant_id,
+              minDuration: Math.max(30, Math.floor(totalDuration * 0.8)),
+            });
+          }
 
           if (track) {
             console.log(`  Background music: "${track.title}" by ${track.artist} [${track.source}] (${track.duration}s)`);
@@ -2234,10 +2289,23 @@ async function runUnifiedPipeline(
               source: track.path,
               volume: 0.12,
               start_time: 0,
+              // Align the track's first downbeat with video t=0 so the
+              // bar-quantized cuts actually land on the music's downbeats.
+              trim_start: beatMap && beatMap.firstDownbeatSec > 0.02 ? beatMap.firstDownbeatSec : undefined,
               loop: true,
               fade_in: 2,
               fade_out: 3,
             });
+
+            if (beatMap) {
+              project.audio.beat_map = {
+                bpm: beatMap.bpm,
+                beat_sec: beatMap.beatSec,
+                bar_sec: beatMap.barSec,
+                first_downbeat_sec: beatMap.firstDownbeatSec,
+                confidence: beatMap.confidence,
+              };
+            }
 
             // Add ducking config to project audio. The shape must match
             // AudioDucking (render.ts gates on `enabled` and resolves
@@ -2318,6 +2386,62 @@ function unifyCaptionStyle(scenes: Array<{ components?: string[] }>): void {
     s.components = rewritten.filter((c, i) => c !== chosen || rewritten.indexOf(c) === i);
   }
   console.log(`  Motif discipline: unified ${counts.size} caption styles -> "${chosen}" (${swaps} swaps)`);
+}
+
+/**
+ * Mood keyword heuristic for music selection (shared by the music-first
+ * selection and the legacy post-scenes fallback).
+ */
+function pickMusicMood(prompt: string): string {
+  const p = prompt.toLowerCase();
+  if (p.includes("exciting") || p.includes("launch") || p.includes("announcement")) return "upbeat";
+  if (p.includes("calm") || p.includes("elegant") || p.includes("premium")) return "calm";
+  if (p.includes("tech") || p.includes("ai") || p.includes("data")) return "electronic";
+  if (p.includes("emotion") || p.includes("story") || p.includes("inspire")) return "inspiring";
+  return "corporate";
+}
+
+/**
+ * The renderer's segment timeline is: scene0 + (transition1 + scene1) + ...
+ * A cut FEELS on-beat when the incoming transition starts on a downbeat, so we
+ * quantize each (transition_in + scene) segment to whole bars -- cumulative
+ * boundaries then all land on the bar grid.
+ *
+ * Mirrors render.ts transition defaulting: missing transition_in renders as a
+ * 0.5s crossfade; type "none" contributes nothing.
+ */
+function segmentTransitionSeconds(
+  scene: { transition_in?: { type?: string; duration_seconds?: number } },
+  index: number,
+): number {
+  if (index === 0) return 0;
+  if (scene.transition_in?.type === "none") return 0;
+  return scene.transition_in?.duration_seconds || 0.5;
+}
+
+function quantizeScenesToBars(
+  scenes: Array<{ label?: string; duration_seconds: number; transition_in?: { type?: string; duration_seconds?: number } }>,
+  barSec: number,
+): void {
+  if (!(barSec > 0)) return;
+  const toBars = (seconds: number) =>
+    Math.round(Math.max(1, Math.round(seconds / barSec)) * barSec * 10000) / 10000;
+
+  let changes = 0;
+  for (let i = 0; i < scenes.length; i++) {
+    const s = scenes[i];
+    const trans = segmentTransitionSeconds(s, i);
+    const target = s.duration_seconds + trans;
+    const quantized = toBars(target);
+    // A scene must keep enough room to breathe after the transition share
+    const newDur = Math.max(1.5, Math.round((quantized - trans) * 100) / 100);
+    if (Math.abs(newDur - s.duration_seconds) > 0.05) {
+      console.log(`  Beat grid: scene ${i} "${s.label || ""}" ${s.duration_seconds}s -> ${newDur}s (segment=${quantized}s = ${Math.round(quantized / barSec)} bars)`);
+      s.duration_seconds = newDur;
+      changes++;
+    }
+  }
+  if (changes === 0) console.log("  Beat grid: scene durations already on the bar grid");
 }
 
 /**

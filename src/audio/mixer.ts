@@ -16,7 +16,8 @@ export interface AudioTrackInput {
   path: string;
   type: "voiceover" | "music" | "sfx";
   volume: number;       // 0-1
-  startTime?: number;   // seconds offset
+  startTime?: number;   // seconds offset on the video timeline
+  trimStart?: number;   // seconds skipped from the START of the source file
   fadeIn?: number;       // seconds
   fadeOut?: number;      // seconds
   loop?: boolean;
@@ -73,8 +74,10 @@ export async function mixAudio(opts: MixOptions): Promise<string> {
     let filterChain = `[${inputIdx}:a]`;
     const filters: string[] = [];
 
-    // Trim to total duration
-    filters.push(`atrim=0:${opts.totalDuration}`);
+    // Trim: optionally skip the source head (e.g. downbeat alignment), then
+    // cap at total duration. asetpts rebases so startTime delays still work.
+    const trimStart = Math.max(0, track.trimStart || 0);
+    filters.push(`atrim=${trimStart}:${trimStart + opts.totalDuration}`);
     filters.push(`asetpts=PTS-STARTPTS`);
 
     // Delay if startTime is set
