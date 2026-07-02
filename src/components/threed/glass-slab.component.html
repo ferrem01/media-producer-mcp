@@ -70,8 +70,11 @@
     var rootStyle = getComputedStyle(el.querySelector('.gls-root') || el);
     var brandPrimary = (rootStyle.getPropertyValue('--mp-color-primary') || '').trim();
     var glowHex = (data.glow_color && String(data.glow_color).trim()) || brandPrimary || '#393bf5';
-    var g = hexToRgb(glowHex) || { r:0.22, g:0.23, b:0.96 };
-    var glowColor = new THREE.Color(g.r, g.g, g.b);
+    if (!hexToRgb(glowHex)) glowHex = '#393bf5';
+    // Construct from the hex STRING so three applies the sRGB->linear working-space
+    // conversion. Feeding raw sRGB floats in as linear is what washed the brand
+    // blue out to pale lavender on output (linear 0.22 -> sRGB ~0.52).
+    var glowColor = new THREE.Color(glowHex);
 
     // ── Aspect ──
     function parseAspect(s) {
@@ -114,8 +117,11 @@
       clearcoat: 1.0,
       clearcoatRoughness: 0.06,
       reflectivity: 0.6,
+      // Emissive drives the glow. Keep the intensity such that only the BLUE
+      // channel crosses the bloom threshold (>1.05) -- if red/green cross too,
+      // the additive bloom washes the brand blue out to white.
       emissive: glowColor,
-      emissiveIntensity: 1.6,   // the glowing edge/tint that bloom picks up
+      emissiveIntensity: 0.9,
       transparent: false
     });
     var glass = new THREE.Mesh(glassGeo, glassMat);
@@ -133,7 +139,10 @@
       var loader = new THREE.TextureLoader();
       loader.setCrossOrigin('anonymous');
       loader.load(String(data.screenshot), function (tex) {
-        tex.colorSpace = THREE.SRGBColorSpace;
+        // NoColorSpace on purpose: the screen is an unlit basic material and the
+        // composer has no output pass to re-encode, so decoding sRGB->linear here
+        // would ship darker, hue-shifted UI colors. Pass source pixels through.
+        tex.colorSpace = THREE.NoColorSpace;
         tex.anisotropy = 1;
         screenMat.map = tex;
         screenMat.color = new THREE.Color(0xffffff);
@@ -155,11 +164,31 @@
     rim.position.set(0, 0, 2.2);
     scene.add(rim);
 
-    // ── Bloom on the glowing edges ──
+    // ── Selective bloom (classic two-composer technique) ──
+    // A single global bloom pass cannot work here: bloom thresholds are
+    // LUMINANCE-weighted (blue ~0.11), so a white light-mode screenshot always
+    // out-lumas the blue glass edge -- either the whole UI blooms into a blown
+    // white rectangle or nothing blooms. Instead: render a bloom pass with the
+    // screen blacked out (mesh kept, so occlusion is preserved), then additively
+    // composite it over the base render.
+    var blackMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    var bloomComposer = new THREE.EffectComposer(renderer);
+    bloomComposer.renderToScreen = false;
+    bloomComposer.addPass(new THREE.RenderPass(scene, camera));
+    var bloom = new THREE.UnrealBloomPass(new THREE.Vector2(RW, RH), 0.55, 0.28, 0.0);
+    bloomComposer.addPass(bloom);
+
     var composer = new THREE.EffectComposer(renderer);
     composer.addPass(new THREE.RenderPass(scene, camera));
-    var bloom = new THREE.UnrealBloomPass(new THREE.Vector2(RW, RH), 0.9, 0.5, 0.55);
-    composer.addPass(bloom);
+    var mixPass = new THREE.ShaderPass(new THREE.ShaderMaterial({
+      uniforms: {
+        baseTexture: { value: null },
+        bloomTexture: { value: bloomComposer.renderTarget2.texture }
+      },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform sampler2D baseTexture; uniform sampler2D bloomTexture; varying vec2 vUv; void main(){ gl_FragColor = texture2D(baseTexture, vUv) + texture2D(bloomTexture, vUv); }'
+    }), 'baseTexture');
+    composer.addPass(mixPass);
 
     // ── Caption (DOM overlay) ──
     if (captionEl) {
@@ -191,6 +220,12 @@
       camera.position.z = CAM_Z - 0.35 * pushP;
       // rim light drifts with the turn to keep the specular alive
       rim.position.x = -1.6 * (1 - rp);
+      // Selective bloom: bloom pass sees the screen blacked out (occlusion kept),
+      // then the mix pass composites bloom over the true render.
+      var liveMat = screenMesh.material;
+      screenMesh.material = blackMat;
+      bloomComposer.render();
+      screenMesh.material = liveMat;
       composer.render();
     }
 
