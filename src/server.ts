@@ -64,7 +64,7 @@ const animationSchema = z.object({
 }).optional();
 
 const transitionSchema = z.object({
-  type: z.enum(["crossfade", "wipe-left", "wipe-right", "slide-up", "slide-down", "iris", "none"]),
+  type: z.enum(["crossfade", "blur-crossfade", "wipe-left", "wipe-right", "slide-up", "slide-down", "iris", "glass-turn", "none"]),
   duration_seconds: z.number(),
 }).optional();
 
