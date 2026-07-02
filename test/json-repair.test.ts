@@ -47,4 +47,22 @@ describe("parseLlmJson", () => {
   it("throws a labeled, truncated error when nothing parses", () => {
     expect(() => parseLlmJson("not json at all", "test context")).toThrow(/Invalid JSON from test context/);
   });
+
+  it("on genuine syntax breakage, surfaces the real error and enough surrounding text to diagnose it (not just the first 300 chars)", () => {
+    // A trailing comma deep inside a large object -- the break point is well
+    // past the first 300 characters, which the old truncate-from-the-start
+    // error message could never show.
+    const padding = "x".repeat(500);
+    const raw = `{"padding": "${padding}", "broken": [1, 2,]}`;
+    let thrown: Error | undefined;
+    try { parseLlmJson(raw, "deep break test"); } catch (e) { thrown = e as Error; }
+    expect(thrown).toBeDefined();
+    // The real JSON.parse error (not a generic message) is present...
+    expect(thrown!.message).toMatch(/JSON|token/i);
+    // ...and the part of the text that actually broke ("2,]") is surfaced,
+    // whether via a "position N" offset (older V8) or an embedded snippet
+    // resolved back to a location (newer V8) -- either way it must NOT be
+    // buried only in the truncated 2000-char head (padding pushes it out).
+    expect(thrown!.message).toContain("2,]");
+  });
 });
