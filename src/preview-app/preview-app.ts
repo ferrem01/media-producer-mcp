@@ -1662,13 +1662,13 @@ export function getPreviewHtml(): string {
       var parts = [b.label || '', (b.duration_seconds != null ? b.duration_seconds : ''), b.action || ''];
       if (b.voiceover_text) parts.push(b.voiceover_text);
       return parts.join(' | ');
-    }).join('\n');
+    }).join('\\n');
   }
 
   // Parse the editor textarea back into beats. Lines: "label | seconds | action | voiceover".
   function textToBeats(text) {
     var beats = [];
-    (text || '').split('\n').forEach(function(line) {
+    (text || '').split('\\n').forEach(function(line) {
       if (!line.trim()) return;
       var parts = line.split('|').map(function(p) { return p.trim(); });
       if (parts.length < 3) return;
