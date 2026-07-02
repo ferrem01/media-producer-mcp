@@ -37,6 +37,8 @@ import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, encodeGif, concatSegments, applyFilmGrade } from "./encode.js";
 import { exportPdf } from "./pdf-export.js";
 import { renderTransition, extractFirstFrame, extractLastFrame, getTransitionScript, loadGsapMinimal } from "./transitions.js";
+import { renderGlassTurnTransition, sceneHasGlassSlab } from "./glass-transition.js";
+import { resolveAssetUrls } from "./scene-assembler.js";
 // Critique now runs during generate, not render
 import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
@@ -925,13 +927,53 @@ async function renderVideo(
     for (let i = 1; i < sceneMp4s.length; i++) {
       const scene = project.scenes[i];
       const prevScene = project.scenes[i - 1];
-      const transitionType = scene.transition_in?.type || "crossfade";
+      let transitionType: string = scene.transition_in?.type || "crossfade";
       const transitionDuration = scene.transition_in?.duration_seconds || 0.5;
 
       if (transitionType === "none") {
         // No transition, just append the scene
         segments.push(sceneMp4s[i]);
         continue;
+      }
+
+      // ── Shared-element match cut between glass-slab scenes ──
+      // A crossfade between frozen frames breaks object continuity when both
+      // neighbors are glass-slab scenes: the transition instead reuses the
+      // component itself and turns the pane back to edge-on (= scene B's
+      // opening pose), so one continuous object carries across the cut.
+      // Default transitions auto-upgrade; explicit non-default choices are
+      // respected.
+      const bothGlass = sceneHasGlassSlab(prevScene) && sceneHasGlassSlab(scene);
+      if (bothGlass && (transitionType === "glass-turn" || transitionType === "crossfade" || transitionType === "blur-crossfade")) {
+        const glassComp = prevScene.components.find((c) => c.type === "glass-slab");
+        const glassSource = _componentSources.find((s) => s.type === "glass-slab")?.source;
+        if (glassComp && glassSource) {
+          const glassWorkDir = path.join(workDir, `transition_${i - 1}_${i}`);
+          try {
+            console.log(`\n  Transition ${i - 1}->${i}: glass-turn (${transitionDuration}s)${transitionType !== "glass-turn" ? ` [upgraded from ${transitionType}]` : ""}`);
+            const mp4 = await renderGlassTurnTransition({
+              glassData: resolveAssetUrls(glassComp.data as Record<string, any>, false),
+              sceneDurationA: prevScene.duration_seconds,
+              motion: project.brand_kit?.style?.motion,
+              duration: transitionDuration,
+              width: project.canvas.width,
+              height: project.canvas.height,
+              fps: project.canvas.fps,
+              workDir: glassWorkDir,
+              gsapDir,
+              componentSource: glassSource,
+            });
+            segments.push(mp4);
+            segments.push(sceneMp4s[i]);
+            continue;
+          } catch (e: any) {
+            console.warn(`  glass-turn failed (falling back to crossfade): ${e.message}`);
+          }
+        }
+        transitionType = "crossfade";
+      } else if (transitionType === "glass-turn") {
+        // glass-turn requested but the neighbors aren't both glass scenes.
+        transitionType = "crossfade";
       }
 
       // Extract last frame of previous scene and first frame of current scene

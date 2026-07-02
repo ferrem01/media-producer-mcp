@@ -209,6 +209,12 @@
         screenMat.map = tex;
         screenMat.color = new THREE.Color(0xffffff);
         screenMat.needsUpdate = true;
+        // Texture-ready barrier for callers whose FIRST frame shows the face
+        // (the glass-turn transition); normal scenes never need it because the
+        // face stays hidden through the edge-on hold.
+        if (typeof data.__onTexture === 'function') data.__onTexture();
+      }, undefined, function () {
+        if (typeof data.__onTexture === 'function') data.__onTexture();
       });
     }
 
@@ -341,6 +347,11 @@
       var capAt = Math.max(holdDur + rotDur, (ctx.duration || 6.5) - 1.6);
       tl.to(captionEl, { autoAlpha: 1, y: 0, duration: 1.0, ease: 'power2.out' }, capAt);
     }
+
+    // Timing meta for the glass-turn transition (shared-element match cut):
+    // it seeks this timeline in reverse and needs to know where the turn
+    // lives so the turn-away fills the transition instead of the push-in.
+    tl.__gls = { holdDur: holdDur, rotDur: rotDur };
     } catch (e) {
       // WebGL setup/render failed under software rasterization: degrade to an
       // empty (black) timeline rather than hanging the readiness probe.

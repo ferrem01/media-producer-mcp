@@ -81,10 +81,13 @@ Pick the track **before** storyboarding. Rhythm is the #1 perceived-quality sign
 - [x] **Motif discipline**: exactly ONE caption style per film — prompt rule in
       `storyboard-builder.ts` + deterministic `unifyCaptionStyle()` in `pipeline.ts`.
       Extend next to: one accent behavior, one background strategy family.
-- [ ] **Shared-element transitions (cheap match cut)**: both endpoint states of a
-      component are deterministic, so a transition segment can animate the *actual
-      component* (e.g. glass-slab) from scene A's rest pose to scene B's opening
-      pose, swapping content mid-move. Prototype with glass-slab.
+- [x] **Shared-element transitions (cheap match cut)**: `glass-turn`
+      (`src/core/glass-transition.ts`) reuses the glass-slab component itself and
+      seeks its deterministic timeline in reverse — rest pose with screenshot A
+      turns back to edge-on, which is pixel-identical to scene B's opening frame.
+      Auto-upgrades default crossfades between adjacent glass-slab scenes;
+      exposed to the storyboard as transition type `glass-turn`. Next: generalize
+      the pattern to other components (a `transitionFrom` contract).
 - [ ] **A `Look` object**: treatment emits {typeTreatment, captionStyle, motif,
       accentBehavior, gradePreset} as *data*; editorial critique validates against it.
 - [ ] **Sequences** (the real fix): render groups of beats as ONE HTML document with
