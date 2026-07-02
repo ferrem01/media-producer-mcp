@@ -2008,22 +2008,56 @@ async function runUnifiedPipeline(
           console.log(`  Scene ${i + 1}: brand video clip, correctness gate only`);
         }
 
-        const generated = await generateScene({
-          scene: draft,
-          sceneIndex: i,
-          totalScenes: storyboard.scenes.length,
-          prompt: richPrompt,
-          format,
-          llmConfig: opts.llmConfig,
-          brandKit,
-          canvas,
-          imageUrl,
-          tenantId: opts.tenant_id,
-          projectId,
-          referenceImages: processedRefs,
-          treatment,
-          brollVideoUrl: brollUrlMap.get(i),
-        });
+        // The initial codegen call has no critique-loop safety net around it
+        // yet (that only starts once a scene HTML exists) -- an uncaught
+        // throw here (e.g. a max_tokens truncation on an unusually large
+        // beats-heavy scene) rejects this batch entry and takes down the
+        // ENTIRE Promise.all, killing every other scene's work too. One
+        // retry with beats stripped (the single biggest driver of codegen
+        // output size) gives a real shot at fitting the budget before we
+        // let a single scene sink the whole film.
+        let generated;
+        try {
+          generated = await generateScene({
+            scene: draft,
+            sceneIndex: i,
+            totalScenes: storyboard.scenes.length,
+            prompt: richPrompt,
+            format,
+            llmConfig: opts.llmConfig,
+            brandKit,
+            canvas,
+            imageUrl,
+            tenantId: opts.tenant_id,
+            projectId,
+            referenceImages: processedRefs,
+            treatment,
+            brollVideoUrl: brollUrlMap.get(i),
+          });
+        } catch (e: any) {
+          console.error(`  Scene ${i + 1} "${draft.label}" generation failed (${e.message}) -- retrying with beats stripped (smaller codegen output).`);
+          const simplifiedDraft = {
+            ...draft,
+            beats: undefined,
+            visual_notes: `${draft.visual_notes || draft.purpose || ""}\n\nKEEP IT SIMPLE: the full version of this scene was too large to generate in one response. One clear idea, minimal elements, no beat-by-beat progression.`,
+          };
+          generated = await generateScene({
+            scene: simplifiedDraft,
+            sceneIndex: i,
+            totalScenes: storyboard.scenes.length,
+            prompt: richPrompt,
+            format,
+            llmConfig: opts.llmConfig,
+            brandKit,
+            canvas,
+            imageUrl,
+            tenantId: opts.tenant_id,
+            projectId,
+            referenceImages: processedRefs,
+            treatment,
+            brollVideoUrl: brollUrlMap.get(i),
+          });
+        }
 
         // Save custom component HTML if needed
         if (generated.customSources) {

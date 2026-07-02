@@ -568,11 +568,15 @@ Read the spec, then write your scene HTML and submit it.`;
       });
     }
 
+    // A beats-heavy continuous-take scene (one persistent world, 12-24s, 4-6
+    // beats each wiring its own timeline segment) genuinely needs more HTML/
+    // CSS/GSAP than a flat 5s scene ever did -- 16384 truncated a real
+    // multi-beat scene's submit_scene call mid-tag.
     var response = await callLLMAgentic(
       opts.llmConfig,
       messages,
       TOOLS,
-      { temperature: 0.6, maxTokens: 16384 },
+      { temperature: 0.6, maxTokens: 32000 },
     );
 
     // A response cut off by the token budget mid tool-call means submit_scene's
@@ -582,7 +586,7 @@ Read the spec, then write your scene HTML and submit it.`;
     // error with no hint that the real cause was truncation.
     if (response.stopReason === "max_tokens") {
       throw new Error(
-        `Agentic codegen response truncated: hit max_tokens (16384) before finishing scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). Raise maxTokens or shorten the scene spec.`
+        `Agentic codegen response truncated: hit max_tokens (32000) before finishing scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). Raise maxTokens or shorten the scene spec.`
       );
     }
 
