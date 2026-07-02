@@ -334,6 +334,11 @@ Only call finish_scene once template, style, and the full script are all written
 assembles and validates the document. This keeps every individual call small regardless of
 how long or beat-heavy the scene is; there is no size penalty for using more calls.
 
+IMPORTANT: put each tool call in its OWN turn (call one, see the confirmation, then call the
+next) rather than batching write_template + write_style + write_script together in a single
+response -- a batched turn's combined output is what actually risks running long, even when
+each individual section is reasonably sized. One tool call per turn is always safe.
+
 ## Design Skills (FOLLOW THESE RULES)
 
 ${designSkills}
@@ -621,20 +626,22 @@ Read the spec, then write your scene using write_template / write_style / write_
       });
     }
 
+    // max_tokens caps the WHOLE turn's output, not each tool call individually
+    // -- the model is free to batch several write_*/append_script calls into
+    // one turn (e.g. template + style + the first script chunk together), and
+    // their combined size counts against the same budget. 8192 truncated a
+    // real scene this way; 16000 gives room for a realistic multi-call batch
+    // while staying well under the old 32000-for-the-whole-document cap.
     var response = await callLLMAgentic(
       opts.llmConfig,
       messages,
       TOOLS,
-      { temperature: 0.6, maxTokens: 8192 },
+      { temperature: 0.6, maxTokens: 16000 },
     );
 
-    // Each tool call now only holds ONE section (or one beat's worth of
-    // appended script), so a single turn hitting max_tokens should be rare --
-    // still fail loudly and specifically if it happens rather than silently
-    // accept a truncated chunk into the accumulator.
     if (response.stopReason === "max_tokens") {
       throw new Error(
-        `Agentic codegen response truncated: hit max_tokens (8192) mid-turn on scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). A single write_*/append_script call was too large -- write smaller chunks (e.g. one beat per append_script call).`
+        `Agentic codegen response truncated: hit max_tokens (16000) on scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). max_tokens caps the WHOLE turn, so this means either one write_*/append_script call was too large, or several were batched together in one turn -- write smaller chunks and prefer one tool call per turn (e.g. one beat per append_script call, in its own turn).`
       );
     }
 
