@@ -10,7 +10,9 @@
     position: relative;
     width: 100%;
     height: 100%;
-    background: #000000;
+    /* Deep blue ambient vignette behind the transparent canvas: the glow feels
+       like light scattering into a dark room, not a pane floating in a void. */
+    background: radial-gradient(ellipse 90% 75% at 50% 44%, #0a1030 0%, #050818 45%, #000000 100%);
     overflow: hidden;
     font-family: var(--mp-font-heading, var(--mp-font-family, 'Inter', system-ui, sans-serif));
   }
@@ -92,7 +94,7 @@
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
-    renderer.setClearColor(0x000000, 1);
+    renderer.setClearColor(0x000000, 0);   // transparent: the CSS vignette shows through
     mount.appendChild(renderer.domElement);
 
     var scene = new THREE.Scene();
@@ -100,16 +102,34 @@
     var CAM_Z = 5.0;
     camera.position.set(0, 0, CAM_Z);
 
-    // ── The glass pane (rounded, beveled) ──
+    // ── The glass pane (rounded, thin) ──
+    // THIN is what sells the Framer look: edge-on it must read as a hairline of
+    // light, not a glowing column. Face corners stay rounded via the extruded
+    // rounded-rect (a RoundedBox can't have face radius > depth/2 on a thin pane).
     var paneW = 3.4;
     var paneH = paneW / ar;
-    var depth = 0.16;
+    var depth = 0.055;
     var radius = 0.07;
-    var glassGeo = THREE.RoundedBoxGeometry
-      ? new THREE.RoundedBoxGeometry(paneW, paneH, depth, 5, radius)
-      : new THREE.BoxGeometry(paneW, paneH, depth);
-    // No transmission pass (flaky/slow under SwiftShader) -- the glass reads via
-    // clearcoat gloss + emissive glow + real specular + bloom.
+    function roundedRectPath(target, w, h, r) {
+      var x = -w / 2, y = -h / 2;
+      target.moveTo(x, y + r);
+      target.lineTo(x, y + h - r);
+      target.quadraticCurveTo(x, y + h, x + r, y + h);
+      target.lineTo(x + w - r, y + h);
+      target.quadraticCurveTo(x + w, y + h, x + w, y + h - r);
+      target.lineTo(x + w, y + r);
+      target.quadraticCurveTo(x + w, y, x + w - r, y);
+      target.lineTo(x + r, y);
+      target.quadraticCurveTo(x, y, x, y + r);
+    }
+
+    // No transmission pass (flaky/slow under SwiftShader). The Framer look is a
+    // DARK glass body -- barely-there blue tint, glossy specular -- with all the
+    // light coming from the rim ring below. Body emissive stays very low.
+    var glassShape = new THREE.Shape();
+    roundedRectPath(glassShape, paneW, paneH, radius);
+    var glassGeo = new THREE.ExtrudeGeometry(glassShape, { depth: depth, bevelEnabled: false, curveSegments: 10 });
+    glassGeo.translate(0, 0, -depth / 2);
     var glassMat = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(0x05060d),
       metalness: 0.0,
@@ -117,14 +137,28 @@
       clearcoat: 1.0,
       clearcoatRoughness: 0.06,
       reflectivity: 0.6,
-      // Emissive drives the glow. Keep the intensity such that only the BLUE
-      // channel crosses the bloom threshold (>1.05) -- if red/green cross too,
-      // the additive bloom washes the brand blue out to white.
       emissive: glowColor,
-      emissiveIntensity: 0.9,
+      emissiveIntensity: 0.05,
       transparent: false
     });
     var glass = new THREE.Mesh(glassGeo, glassMat);
+
+    // ── The glowing rim: a thin extruded rounded-rect ring wrapping the pane's
+    // edge. This is the ONLY strong bloom source -- a blue line with a hot core
+    // and a soft blue halo tracing the contour, like the Framer reveal. ──
+    var ringW = 0.016;
+    var ringDepth = depth * 1.12;
+    var rimShape = new THREE.Shape();
+    roundedRectPath(rimShape, paneW + 0.016, paneH + 0.016, radius + 0.008);
+    var rimHole = new THREE.Path();
+    roundedRectPath(rimHole, paneW + 0.016 - ringW * 2, paneH + 0.016 - ringW * 2, Math.max(0.02, radius + 0.008 - ringW));
+    rimShape.holes.push(rimHole);
+    var rimGeo = new THREE.ExtrudeGeometry(rimShape, { depth: ringDepth, bevelEnabled: false, curveSegments: 10 });
+    rimGeo.translate(0, 0, -ringDepth / 2);
+    // Mostly brand blue with a slight lift toward white; bloom supplies the halo.
+    var rimColor = glowColor.clone().lerp(new THREE.Color(0xffffff), 0.12).multiplyScalar(1.25);
+    var rimMat = new THREE.MeshBasicMaterial({ color: rimColor });
+    var rimMesh = new THREE.Mesh(rimGeo, rimMat);
 
     // ── The screen (screenshot) sitting just in front of the glass face ──
     var screenW = paneW * 0.93, screenH = paneH * 0.93;
@@ -152,12 +186,13 @@
 
     var slab = new THREE.Group();
     slab.add(glass);
+    slab.add(rimMesh);
     slab.add(screenMesh);
     scene.add(slab);
 
     // ── Lighting: real specular that shifts as the pane turns ──
-    scene.add(new THREE.AmbientLight(0x223055, 0.6));
-    var key = new THREE.DirectionalLight(0xbcc6ff, 2.2);
+    scene.add(new THREE.AmbientLight(0x223055, 0.35));
+    var key = new THREE.DirectionalLight(0xbcc6ff, 1.4);
     key.position.set(-3, 2.5, 4);
     scene.add(key);
     var rim = new THREE.PointLight(glowColor, 3.0, 20);
@@ -175,7 +210,9 @@
     var bloomComposer = new THREE.EffectComposer(renderer);
     bloomComposer.renderToScreen = false;
     bloomComposer.addPass(new THREE.RenderPass(scene, camera));
-    var bloom = new THREE.UnrealBloomPass(new THREE.Vector2(RW, RH), 0.55, 0.28, 0.0);
+    // Strength/radius sized for a THIN line source: the fat, soft blue halo
+    // around the rim comes from here.
+    var bloom = new THREE.UnrealBloomPass(new THREE.Vector2(RW, RH), 1.0, 0.5, 0.0);
     bloomComposer.addPass(bloom);
 
     var composer = new THREE.EffectComposer(renderer);
@@ -220,6 +257,11 @@
       camera.position.z = CAM_Z - 0.35 * pushP;
       // rim light drifts with the turn to keep the specular alive
       rim.position.x = -1.6 * (1 - rp);
+      // The screen wakes up as the pane comes to face the camera (Framer-style:
+      // during the turn the face is dark glass, then the UI lights up).
+      var wake = clamp01((rp - 0.72) / 0.28);
+      var lum = 0.08 + 0.92 * wake * wake;
+      screenMat.color.setRGB(lum, lum, lum);
       // Selective bloom: bloom pass sees the screen blacked out (occlusion kept),
       // then the mix pass composites bloom over the true render.
       var liveMat = screenMesh.material;
