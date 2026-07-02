@@ -50,8 +50,13 @@ export interface Config {
   previewQuality: QualityPreset;
   /** Production quality preset (full resolution) */
   productionQuality: QualityPreset;
-  /** LLM configuration for critique calls (faster/cheaper model) */
+  /** LLM for focused defect DETECTORS + cheap utility calls (Haiku-class:
+   *  single-purpose detection is what small models do well) */
   critiqueLlm: LLMConfig;
+  /** LLM for the single per-scene TASTE judge (holistic aesthetic score +
+   *  intent match). Judgment quality pays for a stronger model; its prompt is
+   *  short because all mechanical checks moved to gates/detectors. */
+  tasteLlm: LLMConfig;
   /** logo.dev publishable token used by the logo component for company logos */
   logoDevToken: string;
 }
@@ -87,6 +92,11 @@ export const config: Config = {
   critiqueLlm: {
     provider: "anthropic",
     model: process.env.MP_CRITIQUE_MODEL || "claude-haiku-4-5",
+    apiKey: process.env.ANTHROPIC_API_KEY || "",
+  },
+  tasteLlm: {
+    provider: "anthropic",
+    model: process.env.MP_TASTE_MODEL || "claude-sonnet-5",
     apiKey: process.env.ANTHROPIC_API_KEY || "",
   },
   logoDevToken: process.env.MP_LOGODEV_TOKEN || "pk_B_cdrQLyTkSFPzSMm52goQ",

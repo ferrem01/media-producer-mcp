@@ -145,6 +145,29 @@ above. Current wiring (`src/config.ts`):
 - [ ] Re-run the quality eval set after each model bump — model upgrades sometimes
       shift prompt-adherence in ways the bibles were tuned around.
 
+### Pillar 7 — Layered critique funnel (recall) `P0`
+A single fully-loaded rubric asks one vision call to check ~10 things; the model
+satisfices — it reports the 2-3 most salient problems and implicitly passes the
+rest. The funnel splits critique by what each layer is good at:
+
+| Layer | What | Model | Blocking |
+|-------|------|-------|----------|
+| 0 | Deterministic gates: contrast, clipped text, ghost panels, dead frames, runtime | code | yes |
+| 1 | Parallel single-purpose detectors: empty_skeleton, dropped_element, overlap, stray_ui, off_brand_theme, missing_asset — each returns yes/no + **evidence**, verified against the scene DOM / spec text (hallucination guard) | `critiqueLlm` (Haiku) | yes, if evidence verifies |
+| 2 | ONE holistic taste judge: score, craft, premium feel, intent_mismatch — short prompt, no mechanical hunting | `tasteLlm` (`MP_TASTE_MODEL`, default `claude-sonnet-5`) | score < 7 |
+
+- [x] Layer 1 built (`src/llm/focused-detectors.ts`): detectors run in parallel
+      with the taste call (no added latency), video-only clips exempt,
+      infra/parse failures never block, findings whose quoted evidence doesn't
+      exist in the scene text are dropped.
+- [x] Layer 2: `consolidated-critique.ts` slimmed to the taste judge and moved
+      to the new `tasteLlm` config (falls back to the critique model when no
+      API key).
+- [ ] Per-detector eval sets: label ~20 frames per defect class, measure
+      recall/precision per detector, tune prompts independently.
+- [ ] Migrate more of Layer 1 to Layer 0 where a deterministic proxy exists
+      (overlap via DOM rect intersection of text elements is the next one).
+
 ### Hygiene / correctness backlog
 - [x] Ducking schema bug (silently dead in auto pipeline) — fixed.
 - [x] **Critique enforcement gaps** (found via the first full-stack film: shipped
