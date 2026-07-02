@@ -43,6 +43,7 @@ import { processReferenceImages } from "./reference-images.js";
 import { type CritiqueResult } from "./critiquer.js";
 import { critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { formatCorrectnessDefects, type CorrectnessResult, type CorrectnessDefect } from "./correctness-critique.js";
+import { parseLlmJson } from "./json-repair.js";
 import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
 import { runFocusedDetectors } from "./focused-detectors.js";
 import { tileFramesToStoryboard } from "./editorial-vision.js";
@@ -1477,9 +1478,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         const fixRaw = await callLLM(opts.critiqueLlmConfig || opts.llmConfig, [
           { role: "user", content: fixPrompt },
         ], { temperature: 0.3, maxTokens: 4096 });
-        const trimmed = fixRaw.trim();
-        const jsonMatch = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
-        fixedScene = JSON.parse(jsonMatch ? jsonMatch[1].trim() : trimmed);
+        fixedScene = parseLlmJson(fixRaw, "fix-storyboard");
       } catch (e: any) {
         console.log(`  Critique fix-storyboard failed to parse: ${e.message}, keeping best (score ${bestScore})`);
         break;

@@ -16,6 +16,7 @@
  */
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import type { CorrectnessDefect, CorrectnessResult } from "./correctness-critique.js";
+import { parseLlmJson } from "./json-repair.js";
 
 export interface ConsolidatedCritiqueResult {
   /** Aesthetic score 1-10 (functional + premium "feel" combined). */
@@ -88,7 +89,7 @@ export async function critiqueConsolidated(opts: {
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userContent },
     ], { temperature: 0.3 });
-    parsed = JSON.parse(raw.trim().replace(/^```json?\s*/i, "").replace(/```$/i, "").trim());
+    parsed = parseLlmJson(raw, "consolidated critique");
   } catch {
     // Never block generation on a critique infra failure -> treat as a clean pass.
     return { score: 8, issues: [], suggestions: [], defects: [] };

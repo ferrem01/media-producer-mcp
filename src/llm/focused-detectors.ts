@@ -22,6 +22,7 @@
 
 import { callLLM, type LLMConfig, type LLMContentPart } from "./client.js";
 import type { CorrectnessDefect } from "./correctness-critique.js";
+import { parseLlmJson } from "./json-repair.js";
 
 export interface DetectorInstance {
   /** Quoted text or spec phrase backing the finding ("" when purely visual). */
@@ -185,7 +186,7 @@ async function runDetector(
       { role: "system", content: spec.system },
       { role: "user", content: userContent },
     ], { temperature: 0.1 });
-    parsed = JSON.parse(raw.trim().replace(/^```json?\s*/i, "").replace(/```$/i, "").trim());
+    parsed = parseLlmJson(raw, `${spec.type} detector`);
   } catch {
     // Infra/parse failure never blocks generation.
     return { type: spec.type, defects: [], droppedInstances: 0 };
