@@ -156,9 +156,37 @@
     var rimGeo = new THREE.ExtrudeGeometry(rimShape, { depth: ringDepth, bevelEnabled: false, curveSegments: 10 });
     rimGeo.translate(0, 0, -ringDepth / 2);
     // Mostly brand blue with a slight lift toward white; bloom supplies the halo.
+    // Brightness is corner-weighted (hot at the top-left, decaying along the run)
+    // like the reference -- a uniform ring reads as cheap neon.
     var rimColor = glowColor.clone().lerp(new THREE.Color(0xffffff), 0.12).multiplyScalar(1.25);
-    var rimMat = new THREE.MeshBasicMaterial({ color: rimColor });
+    var rimMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: rimColor },
+        uHalf: { value: new THREE.Vector2(paneW / 2, paneH / 2) }
+      },
+      vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: [
+        'uniform vec3 uColor; uniform vec2 uHalf; varying vec2 vP;',
+        'void main(){',
+        '  float w = clamp(0.5 - (vP.x / uHalf.x) * 0.42 + (vP.y / uHalf.y) * 0.40, 0.0, 1.0);',
+        '  float b = 0.5 + 1.7 * w * w;',
+        '  gl_FragColor = vec4(uColor * b, 1.0);',
+        '}'
+      ].join('\n')
+    });
     var rimMesh = new THREE.Mesh(rimGeo, rimMat);
+
+    // ── Fresnel sheen: a grazing-angle blue wash over the glass body that lives
+    // during the turn and dies as the pane squares up. Additive, subtle. ──
+    var fresnelMat = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: glowColor.clone() } },
+      vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+      fragmentShader: 'uniform vec3 uColor; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.0); gl_FragColor = vec4(uColor * f * 0.22, 1.0); }',
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      transparent: true
+    });
+    var fresnelMesh = new THREE.Mesh(glassGeo, fresnelMat);
 
     // ── The screen (screenshot) sitting just in front of the glass face ──
     var screenW = paneW * 0.93, screenH = paneH * 0.93;
@@ -186,6 +214,7 @@
 
     var slab = new THREE.Group();
     slab.add(glass);
+    slab.add(fresnelMesh);
     slab.add(rimMesh);
     slab.add(screenMesh);
     scene.add(slab);
@@ -217,13 +246,34 @@
 
     var composer = new THREE.EffectComposer(renderer);
     composer.addPass(new THREE.RenderPass(scene, camera));
+    // The composite also carries the film grade: vignette, a gentle contrast
+    // lift, and grain. Grain is seeded from uTime = the timeline's t, so every
+    // frame is deterministic under the seek-based capture.
     var mixPass = new THREE.ShaderPass(new THREE.ShaderMaterial({
       uniforms: {
         baseTexture: { value: null },
-        bloomTexture: { value: bloomComposer.renderTarget2.texture }
+        bloomTexture: { value: bloomComposer.renderTarget2.texture },
+        uTime: { value: 0 }
       },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform sampler2D baseTexture; uniform sampler2D bloomTexture; varying vec2 vUv; void main(){ gl_FragColor = texture2D(baseTexture, vUv) + texture2D(bloomTexture, vUv); }'
+      fragmentShader: [
+        'uniform sampler2D baseTexture; uniform sampler2D bloomTexture; uniform float uTime; varying vec2 vUv;',
+        'float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }',
+        'void main(){',
+        '  vec4 b = texture2D(baseTexture, vUv);',
+        '  vec4 bl = texture2D(bloomTexture, vUv);',
+        '  vec4 c = b + bl;',
+        // Content mask: geometry (base alpha) or glow (bloom energy). Keeps the
+        // grade/grain off the empty background so it stays clean.
+        '  float m = clamp(b.a + dot(bl.rgb, vec3(2.0)), 0.0, 1.0);',
+        '  float d = distance(vUv, vec2(0.5, 0.47));',
+        '  c.rgb *= 1.0 - 0.30 * smoothstep(0.38, 0.95, d);',         // vignette
+        '  c.rgb = c.rgb * 1.04 + vec3(0.003, 0.005, 0.016) * m;',    // grade: contrast + navy lift
+        '  float g = hash(vUv * vec2(1287.0, 718.0) + fract(uTime * 7.13)) - 0.5;',
+        '  c.rgb += g * 0.012 * m;',                                   // film grain (subtle, content only)
+        '  gl_FragColor = c;',
+        '}'
+      ].join('\n')
     }), 'baseTexture');
     composer.addPass(mixPass);
 
@@ -240,12 +290,15 @@
     var rotDur = 2.7 * base;                  // the turn
     var startY = Math.PI / 2 + 0.10;          // just past edge-on (face turned away)
     var restY = -0.14;                        // ~ -8deg resting angle
-    function easeOutCubic(p) { return 1 - Math.pow(1 - p, 3); }
+    // Weighted mechanical turn: gentle start off the hold, long luxurious
+    // deceleration into the rest pose (the Framer feel), instead of the
+    // front-loaded kick of an ease-out.
+    function turnEase(p) { return p < 0.5 ? 8 * p * p * p * p : 1 - 8 * Math.pow(1 - p, 4); }
     function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
     function applyState(t) {
       // rotation: hold edge-on, then one continuous weighted turn
-      var rp = easeOutCubic(clamp01((t - holdDur) / rotDur));
+      var rp = turnEase(clamp01((t - holdDur) / rotDur));
       slab.rotation.y = startY + (restY - startY) * rp;
       slab.rotation.x = 0.05 * (1 - rp) + 0.03;
       slab.rotation.z = -0.01 * rp;
@@ -262,6 +315,7 @@
       var wake = clamp01((rp - 0.72) / 0.28);
       var lum = 0.08 + 0.92 * wake * wake;
       screenMat.color.setRGB(lum, lum, lum);
+      mixPass.material.uniforms.uTime.value = t;
       // Selective bloom: bloom pass sees the screen blacked out (occlusion kept),
       // then the mix pass composites bloom over the true render.
       var liveMat = screenMesh.material;
