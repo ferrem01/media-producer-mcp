@@ -67,9 +67,10 @@ Pick the track **before** storyboarding. Rhythm is the #1 perceived-quality sign
 - [x] Quantize cuts to downbeats: each (transition_in + scene) segment snapped to
       whole bars (`quantizeScenesToBars`), track head-trimmed so beat 1 = video
       t=0 (`trim_start` on the bgm track), VO extensions round up to the next bar.
-- [ ] Anchor each scene's Build→Breathe→Resolve phases to beats (pass beat offsets
-      in `ctx` so component timelines can sync — `project.audio.beat_map` is
-      already stored for this).
+- [x] Anchor scene phases to beats: `ctx.beats` ([{label, start, end}]) now flows
+      to scene AND component `createTimeline` (`scene-assembler.ts`,
+      `component-tags.ts`); storyboard beats are authored in bars on the music
+      grid and rescaled whenever the scene is re-quantized or VO-extended.
 - [x] Fix ducking: auto-pipeline wrote a config shape render never read
       (`pipeline.ts` vs `render.ts`); ducking now covers **every** VO clip window,
       not just the first (`mixer.ts` multi-trigger enable expression).
@@ -90,11 +91,20 @@ Pick the track **before** storyboarding. Rhythm is the #1 perceived-quality sign
       the pattern to other components (a `transitionFrom` contract).
 - [ ] **A `Look` object**: treatment emits {typeTreatment, captionStyle, motif,
       accentBehavior, gradePreset} as *data*; editorial critique validates against it.
-- [ ] **Sequences** (the real fix): render groups of beats as ONE HTML document with
-      a persistent world + continuous camera; hard cuts only between sequences.
-      (`composite-assembler.ts` already proves multi-scene documents work.)
-- [ ] Film-level camera plan: continuous drift/push direction across a sequence
-      instead of per-scene seeded resets (`scene-assembler.ts` camera block).
+- [x] **Beats-in-scene** (the sequences fix, without a new container level):
+      "cut = new world, beat = new thought". `SceneBeat[]` on
+      `Scene`/`StoryboardScene`/`DraftScene` (`src/core/beats.ts` for
+      normalize/rescale/timeline math). Storyboard authors 2-5 scenes with 3-6
+      beats each (bars on the music grid; per-beat VO); codegen gets a timed
+      BEAT SHEET + `ctx.beats` and `tl.addLabel` per beat; critique samples
+      contact-sheet frames at beat MIDPOINTS and the spec includes the beat
+      sheet; a deterministic **dead-beat gate** (`src/core/beat-gate.ts`,
+      changed-pixel fraction between consecutive beat midpoints) blocks beats
+      where nothing visibly happens. Studio: beats editor line-format field,
+      beat list in the storyboard panel, beat/scene tick marks on the timeline.
+- [ ] Film-level camera plan: continuous drift/push direction ACROSS beats and
+      scenes instead of per-scene seeded resets (`scene-assembler.ts` camera
+      block); beats make the drift targets explicit (`ctx.beats`).
 
 ### Pillar 3 — Golden library + adapt-don't-generate (taste) `P1`
 - [ ] Curate 20–50 exemplar scenes at glass-slab polish, parameterized by schema.

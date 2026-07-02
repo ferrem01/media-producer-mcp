@@ -15,7 +15,8 @@ import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { COMPOSITION_PLAYBOOK, PACING_PLAYBOOK } from "./cinematography.js";
 import { getStorytellingGuide } from "./design-skills.js";
 import { formatTemplateCatalogForPrompt } from "./template-catalog.js";
-import type { BrandKit, Canvas, OutputFormat, ReferenceImage } from "../core/types.js";
+import type { BrandKit, Canvas, OutputFormat, ReferenceImage, SceneBeat } from "../core/types.js";
+import { normalizeBeats, beatsVoiceover } from "../core/beats.js";
 import {
   buildReferenceImageParts,
   buildReferenceImageSummary,
@@ -75,6 +76,9 @@ export interface DraftScene {
   hero_image?: string;
   voiceover_text?: string;  // Narration script for this scene (TTS)
   broll_query?: string;     // when set, fetch cinematic stock footage as this scene's background
+  /** The scene's internal beat timeline: one persistent world, several thoughts.
+   *  Normalized (bars -> seconds, rescaled to fill the scene) after parsing. */
+  beats?: SceneBeat[];
 }
 
 export interface StoryboardResult {
@@ -90,7 +94,9 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
 
   var sceneCountGuide = opts.sceneCount
     ? `Exactly ${opts.sceneCount} scenes.`
-    : "5-8 scenes (scale to content complexity).";
+    : (opts.format === "video"
+      ? "2-5 scenes. FEWER, LONGER scenes with beats beat many short ones: a scene is a WORLD, and you only cut when the world changes (see CUT vs BEAT). A typical 30-45s film is 3-4 scenes: an opening world, one or two long living middles (12-24s each, 3-6 beats), a closing CTA world. Do NOT emit a new scene for every idea -- advance ideas with beats inside a persistent scene."
+      : "5-8 scenes (scale to content complexity).");
 
   var templateCatalogStr = formatTemplateCatalogForPrompt();
 
@@ -108,13 +114,28 @@ Each scene has visual notes (the visual direction) and a list of component types
 
 {
   "label": "Scene 1 - Connector Discovery",
-  "duration_seconds": 5,
+  "duration_seconds": 16,
   "purpose": "User discovers and activates the connector feature",
-  "visual_notes": "A clean workspace fills the frame — warm off-white background with subtle grid lines pulsing faintly. A cursor GLIDES from below toward a plus icon at center. On click, a circular button BLOOMS outward with a soft shadow spreading beneath it. The circle MORPHS into a rounded card panel. Menu items STAGGER in from the right — each row has a thin icon, label text, and a chevron. The cursor DRIFTS to Connectors, which highlights with a warm rounded fill. BG: subtle grid with breathing glow. MG: UI card with menu items. FG: cursor with drop shadow, particle hints.",
+  "visual_notes": "A clean workspace fills the frame — warm off-white background with subtle grid lines pulsing faintly. One persistent world: the workspace never resets; the card, cursor, and grid carry through every beat below, morphing and re-arranging as the idea advances. BG: subtle grid with breathing glow. MG: UI card with menu items. FG: cursor with drop shadow, particle hints.",
+  "beats": [
+    { "label": "the approach", "duration_seconds": 4, "action": "A cursor GLIDES from below toward a plus icon at center; the grid brightens along its path.", "voiceover_text": "It starts with one click." },
+    { "label": "the bloom", "duration_seconds": 5, "action": "On click, a circular button BLOOMS outward with a soft shadow, then MORPHS into a rounded card panel. Menu items STAGGER in from the right — thin icon, label, chevron.", "voiceover_text": "A menu of every connector you need." },
+    { "label": "the choice", "duration_seconds": 7, "action": "The cursor DRIFTS to Connectors, which highlights with a warm rounded fill; the card TILTS forward slightly and the other rows dim, pulling all focus to the selection.", "voiceover_text": "Pick one. The rest is automatic." }
+  ],
   "components": [],
-  "voiceover_text": "Discover the connector that changes everything.",
+  "voiceover_text": "It starts with one click. A menu of every connector you need. Pick one. The rest is automatic.",
   "transition_in": { "type": "none", "duration_seconds": 0 }
 }
+
+### CUT vs BEAT (the editorial rule that makes this a FILM, not a slide deck)
+A CUT (new scene) is earned ONLY when the WORLD changes: a different location/metaphor, the arc's emotional pivot, or the intro/outro bookends. Everything else is a BEAT: the idea advances INSIDE a persistent world -- elements morph, move, re-light, and re-arrange, but the world survives. A video that cuts on every new thought reads as a slideshow; a film holds its world and lets the thoughts move through it.
+
+Beat authoring rules:
+- Any scene longer than ~8s MUST have "beats": 3-6 of them, each 2-8s${opts.beatGrid ? ` (author "duration_bars" instead of "duration_seconds": 1-2 bars each; one bar = ${opts.beatGrid.barSec.toFixed(2)}s)` : ""}. Short bookend scenes (intro/outro/breathing, <=8s) need no beats.
+- Beat durations must sum to the scene's duration_seconds.
+- Each beat's "action" describes a VISIBLE change with motion verbs -- something enters, transforms, or re-arranges. A beat where nothing visibly changes is a storyboard failure.
+- Each beat may carry its own short "voiceover_text" (~2.5 words/second of beat); the scene's voiceover_text is their concatenation.
+- The scene's visual_notes describe the WORLD (setting, layers, what persists); the beats describe what HAPPENS in it, in order.
 
 ### Writing Great Visual Notes
 Visual notes MUST be 5+ sentences with specific motion verbs, depth layers (BG/MG/FG), and choreography.
@@ -214,7 +235,7 @@ ${catalogStr}
 ## Rules
 
 - ${sceneCountGuide}
-- **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Its visual notes must describe the whole flow as an ordered progression (step 1 → step 2 → step 3 …, each as motion: SLIDES, MORPHS, ASSEMBLES), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a storyboard failure.
+- **CONTINUOUS-TAKE OVERRIDE (takes priority over the scene count above):** If the prompt asks for a "walkthrough", "demo", "demo flow", "step by step", "continuous take", "single take", "one take", or any unbroken multi-step flow where elements should persist and transform, output **EXACTLY ONE scene** spanning the full requested duration (12-30s) -- do NOT split it into multiple scenes. Author each step as a BEAT in the scene's "beats" array (label + action + optional voiceover), set transition_in to "none", and list every library component the flow touches. The codegen LLM lays it all out on one master timeline with persistent, transforming elements. A walkthrough split across scenes reads as a slideshow and is a storyboard failure.
 - B-ROLL: if the prompt is a brand film, or has an emotional/aspirational/lifestyle opener or closer, or any "feeling / place / human moment" scene, you MUST add a "broll_query" (a specific cinematic stock-footage phrase) to at least one such scene -- see the B-Roll section. Don't default those moments to a flat gradient. (Skip b-roll entirely for pure data/UI/feature/logo/CTA videos.)
 - First scene: transition "none" or omit transition_in.
 - Valid transitions: crossfade, blur-crossfade, wipe-left, wipe-right, slide-up, slide-down, iris, morph-wipe, zoom-through, glitch-cut, scale-rotate, curtain, whip-pan, cinematic-zoom, glass-turn, shader-crosswarp, shader-ripple, shader-radial, shader-directional-warp, shader-burn, shader-chromatic, shader-lens-distortion, shader-swirl, shader-pixelize, none.
@@ -230,8 +251,8 @@ ${catalogStr}
 - hero_image and broll_query are MUTUALLY EXCLUSIVE on a single scene -- pick one (moving footage OR a still image), never both.
 - hero_image prompts describe the IMAGE itself, not the scene layout.
 - Every scene MUST have a components array with at least one component.
-- Think Apple keynote: one powerful idea per scene, cinematic motion, premium aesthetic.
-- MANDATORY: For EACH scene (except intro/outro/breathing), you MUST include a "voiceover_text" field with narration that FITS the scene duration. Missing voiceover is a storyboard failure. CRITICAL: at ~150 words per minute, a 5-second scene fits ~12 words (1 short sentence), a 6-second scene fits ~15 words, a 7-second scene fits ~17 words. NEVER write more words than the scene duration allows. Keep narration punchy -- one idea per scene. Skip voiceover_text for intro/outro brand asset scenes and breathing pauses.
+- Think FILM, not keynote: one powerful WORLD per scene, one idea per BEAT, cinematic motion, premium aesthetic. Cut = new world, beat = new thought.
+- MANDATORY: For EACH scene (except intro/outro/breathing), you MUST include a "voiceover_text" field with narration that FITS the scene duration. Missing voiceover is a storyboard failure. CRITICAL: at ~150 words per minute, a 5-second scene fits ~12 words (1 short sentence), a 6-second scene fits ~15 words, a 7-second scene fits ~17 words. NEVER write more words than the scene duration allows. Keep narration punchy -- one idea per beat. On scenes WITH beats, narrate per beat ("voiceover_text" on each beat, ~2.5 words/second of beat) and make the scene's voiceover_text their concatenation. Skip voiceover_text for intro/outro brand asset scenes and breathing pauses.
 - For IMAGE format: write comprehensive visual notes covering the entire visual composition. List components only if library UI elements fit.
 - For PRESENTATION/DECK format: treat each slide as a self-contained visual composition. Write detailed visual notes per slide.
 - For VIDEO: write rich visual notes per scene and list matching library components for UI elements.
@@ -427,6 +448,19 @@ Prefer Speaker templates over regular templates when the speaker should be visib
       scene.visual_notes = scene.purpose || scene.label || "";
     }
     if (!scene.purpose) scene.purpose = scene.label || "";
+
+    // Beats: convert bars -> seconds, drop unusable entries, rescale to fill the
+    // scene exactly. A scene with < 2 usable beats is just a scene (beats: undefined).
+    const beats: SceneBeat[] | undefined = normalizeBeats(scene.beats, scene.duration_seconds || 5, opts.beatGrid?.barSec);
+    scene.beats = beats;
+    if (beats) {
+      // Scene voiceover is the single TTS source of truth; when the model only
+      // narrated per-beat, concatenate for the scene.
+      if (!scene.voiceover_text) scene.voiceover_text = beatsVoiceover(beats);
+      console.log(`  Scene "${scene.label}": ${beats.length} beats [${beats.map((b: SceneBeat) => `${b.label} ${b.duration_seconds}s`).join(" | ")}]`);
+    } else if ((scene.duration_seconds || 5) > 10) {
+      console.warn(`  Scene "${scene.label}": ${scene.duration_seconds}s with no usable beats -- long scenes should carry a beat timeline.`);
+    }
   }
 
   var componentHints = 0;

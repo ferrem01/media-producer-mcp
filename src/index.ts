@@ -21,6 +21,7 @@ import { generateComponent, saveGeneratedComponent } from "./core/component-gene
 import { writeComponentSchema } from "./core/component-schema.js";
 import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
 import { reviseScene, undoScene } from "./llm/scene-revise.js";
+import { normalizeBeats } from "./core/beats.js";
 import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit } from "./persistence/brand-kit.js";
@@ -164,6 +165,12 @@ function applyStoryboardFields(ps: any, body: any): void {
     ps.components = body.components.filter((c: any) => typeof c === "string" && c.trim()).map((c: string) => c.trim());
   } else if (typeof body?.components === "string") {
     ps.components = body.components.split(",").map((c: string) => c.trim()).filter(Boolean);
+  }
+  // Beats: accept an array of {label, duration_seconds, action, voiceover_text}
+  // and normalize it against the scene's (possibly just-updated) duration.
+  // An empty array explicitly clears the beat timeline.
+  if (Array.isArray(body?.beats)) {
+    ps.beats = normalizeBeats(body.beats, ps.duration_seconds || 5);
   }
 }
 
