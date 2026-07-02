@@ -1273,8 +1273,9 @@ async function critiqueAndRetryScene(opts: {
           });
           for (const d of layoutDefects) {
             correctness.defects.push({ type: d.type, detail: d.detail });
-            critiqueResult.issues.push(d.type === "invisible_surface"
-              ? "A panel/card has near-zero separation from the background (ghost panel)"
+            critiqueResult.issues.push(
+              d.type === "invisible_surface" ? "A panel/card has near-zero separation from the background (ghost panel)"
+              : d.type === "edge_bleed" ? "A decorative/photo element bleeds across a frame border (positioned partially off-canvas)"
               : "Large empty/flat region -- the frame reads as sparse/dead");
           }
           if (layoutDefects.length > 0) {

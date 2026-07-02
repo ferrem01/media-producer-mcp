@@ -9,11 +9,17 @@
  * violated -- the same deterministic approach as the text-contrast gate, but for
  * surface separation and content coverage instead of text legibility.
  *
- * Two checks:
+ * Three checks:
  *   - invisible_surface: a panel/card/window whose fill is within a few % lightness
  *     of the page background AND has no visible border or shadow -> a ghost panel.
  *   - dead_frame: content occupies very little of the canvas, or a tall band is
  *     empty, AND no rich full-bleed background fills that space -> a dead/empty frame.
+ *   - edge_bleed: a decorative/photographic element positioned partially off-canvas
+ *     (e.g. `bottom: -80px`) leaks a strip of foreign texture across a frame border.
+ *     Detected by comparing each edge's outermost pixel strip against the strip just
+ *     inboard of it: real edge content (a full-bleed photo/video, an intentional
+ *     vignette) has SIMILAR texture at the edge and just inside it; a clipped stray
+ *     element creates an ABRUPT noise spike confined to the outermost strip only.
  */
 
 import { execFile } from "node:child_process";
@@ -27,7 +33,7 @@ import { captureSingleFrame, type LayoutProbeResult, type SurfaceMetric } from "
 const execFileAsync = promisify(execFile);
 
 export interface LayoutDefect {
-  type: "invisible_surface" | "dead_frame";
+  type: "invisible_surface" | "dead_frame" | "edge_bleed";
   detail: string;
 }
 
@@ -47,6 +53,15 @@ const MIN_CONTENT_COVERAGE = 0.16;
 const FLAT_COLOR_SPREAD = 8;
 /** Occupancy grid resolution. */
 const COLS = 32, ROWS = 18;
+/** Thickness of the edge strip probed for bleed-through, as a fraction of the
+ *  relevant dimension (height for top/bottom, width for left/right). */
+const EDGE_STRIP_FRAC = 0.035;
+/** The outermost strip's noise must exceed the strip just inboard of it by this
+ *  multiple to count as an abrupt, localized texture spike (not a gradual trend). */
+const EDGE_NOISE_RATIO = 2.5;
+/** ...and clear this absolute floor, so near-zero-noise strips don't trigger on
+ *  ratio alone (division noise near 0 is unstable). */
+const EDGE_NOISE_FLOOR = 10;
 
 function srgbToLinear(c: number): number {
   const s = c / 255;
@@ -132,6 +147,73 @@ async function backdropColorSpread(imagePath: string, w: number, h: number): Pro
   return Math.max(top ?? 0, bot ?? 0);
 }
 
+/** Worst-channel RGB std-dev of a RAW (undownsampled) crop -- unlike
+ *  stripColorSpread's area-averaged sampling (tuned to see broad gradient
+ *  variation), this preserves per-pixel grain/dither texture, which is exactly
+ *  the signal that separates a smooth intentional gradient from a leaked photo. */
+async function rawRegionNoise(imagePath: string, cropW: number, cropH: number, cropX: number, cropY: number): Promise<number | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      "ffmpeg",
+      ["-v", "error", "-i", imagePath, "-vf", `crop=${cropW}:${cropH}:${cropX}:${cropY}`,
+        "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+      { encoding: "buffer", maxBuffer: 8 << 20 },
+    );
+    const buf = stdout as unknown as Buffer;
+    if (Math.floor(buf.length / 3) < 16) return null;
+    return Math.max(channelStdev(buf, 0), channelStdev(buf, 1), channelStdev(buf, 2));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Edge-bleed defect: a foreign element (typically a decorative image/photo
+ * positioned partially off-canvas) leaking a strip of texture across a frame
+ * border. Checked on all four edges by comparing the outermost strip's noise
+ * to the strip immediately inboard of it -- a real full-bleed background has
+ * comparable texture on both; a clipped stray element spikes only at the edge.
+ */
+async function edgeBleedDefect(imagePath: string, w: number, h: number): Promise<LayoutDefect | null> {
+  const edges: Array<{ name: string; strip: number; outer: [number, number, number, number]; inboard: [number, number, number, number] }> = [
+    { name: "top", strip: Math.round(h * EDGE_STRIP_FRAC), outer: [0, 0, 0, 0], inboard: [0, 0, 0, 0] },
+    { name: "bottom", strip: Math.round(h * EDGE_STRIP_FRAC), outer: [0, 0, 0, 0], inboard: [0, 0, 0, 0] },
+    { name: "left", strip: Math.round(w * EDGE_STRIP_FRAC), outer: [0, 0, 0, 0], inboard: [0, 0, 0, 0] },
+    { name: "right", strip: Math.round(w * EDGE_STRIP_FRAC), outer: [0, 0, 0, 0], inboard: [0, 0, 0, 0] },
+  ];
+  for (const e of edges) {
+    const s = e.strip;
+    if (s < 4) continue;
+    if (e.name === "top") { e.outer = [w, s, 0, 0]; e.inboard = [w, s, 0, s]; }
+    else if (e.name === "bottom") { e.outer = [w, s, 0, h - s]; e.inboard = [w, s, 0, h - 2 * s]; }
+    else if (e.name === "left") { e.outer = [s, h, 0, 0]; e.inboard = [s, h, s, 0]; }
+    else { e.outer = [s, h, w - s, 0]; e.inboard = [s, h, w - 2 * s, 0]; }
+  }
+
+  let worst: LayoutDefect | null = null;
+  let worstRatio = 0;
+  for (const e of edges) {
+    if (e.strip < 4) continue;
+    const [ow, oh, ox, oy] = e.outer;
+    const [iw, ih, ix, iy] = e.inboard;
+    if (oy < 0 || ox < 0 || iy < 0 || ix < 0) continue;
+    const [outerNoise, inboardNoise] = await Promise.all([
+      rawRegionNoise(imagePath, ow, oh, ox, oy),
+      rawRegionNoise(imagePath, iw, ih, ix, iy),
+    ]);
+    if (outerNoise === null || inboardNoise === null) continue;
+    const ratio = outerNoise / Math.max(inboardNoise, 0.5);
+    if (outerNoise >= EDGE_NOISE_FLOOR && ratio >= EDGE_NOISE_RATIO && ratio > worstRatio) {
+      worstRatio = ratio;
+      worst = {
+        type: "edge_bleed",
+        detail: `Foreign texture bleeding across the ${e.name} edge of the frame -- a ${e.strip}px strip at the ${e.name} border has ${outerNoise.toFixed(1)} noise vs ${inboardNoise.toFixed(1)} just inboard (${ratio.toFixed(1)}x spike), consistent with a decorative image or photo positioned partially off-canvas. Move the element fully on-canvas or fully off (not straddling the border).`,
+      };
+    }
+  }
+  return worst;
+}
+
 /** Compute content coverage (fraction of an occupancy grid filled). */
 function contentCoverage(layout: LayoutProbeResult): number {
   if (layout.contentBoxes.length === 0) return 0;
@@ -182,6 +264,7 @@ export async function measureLayout(opts: {
   let deadEveryFrame = true;
   let sawAnyFrame = false;
   let lastDead: LayoutDefect | null = null;
+  let edgeBleed: LayoutDefect | null = null;
 
   const tmpDir = path.join(os.tmpdir(), `layout_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true }).catch(() => {});
@@ -221,11 +304,18 @@ export async function measureLayout(opts: {
     if (process.env.MP_LAYOUT_DEBUG) console.log(`  [layout-dbg] t=${t} coverage=${(coverage*100).toFixed(1)}% colorSpread=${colorSpread?.toFixed(2)} surfaces=${layout.surfaces.length} contentBoxes=${layout.contentBoxes.length} pageBg=${layout.pageBg}`);
     const dead = deadFrameDefect(coverage, colorSpread);
     if (dead) lastDead = dead; else deadEveryFrame = false;
+
+    // Edge bleed: a static positioning bug (element straddling the canvas
+    // border), so ONE hit across the probed moments is enough -- keep the first.
+    if (!edgeBleed) {
+      edgeBleed = await edgeBleedDefect(probePath, opts.width, opts.height);
+    }
   }
 
   const defects: LayoutDefect[] = [];
   if (worstSurface) defects.push(worstSurface);
   if (sawAnyFrame && deadEveryFrame && lastDead) defects.push(lastDead);
+  if (edgeBleed) defects.push(edgeBleed);
   return defects;
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
