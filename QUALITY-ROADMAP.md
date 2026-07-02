@@ -116,13 +116,29 @@ Nobody does end-to-end **agent-operated product filming**. We already have Playw
 - [ ] Film-level eval harness: pacing-curve check, motif-persistence check,
       golden-frame regression diffs.
 
+### Pillar 6 — Pipeline model upgrades (quality dial, orthogonal to everything) `P0`
+The pipeline's own LLMs are a direct quality lever, independent of all the pillars
+above. Current wiring (`src/config.ts`):
+
+| Stage | Env var | Current default | Recommendation |
+|-------|---------|-----------------|----------------|
+| Creative director + storyboard + codegen | `MP_LLM_MODEL` | `claude-sonnet-4-6` | `claude-sonnet-5` now; consider `claude-opus-4-8` for the director |
+| Per-scene critique (vision judge) | `MP_CRITIQUE_MODEL` | `claude-haiku-4-5` | keep (cheap + gates are deterministic anyway) |
+| Asset captioning | `MP_CAPTION_MODEL` | `claude-haiku-4-5-20251001` | keep |
+
+- [ ] Set `MP_LLM_MODEL=claude-sonnet-5` on the deployed server (zero-code upgrade).
+- [ ] **Per-stage model config**: one `MP_LLM_MODEL` for director/storyboard/codegen is
+      too coarse. The creative director runs ~1 call per video and sets the ceiling for
+      everything downstream — it deserves the strongest model (`MP_DIRECTOR_MODEL`);
+      codegen runs N scenes × iterations and can stay a tier down (`MP_CODEGEN_MODEL`).
+- [ ] Re-run the quality eval set after each model bump — model upgrades sometimes
+      shift prompt-adherence in ways the bibles were tuned around.
+
 ### Hygiene / correctness backlog
 - [x] Ducking schema bug (silently dead in auto pipeline) — fixed.
 - [ ] Whole-video revision (`runVideoRevisionPipeline`) rebuilds the storyboard from
       scratch and **drops the treatment** → revisions drift. Make revision a diff:
       approved fields immutable unless explicitly reopened; re-attach treatment.
-- [ ] `MP_LLM_MODEL` is a quality dial: codegen/creative-director on a stronger model
-      is a one-line upgrade orthogonal to everything above.
 - [ ] Speaker-track path bypasses the film grade (grades only the standard
       renderVideo path today).
 
