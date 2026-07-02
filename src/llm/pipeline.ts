@@ -501,6 +501,9 @@ async function runVideoRevisionPipeline(
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
+  // Motif discipline applies to revisions too (see runUnifiedPipeline).
+  unifyCaptionStyle(storyboard.scenes);
+
   // Media enrichment
   trace?.beginEvent("video_revision_media");
   const enrichResult = await enrichProjectMedia({
@@ -1652,6 +1655,14 @@ async function runUnifiedPipeline(
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
+  // ── Motif discipline: one caption style per film ──
+  // A film that uses several caption-* treatments reads as template soup;
+  // repeating ONE treatment reads as design (compare the Framer launch film:
+  // one motif, repeated with discipline). The prompt asks for this, but we
+  // enforce it deterministically: rewrite every caption-* component in the
+  // draft to the majority caption style.
+  unifyCaptionStyle(storyboard.scenes);
+
     // Create project shell (reuse tempProjectId from reference image processing if available)
   var projectId = tempProjectId || `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
   var project: Project = {
@@ -1664,6 +1675,7 @@ async function runUnifiedPipeline(
     brand_kit: brandKit,
     scenes: [],
     treatment: treatment,
+    film_grade: format === "video" || format === "slideshow" ? "cinematic" : undefined,
   };
 
   // ── Storyboard-only mode: save storyboard and return early ──
@@ -2227,9 +2239,16 @@ async function runUnifiedPipeline(
               fade_out: 3,
             });
 
-            // Add ducking config to project audio
-            (project.audio as any).ducking = {
-              music_volume_during_voiceover: 0.04,
+            // Add ducking config to project audio. The shape must match
+            // AudioDucking (render.ts gates on `enabled` and resolves
+            // duck_track/trigger_track by id) -- the old freeform shape here
+            // meant auto-generated ducking silently never fired.
+            // "voiceover" as trigger_track = duck against ALL voiceover clips.
+            project.audio.ducking = {
+              enabled: true,
+              duck_track: "bgm",
+              trigger_track: "voiceover",
+              ducked_volume: 0.04,
               attack: 0.3,
               release: 0.8,
             };
@@ -2261,6 +2280,44 @@ async function runUnifiedPipeline(
     target: opts.target,
     project,
   };
+}
+
+/**
+ * Motif discipline: a film uses exactly ONE caption treatment.
+ *
+ * The caption library has many personalities (kinetic-slam, clip-wipe,
+ * gradient-fill, matrix-decode, ...) and storyboards tend to sample several
+ * for "variety" -- which reads as template soup. Professional films repeat a
+ * single treatment (one motif, disciplined). This deterministically rewrites
+ * every caption-* component in the draft to the majority caption style.
+ * Safe at the draft stage: components are type names only; codegen fills
+ * data against the (unified) type's schema.
+ */
+function unifyCaptionStyle(scenes: Array<{ components?: string[] }>): void {
+  const counts = new Map<string, number>();
+  for (const s of scenes) {
+    for (const c of s.components || []) {
+      if (c.startsWith("caption-")) counts.set(c, (counts.get(c) || 0) + 1);
+    }
+  }
+  if (counts.size <= 1) return;
+
+  let chosen = "";
+  let best = -1;
+  for (const [type, n] of counts) {
+    if (n > best) { chosen = type; best = n; }
+  }
+
+  let swaps = 0;
+  for (const s of scenes) {
+    if (!s.components?.length) continue;
+    const rewritten = s.components.map((c) =>
+      c.startsWith("caption-") && c !== chosen ? (swaps++, chosen) : c
+    );
+    // Dedupe (a scene that listed two caption styles now lists one twice)
+    s.components = rewritten.filter((c, i) => c !== chosen || rewritten.indexOf(c) === i);
+  }
+  console.log(`  Motif discipline: unified ${counts.size} caption styles -> "${chosen}" (${swaps} swaps)`);
 }
 
 /**

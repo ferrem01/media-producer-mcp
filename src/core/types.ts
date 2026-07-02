@@ -293,6 +293,10 @@ export interface Project {
   assets?: Asset[];
   /** New continuous speaker track architecture  */
   speaker_track?: SpeakerTrack;
+  /** Film-level color grade applied to the final concatenated video for
+   *  cross-scene consistency (subtle S-curve + saturation + grain).
+   *  "none" disables. The generate pipeline defaults videos to "cinematic". */
+  film_grade?: "cinematic" | "none";
 
   // ── Lifecycle ──
   /** Creative bible from the concept director (structured, not prose) */
