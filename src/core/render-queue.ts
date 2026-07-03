@@ -160,7 +160,13 @@ async function runRender(
 
     const renderOpts: RenderOptions = {
       project: projectForRender,
-      workDir: path.join(projectDir(job.tenantId, projectId), "_work"),
+      // Per-JOB work dir, not a shared per-project one: when a render fails,
+      // its still-running sibling scene workers are killed, but any that slip
+      // through (or a crashed server's orphans) must never share frame dirs
+      // with a later render of the same project -- a leftover worker's
+      // post-encode cleanup deleting the new run's frames mid-capture was the
+      // "Could find no file ... frames" stitch failure.
+      workDir: path.join(projectDir(job.tenantId, projectId), "_work", job.id),
       componentLibDir: config.componentLibDir,
       gsapDir: config.gsapDir,
       extraComponentDirs: [path.join(projectDir(job.tenantId, projectId), "components")],

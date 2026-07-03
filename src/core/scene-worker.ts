@@ -70,10 +70,32 @@ async function extractVideoFrames(videoPath: string, fps: number, width: number,
   return { framesDir, totalFrames };
 }
 
-async function cleanupFrameDirs(dirs: Set<string>): Promise<void> {
-  for (const dir of dirs) {
-    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
-  }
+/**
+ * The /tmp/vframes_* dirs are a SHARED cache keyed on (videoPath, fps, size):
+ * two parallel scene workers rendering scenes that use the same clip read from
+ * the SAME dir. They must therefore never be deleted mid-run -- the first
+ * worker to finish would yank the frames out from under a sibling still
+ * reading them (observed as fs.readFile ENOENT -> worker crash). Instead of
+ * per-run deletion, each worker sweeps STALE cache dirs (untouched for 24h+)
+ * at startup: old dirs are never part of an active render, so this is
+ * race-free, and /tmp stays bounded across many renders.
+ */
+async function sweepStaleVideoFrameCache(): Promise<void> {
+  const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  try {
+    const entries = await fs.readdir("/tmp");
+    const now = Date.now();
+    for (const name of entries) {
+      if (!name.startsWith("vframes_")) continue;
+      const dir = `/tmp/${name}`;
+      try {
+        const stat = await fs.stat(dir);
+        if (now - stat.mtimeMs > MAX_AGE_MS) {
+          await fs.rm(dir, { recursive: true, force: true });
+        }
+      } catch { /* raced with another sweep -- fine */ }
+    }
+  } catch { /* /tmp unreadable -- skip */ }
 }
 
 interface WorkerArgs {
@@ -259,7 +281,9 @@ async function main() {
     ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
   });
 
-  const frameDirsToCleanup = new Set<string>();
+  // Sweep stale shared vframes cache dirs (see sweepStaleVideoFrameCache --
+  // active dirs are never deleted; they are a cross-worker shared cache).
+  await sweepStaleVideoFrameCache();
 
   try {
     var page = await browser.newPage({ ignoreHTTPSErrors: true });
@@ -323,7 +347,6 @@ async function main() {
         }
         const extracted = await extractVideoFrames(videoPath, args.fps, args.width, args.height);
         extractionMap.set(src, extracted);
-        frameDirsToCleanup.add(extracted.framesDir);
       }
 
       // Hide <video> elements and insert sibling <img> overlays
@@ -437,7 +460,6 @@ async function main() {
     await page.close();
   } finally {
     await browser.close();
-    await cleanupFrameDirs(frameDirsToCleanup);
   }
 
   if (args.captureAsPng) {
