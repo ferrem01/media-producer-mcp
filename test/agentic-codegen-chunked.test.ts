@@ -187,6 +187,22 @@ describe("reviseSceneInSession: Write-then-Edit revisions", () => {
       reviseSceneInSession({ messages: [], parts: { template: "", style: "", script: "" } }, "fix it", baseOpts())
     ).rejects.toThrow(/no banked/i);
   });
+
+  it("salvages the edited sections when the model polishes to budget exhaustion without finish_scene", async () => {
+    const { session } = await buildSession();
+    // The model only ever edits and never files -- the mock repeats the last
+    // turn (a no-op non-matching edit), so the loop runs to its iteration cap
+    // with no finish_scene call.
+    mockTurns([
+      { content: [toolUse("e1", "edit_style", { search: "color: var(--mp-color-text-muted);", replace: "color: var(--mp-color-text); font-weight: 600;" })], stop_reason: "tool_use" },
+      { content: [toolUse("e2", "edit_style", { search: "no-such-text", replace: "still polishing" })], stop_reason: "tool_use" },
+    ]);
+
+    const revised = await reviseSceneInSession(session, "make the title readable", baseOpts());
+    // The banked edit shipped even though finish_scene was never called.
+    expect(revised.html).toContain("font-weight: 600;");
+    expect(revised.html).toContain('<h1 class="title">Hello</h1>');
+  });
 });
 
 describe("color discipline: text colors are tokens-only", () => {
