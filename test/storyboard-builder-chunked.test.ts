@@ -135,11 +135,28 @@ describe("buildStoryboard: incremental add_scene tool calls", () => {
     expect(result.scenes[0].components).toEqual(["hero-reveal"]);
   });
 
-  it("throws a specific error when a single turn is truncated by max_tokens", async () => {
+  it("recovers from a truncated turn: discards it, keeps banked scenes, and finishes on the retry", async () => {
+    mockTurns([
+      { content: [toolUse("t1", "add_scene", { label: "Scene 1", duration_seconds: 5, purpose: "p", visual_notes: "v", components: [] })], stop_reason: "tool_use" },
+      // This turn blows the cap -- its add_scene must be discarded, not banked.
+      { content: [toolUse("tX", "add_scene", { label: "Scene TRUNCATED", duration_seconds: 5, purpose: "cut", visual_notes: "off" })], stop_reason: "max_tokens" },
+      // Model retries and completes.
+      { content: [toolUse("t2", "add_scene", { label: "Scene 2", duration_seconds: 4, purpose: "p2", visual_notes: "v2", components: [] })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "finish_storyboard", { name: "Recovered Film" })], stop_reason: "tool_use" },
+    ]);
+
+    const result = await buildStoryboard(baseOpts());
+    expect(result.name).toBe("Recovered Film");
+    expect(result.scenes.map((s) => s.label)).toEqual(["Scene 1", "Scene 2"]);
+  });
+
+  it("aborts with a specific error after repeated truncation (model refuses to chunk)", async () => {
     mockTurns([
       { content: [{ type: "text", text: "..." }], stop_reason: "max_tokens" },
+      { content: [{ type: "text", text: "..." }], stop_reason: "max_tokens" },
+      { content: [{ type: "text", text: "..." }], stop_reason: "max_tokens" },
     ]);
-    await expect(buildStoryboard(baseOpts())).rejects.toThrow(/truncated.*max_tokens/i);
+    await expect(buildStoryboard(baseOpts())).rejects.toThrow(/truncated 3 times.*max_tokens/i);
   });
 
   it("builds a beat-heavy scene from sequential add_beat calls instead of one inline array", async () => {

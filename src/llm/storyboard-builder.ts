@@ -564,6 +564,13 @@ Prefer Speaker templates over regular templates when the speaker should be visib
   // scenes -- assume up to ~6 beats/scene plus buffer.
   var maxIterations = Math.max(24, (opts.sceneCount || 8) * 8 + 10);
 
+  // A truncated turn is RECOVERABLE, not fatal: every scene/beat already
+  // banked survives, so discard the turn (its tool calls may be cut mid-JSON
+  // and cannot be trusted), tell the model what's banked, and let it re-send
+  // the same work in smaller pieces. Only repeated truncation aborts.
+  var SB_MAX_TOKENS = 8192;
+  var truncations = 0;
+
   for (var iteration = 0; iteration < maxIterations && !finished; iteration++) {
     if (iteration >= Math.floor(maxIterations * 0.8) && scenes.length > 0) {
       messages.push({
@@ -572,16 +579,27 @@ Prefer Speaker templates over regular templates when the speaker should be visib
       });
     }
 
-    var response = await callLLMAgentic(opts.llmConfig, messages, TOOLS, { temperature: 0.5, maxTokens: 8192 });
+    var response = await callLLMAgentic(opts.llmConfig, messages, TOOLS, { temperature: 0.5, maxTokens: SB_MAX_TOKENS });
 
-    // add_scene and add_beat calls are each small on their own, but a
-    // single turn can still hit the cap if the model batches several of
-    // them together (e.g. add_scene + 3 add_beat calls in one response) --
-    // fail loudly rather than silently accept a truncated scene/beat.
     if (response.stopReason === "max_tokens") {
-      throw new Error(
-        `Storyboard builder response truncated: hit max_tokens (8192) mid-turn after ${scenes.length} scene(s) added. Either a single add_scene/add_beat call was too large, or too many were batched into one response -- write shorter visual_notes, keep beats out of add_scene's inline "beats" field (use add_beat instead) for any scene with 3+ beats, and split the work across more turns.`
+      truncations++;
+      if (truncations > 2) {
+        throw new Error(
+          `Storyboard builder truncated ${truncations} times despite retry nudges (${scenes.length} scene(s) banked): the model kept exceeding max_tokens (${SB_MAX_TOKENS}) per turn instead of chunking its output.`
+        );
+      }
+      console.warn(
+        `  Storyboard builder: turn truncated at max_tokens (${SB_MAX_TOKENS}) -- discarding the turn and asking for smaller chunks (attempt ${truncations}/2).`
       );
+      messages.push({
+        role: "assistant",
+        content: (response.text || "(response truncated)").slice(0, 2000),
+      });
+      messages.push({
+        role: "user",
+        content: `Your last response hit the output-token limit and was DISCARDED -- NONE of its tool calls were applied. Still banked: ${scenes.length} scene(s)${currentSceneIdx >= 0 && scenes[currentSceneIdx]._rawBeats ? ` (current scene has ${scenes[currentSceneIdx]._rawBeats.length} beat(s) so far)` : ""}. Re-send the missing work in SMALLER pieces: ONE tool call per response, shorter visual_notes, and add_beat calls for beats instead of inline arrays. Do not re-add scenes or beats that are already banked.`,
+      });
+      continue;
     }
 
     if (response.toolCalls.length === 0) {
