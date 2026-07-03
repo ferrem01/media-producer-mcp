@@ -267,9 +267,11 @@ field is only for 1-2 beats. Any scene with 3 or more beats should call add_scen
 "beats" (or with just the first one or two), then call add_beat once per remaining beat, in
 order. Each add_beat call targets whichever scene was most recently started by add_scene, so
 no single tool call ever has to hold a whole beat timeline -- this keeps every call small
-regardless of how many beats a scene has. Put each add_beat call in its OWN turn (call one,
-see the confirmation, then call the next) rather than batching several beats into one
-response -- a batched turn's combined output is what actually risks running long.
+regardless of how many beats a scene has. Batching a few add_beat calls into one response is
+fine (each beat is small); just never fold a full beat list back into add_scene's inline
+"beats" array, and don't put an add_scene AND all of its beats AND the next scene into a
+single response -- a response's combined output across all its calls is what risks running
+long.
 
 Four example scenes (each add_scene / add_beat is its own call):
 
@@ -578,7 +580,7 @@ Prefer Speaker templates over regular templates when the speaker should be visib
     // fail loudly rather than silently accept a truncated scene/beat.
     if (response.stopReason === "max_tokens") {
       throw new Error(
-        `Storyboard builder response truncated: hit max_tokens (8192) mid-turn after ${scenes.length} scene(s) added. Either a single add_scene/add_beat call was too large, or several were batched into one turn -- write shorter visual_notes, keep beats out of add_scene's inline "beats" field (use add_beat instead) for any scene with 3+ beats, and put one tool call per turn.`
+        `Storyboard builder response truncated: hit max_tokens (8192) mid-turn after ${scenes.length} scene(s) added. Either a single add_scene/add_beat call was too large, or too many were batched into one response -- write shorter visual_notes, keep beats out of add_scene's inline "beats" field (use add_beat instead) for any scene with 3+ beats, and split the work across more turns.`
       );
     }
 

@@ -334,10 +334,13 @@ Only call finish_scene once template, style, and the full script are all written
 assembles and validates the document. This keeps every individual call small regardless of
 how long or beat-heavy the scene is; there is no size penalty for using more calls.
 
-IMPORTANT: put each tool call in its OWN turn (call one, see the confirmation, then call the
-next) rather than batching write_template + write_style + write_script together in a single
-response -- a batched turn's combined output is what actually risks running long, even when
-each individual section is reasonably sized. One tool call per turn is always safe.
+Batching a FEW small calls into one response is fine and fast (e.g. write_template +
+write_style together, or write_style + the first write_script chunk). What you must NEVER
+do is put the entire scene into one response: a response's combined output across ALL its
+tool calls is what risks truncation, not any single call. Rule of thumb: if the response
+you're about to write would contain the whole multi-beat timeline plus other sections,
+split it -- write a couple of beats, see the confirmation, continue with append_script in
+the next turn.
 
 ## Design Skills (FOLLOW THESE RULES)
 
@@ -641,7 +644,7 @@ Read the spec, then write your scene using write_template / write_style / write_
 
     if (response.stopReason === "max_tokens") {
       throw new Error(
-        `Agentic codegen response truncated: hit max_tokens (16000) on scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). max_tokens caps the WHOLE turn, so this means either one write_*/append_script call was too large, or several were batched together in one turn -- write smaller chunks and prefer one tool call per turn (e.g. one beat per append_script call, in its own turn).`
+        `Agentic codegen response truncated: hit max_tokens (16000) on scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). max_tokens caps the WHOLE turn (all tool calls in the response combined), so either one write_*/append_script call was too large or too many were batched into one response -- write smaller chunks and split the work across more turns.`
       );
     }
 

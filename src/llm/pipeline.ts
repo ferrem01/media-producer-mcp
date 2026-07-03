@@ -1985,12 +1985,18 @@ async function runUnifiedPipeline(
   let scenesDone = 0;
   opts.onProgress?.({ step: "scenes", percent: 20, detail: `Generating ${totalScenes} scene${totalScenes === 1 ? "" : "s"}` });
 
-  for (let batchStart = 0; batchStart < storyboard.scenes.length; batchStart += SCENE_CONCURRENCY) {
-    const batchEnd = Math.min(batchStart + SCENE_CONCURRENCY, storyboard.scenes.length);
-    const batch: Promise<void>[] = [];
-
-    for (let i = batchStart; i < batchEnd; i++) {
-      batch.push((async () => {
+  // Sliding worker pool, NOT fixed batches: with batches, the whole next
+  // group waited on the SLOWEST scene of the previous one (a single scene
+  // stuck in critique regens stalled every idle slot). Each worker instead
+  // pulls the next un-started scene the moment it frees up, so concurrency
+  // stays saturated for the whole run.
+  let nextSceneIdx = 0;
+  const workers: Promise<void>[] = [];
+  for (let w = 0; w < Math.min(SCENE_CONCURRENCY, storyboard.scenes.length); w++) {
+    workers.push((async () => {
+      while (true) {
+        const i = nextSceneIdx++;
+        if (i >= storyboard.scenes.length) break;
         const draft = storyboard.scenes[i];
         const imageUrl = enrichResult.imageUrls.get(i);
 
@@ -2120,11 +2126,11 @@ async function runUnifiedPipeline(
           detail: `Scene ${scenesDone}/${totalScenes} ready`,
           etaSeconds: eta,
         });
-      })());
-    }
-
-    await Promise.all(batch);
+      }
+    })());
   }
+
+  await Promise.all(workers);
 
   // Add scenes in order, carrying over voiceover text and stock footage from storyboard builder
   for (let si = 0; si < sceneResults.length; si++) {
