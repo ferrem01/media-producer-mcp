@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { generateSceneAgentic } from "../src/llm/agentic-codegen.js";
+import { generateSceneAgentic, reviseSceneInSession } from "../src/llm/agentic-codegen.js";
 
 const BRAND_KIT = {
   name: "Test",
@@ -67,7 +67,7 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
       { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
 
-    const html = await generateSceneAgentic(baseOpts());
+    const { html } = await generateSceneAgentic(baseOpts());
     expect(html).toContain("<template>");
     expect(html).toContain('<div class="hero">Hi</div>');
     expect(html).toContain("<style scoped>");
@@ -87,7 +87,7 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
       { content: [toolUse("t7", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
 
-    const html = await generateSceneAgentic(baseOpts());
+    const { html } = await generateSceneAgentic(baseOpts());
     // The full script is the concatenation of write_script + every append_script, in order.
     expect(html).toContain("function createTimeline(el,data,ctx){var tl=gsap.timeline();tl.addLabel('beat_1',0);tl.addLabel('beat_2',4);return tl;}");
   });
@@ -101,7 +101,7 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
       { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
 
-    const html = await generateSceneAgentic(baseOpts());
+    const { html } = await generateSceneAgentic(baseOpts());
     expect(html).toContain("<template>");
     expect(html).toContain("<script>");
   });
@@ -117,7 +117,7 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
       { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
 
-    const html = await generateSceneAgentic(baseOpts());
+    const { html } = await generateSceneAgentic(baseOpts());
     // The banked template survived the truncated turn; the truncated write_script did NOT land.
     expect(html).toContain('<div id="s"></div>');
     expect(html).not.toContain("cut off mid");
@@ -131,5 +131,60 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
       { content: [{ type: "text", text: "still too long" }], stop_reason: "max_tokens" },
     ]);
     await expect(generateSceneAgentic(baseOpts())).rejects.toThrow(/truncated 3 times.*max_tokens/i);
+  });
+});
+
+describe("reviseSceneInSession: Write-then-Edit revisions", () => {
+  /** Build a completed session via a mocked initial generation. */
+  async function buildSession() {
+    mockTurns([
+      { content: [toolUse("t1", "write_template", { html: '<h1 class="title">Hello</h1>' })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "write_style", { css: ".title { color: #888888; }" })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){var t=el.querySelector('.title');t.textContent;return gsap.timeline();}" })], stop_reason: "tool_use" },
+      { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
+    ]);
+    const result = await generateSceneAgentic(baseOpts());
+    vi.unstubAllGlobals();
+    return result;
+  }
+
+  it("applies a minimal edit_style patch in-session and re-validates via finish_scene", async () => {
+    const { session } = await buildSession();
+    mockTurns([
+      { content: [toolUse("e1", "edit_style", { search: "color: #888888;", replace: "color: #ffffff;" })], stop_reason: "tool_use" },
+      { content: [toolUse("e2", "finish_scene", {})], stop_reason: "tool_use" },
+    ]);
+
+    const revised = await reviseSceneInSession(session, 'Text "Hello" is unreadable: contrast 2.1:1', baseOpts());
+    expect(revised.html).toContain("color: #ffffff;");
+    expect(revised.html).not.toContain("color: #888888;");
+    // Everything not flagged is untouched.
+    expect(revised.html).toContain('<h1 class="title">Hello</h1>');
+    expect(revised.html).toContain("function createTimeline");
+  });
+
+  it("rejects a non-matching edit search with a corrective tool_result, and the model recovers", async () => {
+    const { session } = await buildSession();
+    const fetchMock = mockTurns([
+      // Wrong search text -- must be rejected, not silently ignored.
+      { content: [toolUse("e1", "edit_script", { search: "t.textContent!!!", replace: "if (t) t.textContent;" })], stop_reason: "tool_use" },
+      // Model retries with the exact text.
+      { content: [toolUse("e2", "edit_script", { search: "t.textContent;", replace: "if (t) t.textContent;" })], stop_reason: "tool_use" },
+      { content: [toolUse("e3", "finish_scene", {})], stop_reason: "tool_use" },
+    ]);
+
+    const revised = await reviseSceneInSession(session, "runtime error: t is null", baseOpts());
+    expect(revised.html).toContain("if (t) t.textContent;");
+    // The corrective feedback for the failed edit went back to the model.
+    const secondCallBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    const lastMsg = secondCallBody.messages[secondCallBody.messages.length - 1];
+    const resultBlock = lastMsg.content.find((b: any) => b.type === "tool_result");
+    expect(String(resultBlock.content)).toMatch(/not found/i);
+  });
+
+  it("refuses to revise a session with nothing banked", async () => {
+    await expect(
+      reviseSceneInSession({ messages: [], parts: { template: "", style: "", script: "" } }, "fix it", baseOpts())
+    ).rejects.toThrow(/no banked/i);
   });
 });

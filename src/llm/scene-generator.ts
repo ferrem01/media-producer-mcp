@@ -7,7 +7,7 @@
  */
 
 import type { LLMConfig } from "./client.js";
-import { generateSceneAgentic } from "./agentic-codegen.js";
+import { generateSceneAgentic, type CodegenSession } from "./agentic-codegen.js";
 import { buildComponentCatalog, formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import { config } from "../config.js";
 import type { DraftScene } from "./storyboard-builder.js";
@@ -39,6 +39,9 @@ export interface SceneGeneratorOpts {
 export interface GeneratedScene {
   scene: Scene;
   customSources?: Map<string, string>;  // compName -> HTML source (multiple custom components per scene)
+  /** Live codegen conversation for Write-then-Edit revisions (critique fixes
+   *  patch the scene in-session instead of regenerating from scratch). */
+  codegenSession?: CodegenSession;
 }
 
 /**
@@ -72,7 +75,7 @@ async function generateCodegenScene(
   console.log("  [codegen-spec] Scene \"" + draft.label + "\" has " + (draft.components?.length || 0) + " component hints, spec includes schemas: " + effectiveSpec.includes("Component Schemas"));
   console.log("  [codegen-spec] Full spec length:", effectiveSpec.length, "chars");
 
-  var sceneHtml = await generateSceneAgentic({
+  var agenticResult = await generateSceneAgentic({
     sceneSpec: effectiveSpec,
     sceneLabel: draft.label,
     sceneDescription: draft.purpose || draft.visual_notes,
@@ -90,7 +93,7 @@ async function generateCodegenScene(
     heroImageUrl: opts.imageUrl,
   });
 
-  sceneHtml = stripHtmlFences(sceneHtml);
+  var sceneHtml = stripHtmlFences(agenticResult.html);
 
   var customSources = new Map<string, string>();
   customSources.set(compName, sceneHtml);
@@ -117,7 +120,7 @@ async function generateCodegenScene(
     }],
   };
 
-  return { scene, customSources };
+  return { scene, customSources, codegenSession: agenticResult.session };
 }
 
 function buildBrandContext(brandKit: BrandKit): string {
