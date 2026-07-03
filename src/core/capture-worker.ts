@@ -145,6 +145,7 @@ async function main() {
 
     await page.waitForFunction(
       () => (window as any).__MP_READY === true,
+      undefined,
       { timeout: 15000 }
     );
 
