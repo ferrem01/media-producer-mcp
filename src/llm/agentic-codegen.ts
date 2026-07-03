@@ -392,6 +392,25 @@ you're about to write would contain the whole multi-beat timeline plus other sec
 split it -- write a couple of beats, see the confirmation, continue with append_script in
 the next turn.
 
+## COLOR DISCIPLINE (statically ENFORCED -- finish_scene rejects violations)
+
+Text colors are TOKENS ONLY. Every \`color:\` (and \`-webkit-text-fill-color:\`) declaration
+must use a brand var -- raw hex/rgb/named colors are rejected because you cannot verify
+contrast by eye and low-contrast text is the #1 recurring defect. The vocabulary covers
+every legitimate case:
+
+- var(--mp-color-text) / var(--mp-color-text-muted) -- text on the scene background or on
+  var(--mp-color-surface) cards. This is the DEFAULT; when in doubt, use these.
+- var(--mp-color-on-dark) / var(--mp-color-on-dark-muted) -- ONLY inside a panel you
+  explicitly styled dark (e.g. a terminal/code window on a light scene).
+- var(--mp-color-on-accent) / var(--mp-color-on-primary) -- text sitting on an accent or
+  primary fill (buttons, badges, highlighted chips).
+- transparent / inherit / currentColor -- allowed (e.g. gradient text via background-clip).
+
+Decorative properties (backgrounds, gradients, borders, shadows, glows) remain free -- this
+rule is about TEXT legibility, not your palette. Surfaces still need real separation from
+the backdrop (fill difference, border, shadow), per the design rules below.
+
 ## Design Skills (FOLLOW THESE RULES)
 
 ${designSkills}
@@ -697,6 +716,42 @@ function assemblePartsHtml(parts: { template: string; style: string; script: str
 }
 
 /**
+ * Static color discipline: find text-color declarations (`color:` /
+ * `-webkit-text-fill-color:`) whose value is a raw literal instead of a brand
+ * token. Tokens are pre-validated for contrast by the assembler; raw literals
+ * are how ~2:1-contrast gray-on-white text keeps shipping. Checked at
+ * finish_scene so a violation costs a same-conversation edit, not a
+ * render+measure revision round. Scans the model-authored style section and
+ * inline style="" attributes in the template (library components are vetted
+ * separately and are not part of these sections).
+ */
+export function findRawTextColors(parts: { template: string; style: string }): string[] {
+  var violations: string[] = [];
+  var ALLOWED = /^\s*(var\(--mp-|transparent\b|inherit\b|currentcolor\b|unset\b|initial\b)/i;
+  var DECL = /(?:^|[;{\s"'])(color|-webkit-text-fill-color)\s*:\s*([^;}"']+)/gi;
+
+  function scan(css: string, where: string) {
+    var m: RegExpExecArray | null;
+    DECL.lastIndex = 0;
+    while ((m = DECL.exec(css)) !== null) {
+      var value = m[2].trim();
+      if (!ALLOWED.test(value)) {
+        violations.push(`${where}: ${m[1]}: ${value.slice(0, 60)}`);
+      }
+    }
+  }
+
+  scan(parts.style, "style");
+  // Inline style="" attributes in the template markup
+  var attr: RegExpExecArray | null;
+  var ATTR = /style\s*=\s*"([^"]*)"/gi;
+  while ((attr = ATTR.exec(parts.template)) !== null) {
+    scan(attr[1], "template inline style");
+  }
+  return violations;
+}
+
+/**
  * Revise an already-built scene INSIDE its original codegen conversation.
  *
  * The Write-then-Edit pattern: the session still holds the spec, the model's
@@ -867,9 +922,20 @@ async function runAgenticLoop(args: {
             }
           }
         } else if (toolCall.name === "finish_scene") {
+          var colorViolations = findRawTextColors(parts);
           if (!parts.template || !parts.script) {
             var missing = [!parts.template && "write_template", !parts.script && "write_script"].filter(Boolean).join(" and ");
             toolResult = `Cannot finish yet -- ${missing} not called. Write the missing section(s) first, then call finish_scene again.`;
+          } else if (colorViolations.length > 0) {
+            // Static color discipline: raw literals in text-color declarations
+            // are THE recurring legibility failure (the model's dark-biased
+            // aesthetic prior writes ~2:1-contrast grays on light brands, and
+            // it cannot do contrast math while generating). Rejecting here --
+            // before anything renders -- turns a 1-2 minute render+measure
+            // revision round into a same-conversation edit costing seconds.
+            toolResult = `REJECTED -- raw color literals in text-color declarations (text colors must be brand tokens, which are pre-validated for contrast):\n` +
+              colorViolations.slice(0, 8).map((v) => `  - ${v}`).join("\n") +
+              `\nReplace each with the right token: var(--mp-color-text) / var(--mp-color-text-muted) for text on the scene background or on var(--mp-color-surface) cards; var(--mp-color-on-dark) / var(--mp-color-on-dark-muted) ONLY inside explicitly dark panels; var(--mp-color-on-accent) / var(--mp-color-on-primary) on accent/primary fills. Use edit_style/edit_template to fix ONLY these declarations, then call finish_scene again.`;
           } else {
             var assembled = assemblePartsHtml(parts);
             var submitResult = executeSubmitScene(assembled);

@@ -828,6 +828,21 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
     vars.push(`  --mp-color-text-muted: ${brand.colors?.text_muted || '#64748b'};`);
   }
 
+  // ── Complete the text-color vocabulary ──
+  // Codegen text colors are TOKENS-ONLY (raw hex in `color:` is rejected at
+  // finish_scene) -- so every legitimate case needs a var. These cover the
+  // cases that used to push the model to raw literals: text inside a dark
+  // panel on a light scene (and vice versa), and text on accent/primary fills
+  // (picked by fill luminance so it always clears contrast).
+  vars.push('  --mp-color-on-dark: #ffffff;');
+  vars.push('  --mp-color-on-dark-muted: rgba(255,255,255,0.72);');
+  vars.push(`  --mp-color-on-light: ${brand.colors?.text || '#0f172a'};`);
+  vars.push(`  --mp-color-on-light-muted: ${brand.colors?.text_muted || '#64748b'};`);
+  const accentFill = brand.colors?.accent || brand.colors?.primary || '#6366f1';
+  const primaryFill = brand.colors?.primary || accentFill;
+  vars.push(`  --mp-color-on-accent: ${isLightColor(accentFill) ? '#111318' : '#ffffff'};`);
+  vars.push(`  --mp-color-on-primary: ${isLightColor(primaryFill) ? '#111318' : '#ffffff'};`);
+
   // Always provide a theme-aware surface + hairline border so component cards
   // and borders are visible on BOTH light and dark scenes even when the brand
   // kit doesn't define them. (Components reference var(--mp-color-surface) /

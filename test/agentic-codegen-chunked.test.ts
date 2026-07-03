@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { generateSceneAgentic, reviseSceneInSession } from "../src/llm/agentic-codegen.js";
+import { generateSceneAgentic, reviseSceneInSession, findRawTextColors } from "../src/llm/agentic-codegen.js";
 
 const BRAND_KIT = {
   name: "Test",
@@ -59,7 +59,7 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
       {
         content: [
           toolUse("t1", "write_template", { html: "<div class=\"hero\">Hi</div>" }),
-          toolUse("t2", "write_style", { css: ".hero { color: red; }" }),
+          toolUse("t2", "write_style", { css: ".hero { color: var(--mp-color-text); }" }),
           toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" }),
         ],
         stop_reason: "tool_use",
@@ -71,7 +71,7 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
     expect(html).toContain("<template>");
     expect(html).toContain('<div class="hero">Hi</div>');
     expect(html).toContain("<style scoped>");
-    expect(html).toContain(".hero { color: red; }");
+    expect(html).toContain(".hero { color: var(--mp-color-text); }");
     expect(html).toContain("<script>");
     expect(html).toContain("function createTimeline");
   });
@@ -139,7 +139,7 @@ describe("reviseSceneInSession: Write-then-Edit revisions", () => {
   async function buildSession() {
     mockTurns([
       { content: [toolUse("t1", "write_template", { html: '<h1 class="title">Hello</h1>' })], stop_reason: "tool_use" },
-      { content: [toolUse("t2", "write_style", { css: ".title { color: #888888; }" })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "write_style", { css: ".title { color: var(--mp-color-text-muted); }" })], stop_reason: "tool_use" },
       { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){var t=el.querySelector('.title');t.textContent;return gsap.timeline();}" })], stop_reason: "tool_use" },
       { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
@@ -151,13 +151,13 @@ describe("reviseSceneInSession: Write-then-Edit revisions", () => {
   it("applies a minimal edit_style patch in-session and re-validates via finish_scene", async () => {
     const { session } = await buildSession();
     mockTurns([
-      { content: [toolUse("e1", "edit_style", { search: "color: #888888;", replace: "color: #ffffff;" })], stop_reason: "tool_use" },
+      { content: [toolUse("e1", "edit_style", { search: "color: var(--mp-color-text-muted);", replace: "color: var(--mp-color-text);" })], stop_reason: "tool_use" },
       { content: [toolUse("e2", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
 
     const revised = await reviseSceneInSession(session, 'Text "Hello" is unreadable: contrast 2.1:1', baseOpts());
-    expect(revised.html).toContain("color: #ffffff;");
-    expect(revised.html).not.toContain("color: #888888;");
+    expect(revised.html).toContain("color: var(--mp-color-text);");
+    expect(revised.html).not.toContain("color: var(--mp-color-text-muted);");
     // Everything not flagged is untouched.
     expect(revised.html).toContain('<h1 class="title">Hello</h1>');
     expect(revised.html).toContain("function createTimeline");
@@ -186,5 +186,40 @@ describe("reviseSceneInSession: Write-then-Edit revisions", () => {
     await expect(
       reviseSceneInSession({ messages: [], parts: { template: "", style: "", script: "" } }, "fix it", baseOpts())
     ).rejects.toThrow(/no banked/i);
+  });
+});
+
+describe("color discipline: text colors are tokens-only", () => {
+  it("flags raw literals in color declarations, allows tokens and gradient-text values", () => {
+    const violations = findRawTextColors({
+      template: '<div style="color: #888888">hi</div><span style="color: var(--mp-color-text)">ok</span>',
+      style: `
+        .title { color: var(--mp-color-text); }
+        .muted { color: rgba(120,120,120,0.8); }
+        .grad { background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn { color: white; background-color: #6366f1; border-color: #eee; }
+      `,
+    });
+    // background-color / border-color are NOT text props and must not be flagged.
+    expect(violations).toHaveLength(3);
+    expect(violations.join("\n")).toMatch(/rgba\(120/);
+    expect(violations.join("\n")).toMatch(/color: white/);
+    expect(violations.join("\n")).toMatch(/#888888/);
+  });
+
+  it("finish_scene rejects raw text colors, and the model fixes them with an edit and finishes", async () => {
+    mockTurns([
+      { content: [toolUse("t1", "write_template", { html: "<h1>Hello</h1>" })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "write_style", { css: "h1 { color: #999999; font-size: 96px; }" })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
+      // Rejected: raw literal in color:
+      { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
+      { content: [toolUse("t5", "edit_style", { search: "color: #999999;", replace: "color: var(--mp-color-text);" })], stop_reason: "tool_use" },
+      { content: [toolUse("t6", "finish_scene", {})], stop_reason: "tool_use" },
+    ]);
+
+    const { html } = await generateSceneAgentic(baseOpts());
+    expect(html).toContain("color: var(--mp-color-text);");
+    expect(html).not.toContain("#999999");
   });
 });
