@@ -775,17 +775,32 @@ export async function reviseSceneInSession(
 
 ${feedback}
 
-Fix these with MINIMAL, targeted patches using edit_template / edit_style / edit_script (exact-match search & replace on what you already wrote). Only use write_template / write_style / write_script if a whole section genuinely must be rewritten -- prefer the smallest change that fixes each problem, and do NOT touch anything that wasn't flagged. When every problem is addressed, call finish_scene to re-validate.`,
+Fix these with MINIMAL, targeted patches using edit_template / edit_style / edit_script (exact-match search & replace on what you already wrote). Batching several small edit_* calls into ONE response is good -- fix multiple problems per turn. Only use write_template / write_style / write_script if a whole section genuinely must be rewritten, and do NOT touch anything that wasn't flagged. As soon as the flagged problems are addressed, call finish_scene -- do not keep polishing beyond the list.`,
   });
 
   console.log(`  [agentic] Scene ${opts.sceneIndex + 1}: revising in-session (${session.parts.script.length} chars script banked)`);
 
   var result = await runAgenticLoop({
     messages: session.messages, parts: session.parts, opts,
-    maxIterations: 8,
+    maxIterations: 12,
     phase: "revise",
   });
   if (result.html) return { html: result.html, session };
+
+  // Budget exhausted mid-polish. The edits made so far are already banked in
+  // session.parts -- if they assemble into a valid scene, SHIP the edited
+  // version rather than throwing it away (the old throw here discarded a
+  // full round of good fixes and triggered the most expensive fallback,
+  // a complete re-storyboard + regeneration).
+  if (session.parts.template && session.parts.script) {
+    var salvage = executeSubmitScene(assemblePartsHtml(session.parts));
+    if (salvage.valid) {
+      console.warn(
+        `  [agentic] Scene ${opts.sceneIndex + 1}: revision ran out of iterations without finish_scene -- using the edited sections as-is (they validate).`,
+      );
+      return { html: salvage.html, session };
+    }
+  }
 
   throw new Error(
     `In-session revision did not converge for scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}")`,
@@ -819,11 +834,15 @@ async function runAgenticLoop(args: {
       `  [agentic] Scene ${opts.sceneIndex + 1}: ${args.phase} iteration ${iteration + 1}/${maxIterations}`,
     );
 
-    // Near the end of the budget, inject urgency to finish
-    if (iteration >= Math.max(3, maxIterations - 6) && !lastHtml && args.phase === "codegen") {
+    // Near the end of the budget, inject urgency to finish. This must fire in
+    // BOTH phases: without it, revise loops polished with edit_* calls until
+    // the budget died and never called finish_scene at all.
+    if (iteration >= Math.max(3, maxIterations - 6) && !lastHtml) {
       messages.push({
         role: "user",
-        content: `IMPORTANT: You have ${maxIterations - iteration} iterations remaining. Finish writing NOW: whatever sections you haven't written yet, write them (use append_script for any remaining beats), then call finish_scene immediately. Do not start over -- build on what you've already written.`,
+        content: args.phase === "revise"
+          ? `IMPORTANT: You have ${maxIterations - iteration} iterations remaining. Stop polishing and call finish_scene NOW -- remaining minor issues are acceptable; losing the revision entirely is not.`
+          : `IMPORTANT: You have ${maxIterations - iteration} iterations remaining. Finish writing NOW: whatever sections you haven't written yet, write them (use append_script for any remaining beats), then call finish_scene immediately. Do not start over -- build on what you've already written.`,
       });
     }
 

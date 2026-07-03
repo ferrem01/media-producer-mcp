@@ -187,6 +187,57 @@ describe("reviseSceneInSession: Write-then-Edit revisions", () => {
       reviseSceneInSession({ messages: [], parts: { template: "", style: "", script: "" } }, "fix it", baseOpts())
     ).rejects.toThrow(/no banked/i);
   });
+
+  it("salvages the edited sections when the model polishes to budget exhaustion without finish_scene", async () => {
+    const { session } = await buildSession();
+    // The model only ever edits and never files -- the mock repeats the last
+    // turn (a no-op non-matching edit), so the loop runs to its iteration cap
+    // with no finish_scene call.
+    mockTurns([
+      { content: [toolUse("e1", "edit_style", { search: "color: var(--mp-color-text-muted);", replace: "color: var(--mp-color-text); font-weight: 600;" })], stop_reason: "tool_use" },
+      { content: [toolUse("e2", "edit_style", { search: "no-such-text", replace: "still polishing" })], stop_reason: "tool_use" },
+    ]);
+
+    const revised = await reviseSceneInSession(session, "make the title readable", baseOpts());
+    // The banked edit shipped even though finish_scene was never called.
+    expect(revised.html).toContain("font-weight: 600;");
+    expect(revised.html).toContain('<h1 class="title">Hello</h1>');
+  });
+});
+
+describe("color discipline: text colors are tokens-only", () => {
+  it("flags raw literals in color declarations, allows tokens and gradient-text values", () => {
+    const violations = findRawTextColors({
+      template: '<div style="color: #888888">hi</div><span style="color: var(--mp-color-text)">ok</span>',
+      style: `
+        .title { color: var(--mp-color-text); }
+        .muted { color: rgba(120,120,120,0.8); }
+        .grad { background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn { color: white; background-color: #6366f1; border-color: #eee; }
+      `,
+    });
+    // background-color / border-color are NOT text props and must not be flagged.
+    expect(violations).toHaveLength(3);
+    expect(violations.join("\n")).toMatch(/rgba\(120/);
+    expect(violations.join("\n")).toMatch(/color: white/);
+    expect(violations.join("\n")).toMatch(/#888888/);
+  });
+
+  it("finish_scene rejects raw text colors, and the model fixes them with an edit and finishes", async () => {
+    mockTurns([
+      { content: [toolUse("t1", "write_template", { html: "<h1>Hello</h1>" })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "write_style", { css: "h1 { color: #999999; font-size: 96px; }" })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
+      // Rejected: raw literal in color:
+      { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
+      { content: [toolUse("t5", "edit_style", { search: "color: #999999;", replace: "color: var(--mp-color-text);" })], stop_reason: "tool_use" },
+      { content: [toolUse("t6", "finish_scene", {})], stop_reason: "tool_use" },
+    ]);
+
+    const { html } = await generateSceneAgentic(baseOpts());
+    expect(html).toContain("color: var(--mp-color-text);");
+    expect(html).not.toContain("#999999");
+  });
 });
 
 describe("color discipline: text colors are tokens-only", () => {
