@@ -45,12 +45,16 @@ import { critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-cr
 import { reviseScene, undoScene } from "./scene-revise.js";
 import { reviseSceneInSession, type CodegenSession } from "./agentic-codegen.js";
 
-// Default critique revision budget. 2 dated from when every revision round was
-// a full multi-minute regeneration; with in-session Write-then-Edit patches a
-// round is seconds, and exhausting the budget is what ships hard-floor template
-// swaps (4/5 scenes on a real light-brand run). Overridable per-request via
-// opts.maxRevisions or globally via MP_MAX_REVISIONS.
-const MAX_SCENE_REVISIONS = Math.max(1, parseInt(process.env.MP_MAX_REVISIONS || "4", 10) || 4);
+// Default critique revision budget: ONE revision round (draft-first
+// philosophy). Live data across runs showed a sharp two-population split --
+// scenes that pass do so within 1-2 rounds; scenes that grind for 4 rounds
+// (~2-3 min of render+vision-verify per round) rarely become GOOD, just
+// slowly less bad. With per-scene defect badges + one-line revise in the
+// Studio, a flawed DESIGNED scene shipped honestly is better raw material
+// for a human than machine-ground output. Objective gates (runtime, color
+// tokens) still hard-block regardless. Set MP_MAX_REVISIONS=4 for the old
+// grind-it-out behavior in unattended/batch contexts.
+const MAX_SCENE_REVISIONS = Math.max(1, parseInt(process.env.MP_MAX_REVISIONS || "1", 10) || 1);
 import { formatCorrectnessDefects, type CorrectnessResult, type CorrectnessDefect } from "./correctness-critique.js";
 import { parseLlmJson } from "./json-repair.js";
 import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
@@ -1011,6 +1015,7 @@ async function critiqueAndRetryScene(opts: {
   let bestScene = opts.scene;
   let bestCustomSources = opts.customSources;
   let bestScore = -Infinity;
+  let bestRuntimeOk = false;
   let bestCritique: CritiqueResult | undefined;
   // Persisted alongside the best attempt so the shipped scene can carry its
   // own verdict (SceneQuality) -- observability without excavating logs.
@@ -1376,6 +1381,7 @@ async function critiqueAndRetryScene(opts: {
         bestCritique = critiqueResult;
         bestDefects = correctness.defects;
         bestPassed = aestheticPass && correctness.pass;
+        bestRuntimeOk = runtime.ok;
       }
 
       // 6. Accept only if the vision score passes AND the scene runs clean AND
@@ -1601,8 +1607,8 @@ Output valid JSON only. No markdown fences, no commentary.`;
   // with explicit "avoid these mistakes" instructions. This prevents shipping
   // garbage scenes. Defect-penalized attempts have NEGATIVE effective scores
   // and need this net the most.
-  if (bestScore < 6 && bestScore > -Infinity && opts.maxRetries > 0) {
-    console.log(`  Hard floor triggered: best score ${bestScore} < 6, attempting full template swap`);
+  if (!bestRuntimeOk && bestScore > -Infinity && opts.maxRetries > 0) {
+    console.log(`  Hard floor triggered: best attempt cannot render clean (score ${bestScore}), attempting full template swap`);
     opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_template_swap`);
     try {
       const swapFeedback = bestCritique
@@ -1700,7 +1706,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         attempts: attemptsRun,
         passed: false,
         unresolved_defects: [
-          `[template_swap] Best attempt scored ${bestScore} (< 6 floor) after ${attemptsRun} attempt(s); shipped a hard-floor template swap, not re-verified by critique.`,
+          `[template_swap] Best attempt could not render clean (score ${bestScore}) after ${attemptsRun} attempt(s); shipped a runtime-verified template swap.`,
           ...bestDefects.map((d) => `[${d.type}] ${d.detail}`),
         ],
       };
