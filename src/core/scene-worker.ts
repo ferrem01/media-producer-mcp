@@ -287,6 +287,12 @@ async function main() {
 
   try {
     var page = await browser.newPage({ ignoreHTTPSErrors: true });
+    // A script throw during load kills the runtime harness BEFORE it sets
+    // __MP_READY -- without capturing pageerrors, that surfaces as a naked
+    // 60s ready-timeout with zero diagnostic value. Collect them so the
+    // timeout error can say exactly WHAT threw.
+    const pageErrors: string[] = [];
+    page.on("pageerror", (e: any) => { if (pageErrors.length < 5) pageErrors.push(String(e?.message || e)); });
     await page.setViewportSize({ width: args.width, height: args.height });
     // Use "load", NOT "networkidle": a full-bleed autoplay/loop <video> (b-roll)
     // keeps the network "active" so networkidle never settles -> 60s page.goto
@@ -299,7 +305,16 @@ async function main() {
     // NOTE: waitForFunction's signature is (fn, arg?, options?) -- options MUST
     // be the THIRD argument. Passing { timeout } second silently made it the
     // page-function arg and left the wait on Playwright's 30s default.
-    await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 60000 });
+    try {
+      await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 60000 });
+    } catch (readyErr: any) {
+      throw new Error(
+        `Scene never signaled __MP_READY within 60s.` +
+        (pageErrors.length
+          ? ` Page JS errors (the scene's script likely threw before setting the ready flag): ${pageErrors.join(" | ")}`
+          : ` No page JS errors were captured -- the script may be hanging (infinite loop / unresolved await) or a render-blocking resource never settled.`)
+      );
+    }
 
     // Wait for all <img> to finish loading before capturing. External images
     // (e.g. logo.dev company logos) get their src set by JS *after* page load and
