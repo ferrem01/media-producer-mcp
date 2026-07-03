@@ -61,3 +61,65 @@ describe("callLLMAgentic truncation detection (Anthropic)", () => {
     expect(res.stopReason).toBe("tool_use");
   });
 });
+
+describe("callLLMAgentic prompt caching (Anthropic)", () => {
+  const TOOLS: LLMTool[] = [
+    { name: "write_template", description: "t", input_schema: { type: "object", properties: {} } },
+    { name: "finish_scene", description: "f", input_schema: { type: "object", properties: {} } },
+  ];
+
+  it("sets cache breakpoints on the last tool, the system prompt, and the last message block", async () => {
+    const fetchMock = mockFetchOnce({
+      content: [{ type: "tool_use", id: "t1", name: "write_template", input: {} }],
+      stop_reason: "tool_use",
+    });
+    await callLLMAgentic(
+      CONFIG,
+      [
+        { role: "system", content: "big system prompt" },
+        { role: "user", content: "write the scene" },
+      ],
+      TOOLS,
+      { maxTokens: 16000 },
+    );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    // last tool carries the breakpoint; earlier tools do not
+    expect(body.tools[1].cache_control).toEqual({ type: "ephemeral" });
+    expect(body.tools[0].cache_control).toBeUndefined();
+    // system prompt is a cached block array
+    expect(body.system[0].cache_control).toEqual({ type: "ephemeral" });
+    expect(body.system[0].text).toBe("big system prompt");
+    // last message's last block carries the incremental-conversation breakpoint
+    const lastMsg = body.messages[body.messages.length - 1];
+    const lastBlock = lastMsg.content[lastMsg.content.length - 1];
+    expect(lastBlock.cache_control).toEqual({ type: "ephemeral" });
+    expect(lastBlock.text).toBe("write the scene");
+  });
+
+  it("puts the breakpoint on the last tool_result block of a multi-part message", async () => {
+    const fetchMock = mockFetchOnce({
+      content: [{ type: "tool_use", id: "t2", name: "finish_scene", input: {} }],
+      stop_reason: "tool_use",
+    });
+    await callLLMAgentic(
+      CONFIG,
+      [
+        { role: "user", content: "write the scene" },
+        { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "write_template", input: {} } as any] },
+        { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "template saved" } as any] },
+      ],
+      TOOLS,
+      { maxTokens: 16000 },
+    );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const lastMsg = body.messages[body.messages.length - 1];
+    const lastBlock = lastMsg.content[lastMsg.content.length - 1];
+    expect(lastBlock.type).toBe("tool_result");
+    expect(lastBlock.cache_control).toEqual({ type: "ephemeral" });
+    // only the LAST message gets a conversation breakpoint
+    const firstMsg = body.messages[0];
+    expect(typeof firstMsg.content === "string" || !firstMsg.content.some((b: any) => b.cache_control)).toBe(true);
+  });
+});

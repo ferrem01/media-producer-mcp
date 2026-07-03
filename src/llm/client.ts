@@ -219,7 +219,11 @@ async function callAnthropic(
   };
 
   if (systemPrompt) {
-    body.system = systemPrompt;
+    // Cache the system prompt: the per-scene callers (codegen, critique)
+    // reuse the same large system prompt across every scene running in
+    // parallel and across every critique regen, so turns after the first
+    // read it from cache instead of reprocessing it.
+    body.system = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
   }
 
   if (options?.temperature !== undefined && modelAcceptsTemperature(config.model)) {
@@ -267,15 +271,36 @@ async function callAnthropicAgentic(
     systemPrompt = options.systemPrompt + (systemPrompt ? "\n\n" + systemPrompt : "");
   }
 
+  // Prompt caching: the agentic loops (codegen's chunked write_* calls, the
+  // storyboard's add_scene/add_beat calls) hit this in a tight multi-turn
+  // loop where every request repeats a large static prefix -- the tools, the
+  // system prompt, and the whole conversation so far. Three cache breakpoints
+  // (last tool, system, last message block) let turns 2..N read that prefix
+  // from cache instead of reprocessing it from scratch, which is the dominant
+  // per-turn latency cost of small-call-per-turn agentic generation.
+  var cachedTools = tools.map((t, idx) =>
+    idx === tools.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t
+  );
+
   var body: Record<string, unknown> = {
     model: config.model,
     max_tokens: options?.maxTokens || 16384,
     messages: apiMessages,
-    tools: tools,
+    tools: cachedTools,
   };
 
   if (systemPrompt) {
-    body.system = systemPrompt;
+    body.system = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
+  }
+
+  var lastMsg = apiMessages[apiMessages.length - 1];
+  if (lastMsg) {
+    if (typeof lastMsg.content === "string" && lastMsg.content.length > 0) {
+      lastMsg.content = [{ type: "text", text: lastMsg.content, cache_control: { type: "ephemeral" } }];
+    } else if (Array.isArray(lastMsg.content) && lastMsg.content.length > 0) {
+      var lastBlock = lastMsg.content[lastMsg.content.length - 1] as Record<string, unknown>;
+      lastMsg.content[lastMsg.content.length - 1] = { ...lastBlock, cache_control: { type: "ephemeral" } };
+    }
   }
 
   if (options?.temperature !== undefined && modelAcceptsTemperature(config.model)) {
