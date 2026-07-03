@@ -129,6 +129,18 @@ Output the SEARCH/REPLACE blocks to make these changes.`;
       }
     }
 
+    // Never return source whose script doesn't parse -- a bad patch must
+    // trigger the full-rewrite fallback, not ship a scene no browser can run.
+    const patchedScript = applied.result.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+    if (patchedScript) {
+      try {
+        new Function(patchedScript[1]);
+      } catch (e: any) {
+        console.warn(`  [revise] Patched source has a JS syntax error (${e.message}) -- discarding patch, falling back to full rewrite`);
+        return null;
+      }
+    }
+
     console.log(`  [revise] Applied ${applied.successes}/${blocks.length} SEARCH/REPLACE blocks for ${opts.componentName}`);
 
     return {
@@ -222,10 +234,20 @@ function parseSearchReplaceBlocks(response: string): SearchReplaceBlock[] {
       i++; // skip >>>>>>> REPLACE
 
       if (searchLines.length > 0) {
-        blocks.push({
-          search: searchLines.join("\n"),
-          replace: replaceLines.join("\n"),
-        });
+        const search = searchLines.join("\n");
+        const replace = replaceLines.join("\n");
+        // A bare divider / conflict-marker line inside either side means the
+        // response was malformed (e.g. the model reused ======= to separate a
+        // SECOND change inside one block). Applying it would write the marker
+        // into the component source -- and every later revise that quotes that
+        // content then mis-splits on it, multiplying the corruption (observed
+        // live: a scene accumulated four ======= lines across three revises).
+        const MARKER = /^\s*(={4,}|<{4,}.*|>{4,}.*)\s*$/m;
+        if (MARKER.test(replace) || MARKER.test(search)) {
+          console.warn(`  [revise] Dropping malformed SEARCH/REPLACE block (contains divider/conflict-marker lines)`);
+        } else {
+          blocks.push({ search, replace });
+        }
       }
     } else {
       i++;
