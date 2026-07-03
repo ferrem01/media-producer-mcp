@@ -141,4 +141,52 @@ describe("buildStoryboard: incremental add_scene tool calls", () => {
     ]);
     await expect(buildStoryboard(baseOpts())).rejects.toThrow(/truncated.*max_tokens/i);
   });
+
+  it("builds a beat-heavy scene from sequential add_beat calls instead of one inline array", async () => {
+    mockTurns([
+      { content: [toolUse("t1", "add_scene", { label: "Scene 1", duration_seconds: 16, purpose: "p", visual_notes: "v" })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "add_beat", { label: "a", duration_seconds: 4, action: "thing one happens" })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "add_beat", { label: "b", duration_seconds: 5, action: "thing two happens" })], stop_reason: "tool_use" },
+      { content: [toolUse("t4", "add_beat", { label: "c", duration_seconds: 7, action: "thing three happens" })], stop_reason: "tool_use" },
+      { content: [toolUse("t5", "finish_storyboard", { name: "Beat Chunked Film" })], stop_reason: "tool_use" },
+    ]);
+
+    const result = await buildStoryboard(baseOpts());
+    expect(result.scenes).toHaveLength(1);
+    expect(result.scenes[0].beats).toHaveLength(3);
+    expect(result.scenes[0].beats!.map((b) => b.label)).toEqual(["a", "b", "c"]);
+    const total = result.scenes[0].beats!.reduce((sum, b) => sum + b.duration_seconds, 0);
+    expect(total).toBeCloseTo(16, 1);
+  });
+
+  it("closes out a scene's beats as soon as the next add_scene starts, keeping each scene's beats separate", async () => {
+    mockTurns([
+      { content: [toolUse("t1", "add_scene", { label: "Scene 1", duration_seconds: 8, purpose: "p1", visual_notes: "v1" })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "add_beat", { label: "a", duration_seconds: 4, action: "one" })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "add_beat", { label: "b", duration_seconds: 4, action: "two" })], stop_reason: "tool_use" },
+      { content: [toolUse("t4", "add_scene", { label: "Scene 2", duration_seconds: 6, purpose: "p2", visual_notes: "v2" })], stop_reason: "tool_use" },
+      { content: [toolUse("t5", "add_beat", { label: "c", duration_seconds: 3, action: "three" })], stop_reason: "tool_use" },
+      { content: [toolUse("t6", "add_beat", { label: "d", duration_seconds: 3, action: "four" })], stop_reason: "tool_use" },
+      { content: [toolUse("t7", "finish_storyboard", { name: "Two Scenes" })], stop_reason: "tool_use" },
+    ]);
+
+    const result = await buildStoryboard(baseOpts());
+    expect(result.scenes).toHaveLength(2);
+    expect(result.scenes[0].beats!.map((b) => b.label)).toEqual(["a", "b"]);
+    expect(result.scenes[1].beats!.map((b) => b.label)).toEqual(["c", "d"]);
+  });
+
+  it("rejects add_beat before any scene has been started, and lets the model recover", async () => {
+    mockTurns([
+      { content: [toolUse("t1", "add_beat", { action: "too early" })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "add_scene", { label: "Scene 1", duration_seconds: 8, purpose: "p", visual_notes: "v" })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "add_beat", { label: "a", duration_seconds: 4, action: "now valid" })], stop_reason: "tool_use" },
+      { content: [toolUse("t4", "add_beat", { label: "b", duration_seconds: 4, action: "also valid" })], stop_reason: "tool_use" },
+      { content: [toolUse("t5", "finish_storyboard", { name: "Recovered" })], stop_reason: "tool_use" },
+    ]);
+
+    const result = await buildStoryboard(baseOpts());
+    expect(result.scenes).toHaveLength(1);
+    expect(result.scenes[0].beats).toHaveLength(2);
+  });
 });
