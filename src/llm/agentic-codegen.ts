@@ -616,6 +616,15 @@ Read the spec, then write your scene using write_template / write_style / write_
     return `<template>\n${parts.template}\n</template>\n<style scoped>\n${parts.style}\n</style>\n<script>\n${parts.script}\n</script>`;
   }
 
+  // max_tokens caps the WHOLE turn (all tool calls in one response combined).
+  // A truncated turn is RECOVERABLE, not fatal: everything already banked in
+  // `parts` survives, so we discard the truncated turn (its tool calls may be
+  // cut mid-JSON and cannot be trusted), tell the model what state is banked,
+  // and let it re-send the same work in smaller pieces. Only repeated
+  // truncation (the model refusing to chunk) aborts the scene.
+  var CODEGEN_MAX_TOKENS = 24000;
+  var truncations = 0;
+
   for (var iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     console.log(
       `  [agentic] Scene ${opts.sceneIndex + 1}: iteration ${iteration + 1}/${MAX_ITERATIONS}`,
@@ -629,23 +638,32 @@ Read the spec, then write your scene using write_template / write_style / write_
       });
     }
 
-    // max_tokens caps the WHOLE turn's output, not each tool call individually
-    // -- the model is free to batch several write_*/append_script calls into
-    // one turn (e.g. template + style + the first script chunk together), and
-    // their combined size counts against the same budget. 8192 truncated a
-    // real scene this way; 16000 gives room for a realistic multi-call batch
-    // while staying well under the old 32000-for-the-whole-document cap.
     var response = await callLLMAgentic(
       opts.llmConfig,
       messages,
       TOOLS,
-      { temperature: 0.6, maxTokens: 16000 },
+      { temperature: 0.6, maxTokens: CODEGEN_MAX_TOKENS },
     );
 
     if (response.stopReason === "max_tokens") {
-      throw new Error(
-        `Agentic codegen response truncated: hit max_tokens (16000) on scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}"). max_tokens caps the WHOLE turn (all tool calls in the response combined), so either one write_*/append_script call was too large or too many were batched into one response -- write smaller chunks and split the work across more turns.`
+      truncations++;
+      if (truncations > 2) {
+        throw new Error(
+          `Agentic codegen truncated ${truncations} times on scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}") despite retry nudges: the model kept exceeding max_tokens (${CODEGEN_MAX_TOKENS}) per turn instead of chunking its output.`
+        );
+      }
+      console.warn(
+        `  [agentic] Scene ${opts.sceneIndex + 1}: turn truncated at max_tokens (${CODEGEN_MAX_TOKENS}) -- discarding the turn and asking for smaller chunks (attempt ${truncations}/2).`
       );
+      messages.push({
+        role: "assistant",
+        content: (response.text || "(response truncated)").slice(0, 2000),
+      });
+      messages.push({
+        role: "user",
+        content: `Your last response hit the output-token limit and was DISCARDED -- NONE of its tool calls were applied. Still banked from before: template ${parts.template ? `WRITTEN (${parts.template.length} chars)` : "NOT written"}, style ${parts.style ? `WRITTEN (${parts.style.length} chars)` : "NOT written"}, script ${parts.script ? `${parts.script.length} chars so far` : "NOT started"}. Re-send the missing work in SMALLER pieces: ONE tool call per response, and split the timeline across several append_script calls (one or two beats each). Do not re-write sections that are already banked.`,
+      });
+      continue;
     }
 
     // Process tool calls

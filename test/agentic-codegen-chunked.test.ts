@@ -106,10 +106,30 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
     expect(html).toContain("<script>");
   });
 
-  it("throws a specific error when a single turn is truncated by max_tokens (not a silent partial chunk)", async () => {
+  it("recovers from a truncated turn: discards it, keeps banked sections, and finishes on the retry", async () => {
     mockTurns([
-      { content: [{ type: "text", text: "function createTimeline(el,data,ctx){ // cut off mid" }], stop_reason: "max_tokens" },
+      // Template banks fine, then a turn blows the token cap (its calls must be discarded).
+      { content: [toolUse("t1", "write_template", { html: "<div id=\"s\"></div>" })], stop_reason: "tool_use" },
+      { content: [toolUse("tX", "write_script", { js: "function createTimeline(el,data,ctx){ // cut off mid" }), { type: "text", text: "partial" }], stop_reason: "max_tokens" },
+      // Model retries with smaller chunks and completes.
+      { content: [toolUse("t2", "write_style", { css: "#s{}" })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
+      { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
-    await expect(generateSceneAgentic(baseOpts())).rejects.toThrow(/truncated.*max_tokens/i);
+
+    const html = await generateSceneAgentic(baseOpts());
+    // The banked template survived the truncated turn; the truncated write_script did NOT land.
+    expect(html).toContain('<div id="s"></div>');
+    expect(html).not.toContain("cut off mid");
+    expect(html).toContain("return gsap.timeline();");
+  });
+
+  it("aborts with a specific error after repeated truncation (model refuses to chunk)", async () => {
+    mockTurns([
+      { content: [{ type: "text", text: "way too long" }], stop_reason: "max_tokens" },
+      { content: [{ type: "text", text: "way too long again" }], stop_reason: "max_tokens" },
+      { content: [{ type: "text", text: "still too long" }], stop_reason: "max_tokens" },
+    ]);
+    await expect(generateSceneAgentic(baseOpts())).rejects.toThrow(/truncated 3 times.*max_tokens/i);
   });
 });
