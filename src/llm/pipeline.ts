@@ -43,6 +43,7 @@ import { processReferenceImages } from "./reference-images.js";
 import { type CritiqueResult } from "./critiquer.js";
 import { critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { reviseScene, undoScene } from "./scene-revise.js";
+import { reviseSceneInSession, type CodegenSession } from "./agentic-codegen.js";
 import { formatCorrectnessDefects, type CorrectnessResult, type CorrectnessDefect } from "./correctness-critique.js";
 import { parseLlmJson } from "./json-repair.js";
 import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
@@ -444,6 +445,7 @@ async function runSceneRevisionPipeline(
       maxRetries: opts.maxRevisions ?? 2,
       trace,
       customSources: generated.customSources,
+      codegenSession: generated.codegenSession,
       catalog,
       critique: opts.critique,
       creativity: resolveCreativity(opts),
@@ -583,6 +585,7 @@ async function runVideoRevisionPipeline(
         imageUrl,
         trace,
         customSources: generated.customSources,
+        codegenSession: generated.codegenSession,
         catalog,
         critique: opts.critique,
         creativity: resolveCreativity(opts),
@@ -978,6 +981,9 @@ async function critiqueAndRetryScene(opts: {
   creativity?: number;
   critiqueLlmConfig?: LLMConfig;
   treatment?: any;
+  /** Live codegen conversation from the initial generation -- lets the
+   *  surgical patch run as in-session Write-then-Edit patches. */
+  codegenSession?: CodegenSession;
 }): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
   // Skip critique if disabled (but correctnessOnly still runs the correctness gate).
   if (opts.critique === false && !opts.correctnessOnly) {
@@ -987,6 +993,7 @@ async function critiqueAndRetryScene(opts: {
   let currentScene = opts.scene;
   let currentCustomSources = opts.customSources;
   let currentDraft = opts.draft;
+  let session = opts.codegenSession;
   let lastCritique: CritiqueResult | undefined;
 
   // Track best attempt by EFFECTIVE score (visual score minus runtime/defect
@@ -1399,8 +1406,13 @@ async function critiqueAndRetryScene(opts: {
       const STRUCTURAL_DEFECTS = new Set(["missing_asset", "stray_ui", "not_sequenced", "off_brand_theme"]);
       const customEntries = currentCustomSources ? [...currentCustomSources.entries()] : [];
       const lastPatchImproved = patchAnchor < 0 || critiqueResult.score > patchAnchor;
+      const sessionUsable = !!(session && session.parts.template && session.parts.script);
       const canPatch =
-        runtime.ok &&
+        // A runtime throw is prime EDIT territory when the original codegen
+        // conversation is live (the error pinpoints the broken lookup; the
+        // model null-guards it in one edit_script call). Without a session,
+        // runtime errors keep taking the full-regen path as before.
+        (runtime.ok || sessionUsable) &&
         customEntries.length === 1 &&
         critiqueResult.score >= 4 &&
         !correctness.defects.some((d) => STRUCTURAL_DEFECTS.has(d.type)) &&
@@ -1411,27 +1423,50 @@ async function critiqueAndRetryScene(opts: {
           ...correctness.defects.map((d) => `[${d.type}] ${d.detail}`),
           ...critiqueResult.issues,
         ];
+        if (!runtime.ok) {
+          patchProblems.unshift(`[runtime_error] The scene THROWS at ${(runtime.atTime ?? 0).toFixed(1)}s: ${runtime.error}. Null-guard the failing lookup / fix the broken reference -- a scene that throws renders degraded.`);
+        }
         const patchInstructions =
           "Improve this scene by fixing these problems with MINIMAL, targeted edits. Keep the content, layout structure, and animations otherwise intact:\n" +
           patchProblems.map((p, i) => `${i + 1}. ${p}`).join("\n");
         patchAnchor = critiqueResult.score; // remember the pre-patch score for the guard
         opts.trace?.beginEvent(`critique_scene_${opts.sceneIndex}_patch`);
         try {
-          const revised = await reviseComponent({
-            existingSource: patchSource,
-            instructions: patchInstructions,
-            componentName: patchType,
-            llmConfig: opts.llmConfig,
-            brandKit: opts.brandKit,
-            canvas: opts.canvas,
-          });
+          // Write-then-Edit fast path: reopen the ORIGINAL codegen conversation
+          // (spec + build reasoning still in the prompt-cached prefix) and fix
+          // the flagged problems with minimal edit_* patches. Falls back to the
+          // context-blind single-shot SEARCH/REPLACE when no session exists
+          // (e.g. scenes loaded from disk).
+          let patchedSource: string;
+          let patchLabel: string;
+          if (sessionUsable) {
+            const revised = await reviseSceneInSession(session!, patchInstructions, {
+              sceneSpec: "", sceneLabel: currentDraft?.label || patchType, sceneDescription: "",
+              sceneDuration: currentScene.duration_seconds || 5,
+              sceneIndex: opts.sceneIndex, totalScenes: opts.totalScenes, prompt: opts.prompt,
+              llmConfig: opts.llmConfig, brandKit: opts.brandKit, canvas: opts.canvas,
+            });
+            patchedSource = revised.html;
+            patchLabel = "in-session edit";
+          } else {
+            const revised = await reviseComponent({
+              existingSource: patchSource,
+              instructions: patchInstructions,
+              componentName: patchType,
+              llmConfig: opts.llmConfig,
+              brandKit: opts.brandKit,
+              canvas: opts.canvas,
+            });
+            patchedSource = revised.source;
+            patchLabel = `surgical patch, ${revised.blocksApplied} block(s)${revised.fullRewrite ? ", full-rewrite fallback" : ""}`;
+          }
           // Copy the Map (bestCustomSources may alias it) so a patch can't clobber
           // a previously-tracked best attempt.
           currentCustomSources = new Map(currentCustomSources);
-          currentCustomSources.set(patchType, revised.source);
-          await fs.writeFile(path.join(opts.compDir, `${patchType}.component.html`), revised.source);
-          console.log(`  Critique: surgical patch on ${patchType} (${revised.blocksApplied} block(s)${revised.fullRewrite ? ", full-rewrite fallback" : ""})`);
-          opts.trace?.endEvent({ patched: true, blocks: revised.blocksApplied, fullRewrite: revised.fullRewrite });
+          currentCustomSources.set(patchType, patchedSource);
+          await fs.writeFile(path.join(opts.compDir, `${patchType}.component.html`), patchedSource);
+          console.log(`  Critique: ${patchLabel} on ${patchType}`);
+          opts.trace?.endEvent({ patched: true, mode: patchLabel });
           continue; // re-assemble + re-critique the patched scene next iteration
         } catch (e: any) {
           console.warn(`  Surgical patch failed, falling back to full re-storyboard: ${e.message}`);
@@ -1543,6 +1578,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
 
       currentScene = regenerated.scene;
       currentCustomSources = regenerated.customSources;
+      session = regenerated.codegenSession; // fresh conversation replaces the stale one
       patchAnchor = -1; // a full regen resets the patch-improvement guard
 
     } catch (e: any) {
@@ -2095,6 +2131,7 @@ async function runUnifiedPipeline(
             imageUrl,
             trace,
             customSources: generated.customSources,
+            codegenSession: generated.codegenSession,
             catalog,
             critique: skipCritique ? false : opts.critique,
             // Bookends skip the aesthetic critique but STILL get the correctness +
@@ -2304,6 +2341,7 @@ async function runUnifiedPipeline(
               prompt: richPrompt, format, llmConfig: opts.llmConfig, brandKit, canvas,
               tenantId: opts.tenant_id, projectId, compDir, maxRetries: 1,
               imageUrl: enrichResult.imageUrls.get(idx), trace, customSources: re.customSources,
+            codegenSession: re.codegenSession,
               catalog, critique: opts.critique, correctnessOnly: true,
               creativity: resolveCreativity(opts), critiqueLlmConfig: config.critiqueLlm, treatment,
             });

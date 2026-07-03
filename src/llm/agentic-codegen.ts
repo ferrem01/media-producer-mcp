@@ -103,7 +103,57 @@ const TOOLS: LLMTool[] = [
     description: "Call this when write_template, write_style, and write_script (plus any append_script calls) are all done and the scene is complete and ready to render. This assembles and validates the final document.",
     input_schema: { type: "object", properties: {} },
   },
+  // Edit tools -- the Claude Code Write-then-Edit pattern. During REVISION
+  // (critique feedback on an already-built scene) the model patches the banked
+  // sections with minimal exact-match replacements instead of re-emitting whole
+  // sections: a contrast fix is ~20 output tokens instead of a 6k-token rewrite.
+  {
+    name: "edit_template",
+    description: "Replace ONE exact occurrence of `search` with `replace` in the template (HTML) section you already wrote. `search` must match the existing text EXACTLY (including whitespace) and exactly once -- add surrounding context if it matches more than once. Use for minimal, targeted revisions; use write_template only when the whole section must change.",
+    input_schema: {
+      type: "object",
+      properties: {
+        search: { type: "string", description: "Exact existing text to find (must match exactly once)" },
+        replace: { type: "string", description: "Replacement text" },
+      },
+      required: ["search", "replace"],
+    },
+  },
+  {
+    name: "edit_style",
+    description: "Replace ONE exact occurrence of `search` with `replace` in the style (CSS) section you already wrote. Same exact-match rules as edit_template.",
+    input_schema: {
+      type: "object",
+      properties: {
+        search: { type: "string", description: "Exact existing text to find (must match exactly once)" },
+        replace: { type: "string", description: "Replacement text" },
+      },
+      required: ["search", "replace"],
+    },
+  },
+  {
+    name: "edit_script",
+    description: "Replace ONE exact occurrence of `search` with `replace` in the script (JavaScript) section you already wrote. Same exact-match rules as edit_template.",
+    input_schema: {
+      type: "object",
+      properties: {
+        search: { type: "string", description: "Exact existing text to find (must match exactly once)" },
+        replace: { type: "string", description: "Replacement text" },
+      },
+      required: ["search", "replace"],
+    },
+  },
 ];
+
+/** A resumable codegen conversation: the full message history plus the banked
+ *  template/style/script sections. Returned by generateSceneAgentic and fed
+ *  back to reviseSceneInSession so critique revisions are small in-context
+ *  edits (with the spec + the model's own build reasoning still in the
+ *  prompt-cached prefix) instead of context-blind full regenerations. */
+export interface CodegenSession {
+  messages: LLMMessage[];
+  parts: { template: string; style: string; script: string };
+}
 
 // ── Tool Implementations ──
 
@@ -558,7 +608,7 @@ const MAX_ITERATIONS = 14;
 
 export async function generateSceneAgentic(
   opts: AgenticCodegenOpts,
-): Promise<string> {
+): Promise<{ html: string; session: CodegenSession }> {
   var systemPrompt = buildAgenticSystemPrompt(opts);
 
   // Component schemas are provided in the spec by the storyboard builder
@@ -606,15 +656,99 @@ Read the spec, then write your scene using write_template / write_style / write_
     `  [agentic] Scene ${opts.sceneIndex + 1}: starting codegen for "${opts.sceneLabel}"`,
   );
 
-  var lastHtml: string | null = null;
-
-  // Incremental accumulator: no single tool call ever needs to hold the whole
-  // document. write_script/append_script build .script up across many small
-  // calls (the beats-heavy-scene failure mode this replaces).
   var parts = { template: "", style: "", script: "" };
-  function assembleHtml(): string {
-    return `<template>\n${parts.template}\n</template>\n<style scoped>\n${parts.style}\n</style>\n<script>\n${parts.script}\n</script>`;
+  var session: CodegenSession = { messages, parts };
+
+  var result = await runAgenticLoop({
+    messages, parts, opts,
+    maxIterations: MAX_ITERATIONS,
+    phase: "codegen",
+  });
+  if (result.html) return { html: result.html, session };
+
+  // Max iterations reached without an accepted finish_scene.
+  console.warn(
+    `  [agentic] Scene ${opts.sceneIndex + 1}: ⚠️ max iterations (${MAX_ITERATIONS}) reached`,
+  );
+
+  // Prefer whatever got assembled in the accumulator over a stray text blob --
+  // it's more likely to be a coherent (if incomplete) document.
+  if (parts.template && parts.script) {
+    console.log(
+      `  [agentic] Scene ${opts.sceneIndex + 1}: using accumulated sections (template ${parts.template.length}, style ${parts.style.length}, script ${parts.script.length} chars)`,
+    );
+    return { html: assemblePartsHtml(parts), session };
   }
+
+  if (result.lastHtml) {
+    console.log(
+      `  [agentic] Scene ${opts.sceneIndex + 1}: using last available HTML`,
+    );
+    return { html: result.lastHtml, session };
+  }
+
+  throw new Error(
+    `Agentic codegen failed after ${MAX_ITERATIONS} iterations without producing HTML`,
+  );
+}
+
+function assemblePartsHtml(parts: { template: string; style: string; script: string }): string {
+  return `<template>\n${parts.template}\n</template>\n<style scoped>\n${parts.style}\n</style>\n<script>\n${parts.script}\n</script>`;
+}
+
+/**
+ * Revise an already-built scene INSIDE its original codegen conversation.
+ *
+ * The Write-then-Edit pattern: the session still holds the spec, the model's
+ * own build reasoning, and the banked template/style/script (all in the
+ * prompt-cached prefix), so a critique fix is a handful of edit_* patches
+ * (~tens of output tokens) instead of a context-blind full regeneration.
+ * Throws if the revision doesn't converge -- callers fall back to full regen.
+ */
+export async function reviseSceneInSession(
+  session: CodegenSession,
+  feedback: string,
+  opts: AgenticCodegenOpts,
+): Promise<{ html: string; session: CodegenSession }> {
+  if (!session.parts.template || !session.parts.script) {
+    throw new Error("Codegen session has no banked template/script to revise");
+  }
+
+  session.messages.push({
+    role: "user",
+    content: `The rendered scene FAILED review. Problems found:
+
+${feedback}
+
+Fix these with MINIMAL, targeted patches using edit_template / edit_style / edit_script (exact-match search & replace on what you already wrote). Only use write_template / write_style / write_script if a whole section genuinely must be rewritten -- prefer the smallest change that fixes each problem, and do NOT touch anything that wasn't flagged. When every problem is addressed, call finish_scene to re-validate.`,
+  });
+
+  console.log(`  [agentic] Scene ${opts.sceneIndex + 1}: revising in-session (${session.parts.script.length} chars script banked)`);
+
+  var result = await runAgenticLoop({
+    messages: session.messages, parts: session.parts, opts,
+    maxIterations: 8,
+    phase: "revise",
+  });
+  if (result.html) return { html: result.html, session };
+
+  throw new Error(
+    `In-session revision did not converge for scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}")`,
+  );
+}
+
+// The shared agentic tool loop: drives the write/append/edit/finish tools
+// against a message history + parts accumulator until finish_scene validates,
+// the model emits a full document as text, or the iteration budget runs out.
+async function runAgenticLoop(args: {
+  messages: LLMMessage[];
+  parts: { template: string; style: string; script: string };
+  opts: AgenticCodegenOpts;
+  maxIterations: number;
+  phase: "codegen" | "revise";
+}): Promise<{ html: string | null; lastHtml: string | null }> {
+  var { messages, parts, opts, maxIterations } = args;
+  var lastHtml: string | null = null;
 
   // max_tokens caps the WHOLE turn (all tool calls in one response combined).
   // A truncated turn is RECOVERABLE, not fatal: everything already banked in
@@ -625,16 +759,16 @@ Read the spec, then write your scene using write_template / write_style / write_
   var CODEGEN_MAX_TOKENS = 24000;
   var truncations = 0;
 
-  for (var iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+  for (var iteration = 0; iteration < maxIterations; iteration++) {
     console.log(
-      `  [agentic] Scene ${opts.sceneIndex + 1}: iteration ${iteration + 1}/${MAX_ITERATIONS}`,
+      `  [agentic] Scene ${opts.sceneIndex + 1}: ${args.phase} iteration ${iteration + 1}/${maxIterations}`,
     );
 
-    // After iteration 8, inject urgency to finish
-    if (iteration >= 8 && !lastHtml) {
+    // Near the end of the budget, inject urgency to finish
+    if (iteration >= Math.max(3, maxIterations - 6) && !lastHtml && args.phase === "codegen") {
       messages.push({
         role: "user",
-        content: `IMPORTANT: You have ${MAX_ITERATIONS - iteration} iterations remaining. Finish writing NOW: whatever sections you haven't written yet, write them (use append_script for any remaining beats), then call finish_scene immediately. Do not start over -- build on what you've already written.`,
+        content: `IMPORTANT: You have ${maxIterations - iteration} iterations remaining. Finish writing NOW: whatever sections you haven't written yet, write them (use append_script for any remaining beats), then call finish_scene immediately. Do not start over -- build on what you've already written.`,
       });
     }
 
@@ -713,16 +847,35 @@ Read the spec, then write your scene using write_template / write_style / write_
         } else if (toolCall.name === "append_script") {
           parts.script += String(toolCall.input.js || "");
           toolResult = `appended (script is now ${parts.script.length} chars total)`;
+        } else if (toolCall.name === "edit_template" || toolCall.name === "edit_style" || toolCall.name === "edit_script") {
+          var sectionKey = toolCall.name === "edit_template" ? "template" as const
+            : toolCall.name === "edit_style" ? "style" as const : "script" as const;
+          var search = String(toolCall.input.search ?? "");
+          var replacement = String(toolCall.input.replace ?? "");
+          var haystack = parts[sectionKey];
+          if (!search) {
+            toolResult = "search must be a non-empty string";
+          } else {
+            var occurrences = haystack.split(search).length - 1;
+            if (occurrences === 0) {
+              toolResult = `search text not found in ${sectionKey} -- it must match the existing text EXACTLY, whitespace included. Re-read what you wrote and retry with an exact excerpt.`;
+            } else if (occurrences > 1) {
+              toolResult = `search text matches ${occurrences} places in ${sectionKey} -- include more surrounding context so it matches exactly once.`;
+            } else {
+              parts[sectionKey] = haystack.split(search).join(replacement);
+              toolResult = `${sectionKey} edited (${haystack.length} -> ${parts[sectionKey].length} chars)`;
+            }
+          }
         } else if (toolCall.name === "finish_scene") {
           if (!parts.template || !parts.script) {
             var missing = [!parts.template && "write_template", !parts.script && "write_script"].filter(Boolean).join(" and ");
             toolResult = `Cannot finish yet -- ${missing} not called. Write the missing section(s) first, then call finish_scene again.`;
           } else {
-            var assembled = assembleHtml();
+            var assembled = assemblePartsHtml(parts);
             var submitResult = executeSubmitScene(assembled);
             if (submitResult.valid) {
               console.log(
-                `  [agentic] Scene ${opts.sceneIndex + 1}: ✅ scene finished after ${iteration + 1} iterations (template ${parts.template.length}, style ${parts.style.length}, script ${parts.script.length} chars)`,
+                `  [agentic] Scene ${opts.sceneIndex + 1}: ✅ ${args.phase} finished after ${iteration + 1} iterations (template ${parts.template.length}, style ${parts.style.length}, script ${parts.script.length} chars)`,
               );
               finished = true;
               finishedHtml = submitResult.html;
@@ -743,13 +896,15 @@ Read the spec, then write your scene using write_template / write_style / write_
         });
       }
 
-      if (finished) return finishedHtml;
-
-      // Add user message with tool results
+      // Always bank the tool results BEFORE returning so the conversation
+      // stays resumable (a dangling tool_use with no tool_result is an API
+      // error on the next call in this session).
       messages.push({
         role: "user",
         content: toolResults,
       });
+
+      if (finished) return { html: finishedHtml, lastHtml };
 
       continue;
     }
@@ -771,7 +926,8 @@ Read the spec, then write your scene using write_template / write_style / write_
         console.log(
           `  [agentic] Scene ${opts.sceneIndex + 1}: ✅ scene returned as text after ${iteration + 1} iterations`,
         );
-        return text;
+        messages.push({ role: "assistant", content: response.text });
+        return { html: text, lastHtml };
       }
 
       // Text but no HTML - prompt to use the tools
@@ -788,28 +944,5 @@ Read the spec, then write your scene using write_template / write_style / write_
     }
   }
 
-  // Max iterations reached
-  console.warn(
-    `  [agentic] Scene ${opts.sceneIndex + 1}: ⚠️ max iterations (${MAX_ITERATIONS}) reached`,
-  );
-
-  // Prefer whatever got assembled in the accumulator over a stray text blob --
-  // it's more likely to be a coherent (if incomplete) document.
-  if (parts.template && parts.script) {
-    console.log(
-      `  [agentic] Scene ${opts.sceneIndex + 1}: using accumulated sections (template ${parts.template.length}, style ${parts.style.length}, script ${parts.script.length} chars)`,
-    );
-    return assembleHtml();
-  }
-
-  if (lastHtml) {
-    console.log(
-      `  [agentic] Scene ${opts.sceneIndex + 1}: using last available HTML`,
-    );
-    return lastHtml;
-  }
-
-  throw new Error(
-    `Agentic codegen failed after ${MAX_ITERATIONS} iterations without producing HTML`,
-  );
+  return { html: null, lastHtml };
 }
