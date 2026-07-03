@@ -11,7 +11,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fork, execFile } from "node:child_process";
+import { fork, execFile, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { assembleSceneAuto, type ComponentSource } from "./scene-assembler.js";
@@ -281,6 +281,7 @@ async function renderSingleSceneWorker(
   workDir: string,
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
+  workerRegistry?: Set<ChildProcess>,
 ): Promise<{ mp4Path: string; frameCount: number }> {
   const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `scene_${sceneIndex}`);
@@ -396,6 +397,7 @@ async function renderSingleSceneWorker(
       // fork() requires an "ipc" entry in the stdio array.
       stdio: ["inherit", "inherit", "pipe", "ipc"],
     });
+    workerRegistry?.add(child);
     let stderrTail = "";
     if (child.stderr) {
       child.stderr.on("data", (chunk: Buffer) => {
@@ -404,6 +406,7 @@ async function renderSingleSceneWorker(
       });
     }
     child.on("exit", (code) => {
+      workerRegistry?.delete(child);
       if (code === 0) resolve();
       else {
         const label = scene.label ? ` "${scene.label}"` : "";
@@ -439,15 +442,30 @@ async function renderScenesParallel(
 
   console.log(`  Rendering ${project.scenes.length} scenes (concurrency: ${concurrency})`);
 
+  // Registry of in-flight scene workers. When one worker fails, Promise.all
+  // rejects immediately -- but WITHOUT this, the sibling forks keep running as
+  // zombies after the job is declared failed: they finish capturing, encode,
+  // then delete their frames dir, corrupting any subsequent render that reuses
+  // the same scene work dirs ("Could find no file ... frames"). On failure,
+  // kill every still-running worker before propagating.
+  const workers = new Set<ChildProcess>();
+
   for (let batch = 0; batch < project.scenes.length; batch += concurrency) {
     const batchEnd = Math.min(batch + concurrency, project.scenes.length);
     const promises: Promise<{ mp4Path: string; frameCount: number }>[] = [];
 
     for (let idx = batch; idx < batchEnd; idx++) {
-      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts, extraComponentDirs));
+      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts, extraComponentDirs, workers));
     }
 
-    const batchResults = await Promise.all(promises);
+    let batchResults;
+    try {
+      batchResults = await Promise.all(promises);
+    } catch (e) {
+      for (const child of workers) child.kill("SIGKILL");
+      workers.clear();
+      throw e;
+    }
     for (let i = 0; i < batchResults.length; i++) {
       results[batch + i] = batchResults[i];
     }
@@ -557,17 +575,27 @@ async function renderVideoWithSpeakerTrack(
 
   const sceneFrameDirs: Array<{ framesDir: string; frameCount: number }> = [];
 
-  // Render scenes in parallel batches (same concurrency as normal pipeline)
+  // Render scenes in parallel batches (same concurrency as normal pipeline).
+  // Same zombie-worker guard as renderScenesParallel: on failure, kill the
+  // still-running sibling forks before propagating.
   const concurrency = config.renderConcurrency;
+  const speakerWorkers = new Set<ChildProcess>();
   for (let batch = 0; batch < scenes.length; batch += concurrency) {
     const batchEnd = Math.min(batch + concurrency, scenes.length);
     const promises: Promise<{ framesDir: string; frameCount: number }>[] = [];
 
     for (let idx = batch; idx < batchEnd; idx++) {
-      promises.push(renderSceneTransparentFrames(project, idx, workDir, critiqueOpts, extraComponentDirs));
+      promises.push(renderSceneTransparentFrames(project, idx, workDir, critiqueOpts, extraComponentDirs, speakerWorkers));
     }
 
-    const batchResults = await Promise.all(promises);
+    let batchResults;
+    try {
+      batchResults = await Promise.all(promises);
+    } catch (e) {
+      for (const child of speakerWorkers) child.kill("SIGKILL");
+      speakerWorkers.clear();
+      throw e;
+    }
     for (const r of batchResults) {
       sceneFrameDirs.push(r);
     }
@@ -728,6 +756,7 @@ async function renderSceneTransparentFrames(
   workDir: string,
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
+  workerRegistry?: Set<ChildProcess>,
 ): Promise<{ framesDir: string; frameCount: number }> {
   const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `speaker_scene_${sceneIndex}`);
@@ -777,6 +806,7 @@ async function renderSceneTransparentFrames(
 
   await new Promise<void>((resolve, reject) => {
     const child = fork(workerPath, [argsPath], { execArgv: [], stdio: ["inherit", "inherit", "pipe", "ipc"] });
+    workerRegistry?.add(child);
     let stderrTail = "";
     if (child.stderr) {
       child.stderr.on("data", (chunk: Buffer) => {
@@ -785,6 +815,7 @@ async function renderSceneTransparentFrames(
       });
     }
     child.on("exit", (code) => {
+      workerRegistry?.delete(child);
       if (code === 0) resolve();
       else {
         const tail = stderrTail.trim();
