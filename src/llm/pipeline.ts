@@ -2258,12 +2258,32 @@ async function runUnifiedPipeline(
             critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its draft intent. ${fix.detail}`,
           });
           if (re.customSources) for (const [n, h] of re.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
-          const newScene = re.scene;
+
+          // An editorial replacement must clear the SAME correctness gate as
+          // every normally-generated scene. Without this, a regen with a
+          // runtime error (never reaches its ready signal) sails straight
+          // into the project and the first thing that notices is the render
+          // worker timing out -- which kills the whole render. correctnessOnly
+          // keeps it cheap (render + gates, no aesthetic re-judging).
+          const gated = await critiqueAndRetryScene({
+            scene: re.scene, draft, sceneIndex: idx, totalScenes: project.scenes.length,
+            prompt: richPrompt, format, llmConfig: opts.llmConfig, brandKit, canvas,
+            tenantId: opts.tenant_id, projectId, compDir, maxRetries: 1,
+            imageUrl: enrichResult.imageUrls.get(idx), trace, customSources: re.customSources,
+            catalog, critique: opts.critique, correctnessOnly: true,
+            creativity: resolveCreativity(opts), critiqueLlmConfig: config.critiqueLlm, treatment,
+          });
+          const newScene = gated.scene;
+          if (gated.customSources) for (const [n, h] of gated.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
           if (draft.voiceover_text) { if (!newScene.audio_hints) newScene.audio_hints = {}; newScene.audio_hints.voiceover_text = draft.voiceover_text; }
           project.scenes[idx] = newScene;
           regen++;
           console.log(`    Editorial: regenerated scene ${idx + 1} to match intent`);
-        } catch (e: any) { console.warn(`    Editorial regen scene ${idx + 1} failed: ${e.message}`); }
+        } catch (e: any) {
+          // The pre-regen scene is still in place and known-renderable -- a
+          // failed replacement must never displace it.
+          console.warn(`    Editorial regen scene ${idx + 1} failed (${e.message}) -- keeping the original scene.`);
+        }
       }
 
       // Structural auto-fixes (transition variety, breathing, durations) -- applied
