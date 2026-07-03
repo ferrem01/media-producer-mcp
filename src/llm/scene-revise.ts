@@ -181,6 +181,20 @@ export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneRes
     canvas: project.canvas,
   });
 
+  // Static JS syntax gate: a SEARCH/REPLACE patch can splice a statement
+  // mid-expression and produce a script no browser will parse -- which then
+  // ships (the fast gates are best-effort) and kills the RENDER with a
+  // ready-timeout. Parse without executing; refuse the revise rather than
+  // overwrite a working scene with one that cannot run.
+  const patchedScript = revised.source.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+  if (patchedScript) {
+    try {
+      new Function(patchedScript[1]);
+    } catch (e: any) {
+      return { ok: false, error: `Revise produced a script with a JavaScript syntax error (${e.message}) -- keeping the existing scene source.` };
+    }
+  }
+
   // Version the prior source, then write the new one.
   const compDir = path.join(projectDir(opts.tenantId, opts.projectId), "components");
   const revisionId = `${type}.${Date.now()}`;

@@ -227,6 +227,25 @@ export function executeSubmitScene(html: string): { valid: boolean; html: string
     console.warn("  [agentic] submit_scene: no <style> section (acceptable but unusual)");
   }
 
+  // Static JS syntax gate: parse (without executing) the script section. A
+  // syntax error here previously shipped silently -- nothing between codegen
+  // and the BROWSER parsed the script, so a malformed edit/patch surfaced as
+  // a render-worker ready-timeout ("Unexpected token") on a scene every other
+  // gate had passed. new Function() parses declarations as a function body,
+  // which is exactly how the runtime evals the section.
+  var scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+  if (scriptMatch) {
+    try {
+      new Function(scriptMatch[1]);
+    } catch (e: any) {
+      return {
+        valid: false,
+        html,
+        error: `The <script> section has a JavaScript SYNTAX error and cannot run: ${e.message}. Re-read the script you wrote (especially around any recent edit/append boundaries -- unbalanced braces, a statement spliced mid-expression) and fix it, then finish again.`,
+      };
+    }
+  }
+
   // Reject remote media URLs. Every legitimate asset (b-roll, hero image, logo)
   // is handed to the agent as a LOCAL /assets/... path; a remote http(s) media
   // URL means the agent invented one (e.g. a Pexels clip from training) when no
