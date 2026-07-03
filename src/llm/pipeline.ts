@@ -44,6 +44,13 @@ import { type CritiqueResult } from "./critiquer.js";
 import { critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
 import { reviseScene, undoScene } from "./scene-revise.js";
 import { reviseSceneInSession, type CodegenSession } from "./agentic-codegen.js";
+
+// Default critique revision budget. 2 dated from when every revision round was
+// a full multi-minute regeneration; with in-session Write-then-Edit patches a
+// round is seconds, and exhausting the budget is what ships hard-floor template
+// swaps (4/5 scenes on a real light-brand run). Overridable per-request via
+// opts.maxRevisions or globally via MP_MAX_REVISIONS.
+const MAX_SCENE_REVISIONS = Math.max(1, parseInt(process.env.MP_MAX_REVISIONS || "4", 10) || 4);
 import { formatCorrectnessDefects, type CorrectnessResult, type CorrectnessDefect } from "./correctness-critique.js";
 import { parseLlmJson } from "./json-repair.js";
 import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
@@ -442,7 +449,7 @@ async function runSceneRevisionPipeline(
       tenantId: opts.tenant_id,
       projectId: project.project_id,
       compDir,
-      maxRetries: opts.maxRevisions ?? 2,
+      maxRetries: opts.maxRevisions ?? MAX_SCENE_REVISIONS,
       trace,
       customSources: generated.customSources,
       codegenSession: generated.codegenSession,
@@ -581,7 +588,7 @@ async function runVideoRevisionPipeline(
         tenantId: opts.tenant_id,
         projectId: project.project_id,
         compDir,
-        maxRetries: opts.maxRevisions ?? 2,
+        maxRetries: opts.maxRevisions ?? MAX_SCENE_REVISIONS,
         imageUrl,
         trace,
         customSources: generated.customSources,
@@ -841,7 +848,7 @@ async function runImageRevisionPipeline(
       tenantId: opts.tenant_id,
       projectId: project.project_id,
       compDir,
-      maxRetries: opts.maxRevisions ?? 2,
+      maxRetries: opts.maxRevisions ?? MAX_SCENE_REVISIONS,
       trace,
     });
     finalScene = critiqueResult.scene;
@@ -1608,6 +1615,10 @@ Output valid JSON only. No markdown fences, no commentary.`;
         purpose: currentDraft.purpose || opts.prompt,
         visual_notes: `${currentDraft.purpose || opts.prompt}\n\nDESIGN MANDATE: Keep it simple. One bold visual idea. Large readable text on a high-contrast background. No more than 10 words visible. Use var(--mp-color-text) on var(--mp-color-background) for guaranteed contrast.`,
         transition_in: currentDraft.transition_in,
+        // Keep the beat timeline: the old swap dropped it, so every
+        // fallback-heavy film collapsed into a beat-less slideshow even
+        // though the storyboard authored real beats.
+        beats: currentDraft.beats,
         components: [],
       };
 
@@ -1631,6 +1642,53 @@ Output valid JSON only. No markdown fences, no commentary.`;
         for (const [compName, compHtml] of swapped.customSources) {
           await fs.writeFile(path.join(opts.compDir, `${compName}.component.html`), compHtml);
         }
+      }
+
+      // The swap used to ship completely unverified ("never re-critiqued") --
+      // which let a runtime-broken fallback reach the RENDERER as the first
+      // thing to notice. Verify it runs; give one cheap in-session repair;
+      // if it still doesn't run, fall through and keep the best attempt
+      // instead of shipping a swap that cannot render.
+      const gateSwap = async (): Promise<{ ok: boolean; error?: string }> => {
+        const sources = swapped.customSources
+          ? [...swapped.customSources.entries()].map(([type, source]) => ({ type, source })) : [];
+        const html = await assembleSceneAuto({
+          scene: swapped.scene, components: sources, brandKit: opts.brandKit, canvas: opts.canvas,
+          gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: true,
+        });
+        const tmp = path.join(os.tmpdir(), `swapgate_${opts.projectId}_${opts.sceneIndex}`);
+        await fs.mkdir(tmp, { recursive: true });
+        const hp = path.join(tmp, "scene.html");
+        await fs.writeFile(hp, html);
+        const rt = await validateSceneRuntime({
+          htmlPath: hp, width: opts.canvas.width, height: opts.canvas.height,
+          duration: swapped.scene.duration_seconds || 5,
+        });
+        return { ok: rt.ok, error: rt.error };
+      };
+      let swapGate = await gateSwap();
+      if (!swapGate.ok && swapped.codegenSession) {
+        console.warn(`  Template swap has a runtime error (${swapGate.error}) -- attempting one in-session repair.`);
+        try {
+          const repaired = await reviseSceneInSession(
+            swapped.codegenSession,
+            `[runtime_error] The scene's script THROWS: ${swapGate.error}. Null-guard the failing lookup / fix the broken reference; change nothing else.`,
+            { sceneSpec: "", sceneLabel: swapScene.label, sceneDescription: "", sceneDuration: swapScene.duration_seconds,
+              sceneIndex: opts.sceneIndex, totalScenes: opts.totalScenes, prompt: opts.prompt,
+              llmConfig: opts.llmConfig, brandKit: opts.brandKit, canvas: opts.canvas },
+          );
+          const swapCompType = swapped.customSources ? [...swapped.customSources.keys()][0] : undefined;
+          if (swapCompType) {
+            swapped.customSources!.set(swapCompType, repaired.html);
+            await fs.writeFile(path.join(opts.compDir, `${swapCompType}.component.html`), repaired.html);
+          }
+          swapGate = await gateSwap();
+        } catch (repairErr: any) {
+          console.warn(`  Swap in-session repair failed: ${repairErr.message}`);
+        }
+      }
+      if (!swapGate.ok) {
+        throw new Error(`template swap failed its runtime gate (${swapGate.error}) -- keeping the best attempt instead`);
       }
 
       console.log(`  Template swap complete for scene ${opts.sceneIndex}`);
@@ -2127,7 +2185,7 @@ async function runUnifiedPipeline(
             tenantId: opts.tenant_id,
             projectId,
             compDir,
-            maxRetries: opts.maxRevisions ?? 2,
+            maxRetries: opts.maxRevisions ?? MAX_SCENE_REVISIONS,
             imageUrl,
             trace,
             customSources: generated.customSources,
