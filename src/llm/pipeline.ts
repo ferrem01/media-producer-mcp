@@ -42,6 +42,7 @@ import { resolveImageCanvas } from "./image-canvas.js";
 import { processReferenceImages } from "./reference-images.js";
 import { type CritiqueResult } from "./critiquer.js";
 import { critiqueEditorial, type EditorialCritiqueResult } from "./multi-pass-critiquer.js";
+import { reviseScene, undoScene } from "./scene-revise.js";
 import { formatCorrectnessDefects, type CorrectnessResult, type CorrectnessDefect } from "./correctness-critique.js";
 import { parseLlmJson } from "./json-repair.js";
 import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
@@ -2244,46 +2245,82 @@ async function runUnifiedPipeline(
       const MAX_EDITORIAL_REGEN = 2;
       const sceneFixes = (editorial.fixes || []).filter(f => f.type === "fix_scene" && typeof f.scene_index === "number" && f.detail && f.scene_index! >= 0 && f.scene_index! < project.scenes.length);
       let regen = 0;
-      for (const fix of sceneFixes) {
-        if (regen >= MAX_EDITORIAL_REGEN) break;
-        const idx = fix.scene_index!;
-        const draft = storyboard.scenes[idx];
-        if (!draft) continue;
-        try {
-          const re = await generateScene({
-            scene: draft, sceneIndex: idx, totalScenes: project.scenes.length, prompt: richPrompt, format,
-            llmConfig: opts.llmConfig, brandKit, canvas, imageUrl: enrichResult.imageUrls.get(idx),
-            tenantId: opts.tenant_id, projectId, referenceImages: processedRefs, treatment,
-            brollVideoUrl: brollUrlMap.get(idx),
-            critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its draft intent. ${fix.detail}`,
-          });
-          if (re.customSources) for (const [n, h] of re.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
+      if (sceneFixes.length > 0) {
+        // reviseScene loads the project from disk -- persist the in-memory
+        // scenes before the surgical pass so it patches CURRENT sources.
+        await saveProject(project);
 
-          // An editorial replacement must clear the SAME correctness gate as
-          // every normally-generated scene. Without this, a regen with a
-          // runtime error (never reaches its ready signal) sails straight
-          // into the project and the first thing that notices is the render
-          // worker timing out -- which kills the whole render. correctnessOnly
-          // keeps it cheap (render + gates, no aesthetic re-judging).
-          const gated = await critiqueAndRetryScene({
-            scene: re.scene, draft, sceneIndex: idx, totalScenes: project.scenes.length,
-            prompt: richPrompt, format, llmConfig: opts.llmConfig, brandKit, canvas,
-            tenantId: opts.tenant_id, projectId, compDir, maxRetries: 1,
-            imageUrl: enrichResult.imageUrls.get(idx), trace, customSources: re.customSources,
-            catalog, critique: opts.critique, correctnessOnly: true,
-            creativity: resolveCreativity(opts), critiqueLlmConfig: config.critiqueLlm, treatment,
-          });
-          const newScene = gated.scene;
-          if (gated.customSources) for (const [n, h] of gated.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
-          if (draft.voiceover_text) { if (!newScene.audio_hints) newScene.audio_hints = {}; newScene.audio_hints.voiceover_text = draft.voiceover_text; }
-          project.scenes[idx] = newScene;
-          regen++;
-          console.log(`    Editorial: regenerated scene ${idx + 1} to match intent`);
-        } catch (e: any) {
-          // The pre-regen scene is still in place and known-renderable -- a
-          // failed replacement must never displace it.
-          console.warn(`    Editorial regen scene ${idx + 1} failed (${e.message}) -- keeping the original scene.`);
-        }
+        // Surgical revise FIRST, full regen only as fallback. A from-scratch
+        // regen takes minutes per scene and -- because it replaces a working
+        // scene wholesale -- is exactly how editorial shipped runtime-broken
+        // scenes; a SEARCH/REPLACE patch on the existing source is ~5-10x
+        // faster and keeps everything that already works. The revise runs the
+        // fast gates itself: a "runtime" defect on the patched scene means we
+        // undo to the versioned source and fall through to the gated regen.
+        // Fixes run in parallel -- they touch different scenes/files.
+        const fixResults = await Promise.all(sceneFixes.slice(0, MAX_EDITORIAL_REGEN).map(async (fix) => {
+          const idx = fix.scene_index!;
+          const draft = storyboard.scenes[idx];
+          const sceneId = project.scenes[idx]?.id;
+          if (!draft || !sceneId) return false;
+          const instruction = `EDITORIAL FIX -- this scene did not achieve its storyboard intent. ${fix.detail} Make the necessary changes while keeping everything that already works.`;
+
+          try {
+            const revised = await reviseScene({
+              tenantId: opts.tenant_id, projectId, sceneId, instruction,
+              llmConfig: opts.llmConfig,
+            });
+            const runtimeBroken = revised.ok && (revised.defects || []).some(d => d.type === "runtime");
+            if (revised.ok && !runtimeBroken) {
+              console.log(`    Editorial: surgically revised scene ${idx + 1} (${revised.blocksApplied} block(s)${revised.fullRewrite ? ", full-rewrite fallback" : ""})`);
+              return true;
+            }
+            if (revised.ok && runtimeBroken) {
+              console.warn(`    Editorial: revise broke scene ${idx + 1} at runtime -- undoing patch, falling back to full regen.`);
+              await undoScene({ tenantId: opts.tenant_id, projectId, sceneId });
+            }
+          } catch (e: any) {
+            console.warn(`    Editorial: surgical revise of scene ${idx + 1} failed (${e.message}) -- falling back to full regen.`);
+          }
+
+          try {
+            const re = await generateScene({
+              scene: draft, sceneIndex: idx, totalScenes: project.scenes.length, prompt: richPrompt, format,
+              llmConfig: opts.llmConfig, brandKit, canvas, imageUrl: enrichResult.imageUrls.get(idx),
+              tenantId: opts.tenant_id, projectId, referenceImages: processedRefs, treatment,
+              brollVideoUrl: brollUrlMap.get(idx),
+              critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its draft intent. ${fix.detail}`,
+            });
+            if (re.customSources) for (const [n, h] of re.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
+
+            // An editorial replacement must clear the SAME correctness gate as
+            // every normally-generated scene. Without this, a regen with a
+            // runtime error (never reaches its ready signal) sails straight
+            // into the project and the first thing that notices is the render
+            // worker timing out -- which kills the whole render. correctnessOnly
+            // keeps it cheap (render + gates, no aesthetic re-judging).
+            const gated = await critiqueAndRetryScene({
+              scene: re.scene, draft, sceneIndex: idx, totalScenes: project.scenes.length,
+              prompt: richPrompt, format, llmConfig: opts.llmConfig, brandKit, canvas,
+              tenantId: opts.tenant_id, projectId, compDir, maxRetries: 1,
+              imageUrl: enrichResult.imageUrls.get(idx), trace, customSources: re.customSources,
+              catalog, critique: opts.critique, correctnessOnly: true,
+              creativity: resolveCreativity(opts), critiqueLlmConfig: config.critiqueLlm, treatment,
+            });
+            const newScene = gated.scene;
+            if (gated.customSources) for (const [n, h] of gated.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
+            if (draft.voiceover_text) { if (!newScene.audio_hints) newScene.audio_hints = {}; newScene.audio_hints.voiceover_text = draft.voiceover_text; }
+            project.scenes[idx] = newScene;
+            console.log(`    Editorial: regenerated scene ${idx + 1} to match intent`);
+            return true;
+          } catch (e: any) {
+            // The pre-regen scene is still in place and known-renderable -- a
+            // failed replacement must never displace it.
+            console.warn(`    Editorial regen scene ${idx + 1} failed (${e.message}) -- keeping the original scene.`);
+            return false;
+          }
+        }));
+        regen = fixResults.filter(Boolean).length;
       }
 
       // Structural auto-fixes (transition variety, breathing, durations) -- applied
