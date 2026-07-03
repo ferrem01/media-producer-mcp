@@ -1480,7 +1480,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         // (label/duration/action/voiceover x4-6) -- 4096 is tight for that.
         const fixRaw = await callLLM(opts.critiqueLlmConfig || opts.llmConfig, [
           { role: "user", content: fixPrompt },
-        ], { temperature: 0.3, maxTokens: 8192 });
+        ], { temperature: 0.3, maxTokens: 16384 });
         fixedScene = parseLlmJson(fixRaw, "fix-storyboard");
       } catch (e: any) {
         console.log(`  Critique fix-storyboard failed to parse: ${e.message}, keeping best (score ${bestScore})`);

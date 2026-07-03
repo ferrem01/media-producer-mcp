@@ -149,7 +149,7 @@ Then pick the STRONGEST concept, explain why, and decide the optimal number of s
   var raw = await callLLM(opts.llmConfig, [
     { role: "system", content: systemPrompt },
     { role: "user", content: userContent },
-  ], { temperature: 0.9, maxTokens: 4096 });
+  ], { temperature: 0.9, maxTokens: 8192 });
 
   var result = parseJsonResponse(raw);
 

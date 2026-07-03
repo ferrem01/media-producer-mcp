@@ -113,7 +113,7 @@ Output the SEARCH/REPLACE blocks to make these changes.`;
     const raw = await callLLM(opts.llmConfig, [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
-    ], { temperature: 0.2, maxTokens: 4096 });
+    ], { temperature: 0.2, maxTokens: 8192 });
 
     const blocks = parseSearchReplaceBlocks(raw);
     if (blocks.length === 0) {
@@ -173,7 +173,7 @@ Output the COMPLETE revised .component.html with ONLY the listed changes applied
   const raw = await callLLM(opts.llmConfig, [
     { role: "system", content: systemPrompt },
     { role: "user", content: userPrompt },
-  ], { temperature: 0.2, maxTokens: 8192 });
+  ], { temperature: 0.2, maxTokens: 16384 });
 
   let source = raw.trim();
   // Strip markdown fences
