@@ -231,7 +231,7 @@ export async function validateSceneRuntime(options: {
     page.on("pageerror", (e) => { if (!pageError) pageError = String((e as any)?.message || e); });
 
     await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 60000 });
+    await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 60000 });
 
     // Seek across the timeline; the first synchronous throw from a component
     // callback is caught here. Async/load errors surface via the pageerror listener.
@@ -365,6 +365,7 @@ export async function captureSingleFrame(options: {
 
     await page.waitForFunction(
       () => (window as any).__MP_READY === true,
+      undefined,
       { timeout: 60000 }
     );
 

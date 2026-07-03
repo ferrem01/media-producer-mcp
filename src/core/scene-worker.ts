@@ -296,7 +296,10 @@ async function main() {
     await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "load", timeout: 60000 });
     // Ensure web fonts are loaded before capture (networkidle used to cover this).
     await page.evaluate(() => (document as any).fonts?.ready).catch(() => {});
-    await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 60000 });
+    // NOTE: waitForFunction's signature is (fn, arg?, options?) -- options MUST
+    // be the THIRD argument. Passing { timeout } second silently made it the
+    // page-function arg and left the wait on Playwright's 30s default.
+    await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 60000 });
 
     // Wait for all <img> to finish loading before capturing. External images
     // (e.g. logo.dev company logos) get their src set by JS *after* page load and
