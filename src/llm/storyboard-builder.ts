@@ -59,7 +59,7 @@ const SCENE_TOOL_SCHEMA = {
     purpose: { type: "string", description: "What this scene communicates -- its job in the story" },
     visual_notes: { type: "string", description: "The WORLD: setting, layers, what persists (5+ sentences, motion verbs, BG/MG/FG)" },
     components: { type: "array", items: { type: "string" }, description: "Library component types from the catalog" },
-    beats: { type: "array", items: BEAT_TOOL_SCHEMA, description: "The scene's internal beat timeline (required for scenes longer than ~8s)" },
+    beats: { type: "array", items: BEAT_TOOL_SCHEMA, description: "The scene's internal beat timeline, ONLY for scenes with 2 or fewer beats. Scenes with 3+ beats MUST omit this and add each beat with its own add_beat call instead -- see add_beat." },
     transition_in: {
       type: "object",
       properties: { type: { type: "string" }, duration_seconds: { type: "number" } },
@@ -75,12 +75,17 @@ const SCENE_TOOL_SCHEMA = {
 const TOOLS: LLMTool[] = [
   {
     name: "add_scene",
-    description: "Add ONE scene to the storyboard, in order. Call this once per scene -- never batch multiple scenes into one call.",
+    description: "Start ONE new scene, in order. Call this once per scene -- never batch multiple scenes into one call. For a scene with 3+ beats, omit \"beats\" here and add each one afterward with add_beat -- that keeps this call small regardless of how beat-heavy the scene is.",
     input_schema: SCENE_TOOL_SCHEMA,
   },
   {
+    name: "add_beat",
+    description: "Add ONE beat to the scene most recently started with add_scene. Call this once per beat, in order, right after add_scene (or after the previous add_beat) -- never batch several beats into one call and never put more than 2 beats inline in add_scene's \"beats\" array.",
+    input_schema: BEAT_TOOL_SCHEMA,
+  },
+  {
     name: "finish_storyboard",
-    description: "Call this once every scene has been added via add_scene. Supplies the overall film title.",
+    description: "Call this once every scene (and all of its beats) has been added. Supplies the overall film title.",
     input_schema: {
       type: "object",
       properties: { name: { type: "string", description: "The project/film title" } },
@@ -257,7 +262,16 @@ overall title as "name". Never batch the whole storyboard into one call and neve
 scenes in prose -- each scene is its own add_scene call, so no single response ever has to
 hold the entire storyboard.
 
-Three example scenes (each of these would be ONE add_scene call):
+**Beat-heavy scenes: use add_beat, not an inline "beats" array.** add_scene's own "beats"
+field is only for 1-2 beats. Any scene with 3 or more beats should call add_scene WITHOUT
+"beats" (or with just the first one or two), then call add_beat once per remaining beat, in
+order. Each add_beat call targets whichever scene was most recently started by add_scene, so
+no single tool call ever has to hold a whole beat timeline -- this keeps every call small
+regardless of how many beats a scene has. Put each add_beat call in its OWN turn (call one,
+see the confirmation, then call the next) rather than batching several beats into one
+response -- a batched turn's combined output is what actually risks running long.
+
+Four example scenes (each add_scene / add_beat is its own call):
 
 \`\`\`
 add_scene({
@@ -287,6 +301,17 @@ add_scene({
   "hero_image": "a perfectly still misty mountain lake at dawn, soft violet and amber light, mirror-like reflection, serene and contemplative, cinematic photograph",
   "transition_in": { "type": "blur-crossfade", "duration_seconds": 0.6 }
 })
+
+add_scene({
+  "label": "Scene 4 - The Workflow", "duration_seconds": 16,
+  "purpose": "User discovers and activates the connector feature",
+  "visual_notes": "A clean workspace fills the frame — warm off-white background with subtle grid lines pulsing faintly. One persistent world: the workspace never resets; the card, cursor, and grid carry through every beat below, morphing and re-arranging as the idea advances. BG: subtle grid with breathing glow. MG: UI card with menu items. FG: cursor with drop shadow, particle hints.",
+  "components": [],
+  "transition_in": { "type": "none", "duration_seconds": 0 }
+})
+add_beat({ "label": "the approach", "duration_seconds": 4, "action": "A cursor GLIDES from below toward a plus icon at center; the grid brightens along its path.", "voiceover_text": "It starts with one click." })
+add_beat({ "label": "the bloom", "duration_seconds": 5, "action": "On click, a circular button BLOOMS outward with a soft shadow, then MORPHS into a rounded card panel. Menu items STAGGER in from the right.", "voiceover_text": "A menu of every connector you need." })
+add_beat({ "label": "the choice", "duration_seconds": 7, "action": "The cursor DRIFTS to Connectors, which highlights with a warm rounded fill; the card TILTS forward slightly and the other rows dim.", "voiceover_text": "Pick one. The rest is automatic." })
 
 finish_storyboard({ "name": "Project Title" })
 \`\`\`
@@ -470,12 +495,11 @@ Prefer Speaker templates over regular templates when the speaker should be visib
   validTypes.add("image");
 
   /**
-   * Normalize one add_scene call's input in place and return the correction
-   * notes (if any) so the model sees what changed -- e.g. "removed unknown
-   * component types: X, Y" -- and can self-correct, instead of validation
-   * happening silently after the fact with no feedback loop.
+   * Normalize one add_scene call's metadata in place (everything except
+   * beats -- beats may still be arriving via add_beat calls when this runs)
+   * and return the correction notes so the model sees what changed.
    */
-  function normalizeScene(scene: any): string[] {
+  function normalizeSceneMeta(scene: any): string[] {
     var notes: string[] = [];
 
     if (!scene.components || !Array.isArray(scene.components)) {
@@ -497,7 +521,23 @@ Prefer Speaker templates over regular templates when the speaker should be visib
     }
     if (!scene.purpose) scene.purpose = scene.label || "";
 
-    var beats: SceneBeat[] | undefined = normalizeBeats(scene.beats, scene.duration_seconds || 5, opts.beatGrid?.barSec);
+    return notes;
+  }
+
+  /**
+   * Finalize a scene's beats once it closes (the next add_scene fires, or
+   * finish_storyboard is called) -- combines whatever was passed inline on
+   * add_scene with everything appended via add_beat, normalizes durations,
+   * and derives voiceover_text. Idempotent: a scene that has already been
+   * finalized (no _rawBeats left) is left untouched.
+   */
+  function finalizeBeats(scene: any): string[] {
+    var notes: string[] = [];
+    if (!scene._rawBeats) return notes;
+    var rawBeats = scene._rawBeats;
+    delete scene._rawBeats;
+
+    var beats: SceneBeat[] | undefined = normalizeBeats(rawBeats, scene.duration_seconds || 5, opts.beatGrid?.barSec);
     scene.beats = beats;
     if (beats) {
       if (!scene.voiceover_text) scene.voiceover_text = beatsVoiceover(beats);
@@ -513,13 +553,14 @@ Prefer Speaker templates over regular templates when the speaker should be visib
   ];
 
   var scenes: any[] = [];
+  var currentSceneIdx = -1;
   var name: string | undefined;
   var finished = false;
 
-  // Generous headroom: the model may add scenes sequentially (1 add_scene per
-  // turn) or batch several in parallel within one turn -- either pattern
-  // completes well within this budget.
-  var maxIterations = Math.max(16, (opts.sceneCount || 8) * 3 + 6);
+  // Generous headroom: scenes now arrive as add_scene + one add_beat call
+  // per beat, so the turn budget must scale with total beats, not just
+  // scenes -- assume up to ~6 beats/scene plus buffer.
+  var maxIterations = Math.max(24, (opts.sceneCount || 8) * 8 + 10);
 
   for (var iteration = 0; iteration < maxIterations && !finished; iteration++) {
     if (iteration >= Math.floor(maxIterations * 0.8) && scenes.length > 0) {
@@ -531,12 +572,13 @@ Prefer Speaker templates over regular templates when the speaker should be visib
 
     var response = await callLLMAgentic(opts.llmConfig, messages, TOOLS, { temperature: 0.5, maxTokens: 8192 });
 
-    // Each add_scene call now only holds ONE scene, so a single turn hitting
-    // max_tokens should be rare -- still fail loudly rather than silently
-    // accept a truncated scene.
+    // add_scene and add_beat calls are each small on their own, but a
+    // single turn can still hit the cap if the model batches several of
+    // them together (e.g. add_scene + 3 add_beat calls in one response) --
+    // fail loudly rather than silently accept a truncated scene/beat.
     if (response.stopReason === "max_tokens") {
       throw new Error(
-        `Storyboard builder response truncated: hit max_tokens (8192) mid-turn after ${scenes.length} scene(s) added. A single add_scene call was too large -- write shorter visual_notes/beats per call.`
+        `Storyboard builder response truncated: hit max_tokens (8192) mid-turn after ${scenes.length} scene(s) added. Either a single add_scene/add_beat call was too large, or several were batched into one turn -- write shorter visual_notes, keep beats out of add_scene's inline "beats" field (use add_beat instead) for any scene with 3+ beats, and put one tool call per turn.`
       );
     }
 
@@ -548,7 +590,7 @@ Prefer Speaker templates over regular templates when the speaker should be visib
       messages.push({
         role: "user",
         content: scenes.length > 0
-          ? `Please continue: call add_scene for any remaining scenes, then finish_storyboard. (${scenes.length} scene(s) added so far.)`
+          ? `Please continue: call add_scene/add_beat for any remaining scenes/beats, then finish_storyboard. (${scenes.length} scene(s) added so far.)`
           : "Please call add_scene to add the first scene -- do not describe it in prose.",
       });
       continue;
@@ -566,12 +608,30 @@ Prefer Speaker templates over regular templates when the speaker should be visib
       var toolResult: string;
 
       if (toolCall.name === "add_scene") {
+        // Close out the previous scene's beats before starting a new one.
+        var prevNotes: string[] = currentSceneIdx >= 0 ? finalizeBeats(scenes[currentSceneIdx]) : [];
+
         var scene: any = { ...toolCall.input };
-        var notes = normalizeScene(scene);
+        var rawBeats = Array.isArray(scene.beats) ? scene.beats : [];
+        delete scene.beats;
+        scene._rawBeats = rawBeats;
+        var notes = normalizeSceneMeta(scene);
         scenes.push(scene);
-        console.log(`  Scene ${scenes.length}: "${scene.label}" (${scene.duration_seconds}s${scene.beats ? `, ${scene.beats.length} beats` : ""})`);
-        toolResult = `scene ${scenes.length} added: "${scene.label}"` + (notes.length ? ` -- ${notes.join("; ")}` : "");
+        currentSceneIdx = scenes.length - 1;
+        console.log(`  Scene ${scenes.length}: "${scene.label}" (${scene.duration_seconds}s${rawBeats.length ? `, ${rawBeats.length} inline beat(s)` : ""})`);
+        var allNotes = notes.concat(prevNotes.map((n) => `previous scene: ${n}`));
+        toolResult = `scene ${scenes.length} added: "${scene.label}"` + (allNotes.length ? ` -- ${allNotes.join("; ")}` : "")
+          + " -- call add_beat for each of this scene's beats (3+ beats), or move on if it needs 2 or fewer.";
+      } else if (toolCall.name === "add_beat") {
+        if (currentSceneIdx < 0) {
+          toolResult = "Cannot add a beat yet -- call add_scene first to start a scene.";
+        } else {
+          var targetScene = scenes[currentSceneIdx];
+          targetScene._rawBeats.push({ ...toolCall.input });
+          toolResult = `beat ${targetScene._rawBeats.length} added to scene ${currentSceneIdx + 1} ("${targetScene.label}")`;
+        }
       } else if (toolCall.name === "finish_storyboard") {
+        var finishNotes: string[] = currentSceneIdx >= 0 ? finalizeBeats(scenes[currentSceneIdx]) : [];
         if (scenes.length === 0) {
           toolResult = "Cannot finish yet -- no scenes added. Call add_scene at least once first.";
         } else if (opts.sceneCount && scenes.length !== opts.sceneCount) {
@@ -579,7 +639,7 @@ Prefer Speaker templates over regular templates when the speaker should be visib
         } else {
           name = String(toolCall.input.name || opts.prompt.slice(0, 60));
           finished = true;
-          toolResult = "accepted";
+          toolResult = "accepted" + (finishNotes.length ? ` -- ${finishNotes.join("; ")}` : "");
         }
       } else {
         toolResult = `Unknown tool: ${toolCall.name}`;
@@ -593,6 +653,7 @@ Prefer Speaker templates over regular templates when the speaker should be visib
   if (scenes.length === 0) {
     throw new Error("Storyboard builder returned no scenes");
   }
+  if (currentSceneIdx >= 0) finalizeBeats(scenes[currentSceneIdx]);
   if (!finished) {
     console.warn(`  Storyboard builder: max iterations (${maxIterations}) reached with ${scenes.length} scene(s) and no finish_storyboard call -- using what was added.`);
     name = name || opts.prompt.slice(0, 60);
