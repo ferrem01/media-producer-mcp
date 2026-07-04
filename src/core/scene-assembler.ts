@@ -43,6 +43,8 @@ export interface AssembleOptions {
   preview?: boolean;
   /** HTTP URL for the speaker video (used in preview to resolve "speaker" references) */
   speakerUrl?: string;
+  /** Seconds into the speaker video where this scene starts (preview underlay sync). */
+  speakerOffset?: number;
 }
 
 /** Component type prefixes that indicate an LLM-generated (codegen) scene. */
@@ -116,10 +118,11 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
       transparentBackground: scene.transparent_background,
       preview,
       speakerUrl,
+      speakerOffset: options.speakerOffset,
     });
   }
 
-  return assembleScene({ scene, components, brandKit, canvas, gsapDir, preview, speakerUrl });
+  return assembleScene({ scene, components, brandKit, canvas, gsapDir: options.gsapDir, preview, speakerUrl, speakerOffset: options.speakerOffset });
 }
 
 /**
@@ -284,6 +287,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
+${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? '' : '<div class="mp-ambient"></div>'}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
@@ -369,6 +373,7 @@ export async function assembleCodegenScene(options: {
   background?: string;
   /** When true, use transparent background */
   transparentBackground?: boolean;
+  speakerOffset?: number;
   /** Keep HTTP paths for preview */
   preview?: boolean;
   /** Speaker URL for resolving "speaker" references */
@@ -505,6 +510,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
+${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}
@@ -632,6 +638,45 @@ export function resolveHtmlAssetUrls(html: string, preview?: boolean): string {
  * Resolve relative /assets/ URLs in component data to absolute URLs so they
  * work when loaded via file:// protocol in Playwright.
  */
+/**
+ * Preview-only speaker underlay: in the Studio, transparent speaker scenes
+ * were previewed over a blank page -- nothing like the final composite. This
+ * injects the camera as a fixed base layer behind the scene content, seeked
+ * to the scene's offset in the film and loosely drift-corrected against the
+ * master timeline when one is exposed. Render-path assembly (preview=false)
+ * never includes it: the real composite handles the camera there.
+ */
+export function speakerUnderlayHtml(speakerUrl: string, offsetSeconds: number): string {
+  return `
+<video id="__mp_speaker_base" src="${speakerUrl}" muted playsinline preload="auto"
+  style="position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:-10; pointer-events:none;"></video>
+<script>
+(function(){
+  var v = document.getElementById('__mp_speaker_base');
+  var offset = ${Math.max(0, offsetSeconds)};
+  if (!v) return;
+  v.addEventListener('loadedmetadata', function(){
+    try { v.currentTime = isFinite(v.duration) && v.duration > 0 ? (offset % v.duration) : offset; } catch(e){}
+    v.play && v.play().catch(function(){});
+  });
+  // Loose drift correction against the scene master timeline, when present.
+  function tick(){
+    try {
+      var tl = window.__MP_TIMELINE;
+      if (tl && typeof tl.time === 'function') {
+        var want = offset + tl.time();
+        if (isFinite(v.duration) && v.duration > 0) want = want % v.duration;
+        if (Math.abs(v.currentTime - want) > 0.35) v.currentTime = want;
+      }
+    } catch(e){}
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</scr` + `ipt>
+`;
+}
+
 export function resolveAssetUrls(data: Record<string, any>, preview?: boolean, speakerUrl?: string): Record<string, any> {
   const baseUrl = `http://localhost:${config.port}`;
   const resolved = { ...data };
