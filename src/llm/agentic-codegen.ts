@@ -54,6 +54,12 @@ export interface AgenticCodegenOpts {
   /** Structured element inventory from the storyboard -- finish_design
    *  statically verifies every element's copy is present in the template. */
   elements?: Array<{ name: string; kind: string; content: string; motion?: string }>;
+  /** Speaker-track scene mode. 'visible': the live camera is the base layer
+   *  beneath this scene -- the design must stay transparent (no backgrounds,
+   *  no placeholder humans). 'screencast': opaque scene; the camera appears
+   *  in-scene via <video src="speaker"> (the renderer swaps in the synced
+   *  camera file). */
+  speakerMode?: "visible" | "screencast";
 }
 
 // ── Tool Definitions ──
@@ -685,7 +691,7 @@ ${!opts.brollVideoUrl && !opts.heroImageUrl ? `REMINDER before you write CSS: th
 - Every decorative element must have ambient animation (drift, breathe, pulse).
 - All text MUST have correct spacing. Never concatenate words. Check every text string for missing spaces.
 - Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
-${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
+${opts.speakerMode === "visible" ? `## SPEAKER-VISIBLE SCENE (composited over a live camera)\nThis scene is rendered with a TRANSPARENT background and composited on top of a continuous live camera recording of the speaker -- the REAL HUMAN is the backdrop. Therefore:\n- Do NOT paint any background on .scene or any full-frame layer -- finish_design rejects it.\n- Do NOT draw a person, avatar, silhouette, or camera placeholder -- the real speaker is already there.\n- The 'fill the frame' rule is SUSPENDED: your job is a few floating UI elements (phrases, badges, a lower-third) positioned to NOT cover the speaker's face (keep the center-left third clear).\n- Text must carry its own legibility: give each floating element a small solid pad or scrim behind ITSELF (a pill, a card), never a full-frame wash.\n` : ""}${opts.speakerMode === "screencast" ? `## SCREENCAST SCENE (speaker in a PiP bubble)\nThis scene is OPAQUE (own background is fine). The speaker camera appears INSIDE the scene: build the picture-in-picture bubble as a circular container holding EXACTLY this element: <video src="speaker" autoplay muted playsinline> -- the literal src value "speaker" is a magic token the renderer replaces with the time-synced camera video. Style the video to fill the circle (object-fit: cover; border-radius: 50%). Do NOT draw an avatar placeholder in the bubble.\nAny embedded screen-recording <video> must be VISIBLE: place it above panel fills (explicit z-index) and never cover it with opaque children.\n` : ""}${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
 CRITICAL: If the spec lists components with schemas, use <component type=... data='...' /> tags with the data fields from the schemas. Do NOT rebuild from scratch what the spec says to use as a component.
 Read the spec, then write your scene using write_template / write_style / write_script (+ append_script for a long multi-beat timeline), then finish_scene.`;
 
@@ -779,6 +785,30 @@ Read the spec, then write your scene using write_template / write_style / write_
  * tag-stripped, whitespace-collapsed, case-insensitive; content segments are
  * split on ' / ' and newlines (short fragments under 4 chars are skipped).
  */
+/**
+ * Speaker-visible scenes composite OVER a live camera base layer -- any
+ * full-frame background paint hides the human. Flag background declarations
+ * on the .scene root rule and on any rule that also stretches full-frame
+ * (inset:0 / 100% x 100% / 100vw|vh).
+ */
+export function findOpaqueBackdrops(style: string): string[] {
+  var violations: string[] = [];
+  var BLOCK = /([^{}]+)\{([^{}]*)\}/g;
+  var m: RegExpExecArray | null;
+  while ((m = BLOCK.exec(style)) !== null) {
+    var sel = m[1].trim();
+    var body = m[2];
+    var hasBg = /(?:^|[;\s])background(?:-color|-image)?\s*:(?!\s*(transparent|none)\b)/i.test(body);
+    if (!hasBg) continue;
+    var isRoot = /(^|,)\s*\.scene\s*($|,)/.test(sel) || sel === ".scene" || /body|html/.test(sel);
+    var fullFrame = /inset\s*:\s*0/.test(body) || (/width\s*:\s*100(%|vw)/.test(body) && /height\s*:\s*100(%|vh)/.test(body));
+    if (isRoot || fullFrame) {
+      violations.push(`${sel.slice(0, 50)}: paints a full-frame background (${(body.match(/background[^;]*/i) || [""])[0].slice(0, 60)})`);
+    }
+  }
+  return violations;
+}
+
 export function findMissingElementContents(
   template: string,
   elements: Array<{ name: string; kind: string; content: string }> | undefined,
@@ -1036,7 +1066,12 @@ async function runAgenticLoop(args: {
           } else {
             var designColorViolations = findRawTextColors(parts);
             var missingCopy = findMissingElementContents(parts.template, opts.elements);
-            if (designColorViolations.length > 0) {
+            var opaqueBackdrops = opts.speakerMode === "visible" ? findOpaqueBackdrops(parts.style) : [];
+            if (opaqueBackdrops.length > 0) {
+              toolResult = `Design REJECTED -- this is a SPEAKER-VISIBLE scene compositing over the live camera, but the design paints full-frame backgrounds that would HIDE the speaker:\n` +
+                opaqueBackdrops.slice(0, 5).map((v) => `  - ${v}`).join("\n") +
+                `\nRemove these backgrounds entirely (the camera is the backdrop); style only the floating UI elements, then call finish_design again.`;
+            } else if (designColorViolations.length > 0) {
               toolResult = `Design REJECTED -- raw color literals in text-color declarations:\n` +
                 designColorViolations.slice(0, 8).map((v) => `  - ${v}`).join("\n") +
                 `\nFix with edit_style using the brand tokens, then call finish_design again.`;

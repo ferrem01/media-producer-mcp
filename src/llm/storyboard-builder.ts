@@ -500,12 +500,15 @@ modes; choose per scene and SAY WHICH in the visual notes:
 2. SCREENCAST / demo scene: content fills the whole frame with its own OPAQUE background
    (browser-frame / device-mockup / code and terminal components for the screen
    recording look), and the speaker shrinks to a small circular PiP -- inventory it as an
-   element (kind "ui-window", e.g. name "speaker-pip", content "circular speaker camera
-   bubble, 220px, bottom-right, thin white border, soft shadow") so the codegen builds
-   the PiP mask deliberately.
+   element (kind "ui-window", e.g. name "speaker-pip", content "circular camera bubble
+   playing the LIVE speaker video via <video src=\"speaker\">, 220px, bottom-right, thin
+   white border, soft shadow"). The literal src value "speaker" is a renderer token that
+   becomes the time-synced camera -- the bubble must NEVER contain a drawn avatar or
+   placeholder person.
 
 Never leave the speaker both invisible and un-PiPed -- every scene either shows the
-speaker beside the content or carries the PiP bubble.`;
+speaker beside the content or carries the PiP bubble. And NEVER direct a drawn person,
+avatar, or silhouette anywhere: the real camera is the only human in this film.`;
   }
 
   var userPrompt = `Create a ${opts.format} project.\n\n${opts.prompt}`;

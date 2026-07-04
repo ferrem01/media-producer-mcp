@@ -2140,6 +2140,7 @@ async function runUnifiedPipeline(
             referenceImages: processedRefs,
             treatment,
             brollVideoUrl: brollUrlMap.get(i),
+            hasSpeakerTrack: !!opts.speaker_source,
           });
         } catch (e: any) {
           console.error(`  Scene ${i + 1} "${draft.label}" generation failed (${e.message}) -- retrying with beats stripped (smaller codegen output).`);
@@ -2163,6 +2164,7 @@ async function runUnifiedPipeline(
             referenceImages: processedRefs,
             treatment,
             brollVideoUrl: brollUrlMap.get(i),
+            hasSpeakerTrack: !!opts.speaker_source,
           });
         }
 
@@ -2390,6 +2392,7 @@ async function runUnifiedPipeline(
               llmConfig: opts.llmConfig, brandKit, canvas, imageUrl: enrichResult.imageUrls.get(idx),
               tenantId: opts.tenant_id, projectId, referenceImages: processedRefs, treatment,
               brollVideoUrl: brollUrlMap.get(idx),
+            hasSpeakerTrack: !!opts.speaker_source,
               critiqueFeedback: `EDITORIAL FIX -- this scene did not achieve its draft intent. ${fix.detail}`,
             });
             if (re.customSources) for (const [n, h] of re.customSources) await fs.writeFile(path.join(compDir, `${n}.component.html`), h);
