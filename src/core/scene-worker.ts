@@ -432,7 +432,12 @@ async function main() {
         for (const vInfo of videoInfos) {
           const extracted = extractionMap.get(vInfo.src);
           if (!extracted) continue;
-          const targetTime = Math.max(0, time - vInfo.startAt);
+          // data-start-at is a SEEK offset ("this element shows the source
+          // video from N seconds"), matching the preview's offset+localTime.
+          // It was misread as a delay (time - startAt), which froze a
+          // film-time-synced PiP on frame 0 and then played it N seconds
+          // behind the speaker audio.
+          const targetTime = Math.max(0, vInfo.startAt + time);
           const frameIndex = Math.min(Math.round(targetTime * args.fps), extracted.totalFrames - 1);
           const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.png`);
           const frameData = await fs.readFile(framePath);
