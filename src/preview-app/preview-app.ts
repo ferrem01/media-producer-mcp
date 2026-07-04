@@ -553,7 +553,7 @@ export function getPreviewHtml(): string {
     <div id="preview-container">
       <div class="no-scene" id="preview-placeholder">Select a scene to preview</div>
       <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
-        <video id="speaker-bg" muted playsinline preload="auto" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
+        <video id="speaker-bg" muted playsinline preload="metadata" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
         <iframe id="preview-iframe"></iframe>
         <div id="buffer-overlay" class="buffer-overlay"><div class="loading-state">Buffering media<div class="loading-dots"><span></span><span></span><span></span></div></div></div>
       </div>

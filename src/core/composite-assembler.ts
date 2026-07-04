@@ -19,7 +19,6 @@ import {
   generateFontLinks,
   resolveAssetUrls,
   generateBrandCSS,
-  speakerUnderlayHtml,
   buildPositionStyle,
   buildContentRegionWrapper,
   buildComponentScript,
@@ -27,6 +26,7 @@ import {
   loadSharedUtilities,
   loadLibraryComponentSources,
   resolveSpeakerVideoTags,
+  stripEagerVideoLoading,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
 import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
@@ -310,7 +310,10 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${speakerUrl ? speakerUnderlayHtml(speakerUrl, 0) : ""}
+<!-- No camera underlay here: the Studio shell renders its own speaker layer
+     (#speaker-bg, drift-synced by syncMedia) behind this transparent
+     composite. Injecting one too meant TWO simultaneous 1080p decoders for
+     the same camera file -- enough to kill a mobile tab on open. -->${""}
 ${sceneBlocks.join("\n\n")}
 
 <script>
@@ -331,7 +334,9 @@ ${masterScript}
 </body>
 </html>`;
 
-  return normalizeHtmlUrls(html);
+  // The composite is always a preview surface -- never let scene videos
+  // eagerly decode; syncMedia drives playback when the user presses Play.
+  return stripEagerVideoLoading(normalizeHtmlUrls(html));
 }
 
 /**
