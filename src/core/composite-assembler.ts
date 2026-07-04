@@ -18,6 +18,7 @@ import {
   generateFontLinks,
   resolveAssetUrls,
   generateBrandCSS,
+  speakerUnderlayHtml,
   buildPositionStyle,
   buildContentRegionWrapper,
   buildComponentScript,
@@ -233,6 +234,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
+${speakerUrl ? speakerUnderlayHtml(speakerUrl, 0) : ""}
 ${sceneBlocks.join("\n\n")}
 
 <script>
