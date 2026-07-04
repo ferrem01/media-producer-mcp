@@ -534,7 +534,8 @@ Color mood: ${opts.treatment.visualStyle.colorMood}
 Typography: ${opts.treatment.visualStyle.typographyAttitude}
 Motion: ${opts.treatment.visualStyle.motionPersonality}
 Spatial: ${opts.treatment.visualStyle.spatialStrategy}
-Through-line: ${opts.treatment.throughLine}
+Through-line: ${opts.treatment.throughLine}${opts.treatment.visualDevices?.length ? `
+Visual devices (recurring, build them as specified): ${opts.treatment.visualDevices.join("; ")}` : ""}
 ` : ""}
 `;
 }

@@ -52,6 +52,9 @@ export interface Treatment {
     motionPersonality: string;
     spatialStrategy: string;
   };
+  /** 3-5 concrete, buildable recurring devices (the film's set list) -- named
+   *  things with specific looks + behavior, never mood adjectives. */
+  visualDevices?: string[];
   /** 3-5 sentence summary the storyboard builder can use as creative direction */
   directorNote: string;
   /** Recommended number of scenes (the director decides the structure). */
@@ -98,7 +101,11 @@ Given the prompt, generate THREE distinct creative concepts. Each concept should
 4. Describe the emotional arc (what the viewer feels at start vs middle vs end)
 5. Commit to a visual style (color mood, typography attitude, motion personality, spatial strategy)
 
-Then pick the STRONGEST concept, explain why, and decide the optimal number of scenes for this piece (4-6 for short-form, 6-9 for standard, 8-12 for a deep dive -- scale to the content and pacing).
+Then pick the STRONGEST concept, explain why, and decide the optimal number of scenes.
+A scene is a WORLD that persists while ideas advance INSIDE it as beats -- not one idea
+per scene. Scene counts: 1-2 for short-form (12-20s), 3-4 for standard (30-60s), 4-6 for
+a deep dive (60-120s). Each scene carries 3-6 beats; a 30-45s film is typically an
+opening world, one or two long living middles (12-18s each), and a closing world.
 
 ## Output Format (valid JSON, no markdown fences)
 
@@ -114,12 +121,18 @@ Then pick the STRONGEST concept, explain why, and decide the optimal number of s
         "typographyAttitude": "e.g. sharp and technical, becoming warmer",
         "motionPersonality": "e.g. precise mechanical movements that loosen into organic flows",
         "spatialStrategy": "e.g. tight close-ups opening into wide panoramas"
-      }
+      },
+      "visualDevices": [
+        "3-5 CONCRETE, BUILDABLE recurring devices -- named things with specific behavior, not moods",
+        "e.g. 'a 4px violet pipeline rail across the lower third that thickens each time a channel connects'",
+        "e.g. 'notification cards with real app chrome (Slack/Gmail/Calendar) that land tilted 4-8 degrees'",
+        "e.g. 'one cursor with a soft shadow that is the protagonist -- every action starts from it'"
+      ]
     }
   ],
   "selected": 0,
   "selectionReason": "Why this concept is strongest",
-  "sceneCount": 6,
+  "sceneCount": 3,
   "directorNote": "3-5 sentence creative direction summary that the storyboard should follow"
 }
 
@@ -127,6 +140,7 @@ Then pick the STRONGEST concept, explain why, and decide the optimal number of s
 - Each concept must be FUNDAMENTALLY different (different pattern, different through-line, different feel)
 - Concepts must be VISUAL, not narrative. Describe what the viewer SEES, not what a narrator says.
 - The through-line must be concrete and filmable, not abstract ("trust grows" is abstract; "scattered UI fragments assemble into a complete dashboard" is filmable)
+- visualDevices are the SET LIST the storyboard builds from: each one names a THING with looks + behavior specific enough that a motion designer could build it without asking questions. Mood words ("luminous calm") are not devices.
 - The emotional arc must use specific emotions, not "good -> better -> best"
 - Output ONLY valid JSON. No commentary.`;
 
@@ -175,6 +189,9 @@ Then pick the STRONGEST concept, explain why, and decide the optimal number of s
       motionPersonality: "fluid and purposeful",
       spatialStrategy: "layered depth with focus pulls",
     },
+    visualDevices: Array.isArray(selected.visualDevices)
+      ? selected.visualDevices.filter((d: unknown) => typeof d === "string" && (d as string).trim().length > 0)
+      : undefined,
     directorNote: result.directorNote || `Concept: ${selected.idea}. Pattern: ${selected.pattern}. Through-line: ${selected.throughLine}.`,
     sceneCount: typeof result.sceneCount === "number" ? result.sceneCount : undefined,
   };
@@ -198,7 +215,10 @@ export function formatTreatmentForStoryboard(bible: Treatment): string {
 - Motion personality: ${bible.visualStyle.motionPersonality}
 - Spatial strategy: ${bible.visualStyle.spatialStrategy}
 
-**Director's Note:** ${bible.directorNote}
+${bible.visualDevices?.length ? `**Visual Devices (the film's SET LIST -- build scenes FROM these, reference them by name in visual notes, beats, and element inventories):**
+${bible.visualDevices.map((d) => `- ${d}`).join("\n")}
+
+` : ""}**Director's Note:** ${bible.directorNote}
 
 IMPORTANT: Every scene in the storyboard must serve this ONE concept. Do not generate disconnected scene ideas. The visual through-line (${bible.throughLine}) should be present or referenced in most scenes. The emotional arc should progress across the scene sequence.`;
 }
