@@ -30,6 +30,8 @@ export interface SceneGeneratorOpts {
   tenantId: string;
   projectId: string;
   critiqueFeedback?: string; // feedback from visual critiquer for retry
+  /** Project has a speaker track: scenes composite over a live camera base. */
+  hasSpeakerTrack?: boolean;
   referenceImages?: ReferenceImage[];
   treatment?: Treatment;
   /** URL of a b-roll stock clip for the agent to place as this scene's background. */
