@@ -202,9 +202,14 @@ async function main() {
           img.id = `__render_frame_${idx}__`;
           img.className = "__render_frame__";
           img.style.cssText = video.style.cssText;
-          // Honor a video's own inline geometry (e.g. a 54%-wide framed
-          // camera panel); only default to fill-the-container when it has none.
-          if (!video.style.width && !video.style.height && !video.style.left && !video.style.right && !video.style.inset) {
+          // A video that positions ITSELF inline (position:absolute + its own
+          // box, e.g. a 54%-wide framed camera panel) keeps its geometry --
+          // forcing 100% here blew such a panel up to a full-frame camera
+          // that buried the scene. Flow videos (loadVideoForCapture sets
+          // width/height but NO position) still get the absolute-fill
+          // default: the hidden video keeps its layout slot, so a flowed img
+          // would land BELOW it instead of overlaying.
+          if (!video.style.position) {
             img.style.position = "absolute";
             img.style.top = "0";
             img.style.left = "0";
