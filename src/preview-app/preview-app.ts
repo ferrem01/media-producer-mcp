@@ -2308,8 +2308,11 @@ export function getPreviewHtml(): string {
     if (!project || !project.scenes || !project.speaker_track) return false;
     var scene = project.scenes[sceneIndex];
     if (!scene) return false;
-    // Speaker scenes have transparent_background=true and a speaker_track defined
-    return scene.transparent_background === true;
+    // Mirror the RENDER's rule: on a speaker project, every scene composites
+    // over the live camera unless it explicitly opts out. (Requiring === true
+    // hid the camera on every scene, since the pipeline leaves the field
+    // unset -- the composite showed overlays floating on a blank background.)
+    return scene.transparent_background !== false;
   }
 
 
