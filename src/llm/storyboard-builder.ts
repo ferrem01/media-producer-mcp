@@ -663,18 +663,13 @@ Prefer Speaker templates over regular templates when the speaker should be visib
       var toolResult: string;
 
       if (toolCall.name === "add_scene") {
-        // ── Scene-budget ENFORCEMENT (video) ──
-        // "3-4 scenes for short films" was prose-only and drifted to 5-6 on
-        // most runs (6/4/5/6 observed on the same 30s prompt). Enforce it the
-        // way everything reliable here is enforced: at the tool boundary.
-        // A short film's 5th scene is rejected -- the material belongs in the
-        // current scene as BEATS. Duration-aware so genuinely long films can
-        // still earn more scenes (a 60s film passes 45s of content by scene
-        // 4 and may continue).
+        // Scene-count discipline is carried by the pacing playbook + examples
+        // (arc templates in beat grammar, slideshow self-check) rather than a
+        // hard tool-boundary rejection -- the prompt no longer argues with
+        // itself, so the model is trusted to hold the 3-4 world structure.
+        // The advisory note below still flags when the budget is nearly full.
         var totalSoFar = scenes.reduce((acc: number, sc: any) => acc + (Number(sc.duration_seconds) || 5), 0);
-        if (!opts.sceneCount && opts.format === "video" && scenes.length >= 4 && totalSoFar <= 45) {
-          toolResult = `REJECTED -- the scene budget is FULL: ${scenes.length} scenes totaling ${totalSoFar}s. A film this length is 3-4 scenes MAX. A scene is a WORLD; a new idea inside the same world is a BEAT, not a scene. Give this material to the CURRENT scene instead: call add_beat for each moment (beats attach to the most recently added scene, and its beat timings will share the scene's duration), or drop it. Then call finish_storyboard.`;
-        } else {
+        {
         // Close out the previous scene's beats before starting a new one.
         var prevNotes: string[] = currentSceneIdx >= 0 ? finalizeBeats(scenes[currentSceneIdx]) : [];
 
