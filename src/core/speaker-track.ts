@@ -14,6 +14,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { SpeakerTrack } from "./types.js";
+import { resolveVideoPath } from "./video-path.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -178,7 +179,9 @@ function buildSingleClipArgs(
     args.push("-ss", String(trimStart));
   }
 
-  args.push("-i", clip.source);
+  // clip.source is often the SERVED asset URL (/assets/{tenant}/...) --
+  // ffmpeg needs the real filesystem path (same mapping scene-worker uses).
+  args.push("-i", resolveVideoPath(clip.source));
 
   // Duration from trim_start to trim_end
   if (trimEnd !== undefined) {
