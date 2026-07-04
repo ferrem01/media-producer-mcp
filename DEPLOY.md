@@ -33,6 +33,10 @@ SESSION_SECRET=change-me
 # ── Instance ──
 MP_PORT=3200
 MP_DATA_DIR=/data/media-producer
+# Enables POST /api/deploy (remote one-command deploy). Use a long random
+# value; it is deliberately separate from AUTH_TOKENS -- preview tokens live
+# in shareable URLs and must never be able to trigger deploys.
+MP_DEPLOY_TOKEN=
 # The base URL baked into preview_url links handed to clients.
 # Set to https://your-domain once Caddy is in front (see below).
 MP_PUBLIC_URL=http://159.203.115.164:3200
@@ -80,6 +84,28 @@ the token as a query param, so either path works.)
 
 Note: bare-IP links (`http://IP:3200/...`) never pass through Caddy — Caddy
 only answers for the domain on ports 80/443.
+
+## Remote deploy (no SSH)
+
+With `MP_DEPLOY_TOKEN` set in the env file, the server exposes a self-deploy
+endpoint — the running process spawns `scripts/deploy.sh` **detached**, so it
+survives the pm2 reload that replaces its parent:
+
+```bash
+curl -X POST "https://your-host/api/deploy" \
+  -H "Authorization: Bearer <tenant-token>" \
+  -H "X-Deploy-Token: <MP_DEPLOY_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"branch":"master"}'
+
+curl "https://your-host/api/deploy/log?deploy_token=<MP_DEPLOY_TOKEN>&token=<tenant-token>"   # tail the output
+curl https://your-host/health                                            # commit field = deployed sha
+```
+
+Safety: it refuses with `409` while any generate/render job is running or
+queued (the reload would kill them) — pass `{"force": true}` to override.
+The deploy token is separate from `AUTH_TOKENS` on purpose: preview tokens
+live in shareable URLs and must never be able to trigger deploys.
 
 ## Debugging a deploy
 
