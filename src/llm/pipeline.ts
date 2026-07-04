@@ -2250,17 +2250,14 @@ async function runUnifiedPipeline(
 
   // Apply speaker track scene-level settings after all scenes are generated
   if (project.speaker_track) {
-    const FULL_FRAME_TYPES = new Set(["screencast", "browser-frame", "video", "image-showcase", "S2-screencast-pip"]);
-    for (var si = 0; si < project.scenes.length; si++) {
-      const scene = project.scenes[si];
-      if (!scene.content_region) {
-        // Check if any component is a full-frame type
-        const hasFullFrame = scene.components.some(c => FULL_FRAME_TYPES.has(c.type));
-        if (!hasFullFrame) {
-          scene.content_region = { side: "right", width: "42%" };
-        }
-      }
-    }
+    // NOTE: no auto content_region here. That was retired-template-era logic
+    // (it squeezed any scene without a legacy full-frame component type into
+    // a right-side 42% box) -- under the unified codegen path EVERY scene is
+    // a scene_* component, so it crammed meticulously full-frame designs
+    // (screencast browser, b-roll) into 42% of the canvas and clipped them.
+    // Codegen scenes own their layout: the speakerMode prompt rules keep the
+    // camera clear in visible scenes, and the opaque-backdrop gate enforces
+    // it. content_region still applies when a scene explicitly sets it.
 
     // Set pip_source: "speaker" on S2-screencast-pip scenes so the pipeline
     // resolves the speaker video path before rendering.
