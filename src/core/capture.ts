@@ -313,6 +313,9 @@ export interface LayoutProbeResult {
   /** True if a near-full-bleed element carries a gradient or image fill -- i.e.
    *  empty regions are richly filled (a colorful backdrop), not flat dead space. */
   hasRichFullBleedBg: boolean;
+  /** Text elements whose glyphs are cut off by an overflow-clipping ancestor or
+   *  the canvas edge ("One brief" rendering as "One br"). */
+  clippedTexts: Array<{ text: string; el: string; container: string; overflowX: number; overflowY: number }>;
 }
 
 export async function captureSingleFrame(options: {
@@ -633,6 +636,7 @@ export async function captureSingleFrame(options: {
         let hasRichFullBleedBg = false;
         const surfaces: any[] = [];
         const contentBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
+        const clippedTexts: Array<{ text: string; el: string; container: string; overflowX: number; overflowY: number }> = [];
 
         for (const el of els) {
           const cs = getComputedStyle(el);
@@ -662,6 +666,45 @@ export async function captureSingleFrame(options: {
           const fontSize = parseFloat(cs.fontSize) || 0;
           if ((directText.length >= 2 && fontSize >= 14) || isMedia || isButton) {
             contentBoxes.push(box);
+          }
+
+          // Clipped text: significant text whose glyphs are cut off -- by its
+          // own overflow-hidden box, by the nearest clipping ancestor, or by
+          // the canvas edge. This is the defect class where "One brief"
+          // renders as "One br": obvious to a human, invisible to contrast
+          // and coverage measurements.
+          if (directText.length >= 3 && fontSize >= 16) {
+            const se = el as HTMLElement;
+            let clipX = 0, clipY = 0, container = "";
+            if (se.scrollWidth - se.clientWidth > 8) { clipX = se.scrollWidth - se.clientWidth; container = "its own box"; }
+            if (se.scrollHeight - se.clientHeight > 14) { clipY = se.scrollHeight - se.clientHeight; container = container || "its own box"; }
+            let anc = el.parentElement;
+            while (anc && anc !== document.body) {
+              const acs = getComputedStyle(anc);
+              if (/(hidden|clip)/.test(String(acs.overflow) + String(acs.overflowX) + String(acs.overflowY))) {
+                const ar = anc.getBoundingClientRect();
+                const ox = Math.max(0, Math.round(r.right - ar.right), Math.round(ar.left - r.left));
+                const oy = Math.max(0, Math.round(r.bottom - ar.bottom), Math.round(ar.top - r.top));
+                if (ox > 8 || oy > 14) {
+                  container = anc.tagName.toLowerCase() +
+                    (anc.className && typeof anc.className === "string" ? "." + anc.className.split(/\s+/)[0] : "");
+                  clipX = Math.max(clipX, ox);
+                  clipY = Math.max(clipY, oy);
+                }
+                break; // nearest clipping ancestor decides
+              }
+              anc = anc.parentElement;
+            }
+            const ex = Math.max(0, Math.round(r.right - vw), Math.round(0 - r.left));
+            const ey = Math.max(0, Math.round(r.bottom - vh), Math.round(0 - r.top));
+            if ((ex > 8 || ey > 14) && !container) { clipX = Math.max(clipX, ex); clipY = Math.max(clipY, ey); container = "the canvas edge"; }
+            if ((clipX > 8 || clipY > 14) && container) {
+              clippedTexts.push({
+                text: directText.slice(0, 40),
+                el: tag + (el.className && typeof el.className === "string" ? "." + el.className.split(/\s+/)[0] : ""),
+                container, overflowX: clipX, overflowY: clipY,
+              });
+            }
           }
 
           // Surfaces: mid-sized filled containers (panels/cards/windows). Skip the
@@ -701,7 +744,7 @@ export async function captureSingleFrame(options: {
             });
           }
         }
-        return { vw, vh, pageBg, surfaces, contentBoxes, hasRichFullBleedBg };
+        return { vw, vh, pageBg, surfaces, contentBoxes, hasRichFullBleedBg, clippedTexts };
       }, { vw: width, vh: height });
     }
 

@@ -708,7 +708,7 @@ export function resolveHtmlAssetUrls(html: string, preview?: boolean): string {
  */
 export function speakerUnderlayHtml(speakerUrl: string, offsetSeconds: number): string {
   return `
-<video id="__mp_speaker_base" src="${speakerUrl}" muted playsinline preload="auto"
+<video id="__mp_speaker_base" src="${speakerUrl}" muted playsinline preload="auto" data-start-at="${Math.max(0, offsetSeconds)}"
   style="position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:-10; pointer-events:none;"></video>
 <script>
 (function(){

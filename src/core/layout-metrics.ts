@@ -33,7 +33,7 @@ import { captureSingleFrame, type LayoutProbeResult, type SurfaceMetric } from "
 const execFileAsync = promisify(execFile);
 
 export interface LayoutDefect {
-  type: "invisible_surface" | "dead_frame" | "edge_bleed";
+  type: "invisible_surface" | "dead_frame" | "edge_bleed" | "clipped_text";
   detail: string;
 }
 
@@ -265,6 +265,8 @@ export async function measureLayout(opts: {
   let sawAnyFrame = false;
   let lastDead: LayoutDefect | null = null;
   let edgeBleed: LayoutDefect | null = null;
+  // text snippet -> { frames seen clipped, worst sample }
+  const clipSeen = new Map<string, { count: number; sample: { text: string; el: string; container: string; overflowX: number; overflowY: number } }>();
 
   const tmpDir = path.join(os.tmpdir(), `layout_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true }).catch(() => {});
@@ -310,12 +312,38 @@ export async function measureLayout(opts: {
     if (!edgeBleed) {
       edgeBleed = await edgeBleedDefect(probePath, opts.width, opts.height);
     }
+
+    // Clipped text: tally per text snippet. Requiring >= 2 probed moments
+    // filters an element that is merely mid-entrance at one instant.
+    for (const c of layout.clippedTexts || []) {
+      const key = c.text;
+      const prev = clipSeen.get(key);
+      if (prev) {
+        prev.count++;
+        if (c.overflowX + c.overflowY > prev.sample.overflowX + prev.sample.overflowY) prev.sample = c;
+      } else {
+        clipSeen.set(key, { count: 1, sample: c });
+      }
+    }
   }
 
   const defects: LayoutDefect[] = [];
   if (worstSurface) defects.push(worstSurface);
   if (sawAnyFrame && deadEveryFrame && lastDead) defects.push(lastDead);
   if (edgeBleed) defects.push(edgeBleed);
+  let clipEmitted = 0;
+  for (const { count, sample } of clipSeen.values()) {
+    if (count < 2 || clipEmitted >= 2) continue;
+    const axis = sample.overflowX >= sample.overflowY
+      ? `~${sample.overflowX}px extends past it horizontally`
+      : `~${sample.overflowY}px extends past it vertically`;
+    defects.push({
+      type: "clipped_text",
+      detail: `Text "${sample.text}" (${sample.el}) is cut off by ${sample.container} -- ${axis}. ` +
+        `Make the full text visible: smaller font-size, wrapping, or a wider container.`,
+    });
+    clipEmitted++;
+  }
   return defects;
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
