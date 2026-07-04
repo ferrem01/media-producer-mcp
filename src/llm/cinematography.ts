@@ -23,84 +23,71 @@ at each point. Don't just list features -- take them on a journey.
 ### The Heartbeat Pattern
 Every great video alternates between HIGH and LOW intensity:
 
-  HIGH → low → HIGH → low → HIGH → low → HIGHEST
+  HIGH → low → HIGH → low → HIGHEST
 
-- HIGH: Big statement, dramatic stat, product reveal, hero moment
-- low: Breathing room, transition text, ambient visual, section divider
-- HIGHEST: The CTA or final payoff. Peak emotional moment.
+The heartbeat lives at the BEAT level, INSIDE scenes -- NOT as scene cuts. A scene is a
+world that holds for several heartbeats; intensity changes through what happens IN the
+world (an element SLAMS in = HIGH; the world breathes = low), not by cutting away. A
+video that cuts on every heartbeat is a slideshow.
 
-This creates RHYTHM. Without it, everything feels the same and nothing stands out.
+### Arc Templates (scenes are WORLDS -- each carries 3-6 beats)
 
-### Pacing Arc Templates
+#### Product Launch (3-4 scenes, 30-45s)
+1. THE WORLD BEFORE (8-12s, 3-4 beats): hook beat (bold claim or question SLAMS in) →
+   pain beats (the frustration piles up VISIBLY, escalating in the same frame) → a low
+   breath right before everything changes.
+2. THE ARRIVAL (12-18s, 4-6 beats): reveal beat (the product ENTERS the existing world)
+   → transformation beats (the world reorganizes around it -- one capability per beat,
+   same elements morphing, never a reset) → proof beat (the jaw-drop stat lands amid
+   the calm the product created).
+3. THE CLOSE (6-9s, 2-3 beats): CTA beat (one clear action) → brand signoff beat.
+A 4th scene is earned only when the story genuinely changes worlds (e.g. a distinct
+customer-results world between ARRIVAL and CLOSE).
 
-#### Product Launch (5-8 scenes)
-1. ★ HOOK: Bold claim or question that creates curiosity (4s)
-2. ↓ PROBLEM: Quick pain point, relatable frustration (4s)
-3. ★ REVEAL: "Introducing [Product]" -- the hero moment (5s)
-4. ↓ FEATURES: 2-3 key capabilities, visual demos (5-6s each)
-5. ★ PROOF: Impact stat or social proof (4s)
-6. ↓ CTA: Clear next step (4s)
-7. ★ OUTRO: Brand signoff (3s)
+#### Feature Announcement (3 scenes, 25-40s)
+1. TEASE + REVEAL (10-14s, 3-4 beats): mystery beat → reveal beat → first-use beat.
+2. THE DEMO WORLD (10-16s, 4-5 beats): ONE continuous product world; each benefit is a
+   beat where the SAME interface advances or morphs.
+3. THE CLOSE (5-8s, 2 beats): try-it beat → signoff beat.
 
-#### Feature Announcement (4-6 scenes)
-1. ★ TEASER: "Something new" or mystery build-up (3s)
-2. ★ REVEAL: The feature, shown in action (6s)
-3. ↓ BENEFITS: What this means for the user, 2-3 points (5s)
-4. ★ DEMO: Product frame showing the feature live (6s)
-5. ↓ CTA: "Try it now" (4s)
-6. ★ OUTRO: Brand signoff (3s)
+#### Brand Story (3-4 scenes, 40-60s)
+1. THE OLD WORLD (10-15s, 3-4 beats): provocative hook beat → context beats.
+2. THE MISSION (12-18s, 4-5 beats): what you believe → how you're different → impact
+   proof, all advancing inside one visual metaphor.
+3. THE ROAD AHEAD (8-12s, 3 beats): vision beat → join-us CTA beat → signoff beat.
 
-#### Brand Story (6-8 scenes)
-1. ★ HOOK: Provocative question or bold vision statement (4s)
-2. ↓ CONTEXT: The world before your product (4s)
-3. ★ MISSION: What you believe. Why this matters. (5s)
-4. ↓ APPROACH: How you're different (5s)
-5. ★ IMPACT: Stats, testimonials, proof of impact (5s)
-6. ↓ VISION: Where you're going (4s)
-7. ★ CTA: Join the mission (4s)
-8. ★ OUTRO: Brand signoff (3s)
+#### Explainer / How-It-Works (3 scenes, 30-50s)
+1. THE PROBLEM (8-12s, 3 beats): pain beat → "what if" beat.
+2. THE WALKTHROUGH (14-24s, 4-6 beats): the solution as ONE continuous take -- each
+   step is a beat; elements persist and transform between steps. NEVER split a
+   walkthrough's steps into separate scenes.
+3. THE PAYOFF (6-10s, 2-3 beats): results beat → CTA beat.
 
-#### Explainer / How-It-Works (5-7 scenes)
-1. ★ PROBLEM: The pain point, stated clearly (4s)
-2. ↓ "WHAT IF": Imagine a better way (3s)
-3. ★ SOLUTION: Introduce your approach (5s)
-4. ↓ STEPS: How it works, 3-step walkthrough (6-8s)
-5. ★ RESULTS: What users achieve (5s)
-6. ↓ CTA: Get started (4s)
-7. ★ OUTRO: Brand signoff (3s)
+#### Case Study / Results (3 scenes, 30-45s)
+1. THE CHALLENGE (8-12s, 3 beats): hook beat ("here's what happened when...") →
+   problem beats.
+2. THE TURNAROUND (12-16s, 4-5 beats): approach beats → hero-stat beat (the jaw-drop
+   numbers roll up in the same world) → testimonial beat.
+3. THE CLOSE (5-8s, 2 beats): "get results like these" CTA → signoff.
 
-#### Case Study / Results (5-7 scenes)
-1. ★ HOOK: "Here's what happened when [Company] used [Product]" (4s)
-2. ↓ CHALLENGE: The problem they faced (4s)
-3. ★ APPROACH: How they used the product (5s)
-4. ★ RESULTS: Hero stat(s) -- the jaw-drop numbers (5s)
-5. ↓ QUOTE: Customer testimonial (5s)
-6. ★ CTA: "Get results like these" (4s)
-7. ★ OUTRO: Brand signoff (3s)
-
-#### Social Media / Short-Form (3-4 scenes)
-1. ★ HOOK: Scroll-stopping first frame (3s)
-2. ★ VALUE: The one thing you need to know (4s)
-3. ★ PROOF: One stat or demo that validates (4s)
-4. ★ CTA: Action step (3s)
-- No breathing scenes. Every second counts. Punchy motion style.
+#### Social Media / Short-Form (1-2 scenes, 12-20s)
+Often ONE world, 3-4 beats: scroll-stopper beat → value beat → proof beat → CTA beat.
+Every second counts; punchy motion; the world never cuts.
 
 ### Duration Guidelines
 
-| Content Type         | Per-Scene Duration | Total Video   |
-|----------------------|-------------------|---------------|
-| Title/intro          | 3-4s              |               |
-| Key statement        | 4-5s              |               |
-| Feature highlight    | 5-6s              |               |
-| Product demo         | 6-8s              |               |
-| Interactive demo     | 8-15s             |               |
-| Stats/data           | 4-5s              |               |
-| Breathing/divider    | 2-3s              |               |
-| CTA                  | 4-5s              |               |
-| Outro                | 3-5s              |               |
-| **Short-form total** |                   | **12-20s**    |
-| **Standard total**   |                   | **30-60s**    |
-| **Deep dive total**  |                   | **60-120s**   |
+| Unit                                   | Duration          |
+|----------------------------------------|-------------------|
+| A beat                                 | 2-6s              |
+| A bookend scene (intro/outro world)    | 5-9s, 2-3 beats   |
+| A living middle scene                  | 12-24s, 4-6 beats |
+| **Short-form total**                   | **12-20s, 1-2 scenes** |
+| **Standard total**                     | **30-60s, 3-4 scenes** |
+| **Deep dive total**                    | **60-120s, 4-6 scenes** |
+
+Sanity check before finishing: divide total duration by scene count. If the average
+scene is under ~7 seconds, you have authored a slideshow -- merge same-world neighbors
+into one scene's beats until every scene is a world that breathes.
 `;
 
 /**
