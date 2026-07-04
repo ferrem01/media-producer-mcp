@@ -135,6 +135,27 @@ describe("buildStoryboard: incremental add_scene tool calls", () => {
     expect(result.scenes[0].components).toEqual(["hero-reveal"]);
   });
 
+  it("enforces the short-film scene budget: rejects a 5th scene and folds the material into beats", async () => {
+    const shortScene = (n: number) => toolUse("t" + n, "add_scene", {
+      label: "Scene " + n, duration_seconds: 8, purpose: "p" + n, visual_notes: "v" + n, components: [],
+    });
+    mockTurns([
+      { content: [shortScene(1)], stop_reason: "tool_use" },
+      { content: [shortScene(2)], stop_reason: "tool_use" },
+      { content: [shortScene(3)], stop_reason: "tool_use" },
+      { content: [shortScene(4)], stop_reason: "tool_use" },
+      // 5th scene on a 32s film -- must be REJECTED at the tool boundary.
+      { content: [shortScene(5)], stop_reason: "tool_use" },
+      // Model folds the material into the current scene as beats instead.
+      { content: [toolUse("b1", "add_beat", { label: "extra moment", duration_seconds: 4, action: "the idea lands as a beat" })], stop_reason: "tool_use" },
+      { content: [toolUse("f1", "finish_storyboard", { name: "Budgeted Film" })], stop_reason: "tool_use" },
+    ]);
+
+    const result = await buildStoryboard(baseOpts());
+    expect(result.scenes).toHaveLength(4);
+    expect(result.name).toBe("Budgeted Film");
+  });
+
   it("recovers from a truncated turn: discards it, keeps banked scenes, and finishes on the retry", async () => {
     mockTurns([
       { content: [toolUse("t1", "add_scene", { label: "Scene 1", duration_seconds: 5, purpose: "p", visual_notes: "v", components: [] })], stop_reason: "tool_use" },
