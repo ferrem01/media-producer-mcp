@@ -240,7 +240,9 @@ async function main() {
         for (const vInfo of videoInfos) {
           const extracted = extractionMap.get(vInfo.src);
           if (!extracted) continue;
-          const targetTime = Math.max(0, time - vInfo.startAt);
+          // Seek semantics (offset + time), matching the preview and
+          // scene-worker -- data-start-at is not a delay.
+          const targetTime = Math.max(0, vInfo.startAt + time);
           const frameIndex = Math.min(Math.round(targetTime * args.fps), extracted.totalFrames - 1);
           const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.png`);
           frameUpdates.push({ imgId: `__render_frame_${vInfo.index}__`, src: `file://${framePath}` });

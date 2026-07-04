@@ -413,7 +413,9 @@ export async function captureSingleFrame(options: {
           continue;
         }
 
-        const targetTime = Math.max(0, captureTime - vInfo.startAt);
+        // Seek semantics (offset + time), matching the preview and the
+        // render frame swapper -- data-start-at is not a delay.
+        const targetTime = Math.max(0, vInfo.startAt + captureTime);
         const key = `${vInfo.src}__${vInfo.startAt}`;
 
         // Skip if we already extracted this exact frame
