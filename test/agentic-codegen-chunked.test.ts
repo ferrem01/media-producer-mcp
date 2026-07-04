@@ -60,11 +60,12 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
         content: [
           toolUse("t1", "write_template", { html: "<div class=\"hero\">Hi</div>" }),
           toolUse("t2", "write_style", { css: ".hero { color: var(--mp-color-text); }" }),
-          toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" }),
         ],
         stop_reason: "tool_use",
       },
-      { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "finish_design", {})], stop_reason: "tool_use" },
+      { content: [toolUse("t4", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
+      { content: [toolUse("t5", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
 
     const { html } = await generateSceneAgentic(baseOpts());
@@ -80,6 +81,7 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
     mockTurns([
       { content: [toolUse("t1", "write_template", { html: "<div id=\"s\"></div>" })], stop_reason: "tool_use" },
       { content: [toolUse("t2", "write_style", { css: "#s{}" })], stop_reason: "tool_use" },
+      { content: [toolUse("td", "finish_design", {})], stop_reason: "tool_use" },
       { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){var tl=gsap.timeline();" })], stop_reason: "tool_use" },
       { content: [toolUse("t4", "append_script", { js: "tl.addLabel('beat_1',0);" })], stop_reason: "tool_use" },
       { content: [toolUse("t5", "append_script", { js: "tl.addLabel('beat_2',4);" })], stop_reason: "tool_use" },
@@ -94,9 +96,11 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
 
   it("rejects finish_scene when template or script is missing, and lets the model recover", async () => {
     mockTurns([
-      // First finish_scene attempt is premature (no template/script yet) -- must be rejected, not silently accepted.
+      // finish_scene during the design phase -- must be rejected, not silently accepted.
       { content: [toolUse("t1", "finish_scene", {})], stop_reason: "tool_use" },
       { content: [toolUse("t2", "write_template", { html: "<div></div>" })], stop_reason: "tool_use" },
+      { content: [toolUse("t2b", "write_style", { css: "div{}" })], stop_reason: "tool_use" },
+      { content: [toolUse("t2c", "finish_design", {})], stop_reason: "tool_use" },
       { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
       { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
@@ -113,6 +117,7 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
       { content: [toolUse("tX", "write_script", { js: "function createTimeline(el,data,ctx){ // cut off mid" }), { type: "text", text: "partial" }], stop_reason: "max_tokens" },
       // Model retries with smaller chunks and completes.
       { content: [toolUse("t2", "write_style", { css: "#s{}" })], stop_reason: "tool_use" },
+      { content: [toolUse("td", "finish_design", {})], stop_reason: "tool_use" },
       { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
       { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
@@ -134,12 +139,54 @@ describe("generateSceneAgentic: incremental chunked submission", () => {
   });
 });
 
+describe("two-phase codegen: design gates and the animation lock", () => {
+  it("rejects finish_design while inventoried element copy is missing, accepts after the edit", async () => {
+    mockTurns([
+      // Card shell built WITHOUT its content -- the empty-card disease.
+      { content: [toolUse("t1", "write_template", { html: '<div class="card"><div class="card-title">Support Tickets</div></div>' })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "write_style", { css: ".card { color: var(--mp-color-text); }" })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "finish_design", {})], stop_reason: "tool_use" },
+      // Model adds the missing copy and re-finishes.
+      { content: [toolUse("t4", "edit_template", { search: '<div class="card-title">Support Tickets</div>', replace: '<div class="card-title">Support Tickets</div><div class="card-line">Avg response: 2.4h</div><div class="card-line">312 Open</div>' })], stop_reason: "tool_use" },
+      { content: [toolUse("t5", "finish_design", {})], stop_reason: "tool_use" },
+      { content: [toolUse("t6", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
+      { content: [toolUse("t7", "finish_scene", {})], stop_reason: "tool_use" },
+    ]);
+
+    const { html } = await generateSceneAgentic(baseOpts({
+      elements: [
+        { name: "support-card", kind: "card", content: "Support Tickets / Avg response: 2.4h / 312 Open" },
+      ],
+    }));
+    expect(html).toContain("Avg response: 2.4h");
+    expect(html).toContain("312 Open");
+  });
+
+  it("locks the design during the animation phase: template/style edits are rejected", async () => {
+    mockTurns([
+      { content: [toolUse("t1", "write_template", { html: "<h1>Hi</h1>" })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "write_style", { css: "h1 { color: var(--mp-color-text); }" })], stop_reason: "tool_use" },
+      { content: [toolUse("t3", "finish_design", {})], stop_reason: "tool_use" },
+      // Attempted design change mid-animation -- must be rejected, design unchanged.
+      { content: [toolUse("t4", "edit_style", { search: "color: var(--mp-color-text);", replace: "color: var(--mp-color-text-muted);" })], stop_reason: "tool_use" },
+      { content: [toolUse("t5", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
+      { content: [toolUse("t6", "finish_scene", {})], stop_reason: "tool_use" },
+    ]);
+
+    const { html } = await generateSceneAgentic(baseOpts());
+    // The locked design survived the rejected edit.
+    expect(html).toContain("color: var(--mp-color-text);");
+    expect(html).not.toContain("text-muted");
+  });
+});
+
 describe("reviseSceneInSession: Write-then-Edit revisions", () => {
   /** Build a completed session via a mocked initial generation. */
   async function buildSession() {
     mockTurns([
       { content: [toolUse("t1", "write_template", { html: '<h1 class="title">Hello</h1>' })], stop_reason: "tool_use" },
       { content: [toolUse("t2", "write_style", { css: ".title { color: var(--mp-color-text-muted); }" })], stop_reason: "tool_use" },
+      { content: [toolUse("td", "finish_design", {})], stop_reason: "tool_use" },
       { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){var t=el.querySelector('.title');t.textContent;return gsap.timeline();}" })], stop_reason: "tool_use" },
       { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
@@ -231,11 +278,12 @@ describe("color discipline: text colors are tokens-only", () => {
     mockTurns([
       { content: [toolUse("t1", "write_template", { html: "<h1>Hello</h1>" })], stop_reason: "tool_use" },
       { content: [toolUse("t2", "write_style", { css: "h1 { color: #999999; font-size: 96px; }" })], stop_reason: "tool_use" },
-      { content: [toolUse("t3", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
-      // Rejected: raw literal in color:
-      { content: [toolUse("t4", "finish_scene", {})], stop_reason: "tool_use" },
-      { content: [toolUse("t5", "edit_style", { search: "color: #999999;", replace: "color: var(--mp-color-text);" })], stop_reason: "tool_use" },
-      { content: [toolUse("t6", "finish_scene", {})], stop_reason: "tool_use" },
+      // Rejected at finish_design: raw literal in color:
+      { content: [toolUse("t3", "finish_design", {})], stop_reason: "tool_use" },
+      { content: [toolUse("t4", "edit_style", { search: "color: #999999;", replace: "color: var(--mp-color-text);" })], stop_reason: "tool_use" },
+      { content: [toolUse("t5", "finish_design", {})], stop_reason: "tool_use" },
+      { content: [toolUse("t6", "write_script", { js: "function createTimeline(el,data,ctx){return gsap.timeline();}" })], stop_reason: "tool_use" },
+      { content: [toolUse("t7", "finish_scene", {})], stop_reason: "tool_use" },
     ]);
 
     const { html } = await generateSceneAgentic(baseOpts());

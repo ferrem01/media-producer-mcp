@@ -11,10 +11,8 @@ import { callLLMAgentic, type LLMConfig, type LLMContentPart, type LLMMessage, t
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import type { Treatment } from "./creative-director.js";
 import { SCENE_STORYBOARD_DESIGN_RULES } from "./design-rules.js";
-import { SCENE_TEMPLATES } from "./scene-templates.js";
 import { COMPOSITION_PLAYBOOK, PACING_PLAYBOOK } from "./cinematography.js";
 import { getStorytellingGuide } from "./design-skills.js";
-import { formatTemplateCatalogForPrompt } from "./template-catalog.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, SceneBeat } from "../core/types.js";
 import { normalizeBeats, beatsVoiceover } from "../core/beats.js";
 import {
@@ -176,8 +174,6 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
     : (opts.format === "video"
       ? "3-4 scenes for films up to 45s -- this is a HARD budget, not a suggestion (5 only for 60s+). A scene is a WORLD and you only cut when the world changes (see CUT vs BEAT). The shape of a 30-45s film: an opening world, one or two long living middles (12-24s each, 4-6 beats), a closing CTA world. Before you output, AUDIT your scene list: if two consecutive scenes share the same setting/canvas/metaphor, they are ONE world -- merge them into one scene and turn each of their moments into a beat. Emitting a new scene for every idea is the #1 storyboard failure."
       : "5-8 scenes (scale to content complexity).");
-
-  var templateCatalogStr = formatTemplateCatalogForPrompt();
 
   var storytellingGuide = getStorytellingGuide();
 
@@ -382,10 +378,6 @@ finish_storyboard({ "name": "Project Title" })
 - When a prompt asks for a "walkthrough", "demo flow", "step by step", or "continuous take" involving multiple existing components, make ONE longer scene (12-30s) with progression-style visual notes that list those components (see "Continuous / Multi-Step Scenes" above) rather than several short scenes.
 
 ${SCENE_STORYBOARD_DESIGN_RULES}
-
-${templateCatalogStr}
-
-${SCENE_TEMPLATES}
 
 ${COMPOSITION_PLAYBOOK}
 

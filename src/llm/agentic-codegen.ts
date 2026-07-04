@@ -51,6 +51,9 @@ export interface AgenticCodegenOpts {
   critiqueFeedback?: string;
   referenceImages?: ReferenceImage[];
   treatment?: Treatment;
+  /** Structured element inventory from the storyboard -- finish_design
+   *  statically verifies every element's copy is present in the template. */
+  elements?: Array<{ name: string; kind: string; content: string; motion?: string }>;
 }
 
 // ── Tool Definitions ──
@@ -99,8 +102,13 @@ const TOOLS: LLMTool[] = [
     },
   },
   {
+    name: "finish_design",
+    description: "DESIGN PHASE terminal: call when the STATIC design (template + style) is complete -- every element fully dressed with its real content, styled in its FINAL RESTING state. Validates the design (all inventory copy present, color discipline) and LOCKS it; the animation phase follows. No script exists yet at this point.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
     name: "finish_scene",
-    description: "Call this when write_template, write_style, and write_script (plus any append_script calls) are all done and the scene is complete and ready to render. This assembles and validates the final document.",
+    description: "ANIMATION PHASE terminal: call when write_script (plus any append_script calls) is done and the timeline is complete. This assembles and validates the final document.",
     input_schema: { type: "object", properties: {} },
   },
   // Edit tools -- the Claude Code Write-then-Edit pattern. During REVISION
@@ -389,27 +397,31 @@ Notice: quotient-chat and code-editor use <component> tags, and BOTH timelines a
 1. READ the spec below — it includes which components to use and their data schemas
 2. BUILD your scene HTML using <component> tags for every listed component, filling data from the provided schemas
 3. WRITE custom code around the components: layout, positioning, backgrounds, transitions, decorative elements
-4. SUBMIT via write_template, write_style, write_script (+ append_script if needed), then finish_scene
+4. DESIGN first: write_template + write_style with EVERY element fully dressed in its final resting state, then finish_design (locks the design)
+5. ANIMATE second: write_script (+ append_script per beat) against the locked design, then finish_scene
 
 You have everything you need in the spec. Go straight to writing.
 
-## Submitting: write in SECTIONS, not one giant block
+## Two phases: DESIGN, then ANIMATION (like a real studio)
 
-Call write_template (markup) and write_style (CSS) once each, then write_script for the
-createTimeline function. For a scene with SEVERAL BEATS, do NOT try to write the whole
-multi-beat timeline in one write_script call -- write the setup plus the first beat or two,
-then call append_script one or two more beats at a time until the timeline is complete.
-Only call finish_scene once template, style, and the full script are all written -- it
-assembles and validates the document. This keeps every individual call small regardless of
-how long or beat-heavy the scene is; there is no size penalty for using more calls.
+PHASE 1 -- DESIGN (set dressing). Build the complete STATIC scene: write_template (all
+markup, every inventoried element present with its REAL content -- an empty card is a
+rejected design) and write_style (all CSS, styling everything in its FINAL RESTING state
+-- how the scene looks at its held moment, fully composed and legible). Do NOT hide
+elements with opacity:0 or off-screen positions in CSS; entrances happen in the animation
+phase via gsap.from(). When the design is complete, call finish_design -- it verifies all
+inventory copy is present and color discipline holds, then LOCKS the design.
 
-Batching a FEW small calls into one response is fine and fast (e.g. write_template +
-write_style together, or write_style + the first write_script chunk). What you must NEVER
-do is put the entire scene into one response: a response's combined output across ALL its
-tool calls is what risks truncation, not any single call. Rule of thumb: if the response
-you're about to write would contain the whole multi-beat timeline plus other sections,
-split it -- write a couple of beats, see the confirmation, continue with append_script in
-the next turn.
+PHASE 2 -- ANIMATION (the timeline). The design is locked; template/style edits are
+rejected. Write createTimeline implementing the beat sheet: gsap.set()/gsap.from() at
+time 0 to establish initial states, then the beats in order with tl.addLabel per beat.
+Write the setup plus the first beat or two with write_script, then continue ONE OR TWO
+BEATS per append_script call. Never the whole multi-beat timeline in one call. Call
+finish_scene when the timeline is complete -- it assembles and validates the document.
+
+Batching a FEW small calls into one response is fine (e.g. write_template + write_style).
+What you must NEVER do is put an entire phase's output in one response -- a response's
+combined output across ALL its tool calls is what risks truncation.
 
 ## COLOR DISCIPLINE (statically ENFORCED -- finish_scene rejects violations)
 
@@ -701,10 +713,35 @@ Read the spec, then write your scene using write_template / write_style / write_
   var parts = { template: "", style: "", script: "" };
   var session: CodegenSession = { messages, parts };
 
+  // ── PHASE 1: DESIGN (the studio's set-dressing step) ──
+  // The scene is fully designed -- every inventoried element dressed with its
+  // real content, styled in its final resting state -- and statically gated
+  // (copy presence + color discipline) BEFORE a single tween exists. The
+  // animator then works against a locked design with nothing else on its
+  // plate. Fail-soft: if the model never calls finish_design but banked a
+  // template+style, proceed (the animation-phase gates still apply).
+  var designResult = await runAgenticLoop({
+    messages, parts, opts,
+    maxIterations: 10,
+    phase: "design",
+  });
+  if (!designResult.designDone) {
+    if (!parts.template) {
+      throw new Error(`Design phase produced no template for scene ${opts.sceneIndex + 1} ("${opts.sceneLabel}")`);
+    }
+    console.warn(`  [agentic] Scene ${opts.sceneIndex + 1}: design phase ended without finish_design -- proceeding with the banked design.`);
+  }
+
+  // ── PHASE 2: ANIMATION (design locked, timeline only) ──
+  messages.push({
+    role: "user",
+    content: `The design is LOCKED. Now write ONLY the animation: the createTimeline(el, data, ctx) function implementing the beat sheet. The design shows every element in its FINAL RESTING state -- create entrances with gsap.from() / gsap.set() at the top of the timeline (never by editing the template or style). Wire component timelines via ctx.getComponentTimeline(...) where components are used. Write the setup plus the first beat with write_script, then ONE OR TWO BEATS per append_script call, then finish_scene.`,
+  });
+
   var result = await runAgenticLoop({
     messages, parts, opts,
     maxIterations: MAX_ITERATIONS,
-    phase: "codegen",
+    phase: "animation",
   });
   if (result.html) return { html: result.html, session };
 
@@ -732,6 +769,35 @@ Read the spec, then write your scene using write_template / write_style / write_
   throw new Error(
     `Agentic codegen failed after ${MAX_ITERATIONS} iterations without producing HTML`,
   );
+}
+
+/**
+ * Verify every inventoried element's copy is actually present in the template.
+ * "Empty cards" happen when the codegen builds the container and abandons the
+ * contents -- this makes that unshippable: finish_design lists exactly which
+ * copy is missing, and the fix is a cheap in-conversation edit. Matching is
+ * tag-stripped, whitespace-collapsed, case-insensitive; content segments are
+ * split on ' / ' and newlines (short fragments under 4 chars are skipped).
+ */
+export function findMissingElementContents(
+  template: string,
+  elements: Array<{ name: string; kind: string; content: string }> | undefined,
+): string[] {
+  if (!elements || elements.length === 0) return [];
+  var haystack = template.replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").toLowerCase();
+  var rawHaystack = template.replace(/\s+/g, " ").toLowerCase(); // for copy living in component data='...' attributes
+  var missing: string[] = [];
+  for (var elm of elements) {
+    if (!elm || !elm.content || elm.kind === "decoration") continue;
+    var segments = String(elm.content).split(/\s\/\s|\n/).map((x) => x.trim()).filter((x) => x.length >= 4);
+    for (var seg of segments) {
+      var needle = seg.replace(/\s+/g, " ").toLowerCase();
+      if (!haystack.includes(needle) && !rawHaystack.includes(needle)) {
+        missing.push(`${elm.name}: "${seg}"`);
+      }
+    }
+  }
+  return missing;
 }
 
 function assemblePartsHtml(parts: { template: string; style: string; script: string }): string {
@@ -854,8 +920,10 @@ async function runAgenticLoop(args: {
   parts: { template: string; style: string; script: string };
   opts: AgenticCodegenOpts;
   maxIterations: number;
-  phase: "codegen" | "revise";
-}): Promise<{ html: string | null; lastHtml: string | null }> {
+  /** design: static set-dressing only (script tools locked); animation: the
+   *  timeline only (design tools locked); revise: everything unlocked. */
+  phase: "design" | "animation" | "revise";
+}): Promise<{ html: string | null; lastHtml: string | null; designDone?: boolean }> {
   var { messages, parts, opts, maxIterations } = args;
   var lastHtml: string | null = null;
 
@@ -881,7 +949,9 @@ async function runAgenticLoop(args: {
         role: "user",
         content: args.phase === "revise"
           ? `IMPORTANT: You have ${maxIterations - iteration} iterations remaining. Stop polishing and call finish_scene NOW -- remaining minor issues are acceptable; losing the revision entirely is not.`
-          : `IMPORTANT: You have ${maxIterations - iteration} iterations remaining. Finish writing NOW: whatever sections you haven't written yet, write them (use append_script for any remaining beats), then call finish_scene immediately. Do not start over -- build on what you've already written.`,
+          : args.phase === "design"
+            ? `IMPORTANT: You have ${maxIterations - iteration} iterations remaining in the DESIGN phase. Complete the template and style NOW and call finish_design.`
+            : `IMPORTANT: You have ${maxIterations - iteration} iterations remaining. Finish the timeline NOW (use append_script for any remaining beats), then call finish_scene immediately. Do not start over -- build on what you've already written.`,
       });
     }
 
@@ -948,7 +1018,40 @@ async function runAgenticLoop(args: {
 
         var toolResult: string;
 
-        if (toolCall.name === "write_template") {
+        var isDesignTool = toolCall.name === "write_template" || toolCall.name === "write_style" || toolCall.name === "edit_template" || toolCall.name === "edit_style";
+        var isScriptTool = toolCall.name === "write_script" || toolCall.name === "append_script" || toolCall.name === "edit_script";
+
+        if (args.phase === "design" && (isScriptTool || toolCall.name === "finish_scene")) {
+          toolResult = `Not yet -- this is the DESIGN phase (static set-dressing only). Complete the template and style, then call finish_design; the animation phase comes after the design is locked.`;
+        } else if (args.phase === "animation" && isDesignTool) {
+          toolResult = `REJECTED -- the design is LOCKED. Do not modify the template or style during the animation phase: entrances/exits are done with gsap.from()/gsap.set() in the script (the design shows the FINAL RESTING state), not by changing the design. Write the timeline only.`;
+        } else if (toolCall.name === "finish_design") {
+          if (args.phase !== "design") {
+            toolResult = args.phase === "animation"
+              ? "The design is already locked -- continue with the timeline and finish_scene."
+              : "finish_design is not used here -- make your edits and call finish_scene.";
+          } else if (!parts.template || !parts.style) {
+            var missingD = [!parts.template && "write_template", !parts.style && "write_style"].filter(Boolean).join(" and ");
+            toolResult = `Cannot lock the design yet -- ${missingD} not called.`;
+          } else {
+            var designColorViolations = findRawTextColors(parts);
+            var missingCopy = findMissingElementContents(parts.template, opts.elements);
+            if (designColorViolations.length > 0) {
+              toolResult = `Design REJECTED -- raw color literals in text-color declarations:\n` +
+                designColorViolations.slice(0, 8).map((v) => `  - ${v}`).join("\n") +
+                `\nFix with edit_style using the brand tokens, then call finish_design again.`;
+            } else if (missingCopy.length > 0) {
+              toolResult = `Design REJECTED -- inventoried element copy is MISSING from the template (empty cards are unshippable):\n` +
+                missingCopy.slice(0, 8).map((v) => `  - ${v}`).join("\n") +
+                `\nAdd the missing content with edit_template (exact text from the inventory), then call finish_design again.`;
+            } else {
+              console.log(`  [agentic] Scene ${opts.sceneIndex + 1}: 🎨 design locked after ${iteration + 1} iterations (template ${parts.template.length}, style ${parts.style.length} chars)`);
+              finished = true;
+              finishedHtml = "";
+              toolResult = "design locked -- now write the animation timeline (write_script, then append_script per beat), and call finish_scene when the timeline is complete.";
+            }
+          }
+        } else if (toolCall.name === "write_template") {
           parts.template = String(toolCall.input.html || "");
           toolResult = `template received (${parts.template.length} chars)`;
         } else if (toolCall.name === "write_style") {
@@ -1028,7 +1131,10 @@ async function runAgenticLoop(args: {
         content: toolResults,
       });
 
-      if (finished) return { html: finishedHtml, lastHtml };
+      if (finished) {
+        if (args.phase === "design") return { html: null, lastHtml, designDone: true };
+        return { html: finishedHtml, lastHtml };
+      }
 
       continue;
     }

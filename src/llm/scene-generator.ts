@@ -91,6 +91,7 @@ async function generateCodegenScene(
     treatment: opts.treatment,
     brollVideoUrl: opts.brollVideoUrl,
     heroImageUrl: opts.imageUrl,
+    elements: Array.isArray(draft.elements) ? draft.elements : undefined,
   });
 
   var sceneHtml = stripHtmlFences(agenticResult.html);
