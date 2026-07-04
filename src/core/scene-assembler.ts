@@ -346,7 +346,28 @@ ${componentScripts.join("\n\n")}
 </body>
 </html>`;
 
-  return resolveHtmlAssetUrls(normalizeHtmlUrls(html), preview);
+  const resolved = resolveHtmlAssetUrls(normalizeHtmlUrls(html), preview);
+  // Preview surfaces must not eagerly decode scene videos (mobile tab-kill).
+  return preview ? stripEagerVideoLoading(resolved) : resolved;
+}
+
+/**
+ * Preview media discipline: strip `autoplay` and force `preload="metadata"`
+ * on every scene <video> so opening Studio decodes NOTHING until the user
+ * presses Play (syncMedia drives play/pause/seek for composite videos).
+ * A 4-scene speaker film otherwise spins up 5+ eager 1080p decoders on
+ * load -- survivable on desktop, a tab-kill on mobile. The camera underlay
+ * (#__mp_speaker_base) is exempt: it is the lone camera in single-scene
+ * previews and manages its own playback.
+ */
+export function stripEagerVideoLoading(html: string): string {
+  return html.replace(/<video\b[^>]*>/gi, (tag) => {
+    if (tag.includes("__mp_speaker_base")) return tag;
+    let out = tag.replace(/\s(?:autoplay)(?:\s*=\s*["'][^"']*["'])?(?=[\s>])/gi, "");
+    if (/\bpreload\s*=/i.test(out)) out = out.replace(/\bpreload\s*=\s*["'][^"']*["']/i, 'preload="metadata"');
+    else out = out.replace(/^<video\b/i, '<video preload="metadata"');
+    return out;
+  });
 }
 
 /**
@@ -631,7 +652,9 @@ ${tagResult.html}
 </body>
 </html>`;
 
-  return resolveHtmlAssetUrls(normalizeHtmlUrls(html), preview);
+  const resolved = resolveHtmlAssetUrls(normalizeHtmlUrls(html), preview);
+  // Preview surfaces must not eagerly decode scene videos (mobile tab-kill).
+  return preview ? stripEagerVideoLoading(resolved) : resolved;
 }
 
 /**
