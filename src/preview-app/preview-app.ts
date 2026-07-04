@@ -1029,19 +1029,27 @@ export function getPreviewHtml(): string {
     // (2) While a playing video is starved (readyState < 3), let it buffer
     // instead of correcting, unless drift is truly runaway (>3s).
     var now = (window.performance && performance.now) ? performance.now() : Date.now();
-    var seekAllowed = !clip._lastSeekTs || (now - clip._lastSeekTs) > 750;
+    var seekAllowed = !clip._lastSeekTs || (now - clip._lastSeekTs) > 1250;
     var starved = isPlayingMedia && el.readyState < 3;
     function doSeek(t) {
       el.currentTime = t;
       clip._lastSeekTs = now;
       clip.driftSamples = 0;
+      clip._wasStarved = false;
     }
+
+    // A starved clip is NEVER seeked -- seeking restarts its buffering, which
+    // is the storm's fuel. A frozen frame that catches up beats a shuddering
+    // one. The moment it recovers (readyState >= 3), one hard sync realigns it.
+    if (starved) { clip._wasStarved = true; }
+    var justRecovered = !starved && clip._wasStarved === true;
 
     // Tier 1: Hard sync (>500ms drift)
     var firstTick = prevOffset === null;
     var offsetJumped = !firstTick && Math.abs(offset - prevOffset) > 0.5;
-    if (drift > HARD_SYNC_THRESHOLD && (firstTick || offsetJumped || drift > 3)) {
-      if (seekAllowed && (!starved || drift > 3)) doSeek(target);
+    if (drift > HARD_SYNC_THRESHOLD && (firstTick || offsetJumped || justRecovered || drift > 3)) {
+      if (seekAllowed && !starved) doSeek(target);
+      else if (justRecovered && !starved) doSeek(target);
     }
     // Tier 2: Strict sync (>40ms, 2 consecutive -- skip for playing media to avoid stutter)
     else if (!isPlayingMedia && drift > STRICT_SYNC_THRESHOLD) {
