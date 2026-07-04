@@ -1023,24 +1023,36 @@ export function getPreviewHtml(): string {
     // until it stabilized.) A clean clock advances on its own once playing.
     var isPlayingMedia = !el.paused && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO');
 
+    // Seek-storm guards. Seeking a STARVED element restarts its buffering, the
+    // element stalls again, drift regrows, we seek again -- a visible ~1s
+    // shudder-loop. (1) Never seek the same clip more than once per 750ms.
+    // (2) While a playing video is starved (readyState < 3), let it buffer
+    // instead of correcting, unless drift is truly runaway (>3s).
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    var seekAllowed = !clip._lastSeekTs || (now - clip._lastSeekTs) > 750;
+    var starved = isPlayingMedia && el.readyState < 3;
+    function doSeek(t) {
+      el.currentTime = t;
+      clip._lastSeekTs = now;
+      clip.driftSamples = 0;
+    }
+
     // Tier 1: Hard sync (>500ms drift)
     var firstTick = prevOffset === null;
     var offsetJumped = !firstTick && Math.abs(offset - prevOffset) > 0.5;
     if (drift > HARD_SYNC_THRESHOLD && (firstTick || offsetJumped || drift > 3)) {
-      el.currentTime = target;
-      clip.driftSamples = 0;
+      if (seekAllowed && (!starved || drift > 3)) doSeek(target);
     }
     // Tier 2: Strict sync (>40ms, 2 consecutive -- skip for playing media to avoid stutter)
     else if (!isPlayingMedia && drift > STRICT_SYNC_THRESHOLD) {
       clip.driftSamples = (clip.driftSamples || 0) + 1;
-      if (clip.driftSamples >= STRICT_REQUIRED_SAMPLES) {
-        el.currentTime = target;
-        clip.driftSamples = 0;
+      if (clip.driftSamples >= STRICT_REQUIRED_SAMPLES && seekAllowed) {
+        doSeek(target);
       }
     }
     // Tier 3: Force sync (>20ms, on seek/play/pause transitions only)
     else if (!isPlayingMedia && state.forceSync && drift > FORCE_SYNC_THRESHOLD) {
-      el.currentTime = target;
+      if (seekAllowed) doSeek(target);
     }
     else {
       clip.driftSamples = 0;
@@ -1048,6 +1060,9 @@ export function getPreviewHtml(): string {
 
     // Play/pause
     if (playing && el.paused) {
+      // The user is playing now -- let the browser buffer aggressively
+      // (preview surfaces load with preload="metadata" to keep OPEN cheap).
+      if (el.preload !== 'auto') { try { el.preload = 'auto'; } catch (e) {} }
       el.play().catch(function(){});
     } else if (!playing && !el.paused) {
       el.pause();
