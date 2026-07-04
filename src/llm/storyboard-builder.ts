@@ -489,20 +489,23 @@ Durations will be snapped to the bar grid after you submit -- authoring on-grid 
   // Inject speaker track mode instructions if applicable
   if (opts.hasSpeakerTrack) {
     systemPrompt += `\n\n## Speaker Track Mode
-This video uses a speaker track -- a continuous speaker video plays as the base layer.
-Scene content will overlay on top of the speaker.
+This video uses a speaker track -- a continuous camera recording of the speaker plays as
+the base layer for the WHOLE film. Every scene is composited ON TOP of it. Two scene
+modes; choose per scene and SAY WHICH in the visual notes:
 
-For content scenes (where the speaker is visible behind):
-- Use Speaker templates (S1-speaker-spotlight, S3-speaker-lowerthird) when they fit
-- Content appears in a region beside the speaker, not full-screen
-- Backgrounds are transparent -- the speaker video shows through
+1. SPEAKER-VISIBLE content scene: the speaker stays on screen; content occupies a region
+   beside them (e.g. right two-thirds, or a lower-third band). The scene background must
+   stay TRANSPARENT so the camera shows through -- say "transparent background, speaker
+   visible left" in the notes, and keep content out of the speaker's area.
+2. SCREENCAST / demo scene: content fills the whole frame with its own OPAQUE background
+   (browser-frame / device-mockup / code and terminal components for the screen
+   recording look), and the speaker shrinks to a small circular PiP -- inventory it as an
+   element (kind "ui-window", e.g. name "speaker-pip", content "circular speaker camera
+   bubble, 220px, bottom-right, thin white border, soft shadow") so the codegen builds
+   the PiP mask deliberately.
 
-For demo/screencast scenes (where content fills the whole frame):
-- The speaker appears as a small PiP circle
-- Use regular templates (C7-picture-in-picture, S2-screencast-pip) or full-frame content
-- Content has its own opaque background
-
-Prefer Speaker templates over regular templates when the speaker should be visible.`;
+Never leave the speaker both invisible and un-PiPed -- every scene either shows the
+speaker beside the content or carries the PiP bubble.`;
   }
 
   var userPrompt = `Create a ${opts.format} project.\n\n${opts.prompt}`;
