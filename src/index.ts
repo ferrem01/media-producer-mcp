@@ -42,6 +42,8 @@ import { readTraces, dailyDigest } from "./trace/index.js";
 import { generateImage } from "./media/image-gen.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
 import { initTenantStoreFromFile } from "./auth/tenant-store.js";
+import { spawn } from "node:child_process";
+import { openSync } from "node:fs";
 
 /**
  * Resolve all component sources for a scene by reading .component.html files
@@ -678,6 +680,78 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       if (urlPath.startsWith("/studio") || urlPath.startsWith("/preview")) {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(previewHtml);
+        return;
+      }
+
+      // ── API: Remote deploy (opt-in via MP_DEPLOY_TOKEN) ──
+      // POST /api/deploy {branch?, force?} runs scripts/deploy.sh DETACHED so
+      // the server can pm2-reload itself without killing the deploy. Guarded
+      // by a dedicated secret on top of normal auth -- tenant/preview tokens
+      // (which live in shareable URLs) must never be able to run root-level
+      // deploys. Refuses while jobs are in flight unless force:true, because
+      // a reload kills running generations/renders.
+      if (urlPath === "/api/deploy" && method === "POST") {
+        const deploySecret = process.env.MP_DEPLOY_TOKEN;
+        if (!deploySecret) {
+          jsonResponse(res, 404, { error: "Remote deploy disabled -- set MP_DEPLOY_TOKEN in the server env to enable." });
+          return;
+        }
+        const provided = (req.headers["x-deploy-token"] as string) ||
+          new URL(url, "http://localhost").searchParams.get("deploy_token") || "";
+        if (provided !== deploySecret) {
+          jsonResponse(res, 403, { error: "Invalid deploy token" });
+          return;
+        }
+        let deployBody: any = {};
+        try { deployBody = await parseBody(req); } catch { /* empty body is fine */ }
+        const activeJobs = listAllJobs().filter((j: any) => j.status === "running" || j.status === "queued");
+        if (activeJobs.length > 0 && deployBody.force !== true) {
+          jsonResponse(res, 409, {
+            error: "Jobs in flight -- the pm2 reload would kill them. Pass {\"force\": true} to deploy anyway.",
+            jobs: activeJobs.map((j: any) => ({ id: j.id, type: j.type, status: j.status, progress: j.progress })),
+          });
+          return;
+        }
+        const branch = typeof deployBody.branch === "string" && /^[\w./-]+$/.test(deployBody.branch)
+          ? deployBody.branch : "master";
+        // dist/index.js -> repo root
+        const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+        const deployScript = path.join(repoRoot, "scripts", "deploy.sh");
+        const logDir = path.join(config.dataDir, "_system");
+        await fs.mkdir(logDir, { recursive: true });
+        const deployLogPath = path.join(logDir, "deploy.log");
+        const logFd = openSync(deployLogPath, "w");
+        const child = spawn("bash", [deployScript, branch], {
+          cwd: repoRoot,
+          detached: true, // own process group: survives this process's pm2 reload
+          stdio: ["ignore", logFd, logFd],
+          env: { ...process.env },
+        });
+        child.unref();
+        jsonResponse(res, 202, {
+          ok: true,
+          branch,
+          message: "Deploy started detached. Tail it at GET /api/deploy/log; verify with GET /health (commit field).",
+        });
+        return;
+      }
+
+      // GET /api/deploy/log -- tail of the last deploy's output (same secret).
+      if (urlPath === "/api/deploy/log" && method === "GET") {
+        const deploySecret = process.env.MP_DEPLOY_TOKEN;
+        const provided = (req.headers["x-deploy-token"] as string) ||
+          new URL(url, "http://localhost").searchParams.get("deploy_token") || "";
+        if (!deploySecret || provided !== deploySecret) {
+          jsonResponse(res, 403, { error: "Invalid deploy token" });
+          return;
+        }
+        try {
+          const log = await fs.readFile(path.join(config.dataDir, "_system", "deploy.log"), "utf-8");
+          res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end(log.slice(-16384));
+        } catch {
+          jsonResponse(res, 404, { error: "No deploy log yet" });
+        }
         return;
       }
 
