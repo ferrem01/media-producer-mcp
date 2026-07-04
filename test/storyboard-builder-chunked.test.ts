@@ -135,6 +135,23 @@ describe("buildStoryboard: incremental add_scene tool calls", () => {
     expect(result.scenes[0].components).toEqual(["hero-reveal"]);
   });
 
+  it("passes the tactical element inventory through to the draft scene", async () => {
+    mockTurns([
+      { content: [toolUse("t1", "add_scene", {
+        label: "Scene 1", duration_seconds: 6, purpose: "p", visual_notes: "v", components: [],
+        elements: [
+          { name: "support-card", kind: "card", content: "Support Tickets / Avg response: 2.4h / 312 Open", motion: "pops in at 0.8s" },
+          { name: "headline", kind: "headline", content: "One brief. Every channel." },
+        ],
+      })], stop_reason: "tool_use" },
+      { content: [toolUse("t2", "finish_storyboard", { name: "Tactical Film" })], stop_reason: "tool_use" },
+    ]);
+
+    const result = await buildStoryboard(baseOpts());
+    expect(result.scenes[0].elements).toHaveLength(2);
+    expect(result.scenes[0].elements![0].content).toContain("312 Open");
+  });
+
   it("enforces the short-film scene budget: rejects a 5th scene and folds the material into beats", async () => {
     const shortScene = (n: number) => toolUse("t" + n, "add_scene", {
       label: "Scene " + n, duration_seconds: 8, purpose: "p" + n, visual_notes: "v" + n, components: [],

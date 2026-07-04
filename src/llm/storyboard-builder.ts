@@ -59,6 +59,20 @@ const SCENE_TOOL_SCHEMA = {
     purpose: { type: "string", description: "What this scene communicates -- its job in the story" },
     visual_notes: { type: "string", description: "The WORLD: setting, layers, what persists (5+ sentences, motion verbs, BG/MG/FG)" },
     components: { type: "array", items: { type: "string" }, description: "Library component types from the catalog" },
+    elements: {
+      type: "array",
+      description: "TACTICAL element inventory: every concrete on-screen element with its EXACT copy. The codegen renders these verbatim -- an element you don't inventory gets invented (badly) or dropped.",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Short handle, e.g. 'support-tickets-card' -- beats reference elements by name" },
+          kind: { type: "string", description: "headline | subhead | card | badge | diagram-node | caption | cta | metric | ui-window | decoration" },
+          content: { type: "string", description: "The EXACT on-screen text/data, fully written out (e.g. 'Support Tickets / Avg response: 2.4h / CSAT: 91% / 312 Open'). Never 'placeholder' or 'some stats'." },
+          motion: { type: "string", description: "How/when it enters, transforms, exits (motion verbs + rough timing)" },
+        },
+        required: ["name", "kind", "content"],
+      },
+    },
     beats: { type: "array", items: BEAT_TOOL_SCHEMA, description: "The scene's internal beat timeline, ONLY for scenes with 2 or fewer beats. Scenes with 3+ beats MUST omit this and add each beat with its own add_beat call instead -- see add_beat." },
     transition_in: {
       type: "object",
@@ -134,6 +148,9 @@ export interface DraftScene {
   purpose: string;         // what this scene communicates -- its job in the story
   visual_notes: string;    // visual direction (what the viewer experiences, motion verbs, depth layers)
   components: string[];    // library component types to embed, e.g. ["quotient-chat", "dashboard-kpi"]
+  /** Tactical element inventory: concrete on-screen elements with exact copy.
+   *  The codegen renders these verbatim; beats reference them by name. */
+  elements?: Array<{ name: string; kind: string; content: string; motion?: string }>;
   transition_in?: { type: string; duration_seconds: number };
   hero_image?: string;
   voiceover_text?: string;  // Narration script for this scene (TTS)
@@ -201,6 +218,16 @@ NOT "show the feature" — describe what HAPPENS frame by frame.
 Think like a storyboard director. Describe what the viewer EXPERIENCES, not the layout.
 Use motion verbs (SLAMS, DRIFTS, MORPHS, SNAPS, ASSEMBLES). Include BG/MG/FG layers.
 Describe choreography and timing relationships between elements.
+
+### TACTICAL over abstract: the element inventory ("elements")
+The notes set the mood; the "elements" array is the SET LIST the builder actually works from.
+For every scene, inventory each concrete on-screen element with its EXACT copy -- real
+product-plausible text and numbers, fully written out. "A cluster of notification cards"
+is abstract and gets half-invented; this is tactical:
+  { "name": "slack-toast", "kind": "ui-window", "content": "Slack — #campaigns / Priya: can we move the launch email to Thursday?? / 12 new messages", "motion": "pops in top-right at 0.8s, jitters" }
+Rules: every card/window/badge the notes mention MUST appear in elements with its full
+content. Beat actions should reference elements by name. A scene whose elements all have
+real copy cannot ship an empty skeleton; a scene without an inventory usually does.
 
 ### Picking Components -- PREFER THE CATALOG
 List library component types from the catalog that the scene should embed.

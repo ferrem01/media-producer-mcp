@@ -167,6 +167,17 @@ async function buildCodegenSpec(draft: any): Promise<string> {
     parts.push(`\nVisual Direction:\n${visualDirection}`);
   }
 
+  // Tactical element inventory: the set list. The visual notes carry the
+  // mood; this carries the EXACT elements + copy the scene must contain --
+  // the antidote to abstract notes getting half-invented as empty skeletons.
+  if (Array.isArray(draft.elements) && draft.elements.length > 0) {
+    parts.push(`\nElement Inventory -- render EVERY element below, with EXACTLY this content (do not invent different copy, do not leave any as an empty shell):`);
+    for (const elm of draft.elements) {
+      if (!elm || !elm.content) continue;
+      parts.push(`  - [${elm.kind || "element"}] ${elm.name || "unnamed"}: "${elm.content}"${elm.motion ? ` -- motion: ${elm.motion}` : ""}`);
+    }
+  }
+
   // Beat sheet: the scene's internal timeline (continuous-take scenes). The
   // visual notes describe the WORLD; the beats are the shot clock of what
   // HAPPENS in it. Rendered as explicit time segments the master timeline
