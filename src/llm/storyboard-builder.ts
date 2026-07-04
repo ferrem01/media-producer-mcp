@@ -314,12 +314,20 @@ add_scene({
 })
 
 add_scene({
-  "label": "Scene 2 - Key Stats", "duration_seconds": 4,
-  "purpose": "Show impressive metrics with animated stat cards",
-  "visual_notes": "Two stat cards STAGGER in from below — first '340% ROI Increase' lands with a bounce, then '2.5M Users Reached' follows 0.3s later. Each card has a large animated counter that rolls up to its final number. Subtle gradient background with brand colors. Cards have rounded corners with soft shadows. BG: gradient. FG: stat cards with counter animations.",
+  "label": "Scene 2 - The Living Dashboard", "duration_seconds": 14,
+  "purpose": "One persistent product world where the results accumulate",
+  "visual_notes": "A single dashboard world that never cuts: the empty canvas ASSEMBLES, stat cards LAND one per beat, and the whole layout re-balances as each arrives. BG: soft gradient with slow-breathing glow. MG: the dashboard grid. FG: stat cards + counters.",
   "components": ["stat-card"],
+  "elements": [
+    { "name": "roi-card", "kind": "metric", "content": "340% ROI Increase", "motion": "lands with a bounce at beat 2" },
+    { "name": "users-card", "kind": "metric", "content": "2.5M Users Reached", "motion": "slides in 0.3s later, counter rolls up" }
+  ],
   "transition_in": { "type": "slide-up", "duration_seconds": 0.5 }
 })
+add_beat({ "label": "the canvas wakes", "duration_seconds": 3, "action": "the empty dashboard grid DRAWS itself in, glow breathing" })
+add_beat({ "label": "first proof", "duration_seconds": 4, "action": "roi-card LANDS with a bounce; its counter ROLLS to 340%", "voiceover_text": "The results speak first." })
+add_beat({ "label": "second proof", "duration_seconds": 4, "action": "users-card slides in; layout RE-BALANCES around both cards" })
+add_beat({ "label": "the settle", "duration_seconds": 3, "action": "both cards ease back into the grid; glow calms" })
 
 add_scene({
   "label": "Scene 3 - Quiet Moment", "duration_seconds": 5,
