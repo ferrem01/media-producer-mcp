@@ -1326,6 +1326,49 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // ── API: Direct binary asset upload ──
+      // POST /api/upload-asset/{tenant}/{project}?name=camera.mp4 with the raw
+      // file bytes as the request body. The MCP upload tool only ingests via a
+      // fetchable URL; this is the push path for local files (a speaker camera
+      // clip, a screencast recording) from Studio or a remote client. The
+      // project directory is created if needed, so a pseudo-project like
+      // "library" works for assets that predate any generated project.
+      const uploadAssetMatch = urlPath.match(/^\/api\/upload-asset\/([^/]+)\/([^/]+)$/);
+      if (uploadAssetMatch && method === "POST") {
+        const [, upTenant, upProject] = uploadAssetMatch.map(decodeURIComponent);
+        const upQuery = new URL(req.url || "/", "http://localhost").searchParams;
+        const upName = path.basename(upQuery.get("name") || `asset_${Date.now()}.bin`).replace(/[^a-zA-Z0-9._-]/g, "_");
+        try {
+          const MAX_UPLOAD = 512 * 1024 * 1024;
+          const chunks: Buffer[] = [];
+          let received = 0;
+          await new Promise<void>((resolve, reject) => {
+            req.on("data", (c: Buffer) => {
+              received += c.length;
+              if (received > MAX_UPLOAD) { reject(new Error("file exceeds 512MB limit")); req.destroy(); return; }
+              chunks.push(c);
+            });
+            req.on("end", () => resolve());
+            req.on("error", reject);
+          });
+          const fileBuffer = Buffer.concat(chunks);
+          if (fileBuffer.length === 0) { jsonResponse(res, 400, { error: "empty request body" }); return; }
+          const upDir = path.join(config.dataDir, upTenant, "projects", upProject, "assets");
+          await fs.mkdir(upDir, { recursive: true });
+          const upPath = path.join(upDir, upName);
+          await fs.writeFile(upPath, fileBuffer);
+          jsonResponse(res, 200, {
+            ok: true,
+            url: `/assets/${upTenant}/projects/${upProject}/assets/${upName}`,
+            path: upPath,
+            size: fileBuffer.length,
+          });
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       // ── API: Undo last revise on a scene ──
       const undoMatch = urlPath.match(/^\/api\/revise\/undo\/([^/]+)\/([^/]+)$/);
       if (undoMatch && method === "POST") {
