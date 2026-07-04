@@ -354,6 +354,11 @@ export function createMcpServer(): McpServer {
       background: z.string().optional(),
       transition_in: transitionSchema,
       beats: z.array(beatSchema).optional().describe("Replace the scene's beat timeline"),
+      content_region: z.object({
+        side: z.enum(["left", "right"]),
+        width: z.string(),
+        offset: z.string().optional(),
+      }).nullable().optional().describe("Confine the scene's components to one side of the frame (speaker films). Pass null to clear it so the scene lays out full-frame."),
 
       // Component-level updates
       data: z.record(z.unknown()).optional(),
@@ -541,6 +546,11 @@ export function createMcpServer(): McpServer {
             // Normalize against the scene's (possibly just-updated) duration;
             // an empty array clears the beat timeline.
             scene.beats = normalizeBeats(params.beats, scene.duration_seconds || 5);
+            updated = true;
+          }
+          if (params.content_region !== undefined) {
+            if (params.content_region === null) delete scene.content_region;
+            else scene.content_region = params.content_region as any;
             updated = true;
           }
           if (params.speaker_track !== undefined) { project.speaker_track = params.speaker_track as any; updated = true; }
