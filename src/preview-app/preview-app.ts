@@ -681,6 +681,16 @@ export function getPreviewHtml(): string {
   var _token = new URLSearchParams(window.location.search).get('token');
   var _urlTenant = new URLSearchParams(window.location.search).get('tenant');
 
+  // Mobile budget: phones cannot boot 5 live scene runtimes (GSAP + up to
+  // several WebGL contexts) on open -- the tab gets killed. On coarse-pointer
+  // / small screens, thumbnails render as static tiles and the composite
+  // loads only when the user taps to load the preview.
+  var IS_MOBILE = (function() {
+    try {
+      return window.matchMedia('(pointer: coarse)').matches || Math.min(window.screen.width, window.screen.height) < 700;
+    } catch (e) { return false; }
+  })();
+
   // Append the URL token as a query param. The Authorization header alone is
   // not enough: proxies and middleboxes routinely strip Authorization from
   // plain-HTTP requests, silently 401-ing every Studio API call. Query params
@@ -1442,6 +1452,22 @@ export function getPreviewHtml(): string {
       // Initialize audio tracks once for the project
       initAudio();
 
+      // Mobile: don't boot the composite (all scenes' runtimes in one doc)
+      // until the user asks for it.
+      if (IS_MOBILE) {
+        els.previewPlaceholder.innerHTML = '<button id="mobile-load-preview" style="font:600 15px Inter,sans-serif;padding:14px 26px;border-radius:999px;border:0;background:#6366f1;color:#fff;cursor:pointer;">\u25b6 Tap to load preview</button>';
+        els.previewPlaceholder.style.display = '';
+        var mlp = document.getElementById('mobile-load-preview');
+        if (mlp) mlp.addEventListener('click', function() { startCompositePreview(state.currentProject); }, { once: true });
+        return;
+      }
+      startCompositePreview(project);
+    }).catch(function() {
+      els.sceneList.innerHTML = '<div class="empty-state">Failed to load project</div>';
+    });
+  }
+
+  function startCompositePreview(project) {
       // Show loading state while preloading scenes
       els.previewPlaceholder.innerHTML = '<div class="loading-state">Preloading scenes<div class="loading-dots"><span></span><span></span><span></span></div></div>';
       els.previewPlaceholder.style.display = '';
@@ -1483,9 +1509,6 @@ export function getPreviewHtml(): string {
         console.error('[preview] composite load error:', err);
         els.previewPlaceholder.textContent = 'Failed to load preview';
       });
-    }).catch(function() {
-      els.sceneList.innerHTML = '<div class="empty-state">Failed to load project</div>';
-    });
   }
 
   // Render scene list in sidebar
@@ -1534,6 +1557,7 @@ export function getPreviewHtml(): string {
     });
 
     els.sceneList.querySelectorAll('.scene-thumb').forEach(function(thumb) {
+      if (IS_MOBILE) return; // static tiles -- no live scene runtime per thumbnail
       var sceneId = thumb.dataset.sceneId;
       var path = '/scene-thumbnail/' + state.tenantId + '/' + project.project_id + '/' + sceneId;
       fetchHtml(path).then(function(html) {
