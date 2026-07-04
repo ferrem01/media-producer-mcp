@@ -201,12 +201,17 @@ async function main() {
           const img = document.createElement("img");
           img.id = `__render_frame_${idx}__`;
           img.className = "__render_frame__";
-          img.style.position = "absolute";
-          img.style.top = "0";
-          img.style.left = "0";
-          img.style.width = "100%";
-          img.style.height = "100%";
-          img.style.objectFit = "cover";
+          img.style.cssText = video.style.cssText;
+          // Honor a video's own inline geometry (e.g. a 54%-wide framed
+          // camera panel); only default to fill-the-container when it has none.
+          if (!video.style.width && !video.style.height && !video.style.left && !video.style.right && !video.style.inset) {
+            img.style.position = "absolute";
+            img.style.top = "0";
+            img.style.left = "0";
+            img.style.width = "100%";
+            img.style.height = "100%";
+          }
+          if (!img.style.objectFit) img.style.objectFit = "cover";
           img.style.visibility = "visible";
           img.style.pointerEvents = "none";
           const startAt = video.getAttribute("data-start-at");

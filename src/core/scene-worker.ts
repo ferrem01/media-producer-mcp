@@ -387,12 +387,19 @@ async function main() {
           img.id = `__render_frame_${idx}__`;
           img.className = "__render_frame__";
           img.style.cssText = video.style.cssText;
-          img.style.position = "absolute";
-          img.style.top = "0";
-          img.style.left = "0";
-          img.style.width = "100%";
-          img.style.height = "100%";
-          img.style.objectFit = "cover";
+          // Videos inside a sized container (PiP bubbles, browser frames)
+          // carry no inline geometry -- fill the container. A video that
+          // positions ITSELF inline (e.g. a 54%-wide framed camera panel)
+          // keeps its own geometry; forcing 100% here blew such a panel up
+          // to a full-frame camera that buried the rest of the scene.
+          if (!video.style.width && !video.style.height && !video.style.left && !video.style.right && !video.style.inset) {
+            img.style.position = "absolute";
+            img.style.top = "0";
+            img.style.left = "0";
+            img.style.width = "100%";
+            img.style.height = "100%";
+          }
+          if (!img.style.objectFit) img.style.objectFit = "cover";
           img.style.visibility = "visible";
           img.style.pointerEvents = "none";
           const startAt = video.getAttribute("data-start-at");
