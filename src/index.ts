@@ -767,6 +767,11 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         // Return the assembled scene HTML at a small size for thumbnail capture
         const components = await resolveComponentSources(scene, tenantId, projectId);
 
+        // No speakerUrl here: Studio renders one thumbnail iframe PER SCENE on
+        // project open, and the camera underlay is a full 1080p <video> -- a
+        // 4-scene speaker project would spin up 4 decode pipelines for 200px
+        // thumbnails (plus the composite + selected-scene previews), enough to
+        // kill the tab. Thumbnails show the scene's own content only.
         const html = await assembleScene({
           scene,
           components,
@@ -774,7 +779,6 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           canvas: project.canvas,
           gsapDir: config.gsapDir,
           preview: true,
-          speakerUrl: getSpeakerUrl(project),
         });
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",

@@ -681,6 +681,15 @@ export function getPreviewHtml(): string {
   var _token = new URLSearchParams(window.location.search).get('token');
   var _urlTenant = new URLSearchParams(window.location.search).get('tenant');
 
+  // Append the URL token as a query param. The Authorization header alone is
+  // not enough: proxies and middleboxes routinely strip Authorization from
+  // plain-HTTP requests, silently 401-ing every Studio API call. Query params
+  // survive any proxy, and the server accepts both.
+  function withToken(path) {
+    if (!_token) return path;
+    return path + (path.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(_token);
+  }
+
   // API helper
   function api(methodOrPath, pathOrBody, bodyArg) {
     // Support both api(path) and api(method, path, body)
@@ -700,7 +709,7 @@ export function getPreviewHtml(): string {
       opts.headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(body);
     }
-    return fetch('/api' + path, opts).then(function(r) {
+    return fetch('/api' + withToken(path), opts).then(function(r) {
       if (!r.ok) throw new Error('API error ' + r.status);
       return r.json();
     });
@@ -710,7 +719,7 @@ export function getPreviewHtml(): string {
   function fetchHtml(path) {
     var opts = { headers: {} };
     if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
-    return fetch('/api' + path, opts).then(function(r) {
+    return fetch('/api' + withToken(path), opts).then(function(r) {
       if (!r.ok) throw new Error('Fetch error ' + r.status);
       return r.text();
     });
