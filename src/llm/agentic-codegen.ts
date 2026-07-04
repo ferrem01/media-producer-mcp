@@ -691,7 +691,7 @@ ${!opts.brollVideoUrl && !opts.heroImageUrl ? `REMINDER before you write CSS: th
 - Every decorative element must have ambient animation (drift, breathe, pulse).
 - All text MUST have correct spacing. Never concatenate words. Check every text string for missing spaces.
 - Word wrapping: ensure headlines have enough room. Use max-width constraints and test that no word breaks mid-word.
-${opts.speakerMode === "visible" ? `## SPEAKER-VISIBLE SCENE (composited over a live camera)\nThis scene is rendered with a TRANSPARENT background and composited on top of a continuous live camera recording of the speaker -- the REAL HUMAN is the backdrop. Therefore:\n- Do NOT paint any background on .scene or any full-frame layer -- finish_design rejects it.\n- Do NOT draw a person, avatar, silhouette, or camera placeholder -- the real speaker is already there.\n- The 'fill the frame' rule is SUSPENDED: your job is a few floating UI elements (phrases, badges, a lower-third) positioned to NOT cover the speaker's face (keep the center-left third clear).\n- Text must carry its own legibility: give each floating element a small solid pad or scrim behind ITSELF (a pill, a card), never a full-frame wash.\n` : ""}${opts.speakerMode === "screencast" ? `## SCREENCAST SCENE (speaker in a PiP bubble)\nThis scene is OPAQUE (own background is fine). The speaker camera appears INSIDE the scene: build the picture-in-picture bubble as a circular container holding EXACTLY this element: <video src="speaker" autoplay muted playsinline> -- the literal src value "speaker" is a magic token the renderer replaces with the time-synced camera video. Style the video to fill the circle (object-fit: cover; border-radius: 50%). Do NOT draw an avatar placeholder in the bubble.\nAny embedded screen-recording <video> must be VISIBLE: place it above panel fills (explicit z-index) and never cover it with opaque children.\n` : ""}${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
+${opts.speakerMode === "visible" ? `## SPEAKER-VISIBLE SCENE (composited over a live camera)\nThis scene is rendered with a TRANSPARENT background and composited on top of a continuous live camera recording of the speaker -- the REAL HUMAN is the backdrop. Therefore:\n- Do NOT paint any background on .scene or any full-frame layer -- finish_design rejects it.\n- Do NOT draw a person, avatar, silhouette, or camera placeholder -- the real speaker is already there. If the spec calls for a PiP bubble of the speaker (e.g. over b-roll), build it as a circular container holding <video src="speaker" autoplay muted playsinline> (object-fit: cover; border-radius: 50%) -- the renderer swaps the "speaker" token for the time-synced camera.\n- The 'fill the frame' rule is SUSPENDED: your job is a few floating UI elements (phrases, badges, a lower-third) positioned to NOT cover the speaker's face (keep the center-left third clear).\n- Text must carry its own legibility: give each floating element a small solid pad or scrim behind ITSELF (a pill, a card), never a full-frame wash.\n` : ""}${opts.speakerMode === "screencast" ? `## SCREENCAST SCENE (speaker in a PiP bubble)\nThis scene is OPAQUE (own background is fine). The speaker camera appears INSIDE the scene: build the picture-in-picture bubble as a circular container holding EXACTLY this element: <video src="speaker" autoplay muted playsinline> -- the literal src value "speaker" is a magic token the renderer replaces with the time-synced camera video. Style the video to fill the circle (object-fit: cover; border-radius: 50%). Do NOT draw an avatar placeholder in the bubble.\nAny embedded screen-recording <video> must be VISIBLE: place it above panel fills (explicit z-index) and never cover it with opaque children.\n` : ""}${opts.critiqueFeedback ? `\n## Previous Attempt Feedback (FIX THESE)\n${opts.critiqueFeedback}\n` : ""}
 CRITICAL: If the spec lists components with schemas, use <component type=... data='...' /> tags with the data fields from the schemas. Do NOT rebuild from scratch what the spec says to use as a component.
 Read the spec, then write your scene using write_template / write_style / write_script (+ append_script for a long multi-beat timeline), then finish_scene.`;
 
@@ -806,6 +806,49 @@ export function findOpaqueBackdrops(style: string): string[] {
       violations.push(`${sel.slice(0, 50)}: paints a full-frame background (${(body.match(/background[^;]*/i) || [""])[0].slice(0, 60)})`);
     }
   }
+  return violations;
+}
+
+/**
+ * Speaker-track scenes must show the REAL human -- the live camera composited
+ * underneath (visible mode) or swapped into `<video src="speaker">` (the PiP
+ * in screencast mode). The recurring violation is a codegen-drawn stand-in:
+ * an avatar circle, an initials monogram, a CSS head-and-shoulders
+ * silhouette. Two deterministic checks make that unwritable:
+ *   1. screencast scenes must contain a `<video src="speaker">` element
+ *      (the renderer swaps the token for the time-synced camera video);
+ *   2. no speaker-track scene may name drawn-persona markup -- avatar /
+ *      silhouette / headshot, or a pip-/speaker-/host-prefixed face / figure /
+ *      head / shoulders / bust / placeholder / initials / monogram construct --
+ *      in template classes/ids or style selectors.
+ */
+export function findSpeakerPlaceholders(
+  parts: { template: string; style: string },
+  speakerMode: "visible" | "screencast",
+): string[] {
+  var violations: string[] = [];
+  if (speakerMode === "screencast" && !/<video\b[^>]*\bsrc\s*=\s*["']speaker["']/i.test(parts.template)) {
+    violations.push(`no <video src="speaker"> element in the template -- the live camera has nowhere to appear. The PiP bubble must contain <video src="speaker" autoplay muted playsinline> styled to fill the circle (object-fit: cover; border-radius: 50%); the renderer replaces the "speaker" token with the time-synced camera video.`);
+  }
+  // Standalone words that always mean a drawn person in a speaker scene,
+  // plus pip-/speaker-prefixed compounds (a standalone "monogram"/"initials"
+  // can be a legitimate brand logo, so those only count inside a PiP/speaker
+  // construct).
+  var DRAWN = /\b(avatar|silhouette|headshot)\b|\b(?:pip|speaker|host|presenter|persona)[-_](?:face|figure|head|shoulders|bust|placeholder|person|initials|monogram)\b/i;
+  var seen = new Set<string>();
+  function flag(name: string, where: string) {
+    if (name && DRAWN.test(name) && !seen.has(name)) {
+      seen.add(name);
+      violations.push(`${where} "${name}" names a drawn stand-in for the speaker. The REAL person comes from the camera track -- delete the fake (let the camera show through, or use <video src="speaker"> inside the PiP).`);
+    }
+  }
+  var ATTR = /(?:class|id)\s*=\s*["']([^"']*)["']/gi;
+  var m: RegExpExecArray | null;
+  while ((m = ATTR.exec(parts.template)) !== null) {
+    for (var name of m[1].split(/\s+/)) flag(name, "template class/id");
+  }
+  var SEL = /[.#]([a-z][a-z0-9_-]*)/gi;
+  while ((m = SEL.exec(parts.style)) !== null) flag(m[1], "style selector");
   return violations;
 }
 
@@ -1067,7 +1110,12 @@ async function runAgenticLoop(args: {
             var designColorViolations = findRawTextColors(parts);
             var missingCopy = findMissingElementContents(parts.template, opts.elements);
             var opaqueBackdrops = opts.speakerMode === "visible" ? findOpaqueBackdrops(parts.style) : [];
-            if (opaqueBackdrops.length > 0) {
+            var speakerPlaceholders = opts.speakerMode ? findSpeakerPlaceholders(parts, opts.speakerMode) : [];
+            if (speakerPlaceholders.length > 0) {
+              toolResult = `Design REJECTED -- this scene sits on a LIVE SPEAKER TRACK (a real camera recording of a real person), but the design violates the speaker contract:\n` +
+                speakerPlaceholders.slice(0, 5).map((v) => `  - ${v}`).join("\n") +
+                `\nNever draw a person, avatar, monogram, or silhouette -- the real human comes from the camera. Fix with edit_template/edit_style, then call finish_design again.`;
+            } else if (opaqueBackdrops.length > 0) {
               toolResult = `Design REJECTED -- this is a SPEAKER-VISIBLE scene compositing over the live camera, but the design paints full-frame backgrounds that would HIDE the speaker:\n` +
                 opaqueBackdrops.slice(0, 5).map((v) => `  - ${v}`).join("\n") +
                 `\nRemove these backgrounds entirely (the camera is the backdrop); style only the floating UI elements, then call finish_design again.`;
@@ -1119,9 +1167,17 @@ async function runAgenticLoop(args: {
           }
         } else if (toolCall.name === "finish_scene") {
           var colorViolations = findRawTextColors(parts);
+          var scenePlaceholders = opts.speakerMode ? findSpeakerPlaceholders(parts, opts.speakerMode) : [];
           if (!parts.template || !parts.script) {
             var missing = [!parts.template && "write_template", !parts.script && "write_script"].filter(Boolean).join(" and ");
             toolResult = `Cannot finish yet -- ${missing} not called. Write the missing section(s) first, then call finish_scene again.`;
+          } else if (scenePlaceholders.length > 0) {
+            // Speaker contract: the design phase gates this too, but revise
+            // edits can re-introduce a drawn stand-in after the design lock,
+            // so finish_scene re-checks.
+            toolResult = `REJECTED -- this scene sits on a LIVE SPEAKER TRACK, but the speaker contract is violated:\n` +
+              scenePlaceholders.slice(0, 5).map((v) => `  - ${v}`).join("\n") +
+              `\nNever draw a person, avatar, monogram, or silhouette -- the real human comes from the camera. Fix with edit_template/edit_style, then call finish_scene again.`;
           } else if (colorViolations.length > 0) {
             // Static color discipline: raw literals in text-color declarations
             // are THE recurring legibility failure (the model's dark-biased
