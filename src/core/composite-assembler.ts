@@ -14,6 +14,7 @@
 
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
+import { resolveComponentTags } from "./component-tags.js";
 import {
   generateFontLinks,
   resolveAssetUrls,
@@ -24,7 +25,9 @@ import {
   buildComponentScript,
   loadGsapSource,
   loadSharedUtilities,
+  loadLibraryComponentSources,
 } from "./scene-assembler.js";
+import { config } from "../config.js";
 import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
 
 export interface CompositeComponentSource {
@@ -54,6 +57,20 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
   // Load GSAP + shared utilities once
   const gsapSource = await loadGsapSource(options.gsapDir);
   const sharedSource = await loadSharedUtilities();
+
+  // Codegen scenes embed library components via <component> tags (video,
+  // browser frames, charts...). Load the library once if any scene needs it,
+  // so those tags resolve here the same way the render path resolves them --
+  // an unresolved <component> tag is invisible to the browser, which is how
+  // screencast/b-roll videos silently vanished from Studio.
+  const anyComponentTags = options.scenes.some((s) =>
+    s.components.some((c) => c.source.includes("<component ")));
+  const librarySourceMap = new Map<string, string>();
+  if (anyComponentTags) {
+    for (const cs of await loadLibraryComponentSources(config.componentLibDir)) {
+      librarySourceMap.set(cs.type, cs.source);
+    }
+  }
 
   // Generate brand kit CSS (use first scene's background as fallback)
   const firstScene = sceneInputs[0]?.scene;
@@ -90,11 +107,45 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       if (!parsed) continue;
 
       const resolvedData = resolveAssetUrls(comp.data, true, speakerUrl);
-      const boundHtml = bindTemplate(parsed.template, resolvedData);
+      let boundHtml = bindTemplate(parsed.template, resolvedData);
       const posStyle = buildPositionStyle(comp);
 
       // Scope component IDs to scene to avoid collisions across scenes
       const scopedCid = `${scene.id}__${comp.id}`;
+
+      // Resolve nested <component> tags (codegen scenes). Each nested
+      // instance gets a scene-scoped id (resolveComponentTags restarts at
+      // comp_0 per call, so two codegen scenes would otherwise collide),
+      // its scoped CSS is collected, and its timeline runs on sceneTl so
+      // script-created elements (e.g. the video component's <video>, built
+      // by loadVideoForCapture) actually exist in the preview DOM.
+      if (boundHtml.includes("<component ") && librarySourceMap.size > 0) {
+        const tagResult = resolveComponentTags(
+          boundHtml,
+          librarySourceMap,
+          (data) => resolveAssetUrls(data, true, speakerUrl),
+        );
+        boundHtml = tagResult.html;
+        for (const nested of tagResult.components) {
+          const nestedCid = `${scene.id}__${nested.id}`;
+          // The wrapper quotes ids in data-cid/data-comp-id attrs and scoped
+          // CSS selectors -- a quoted replace renames all three coherently.
+          boundHtml = boundHtml.split(`"${nested.id}"`).join(`"${nestedCid}"`);
+          if (nested.scopedCss) {
+            componentStyles.push(
+              `/* nested ${nested.type} (${nestedCid}) */\n${nested.scopedCss.split(`"${nested.id}"`).join(`"${nestedCid}"`)}`
+            );
+          }
+          const nestedScript = buildComponentScript(
+            { id: nestedCid, type: nested.type, data: nested.data } as SceneComponent,
+            nested.parsed.script,
+            scene.duration_seconds,
+            canvas,
+            { motion: brandKit.style?.motion || "cinematic" },
+          );
+          componentScripts.push(nestedScript.replace(/master\.add\(/g, 'sceneTl.add('));
+        }
+      }
 
       componentBlocks.push(
         `    <div class="mp-component" data-cid="${scopedCid}" style="${posStyle}">\n` +
