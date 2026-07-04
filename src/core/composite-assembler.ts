@@ -26,6 +26,7 @@ import {
   loadGsapSource,
   loadSharedUtilities,
   loadLibraryComponentSources,
+  resolveSpeakerVideoTags,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
 import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
@@ -85,6 +86,17 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
   const sceneScripts: string[] = [];
   const sceneMeta: Array<{ id: string; duration: number; transitionIn?: { type: string; duration: number } }> = [];
 
+  // Cumulative scene starts: raw <video src="speaker"> PiPs seek the camera
+  // to film-time, not scene-local zero.
+  const sceneStarts: number[] = [];
+  {
+    let t = 0;
+    for (const si2 of sceneInputs) {
+      sceneStarts.push(t);
+      t += si2.scene.duration_seconds || 0;
+    }
+  }
+
   for (let si = 0; si < sceneInputs.length; si++) {
     const { scene, components } = sceneInputs[si];
 
@@ -94,7 +106,14 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       sourceMap.set(cs.type, parseComponent(cs.source));
     }
 
-    const isTransparent = scene.transparent_background === true;
+    // Mirror the RENDER's transparency rule for speaker projects: scenes
+    // composite over the live camera unless they explicitly opt out
+    // (transparent_background === false). Without this, Studio paints each
+    // scene's brand background where the render shows the human -- the
+    // composite looked nothing like the film.
+    const isTransparent = speakerUrl
+      ? scene.transparent_background !== false
+      : scene.transparent_background === true;
     const sceneBgCSS = generateBrandCSS(brandKit, scene.background, true);
 
     // Build component blocks for this scene
@@ -108,6 +127,12 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
 
       const resolvedData = resolveAssetUrls(comp.data, true, speakerUrl);
       let boundHtml = bindTemplate(parsed.template, resolvedData);
+      // Resolve raw <video src="speaker"> PiP tags (same contract as the
+      // render and single-scene preview) -- an unresolved token is a dead,
+      // empty bubble in Studio.
+      if (speakerUrl) {
+        boundHtml = resolveSpeakerVideoTags(boundHtml, speakerUrl, sceneStarts[si]);
+      }
       const posStyle = buildPositionStyle(comp);
 
       // Scope component IDs to scene to avoid collisions across scenes
