@@ -218,6 +218,10 @@ describe("color discipline: text colors are tokens-only", () => {
     });
     // background-color / border-color are NOT text props and must not be flagged.
     expect(violations).toHaveLength(3);
+    expect(findRawTextColors({
+      template: "",
+      style: ".subcopy { color: var(--mp-color-text); opacity: 0.72; } .glow { opacity: 0.4; } .fine { color: var(--mp-color-text-muted); opacity: 0.9; }",
+    })).toHaveLength(1); // only the color+low-opacity pairing; decorative opacity and >=0.85 are fine
     expect(violations.join("\n")).toMatch(/rgba\(120/);
     expect(violations.join("\n")).toMatch(/color: white/);
     expect(violations.join("\n")).toMatch(/#888888/);

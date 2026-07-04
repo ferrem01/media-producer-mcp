@@ -425,6 +425,9 @@ every legitimate case:
 - var(--mp-color-on-accent) / var(--mp-color-on-primary) -- text sitting on an accent or
   primary fill (buttons, badges, highlighted chips).
 - transparent / inherit / currentColor -- allowed (e.g. gradient text via background-clip).
+- Do NOT de-emphasize text with opacity (any opacity below 0.85 on a rule that sets a text
+  color is rejected) -- opacity multiplies the token's validated contrast back down. Use
+  var(--mp-color-text-muted) / var(--mp-color-on-dark-muted) at full opacity instead.
 
 Decorative properties (backgrounds, gradients, borders, shadows, glows) remain free -- this
 rule is about TEXT legibility, not your palette. Surfaces still need real separation from
@@ -766,6 +769,22 @@ export function findRawTextColors(parts: { template: string; style: string }): s
   var ATTR = /style\s*=\s*"([^"]*)"/gi;
   while ((attr = ATTR.exec(parts.template)) !== null) {
     scan(attr[1], "template inline style");
+  }
+
+  // Opacity dilution: the tokens are contrast-validated, but `color:
+  // var(--mp-color-text); opacity: 0.72` multiplies the text back down to
+  // ~2:1 -- the exact failure the tokens exist to prevent, observed live
+  // after the token rule shipped. Flag any rule block that sets BOTH a text
+  // color and opacity below 0.85; de-emphasis is what text-muted is for.
+  var BLOCK = /([^{}]+)\{([^{}]*)\}/g;
+  var blk: RegExpExecArray | null;
+  while ((blk = BLOCK.exec(parts.style)) !== null) {
+    var body = blk[2];
+    if (!/(?:^|[;\s])color\s*:/i.test(body)) continue;
+    var op = body.match(/(?:^|[;\s])opacity\s*:\s*(0?\.\d+|0)\b/i);
+    if (op && parseFloat(op[1]) < 0.85) {
+      violations.push(`style rule "${blk[1].trim().slice(0, 40)}": sets a text color AND opacity: ${op[1]} -- opacity dilutes the token's validated contrast. De-emphasize with var(--mp-color-text-muted) (or on-dark-muted) at full opacity instead.`);
+    }
   }
   return violations;
 }

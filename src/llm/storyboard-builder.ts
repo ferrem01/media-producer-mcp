@@ -628,6 +628,18 @@ Prefer Speaker templates over regular templates when the speaker should be visib
       var toolResult: string;
 
       if (toolCall.name === "add_scene") {
+        // ── Scene-budget ENFORCEMENT (video) ──
+        // "3-4 scenes for short films" was prose-only and drifted to 5-6 on
+        // most runs (6/4/5/6 observed on the same 30s prompt). Enforce it the
+        // way everything reliable here is enforced: at the tool boundary.
+        // A short film's 5th scene is rejected -- the material belongs in the
+        // current scene as BEATS. Duration-aware so genuinely long films can
+        // still earn more scenes (a 60s film passes 45s of content by scene
+        // 4 and may continue).
+        var totalSoFar = scenes.reduce((acc: number, sc: any) => acc + (Number(sc.duration_seconds) || 5), 0);
+        if (!opts.sceneCount && opts.format === "video" && scenes.length >= 4 && totalSoFar <= 45) {
+          toolResult = `REJECTED -- the scene budget is FULL: ${scenes.length} scenes totaling ${totalSoFar}s. A film this length is 3-4 scenes MAX. A scene is a WORLD; a new idea inside the same world is a BEAT, not a scene. Give this material to the CURRENT scene instead: call add_beat for each moment (beats attach to the most recently added scene, and its beat timings will share the scene's duration), or drop it. Then call finish_storyboard.`;
+        } else {
         // Close out the previous scene's beats before starting a new one.
         var prevNotes: string[] = currentSceneIdx >= 0 ? finalizeBeats(scenes[currentSceneIdx]) : [];
 
@@ -640,8 +652,12 @@ Prefer Speaker templates over regular templates when the speaker should be visib
         currentSceneIdx = scenes.length - 1;
         console.log(`  Scene ${scenes.length}: "${scene.label}" (${scene.duration_seconds}s${rawBeats.length ? `, ${rawBeats.length} inline beat(s)` : ""})`);
         var allNotes = notes.concat(prevNotes.map((n) => `previous scene: ${n}`));
+        var budgetNote = (!opts.sceneCount && opts.format === "video" && scenes.length === 3 && totalSoFar + (Number(scene.duration_seconds) || 5) <= 40)
+          ? " NOTE: the scene budget is nearly full (3-4 scenes max for a short film) -- remaining ideas should become BEATS of these scenes, not new scenes."
+          : "";
         toolResult = `scene ${scenes.length} added: "${scene.label}"` + (allNotes.length ? ` -- ${allNotes.join("; ")}` : "")
-          + " -- call add_beat for each of this scene's beats (3+ beats), or move on if it needs 2 or fewer.";
+          + " -- call add_beat for each of this scene's beats (3+ beats), or move on if it needs 2 or fewer." + budgetNote;
+        }
       } else if (toolCall.name === "add_beat") {
         if (currentSceneIdx < 0) {
           toolResult = "Cannot add a beat yet -- call add_scene first to start a scene.";
