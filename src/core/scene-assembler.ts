@@ -158,7 +158,13 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol
     const resolvedData = resolveAssetUrls(comp.data, preview, speakerUrl);
-    const boundHtml = bindTemplate(parsed.template, resolvedData);
+    let boundHtml = bindTemplate(parsed.template, resolvedData);
+
+    // Codegen scenes without <component> tags route through here -- resolve
+    // any raw <video src="speaker"> tags the model wrote (PiP contract).
+    if (speakerUrl) {
+      boundHtml = resolveSpeakerVideoTags(boundHtml, speakerUrl, options.speakerOffset || 0);
+    }
 
     // Position the component
     const posStyle = buildPositionStyle(comp);
@@ -344,6 +350,27 @@ ${componentScripts.join("\n\n")}
 }
 
 /**
+ * Rewrite codegen-authored `<video src="speaker">` tags to the resolved
+ * camera URL. The "speaker" src is the renderer's magic token for "the live
+ * camera, time-synced" -- the codegen prompt directs the model to write it
+ * for PiP bubbles in screencast scenes. Adds data-start-at (seconds into the
+ * speaker track at this scene's start) unless the author set one, and forces
+ * muted so the PiP never doubles the speaker's audio.
+ */
+export function resolveSpeakerVideoTags(template: string, speakerUrl: string, offsetSeconds: number): string {
+  return template.replace(/<video\b[^>]*\bsrc\s*=\s*["']speaker["'][^>]*>/gi, (tag) => {
+    let out = tag.replace(/\bsrc\s*=\s*["']speaker["']/i, `src="${speakerUrl}"`);
+    if (!/\bdata-start-at\s*=/i.test(out)) {
+      out = out.replace(/^<video\b/i, `<video data-start-at="${offsetSeconds}"`);
+    }
+    if (!/\bmuted\b/i.test(out)) {
+      out = out.replace(/^<video\b/i, "<video muted");
+    }
+    return out;
+  });
+}
+
+/**
  * Assemble a codegen scene (.scene.html with <component> tags).
  *
  * This is the unified codegen path: the LLM generates a .scene.html file
@@ -396,6 +423,16 @@ export async function assembleCodegenScene(options: {
   // 1. Parse the scene source
   const { parseComponent } = await import("./component-parser.js");
   const sceneParsed = parseComponent(sceneSource);
+
+  // Resolve raw <video src="speaker"> tags authored directly in codegen HTML.
+  // The literal "speaker" token means nothing to the browser -- swap in the
+  // resolved camera URL and stamp data-start-at so capture (scene-worker) and
+  // preview (preview-app) seek the PiP in sync with the film timeline.
+  // (Component DATA carrying "speaker" is resolved separately: render.ts
+  // step 2b for renders, resolveAssetUrls below for previews.)
+  if (speakerUrl) {
+    sceneParsed.template = resolveSpeakerVideoTags(sceneParsed.template, speakerUrl, options.speakerOffset || 0);
+  }
 
   // 2. Build component source map for tag resolution
   const rawSourceMap = new Map<string, string>();

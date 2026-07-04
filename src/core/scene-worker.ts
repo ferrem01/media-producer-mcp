@@ -129,6 +129,10 @@ interface WorkerArgs {
    * Used by the speaker track pipeline (renderVideoWithSpeakerTrack).
    */
   captureAsPng?: boolean;
+  /** Resolved URL of the speaker base video -- rewrites raw <video src="speaker"> tags in codegen HTML */
+  speakerUrl?: string;
+  /** Seconds into the speaker track at this scene's start (for data-start-at sync) */
+  speakerOffset?: number;
 }
 
 async function main() {
@@ -182,6 +186,8 @@ async function main() {
     canvas: project.canvas || { width: args.width, height: args.height, fps: args.fps, preset: "landscape", background: "#0f172a" },
     gsapDir: args.gsapDir,
     componentLibDir,
+    speakerUrl: args.speakerUrl,
+    speakerOffset: args.speakerOffset,
   });
 
   // Download any remote media (e.g. a directly-embedded Pexels clip) to local

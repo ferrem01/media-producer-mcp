@@ -575,6 +575,17 @@ async function renderVideoWithSpeakerTrack(
 
   const sceneFrameDirs: Array<{ framesDir: string; frameCount: number }> = [];
 
+  // Per-scene start offsets into the film, so a raw <video src="speaker">
+  // PiP inside a scene seeks the camera to the film-time, not 0.
+  const sceneStartTimes: number[] = [];
+  {
+    let t = 0;
+    for (const scene of project.scenes) {
+      sceneStartTimes.push(t);
+      t += scene.duration_seconds;
+    }
+  }
+
   // Render scenes in parallel batches (same concurrency as normal pipeline).
   // Same zombie-worker guard as renderScenesParallel: on failure, kill the
   // still-running sibling forks before propagating.
@@ -585,7 +596,10 @@ async function renderVideoWithSpeakerTrack(
     const promises: Promise<{ framesDir: string; frameCount: number }>[] = [];
 
     for (let idx = batch; idx < batchEnd; idx++) {
-      promises.push(renderSceneTransparentFrames(project, idx, workDir, critiqueOpts, extraComponentDirs, speakerWorkers));
+      promises.push(renderSceneTransparentFrames(project, idx, workDir, critiqueOpts, extraComponentDirs, speakerWorkers, {
+        speakerUrl: speakerFileUrl,
+        speakerOffset: sceneStartTimes[idx],
+      }));
     }
 
     let batchResults;
@@ -757,6 +771,7 @@ async function renderSceneTransparentFrames(
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
   workerRegistry?: Set<ChildProcess>,
+  speakerRef?: { speakerUrl: string; speakerOffset: number },
 ): Promise<{ framesDir: string; frameCount: number }> {
   const scene = project.scenes[sceneIndex];
   const sceneDir = path.join(workDir, `speaker_scene_${sceneIndex}`);
@@ -787,6 +802,11 @@ async function renderSceneTransparentFrames(
     extraComponentDirs: extraComponentDirs || [],
     captureAsPng: true,
   };
+
+  if (speakerRef) {
+    workerArgs.speakerUrl = speakerRef.speakerUrl;
+    workerArgs.speakerOffset = speakerRef.speakerOffset;
+  }
 
   if (critiqueOpts?.critique && critiqueOpts.llmConfig) {
     workerArgs.critique = true;
