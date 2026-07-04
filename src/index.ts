@@ -590,7 +590,14 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
 
       // ── Health ──
       if (urlPath === "/health") {
-        jsonResponse(res, 200, { status: "ok", service: "media-producer-mcp", version: SERVICE_VERSION });
+        jsonResponse(res, 200, {
+          status: "ok",
+          service: "media-producer-mcp",
+          version: SERVICE_VERSION,
+          // Set by scripts/deploy.sh -- lets anyone (including a remote
+          // debugging session) verify WHICH commit is actually serving.
+          commit: process.env.MP_GIT_SHA || "unknown",
+        });
         return;
       }
       if (urlPath === "/" || url === "/") {
