@@ -31,7 +31,7 @@ import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js"
 import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes, ensureStoryboardScene } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
-import { assembleScene, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
+import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -779,12 +779,16 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         // 4-scene speaker project would spin up 4 decode pipelines for 200px
         // thumbnails (plus the composite + selected-scene previews), enough to
         // kill the tab. Thumbnails show the scene's own content only.
-        const html = await assembleScene({
+        // assembleSceneAuto (not assembleScene): codegen scenes embed library
+        // components via <component> tags, which only the codegen assembler
+        // resolves -- unresolved tags are invisible to the browser.
+        const html = await assembleSceneAuto({
           scene,
           components,
           brandKit: project.brand_kit,
           canvas: project.canvas,
           gsapDir: config.gsapDir,
+          componentLibDir: config.componentLibDir,
           preview: true,
         });
         res.writeHead(200, {
@@ -826,12 +830,18 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         const sceneForPreview = spUrl && scene.transparent_background !== false
           ? { ...scene, transparent_background: true }
           : scene;
-        const html = await assembleScene({
+        // assembleSceneAuto routes codegen scenes through the codegen
+        // assembler so nested <component> tags (screencast video, b-roll,
+        // charts) resolve exactly like the render path -- this is why the
+        // rendered MP4 played the screencast while Studio showed a blank
+        // browser frame.
+        const html = await assembleSceneAuto({
           scene: sceneForPreview,
           components,
           brandKit: project.brand_kit,
           canvas: project.canvas,
           gsapDir: config.gsapDir,
+          componentLibDir: config.componentLibDir,
           preview: true,
           speakerUrl: spUrl,
           speakerOffset: spOffset,
