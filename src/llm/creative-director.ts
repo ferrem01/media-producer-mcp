@@ -55,6 +55,9 @@ export interface Treatment {
   /** 3-5 concrete, buildable recurring devices (the film's set list) -- named
    *  things with specific looks + behavior, never mood adjectives. */
   visualDevices?: string[];
+  /** The media mix: which worlds open on real footage (b-roll), hold on a
+   *  generated still, or are pure motion graphics -- decided deliberately. */
+  mediaPlan?: string;
   /** 3-5 sentence summary the storyboard builder can use as creative direction */
   directorNote: string;
   /** Recommended number of scenes (the director decides the structure). */
@@ -122,6 +125,7 @@ opening world, one or two long living middles (12-18s each), and a closing world
         "motionPersonality": "e.g. precise mechanical movements that loosen into organic flows",
         "spatialStrategy": "e.g. tight close-ups opening into wide panoramas"
       },
+      "mediaPlan": "Which worlds use real media vs pure motion graphics -- e.g. 'World 1 opens on b-roll of a cluttered desk at dawn (real footage, moving); worlds 2-3 are pure motion graphics; the close holds on a generated still of a calm workspace.' A launch/brand film with a human or place moment should open on REAL media (b-roll if it moves, a generated still if it holds); an all-UI film may say 'all motion graphics' -- but say it deliberately.",
       "visualDevices": [
         "3-5 CONCRETE, BUILDABLE recurring devices -- named things with specific behavior, not moods",
         "e.g. 'a 4px violet pipeline rail across the lower third that thickens each time a channel connects'",
@@ -189,6 +193,7 @@ opening world, one or two long living middles (12-18s each), and a closing world
       motionPersonality: "fluid and purposeful",
       spatialStrategy: "layered depth with focus pulls",
     },
+    mediaPlan: typeof selected.mediaPlan === "string" ? selected.mediaPlan : undefined,
     visualDevices: Array.isArray(selected.visualDevices)
       ? selected.visualDevices.filter((d: unknown) => typeof d === "string" && (d as string).trim().length > 0)
       : undefined,
@@ -215,7 +220,9 @@ export function formatTreatmentForStoryboard(bible: Treatment): string {
 - Motion personality: ${bible.visualStyle.motionPersonality}
 - Spatial strategy: ${bible.visualStyle.spatialStrategy}
 
-${bible.visualDevices?.length ? `**Visual Devices (the film's SET LIST -- build scenes FROM these, reference them by name in visual notes, beats, and element inventories):**
+${bible.mediaPlan ? `**Media Plan (follow it -- set broll_query / hero_image on the scenes it names):** ${bible.mediaPlan}
+
+` : ""}${bible.visualDevices?.length ? `**Visual Devices (the film's SET LIST -- build scenes FROM these, reference them by name in visual notes, beats, and element inventories):**
 ${bible.visualDevices.map((d) => `- ${d}`).join("\n")}
 
 ` : ""}**Director's Note:** ${bible.directorNote}
