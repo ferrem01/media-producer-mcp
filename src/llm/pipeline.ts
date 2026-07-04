@@ -995,6 +995,12 @@ async function critiqueAndRetryScene(opts: {
   /** Live codegen conversation from the initial generation -- lets the
    *  surgical patch run as in-session Write-then-Edit patches. */
   codegenSession?: CodegenSession;
+  /** Speaker film: camera URL + this scene's film-time start. Critique
+   *  captures composite the real camera behind transparent scenes -- without
+   *  it the critic sees black voids where the human is and burns its defect
+   *  list on phantoms (stray_ui / off_brand_theme on its own camera). */
+  speakerUrl?: string;
+  speakerOffset?: number;
 }): Promise<{ scene: Scene; customSources?: Map<string, string>; critiqueResult?: CritiqueResult }> {
   // Skip critique if disabled (but correctnessOnly still runs the correctness gate).
   if (opts.critique === false && !opts.correctnessOnly) {
@@ -1058,14 +1064,22 @@ async function critiqueAndRetryScene(opts: {
 
       // 2. Assemble the scene HTML. assembleSceneAuto routes codegen scenes
       //    (with <component> tags) through the codegen assembler + library load.
+      // Speaker films: mirror the render's transparency rule so the critique
+      // judges the scene COMPOSITED over the real camera (captureSingleFrame
+      // swaps the underlay video for the correct camera frame via ffmpeg).
+      const sceneForCritique = opts.speakerUrl && currentScene.transparent_background !== false
+        ? { ...currentScene, transparent_background: true }
+        : currentScene;
       const assembledHtml = await assembleSceneAuto({
-        scene: currentScene,
+        scene: sceneForCritique,
         components: componentSources,
         brandKit: opts.brandKit,
         canvas: opts.canvas,
         gsapDir: config.gsapDir,
         componentLibDir: config.componentLibDir,
         preview: true,
+        speakerUrl: opts.speakerUrl,
+        speakerOffset: opts.speakerOffset,
       });
 
       // 3. Write to temp file and capture preview
@@ -1319,6 +1333,7 @@ async function critiqueAndRetryScene(opts: {
             critiqueResult.issues.push(
               d.type === "invisible_surface" ? "A panel/card has near-zero separation from the background (ghost panel)"
               : d.type === "edge_bleed" ? "A decorative/photo element bleeds across a frame border (positioned partially off-canvas)"
+              : d.type === "clipped_text" ? "Text is cut off by its container and reads as nonsense"
               : "Large empty/flat region -- the frame reads as sparse/dead");
           }
           if (layoutDefects.length > 0) {
@@ -2199,6 +2214,8 @@ async function runUnifiedPipeline(
             customSources: generated.customSources,
             codegenSession: generated.codegenSession,
             catalog,
+            speakerUrl: opts.speaker_source || undefined,
+            speakerOffset: storyboard.scenes.slice(0, i).reduce((t: number, d: any) => t + (d.duration_seconds || 5), 0),
             critique: skipCritique ? false : opts.critique,
             // Bookends skip the aesthetic critique but STILL get the correctness +
             // brand-theme gate so an intro/outro can't drift off-brand (e.g. dark on a light brand).
