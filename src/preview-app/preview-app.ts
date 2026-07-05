@@ -1515,7 +1515,9 @@ export function getPreviewHtml(): string {
     });
   }
 
-  function startCompositePreview(project) {
+  function startCompositePreview(project, resume) {
+      // resume: { time, sceneIndex } -- restore position after an in-place
+      // reload (e.g. saving a camera move). Without it, boot at the start.
       // Show loading state while preloading scenes
       els.previewPlaceholder.innerHTML = '<div class="loading-state">Preloading scenes<div class="loading-dots"><span></span><span></span><span></span></div></div>';
       els.previewPlaceholder.style.display = '';
@@ -1527,18 +1529,20 @@ export function getPreviewHtml(): string {
           els.previewPlaceholder.textContent = 'Loading composite preview...';
           initComposite();
           waitForCompositeReady(function(masterTl) {
-            state.currentSceneIndex = 0;
+            var idx = (resume && resume.sceneIndex >= 0 && resume.sceneIndex < project.scenes.length) ? resume.sceneIndex : 0;
+            var t = resume ? Math.max(0.001, Math.min(resume.time || 0, state.totalDuration || 0)) : 0.001;
+            state.currentSceneIndex = idx;
             state.currentComponentIndex = -1;
-            state.duration = project.scenes[0].duration_seconds || 0;
-            updateActiveScene(0);
+            state.duration = project.scenes[idx].duration_seconds || 0;
+            updateActiveScene(idx);
             renderLayers();
             clearProps();
             updateSceneIndicator();
-            // Seek to start
-            masterTl.time(0.001);
-            state.masterTime = 0;
-            els.slider.value = 0;
-            updateTimeDisplay(0);
+            renderCamList();
+            masterTl.time(t);
+            state.masterTime = t;
+            els.slider.value = state.totalDuration > 0 ? Math.round((t / state.totalDuration) * 1000) : 0;
+            updateTimeDisplay(t);
             // Show speaker bg if first scene needs it
             // Show preview with buffering overlay on top
             els.previewPlaceholder.style.display = 'none';
@@ -2413,11 +2417,11 @@ export function getPreviewHtml(): string {
       scene.camera_moves = r.camera_moves && r.camera_moves.length ? r.camera_moves : undefined;
       els.camHint.textContent = 'Saved. Reloading preview\u2026';
       renderCamList();
-      // Reload the composite so the move is live in playback.
-      loadComposite(p).then(function() {
-        if (state._compositeHtml) { initComposite(); }
-        els.camHint.textContent = '';
-      }).catch(function() { els.camHint.textContent = 'Preview reload failed \u2014 press Load.'; });
+      // Full composite reboot (same path as project load) with the playhead
+      // restored -- a bare re-init leaves the new iframe unseeked (scene
+      // content hidden, camera showing through) and media clips stale.
+      startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+      els.camHint.textContent = '';
     }).catch(function(e) {
       els.camHint.textContent = 'Save failed: ' + e.message;
     });
