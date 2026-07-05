@@ -184,6 +184,19 @@ export function getPreviewHtml(): string {
   #beat-ticks { position: absolute; inset: 0; pointer-events: none; }
   .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #a5b4fc; opacity: 0.75; border-radius: 1px; }
   .beat-tick.scene-cut { width: 2px; height: 13px; background: #6366f1; opacity: 0.9; }
+  /* Camera-move pills on the scrubber: one clickable pill per zoom/pan/rotate. */
+  #cam-pills { position: absolute; inset: 0; pointer-events: none; }
+  .cam-pill {
+    position: absolute; top: -3px; transform: translateX(-50%);
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #4f46e5; color: #fff; border: 1.5px solid #fff;
+    font-size: 9px; line-height: 12px; text-align: center;
+    cursor: pointer; pointer-events: auto; box-sizing: border-box;
+    box-shadow: 0 1px 4px rgba(79,70,229,0.45);
+    transition: transform 0.1s ease; z-index: 3;
+  }
+  .cam-pill:hover { transform: translateX(-50%) scale(1.3); }
+  .cam-pill.active { background: #312e81; transform: translateX(-50%) scale(1.3); }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -529,6 +542,30 @@ export function getPreviewHtml(): string {
   #studio-ctx button { display: block; width: 100%; text-align: left; padding: 7px 10px; font-size: 12px; color: #e2e8f0; background: none; border: none; border-radius: 6px; cursor: pointer; }
   #studio-ctx button:hover { background: rgba(99,102,241,0.25); }
   #studio-ctx .ctx-sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,0.08); }
+  /* Floating popovers: revise-next-to-the-element + camera-move editor on a pill. */
+  .studio-pop {
+    position: fixed; z-index: 9998; display: none; width: 320px;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(15,23,42,0.18); padding: 10px 12px;
+    font-size: 12px; color: #374151; box-sizing: border-box;
+  }
+  .studio-pop .sp-head { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+  .studio-pop .sp-title { flex: 1; font-size: 11px; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .studio-pop .sp-title b { color: #111827; }
+  .studio-pop .sp-x { flex: 0 0 auto; border: 0; background: none; color: #9ca3af; cursor: pointer; font-size: 14px; line-height: 1; padding: 2px; }
+  .studio-pop .sp-x:hover { color: #374151; }
+  .studio-pop textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 52px; padding: 8px 10px; font-size: 12px; font-family: inherit; background: #fff; color: #111827; border: 1px solid #d1d5db; border-radius: 8px; }
+  .studio-pop textarea:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
+  .studio-pop textarea:disabled { opacity: 0.5; }
+  .studio-pop .sp-row { display: flex; gap: 6px; margin-top: 7px; align-items: center; }
+  .studio-pop .sp-scope { display: flex; gap: 4px; margin-bottom: 7px; }
+  .studio-pop .sp-scope button { flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 500; border: 1px solid #d1d5db; background: #fff; color: #6b7280; border-radius: 7px; cursor: pointer; }
+  .studio-pop .sp-scope button.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+  .studio-pop .sp-status { font-size: 11px; min-height: 14px; margin-top: 5px; }
+  .studio-pop .sp-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 4px; }
+  .studio-pop .sp-fields label { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; color: #6b7280; }
+  .studio-pop .sp-fields input[type="number"] { width: 56px; padding: 4px 6px; font-size: 11px; border: 1px solid #d1d5db; border-radius: 6px; }
+  .studio-pop .sp-region { grid-column: 1 / -1; font-size: 11px; color: #6b7280; }
 </style>
 </head>
 <body>
@@ -569,6 +606,7 @@ export function getPreviewHtml(): string {
         <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
         <div id="beat-ticks"></div>
         <div id="audio-lanes"></div>
+        <div id="cam-pills"></div>
       </span>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
       <span class="audio-indicator" id="audio-indicator"></span>
@@ -622,8 +660,7 @@ export function getPreviewHtml(): string {
             <label>hold <input id="cam-hold" type="number" min="0" max="10" step="0.5" value="1.5" style="width:44px;">s</label>
             <label title="Ease back to wide afterwards"><input id="cam-return" type="checkbox" checked> return</label>
           </div>
-          <div id="cam-hint" style="font-size:10px;color:#9ca3af;margin-top:4px;"></div>
-          <div id="cam-list" style="display:flex;flex-direction:column;gap:3px;margin-top:6px;font-size:11px;color:#374151;"></div>
+          <div id="cam-hint" style="font-size:10px;color:#9ca3af;margin-top:4px;">Saved moves show as &#x2922; pills on the timeline &mdash; click one to edit or delete.</div>
         <div style="display:none;">
         </div>
         <div class="rv-hint" style="font-size:10px;color:#64748b;margin-top:4px;">Revise makes a surgical edit and keeps the rest of the scene. To rebuild a broken or empty scene, use Regenerate on the left.</div>
@@ -634,6 +671,8 @@ export function getPreviewHtml(): string {
 </div>
 
 <div id="studio-ctx"></div>
+<div id="rv-pop" class="studio-pop"></div>
+<div id="cam-pop" class="studio-pop" style="width:280px;"></div>
 
 <div id="studio-modal" class="studio-modal-backdrop" style="display:none;">
   <div class="studio-modal-card" id="studio-modal-card"></div>
@@ -685,7 +724,6 @@ export function getPreviewHtml(): string {
     camHold: document.getElementById('cam-hold'),
     camReturn: document.getElementById('cam-return'),
     camHint: document.getElementById('cam-hint'),
-    camList: document.getElementById('cam-list'),
     previewIframe: document.getElementById('preview-iframe'),
     speakerBg: document.getElementById('speaker-bg'),
     previewContainer: document.getElementById('preview-container'),
@@ -1518,6 +1556,9 @@ export function getPreviewHtml(): string {
   function startCompositePreview(project, resume) {
       // resume: { time, sceneIndex } -- restore position after an in-place
       // reload (e.g. saving a camera move). Without it, boot at the start.
+      // Any open popover is anchored to the outgoing document -- close it.
+      camPopClose();
+      rvPopClose();
       // Show loading state while preloading scenes
       els.previewPlaceholder.innerHTML = '<div class="loading-state">Preloading scenes<div class="loading-dots"><span></span><span></span><span></span></div></div>';
       els.previewPlaceholder.style.display = '';
@@ -1538,7 +1579,7 @@ export function getPreviewHtml(): string {
             renderLayers();
             clearProps();
             updateSceneIndicator();
-            renderCamList();
+            renderCamPills();
             masterTl.time(t);
             state.masterTime = t;
             els.slider.value = state.totalDuration > 0 ? Math.round((t / state.totalDuration) * 1000) : 0;
@@ -1601,6 +1642,7 @@ export function getPreviewHtml(): string {
     els.sceneList.innerHTML = html;
     renderBeatTicks();
     renderAudioLanes();
+    renderCamPills();
 
     els.sceneList.querySelectorAll('.scene-item').forEach(function(el) {
       el.addEventListener('click', function() {
@@ -1639,7 +1681,6 @@ export function getPreviewHtml(): string {
     // Don't touch music audio on manual scene click. Only pause voiceover/sfx.
 
     updateActiveScene(index);
-    renderCamList();
 
     if (!state.compositeLoaded) return;
     {
@@ -1672,10 +1713,6 @@ export function getPreviewHtml(): string {
         el.classList.remove('active');
       }
     });
-    // Every selection change flows through here (clicks, scrubbing, playback
-    // crossing a boundary) -- keep the camera-move list in step so moves on
-    // the now-active scene are always visible and deletable.
-    renderCamList();
   }
 
 
@@ -2385,33 +2422,53 @@ export function getPreviewHtml(): string {
     return p.scenes[state.currentSceneIndex] || null;
   }
 
-  function renderCamList() {
-    if (!els.camList) return;
-    var scene = currentSceneEntry();
-    var moves = (scene && scene.camera_moves) || [];
-    els.camList.innerHTML = moves.length ? '' : '<span style="color:#9ca3af;">No camera moves on this scene.</span>';
-    moves.forEach(function(m, i) {
-      var row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:6px;';
-      var desc = (m.target === 'screencast' ? 'screencast ' : '') + m.type + (m.w ? ' [box ' + m.w + '\u00d7' + m.h + '%]' : (m.scale ? ' ' + m.scale + '\u00d7' : '')) + ' @' + (m.at != null ? m.at.toFixed(1) : '?') + 's \u2192 (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%)' + (m['return'] ? ' \u21a9' : '');
-      var span = document.createElement('span');
-      span.textContent = desc;
-      span.style.flex = '1';
-      var del = document.createElement('button');
-      del.textContent = '\u2715';
-      del.style.cssText = 'border:0;background:none;color:#9ca3af;cursor:pointer;font-size:11px;';
-      del.addEventListener('click', function() {
-        var next = moves.slice(); next.splice(i, 1);
-        saveCameraMoves(next);
+  // Scene start on the master clock: composite meta when available (includes
+  // transition insertions), plain duration sum otherwise.
+  function sceneStartFor(index) {
+    try {
+      var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
+      if (meta && meta[index]) return meta[index].start;
+    } catch (e) {}
+    return sceneOffset(index);
+  }
+
+  function camMoveDesc(m) {
+    return (m.target === 'screencast' ? 'screencast ' : '') + (m.type || 'zoom')
+      + (m.w ? ' [box ' + m.w + '\u00d7' + m.h + '%]' : (m.scale ? ' ' + m.scale + '\u00d7' : ''))
+      + ' @' + (m.at != null ? Number(m.at).toFixed(1) : '?') + 's'
+      + ' \u2192 (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%)'
+      + (m['return'] ? ' \u21a9' : '');
+  }
+
+  // Camera moves live on the scrubber: one pill per move, across ALL scenes.
+  // Clicking a pill opens the editor popover (edit / preview / delete).
+  function renderCamPills() {
+    var wrap = document.getElementById('cam-pills');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    var p = state.currentProject;
+    var total = state.totalDuration || calcTotalDuration();
+    if (!p || !p.scenes || !(total > 0)) return;
+    p.scenes.forEach(function(scene, si) {
+      (scene.camera_moves || []).forEach(function(m, mi) {
+        var t = sceneStartFor(si) + (m.at || 0);
+        var pill = document.createElement('div');
+        pill.className = 'cam-pill';
+        pill.textContent = '\u2922';
+        pill.style.left = Math.max(0, Math.min(100, (t / total) * 100)).toFixed(2) + '%';
+        pill.title = 'Scene ' + (si + 1) + ': ' + camMoveDesc(m);
+        pill.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          camPopOpen(si, mi, pill);
+        });
+        wrap.appendChild(pill);
       });
-      row.appendChild(span); row.appendChild(del);
-      els.camList.appendChild(row);
     });
   }
 
-  function saveCameraMoves(moves) {
-    var scene = currentSceneEntry();
+  function saveCameraMovesForScene(sceneIndex, moves) {
     var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[sceneIndex];
     if (!scene || !p) return;
     els.camHint.textContent = 'Saving\u2026';
     api('POST', '/camera-moves/' + state.tenantId + '/' + p.project_id, {
@@ -2420,7 +2477,7 @@ export function getPreviewHtml(): string {
     }).then(function(r) {
       scene.camera_moves = r.camera_moves && r.camera_moves.length ? r.camera_moves : undefined;
       els.camHint.textContent = 'Saved. Reloading preview\u2026';
-      renderCamList();
+      renderCamPills();
       // Full composite reboot (same path as project load) with the playhead
       // restored -- a bare re-init leaves the new iframe unseeked (scene
       // content hidden, camera showing through) and media clips stale.
@@ -2430,6 +2487,103 @@ export function getPreviewHtml(): string {
       els.camHint.textContent = 'Save failed: ' + e.message;
     });
   }
+
+  function saveCameraMoves(moves) {
+    saveCameraMovesForScene(state.currentSceneIndex, moves);
+  }
+
+  // \u2500\u2500 Camera-move popover (opens from a scrubber pill) \u2500\u2500
+  var camPop = { si: -1, mi: -1 };
+
+  function camPopClose() {
+    var pop = document.getElementById('cam-pop');
+    if (pop) pop.style.display = 'none';
+    camPop.si = camPop.mi = -1;
+    document.querySelectorAll('.cam-pill.active').forEach(function(el) { el.classList.remove('active'); });
+  }
+
+  function camPopOpen(si, mi, pill) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[si];
+    var m = scene && scene.camera_moves && scene.camera_moves[mi];
+    var pop = document.getElementById('cam-pop');
+    if (!m || !pop) return;
+    camPopClose();
+    camPop.si = si; camPop.mi = mi;
+    pill.classList.add('active');
+    var isBox = m.w != null && m.h != null;
+    var dur = scene.duration_seconds || 5;
+    pop.innerHTML =
+      '<div class="sp-head"><span class="sp-title"><b>' + escHtml((m.target === 'screencast' ? 'Screencast ' : '') + (m.type || 'zoom')) + '</b> \u2014 scene ' + (si + 1) + '</span>' +
+      '<button class="sp-x" id="cp-x" title="Close">\u2715</button></div>' +
+      '<div class="sp-fields">' +
+        '<label>at <input id="cp-at" type="number" min="0" max="' + escAttr('' + Math.max(0, dur - 0.2).toFixed(1)) + '" step="0.1" value="' + escAttr('' + (m.at != null ? Number(m.at).toFixed(1) : '0')) + '">s</label>' +
+        (isBox
+          ? '<label>hold <input id="cp-hold" type="number" min="0" max="10" step="0.5" value="' + escAttr('' + (m.hold != null ? m.hold : 0)) + '">s</label>' +
+            '<div class="sp-region">Region ' + Math.round(m.w) + '\u00d7' + Math.round(m.h) + '% at (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%) \u2014 redraw the box to change it.</div>'
+          : '<label>scale <input id="cp-scale" type="number" min="1.1" max="5" step="0.1" value="' + escAttr('' + (m.scale || 1.8)) + '">\u00d7</label>' +
+            '<label>hold <input id="cp-hold" type="number" min="0" max="10" step="0.5" value="' + escAttr('' + (m.hold != null ? m.hold : 0)) + '">s</label>') +
+        '<label>ease <input id="cp-dur" type="number" min="0.2" max="3" step="0.1" value="' + escAttr('' + (m.duration || 0.8)) + '">s</label>' +
+        '<label title="Ease back to wide afterwards">return <input id="cp-return" type="checkbox"' + (m['return'] ? ' checked' : '') + '></label>' +
+      '</div>' +
+      '<div class="sp-row">' +
+        '<button class="rv-go secondary" id="cp-prev" style="flex:0 0 auto;" title="Jump the playhead just before this move and play">Preview</button>' +
+        '<button class="rv-go secondary" id="cp-del" style="flex:0 0 auto;color:#dc2626;border-color:#fca5a5;" title="Remove this camera move">Delete</button>' +
+        '<button class="rv-go" id="cp-save" style="flex:1;">Save</button>' +
+      '</div>';
+    pop.style.display = 'block';
+    // Anchor above the pill, clamped to the viewport.
+    var r = pill.getBoundingClientRect();
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 150;
+    var x = Math.max(8, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 8));
+    var y = r.top - ph - 10;
+    if (y < 8) y = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
+    pop.style.left = x + 'px';
+    pop.style.top = y + 'px';
+    document.getElementById('cp-x').addEventListener('click', camPopClose);
+    document.getElementById('cp-del').addEventListener('click', function() {
+      var moves = (scene.camera_moves || []).slice();
+      moves.splice(mi, 1);
+      camPopClose();
+      saveCameraMovesForScene(si, moves);
+    });
+    document.getElementById('cp-save').addEventListener('click', function() {
+      var moves = (scene.camera_moves || []).slice();
+      var next = {};
+      for (var k in m) next[k] = m[k];
+      var atEl = document.getElementById('cp-at');
+      var at = parseFloat(atEl && atEl.value);
+      if (!isNaN(at)) next.at = Math.max(0, Math.min(dur - 0.2, Math.round(at * 10) / 10));
+      var scEl = document.getElementById('cp-scale');
+      if (scEl) { var sc = parseFloat(scEl.value); if (!isNaN(sc)) next.scale = sc; }
+      var hdEl = document.getElementById('cp-hold');
+      if (hdEl) { var hd = parseFloat(hdEl.value); if (!isNaN(hd)) next.hold = hd; }
+      var duEl = document.getElementById('cp-dur');
+      if (duEl) { var du = parseFloat(duEl.value); if (!isNaN(du)) next.duration = du; }
+      var rtEl = document.getElementById('cp-return');
+      next['return'] = !!(rtEl && rtEl.checked);
+      moves[mi] = next;
+      camPopClose();
+      saveCameraMovesForScene(si, moves);
+    });
+    document.getElementById('cp-prev').addEventListener('click', function() {
+      var total = state.totalDuration || calcTotalDuration();
+      if (!(total > 0)) return;
+      var atEl = document.getElementById('cp-at');
+      var at = parseFloat(atEl && atEl.value);
+      var t = sceneStartFor(si) + Math.max(0, (isNaN(at) ? (m.at || 0) : at) - 1);
+      camPopClose();
+      scrub(Math.round((t / total) * 1000));
+      els.slider.value = Math.round((t / total) * 1000);
+      if (!state.playing) togglePlay();
+    });
+  }
+
+  // Close the camera popover on any outside press (pills stop propagation).
+  document.addEventListener('mousedown', function(e) {
+    var pop = document.getElementById('cam-pop');
+    if (pop && pop.style.display === 'block' && !pop.contains(e.target)) camPopClose();
+  });
 
   var camOverlay = null;
   var camMarquee = null;
@@ -2518,7 +2672,9 @@ export function getPreviewHtml(): string {
 
   if (els.camAddZoom) {
     els.camAddZoom.addEventListener('click', armCameraZoom);
-    document.addEventListener('keydown', function(ev) { if (ev.key === 'Escape') disarmCameraZoom(); });
+    document.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Escape') { disarmCameraZoom(); camPopClose(); rvPopClose(); }
+    });
   }
 
   function togglePlay() {
@@ -2917,7 +3073,99 @@ export function getPreviewHtml(): string {
     if (studio.selLabel) studio.selLabel.textContent = label + (studio.sel.text ? ' \\u2014 ' + studio.sel.text.slice(0, 32) : '');
     studioSetScope('element');
     studioPositionSel();
-    var inp = document.getElementById('rv-input'); if (inp) inp.focus();
+    rvPopShow();
+  }
+
+  // ── Floating revise popover: opens next to the clicked element so surgical
+  // revisions happen where you're looking, not in the bottom panel. ──
+  function rvPopClose() {
+    var pop = document.getElementById('rv-pop');
+    if (pop) pop.style.display = 'none';
+  }
+
+  function rvPopBuild(pop) {
+    pop.innerHTML =
+      '<div class="sp-head"><span class="sp-title" id="rv-pop-title"></span>' +
+      '<button class="sp-x" id="rv-pop-x" title="Close (Esc)">✕</button></div>' +
+      '<div class="sp-scope">' +
+        '<button id="rv-pop-scope-el" class="active">This element</button>' +
+        '<button id="rv-pop-scope-scene">Whole scene</button>' +
+      '</div>' +
+      '<textarea id="rv-pop-input" placeholder="What should change? e.g. make this bigger, use the brand green"></textarea>' +
+      '<div class="sp-row">' +
+        '<button class="rv-go secondary" id="rv-pop-undo" style="flex:0 0 auto;" title="Undo the last revise on this scene">Undo</button>' +
+        '<button class="rv-go" id="rv-pop-go" style="flex:1;">Revise</button>' +
+      '</div>' +
+      '<div class="sp-status" id="rv-pop-status"></div>';
+    document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
+    document.getElementById('rv-pop-scope-el').addEventListener('click', function() { studioSetScope('element'); });
+    document.getElementById('rv-pop-scope-scene').addEventListener('click', function() { studioSetScope('scene'); });
+    document.getElementById('rv-pop-go').addEventListener('click', rvPopGo);
+    document.getElementById('rv-pop-undo').addEventListener('click', studioUndo);
+    document.getElementById('rv-pop-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); rvPopGo(); }
+    });
+    pop._built = true;
+  }
+
+  function rvPopGo() {
+    var ta = document.getElementById('rv-pop-input');
+    var inp = document.getElementById('rv-input');
+    if (ta && inp) inp.value = ta.value;
+    studioRevise();
+  }
+
+  function rvPopSetBusy(busy) {
+    ['rv-pop-go', 'rv-pop-undo', 'rv-pop-input'].forEach(function(id) {
+      var el = document.getElementById(id); if (el) el.disabled = busy;
+    });
+  }
+
+  function rvPopShow() {
+    var pop = document.getElementById('rv-pop');
+    var sel = studio.sel;
+    if (!pop || !sel) return;
+    if (!pop._built) rvPopBuild(pop);
+    var label = sel.compType || sel.tagName || 'element';
+    document.getElementById('rv-pop-title').innerHTML = '<b>' + escHtml(label) + '</b>' +
+      (sel.text ? ' \\u2014 \\u201c' + escHtml(sel.text.slice(0, 40)) + '\\u201d' : '');
+    var st = document.getElementById('rv-pop-status');
+    if (st) { st.className = 'sp-status'; st.textContent = ''; }
+    rvPopSetBusy(!!studio.busy);
+    rvPopSyncScope();
+    pop.style.display = 'block';
+    rvPopPosition();
+    var ta = document.getElementById('rv-pop-input');
+    if (ta) ta.focus();
+  }
+
+  function rvPopSyncScope() {
+    var e1 = document.getElementById('rv-pop-scope-el'), e2 = document.getElementById('rv-pop-scope-scene');
+    if (e1) e1.classList.toggle('active', studio.scope === 'element');
+    if (e2) e2.classList.toggle('active', studio.scope === 'scene');
+  }
+
+  // Anchor the popover next to the selected element: the element's rect is in
+  // iframe content coordinates (1920x1080), scaled to the on-screen iframe box.
+  function rvPopPosition() {
+    var pop = document.getElementById('rv-pop');
+    var sel = studio.sel;
+    if (!pop || !sel || !sel._el) return;
+    var ifr = els.previewIframe;
+    var rect = ifr.getBoundingClientRect();
+    var sxr = rect.width / (ifr.width || 1920), syr = rect.height / (ifr.height || 1080);
+    var r = null;
+    try { r = sel._el.getBoundingClientRect(); } catch (e) {}
+    var pw = pop.offsetWidth || 320, ph = pop.offsetHeight || 170;
+    var cx = rect.left + (r ? (r.left + r.width / 2) * sxr : rect.width / 2);
+    var x = Math.max(8, Math.min(cx - pw / 2, window.innerWidth - pw - 8));
+    var y = rect.top + (r ? r.bottom * syr : rect.height) + 10;
+    if (y + ph > window.innerHeight - 8) {
+      y = rect.top + (r ? r.top * syr : 0) - ph - 10;
+      if (y < 8) y = Math.max(8, window.innerHeight - ph - 8);
+    }
+    pop.style.left = x + 'px';
+    pop.style.top = y + 'px';
   }
 
   // Keep the persistent selection box on the selected element (if it's in the
@@ -2941,6 +3189,7 @@ export function getPreviewHtml(): string {
     studio.scope = scope;
     document.getElementById('rv-scope-el').classList.toggle('active', scope === 'element');
     document.getElementById('rv-scope-scene').classList.toggle('active', scope === 'scene');
+    rvPopSyncScope();
   }
 
   function studioShowCtx(x, y) {
@@ -2976,6 +3225,12 @@ export function getPreviewHtml(): string {
     var s = document.getElementById('rv-status');
     s.className = 'rv-status' + (cls ? ' ' + cls : '');
     s.textContent = msg;
+    // Mirror into the floating revise popover when it's open.
+    var ps = document.getElementById('rv-pop-status');
+    if (ps) {
+      ps.className = 'sp-status rv-status' + (cls ? ' ' + cls : '');
+      ps.textContent = msg;
+    }
   }
 
   // Re-fetch the composite and actually re-render it (hot-swap), preserving time.
@@ -2989,6 +3244,7 @@ export function getPreviewHtml(): string {
     // Clear stale selection (the old element is gone after a re-render).
     studio.sel = null;
     if (studio.selBox) studio.selBox.style.display = 'none';
+    rvPopClose();
     loadComposite(p).then(function() {
       // CRITICAL: document.write reuses the iframe window, so the PREVIOUS
       // document's __MP_READY/__MP_TIMELINE are still set when we rewrite.
@@ -3062,6 +3318,7 @@ export function getPreviewHtml(): string {
     studio.busy = true;
     document.getElementById('rv-go').disabled = true;
     document.getElementById('rv-input').disabled = true;
+    rvPopSetBusy(true);
     var sbRegenR = document.getElementById('sb-regen'); if (sbRegenR) sbRegenR.disabled = true;
     var sbEditR = document.getElementById('sb-edit'); if (sbEditR) sbEditR.disabled = true;
     studioStatus('Revising\\u2026 (' + (studio.scope === 'scene' ? 'whole scene' : 'element') + ')', '');
@@ -3071,6 +3328,7 @@ export function getPreviewHtml(): string {
       studio.busy = false;
       document.getElementById('rv-go').disabled = false;
       document.getElementById('rv-input').disabled = false;
+      rvPopSetBusy(false);
       var sr = document.getElementById('sb-regen'); if (sr) sr.disabled = false;
       var ss = document.getElementById('sb-edit'); if (ss) ss.disabled = false;
       studioBusyOverlay(false);
@@ -3095,32 +3353,7 @@ export function getPreviewHtml(): string {
           studioStatus('Updated \\u2713 (' + edits + ')', 'ok');
         }
         document.getElementById('rv-input').value = '';
-        studioReload();
-      })
-      .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
-  }
-
-  function studioUndo() {
-    if (studio.busy) return;
-    var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
-    if (!sceneId) { studioStatus('Select a scene first.', 'warn'); return; }
-    var p = state.currentProject; if (!p) { studioStatus('Load a project first.', 'warn'); return; }
-    studio.busy = true;
-    document.getElementById('rv-undo').disabled = true;
-    document.getElementById('rv-go').disabled = true;
-    studioStatus('Undoing\\u2026', '');
-    function done() {
-      studio.busy = false;
-      document.getElementById('rv-undo').disabled = false;
-      document.getElementById('rv-go').disabled = false;
-    }
-    api('POST', '/revise/undo/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { scene_id: sceneId })
-      .then(function(res) {
-        done();
-        if (!res || res.ok === false) { studioStatus('Undo failed: ' + ((res && res.error) || 'unknown'), 'err'); return; }
-        if (!res.restored) { studioStatus('Nothing to undo.', 'warn'); return; }
-        var rem = res.remaining || 0;
-        studioStatus('Reverted \\u2713 (' + rem + ' earlier revision' + (rem === 1 ? '' : 's') + ' left)', 'ok');
+        var pi = document.getElementById('rv-pop-input'); if (pi) pi.value = '';
         studioReload();
       })
       .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
