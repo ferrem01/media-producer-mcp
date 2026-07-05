@@ -1672,6 +1672,10 @@ export function getPreviewHtml(): string {
         el.classList.remove('active');
       }
     });
+    // Every selection change flows through here (clicks, scrubbing, playback
+    // crossing a boundary) -- keep the camera-move list in step so moves on
+    // the now-active scene are always visible and deletable.
+    renderCamList();
   }
 
 
