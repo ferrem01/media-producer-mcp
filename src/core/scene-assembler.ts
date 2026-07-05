@@ -463,7 +463,14 @@ export function cameraMovesScript(
         var to;
         if (m.type === 'reset') to = { scale: 1, x: 0, y: 0, rotation: 0 };
         else {
-          var sc = m.type === 'zoom' ? (m.scale || 2) : st.scale;
+          var sc;
+          if (m.type === 'zoom' && m.w && m.h) {
+            // Drawn box: zoom so the outlined region just fills the rig frame.
+            var bw = (m.w / 100) * CW, bh = (m.h / 100) * CH;
+            sc = Math.max(1.05, Math.min(5, Math.min(W / bw, H / bh)));
+          } else {
+            sc = m.type === 'zoom' ? (m.scale || 2) : st.scale;
+          }
           to = {
             scale: sc,
             x: (0.5 - px) * W * sc,

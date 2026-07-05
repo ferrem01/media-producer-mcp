@@ -191,8 +191,13 @@ export interface CameraMove {
    *  frame -- the screen content magnifies while browser chrome and PiP stay
    *  fixed. Any other value is a CSS selector for the media element to rig. */
   target?: string;
-  /** Zoom factor for type=zoom (e.g. 1.8). */
+  /** Zoom factor for type=zoom (e.g. 1.8). Ignored when w/h are present. */
   scale?: number;
+  /** Drawn-box dimensions as canvas % (x,y = box center). When present, the
+   *  scale is computed at apply time so the box just fills the rig's frame --
+   *  "what you outlined is what you get". */
+  w?: number;
+  h?: number;
   /** Degrees for type=rotate. */
   angle?: number;
   /** Seconds the move eases over (default 1). */
