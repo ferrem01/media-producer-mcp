@@ -2413,6 +2413,25 @@ export function getPreviewHtml(): string {
     return sceneOffset(index);
   }
 
+  // The scene's "screencast": its largest non-speaker video. Mirrors how the
+  // runtime rig resolves target:"screencast", so what the UI offers is what
+  // the saved move will actually do.
+  function findScreencastVideo(doc, sceneId) {
+    try {
+      var root = (sceneId && doc.querySelector('.mp-scene[data-scene-id="' + sceneId + '"]')) || doc.body;
+      var vids = root.querySelectorAll('video');
+      var best = null, bestA = 0;
+      for (var i = 0; i < vids.length; i++) {
+        var v = vids[i];
+        if (v.id === '__mp_speaker_base') continue;
+        if (/speaker/i.test(v.getAttribute('src') || '')) continue;
+        var r = v.getBoundingClientRect();
+        if (r.width * r.height > bestA) { bestA = r.width * r.height; best = v; }
+      }
+      return best;
+    } catch (e) { return null; }
+  }
+
   function camMoveDesc(m) {
     return (m.target === 'screencast' ? 'screencast ' : '') + (m.type || 'zoom')
       + (m.w ? ' [box ' + m.w + '\u00d7' + m.h + '%]' : (m.scale ? ' ' + m.scale + '\u00d7' : ''))
@@ -2584,6 +2603,7 @@ export function getPreviewHtml(): string {
     var scene = currentSceneEntry();
     if (!pop || !scene) { if (studio.dragCancel) studio.dragCancel(); return; }
     camPopClose();
+    rvPopClose();
     var cw = parseInt(els.previewIframe.width, 10) || 1920;
     var ch = parseInt(els.previewIframe.height, 10) || 1080;
     var dur = scene.duration_seconds || 5;
@@ -2592,18 +2612,8 @@ export function getPreviewHtml(): string {
     // non-speaker video, offer to scope the zoom to that video's content
     // (same semantic target the runtime rig resolves).
     var castRect = null;
-    try {
-      var root = doc.querySelector('.mp-scene[data-scene-id="' + (scene.id || '') + '"]') || doc.body;
-      var vids = root.querySelectorAll('video');
-      var bestA = 0;
-      for (var i = 0; i < vids.length; i++) {
-        var v = vids[i];
-        if (v.id === '__mp_speaker_base') continue;
-        if (/speaker/i.test(v.getAttribute('src') || '')) continue;
-        var vr = v.getBoundingClientRect();
-        if (vr.width * vr.height > bestA) { bestA = vr.width * vr.height; castRect = vr; }
-      }
-    } catch (e) {}
+    var castVid = findScreencastVideo(doc, scene.id);
+    if (castVid) { try { castRect = castVid.getBoundingClientRect(); } catch (e) {} }
     var cx = boxPx.left + boxPx.width / 2, cy = boxPx.top + boxPx.height / 2;
     var boxInCast = castRect && cx >= castRect.left && cx <= castRect.right && cy >= castRect.top && cy <= castRect.bottom;
     var fullyInCast = castRect && boxPx.left >= castRect.left && boxPx.top >= castRect.top &&
@@ -3064,6 +3074,7 @@ export function getPreviewHtml(): string {
       if (!drag) return;
       var w = Math.abs(e.clientX - drag.x0), h = Math.abs(e.clientY - drag.y0);
       if (!drag.moved && w + h < 10) return;
+      if (!drag.moved) rvPopClose(); // marquee takes over; don't stack popovers
       drag.moved = true;
       e.preventDefault();
       hi.style.display = 'none';
@@ -3173,41 +3184,56 @@ export function getPreviewHtml(): string {
     if (pop) pop.style.display = 'none';
   }
 
-  // Rebuilt on every show: the contents are contextual (element vs scene).
+  // Rebuilt on every show: the contents are contextual (element vs scene vs
+  // media). No scope toggle -- what you clicked IS the scope: an element
+  // revises that element, the scene (or a full-bleed wrapper) revises the
+  // whole scene.
   function rvPopBuild(pop) {
     var sel = studio.sel;
-    var isScene = !!(sel && sel._isScene);
+    var isScene = !!(sel && (sel._isScene || sel._fullBleed));
     var keepText = '';
     var prevTa = document.getElementById('rv-pop-input');
     if (prevTa) keepText = prevTa.value || '';
+    // Media selection: the element is (or wraps, or sits inside) the scene's
+    // screencast video -- offer the inside-the-frame zoom too.
+    var onScreencast = false;
+    if (!isScene && sel && sel._el && sel._doc) {
+      var cast = findScreencastVideo(sel._doc, sel.sceneId || (currentSceneEntry() || {}).id);
+      if (cast) {
+        try {
+          onScreencast = sel._el === cast || sel._el.contains(cast) || cast.contains(sel._el);
+          if (!onScreencast) {
+            var er = sel._el.getBoundingClientRect(), vr = cast.getBoundingClientRect();
+            var ecx = er.left + er.width / 2, ecy = er.top + er.height / 2;
+            onScreencast = ecx >= vr.left && ecx <= vr.right && ecy >= vr.top && ecy <= vr.bottom;
+          }
+        } catch (e) {}
+      }
+    }
+    var camRow;
+    if (isScene) {
+      camRow = '<button class="rv-go secondary" id="rv-pop-draw" style="flex:1;" title="Drag on the scene to outline the region the camera should push into">⤢ Draw zoom region…</button>';
+    } else {
+      camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
+        (onScreencast ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1;" title="Magnify the screencast footage inside its frame; the browser frame and PiP stay put">⊕ Zoom inside</button>' : '');
+    }
     pop.innerHTML =
       '<div class="sp-head"><span class="sp-title" id="rv-pop-title"></span>' +
       '<button class="sp-x" id="rv-pop-x" title="Close (Esc)">✕</button></div>' +
-      (isScene ? '' :
-        '<div class="sp-scope">' +
-          '<button id="rv-pop-scope-el" class="active">This element</button>' +
-          '<button id="rv-pop-scope-scene">Whole scene</button>' +
-        '</div>') +
       '<textarea id="rv-pop-input" placeholder="' + (isScene ? 'What should change in this scene?' : 'What should change? e.g. make this bigger, use the brand green') + '"></textarea>' +
       '<div class="sp-row">' +
         '<button class="rv-go secondary" id="rv-pop-undo" style="flex:0 0 auto;" title="Undo the last revise on this scene">Undo</button>' +
-        '<button class="rv-go" id="rv-pop-go" style="flex:1;">Revise</button>' +
+        '<button class="rv-go" id="rv-pop-go" style="flex:1;">' + (isScene ? 'Revise scene' : 'Revise') + '</button>' +
       '</div>' +
-      '<div class="sp-row">' +
-        (isScene || (sel && sel._fullBleed)
-          ? '<button class="rv-go secondary" id="rv-pop-draw" style="flex:1;" title="Drag on the scene to outline the region the camera should push into">⤢ Draw zoom region…</button>'
-          : '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1;" title="Add a camera zoom that frames this element, starting at the playhead">⤢ Zoom to this</button>') +
-      '</div>' +
+      '<div class="sp-row">' + camRow + '</div>' +
       '<div class="sp-status" id="rv-pop-status"></div>';
     document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
-    var se = document.getElementById('rv-pop-scope-el');
-    var ss = document.getElementById('rv-pop-scope-scene');
-    if (se) se.addEventListener('click', function() { studioSetScope('element'); });
-    if (ss) ss.addEventListener('click', function() { studioSetScope('scene'); });
     document.getElementById('rv-pop-go').addEventListener('click', rvPopGo);
     document.getElementById('rv-pop-undo').addEventListener('click', studioUndo);
     var zb = document.getElementById('rv-pop-zoom');
     if (zb) zb.addEventListener('click', zoomToSelection);
+    var zi = document.getElementById('rv-pop-zoom-inside');
+    if (zi) zi.addEventListener('click', zoomInsideSelection);
     var db = document.getElementById('rv-pop-draw');
     if (db) db.addEventListener('click', function() {
       rvPopClose();
@@ -3245,6 +3271,39 @@ export function getPreviewHtml(): string {
       y: Math.round(((r.top + r.height / 2) / ch) * 100),
       w: Math.round(Math.max(6, w)),
       h: Math.round(Math.max(6, h)),
+      duration: 0.8,
+      hold: 1.5,
+      'return': true,
+    };
+    var moves = (scene.camera_moves || []).slice();
+    moves.push(move);
+    rvPopClose();
+    saveCameraMovesForScene(si, moves);
+  }
+
+  // "Zoom inside": magnify the screencast footage inside its own frame
+  // (target:"screencast" -- the browser chrome and PiP stay put). Centered
+  // push at 1.8x; draw a box inside the video for a specific region instead.
+  function zoomInsideSelection() {
+    var sel = studio.sel;
+    var si = state.currentSceneIndex;
+    var scene = currentSceneEntry();
+    if (!sel || !sel._doc || !scene) return;
+    var vid = findScreencastVideo(sel._doc, scene.id);
+    if (!vid) { studioStatus('No screencast video found in this scene.', 'warn'); return; }
+    var r;
+    try { r = vid.getBoundingClientRect(); } catch (e) { return; }
+    var cw = parseInt(els.previewIframe.width, 10) || 1920;
+    var ch = parseInt(els.previewIframe.height, 10) || 1080;
+    var dur = scene.duration_seconds || 5;
+    var at = Math.max(0, Math.min(dur - 0.2, (state.masterTime || 0) - sceneStartFor(si)));
+    var move = {
+      at: Math.round(at * 10) / 10,
+      type: 'zoom',
+      target: 'screencast',
+      x: Math.round(((r.left + r.width / 2) / cw) * 100),
+      y: Math.round(((r.top + r.height / 2) / ch) * 100),
+      scale: 1.8,
       duration: 0.8,
       hold: 1.5,
       'return': true,
