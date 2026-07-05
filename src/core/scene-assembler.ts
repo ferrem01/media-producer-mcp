@@ -392,53 +392,102 @@ export function cameraMovesScript(
 (function() {
   var moves = ${movesJson};
   if (!moves.length) return;
-  var W = ${canvas.width}, H = ${canvas.height};
+  var CW = ${canvas.width}, CH = ${canvas.height};
+  function buildRig(root, target) {
+    // Returns { el, box() } or null. box() is the clipping container's rect --
+    // the coordinate space the focal point is expressed in.
+    if (!target) {
+      var cam = document.createElement('div');
+      cam.className = '__mp_camera_rig';
+      cam.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;will-change:transform;transform-origin:50% 50%;';
+      Array.prototype.slice.call(root.childNodes).forEach(function(n) {
+        if (n.nodeType === 1) {
+          var t = n.tagName;
+          if (t === 'SCRIPT' || t === 'STYLE') return;
+          if (n.id === '__mp_speaker_base') return;
+        }
+        cam.appendChild(n);
+      });
+      root.appendChild(cam);
+      return { el: cam, box: function() { return { width: CW, height: CH, left: 0, top: 0 }; } };
+    }
+    var media = null;
+    if (target === 'screencast') {
+      // The largest video that is NOT the speaker: the screencast. The PiP
+      // and the live camera are excluded by src and by size.
+      var best = 0;
+      Array.prototype.slice.call(root.querySelectorAll('video')).forEach(function(v) {
+        if (v.id === '__mp_speaker_base') return;
+        if (/speaker/i.test(v.currentSrc || v.src || '')) return;
+        var r = v.getBoundingClientRect();
+        var area = r.width * r.height;
+        if (area > best) { best = area; media = v; }
+      });
+    } else {
+      media = root.querySelector(target);
+    }
+    if (!media) return null;
+    var host = media.parentElement;
+    if (!host) return null;
+    var hcs = getComputedStyle(host);
+    if (hcs.position === 'static') host.style.position = 'relative';
+    host.style.overflow = 'hidden';
+    var wrap = document.createElement('div');
+    wrap.className = '__mp_camera_rig __mp_camera_rig--content';
+    wrap.style.cssText = 'position:absolute;inset:0;will-change:transform;transform-origin:50% 50%;';
+    host.insertBefore(wrap, media);
+    wrap.appendChild(media);
+    return { el: wrap, box: function() { return host.getBoundingClientRect(); } };
+  }
   function apply() {
-    var host = ${containerExpr};
+    var root = ${containerExpr};
     var tl = ${timelineExpr};
-    if (!host || !tl || !tl.to) return false;
-    var cam = document.createElement('div');
-    cam.className = '__mp_camera_rig';
-    cam.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;will-change:transform;transform-origin:50% 50%;';
-    Array.prototype.slice.call(host.childNodes).forEach(function(n) {
-      if (n.nodeType === 1) {
-        var t = n.tagName;
-        if (t === 'SCRIPT' || t === 'STYLE') return;
-        if (n.id === '__mp_speaker_base') return;
-      }
-      cam.appendChild(n);
+    if (!root || !tl || !tl.to) return false;
+    var groups = {};
+    moves.forEach(function(m) {
+      var k = m.target || '';
+      (groups[k] = groups[k] || []).push(m);
     });
-    host.appendChild(cam);
-    var st = { scale: 1, x: 0, y: 0, rotation: 0 };
-    moves.slice().sort(function(a, b) { return a.at - b.at; }).forEach(function(m) {
-      var px = (m.x != null ? m.x : 50) / 100, py = (m.y != null ? m.y : 50) / 100;
-      var to;
-      if (m.type === 'reset') to = { scale: 1, x: 0, y: 0, rotation: 0 };
-      else {
-        var sc = m.type === 'zoom' ? (m.scale || 2) : st.scale;
-        to = {
-          scale: sc,
-          x: (0.5 - px) * W * sc,
-          y: (0.5 - py) * H * sc,
-          rotation: m.type === 'rotate' ? (m.angle || 0) : st.rotation,
-        };
-      }
-      var dur = m.duration || 1;
-      var ease = m.ease || 'power2.inOut';
-      tl.to(cam, { scale: to.scale, x: to.x, y: to.y, rotation: to.rotation, duration: dur, ease: ease }, m.at);
-      st = to;
-      if (m['return']) {
-        tl.to(cam, { scale: 1, x: 0, y: 0, rotation: 0, duration: dur, ease: ease }, m.at + dur + (m.hold || 0));
-        st = { scale: 1, x: 0, y: 0, rotation: 0 };
-      }
+    Object.keys(groups).forEach(function(k) {
+      var rig = buildRig(root, k || null);
+      if (!rig) return;
+      var st = { scale: 1, x: 0, y: 0, rotation: 0 };
+      groups[k].slice().sort(function(a, b) { return a.at - b.at; }).forEach(function(m) {
+        var b = rig.box();
+        var W = b.width || CW, H = b.height || CH;
+        // Focal point arrives as canvas %, convert to this rig's box %.
+        var fx = ((m.x != null ? m.x : 50) / 100) * CW;
+        var fy = ((m.y != null ? m.y : 50) / 100) * CH;
+        var px = k ? Math.max(0, Math.min(1, (fx - b.left) / W)) : fx / CW;
+        var py = k ? Math.max(0, Math.min(1, (fy - b.top) / H)) : fy / CH;
+        var to;
+        if (m.type === 'reset') to = { scale: 1, x: 0, y: 0, rotation: 0 };
+        else {
+          var sc = m.type === 'zoom' ? (m.scale || 2) : st.scale;
+          to = {
+            scale: sc,
+            x: (0.5 - px) * W * sc,
+            y: (0.5 - py) * H * sc,
+            rotation: m.type === 'rotate' ? (m.angle || 0) : st.rotation,
+          };
+        }
+        var dur = m.duration || 1;
+        var ease = m.ease || 'power2.inOut';
+        tl.to(rig.el, { scale: to.scale, x: to.x, y: to.y, rotation: to.rotation, duration: dur, ease: ease }, m.at);
+        st = to;
+        if (m['return']) {
+          tl.to(rig.el, { scale: 1, x: 0, y: 0, rotation: 0, duration: dur, ease: ease }, m.at + dur + (m.hold || 0));
+          st = { scale: 1, x: 0, y: 0, rotation: 0 };
+        }
+      });
     });
     return true;
   }
-  // The master timeline may be created after this script runs -- retry
-  // briefly on rAF until it exists.
   var tries = 0;
   (function tick() {
-    if (apply() || tries++ > 300) return;
+    var root = ${containerExpr};
+    var tl = ${timelineExpr};
+    if ((root && tl && tl.to && apply()) || tries++ > 300) return;
     requestAnimationFrame(tick);
   })();
 })();

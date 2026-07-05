@@ -362,6 +362,7 @@ export function createMcpServer(): McpServer {
       camera_moves: z.array(z.object({
         at: z.number(),
         type: z.enum(["zoom", "pan", "rotate", "reset"]),
+        target: z.string().optional(),
         x: z.number().optional(),
         y: z.number().optional(),
         scale: z.number().optional(),

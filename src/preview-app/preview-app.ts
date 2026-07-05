@@ -613,6 +613,10 @@ export function getPreviewHtml(): string {
           <div class="rv-scope-label" style="margin-bottom:6px;">Camera &mdash; click to direct</div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;">
             <button class="rv-go" id="cam-add-zoom" style="flex:0 0 auto;padding:6px 10px;" title="Then click the point in the preview to zoom into (at the current playhead time)">&#127909; Zoom at playhead</button>
+            <label>into <select id="cam-target" style="font-size:11px;">
+              <option value="">whole scene</option>
+              <option value="screencast">screencast only</option>
+            </select></label>
             <label>scale <input id="cam-scale" type="number" min="1.1" max="4" step="0.1" value="1.8" style="width:48px;"></label>
             <label>ease <input id="cam-dur" type="number" min="0.2" max="3" step="0.1" value="0.8" style="width:44px;">s</label>
             <label>hold <input id="cam-hold" type="number" min="0" max="10" step="0.5" value="1.5" style="width:44px;">s</label>
@@ -675,6 +679,7 @@ export function getPreviewHtml(): string {
     previewPlaceholder: document.getElementById('preview-placeholder'),
     previewWrapper: document.getElementById('preview-wrapper'),
     camAddZoom: document.getElementById('cam-add-zoom'),
+    camTarget: document.getElementById('cam-target'),
     camScale: document.getElementById('cam-scale'),
     camDur: document.getElementById('cam-dur'),
     camHold: document.getElementById('cam-hold'),
@@ -2380,7 +2385,7 @@ export function getPreviewHtml(): string {
     moves.forEach(function(m, i) {
       var row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:6px;';
-      var desc = m.type + (m.scale ? ' ' + m.scale + '\u00d7' : '') + ' @' + (m.at != null ? m.at.toFixed(1) : '?') + 's \u2192 (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%)' + (m['return'] ? ' \u21a9' : '');
+      var desc = (m.target === 'screencast' ? 'screencast ' : '') + m.type + (m.scale ? ' ' + m.scale + '\u00d7' : '') + ' @' + (m.at != null ? m.at.toFixed(1) : '?') + 's \u2192 (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%)' + (m['return'] ? ' \u21a9' : '');
       var span = document.createElement('span');
       span.textContent = desc;
       span.style.flex = '1';
@@ -2451,6 +2456,7 @@ export function getPreviewHtml(): string {
       hold: parseFloat(els.camHold.value) || 0,
       'return': !!els.camReturn.checked,
     };
+    if (els.camTarget && els.camTarget.value) move.target = els.camTarget.value;
     var moves = ((scene.camera_moves) || []).slice();
     moves.push(move);
     disarmCameraZoom();
