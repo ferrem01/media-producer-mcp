@@ -566,6 +566,25 @@ export function getPreviewHtml(): string {
   .studio-pop .sp-fields label { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; color: #6b7280; }
   .studio-pop .sp-fields input[type="number"] { width: 56px; padding: 4px 6px; font-size: 11px; border: 1px solid #d1d5db; border-radius: 6px; }
   .studio-pop .sp-region { grid-column: 1 / -1; font-size: 11px; color: #6b7280; }
+  /* Transient status toast (the bottom panels that used to host status lines are gone). */
+  #studio-toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(8px);
+    z-index: 9997; max-width: 640px; padding: 8px 16px; border-radius: 999px;
+    background: rgba(17,24,39,0.92); color: #e5e7eb; font-size: 12px;
+    box-shadow: 0 8px 24px rgba(15,23,42,0.25);
+    opacity: 0; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  #studio-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #studio-toast.ok { background: rgba(5,102,72,0.94); color: #d1fae5; }
+  #studio-toast.warn { background: rgba(146,64,14,0.94); color: #fef3c7; }
+  #studio-toast.err { background: rgba(153,27,27,0.94); color: #fee2e2; }
+  /* Storyboard button on each scene row */
+  .scene-sb-btn {
+    flex: 0 0 auto; border: 1px solid #e5e7eb; background: #fff; color: #6b7280;
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 6px; cursor: pointer;
+  }
+  .scene-sb-btn:hover { border-color: #6366f1; color: #4f46e5; }
+  .scene-quality-badge { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -618,47 +637,9 @@ export function getPreviewHtml(): string {
     </div>
   </div>
 
-  <div id="bottom-panels">
-    <div id="storyboard-panel">
-      <div class="panel-header">Storyboard &mdash; this scene</div>
-      <div id="storyboard-body">
-        <div id="sb-preview" class="sb-preview"><div class="sb-prev-text empty">No scene selected</div></div>
-        <div class="sb-actions">
-          <button class="rv-go secondary" id="sb-edit" style="flex:0 0 auto;" title="Open the storyboard in a larger editor">Edit storyboard</button>
-          <button class="rv-go" id="sb-regen" style="flex:1;" title="Rebuild this scene from scratch (storyboard builder + generate + critique) to fulfill the storyboard. Slow.">Regenerate from this storyboard</button>
-        </div>
-        <div class="sb-hint">Regenerate rebuilds this scene from scratch (slow) to fulfill the storyboard. Edit the storyboard for more room to read and write.</div>
-        <div class="rv-status" id="sb-status"></div>
-      </div>
-    </div>
-    <div id="props-panel">
-      <div class="panel-header">Revise &mdash; tweak what's there</div>
-      <div id="revise-panel">
-        <div class="rv-sel" id="rv-sel">Click an element in the scene, or revise the whole scene.</div>
-        <div class="rv-scope-row">
-          <span class="rv-scope-label">Apply to</span>
-          <div class="rv-scope">
-            <button id="rv-scope-el" class="active">This element</button>
-            <button id="rv-scope-scene">Whole scene</button>
-          </div>
-        </div>
-        <textarea id="rv-input" placeholder="What should change? e.g. make this bigger, use the brand green, move it off her face"></textarea>
-        <div style="display:flex;gap:6px;">
-          <button class="rv-go" id="rv-go" style="flex:1;">Revise</button>
-          <button class="rv-go secondary" id="rv-undo" style="flex:0 0 auto;" title="Undo the last revise on this scene">Undo</button>
-        </div>
-        <div id="cam-section" style="border-top:1px solid #e5e7eb;padding-top:8px;margin-top:2px;">
-          <div class="rv-scope-label" style="margin-bottom:6px;">Camera</div>
-          <div id="cam-hint" style="font-size:10px;color:#9ca3af;">Drag on the scene to draw a zoom region. Saved zooms are &#x2922; pills on the timeline &mdash; click one to edit or delete.</div>
-        <div style="display:none;">
-        </div>
-        <div class="rv-hint" style="font-size:10px;color:#64748b;margin-top:4px;">Revise makes a surgical edit and keeps the rest of the scene. To rebuild a broken or empty scene, use Regenerate on the left.</div>
-        <div class="rv-status" id="rv-status"></div>
-      </div>
-    </div>
-  </div>
 </div>
 
+<div id="studio-toast"></div>
 <div id="studio-ctx"></div>
 <div id="rv-pop" class="studio-pop"></div>
 <div id="cam-pop" class="studio-pop" style="width:280px;"></div>
@@ -1634,6 +1615,7 @@ export function getPreviewHtml(): string {
         + '<div class="scene-label">' + (i + 1) + '. ' + escHtml(label) + '</div>'
         + '<div class="scene-meta-row">'
         + '<span class="scene-dur">' + (scene.duration_seconds || 0).toFixed(1) + 's' + (beatCount ? ' \\u00b7 ' + beatCount + ' beats' : '') + '</span>'
+        + '<button class="scene-sb-btn" data-index="' + i + '" title="Storyboard, defects &amp; regenerate">&#x2261; Storyboard</button>'
         + badgeHtml
         + '</div>'
         + '</div>'
@@ -1648,6 +1630,23 @@ export function getPreviewHtml(): string {
       el.addEventListener('click', function() {
         selectScene(parseInt(el.dataset.index, 10));
       });
+    });
+
+    // Storyboard button (and the defect badge) open the storyboard dialog
+    // for that scene -- the dialog now also carries the defect report and
+    // the Regenerate action.
+    function openSbFor(idx, ev) {
+      ev.stopPropagation();
+      selectScene(idx);
+      renderLayers();
+      openStoryboardEditor();
+    }
+    els.sceneList.querySelectorAll('.scene-sb-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(ev) { openSbFor(parseInt(btn.dataset.index, 10), ev); });
+    });
+    els.sceneList.querySelectorAll('.scene-quality-badge').forEach(function(badge) {
+      var item = badge.closest('.scene-item');
+      if (item) badge.addEventListener('click', function(ev) { openSbFor(parseInt(item.dataset.index, 10), ev); });
     });
 
     els.sceneList.querySelectorAll('.scene-thumb').forEach(function(thumb) {
@@ -1946,7 +1945,9 @@ export function getPreviewHtml(): string {
   }
 
   function renderLayers() {
-    if (!els.sbPreview) return;
+    // Keeps studio.sb (the storyboard dialog's data source) in step with the
+    // active scene. The old bottom-panel preview is gone; the DOM part is a
+    // no-op unless the panel exists.
     var project = state.currentProject;
     var idx = state.currentSceneIndex;
     var scene = project && idx >= 0 && project.scenes[idx];
@@ -2557,21 +2558,20 @@ export function getPreviewHtml(): string {
     var p = state.currentProject;
     var scene = p && p.scenes && p.scenes[sceneIndex];
     if (!scene || !p) return;
-    els.camHint.textContent = 'Saving\u2026';
+    studioStatus('Saving camera move\u2026', '');
     api('POST', '/camera-moves/' + state.tenantId + '/' + p.project_id, {
       scene_id: scene.id,
       camera_moves: moves.length ? moves : null,
     }).then(function(r) {
       scene.camera_moves = r.camera_moves && r.camera_moves.length ? r.camera_moves : undefined;
-      els.camHint.textContent = 'Saved. Reloading preview\u2026';
+      studioStatus('Saved \u2713 reloading preview\u2026', 'ok');
       renderCamPills();
       // Full composite reboot (same path as project load) with the playhead
       // restored -- a bare re-init leaves the new iframe unseeked (scene
       // content hidden, camera showing through) and media clips stale.
       startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
-      els.camHint.textContent = '';
     }).catch(function(e) {
-      els.camHint.textContent = 'Save failed: ' + e.message;
+      studioStatus('Save failed: ' + e.message, 'err');
     });
   }
 
@@ -3241,7 +3241,6 @@ export function getPreviewHtml(): string {
     }
     studio.sel._label = label;
     studio.sel._fullBleed = false;
-    document.getElementById('rv-sel').innerHTML = 'Selected: <b>' + escHtml(label) + '</b>' + txt;
     if (studio.selLabel) studio.selLabel.textContent = label + (!isScene && studio.sel.text ? ' \\u2014 ' + studio.sel.text.slice(0, 32) : '');
     // A near-full-canvas element (a full-bleed background wrapper) almost
     // always means "the scene" to the person clicking -- default the scope
@@ -3369,9 +3368,6 @@ export function getPreviewHtml(): string {
   }
 
   function rvPopGo() {
-    var ta = document.getElementById('rv-pop-input');
-    var inp = document.getElementById('rv-input');
-    if (ta && inp) inp.value = ta.value;
     studioRevise();
   }
 
@@ -3450,18 +3446,16 @@ export function getPreviewHtml(): string {
   }
 
   function studioSetScope(scope) {
+    // Scope is implied by the selection now (element vs scene); no toggles.
     studio.scope = scope;
-    document.getElementById('rv-scope-el').classList.toggle('active', scope === 'element');
-    document.getElementById('rv-scope-scene').classList.toggle('active', scope === 'scene');
-    rvPopSyncScope();
   }
 
   function studioShowCtx(x, y) {
     var m = document.getElementById('studio-ctx');
     m.innerHTML = '';
     function item(label, fn) { var b = document.createElement('button'); b.textContent = label; b.onclick = function() { m.style.display = 'none'; fn(); }; m.appendChild(b); }
-    item('Revise this element\\u2026', function() { studioSetScope('element'); document.getElementById('rv-input').focus(); });
-    item('Revise whole scene\\u2026', function() { studioSetScope('scene'); document.getElementById('rv-input').focus(); });
+    item('Revise this element\\u2026', function() { studioSetScope('element'); rvPopShow(); });
+    item('Revise whole scene\\u2026', function() { studioSetScope('scene'); rvPopShow(); });
     var sep = document.createElement('div'); sep.className = 'ctx-sep'; m.appendChild(sep);
     item('Cancel', function() {});
     m.style.left = Math.max(4, Math.min(x, window.innerWidth - 190)) + 'px';
@@ -3485,11 +3479,17 @@ export function getPreviewHtml(): string {
     ov.textContent = label || 'Revising\\u2026';
   }
 
+  var _toastTimer = null;
   function studioStatus(msg, cls) {
-    var s = document.getElementById('rv-status');
-    s.className = 'rv-status' + (cls ? ' ' + cls : '');
-    s.textContent = msg;
-    // Mirror into the floating revise popover when it's open.
+    // Toast (the bottom status lines are gone) + mirror into the revise
+    // popover when it's open.
+    var t = document.getElementById('studio-toast');
+    if (t) {
+      t.className = (cls ? cls + ' ' : '') + (msg ? 'show' : '');
+      t.textContent = msg;
+      if (_toastTimer) clearTimeout(_toastTimer);
+      if (msg) _toastTimer = setTimeout(function() { t.className = ''; }, cls === 'err' ? 8000 : 4500);
+    }
     var ps = document.getElementById('rv-pop-status');
     if (ps) {
       ps.className = 'sp-status rv-status' + (cls ? ' ' + cls : '');
@@ -3568,7 +3568,8 @@ export function getPreviewHtml(): string {
 
   function studioRevise() {
     if (studio.busy) return;
-    var instruction = (document.getElementById('rv-input').value || '').trim();
+    var ta = document.getElementById('rv-pop-input');
+    var instruction = ((ta && ta.value) || '').trim();
     if (!instruction) { studioStatus('Type what to change first.', 'warn'); return; }
     var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
     if (!sceneId) { studioStatus('Select an element or load a scene first.', 'warn'); return; }
@@ -3580,21 +3581,15 @@ export function getPreviewHtml(): string {
     } : undefined;
 
     studio.busy = true;
-    document.getElementById('rv-go').disabled = true;
-    document.getElementById('rv-input').disabled = true;
     rvPopSetBusy(true);
-    var sbRegenR = document.getElementById('sb-regen'); if (sbRegenR) sbRegenR.disabled = true;
-    var sbEditR = document.getElementById('sb-edit'); if (sbEditR) sbEditR.disabled = true;
+    studioToggleControls(true);
     studioStatus('Revising\\u2026 (' + (studio.scope === 'scene' ? 'whole scene' : 'element') + ')', '');
     studioBusyOverlay(true);
 
     function done() {
       studio.busy = false;
-      document.getElementById('rv-go').disabled = false;
-      document.getElementById('rv-input').disabled = false;
       rvPopSetBusy(false);
-      var sr = document.getElementById('sb-regen'); if (sr) sr.disabled = false;
-      var ss = document.getElementById('sb-edit'); if (ss) ss.disabled = false;
+      studioToggleControls(false);
       studioBusyOverlay(false);
     }
     api('POST', '/revise/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id),
@@ -3616,7 +3611,6 @@ export function getPreviewHtml(): string {
         } else {
           studioStatus('Updated \\u2713 (' + edits + ')', 'ok');
         }
-        document.getElementById('rv-input').value = '';
         var pi = document.getElementById('rv-pop-input'); if (pi) pi.value = '';
         studioReload();
       })
@@ -3629,17 +3623,13 @@ export function getPreviewHtml(): string {
     if (!sceneId) { studioStatus('Select a scene first.', 'warn'); return; }
     var p = state.currentProject; if (!p) { studioStatus('Load a project first.', 'warn'); return; }
     studio.busy = true;
-    document.getElementById('rv-undo').disabled = true;
-    document.getElementById('rv-go').disabled = true;
-    var sbRegenU = document.getElementById('sb-regen'); if (sbRegenU) sbRegenU.disabled = true;
-    var sbEditU = document.getElementById('sb-edit'); if (sbEditU) sbEditU.disabled = true;
+    rvPopSetBusy(true);
+    studioToggleControls(true);
     studioStatus('Undoing\\u2026', '');
     function done() {
       studio.busy = false;
-      document.getElementById('rv-undo').disabled = false;
-      document.getElementById('rv-go').disabled = false;
-      var sr = document.getElementById('sb-regen'); if (sr) sr.disabled = false;
-      var ss = document.getElementById('sb-edit'); if (ss) ss.disabled = false;
+      rvPopSetBusy(false);
+      studioToggleControls(false);
     }
     api('POST', '/revise/undo/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { scene_id: sceneId })
       .then(function(res) {
@@ -3653,12 +3643,9 @@ export function getPreviewHtml(): string {
       .catch(function(e) { done(); studioStatus('Error: ' + e.message, 'err'); });
   }
 
-  // Status line for the Storyboard panel (mirrors studioStatus, separate element).
+  // Storyboard statuses go to the same toast (its panel is gone).
   function sbStatus(msg, cls) {
-    var s = document.getElementById('sb-status');
-    if (!s) return;
-    s.className = 'rv-status' + (cls ? ' ' + cls : '');
-    s.textContent = msg;
+    studioStatus(msg, cls);
   }
 
   // ── Studio modal (storyboard editor + regenerate progress) ──
@@ -3674,9 +3661,9 @@ export function getPreviewHtml(): string {
     if (back) back.style.display = 'none';
   }
 
-  // Enable/disable every scene-mutating control at once (revise + storyboard).
+  // Enable/disable every scene-mutating control at once (popover + modal).
   function studioToggleControls(disabled) {
-    ['sb-edit', 'sb-regen', 'rv-go', 'rv-undo'].forEach(function(id) {
+    ['rv-pop-go', 'rv-pop-undo', 'rv-pop-input', 'sm-save', 'sm-regen'].forEach(function(id) {
       var b = document.getElementById(id); if (b) b.disabled = disabled;
     });
   }
@@ -3686,9 +3673,23 @@ export function getPreviewHtml(): string {
     var sceneId = (studio.sel && studio.sel.sceneId) || studioCurrentSceneId();
     if (!sceneId) { sbStatus('Select or load a scene first.', 'warn'); return; }
     var b = studio.sb || {};
+    // Critique verdict lives here now (the bottom panel is gone): what
+    // shipped and why, so defects can be targeted with Revise/Regenerate.
+    var qualityHtml = '';
+    if (b.quality) {
+      var q = b.quality;
+      var qcls = q.passed ? 'qb-pass' : 'qb-warn';
+      var qhead = q.passed
+        ? '\\u2713 Passed critique clean (score ' + q.score + ', ' + q.attempts + ' attempt' + (q.attempts === 1 ? '' : 's') + ')'
+        : '\\u26a0 Shipped with ' + (q.unresolved_defects || []).length + ' unresolved defect' + ((q.unresolved_defects || []).length === 1 ? '' : 's') + ' (score ' + q.score + ', ' + q.attempts + ' attempt' + (q.attempts === 1 ? '' : 's') + ')';
+      qualityHtml = '<div class="sb-quality-block ' + qcls + '"><div class="sb-quality-head ' + qcls + '">' + qhead + '</div>' +
+        (q.unresolved_defects || []).map(function(d) { return '<div class="sb-quality-defect">\\u2022 ' + escHtml(d) + '</div>'; }).join('') +
+        '</div>';
+    }
     var html =
-      '<h3 class="sm-title">Edit scene storyboard</h3>' +
-      '<p class="sm-desc">This is the storyboard for this scene. Save to keep it; Regenerate rebuilds the scene to fulfill it.</p>' +
+      '<h3 class="sm-title">Scene storyboard</h3>' +
+      '<p class="sm-desc">Save keeps your edits; Regenerate rebuilds the scene from scratch (slow) to fulfill this storyboard.</p>' +
+      qualityHtml +
       '<div class="sm-field"><label>Purpose</label><textarea id="sm-purpose" placeholder="What this scene communicates">' + escHtml(b.purpose || '') + '</textarea></div>' +
       '<div class="sm-field"><label>Script (voiceover / on-screen)</label><textarea id="sm-script" placeholder="The narration or on-screen copy">' + escHtml(b.script || '') + '</textarea></div>' +
       '<div class="sm-field"><label>Visual notes (the WORLD: setting, layers, what persists)</label><textarea id="sm-visual" style="min-height:130px;" placeholder="Layout, motion, imagery, hierarchy">' + escHtml(b.visual_notes || '') + '</textarea></div>' +
@@ -3706,12 +3707,14 @@ export function getPreviewHtml(): string {
       '<div class="sm-status" id="sm-edit-status"></div>' +
       '<div class="sm-actions">' +
         '<button class="sm-btn" id="sm-cancel">Cancel</button>' +
+        '<button class="sm-btn" id="sm-regen" title="Rebuild this scene from scratch (storyboard builder + generate + critique). Slow.">Regenerate scene</button>' +
         '<button class="sm-btn primary" id="sm-save">Save storyboard</button>' +
       '</div>';
     studioModalOpen(html);
     wireBeatEditor(b.beats || []);
     document.getElementById('sm-cancel').addEventListener('click', studioModalClose);
     document.getElementById('sm-save').addEventListener('click', function() { saveStoryboardFromModal(sceneId); });
+    document.getElementById('sm-regen').addEventListener('click', function() { studioRegenerate(); });
   }
 
   function modalVal(id) { var el = document.getElementById(id); return el ? (el.value || '') : ''; }
@@ -3747,7 +3750,9 @@ export function getPreviewHtml(): string {
           if (!p.storyboard.scenes) p.storyboard.scenes = [];
           p.storyboard.scenes[idx] = res.scene;
         }
+        var keptQuality = studio.sb && studio.sb.quality;
         studio.sb = storyboardSceneToFields(res.scene);
+        studio.sb.quality = keptQuality || null;
         renderStoryboardPreview();
         studioModalClose();
         sbStatus('Storyboard saved \\u2713', 'ok');
@@ -3875,16 +3880,8 @@ export function getPreviewHtml(): string {
     tick();
   }
 
-  // Wire the Revise + Storyboard panel controls
-  document.getElementById('rv-scope-el').addEventListener('click', function() { studioSetScope('element'); });
-  document.getElementById('rv-scope-scene').addEventListener('click', function() { studioSetScope('scene'); });
-  document.getElementById('rv-go').addEventListener('click', studioRevise);
-  document.getElementById('rv-undo').addEventListener('click', studioUndo);
-  document.getElementById('sb-edit').addEventListener('click', openStoryboardEditor);
-  document.getElementById('sb-regen').addEventListener('click', studioRegenerate);
-  document.getElementById('rv-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); studioRevise(); }
-  });
+  // Revise + storyboard controls live in the selection popover and the
+  // storyboard dialog (wired where they're built); nothing to bind here.
 })();
 </script>
 </body>
