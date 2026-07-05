@@ -29,6 +29,7 @@ import {
   stripEagerVideoLoading,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
+import { speakerSceneFilmStarts } from "./speaker-track.js";
 import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
 
 export interface CompositeComponentSource {
@@ -86,16 +87,10 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
   const sceneScripts: string[] = [];
   const sceneMeta: Array<{ id: string; duration: number; transitionIn?: { type: string; duration: number } }> = [];
 
-  // Cumulative scene starts: raw <video src="speaker"> PiPs seek the camera
-  // to film-time, not scene-local zero.
-  const sceneStarts: number[] = [];
-  {
-    let t = 0;
-    for (const si2 of sceneInputs) {
-      sceneStarts.push(t);
-      t += si2.scene.duration_seconds || 0;
-    }
-  }
+  // Cumulative scene starts in FILM time (scene durations + inserted
+  // transition durations) -- the same clock the render's speaker base and
+  // audio follow, so PiP/panel camera views match the voice.
+  const sceneStarts = speakerSceneFilmStarts(sceneInputs.map((si2) => si2.scene));
 
   for (let si = 0; si < sceneInputs.length; si++) {
     const { scene, components } = sceneInputs[si];
