@@ -186,6 +186,11 @@ export interface CameraMove {
   /** Focal point as percent of canvas (0-100). Defaults to center. */
   x?: number;
   y?: number;
+  /** What to move. Omitted = the whole scene (cinematic punch-in).
+   *  "screencast" = the largest non-speaker video, rigged INSIDE its clipping
+   *  frame -- the screen content magnifies while browser chrome and PiP stay
+   *  fixed. Any other value is a CSS selector for the media element to rig. */
+  target?: string;
   /** Zoom factor for type=zoom (e.g. 1.8). */
   scale?: number;
   /** Degrees for type=rotate. */
