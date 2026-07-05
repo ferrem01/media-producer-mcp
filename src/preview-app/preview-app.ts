@@ -648,19 +648,8 @@ export function getPreviewHtml(): string {
           <button class="rv-go secondary" id="rv-undo" style="flex:0 0 auto;" title="Undo the last revise on this scene">Undo</button>
         </div>
         <div id="cam-section" style="border-top:1px solid #e5e7eb;padding-top:8px;margin-top:2px;">
-          <div class="rv-scope-label" style="margin-bottom:6px;">Camera &mdash; click to direct</div>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;">
-            <button class="rv-go" id="cam-add-zoom" style="flex:0 0 auto;padding:6px 10px;" title="Then click the point in the preview to zoom into (at the current playhead time)">&#127909; Zoom at playhead</button>
-            <label>into <select id="cam-target" style="font-size:11px;">
-              <option value="">whole scene</option>
-              <option value="screencast">screencast only</option>
-            </select></label>
-            <label>scale <input id="cam-scale" type="number" min="1.1" max="4" step="0.1" value="1.8" style="width:48px;"></label>
-            <label>ease <input id="cam-dur" type="number" min="0.2" max="3" step="0.1" value="0.8" style="width:44px;">s</label>
-            <label>hold <input id="cam-hold" type="number" min="0" max="10" step="0.5" value="1.5" style="width:44px;">s</label>
-            <label title="Ease back to wide afterwards"><input id="cam-return" type="checkbox" checked> return</label>
-          </div>
-          <div id="cam-hint" style="font-size:10px;color:#9ca3af;margin-top:4px;">Saved moves show as &#x2922; pills on the timeline &mdash; click one to edit or delete.</div>
+          <div class="rv-scope-label" style="margin-bottom:6px;">Camera</div>
+          <div id="cam-hint" style="font-size:10px;color:#9ca3af;">Drag on the scene to draw a zoom region. Saved zooms are &#x2922; pills on the timeline &mdash; click one to edit or delete.</div>
         <div style="display:none;">
         </div>
         <div class="rv-hint" style="font-size:10px;color:#64748b;margin-top:4px;">Revise makes a surgical edit and keeps the rest of the scene. To rebuild a broken or empty scene, use Regenerate on the left.</div>
@@ -717,12 +706,6 @@ export function getPreviewHtml(): string {
     sceneList: document.getElementById('scene-list'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
     previewWrapper: document.getElementById('preview-wrapper'),
-    camAddZoom: document.getElementById('cam-add-zoom'),
-    camTarget: document.getElementById('cam-target'),
-    camScale: document.getElementById('cam-scale'),
-    camDur: document.getElementById('cam-dur'),
-    camHold: document.getElementById('cam-hold'),
-    camReturn: document.getElementById('cam-return'),
     camHint: document.getElementById('cam-hint'),
     previewIframe: document.getElementById('preview-iframe'),
     speakerBg: document.getElementById('speaker-bg'),
@@ -2414,8 +2397,6 @@ export function getPreviewHtml(): string {
 
   // ── Camera moves: direct manipulation (click a point at a time) ──
   // Deterministic data -> the assembler applies it as GSAP; no prompting.
-  var camArm = false;
-
   function currentSceneEntry() {
     var p = state.currentProject;
     if (!p || state.currentSceneIndex < 0) return null;
@@ -2449,13 +2430,23 @@ export function getPreviewHtml(): string {
     var p = state.currentProject;
     var total = state.totalDuration || calcTotalDuration();
     if (!p || !p.scenes || !(total > 0)) return;
+    var placed = [];
     p.scenes.forEach(function(scene, si) {
       (scene.camera_moves || []).forEach(function(m, mi) {
         var t = sceneStartFor(si) + (m.at || 0);
+        var pct = Math.max(0, Math.min(100, (t / total) * 100));
+        // Moves at (nearly) the same time stack upward instead of hiding
+        // each other -- every pill must stay clickable.
+        var lift = 0;
+        for (var pi = 0; pi < placed.length; pi++) {
+          if (Math.abs(placed[pi].pct - pct) < 1.1 && placed[pi].lift === lift) { lift++; pi = -1; }
+        }
+        placed.push({ pct: pct, lift: lift });
         var pill = document.createElement('div');
         pill.className = 'cam-pill';
         pill.textContent = '\u2922';
-        pill.style.left = Math.max(0, Math.min(100, (t / total) * 100)).toFixed(2) + '%';
+        pill.style.left = pct.toFixed(2) + '%';
+        if (lift) pill.style.top = (-3 - lift * 16) + 'px';
         pill.title = 'Scene ' + (si + 1) + ': ' + camMoveDesc(m);
         pill.addEventListener('click', function(ev) {
           ev.stopPropagation();
@@ -2486,10 +2477,6 @@ export function getPreviewHtml(): string {
     }).catch(function(e) {
       els.camHint.textContent = 'Save failed: ' + e.message;
     });
-  }
-
-  function saveCameraMoves(moves) {
-    saveCameraMovesForScene(state.currentSceneIndex, moves);
   }
 
   // \u2500\u2500 Camera-move popover (opens from a scrubber pill) \u2500\u2500
@@ -2582,100 +2569,101 @@ export function getPreviewHtml(): string {
   // Close the camera popover on any outside press (pills stop propagation).
   document.addEventListener('mousedown', function(e) {
     var pop = document.getElementById('cam-pop');
-    if (pop && pop.style.display === 'block' && !pop.contains(e.target)) camPopClose();
+    if (pop && pop.style.display === 'block' && !pop.contains(e.target)) {
+      camPopClose();
+      if (studio.dragCancel) studio.dragCancel();
+    }
   });
 
-  var camOverlay = null;
-  var camMarquee = null;
-  var camDrag = null;
-
-  function armCameraZoom() {
+  // ── Draw-a-zoom confirm popover: a drag on the scene (captured inside the
+  // iframe by studioAttach) draws a marquee; on release this opens anchored to
+  // the box. Nothing is saved until "Add zoom" -- a stray drag costs one Esc. ──
+  function zoomConfirmOpen(doc, boxPx) {
+    var pop = document.getElementById('cam-pop');
+    var si = state.currentSceneIndex;
     var scene = currentSceneEntry();
-    if (!scene) { els.camHint.textContent = 'Select a scene first.'; return; }
-    if (camOverlay) return;
-    camArm = true;
-    // Transparent capture overlay: mouse events over the preview land in the
-    // IFRAME's document and never reach the wrapper -- an overlay above the
-    // iframe is the only way to capture the gesture.
-    camOverlay = document.createElement('div');
-    camOverlay.style.cssText = 'position:absolute;inset:0;z-index:40;cursor:crosshair;background:rgba(99,102,241,0.04);';
-    camMarquee = document.createElement('div');
-    camMarquee.style.cssText = 'position:absolute;border:2px solid #6366f1;background:rgba(99,102,241,0.12);border-radius:4px;display:none;pointer-events:none;';
-    camOverlay.appendChild(camMarquee);
-    camOverlay.addEventListener('mousedown', camOnDown);
-    camOverlay.addEventListener('mousemove', camOnMove);
-    camOverlay.addEventListener('mouseup', camOnUp);
-    els.previewWrapper.appendChild(camOverlay);
-    els.camHint.textContent = 'Click a point, or drag a box around the region to fill the frame (Esc cancels).';
-  }
-
-  function disarmCameraZoom() {
-    camArm = false;
-    camDrag = null;
-    if (camOverlay) { camOverlay.remove(); camOverlay = null; camMarquee = null; }
-    if (els.camHint.textContent.indexOf('Click a point') === 0) els.camHint.textContent = '';
-  }
-
-  function camOnDown(ev) {
-    ev.preventDefault();
-    var box = camOverlay.getBoundingClientRect();
-    camDrag = { x0: ev.clientX - box.left, y0: ev.clientY - box.top, box: box, moved: false };
-  }
-
-  function camOnMove(ev) {
-    if (!camDrag) return;
-    var x1 = ev.clientX - camDrag.box.left, y1 = ev.clientY - camDrag.box.top;
-    if (Math.abs(x1 - camDrag.x0) + Math.abs(y1 - camDrag.y0) > 8) camDrag.moved = true;
-    if (!camDrag.moved) return;
-    camMarquee.style.display = 'block';
-    camMarquee.style.left = Math.min(camDrag.x0, x1) + 'px';
-    camMarquee.style.top = Math.min(camDrag.y0, y1) + 'px';
-    camMarquee.style.width = Math.abs(x1 - camDrag.x0) + 'px';
-    camMarquee.style.height = Math.abs(y1 - camDrag.y0) + 'px';
-  }
-
-  function camOnUp(ev) {
-    if (!camDrag) return;
-    var d = camDrag; camDrag = null;
-    var scene = currentSceneEntry();
-    if (!scene) { disarmCameraZoom(); return; }
-    var bw = d.box.width, bh = d.box.height;
-    var x1 = ev.clientX - d.box.left, y1 = ev.clientY - d.box.top;
-    var sceneStart = sceneOffset(state.currentSceneIndex);
-    var at = Math.max(0, Math.min((scene.duration_seconds || 5) - 0.2, state.masterTime - sceneStart));
-    var move = {
-      at: Math.round(at * 10) / 10,
-      type: 'zoom',
-      duration: parseFloat(els.camDur.value) || 0.8,
-      hold: parseFloat(els.camHold.value) || 0,
-      'return': !!els.camReturn.checked,
-    };
-    if (d.moved && Math.abs(x1 - d.x0) > 12 && Math.abs(y1 - d.y0) > 12) {
-      // Box gesture: center + dims as canvas %; scale computed at apply time
-      // so the outlined region just fills the frame.
-      move.x = Math.round(((d.x0 + x1) / 2 / bw) * 100);
-      move.y = Math.round(((d.y0 + y1) / 2 / bh) * 100);
-      move.w = Math.round((Math.abs(x1 - d.x0) / bw) * 100);
-      move.h = Math.round((Math.abs(y1 - d.y0) / bh) * 100);
-    } else {
-      // Point click: center at the click, scale from the field.
-      move.x = Math.round((x1 / bw) * 100);
-      move.y = Math.round((y1 / bh) * 100);
-      move.scale = parseFloat(els.camScale.value) || 1.8;
-    }
-    if (els.camTarget && els.camTarget.value) move.target = els.camTarget.value;
-    var moves = ((scene.camera_moves) || []).slice();
-    moves.push(move);
-    disarmCameraZoom();
-    saveCameraMoves(moves);
-  }
-
-  if (els.camAddZoom) {
-    els.camAddZoom.addEventListener('click', armCameraZoom);
-    document.addEventListener('keydown', function(ev) {
-      if (ev.key === 'Escape') { disarmCameraZoom(); camPopClose(); rvPopClose(); }
+    if (!pop || !scene) { if (studio.dragCancel) studio.dragCancel(); return; }
+    camPopClose();
+    var cw = parseInt(els.previewIframe.width, 10) || 1920;
+    var ch = parseInt(els.previewIframe.height, 10) || 1080;
+    var dur = scene.duration_seconds || 5;
+    var at = Math.max(0, Math.min(dur - 0.2, (state.masterTime || 0) - sceneStartFor(si)));
+    // Screencast detection: if the box sits inside the scene's largest
+    // non-speaker video, offer to scope the zoom to that video's content
+    // (same semantic target the runtime rig resolves).
+    var castRect = null;
+    try {
+      var root = doc.querySelector('.mp-scene[data-scene-id="' + (scene.id || '') + '"]') || doc.body;
+      var vids = root.querySelectorAll('video');
+      var bestA = 0;
+      for (var i = 0; i < vids.length; i++) {
+        var v = vids[i];
+        if (v.id === '__mp_speaker_base') continue;
+        if (/speaker/i.test(v.getAttribute('src') || '')) continue;
+        var vr = v.getBoundingClientRect();
+        if (vr.width * vr.height > bestA) { bestA = vr.width * vr.height; castRect = vr; }
+      }
+    } catch (e) {}
+    var cx = boxPx.left + boxPx.width / 2, cy = boxPx.top + boxPx.height / 2;
+    var boxInCast = castRect && cx >= castRect.left && cx <= castRect.right && cy >= castRect.top && cy <= castRect.bottom;
+    var fullyInCast = castRect && boxPx.left >= castRect.left && boxPx.top >= castRect.top &&
+      boxPx.left + boxPx.width <= castRect.right && boxPx.top + boxPx.height <= castRect.bottom;
+    pop.innerHTML =
+      '<div class="sp-head"><span class="sp-title"><b>Zoom here</b> — scene ' + (si + 1) + '</span>' +
+      '<button class="sp-x" id="zc-x" title="Cancel (Esc)">✕</button></div>' +
+      '<div class="sp-fields">' +
+        '<label>at <input id="zc-at" type="number" min="0" max="' + escAttr('' + Math.max(0, dur - 0.2).toFixed(1)) + '" step="0.1" value="' + escAttr('' + (Math.round(at * 10) / 10)) + '">s</label>' +
+        '<label>hold <input id="zc-hold" type="number" min="0" max="10" step="0.5" value="1.5">s</label>' +
+        '<label>ease <input id="zc-dur" type="number" min="0.2" max="3" step="0.1" value="0.8">s</label>' +
+        '<label title="Ease back to wide afterwards">return <input id="zc-return" type="checkbox" checked></label>' +
+        (boxInCast ? '<label class="sp-region" title="The screencast footage magnifies inside its frame; the browser frame and PiP stay put">inside the screencast only <input id="zc-cast" type="checkbox"' + (fullyInCast ? ' checked' : '') + '></label>' : '') +
+      '</div>' +
+      '<div class="sp-row">' +
+        '<button class="rv-go secondary" id="zc-cancel" style="flex:0 0 auto;">Cancel</button>' +
+        '<button class="rv-go" id="zc-add" style="flex:1;">Add zoom</button>' +
+      '</div>';
+    pop.style.display = 'block';
+    // Anchor next to the drawn box (box is in canvas px; scale to the screen).
+    var irect = els.previewIframe.getBoundingClientRect();
+    var sx = irect.width / cw, sy = irect.height / ch;
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 160;
+    var px = irect.left + (boxPx.left + boxPx.width / 2) * sx - pw / 2;
+    var py = irect.top + (boxPx.top + boxPx.height) * sy + 10;
+    if (py + ph > window.innerHeight - 8) py = Math.max(8, irect.top + boxPx.top * sy - ph - 10);
+    pop.style.left = Math.max(8, Math.min(px, window.innerWidth - pw - 8)) + 'px';
+    pop.style.top = py + 'px';
+    function closeCancel() { camPopClose(); if (studio.dragCancel) studio.dragCancel(); }
+    document.getElementById('zc-x').addEventListener('click', closeCancel);
+    document.getElementById('zc-cancel').addEventListener('click', closeCancel);
+    document.getElementById('zc-add').addEventListener('click', function() {
+      var atV = parseFloat(document.getElementById('zc-at').value);
+      var move = {
+        at: isNaN(atV) ? Math.round(at * 10) / 10 : Math.max(0, Math.min(dur - 0.2, Math.round(atV * 10) / 10)),
+        type: 'zoom',
+        x: Math.round(((boxPx.left + boxPx.width / 2) / cw) * 100),
+        y: Math.round(((boxPx.top + boxPx.height / 2) / ch) * 100),
+        w: Math.round((boxPx.width / cw) * 100),
+        h: Math.round((boxPx.height / ch) * 100),
+        duration: parseFloat(document.getElementById('zc-dur').value) || 0.8,
+        hold: parseFloat(document.getElementById('zc-hold').value) || 0,
+        'return': !!document.getElementById('zc-return').checked,
+      };
+      var castEl = document.getElementById('zc-cast');
+      if (castEl && castEl.checked) move.target = 'screencast';
+      var moves = (scene.camera_moves || []).slice();
+      moves.push(move);
+      closeCancel();
+      saveCameraMovesForScene(si, moves);
     });
   }
+
+  document.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Escape') {
+      if (studio.dragCancel) studio.dragCancel();
+      camPopClose();
+      rvPopClose();
+    }
+  });
 
   function togglePlay() {
     if (state.playing) {
@@ -3000,10 +2988,17 @@ export function getPreviewHtml(): string {
         doc.removeEventListener('mouseleave', prev.leave, true);
         doc.removeEventListener('click', prev.click, true);
         doc.removeEventListener('contextmenu', prev.ctx, true);
+        if (prev.down) doc.removeEventListener('mousedown', prev.down, true);
+        if (prev.dragmove) doc.removeEventListener('mousemove', prev.dragmove, true);
+        if (prev.up) doc.removeEventListener('mouseup', prev.up, true);
+        if (prev.dragstart) doc.removeEventListener('dragstart', prev.dragstart, true);
+        if (prev.key) doc.removeEventListener('keydown', prev.key, true);
       }
     } catch (e) {}
     try { var oh = doc.getElementById('__studio_hi'); if (oh) oh.remove(); } catch (e) {}
     try { var os = doc.getElementById('__studio_sel'); if (os) os.remove(); } catch (e) {}
+    try { var om = doc.getElementById('__studio_mq'); if (om) om.remove(); } catch (e) {}
+    studio.dragBox = null;
 
     // Make it obvious the scene is clickable for revising.
     try { doc.body.style.cursor = 'crosshair'; } catch(e) {}
@@ -3043,8 +3038,73 @@ export function getPreviewHtml(): string {
       studioPositionSel();
     }
     function onLeave() { hi.style.display = 'none'; }
+    // Drag = draw a zoom region (Figma convention: click selects, drag draws).
+    // Captured here because mouse events over the preview land in the iframe's
+    // document and never reach the parent page.
+    var drag = null;
+    function marqueeEl() {
+      if (!studio.dragBox || !studio.dragBox.isConnected) {
+        var mq = doc.createElement('div');
+        mq.id = '__studio_mq';
+        mq.style.cssText = 'position:absolute;z-index:2147483646;border:2px solid #6366f1;background:rgba(99,102,241,0.12);border-radius:4px;pointer-events:none;display:none;';
+        doc.body.appendChild(mq);
+        studio.dragBox = mq;
+      }
+      return studio.dragBox;
+    }
+    studio.dragCancel = function() {
+      drag = null;
+      if (studio.dragBox) studio.dragBox.style.display = 'none';
+    };
+    function onDown(e) {
+      if (studio.busy || e.button !== 0) return;
+      drag = { x0: e.clientX, y0: e.clientY, moved: false };
+    }
+    function onDragMove(e) {
+      if (!drag) return;
+      var w = Math.abs(e.clientX - drag.x0), h = Math.abs(e.clientY - drag.y0);
+      if (!drag.moved && w + h < 10) return;
+      drag.moved = true;
+      e.preventDefault();
+      hi.style.display = 'none';
+      var mq = marqueeEl();
+      mq.style.display = 'block';
+      mq.style.left = Math.min(drag.x0, e.clientX) + 'px';
+      mq.style.top = Math.min(drag.y0, e.clientY) + 'px';
+      mq.style.width = w + 'px';
+      mq.style.height = h + 'px';
+    }
+    function onUp(e) {
+      if (!drag) return;
+      var d = drag; drag = null;
+      if (!d.moved) return; // plain click: onClick handles selection
+      studio._justDragged = +new Date();
+      var w = Math.abs(e.clientX - d.x0), h = Math.abs(e.clientY - d.y0);
+      if (w < 24 || h < 24) { studio.dragCancel(); return; } // too small to mean a zoom
+      zoomConfirmOpen(doc, { left: Math.min(d.x0, e.clientX), top: Math.min(d.y0, e.clientY), width: w, height: h });
+    }
+    function onDragStart(e) { e.preventDefault(); }
+    // Esc must work while focus sits inside the iframe (it usually does after
+    // clicking the scene) -- the parent document's keydown never fires then.
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        studio.dragCancel();
+        camPopClose();
+        rvPopClose();
+      }
+    }
     function onClick(e) {
+      // Swallow the click that follows a drag-release.
+      if (studio._justDragged && (+new Date() - studio._justDragged) < 400) {
+        e.preventDefault(); e.stopPropagation();
+        return;
+      }
       var el = studioHitTest(doc, e.clientX, e.clientY);
+      if (!el) {
+        // Nothing under the pointer: select the SCENE itself.
+        var sid = studioCurrentSceneId();
+        if (sid) el = doc.querySelector('.mp-scene[data-scene-id="' + sid + '"]');
+      }
       if (!el) return;
       e.preventDefault(); e.stopPropagation();
       studioSelect(el, doc);
@@ -3062,16 +3122,46 @@ export function getPreviewHtml(): string {
     doc.addEventListener('mouseleave', onLeave, true);
     doc.addEventListener('click', onClick, true);
     doc.addEventListener('contextmenu', onCtx, true);
-    doc.__studioHandlers = { move: onMove, leave: onLeave, click: onClick, ctx: onCtx };
+    doc.addEventListener('mousedown', onDown, true);
+    doc.addEventListener('mousemove', onDragMove, true);
+    doc.addEventListener('mouseup', onUp, true);
+    doc.addEventListener('dragstart', onDragStart, true);
+    doc.addEventListener('keydown', onKey, true);
+    doc.__studioHandlers = { move: onMove, leave: onLeave, click: onClick, ctx: onCtx, down: onDown, dragmove: onDragMove, up: onUp, dragstart: onDragStart, key: onKey };
   }
 
   function studioSelect(el, doc) {
     studio.sel = studioContextOf(el, doc);
-    var label = studio.sel.compType || studio.sel.tagName || 'element';
-    var txt = studio.sel.text ? ' \\u2014 "' + escHtml(studio.sel.text.slice(0, 40)) + '"' : '';
+    var isScene = !!(el.getAttribute && el.getAttribute('data-scene-id') != null);
+    studio.sel._isScene = isScene;
+    var label, txt = '';
+    if (isScene) {
+      var sIdx = state.currentSceneIndex;
+      var sEnt = currentSceneEntry();
+      label = 'Scene ' + (sIdx >= 0 ? (sIdx + 1) : '');
+      if (sEnt && sEnt.label) txt = ' \\u2014 "' + escHtml(String(sEnt.label).slice(0, 40)) + '"';
+    } else {
+      label = studio.sel.compType || studio.sel.tagName || 'element';
+      txt = studio.sel.text ? ' \\u2014 "' + escHtml(studio.sel.text.slice(0, 40)) + '"' : '';
+    }
+    studio.sel._label = label;
+    studio.sel._fullBleed = false;
     document.getElementById('rv-sel').innerHTML = 'Selected: <b>' + escHtml(label) + '</b>' + txt;
-    if (studio.selLabel) studio.selLabel.textContent = label + (studio.sel.text ? ' \\u2014 ' + studio.sel.text.slice(0, 32) : '');
-    studioSetScope('element');
+    if (studio.selLabel) studio.selLabel.textContent = label + (!isScene && studio.sel.text ? ' \\u2014 ' + studio.sel.text.slice(0, 32) : '');
+    // A near-full-canvas element (a full-bleed background wrapper) almost
+    // always means "the scene" to the person clicking -- default the scope
+    // accordingly; the toggle is still there to narrow it back.
+    var fullBleed = false;
+    if (!isScene && studio.sel._el) {
+      try {
+        var r0 = studio.sel._el.getBoundingClientRect();
+        var cw0 = parseInt(els.previewIframe.width, 10) || 1920;
+        var ch0 = parseInt(els.previewIframe.height, 10) || 1080;
+        fullBleed = (r0.width * r0.height) >= 0.95 * cw0 * ch0;
+      } catch (e) {}
+    }
+    studio.sel._fullBleed = fullBleed;
+    studioSetScope(isScene || fullBleed ? 'scene' : 'element');
     studioPositionSel();
     rvPopShow();
   }
@@ -3083,29 +3173,86 @@ export function getPreviewHtml(): string {
     if (pop) pop.style.display = 'none';
   }
 
+  // Rebuilt on every show: the contents are contextual (element vs scene).
   function rvPopBuild(pop) {
+    var sel = studio.sel;
+    var isScene = !!(sel && sel._isScene);
+    var keepText = '';
+    var prevTa = document.getElementById('rv-pop-input');
+    if (prevTa) keepText = prevTa.value || '';
     pop.innerHTML =
       '<div class="sp-head"><span class="sp-title" id="rv-pop-title"></span>' +
       '<button class="sp-x" id="rv-pop-x" title="Close (Esc)">✕</button></div>' +
-      '<div class="sp-scope">' +
-        '<button id="rv-pop-scope-el" class="active">This element</button>' +
-        '<button id="rv-pop-scope-scene">Whole scene</button>' +
-      '</div>' +
-      '<textarea id="rv-pop-input" placeholder="What should change? e.g. make this bigger, use the brand green"></textarea>' +
+      (isScene ? '' :
+        '<div class="sp-scope">' +
+          '<button id="rv-pop-scope-el" class="active">This element</button>' +
+          '<button id="rv-pop-scope-scene">Whole scene</button>' +
+        '</div>') +
+      '<textarea id="rv-pop-input" placeholder="' + (isScene ? 'What should change in this scene?' : 'What should change? e.g. make this bigger, use the brand green') + '"></textarea>' +
       '<div class="sp-row">' +
         '<button class="rv-go secondary" id="rv-pop-undo" style="flex:0 0 auto;" title="Undo the last revise on this scene">Undo</button>' +
         '<button class="rv-go" id="rv-pop-go" style="flex:1;">Revise</button>' +
       '</div>' +
+      '<div class="sp-row">' +
+        (isScene || (sel && sel._fullBleed)
+          ? '<button class="rv-go secondary" id="rv-pop-draw" style="flex:1;" title="Drag on the scene to outline the region the camera should push into">⤢ Draw zoom region…</button>'
+          : '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1;" title="Add a camera zoom that frames this element, starting at the playhead">⤢ Zoom to this</button>') +
+      '</div>' +
       '<div class="sp-status" id="rv-pop-status"></div>';
     document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
-    document.getElementById('rv-pop-scope-el').addEventListener('click', function() { studioSetScope('element'); });
-    document.getElementById('rv-pop-scope-scene').addEventListener('click', function() { studioSetScope('scene'); });
+    var se = document.getElementById('rv-pop-scope-el');
+    var ss = document.getElementById('rv-pop-scope-scene');
+    if (se) se.addEventListener('click', function() { studioSetScope('element'); });
+    if (ss) ss.addEventListener('click', function() { studioSetScope('scene'); });
     document.getElementById('rv-pop-go').addEventListener('click', rvPopGo);
     document.getElementById('rv-pop-undo').addEventListener('click', studioUndo);
-    document.getElementById('rv-pop-input').addEventListener('keydown', function(e) {
+    var zb = document.getElementById('rv-pop-zoom');
+    if (zb) zb.addEventListener('click', zoomToSelection);
+    var db = document.getElementById('rv-pop-draw');
+    if (db) db.addEventListener('click', function() {
+      rvPopClose();
+      studioStatus('Drag on the scene to draw the zoom region (Esc cancels).', '');
+      if (els.camHint) els.camHint.textContent = 'Drag on the scene to draw the zoom region (Esc cancels).';
+    });
+    var ta = document.getElementById('rv-pop-input');
+    ta.value = keepText;
+    ta.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); rvPopGo(); }
     });
-    pop._built = true;
+  }
+
+  // "Zoom to this": a whole-scene camera push whose box is auto-fitted to the
+  // selected element's on-screen rect (with breathing room), at the playhead.
+  function zoomToSelection() {
+    var sel = studio.sel;
+    var si = state.currentSceneIndex;
+    var scene = currentSceneEntry();
+    if (!sel || !sel._el || sel._isScene || !scene) return;
+    var r;
+    try { r = sel._el.getBoundingClientRect(); } catch (e) { return; }
+    if (!r || r.width < 4 || r.height < 4) { studioStatus('That element has no visible box to zoom to.', 'warn'); return; }
+    var cw = parseInt(els.previewIframe.width, 10) || 1920;
+    var ch = parseInt(els.previewIframe.height, 10) || 1080;
+    var w = Math.min(100, (r.width / cw) * 100 * 1.15);
+    var h = Math.min(100, (r.height / ch) * 100 * 1.15);
+    if (w >= 96 && h >= 96) { studioStatus('This element already fills the frame \\u2014 draw a smaller region instead.', 'warn'); return; }
+    var dur = scene.duration_seconds || 5;
+    var at = Math.max(0, Math.min(dur - 0.2, (state.masterTime || 0) - sceneStartFor(si)));
+    var move = {
+      at: Math.round(at * 10) / 10,
+      type: 'zoom',
+      x: Math.round(((r.left + r.width / 2) / cw) * 100),
+      y: Math.round(((r.top + r.height / 2) / ch) * 100),
+      w: Math.round(Math.max(6, w)),
+      h: Math.round(Math.max(6, h)),
+      duration: 0.8,
+      hold: 1.5,
+      'return': true,
+    };
+    var moves = (scene.camera_moves || []).slice();
+    moves.push(move);
+    rvPopClose();
+    saveCameraMovesForScene(si, moves);
   }
 
   function rvPopGo() {
@@ -3116,7 +3263,7 @@ export function getPreviewHtml(): string {
   }
 
   function rvPopSetBusy(busy) {
-    ['rv-pop-go', 'rv-pop-undo', 'rv-pop-input'].forEach(function(id) {
+    ['rv-pop-go', 'rv-pop-undo', 'rv-pop-input', 'rv-pop-zoom', 'rv-pop-draw'].forEach(function(id) {
       var el = document.getElementById(id); if (el) el.disabled = busy;
     });
   }
@@ -3125,12 +3272,10 @@ export function getPreviewHtml(): string {
     var pop = document.getElementById('rv-pop');
     var sel = studio.sel;
     if (!pop || !sel) return;
-    if (!pop._built) rvPopBuild(pop);
-    var label = sel.compType || sel.tagName || 'element';
+    rvPopBuild(pop);
+    var label = sel._label || sel.compType || sel.tagName || 'element';
     document.getElementById('rv-pop-title').innerHTML = '<b>' + escHtml(label) + '</b>' +
-      (sel.text ? ' \\u2014 \\u201c' + escHtml(sel.text.slice(0, 40)) + '\\u201d' : '');
-    var st = document.getElementById('rv-pop-status');
-    if (st) { st.className = 'sp-status'; st.textContent = ''; }
+      (!sel._isScene && sel.text ? ' \\u2014 \\u201c' + escHtml(sel.text.slice(0, 40)) + '\\u201d' : '');
     rvPopSetBusy(!!studio.busy);
     rvPopSyncScope();
     pop.style.display = 'block';
@@ -3154,9 +3299,15 @@ export function getPreviewHtml(): string {
     var ifr = els.previewIframe;
     var rect = ifr.getBoundingClientRect();
     var sxr = rect.width / (ifr.width || 1920), syr = rect.height / (ifr.height || 1080);
+    var pw = pop.offsetWidth || 320, ph = pop.offsetHeight || 170;
+    if (sel._isScene) {
+      // Scene selection has no meaningful anchor rect -- center over the stage.
+      pop.style.left = Math.max(8, rect.left + rect.width / 2 - pw / 2) + 'px';
+      pop.style.top = Math.max(8, rect.top + rect.height / 2 - ph / 2) + 'px';
+      return;
+    }
     var r = null;
     try { r = sel._el.getBoundingClientRect(); } catch (e) {}
-    var pw = pop.offsetWidth || 320, ph = pop.offsetHeight || 170;
     var cx = rect.left + (r ? (r.left + r.width / 2) * sxr : rect.width / 2);
     var x = Math.max(8, Math.min(cx - pw / 2, window.innerWidth - pw - 8));
     var y = rect.top + (r ? r.bottom * syr : rect.height) + 10;
