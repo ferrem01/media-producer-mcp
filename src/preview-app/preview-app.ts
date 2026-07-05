@@ -1649,17 +1649,21 @@ export function getPreviewHtml(): string {
       if (item) badge.addEventListener('click', function(ev) { openSbFor(parseInt(item.dataset.index, 10), ev); });
     });
 
+    // Thumbnails are captured STILLS (videos + speaker camera included, taken
+    // a few seconds into the scene) -- an <img>, so they're cheap enough for
+    // mobile too. The server caches per scene content; the timestamp busts
+    // the browser cache so a revised scene shows its new frame.
     els.sceneList.querySelectorAll('.scene-thumb').forEach(function(thumb) {
-      if (IS_MOBILE) return; // static tiles -- no live scene runtime per thumbnail
       var sceneId = thumb.dataset.sceneId;
-      var path = '/scene-thumbnail/' + state.tenantId + '/' + project.project_id + '/' + sceneId;
-      fetchHtml(path).then(function(html) {
-        var iframe = document.createElement('iframe');
-        iframe.setAttribute('loading', 'lazy');
-        iframe.setAttribute('tabindex', '-1');
-        iframe.srcdoc = html;
-        thumb.appendChild(iframe);
-      }).catch(function() {});
+      var img = document.createElement('img');
+      img.setAttribute('loading', 'lazy');
+      img.alt = '';
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+      img.addEventListener('error', function() { img.remove(); });
+      // Cache-Control:no-cache + ETag on the server: the browser revalidates
+      // on every project load and gets a fast 304 until the scene changes.
+      img.src = '/api' + withToken('/scene-thumb/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(project.project_id) + '/' + encodeURIComponent(sceneId));
+      thumb.appendChild(img);
     });
   }
 
