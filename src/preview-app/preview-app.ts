@@ -2385,7 +2385,7 @@ export function getPreviewHtml(): string {
     moves.forEach(function(m, i) {
       var row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:6px;';
-      var desc = (m.target === 'screencast' ? 'screencast ' : '') + m.type + (m.scale ? ' ' + m.scale + '\u00d7' : '') + ' @' + (m.at != null ? m.at.toFixed(1) : '?') + 's \u2192 (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%)' + (m['return'] ? ' \u21a9' : '');
+      var desc = (m.target === 'screencast' ? 'screencast ' : '') + m.type + (m.w ? ' [box ' + m.w + '\u00d7' + m.h + '%]' : (m.scale ? ' ' + m.scale + '\u00d7' : '')) + ' @' + (m.at != null ? m.at.toFixed(1) : '?') + 's \u2192 (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%)' + (m['return'] ? ' \u21a9' : '');
       var span = document.createElement('span');
       span.textContent = desc;
       span.style.flex = '1';
@@ -2423,39 +2423,84 @@ export function getPreviewHtml(): string {
     });
   }
 
+  var camOverlay = null;
+  var camMarquee = null;
+  var camDrag = null;
+
   function armCameraZoom() {
     var scene = currentSceneEntry();
     if (!scene) { els.camHint.textContent = 'Select a scene first.'; return; }
+    if (camOverlay) return;
     camArm = true;
-    els.camHint.textContent = 'Click the point in the preview to zoom into (Esc to cancel).';
-    els.previewWrapper.style.cursor = 'crosshair';
+    // Transparent capture overlay: mouse events over the preview land in the
+    // IFRAME's document and never reach the wrapper -- an overlay above the
+    // iframe is the only way to capture the gesture.
+    camOverlay = document.createElement('div');
+    camOverlay.style.cssText = 'position:absolute;inset:0;z-index:40;cursor:crosshair;background:rgba(99,102,241,0.04);';
+    camMarquee = document.createElement('div');
+    camMarquee.style.cssText = 'position:absolute;border:2px solid #6366f1;background:rgba(99,102,241,0.12);border-radius:4px;display:none;pointer-events:none;';
+    camOverlay.appendChild(camMarquee);
+    camOverlay.addEventListener('mousedown', camOnDown);
+    camOverlay.addEventListener('mousemove', camOnMove);
+    camOverlay.addEventListener('mouseup', camOnUp);
+    els.previewWrapper.appendChild(camOverlay);
+    els.camHint.textContent = 'Click a point, or drag a box around the region to fill the frame (Esc cancels).';
   }
 
   function disarmCameraZoom() {
     camArm = false;
-    els.previewWrapper.style.cursor = '';
-    if (els.camHint.textContent.indexOf('Click the point') === 0) els.camHint.textContent = '';
+    camDrag = null;
+    if (camOverlay) { camOverlay.remove(); camOverlay = null; camMarquee = null; }
+    if (els.camHint.textContent.indexOf('Click a point') === 0) els.camHint.textContent = '';
   }
 
-  function onPreviewClickForCamera(ev) {
-    if (!camArm) return;
-    ev.preventDefault(); ev.stopPropagation();
+  function camOnDown(ev) {
+    ev.preventDefault();
+    var box = camOverlay.getBoundingClientRect();
+    camDrag = { x0: ev.clientX - box.left, y0: ev.clientY - box.top, box: box, moved: false };
+  }
+
+  function camOnMove(ev) {
+    if (!camDrag) return;
+    var x1 = ev.clientX - camDrag.box.left, y1 = ev.clientY - camDrag.box.top;
+    if (Math.abs(x1 - camDrag.x0) + Math.abs(y1 - camDrag.y0) > 8) camDrag.moved = true;
+    if (!camDrag.moved) return;
+    camMarquee.style.display = 'block';
+    camMarquee.style.left = Math.min(camDrag.x0, x1) + 'px';
+    camMarquee.style.top = Math.min(camDrag.y0, y1) + 'px';
+    camMarquee.style.width = Math.abs(x1 - camDrag.x0) + 'px';
+    camMarquee.style.height = Math.abs(y1 - camDrag.y0) + 'px';
+  }
+
+  function camOnUp(ev) {
+    if (!camDrag) return;
+    var d = camDrag; camDrag = null;
     var scene = currentSceneEntry();
     if (!scene) { disarmCameraZoom(); return; }
-    var box = els.previewWrapper.getBoundingClientRect();
-    var xPct = Math.max(0, Math.min(100, ((ev.clientX - box.left) / box.width) * 100));
-    var yPct = Math.max(0, Math.min(100, ((ev.clientY - box.top) / box.height) * 100));
+    var bw = d.box.width, bh = d.box.height;
+    var x1 = ev.clientX - d.box.left, y1 = ev.clientY - d.box.top;
     var sceneStart = sceneOffset(state.currentSceneIndex);
     var at = Math.max(0, Math.min((scene.duration_seconds || 5) - 0.2, state.masterTime - sceneStart));
     var move = {
       at: Math.round(at * 10) / 10,
       type: 'zoom',
-      x: Math.round(xPct), y: Math.round(yPct),
-      scale: parseFloat(els.camScale.value) || 1.8,
       duration: parseFloat(els.camDur.value) || 0.8,
       hold: parseFloat(els.camHold.value) || 0,
       'return': !!els.camReturn.checked,
     };
+    if (d.moved && Math.abs(x1 - d.x0) > 12 && Math.abs(y1 - d.y0) > 12) {
+      // Box gesture: center + dims as canvas %; scale computed at apply time
+      // so the outlined region just fills the frame.
+      move.x = Math.round(((d.x0 + x1) / 2 / bw) * 100);
+      move.y = Math.round(((d.y0 + y1) / 2 / bh) * 100);
+      move.w = Math.round((Math.abs(x1 - d.x0) / bw) * 100);
+      move.h = Math.round((Math.abs(y1 - d.y0) / bh) * 100);
+    } else {
+      // Point click: center at the click, scale from the field.
+      move.x = Math.round((x1 / bw) * 100);
+      move.y = Math.round((y1 / bh) * 100);
+      move.scale = parseFloat(els.camScale.value) || 1.8;
+    }
     if (els.camTarget && els.camTarget.value) move.target = els.camTarget.value;
     var moves = ((scene.camera_moves) || []).slice();
     moves.push(move);
@@ -2465,7 +2510,6 @@ export function getPreviewHtml(): string {
 
   if (els.camAddZoom) {
     els.camAddZoom.addEventListener('click', armCameraZoom);
-    els.previewWrapper.addEventListener('click', onPreviewClickForCamera, true);
     document.addEventListener('keydown', function(ev) { if (ev.key === 'Escape') disarmCameraZoom(); });
   }
 

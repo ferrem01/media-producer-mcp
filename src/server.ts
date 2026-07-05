@@ -363,6 +363,8 @@ export function createMcpServer(): McpServer {
         at: z.number(),
         type: z.enum(["zoom", "pan", "rotate", "reset"]),
         target: z.string().optional(),
+        w: z.number().optional(),
+        h: z.number().optional(),
         x: z.number().optional(),
         y: z.number().optional(),
         scale: z.number().optional(),
