@@ -359,6 +359,18 @@ export function createMcpServer(): McpServer {
         width: z.string(),
         offset: z.string().optional(),
       }).nullable().optional().describe("Confine the scene's components to one side of the frame (speaker films). Pass null to clear it so the scene lays out full-frame."),
+      camera_moves: z.array(z.object({
+        at: z.number(),
+        type: z.enum(["zoom", "pan", "rotate", "reset"]),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        scale: z.number().optional(),
+        angle: z.number().optional(),
+        duration: z.number().optional(),
+        hold: z.number().optional(),
+        return: z.boolean().optional(),
+        ease: z.string().optional(),
+      })).nullable().optional().describe("Deterministic scene-camera moves (zoom/pan/rotate at a time+point). Pass null to clear."),
 
       // Component-level updates
       data: z.record(z.unknown()).optional(),
@@ -551,6 +563,11 @@ export function createMcpServer(): McpServer {
           if (params.content_region !== undefined) {
             if (params.content_region === null) delete scene.content_region;
             else scene.content_region = params.content_region as any;
+            updated = true;
+          }
+          if (params.camera_moves !== undefined) {
+            if (params.camera_moves === null) delete scene.camera_moves;
+            else scene.camera_moves = params.camera_moves as any;
             updated = true;
           }
           if (params.speaker_track !== undefined) { project.speaker_track = params.speaker_track as any; updated = true; }

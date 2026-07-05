@@ -609,6 +609,19 @@ export function getPreviewHtml(): string {
           <button class="rv-go" id="rv-go" style="flex:1;">Revise</button>
           <button class="rv-go secondary" id="rv-undo" style="flex:0 0 auto;" title="Undo the last revise on this scene">Undo</button>
         </div>
+        <div id="cam-section" style="border-top:1px solid #e5e7eb;padding-top:8px;margin-top:2px;">
+          <div class="rv-scope-label" style="margin-bottom:6px;">Camera &mdash; click to direct</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;">
+            <button class="rv-go" id="cam-add-zoom" style="flex:0 0 auto;padding:6px 10px;" title="Then click the point in the preview to zoom into (at the current playhead time)">&#127909; Zoom at playhead</button>
+            <label>scale <input id="cam-scale" type="number" min="1.1" max="4" step="0.1" value="1.8" style="width:48px;"></label>
+            <label>ease <input id="cam-dur" type="number" min="0.2" max="3" step="0.1" value="0.8" style="width:44px;">s</label>
+            <label>hold <input id="cam-hold" type="number" min="0" max="10" step="0.5" value="1.5" style="width:44px;">s</label>
+            <label title="Ease back to wide afterwards"><input id="cam-return" type="checkbox" checked> return</label>
+          </div>
+          <div id="cam-hint" style="font-size:10px;color:#9ca3af;margin-top:4px;"></div>
+          <div id="cam-list" style="display:flex;flex-direction:column;gap:3px;margin-top:6px;font-size:11px;color:#374151;"></div>
+        <div style="display:none;">
+        </div>
         <div class="rv-hint" style="font-size:10px;color:#64748b;margin-top:4px;">Revise makes a surgical edit and keeps the rest of the scene. To rebuild a broken or empty scene, use Regenerate on the left.</div>
         <div class="rv-status" id="rv-status"></div>
       </div>
@@ -661,6 +674,13 @@ export function getPreviewHtml(): string {
     sceneList: document.getElementById('scene-list'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
     previewWrapper: document.getElementById('preview-wrapper'),
+    camAddZoom: document.getElementById('cam-add-zoom'),
+    camScale: document.getElementById('cam-scale'),
+    camDur: document.getElementById('cam-dur'),
+    camHold: document.getElementById('cam-hold'),
+    camReturn: document.getElementById('cam-return'),
+    camHint: document.getElementById('cam-hint'),
+    camList: document.getElementById('cam-list'),
     previewIframe: document.getElementById('preview-iframe'),
     speakerBg: document.getElementById('speaker-bg'),
     previewContainer: document.getElementById('preview-container'),
@@ -1610,6 +1630,7 @@ export function getPreviewHtml(): string {
     // Don't touch music audio on manual scene click. Only pause voiceover/sfx.
 
     updateActiveScene(index);
+    renderCamList();
 
     if (!state.compositeLoaded) return;
     {
@@ -2340,6 +2361,107 @@ export function getPreviewHtml(): string {
 
 
 
+
+  // ── Camera moves: direct manipulation (click a point at a time) ──
+  // Deterministic data -> the assembler applies it as GSAP; no prompting.
+  var camArm = false;
+
+  function currentSceneEntry() {
+    var p = state.currentProject;
+    if (!p || state.currentSceneIndex < 0) return null;
+    return p.scenes[state.currentSceneIndex] || null;
+  }
+
+  function renderCamList() {
+    if (!els.camList) return;
+    var scene = currentSceneEntry();
+    var moves = (scene && scene.camera_moves) || [];
+    els.camList.innerHTML = moves.length ? '' : '<span style="color:#9ca3af;">No camera moves on this scene.</span>';
+    moves.forEach(function(m, i) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;';
+      var desc = m.type + (m.scale ? ' ' + m.scale + '\u00d7' : '') + ' @' + (m.at != null ? m.at.toFixed(1) : '?') + 's \u2192 (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%)' + (m['return'] ? ' \u21a9' : '');
+      var span = document.createElement('span');
+      span.textContent = desc;
+      span.style.flex = '1';
+      var del = document.createElement('button');
+      del.textContent = '\u2715';
+      del.style.cssText = 'border:0;background:none;color:#9ca3af;cursor:pointer;font-size:11px;';
+      del.addEventListener('click', function() {
+        var next = moves.slice(); next.splice(i, 1);
+        saveCameraMoves(next);
+      });
+      row.appendChild(span); row.appendChild(del);
+      els.camList.appendChild(row);
+    });
+  }
+
+  function saveCameraMoves(moves) {
+    var scene = currentSceneEntry();
+    var p = state.currentProject;
+    if (!scene || !p) return;
+    els.camHint.textContent = 'Saving\u2026';
+    api('POST', '/camera-moves/' + state.tenantId + '/' + p.project_id, {
+      scene_id: scene.id,
+      camera_moves: moves.length ? moves : null,
+    }).then(function(r) {
+      scene.camera_moves = r.camera_moves && r.camera_moves.length ? r.camera_moves : undefined;
+      els.camHint.textContent = 'Saved. Reloading preview\u2026';
+      renderCamList();
+      // Reload the composite so the move is live in playback.
+      loadComposite(p).then(function() {
+        if (state._compositeHtml) { initComposite(); }
+        els.camHint.textContent = '';
+      }).catch(function() { els.camHint.textContent = 'Preview reload failed \u2014 press Load.'; });
+    }).catch(function(e) {
+      els.camHint.textContent = 'Save failed: ' + e.message;
+    });
+  }
+
+  function armCameraZoom() {
+    var scene = currentSceneEntry();
+    if (!scene) { els.camHint.textContent = 'Select a scene first.'; return; }
+    camArm = true;
+    els.camHint.textContent = 'Click the point in the preview to zoom into (Esc to cancel).';
+    els.previewWrapper.style.cursor = 'crosshair';
+  }
+
+  function disarmCameraZoom() {
+    camArm = false;
+    els.previewWrapper.style.cursor = '';
+    if (els.camHint.textContent.indexOf('Click the point') === 0) els.camHint.textContent = '';
+  }
+
+  function onPreviewClickForCamera(ev) {
+    if (!camArm) return;
+    ev.preventDefault(); ev.stopPropagation();
+    var scene = currentSceneEntry();
+    if (!scene) { disarmCameraZoom(); return; }
+    var box = els.previewWrapper.getBoundingClientRect();
+    var xPct = Math.max(0, Math.min(100, ((ev.clientX - box.left) / box.width) * 100));
+    var yPct = Math.max(0, Math.min(100, ((ev.clientY - box.top) / box.height) * 100));
+    var sceneStart = sceneOffset(state.currentSceneIndex);
+    var at = Math.max(0, Math.min((scene.duration_seconds || 5) - 0.2, state.masterTime - sceneStart));
+    var move = {
+      at: Math.round(at * 10) / 10,
+      type: 'zoom',
+      x: Math.round(xPct), y: Math.round(yPct),
+      scale: parseFloat(els.camScale.value) || 1.8,
+      duration: parseFloat(els.camDur.value) || 0.8,
+      hold: parseFloat(els.camHold.value) || 0,
+      'return': !!els.camReturn.checked,
+    };
+    var moves = ((scene.camera_moves) || []).slice();
+    moves.push(move);
+    disarmCameraZoom();
+    saveCameraMoves(moves);
+  }
+
+  if (els.camAddZoom) {
+    els.camAddZoom.addEventListener('click', armCameraZoom);
+    els.previewWrapper.addEventListener('click', onPreviewClickForCamera, true);
+    document.addEventListener('keydown', function(ev) { if (ev.key === 'Escape') disarmCameraZoom(); });
+  }
 
   function togglePlay() {
     if (state.playing) {
