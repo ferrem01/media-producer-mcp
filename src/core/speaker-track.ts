@@ -274,3 +274,26 @@ export async function compositeContentOverlay(opts: {
 
   return outputPath;
 }
+
+/**
+ * Film-time start of each scene in the speaker-track output. The stitcher
+ * INSERTS transition frames between scenes while the speaker base (and the
+ * speaker's voice) plays straight through them -- so a scene's true start is
+ * the sum of prior scene durations PLUS prior transition durations. Using
+ * plain duration sums put every synced camera view (PiPs, framed panels)
+ * progressively behind the voice: ~2.2s of lip lag by the fourth scene.
+ * This must mirror the Step 4 stitch loop exactly.
+ */
+export function speakerSceneFilmStarts(scenes: Array<{ duration_seconds: number; transition_in?: { type: string; duration_seconds?: number } }>): number[] {
+  const starts: number[] = [];
+  let t = 0;
+  for (let i = 0; i < scenes.length; i++) {
+    starts.push(t);
+    t += scenes[i].duration_seconds || 0;
+    const next = scenes[i + 1];
+    if (next && next.transition_in && next.transition_in.type !== "none") {
+      t += next.transition_in.duration_seconds || 0;
+    }
+  }
+  return starts;
+}

@@ -44,7 +44,7 @@ import { config } from "../config.js";
 import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
-import { buildSpeakerBase, compositeContentOverlay } from "./speaker-track.js";
+import { buildSpeakerBase, compositeContentOverlay, speakerSceneFilmStarts } from "./speaker-track.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
 /**
@@ -475,6 +475,7 @@ async function renderScenesParallel(
 }
 
 
+
 /**
  * Render a video output using the continuous speaker track architecture.
  *
@@ -544,9 +545,10 @@ async function renderVideoWithSpeakerTrack(
   // file:// path to the speaker base video. `start_at` is set to the scene's
   // cumulative start time so the capture worker seeks to the right position.
   const speakerFileUrl = `file://${path.resolve(speakerBasePath)}`;
+  const filmStarts = speakerSceneFilmStarts(project.scenes);
   {
-    let cumulativeTime = 0;
-    for (const scene of project.scenes) {
+    for (let si2 = 0; si2 < project.scenes.length; si2++) {
+      const scene = project.scenes[si2];
       for (const comp of scene.components) {
         const dataCopy = comp.data as Record<string, unknown>;
         for (const [key, val] of Object.entries(dataCopy)) {
@@ -560,10 +562,9 @@ async function renderVideoWithSpeakerTrack(
           dataCopy.pip_source === speakerFileUrl ||
           dataCopy.source === speakerFileUrl
         ) {
-          dataCopy.start_at = cumulativeTime;
+          dataCopy.start_at = filmStarts[si2];
         }
       }
-      cumulativeTime += scene.duration_seconds;
     }
   }
 
@@ -575,16 +576,10 @@ async function renderVideoWithSpeakerTrack(
 
   const sceneFrameDirs: Array<{ framesDir: string; frameCount: number }> = [];
 
-  // Per-scene start offsets into the film, so a raw <video src="speaker">
-  // PiP inside a scene seeks the camera to the film-time, not 0.
-  const sceneStartTimes: number[] = [];
-  {
-    let t = 0;
-    for (const scene of project.scenes) {
-      sceneStartTimes.push(t);
-      t += scene.duration_seconds;
-    }
-  }
+  // Per-scene start offsets into the film (INCLUDING inserted transition
+  // time), so a raw <video src="speaker"> PiP seeks the camera to true
+  // film-time -- the same clock the speaker base and voice follow.
+  const sceneStartTimes = filmStarts;
 
   // Render scenes in parallel batches (same concurrency as normal pipeline).
   // Same zombie-worker guard as renderScenesParallel: on failure, kill the

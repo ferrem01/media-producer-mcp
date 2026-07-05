@@ -17,6 +17,7 @@ import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
+import { speakerSceneFilmStarts } from "./core/speaker-track.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
 import { writeComponentSchema } from "./core/component-schema.js";
 import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
@@ -896,11 +897,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         // the preview's camera underlay to this scene's start offset -- so the
         // Studio preview finally looks like the final composite.
         const spUrl = getSpeakerUrl(project);
-        let spOffset = 0;
-        for (const sc of project.scenes) {
-          if (sc.id === scene.id) break;
-          spOffset += sc.duration_seconds || 0;
-        }
+        const spStarts = speakerSceneFilmStarts(project.scenes);
+        const spIdx = project.scenes.findIndex((s) => s.id === scene.id);
+        const spOffset = spIdx >= 0 ? spStarts[spIdx] : 0;
         const sceneForPreview = spUrl && scene.transparent_background !== false
           ? { ...scene, transparent_background: true }
           : scene;
