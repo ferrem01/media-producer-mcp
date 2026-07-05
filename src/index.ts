@@ -33,6 +33,7 @@ import { listProjects, loadProject, saveProject, addScene, removeScene, reorderS
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
+import { getSceneThumbnail } from "./core/scene-thumbnail.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -871,6 +872,56 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           "Access-Control-Allow-Origin": "*",
         });
         res.end(html);
+        return;
+      }
+
+      // ── API: Scene thumbnail STILL (captured JPEG; videos + camera included) ──
+      // A real frame of the scene a few seconds in, cached on disk and
+      // invalidated when the scene (or brand/camera/speaker context) changes.
+      const thumbImgMatch = urlPath.match(/^\/api\/scene-thumb\/([^/]+)\/([^/]+)\/([^/]+)$/);
+      if (thumbImgMatch && method === "GET") {
+        const [, tenantId, projectId, sceneId] = thumbImgMatch.map(decodeURIComponent);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) {
+          jsonResponse(res, 404, { error: "Project not found" });
+          return;
+        }
+        const scene = project.scenes.find((s) => s.id === sceneId);
+        if (!scene) {
+          jsonResponse(res, 404, { error: "Scene not found" });
+          return;
+        }
+        try {
+          const components = await resolveComponentSources(scene, tenantId, projectId);
+          const { file, etag } = await getSceneThumbnail({
+            project,
+            scene,
+            tenantId,
+            projectId,
+            components,
+            speakerUrl: getSpeakerUrl(project),
+            dataDir: config.dataDir,
+            gsapDir: config.gsapDir,
+            componentLibDir: config.componentLibDir,
+          });
+          if (req.headers["if-none-match"] === etag) {
+            res.writeHead(304, { ETag: etag });
+            res.end();
+            return;
+          }
+          const img = await fs.readFile(file);
+          res.writeHead(200, {
+            "Content-Type": "image/jpeg",
+            "Content-Length": img.length,
+            ETag: etag,
+            "Cache-Control": "no-cache",
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end(img);
+        } catch (err) {
+          console.error(`Thumbnail capture failed for ${sceneId}:`, err);
+          jsonResponse(res, 500, { error: "Thumbnail capture failed" });
+        }
         return;
       }
 
