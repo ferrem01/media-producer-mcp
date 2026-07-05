@@ -393,6 +393,7 @@ export function cameraMovesScript(
   var moves = ${movesJson};
   if (!moves.length) return;
   var CW = ${canvas.width}, CH = ${canvas.height};
+  var riggedMedia = [];
   function buildRig(root, target) {
     // Returns { el, box() } or null. box() is the clipping container's rect --
     // the coordinate space the focal point is expressed in.
@@ -412,9 +413,15 @@ export function cameraMovesScript(
       return { el: cam, box: function() { return { width: CW, height: CH, left: 0, top: 0 }; } };
     }
     var media = null;
-    if (target === 'screencast') {
-      // The largest video that is NOT the speaker: the screencast. The PiP
-      // and the live camera are excluded by src and by size.
+    if (target !== 'screencast') {
+      // Element target: any selector, typically a src-filename match
+      // ('video[src*="demo.mp4"]') stamped by Studio's "zoom inside".
+      try { media = root.querySelector(target); } catch (e) { media = null; }
+    }
+    if (!media) {
+      // 'screencast' semantic -- or a stale selector after a scene rewrite:
+      // fall back to the largest video that is NOT the speaker. The PiP and
+      // the live camera are excluded by src and by size.
       var best = 0;
       Array.prototype.slice.call(root.querySelectorAll('video')).forEach(function(v) {
         if (v.id === '__mp_speaker_base') return;
@@ -423,21 +430,52 @@ export function cameraMovesScript(
         var area = r.width * r.height;
         if (area > best) { best = area; media = v; }
       });
-    } else {
-      media = root.querySelector(target);
     }
     if (!media) return null;
-    var host = media.parentElement;
-    if (!host) return null;
-    var hcs = getComputedStyle(host);
-    if (hcs.position === 'static') host.style.position = 'relative';
-    host.style.overflow = 'hidden';
+    if (!media.parentElement) return null;
+    // One rig per media element, even if several target keys resolve to it
+    // (e.g. legacy "screencast" plus an explicit selector) -- double-wrapping
+    // would compose transforms.
+    for (var ri = 0; ri < riggedMedia.length; ri++) {
+      if (riggedMedia[ri].media === media) return riggedMedia[ri].rig;
+    }
+    // The clip box takes over the video's OWN layout slot (self-positioned
+    // inline geometry copied verbatim; flow videos get pinned dimensions), so
+    // flex/grid siblings -- side-by-side demos -- keep their positions. An
+    // absolute-fill wrapper inside the PARENT (the old approach) ripped the
+    // video out of flow and collapsed multi-video layouts.
+    var mcs = getComputedStyle(media);
+    var mr = media.getBoundingClientRect();
+    var clip = document.createElement('div');
+    clip.className = '__mp_camera_clip';
+    if (media.style.position) {
+      clip.style.cssText = media.style.cssText;
+    } else {
+      clip.style.position = 'relative';
+      clip.style.width = mr.width + 'px';
+      clip.style.height = mr.height + 'px';
+      clip.style.flex = '0 0 auto';
+      clip.style.margin = mcs.margin;
+    }
+    clip.style.overflow = 'hidden';
+    if (mcs.borderRadius && mcs.borderRadius !== '0px') clip.style.borderRadius = mcs.borderRadius;
     var wrap = document.createElement('div');
     wrap.className = '__mp_camera_rig __mp_camera_rig--content';
-    wrap.style.cssText = 'position:absolute;inset:0;will-change:transform;transform-origin:50% 50%;';
-    host.insertBefore(wrap, media);
+    wrap.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;will-change:transform;transform-origin:50% 50%;';
+    media.parentElement.insertBefore(clip, media);
+    clip.appendChild(wrap);
     wrap.appendChild(media);
-    return { el: wrap, box: function() { return host.getBoundingClientRect(); } };
+    media.style.position = 'absolute';
+    media.style.left = '0';
+    media.style.top = '0';
+    media.style.right = '';
+    media.style.bottom = '';
+    media.style.width = '100%';
+    media.style.height = '100%';
+    media.style.margin = '0';
+    var rig = { el: wrap, box: function() { return clip.getBoundingClientRect(); } };
+    riggedMedia.push({ media: media, rig: rig });
+    return rig;
   }
   function apply() {
     var root = ${containerExpr};
