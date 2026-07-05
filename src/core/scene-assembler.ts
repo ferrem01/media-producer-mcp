@@ -119,6 +119,7 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
       preview,
       speakerUrl,
       speakerOffset: options.speakerOffset,
+      cameraMoves: scene.camera_moves,
     });
   }
 
@@ -293,7 +294,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}
+${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? '' : '<div class="mp-ambient"></div>'}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
@@ -370,6 +371,80 @@ export function stripEagerVideoLoading(html: string): string {
   });
 }
 
+
+/**
+ * Generate the runtime JS that applies a scene's camera_moves: wraps the
+ * container's content in a transform rig and adds tweens to the scene
+ * timeline. Pure data -> deterministic GSAP; fixed center origin with
+ * computed translate (origin jumps mid-tween cause visible pops).
+ * The focal-point math: with origin at center, scaling by s maps a point at
+ * offset d from center to d*s; translating by (0.5 - p) * size * s brings
+ * point p to frame center.
+ */
+export function cameraMovesScript(
+  moves: import("./types.js").CameraMove[],
+  canvas: { width: number; height: number },
+  containerExpr: string,
+  timelineExpr: string,
+): string {
+  const movesJson = JSON.stringify(moves);
+  return `
+(function() {
+  var moves = ${movesJson};
+  if (!moves.length) return;
+  var W = ${canvas.width}, H = ${canvas.height};
+  function apply() {
+    var host = ${containerExpr};
+    var tl = ${timelineExpr};
+    if (!host || !tl || !tl.to) return false;
+    var cam = document.createElement('div');
+    cam.className = '__mp_camera_rig';
+    cam.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;will-change:transform;transform-origin:50% 50%;';
+    Array.prototype.slice.call(host.childNodes).forEach(function(n) {
+      if (n.nodeType === 1) {
+        var t = n.tagName;
+        if (t === 'SCRIPT' || t === 'STYLE') return;
+        if (n.id === '__mp_speaker_base') return;
+      }
+      cam.appendChild(n);
+    });
+    host.appendChild(cam);
+    var st = { scale: 1, x: 0, y: 0, rotation: 0 };
+    moves.slice().sort(function(a, b) { return a.at - b.at; }).forEach(function(m) {
+      var px = (m.x != null ? m.x : 50) / 100, py = (m.y != null ? m.y : 50) / 100;
+      var to;
+      if (m.type === 'reset') to = { scale: 1, x: 0, y: 0, rotation: 0 };
+      else {
+        var sc = m.type === 'zoom' ? (m.scale || 2) : st.scale;
+        to = {
+          scale: sc,
+          x: (0.5 - px) * W * sc,
+          y: (0.5 - py) * H * sc,
+          rotation: m.type === 'rotate' ? (m.angle || 0) : st.rotation,
+        };
+      }
+      var dur = m.duration || 1;
+      var ease = m.ease || 'power2.inOut';
+      tl.to(cam, { scale: to.scale, x: to.x, y: to.y, rotation: to.rotation, duration: dur, ease: ease }, m.at);
+      st = to;
+      if (m['return']) {
+        tl.to(cam, { scale: 1, x: 0, y: 0, rotation: 0, duration: dur, ease: ease }, m.at + dur + (m.hold || 0));
+        st = { scale: 1, x: 0, y: 0, rotation: 0 };
+      }
+    });
+    return true;
+  }
+  // The master timeline may be created after this script runs -- retry
+  // briefly on rAF until it exists.
+  var tries = 0;
+  (function tick() {
+    if (apply() || tries++ > 300) return;
+    requestAnimationFrame(tick);
+  })();
+})();
+`;
+}
+
 /**
  * Rewrite codegen-authored `<video src="speaker">` tags to the resolved
  * camera URL. The "speaker" src is the renderer's magic token for "the live
@@ -426,6 +501,8 @@ export async function assembleCodegenScene(options: {
   preview?: boolean;
   /** Speaker URL for resolving "speaker" references */
   speakerUrl?: string;
+  /** Direct-manipulation camera moves applied as a deterministic rig. */
+  cameraMoves?: import("./types.js").CameraMove[];
 }): Promise<string> {
   const {
     sceneSource, componentSources, brandKit, canvas, duration,
@@ -568,7 +645,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}
+${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(options.cameraMoves && options.cameraMoves.length ? `<script>${cameraMovesScript(options.cameraMoves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}

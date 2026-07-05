@@ -27,6 +27,7 @@ import {
   loadLibraryComponentSources,
   resolveSpeakerVideoTags,
   stripEagerVideoLoading,
+  cameraMovesScript,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
 import { speakerSceneFilmStarts } from "./speaker-track.js";
@@ -189,6 +190,17 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       );
       // Rewrite "master.add(" to "sceneTl.add(" since each scene has its own timeline
       componentScripts.push(script.replace(/master\.add\(/g, 'sceneTl.add('));
+    }
+
+    // Direct-manipulation camera moves: deterministic rig on this scene's
+    // timeline (same data the render applies -- Studio preview matches).
+    if (scene.camera_moves && scene.camera_moves.length) {
+      componentScripts.push(cameraMovesScript(
+        scene.camera_moves,
+        canvas,
+        `document.querySelector('.mp-scene[data-scene-id="${scene.id}"]')`,
+        "sceneTl",
+      ));
     }
 
     // Determine scene background

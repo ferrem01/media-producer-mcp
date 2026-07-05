@@ -173,6 +173,32 @@ export interface SceneQuality {
   unresolved_defects: string[];
 }
 
+/**
+ * A deterministic scene-camera move, authored by direct manipulation in
+ * Studio (click a point at a time) -- never by prompt. Applied by the
+ * assembler as GSAP tweens on a wrapper rig, so it works on any existing
+ * scene without regeneration and remains editable/deletable data.
+ */
+export interface CameraMove {
+  /** Scene-local start time in seconds. */
+  at: number;
+  type: "zoom" | "pan" | "rotate" | "reset";
+  /** Focal point as percent of canvas (0-100). Defaults to center. */
+  x?: number;
+  y?: number;
+  /** Zoom factor for type=zoom (e.g. 1.8). */
+  scale?: number;
+  /** Degrees for type=rotate. */
+  angle?: number;
+  /** Seconds the move eases over (default 1). */
+  duration?: number;
+  /** Seconds to hold before returning (only with return=true). */
+  hold?: number;
+  /** Ease back to wide after duration+hold. */
+  return?: boolean;
+  ease?: string;
+}
+
 export interface Scene {
   id: string;
   label?: string;
@@ -180,6 +206,8 @@ export interface Scene {
   background?: string;
   transition_in?: SceneTransition;
   components: SceneComponent[];
+  /** Direct-manipulation camera moves (zoom/pan/rotate the whole scene). */
+  camera_moves?: CameraMove[];
   /** The scene's internal beat timeline (continuous-take scenes). Offsets are
    *  implicit: beat N starts where beat N-1 ended, beat 0 starts at 0. */
   beats?: SceneBeat[];

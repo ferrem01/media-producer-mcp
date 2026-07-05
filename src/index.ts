@@ -1603,6 +1603,27 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // ── API: Save a scene's camera moves (Studio direct manipulation) ──
+      const camMovesMatch = urlPath.match(/^\/api\/camera-moves\/([^/]+)\/([^/]+)$/);
+      if (camMovesMatch && method === "POST") {
+        const [, tenantId, projectId] = camMovesMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const sceneId = (body.scene_id || body.sceneId) as string;
+        if (!sceneId) { jsonResponse(res, 400, { error: "scene_id is required" }); return; }
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const scene = project.scenes.find((s: any) => s.id === sceneId);
+        if (!scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
+        const moves = body.camera_moves;
+        if (moves === null || (Array.isArray(moves) && moves.length === 0)) delete (scene as any).camera_moves;
+        else if (Array.isArray(moves)) (scene as any).camera_moves = moves;
+        else { jsonResponse(res, 400, { error: "camera_moves must be an array or null" }); return; }
+        project.updated_at = new Date().toISOString();
+        await saveProject(project);
+        jsonResponse(res, 200, { ok: true, scene_id: sceneId, camera_moves: (scene as any).camera_moves || [] });
+        return;
+      }
+
       // ── API: Get job status ──
       // ── API: List jobs ──
       const jobsListMatch = urlPath.match(/^\/api\/jobs\/?$/);
