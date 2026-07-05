@@ -31,11 +31,11 @@ export interface SceneThumbnailOptions {
   componentLibDir: string;
 }
 
-/** The capture moment: far enough in that the scene has developed, capped at
- *  5s for long scenes, and safely inside short ones. */
+/** The capture moment: 2s in -- past the intro, early enough to represent
+ *  the scene's opening statement -- clamped safely inside short scenes. */
 export function thumbnailTime(durationSeconds: number): number {
   const dur = durationSeconds || 5;
-  return Math.min(5, Math.max(0.8, dur * 0.5));
+  return Math.min(2, Math.max(0.8, dur * 0.5));
 }
 
 // At most two captures at once: each is a browser page plus ffmpeg frame
