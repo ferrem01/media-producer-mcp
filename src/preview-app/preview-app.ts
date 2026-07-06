@@ -1144,8 +1144,14 @@ export function getPreviewHtml(): string {
     // instead of correcting, unless drift is truly runaway (>3s).
     var now = (window.performance && performance.now) ? performance.now() : Date.now();
     var seekAllowed = !clip._lastSeekTs || (now - clip._lastSeekTs) > (clip._edlFast ? 200 : 1250);
-    var starved = isPlayingMedia && el.readyState < 3;
+    var starved = (el.tagName === 'VIDEO') ? el.readyState < 3 : (isPlayingMedia && el.readyState < 3);
+    // A starving video gets exactly ONE positioning seek (so the browser
+    // fetches from the right offset), then we stop touching it: every
+    // further seek past the buffer edge aborts the download and restarts
+    // it, pinning readyState at 1 indefinitely.
+    var seekBlocked = starved && clip._starveSeeked === true;
     function doSeek(t) {
+      if (starved) clip._starveSeeked = true;
       if (window.__MP_SYNCDEBUG) {
         try { console.log('[sync-seek]', (el.currentSrc || el.src || el.tagName).split('/').pop().slice(0, 40), 'film', (state.masterTime || 0).toFixed(2), 'from', el.currentTime.toFixed(2), 'to', t.toFixed(2), 'drift', drift.toFixed(2), 'rs', el.readyState, 'playing', !el.paused, 'starved', starved, 'recovered', justRecovered); } catch (e4) {}
       }
@@ -1159,24 +1165,25 @@ export function getPreviewHtml(): string {
     // is the storm's fuel. A frozen frame that catches up beats a shuddering
     // one. The moment it recovers (readyState >= 3), one hard sync realigns it.
     if (starved) { clip._wasStarved = true; }
+    else { clip._starveSeeked = false; }
     var justRecovered = !starved && clip._wasStarved === true;
 
     // Tier 1: Hard sync (>500ms drift)
     var firstTick = prevOffset === null;
     var offsetJumped = !firstTick && Math.abs(offset - prevOffset) > 0.5;
     if (drift > HARD_SYNC_THRESHOLD && (firstTick || offsetJumped || justRecovered || drift > 3)) {
-      if (seekAllowed && !starved) doSeek(target);
-      else if (justRecovered && !starved) doSeek(target);
+      if (seekAllowed && !seekBlocked) doSeek(target);
+      else if (justRecovered && !seekBlocked) doSeek(target);
     }
     // Tier 2: Strict sync (>40ms, 2 consecutive -- skip for playing media to avoid stutter)
-    else if (!isPlayingMedia && drift > STRICT_SYNC_THRESHOLD) {
+    else if (!isPlayingMedia && !seekBlocked && drift > STRICT_SYNC_THRESHOLD) {
       clip.driftSamples = (clip.driftSamples || 0) + 1;
       if (clip.driftSamples >= STRICT_REQUIRED_SAMPLES && seekAllowed) {
         doSeek(target);
       }
     }
     // Tier 3: Force sync (>20ms, on seek/play/pause transitions only)
-    else if (!isPlayingMedia && state.forceSync && drift > FORCE_SYNC_THRESHOLD) {
+    else if (!isPlayingMedia && !seekBlocked && state.forceSync && drift > FORCE_SYNC_THRESHOLD) {
       if (seekAllowed) doSeek(target);
     }
     else {
@@ -1648,17 +1655,9 @@ export function getPreviewHtml(): string {
             renderWordLane();
             renderWaveStrip();
             loadTranscript();
-            // Desktop: buffer every scene video up front. The mid-play
-            // stall -> freeze -> catch-up-seek cycle reads as a "jump" in
-            // otherwise untouched footage; full preload removes the stall.
-            if (!IS_MOBILE) {
-              try {
-                var vidsAll = els.previewIframe.contentDocument.querySelectorAll('video');
-                for (var vb = 0; vb < vidsAll.length; vb++) {
-                  if (vidsAll[vb].preload !== 'auto') { vidsAll[vb].preload = 'auto'; try { vidsAll[vb].load(); } catch (e2) {} }
-                }
-              } catch (e3) {}
-            }
+            // Desktop: buffer the ACTIVE scene's videos (blanket load() of
+            // everything just made five files fight for bandwidth).
+            if (!IS_MOBILE) preloadSceneVideos(idx);
             masterTl.time(t);
             state.masterTime = t;
             els.slider.value = state.totalDuration > 0 ? Math.round((t / state.totalDuration) * 1000) : 0;
@@ -1810,8 +1809,24 @@ export function getPreviewHtml(): string {
     }
   }
 
+  // Buffer one scene's videos ahead of need (no load(): that resets and
+  // refetches; flipping preload lets the browser continue sensibly).
+  function preloadSceneVideos(index) {
+    try {
+      var p2 = state.currentProject;
+      if (!p2 || !p2.scenes || !p2.scenes[index]) return;
+      var root = els.previewIframe.contentDocument.querySelector('.mp-scene[data-scene-id="' + p2.scenes[index].id + '"]');
+      if (!root) return;
+      var vs2 = root.querySelectorAll('video');
+      for (var vb = 0; vb < vs2.length; vb++) {
+        if (vs2[vb].preload !== 'auto') vs2[vb].preload = 'auto';
+      }
+    } catch (e5) {}
+  }
+
   // Update scene list active highlight without re-rendering
   function updateActiveScene(index) {
+    if (!IS_MOBILE) { preloadSceneVideos(index); preloadSceneVideos(index + 1); }
     var items = els.sceneList.querySelectorAll('.scene-item');
     items.forEach(function(el) {
       var i = parseInt(el.dataset.index, 10);
