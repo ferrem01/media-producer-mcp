@@ -1079,7 +1079,7 @@ export function getPreviewHtml(): string {
             syncElement(clip, el, target, false, true);
             continue;
           }
-          if (m.rate > 2.5) {
+          if (m.rate > 4) {
             // Browsers can't DECODE H.264 at timelapse rates -- playbackRate
             // silently underdelivers and the picture looks ~1x. Render
             // timelapse honestly as rapid seeks of a paused element.
@@ -1142,7 +1142,7 @@ export function getPreviewHtml(): string {
     // (2) While a playing video is starved (readyState < 3), let it buffer
     // instead of correcting, unless drift is truly runaway (>3s).
     var now = (window.performance && performance.now) ? performance.now() : Date.now();
-    var seekAllowed = !clip._lastSeekTs || (now - clip._lastSeekTs) > (clip._edlFast ? 350 : 1250);
+    var seekAllowed = !clip._lastSeekTs || (now - clip._lastSeekTs) > (clip._edlFast ? 200 : 1250);
     var starved = isPlayingMedia && el.readyState < 3;
     function doSeek(t) {
       el.currentTime = t;
