@@ -1090,11 +1090,12 @@ export function getPreviewHtml(): string {
             continue;
           }
           clip._edlFast = false;
-          var wantRate = m.rate;
-          if (el.playbackRate !== wantRate) { try { el.playbackRate = wantRate; } catch (e) {} }
+          clip._baseRate = m.rate;
+          if (!clip._chasing && el.playbackRate !== m.rate) { try { el.playbackRate = m.rate; } catch (e) {} }
         } else {
           // Regular video asset: start_at is source offset
           target = clip.offset + localTime;
+          clip._baseRate = 1;
         }
         syncElement(clip, el, target, playing, true);
         continue;
@@ -1159,6 +1160,25 @@ export function getPreviewHtml(): string {
       clip._lastSeekTs = now;
       clip.driftSamples = 0;
       clip._wasStarved = false;
+    }
+
+    // Smooth catch-up: a healthy, PLAYING, muted scene video that's
+    // moderately off chases sync (1.6x behind / 0.7x ahead) instead of
+    // hard-seeking -- the seek is a visible snap, the chase is invisible on
+    // screen content. Speaker-sourced video is excluded (its audio is the
+    // clock; never bend its rate). Cuts (offsetJumped) still seek.
+    var chaseEligible = isSceneVideo && !clip.isSpeaker && isPlayingMedia && el.readyState >= 3;
+    if (chaseEligible && drift > 0.3 && drift <= 3 && !firstTick && !(prevOffset !== null && Math.abs(offset - prevOffset) > 0.5)) {
+      var base = clip._baseRate || 1;
+      var chase = (target > el.currentTime) ? Math.min(4, base * 1.6) : Math.max(0.5, base * 0.7);
+      if (el.playbackRate !== chase) { try { el.playbackRate = chase; } catch (e6) {} }
+      clip._chasing = true;
+      return;
+    }
+    if (clip._chasing && (drift <= 0.12 || !isPlayingMedia)) {
+      var base2 = clip._baseRate || 1;
+      if (el.playbackRate !== base2) { try { el.playbackRate = base2; } catch (e7) {} }
+      clip._chasing = false;
     }
 
     // A starved clip is NEVER seeked -- seeking restarts its buffering, which
