@@ -1748,9 +1748,18 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           const videoPath = resolveVideoPath(src);
           const minIdle = typeof body.min_idle === "number" ? (body.min_idle as number) : 2;
           const idleRate = typeof body.idle_rate === "number" ? (body.idle_rate as number) : 8;
-          const det = await detectIdleRanges(videoPath, minIdle);
-          const segments = buildCompressedSegments(det.duration, det.ranges, idleRate);
-          if (!segments.length) { jsonResponse(res, 200, { ok: true, idle_ranges: 0, media_edits: (scene as any).media_edits || {} }); return; }
+          const hasRange = typeof body.range_start === "number" && typeof body.range_end === "number" && (body.range_end as number) > (body.range_start as number);
+          const range = hasRange ? { start: body.range_start as number, end: body.range_end as number } : undefined;
+          const det = await detectIdleRanges(videoPath, minIdle, -40, range);
+          const segments = buildCompressedSegments(det.duration, det.ranges, idleRate, range ? range.start : 0);
+          if (!segments.length || !det.ranges.length) { jsonResponse(res, 200, { ok: true, idle_ranges: 0, media_edits: (scene as any).media_edits || {} }); return; }
+          if (range) {
+            // Scoped scan: return the compressed pieces for the caller to
+            // splice into its map; nothing saved here.
+            const outDurR = segments.reduce((s2, g) => s2 + (g.src_end - g.src_start) / g.rate, 0);
+            jsonResponse(res, 200, { ok: true, idle_ranges: det.ranges.length, segments, output_duration: Math.round(outDurR * 10) / 10, source_duration: range.end - range.start });
+            return;
+          }
           const edits: Record<string, any> = (scene as any).media_edits || {};
           edits[target] = { segments };
           (scene as any).media_edits = edits;
