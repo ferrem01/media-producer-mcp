@@ -212,13 +212,14 @@ export function getPreviewHtml(): string {
   /* Speaker/words lane: what's being said, beat by beat; click to seek. */
   #word-lane { position: absolute; left: 0; right: 0; top: 56px; height: 26px; pointer-events: none; }
   .wl-word {
-    position: absolute; height: 13px; box-sizing: border-box;
-    font-size: 9px; line-height: 13px; color: #6b7280;
-    padding: 0 2px; white-space: nowrap;
+    position: absolute; top: 6px; height: 14px; box-sizing: border-box;
+    font-size: 10px; line-height: 14px; color: #374151;
+    padding: 0 3px; white-space: nowrap;
+    background: rgba(255,255,255,0.88);
     cursor: pointer; pointer-events: auto; border-radius: 3px;
   }
   .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
-  #wave-strip { position: absolute; left: 0; right: 0; top: 56px; height: 26px; pointer-events: none; opacity: 0.35; }
+  #wave-strip { position: absolute; left: 0; right: 0; top: 56px; height: 26px; pointer-events: none; opacity: 0.16; }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -2742,14 +2743,12 @@ export function getPreviewHtml(): string {
       // staggered across two mini-rows so neighbors don't collide. Clicking
       // a word seeks there and opens the pin picker -- "pin the media to
       // this word".
-      var row = 0;
       state._transcript.forEach(function(seg2) {
         var t0 = Math.max(0, seg2.start - (state.speakerTrimStart || 0));
         if (seg2.end - (state.speakerTrimStart || 0) <= 0 || t0 >= total) return;
         var sp = document.createElement('div');
         sp.className = 'wl-word';
         sp.style.left = ((t0 / total) * 100).toFixed(2) + '%';
-        sp.style.top = ((row++ % 2) * 13) + 'px';
         sp.textContent = seg2.text;
         sp.title = '“' + seg2.text + '” — ' + t0.toFixed(1) + 's. Click: jump here and pin the screencast to this word.';
         sp.addEventListener('click', function(ev) {

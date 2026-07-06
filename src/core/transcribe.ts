@@ -67,7 +67,7 @@ export async function getTranscript(
   cacheDir: string,
 ): Promise<{ segments: TranscriptSegment[] }> {
   const st = await fs.stat(audioPath);
-  const key = `${st.size}-${Math.round(st.mtimeMs)}-${path.basename(WHISPER_MODEL())}-ml1`;
+  const key = `${st.size}-${Math.round(st.mtimeMs)}-${path.basename(WHISPER_MODEL())}-ml1sow`;
   const cacheFile = path.join(cacheDir, "transcript.json");
   try {
     const cached = JSON.parse(await fs.readFile(cacheFile, "utf-8"));
@@ -83,7 +83,7 @@ export async function getTranscript(
     await run("ffmpeg", ["-y", "-loglevel", "error", "-i", audioPath, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav]);
     // -ml 1: one word per segment -- word-level timestamps for the lane
     // and for pinning ("click the word, pick the frame").
-    await run(WHISPER_BIN(), ["-m", WHISPER_MODEL(), "-f", wav, "-oj", "-of", tmpBase, "-np", "-ml", "1"]);
+    await run(WHISPER_BIN(), ["-m", WHISPER_MODEL(), "-f", wav, "-oj", "-of", tmpBase, "-np", "-ml", "1", "-sow"]);
     const segments = parseWhisperJson(await fs.readFile(`${tmpBase}.json`, "utf-8"));
     await fs.mkdir(cacheDir, { recursive: true });
     await fs.writeFile(cacheFile, JSON.stringify({ key, segments }), "utf-8");
