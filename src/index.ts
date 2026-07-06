@@ -34,6 +34,7 @@ import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
 import { getSceneThumbnail } from "./core/scene-thumbnail.js";
+import { getWaveformPeaks } from "./core/waveform.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -1672,6 +1673,27 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         jsonResponse(res, 200, { ok: true, scene_id: sceneId, camera_moves: (scene as any).camera_moves || [] });
+        return;
+      }
+
+      // ── API: Speaker waveform peaks (timeline strip) ──
+      const waveMatch = urlPath.match(/^\/api\/speaker-waveform\/([^/]+)\/([^/]+)$/);
+      if (waveMatch && method === "GET") {
+        const [, tenantId, projectId] = waveMatch.map(decodeURIComponent);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        // Speaker recording first; generated voiceover tracks as fallback.
+        const spSrc = (project as any).speaker_track?.clips?.[0]?.source as string | undefined;
+        const voTrack = (project as any).audio?.tracks?.find((t: any) => t.type === "voiceover" && t.source);
+        const audioPath = spSrc || voTrack?.source;
+        if (!audioPath) { jsonResponse(res, 404, { error: "No speaker or voiceover audio on this project" }); return; }
+        try {
+          const cacheDir = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs");
+          const wf = await getWaveformPeaks(audioPath, cacheDir);
+          jsonResponse(res, 200, { ok: true, buckets_per_second: wf.bucketsPerSecond, peaks: wf.peaks });
+        } catch (err: any) {
+          jsonResponse(res, 500, { error: `Waveform extraction failed: ${err?.message || err}` });
+        }
         return;
       }
 

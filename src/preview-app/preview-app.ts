@@ -217,6 +217,7 @@ export function getPreviewHtml(): string {
     cursor: pointer; pointer-events: auto;
   }
   .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
+  #wave-strip { position: absolute; left: 0; right: 0; bottom: -18px; height: 15px; pointer-events: none; opacity: 0.5; }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -647,6 +648,7 @@ export function getPreviewHtml(): string {
         <div id="audio-lanes"></div>
         <div id="cam-pills"></div>
         <div id="media-lane"></div>
+        <canvas id="wave-strip"></canvas>
         <div id="word-lane"></div>
       </span>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
@@ -1617,6 +1619,7 @@ export function getPreviewHtml(): string {
             renderCamPills();
             renderMediaLane();
             renderWordLane();
+            renderWaveStrip();
             masterTl.time(t);
             state.masterTime = t;
             els.slider.value = state.totalDuration > 0 ? Math.round((t / state.totalDuration) * 1000) : 0;
@@ -2736,6 +2739,32 @@ export function getPreviewHtml(): string {
         bt += bd;
       });
     });
+  }
+
+  // Waveform strip behind the words: the speaker's amplitude, so silences
+  // and emphasis are visible while aligning edits.
+  function renderWaveStrip() {
+    var cv = document.getElementById('wave-strip');
+    var p = state.currentProject;
+    if (!cv || !p) return;
+    api('/speaker-waveform/' + state.tenantId + '/' + p.project_id).then(function(r) {
+      if (!r || !r.peaks || !r.peaks.length) return;
+      var total = state.totalDuration || calcTotalDuration();
+      if (!(total > 0)) return;
+      var rect = cv.getBoundingClientRect();
+      cv.width = Math.max(300, Math.round(rect.width));
+      cv.height = 15;
+      var ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = '#818cf8';
+      var bps = r.buckets_per_second || 6;
+      var visible = Math.min(r.peaks.length, Math.ceil(total * bps));
+      for (var i = 0; i < visible; i++) {
+        var x = (i / (total * bps)) * cv.width;
+        var h = Math.max(1, r.peaks[i] * cv.height);
+        ctx.fillRect(x, (cv.height - h) / 2, Math.max(1, cv.width / (total * bps) - 0.5), h);
+      }
+    }).catch(function() {});
   }
 
   function saveMediaEdits(sceneIndex, target, segments) {
