@@ -1172,8 +1172,10 @@ export function getPreviewHtml(): string {
     var firstTick = prevOffset === null;
     var offsetJumped = !firstTick && Math.abs(offset - prevOffset) > 0.5;
     if (drift > HARD_SYNC_THRESHOLD && (firstTick || offsetJumped || justRecovered || drift > 3)) {
-      if (seekAllowed && !seekBlocked) doSeek(target);
-      else if (justRecovered && !seekBlocked) doSeek(target);
+      // offsetJumped = a discrete map jump (segment boundary / cut), not
+      // drift: exempt from the anti-storm cooldown so dense EDLs (many
+      // segments close together) cut on time. Starvation still gates.
+      if ((seekAllowed || offsetJumped || justRecovered) && !seekBlocked) doSeek(target);
     }
     // Tier 2: Strict sync (>40ms, 2 consecutive -- skip for playing media to avoid stutter)
     else if (!isPlayingMedia && !seekBlocked && drift > STRICT_SYNC_THRESHOLD) {
