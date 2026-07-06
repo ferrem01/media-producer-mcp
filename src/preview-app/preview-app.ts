@@ -1620,6 +1620,7 @@ export function getPreviewHtml(): string {
             renderMediaLane();
             renderWordLane();
             renderWaveStrip();
+            loadTranscript();
             masterTl.time(t);
             state.masterTime = t;
             els.slider.value = state.totalDuration > 0 ? Math.round((t / state.totalDuration) * 1000) : 0;
@@ -2712,6 +2713,31 @@ export function getPreviewHtml(): string {
     var p = state.currentProject;
     var total = state.totalDuration || calcTotalDuration();
     if (!p || !p.scenes || !(total > 0)) return;
+    function addSpan(t0, dur2, text) {
+      var span = document.createElement('div');
+      span.className = 'wl-word';
+      span.style.left = ((t0 / total) * 100).toFixed(2) + '%';
+      span.style.width = Math.max(0.5, ((dur2 / total) * 100)).toFixed(2) + '%';
+      span.textContent = '“' + text + '”';
+      span.title = text + ' — ' + t0.toFixed(1) + 's';
+      span.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        scrub(Math.round((t0 / total) * 1000));
+        els.slider.value = Math.round((t0 / total) * 1000);
+      });
+      wrap.appendChild(span);
+    }
+    // The REAL transcript (whisper on the speaker recording) wins; the
+    // storyboard's planned beat script is the fallback approximation.
+    if (state._transcript && state._transcript.length) {
+      state._transcript.forEach(function(seg2) {
+        var t0 = seg2.start - (state.speakerTrimStart || 0);
+        var t1 = seg2.end - (state.speakerTrimStart || 0);
+        if (t1 <= 0 || t0 >= total) return;
+        addSpan(Math.max(0, t0), Math.min(total, t1) - Math.max(0, t0), seg2.text);
+      });
+      return;
+    }
     p.scenes.forEach(function(scene, si) {
       var beats = scene.beats ||
         (p.storyboard && p.storyboard.scenes && p.storyboard.scenes[si] && p.storyboard.scenes[si].beats) || [];
@@ -2720,25 +2746,24 @@ export function getPreviewHtml(): string {
       beats.forEach(function(b) {
         var bd = b.duration_seconds || 0;
         var text = (b.voiceover_text || b.voiceover || '').trim();
-        if (bd > 0 && text) {
-          var t0 = sceneStart + bt;
-          var span = document.createElement('div');
-          span.className = 'wl-word';
-          span.style.left = ((t0 / total) * 100).toFixed(2) + '%';
-          span.style.width = Math.max(0.5, ((bd / total) * 100)).toFixed(2) + '%';
-          span.textContent = '“' + text + '”';
-          span.title = text + ' — ' + t0.toFixed(1) + 's';
-          span.addEventListener('click', function(ev) {
-            ev.stopPropagation();
-            if (!(total > 0)) return;
-            scrub(Math.round((t0 / total) * 1000));
-            els.slider.value = Math.round((t0 / total) * 1000);
-          });
-          wrap.appendChild(span);
-        }
+        if (bd > 0 && text) addSpan(sceneStart + bt, bd, text);
         bt += bd;
       });
     });
+  }
+
+  // Fetch the real transcript once per project; re-render the lane on arrival.
+  function loadTranscript() {
+    var p = state.currentProject;
+    if (!p || state._transcriptFor === p.project_id) return;
+    state._transcriptFor = p.project_id;
+    state._transcript = null;
+    api('/speaker-transcript/' + state.tenantId + '/' + p.project_id).then(function(r) {
+      if (r && r.available && r.segments && r.segments.length) {
+        state._transcript = r.segments;
+        renderWordLane();
+      }
+    }).catch(function() {});
   }
 
   // Waveform strip behind the words: the speaker's amplitude, so silences
