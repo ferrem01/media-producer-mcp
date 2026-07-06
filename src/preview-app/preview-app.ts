@@ -155,7 +155,7 @@ export function getPreviewHtml(): string {
   /* Playback controls */
   #playback-bar {
     display: flex; align-items: center; gap: 12px;
-    padding: 8px 16px;
+    padding: 28px 16px 8px; /* headroom for the media lane above the scrubber */
     background: #ffffff;
     border-top: 1px solid #e5e7eb;
   }
@@ -197,6 +197,16 @@ export function getPreviewHtml(): string {
   }
   .cam-pill:hover { transform: translateX(-50%) scale(1.3); }
   .cam-pill.active { background: #312e81; transform: translateX(-50%) scale(1.3); }
+  /* Media lane: each video's source-map as blocks (color = rate). */
+  #media-lane { position: absolute; left: 0; right: 0; top: -24px; height: 20px; pointer-events: none; }
+  .ml-row { position: absolute; left: 0; right: 0; height: 8px; }
+  .ml-seg { position: absolute; height: 100%; border-radius: 2px; pointer-events: auto; cursor: pointer; opacity: 0.85; box-sizing: border-box; }
+  .ml-seg:hover { opacity: 1; box-shadow: 0 0 0 1.5px #4f46e5; z-index: 2; }
+  .ml-seg.r-normal { background: #a5b4fc; }
+  .ml-seg.r-fast { background: #fbbf24; }
+  .ml-seg.r-turbo { background: #f87171; }
+  .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
+  .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -626,6 +636,7 @@ export function getPreviewHtml(): string {
         <div id="beat-ticks"></div>
         <div id="audio-lanes"></div>
         <div id="cam-pills"></div>
+        <div id="media-lane"></div>
       </span>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
       <span class="audio-indicator" id="audio-indicator"></span>
@@ -1593,6 +1604,7 @@ export function getPreviewHtml(): string {
             clearProps();
             updateSceneIndicator();
             renderCamPills();
+            renderMediaLane();
             masterTl.time(t);
             state.masterTime = t;
             els.slider.value = state.totalDuration > 0 ? Math.round((t / state.totalDuration) * 1000) : 0;
@@ -2594,6 +2606,196 @@ export function getPreviewHtml(): string {
         });
         wrap.appendChild(pill);
       });
+    });
+  }
+
+  // ── Media lane: each scene video's source-map as blocks on the timeline ──
+  // Color = rate (indigo 1x, amber fast, red turbo); hatched tail = freeze;
+  // dashed block = untouched video (click to start editing it).
+  function editForVideo(scene, v, vids) {
+    var edits = scene.media_edits || {};
+    var tkey = videoTargetFor(v);
+    if (edits[tkey]) return { key: tkey, edit: edits[tkey] };
+    // Legacy/semantic key: 'screencast' belongs to the largest non-speaker video.
+    if (edits['screencast']) {
+      var best = null, bestA = 0;
+      vids.forEach(function(x) {
+        if (/speaker/i.test(x.getAttribute('src') || '')) return;
+        var r = x.getBoundingClientRect();
+        if (r.width * r.height > bestA) { bestA = r.width * r.height; best = x; }
+      });
+      if (best === v) return { key: 'screencast', edit: edits['screencast'] };
+    }
+    return { key: tkey, edit: null };
+  }
+
+  function renderMediaLane() {
+    var wrap = document.getElementById('media-lane');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    var p = state.currentProject;
+    var total = state.totalDuration || calcTotalDuration();
+    if (!p || !p.scenes || !(total > 0) || !state.compositeLoaded) return;
+    var doc;
+    try { doc = els.previewIframe.contentDocument; } catch (e) { return; }
+    if (!doc) return;
+    p.scenes.forEach(function(scene, si) {
+      var vids = sceneVideos(doc, scene.id).filter(function(v) {
+        return !/speaker/i.test(v.getAttribute('src') || '');
+      });
+      var sceneStart = sceneStartFor(si);
+      var dur = scene.duration_seconds || 5;
+      vids.slice(0, 2).forEach(function(v, row) {
+        var found = editForVideo(scene, v, vids);
+        var rowEl = document.createElement('div');
+        rowEl.className = 'ml-row';
+        rowEl.style.top = (row * 10) + 'px';
+        function block(fromLocal, toLocal, cls, title, onClick) {
+          var b = document.createElement('div');
+          b.className = 'ml-seg ' + cls;
+          b.style.left = (((sceneStart + fromLocal) / total) * 100).toFixed(2) + '%';
+          b.style.width = Math.max(0.3, (((toLocal - fromLocal) / total) * 100)).toFixed(2) + '%';
+          b.title = title;
+          if (onClick) b.addEventListener('click', function(ev) { ev.stopPropagation(); onClick(b); });
+          rowEl.appendChild(b);
+        }
+        var label = videoLabelFor(v);
+        if (!found.edit) {
+          block(0, dur, 'r-plain', label + ' — untouched. Click to edit its timing.', function(el2) {
+            mediaPopOpen(si, found.key, v, null, -1, el2);
+          });
+        } else {
+          var segs = found.edit.segments || [];
+          var acc = 0;
+          segs.forEach(function(s, i2) {
+            var rate = Math.min(16, Math.max(0.1, s.rate || 1));
+            var outDur = (s.src_end - s.src_start) / rate;
+            var cls = rate >= 6 ? 'r-turbo' : (rate > 1.2 ? 'r-fast' : 'r-normal');
+            var from = acc, to = Math.min(dur, acc + outDur);
+            if (to > from) block(from, to, cls, label + ' — ' + rate + 'x  src ' + s.src_start.toFixed(1) + '-' + s.src_end.toFixed(1) + 's', (function(idx) {
+              return function(el2) { mediaPopOpen(si, found.key, v, found.edit, idx, el2); };
+            })(i2));
+            acc += outDur;
+          });
+          if (acc < dur - 0.05) {
+            block(acc, dur, 'r-freeze', label + ' — frozen on last frame', function(el2) {
+              mediaPopOpen(si, found.key, v, found.edit, -1, el2);
+            });
+          }
+        }
+        wrap.appendChild(rowEl);
+      });
+    });
+  }
+
+  function saveMediaEdits(sceneIndex, target, segments) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[sceneIndex];
+    if (!scene || !p) return;
+    studioStatus('Saving media edit…', '');
+    api('POST', '/media-edits/' + state.tenantId + '/' + p.project_id, {
+      scene_id: scene.id,
+      target: target,
+      segments: segments && segments.length ? segments : null,
+    }).then(function(r) {
+      scene.media_edits = r.media_edits && Object.keys(r.media_edits).length ? r.media_edits : undefined;
+      studioStatus('Saved ✓ reloading preview…', 'ok');
+      startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+    }).catch(function(e) {
+      studioStatus('Save failed: ' + e.message, 'err');
+    });
+  }
+
+  // Segment popover on the media lane (reuses the #cam-pop shell).
+  function mediaPopOpen(si, target, v, edit, segIndex, anchorEl) {
+    var pop = document.getElementById('cam-pop');
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[si];
+    if (!pop || !scene) return;
+    camPopClose();
+    rvPopClose();
+    var label = videoLabelFor(v);
+    var dur = scene.duration_seconds || 5;
+    var segs = edit ? (edit.segments || []).slice() : null;
+    var seg = segs && segIndex >= 0 ? segs[segIndex] : null;
+    var html = '<div class="sp-head"><span class="sp-title"><b>' + escHtml(label) + '</b>' +
+      (seg ? ' — segment ' + (segIndex + 1) + ' of ' + segs.length : (segs ? ' — frozen tail' : '')) + '</span>' +
+      '<button class="sp-x" id="mp-x">✕</button></div>';
+    if (!segs) {
+      var srcDur = (v.duration && isFinite(v.duration)) ? v.duration : dur;
+      html += '<div class="sp-region" style="margin-bottom:7px;">Source is ' + srcDur.toFixed(1) + 's, played as-is. Create a source-map to cut, speed up, or timelapse parts of it.</div>' +
+        '<div class="sp-row"><button class="rv-go" id="mp-create" style="flex:1;">Start editing (full length @ 1×)</button></div>';
+    } else if (seg) {
+      html += '<div class="sp-region" style="margin-bottom:7px;">src ' + seg.src_start.toFixed(1) + 's → ' + seg.src_end.toFixed(1) + 's at <b>' + seg.rate + '×</b></div>' +
+        '<div class="sp-row" style="flex-wrap:wrap;">' +
+          [1, 1.5, 2, 3, 8, 12].map(function(r2) {
+            return '<button class="rv-go secondary mp-rate" data-rate="' + r2 + '" style="flex:1;padding:5px 6px;' + (seg.rate === r2 ? 'background:#6366f1;color:#fff;border-color:#6366f1;' : '') + '">' + r2 + '×</button>';
+          }).join('') +
+        '</div>' +
+        '<div class="sp-row">' +
+          '<button class="rv-go secondary" id="mp-split" style="flex:1;" title="Split this segment at the playhead">Split at playhead</button>' +
+          '<button class="rv-go secondary" id="mp-remove" style="flex:0 0 auto;color:#dc2626;border-color:#fca5a5;" title="Remove this segment (hard cut: the source range is skipped)">Remove</button>' +
+        '</div>' +
+        '<div class="sp-row"><button class="rv-go secondary" id="mp-clear" style="flex:1;color:#6b7280;">Delete ALL edits on this video</button></div>';
+    } else {
+      html += '<div class="sp-region" style="margin-bottom:7px;">The source-map ends before the scene does; the last frame holds. Extend the final segment or add source.</div>' +
+        '<div class="sp-row"><button class="rv-go secondary" id="mp-clear" style="flex:1;color:#6b7280;">Delete ALL edits on this video</button></div>';
+    }
+    pop.innerHTML = html;
+    pop.style.display = 'block';
+    var r = anchorEl.getBoundingClientRect();
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 140;
+    pop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 8)) + 'px';
+    var py = r.top - ph - 10;
+    if (py < 8) py = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
+    pop.style.top = py + 'px';
+    document.getElementById('mp-x').addEventListener('click', camPopClose);
+    var createBtn = document.getElementById('mp-create');
+    if (createBtn) createBtn.addEventListener('click', function() {
+      var srcDur = (v.duration && isFinite(v.duration)) ? v.duration : dur;
+      camPopClose();
+      saveMediaEdits(si, target, [{ src_start: 0, src_end: Math.round(srcDur * 10) / 10, rate: 1 }]);
+    });
+    Array.prototype.slice.call(pop.querySelectorAll('.mp-rate')).forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        segs[segIndex] = { src_start: seg.src_start, src_end: seg.src_end, rate: parseFloat(btn.dataset.rate) };
+        camPopClose();
+        saveMediaEdits(si, target, segs);
+      });
+    });
+    var splitBtn = document.getElementById('mp-split');
+    if (splitBtn) splitBtn.addEventListener('click', function() {
+      // Playhead -> scene-local output time -> source time; split there.
+      var outT = Math.max(0, (state.masterTime || 0) - sceneStartFor(si));
+      var acc = 0, srcAt = null;
+      for (var i3 = 0; i3 < segs.length; i3++) {
+        var s3 = segs[i3];
+        var od = (s3.src_end - s3.src_start) / (s3.rate || 1);
+        if (i3 === segIndex) {
+          if (outT <= acc + 0.05 || outT >= acc + od - 0.05) { studioStatus('Park the playhead inside this segment to split it.', 'warn'); return; }
+          srcAt = s3.src_start + (outT - acc) * (s3.rate || 1);
+          break;
+        }
+        acc += od;
+      }
+      if (srcAt == null) { studioStatus('Park the playhead inside this segment to split it.', 'warn'); return; }
+      srcAt = Math.round(srcAt * 10) / 10;
+      segs.splice(segIndex, 1,
+        { src_start: seg.src_start, src_end: srcAt, rate: seg.rate },
+        { src_start: srcAt, src_end: seg.src_end, rate: seg.rate });
+      camPopClose();
+      saveMediaEdits(si, target, segs);
+    });
+    var removeBtn = document.getElementById('mp-remove');
+    if (removeBtn) removeBtn.addEventListener('click', function() {
+      segs.splice(segIndex, 1);
+      camPopClose();
+      saveMediaEdits(si, target, segs);
+    });
+    var clearBtn = document.getElementById('mp-clear');
+    if (clearBtn) clearBtn.addEventListener('click', function() {
+      camPopClose();
+      saveMediaEdits(si, target, null);
     });
   }
 
