@@ -217,6 +217,8 @@ export function getPreviewHtml(): string {
     cursor: pointer; pointer-events: auto;
   }
   .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
+  .scr-w { cursor: pointer; border-radius: 3px; padding: 0 1px; }
+  .scr-w:hover { background: #eef2ff; color: #4f46e5; }
   #wave-strip { position: absolute; left: 0; right: 0; bottom: -18px; height: 15px; pointer-events: none; opacity: 0.5; }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
@@ -657,6 +659,7 @@ export function getPreviewHtml(): string {
         <span class="vol-icon" id="vol-icon">&#9834;</span>
         <input type="range" id="vol-slider" min="0" max="100" value="100" step="1">
       </span>
+      <button id="script-btn" class="scene-sb-btn" title="Full script — click any word to jump the playhead there">&#x2263; Script</button>
       <span class="scene-indicator" id="scene-indicator"></span>
     </div>
   </div>
@@ -2726,6 +2729,7 @@ export function getPreviewHtml(): string {
         els.slider.value = Math.round((t0 / total) * 1000);
       });
       wrap.appendChild(span);
+      return span;
     }
     // The REAL transcript (whisper on the speaker recording) wins; the
     // storyboard's planned beat script is the fallback approximation.
@@ -2734,7 +2738,8 @@ export function getPreviewHtml(): string {
         var t0 = seg2.start - (state.speakerTrimStart || 0);
         var t1 = seg2.end - (state.speakerTrimStart || 0);
         if (t1 <= 0 || t0 >= total) return;
-        addSpan(Math.max(0, t0), Math.min(total, t1) - Math.max(0, t0), seg2.text);
+        var sp = addSpan(Math.max(0, t0), Math.min(total, t1) - Math.max(0, t0), seg2.text);
+        if (sp) sp.textContent = seg2.text; // word-level: no quote marks
       });
       return;
     }
@@ -2748,6 +2753,46 @@ export function getPreviewHtml(): string {
         var text = (b.voiceover_text || b.voiceover || '').trim();
         if (bd > 0 && text) addSpan(sceneStart + bt, bd, text);
         bt += bd;
+      });
+    });
+  }
+
+  // Full script in a modal: every word clickable to jump the playhead.
+  function openScriptModal() {
+    var p = state.currentProject;
+    var total = state.totalDuration || calcTotalDuration();
+    if (!p || !(total > 0)) return;
+    var words = [];
+    if (state._transcript && state._transcript.length) {
+      state._transcript.forEach(function(s2) {
+        var t0 = s2.start - (state.speakerTrimStart || 0);
+        if (t0 >= 0 && t0 < total) words.push({ t: t0, text: s2.text });
+      });
+    } else {
+      p.scenes.forEach(function(scene, si) {
+        var beats = scene.beats || (p.storyboard && p.storyboard.scenes && p.storyboard.scenes[si] && p.storyboard.scenes[si].beats) || [];
+        var bt = 0, ss = sceneStartFor(si);
+        beats.forEach(function(b) {
+          var text = (b.voiceover_text || '').trim();
+          if (text && (b.duration_seconds || 0) > 0) words.push({ t: ss + bt, text: text });
+          bt += b.duration_seconds || 0;
+        });
+      });
+    }
+    if (!words.length) { studioStatus('No script available for this project yet.', 'warn'); return; }
+    var html = '<h3 class="sm-title">Script</h3>' +
+      '<p class="sm-desc">' + (state._transcript ? 'Transcribed from your recording. ' : 'From the storyboard beats. ') + 'Click any word to jump the playhead there — then pin or split the screencast at that moment.</p>' +
+      '<p style="line-height:2;font-size:15px;color:#111827;">' +
+      words.map(function(w) { return '<span class="scr-w" data-t="' + w.t.toFixed(2) + '">' + escHtml(w.text) + '</span>'; }).join(' ') +
+      '</p><div class="sm-actions"><button class="sm-btn" id="scr-close">Close</button></div>';
+    studioModalOpen(html);
+    document.getElementById('scr-close').addEventListener('click', studioModalClose);
+    Array.prototype.slice.call(document.querySelectorAll('.scr-w')).forEach(function(sp) {
+      sp.addEventListener('click', function() {
+        var t = parseFloat(sp.dataset.t) || 0;
+        studioModalClose();
+        scrub(Math.round((t / total) * 1000));
+        els.slider.value = Math.round((t / total) * 1000);
       });
     });
   }
@@ -4325,7 +4370,9 @@ export function getPreviewHtml(): string {
   }
 
   // Revise + storyboard controls live in the selection popover and the
-  // storyboard dialog (wired where they're built); nothing to bind here.
+  // storyboard dialog (wired where they're built).
+  var scriptBtn = document.getElementById('script-btn');
+  if (scriptBtn) scriptBtn.addEventListener('click', openScriptModal);
 })();
 </script>
 </body>
