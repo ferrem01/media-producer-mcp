@@ -16,6 +16,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { resolveVideoPath } from "./video-path.js";
+import { mapSourceTime, parseEdlAttr } from "./media-edl.js";
 
 // ── Headless-browser pool ───────────────────────────────────────────────────
 // In-process captures (per-scene critique frames + runtime validation) used to
@@ -381,11 +382,12 @@ export async function captureSingleFrame(options: {
     }
 
     // Handle video elements: extract single frames with ffmpeg, replace with <img>
-    const videoInfos: { src: string; startAt: number; index: number }[] = await page.evaluate(() => {
+    const videoInfos: { src: string; startAt: number; index: number; edl: string | null }[] = await page.evaluate(() => {
       const videos = document.querySelectorAll("video");
       return Array.from(videos).map((v, i) => ({
         src: v.src || v.getAttribute("src") || "",
         startAt: parseFloat(v.getAttribute("data-start-at") || "0"),
+        edl: v.getAttribute("data-mp-edl"),
         index: i,
       }));
     });
@@ -417,9 +419,14 @@ export async function captureSingleFrame(options: {
         }
 
         // Seek semantics (offset + time), matching the preview and the
-        // render frame swapper -- data-start-at is not a delay.
-        const targetTime = Math.max(0, vInfo.startAt + captureTime);
-        const key = `${vInfo.src}__${vInfo.startAt}`;
+        // render frame swapper -- data-start-at is not a delay. A media
+        // source-map (data-mp-edl) overrides both: it maps output time to
+        // absolute source time (cuts, timelapse, freeze).
+        const edlSegs = parseEdlAttr(vInfo.edl);
+        const targetTime = edlSegs
+          ? mapSourceTime(edlSegs, captureTime)
+          : Math.max(0, vInfo.startAt + captureTime);
+        const key = `${vInfo.src}__${targetTime.toFixed(3)}`;
 
         // Skip if we already extracted this exact frame
         if (framePathMap[key]) continue;
@@ -432,7 +439,11 @@ export async function captureSingleFrame(options: {
       // Build browser lookup: index -> framePath
       const browserLookup: Record<number, string> = {};
       for (const vInfo of videoInfos) {
-        const key = `${vInfo.src}__${vInfo.startAt}`;
+        const edlSegs2 = parseEdlAttr(vInfo.edl);
+        const targetTime2 = edlSegs2
+          ? mapSourceTime(edlSegs2, captureTime)
+          : Math.max(0, vInfo.startAt + captureTime);
+        const key = `${vInfo.src}__${targetTime2.toFixed(3)}`;
         if (framePathMap[key]) {
           browserLookup[vInfo.index] = framePathMap[key];
         }

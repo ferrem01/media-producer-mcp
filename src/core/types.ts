@@ -209,6 +209,28 @@ export interface CameraMove {
   ease?: string;
 }
 
+/** One stretch of a media element's source-map: play source [src_start,
+ *  src_end) at `rate`. Cuts-with-continuity are just very fast segments
+ *  (timelapse); hard jump-cuts are gaps between consecutive segments'
+ *  source ranges. Output duration = (src_end - src_start) / rate. */
+export interface MediaSegment {
+  /** Seconds into the SOURCE file where this stretch starts. */
+  src_start: number;
+  /** Seconds into the SOURCE file where this stretch ends (exclusive). */
+  src_end: number;
+  /** Playback rate (1 = real time, 8 = timelapse). Must be > 0. */
+  rate: number;
+}
+
+/** A media element's edit: ordered segments (monotonic source times). When
+ *  the mapped source runs out before the element stops being shown, the
+ *  last frame FREEZES. Keyed on the scene by the same target grammar as
+ *  camera moves ("screencast" or a video[src*="file"] selector), so several
+ *  videos in one scene (side-by-side demos) each carry their own edit. */
+export interface MediaEdit {
+  segments: MediaSegment[];
+}
+
 export interface Scene {
   id: string;
   label?: string;
@@ -218,6 +240,10 @@ export interface Scene {
   components: SceneComponent[];
   /** Direct-manipulation camera moves (zoom/pan/rotate the whole scene). */
   camera_moves?: CameraMove[];
+  /** Source-maps for the scene's media elements: condense a long screencast
+   *  (cut waiting, timelapse dead air, speed sections) without touching the
+   *  scene's own clock or the speaker track. Key = media target selector. */
+  media_edits?: Record<string, MediaEdit>;
   /** The scene's internal beat timeline (continuous-take scenes). Offsets are
    *  implicit: beat N starts where beat N-1 ended, beat 0 starts at 0. */
   beats?: SceneBeat[];

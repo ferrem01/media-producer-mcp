@@ -20,6 +20,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { resolveVideoPath } from "./video-path.js";
+import { mapSourceTime, parseEdlAttr } from "./media-edl.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -45,6 +46,7 @@ interface VideoElementInfo {
   src: string;
   startAt: number;
   index: number;
+  edl: string | null;
 }
 
 /**
@@ -155,6 +157,7 @@ async function main() {
       return Array.from(videos).map((v, i) => ({
         src: v.src || v.getAttribute("src") || "",
         startAt: parseFloat(v.getAttribute("data-start-at") || "0"),
+        edl: v.getAttribute("data-mp-edl"),
         index: i,
       }));
     });
@@ -251,8 +254,12 @@ async function main() {
           const extracted = extractionMap.get(vInfo.src);
           if (!extracted) continue;
           // Seek semantics (offset + time), matching the preview and
-          // scene-worker -- data-start-at is not a delay.
-          const targetTime = Math.max(0, vInfo.startAt + time);
+          // scene-worker -- data-start-at is not a delay. A media
+          // source-map (data-mp-edl) overrides both.
+          const edlSegs = parseEdlAttr(vInfo.edl);
+          const targetTime = edlSegs
+            ? mapSourceTime(edlSegs, time)
+            : Math.max(0, vInfo.startAt + time);
           const frameIndex = Math.min(Math.round(targetTime * args.fps), extracted.totalFrames - 1);
           const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.png`);
           frameUpdates.push({ imgId: `__render_frame_${vInfo.index}__`, src: `file://${framePath}` });

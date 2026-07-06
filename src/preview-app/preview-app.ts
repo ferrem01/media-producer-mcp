@@ -945,6 +945,23 @@ export function getPreviewHtml(): string {
     } catch(e) {}
   }
 
+  // Media source-map (EDL) client math -- MUST match core/media-edl.ts.
+  // Maps a video's output clock (scene-local time) to source time through
+  // ordered {src_start, src_end, rate} segments; past the end -> freeze.
+  function edlMapClient(segs, t) {
+    var acc = 0;
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      var rate = Math.min(16, Math.max(0.1, s.rate || 1));
+      if (s.src_end <= s.src_start) continue;
+      var outDur = (s.src_end - s.src_start) / rate;
+      if (t < acc + outDur) return { src: s.src_start + (t - acc) * rate, rate: rate, frozen: false };
+      acc += outDur;
+    }
+    var last = segs[segs.length - 1];
+    return { src: Math.max(last.src_start, last.src_end - 0.05), rate: 1, frozen: true };
+  }
+
   // Unified media sync -- three-tier drift correction for all media elements.
   function syncMedia(time, playing) {
     // Discover any new scene videos from iframe
@@ -999,12 +1016,34 @@ export function getPreviewHtml(): string {
           if (!el.paused) el.pause();
           continue;
         }
+        // Media source-map: the stamp script writes data-mp-edl during doc
+        // parse; read it lazily (once seen, cached on the clip).
+        if (clip.edl === undefined && !clip.isSpeaker) {
+          var edlRaw = el.getAttribute('data-mp-edl');
+          if (edlRaw) {
+            try { clip.edl = JSON.parse(edlRaw); } catch (e) { clip.edl = null; }
+            if (clip.edl && !clip.edl.length) clip.edl = null;
+          }
+        }
         var target;
         if (clip.isSpeaker) {
           // Speaker-sourced video: sync to speaker track timeline
           // Uses same trim values as the speaker bg -- single source of truth
           target = time + state.speakerTrimStart;
           if (target > state.speakerTrimEnd) target = state.speakerTrimEnd;
+        } else if (clip.edl) {
+          // Edited media: map through the source-map; play at the active
+          // segment's rate so the clock advances at the same slope the
+          // target does (drift stays flat between corrections).
+          var m = edlMapClient(clip.edl, localTime);
+          target = m.src;
+          var wantRate = m.frozen ? 1 : m.rate;
+          if (el.playbackRate !== wantRate) { try { el.playbackRate = wantRate; } catch (e) {} }
+          if (m.frozen) {
+            // Source exhausted: hold the last frame for the rest of the scene.
+            syncElement(clip, el, target, false, true);
+            continue;
+          }
         } else {
           // Regular video asset: start_at is source offset
           target = clip.offset + localTime;

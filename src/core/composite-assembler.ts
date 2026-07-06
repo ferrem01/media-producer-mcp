@@ -28,6 +28,7 @@ import {
   resolveSpeakerVideoTags,
   stripEagerVideoLoading,
   cameraMovesScript,
+  mediaEdlScript,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
 import { speakerSceneFilmStarts } from "./speaker-track.js";
@@ -190,6 +191,15 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       );
       // Rewrite "master.add(" to "sceneTl.add(" since each scene has its own timeline
       componentScripts.push(script.replace(/master\.add\(/g, 'sceneTl.add('));
+    }
+
+    // Media source-maps: stamp each edited video with data-mp-edl so the
+    // preview's sync loop plays it through its edit (condensed screencasts).
+    if (scene.media_edits && Object.keys(scene.media_edits).length) {
+      componentScripts.push(mediaEdlScript(
+        scene.media_edits,
+        `document.querySelector('.mp-scene[data-scene-id="${scene.id}"]')`,
+      ));
     }
 
     // Direct-manipulation camera moves: deterministic rig on this scene's
