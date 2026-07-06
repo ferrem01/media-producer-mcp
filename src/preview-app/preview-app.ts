@@ -155,7 +155,7 @@ export function getPreviewHtml(): string {
   /* Playback controls */
   #playback-bar {
     display: flex; align-items: center; gap: 12px;
-    padding: 28px 16px 8px; /* headroom for the media lane above the scrubber */
+    padding: 28px 16px 24px; /* headroom: media lane above, words lane below */
     background: #ffffff;
     border-top: 1px solid #e5e7eb;
   }
@@ -207,6 +207,16 @@ export function getPreviewHtml(): string {
   .ml-seg.r-turbo { background: #f87171; }
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
+  /* Speaker/words lane: what's being said, beat by beat; click to seek. */
+  #word-lane { position: absolute; left: 0; right: 0; bottom: -18px; height: 15px; pointer-events: none; }
+  .wl-word {
+    position: absolute; top: 0; height: 100%; box-sizing: border-box;
+    font-size: 9px; line-height: 15px; color: #6b7280;
+    padding: 0 4px; border-left: 1px solid #e5e7eb;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    cursor: pointer; pointer-events: auto;
+  }
+  .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -637,6 +647,7 @@ export function getPreviewHtml(): string {
         <div id="audio-lanes"></div>
         <div id="cam-pills"></div>
         <div id="media-lane"></div>
+        <div id="word-lane"></div>
       </span>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
       <span class="audio-indicator" id="audio-indicator"></span>
@@ -1605,6 +1616,7 @@ export function getPreviewHtml(): string {
             updateSceneIndicator();
             renderCamPills();
             renderMediaLane();
+            renderWordLane();
             masterTl.time(t);
             state.masterTime = t;
             els.slider.value = state.totalDuration > 0 ? Math.round((t / state.totalDuration) * 1000) : 0;
@@ -2684,6 +2696,44 @@ export function getPreviewHtml(): string {
           }
         }
         wrap.appendChild(rowEl);
+      });
+    });
+  }
+
+  // Words lane: each beat's voiceover text at its film position. Click a
+  // phrase to jump the playhead there -- the alignment anchor for edits.
+  function renderWordLane() {
+    var wrap = document.getElementById('word-lane');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    var p = state.currentProject;
+    var total = state.totalDuration || calcTotalDuration();
+    if (!p || !p.scenes || !(total > 0)) return;
+    p.scenes.forEach(function(scene, si) {
+      var beats = scene.beats ||
+        (p.storyboard && p.storyboard.scenes && p.storyboard.scenes[si] && p.storyboard.scenes[si].beats) || [];
+      var sceneStart = sceneStartFor(si);
+      var bt = 0;
+      beats.forEach(function(b) {
+        var bd = b.duration_seconds || 0;
+        var text = (b.voiceover_text || b.voiceover || '').trim();
+        if (bd > 0 && text) {
+          var t0 = sceneStart + bt;
+          var span = document.createElement('div');
+          span.className = 'wl-word';
+          span.style.left = ((t0 / total) * 100).toFixed(2) + '%';
+          span.style.width = Math.max(0.5, ((bd / total) * 100)).toFixed(2) + '%';
+          span.textContent = '“' + text + '”';
+          span.title = text + ' — ' + t0.toFixed(1) + 's';
+          span.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            if (!(total > 0)) return;
+            scrub(Math.round((t0 / total) * 1000));
+            els.slider.value = Math.round((t0 / total) * 1000);
+          });
+          wrap.appendChild(span);
+        }
+        bt += bd;
       });
     });
   }
