@@ -1675,6 +1675,45 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // ── API: Media source-maps (condensed screencasts) ──
+      // Full replace of ONE target's segments on a scene: {scene_id, target,
+      // segments|null}. Same grammar as camera moves: "screencast" or a
+      // video[src*="file"] selector -- several videos per scene, each with
+      // its own edit.
+      const mediaEditsMatch = urlPath.match(/^\/api\/media-edits\/([^/]+)\/([^/]+)$/);
+      if (mediaEditsMatch && method === "POST") {
+        const [, tenantId, projectId] = mediaEditsMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const sceneId = (body.scene_id || body.sceneId) as string;
+        const target = body.target as string;
+        if (!sceneId) { jsonResponse(res, 400, { error: "scene_id is required" }); return; }
+        if (!target) { jsonResponse(res, 400, { error: "target is required" }); return; }
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const scene = project.scenes.find((s: any) => s.id === sceneId);
+        if (!scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
+        const segments = body.segments;
+        const edits: Record<string, any> = (scene as any).media_edits || {};
+        if (segments === null || (Array.isArray(segments) && segments.length === 0)) {
+          delete edits[target];
+        } else if (Array.isArray(segments)) {
+          const bad = segments.some((s: any) =>
+            !s || typeof s.src_start !== "number" || typeof s.src_end !== "number" ||
+            s.src_end <= s.src_start || typeof s.rate !== "number" || s.rate <= 0);
+          if (bad) { jsonResponse(res, 400, { error: "segments must be [{src_start, src_end, rate>0}] with src_end > src_start" }); return; }
+          edits[target] = { segments };
+        } else {
+          jsonResponse(res, 400, { error: "segments must be an array or null" });
+          return;
+        }
+        if (Object.keys(edits).length) (scene as any).media_edits = edits;
+        else delete (scene as any).media_edits;
+        project.updated_at = new Date().toISOString();
+        await saveProject(project);
+        jsonResponse(res, 200, { ok: true, scene_id: sceneId, media_edits: (scene as any).media_edits || {} });
+        return;
+      }
+
       // ── API: Get job status ──
       // ── API: List jobs ──
       const jobsListMatch = urlPath.match(/^\/api\/jobs\/?$/);

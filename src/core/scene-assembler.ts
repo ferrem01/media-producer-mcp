@@ -120,6 +120,7 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
       speakerUrl,
       speakerOffset: options.speakerOffset,
       cameraMoves: scene.camera_moves,
+      mediaEdits: scene.media_edits,
     });
   }
 
@@ -294,7 +295,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
+${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.media_edits && Object.keys(scene.media_edits).length ? `<script>${mediaEdlScript(scene.media_edits, "document.body")}</script>` : "")}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? '' : '<div class="mp-ambient"></div>'}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
@@ -381,6 +382,64 @@ export function stripEagerVideoLoading(html: string): string {
  * offset d from center to d*s; translating by (0.5 - p) * size * s brings
  * point p to frame center.
  */
+/**
+ * Stamp each edited media element with its source-map as a data-mp-edl
+ * attribute, resolved at runtime with the SAME target grammar as camera
+ * rigs ("screencast" = largest non-speaker video; anything else = a CSS
+ * selector, typically video[src*="file.mp4"]). Every consumer -- the
+ * render/capture frame swappers and the Studio preview's sync loop --
+ * reads the attribute, so target resolution happens exactly once.
+ */
+export function mediaEdlScript(
+  mediaEdits: Record<string, import("./types.js").MediaEdit>,
+  containerExpr: string,
+): string {
+  const editsJson = JSON.stringify(mediaEdits);
+  return `
+(function() {
+  var edits = ${editsJson};
+  var keys = Object.keys(edits || {});
+  if (!keys.length) return;
+  function resolveTarget(root, key) {
+    if (key && key !== 'screencast') {
+      try { var el = root.querySelector(key); if (el) return el; } catch (e) {}
+    }
+    var best = null, bestA = 0;
+    Array.prototype.slice.call(root.querySelectorAll('video')).forEach(function(v) {
+      if (v.id === '__mp_speaker_base') return;
+      if (/speaker/i.test(v.currentSrc || v.src || '')) return;
+      var r = v.getBoundingClientRect();
+      if (r.width * r.height > bestA) { bestA = r.width * r.height; best = v; }
+    });
+    return best;
+  }
+  var tries = 0;
+  (function tick() {
+    // Keep retrying until every key found its element: this script can run
+    // before the video tags are even parsed (single-scene documents inject
+    // it early; the composite runs it at the end).
+    var root = ${containerExpr};
+    var missing = false;
+    if (!root) {
+      missing = true;
+    } else {
+      keys.forEach(function(k) {
+        var edit = edits[k];
+        if (!edit || !edit.segments || !edit.segments.length) return;
+        var v = resolveTarget(root, k);
+        if (v) {
+          if (!v.hasAttribute('data-mp-edl')) v.setAttribute('data-mp-edl', JSON.stringify(edit.segments));
+        } else {
+          missing = true;
+        }
+      });
+    }
+    if (missing && tries++ < 300) requestAnimationFrame(tick);
+  })();
+})();
+`;
+}
+
 export function cameraMovesScript(
   moves: import("./types.js").CameraMove[],
   canvas: { width: number; height: number },
@@ -597,6 +656,7 @@ export async function assembleCodegenScene(options: {
   speakerUrl?: string;
   /** Direct-manipulation camera moves applied as a deterministic rig. */
   cameraMoves?: import("./types.js").CameraMove[];
+  mediaEdits?: Record<string, import("./types.js").MediaEdit>;
 }): Promise<string> {
   const {
     sceneSource, componentSources, brandKit, canvas, duration,
@@ -739,7 +799,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(options.cameraMoves && options.cameraMoves.length ? `<script>${cameraMovesScript(options.cameraMoves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
+${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(options.mediaEdits && Object.keys(options.mediaEdits).length ? `<script>${mediaEdlScript(options.mediaEdits, "document.body")}</script>` : "")}${(options.cameraMoves && options.cameraMoves.length ? `<script>${cameraMovesScript(options.cameraMoves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}

@@ -18,6 +18,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import crypto from "node:crypto";
 import { resolveVideoPath } from "./video-path.js";
+import { mapSourceTime, parseEdlAttr } from "./media-edl.js";
 import { localizeRemoteMedia } from "./remote-media.js";
 
 // Resilience: this worker is forked with stdio:"inherit" and logs progress
@@ -340,11 +341,12 @@ async function main() {
     }));
 
     // ── Video frame extraction: discover, extract, inject ──
-    const videoInfos: { src: string; startAt: number; index: number }[] = await page.evaluate(() => {
+    const videoInfos: { src: string; startAt: number; index: number; edl: string | null }[] = await page.evaluate(() => {
       const videos = document.querySelectorAll("video");
       return Array.from(videos).map((v, i) => ({
         src: v.src || v.getAttribute("src") || "",
         startAt: parseFloat(v.getAttribute("data-start-at") || "0"),
+        edl: v.getAttribute("data-mp-edl"),
         index: i,
       }));
     });
@@ -446,7 +448,13 @@ async function main() {
           // It was misread as a delay (time - startAt), which froze a
           // film-time-synced PiP on frame 0 and then played it N seconds
           // behind the speaker audio.
-          const targetTime = Math.max(0, vInfo.startAt + time);
+          // A media source-map (data-mp-edl) overrides that entirely: the
+          // segments encode absolute source positions (cuts, timelapse,
+          // freeze past the end) and the mapping picks the source frame.
+          const edlSegs = parseEdlAttr(vInfo.edl);
+          const targetTime = edlSegs
+            ? mapSourceTime(edlSegs, time)
+            : Math.max(0, vInfo.startAt + time);
           const frameIndex = Math.min(Math.round(targetTime * args.fps), extracted.totalFrames - 1);
           const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.png`);
           const frameData = await fs.readFile(framePath);
