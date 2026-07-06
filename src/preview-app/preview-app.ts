@@ -2716,15 +2716,30 @@ export function getPreviewHtml(): string {
     rvPopClose();
     var label = videoLabelFor(v);
     var dur = scene.duration_seconds || 5;
-    var segs = edit ? (edit.segments || []).slice() : null;
-    var seg = segs && segIndex >= 0 ? segs[segIndex] : null;
+    // An untouched video is just an implicit single 1x segment -- clicking
+    // it offers Split/speed directly; the map is created on the first action.
+    var implicit = !edit;
+    var segs, seg;
+    if (edit) {
+      segs = (edit.segments || []).slice();
+      seg = segIndex >= 0 ? segs[segIndex] : null;
+    } else {
+      var srcDur0 = (v.duration && isFinite(v.duration)) ? v.duration : dur;
+      segs = [{ src_start: 0, src_end: Math.round(srcDur0 * 10) / 10, rate: 1 }];
+      segIndex = 0;
+      seg = segs[0];
+    }
     var html = '<div class="sp-head"><span class="sp-title"><b>' + escHtml(label) + '</b>' +
-      (seg ? ' — segment ' + (segIndex + 1) + ' of ' + segs.length : (segs ? ' — frozen tail' : '')) + '</span>' +
+      (seg ? (implicit ? '' : ' — segment ' + (segIndex + 1) + ' of ' + segs.length) : ' — frozen tail') + '</span>' +
       '<button class="sp-x" id="mp-x">✕</button></div>';
-    if (!segs) {
-      var srcDur = (v.duration && isFinite(v.duration)) ? v.duration : dur;
-      html += '<div class="sp-region" style="margin-bottom:7px;">Source is ' + srcDur.toFixed(1) + 's, played as-is. Create a source-map to cut, speed up, or timelapse parts of it.</div>' +
-        '<div class="sp-row"><button class="rv-go" id="mp-create" style="flex:1;">Start editing (full length @ 1×)</button></div>';
+    if (implicit) {
+      html += '<div class="sp-region" style="margin-bottom:7px;">Park the playhead where a boring bit starts, then <b>Split</b>. Speed up or remove the pieces you don\\'t need — your narration never moves.</div>' +
+        '<div class="sp-row" style="flex-wrap:wrap;">' +
+          [1, 1.5, 2, 3, 8, 12].map(function(r2) {
+            return '<button class="rv-go secondary mp-rate" data-rate="' + r2 + '" style="flex:1;padding:5px 6px;' + (r2 === 1 ? 'background:#6366f1;color:#fff;border-color:#6366f1;' : '') + '">' + r2 + '×</button>';
+          }).join('') +
+        '</div>' +
+        '<div class="sp-row"><button class="rv-go" id="mp-split" style="flex:1;" title="Split this recording at the playhead">Split at playhead</button></div>';
     } else if (seg) {
       html += '<div class="sp-region" style="margin-bottom:7px;">src ' + seg.src_start.toFixed(1) + 's → ' + seg.src_end.toFixed(1) + 's at <b>' + seg.rate + '×</b></div>' +
         '<div class="sp-row" style="flex-wrap:wrap;">' +
@@ -2750,12 +2765,6 @@ export function getPreviewHtml(): string {
     if (py < 8) py = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
     pop.style.top = py + 'px';
     document.getElementById('mp-x').addEventListener('click', camPopClose);
-    var createBtn = document.getElementById('mp-create');
-    if (createBtn) createBtn.addEventListener('click', function() {
-      var srcDur = (v.duration && isFinite(v.duration)) ? v.duration : dur;
-      camPopClose();
-      saveMediaEdits(si, target, [{ src_start: 0, src_end: Math.round(srcDur * 10) / 10, rate: 1 }]);
-    });
     Array.prototype.slice.call(pop.querySelectorAll('.mp-rate')).forEach(function(btn) {
       btn.addEventListener('click', function() {
         segs[segIndex] = { src_start: seg.src_start, src_end: seg.src_end, rate: parseFloat(btn.dataset.rate) };
