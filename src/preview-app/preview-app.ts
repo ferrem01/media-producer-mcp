@@ -2818,7 +2818,8 @@ export function getPreviewHtml(): string {
             return '<button class="rv-go secondary mp-rate" data-rate="' + r2 + '" style="flex:1;padding:5px 6px;' + (r2 === 1 ? 'background:#6366f1;color:#fff;border-color:#6366f1;' : '') + '">' + r2 + '×</button>';
           }).join('') +
         '</div>' +
-        '<div class="sp-row"><button class="rv-go" id="mp-split" style="flex:1;" title="Split this recording at the playhead">Split at playhead</button></div>';
+        '<div class="sp-row"><button class="rv-go" id="mp-split" style="flex:1;" title="Split this recording at the playhead">Split at playhead</button></div>' +
+        '<div class="sp-row"><button class="rv-go secondary" id="mp-compress" style="flex:1;" title="Find stretches where the screen barely changes (spinners, loading) and timelapse them at 8x">⚡ Compress waiting</button></div>';
     } else if (seg) {
       html += '<div class="sp-region" style="margin-bottom:7px;">src ' + seg.src_start.toFixed(1) + 's → ' + seg.src_end.toFixed(1) + 's at <b>' + seg.rate + '×</b></div>' +
         '<div class="sp-row" style="flex-wrap:wrap;">' +
@@ -2844,6 +2845,20 @@ export function getPreviewHtml(): string {
     if (py < 8) py = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
     pop.style.top = py + 'px';
     document.getElementById('mp-x').addEventListener('click', camPopClose);
+    var compressBtn = document.getElementById('mp-compress');
+    if (compressBtn) compressBtn.addEventListener('click', function() {
+      camPopClose();
+      studioStatus('Scanning ' + label + ' for idle stretches…', '');
+      api('POST', '/compress-waiting/' + state.tenantId + '/' + p.project_id, {
+        scene_id: scene.id, target: target, src: v.getAttribute('src') || '',
+      }).then(function(r2) {
+        if (!r2 || r2.ok === false) { studioStatus('Compress failed: ' + ((r2 && r2.error) || 'unknown'), 'err'); return; }
+        if (!r2.idle_ranges) { studioStatus('No idle stretches found — the screen is always moving.', 'warn'); return; }
+        scene.media_edits = r2.media_edits;
+        studioStatus('Compressed ' + r2.idle_ranges + ' idle stretch' + (r2.idle_ranges === 1 ? '' : 'es') + ': ' + r2.source_duration.toFixed(0) + 's → ' + r2.output_duration.toFixed(0) + 's ✓', 'ok');
+        startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+      }).catch(function(e2) { studioStatus('Compress failed: ' + e2.message, 'err'); });
+    });
     Array.prototype.slice.call(pop.querySelectorAll('.mp-rate')).forEach(function(btn) {
       btn.addEventListener('click', function() {
         segs[segIndex] = { src_start: seg.src_start, src_end: seg.src_end, rate: parseFloat(btn.dataset.rate) };

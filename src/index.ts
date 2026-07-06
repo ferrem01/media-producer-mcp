@@ -35,6 +35,8 @@ import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
 import { getSceneThumbnail } from "./core/scene-thumbnail.js";
 import { getWaveformPeaks } from "./core/waveform.js";
+import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
+import { resolveVideoPath } from "./core/video-path.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
@@ -1693,6 +1695,45 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           jsonResponse(res, 200, { ok: true, buckets_per_second: wf.bucketsPerSecond, peaks: wf.peaks });
         } catch (err: any) {
           jsonResponse(res, 500, { error: `Waveform extraction failed: ${err?.message || err}` });
+        }
+        return;
+      }
+
+      // ── API: Compress waiting -- detect idle stretches, timelapse them ──
+      const compressMatch = urlPath.match(/^\/api\/compress-waiting\/([^/]+)\/([^/]+)$/);
+      if (compressMatch && method === "POST") {
+        const [, tenantId, projectId] = compressMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const sceneId = body.scene_id as string;
+        const target = body.target as string;
+        const src = body.src as string;
+        if (!sceneId || !target || !src) { jsonResponse(res, 400, { error: "scene_id, target and src are required" }); return; }
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const scene = project.scenes.find((s: any) => s.id === sceneId);
+        if (!scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
+        try {
+          const videoPath = resolveVideoPath(src);
+          const minIdle = typeof body.min_idle === "number" ? (body.min_idle as number) : 2;
+          const idleRate = typeof body.idle_rate === "number" ? (body.idle_rate as number) : 8;
+          const det = await detectIdleRanges(videoPath, minIdle);
+          const segments = buildCompressedSegments(det.duration, det.ranges, idleRate);
+          if (!segments.length) { jsonResponse(res, 200, { ok: true, idle_ranges: 0, media_edits: (scene as any).media_edits || {} }); return; }
+          const edits: Record<string, any> = (scene as any).media_edits || {};
+          edits[target] = { segments };
+          (scene as any).media_edits = edits;
+          project.updated_at = new Date().toISOString();
+          await saveProject(project);
+          const outDur = segments.reduce((s2, g) => s2 + (g.src_end - g.src_start) / g.rate, 0);
+          jsonResponse(res, 200, {
+            ok: true,
+            idle_ranges: det.ranges.length,
+            source_duration: det.duration,
+            output_duration: Math.round(outDur * 10) / 10,
+            media_edits: (scene as any).media_edits,
+          });
+        } catch (err: any) {
+          jsonResponse(res, 500, { error: `Compress failed: ${err?.message || err}` });
         }
         return;
       }
