@@ -229,6 +229,10 @@ export interface MediaSegment {
  *  videos in one scene (side-by-side demos) each carry their own edit. */
 export interface MediaEdit {
   segments: MediaSegment[];
+  /** Sync anchors ("when I say X, show Y"): output time -> source time.
+   *  Segments are COMPILED from these when present; kept so later pins can
+   *  recompute the rates between all anchors. */
+  pins?: Array<{ out: number; src: number }>;
 }
 
 export interface Scene {

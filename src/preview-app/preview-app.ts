@@ -2792,7 +2792,36 @@ export function getPreviewHtml(): string {
     }).catch(function() {});
   }
 
-  function saveMediaEdits(sceneIndex, target, segments) {
+  // Pins ("when I say X, show Y") compile into ordinary segments: an
+  // implicit {out:0, src:0} anchor, then between consecutive pins the rate
+  // is whatever makes the source arrive on time; after the last pin the
+  // source plays at 1x until it runs out (then freezes).
+  function compilePinsToSegments(pins, srcDur) {
+    var ps = pins.slice().sort(function(a, b) { return a.out - b.out; });
+    var anchors = [{ out: 0, src: 0 }];
+    ps.forEach(function(pn) {
+      var last = anchors[anchors.length - 1];
+      if (pn.out > last.out + 0.05 && pn.src > last.src + 0.01) anchors.push(pn);
+      else if (pn.out <= 0.05 && anchors.length === 1) anchors[0] = { out: 0, src: Math.max(0, pn.src) };
+    });
+    var segs = [];
+    for (var i = 1; i < anchors.length; i++) {
+      var a = anchors[i - 1], b = anchors[i];
+      var rate = Math.min(16, Math.max(0.1, (b.src - a.src) / (b.out - a.out)));
+      segs.push({ src_start: Math.round(a.src * 10) / 10, src_end: Math.round(b.src * 10) / 10, rate: Math.round(rate * 100) / 100 });
+    }
+    var lastA = anchors[anchors.length - 1];
+    if (srcDur > lastA.src + 0.1) segs.push({ src_start: Math.round(lastA.src * 10) / 10, src_end: Math.round(srcDur * 10) / 10, rate: 1 });
+    return segs;
+  }
+
+  // Where the current map sends an output time (slider prefill for pins).
+  function mapForPin(segs2, t) {
+    if (!segs2 || !segs2.length) return t;
+    return edlMapClient(segs2, t).src;
+  }
+
+  function saveMediaEdits(sceneIndex, target, segments, pins) {
     var p = state.currentProject;
     var scene = p && p.scenes && p.scenes[sceneIndex];
     if (!scene || !p) return;
@@ -2801,6 +2830,7 @@ export function getPreviewHtml(): string {
       scene_id: scene.id,
       target: target,
       segments: segments && segments.length ? segments : null,
+      pins: pins && pins.length ? pins : undefined,
     }).then(function(r) {
       scene.media_edits = r.media_edits && Object.keys(r.media_edits).length ? r.media_edits : undefined;
       studioStatus('Saved ✓ reloading preview…', 'ok');
@@ -2844,7 +2874,8 @@ export function getPreviewHtml(): string {
           }).join('') +
         '</div>' +
         '<div class="sp-row"><button class="rv-go" id="mp-split" style="flex:1;" title="Split this recording at the playhead">Split at playhead</button></div>' +
-        '<div class="sp-row"><button class="rv-go secondary" id="mp-compress" style="flex:1;" title="Find stretches where the screen barely changes (spinners, loading) and timelapse them at 8x">⚡ Compress waiting</button></div>';
+        '<div class="sp-row"><button class="rv-go secondary" id="mp-compress" style="flex:1;" title="Find stretches where the screen barely changes (spinners, loading) and timelapse them at 8x">⚡ Compress waiting</button>' +
+        '<button class="rv-go secondary" id="mp-pin" style="flex:0 0 auto;" title="Pin: at the current playhead, show a source frame you pick — speeds between pins recompute automatically">📌 Pin</button></div>';
     } else if (seg) {
       html += '<div class="sp-region" style="margin-bottom:7px;">src ' + seg.src_start.toFixed(1) + 's → ' + seg.src_end.toFixed(1) + 's at <b>' + seg.rate + '×</b></div>' +
         '<div class="sp-row" style="flex-wrap:wrap;">' +
@@ -2855,6 +2886,7 @@ export function getPreviewHtml(): string {
         '<div class="sp-row">' +
           '<button class="rv-go secondary" id="mp-split" style="flex:1;" title="Split this segment at the playhead">Split at playhead</button>' +
           '<button class="rv-go secondary" id="mp-remove" style="flex:0 0 auto;color:#dc2626;border-color:#fca5a5;" title="Remove this segment (hard cut: the source range is skipped)">Remove</button>' +
+          '<button class="rv-go secondary" id="mp-pin" style="flex:0 0 auto;" title="Pin: at the current playhead, show a source frame you pick — speeds between pins recompute automatically">📌</button>' +
         '</div>' +
         '<div class="sp-row"><button class="rv-go secondary" id="mp-clear" style="flex:1;color:#6b7280;">Delete ALL edits on this video</button></div>';
     } else {
@@ -2870,6 +2902,45 @@ export function getPreviewHtml(): string {
     if (py < 8) py = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
     pop.style.top = py + 'px';
     document.getElementById('mp-x').addEventListener('click', camPopClose);
+    var pinBtn = document.getElementById('mp-pin');
+    if (pinBtn) pinBtn.addEventListener('click', function() {
+      // Pin mode: pick the SOURCE frame that should show at the playhead.
+      var outT = Math.max(0, Math.min(dur - 0.1, (state.masterTime || 0) - sceneStartFor(si)));
+      var srcDur = (v.duration && isFinite(v.duration)) ? v.duration : Math.max(dur, 30);
+      var vsrc = v.getAttribute('src') || '';
+      pop.innerHTML =
+        '<div class="sp-head"><span class="sp-title"><b>📌 ' + escHtml(label) + '</b> — at film ' + outT.toFixed(1) + 's show…</span>' +
+        '<button class="sp-x" id="mpp-x">✕</button></div>' +
+        '<video id="mpp-prev" src="' + escAttr(vsrc) + '" muted preload="auto" style="width:100%;border-radius:8px;background:#111;display:block;margin-bottom:7px;"></video>' +
+        '<div class="sp-row"><input id="mpp-slider" type="range" min="0" max="' + escAttr('' + Math.floor(srcDur * 10) / 10) + '" step="0.1" value="' + escAttr('' + Math.round(mapForPin(segs, outT) * 10) / 10) + '" style="flex:1;">' +
+        '<span id="mpp-time" style="font-size:11px;min-width:44px;text-align:right;">0.0s</span></div>' +
+        '<div class="sp-row"><button class="rv-go secondary" id="mpp-cancel" style="flex:0 0 auto;">Cancel</button>' +
+        '<button class="rv-go" id="mpp-go" style="flex:1;">Pin this frame here</button></div>';
+      var prev = document.getElementById('mpp-prev');
+      var slider = document.getElementById('mpp-slider');
+      var tlabel = document.getElementById('mpp-time');
+      function syncPrev() {
+        var t2 = parseFloat(slider.value) || 0;
+        tlabel.textContent = t2.toFixed(1) + 's';
+        try { prev.currentTime = t2; } catch (e) {}
+      }
+      slider.addEventListener('input', syncPrev);
+      prev.addEventListener('loadedmetadata', function() {
+        if (isFinite(prev.duration)) slider.max = '' + Math.floor(prev.duration * 10) / 10;
+        syncPrev();
+      });
+      syncPrev();
+      document.getElementById('mpp-x').addEventListener('click', camPopClose);
+      document.getElementById('mpp-cancel').addEventListener('click', camPopClose);
+      document.getElementById('mpp-go').addEventListener('click', function() {
+        var srcT = parseFloat(slider.value) || 0;
+        var pins = ((edit && edit.pins) || []).filter(function(pn) { return Math.abs(pn.out - outT) > 0.2; });
+        pins.push({ out: Math.round(outT * 10) / 10, src: Math.round(srcT * 10) / 10 });
+        var realDur = (prev.duration && isFinite(prev.duration)) ? prev.duration : srcDur;
+        camPopClose();
+        saveMediaEdits(si, target, compilePinsToSegments(pins, realDur), pins);
+      });
+    });
     var compressBtn = document.getElementById('mp-compress');
     if (compressBtn) compressBtn.addEventListener('click', function() {
       camPopClose();
