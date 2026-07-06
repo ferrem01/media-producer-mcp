@@ -155,7 +155,7 @@ export function getPreviewHtml(): string {
   /* Playback controls */
   #playback-bar {
     display: flex; align-items: center; gap: 12px;
-    padding: 28px 16px 36px; /* headroom: media lane above, staggered words below */
+    padding: 8px 16px;
     background: #ffffff;
     border-top: 1px solid #e5e7eb;
   }
@@ -168,24 +168,26 @@ export function getPreviewHtml(): string {
   .play-btn:hover { background: #4338ca; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
   .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .play-btn svg { fill: #fff; }
-  #slider-wrap { position: relative; flex: 1; display: flex; align-items: center; height: 30px; }
+  #slider-wrap { position: relative; flex: 1; height: 84px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  #slider-wrap::-webkit-scrollbar { display: none; }
+  #timeline-track { position: relative; height: 100%; min-width: 100%; width: 100%; }
   /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
-  #audio-lanes { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; pointer-events: none; }
+  #audio-lanes { position: absolute; left: 0; right: 0; top: 48px; height: 10px; pointer-events: none; }
   .audio-lane-seg { position: absolute; height: 4px; border-radius: 2px; pointer-events: auto; }
   .audio-lane-seg.music { top: 0; background: linear-gradient(90deg, rgba(99,102,241,0.15), rgba(99,102,241,0.55) 12%, rgba(99,102,241,0.55)); }
   .audio-lane-seg.voiceover { top: 5px; background: #f59e0b; opacity: 0.75; }
   .audio-lane-seg.sfx { top: 5px; background: #10b981; opacity: 0.6; }
   #timeline-slider {
-    flex: 1; -webkit-appearance: none; appearance: none;
+    position: absolute; left: 0; top: 28px; width: 100%; -webkit-appearance: none; appearance: none;
     height: 3px; background: #e5e7eb; border-radius: 3px;
     outline: none; cursor: pointer;
   }
   /* Beat/scene markers over the timeline: scene cuts are strong ticks, beats are soft ticks. */
-  #beat-ticks { position: absolute; inset: 0; pointer-events: none; }
+  #beat-ticks { position: absolute; left: 0; right: 0; top: 28px; height: 5px; pointer-events: none; }
   .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #a5b4fc; opacity: 0.75; border-radius: 1px; }
   .beat-tick.scene-cut { width: 2px; height: 13px; background: #6366f1; opacity: 0.9; }
   /* Camera-move pills on the scrubber: one clickable pill per zoom/pan/rotate. */
-  #cam-pills { position: absolute; inset: 0; pointer-events: none; }
+  #cam-pills { position: absolute; left: 0; right: 0; top: 12px; height: 16px; pointer-events: none; }
   .cam-pill {
     position: absolute; top: -3px; transform: translateX(-50%);
     width: 15px; height: 15px; border-radius: 50%;
@@ -198,7 +200,7 @@ export function getPreviewHtml(): string {
   .cam-pill:hover { transform: translateX(-50%) scale(1.3); }
   .cam-pill.active { background: #312e81; transform: translateX(-50%) scale(1.3); }
   /* Media lane: each video's source-map as blocks (color = rate). */
-  #media-lane { position: absolute; left: 0; right: 0; top: -24px; height: 20px; pointer-events: none; }
+  #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 20px; pointer-events: none; }
   .ml-row { position: absolute; left: 0; right: 0; height: 8px; }
   .ml-seg { position: absolute; height: 100%; border-radius: 2px; pointer-events: auto; cursor: pointer; opacity: 0.85; box-sizing: border-box; }
   .ml-seg:hover { opacity: 1; box-shadow: 0 0 0 1.5px #4f46e5; z-index: 2; }
@@ -208,7 +210,7 @@ export function getPreviewHtml(): string {
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
   /* Speaker/words lane: what's being said, beat by beat; click to seek. */
-  #word-lane { position: absolute; left: 0; right: 0; bottom: -30px; height: 26px; pointer-events: none; }
+  #word-lane { position: absolute; left: 0; right: 0; top: 56px; height: 26px; pointer-events: none; }
   .wl-word {
     position: absolute; height: 13px; box-sizing: border-box;
     font-size: 9px; line-height: 13px; color: #6b7280;
@@ -216,7 +218,7 @@ export function getPreviewHtml(): string {
     cursor: pointer; pointer-events: auto; border-radius: 3px;
   }
   .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
-  #wave-strip { position: absolute; left: 0; right: 0; bottom: -30px; height: 26px; pointer-events: none; opacity: 0.35; }
+  #wave-strip { position: absolute; left: 0; right: 0; top: 56px; height: 26px; pointer-events: none; opacity: 0.35; }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -642,6 +644,7 @@ export function getPreviewHtml(): string {
         </svg>
       </button>
       <span id="slider-wrap">
+        <div id="timeline-track">
         <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
         <div id="beat-ticks"></div>
         <div id="audio-lanes"></div>
@@ -649,6 +652,11 @@ export function getPreviewHtml(): string {
         <div id="media-lane"></div>
         <canvas id="wave-strip"></canvas>
         <div id="word-lane"></div>
+        </div>
+      </span>
+      <span style="display:flex;flex-direction:column;gap:3px;">
+        <button id="tl-zoom-in" class="scene-sb-btn" title="Zoom timeline in">+</button>
+        <button id="tl-zoom-out" class="scene-sb-btn" title="Zoom timeline out">&minus;</button>
       </span>
       <span class="time-display" id="time-display">0.0s / 0.0s</span>
       <span class="audio-indicator" id="audio-indicator"></span>
@@ -2748,6 +2756,7 @@ export function getPreviewHtml(): string {
           ev.stopPropagation();
           scrub(Math.round((t0 / total) * 1000));
           els.slider.value = Math.round((t0 / total) * 1000);
+          followPlayhead(true);
           pinAtPlayhead(sp);
         });
         wrap.appendChild(sp);
@@ -2766,6 +2775,29 @@ export function getPreviewHtml(): string {
         bt += bd;
       });
     });
+  }
+
+  // Timeline zoom: the track grows to zoom x width inside the scroller;
+  // every lane is percent-positioned, so words/blocks/pills spread together.
+  function setTimelineZoom(z) {
+    state.tlZoom = Math.max(1, Math.min(8, z));
+    var track = document.getElementById('timeline-track');
+    if (!track) return;
+    track.style.width = (state.tlZoom * 100) + '%';
+    renderWaveStrip();
+    followPlayhead(true);
+  }
+
+  // Keep the playhead in view while playing (page-scroll like every NLE).
+  function followPlayhead(force) {
+    var sw = document.getElementById('slider-wrap');
+    var track = document.getElementById('timeline-track');
+    var total = state.totalDuration || calcTotalDuration();
+    if (!sw || !track || !(total > 0) || track.offsetWidth <= sw.clientWidth + 2) return;
+    var px = ((state.masterTime || 0) / total) * track.offsetWidth;
+    var lo = sw.scrollLeft + sw.clientWidth * 0.1;
+    var hi = sw.scrollLeft + sw.clientWidth * 0.9;
+    if (force || px < lo || px > hi) sw.scrollLeft = Math.max(0, px - sw.clientWidth / 2);
   }
 
   // Fetch the real transcript once per project; re-render the lane on arrival.
@@ -2793,7 +2825,7 @@ export function getPreviewHtml(): string {
       var total = state.totalDuration || calcTotalDuration();
       if (!(total > 0)) return;
       var rect = cv.getBoundingClientRect();
-      cv.width = Math.max(300, Math.round(rect.width));
+      cv.width = Math.max(300, Math.min(8000, Math.round(rect.width)));
       cv.height = 15;
       var ctx = cv.getContext('2d');
       ctx.clearRect(0, 0, cv.width, cv.height);
@@ -3356,6 +3388,7 @@ export function getPreviewHtml(): string {
 
       // Update UI
       els.slider.value = totalDur > 0 ? Math.round((globalTime / totalDur) * 1000) : 0;
+      followPlayhead(false);
       updateTimeDisplay(globalTime);
 
       // Track which scene we're in for sidebar highlight
@@ -4396,6 +4429,8 @@ export function getPreviewHtml(): string {
 
   // Revise + storyboard controls live in the selection popover and the
   // storyboard dialog (wired where they're built).
+  document.getElementById('tl-zoom-in').addEventListener('click', function() { setTimelineZoom((state.tlZoom || 1) * 1.6); });
+  document.getElementById('tl-zoom-out').addEventListener('click', function() { setTimelineZoom((state.tlZoom || 1) / 1.6); });
 })();
 </script>
 </body>
