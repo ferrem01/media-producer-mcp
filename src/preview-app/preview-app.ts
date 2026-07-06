@@ -740,6 +740,7 @@ export function getPreviewHtml(): string {
   };
 
   // Auth token from URL
+  window.__MP_SYNCDEBUG = new URLSearchParams(window.location.search).has('syncdebug');
   var _token = new URLSearchParams(window.location.search).get('token');
   var _urlTenant = new URLSearchParams(window.location.search).get('tenant');
 
@@ -1145,6 +1146,9 @@ export function getPreviewHtml(): string {
     var seekAllowed = !clip._lastSeekTs || (now - clip._lastSeekTs) > (clip._edlFast ? 200 : 1250);
     var starved = isPlayingMedia && el.readyState < 3;
     function doSeek(t) {
+      if (window.__MP_SYNCDEBUG) {
+        try { console.log('[sync-seek]', (el.currentSrc || el.src || el.tagName).split('/').pop().slice(0, 40), 'film', (state.masterTime || 0).toFixed(2), 'from', el.currentTime.toFixed(2), 'to', t.toFixed(2), 'drift', drift.toFixed(2), 'rs', el.readyState, 'playing', !el.paused, 'starved', starved, 'recovered', justRecovered); } catch (e4) {}
+      }
       el.currentTime = t;
       clip._lastSeekTs = now;
       clip.driftSamples = 0;
@@ -1644,6 +1648,17 @@ export function getPreviewHtml(): string {
             renderWordLane();
             renderWaveStrip();
             loadTranscript();
+            // Desktop: buffer every scene video up front. The mid-play
+            // stall -> freeze -> catch-up-seek cycle reads as a "jump" in
+            // otherwise untouched footage; full preload removes the stall.
+            if (!IS_MOBILE) {
+              try {
+                var vidsAll = els.previewIframe.contentDocument.querySelectorAll('video');
+                for (var vb = 0; vb < vidsAll.length; vb++) {
+                  if (vidsAll[vb].preload !== 'auto') { vidsAll[vb].preload = 'auto'; try { vidsAll[vb].load(); } catch (e2) {} }
+                }
+              } catch (e3) {}
+            }
             masterTl.time(t);
             state.masterTime = t;
             els.slider.value = state.totalDuration > 0 ? Math.round((t / state.totalDuration) * 1000) : 0;
