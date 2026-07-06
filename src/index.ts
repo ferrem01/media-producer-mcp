@@ -1790,6 +1790,9 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             s.src_end <= s.src_start || typeof s.rate !== "number" || s.rate <= 0);
           if (bad) { jsonResponse(res, 400, { error: "segments must be [{src_start, src_end, rate>0}] with src_end > src_start" }); return; }
           edits[target] = { segments };
+          if (Array.isArray(body.pins) && (body.pins as any[]).every((pn: any) => pn && typeof pn.out === "number" && typeof pn.src === "number")) {
+            edits[target].pins = body.pins;
+          }
         } else {
           jsonResponse(res, 400, { error: "segments must be an array or null" });
           return;
