@@ -36,7 +36,7 @@ import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./
 import { getSceneThumbnail } from "./core/scene-thumbnail.js";
 import { getWaveformPeaks } from "./core/waveform.js";
 import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
-import { getTranscript, whisperAvailable } from "./core/transcribe.js";
+import { getTranscript, whisperAvailable, snapLeadingWords } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
@@ -1717,7 +1717,14 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         try {
           const cacheDir2 = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs");
           const tr = await getTranscript(resolveVideoPath(audioSrc2), cacheDir2);
-          jsonResponse(res, 200, { ok: true, available: true, segments: tr.segments });
+          // Correct whisper's leading-silence anchor using the waveform onset.
+          let segs2 = tr.segments;
+          try {
+            const wf2 = await getWaveformPeaks(resolveVideoPath(audioSrc2), cacheDir2);
+            const onsetIdx = wf2.peaks.findIndex((pk) => pk > 0.08);
+            if (onsetIdx > 0) segs2 = snapLeadingWords(segs2, onsetIdx / wf2.bucketsPerSecond);
+          } catch { /* waveform optional */ }
+          jsonResponse(res, 200, { ok: true, available: true, segments: segs2 });
         } catch (err: any) {
           jsonResponse(res, 500, { error: `Transcription failed: ${err?.message || err}` });
         }
