@@ -1029,7 +1029,16 @@ export function getPreviewHtml(): string {
         // Apply speaker track trim: global time 0 maps to trim_start in source
         var target = time + state.speakerTrimStart;
         if (target > state.speakerTrimEnd) target = state.speakerTrimEnd;
-        syncElement(clip, el, target, playing, false);
+        var spkDrift = Math.abs(el.currentTime - target);
+        if (playing && !el.paused && el.readyState >= 3 && !state.forceSync && spkDrift < 2) {
+          // The speaker IS the clock while rolling: never corrective-seek it
+          // (that snaps the picture AND blips the voice). The clock follows
+          // it instead (see animLoop).
+        } else {
+          syncElement(clip, el, target, playing, false);
+        }
+        if (playing && el.paused) { try { el.play().catch(function() {}); } catch (eS) {} }
+        else if (!playing && !el.paused) el.pause();
         // Unmute when playing (audio should be heard even on non-speaker scenes)
         el.muted = !playing;
         continue;
@@ -3456,7 +3465,19 @@ export function getPreviewHtml(): string {
     var now = performance.now();
     var elapsed = (now - state.lastTickTime) / 1000;
     state.lastTickTime = now;
-    state.masterTime += elapsed;
+    // One-stream clock: while the speaker (voice+camera) is rolling, IT is
+    // the film clock -- masterTime reads from its playhead, so camera/voice
+    // can never drift from the timeline by construction. Wall clock is the
+    // fallback (no speaker track, ended, or mid-scrub repositioning).
+    var spkEl = els.speakerBg;
+    var spkT = (spkEl && !spkEl.paused && spkEl.readyState >= 3 && spkEl.currentTime > 0)
+      ? spkEl.currentTime - (state.speakerTrimStart || 0)
+      : null;
+    if (spkT !== null && spkT > state.masterTime - 0.75 && spkT < state.masterTime + 2) {
+      state.masterTime = spkT;
+    } else {
+      state.masterTime += elapsed;
+    }
 
     var globalTime = state.masterTime;
     var totalDur = state.totalDuration;
