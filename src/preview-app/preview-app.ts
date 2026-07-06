@@ -202,7 +202,10 @@ export function getPreviewHtml(): string {
   /* Media lane: each video's source-map as blocks (color = rate). */
   #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 20px; pointer-events: none; }
   .ml-row { position: absolute; left: 0; right: 0; height: 8px; }
-  .ml-seg { position: absolute; height: 100%; border-radius: 2px; pointer-events: auto; cursor: pointer; opacity: 0.85; box-sizing: border-box; }
+  .ml-seg { position: absolute; height: 100%; border-radius: 3px; pointer-events: auto; cursor: pointer; opacity: 0.92; box-sizing: border-box;
+    border: 1px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.10);
+    font-size: 8px; line-height: 8px; color: rgba(255,255,255,0.95); text-align: center; overflow: hidden; white-space: nowrap; }
+  .ml-seg.r-plain, .ml-seg.r-freeze { color: #6b7280; }
   .ml-seg:hover { opacity: 1; box-shadow: 0 0 0 1.5px #4f46e5; z-index: 2; }
   .ml-seg.r-normal { background: #a5b4fc; }
   .ml-seg.r-fast { background: #fbbf24; }
@@ -1069,13 +1072,25 @@ export function getPreviewHtml(): string {
           // target does (drift stays flat between corrections).
           var m = edlMapClient(clip.edl, localTime);
           target = m.src;
-          var wantRate = m.frozen ? 1 : m.rate;
-          if (el.playbackRate !== wantRate) { try { el.playbackRate = wantRate; } catch (e) {} }
           if (m.frozen) {
+            if (el.playbackRate !== 1) { try { el.playbackRate = 1; } catch (e) {} }
+            clip._edlFast = false;
             // Source exhausted: hold the last frame for the rest of the scene.
             syncElement(clip, el, target, false, true);
             continue;
           }
+          if (m.rate > 2.5) {
+            // Browsers can't DECODE H.264 at timelapse rates -- playbackRate
+            // silently underdelivers and the picture looks ~1x. Render
+            // timelapse honestly as rapid seeks of a paused element.
+            clip._edlFast = true;
+            if (el.playbackRate !== 1) { try { el.playbackRate = 1; } catch (e) {} }
+            syncElement(clip, el, target, false, true);
+            continue;
+          }
+          clip._edlFast = false;
+          var wantRate = m.rate;
+          if (el.playbackRate !== wantRate) { try { el.playbackRate = wantRate; } catch (e) {} }
         } else {
           // Regular video asset: start_at is source offset
           target = clip.offset + localTime;
@@ -1127,7 +1142,7 @@ export function getPreviewHtml(): string {
     // (2) While a playing video is starved (readyState < 3), let it buffer
     // instead of correcting, unless drift is truly runaway (>3s).
     var now = (window.performance && performance.now) ? performance.now() : Date.now();
-    var seekAllowed = !clip._lastSeekTs || (now - clip._lastSeekTs) > 1250;
+    var seekAllowed = !clip._lastSeekTs || (now - clip._lastSeekTs) > (clip._edlFast ? 350 : 1250);
     var starved = isPlayingMedia && el.readyState < 3;
     function doSeek(t) {
       el.currentTime = t;
@@ -2674,9 +2689,10 @@ export function getPreviewHtml(): string {
         var rowEl = document.createElement('div');
         rowEl.className = 'ml-row';
         rowEl.style.top = (row * 10) + 'px';
-        function block(fromLocal, toLocal, cls, title, onClick) {
+        function block(fromLocal, toLocal, cls, title, onClick, text) {
           var b = document.createElement('div');
           b.className = 'ml-seg ' + cls;
+          if (text) b.textContent = text;
           b.style.left = (((sceneStart + fromLocal) / total) * 100).toFixed(2) + '%';
           b.style.width = Math.max(0.3, (((toLocal - fromLocal) / total) * 100)).toFixed(2) + '%';
           b.title = title;
@@ -2698,7 +2714,7 @@ export function getPreviewHtml(): string {
             var from = acc, to = Math.min(dur, acc + outDur);
             if (to > from) block(from, to, cls, label + ' — ' + rate + 'x  src ' + s.src_start.toFixed(1) + '-' + s.src_end.toFixed(1) + 's', (function(idx) {
               return function(el2) { mediaPopOpen(si, found.key, v, found.edit, idx, el2); };
-            })(i2));
+            })(i2), rate !== 1 ? (rate + '×') : '');
             acc += outDur;
           });
           if (acc < dur - 0.05) {
@@ -3034,8 +3050,7 @@ export function getPreviewHtml(): string {
           }).join('') +
         '</div>' +
         '<div class="sp-row"><button class="rv-go" id="mp-split" style="flex:1;" title="Split this recording at the playhead">Split at playhead</button></div>' +
-        '<div class="sp-row"><button class="rv-go secondary" id="mp-compress" style="flex:1;" title="Find stretches where the screen barely changes (spinners, loading) and timelapse them at 8x">⚡ Compress waiting</button>' +
-        '<button class="rv-go secondary" id="mp-pin" style="flex:0 0 auto;" title="Pin: at the current playhead, show a source frame you pick — speeds between pins recompute automatically">📌 Pin</button></div>';
+        '<div class="sp-row"><button class="rv-go secondary" id="mp-compress" style="flex:1;" title="Find stretches where the screen barely changes (spinners, loading) and timelapse them at 8x">⚡ Compress waiting</button></div>';
     } else if (seg) {
       html += '<div class="sp-region" style="margin-bottom:7px;">src ' + seg.src_start.toFixed(1) + 's → ' + seg.src_end.toFixed(1) + 's at <b>' + seg.rate + '×</b></div>' +
         '<div class="sp-row" style="flex-wrap:wrap;">' +
@@ -3046,8 +3061,8 @@ export function getPreviewHtml(): string {
         '<div class="sp-row">' +
           '<button class="rv-go secondary" id="mp-split" style="flex:1;" title="Split this segment at the playhead">Split at playhead</button>' +
           '<button class="rv-go secondary" id="mp-remove" style="flex:0 0 auto;color:#dc2626;border-color:#fca5a5;" title="Remove this segment (hard cut: the source range is skipped)">Remove</button>' +
-          '<button class="rv-go secondary" id="mp-pin" style="flex:0 0 auto;" title="Pin: at the current playhead, show a source frame you pick — speeds between pins recompute automatically">📌</button>' +
         '</div>' +
+        '<div class="sp-row"><button class="rv-go secondary" id="mp-compress" style="flex:1;" title="Scan JUST this segment for stretches where the screen barely changes and timelapse them at 8x">⚡ Compress waiting in this segment</button></div>' +
         '<div class="sp-row"><button class="rv-go secondary" id="mp-clear" style="flex:1;color:#6b7280;">Delete ALL edits on this video</button></div>';
     } else {
       html += '<div class="sp-region" style="margin-bottom:7px;">The source-map ends before the scene does; the last frame holds. Extend the final segment or add source.</div>' +
@@ -3062,19 +3077,24 @@ export function getPreviewHtml(): string {
     if (py < 8) py = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
     pop.style.top = py + 'px';
     document.getElementById('mp-x').addEventListener('click', camPopClose);
-    var pinBtn = document.getElementById('mp-pin');
-    if (pinBtn) pinBtn.addEventListener('click', function() {
-      openPinPicker(si, target, v, edit, pop.getBoundingClientRect());
-    });
     var compressBtn = document.getElementById('mp-compress');
     if (compressBtn) compressBtn.addEventListener('click', function() {
       camPopClose();
-      studioStatus('Scanning ' + label + ' for idle stretches…', '');
-      api('POST', '/compress-waiting/' + state.tenantId + '/' + p.project_id, {
-        scene_id: scene.id, target: target, src: v.getAttribute('src') || '',
-      }).then(function(r2) {
+      var body = { scene_id: scene.id, target: target, src: v.getAttribute('src') || '' };
+      var scoped = !implicit && seg;
+      if (scoped) { body.range_start = seg.src_start; body.range_end = seg.src_end; }
+      studioStatus('Scanning ' + label + (scoped ? ' (this segment)' : '') + ' for idle stretches…', '');
+      api('POST', '/compress-waiting/' + state.tenantId + '/' + p.project_id, body).then(function(r2) {
         if (!r2 || r2.ok === false) { studioStatus('Compress failed: ' + ((r2 && r2.error) || 'unknown'), 'err'); return; }
-        if (!r2.idle_ranges) { studioStatus('No idle stretches found — the screen is always moving.', 'warn'); return; }
+        if (!r2.idle_ranges) { studioStatus('No idle stretches found — the screen is always moving there.', 'warn'); return; }
+        if (scoped && r2.segments) {
+          // Replace just this segment with the compressed pieces (at its rate
+          // for the active parts if it was speeded? keep 1x actives).
+          var next2 = segs.slice();
+          next2.splice.apply(next2, [segIndex, 1].concat(r2.segments));
+          saveMediaEdits(si, target, next2, edit && edit.pins);
+          return;
+        }
         scene.media_edits = r2.media_edits;
         studioStatus('Compressed ' + r2.idle_ranges + ' idle stretch' + (r2.idle_ranges === 1 ? '' : 'es') + ': ' + r2.source_duration.toFixed(0) + 's → ' + r2.output_duration.toFixed(0) + 's ✓', 'ok');
         startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });

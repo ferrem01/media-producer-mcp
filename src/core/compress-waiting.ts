@@ -17,9 +17,11 @@ export async function detectIdleRanges(
   videoPath: string,
   minIdleSeconds = 2,
   noiseDb = -40,
+  range?: { start: number; end: number },
 ): Promise<{ ranges: IdleRange[]; duration: number }> {
   const stderr: string = await new Promise((resolve, reject) => {
     const ff = spawn("ffmpeg", [
+      ...(range ? ["-ss", String(range.start), "-to", String(range.end)] : []),
       "-i", videoPath,
       "-vf", `freezedetect=n=${noiseDb}dB:d=${minIdleSeconds}`,
       "-an",
@@ -39,15 +41,19 @@ export async function detectIdleRanges(
   let duration = 0;
   const dm = stderr.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/);
   if (dm) duration = parseInt(dm[1], 10) * 3600 + parseInt(dm[2], 10) * 60 + parseFloat(dm[3]);
+  // With -ss before -i, freeze timestamps restart at 0: offset back into
+  // absolute source time, and the working duration is the range's end.
+  const offset = range ? range.start : 0;
+  if (range) duration = range.end;
 
   const ranges: IdleRange[] = [];
   let pendingStart: number | null = null;
   const re = /freeze_(start|end):\s*([\d.]+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(stderr))) {
-    if (m[1] === "start") pendingStart = parseFloat(m[2]);
+    if (m[1] === "start") pendingStart = parseFloat(m[2]) + offset;
     else if (pendingStart != null) {
-      ranges.push({ start: pendingStart, end: parseFloat(m[2]) });
+      ranges.push({ start: pendingStart, end: parseFloat(m[2]) + offset });
       pendingStart = null;
     }
   }
@@ -62,9 +68,10 @@ export function buildCompressedSegments(
   duration: number,
   ranges: IdleRange[],
   idleRate = 8,
+  startAt = 0,
 ): MediaSegment[] {
   const segs: MediaSegment[] = [];
-  let cursor = 0;
+  let cursor = startAt;
   const push = (a: number, b: number, rate: number) => {
     if (b - a < 0.05) return;
     const prev = segs[segs.length - 1];
