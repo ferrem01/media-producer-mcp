@@ -62,6 +62,27 @@ export function parseWhisperJson(raw: string): TranscriptSegment[] {
     .filter((s: TranscriptSegment) => s.text && s.end > s.start);
 }
 
+/** Whisper anchors the opening word(s) at t=0 even when the recording
+ *  starts with silence. Given the waveform's speech onset, pack the words
+ *  that "start" clearly inside the leading silence into the ~0.3s/word
+ *  window just before the first aligned word. */
+export function snapLeadingWords(
+  segments: TranscriptSegment[],
+  onsetSeconds: number,
+): TranscriptSegment[] {
+  if (!segments.length || onsetSeconds <= 0.3) return segments;
+  let n = 0;
+  while (n < segments.length && segments[n].start < onsetSeconds - 0.25) n++;
+  if (n === 0 || n > 8 || n >= segments.length) return segments; // nothing, or globally off -- don't guess
+  const out = segments.slice();
+  const anchor = Math.max(out[n].start, onsetSeconds);
+  for (let i = 0; i < n; i++) {
+    const start = Math.max(0, anchor - (n - i) * 0.3);
+    out[i] = { ...out[i], start, end: Math.max(start + 0.2, i + 1 < n ? anchor - (n - i - 1) * 0.3 : anchor) };
+  }
+  return out;
+}
+
 export async function getTranscript(
   audioPath: string,
   cacheDir: string,
