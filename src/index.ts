@@ -1688,11 +1688,11 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         // Speaker recording first; generated voiceover tracks as fallback.
         const spSrc = (project as any).speaker_track?.clips?.[0]?.source as string | undefined;
         const voTrack = (project as any).audio?.tracks?.find((t: any) => t.type === "voiceover" && t.source);
-        const audioPath = spSrc || voTrack?.source;
-        if (!audioPath) { jsonResponse(res, 404, { error: "No speaker or voiceover audio on this project" }); return; }
+        const audioSrc = spSrc || voTrack?.source;
+        if (!audioSrc) { jsonResponse(res, 404, { error: "No speaker or voiceover audio on this project" }); return; }
         try {
           const cacheDir = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs");
-          const wf = await getWaveformPeaks(audioPath, cacheDir);
+          const wf = await getWaveformPeaks(resolveVideoPath(audioSrc), cacheDir);
           jsonResponse(res, 200, { ok: true, buckets_per_second: wf.bucketsPerSecond, peaks: wf.peaks });
         } catch (err: any) {
           jsonResponse(res, 500, { error: `Waveform extraction failed: ${err?.message || err}` });
@@ -1712,11 +1712,11 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         }
         const spSrc2 = (project as any).speaker_track?.clips?.[0]?.source as string | undefined;
         const voTrack2 = (project as any).audio?.tracks?.find((t: any) => t.type === "voiceover" && t.source);
-        const audioPath2 = spSrc2 || voTrack2?.source;
-        if (!audioPath2) { jsonResponse(res, 404, { error: "No speaker or voiceover audio on this project" }); return; }
+        const audioSrc2 = spSrc2 || voTrack2?.source;
+        if (!audioSrc2) { jsonResponse(res, 404, { error: "No speaker or voiceover audio on this project" }); return; }
         try {
           const cacheDir2 = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs");
-          const tr = await getTranscript(audioPath2, cacheDir2);
+          const tr = await getTranscript(resolveVideoPath(audioSrc2), cacheDir2);
           jsonResponse(res, 200, { ok: true, available: true, segments: tr.segments });
         } catch (err: any) {
           jsonResponse(res, 500, { error: `Transcription failed: ${err?.message || err}` });
