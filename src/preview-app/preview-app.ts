@@ -155,7 +155,7 @@ export function getPreviewHtml(): string {
   /* Playback controls */
   #playback-bar {
     display: flex; align-items: center; gap: 12px;
-    padding: 28px 16px 24px; /* headroom: media lane above, words lane below */
+    padding: 28px 16px 36px; /* headroom: media lane above, staggered words below */
     background: #ffffff;
     border-top: 1px solid #e5e7eb;
   }
@@ -208,18 +208,15 @@ export function getPreviewHtml(): string {
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
   /* Speaker/words lane: what's being said, beat by beat; click to seek. */
-  #word-lane { position: absolute; left: 0; right: 0; bottom: -18px; height: 15px; pointer-events: none; }
+  #word-lane { position: absolute; left: 0; right: 0; bottom: -30px; height: 26px; pointer-events: none; }
   .wl-word {
-    position: absolute; top: 0; height: 100%; box-sizing: border-box;
-    font-size: 9px; line-height: 15px; color: #6b7280;
-    padding: 0 4px; border-left: 1px solid #e5e7eb;
-    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-    cursor: pointer; pointer-events: auto;
+    position: absolute; height: 13px; box-sizing: border-box;
+    font-size: 9px; line-height: 13px; color: #6b7280;
+    padding: 0 2px; white-space: nowrap;
+    cursor: pointer; pointer-events: auto; border-radius: 3px;
   }
   .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
-  .scr-w { cursor: pointer; border-radius: 3px; padding: 0 1px; }
-  .scr-w:hover { background: #eef2ff; color: #4f46e5; }
-  #wave-strip { position: absolute; left: 0; right: 0; bottom: -18px; height: 15px; pointer-events: none; opacity: 0.5; }
+  #wave-strip { position: absolute; left: 0; right: 0; bottom: -30px; height: 26px; pointer-events: none; opacity: 0.35; }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -659,7 +656,6 @@ export function getPreviewHtml(): string {
         <span class="vol-icon" id="vol-icon">&#9834;</span>
         <input type="range" id="vol-slider" min="0" max="100" value="100" step="1">
       </span>
-      <button id="script-btn" class="scene-sb-btn" title="Full script — click any word to jump the playhead there">&#x2263; Script</button>
       <span class="scene-indicator" id="scene-indicator"></span>
     </div>
   </div>
@@ -2734,12 +2730,27 @@ export function getPreviewHtml(): string {
     // The REAL transcript (whisper on the speaker recording) wins; the
     // storyboard's planned beat script is the fallback approximation.
     if (state._transcript && state._transcript.length) {
+      // Word-level: every word FULLY visible (no width clamp, no clipping),
+      // staggered across two mini-rows so neighbors don't collide. Clicking
+      // a word seeks there and opens the pin picker -- "pin the media to
+      // this word".
+      var row = 0;
       state._transcript.forEach(function(seg2) {
-        var t0 = seg2.start - (state.speakerTrimStart || 0);
-        var t1 = seg2.end - (state.speakerTrimStart || 0);
-        if (t1 <= 0 || t0 >= total) return;
-        var sp = addSpan(Math.max(0, t0), Math.min(total, t1) - Math.max(0, t0), seg2.text);
-        if (sp) sp.textContent = seg2.text; // word-level: no quote marks
+        var t0 = Math.max(0, seg2.start - (state.speakerTrimStart || 0));
+        if (seg2.end - (state.speakerTrimStart || 0) <= 0 || t0 >= total) return;
+        var sp = document.createElement('div');
+        sp.className = 'wl-word';
+        sp.style.left = ((t0 / total) * 100).toFixed(2) + '%';
+        sp.style.top = ((row++ % 2) * 13) + 'px';
+        sp.textContent = seg2.text;
+        sp.title = '“' + seg2.text + '” — ' + t0.toFixed(1) + 's. Click: jump here and pin the screencast to this word.';
+        sp.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          scrub(Math.round((t0 / total) * 1000));
+          els.slider.value = Math.round((t0 / total) * 1000);
+          pinAtPlayhead(sp);
+        });
+        wrap.appendChild(sp);
       });
       return;
     }
@@ -2753,46 +2764,6 @@ export function getPreviewHtml(): string {
         var text = (b.voiceover_text || b.voiceover || '').trim();
         if (bd > 0 && text) addSpan(sceneStart + bt, bd, text);
         bt += bd;
-      });
-    });
-  }
-
-  // Full script in a modal: every word clickable to jump the playhead.
-  function openScriptModal() {
-    var p = state.currentProject;
-    var total = state.totalDuration || calcTotalDuration();
-    if (!p || !(total > 0)) return;
-    var words = [];
-    if (state._transcript && state._transcript.length) {
-      state._transcript.forEach(function(s2) {
-        var t0 = s2.start - (state.speakerTrimStart || 0);
-        if (t0 >= 0 && t0 < total) words.push({ t: t0, text: s2.text });
-      });
-    } else {
-      p.scenes.forEach(function(scene, si) {
-        var beats = scene.beats || (p.storyboard && p.storyboard.scenes && p.storyboard.scenes[si] && p.storyboard.scenes[si].beats) || [];
-        var bt = 0, ss = sceneStartFor(si);
-        beats.forEach(function(b) {
-          var text = (b.voiceover_text || '').trim();
-          if (text && (b.duration_seconds || 0) > 0) words.push({ t: ss + bt, text: text });
-          bt += b.duration_seconds || 0;
-        });
-      });
-    }
-    if (!words.length) { studioStatus('No script available for this project yet.', 'warn'); return; }
-    var html = '<h3 class="sm-title">Script</h3>' +
-      '<p class="sm-desc">' + (state._transcript ? 'Transcribed from your recording. ' : 'From the storyboard beats. ') + 'Click any word to jump the playhead there — then pin or split the screencast at that moment.</p>' +
-      '<p style="line-height:2;font-size:15px;color:#111827;">' +
-      words.map(function(w) { return '<span class="scr-w" data-t="' + w.t.toFixed(2) + '">' + escHtml(w.text) + '</span>'; }).join(' ') +
-      '</p><div class="sm-actions"><button class="sm-btn" id="scr-close">Close</button></div>';
-    studioModalOpen(html);
-    document.getElementById('scr-close').addEventListener('click', studioModalClose);
-    Array.prototype.slice.call(document.querySelectorAll('.scr-w')).forEach(function(sp) {
-      sp.addEventListener('click', function() {
-        var t = parseFloat(sp.dataset.t) || 0;
-        studioModalClose();
-        scrub(Math.round((t / total) * 1000));
-        els.slider.value = Math.round((t / total) * 1000);
       });
     });
   }
@@ -2864,6 +2835,95 @@ export function getPreviewHtml(): string {
   function mapForPin(segs2, t) {
     if (!segs2 || !segs2.length) return t;
     return edlMapClient(segs2, t).src;
+  }
+
+  // The pin picker: at the current playhead, scrub a live preview of the
+  // SOURCE video to the frame that should be showing, and pin it. Speeds
+  // between pins recompute automatically. Reached from a media block's
+  // popover or directly by clicking a word in the transcript lane.
+  function openPinPicker(si, target, v, edit, anchorRect) {
+    var pop = document.getElementById('cam-pop');
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[si];
+    if (!pop || !scene) return;
+    camPopClose();
+    rvPopClose();
+    var label = videoLabelFor(v);
+    var dur = scene.duration_seconds || 5;
+    var segs = edit ? (edit.segments || []).slice()
+      : [{ src_start: 0, src_end: (v.duration && isFinite(v.duration)) ? v.duration : dur, rate: 1 }];
+    var outT = Math.max(0, Math.min(dur - 0.1, (state.masterTime || 0) - sceneStartFor(si)));
+    var srcDur = (v.duration && isFinite(v.duration)) ? v.duration : Math.max(dur, 30);
+    var vsrc = v.getAttribute('src') || '';
+    pop.innerHTML =
+      '<div class="sp-head"><span class="sp-title"><b>📌 ' + escHtml(label) + '</b> — at film ' + outT.toFixed(1) + 's show…</span>' +
+      '<button class="sp-x" id="mpp-x">✕</button></div>' +
+      '<video id="mpp-prev" src="' + escAttr(vsrc) + '" muted preload="auto" style="width:100%;border-radius:8px;background:#111;display:block;margin-bottom:7px;"></video>' +
+      '<div class="sp-row"><input id="mpp-slider" type="range" min="0" max="' + escAttr('' + Math.floor(srcDur * 10) / 10) + '" step="0.1" value="' + escAttr('' + Math.round(mapForPin(segs, outT) * 10) / 10) + '" style="flex:1;">' +
+      '<span id="mpp-time" style="font-size:11px;min-width:44px;text-align:right;">0.0s</span></div>' +
+      '<div class="sp-row"><button class="rv-go secondary" id="mpp-cancel" style="flex:0 0 auto;">Cancel</button>' +
+      '<button class="rv-go" id="mpp-go" style="flex:1;">Pin this frame here</button></div>';
+    pop.style.display = 'block';
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 260;
+    if (anchorRect) {
+      pop.style.left = Math.max(8, Math.min(anchorRect.left + anchorRect.width / 2 - pw / 2, window.innerWidth - pw - 8)) + 'px';
+      var py = anchorRect.top - ph - 10;
+      if (py < 8) py = Math.min(window.innerHeight - ph - 8, anchorRect.bottom + 10);
+      pop.style.top = py + 'px';
+    } else {
+      pop.style.left = Math.max(8, (window.innerWidth - pw) / 2) + 'px';
+      pop.style.top = Math.max(8, (window.innerHeight - ph) / 2) + 'px';
+    }
+    var prev = document.getElementById('mpp-prev');
+    var slider = document.getElementById('mpp-slider');
+    var tlabel = document.getElementById('mpp-time');
+    function syncPrev() {
+      var t2 = parseFloat(slider.value) || 0;
+      tlabel.textContent = t2.toFixed(1) + 's';
+      try { prev.currentTime = t2; } catch (e) {}
+    }
+    slider.addEventListener('input', syncPrev);
+    prev.addEventListener('loadedmetadata', function() {
+      if (isFinite(prev.duration)) slider.max = '' + Math.floor(prev.duration * 10) / 10;
+      syncPrev();
+    });
+    syncPrev();
+    document.getElementById('mpp-x').addEventListener('click', camPopClose);
+    document.getElementById('mpp-cancel').addEventListener('click', camPopClose);
+    document.getElementById('mpp-go').addEventListener('click', function() {
+      var srcT = parseFloat(slider.value) || 0;
+      var pins = ((edit && edit.pins) || []).filter(function(pn) { return Math.abs(pn.out - outT) > 0.2; });
+      pins.push({ out: Math.round(outT * 10) / 10, src: Math.round(srcT * 10) / 10 });
+      var realDur = (prev.duration && isFinite(prev.duration)) ? prev.duration : srcDur;
+      camPopClose();
+      saveMediaEdits(si, target, compilePinsToSegments(pins, realDur), pins);
+    });
+  }
+
+  // Word-click entry: pin this scene's screencast to the word at the
+  // playhead (the largest non-speaker video; other videos pin via their
+  // blocks). No video in the scene -> the click just seeks.
+  function pinAtPlayhead(anchorEl) {
+    var p = state.currentProject;
+    var t = state.masterTime || 0;
+    if (!p) return;
+    var info = compositeSceneForTime(t);
+    var si = (info && info.index != null) ? info.index : state.currentSceneIndex;
+    var scene = p.scenes && p.scenes[si];
+    if (!scene) return;
+    var doc;
+    try { doc = els.previewIframe.contentDocument; } catch (e) { return; }
+    var vids = sceneVideos(doc, scene.id).filter(function(x) {
+      return !/speaker/i.test(x.getAttribute('src') || '');
+    });
+    if (!vids.length) return;
+    var best = vids[0], bestA = 0;
+    vids.forEach(function(x) {
+      var r2 = x.getBoundingClientRect();
+      if (r2.width * r2.height > bestA) { bestA = r2.width * r2.height; best = x; }
+    });
+    var found = editForVideo(scene, best, vids);
+    openPinPicker(si, found.key, best, found.edit, anchorEl ? anchorEl.getBoundingClientRect() : null);
   }
 
   function saveMediaEdits(sceneIndex, target, segments, pins) {
@@ -2949,42 +3009,7 @@ export function getPreviewHtml(): string {
     document.getElementById('mp-x').addEventListener('click', camPopClose);
     var pinBtn = document.getElementById('mp-pin');
     if (pinBtn) pinBtn.addEventListener('click', function() {
-      // Pin mode: pick the SOURCE frame that should show at the playhead.
-      var outT = Math.max(0, Math.min(dur - 0.1, (state.masterTime || 0) - sceneStartFor(si)));
-      var srcDur = (v.duration && isFinite(v.duration)) ? v.duration : Math.max(dur, 30);
-      var vsrc = v.getAttribute('src') || '';
-      pop.innerHTML =
-        '<div class="sp-head"><span class="sp-title"><b>📌 ' + escHtml(label) + '</b> — at film ' + outT.toFixed(1) + 's show…</span>' +
-        '<button class="sp-x" id="mpp-x">✕</button></div>' +
-        '<video id="mpp-prev" src="' + escAttr(vsrc) + '" muted preload="auto" style="width:100%;border-radius:8px;background:#111;display:block;margin-bottom:7px;"></video>' +
-        '<div class="sp-row"><input id="mpp-slider" type="range" min="0" max="' + escAttr('' + Math.floor(srcDur * 10) / 10) + '" step="0.1" value="' + escAttr('' + Math.round(mapForPin(segs, outT) * 10) / 10) + '" style="flex:1;">' +
-        '<span id="mpp-time" style="font-size:11px;min-width:44px;text-align:right;">0.0s</span></div>' +
-        '<div class="sp-row"><button class="rv-go secondary" id="mpp-cancel" style="flex:0 0 auto;">Cancel</button>' +
-        '<button class="rv-go" id="mpp-go" style="flex:1;">Pin this frame here</button></div>';
-      var prev = document.getElementById('mpp-prev');
-      var slider = document.getElementById('mpp-slider');
-      var tlabel = document.getElementById('mpp-time');
-      function syncPrev() {
-        var t2 = parseFloat(slider.value) || 0;
-        tlabel.textContent = t2.toFixed(1) + 's';
-        try { prev.currentTime = t2; } catch (e) {}
-      }
-      slider.addEventListener('input', syncPrev);
-      prev.addEventListener('loadedmetadata', function() {
-        if (isFinite(prev.duration)) slider.max = '' + Math.floor(prev.duration * 10) / 10;
-        syncPrev();
-      });
-      syncPrev();
-      document.getElementById('mpp-x').addEventListener('click', camPopClose);
-      document.getElementById('mpp-cancel').addEventListener('click', camPopClose);
-      document.getElementById('mpp-go').addEventListener('click', function() {
-        var srcT = parseFloat(slider.value) || 0;
-        var pins = ((edit && edit.pins) || []).filter(function(pn) { return Math.abs(pn.out - outT) > 0.2; });
-        pins.push({ out: Math.round(outT * 10) / 10, src: Math.round(srcT * 10) / 10 });
-        var realDur = (prev.duration && isFinite(prev.duration)) ? prev.duration : srcDur;
-        camPopClose();
-        saveMediaEdits(si, target, compilePinsToSegments(pins, realDur), pins);
-      });
+      openPinPicker(si, target, v, edit, pop.getBoundingClientRect());
     });
     var compressBtn = document.getElementById('mp-compress');
     if (compressBtn) compressBtn.addEventListener('click', function() {
@@ -4371,8 +4396,6 @@ export function getPreviewHtml(): string {
 
   // Revise + storyboard controls live in the selection popover and the
   // storyboard dialog (wired where they're built).
-  var scriptBtn = document.getElementById('script-btn');
-  if (scriptBtn) scriptBtn.addEventListener('click', openScriptModal);
 })();
 </script>
 </body>
