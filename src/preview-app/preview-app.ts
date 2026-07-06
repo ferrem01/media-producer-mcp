@@ -2787,6 +2787,28 @@ export function getPreviewHtml(): string {
     followPlayhead(true);
   }
 
+  // Default zoom = the level where transcript words are actually readable:
+  // estimate each word's pixel width and pick the zoom (85th percentile of
+  // word-density needs, capped 8x) where neighbors stop colliding. Runs
+  // once per project; manual +/- wins after first touch.
+  function autoFitTimelineZoom() {
+    var sw = document.getElementById('slider-wrap');
+    var total = state.totalDuration || calcTotalDuration();
+    var tr = state._transcript;
+    if (!sw || !tr || !tr.length || !(total > 0) || state._userZoomed) return;
+    var base = sw.clientWidth || 1000;
+    var needs = [];
+    for (var i = 0; i < tr.length - 1; i++) {
+      var gap = Math.max(0.05, tr[i + 1].start - tr[i].start);
+      var px = tr[i].text.length * 6 + 10;
+      needs.push(px / ((gap / total) * base));
+    }
+    if (!needs.length) return;
+    needs.sort(function(a, b) { return a - b; });
+    var need = needs[Math.floor(needs.length * 0.85)];
+    if (need > 1.05) setTimelineZoom(need);
+  }
+
   // Keep the playhead in view while playing (page-scroll like every NLE).
   function followPlayhead(force) {
     var sw = document.getElementById('slider-wrap');
@@ -2808,7 +2830,9 @@ export function getPreviewHtml(): string {
     api('/speaker-transcript/' + state.tenantId + '/' + p.project_id).then(function(r) {
       if (r && r.available && r.segments && r.segments.length) {
         state._transcript = r.segments;
+        state._userZoomed = false;
         renderWordLane();
+        autoFitTimelineZoom();
       }
     }).catch(function() {});
   }
@@ -4428,8 +4452,8 @@ export function getPreviewHtml(): string {
 
   // Revise + storyboard controls live in the selection popover and the
   // storyboard dialog (wired where they're built).
-  document.getElementById('tl-zoom-in').addEventListener('click', function() { setTimelineZoom((state.tlZoom || 1) * 1.6); });
-  document.getElementById('tl-zoom-out').addEventListener('click', function() { setTimelineZoom((state.tlZoom || 1) / 1.6); });
+  document.getElementById('tl-zoom-in').addEventListener('click', function() { state._userZoomed = true; setTimelineZoom((state.tlZoom || 1) * 1.6); });
+  document.getElementById('tl-zoom-out').addEventListener('click', function() { state._userZoomed = true; setTimelineZoom((state.tlZoom || 1) / 1.6); });
 })();
 </script>
 </body>
