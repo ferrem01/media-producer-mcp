@@ -29,6 +29,10 @@ echo "commit:  $SHA ($(git log -1 --format=%s | head -c 80))"
 npm ci --no-audit --no-fund
 npm run build
 
+# whisper.cpp for speaker transcription (idempotent; a failed install just
+# leaves transcription off -- Studio falls back to the storyboard script).
+bash scripts/setup-whisper.sh || echo "whisper setup skipped"
+
 # Environment: secrets and instance config live OUTSIDE the repo.
 if [ -f "$ENV_FILE" ]; then
   set -a

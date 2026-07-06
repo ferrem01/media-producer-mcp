@@ -36,6 +36,7 @@ import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./
 import { getSceneThumbnail } from "./core/scene-thumbnail.js";
 import { getWaveformPeaks } from "./core/waveform.js";
 import { detectIdleRanges, buildCompressedSegments } from "./core/compress-waiting.js";
+import { getTranscript, whisperAvailable } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
@@ -1695,6 +1696,30 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           jsonResponse(res, 200, { ok: true, buckets_per_second: wf.bucketsPerSecond, peaks: wf.peaks });
         } catch (err: any) {
           jsonResponse(res, 500, { error: `Waveform extraction failed: ${err?.message || err}` });
+        }
+        return;
+      }
+
+      // ── API: Speaker transcript (whisper.cpp; what was ACTUALLY said) ──
+      const transcriptMatch = urlPath.match(/^\/api\/speaker-transcript\/([^/]+)\/([^/]+)$/);
+      if (transcriptMatch && method === "GET") {
+        const [, tenantId, projectId] = transcriptMatch.map(decodeURIComponent);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        if (!(await whisperAvailable())) {
+          jsonResponse(res, 200, { ok: true, available: false, segments: [] });
+          return;
+        }
+        const spSrc2 = (project as any).speaker_track?.clips?.[0]?.source as string | undefined;
+        const voTrack2 = (project as any).audio?.tracks?.find((t: any) => t.type === "voiceover" && t.source);
+        const audioPath2 = spSrc2 || voTrack2?.source;
+        if (!audioPath2) { jsonResponse(res, 404, { error: "No speaker or voiceover audio on this project" }); return; }
+        try {
+          const cacheDir2 = path.join(config.dataDir, tenantId, "projects", projectId, "thumbs");
+          const tr = await getTranscript(audioPath2, cacheDir2);
+          jsonResponse(res, 200, { ok: true, available: true, segments: tr.segments });
+        } catch (err: any) {
+          jsonResponse(res, 500, { error: `Transcription failed: ${err?.message || err}` });
         }
         return;
       }
