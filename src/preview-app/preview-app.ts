@@ -168,26 +168,26 @@ export function getPreviewHtml(): string {
   .play-btn:hover { background: #4338ca; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
   .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .play-btn svg { fill: #fff; }
-  #slider-wrap { position: relative; flex: 1; height: 96px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  #slider-wrap { position: relative; flex: 1; height: 122px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   #slider-wrap::-webkit-scrollbar { display: none; }
   #timeline-track { position: relative; height: 100%; min-width: 100%; width: 100%; }
   /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
-  #audio-lanes { position: absolute; left: 0; right: 0; top: 60px; height: 10px; pointer-events: none; }
+  #audio-lanes { position: absolute; left: 0; right: 0; top: 86px; height: 10px; pointer-events: none; }
   .audio-lane-seg { position: absolute; height: 4px; border-radius: 2px; pointer-events: auto; }
   .audio-lane-seg.music { top: 0; background: linear-gradient(90deg, rgba(99,102,241,0.15), rgba(99,102,241,0.55) 12%, rgba(99,102,241,0.55)); }
   .audio-lane-seg.voiceover { top: 5px; background: #f59e0b; opacity: 0.75; }
   .audio-lane-seg.sfx { top: 5px; background: #10b981; opacity: 0.6; }
   #timeline-slider {
-    position: absolute; left: 0; top: 40px; width: 100%; -webkit-appearance: none; appearance: none;
+    position: absolute; left: 0; top: 66px; width: 100%; -webkit-appearance: none; appearance: none;
     height: 3px; background: #e5e7eb; border-radius: 3px;
     outline: none; cursor: pointer;
   }
   /* Beat/scene markers over the timeline: scene cuts are strong ticks, beats are soft ticks. */
-  #beat-ticks { position: absolute; left: 0; right: 0; top: 40px; height: 5px; pointer-events: none; }
+  #beat-ticks { position: absolute; left: 0; right: 0; top: 66px; height: 5px; pointer-events: none; }
   .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #a5b4fc; opacity: 0.75; border-radius: 1px; }
   .beat-tick.scene-cut { width: 2px; height: 13px; background: #6366f1; opacity: 0.9; }
   /* Camera-move pills on the scrubber: one clickable pill per zoom/pan/rotate. */
-  #cam-pills { position: absolute; left: 0; right: 0; top: 26px; height: 16px; pointer-events: none; }
+  #cam-pills { position: absolute; left: 0; right: 0; top: 52px; height: 16px; pointer-events: none; }
   .cam-pill {
     position: absolute; top: -3px; transform: translateX(-50%);
     width: 15px; height: 15px; border-radius: 50%;
@@ -200,11 +200,11 @@ export function getPreviewHtml(): string {
   .cam-pill:hover { transform: translateX(-50%) scale(1.3); }
   .cam-pill.active { background: #312e81; transform: translateX(-50%) scale(1.3); }
   /* Media lane: each video's source-map as blocks (color = rate). */
-  #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 26px; pointer-events: none; }
-  .ml-row { position: absolute; left: 0; right: 0; height: 12px; }
-  .ml-seg { position: absolute; height: 100%; border-radius: 3px; pointer-events: auto; cursor: pointer; opacity: 0.92; box-sizing: border-box;
+  #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 52px; pointer-events: none; }
+  .ml-row { position: absolute; left: 0; right: 0; height: 24px; }
+  .ml-seg { position: absolute; height: 100%; border-radius: 4px; pointer-events: auto; cursor: pointer; opacity: 0.92; box-sizing: border-box;
     border: 1px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.10);
-    font-size: 9px; line-height: 11px; font-weight: 600; color: rgba(255,255,255,0.97); text-align: center; overflow: hidden; white-space: nowrap; }
+    font-size: 12px; line-height: 22px; font-weight: 600; color: rgba(255,255,255,0.97); text-align: center; overflow: hidden; white-space: nowrap; }
   .ml-seg.r-plain, .ml-seg.r-freeze { color: #6b7280; }
   .ml-seg:hover { opacity: 1; box-shadow: 0 0 0 1.5px #4f46e5; z-index: 2; }
   .ml-seg.r-normal { background: #a5b4fc; }
@@ -213,7 +213,7 @@ export function getPreviewHtml(): string {
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
   /* Speaker/words lane: what's being said, beat by beat; click to seek. */
-  #word-lane { position: absolute; left: 0; right: 0; top: 68px; height: 26px; pointer-events: none; }
+  #word-lane { position: absolute; left: 0; right: 0; top: 94px; height: 26px; pointer-events: none; }
   .wl-word {
     position: absolute; top: 6px; height: 14px; box-sizing: border-box;
     font-size: 10px; line-height: 14px; color: #374151;
@@ -222,7 +222,7 @@ export function getPreviewHtml(): string {
     cursor: pointer; pointer-events: auto; border-radius: 3px;
   }
   .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
-  #wave-strip { position: absolute; left: 0; right: 0; top: 68px; height: 26px; pointer-events: none; opacity: 0.16; }
+  #wave-strip { position: absolute; left: 0; right: 0; top: 94px; height: 26px; pointer-events: none; opacity: 0.16; }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -2895,7 +2895,7 @@ export function getPreviewHtml(): string {
         var found = editForVideo(scene, v, vids);
         var rowEl = document.createElement('div');
         rowEl.className = 'ml-row';
-        rowEl.style.top = (row * 13) + 'px';
+        rowEl.style.top = (row * 26) + 'px';
         function block(fromLocal, toLocal, cls, title, onClick, text) {
           var b = document.createElement('div');
           b.className = 'ml-seg ' + cls;
@@ -3133,6 +3133,9 @@ export function getPreviewHtml(): string {
     var outT = Math.max(0, Math.min(dur - 0.1, (state.masterTime || 0) - sceneStartFor(si)));
     var srcDur = (v.duration && isFinite(v.duration)) ? v.duration : Math.max(dur, 30);
     var vsrc = v.getAttribute('src') || '';
+    // Frame-picking needs a real look at the frame: double the shell for
+    // this popover only (camPopClose restores the default width).
+    pop.style.width = Math.min(560, window.innerWidth - 24) + 'px';
     pop.innerHTML =
       '<div class="sp-head"><span class="sp-title"><b>📌 ' + escHtml(label) + '</b> — at film ' + outT.toFixed(1) + 's show…</span>' +
       '<button class="sp-x" id="mpp-x">✕</button></div>' +
@@ -3428,7 +3431,7 @@ export function getPreviewHtml(): string {
 
   function camPopClose() {
     var pop = document.getElementById('cam-pop');
-    if (pop) pop.style.display = 'none';
+    if (pop) { pop.style.display = 'none'; pop.style.width = '280px'; }
     camPop.si = camPop.mi = -1;
     document.querySelectorAll('.cam-pill.active').forEach(function(el) { el.classList.remove('active'); });
   }
