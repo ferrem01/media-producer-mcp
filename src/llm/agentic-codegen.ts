@@ -540,6 +540,12 @@ This scene has a real, cinematic AI-generated image that MUST be the full-bleed 
 ` : ""}
 ## ASSETS: LOCAL PATHS ONLY (hard rule)
 NEVER reference an external/remote URL (http://, https://) for a video, image, or any media. The ONLY media you may use are the local /assets/... paths explicitly handed to you above (b-roll, hero image, logos). Do NOT invent stock-footage URLs (Pexels, Unsplash, etc.) -- remote media breaks the renderer.
+
+## VIDEOS: MARKUP ONLY -- never drive their playback (hard rule)
+The runtime transport owns every <video>'s clock: it seeks, plays, pauses and speed-maps each video to the film timeline (including user edits made later in the studio). Your script must NEVER fight it:
+- Do NOT write video.currentTime, do NOT build GSAP "scrub proxies" that seek a video every frame, do NOT call video.play()/pause()/load() from timeline callbacks or media-event handlers (no canplay->pause, no ended->replay loops).
+- Place the <video> tag with its src, style, and \`muted playsinline\` -- that is ALL. It will already be playing, frame-accurate, when your scene is on screen.
+- Animate AROUND the video (frames, overlays, transforms of its container), never its playback.
 ${!opts.brollVideoUrl && !opts.heroImageUrl ? `This scene was given NO footage or hero image. Even if the visual notes mention "real footage" or "b-roll", do NOT add a <video> with an external src -- compose the background entirely from brand colors, gradients, and typography.` : ""}
 
 Duration: ${opts.sceneDuration} seconds
