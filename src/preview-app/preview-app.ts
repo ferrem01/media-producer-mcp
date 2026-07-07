@@ -971,6 +971,30 @@ export function getPreviewHtml(): string {
         // don't activate the frame). Enforce as a property too -- component
         // scripts can undo the attribute.
         try { v.muted = true; } catch (eM) {}
+        // The transport owns every scene-video clock. Codegen components
+        // sometimes author their own scrub drivers (a GSAP proxy writing
+        // currentTime every frame from its own t=0 clock, canplay->pause
+        // handlers) -- two drivers on one clock reads as "the video snaps
+        // back to the start, crawls behind the film, then jumps". Shadow
+        // the setter: component writes are ignored; the sync loop seeks
+        // through the native setter (_mpSeek).
+        try {
+          var win0 = v.ownerDocument.defaultView;
+          var ctDesc = Object.getOwnPropertyDescriptor(win0.HTMLMediaElement.prototype, 'currentTime');
+          if (ctDesc && ctDesc.set) {
+            v._mpSeek = (function(vv, dd) { return function(t9) { dd.set.call(vv, t9); }; })(v, ctDesc);
+            Object.defineProperty(v, 'currentTime', {
+              configurable: true,
+              get: (function(vv, dd) { return function() { return dd.get.call(vv); }; })(v, ctDesc),
+              set: (function(vv) { return function(x9) {
+                if (window.__MP_SYNCDEBUG && !vv._mpCtBlockLogged) {
+                  vv._mpCtBlockLogged = true;
+                  try { console.log('[ct-blocked] component script tried to seek', (vv.currentSrc || vv.src || '?').split('/').pop().slice(0, 40), 'to', Number(x9).toFixed(2), '-- the transport owns this clock'); } catch (eCB) {}
+                }
+              }; })(v)
+            });
+          }
+        } catch (eSh) {}
         if (window.__MP_SYNCDEBUG) {
           ['emptied', 'abort', 'stalled', 'error', 'loadstart'].forEach(function(evn) {
             v.addEventListener(evn, function() {
@@ -1187,7 +1211,7 @@ export function getPreviewHtml(): string {
       if (window.__MP_SYNCDEBUG) {
         try { console.log('[sync-seek]', (el.currentSrc || el.src || el.tagName).split('/').pop().slice(0, 40), 'film', (state.masterTime || 0).toFixed(2), 'from', el.currentTime.toFixed(2), 'to', t.toFixed(2), 'drift', drift.toFixed(2), 'rs', el.readyState, 'playing', !el.paused, 'starved', starved, 'recovered', justRecovered); } catch (e4) {}
       }
-      el.currentTime = t;
+      if (el._mpSeek) el._mpSeek(t); else el.currentTime = t;
       clip._lastSeekTs = now;
       clip.driftSamples = 0;
       clip._wasStarved = false;
@@ -1925,7 +1949,7 @@ export function getPreviewHtml(): string {
           if (window.__MP_SYNCDEBUG) {
             try { console.log('[preload] pre-positioned', (c.el.currentSrc || '').split('/').pop().slice(0, 40), c.el.currentTime.toFixed(2), '->', entry.toFixed(2)); } catch (e8) {}
           }
-          try { c.el.currentTime = entry; } catch (e7) {}
+          try { if (c.el._mpSeek) c.el._mpSeek(entry); else c.el.currentTime = entry; } catch (e7) {}
         }
       }
     } catch (e5) {}
