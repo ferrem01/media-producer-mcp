@@ -3139,22 +3139,28 @@ export function getPreviewHtml(): string {
     pop.innerHTML =
       '<div class="sp-head"><span class="sp-title"><b>📌 ' + escHtml(label) + '</b> — at film ' + outT.toFixed(1) + 's show…</span>' +
       '<button class="sp-x" id="mpp-x">✕</button></div>' +
-      '<video id="mpp-prev" src="' + escAttr(vsrc) + '" muted preload="auto" style="width:100%;border-radius:8px;background:#111;display:block;margin-bottom:7px;"></video>' +
+      '<video id="mpp-prev" src="' + escAttr(vsrc) + '" muted preload="auto" style="width:100%;aspect-ratio:16/9;object-fit:contain;max-height:55vh;border-radius:8px;background:#111;display:block;margin-bottom:7px;"></video>' +
       '<div class="sp-row"><input id="mpp-slider" type="range" min="0" max="' + escAttr('' + Math.floor(srcDur * 10) / 10) + '" step="0.1" value="' + escAttr('' + Math.round(mapForPin(segs, outT) * 10) / 10) + '" style="flex:1;">' +
       '<span id="mpp-time" style="font-size:11px;min-width:44px;text-align:right;">0.0s</span></div>' +
       '<div class="sp-row"><button class="rv-go secondary" id="mpp-cancel" style="flex:0 0 auto;">Cancel</button>' +
       '<button class="rv-go" id="mpp-go" style="flex:1;">Pin this frame here</button></div>';
     pop.style.display = 'block';
-    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 260;
-    if (anchorRect) {
-      pop.style.left = Math.max(8, Math.min(anchorRect.left + anchorRect.width / 2 - pw / 2, window.innerWidth - pw - 8)) + 'px';
-      var py = anchorRect.top - ph - 10;
-      if (py < 8) py = Math.min(window.innerHeight - ph - 8, anchorRect.bottom + 10);
-      pop.style.top = py + 'px';
-    } else {
-      pop.style.left = Math.max(8, (window.innerWidth - pw) / 2) + 'px';
-      pop.style.top = Math.max(8, (window.innerHeight - ph) / 2) + 'px';
+    // The video reserves its 16:9 box via aspect-ratio, so the height
+    // measured here is real; placePinPop re-clamps anyway once metadata
+    // arrives (a portrait clip changes the height after load).
+    function placePinPop() {
+      var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 260;
+      if (anchorRect) {
+        pop.style.left = Math.max(8, Math.min(anchorRect.left + anchorRect.width / 2 - pw / 2, window.innerWidth - pw - 8)) + 'px';
+        var py = anchorRect.top - ph - 10;
+        if (py < 8) py = anchorRect.bottom + 10;
+        pop.style.top = Math.max(8, Math.min(py, window.innerHeight - ph - 8)) + 'px';
+      } else {
+        pop.style.left = Math.max(8, (window.innerWidth - pw) / 2) + 'px';
+        pop.style.top = Math.max(8, (window.innerHeight - ph) / 2) + 'px';
+      }
     }
+    placePinPop();
     var prev = document.getElementById('mpp-prev');
     var slider = document.getElementById('mpp-slider');
     var tlabel = document.getElementById('mpp-time');
@@ -3167,6 +3173,7 @@ export function getPreviewHtml(): string {
     prev.addEventListener('loadedmetadata', function() {
       if (isFinite(prev.duration)) slider.max = '' + Math.floor(prev.duration * 10) / 10;
       syncPrev();
+      placePinPop();
     });
     syncPrev();
     document.getElementById('mpp-x').addEventListener('click', camPopClose);
