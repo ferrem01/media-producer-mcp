@@ -45,6 +45,7 @@ import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
+import { inspectSceneLayout } from "./core/layout-inspect.js";
 import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
 import { generateImage } from "./media/image-gen.js";
 
@@ -181,14 +182,16 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "get",
-    "Get a project's state, tenant brand kit, or a single scene. Pass project_id for project, 'brand_kit' target for brand kit, project_id + scene_id for a single scene.",
+    "Get a project's state, tenant brand kit, a single scene, or a scene's MEASURED layout. Pass project_id for project, 'brand_kit' target for brand kit, project_id + scene_id for a single scene. target='layout' (with project_id + scene_id, optional selector) renders the scene headless and returns real element boxes, container chains, video intrinsic sizes and object-fit crop math, plus plain-English warnings -- use it to diagnose WHY something looks wrong (e.g. \"video runs over the frame\") before writing a revise instruction.",
     {
       tenant_id: z.string(),
       project_id: z.string().optional(),
       scene_id: z.string().optional(),
-      target: z.enum(["project", "brand_kit", "job", "jobs"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs."),
+      target: z.enum(["project", "brand_kit", "job", "jobs", "layout"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs, 'layout' for measured scene geometry."),
       job_id: z.string().optional().describe("Job ID to check status (use with target='job')"),
       job_type: z.enum(["render", "generate"]).optional().describe("Filter jobs by type (use with target='jobs')"),
+      selector: z.string().optional().describe("CSS selector to also measure specific element(s) (use with target='layout')"),
+      at_time: z.number().optional().describe("Timeline second to measure at (use with target='layout'; default mid-scene)"),
     },
     async (params) => {
       const target = params.target || "project";
@@ -196,6 +199,18 @@ export function createMcpServer(): McpServer {
       if (target === "brand_kit") {
         const kit = await loadBrandKit(params.tenant_id);
         return ok(kit || { message: "No brand kit configured" });
+      }
+
+      if (target === "layout") {
+        if (!params.project_id || !params.scene_id) return err("project_id and scene_id are required for target='layout'");
+        const inspection = await inspectSceneLayout({
+          tenantId: params.tenant_id,
+          projectId: params.project_id,
+          sceneId: params.scene_id,
+          selector: params.selector,
+          atTime: params.at_time,
+        });
+        return inspection.ok ? ok(inspection) : err(inspection.error || "Layout inspection failed");
       }
 
       if (target === "job") {
