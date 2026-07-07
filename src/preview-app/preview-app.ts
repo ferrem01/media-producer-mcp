@@ -168,26 +168,26 @@ export function getPreviewHtml(): string {
   .play-btn:hover { background: #4338ca; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
   .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .play-btn svg { fill: #fff; }
-  #slider-wrap { position: relative; flex: 1; height: 84px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  #slider-wrap { position: relative; flex: 1; height: 96px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   #slider-wrap::-webkit-scrollbar { display: none; }
   #timeline-track { position: relative; height: 100%; min-width: 100%; width: 100%; }
   /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
-  #audio-lanes { position: absolute; left: 0; right: 0; top: 48px; height: 10px; pointer-events: none; }
+  #audio-lanes { position: absolute; left: 0; right: 0; top: 60px; height: 10px; pointer-events: none; }
   .audio-lane-seg { position: absolute; height: 4px; border-radius: 2px; pointer-events: auto; }
   .audio-lane-seg.music { top: 0; background: linear-gradient(90deg, rgba(99,102,241,0.15), rgba(99,102,241,0.55) 12%, rgba(99,102,241,0.55)); }
   .audio-lane-seg.voiceover { top: 5px; background: #f59e0b; opacity: 0.75; }
   .audio-lane-seg.sfx { top: 5px; background: #10b981; opacity: 0.6; }
   #timeline-slider {
-    position: absolute; left: 0; top: 28px; width: 100%; -webkit-appearance: none; appearance: none;
+    position: absolute; left: 0; top: 40px; width: 100%; -webkit-appearance: none; appearance: none;
     height: 3px; background: #e5e7eb; border-radius: 3px;
     outline: none; cursor: pointer;
   }
   /* Beat/scene markers over the timeline: scene cuts are strong ticks, beats are soft ticks. */
-  #beat-ticks { position: absolute; left: 0; right: 0; top: 28px; height: 5px; pointer-events: none; }
+  #beat-ticks { position: absolute; left: 0; right: 0; top: 40px; height: 5px; pointer-events: none; }
   .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #a5b4fc; opacity: 0.75; border-radius: 1px; }
   .beat-tick.scene-cut { width: 2px; height: 13px; background: #6366f1; opacity: 0.9; }
   /* Camera-move pills on the scrubber: one clickable pill per zoom/pan/rotate. */
-  #cam-pills { position: absolute; left: 0; right: 0; top: 12px; height: 16px; pointer-events: none; }
+  #cam-pills { position: absolute; left: 0; right: 0; top: 26px; height: 16px; pointer-events: none; }
   .cam-pill {
     position: absolute; top: -3px; transform: translateX(-50%);
     width: 15px; height: 15px; border-radius: 50%;
@@ -200,11 +200,11 @@ export function getPreviewHtml(): string {
   .cam-pill:hover { transform: translateX(-50%) scale(1.3); }
   .cam-pill.active { background: #312e81; transform: translateX(-50%) scale(1.3); }
   /* Media lane: each video's source-map as blocks (color = rate). */
-  #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 20px; pointer-events: none; }
-  .ml-row { position: absolute; left: 0; right: 0; height: 8px; }
+  #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 26px; pointer-events: none; }
+  .ml-row { position: absolute; left: 0; right: 0; height: 12px; }
   .ml-seg { position: absolute; height: 100%; border-radius: 3px; pointer-events: auto; cursor: pointer; opacity: 0.92; box-sizing: border-box;
     border: 1px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.10);
-    font-size: 8px; line-height: 8px; color: rgba(255,255,255,0.95); text-align: center; overflow: hidden; white-space: nowrap; }
+    font-size: 9px; line-height: 11px; font-weight: 600; color: rgba(255,255,255,0.97); text-align: center; overflow: hidden; white-space: nowrap; }
   .ml-seg.r-plain, .ml-seg.r-freeze { color: #6b7280; }
   .ml-seg:hover { opacity: 1; box-shadow: 0 0 0 1.5px #4f46e5; z-index: 2; }
   .ml-seg.r-normal { background: #a5b4fc; }
@@ -213,7 +213,7 @@ export function getPreviewHtml(): string {
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
   /* Speaker/words lane: what's being said, beat by beat; click to seek. */
-  #word-lane { position: absolute; left: 0; right: 0; top: 56px; height: 26px; pointer-events: none; }
+  #word-lane { position: absolute; left: 0; right: 0; top: 68px; height: 26px; pointer-events: none; }
   .wl-word {
     position: absolute; top: 6px; height: 14px; box-sizing: border-box;
     font-size: 10px; line-height: 14px; color: #374151;
@@ -222,7 +222,7 @@ export function getPreviewHtml(): string {
     cursor: pointer; pointer-events: auto; border-radius: 3px;
   }
   .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
-  #wave-strip { position: absolute; left: 0; right: 0; top: 56px; height: 26px; pointer-events: none; opacity: 0.16; }
+  #wave-strip { position: absolute; left: 0; right: 0; top: 68px; height: 26px; pointer-events: none; opacity: 0.16; }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -1068,6 +1068,9 @@ export function getPreviewHtml(): string {
           if (edlRaw) {
             try { clip.edl = JSON.parse(edlRaw); } catch (e) { clip.edl = null; }
             if (clip.edl && !clip.edl.length) clip.edl = null;
+            if (clip.edl && window.__MP_SYNCDEBUG) {
+              try { console.log('[edl] adopted', (el.currentSrc || el.src || '').split('/').pop().slice(0, 40), edlRaw); } catch (e5) {}
+            }
           }
         }
         var target;
@@ -1585,6 +1588,7 @@ export function getPreviewHtml(): string {
           state.compositeLoaded = true;
           buildMediaClips();
           state.totalDuration = w.__MP_DURATION || state.totalDuration;
+          setTimeout(auditEdlStamps, 6000);
           cb(w.__MP_TIMELINE);
         }
       } catch(e) { clearInterval(check); }
@@ -2729,6 +2733,35 @@ export function getPreviewHtml(): string {
     return { key: tkey, edit: null };
   }
 
+  // Post-reboot sanity: every saved media edit must actually be stamped on
+  // its video. If the lane shows a map the runtime never attached (selector
+  // no longer matches the file, or a stale key claimed the element first),
+  // say so loudly instead of silently playing the wrong thing at 1x.
+  function auditEdlStamps() {
+    var p = state.currentProject;
+    if (!p || !p.scenes || !state.compositeLoaded) return;
+    var doc;
+    try { doc = els.previewIframe.contentDocument; } catch (e) { return; }
+    if (!doc) return;
+    var bad = [];
+    p.scenes.forEach(function(scene) {
+      if (!scene.media_edits || !Object.keys(scene.media_edits).length) return;
+      var vids = sceneVideos(doc, scene.id).filter(function(v) {
+        return !/speaker/i.test(v.getAttribute('src') || '');
+      });
+      vids.forEach(function(v) {
+        var found = editForVideo(scene, v, vids);
+        if (!found.edit || !found.edit.segments || !found.edit.segments.length) return;
+        var raw = v.getAttribute('data-mp-edl');
+        if (raw !== JSON.stringify(found.edit.segments)) bad.push(videoLabelFor(v));
+      });
+    });
+    if (bad.length) {
+      try { console.warn('[edl] stamp mismatch on:', bad.join(', ')); } catch (e2) {}
+      studioStatus('⚠ Media edit didn’t attach to ' + bad.join(', ') + ' — playback may ignore it. Try re-saving the edit on that video.', 'err');
+    }
+  }
+
   function renderMediaLane() {
     var wrap = document.getElementById('media-lane');
     if (!wrap) return;
@@ -2749,7 +2782,7 @@ export function getPreviewHtml(): string {
         var found = editForVideo(scene, v, vids);
         var rowEl = document.createElement('div');
         rowEl.className = 'ml-row';
-        rowEl.style.top = (row * 10) + 'px';
+        rowEl.style.top = (row * 13) + 'px';
         function block(fromLocal, toLocal, cls, title, onClick, text) {
           var b = document.createElement('div');
           b.className = 'ml-seg ' + cls;
@@ -3058,19 +3091,58 @@ export function getPreviewHtml(): string {
     openPinPicker(si, found.key, best, found.edit, anchorEl ? anchorEl.getBoundingClientRect() : null);
   }
 
-  function saveMediaEdits(sceneIndex, target, segments, pins) {
+  // Merge touching same-rate segments; a map that has collapsed back to one
+  // full-length 1x segment is no edit at all (null -> the key is deleted and
+  // the video reads "untouched" again instead of a 1x block + freeze tail).
+  function tidySegments(segs, srcDur) {
+    if (!segs || !segs.length) return segs;
+    var out = [];
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      var prev = out[out.length - 1];
+      if (prev && (prev.rate || 1) === (s.rate || 1) && Math.abs(prev.src_end - s.src_start) < 0.001) prev.src_end = s.src_end;
+      else out.push({ src_start: s.src_start, src_end: s.src_end, rate: s.rate });
+    }
+    if (out.length === 1 && (out[0].rate || 1) === 1 && out[0].src_start <= 0.05
+        && srcDur > 0 && out[0].src_end >= srcDur - 0.25) return null;
+    return out;
+  }
+
+  function saveMediaEdits(sceneIndex, target, segments, pins, doneMsg) {
     var p = state.currentProject;
     var scene = p && p.scenes && p.scenes[sceneIndex];
     if (!scene || !p) return;
+    var deleteTargets;
+    try {
+      var doc = els.previewIframe.contentDocument;
+      if (segments && segments.length) {
+        var vEl = (target !== 'screencast' && doc) ? doc.querySelector(target) : null;
+        segments = tidySegments(segments, vEl && isFinite(vEl.duration) ? vEl.duration : 0);
+      }
+      // Saving under a file-specific key: drop a stale legacy 'screencast'
+      // entry that belongs to this same video (both keys resolving to one
+      // element means the lane shows one map while playback runs another).
+      if (target !== 'screencast' && scene.media_edits && scene.media_edits['screencast'] && doc) {
+        var vids0 = sceneVideos(doc, scene.id);
+        var best0 = null, bestA0 = 0;
+        vids0.forEach(function(x) {
+          if (/speaker/i.test(x.getAttribute('src') || '')) return;
+          var r0 = x.getBoundingClientRect();
+          if (r0.width * r0.height > bestA0) { bestA0 = r0.width * r0.height; best0 = x; }
+        });
+        if (best0 && videoTargetFor(best0) === target) deleteTargets = ['screencast'];
+      }
+    } catch (eTidy) {}
     studioStatus('Saving media edit…', '');
     api('POST', '/media-edits/' + state.tenantId + '/' + p.project_id, {
       scene_id: scene.id,
       target: target,
       segments: segments && segments.length ? segments : null,
       pins: pins && pins.length ? pins : undefined,
+      delete_targets: deleteTargets,
     }).then(function(r) {
       scene.media_edits = r.media_edits && Object.keys(r.media_edits).length ? r.media_edits : undefined;
-      studioStatus('Saved ✓ reloading preview…', 'ok');
+      studioStatus((doneMsg || 'Saved') + ' ✓ reloading preview…', 'ok');
       startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
     }).catch(function(e) {
       studioStatus('Save failed: ' + e.message, 'err');
@@ -3121,7 +3193,10 @@ export function getPreviewHtml(): string {
         '</div>' +
         '<div class="sp-row">' +
           '<button class="rv-go secondary" id="mp-split" style="flex:1;" title="Split this segment at the playhead">Split at playhead</button>' +
-          '<button class="rv-go secondary" id="mp-remove" style="flex:0 0 auto;color:#dc2626;border-color:#fca5a5;" title="Remove this segment (hard cut: the source range is skipped)">Remove</button>' +
+        '</div>' +
+        '<div class="sp-row">' +
+          '<button class="rv-go secondary" id="mp-reset" style="flex:1;" title="Undo the speed-up: play this stretch at normal 1x speed">↩ Reset to 1×</button>' +
+          '<button class="rv-go secondary" id="mp-cut" style="flex:0 0 auto;color:#dc2626;border-color:#fca5a5;" title="Cut this footage out entirely — everything after it plays sooner">✂ Cut</button>' +
         '</div>' +
         '<div class="sp-row"><button class="rv-go secondary" id="mp-compress" style="flex:1;" title="Scan JUST this segment for stretches where the screen barely changes and timelapse them at 8x">⚡ Compress waiting in this segment</button></div>' +
         '<div class="sp-row"><button class="rv-go secondary" id="mp-clear" style="flex:1;color:#6b7280;">Delete ALL edits on this video</button></div>';
@@ -3163,9 +3238,10 @@ export function getPreviewHtml(): string {
     });
     Array.prototype.slice.call(pop.querySelectorAll('.mp-rate')).forEach(function(btn) {
       btn.addEventListener('click', function() {
-        segs[segIndex] = { src_start: seg.src_start, src_end: seg.src_end, rate: parseFloat(btn.dataset.rate) };
+        var newRate = parseFloat(btn.dataset.rate);
+        segs[segIndex] = { src_start: seg.src_start, src_end: seg.src_end, rate: newRate };
         camPopClose();
-        saveMediaEdits(si, target, segs);
+        saveMediaEdits(si, target, segs, edit && edit.pins, 'Set to ' + newRate + '×');
       });
     });
     var splitBtn = document.getElementById('mp-split');
@@ -3191,11 +3267,21 @@ export function getPreviewHtml(): string {
       camPopClose();
       saveMediaEdits(si, target, segs);
     });
-    var removeBtn = document.getElementById('mp-remove');
-    if (removeBtn) removeBtn.addEventListener('click', function() {
+    var resetBtn = document.getElementById('mp-reset');
+    if (resetBtn) resetBtn.addEventListener('click', function() {
+      // "Remove the speed-up" -- back to 1x. tidySegments merges it with
+      // 1x neighbours; if the whole map collapses to plain playback the
+      // edit is deleted and the video reads untouched again.
+      segs[segIndex] = { src_start: seg.src_start, src_end: seg.src_end, rate: 1 };
+      camPopClose();
+      saveMediaEdits(si, target, segs, edit && edit.pins, 'Back to 1×');
+    });
+    var cutBtn = document.getElementById('mp-cut');
+    if (cutBtn) cutBtn.addEventListener('click', function() {
       segs.splice(segIndex, 1);
       camPopClose();
-      saveMediaEdits(si, target, segs);
+      saveMediaEdits(si, target, segs, edit && edit.pins,
+        'Footage cut — that stretch is skipped, later footage plays sooner');
     });
     var clearBtn = document.getElementById('mp-clear');
     if (clearBtn) clearBtn.addEventListener('click', function() {

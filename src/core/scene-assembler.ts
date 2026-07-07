@@ -400,10 +400,7 @@ export function mediaEdlScript(
   var edits = ${editsJson};
   var keys = Object.keys(edits || {});
   if (!keys.length) return;
-  function resolveTarget(root, key) {
-    if (key && key !== 'screencast') {
-      try { var el = root.querySelector(key); if (el) return el; } catch (e) {}
-    }
+  function largestVideo(root) {
     var best = null, bestA = 0;
     Array.prototype.slice.call(root.querySelectorAll('video')).forEach(function(v) {
       if (v.id === '__mp_speaker_base') return;
@@ -413,6 +410,7 @@ export function mediaEdlScript(
     });
     return best;
   }
+  var exact = keys.filter(function(k) { return k !== 'screencast'; });
   var tries = 0;
   (function tick() {
     // Keep retrying until every key found its element: this script can run
@@ -423,18 +421,27 @@ export function mediaEdlScript(
     if (!root) {
       missing = true;
     } else {
-      keys.forEach(function(k) {
+      // File-specific selector keys stamp first and always win. The legacy
+      // semantic 'screencast' key only fills a video no exact key claimed --
+      // a stale 'screencast' entry must never shadow an edit saved for a
+      // specific file (the lane shows one map, playback runs another).
+      exact.forEach(function(k) {
         var edit = edits[k];
         if (!edit || !edit.segments || !edit.segments.length) return;
-        var v = resolveTarget(root, k);
-        if (v) {
-          if (!v.hasAttribute('data-mp-edl')) v.setAttribute('data-mp-edl', JSON.stringify(edit.segments));
-        } else {
-          missing = true;
-        }
+        var v = null;
+        try { v = root.querySelector(k); } catch (e) {}
+        if (v) v.setAttribute('data-mp-edl', JSON.stringify(edit.segments));
+        else missing = true;
       });
+      var legacy = edits['screencast'];
+      if (legacy && legacy.segments && legacy.segments.length) {
+        var lv = largestVideo(root);
+        if (!lv) missing = true;
+        else if (!lv.hasAttribute('data-mp-edl')) lv.setAttribute('data-mp-edl', JSON.stringify(legacy.segments));
+      }
     }
     if (missing && tries++ < 300) requestAnimationFrame(tick);
+    else if (missing) { try { console.warn('[edl] media-edit target(s) never matched an element:', keys.join(', ')); } catch (e2) {} }
   })();
 })();
 `;
