@@ -1850,11 +1850,37 @@ export function getPreviewHtml(): string {
     try {
       var p2 = state.currentProject;
       if (!p2 || !p2.scenes || !p2.scenes[index]) return;
-      var root = els.previewIframe.contentDocument.querySelector('.mp-scene[data-scene-id="' + p2.scenes[index].id + '"]');
+      var sid = p2.scenes[index].id;
+      var root = els.previewIframe.contentDocument.querySelector('.mp-scene[data-scene-id="' + sid + '"]');
       if (!root) return;
       var vs2 = root.querySelectorAll('video');
       for (var vb = 0; vb < vs2.length; vb++) {
         if (vs2[vb].preload !== 'auto') vs2[vb].preload = 'auto';
+      }
+      // Pre-position a HIDDEN scene's paused videos at their scene-entry
+      // source frame: the cut then lands on the right content immediately
+      // (no visible snap back from a stale frame left by an earlier
+      // viewing), and the browser buffers from the right offset instead of
+      // wherever the element happened to sit.
+      var hidden = root.style.visibility === 'hidden' || !(parseFloat(root.style.opacity || '0') > 0);
+      if (!hidden) return;
+      for (var ci = 0; ci < state.mediaClips.length; ci++) {
+        var c = state.mediaClips[ci];
+        if (c.kind !== 'scene-video' || c.sceneId !== sid || !c.el.paused) continue;
+        var entry;
+        if (c.isSpeaker) {
+          entry = c.start + (state.speakerTrimStart || 0);
+        } else {
+          var segs2 = c.edl;
+          if (segs2 === undefined) {
+            var raw2 = c.el.getAttribute('data-mp-edl');
+            if (raw2) { try { segs2 = JSON.parse(raw2); } catch (e6) { segs2 = null; } }
+          }
+          entry = (segs2 && segs2.length) ? edlMapClient(segs2, 0).src : c.offset;
+        }
+        if (entry != null && isFinite(entry) && Math.abs(c.el.currentTime - entry) > 0.75) {
+          try { c.el.currentTime = entry; } catch (e7) {}
+        }
       }
     } catch (e5) {}
   }
