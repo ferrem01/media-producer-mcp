@@ -741,6 +741,13 @@ export function getPreviewHtml(): string {
 
   // Auth token from URL
   window.__MP_SYNCDEBUG = new URLSearchParams(window.location.search).has('syncdebug');
+  // Which build is this browser actually running? (/health is unauthenticated;
+  // its commit field is set by the deploy.) First line of every debug session.
+  try {
+    fetch('/health').then(function(r) { return r.json(); }).then(function(j) {
+      console.log('[studio] build', (j && j.commit) || '?', window.__MP_SYNCDEBUG ? '(syncdebug on)' : '');
+    }).catch(function() {});
+  } catch (eB) {}
   var _token = new URLSearchParams(window.location.search).get('token');
   var _urlTenant = new URLSearchParams(window.location.search).get('tenant');
 
@@ -1184,6 +1191,9 @@ export function getPreviewHtml(): string {
       var base = clip._baseRate || 1;
       var chase = (target > el.currentTime) ? Math.min(4, base * 1.6) : Math.max(0.5, base * 0.7);
       if (el.playbackRate !== chase) { try { el.playbackRate = chase; } catch (e6) {} }
+      if (!clip._chasing && window.__MP_SYNCDEBUG) {
+        try { console.log('[chase] start', (el.currentSrc || '').split('/').pop().slice(0, 40), 'film', (state.masterTime || 0).toFixed(2), 'drift', drift.toFixed(2), 'rate', chase.toFixed(2)); } catch (e8) {}
+      }
       clip._chasing = true;
       return;
     }
@@ -1191,14 +1201,28 @@ export function getPreviewHtml(): string {
       var base2 = clip._baseRate || 1;
       if (el.playbackRate !== base2) { try { el.playbackRate = base2; } catch (e7) {} }
       clip._chasing = false;
+      if (window.__MP_SYNCDEBUG) {
+        try { console.log('[chase] end', (el.currentSrc || '').split('/').pop().slice(0, 40), 'film', (state.masterTime || 0).toFixed(2), 'drift', drift.toFixed(2)); } catch (e9) {}
+      }
     }
 
     // A starved clip is NEVER seeked -- seeking restarts its buffering, which
     // is the storm's fuel. A frozen frame that catches up beats a shuddering
     // one. The moment it recovers (readyState >= 3), one hard sync realigns it.
-    if (starved) { clip._wasStarved = true; }
+    if (starved) {
+      if (!clip._wasStarved) {
+        clip._starveT0 = now;
+        if (window.__MP_SYNCDEBUG) {
+          try { console.log('[starve] begin', (el.currentSrc || '').split('/').pop().slice(0, 40), 'film', (state.masterTime || 0).toFixed(2), 'ct', el.currentTime.toFixed(2), 'rs', el.readyState); } catch (eA) {}
+        }
+      }
+      clip._wasStarved = true;
+    }
     else { clip._starveSeeked = false; }
     var justRecovered = !starved && clip._wasStarved === true;
+    if (justRecovered && window.__MP_SYNCDEBUG) {
+      try { console.log('[starve] end', (el.currentSrc || '').split('/').pop().slice(0, 40), 'film', (state.masterTime || 0).toFixed(2), 'after', ((now - (clip._starveT0 || now)) / 1000).toFixed(1) + 's', 'drift', drift.toFixed(2)); } catch (eC) {}
+    }
 
     // Tier 1: Hard sync (>500ms drift)
     var firstTick = prevOffset === null;
@@ -1879,6 +1903,9 @@ export function getPreviewHtml(): string {
           entry = (segs2 && segs2.length) ? edlMapClient(segs2, 0).src : c.offset;
         }
         if (entry != null && isFinite(entry) && Math.abs(c.el.currentTime - entry) > 0.75) {
+          if (window.__MP_SYNCDEBUG) {
+            try { console.log('[preload] pre-positioned', (c.el.currentSrc || '').split('/').pop().slice(0, 40), c.el.currentTime.toFixed(2), '->', entry.toFixed(2)); } catch (e8) {}
+          }
           try { c.el.currentTime = entry; } catch (e7) {}
         }
       }
@@ -1887,6 +1914,23 @@ export function getPreviewHtml(): string {
 
   // Update scene list active highlight without re-rendering
   function updateActiveScene(index) {
+    if (window.__MP_SYNCDEBUG) {
+      try {
+        var p9 = state.currentProject;
+        var sid9 = p9 && p9.scenes && p9.scenes[index] && p9.scenes[index].id;
+        var vids9 = [];
+        (state.mediaClips || []).forEach(function(c9) {
+          if (c9.kind !== 'scene-video' || c9.sceneId !== sid9) return;
+          var e9 = c9.el, b9 = 'none';
+          try { if (e9.buffered.length) b9 = e9.buffered.start(0).toFixed(1) + '-' + e9.buffered.end(0).toFixed(1); } catch (eb9) {}
+          vids9.push((e9.currentSrc || e9.src || '?').split('/').pop().slice(0, 30)
+            + ' ct=' + e9.currentTime.toFixed(2) + ' rs=' + e9.readyState + ' buf=' + b9
+            + (e9.paused ? ' paused' : ' playing') + (c9.edl ? ' edl' : ''));
+        });
+        console.log('[scene] -> ' + (index + 1) + ' film ' + (state.masterTime || 0).toFixed(2)
+          + (vids9.length ? ' | ' + vids9.join(' | ') : ' (no scene videos)'));
+      } catch (e10) {}
+    }
     if (!IS_MOBILE) { preloadSceneVideos(index); preloadSceneVideos(index + 1); }
     var items = els.sceneList.querySelectorAll('.scene-item');
     items.forEach(function(el) {
@@ -3548,6 +3592,9 @@ export function getPreviewHtml(): string {
       if (state.compositeLoaded) {
         // Composite mode: just start the transport clock loop
         // Master timeline is always paused; we seek it on each tick
+        // Re-prime buffering for here + the next cut: the browser throttles
+        // preload on hidden videos, so ask again the moment play starts.
+        if (!IS_MOBILE) { preloadSceneVideos(state.currentSceneIndex); preloadSceneVideos(state.currentSceneIndex + 1); }
         state.lastTickTime = performance.now();
         // Unified media sync handles speaker + audio
         state.forceSync = true;
