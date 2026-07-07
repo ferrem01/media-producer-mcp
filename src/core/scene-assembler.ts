@@ -368,6 +368,12 @@ export function stripEagerVideoLoading(html: string): string {
     let out = tag.replace(/\s(?:autoplay)(?:\s*=\s*["'][^"']*["'])?(?=[\s>])/gi, "");
     if (/\bpreload\s*=/i.test(out)) out = out.replace(/\bpreload\s*=\s*["'][^"']*["']/i, 'preload="metadata"');
     else out = out.replace(/^<video\b/i, '<video preload="metadata"');
+    // Scene videos never own the audio (the speaker/voiceover track does) and
+    // an UNMUTED video inside the preview iframe is refused play() by the
+    // autoplay policy -- user activation on the parent page does not extend
+    // into the frame. Force muted + playsinline so playback always starts.
+    if (!/\bmuted\b/i.test(out)) out = out.replace(/^<video\b/i, "<video muted");
+    if (!/\bplaysinline\b/i.test(out)) out = out.replace(/^<video\b/i, "<video playsinline");
     return out;
   });
 }

@@ -636,7 +636,7 @@ export function getPreviewHtml(): string {
       <div class="no-scene" id="preview-placeholder">Select a scene to preview</div>
       <div class="preview-wrapper" id="preview-wrapper" style="display:none;">
         <video id="speaker-bg" muted playsinline preload="metadata" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;border-radius:8px;"></video>
-        <iframe id="preview-iframe"></iframe>
+        <iframe id="preview-iframe" allow="autoplay; fullscreen"></iframe>
         <div id="buffer-overlay" class="buffer-overlay"><div class="loading-state">Buffering media<div class="loading-dots"><span></span><span></span><span></span></div></div></div>
       </div>
     </div>
@@ -966,6 +966,18 @@ export function getPreviewHtml(): string {
         var startAt = parseFloat(v.getAttribute('data-start-at') || '0');
         v._mpRegistered = true;
         v._mpSceneEl = sceneEl;
+        // Scene videos never own the audio; unmuted media in the iframe is
+        // also refused play() by the autoplay policy (parent-page clicks
+        // don't activate the frame). Enforce as a property too -- component
+        // scripts can undo the attribute.
+        try { v.muted = true; } catch (eM) {}
+        if (window.__MP_SYNCDEBUG) {
+          ['emptied', 'abort', 'stalled', 'error', 'loadstart'].forEach(function(evn) {
+            v.addEventListener(evn, function() {
+              try { console.log('[media-ev]', evn, (v.currentSrc || v.src || '?').split('/').pop().slice(0, 40), 'ct', v.currentTime.toFixed(2), 'rs', v.readyState, 'net', v.networkState); } catch (eE) {}
+            });
+          });
+        }
         // Detect if this video is the speaker track (PiP speaker scenes)
         var speakerClipUrl = getSpeakerClipUrl();
         var isSpeakerVideo = speakerClipUrl && v.src && (
@@ -1253,7 +1265,14 @@ export function getPreviewHtml(): string {
       // The user is playing now -- let the browser buffer aggressively
       // (preview surfaces load with preload="metadata" to keep OPEN cheap).
       if (el.preload !== 'auto') { try { el.preload = 'auto'; } catch (e) {} }
-      el.play().catch(function(){});
+      el.play().catch(function(err) {
+        // A rejected play() is invisible otherwise -- the element just sits
+        // paused while the film rolls (the autoplay-policy failure mode).
+        if (window.__MP_SYNCDEBUG && !clip._playFailLogged) {
+          clip._playFailLogged = true;
+          try { console.log('[play-fail]', (el.currentSrc || el.src || '?').split('/').pop().slice(0, 40), err && err.name, String((err && err.message) || '').slice(0, 100)); } catch (eF) {}
+        }
+      });
     } else if (!playing && !el.paused) {
       el.pause();
     }
@@ -3685,6 +3704,26 @@ export function getPreviewHtml(): string {
       // Unified media sync (Phase 2)
       syncMedia(globalTime, true);
       state.forceSync = false;
+
+      // Debug heartbeat: once a second, the active scene's videos in one
+      // line -- shows exactly when a clock freezes or readyState collapses.
+      if (window.__MP_SYNCDEBUG) {
+        var nowHb = performance.now();
+        if (!state._hbTs || nowHb - state._hbTs > 1000) {
+          state._hbTs = nowHb;
+          try {
+            var sidH = state.currentProject.scenes[state.currentSceneIndex].id;
+            var partsH = [];
+            state.mediaClips.forEach(function(cH) {
+              if (cH.kind !== 'scene-video' || cH.sceneId !== sidH) return;
+              var eH = cH.el, bH = 'none';
+              try { if (eH.buffered.length) bH = eH.buffered.end(eH.buffered.length - 1).toFixed(1); } catch (eB2) {}
+              partsH.push((eH.currentSrc || '').split('/').pop().slice(0, 25) + ' ct=' + eH.currentTime.toFixed(2) + ' rs=' + eH.readyState + ' rate=' + eH.playbackRate + (eH.paused ? ' P' : ' >') + ' buf<=' + bH);
+            });
+            if (partsH.length) console.log('[hb] film ' + globalTime.toFixed(2) + ' | ' + partsH.join(' | '));
+          } catch (eHb) {}
+        }
+      }
 
       state.animFrameId = requestAnimationFrame(animLoop);
       return;
