@@ -1813,6 +1813,15 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           jsonResponse(res, 400, { error: "segments must be an array or null" });
           return;
         }
+        // Hygiene: the client may ask to drop stale keys in the same save
+        // (e.g. a legacy 'screencast' entry now superseded by a file-specific
+        // key for the same video -- two keys resolving to one element means
+        // the lane shows one map while playback runs another).
+        if (Array.isArray(body.delete_targets)) {
+          for (const dt of body.delete_targets as any[]) {
+            if (typeof dt === "string" && dt !== target) delete edits[dt];
+          }
+        }
         if (Object.keys(edits).length) (scene as any).media_edits = edits;
         else delete (scene as any).media_edits;
         project.updated_at = new Date().toISOString();
