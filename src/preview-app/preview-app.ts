@@ -3221,14 +3221,17 @@ export function getPreviewHtml(): string {
     return out;
   }
 
-  function saveMediaEdits(sceneIndex, target, segments, pins, doneMsg) {
+  // keepBoundaries: a Split creates two ADJACENT same-rate segments on
+  // purpose -- the cut point the user is about to edit. Skip the merge for
+  // that save or the split is undone before it lands.
+  function saveMediaEdits(sceneIndex, target, segments, pins, doneMsg, keepBoundaries) {
     var p = state.currentProject;
     var scene = p && p.scenes && p.scenes[sceneIndex];
     if (!scene || !p) return;
     var deleteTargets;
     try {
       var doc = els.previewIframe.contentDocument;
-      if (segments && segments.length) {
+      if (segments && segments.length && !keepBoundaries) {
         var vEl = (target !== 'screencast' && doc) ? doc.querySelector(target) : null;
         segments = tidySegments(segments, vEl && isFinite(vEl.duration) ? vEl.duration : 0);
       }
@@ -3378,7 +3381,7 @@ export function getPreviewHtml(): string {
         { src_start: seg.src_start, src_end: srcAt, rate: seg.rate },
         { src_start: srcAt, src_end: seg.src_end, rate: seg.rate });
       camPopClose();
-      saveMediaEdits(si, target, segs);
+      saveMediaEdits(si, target, segs, edit && edit.pins, 'Split at ' + srcAt.toFixed(1) + 's', true);
     });
     var resetBtn = document.getElementById('mp-reset');
     if (resetBtn) resetBtn.addEventListener('click', function() {
