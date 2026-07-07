@@ -18,6 +18,7 @@ import { projectDir } from "../persistence/paths.js";
 import { reviseComponent } from "./component-revise.js";
 import { assembleSceneAuto } from "../core/scene-assembler.js";
 import { validateSceneRuntime } from "../core/capture.js";
+import { inspectSceneLayout, formatInspectionForPrompt } from "../core/layout-inspect.js";
 import { measureTextContrast } from "../core/text-contrast.js";
 import { config } from "../config.js";
 import type { LLMConfig } from "./client.js";
@@ -93,10 +94,17 @@ async function findFile(dir: string, filename: string): Promise<string | null> {
   return null;
 }
 
-function buildInstructions(opts: ReviseSceneOpts): string {
+function buildInstructions(opts: ReviseSceneOpts, layoutFacts?: string): string {
   const inst = opts.instruction.trim();
+  // Measured geometry turns symptom-level asks ("the video runs over the
+  // bottom") into cause-level fixes (a 110px object-fit:cover crop) -- the
+  // reviser must not patch a plausible-looking property that can't move
+  // anything (padding on the parent of an absolutely-positioned child).
+  const facts = layoutFacts
+    ? `\n\nMEASURED LAYOUT FACTS (from a real render of the CURRENT scene -- trust these numbers over intuition; fix the stated cause, not the phrasing of the symptom):\n${layoutFacts}\n`
+    : "";
   if (!opts.element) {
-    return `Apply this change to the WHOLE scene: ${inst}\nChange only what's needed to achieve it; preserve everything else.`;
+    return `Apply this change to the WHOLE scene: ${inst}\nChange only what's needed to achieve it; preserve everything else.${facts}`;
   }
   const e = opts.element;
   const desc = [
@@ -108,7 +116,7 @@ function buildInstructions(opts: ReviseSceneOpts): string {
   const snippet = e.outerHTMLSnippet ? `\nIts current markup (for reference, locate it exactly):\n${e.outerHTMLSnippet.slice(0, 600)}` : "";
   return `The user selected this specific element in the scene: ${desc}.${snippet}\n` +
     `Apply this change to THAT element only (and the minimum needed to achieve it): ${inst}\n` +
-    `Do NOT change unrelated elements, other text, or other colors.`;
+    `Do NOT change unrelated elements, other text, or other colors.${facts}`;
 }
 
 /** Run the fast deterministic gates (runtime + legibility) on assembled HTML. */
@@ -172,9 +180,22 @@ export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneRes
   const existingSource = await loadSource(type, opts.tenantId, opts.projectId);
   if (existingSource == null) return { ok: false, error: `Source for component "${type}" not found` };
 
+  // Measure the CURRENT scene so the reviser sees real geometry, not just
+  // source code. Best-effort: a broken/slow scene must not block the revise.
+  let layoutFacts: string | undefined;
+  try {
+    const selector = opts.element?.classList?.length ? "." + opts.element.classList[0] : undefined;
+    const inspection = await inspectSceneLayout({
+      tenantId: opts.tenantId, projectId: opts.projectId, sceneId: opts.sceneId, selector,
+    });
+    if (inspection.ok) layoutFacts = formatInspectionForPrompt(inspection) || undefined;
+  } catch (e: any) {
+    console.warn(`  [revise] layout inspection skipped: ${e?.message || e}`);
+  }
+
   const revised = await reviseComponent({
     existingSource,
-    instructions: buildInstructions(opts),
+    instructions: buildInstructions(opts, layoutFacts),
     componentName: type,
     llmConfig: opts.llmConfig,
     brandKit: project.brand_kit,
