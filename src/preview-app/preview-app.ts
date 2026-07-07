@@ -3311,8 +3311,7 @@ export function getPreviewHtml(): string {
           '<button class="rv-go secondary" id="mp-split" style="flex:1;" title="Split this segment at the playhead">Split at playhead</button>' +
         '</div>' +
         '<div class="sp-row">' +
-          '<button class="rv-go secondary" id="mp-reset" style="flex:1;" title="Undo the speed-up: play this stretch at normal 1x speed">↩ Reset to 1×</button>' +
-          '<button class="rv-go secondary" id="mp-cut" style="flex:0 0 auto;color:#dc2626;border-color:#fca5a5;" title="Cut this footage out entirely — everything after it plays sooner">✂ Cut</button>' +
+          '<button class="rv-go secondary" id="mp-cut" style="flex:1;color:#dc2626;border-color:#fca5a5;" title="Cut this footage out entirely — everything after it plays sooner">✂ Cut this footage</button>' +
         '</div>' +
         '<div class="sp-row"><button class="rv-go secondary" id="mp-compress" style="flex:1;" title="Scan JUST this segment for stretches where the screen barely changes and timelapse them at 8x">⚡ Compress waiting in this segment</button></div>' +
         '<div class="sp-row"><button class="rv-go secondary" id="mp-clear" style="flex:1;color:#6b7280;">Delete ALL edits on this video</button></div>';
@@ -3348,7 +3347,13 @@ export function getPreviewHtml(): string {
           return;
         }
         scene.media_edits = r2.media_edits;
-        studioStatus('Compressed ' + r2.idle_ranges + ' idle stretch' + (r2.idle_ranges === 1 ? '' : 'es') + ': ' + r2.source_duration.toFixed(0) + 's → ' + r2.output_duration.toFixed(0) + 's ✓', 'ok');
+        // Say exactly what was (and wasn't) found: a tiny saving with a bare
+        // "✓" reads as "it turned my video 8x" when only a sliver was idle.
+        var saved2 = r2.source_duration - r2.output_duration;
+        var pct2 = r2.source_duration > 0 ? saved2 / r2.source_duration : 0;
+        var msg2 = 'Compressed ' + r2.idle_ranges + ' idle stretch' + (r2.idle_ranges === 1 ? '' : 'es') + ': ' + r2.source_duration.toFixed(0) + 's → ' + r2.output_duration.toFixed(0) + 's (saved ' + saved2.toFixed(1) + 's) ✓';
+        if (pct2 < 0.15) msg2 += ' The rest of the recording has continuous on-screen motion — to condense it further, Split it and set a speed on the busy stretches.';
+        studioStatus(msg2, pct2 < 0.15 ? 'warn' : 'ok');
         startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
       }).catch(function(e2) { studioStatus('Compress failed: ' + e2.message, 'err'); });
     });
@@ -3382,15 +3387,6 @@ export function getPreviewHtml(): string {
         { src_start: srcAt, src_end: seg.src_end, rate: seg.rate });
       camPopClose();
       saveMediaEdits(si, target, segs, edit && edit.pins, 'Split at ' + srcAt.toFixed(1) + 's', true);
-    });
-    var resetBtn = document.getElementById('mp-reset');
-    if (resetBtn) resetBtn.addEventListener('click', function() {
-      // "Remove the speed-up" -- back to 1x. tidySegments merges it with
-      // 1x neighbours; if the whole map collapses to plain playback the
-      // edit is deleted and the video reads untouched again.
-      segs[segIndex] = { src_start: seg.src_start, src_end: seg.src_end, rate: 1 };
-      camPopClose();
-      saveMediaEdits(si, target, segs, edit && edit.pins, 'Back to 1×');
     });
     var cutBtn = document.getElementById('mp-cut');
     if (cutBtn) cutBtn.addEventListener('click', function() {
