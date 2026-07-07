@@ -2,10 +2,18 @@ import { spawn } from "node:child_process";
 import type { MediaSegment } from "./types.js";
 
 /**
- * "Compress the waiting": find stretches of a screen recording where the
- * picture barely changes (AI spinners, loading, reading) with ffmpeg's
- * freezedetect, and build a source-map that timelapses them. Deterministic,
- * no LLM -- the 15-minutes-to-3 first pass in one click.
+ * "Compress the waiting": find stretches of a screen recording where nothing
+ * meaningful happens (AI spinners, loading, reading) and build a source-map
+ * that timelapses them. Deterministic, no LLM -- the 15-minutes-to-3 first
+ * pass in one click.
+ *
+ * Detection is a motion profile, not ffmpeg freezedetect: freezedetect's
+ * single dB threshold is a cliff on real screencasts (at -40dB a blinking
+ * cursor defeats it; at -30dB an entire active demo reads as "frozen").
+ * Instead we decode tiny grayscale frames, score per-frame motion as mean
+ * absolute pixel difference, and classify seconds against an adaptive
+ * threshold derived from the clip's own motion distribution -- real activity
+ * (typing, scrolling, streaming text) scores 10-50x higher than a spinner.
  */
 
 export interface IdleRange {
@@ -13,53 +21,93 @@ export interface IdleRange {
   end: number;
 }
 
-export async function detectIdleRanges(
+const W = 64;
+const H = 36;
+const FPS = 4;
+const FRAME_BYTES = W * H;
+
+/** Decode downscaled gray frames and return one motion score per frame gap. */
+async function motionScores(
   videoPath: string,
-  minIdleSeconds = 2,
-  noiseDb = -40,
   range?: { start: number; end: number },
-): Promise<{ ranges: IdleRange[]; duration: number }> {
-  const stderr: string = await new Promise((resolve, reject) => {
-    const ff = spawn("ffmpeg", [
-      ...(range ? ["-ss", String(range.start), "-to", String(range.end)] : []),
-      "-i", videoPath,
-      "-vf", `freezedetect=n=${noiseDb}dB:d=${minIdleSeconds}`,
-      "-an",
-      "-f", "null",
-      "-",
-    ]);
+): Promise<{ scores: number[]; duration: number }> {
+  const args = [
+    ...(range ? ["-ss", String(range.start), "-to", String(range.end)] : []),
+    "-i", videoPath,
+    "-vf", `scale=${W}:${H},format=gray`,
+    "-r", String(FPS),
+    "-f", "rawvideo",
+    "-loglevel", "error",
+    "-",
+  ];
+  return new Promise((resolve, reject) => {
+    const ff = spawn("ffmpeg", args);
+    let buf: Buffer = Buffer.alloc(0);
+    let prev: Buffer | null = null;
+    let frames = 0;
+    const scores: number[] = [];
+    ff.stdout.on("data", (c: Buffer) => {
+      buf = Buffer.concat([buf, c]);
+      while (buf.length >= FRAME_BYTES) {
+        const frame = buf.subarray(0, FRAME_BYTES);
+        buf = buf.subarray(FRAME_BYTES);
+        if (prev) {
+          let sum = 0;
+          for (let p = 0; p < FRAME_BYTES; p++) sum += Math.abs(frame[p] - prev[p]);
+          scores.push(sum / FRAME_BYTES);
+        }
+        prev = Buffer.from(frame);
+        frames++;
+      }
+    });
     const errs: Buffer[] = [];
     ff.stderr.on("data", (c) => errs.push(c));
     ff.on("error", reject);
     ff.on("close", (code) => {
-      const out = Buffer.concat(errs).toString();
-      if (code === 0) resolve(out);
-      else reject(new Error(`ffmpeg freezedetect failed (${code}): ${out.slice(-300)}`));
+      if (code === 0) resolve({ scores, duration: frames / FPS });
+      else reject(new Error(`ffmpeg motion decode failed (${code}): ${Buffer.concat(errs).toString().slice(-300)}`));
     });
   });
+}
 
-  let duration = 0;
-  const dm = stderr.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/);
-  if (dm) duration = parseInt(dm[1], 10) * 3600 + parseInt(dm[2], 10) * 60 + parseFloat(dm[3]);
-  // With -ss before -i, freeze timestamps restart at 0: offset back into
-  // absolute source time, and the working duration is the range's end.
+export async function detectIdleRanges(
+  videoPath: string,
+  minIdleSeconds = 2,
+  _noiseDb = -40, // kept for API compatibility; superseded by the motion profile
+  range?: { start: number; end: number },
+): Promise<{ ranges: IdleRange[]; duration: number }> {
+  const { scores, duration } = await motionScores(videoPath, range);
   const offset = range ? range.start : 0;
-  if (range) duration = range.end;
+  const total = range ? range.end : duration;
+  if (!scores.length) return { ranges: [], duration: total };
 
+  // Adaptive idle threshold: a fraction of the clip's own busy level, with a
+  // floor so a fully-static recording still reads idle and a ceiling so a
+  // low-energy clip doesn't classify real activity away.
+  const sorted = scores.slice().sort((a, b) => a - b);
+  const p95 = sorted[Math.floor(0.95 * (sorted.length - 1))];
+  const threshold = Math.min(2.5, Math.max(0.7, p95 * 0.15));
+
+  // A second is idle only if NOTHING moved in it (max of its samples): one
+  // real flick -- a click, a keystroke -- marks the whole second active.
+  const secCount = Math.ceil(scores.length / FPS);
   const ranges: IdleRange[] = [];
-  let pendingStart: number | null = null;
-  const re = /freeze_(start|end):\s*([\d.]+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(stderr))) {
-    if (m[1] === "start") pendingStart = parseFloat(m[2]) + offset;
-    else if (pendingStart != null) {
-      ranges.push({ start: pendingStart, end: parseFloat(m[2]) + offset });
-      pendingStart = null;
+  let runStart: number | null = null;
+  for (let s = 0; s <= secCount; s++) {
+    let idle = false;
+    if (s < secCount) {
+      const chunk = scores.slice(s * FPS, (s + 1) * FPS);
+      idle = chunk.length > 0 && Math.max(...chunk) < threshold;
+    }
+    if (idle && runStart === null) runStart = s;
+    else if (!idle && runStart !== null) {
+      if (s - runStart >= minIdleSeconds) {
+        ranges.push({ start: runStart + offset, end: Math.min(s + offset, total) });
+      }
+      runStart = null;
     }
   }
-  // A freeze running to EOF emits no freeze_end.
-  if (pendingStart != null && duration > pendingStart) ranges.push({ start: pendingStart, end: duration });
-  return { ranges, duration };
+  return { ranges, duration: total };
 }
 
 /** Idle ranges -> a full source-map: active stretches at 1x, idle at
