@@ -2527,6 +2527,24 @@ async function runUnifiedPipeline(
     }
   }
 
+  // ── Narration-locked duration: absorb transition overlap ──
+  // Scene transitions OVERLAP on the master timeline, so the film runs
+  // (sum of scene durations - sum of transition durations). A recorded
+  // narration is a fixed length: if the storyboard summed scenes to the
+  // narration, the overlap silently chops the final seconds of the audio.
+  // Extend the LAST scene by the total overlap so the film outlasts the
+  // recording.
+  if (project.speaker_track?.clips?.length && (format === "video" || format === "slideshow") && project.scenes.length > 1) {
+    const overlap = project.scenes.slice(1).reduce(
+      (s: number, sc: any) => s + (sc.transition_in?.duration_seconds || 0), 0);
+    if (overlap > 0) {
+      const last = project.scenes[project.scenes.length - 1];
+      last.duration_seconds = Math.round((last.duration_seconds + overlap) * 10) / 10;
+      console.log(`  Narration lock: extended final scene by ${overlap.toFixed(1)}s of transition overlap (film must outlast the recording)`);
+      await saveProject(project);
+    }
+  }
+
     // ── Voiceover generation (TTS) ──
   if (opts.voiceover && (format === "video" || format === "slideshow")) {
     trace?.beginEvent("generate_voiceover");
