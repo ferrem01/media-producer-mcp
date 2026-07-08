@@ -1181,9 +1181,14 @@ export function getPreviewHtml(): string {
 
   // Live media-rate badge (next to the time display): the ACTIVE scene's
   // edited video, its mapped segment rate, and the measured actual advance.
+  // Called from updateTimeDisplay so it works PAUSED and while scrubbing,
+  // not just during playback; self-throttled.
   function updateRateBadge(time) {
     var el = document.getElementById('rate-badge');
     if (!el) return;
+    var nowRb = (window.performance && performance.now) ? performance.now() : Date.now();
+    if (state._rbTs && nowRb - state._rbTs < 300) return;
+    state._rbTs = nowRb;
     var best = null;
     for (var i = 0; i < (state.mediaClips || []).length; i++) {
       var c = state.mediaClips[i];
@@ -3781,17 +3786,6 @@ export function getPreviewHtml(): string {
       syncMedia(globalTime, true);
       state.forceSync = false;
 
-      // Live media-rate badge: ground truth for "is the 8x actually
-      // running". Shows the active edited video's MAPPED rate and the
-      // MEASURED source-seconds-per-film-second, so a map that says 8x
-      // while the picture crawls (buffer-bound stepping) is visible as
-      // "8x · actual 2.1x" instead of a mystery.
-      var nowRb = performance.now();
-      if (!state._rbTs || nowRb - state._rbTs > 400) {
-        state._rbTs = nowRb;
-        try { updateRateBadge(globalTime); } catch (eRB) {}
-      }
-
       // Debug heartbeat: once a second, the active scene's videos in one
       // line -- shows exactly when a clock freezes or readyState collapses.
       if (window.__MP_SYNCDEBUG) {
@@ -3863,6 +3857,13 @@ export function getPreviewHtml(): string {
       syncMedia(targetGlobal, false);
       state.forceSync = false;
       stopPlayback();
+      // Paused scrub: scene visibility settles a frame after the timeline
+      // seek, and no animLoop tick follows to refresh the rate badge --
+      // re-read it once the new scene is actually visible.
+      setTimeout(function() {
+        state._rbTs = 0;
+        try { updateRateBadge(state.masterTime || 0); } catch (eRB2) {}
+      }, 250);
       return;
     }
 
@@ -3872,6 +3873,7 @@ export function getPreviewHtml(): string {
   function updateTimeDisplay(globalTime) {
     var total = state.totalDuration || 0;
     els.timeDisplay.textContent = fmtTime(globalTime || 0) + ' / ' + fmtTime(total);
+    try { updateRateBadge(globalTime || 0); } catch (eRB) {}
   }
 
   function fmtTime(sec) {
