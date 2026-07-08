@@ -105,8 +105,23 @@ async function generateCodegenScene(
   // 125-entry catalog and ZERO <component> tags). One corrective retry.
   var wantedComps = (Array.isArray(draft.components) ? draft.components : [])
     .filter((c: any) => typeof c === "string" && c !== "video");
-  if (wantedComps.length > 0 && !sceneHtml.includes("<component ")) {
-    console.warn(`  Scene ${opts.sceneIndex + 1}: storyboard chose [${wantedComps.join(", ")}] but codegen embedded NO <component> tags -- corrective retry`);
+  var missingComponents = wantedComps.length > 0 && !sceneHtml.includes("<component ");
+  // REAL FOOTAGE is even less optional than library components: when the
+  // spec names an /assets video, a scene that fabricates a lookalike UI
+  // mock instead of embedding the recording is a structural failure
+  // (measured: a walkthrough scene shipped with a fake chat UI and zero
+  // <video> tags while the real 10-minute recording sat unused).
+  var specVideoFiles: string[] = Array.from(new Set(
+    (effectiveSpec.match(/\/assets\/[^\s"'`)\]]+\.(?:mp4|webm|mov|m4v|ogv)/gi) || [])
+      .map((u: string) => u.split("/").pop() || "")
+      .filter((f: string) => f.length > 0),
+  ));
+  var missingFootage = specVideoFiles.filter((f) => !sceneHtml.includes(f));
+  if (missingComponents || missingFootage.length > 0) {
+    var defectLines: string[] = [];
+    if (missingComponents) defectLines.push(`the storyboard selected the vetted library components [${wantedComps.join(", ")}] but you embedded NONE of them -- you rebuilt everything as bespoke HTML, which produces flat, low-craft results. You MUST embed each via <component type="..." data='{...}' /> (schemas are in the spec).`);
+    if (missingFootage.length > 0) defectLines.push(`the spec names REAL footage (${missingFootage.join(", ")}) and your scene does not reference it -- you fabricated a mock instead of embedding the actual recording. You MUST include a <video> element (markup only: src + muted playsinline) for each named file, presented as the spec directs.`);
+    console.warn(`  Scene ${opts.sceneIndex + 1}: structural defect(s) -- ${missingComponents ? "no <component> tags" : ""}${missingComponents && missingFootage.length ? " + " : ""}${missingFootage.length ? "dropped footage " + missingFootage.join(",") : ""} -- corrective retry`);
     try {
       var retryResult = await generateSceneAgentic({
         sceneSpec: effectiveSpec,
@@ -119,7 +134,7 @@ async function generateCodegenScene(
         llmConfig: opts.llmConfig,
         brandKit: opts.brandKit,
         canvas: opts.canvas,
-        critiqueFeedback: `${opts.critiqueFeedback ? opts.critiqueFeedback + "\n\n" : ""}STRUCTURAL DEFECT in your previous attempt: the storyboard selected the vetted library components [${wantedComps.join(", ")}] for this scene, but you embedded NONE of them -- you rebuilt everything as bespoke HTML, which produces flat, low-craft results. You MUST embed each of these via <component type="..." data='{...}' /> (schemas are in the spec) and write custom code only for layout, backgrounds, and connective motion around them.`,
+        critiqueFeedback: `${opts.critiqueFeedback ? opts.critiqueFeedback + "\n\n" : ""}STRUCTURAL DEFECT(S) in your previous attempt: ${defectLines.join(" ALSO: ")}`,
         referenceImages: opts.referenceImages,
         treatment: opts.treatment,
         brollVideoUrl: opts.brollVideoUrl,
@@ -127,12 +142,14 @@ async function generateCodegenScene(
         elements: Array.isArray(draft.elements) ? draft.elements : undefined,
       });
       var retryHtml = stripHtmlFences(retryResult.html);
-      if (retryHtml.includes("<component ")) {
+      var retryCompsOk = !missingComponents || retryHtml.includes("<component ");
+      var retryFootageOk = missingFootage.every((f) => retryHtml.includes(f));
+      if (retryCompsOk && retryFootageOk) {
         sceneHtml = retryHtml;
         agenticResult = retryResult;
-        console.log(`  Scene ${opts.sceneIndex + 1}: corrective retry embedded library components ✓`);
+        console.log(`  Scene ${opts.sceneIndex + 1}: corrective retry fixed the structural defect(s) ✓`);
       } else {
-        console.warn(`  Scene ${opts.sceneIndex + 1}: retry still has no <component> tags -- shipping bespoke version`);
+        console.warn(`  Scene ${opts.sceneIndex + 1}: retry still defective (components ok: ${retryCompsOk}, footage ok: ${retryFootageOk}) -- shipping first version`);
       }
     } catch (e: any) {
       console.warn(`  Scene ${opts.sceneIndex + 1}: component-enforcement retry failed (${e?.message || e}) -- shipping first version`);
