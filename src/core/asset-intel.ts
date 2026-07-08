@@ -219,6 +219,74 @@ function classifyBand(prof: AxisProfile, fromEnd: boolean, band: number): TrimRe
 }
 
 /**
+ * Fine pass for the top chrome boundary. The coarse pass works at ~5-7 source
+ * px per analysis row -- enough to find "there is a static header band" but
+ * not where the browser chrome actually ends when the app below has its own
+ * static, detailed header (measured on real footage: coarse said 136px, the
+ * Safari bar is 108px). What DOES mark the boundary in every real browser is
+ * the full-width hairline divider drawn between toolbar and page. Re-decode
+ * just the top region at native 1:1 row resolution and return the row of the
+ * strongest full-width luminance dip inside the static band; null when no
+ * hairline exists (step boundaries are the coarse pass's job).
+ */
+async function refineTopChromeFine(
+  filePath: string, duration: number, height: number, coarseBandPx: number,
+): Promise<number | null> {
+  const R = Math.min(height, Math.max(160, Math.round(coarseBandPx * 1.6 + 60)));
+  const aw = 480;
+  const span = Math.max(duration, 0.5);
+  const rowMeans: Float32Array[] = [];
+  for (const f of [0.15, 0.35, 0.55, 0.75, 0.9]) {
+    const t = Math.max(0, Math.min(span * f, span - 0.3));
+    const { code, stdout } = await runFfmpeg([
+      "-ss", t.toFixed(2), "-i", filePath,
+      "-frames:v", "1", "-vf", `crop=iw:${R}:0:0,scale=${aw}:${R}`,
+      "-f", "rawvideo", "-pix_fmt", "rgb24", "-loglevel", "error", "-",
+    ]).catch(() => ({ code: -1, stdout: Buffer.alloc(0) }));
+    if (code !== 0 || stdout.length < aw * R * 3) continue;
+    const rm = new Float32Array(R);
+    for (let r = 0; r < R; r++) {
+      let sum = 0;
+      for (let p = 0; p < aw; p++) {
+        const o = (r * aw + p) * 3;
+        sum += 0.2126 * stdout[o] + 0.7152 * stdout[o + 1] + 0.0722 * stdout[o + 2];
+      }
+      rm[r] = sum / aw;
+    }
+    rowMeans.push(rm);
+  }
+  if (rowMeans.length < 3) return null;
+
+  const meanLuma = new Float32Array(R);
+  const activity = new Float32Array(R);
+  for (let r = 0; r < R; r++) {
+    let lum = 0, act = 0;
+    for (let f = 0; f < rowMeans.length; f++) {
+      lum += rowMeans[f][r];
+      if (f > 0) act += Math.abs(rowMeans[f][r] - rowMeans[f - 1][r]);
+    }
+    meanLuma[r] = lum / rowMeans.length;
+    activity[r] = act / (rowMeans.length - 1);
+  }
+
+  const cap = Math.min(R - 5, coarseBandPx + 24);
+  let best: number | null = null;
+  let bestDip = 8; // a real divider dips well past noise
+  for (let r = 6; r <= cap; r++) {
+    if (activity[r] > 1.5) continue; // boundary rows are static
+    // A hairline deviates from BOTH sides in the same direction; a step
+    // boundary deviates from one side only (and would false-positive if
+    // compared against averaged neighbors that span the step).
+    const left = (meanLuma[r - 4] + meanLuma[r - 3] + meanLuma[r - 2]) / 3;
+    const right = (meanLuma[r + 2] + meanLuma[r + 3] + meanLuma[r + 4]) / 3;
+    const dl = left - meanLuma[r], dr = right - meanLuma[r];
+    const dip = dl > 0 && dr > 0 ? Math.min(dl, dr) : dl < 0 && dr < 0 ? Math.min(-dl, -dr) : 0;
+    if (dip > bestDip) { bestDip = dip; best = r; }
+  }
+  return best != null ? best + 2 : null; // crop just past the divider line
+}
+
+/**
  * Analyze a video file. Returns null when the file is not a decodable video
  * or too short/degenerate to say anything useful.
  */
@@ -252,15 +320,15 @@ export async function analyzeVideoAsset(filePath: string): Promise<AssetIntel | 
   const srcPerRow = height / ah;
   const srcPerCol = width / aw;
 
-  const measure = (prof: AxisProfile, fromEnd: boolean, srcPerLine: number, minSrcPx: number): EdgeTrim => {
+  const measure = (prof: AxisProfile, fromEnd: boolean, srcPerLine: number, minSrcPx: number): EdgeTrim & { rawPx?: number } => {
     const maxBand = Math.floor(prof.activity.length * MAX_BAND_FRACTION);
-    let band = staticBandFromEdge(prof, fromEnd, threshold, maxBand);
-    if (band === 0) return { px: 0, reason: null };
-    const reason = classifyBand(prof, fromEnd, band);
-    if (reason === "static-chrome") band = refineBandBySeam(prof, fromEnd, band);
+    const rawBand = staticBandFromEdge(prof, fromEnd, threshold, maxBand);
+    if (rawBand === 0) return { px: 0, reason: null };
+    const reason = classifyBand(prof, fromEnd, rawBand);
+    const band = reason === "static-chrome" ? refineBandBySeam(prof, fromEnd, rawBand) : rawBand;
     const px = Math.round(band * srcPerLine);
     if (px < minSrcPx) return { px: 0, reason: null };
-    return { px, reason };
+    return { px, reason, rawPx: Math.round(rawBand * srcPerLine) };
   };
 
   // Letterbox bars can be thin; chrome must clear MIN_CHROME_SRC_PX. Apply the
@@ -268,12 +336,24 @@ export async function analyzeVideoAsset(filePath: string): Promise<AssetIntel | 
   const finalize = (t: EdgeTrim): EdgeTrim =>
     t.reason === "static-chrome" && t.px < MIN_CHROME_SRC_PX ? { px: 0, reason: null } : t;
 
+  const topMeasured = measure(rows, false, srcPerRow, 4);
   const trims = {
-    top: finalize(measure(rows, false, srcPerRow, 4)),
+    top: finalize({ px: topMeasured.px, reason: topMeasured.reason }),
     bottom: finalize(measure(rows, true, srcPerRow, 4)),
     left: finalize(measure(cols, false, srcPerCol, 4)),
     right: finalize(measure(cols, true, srcPerCol, 4)),
   };
+
+  // Fine pass: a real browser draws a full-width hairline divider between
+  // its toolbar and the page; find it at native row resolution and let it
+  // override the coarse boundary. Skipped when no line exists (step
+  // boundaries) or the coarse pass found no chrome at all.
+  if (trims.top.reason === "static-chrome" && topMeasured.rawPx) {
+    try {
+      const fine = await refineTopChromeFine(filePath, duration, height, topMeasured.rawPx);
+      if (fine != null && fine >= MIN_CHROME_SRC_PX) trims.top = { px: fine, reason: "static-chrome" };
+    } catch { /* fine pass is best-effort */ }
+  }
 
   const content_box = {
     x: trims.left.px,
