@@ -1838,6 +1838,17 @@ async function runUnifiedPipeline(
   var creativity = resolveCreativity(opts);
   console.log(`  Unified pipeline: format=${format}, creativity=${creativity}`);
 
+  // Narration presence for narration-locked rules: the working project may
+  // not carry the ORIGINAL project's speaker track (storyboard builds run in
+  // a fresh project), so check speaker_source and the original explicitly.
+  let pipelineHasNarration = !!opts.speaker_source;
+  if (!pipelineHasNarration && opts.project_id) {
+    try {
+      const existingNarr = await loadProject(opts.tenant_id, opts.project_id);
+      pipelineHasNarration = !!(existingNarr?.speaker_track?.clips?.length);
+    } catch { /* no existing project -- fresh build */ }
+  }
+
   // Images are always 1 scene
   if (format === "image") {
     opts.sceneCount = 1;
