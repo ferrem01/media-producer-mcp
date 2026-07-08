@@ -133,8 +133,11 @@ function tenantTraceFile(tenantId: string): string {
 export class TraceBuilder {
   private trace: Partial<PipelineTrace>;
   private startTime: number;
-  private pendingEventStart = 0;
-  private pendingEvent: Partial<TraceEvent> | null = null;
+  // Keyed by event type: generation runs scenes CONCURRENTLY, and a single
+  // pending slot meant one worker's beginEvent clobbered another's before its
+  // endEvent fired -- whole scenes silently vanished from traces.
+  private pendingEvents = new Map<string, { start: number; data: Partial<TraceEvent> }>();
+  private lastBegunType: string | null = null;
 
   constructor(operation: OperationType, tenantId: string, projectId: string, prompt: string) {
     this.startTime = Date.now();
@@ -192,24 +195,35 @@ export class TraceBuilder {
     return this;
   }
 
-  /** Start timing an event. Call endEvent() when done. */
+  /** Start timing an event. Call endEvent() when done. Concurrency-safe when
+   *  event types are unique (scene-indexed types are). */
   beginEvent(type: string, data?: Record<string, unknown>): this {
-    this.pendingEventStart = Date.now();
-    this.pendingEvent = { type, ...data };
+    this.pendingEvents.set(type, { start: Date.now(), data: { type, ...data } });
+    this.lastBegunType = type;
     return this;
   }
 
-  /** End the pending timed event. */
-  endEvent(data?: Record<string, unknown>): this {
-    if (!this.pendingEvent) return this;
+  /** End a pending timed event. Pass `type` from concurrent contexts; without
+   *  it, the most recently begun still-pending event is ended (fine for the
+   *  sequential top-level phases). */
+  endEvent(data?: Record<string, unknown>, type?: string): this {
+    let key = type;
+    if (!key) {
+      if (this.lastBegunType && this.pendingEvents.has(this.lastBegunType)) key = this.lastBegunType;
+      else key = Array.from(this.pendingEvents.keys()).pop();
+    }
+    if (!key) return this;
+    const pending = this.pendingEvents.get(key);
+    if (!pending) return this;
+    this.pendingEvents.delete(key);
+    if (this.lastBegunType === key) this.lastBegunType = null;
     const event: TraceEvent = {
-      ...this.pendingEvent,
+      ...pending.data,
       ...data,
-      type: this.pendingEvent.type as string,
-      timestamp: new Date(this.pendingEventStart).toISOString(),
-      duration_ms: Date.now() - this.pendingEventStart,
+      type: pending.data.type as string,
+      timestamp: new Date(pending.start).toISOString(),
+      duration_ms: Date.now() - pending.start,
     };
-    this.pendingEvent = null;
     this.trace.events!.push(event);
     return this;
   }

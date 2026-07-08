@@ -60,9 +60,9 @@ import { parseLlmJson } from "./json-repair.js";
 import { critiqueConsolidated, consolidatedCorrectness } from "./consolidated-critique.js";
 import { runFocusedDetectors } from "./focused-detectors.js";
 import { tileFramesToStoryboard } from "./editorial-vision.js";
-import { generateContactSheet } from "../core/contact-sheet.js";
+import { resolveContactTimestamps, stitchFramesToSheet } from "../core/contact-sheet.js";
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
-import { captureSingleFrame, validateSceneRuntime } from "../core/capture.js";
+import { captureSingleFrame, captureFrameSequence, validateSceneRuntime } from "../core/capture.js";
 import { measureTextContrast } from "../core/text-contrast.js";
 import { measureLayout } from "../core/layout-metrics.js";
 import os from "node:os";
@@ -1075,7 +1075,7 @@ async function critiqueAndRetryScene(opts: {
 
       if (componentSources.length === 0) {
         console.log(`  Critique: no component sources found for scene ${opts.sceneIndex}, skipping`);
-        opts.trace?.endEvent({ skipped: true, reason: "no_sources" });
+        opts.trace?.endEvent({ skipped: true, reason: "no_sources" }, `critique_scene_${opts.sceneIndex}_attempt_${attempt}`);
         break;
       }
 
@@ -1107,24 +1107,35 @@ async function critiqueAndRetryScene(opts: {
 
       await fs.writeFile(htmlPath, assembledHtml);
 
-      // 3b. Runtime gate: seek the timeline and catch any thrown error. The vision
-      // critique can't see a callback that throws mid-animation (the frame still
-      // renders), so this is what catches the "broken" (vs "ugly") class of bug.
-      const runtime = await validateSceneRuntime({
-        htmlPath,
-        width: opts.canvas.width,
-        height: opts.canvas.height,
-        duration: currentScene.duration_seconds || 5,
-      });
-      if (!runtime.ok) {
-        console.warn(`  Scene ${opts.sceneIndex} runtime error @${(runtime.atTime ?? 0).toFixed(1)}s: ${runtime.error}`);
-      }
-
       // Video-only scene: extract frame directly from video file via ffmpeg
       // (Playwright can't load http:// video in file:// pages due to CORS)
       const isVideoOnly = currentScene.components.length === 1 &&
         currentScene.components[0].type === "video" &&
         currentScene.components[0].data?.src;
+
+      // 3b+3c+4a in ONE page session (captureFrameSequence): runtime seek
+      // sweep + full-res preview + contact-sheet tiles. These used to be
+      // separate page loads -- validateSceneRuntime, captureSingleFrame,
+      // and generateContactSheet booting once PER TILE -- i.e. up to 11
+      // loads of an assembled page that can reference a multi-hundred-MB
+      // recording. Measured as the dominant wall-clock cost of generation.
+      let runtime: { ok: boolean; error?: string; atTime?: number } = { ok: true };
+      let contactSheetBase64: string | undefined;
+      let contactTimestamps: number[] | undefined;
+      const sceneBeats: SceneBeat[] | undefined =
+        Array.isArray(currentDraft?.beats) && currentDraft.beats.length >= 2 ? currentDraft.beats : undefined;
+
+      if (isVideoOnly) {
+        runtime = await validateSceneRuntime({
+          htmlPath,
+          width: opts.canvas.width,
+          height: opts.canvas.height,
+          duration: currentScene.duration_seconds || 5,
+        });
+        if (!runtime.ok) {
+          console.warn(`  Scene ${opts.sceneIndex} runtime error @${(runtime.atTime ?? 0).toFixed(1)}s: ${runtime.error}`);
+        }
+      }
 
       if (isVideoOnly) {
         const videoSrc = currentScene.components[0].data!.src as string;
@@ -1164,44 +1175,64 @@ async function critiqueAndRetryScene(opts: {
           });
         }
       } else {
-        await captureSingleFrame({
-          htmlPath,
-          outputPath: previewPath,
-          width: opts.canvas.width,
-          height: opts.canvas.height,
-          atTime: currentScene.duration_seconds * 0.9,
-        });
-      }
-
-      // 4a. Generate contact sheet for motion-aware critique. Scenes with a
-      // beat timeline sample each beat's MIDPOINT (plus open/close moments) so
-      // every beat's content is seen fully on screen; other scenes spread 6
-      // frames evenly.
-      let contactSheetBase64: string | undefined;
-      let contactTimestamps: number[] | undefined;
-      const sceneBeats: SceneBeat[] | undefined =
-        Array.isArray(currentDraft?.beats) && currentDraft.beats.length >= 2 ? currentDraft.beats : undefined;
-      if (!isVideoOnly && currentScene.duration_seconds >= 3) {
+        // One page session: runtime sweep + preview frame + contact tiles.
+        // Beat scenes sample each beat's MIDPOINT (plus open/close moments)
+        // so every beat's content is seen fully on screen; other scenes
+        // spread 6 frames evenly.
+        const dur = currentScene.duration_seconds || 5;
+        const wantSheet = dur >= 3;
+        const beatSample = sceneBeats
+          ? [dur * 0.06, ...beatMidpoints(sceneBeats), dur * 0.97].slice(0, 9)
+          : undefined;
+        const sheetTimes = wantSheet ? resolveContactTimestamps(dur, 6, beatSample) : [];
+        const tilesDir = path.join(tmpDir, "tiles");
+        await fs.mkdir(tilesDir, { recursive: true });
+        const tilePaths = sheetTimes.map((_t, ti) => path.join(tilesDir, `tile_${ti}.png`));
+        const captureStart = Date.now();
         try {
-          const contactPath = path.join(tmpDir, "contact-sheet.png");
-          const dur = currentScene.duration_seconds;
-          const beatSample = sceneBeats
-            ? [dur * 0.06, ...beatMidpoints(sceneBeats), dur * 0.97].slice(0, 9)
-            : undefined;
-          const contactResult = await generateContactSheet({
+          runtime = await captureFrameSequence({
             htmlPath,
             width: opts.canvas.width,
             height: opts.canvas.height,
-            duration: dur,
-            frameCount: 6,
-            timestamps: beatSample,
-            outputPath: contactPath,
+            frames: [
+              { atTime: dur * 0.9, outputPath: previewPath },
+              ...sheetTimes.map((t, ti) => ({ atTime: t, outputPath: tilePaths[ti] })),
+            ],
+            sweepDuration: dur,
+            sweepSteps: 12,
           });
-          contactSheetBase64 = contactResult.base64;
-          contactTimestamps = contactResult.timestamps;
         } catch (e: any) {
-          console.warn(`  Contact sheet generation failed (${e.message}), using single frame`);
+          // Sequence infra failure: fall back to the old single-frame path so
+          // the critique still gets a preview (runtime treated as ok).
+          console.warn(`  Frame sequence capture failed (${e?.message || e}), falling back to single frame`);
+          await captureSingleFrame({
+            htmlPath,
+            outputPath: previewPath,
+            width: opts.canvas.width,
+            height: opts.canvas.height,
+            atTime: dur * 0.9,
+          });
         }
+        if (!runtime.ok) {
+          console.warn(`  Scene ${opts.sceneIndex} runtime error @${(runtime.atTime ?? 0).toFixed(1)}s: ${runtime.error}`);
+        }
+        if (wantSheet) {
+          try {
+            const contactPath = path.join(tmpDir, "contact-sheet.png");
+            const existing: string[] = [];
+            for (const tp of tilePaths) {
+              try { await fs.access(tp); existing.push(tp); } catch { /* tile missing */ }
+            }
+            if (existing.length >= 2) {
+              const stitched = await stitchFramesToSheet(existing, opts.canvas.width, opts.canvas.height, contactPath);
+              contactSheetBase64 = stitched.base64;
+              contactTimestamps = sheetTimes.slice(0, existing.length);
+            }
+          } catch (e: any) {
+            console.warn(`  Contact sheet stitch failed (${e.message}), using single frame`);
+          }
+        }
+        console.log(`  Scene ${opts.sceneIndex} critique capture: ${sheetTimes.length + 1} frames + runtime sweep in ${((Date.now() - captureStart) / 1000).toFixed(1)}s (one page session)`);
       }
 
       // 4. Read preview and critique
@@ -1421,7 +1452,7 @@ async function critiqueAndRetryScene(opts: {
       // visual score, but overlaps/stray UI/missing logo) is forced to revise.
       if (aestheticPass && correctness.pass) {
         console.log(`  Score ${critiqueResult.score} accepted`);
-        opts.trace?.endEvent({ score: critiqueResult.score, accepted: true });
+        opts.trace?.endEvent({ score: critiqueResult.score, accepted: true }, `critique_scene_${opts.sceneIndex}_attempt_${attempt}`);
         break;
       }
       if (aestheticPass && !correctness.pass) {
@@ -1433,7 +1464,7 @@ async function critiqueAndRetryScene(opts: {
 
       // 7. Score < 7: surgical re-storyboard to fix issues
 
-      opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false });
+      opts.trace?.endEvent({ score: critiqueResult.score, retries: attempt + 1, accepted: false }, `critique_scene_${opts.sceneIndex}_attempt_${attempt}`);
 
       // 7b. SURGICAL PATCH fast-path. Most retries are driven by a low aesthetic
       // score (or local visual defects: contrast/overlap/clip/off-brand), not by
@@ -1511,11 +1542,11 @@ async function critiqueAndRetryScene(opts: {
           currentCustomSources.set(patchType, patchedSource);
           await fs.writeFile(path.join(opts.compDir, `${patchType}.component.html`), patchedSource);
           console.log(`  Critique: ${patchLabel} on ${patchType}`);
-          opts.trace?.endEvent({ patched: true, mode: patchLabel });
+          opts.trace?.endEvent({ patched: true, mode: patchLabel }, `critique_scene_${opts.sceneIndex}_patch`);
           continue; // re-assemble + re-critique the patched scene next iteration
         } catch (e: any) {
           console.warn(`  Surgical patch failed, falling back to full re-storyboard: ${e.message}`);
-          opts.trace?.endEvent({ error: e.message });
+          opts.trace?.endEvent({ error: e.message }, `critique_scene_${opts.sceneIndex}_patch`);
           // fall through to the full re-storyboard path below
         }
       }
@@ -1598,6 +1629,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
       // generator knows what went wrong and can avoid the same mistakes.
       const critiqueFeedback = buildCritiqueFeedback(critiqueResult) + formatCorrectnessDefects(correctness.defects);
 
+      opts.trace?.beginEvent(`regen_scene_${opts.sceneIndex}_attempt_${attempt}`);
       const regenerated = await generateScene({
         scene: newDraft,
         sceneIndex: opts.sceneIndex,
@@ -1613,6 +1645,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         treatment: opts.treatment,
         critiqueFeedback,
       });
+      opts.trace?.endEvent({}, `regen_scene_${opts.sceneIndex}_attempt_${attempt}`);
 
       // Save custom component HTML if needed
       if (regenerated.customSources) {
@@ -1730,7 +1763,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
       }
 
       console.log(`  Template swap complete for scene ${opts.sceneIndex}`);
-      opts.trace?.endEvent({ swapped: true, previousBest: bestScore });
+      opts.trace?.endEvent({ swapped: true, previousBest: bestScore }, `critique_scene_${opts.sceneIndex}_template_swap`);
       // The swap itself is never re-critiqued (it's the last-resort fallback),
       // so it can't be marked "passed" -- record what drove the swap.
       swapped.scene.quality = {
@@ -2167,6 +2200,7 @@ async function runUnifiedPipeline(
         // output size) gives a real shot at fitting the budget before we
         // let a single scene sink the whole film.
         let generated;
+        trace?.beginEvent(`codegen_scene_${i}`);
         try {
           generated = await generateScene({
             scene: draft,
@@ -2210,6 +2244,7 @@ async function runUnifiedPipeline(
             hasSpeakerTrack: !!opts.speaker_source,
           });
         }
+        trace?.endEvent({ label: draft.label }, `codegen_scene_${i}`);
 
         // Save custom component HTML if needed
         if (generated.customSources) {

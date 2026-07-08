@@ -260,6 +260,180 @@ export async function validateSceneRuntime(options: {
 }
 
 /**
+ * Capture MANY frames of one scene in a single page session.
+ *
+ * The critique loop needs a runtime sweep + a full-res preview + 6-9 contact
+ * sheet tiles per attempt. Doing each via its own captureSingleFrame call
+ * loads the assembled page (vendored GSAP/three + fonts + possibly a
+ * multi-hundred-MB source video) up to 11 times per attempt -- measured as
+ * the dominant wall-clock cost of generation. This boots ONE page, seeks the
+ * timeline through every requested timestamp (collecting the first component
+ * throw + page errors on the way, superseding a separate
+ * validateSceneRuntime pass), and per frame swaps each <video> for a
+ * ffmpeg-extracted still exactly like captureSingleFrame does -- swapping
+ * the original element back afterwards so GSAP tween wiring stays intact for
+ * the next timestamp.
+ */
+export async function captureFrameSequence(options: {
+  htmlPath: string;
+  width: number;
+  height: number;
+  /** Frames to capture, any order; captured in ascending time order. */
+  frames: { atTime: number; outputPath: string }[];
+  /** Also sweep this many evenly-spread seek steps across [0, duration] for
+   *  runtime errors (component throws / page errors). 0 = only the frame
+   *  timestamps themselves are swept. */
+  sweepDuration?: number;
+  sweepSteps?: number;
+}): Promise<{ ok: boolean; error?: string; atTime?: number }> {
+  const { htmlPath, width, height } = options;
+  const frames = options.frames.slice().sort((a, b) => a.atTime - b.atTime);
+  let page: Page | undefined;
+  let ownBrowser: Browser | undefined;
+  const tempDirs = new Set<string>();
+  let runtime: { ok: boolean; error?: string; atTime?: number } = { ok: true };
+  try {
+    let browser: Browser;
+    try { browser = await getPooledBrowser(); }
+    catch { ownBrowser = await chromium.launch(LAUNCH_OPTS); browser = ownBrowser; }
+    page = await browser.newPage({ ignoreHTTPSErrors: true });
+    await page.setViewportSize({ width, height });
+    let pageError: string | undefined;
+    page.on("pageerror", (e) => { if (!pageError) pageError = String((e as any)?.message || e); });
+
+    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 60000 });
+
+    // Runtime sweep first (cheap seeks, no capture): catches throws at times
+    // BETWEEN the sampled frames, like the old validateSceneRuntime did.
+    if (options.sweepDuration && options.sweepDuration > 0) {
+      const swept = await page.evaluate((args: { dur: number; steps: number }) => {
+        const tl = (window as any).__MP_TIMELINE;
+        if (!tl || typeof tl.time !== "function") return { err: "__MP_TIMELINE not defined", at: 0 };
+        const n = Math.max(1, args.steps);
+        for (let i = 0; i <= n; i++) {
+          const t = (args.dur * i) / n;
+          try { tl.time(t); } catch (e: any) { return { err: String(e?.message || e), at: t }; }
+        }
+        return { err: null as string | null, at: 0 };
+      }, { dur: options.sweepDuration, steps: options.sweepSteps ?? 12 });
+      if (swept.err) runtime = { ok: false, error: swept.err, atTime: swept.at };
+    }
+
+    // Static facts about the scene's videos (index-addressed; the elements
+    // themselves are swapped in and out per frame below).
+    const videoInfos: { src: string; startAt: number; index: number; edl: string | null }[] = await page.evaluate(() => {
+      const videos = document.querySelectorAll("video");
+      return Array.from(videos).map((v, i) => ({
+        src: v.src || v.getAttribute("src") || "",
+        startAt: parseFloat(v.getAttribute("data-start-at") || "0"),
+        edl: v.getAttribute("data-mp-edl"),
+        index: i,
+      }));
+    });
+    const realVideos = videoInfos.filter((v) => v.src && /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(v.src));
+
+    // Tag original videos once so we can swap the SAME elements back and
+    // forth (replaceWith preserves element identity + GSAP tween wiring).
+    if (realVideos.length > 0) {
+      await page.evaluate(() => {
+        document.querySelectorAll("video").forEach((v, i) => v.setAttribute("data-mp-seq-idx", String(i)));
+      });
+    }
+
+    const tempDir = `/tmp/vframes_seq_${crypto.randomBytes(6).toString("hex")}`;
+    if (realVideos.length > 0) { await fs.mkdir(tempDir, { recursive: true }); tempDirs.add(tempDir); }
+    const framePathCache: Record<string, string> = {}; // src__targetTime -> extracted png
+    let extractCount = 0;
+
+    for (const frame of frames) {
+      await page.evaluate((t: number) => {
+        try { (window as any).__MP_TIMELINE.time(t); } catch { /* capture current state */ }
+      }, frame.atTime);
+
+      if (realVideos.length > 0) {
+        // Extract (or reuse) each video's frame for this timestamp.
+        const lookup: Record<number, string> = {};
+        for (const v of realVideos) {
+          const videoPath = resolveVideoPath(v.src);
+          try { await fs.access(videoPath); } catch { continue; }
+          const edlSegs = parseEdlAttr(v.edl);
+          const targetTime = edlSegs ? mapSourceTime(edlSegs, frame.atTime) : Math.max(0, v.startAt + frame.atTime);
+          const key = `${v.src}__${targetTime.toFixed(3)}`;
+          if (!framePathCache[key]) {
+            const fp = path.join(tempDir, `f_${extractCount++}.png`);
+            try { await extractSingleVideoFrame(videoPath, targetTime, fp); framePathCache[key] = fp; }
+            catch { continue; }
+          }
+          lookup[v.index] = framePathCache[key];
+        }
+        // Swap videos -> stills (styles copied AFTER the seek, exactly like
+        // captureSingleFrame), screenshot, then restore the originals.
+        await page.evaluate((lu: Record<number, string>) => {
+          const w = window as any;
+          w.__mpSeqSwapped = [];
+          document.querySelectorAll("video[data-mp-seq-idx]").forEach((video) => {
+            const idx = Number(video.getAttribute("data-mp-seq-idx"));
+            const framePath = lu[idx];
+            if (!framePath) return;
+            const img = document.createElement("img");
+            const cs = window.getComputedStyle(video);
+            // Copy the RESOLVED layout, not just inline styles: a video whose
+            // position/size/crop comes from a stylesheet class (e.g. the
+            // screencast-frame overscan viewport) must land the still in the
+            // exact same box, or the captured frame shows the uncropped/
+            // unpositioned source.
+            img.style.cssText = (video as HTMLElement).style.cssText;
+            for (const p of ["position", "top", "left", "right", "bottom", "width", "height",
+              "maxWidth", "maxHeight", "objectFit", "objectPosition", "transform",
+              "zIndex", "borderRadius", "opacity"] as const) {
+              const v = (cs as any)[p];
+              if (v) (img.style as any)[p] = v;
+            }
+            img.style.display = cs.display === "none" ? "none" : (cs.display || "block");
+            img.setAttribute("data-mp-seq-img", "1");
+            img.src = `file://${framePath}`;
+            video.replaceWith(img);
+            w.__mpSeqSwapped.push([img, video]);
+          });
+        }, lookup);
+        await page.evaluate(() =>
+          new Promise<void>((resolve) => {
+            const imgs = document.querySelectorAll("img[data-mp-seq-img]");
+            if (imgs.length === 0) { resolve(); return; }
+            let pending = imgs.length;
+            const done = () => { if (--pending <= 0) setTimeout(() => resolve(), 50); };
+            imgs.forEach((img) => {
+              if ((img as HTMLImageElement).complete) done();
+              else {
+                img.addEventListener("load", () => done(), { once: true });
+                img.addEventListener("error", () => done(), { once: true });
+                setTimeout(() => done(), 5000);
+              }
+            });
+          })
+        );
+        await page.screenshot({ path: frame.outputPath });
+        await page.evaluate(() => {
+          const w = window as any;
+          for (const [img, video] of w.__mpSeqSwapped || []) img.replaceWith(video);
+          w.__mpSeqSwapped = [];
+        });
+      } else {
+        await page.screenshot({ path: frame.outputPath });
+      }
+    }
+
+    if (runtime.ok && pageError) runtime = { ok: false, error: pageError };
+    return runtime;
+  } finally {
+    await page?.close().catch(() => {});
+    await ownBrowser?.close().catch(() => {});
+    for (const dir of tempDirs) await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
  * Capture a single frame (for image output or critique screenshots).
  * Uses ffmpeg to extract video frames instead of Chrome seeking.
  */
@@ -449,7 +623,9 @@ export async function captureSingleFrame(options: {
         }
       }
 
-      // Replace <video> with <img> in the DOM
+      // Replace <video> with <img> in the DOM. Copy the RESOLVED layout, not
+      // just inline styles: a video positioned/sized/cropped by a stylesheet
+      // class must land the still in the exact same box.
       await page.evaluate((lookup: Record<number, string>) => {
         const videos = document.querySelectorAll("video");
         videos.forEach((video, idx) => {
@@ -459,10 +635,13 @@ export async function captureSingleFrame(options: {
           const img = document.createElement("img");
           const cs = window.getComputedStyle(video);
           img.style.cssText = video.style.cssText;
-          img.style.objectFit = cs.objectFit || "cover";
-          img.style.display = cs.display === "none" ? "none" : (video.style.display || "block");
-          img.style.width = video.style.width || cs.width;
-          img.style.height = video.style.height || cs.height;
+          for (const p of ["position", "top", "left", "right", "bottom", "width", "height",
+            "maxWidth", "maxHeight", "objectFit", "objectPosition", "transform",
+            "zIndex", "borderRadius", "opacity"] as const) {
+            const v = (cs as any)[p];
+            if (v) (img.style as any)[p] = v;
+          }
+          img.style.display = cs.display === "none" ? "none" : (cs.display || "block");
 
           const startAt = video.getAttribute("data-start-at");
           if (startAt) img.setAttribute("data-start-at", startAt);
