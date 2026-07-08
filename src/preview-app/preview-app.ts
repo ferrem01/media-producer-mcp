@@ -662,7 +662,7 @@ export function getPreviewHtml(): string {
         <button id="tl-zoom-in" class="scene-sb-btn" title="Zoom timeline in">+</button>
         <button id="tl-zoom-out" class="scene-sb-btn" title="Zoom timeline out">&minus;</button>
       </span>
-      <span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock" style="display:none;font:600 10px Inter,sans-serif;padding:2px 8px;border-radius:999px;margin-right:6px;white-space:nowrap;"></span><span class="time-display" id="time-display">0.0s / 0.0s</span>
+      <span style="position:relative;display:inline-block;"><span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock" style="display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:3px;font:600 9px Inter,sans-serif;padding:1px 6px;border-radius:999px;white-space:nowrap;z-index:5;pointer-events:none;"></span><span class="time-display" id="time-display">0.0s / 0.0s</span></span>
       <span class="audio-indicator" id="audio-indicator"></span>
       <span class="vol-control" title="Volume">
         <span class="vol-icon" id="vol-icon">&#9834;</span>
