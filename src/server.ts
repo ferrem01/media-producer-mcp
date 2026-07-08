@@ -1570,6 +1570,10 @@ export function createMcpServer(): McpServer {
           }
 
           const brandKit = await loadBrandKit(params.tenant_id);
+          // A project with a speaker track already HAS its narration (a real
+          // recording). Auto-TTS on top of it double-voices the film, and
+          // auto-music fights the recording -- both were hardcoded true.
+          const hasNarration = !!(project.speaker_track && project.speaker_track.clips && project.speaker_track.clips.length);
           const job = queueJob("generate", params.tenant_id, async (j) => {
             const trace = new TraceBuilder("generate", params.tenant_id, "", storyboardPrompt);
             try {
@@ -1584,8 +1588,8 @@ export function createMcpServer(): McpServer {
                 canvas: project.canvas,
                 creativity: params.creativity,
                 project_id: project.project_id,
-                voiceover: true,
-                backgroundMusic: true,
+                voiceover: !hasNarration,
+                backgroundMusic: !hasNarration,
                 voice: project.storyboard!.audio.voice as any,
                 sceneCount: project.storyboard!.scenes.length,
               });
