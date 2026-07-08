@@ -46,6 +46,8 @@ import { isAuthEnabled, validateToken } from "./auth/auth.js";
 import { signToken } from "./auth/jwt.js";
 import { captureUrl } from "./core/capture-url.js";
 import { inspectSceneLayout } from "./core/layout-inspect.js";
+import { getTranscript, whisperAvailable } from "./core/transcribe.js";
+import { resolveVideoPath } from "./core/video-path.js";
 import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
 import { generateImage } from "./media/image-gen.js";
 
@@ -1490,6 +1492,43 @@ export function createMcpServer(): McpServer {
             storyboardPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
             if (existingProject.storyboard?.narrative) {
               storyboardPrompt += `\n\n## Previous Storyboard Narrative\n${existingProject.storyboard.narrative}`;
+            }
+          }
+
+          // Narration-first storyboarding: when the project already carries a
+          // real speaker recording, transcribe it and hand the builder the
+          // ACTUAL script with timings -- scenes land on spoken sentence
+          // boundaries instead of an invented script, and no TTS will be
+          // layered on it later (the narration rule).
+          if (params.project_id) {
+            try {
+              const proj0 = await loadProject(params.tenant_id, params.project_id);
+              const clip0 = proj0?.speaker_track?.clips?.[0];
+              if (clip0?.source && await whisperAvailable()) {
+                const audioPath = resolveVideoPath(clip0.source);
+                const cacheDir = path.join(projectDir(params.tenant_id, params.project_id), "thumbs");
+                const { segments } = await getTranscript(audioPath, cacheDir);
+                if (segments.length) {
+                  const total = segments[segments.length - 1].end;
+                  const lines: string[] = [];
+                  let buf: string[] = [];
+                  let t0 = -1;
+                  for (const s of segments) {
+                    const w = s.text.trim();
+                    if (t0 < 0) t0 = s.start;
+                    buf.push(w);
+                    if (/[.?!]$/.test(w)) { lines.push(`[${t0.toFixed(1)}s] ${buf.join(" ")}`); buf = []; t0 = -1; }
+                  }
+                  if (buf.length) lines.push(`[${t0.toFixed(1)}s] ${buf.join(" ")}`);
+                  storyboardPrompt += `\n\n## RECORDED NARRATION (the project's speaker track -- this IS the soundtrack)\n` +
+                    `Total narration length: ${total.toFixed(1)}s. Scene durations MUST sum to this, and scene cuts MUST land on the sentence boundaries below. ` +
+                    `Do NOT write new voiceover scripts (no TTS will be generated on top of this recording); each scene's voiceover_text must QUOTE its span of the narration verbatim.\n` +
+                    lines.join("\n");
+                  console.log(`  Storyboard: injected recorded narration (${segments.length} words, ${total.toFixed(1)}s)`);
+                }
+              }
+            } catch (e: any) {
+              console.warn(`  Storyboard: narration transcript skipped: ${e?.message || e}`);
             }
           }
 

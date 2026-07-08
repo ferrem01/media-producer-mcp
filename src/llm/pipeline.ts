@@ -195,6 +195,25 @@ export function isBookendScene(
  * Run the full generation pipeline.
  */
 export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineResult> {
+  // Deterministic narration rule: a real speaker recording IS the narration.
+  // speaker_source carries its own audio, and a project being (re)built may
+  // already have a narration track attached -- in either case auto-TTS would
+  // double-voice the film and auto-music would fight the recording. This is
+  // the pipeline-level backstop; callers apply the same rule up front.
+  if (opts.voiceover || opts.backgroundMusic) {
+    let hasNarration = !!opts.speaker_source;
+    if (!hasNarration && opts.project_id) {
+      try {
+        const existing = await loadProject(opts.tenant_id, opts.project_id);
+        hasNarration = !!(existing?.speaker_track?.clips?.length);
+      } catch { /* no existing project -- fresh build */ }
+    }
+    if (hasNarration) {
+      console.log("  Narration rule: speaker track present -> auto-TTS and auto-music disabled (the recording is the soundtrack).");
+      opts.voiceover = false;
+      opts.backgroundMusic = false;
+    }
+  }
   var brandKit = opts.brandKit || DEFAULT_BRAND_KIT;
   var canvas = opts.canvas || DEFAULT_CANVAS;
 
