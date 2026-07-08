@@ -77,23 +77,38 @@
 
     var spans;
 
-    // Use SplitText if available, fallback to manual splitting
+    // Use SplitText if available, fallback to manual splitting.
+    // Char mode must ALWAYS group chars inside word wrappers: flat
+    // inline-block char spans let the line break BETWEEN LETTERS
+    // ("Blo / g"). words,chars keeps line breaks at word boundaries.
     if (typeof SplitText !== 'undefined') {
-      var splitType = mode === 'char' ? 'chars' : 'words';
-      var split = new SplitText(container, { type: splitType });
-      spans = mode === 'char' ? split.chars : split.words;
+      if (mode === 'char') {
+        var splitWC = new SplitText(container, { type: 'words,chars' });
+        spans = splitWC.chars;
+      } else {
+        var splitW = new SplitText(container, { type: 'words' });
+        spans = splitW.words;
+      }
     } else {
       // Manual fallback
       container.innerHTML = '';
       spans = [];
       if (mode === 'char') {
-        var chars = text.split('');
-        for (var i = 0; i < chars.length; i++) {
-          var span = document.createElement('span');
-          span.className = 'kt-char';
-          span.textContent = chars[i] === ' ' ? '\u00A0' : chars[i];
-          container.appendChild(span);
-          spans.push(span);
+        var wordsC = text.split(/\s+/);
+        for (var wi = 0; wi < wordsC.length; wi++) {
+          var wordWrap = document.createElement('span');
+          wordWrap.className = 'kt-wordwrap';
+          wordWrap.style.cssText = 'display:inline-block;white-space:nowrap;';
+          var chars = wordsC[wi].split('');
+          for (var i = 0; i < chars.length; i++) {
+            var span = document.createElement('span');
+            span.className = 'kt-char';
+            span.textContent = chars[i];
+            wordWrap.appendChild(span);
+            spans.push(span);
+          }
+          container.appendChild(wordWrap);
+          if (wi < wordsC.length - 1) container.appendChild(document.createTextNode(' '));
         }
       } else {
         var words = text.split(/\s+/);

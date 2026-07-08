@@ -662,7 +662,7 @@ export function getPreviewHtml(): string {
         <button id="tl-zoom-in" class="scene-sb-btn" title="Zoom timeline in">+</button>
         <button id="tl-zoom-out" class="scene-sb-btn" title="Zoom timeline out">&minus;</button>
       </span>
-      <span class="time-display" id="time-display">0.0s / 0.0s</span>
+      <span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock" style="display:none;font:600 10px Inter,sans-serif;padding:2px 8px;border-radius:999px;margin-right:6px;white-space:nowrap;"></span><span class="time-display" id="time-display">0.0s / 0.0s</span>
       <span class="audio-indicator" id="audio-indicator"></span>
       <span class="vol-control" title="Volume">
         <span class="vol-icon" id="vol-icon">&#9834;</span>
@@ -1177,6 +1177,49 @@ export function getPreviewHtml(): string {
         continue;
       }
     }
+  }
+
+  // Live media-rate badge (next to the time display): the ACTIVE scene's
+  // edited video, its mapped segment rate, and the measured actual advance.
+  function updateRateBadge(time) {
+    var el = document.getElementById('rate-badge');
+    if (!el) return;
+    var best = null;
+    for (var i = 0; i < (state.mediaClips || []).length; i++) {
+      var c = state.mediaClips[i];
+      if (c.kind !== 'scene-video' || c.isSpeaker || !c.edl) continue;
+      var visible = false;
+      try { visible = c.sceneEl.style.visibility !== 'hidden' && parseFloat(c.sceneEl.style.opacity || '0') > 0; } catch (eV) {}
+      if (!visible) continue;
+      var local = time - c.start;
+      if (local < 0 || local > (c.end - c.start)) continue;
+      best = { clip: c, m: edlMapClient(c.edl, local) };
+      break;
+    }
+    if (!best) { el.style.display = 'none'; state._rbPrev = null; return; }
+    var label, bg, fg;
+    if (best.m.frozen) {
+      label = '❄ frozen';
+      bg = '#e5e7eb'; fg = '#6b7280';
+      state._rbPrev = null;
+    } else {
+      var rate = best.m.rate;
+      var meas = '';
+      var ct = best.clip.el.currentTime;
+      var prev = state._rbPrev;
+      if (state.playing && prev && prev.clip === best.clip && time > prev.time + 0.3) {
+        var actual = (ct - prev.ct) / (time - prev.time);
+        if (isFinite(actual) && actual >= 0) meas = ' · actual ' + actual.toFixed(1) + '×';
+      }
+      state._rbPrev = { clip: best.clip, ct: ct, time: time };
+      label = '▶ ' + rate + '×' + meas;
+      bg = rate >= 6 ? '#fee2e2' : (rate > 1.2 ? '#fef3c7' : '#eef2ff');
+      fg = rate >= 6 ? '#b91c1c' : (rate > 1.2 ? '#92400e' : '#4338ca');
+    }
+    el.textContent = label;
+    el.style.display = 'inline-block';
+    el.style.background = bg;
+    el.style.color = fg;
   }
 
   // Core drift-correcting sync for a single element.
@@ -3737,6 +3780,17 @@ export function getPreviewHtml(): string {
       // Unified media sync (Phase 2)
       syncMedia(globalTime, true);
       state.forceSync = false;
+
+      // Live media-rate badge: ground truth for "is the 8x actually
+      // running". Shows the active edited video's MAPPED rate and the
+      // MEASURED source-seconds-per-film-second, so a map that says 8x
+      // while the picture crawls (buffer-bound stepping) is visible as
+      // "8x · actual 2.1x" instead of a mystery.
+      var nowRb = performance.now();
+      if (!state._rbTs || nowRb - state._rbTs > 400) {
+        state._rbTs = nowRb;
+        try { updateRateBadge(globalTime); } catch (eRB) {}
+      }
 
       // Debug heartbeat: once a second, the active scene's videos in one
       // line -- shows exactly when a clock freezes or readyState collapses.
