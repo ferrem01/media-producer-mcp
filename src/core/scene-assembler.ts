@@ -1382,7 +1382,15 @@ export function buildComponentScript(
     })();
 
     if (typeof createTimeline === 'function') {
-      var tl_${safeId} = createTimeline(el, data, ctx);
+      // One component throwing (e.g. a tween on an element a revise removed)
+      // must degrade to THAT scene rendering static -- not kill the whole
+      // document's boot and freeze the film.
+      var tl_${safeId} = null;
+      try {
+        tl_${safeId} = createTimeline(el, data, ctx);
+      } catch (eCT_${safeId}) {
+        try { console.error('[scene] createTimeline crashed for ${safeId}:', eCT_${safeId} && eCT_${safeId}.message); } catch (e2_${safeId}) {}
+      }
       if (tl_${safeId}) {
         master.add(tl_${safeId}, 0);
       }
