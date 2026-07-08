@@ -162,6 +162,31 @@ function staticBandFromEdge(prof: AxisProfile, fromEnd: boolean, threshold: numb
   return run;
 }
 
+/**
+ * A static band can overshoot real window chrome into the CONTENT's own
+ * static region (an app's fixed header stays put across every frame too --
+ * measured: a Safari recording read 157px "chrome" when the browser bar is
+ * 108px, the extra 49px being the app header's padding). Real chrome ends
+ * at a crisp horizontal seam (gray address bar -> white page); static page
+ * padding does not. Cut the band back to its deepest visible seam; keep the
+ * full band when there is none (uniform letterbox bars, gradient headers).
+ */
+function refineBandBySeam(prof: AxisProfile, fromEnd: boolean, band: number): number {
+  const n = prof.activity.length;
+  let best = -1;
+  // Stop 2 lines short of the band's end: the transition into the ACTIVE
+  // region is the band's own outer boundary (plus a blended row), not the
+  // chrome's inner edge -- counting it would always return the full band.
+  for (let i = 1; i < band - 2; i++) {
+    const a = fromEnd ? n - i : i - 1;
+    const b = fromEnd ? n - 1 - i : i;
+    const lumaJump = Math.abs(prof.meanLuma[b] - prof.meanLuma[a]);
+    const devJump = Math.abs(prof.spatialDev[b] - prof.spatialDev[a]);
+    if (lumaJump > 6 || devJump > 8) best = i;
+  }
+  return best > 0 ? best : band;
+}
+
 function classifyBand(prof: AxisProfile, fromEnd: boolean, band: number): TrimReason {
   // Flat + dark rows = letterbox bar; rows with visible detail = UI chrome.
   // Vote per row (majority) so a boundary row or two can't tip the class.
@@ -210,10 +235,13 @@ export async function analyzeVideoAsset(filePath: string): Promise<AssetIntel | 
 
   const measure = (prof: AxisProfile, fromEnd: boolean, srcPerLine: number, minSrcPx: number): EdgeTrim => {
     const maxBand = Math.floor(prof.activity.length * MAX_BAND_FRACTION);
-    const band = staticBandFromEdge(prof, fromEnd, threshold, maxBand);
+    let band = staticBandFromEdge(prof, fromEnd, threshold, maxBand);
+    if (band === 0) return { px: 0, reason: null };
+    const reason = classifyBand(prof, fromEnd, band);
+    if (reason === "static-chrome") band = refineBandBySeam(prof, fromEnd, band);
     const px = Math.round(band * srcPerLine);
     if (px < minSrcPx) return { px: 0, reason: null };
-    return { px, reason: classifyBand(prof, fromEnd, band) };
+    return { px, reason };
   };
 
   // Letterbox bars can be thin; chrome must clear MIN_CHROME_SRC_PX. Apply the
