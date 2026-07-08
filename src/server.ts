@@ -905,6 +905,11 @@ export function createMcpServer(): McpServer {
         blocks_applied: result.blocksApplied,
         full_rewrite: result.fullRewrite,
         defects: result.defects,
+        // Post-apply verification: declared CSS the browser did NOT honor
+        // (clamped by another rule, or the selector matched nothing). If
+        // non-empty, the visual change you asked for likely did NOT land --
+        // fix the named cause in a follow-up revise.
+        layout_warnings: result.layout_warnings,
         scene_html_bytes: result.sceneHtml?.length ?? 0,
       });
     },

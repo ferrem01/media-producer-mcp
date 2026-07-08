@@ -4557,6 +4557,7 @@ export function getPreviewHtml(): string {
         console.log('[studio] revise response:', res);
         if (!res || res.ok === false) { studioStatus('Failed: ' + ((res && res.error) || 'unknown'), 'err'); return; }
         var defs = res.defects || [];
+        var geo = res.layout_warnings || [];
         var n = res.blocks_applied != null ? res.blocks_applied : (res.blocksApplied || 0);
         var full = res.full_rewrite != null ? res.full_rewrite : res.fullRewrite;
         // Always report how much actually changed at the source so a no-op
@@ -4564,6 +4565,10 @@ export function getPreviewHtml(): string {
         var edits = full ? 'rewrote scene' : (n + ' edit' + (n === 1 ? '' : 's'));
         if (n === 0 && !full) {
           studioStatus('No change applied \\u2014 the revise did not match anything. Try rephrasing, or use Regenerate scene.', 'warn');
+        } else if (geo.length) {
+          // The patch was applied but the browser refused part of it -- that
+          // is the "revise said ok but nothing changed on screen" trap.
+          studioStatus('Applied (' + edits + ') but part did NOT take effect: ' + geo.join(' | '), 'warn');
         } else if (defs.length) {
           studioStatus('Updated (' + edits + ') \\u26a0 ' + defs.length + ' issue(s): ' + defs.map(function(d) { return d.detail; }).join('; '), 'warn');
         } else {

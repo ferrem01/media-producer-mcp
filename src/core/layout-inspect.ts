@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 import { assembleSceneAuto } from "./scene-assembler.js";
 import { resolveVideoPath } from "./video-path.js";
+import { loadAssetIntel, type AssetIntel } from "./asset-intel.js";
 import { loadProject } from "../persistence/project.js";
 import { config } from "../config.js";
 
@@ -44,6 +45,9 @@ export interface VideoLayoutFact {
   /** For cover: how many px of the (scaled) media are cropped per edge.
    *  For contain: negative values mean empty gutters instead. */
   crop?: { top: number; bottom: number; left: number; right: number; mode: "cropped" | "gutters" };
+  /** Ingest-time analysis of the SOURCE file (embedded chrome, letterbox,
+   *  content box, theme) from the asset's .intel.json sidecar, when present. */
+  source_intel?: AssetIntel;
   containers: AncestorFact[];
 }
 
@@ -179,6 +183,19 @@ function buildWarnings(inspection: LayoutInspection): string[] {
       if (edges.length) out.push(`<video ${v.descriptor}> letterboxes with empty gutters (${edges.join(", ")}) from object-fit:contain in a box that doesn't match its aspect.`);
     }
   }
+  for (const v of inspection.videos) {
+    const si = v.source_intel;
+    if (!si) continue;
+    if (si.has_own_chrome) {
+      out.push(
+        `<video ${v.descriptor}> SOURCE FOOTAGE contains its own window/browser chrome: the top ${si.trims.top.px}px of the ${si.width}x${si.height} recording is a static header. If this scene adds a mock browser/window frame around the video, the source's top ${si.trims.top.px}px must be cropped (e.g. the screencast-frame component's crop options, or an overscan viewport) or the result shows two stacked headers.`,
+      );
+    }
+    const bars = (["top", "bottom", "left", "right"] as const)
+      .filter((e) => si.trims[e].reason === "letterbox")
+      .map((e) => `${si.trims[e].px}px ${e}`);
+    if (bars.length) out.push(`<video ${v.descriptor}> SOURCE FOOTAGE has baked-in letterbox bars (${bars.join(", ")}); the real content box is ${si.content_box.w}x${si.content_box.h} at (${si.content_box.x},${si.content_box.y}).`);
+  }
   for (const el of inspection.elements || []) {
     if (el.position === "absolute" || el.position === "fixed") {
       out.push(`${el.descriptor} is position:${el.position} -- it ignores its parent's padding; size it via inset/width/height or move the parent's bounds instead.`);
@@ -304,11 +321,13 @@ export async function inspectSceneLayout(opts: {
     const videos: VideoLayoutFact[] = [];
     for (const v of raw.videos as any[]) {
       let intrinsic: { w: number; h: number } | null = null;
+      let sourceIntel: AssetIntel | null = null;
       if (v.src && /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(v.src)) {
         try {
           const p = resolveVideoPath(v.src);
           await fs.access(p);
           intrinsic = await probeVideoDimensions(p);
+          sourceIntel = await loadAssetIntel(p);
         } catch { /* unreadable media -> no intrinsic facts */ }
       }
       const fact: VideoLayoutFact = {
@@ -316,6 +335,7 @@ export async function inspectSceneLayout(opts: {
         objectFit: v.objectFit, objectPosition: v.objectPosition,
         intrinsic, containers: v.containers,
       };
+      if (sourceIntel) fact.source_intel = sourceIntel;
       if (intrinsic) fact.crop = cropMath(v.box, intrinsic, v.objectFit, v.objectPosition);
       videos.push(fact);
     }

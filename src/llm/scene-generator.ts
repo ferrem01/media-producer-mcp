@@ -14,6 +14,8 @@ import type { DraftScene } from "./storyboard-builder.js";
 import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransition } from "../core/types.js";
 import { formatBeatSheet } from "../core/beats.js";
 import type { Treatment } from "./creative-director.js";
+import { loadAssetIntel } from "../core/asset-intel.js";
+import { resolveVideoPath } from "../core/video-path.js";
 
 // ── Types ──
 
@@ -74,6 +76,25 @@ async function generateCodegenScene(
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (agentic-codegen)`);
 
   var effectiveSpec = codegenSpec;
+  // ── Source footage facts ──
+  // When the spec references real uploaded footage, append what ingest-time
+  // analysis learned about it (dimensions, embedded browser/window chrome,
+  // letterbox bars, theme). Without these facts the codegen guesses -- and a
+  // recording that carries its own browser header inside a mock browser
+  // frame ships with two stacked headers.
+  try {
+    var specVideoUrls: string[] = Array.from(new Set(
+      (effectiveSpec.match(/\/assets\/[^\s"'`)\]]+\.(?:mp4|webm|mov|m4v|ogv)/gi) || []),
+    ));
+    var factLines: string[] = [];
+    for (var svUrl of specVideoUrls) {
+      var svIntel = await loadAssetIntel(resolveVideoPath(svUrl));
+      if (svIntel) factLines.push(`- ${svUrl.split("/").pop()}: ${svIntel.notes.join(" ")}`);
+    }
+    if (factLines.length > 0) {
+      effectiveSpec += "\n\n## SOURCE FOOTAGE FACTS (measured -- trust these over guesses)\n" + factLines.join("\n");
+    }
+  } catch { /* facts are best-effort; the spec stands without them */ }
   console.log("  [codegen-spec] Scene \"" + draft.label + "\" has " + (draft.components?.length || 0) + " component hints, spec includes schemas: " + effectiveSpec.includes("Component Schemas"));
   console.log("  [codegen-spec] Full spec length:", effectiveSpec.length, "chars");
 
@@ -120,7 +141,7 @@ async function generateCodegenScene(
   if (missingComponents || missingFootage.length > 0) {
     var defectLines: string[] = [];
     if (missingComponents) defectLines.push(`the storyboard selected the vetted library components [${wantedComps.join(", ")}] but you embedded NONE of them -- you rebuilt everything as bespoke HTML, which produces flat, low-craft results. You MUST embed each via <component type="..." data='{...}' /> (schemas are in the spec).`);
-    if (missingFootage.length > 0) defectLines.push(`the spec names REAL footage (${missingFootage.join(", ")}) and your scene does not reference it -- you fabricated a mock instead of embedding the actual recording. You MUST include a <video> element (markup only: src + muted playsinline) for each named file, presented as the spec directs.`);
+    if (missingFootage.length > 0) defectLines.push(`the spec names REAL footage (${missingFootage.join(", ")}) and your scene does not reference it -- you fabricated a mock instead of embedding the actual recording. You MUST present each named file, preferably via <component type="screencast-frame" data='{"video_url":"...","frame_style":"macos-browser","crop":"auto"}' /> (or a bare markup <video src muted playsinline> for full-bleed moments), as the spec directs.`);
     console.warn(`  Scene ${opts.sceneIndex + 1}: structural defect(s) -- ${missingComponents ? "no <component> tags" : ""}${missingComponents && missingFootage.length ? " + " : ""}${missingFootage.length ? "dropped footage " + missingFootage.join(",") : ""} -- corrective retry`);
     try {
       var retryResult = await generateSceneAgentic({
