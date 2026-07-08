@@ -48,6 +48,7 @@ import { readTraces, dailyDigest } from "./trace/index.js";
 import { generateImage } from "./media/image-gen.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
 import { initTenantStoreFromFile } from "./auth/tenant-store.js";
+import { normalizeVideoForWeb } from "./core/video-normalize.js";
 import { spawn } from "node:child_process";
 import { openSync } from "node:fs";
 
@@ -1519,11 +1520,31 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           await fs.mkdir(upDir, { recursive: true });
           const upPath = path.join(upDir, upName);
           await fs.writeFile(upPath, fileBuffer);
+          // Videos must preview in the browser: remux/transcode anything
+          // Chrome can't play (HEVC/ProRes .mov -> black rectangle in
+          // Studio). Lossless remux for h264-in-mov; full transcode
+          // otherwise. May take a while for big ProRes files -- the HTTP
+          // client just waits (this is a curl-driven push path).
+          let finalPath = upPath;
+          let normalized: { action: string; videoCodec: string | null } | undefined;
+          try {
+            const norm = await normalizeVideoForWeb(upPath);
+            finalPath = norm.filePath;
+            if (norm.action !== "kept") {
+              normalized = { action: norm.action, videoCodec: norm.videoCodec };
+              console.log(`  upload-asset: ${upName} ${norm.action} (${norm.videoCodec}) -> ${path.basename(finalPath)}`);
+            }
+          } catch (normErr: any) {
+            console.warn(`  upload-asset: normalization skipped: ${normErr?.message || normErr}`);
+          }
+          const finalName = path.basename(finalPath);
+          const finalSize = (await fs.stat(finalPath)).size;
           jsonResponse(res, 200, {
             ok: true,
-            url: `/assets/${upTenant}/projects/${upProject}/assets/${upName}`,
-            path: upPath,
-            size: fileBuffer.length,
+            url: `/assets/${upTenant}/projects/${upProject}/assets/${finalName}`,
+            path: finalPath,
+            size: finalSize,
+            ...(normalized ? { normalized: true, normalize_action: normalized.action, original_codec: normalized.videoCodec, original_name: upName } : {}),
           });
         } catch (e: any) {
           jsonResponse(res, 500, { error: e?.message || String(e) });
