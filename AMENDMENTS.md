@@ -82,3 +82,42 @@ naming cleanup. See `SPEC.md` for the design.
   launch sites) if renders need to run in constrained/remote envs.
 - **[docs] `ARCHITECTURE.md` is stale** — still references `plan`/`brief`; current
   vocabulary is `storyboard`/`purpose`/`visual_notes`.
+
+## 2026-07-08 — Asset intelligence + screencast-frame + revise verification (PRs #216–#219)
+
+Born from a live incident: presenting a screen recording inside a browser frame took an
+hour of eyeballed percentages in Studio. Three capabilities close the gap:
+
+- **A — Asset intelligence at ingest** (`core/asset-intel.ts`): sample frames across an
+  uploaded video, classify rows/columns by temporal activity → per-edge trims (embedded
+  window/browser chrome, letterbox), content box, light/dark theme. Sidecar
+  `<file>.intel.json`; `POST /api/analyze-asset/{tenant}/{project}?name=` backfills.
+  Facts flow to codegen specs (`SOURCE FOOTAGE FACTS`), the layout tool (`source_intel`
+  + doubled-chrome warning), and `crop:"auto"`.
+- **B — `screencast-frame` rebuilt** into a real browser-frame component: markup `<video>`
+  (EDL/transport-safe), `frame_style` macos-browser|plain|none, frame = single clip shape,
+  `crop:"auto"` resolved from the sidecar at assembly (both assemblers + tag rewrite),
+  overscan math from intrinsic size, no self-fade. Codegen prompt + dropped-footage retry
+  now route real footage here instead of hand-rolled div mocks.
+- **D — revise verifies its own geometry**: diff the geometry-critical declarations a patch
+  changed, boot the revised scene once, compare declared vs rendered; clamped values name
+  the clamping rule (e.g. the `img,video{max-width:100%}` reset). `layout_warnings` in MCP
+  + HTTP responses and the Studio status line. Runs even with `skip_gates`.
+
+### Chrome-boundary accuracy (honest state)
+
+Three refinement passes: interior-seam cut (#217), detail-drop split (#218), hairline
+fine pass at native row resolution (#219). Synthetics land within ±4px across four
+regimes (gradient chrome, chrome+static app header, detailed chrome, hairline divider).
+On the real 99U Safari recording auto-detection reads **136px vs 108px ideal** (~14 CSS px
+extra crop into blank app-header padding): that toolbar has no divider hairline and its
+boundary step (Δ5 luma) is smaller than app-content steps below (Δ13) — no unsupervised
+ordering rule picks it without breaking other cases. Judged acceptable: the trim is a
+suggestion; components/agents/Studio can override with exact values.
+
+### Open items
+
+- Studio "crop source chrome" button = thin UI over the sidecar + `screencast-frame`.
+- Generation wall-clock (~37 min for a 4-scene narration video) needs profiling
+  (suspects: sequential per-scene codegen, huge scene files, critique regen loops).
+- Revise fast-gates once passed a boot-crashing scene (defects:[]) — still unexplained.
