@@ -200,19 +200,17 @@ export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineR
   // already have a narration track attached -- in either case auto-TTS would
   // double-voice the film and auto-music would fight the recording. This is
   // the pipeline-level backstop; callers apply the same rule up front.
-  if (opts.voiceover || opts.backgroundMusic) {
-    let hasNarration = !!opts.speaker_source;
-    if (!hasNarration && opts.project_id) {
-      try {
-        const existing = await loadProject(opts.tenant_id, opts.project_id);
-        hasNarration = !!(existing?.speaker_track?.clips?.length);
-      } catch { /* no existing project -- fresh build */ }
-    }
-    if (hasNarration) {
-      console.log("  Narration rule: speaker track present -> auto-TTS and auto-music disabled (the recording is the soundtrack).");
-      opts.voiceover = false;
-      opts.backgroundMusic = false;
-    }
+  let pipelineHasNarration = !!opts.speaker_source;
+  if (!pipelineHasNarration && opts.project_id) {
+    try {
+      const existing = await loadProject(opts.tenant_id, opts.project_id);
+      pipelineHasNarration = !!(existing?.speaker_track?.clips?.length);
+    } catch { /* no existing project -- fresh build */ }
+  }
+  if (pipelineHasNarration && (opts.voiceover || opts.backgroundMusic)) {
+    console.log("  Narration rule: speaker track present -> auto-TTS and auto-music disabled (the recording is the soundtrack).");
+    opts.voiceover = false;
+    opts.backgroundMusic = false;
   }
   var brandKit = opts.brandKit || DEFAULT_BRAND_KIT;
   var canvas = opts.canvas || DEFAULT_CANVAS;
@@ -2534,7 +2532,12 @@ async function runUnifiedPipeline(
   // narration, the overlap silently chops the final seconds of the audio.
   // Extend the LAST scene by the total overlap so the film outlasts the
   // recording.
-  if (project.speaker_track?.clips?.length && (format === "video" || format === "slideshow") && project.scenes.length > 1) {
+  // NOTE: check pipelineHasNarration (the ORIGINAL project / speaker_source),
+  // not just this working project -- storyboard builds run in a fresh project
+  // that doesn't carry the original's speaker track (the same scope bug the
+  // TTS gate had: the lock silently skipped and transitions chopped the last
+  // seconds of the recording).
+  if ((pipelineHasNarration || project.speaker_track?.clips?.length) && (format === "video" || format === "slideshow") && project.scenes.length > 1) {
     const overlap = project.scenes.slice(1).reduce(
       (s: number, sc: any) => s + (sc.transition_in?.duration_seconds || 0), 0);
     if (overlap > 0) {
