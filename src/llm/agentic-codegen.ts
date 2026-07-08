@@ -636,7 +636,12 @@ function buildBrandContext(brandKit: BrandKit): string {
     lines.push(
       "",
       `Border radius: use var(--mp-border-radius) [default: ${brandKit.style.border_radius || "12px"}]`,
-      `Motion: ${brandKit.style.motion || "cinematic"}`,
+      // The brand kit's "motion" describes the WEBSITE's hover/transition
+      // etiquette. Injected raw ("minimal"), it muzzles the film: scenes
+      // come out as static slides. Motion direction for the FILM comes from
+      // the treatment's motionPersonality; the website style only informs
+      // easing taste.
+      `Website motion etiquette: ${brandKit.style.motion || "cinematic"} -- this describes their SITE's hover/transition feel and informs your easing taste ONLY. It does NOT cap how much your scene moves: this is a FILM, motion is the storytelling medium, and a scene that just fades static cards in is a failure regardless of how "minimal" the website is. Follow the Creative Direction's Motion personality for energy.`,
     );
   }
   if (brandKit.logos?.length) {

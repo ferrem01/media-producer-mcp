@@ -98,6 +98,47 @@ async function generateCodegenScene(
 
   var sceneHtml = stripHtmlFences(agenticResult.html);
 
+  // ── Component-usage enforcement (deterministic) ──
+  // The storyboard chose vetted library components and the system prompt says
+  // rebuilding them by hand is a bug -- but an instruction without a check
+  // ships non-compliance silently (measured: whole projects generated with a
+  // 125-entry catalog and ZERO <component> tags). One corrective retry.
+  var wantedComps = (Array.isArray(draft.components) ? draft.components : [])
+    .filter((c: any) => typeof c === "string" && c !== "video");
+  if (wantedComps.length > 0 && !sceneHtml.includes("<component ")) {
+    console.warn(`  Scene ${opts.sceneIndex + 1}: storyboard chose [${wantedComps.join(", ")}] but codegen embedded NO <component> tags -- corrective retry`);
+    try {
+      var retryResult = await generateSceneAgentic({
+        sceneSpec: effectiveSpec,
+        sceneLabel: draft.label,
+        sceneDescription: draft.purpose || draft.visual_notes,
+        sceneDuration: draft.duration_seconds || 5,
+        sceneIndex: opts.sceneIndex,
+        totalScenes: opts.totalScenes,
+        prompt: opts.prompt,
+        llmConfig: opts.llmConfig,
+        brandKit: opts.brandKit,
+        canvas: opts.canvas,
+        critiqueFeedback: `${opts.critiqueFeedback ? opts.critiqueFeedback + "\n\n" : ""}STRUCTURAL DEFECT in your previous attempt: the storyboard selected the vetted library components [${wantedComps.join(", ")}] for this scene, but you embedded NONE of them -- you rebuilt everything as bespoke HTML, which produces flat, low-craft results. You MUST embed each of these via <component type="..." data='{...}' /> (schemas are in the spec) and write custom code only for layout, backgrounds, and connective motion around them.`,
+        referenceImages: opts.referenceImages,
+        treatment: opts.treatment,
+        brollVideoUrl: opts.brollVideoUrl,
+        heroImageUrl: opts.imageUrl,
+        elements: Array.isArray(draft.elements) ? draft.elements : undefined,
+      });
+      var retryHtml = stripHtmlFences(retryResult.html);
+      if (retryHtml.includes("<component ")) {
+        sceneHtml = retryHtml;
+        agenticResult = retryResult;
+        console.log(`  Scene ${opts.sceneIndex + 1}: corrective retry embedded library components ✓`);
+      } else {
+        console.warn(`  Scene ${opts.sceneIndex + 1}: retry still has no <component> tags -- shipping bespoke version`);
+      }
+    } catch (e: any) {
+      console.warn(`  Scene ${opts.sceneIndex + 1}: component-enforcement retry failed (${e?.message || e}) -- shipping first version`);
+    }
+  }
+
   var customSources = new Map<string, string>();
   customSources.set(compName, sceneHtml);
 
