@@ -1602,28 +1602,34 @@ export function createMcpServer(): McpServer {
                   origProject.audio = generatedProject.audio;
                   origProject.assets = generatedProject.assets;
                   origProject.canvas = generatedProject.canvas;
-                  origProject.speaker_track = generatedProject.speaker_track;
+                  // Never WIPE a speaker track the user already attached: the
+                  // pipeline only produces one in speaker-source mode, so an
+                  // undefined here used to clobber a narration set via `add`.
+                  if (generatedProject.speaker_track) origProject.speaker_track = generatedProject.speaker_track;
                   origProject.status = "generated";
                   origProject.updated_at = new Date().toISOString();
                   await saveProject(origProject);
 
-                  // Copy component HTML files and voiceover audio from new project to original
+                  // Copy component HTML, voiceover audio, and downloaded assets
+                  // from the working-copy project to the original. Recursive
+                  // (component dirs can nest) and LOUD on failure -- a silent
+                  // skip here leaves the original with scenes that reference
+                  // components it doesn't have (an empty preview).
                   const srcDir = projectDir(params.tenant_id, newProjectId);
                   const dstDir = projectDir(params.tenant_id, params.project_id!);
-                  for (const subdir of ["components", "voiceover"]) {
+                  for (const subdir of ["components", "voiceover", "assets"]) {
                     const srcSub = path.join(srcDir, subdir);
                     const dstSub = path.join(dstDir, subdir);
                     try {
-                      const entries = await fs.readdir(srcSub);
-                      if (entries.length > 0) {
-                        await fs.mkdir(dstSub, { recursive: true });
-                        for (const entry of entries) {
-                          await fs.copyFile(path.join(srcSub, entry), path.join(dstSub, entry));
-                        }
-                        console.log(`  Build-from-storyboard: copied ${entries.length} ${subdir} files`);
-                      }
+                      await fs.access(srcSub);
                     } catch {
-                      // Directory may not exist, skip
+                      continue; // nothing generated for this subdir
+                    }
+                    try {
+                      await fs.cp(srcSub, dstSub, { recursive: true, force: true });
+                      console.log(`  Build-from-storyboard: copied ${subdir}/ from ${newProjectId}`);
+                    } catch (copyErr: any) {
+                      console.error(`  Build-from-storyboard: FAILED to copy ${subdir}/ from ${newProjectId}: ${copyErr?.message || copyErr}`);
                     }
                   }
 
