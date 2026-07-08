@@ -244,11 +244,17 @@ function buildBrandSummary(brandKit: BrandKit): string {
     lines.push(`Fonts: ${brandKit.fonts.map(f => f.family).join(", ")}`);
   }
   if (brandKit.style?.motion) {
-    lines.push(`Motion style: ${brandKit.style.motion}`);
+    lines.push(`Website motion etiquette: ${brandKit.style.motion} (their SITE's hover/transition feel -- taste input only)`);
   }
   if (brandKit.guidelines) {
     lines.push(`\nBrand guidelines: ${brandKit.guidelines}`);
   }
+  lines.push(
+    `\nIMPORTANT -- these guidelines describe the brand's STATIC identity and its website's` +
+    ` micro-interaction etiquette. You are directing a FILM. "Minimal"/"understated" website` +
+    ` motion never means a slideshow of static cards: your motionPersonality must direct real` +
+    ` cinematic motion (build, reveal, transform, choreography) executed with the brand's taste level.`,
+  );
   return lines.join("\n");
 }
 
