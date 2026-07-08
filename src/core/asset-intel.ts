@@ -173,15 +173,34 @@ function staticBandFromEdge(prof: AxisProfile, fromEnd: boolean, threshold: numb
  */
 function refineBandBySeam(prof: AxisProfile, fromEnd: boolean, band: number): number {
   const n = prof.activity.length;
+  const at = (i: number) => (fromEnd ? n - 1 - i : i); // i-th line counted from this edge
+
+  // Primary signal: browser/window chrome is DENSE with detail (tab strip,
+  // URL text, buttons -- high spatial deviation); the page area right below
+  // it is flat padding. The chrome boundary is the split that maximizes
+  // (mean detail before) - (mean detail after) within the static band. A
+  // plain luminance seam can be as small as 5 units (near-white Safari
+  // toolbar on a near-white page) while an app header's own edges jump more,
+  // so luma-seam-only refinement picks the wrong boundary on real footage.
+  let bestSplit = -1, bestScore = 2.5; // minimum meaningful contrast in detail
+  for (let i = 2; i < band - 3; i++) {
+    let before = 0, after = 0;
+    for (let k = 0; k <= i; k++) before += prof.spatialDev[at(k)];
+    for (let k = i + 1; k < band; k++) after += prof.spatialDev[at(k)];
+    const score = before / (i + 1) - after / (band - i - 1);
+    if (score > bestScore) { bestScore = score; bestSplit = i + 1; }
+  }
+  if (bestSplit > 0) return bestSplit;
+
+  // Fallback (flat-detail chrome, e.g. a plain title bar): deepest interior
+  // luminance/detail seam. Stop 2 lines short of the band's end -- the
+  // transition into the ACTIVE region is the band's own outer boundary (plus
+  // a blended row), not the chrome's inner edge; counting it would always
+  // return the full band.
   let best = -1;
-  // Stop 2 lines short of the band's end: the transition into the ACTIVE
-  // region is the band's own outer boundary (plus a blended row), not the
-  // chrome's inner edge -- counting it would always return the full band.
   for (let i = 1; i < band - 2; i++) {
-    const a = fromEnd ? n - i : i - 1;
-    const b = fromEnd ? n - 1 - i : i;
-    const lumaJump = Math.abs(prof.meanLuma[b] - prof.meanLuma[a]);
-    const devJump = Math.abs(prof.spatialDev[b] - prof.spatialDev[a]);
+    const lumaJump = Math.abs(prof.meanLuma[at(i)] - prof.meanLuma[at(i - 1)]);
+    const devJump = Math.abs(prof.spatialDev[at(i)] - prof.spatialDev[at(i - 1)]);
     if (lumaJump > 6 || devJump > 8) best = i;
   }
   return best > 0 ? best : band;
