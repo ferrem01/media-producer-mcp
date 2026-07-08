@@ -1,22 +1,57 @@
 {
   "type": "screencast-frame",
-  "label": "Screencast Frame",
+  "label": "Screencast / Browser Frame",
   "category": "media",
-  "description": "Displays a screen recording (video) or screenshot (still image) inside a clean device-style viewport frame. Provide video_url for a clip or image_url for a still.",
+  "description": "THE component for presenting real screen recordings (or screenshots) -- never hand-roll a browser mock around a <video>. Renders the footage in a polished device frame: frame_style 'macos-browser' draws a mac window bar (traffic lights + address pill), 'plain' is a clean rounded card, 'none' is edge-to-edge. crop:'auto' reads the footage's ingest analysis and crops any window chrome the RECORDING ITSELF contains (a screencast of a full browser window carries its own address bar -- framing it without cropping shows two stacked headers).",
   "data": {
     "video_url": {
       "type": "string",
-      "label": "Video URL",
+      "label": "Video URL (/assets/... recording)",
       "optional": true
     },
     "image_url": {
       "type": "string",
-      "label": "Image URL",
+      "label": "Image URL (screenshot alternative)",
       "optional": true
+    },
+    "frame_style": {
+      "type": "string",
+      "label": "Frame style: none | plain | macos-browser",
+      "optional": true,
+      "default": "plain"
+    },
+    "url_text": {
+      "type": "string",
+      "label": "Address bar text (macos-browser only)",
+      "optional": true
+    },
+    "crop": {
+      "type": "object",
+      "label": "Source crop: 'auto' (recommended -- uses ingest analysis) or {top,bottom,left,right} in SOURCE pixels",
+      "optional": true,
+      "default": "auto"
+    },
+    "corner_radius": {
+      "type": "number",
+      "label": "Frame corner radius px",
+      "optional": true,
+      "default": 16
+    },
+    "max_width_pct": {
+      "type": "number",
+      "label": "Frame width as % of the component box",
+      "optional": true,
+      "default": 90
+    },
+    "shadow": {
+      "type": "boolean",
+      "label": "Window shadow",
+      "optional": true,
+      "default": true
     },
     "video_start_at": {
       "type": "number",
-      "label": "Video Start Time (seconds)",
+      "label": "Video start time (seconds)",
       "optional": true,
       "default": 0
     }

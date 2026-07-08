@@ -1,11 +1,21 @@
 <template>
-  <div class="screencast-frame">
-    <div class="screencast-viewport"></div>
+  <div class="scf-stage">
+    <div class="scf-frame">
+      <div class="scf-chrome">
+        <span class="scf-dot scf-dot--red"></span>
+        <span class="scf-dot scf-dot--yellow"></span>
+        <span class="scf-dot scf-dot--green"></span>
+        <span class="scf-url">{{url_text}}</span>
+      </div>
+      <div class="scf-viewport">
+        <video class="scf-media" src="{{video_url}}" muted playsinline preload="auto"></video>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-  .screencast-frame {
+  .scf-stage {
     width: 100%;
     height: 100%;
     display: flex;
@@ -13,15 +23,65 @@
     justify-content: center;
   }
 
-  .screencast-viewport {
-    width: 100%;
-    height: 100%;
-    border-radius: 12px;
+  /* The frame is the SINGLE clip shape: rounded corners + overflow hidden
+     here, radius 0 on everything inside, so nothing bleeds past the curves. */
+  .scf-frame {
+    position: relative;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
-    box-shadow:
-      0 30px 80px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    background: #16161a;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28), 0 4px 16px rgba(0, 0, 0, 0.18);
+  }
+
+  .scf-chrome {
+    display: none; /* shown for frame_style: macos-browser */
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.45em;
+    background: #e7e7ea;
+    padding: 0 1.1em;
+    border-radius: 0;
+  }
+
+  .scf-dot { width: 0.62em; height: 0.62em; border-radius: 50%; display: inline-block; }
+  .scf-dot--red { background: #ff5f57; }
+  .scf-dot--yellow { background: #febc2e; }
+  .scf-dot--green { background: #28c840; }
+
+  .scf-url {
+    margin-left: auto;
+    margin-right: auto;
+    background: #d9d9de;
+    color: #4a4a52;
+    border-radius: 0.45em;
+    padding: 0.22em 1.4em;
+    font-size: 0.72em;
+    font-family: -apple-system, 'Inter', sans-serif;
+    white-space: nowrap;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Overscan viewport: aspect-ratio + video offsets are computed by the
+     script from the source's content box (crop). */
+  .scf-viewport {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0;
+    width: 100%;
+    background: #000;
+  }
+
+  .scf-media {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    max-width: none; /* the global img,video reset clamps overscan widths */
+    display: block;
     background: #000;
   }
 </style>
@@ -29,41 +89,118 @@
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var viewport = el.querySelector('.screencast-viewport');
+    var stage = el.querySelector('.scf-stage');
+    var frame = el.querySelector('.scf-frame');
+    var chrome = el.querySelector('.scf-chrome');
+    var viewport = el.querySelector('.scf-viewport');
+    var media = el.querySelector('.scf-media');
 
-    if (data.video_url) {
-      var video = document.createElement('video');
-      video.src = data.video_url;
-      video.muted = true;
-      video.playsInline = true;
-      video.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;background:#000';
-      if (data.video_start_at) video.setAttribute('data-start-at', String(data.video_start_at));
-      viewport.appendChild(video);
-    } else if (data.image_url) {
-      viewport.style.backgroundImage = 'url(' + data.image_url + ')';
-      viewport.style.backgroundSize = 'contain';
-      viewport.style.backgroundPosition = 'center';
-      viewport.style.backgroundRepeat = 'no-repeat';
+    var frameStyle = data.frame_style || 'plain'; // none | plain | macos-browser
+    var isImage = !data.video_url && data.image_url;
+
+    // Image mode: swap the (empty-src) video for an <img> with identical
+    // crop/overscan behavior. Videos are markup-only; images are fair game.
+    if (isImage) {
+      var img = document.createElement('img');
+      img.className = media.className;
+      img.src = data.image_url;
+      media.parentNode.replaceChild(img, media);
+      media = img;
+    } else if (!data.video_url) {
+      media.removeAttribute('src'); // no source at all: keep an empty dark frame
+    }
+    if (!isImage && data.video_start_at) {
+      media.setAttribute('data-start-at', String(data.video_start_at));
     }
 
-    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
-    var frame = el.querySelector('.screencast-frame');
-
-    gsap.set(frame, { autoAlpha: 0, scale: 0.95, y: 30 });
-
-    tl.to(frame, {
-      autoAlpha: 1, scale: 1, y: 0,
-      duration: speed,
-      ease: 'power3.out'
-    }, 0.2);
-
-    if (ctx.duration > 2) {
-      tl.to(frame, {
-        autoAlpha: 0, scale: 0.97, y: -15,
-        duration: 0.5,
-        ease: 'power2.in'
-      }, ctx.duration - 0.6);
+    // ── Crop resolution ──
+    // data.crop is either an object {top,bottom,left,right} in SOURCE pixels
+    // (the assembler resolves crop:"auto" from the asset's ingest analysis)
+    // or still "auto" when no sidecar existed at assembly -- then we try the
+    // sidecar over HTTP and fall back to no crop.
+    function normCrop(c) {
+      c = c && typeof c === 'object' ? c : {};
+      return {
+        top: Math.max(0, Number(c.top) || 0),
+        bottom: Math.max(0, Number(c.bottom) || 0),
+        left: Math.max(0, Number(c.left) || 0),
+        right: Math.max(0, Number(c.right) || 0)
+      };
     }
+    var crop = normCrop(data.crop === 'auto' ? null : data.crop);
+    if (data.crop === 'auto' && data.video_url && typeof fetch === 'function') {
+      try {
+        fetch(data.video_url + '.intel.json').then(function (r) { return r.ok ? r.json() : null; }).then(function (intel) {
+          if (intel && intel.trims) {
+            crop = normCrop({
+              top: intel.trims.top.px, bottom: intel.trims.bottom.px,
+              left: intel.trims.left.px, right: intel.trims.right.px
+            });
+            layout();
+          }
+        }).catch(function () {});
+      } catch (e) {}
+    }
+
+    // ── Geometry ──
+    // The frame is sized so the whole window (chrome bar + viewport) fits the
+    // component box; the viewport takes the CONTENT box's aspect; the media
+    // overscans the viewport by the crop amounts so the source's own chrome /
+    // letterbox sits outside the clip. All values are proportional, so the
+    // math holds at any frame size.
+    function layout() {
+      var srcW = 1920, srcH = 1080;
+      if (!isImage && media.videoWidth) { srcW = media.videoWidth; srcH = media.videoHeight; }
+      else if (isImage && media.naturalWidth) { srcW = media.naturalWidth; srcH = media.naturalHeight; }
+      var cw = Math.max(1, srcW - crop.left - crop.right);
+      var chh = Math.max(1, srcH - crop.top - crop.bottom);
+      var ar = cw / chh;
+
+      var stageBox = stage.getBoundingClientRect();
+      if (stageBox.width < 4 || stageBox.height < 4) return;
+      var full = frameStyle === 'none';
+      var maxWPct = full ? 100 : Math.min(100, Math.max(20, Number(data.max_width_pct) || 90));
+      var padV = full ? 1.0 : 0.94;
+
+      var frameW = stageBox.width * (maxWPct / 100);
+      var chromeH = frameStyle === 'macos-browser' ? Math.min(64, Math.max(40, frameW * 0.034)) : 0;
+      var maxH = stageBox.height * padV;
+      if (frameW / ar + chromeH > maxH) frameW = Math.max(1, (maxH - chromeH) * ar);
+      chromeH = frameStyle === 'macos-browser' ? Math.min(64, Math.max(40, frameW * 0.034)) : 0;
+
+      var radius = full ? 0 : (data.corner_radius === undefined ? 16 : Math.max(0, Number(data.corner_radius) || 0));
+      frame.style.width = frameW + 'px';
+      frame.style.borderRadius = radius + 'px';
+      if (full || data.shadow === false) frame.style.boxShadow = 'none';
+
+      if (frameStyle === 'macos-browser') {
+        chrome.style.display = 'flex';
+        chrome.style.height = chromeH + 'px';
+        chrome.style.fontSize = Math.max(12, chromeH * 0.36) + 'px';
+        if (!data.url_text) { var u = chrome.querySelector('.scf-url'); if (u) u.style.visibility = 'hidden'; }
+      } else {
+        chrome.style.display = 'none';
+      }
+
+      viewport.style.aspectRatio = cw + ' / ' + chh;
+      media.style.width = (srcW / cw) * 100 + '%';
+      media.style.left = (-crop.left / cw) * 100 + '%';
+      media.style.top = (-crop.top / chh) * 100 + '%';
+    }
+
+    layout();
+    if (!isImage) {
+      if (media.readyState >= 1) layout();
+      media.addEventListener('loadedmetadata', layout);
+    } else {
+      if (media.complete) layout(); else media.addEventListener('load', layout);
+    }
+
+    // Entrance only -- real footage NEVER fades itself out; the scene or a
+    // transition decides how it ends.
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 0.9;
+    gsap.set(frame, { autoAlpha: 0, scale: 0.97, y: 24 });
+    tl.to(frame, { autoAlpha: 1, scale: 1, y: 0, duration: speed, ease: 'power3.out' }, 0.15);
 
     return tl;
   }

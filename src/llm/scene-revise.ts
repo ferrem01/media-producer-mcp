@@ -56,6 +56,9 @@ export interface ReviseSceneResult {
   sceneHtml?: string;
   /** Fast-gate findings (empty = clean). */
   defects?: { type: string; detail: string }[];
+  /** Post-apply verification: CSS the patch declared that the browser did NOT
+   *  honor (clamped/overridden/selector matched nothing). Empty = geometry took. */
+  layout_warnings?: string[];
   /** Undo only: whether a prior version was restored, and how many remain. */
   restored?: boolean;
   remaining?: number;
@@ -165,6 +168,165 @@ async function runFastGates(
   return defects;
 }
 
+// ── Post-apply geometry verification ──
+// A revise can "succeed" while the browser quietly refuses the change: a
+// global reset clamps the width, a later rule wins the cascade, a selector
+// typo matches nothing. The patch DECLARED it; nothing checked it RENDERED.
+// So: diff the geometry-critical declarations the patch changed, boot the
+// revised scene once, and compare declared vs rendered. Runs even with
+// skipGates -- it verifies the revise itself, not scene quality.
+
+const GEO_PROPS = new Set([
+  "width", "height", "left", "top", "right", "bottom",
+  "max-width", "max-height", "aspect-ratio", "border-radius",
+  "object-fit", "object-position",
+]);
+
+interface GeoCheck { selector: string; prop: string; value: string }
+
+export function extractGeoDecls(source: string): Map<string, Record<string, string>> {
+  const styleMatch = source.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const css = (styleMatch?.[1] || "").replace(/\/\*[\s\S]*?\*\//g, "");
+  const out = new Map<string, Record<string, string>>();
+  const ruleRe = /([^{}]+)\{([^{}]*)\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = ruleRe.exec(css))) {
+    const selector = m[1].trim();
+    if (!selector || selector.startsWith("@")) continue;
+    const decls: Record<string, string> = {};
+    for (const d of m[2].split(";")) {
+      const i = d.indexOf(":");
+      if (i < 0) continue;
+      const prop = d.slice(0, i).trim().toLowerCase();
+      const value = d.slice(i + 1).trim().replace(/!important\s*$/i, "").trim();
+      if (GEO_PROPS.has(prop) && value) decls[prop] = value;
+    }
+    if (Object.keys(decls).length) out.set(selector, { ...(out.get(selector) || {}), ...decls });
+  }
+  return out;
+}
+
+/** Geometry declarations present/changed in the new source vs the old one. */
+export function changedGeoChecks(oldSource: string, newSource: string): GeoCheck[] {
+  const before = extractGeoDecls(oldSource);
+  const after = extractGeoDecls(newSource);
+  const checks: GeoCheck[] = [];
+  for (const [selector, decls] of after) {
+    if (selector.includes(":")) continue; // pseudo-classes/-elements: not queryable as-is
+    const prev = before.get(selector) || {};
+    for (const [prop, value] of Object.entries(decls)) {
+      if (prev[prop] === value) continue;
+      if (/var\(|calc\(|auto|inherit|initial|unset/i.test(value)) continue; // not comparable
+      checks.push({ selector, prop, value });
+    }
+  }
+  return checks.slice(0, 24);
+}
+
+/** Boot the revised scene and compare each declared value with the rendered one. */
+export async function verifyAppliedGeometry(
+  scene: any, sources: { type: string; source: string }[], project: any,
+  revisionId: string, checks: GeoCheck[],
+): Promise<string[]> {
+  if (!checks.length) return [];
+  const { chromium } = await import("playwright");
+  const canvas = project.canvas || { width: 1920, height: 1080 };
+  const tmpDir = path.join(os.tmpdir(), `revise_verify_${revisionId.replace(/[^a-z0-9]/gi, "_")}`);
+  await fs.mkdir(tmpDir, { recursive: true });
+  const htmlPath = path.join(tmpDir, "scene.html");
+  const warnings: string[] = [];
+  let browser;
+  try {
+    const html = await assembleSceneAuto({
+      scene, components: sources, brandKit: project.brand_kit, canvas,
+      gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: false,
+    });
+    await fs.writeFile(htmlPath, html);
+    browser = await chromium.launch({
+      args: [
+        "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox",
+        "--allow-file-access-from-files", "--mute-audio", "--no-first-run",
+      ],
+      ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+    });
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: canvas.width, height: canvas.height });
+    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+    try {
+      await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 12000 });
+    } catch { /* verify against whatever settled */ }
+
+    const results = await page.evaluate((cks: GeoCheck[]) => {
+      return cks.map((c) => {
+        let el: Element | null = null;
+        try { el = document.querySelector(c.selector); } catch { return { c, status: "bad-selector" }; }
+        if (!el) return { c, status: "not-found" };
+        const cs = getComputedStyle(el);
+        const camel = c.prop.replace(/-([a-z])/g, (_s, g) => g.toUpperCase());
+        const rect = el.getBoundingClientRect();
+        const p = el.parentElement;
+        const pbox = p ? p.getBoundingClientRect() : rect;
+        return {
+          c, status: "ok",
+          computed: (cs as any)[camel] ?? cs.getPropertyValue(c.prop),
+          rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
+          pbox: { x: pbox.left, y: pbox.top, w: pbox.width, h: pbox.height },
+          maxWidth: cs.maxWidth, maxHeight: cs.maxHeight,
+        };
+      });
+    }, checks);
+
+    for (const r of results as any[]) {
+      const { selector, prop, value } = r.c;
+      const decl = `${selector} { ${prop}: ${value} }`;
+      if (r.status === "bad-selector") continue;
+      if (r.status === "not-found") {
+        warnings.push(`${decl} -- selector matches NO element in the rendered scene (typo, or the element is created later by script).`);
+        continue;
+      }
+      const pctMatch = value.match(/^(-?\d+(?:\.\d+)?)%$/);
+      if (pctMatch && ["width", "height", "left", "top", "right", "bottom"].includes(prop)) {
+        const pct = Number(pctMatch[1]) / 100;
+        const horizontal = prop === "width" || prop === "left" || prop === "right";
+        const base = horizontal ? r.pbox.w : r.pbox.h;
+        const expected = pct * base;
+        const actual = prop === "width" ? r.rect.w
+          : prop === "height" ? r.rect.h
+          : prop === "left" ? r.rect.x - r.pbox.x
+          : prop === "top" ? r.rect.y - r.pbox.y
+          : prop === "right" ? (r.pbox.x + r.pbox.w) - (r.rect.x + r.rect.w)
+          : (r.pbox.y + r.pbox.h) - (r.rect.y + r.rect.h);
+        if (Math.abs(expected - actual) > 2.5) {
+          let culprit = "";
+          if (prop === "width" && r.maxWidth !== "none") culprit = ` -- clamped by max-width: ${r.maxWidth} (likely the global img,video reset; add max-width: none)`;
+          if (prop === "height" && r.maxHeight !== "none") culprit = ` -- clamped by max-height: ${r.maxHeight}`;
+          warnings.push(`${decl} did NOT take: rendered ${Math.round(actual)}px, the declaration implies ${Math.round(expected)}px${culprit}.`);
+        }
+        continue;
+      }
+      const pxMatch = value.match(/^(-?\d+(?:\.\d+)?)px$/);
+      const computed = String(r.computed || "").trim();
+      if (pxMatch) {
+        const computedPx = parseFloat(computed);
+        if (Number.isFinite(computedPx) && Math.abs(computedPx - Number(pxMatch[1])) > 1.5) {
+          warnings.push(`${decl} did NOT take: computed value is ${computed} (another rule wins the cascade).`);
+        }
+        continue;
+      }
+      const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+      if (computed && norm(computed) !== norm(value) && !computed.includes("(")) {
+        warnings.push(`${decl} did NOT take: computed value is "${computed}" (another rule wins the cascade).`);
+      }
+    }
+  } catch (e: any) {
+    console.warn(`  [revise] geometry verification skipped: ${e?.message || e}`);
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+  return warnings;
+}
+
 export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneResult> {
   if (!opts.instruction?.trim()) return { ok: false, error: "instruction is required" };
 
@@ -245,6 +407,19 @@ export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneRes
 
   const defects = opts.skipGates ? [] : await runFastGates(scene, sources, project, revisionId);
 
+  // Verify the patch's own geometry landed (runs even with skipGates -- this
+  // checks the revise, not the scene). Best-effort: never blocks the result.
+  let layoutWarnings: string[] = [];
+  try {
+    const checks = changedGeoChecks(existingSource, revised.source);
+    if (checks.length) {
+      layoutWarnings = await verifyAppliedGeometry(scene, sources, project, revisionId, checks);
+      for (const w of layoutWarnings) console.warn(`  [revise] geometry: ${w}`);
+    }
+  } catch (e: any) {
+    console.warn(`  [revise] geometry verification failed: ${e?.message || e}`);
+  }
+
   return {
     ok: true,
     blocksApplied: revised.blocksApplied,
@@ -253,6 +428,7 @@ export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneRes
     revisionId,
     sceneHtml,
     defects,
+    layout_warnings: layoutWarnings,
   };
 }
 

@@ -49,6 +49,7 @@ import { generateImage } from "./media/image-gen.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
 import { initTenantStoreFromFile } from "./auth/tenant-store.js";
 import { normalizeVideoForWeb } from "./core/video-normalize.js";
+import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/asset-intel.js";
 import { spawn } from "node:child_process";
 import { openSync } from "node:fs";
 
@@ -1539,13 +1540,55 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           }
           const finalName = path.basename(finalPath);
           const finalSize = (await fs.stat(finalPath)).size;
+          // Asset intelligence: understand the footage once, at ingest --
+          // dimensions, embedded window chrome, letterboxing, theme -- and
+          // persist it as a <file>.intel.json sidecar for codegen/components.
+          let intel: AssetIntel | null = null;
+          if (isAnalyzableVideo(finalPath)) {
+            intel = await analyzeAndSaveIntel(finalPath).catch((e: any) => {
+              console.warn(`  upload-asset: intel analysis skipped: ${e?.message || e}`);
+              return null;
+            });
+            if (intel) console.log(`  upload-asset: intel for ${finalName}: ${intel.notes.join(" | ")}`);
+          }
           jsonResponse(res, 200, {
             ok: true,
             url: `/assets/${upTenant}/projects/${upProject}/assets/${finalName}`,
             path: finalPath,
             size: finalSize,
             ...(normalized ? { normalized: true, normalize_action: normalized.action, original_codec: normalized.videoCodec, original_name: upName } : {}),
+            ...(intel ? { intel } : {}),
           });
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
+      // ── API: (Re-)analyze an existing asset ──
+      // POST /api/analyze-asset/{tenant}/{project}?name=file.mp4 runs the
+      // same asset-intelligence pass the upload path runs, for assets that
+      // predate it (or to refresh after editing the file). Writes the
+      // <file>.intel.json sidecar and returns the intel.
+      const analyzeAssetMatch = urlPath.match(/^\/api\/analyze-asset\/([^/]+)\/([^/]+)$/);
+      if (analyzeAssetMatch && method === "POST") {
+        const [, anTenant, anProject] = analyzeAssetMatch.map(decodeURIComponent);
+        const anQuery = new URL(req.url || "/", "http://localhost").searchParams;
+        const anName = path.basename(anQuery.get("name") || "").replace(/[^a-zA-Z0-9._-]/g, "_");
+        if (!anName) { jsonResponse(res, 400, { error: "name query param is required" }); return; }
+        const anPath = path.join(config.dataDir, anTenant, "projects", anProject, "assets", anName);
+        try {
+          await fs.access(anPath);
+        } catch {
+          jsonResponse(res, 404, { error: `asset not found: ${anName}` });
+          return;
+        }
+        if (!isAnalyzableVideo(anPath)) { jsonResponse(res, 400, { error: "not an analyzable video type" }); return; }
+        try {
+          const intel = await analyzeAndSaveIntel(anPath);
+          if (!intel) { jsonResponse(res, 422, { error: "analysis produced no result (undecodable or degenerate video)" }); return; }
+          console.log(`  analyze-asset: ${anName}: ${intel.notes.join(" | ")}`);
+          jsonResponse(res, 200, { ok: true, intel });
         } catch (e: any) {
           jsonResponse(res, 500, { error: e?.message || String(e) });
         }

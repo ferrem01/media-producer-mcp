@@ -18,6 +18,7 @@ import { resolveComponentTags, buildComponentTimelineScript } from "./component-
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types.js";
 import { beatTimeline } from "./beats.js";
+import { resolveAutoCropData, resolveScreencastAutoCrops } from "./asset-intel.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -159,7 +160,8 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
 
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol
-    const resolvedData = resolveAssetUrls(comp.data, preview, speakerUrl);
+    const preData = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : comp.data;
+    const resolvedData = resolveAssetUrls(preData, preview, speakerUrl);
     let boundHtml = bindTemplate(parsed.template, resolvedData);
 
     // Codegen scenes without <component> tags route through here -- resolve
@@ -698,6 +700,11 @@ export async function assembleCodegenScene(options: {
   if (speakerUrl) {
     sceneParsed.template = resolveSpeakerVideoTags(sceneParsed.template, speakerUrl, options.speakerOffset || 0);
   }
+
+  // Resolve crop:"auto" on screencast-frame tags from the footage's ingest
+  // analysis (asset-intel sidecar) before tag binding -- the browser gets
+  // concrete per-edge trims, not a sentinel.
+  sceneParsed.template = await resolveScreencastAutoCrops(sceneParsed.template);
 
   // 2. Build component source map for tag resolution
   const rawSourceMap = new Map<string, string>();

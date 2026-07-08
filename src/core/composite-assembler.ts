@@ -31,6 +31,7 @@ import {
   mediaEdlScript,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
+import { resolveAutoCropData, resolveScreencastAutoCrops } from "./asset-intel.js";
 import { speakerSceneFilmStarts } from "./speaker-track.js";
 import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
 
@@ -122,7 +123,8 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       const parsed = sourceMap.get(comp.type);
       if (!parsed) continue;
 
-      const resolvedData = resolveAssetUrls(comp.data, true, speakerUrl);
+      const preData = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : comp.data;
+      const resolvedData = resolveAssetUrls(preData, true, speakerUrl);
       let boundHtml = bindTemplate(parsed.template, resolvedData);
       // Resolve raw <video src="speaker"> PiP tags (same contract as the
       // render and single-scene preview) -- an unresolved token is a dead,
@@ -142,6 +144,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       // script-created elements (e.g. the video component's <video>, built
       // by loadVideoForCapture) actually exist in the preview DOM.
       if (boundHtml.includes("<component ") && librarySourceMap.size > 0) {
+        boundHtml = await resolveScreencastAutoCrops(boundHtml);
         const tagResult = resolveComponentTags(
           boundHtml,
           librarySourceMap,
