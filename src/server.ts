@@ -1600,7 +1600,14 @@ export function createMcpServer(): McpServer {
         // falls through to the fresh storyboard+scenes run below.
         if (params.project_id && !params.id) {
           const project = await loadProject(params.tenant_id, params.project_id);
-          if (project && project.storyboard && project.status === "storyboard") {
+          // Any project that HAS a storyboard rebuilds from it -- not just the
+          // never-built "storyboard" state. Passing project_id + mode=full on
+          // an already-generated project used to fall through to the fresh-
+          // storyboard path below: it invented a brand-new video from a near-
+          // empty prompt in a scratch project and left the named project
+          // untouched -- the opposite of what the caller asked for. Only
+          // 'rendering' is excluded (don't swap scenes mid-render).
+          if (project && project.storyboard && project.status !== "rendering") {
 
           // Use the storyboard's script as the prompt for the unified pipeline
           // Build a rich prompt from the storyboard's narrative + scene details
