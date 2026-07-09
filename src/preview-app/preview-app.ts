@@ -212,6 +212,18 @@ export function getPreviewHtml(): string {
   .ml-seg.r-turbo { background: #f87171; }
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
+  /* Pins: the user's sync anchors -- a diamond above the lane. Color = health. */
+  .ml-pin { position: absolute; top: -9px; margin-left: -7px; width: 14px; height: 14px; line-height: 13px; text-align: center;
+    font-size: 13px; cursor: pointer; pointer-events: auto; z-index: 4; color: #4f46e5; text-shadow: 0 1px 2px rgba(255,255,255,0.9); }
+  .ml-pin:hover { transform: scale(1.35); }
+  .ml-pin-strained { color: #d97706; }
+  .ml-pin-broken { color: #dc2626; animation: mlPinPulse 1.2s ease-in-out infinite; }
+  @keyframes mlPinPulse { 50% { opacity: 0.45; } }
+  /* Cuts: restorable removed footage -- a scissors chip at the seam. */
+  .ml-cut { position: absolute; top: 2px; margin-left: -8px; width: 16px; height: 18px; line-height: 18px; text-align: center;
+    font-size: 11px; cursor: pointer; pointer-events: auto; z-index: 4; color: #dc2626;
+    background: #fff; border: 1px solid #fca5a5; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+  .ml-cut:hover { transform: scale(1.2); }
   /* Speaker/words lane: what's being said, beat by beat; click to seek. */
   #word-lane { position: absolute; left: 0; right: 0; top: 94px; height: 26px; pointer-events: none; }
   .wl-word {
@@ -3032,6 +3044,42 @@ export function getPreviewHtml(): string {
               mediaPopOpen(si, found.key, v, found.edit, -1, el2);
             });
           }
+          // Cut markers: a chip at each source gap. Click = restore.
+          var acc2 = 0;
+          for (var ci = 0; ci < segs.length; ci++) {
+            var sPrev = segs[ci];
+            acc2 += (sPrev.src_end - sPrev.src_start) / Math.min(16, Math.max(0.1, sPrev.rate || 1));
+            var sNext = segs[ci + 1];
+            var gapLen = sNext ? sNext.src_start - sPrev.src_end : 0;
+            if (gapLen > 0.05) {
+              (function(gs, glen, outAt) {
+                var chip = document.createElement('div');
+                chip.className = 'ml-cut';
+                chip.textContent = '✂';
+                chip.style.left = (((sceneStart + Math.min(outAt, dur)) / total) * 100).toFixed(2) + '%';
+                chip.title = glen.toFixed(1) + 's of footage cut here (src ' + gs.toFixed(1) + 's). Click to restore.';
+                chip.addEventListener('click', function(ev) {
+                  ev.stopPropagation();
+                  cutPopOpen(si, found.key, v, gs, glen, chip);
+                });
+                rowEl.appendChild(chip);
+              })(sPrev.src_end, gapLen, acc2);
+            }
+          }
+          // Pin diamonds: the constraints. Color = health. Click = inspect/remove.
+          (found.edit.pins || []).forEach(function(pn) {
+            var st = ((found.edit.pin_status || []).filter(function(x) { return Math.abs(x.out - pn.out) < 0.25; })[0] || {}).status || 'ok';
+            var d = document.createElement('div');
+            d.className = 'ml-pin ml-pin-' + st;
+            d.textContent = '⧫';
+            d.style.left = (((sceneStart + Math.min(pn.out, dur)) / total) * 100).toFixed(2) + '%';
+            d.title = 'Pin: at ' + pn.out.toFixed(1) + 's show source ' + pn.src.toFixed(1) + 's' + (st !== 'ok' ? ' — ' + st.toUpperCase() : '') + '. Click to inspect/remove.';
+            d.addEventListener('click', function(ev) {
+              ev.stopPropagation();
+              pinPopOpen(si, found.key, v, pn, st, found.edit, d);
+            });
+            rowEl.appendChild(d);
+          });
         }
         wrap.appendChild(rowEl);
       });
@@ -3289,11 +3337,9 @@ export function getPreviewHtml(): string {
     document.getElementById('mpp-cancel').addEventListener('click', camPopClose);
     document.getElementById('mpp-go').addEventListener('click', function() {
       var srcT = parseFloat(slider.value) || 0;
-      var pins = ((edit && edit.pins) || []).filter(function(pn) { return Math.abs(pn.out - outT) > 0.2; });
-      pins.push({ out: Math.round(outT * 10) / 10, src: Math.round(srcT * 10) / 10 });
-      var realDur = (prev.duration && isFinite(prev.duration)) ? prev.duration : srcDur;
       camPopClose();
-      saveMediaEdits(si, target, compilePinsToSegments(pins, realDur), pins);
+      mediaOp(si, target, v, { op: 'add_pin', pin: { out: Math.round(outT * 10) / 10, src: Math.round(srcT * 10) / 10 } },
+        'Pinned — this moment now always lands here');
     });
   }
 
@@ -3338,6 +3384,33 @@ export function getPreviewHtml(): string {
     if (out.length === 1 && (out[0].rate || 1) === 1 && out[0].src_start <= 0.05
         && srcDur > 0 && out[0].src_end >= srcDur - 0.25) return null;
     return out;
+  }
+
+  // Op-based media edit: pins/cuts/rates are INTENTS; the server re-solves
+  // the playback map around them, so editing one thing never silently breaks
+  // another (a cut before a pin used to un-pin everything after it).
+  function mediaOp(si, target, v, opBody, doneMsg) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[si];
+    if (!scene || !p) return;
+    var srcDur = (v && v.duration && isFinite(v.duration)) ? v.duration : 0;
+    if (!(srcDur > 0)) { studioStatus('Video duration not loaded yet — try again in a second.', 'warn'); return; }
+    opBody.scene_id = scene.id;
+    opBody.target = target;
+    opBody.src_duration = Math.round(srcDur * 100) / 100;
+    studioStatus('Saving media edit…', '');
+    api('POST', '/media-edits/' + state.tenantId + '/' + p.project_id, opBody).then(function(r) {
+      if (!r || r.ok === false) { studioStatus('Save failed: ' + ((r && r.error) || 'unknown'), 'err'); return; }
+      scene.media_edits = scene.media_edits || {};
+      if (r.edit) scene.media_edits[target] = r.edit;
+      else { delete scene.media_edits[target]; if (!Object.keys(scene.media_edits).length) delete scene.media_edits; }
+      var warn = '';
+      (r.edit && r.edit.pin_status || []).forEach(function(ps) {
+        if (ps.status !== 'ok') warn += ' ⚠ pin @' + Number(ps.out).toFixed(1) + 's: ' + (ps.detail || ps.status) + '.';
+      });
+      studioStatus((doneMsg || 'Saved') + ' ✓' + warn + ' reloading preview…', warn ? 'warn' : 'ok');
+      startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+    }).catch(function(e) { studioStatus('Save failed: ' + e.message, 'err'); });
   }
 
   // keepBoundaries: a Split creates two ADJACENT same-rate segments on
@@ -3457,14 +3530,6 @@ export function getPreviewHtml(): string {
       api('POST', '/compress-waiting/' + state.tenantId + '/' + p.project_id, body).then(function(r2) {
         if (!r2 || r2.ok === false) { studioStatus('Compress failed: ' + ((r2 && r2.error) || 'unknown'), 'err'); return; }
         if (!r2.idle_ranges) { studioStatus('No idle stretches found — the screen is always moving there.', 'warn'); return; }
-        if (scoped && r2.segments) {
-          // Replace just this segment with the compressed pieces (at its rate
-          // for the active parts if it was speeded? keep 1x actives).
-          var next2 = segs.slice();
-          next2.splice.apply(next2, [segIndex, 1].concat(r2.segments));
-          saveMediaEdits(si, target, next2, edit && edit.pins);
-          return;
-        }
         scene.media_edits = r2.media_edits;
         // Say exactly what was (and wasn't) found: a tiny saving with a bare
         // "✓" reads as "it turned my video 8x" when only a sliver was idle.
@@ -3479,9 +3544,8 @@ export function getPreviewHtml(): string {
     Array.prototype.slice.call(pop.querySelectorAll('.mp-rate')).forEach(function(btn) {
       btn.addEventListener('click', function() {
         var newRate = parseFloat(btn.dataset.rate);
-        segs[segIndex] = { src_start: seg.src_start, src_end: seg.src_end, rate: newRate };
         camPopClose();
-        saveMediaEdits(si, target, segs, edit && edit.pins, 'Set to ' + newRate + '×');
+        mediaOp(si, target, v, { op: 'set_rate', region: { src_start: seg.src_start, src_end: seg.src_end, rate: newRate } }, 'Set to ' + newRate + '×');
       });
     });
     var splitBtn = document.getElementById('mp-split');
@@ -3501,23 +3565,65 @@ export function getPreviewHtml(): string {
       }
       if (srcAt == null) { studioStatus('Park the playhead inside this segment to split it.', 'warn'); return; }
       srcAt = Math.round(srcAt * 10) / 10;
-      segs.splice(segIndex, 1,
-        { src_start: seg.src_start, src_end: srcAt, rate: seg.rate },
-        { src_start: srcAt, src_end: seg.src_end, rate: seg.rate });
       camPopClose();
-      saveMediaEdits(si, target, segs, edit && edit.pins, 'Split at ' + srcAt.toFixed(1) + 's', true);
+      mediaOp(si, target, v, { op: 'split', src: srcAt }, 'Split at ' + srcAt.toFixed(1) + 's');
     });
     var cutBtn = document.getElementById('mp-cut');
     if (cutBtn) cutBtn.addEventListener('click', function() {
-      segs.splice(segIndex, 1);
       camPopClose();
-      saveMediaEdits(si, target, segs, edit && edit.pins,
-        'Footage cut — that stretch is skipped, later footage plays sooner');
+      mediaOp(si, target, v, { op: 'add_cut', cut: { src_start: seg.src_start, src_end: seg.src_end } },
+        'Footage cut ✂ (a marker shows where — click it to restore)');
     });
     var clearBtn = document.getElementById('mp-clear');
     if (clearBtn) clearBtn.addEventListener('click', function() {
       camPopClose();
-      saveMediaEdits(si, target, null);
+      mediaOp(si, target, v, { op: 'clear' }, 'All edits removed');
+    });
+  }
+
+  // Pin popover: status + remove. A pin is the user's constraint -- it gets
+  // its own visual and its own delete, independent of every other edit.
+  function pinPopOpen(si, target, v, pn, st, edit, anchorEl) {
+    var pop = document.getElementById('cam-pop');
+    if (!pop) return;
+    camPopClose(); rvPopClose();
+    var detail = ((edit.pin_status || []).filter(function(x) { return Math.abs(x.out - pn.out) < 0.25; })[0] || {}).detail;
+    var stLine = st === 'ok' ? 'Holding: every other edit re-solves around this anchor.'
+      : '<b style="color:' + (st === 'broken' ? '#dc2626' : '#d97706') + ';">' + st.toUpperCase() + '</b> — ' + escHtml(detail || '');
+    pop.innerHTML = '<div class="sp-head"><span class="sp-title"><b>⧫ Pin</b> — film ' + pn.out.toFixed(1) + 's → source ' + pn.src.toFixed(1) + 's</span>' +
+      '<button class="sp-x" id="pp-x">✕</button></div>' +
+      '<div class="sp-region" style="margin-bottom:7px;">' + stLine + '</div>' +
+      '<div class="sp-row"><button class="rv-go secondary" id="pp-remove" style="flex:1;color:#dc2626;border-color:#fca5a5;">Remove this pin</button></div>';
+    pop.style.display = 'block';
+    var r = anchorEl.getBoundingClientRect();
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 120;
+    pop.style.left = Math.max(8, Math.min(r.left - pw / 2, window.innerWidth - pw - 8)) + 'px';
+    pop.style.top = Math.max(8, r.top - ph - 10) + 'px';
+    document.getElementById('pp-x').addEventListener('click', camPopClose);
+    document.getElementById('pp-remove').addEventListener('click', function() {
+      camPopClose();
+      mediaOp(si, target, v, { op: 'remove_pin', out: pn.out }, 'Pin removed');
+    });
+  }
+
+  // Cut popover: the footage isn't gone, just skipped -- offer restore.
+  function cutPopOpen(si, target, v, gapSrcStart, gapLen, anchorEl) {
+    var pop = document.getElementById('cam-pop');
+    if (!pop) return;
+    camPopClose(); rvPopClose();
+    pop.innerHTML = '<div class="sp-head"><span class="sp-title"><b>✂ Cut</b> — ' + gapLen.toFixed(1) + 's removed (source ' + gapSrcStart.toFixed(1) + 's–' + (gapSrcStart + gapLen).toFixed(1) + 's)</span>' +
+      '<button class="sp-x" id="cp-x">✕</button></div>' +
+      '<div class="sp-region" style="margin-bottom:7px;">The footage is skipped, not deleted. Restoring re-solves the timing around your pins.</div>' +
+      '<div class="sp-row"><button class="rv-go" id="cp-restore" style="flex:1;">Restore this footage</button></div>';
+    pop.style.display = 'block';
+    var r = anchorEl.getBoundingClientRect();
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 120;
+    pop.style.left = Math.max(8, Math.min(r.left - pw / 2, window.innerWidth - pw - 8)) + 'px';
+    pop.style.top = Math.max(8, r.top - ph - 10) + 'px';
+    document.getElementById('cp-x').addEventListener('click', camPopClose);
+    document.getElementById('cp-restore').addEventListener('click', function() {
+      camPopClose();
+      mediaOp(si, target, v, { op: 'remove_cut', src_start: gapSrcStart }, 'Footage restored');
     });
   }
 

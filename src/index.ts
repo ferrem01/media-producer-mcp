@@ -51,6 +51,7 @@ import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGet
 import { initTenantStoreFromFile } from "./auth/tenant-store.js";
 import { normalizeVideoForWeb } from "./core/video-normalize.js";
 import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/asset-intel.js";
+import { solveMediaEdits, inferIntents } from "./core/media-edl.js";
 import { spawn } from "node:child_process";
 import { openSync } from "node:fs";
 
@@ -1927,26 +1928,37 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           const hasRange = typeof body.range_start === "number" && typeof body.range_end === "number" && (body.range_end as number) > (body.range_start as number);
           const range = hasRange ? { start: body.range_start as number, end: body.range_end as number } : undefined;
           const det = await detectIdleRanges(videoPath, minIdle, -40, range);
-          const segments = buildCompressedSegments(det.duration, det.ranges, idleRate, range ? range.start : 0);
-          if (!segments.length || !det.ranges.length) { jsonResponse(res, 200, { ok: true, idle_ranges: 0, media_edits: (scene as any).media_edits || {} }); return; }
-          if (range) {
-            // Scoped scan: return the compressed pieces for the caller to
-            // splice into its map; nothing saved here.
-            const outDurR = segments.reduce((s2, g) => s2 + (g.src_end - g.src_start) / g.rate, 0);
-            jsonResponse(res, 200, { ok: true, idle_ranges: det.ranges.length, segments, output_duration: Math.round(outDurR * 10) / 10, source_duration: range.end - range.start });
-            return;
-          }
+          if (!det.ranges.length) { jsonResponse(res, 200, { ok: true, idle_ranges: 0, media_edits: (scene as any).media_edits || {} }); return; }
+          // Compress writes INTENTS: idle stretches become 8x rate regions;
+          // pins and cuts survive and the solver re-fits around them (a
+          // compress pass used to overwrite the whole map, nuking pins).
           const edits: Record<string, any> = (scene as any).media_edits || {};
-          edits[target] = { segments };
+          const current = edits[target] || { segments: [] };
+          const intents = inferIntents(current, det.duration);
+          const scanLo = range ? range.start : 0;
+          const scanHi = range ? range.end : det.duration;
+          // Replace prior rate preferences inside the scanned window only.
+          intents.rate_regions = (intents.rate_regions || []).filter((x) => x.src_end <= scanLo || x.src_start >= scanHi);
+          for (const r of det.ranges) intents.rate_regions.push({ src_start: r.start, src_end: r.end, rate: idleRate });
+          const solved = solveMediaEdits(intents, det.duration);
+          edits[target] = {
+            segments: solved.segments,
+            pins: intents.pins || [],
+            cuts: intents.cuts || [],
+            rate_regions: intents.rate_regions,
+            pin_status: solved.pin_status,
+          };
           (scene as any).media_edits = edits;
           project.updated_at = new Date().toISOString();
           await saveProject(project);
-          const outDur = segments.reduce((s2, g) => s2 + (g.src_end - g.src_start) / g.rate, 0);
+          const outDur = solved.segments.reduce((s2, g) => s2 + (g.src_end - g.src_start) / g.rate, 0);
+          const scanned = scanHi - scanLo;
+          const idleTotal = det.ranges.reduce((t, r) => t + (r.end - r.start), 0);
           jsonResponse(res, 200, {
             ok: true,
             idle_ranges: det.ranges.length,
-            source_duration: det.duration,
-            output_duration: Math.round(outDur * 10) / 10,
+            source_duration: range ? scanned : det.duration,
+            output_duration: range ? Math.round((scanned - idleTotal + idleTotal / idleRate) * 10) / 10 : Math.round(outDur * 10) / 10,
             media_edits: (scene as any).media_edits,
           });
         } catch (err: any) {
@@ -1972,6 +1984,104 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         const scene = project.scenes.find((s: any) => s.id === sceneId);
         if (!scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
+        // ── Op-based intent edits ──
+        // A pin is a constraint, a cut is restorable, a rate is a preference:
+        // each op mutates INTENTS and recompiles the playback segments via
+        // the solver, so editing one thing never silently breaks another
+        // (the reported failure: a cut before a pin un-pinned everything).
+        if (typeof body.op === "string") {
+          const srcDur = Number(body.src_duration);
+          if (!(srcDur > 0)) { jsonResponse(res, 400, { error: "src_duration (seconds) is required for op-based edits" }); return; }
+          const editsMap: Record<string, any> = (scene as any).media_edits || {};
+          const current = editsMap[target] || { segments: [] };
+          const intents = inferIntents(current, srcDur);
+          const near = (a: number, b: number, eps = 0.25) => Math.abs(a - b) < eps;
+          try {
+            switch (body.op) {
+              case "add_pin": {
+                const p = (body.pin || {}) as { out: number; src: number; word?: string };
+                if (!(p.out >= 0) || !(p.src >= 0)) throw new Error("pin {out, src} required");
+                intents.pins = (intents.pins || []).filter((x: any) => !near(x.out, p.out));
+                intents.pins.push({ out: p.out, src: p.src, ...(p.word ? { word: String(p.word).slice(0, 40) } : {}) });
+                break;
+              }
+              case "remove_pin":
+                intents.pins = (intents.pins || []).filter((x: any) => !near(x.out, Number(body.out)));
+                break;
+              case "add_cut": {
+                const c = (body.cut || {}) as { src_start: number; src_end: number };
+                if (!(c.src_end > c.src_start)) throw new Error("cut {src_start, src_end} required");
+                (intents.cuts = intents.cuts || []).push({ src_start: c.src_start, src_end: c.src_end });
+                break;
+              }
+              case "remove_cut":
+                intents.cuts = (intents.cuts || []).filter((x: any) => !near(x.src_start, Number(body.src_start), 0.5));
+                break;
+              case "set_rate": {
+                const r = (body.region || {}) as { src_start: number; src_end: number; rate?: number };
+                if (!(r.src_end > r.src_start)) throw new Error("region {src_start, src_end, rate} required");
+                // carve the range out of existing regions, then add the new one (1x = just carve)
+                const out: any[] = [];
+                for (const x of intents.rate_regions || []) {
+                  if (x.src_end <= r.src_start || x.src_start >= r.src_end) { out.push(x); continue; }
+                  if (x.src_start < r.src_start) out.push({ ...x, src_end: r.src_start });
+                  if (x.src_end > r.src_end) out.push({ ...x, src_start: r.src_end });
+                }
+                out.push({ src_start: r.src_start, src_end: r.src_end, rate: r.rate || 1 });
+                intents.rate_regions = out;
+                break;
+              }
+              case "split": {
+                const at = Number(body.src);
+                if (!(at > 0)) throw new Error("split {src} required");
+                const regions = intents.rate_regions || [];
+                const hit = regions.find((x: any) => at > x.src_start + 0.05 && at < x.src_end - 0.05);
+                if (hit) {
+                  const rest = { ...hit, src_start: at };
+                  hit.src_end = at;
+                  regions.splice(regions.indexOf(hit) + 1, 0, rest);
+                } else {
+                  // No region here: create a boundary pair over the enclosing
+                  // unregioned span at the ambient rate (1x), so each side is
+                  // independently rate-able and visible as its own block.
+                  let lo = 0, hi = srcDur;
+                  for (const x of regions) { if (x.src_end <= at) lo = Math.max(lo, x.src_end); if (x.src_start >= at) hi = Math.min(hi, x.src_start); }
+                  regions.push({ src_start: lo, src_end: at, rate: 1 }, { src_start: at, src_end: hi, rate: 1 });
+                }
+                intents.rate_regions = regions;
+                break;
+              }
+              case "set_rate_regions": // bulk replace (compress-waiting)
+                intents.rate_regions = Array.isArray(body.rate_regions) ? body.rate_regions : [];
+                break;
+              case "clear":
+                intents.cuts = []; intents.rate_regions = []; intents.pins = [];
+                break;
+              default:
+                throw new Error(`unknown op "${body.op}"`);
+            }
+          } catch (opErr: any) {
+            jsonResponse(res, 400, { error: opErr?.message || String(opErr) });
+            return;
+          }
+          const solved = solveMediaEdits(intents, srcDur);
+          const hasAny = (intents.cuts?.length || 0) + (intents.rate_regions?.length || 0) + (intents.pins?.length || 0) > 0;
+          if (!hasAny) delete editsMap[target];
+          else editsMap[target] = {
+            segments: solved.segments,
+            pins: intents.pins || [],
+            cuts: intents.cuts || [],
+            rate_regions: intents.rate_regions || [],
+            pin_status: solved.pin_status,
+          };
+          if (Object.keys(editsMap).length) (scene as any).media_edits = editsMap;
+          else delete (scene as any).media_edits;
+          project.updated_at = new Date().toISOString();
+          await saveProject(project);
+          jsonResponse(res, 200, { ok: true, scene_id: sceneId, target, edit: editsMap[target] || null });
+          return;
+        }
+
         const segments = body.segments;
         const edits: Record<string, any> = (scene as any).media_edits || {};
         if (segments === null || (Array.isArray(segments) && segments.length === 0)) {

@@ -227,12 +227,26 @@ export interface MediaSegment {
  *  last frame FREEZES. Keyed on the scene by the same target grammar as
  *  camera moves ("screencast" or a video[src*="file"] selector), so several
  *  videos in one scene (side-by-side demos) each carry their own edit. */
+/** A removed range of SOURCE footage (restorable: the file is untouched). */
+export interface MediaCut { src_start: number; src_end: number }
+/** A playback-rate preference over a SOURCE range (compress-waiting emits these). */
+export interface MediaRateRegion { src_start: number; src_end: number; rate: number }
+/** A sync anchor: "when the narration reaches `out`, source moment `src` is
+ *  on screen." Pins are CONSTRAINTS -- every other edit re-solves around them. */
+export interface MediaPin { out: number; src: number; word?: string }
+
 export interface MediaEdit {
+  /** DERIVED playback map -- always present; playback/render/capture read
+   *  ONLY this. When intents (cuts/rate_regions/pins) exist, segments are
+   *  recompiled from them by solveMediaEdits on every save. */
   segments: MediaSegment[];
-  /** Sync anchors ("when I say X, show Y"): output time -> source time.
-   *  Segments are COMPILED from these when present; kept so later pins can
-   *  recompute the rates between all anchors. */
-  pins?: Array<{ out: number; src: number }>;
+  pins?: MediaPin[];
+  /** Edit intents. Absent on legacy edits (segments authored directly);
+   *  inferred from segments on the first op-based edit. */
+  cuts?: MediaCut[];
+  rate_regions?: MediaRateRegion[];
+  /** Derived per-pin health from the last solve. */
+  pin_status?: Array<{ out: number; status: "ok" | "strained" | "broken"; detail?: string }>;
 }
 
 export interface Scene {
