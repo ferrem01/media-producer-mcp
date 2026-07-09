@@ -92,6 +92,38 @@ describe("pin solver: pins are constraints", () => {
   });
 });
 
+describe("split + cut between pins (reported failure)", () => {
+  it("a split between two pins survives into the derived map as two blocks", () => {
+    const intents = {
+      pins: [{ out: 10, src: 100 }, { out: 20, src: 200 }],
+      rate_regions: [
+        { src_start: 100, src_end: 150, rate: 1 },
+        { src_start: 150, src_end: 200, rate: 1 },
+      ],
+    };
+    const { segments } = solveMediaEdits(intents, SRC);
+    const between = segments.filter((g) => g.src_start >= 100 && g.src_end <= 200);
+    expect(between.length).toBe(2); // the split boundary is visible, not merged away
+    expect(between[0].src_end).toBeCloseTo(150, 1);
+  });
+
+  it("cutting one half of the split removes ONLY that half; both pins still land", () => {
+    const intents = {
+      pins: [{ out: 10, src: 100 }, { out: 20, src: 200 }],
+      rate_regions: [
+        { src_start: 100, src_end: 150, rate: 1 },
+        { src_start: 150, src_end: 200, rate: 1 },
+      ],
+      cuts: [{ src_start: 150, src_end: 200 }],
+    };
+    const { segments, pin_status } = solveMediaEdits(intents, SRC);
+    expect(pin_status.find((x) => x.out === 20)?.status).toBe("ok"); // arrives early + holds
+    expect(mapSourceTime(segments, 10)).toBeCloseTo(100, 1);
+    // the surviving half plays; the cut half never appears
+    expect(segments.some((g) => g.src_start >= 150 && g.src_end <= 200 && g.src_end - g.src_start > 6)).toBe(false);
+  });
+});
+
 describe("legacy migration: inferIntents", () => {
   it("recovers cuts and rate regions from a segment-only edit", () => {
     const intents = inferIntents({
