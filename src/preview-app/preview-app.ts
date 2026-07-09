@@ -3057,8 +3057,12 @@ export function getPreviewHtml(): string {
 
   // Timeline zoom: the track grows to zoom x width inside the scroller;
   // every lane is percent-positioned, so words/blocks/pills spread together.
+  // Manual ceiling 40x: pinning targets ONE word, so the lane must zoom
+  // until every word is fully legible (at 8x a 2-minute narration still
+  // renders as colliding fragments). The wave canvas caps its own internal
+  // resolution, so a wide track costs nothing.
   function setTimelineZoom(z) {
-    state.tlZoom = Math.max(1, Math.min(8, z));
+    state.tlZoom = Math.max(1, Math.min(40, z));
     var track = document.getElementById('timeline-track');
     if (!track) return;
     track.style.width = (state.tlZoom * 100) + '%';
@@ -3085,7 +3089,9 @@ export function getPreviewHtml(): string {
     if (!needs.length) return;
     needs.sort(function(a, b) { return a - b; });
     var need = needs[Math.floor(needs.length * 0.85)];
-    if (need > 1.05) setTimelineZoom(need);
+    // Auto-fit keeps its own modest ceiling: the default view should show
+    // context, not open at maximum magnification -- deep zoom is a manual +.
+    if (need > 1.05) setTimelineZoom(Math.min(8, need));
   }
 
   // Keep the playhead in view while playing (page-scroll like every NLE).
