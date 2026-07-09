@@ -148,19 +148,29 @@ function prefRate(regions: MediaRateRegion[], t: number): number {
 
 /** Available (uncut) source intervals within [from, to), split at every cut
  *  and rate-region boundary so each piece has one preferred rate. */
-function piecesBetween(from: number, to: number, cuts: MediaCut[], regions: MediaRateRegion[]): Array<{ s: number; e: number; pref: number }> {
+function piecesBetween(from: number, to: number, cuts: MediaCut[], regions: MediaRateRegion[]): Array<{ s: number; e: number; pref: number; hard: boolean }> {
   if (to <= from + 0.001) return [];
   const bounds = new Set<number>([from, to]);
+  const regionBounds = new Set<number>();
   for (const c of cuts) { if (c.src_start > from && c.src_start < to) bounds.add(c.src_start); if (c.src_end > from && c.src_end < to) bounds.add(c.src_end); }
-  for (const r of regions) { if (r.src_start > from && r.src_start < to) bounds.add(r.src_start); if (r.src_end > from && r.src_end < to) bounds.add(r.src_end); }
+  for (const r of regions) {
+    for (const b of [r.src_start, r.src_end]) {
+      if (b > from && b < to) { bounds.add(b); regionBounds.add(Math.round(b * 1000)); }
+    }
+  }
   const bs = Array.from(bounds).sort((a, b) => a - b);
-  const pieces: Array<{ s: number; e: number; pref: number }> = [];
+  const pieces: Array<{ s: number; e: number; pref: number; hard: boolean }> = [];
   for (let i = 0; i < bs.length - 1; i++) {
     const s = bs[i], e = bs[i + 1];
     if (e - s < 0.005) continue;
     const mid = (s + e) / 2;
     if (inCut(cuts, mid)) continue;
-    pieces.push({ s, e, pref: prefRate(regions, mid) });
+    // hard: this piece begins at a USER boundary (a rate-region edge -- i.e.
+    // a split point). The derived map must keep it as its own segment even
+    // when the neighbor solves to the same rate, or the user's split
+    // vanishes from the lane and block-level Cut targets the merged span
+    // (measured: cutting between two pins removed the whole stretch).
+    pieces.push({ s, e, pref: prefRate(regions, mid), hard: regionBounds.has(Math.round(s * 1000)) });
   }
   return pieces;
 }
@@ -204,10 +214,10 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
   chain = chain.concat(anchors);
 
   const segments: MediaSegment[] = [];
-  const push = (s: number, e: number, rate: number) => {
+  const push = (s: number, e: number, rate: number, hard?: boolean) => {
     rate = Math.min(16, Math.max(0.1, rate));
     const last = segments[segments.length - 1];
-    if (last && Math.abs(last.src_end - s) < 0.005 && Math.abs(last.rate - rate) < 0.001) last.src_end = e;
+    if (!hard && last && Math.abs(last.src_end - s) < 0.005 && Math.abs(last.rate - rate) < 0.001) last.src_end = e;
     else segments.push({ src_start: s, src_end: e, rate: Math.round(rate * 1000) / 1000 });
   };
 
@@ -228,7 +238,8 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
       // Less footage than film time: DON'T stretch it into slow-motion soup.
       // Play at the preferred rates (arriving early), then hold the pinned
       // frame until the pin's moment.
-      for (const p of pieces) push(p.s, p.e, p.pref);
+      let first0 = true;
+      for (const p of pieces) { push(p.s, p.e, p.pref, p.hard || first0); first0 = false; }
       const hold = window - atPref;
       push(b.src, Math.min(srcDur, b.src + 0.1 * hold), 0.1);
       pinStatus.push({ out: b.out, status: "ok", detail: `arrives early -- holds the pinned frame ${hold.toFixed(1)}s` });
@@ -252,10 +263,12 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
       scale = next;
     }
     let arrival = 0;
+    let first1 = true;
     for (const p of pieces) {
       const rate = Math.min(16, Math.max(0.1, p.pref * scale));
       arrival += (p.e - p.s) / rate;
-      push(p.s, p.e, rate);
+      push(p.s, p.e, rate, p.hard || first1);
+      first1 = false;
     }
     if (Math.abs(arrival - window) > 0.15) {
       pinStatus.push({ out: b.out, status: "strained", detail: `needs ${(scale > 1 ? "faster" : "slower")} playback than the ${scale > 1 ? "16x cap" : "0.1x floor"} allows -- lands ${(arrival - window).toFixed(1)}s off` });
@@ -266,7 +279,10 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
 
   // Tail after the last anchor: preferred rates until the source ends.
   const lastAnchor = chain[chain.length - 1];
-  if (lastAnchor) for (const p of piecesBetween(lastAnchor.src, srcDur, cuts, regions)) push(p.s, p.e, p.pref);
+  if (lastAnchor) {
+    let first2 = true;
+    for (const p of piecesBetween(lastAnchor.src, srcDur, cuts, regions)) { push(p.s, p.e, p.pref, p.hard || first2); first2 = false; }
+  }
 
   return { segments: normalizeSegments(segments), pin_status: pinStatus };
 }
