@@ -213,11 +213,13 @@ export function getPreviewHtml(): string {
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
   /* Pins: the user's sync anchors -- a diamond above the lane. Color = health. */
-  .ml-pin { position: absolute; top: -9px; margin-left: -7px; width: 14px; height: 14px; line-height: 13px; text-align: center;
-    font-size: 13px; cursor: pointer; pointer-events: auto; z-index: 4; color: #4f46e5; text-shadow: 0 1px 2px rgba(255,255,255,0.9); }
-  .ml-pin:hover { transform: scale(1.35); }
-  .ml-pin-strained { color: #d97706; }
-  .ml-pin-broken { color: #dc2626; animation: mlPinPulse 1.2s ease-in-out infinite; }
+  .ml-pin { position: absolute; top: -4px; margin-left: -9px; width: 18px; height: 32px; text-align: center;
+    font-size: 15px; line-height: 16px; cursor: pointer; pointer-events: auto; z-index: 5; color: #fff;
+    background: #4f46e5; border-radius: 9px 9px 2px 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.35); }
+  .ml-pin::after { content: ''; position: absolute; left: 50%; top: 100%; margin-left: -1px; width: 2px; height: 26px; background: inherit; opacity: 0.85; }
+  .ml-pin:hover { transform: scale(1.2); z-index: 6; }
+  .ml-pin-strained { background: #d97706; }
+  .ml-pin-broken { background: #dc2626; animation: mlPinPulse 1.2s ease-in-out infinite; }
   @keyframes mlPinPulse { 50% { opacity: 0.45; } }
   /* Cuts: restorable removed footage -- a scissors chip at the seam. */
   .ml-cut { position: absolute; top: 2px; margin-left: -8px; width: 16px; height: 18px; line-height: 18px; text-align: center;
@@ -3071,7 +3073,7 @@ export function getPreviewHtml(): string {
             var st = ((found.edit.pin_status || []).filter(function(x) { return Math.abs(x.out - pn.out) < 0.25; })[0] || {}).status || 'ok';
             var d = document.createElement('div');
             d.className = 'ml-pin ml-pin-' + st;
-            d.textContent = '⧫';
+            d.textContent = '📌';
             d.style.left = (((sceneStart + Math.min(pn.out, dur)) / total) * 100).toFixed(2) + '%';
             d.title = 'Pin: at ' + pn.out.toFixed(1) + 's show source ' + pn.src.toFixed(1) + 's' + (st !== 'ok' ? ' — ' + st.toUpperCase() : '') + '. Click to inspect/remove.';
             d.addEventListener('click', function(ev) {
