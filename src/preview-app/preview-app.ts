@@ -3034,11 +3034,12 @@ export function getPreviewHtml(): string {
           segs.forEach(function(s, i2) {
             var rate = Math.min(16, Math.max(0.1, s.rate || 1));
             var outDur = (s.src_end - s.src_start) / rate;
-            var cls = rate >= 6 ? 'r-turbo' : (rate > 1.2 ? 'r-fast' : 'r-normal');
+            var isHold = rate <= 0.12;
+            var cls = isHold ? 'r-freeze' : (rate >= 6 ? 'r-turbo' : (rate > 1.2 ? 'r-fast' : 'r-normal'));
             var from = acc, to = Math.min(dur, acc + outDur);
             if (to > from) block(from, to, cls, label + ' — ' + rate + 'x  src ' + s.src_start.toFixed(1) + '-' + s.src_end.toFixed(1) + 's', (function(idx) {
               return function(el2) { mediaPopOpen(si, found.key, v, found.edit, idx, el2); };
-            })(i2), rate !== 1 ? (rate + '×') : '');
+            })(i2), isHold ? 'HOLD' : (rate !== 1 ? (rate + '×') : ''));
             acc += outDur;
           });
           if (acc < dur - 0.05) {
@@ -3524,6 +3525,7 @@ export function getPreviewHtml(): string {
         '</div>' +
         '<div class="sp-row">' +
           '<button class="rv-go secondary" id="mp-split" style="flex:1;" title="Split this segment at the playhead">Split at playhead</button>' +
+          '<button class="rv-go secondary" id="mp-merge" style="flex:1;" title="Dissolve this segment into its neighbor — the neighboring speed takes over this stretch">⇤ Merge into neighbor</button>' +
         '</div>' +
         '<div class="sp-row">' +
           '<button class="rv-go secondary" id="mp-cut" style="flex:1;color:#dc2626;border-color:#fca5a5;" title="Cut this footage out entirely — everything after it plays sooner">✂ Cut this footage</button>' +
@@ -3590,6 +3592,11 @@ export function getPreviewHtml(): string {
       srcAt = Math.round(srcAt * 10) / 10;
       camPopClose();
       mediaOp(si, target, v, { op: 'split', src: srcAt }, 'Split at ' + srcAt.toFixed(1) + 's');
+    });
+    var mergeBtn = document.getElementById('mp-merge');
+    if (mergeBtn) mergeBtn.addEventListener('click', function() {
+      camPopClose();
+      mediaOp(si, target, v, { op: 'merge_region', region: { src_start: seg.src_start, src_end: seg.src_end } }, 'Merged into neighbor');
     });
     var cutBtn = document.getElementById('mp-cut');
     if (cutBtn) cutBtn.addEventListener('click', function() {

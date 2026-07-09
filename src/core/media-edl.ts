@@ -217,10 +217,21 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
     const pieces = piecesBetween(a.src, b.src, cuts, regions);
     const atPref = pieces.reduce((t, p) => t + (p.e - p.s) / p.pref, 0);
     if (!pieces.length) {
-      // Nothing to show: hold (approximated as min-rate slow-mo on a sliver).
-      const sliver = Math.min(0.1 * window, 0.5);
-      if (a.src > sliver) push(a.src - sliver, a.src, sliver / window);
-      pinStatus.push({ out: b.out, status: "strained", detail: "no footage left between this pin and the previous one -- frame holds" });
+      // Nothing to show before this pin: hold the PINNED frame for the whole
+      // window (a forward micro-sliver at the 0.1x floor -- visually a
+      // freeze, rendered as HOLD in the lane).
+      push(b.src, Math.min(srcDur, b.src + 0.1 * window), 0.1);
+      pinStatus.push({ out: b.out, status: "ok", detail: `holds the pinned frame ${window.toFixed(1)}s (no footage before it)` });
+      continue;
+    }
+    if (atPref < window - 0.2) {
+      // Less footage than film time: DON'T stretch it into slow-motion soup.
+      // Play at the preferred rates (arriving early), then hold the pinned
+      // frame until the pin's moment.
+      for (const p of pieces) push(p.s, p.e, p.pref);
+      const hold = window - atPref;
+      push(b.src, Math.min(srcDur, b.src + 0.1 * hold), 0.1);
+      pinStatus.push({ out: b.out, status: "ok", detail: `arrives early -- holds the pinned frame ${hold.toFixed(1)}s` });
       continue;
     }
     // Scale preferences so we arrive exactly on time. Pieces that hit the

@@ -41,6 +41,17 @@ describe("pin solver: pins are constraints", () => {
     expect(fast.rate / slow.rate).toBeCloseTo(4, 1); // preference RATIO preserved
   });
 
+  it("less footage than film time: plays natural speed then HOLDS (no slow-mo soup)", () => {
+    // 5s of footage into a 20s window: 1x for 5s, then hold the pinned frame.
+    const { segments, pin_status } = solveMediaEdits(
+      { pins: [{ out: 20, src: 10 }], cuts: [{ src_start: 0, src_end: 5 }] }, SRC);
+    expect(pin_status[0].status).toBe("ok");
+    expect(pin_status[0].detail).toMatch(/holds/);
+    expect(segments[0]).toEqual({ src_start: 5, src_end: 10, rate: 1 });
+    expect(segments[1].rate).toBeCloseTo(0.1, 3); // the hold sliver
+    expect(edlOutputDuration(segments.slice(0, 2))).toBeCloseTo(20, 0);
+  });
+
   it("cutting the pinned footage itself breaks the pin loudly", () => {
     const { pin_status } = solveMediaEdits(
       { pins: [{ out: 10, src: 40 }], cuts: [{ src_start: 30, src_end: 50 }] }, SRC);

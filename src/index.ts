@@ -2056,6 +2056,21 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
                 intents.rate_regions = regions;
                 break;
               }
+              case "merge_region": {
+                // Dissolve the rate region covering this span and let a
+                // touching neighbor absorb it (left wins; right if no left;
+                // plain removal restores ambient 1x when isolated). This is
+                // the "un-shard" for tiny solver/split leftovers.
+                const m = (body.region || {}) as { src_start: number; src_end: number };
+                if (!(m.src_end > m.src_start)) throw new Error("region {src_start, src_end} required");
+                const rs2 = (intents.rate_regions || []).filter((x: any) => !(x.src_start >= m.src_start - 0.25 && x.src_end <= m.src_end + 0.25));
+                const left = rs2.find((x: any) => Math.abs(x.src_end - m.src_start) < 0.25);
+                const right = rs2.find((x: any) => Math.abs(x.src_start - m.src_end) < 0.25);
+                if (left) left.src_end = m.src_end;
+                else if (right) right.src_start = m.src_start;
+                intents.rate_regions = rs2;
+                break;
+              }
               case "set_rate_regions": // bulk replace (compress-waiting)
                 intents.rate_regions = Array.isArray(body.rate_regions) ? body.rate_regions : [];
                 break;
