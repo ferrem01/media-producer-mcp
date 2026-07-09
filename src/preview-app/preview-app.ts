@@ -3046,28 +3046,41 @@ export function getPreviewHtml(): string {
               mediaPopOpen(si, found.key, v, found.edit, -1, el2);
             });
           }
-          // Cut markers: a chip at each source gap. Click = restore.
-          var acc2 = 0;
-          for (var ci = 0; ci < segs.length; ci++) {
-            var sPrev = segs[ci];
-            acc2 += (sPrev.src_end - sPrev.src_start) / Math.min(16, Math.max(0.1, sPrev.rate || 1));
-            var sNext = segs[ci + 1];
-            var gapLen = sNext ? sNext.src_start - sPrev.src_end : 0;
-            if (gapLen > 0.05) {
-              (function(gs, glen, outAt) {
-                var chip = document.createElement('div');
-                chip.className = 'ml-cut';
-                chip.textContent = '✂';
-                chip.style.left = (((sceneStart + Math.min(outAt, dur)) / total) * 100).toFixed(2) + '%';
-                chip.title = glen.toFixed(1) + 's of footage cut here (src ' + gs.toFixed(1) + 's). Click to restore.';
-                chip.addEventListener('click', function(ev) {
-                  ev.stopPropagation();
-                  cutPopOpen(si, found.key, v, gs, glen, chip);
-                });
-                rowEl.appendChild(chip);
-              })(sPrev.src_end, gapLen, acc2);
+          // Cut markers: one chip per stored cut (leading cuts included --
+          // gap-walking between segments missed a cut at the very start).
+          function srcToOut(srcT) {
+            var a2 = 0;
+            for (var k2 = 0; k2 < segs.length; k2++) {
+              var g2 = segs[k2];
+              var rr = Math.min(16, Math.max(0.1, g2.rate || 1));
+              if (srcT <= g2.src_start) return a2;
+              if (srcT <= g2.src_end) return a2 + (srcT - g2.src_start) / rr;
+              a2 += (g2.src_end - g2.src_start) / rr;
+            }
+            return a2;
+          }
+          var cutList = found.edit.cuts;
+          if (!cutList) {
+            cutList = [];
+            if (segs.length && segs[0].src_start > 0.05) cutList.push({ src_start: 0, src_end: segs[0].src_start });
+            for (var ci = 0; ci < segs.length - 1; ci++) {
+              if (segs[ci + 1].src_start - segs[ci].src_end > 0.05) cutList.push({ src_start: segs[ci].src_end, src_end: segs[ci + 1].src_start });
             }
           }
+          cutList.forEach(function(c2) {
+            var glen = c2.src_end - c2.src_start;
+            if (glen < 0.05) return;
+            var chip = document.createElement('div');
+            chip.className = 'ml-cut';
+            chip.textContent = '✂';
+            chip.style.left = (((sceneStart + Math.min(srcToOut(c2.src_start), dur)) / total) * 100).toFixed(2) + '%';
+            chip.title = glen.toFixed(1) + 's of footage cut (src ' + c2.src_start.toFixed(1) + 's–' + c2.src_end.toFixed(1) + 's). Click to restore.';
+            chip.addEventListener('click', function(ev) {
+              ev.stopPropagation();
+              cutPopOpen(si, found.key, v, c2.src_start, glen, chip);
+            });
+            rowEl.appendChild(chip);
+          });
           // Pin diamonds: the constraints. Color = health. Click = inspect/remove.
           (found.edit.pins || []).forEach(function(pn) {
             var st = ((found.edit.pin_status || []).filter(function(x) { return Math.abs(x.out - pn.out) < 0.25; })[0] || {}).status || 'ok';

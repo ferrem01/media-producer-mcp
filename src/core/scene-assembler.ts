@@ -513,6 +513,22 @@ export function cameraMovesScript(
     for (var ri = 0; ri < riggedMedia.length; ri++) {
       if (riggedMedia[ri].media === media) return riggedMedia[ri].rig;
     }
+    // A video inside a screencast-frame viewport: the viewport IS the crop
+    // window (overflow hidden, correct box, geometry managed by the
+    // component). Rig ITS children instead of re-deriving the video's
+    // geometry -- copying it breaks the overscan crop (measured: zoom-inside
+    // shrank the footage to a thumbnail on frame-hosted screencasts).
+    var scfHost = media.closest ? media.closest('.scf-viewport') : null;
+    if (scfHost) {
+      var wrapS = document.createElement('div');
+      wrapS.className = '__mp_camera_rig __mp_camera_rig--content';
+      wrapS.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;will-change:transform;transform-origin:50% 50%;';
+      while (scfHost.firstChild) wrapS.appendChild(scfHost.firstChild);
+      scfHost.appendChild(wrapS);
+      var rigS = { el: wrapS, box: function() { return scfHost.getBoundingClientRect(); } };
+      riggedMedia.push({ media: media, rig: rigS });
+      return rigS;
+    }
     // The clip box takes over the video's OWN layout slot (self-positioned
     // inline geometry copied verbatim; flow videos get pinned dimensions), so
     // flex/grid siblings -- side-by-side demos -- keep their positions. An
