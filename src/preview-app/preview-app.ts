@@ -759,6 +759,53 @@ export function getPreviewHtml(): string {
   var _token = new URLSearchParams(window.location.search).get('token');
   var _urlTenant = new URLSearchParams(window.location.search).get('tenant');
 
+  // ── Session log shipping ──
+  // Every console line (ours and the browser's errors) lands in a ring
+  // buffer and is shipped to the server every few seconds, so a remote
+  // debugger can tail THIS browser session's [scene]/[chase]/[edl]/error
+  // channels without asking the user to open devtools and copy-paste.
+  var _slBuf = [];
+  var _slSid = new Date().toISOString().slice(0, 10) + '-' + Math.random().toString(36).slice(2, 8);
+  (function() {
+    ['log', 'warn', 'error'].forEach(function(lv) {
+      var orig = console[lv].bind(console);
+      console[lv] = function() {
+        try {
+          var msg = Array.prototype.slice.call(arguments).map(function(a) {
+            if (typeof a === 'string') return a;
+            try { return JSON.stringify(a); } catch (e) { return String(a); }
+          }).join(' ');
+          _slBuf.push({ t: Date.now(), l: lv, m: msg.slice(0, 600) });
+          if (_slBuf.length > 800) _slBuf.splice(0, _slBuf.length - 800);
+        } catch (e) { /* never break the console */ }
+        orig.apply(null, arguments);
+      };
+    });
+    window.addEventListener('error', function(e) {
+      console.error('[uncaught]', (e && e.message) || '?', (e && e.filename) || '', (e && e.lineno) || '');
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      console.error('[unhandledrejection]', String(e && e.reason).slice(0, 300));
+    });
+  })();
+  function _slFlush(useBeacon) {
+    if (!_slBuf.length) return;
+    var tenant = (typeof state !== 'undefined' && state.tenantId) || _urlTenant;
+    if (!tenant) return;
+    var batch = _slBuf.splice(0, _slBuf.length);
+    var proj = (typeof state !== 'undefined' && state.currentProject && state.currentProject.project_id) || null;
+    var url = '/api/studio-log/' + encodeURIComponent(tenant) + '?session=' + _slSid +
+      (_token ? '&token=' + encodeURIComponent(_token) : '');
+    var body = JSON.stringify({ project: proj, lines: batch });
+    try {
+      if (useBeacon && navigator.sendBeacon) { navigator.sendBeacon(url, body); return; }
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body }).catch(function() {});
+    } catch (e) { /* logging must never break the app */ }
+  }
+  setInterval(function() { _slFlush(false); }, 5000);
+  window.addEventListener('beforeunload', function() { _slFlush(true); });
+  console.log('[studio] session log id', _slSid);
+
   // Mobile budget: phones cannot boot 5 live scene runtimes (GSAP + up to
   // several WebGL contexts) on open -- the tab gets killed. On coarse-pointer
   // / small screens, thumbnails render as static tiles and the composite

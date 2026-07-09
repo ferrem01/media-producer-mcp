@@ -41,6 +41,7 @@ import { resolveVideoPath } from "./core/video-path.js";
 import fs from "node:fs/promises";
 import { assembleComposite, type CompositeComponentSource } from "./core/composite-assembler.js";
 import path from "node:path";
+import os from "node:os";
 import { setupWebSocket } from "./ws.js";
 import { authMiddleware, extractToken, validateToken, isAuthEnabled } from "./auth/auth.js";
 import { protectedResourceMetadata, authorizationServerMetadata, registerClient, wwwAuthenticateChallenge } from "./auth/mcp-oauth.js";
@@ -759,6 +760,47 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           res.end(log.slice(-16384));
         } catch {
           jsonResponse(res, 404, { error: "No deploy log yet" });
+        }
+        return;
+      }
+
+      // GET /api/server-log -- tail of the pm2 process's stdout/stderr (same
+      // secret as deploy): the server-side half of a remote debug session.
+      if (urlPath === "/api/server-log" && method === "GET") {
+        const deploySecret = process.env.MP_DEPLOY_TOKEN;
+        const provided = (req.headers["x-deploy-token"] as string) ||
+          new URL(url, "http://localhost").searchParams.get("deploy_token") || "";
+        if (!deploySecret || provided !== deploySecret) {
+          jsonResponse(res, 403, { error: "Invalid deploy token" });
+          return;
+        }
+        try {
+          const logsDir = path.join(os.homedir(), ".pm2", "logs");
+          const files = (await fs.readdir(logsDir)).filter((f) => /out|error/.test(f) && f.endsWith(".log"));
+          let newest: { file: string; mtime: number } | null = null;
+          const parts: string[] = [];
+          for (const f of files) {
+            const st = await fs.stat(path.join(logsDir, f)).catch(() => null);
+            if (!st) continue;
+            if (/out/.test(f) && (!newest || st.mtime.getTime() > newest.mtime)) newest = { file: f, mtime: st.mtime.getTime() };
+          }
+          const wantBytes = Math.min(256 * 1024, Math.max(1024, parseInt(new URL(url, "http://localhost").searchParams.get("bytes") || "32768", 10) || 32768));
+          for (const f of files.sort()) {
+            const full = path.join(logsDir, f);
+            const st = await fs.stat(full).catch(() => null);
+            if (!st) continue;
+            const fh = await fs.open(full, "r");
+            try {
+              const start = Math.max(0, st.size - wantBytes);
+              const buf = Buffer.alloc(Math.min(wantBytes, st.size));
+              await fh.read(buf, 0, buf.length, start);
+              parts.push(`===== ${f} (tail ${buf.length} bytes) =====\n${buf.toString()}`);
+            } finally { await fh.close(); }
+          }
+          res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end(parts.join("\n\n") || "no pm2 logs found");
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
         }
         return;
       }
@@ -1563,6 +1605,76 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           jsonResponse(res, 500, { error: e?.message || String(e) });
         }
         return;
+      }
+
+      // ── API: Studio session logs ──
+      // POST /api/studio-log/{tenant}?session=sid  -- the Studio client ships
+      // its console ring buffer here every few seconds, so a remote debugger
+      // can tail a LIVE browser session's [scene]/[chase]/[edl]/error output.
+      // GET  /api/studio-log/{tenant}               -- list sessions
+      // GET  /api/studio-log/{tenant}?session=sid&lines=N -- tail one session
+      const studioLogMatch = urlPath.match(/^\/api\/studio-log\/([^/]+)$/);
+      if (studioLogMatch) {
+        const slTenant = decodeURIComponent(studioLogMatch[1]);
+        const slQuery = new URL(req.url || "/", "http://localhost").searchParams;
+        const slDir = path.join(config.dataDir, slTenant, "_studio-logs");
+        const sidRaw = slQuery.get("session") || "";
+        const sid = sidRaw.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 48);
+        if (method === "POST") {
+          if (!sid) { jsonResponse(res, 400, { error: "session query param required" }); return; }
+          try {
+            const chunks: Buffer[] = [];
+            let recd = 0;
+            await new Promise<void>((resolve, reject) => {
+              req.on("data", (c: Buffer) => { recd += c.length; if (recd > 512 * 1024) { reject(new Error("too large")); req.destroy(); return; } chunks.push(c); });
+              req.on("end", () => resolve());
+              req.on("error", reject);
+            });
+            const payload = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+            const lines: any[] = Array.isArray(payload.lines) ? payload.lines.slice(0, 900) : [];
+            if (lines.length) {
+              await fs.mkdir(slDir, { recursive: true });
+              const file = path.join(slDir, `${sid}.jsonl`);
+              const st = await fs.stat(file).catch(() => null);
+              if (!st || st.size < 5 * 1024 * 1024) { // 5MB cap per session
+                const out = lines.map((l) => JSON.stringify({
+                  ts: new Date(Number(l.t) || Date.now()).toISOString(),
+                  level: String(l.l || "log").slice(0, 5),
+                  project: payload.project || undefined,
+                  msg: String(l.m || "").slice(0, 600),
+                })).join("\n") + "\n";
+                await fs.appendFile(file, out);
+              }
+            }
+            jsonResponse(res, 200, { ok: true, received: lines.length });
+          } catch (e: any) {
+            jsonResponse(res, 400, { error: e?.message || String(e) });
+          }
+          return;
+        }
+        if (method === "GET") {
+          try {
+            if (!sid) {
+              const entries = await fs.readdir(slDir).catch(() => [] as string[]);
+              const sessions = [];
+              for (const f of entries) {
+                if (!f.endsWith(".jsonl")) continue;
+                const st = await fs.stat(path.join(slDir, f)).catch(() => null);
+                if (st) sessions.push({ session: f.replace(/\.jsonl$/, ""), bytes: st.size, updated_at: st.mtime.toISOString() });
+              }
+              sessions.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+              jsonResponse(res, 200, { sessions: sessions.slice(0, 40) });
+              return;
+            }
+            const nLines = Math.min(2000, Math.max(1, parseInt(slQuery.get("lines") || "200", 10) || 200));
+            const raw = await fs.readFile(path.join(slDir, `${sid}.jsonl`), "utf-8");
+            const all = raw.trim().split("\n");
+            jsonResponse(res, 200, { session: sid, total: all.length, lines: all.slice(-nLines).map((l) => { try { return JSON.parse(l); } catch { return { msg: l }; } }) });
+          } catch (e: any) {
+            jsonResponse(res, 404, { error: `session log not found: ${e?.message || e}` });
+          }
+          return;
+        }
       }
 
       // ── API: (Re-)analyze an existing asset ──
