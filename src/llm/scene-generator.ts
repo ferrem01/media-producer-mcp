@@ -76,6 +76,13 @@ async function generateCodegenScene(
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (agentic-codegen)`);
 
   var effectiveSpec = codegenSpec;
+  // Provided real footage must be IN the spec text: the dropped-footage
+  // enforcement below and the footage-facts injection both key on /assets
+  // video URLs appearing in the spec -- a URL that only travels via
+  // opts.brollVideoUrl is invisible to both.
+  if (opts.brollVideoUrl && /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(opts.brollVideoUrl) && !effectiveSpec.includes(opts.brollVideoUrl)) {
+    effectiveSpec += `\n\n## PROVIDED FOOTAGE (REAL -- must appear in the scene)\n${opts.brollVideoUrl}`;
+  }
   // ── Source footage facts ──
   // When the spec references real uploaded footage, append what ingest-time
   // analysis learned about it (dimensions, embedded browser/window chrome,

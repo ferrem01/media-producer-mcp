@@ -428,6 +428,26 @@ async function runSceneRevisionPipeline(
   const compDir = path.join(projectDir(opts.tenant_id, project.project_id), "components");
   await fs.mkdir(compDir, { recursive: true });
 
+  // Real footage re-attachment (same rule as the full build): when the
+  // project/revision prompt names an uploaded recording and the scene talks
+  // about a screencast/recording without carrying the URL itself, hand it to
+  // the codegen -- otherwise it is told "no footage was provided" and ships
+  // a placeholder.
+  let revBrollUrl: string | undefined;
+  {
+    const promptFootage = Array.from(new Set(
+      (`${revisionPrompt}\n${project.prompt || ""}`.match(/\/assets\/[^\s"'`)\]]+\.(?:mp4|webm|mov|m4v|ogv)/gi) || []),
+    ));
+    const sceneText = JSON.stringify(draft);
+    if (promptFootage.length > 0
+      && !/\/assets\/[^\s"'`)\]]+\.(?:mp4|webm|mov|m4v|ogv)/i.test(sceneText)
+      && /screencast|screen[- ]?record|screen[- ]?capture|recording|walkthrough footage|real footage|demo video/i.test(sceneText)) {
+      const byName = promptFootage.find((u) => sceneText.includes(u.split("/").pop() || " "));
+      revBrollUrl = byName || (promptFootage.length === 1 ? promptFootage[0] : undefined);
+      if (revBrollUrl) console.log(`  Footage re-attach (scene revision): ${revBrollUrl.split("/").pop()}`);
+    }
+  }
+
   const generated = await generateScene({
     scene: draft,
     sceneIndex,
@@ -440,6 +460,7 @@ async function runSceneRevisionPipeline(
     tenantId: opts.tenant_id,
     projectId: project.project_id,
     treatment: project.treatment as any,
+    brollVideoUrl: revBrollUrl,
   });
 
   // Preserve the original scene id
@@ -2109,6 +2130,38 @@ async function runUnifiedPipeline(
     }
     console.log(`  Stock footage: ${brollUrlMap.size} clip(s) fetched`);
     trace?.endEvent({ clips: brollUrlMap.size });
+  }
+
+  // 3b2. REAL uploaded footage named in the prompt. A build-from-storyboard
+  // prompt carries the uploaded recording's /assets path, but the storyboard
+  // builder rewrites scenes in its own words -- the URL rarely survives into
+  // visual_notes. Codegen then sees "no footage was provided", is EXPLICITLY
+  // told not to invent a <video>, and ships an asset-placeholder where a real
+  // 10-minute screencast should play (measured live: a rebuild dropped the
+  // footage from every scene). Deterministic re-attachment: for each scene
+  // whose text talks about a screencast/recording but names no video URL,
+  // hand it the prompt's footage (matched by filename mention when the prompt
+  // names several) via the same brollVideoUrl channel real footage already
+  // uses -- the codegen composes it, and the dropped-footage retry enforces it.
+  {
+    const promptFootage = Array.from(new Set(
+      (richPrompt.match(/\/assets\/[^\s"'`)\]]+\.(?:mp4|webm|mov|m4v|ogv)/gi) || []),
+    ));
+    if (promptFootage.length > 0) {
+      const FOOTAGE_WORDS = /screencast|screen[- ]?record|screen[- ]?capture|recording|walkthrough footage|real footage|demo video/i;
+      for (let si = 0; si < storyboard.scenes.length; si++) {
+        if (brollUrlMap.has(si)) continue;
+        const draft = storyboard.scenes[si];
+        const sceneText = JSON.stringify(draft);
+        if (/\/assets\/[^\s"'`)\]]+\.(?:mp4|webm|mov|m4v|ogv)/i.test(sceneText)) continue; // already carries its own URL
+        if (!FOOTAGE_WORDS.test(sceneText)) continue;
+        const byName = promptFootage.find((u) => sceneText.includes(u.split("/").pop() || " "));
+        const url = byName || (promptFootage.length === 1 ? promptFootage[0] : null);
+        if (!url) continue;
+        brollUrlMap.set(si, url);
+        console.log(`  Footage re-attach: scene ${si} "${draft.label}" -> ${url.split("/").pop()}`);
+      }
+    }
   }
 
   // 3c. Enforce mandatory behaviors (voiceover, bookend detection)
