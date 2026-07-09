@@ -507,6 +507,7 @@ This scene has a real cinematic video clip that MUST be the full-bleed backgroun
   \`<video class="mp-broll" src="${opts.brollVideoUrl}" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;"></video>\`
   (Keep the src EXACTLY as given -- the system resolves it to the real file at render time and an http URL in preview.)
 - DO NOT add any OTHER full-screen background (NO gradient-background, mesh, particles, grids, glow orbs) -- the footage IS the background. Keep your root container transparent.
+- EXCEPTION -- SCREEN RECORDINGS: if this footage is a screencast / app or browser walkthrough (not cinematic b-roll), do NOT stretch it full-bleed with object-fit:cover (that crops the UI's edges). Present it via the library frame instead: <component type="screencast-frame" data='{"video_url":"${opts.brollVideoUrl}","frame_style":"macos-browser","crop":"auto"}' /> in a container that fills most of the frame, over a simple brand-colored backdrop. crop:"auto" removes any browser chrome the RECORDING itself contains.
 - Keep the foreground MINIMAL: a headline/tagline and at most one small supporting element. Lots of negative space. Place foreground content at z-index:2+.
 
 ### TEXT OVER VIDEO -- legibility treatment is MANDATORY
