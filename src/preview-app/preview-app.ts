@@ -3067,17 +3067,25 @@ export function getPreviewHtml(): string {
               if (segs[ci + 1].src_start - segs[ci].src_end > 0.05) cutList.push({ src_start: segs[ci].src_end, src_end: segs[ci + 1].src_start });
             }
           }
+          var chipSpots = [];
           cutList.forEach(function(c2) {
             var glen = c2.src_end - c2.src_start;
             if (glen < 0.05) return;
             var chip = document.createElement('div');
             chip.className = 'ml-cut';
             chip.textContent = '✂';
-            chip.style.left = (((sceneStart + Math.min(srcToOut(c2.src_start), dur)) / total) * 100).toFixed(2) + '%';
+            var pctC = ((sceneStart + Math.min(srcToOut(c2.src_start), dur)) / total) * 100;
+            var liftC = 0;
+            for (var cs2 = 0; cs2 < chipSpots.length; cs2++) {
+              if (Math.abs(chipSpots[cs2].pct - pctC) < 1.2 && chipSpots[cs2].lift === liftC) { liftC++; cs2 = -1; }
+            }
+            chipSpots.push({ pct: pctC, lift: liftC });
+            if (liftC) chip.style.top = (2 - liftC * 20) + 'px';
+            chip.style.left = pctC.toFixed(2) + '%';
             chip.title = glen.toFixed(1) + 's of footage cut (src ' + c2.src_start.toFixed(1) + 's–' + c2.src_end.toFixed(1) + 's). Click to restore.';
             chip.addEventListener('click', function(ev) {
               ev.stopPropagation();
-              cutPopOpen(si, found.key, v, c2.src_start, glen, chip);
+              cutPopOpen(si, found.key, v, c2.src_start, glen, chip, c2.src_end);
             });
             rowEl.appendChild(chip);
           });
@@ -3622,7 +3630,7 @@ export function getPreviewHtml(): string {
   }
 
   // Cut popover: the footage isn't gone, just skipped -- offer restore.
-  function cutPopOpen(si, target, v, gapSrcStart, gapLen, anchorEl) {
+  function cutPopOpen(si, target, v, gapSrcStart, gapLen, anchorEl, gapSrcEnd) {
     var pop = document.getElementById('cam-pop');
     if (!pop) return;
     camPopClose(); rvPopClose();
@@ -3638,7 +3646,7 @@ export function getPreviewHtml(): string {
     document.getElementById('cp-x').addEventListener('click', camPopClose);
     document.getElementById('cp-restore').addEventListener('click', function() {
       camPopClose();
-      mediaOp(si, target, v, { op: 'remove_cut', src_start: gapSrcStart }, 'Footage restored');
+      mediaOp(si, target, v, { op: 'remove_cut', src_start: gapSrcStart, src_end: (gapSrcEnd != null ? gapSrcEnd : gapSrcStart + gapLen) }, 'Footage restored');
     });
   }
 
