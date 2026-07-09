@@ -2014,9 +2014,14 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
                 (intents.cuts = intents.cuts || []).push({ src_start: c.src_start, src_end: c.src_end });
                 break;
               }
-              case "remove_cut":
-                intents.cuts = (intents.cuts || []).filter((x: any) => !near(x.src_start, Number(body.src_start), 0.5));
+              case "remove_cut": {
+                // Exact match when src_end is given (two cuts can share a
+                // start after merges); nearest-start fallback otherwise.
+                const rs = Number(body.src_start), re = Number(body.src_end);
+                intents.cuts = (intents.cuts || []).filter((x: any) =>
+                  isFinite(re) ? !(near(x.src_start, rs, 0.5) && near(x.src_end, re, 0.5)) : !near(x.src_start, rs, 0.5));
                 break;
+              }
               case "set_rate": {
                 const r = (body.region || {}) as { src_start: number; src_end: number; rate?: number };
                 if (!(r.src_end > r.src_start)) throw new Error("region {src_start, src_end, rate} required");
