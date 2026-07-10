@@ -213,10 +213,15 @@ export function getPreviewHtml(): string {
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
   /* Pins: the user's sync anchors -- a diamond above the lane. Color = health. */
-  .ml-pin { position: absolute; top: -4px; margin-left: -9px; width: 18px; height: 32px; text-align: center;
-    font-size: 15px; line-height: 16px; cursor: pointer; pointer-events: auto; z-index: 5; color: #fff;
-    background: #4f46e5; border-radius: 9px 9px 2px 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.35); }
-  .ml-pin::after { content: ''; position: absolute; left: 50%; top: 100%; margin-left: -1px; width: 2px; height: 26px; background: inherit; opacity: 0.85; }
+  /* The pin's LEFT edge is the anchor: the stem sits exactly on the pinned
+     film time and the flag hangs to the right -- a point marker, not a blob
+     that straddles the segment seam (read as "the pin moved" when segments
+     re-solved around it). */
+  .ml-pin { position: absolute; top: -6px; margin-left: -1px; width: 18px; height: 30px; text-align: center;
+    font-size: 14px; line-height: 15px; cursor: pointer; pointer-events: auto; z-index: 5; color: #fff;
+    background: #4f46e5; border-radius: 0 9px 9px 0; border-left: 2px solid rgba(255,255,255,0.9);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.35); }
+  .ml-pin::after { content: ''; position: absolute; left: -2px; top: 100%; width: 2px; height: 34px; background: inherit; opacity: 0.9; }
   .ml-pin:hover { transform: scale(1.2); z-index: 6; }
   .ml-pin-strained { background: #d97706; }
   .ml-pin-broken { background: #dc2626; animation: mlPinPulse 1.2s ease-in-out infinite; }
