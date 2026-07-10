@@ -7,7 +7,7 @@
  * and builds the scene HTML.
  */
 
-import { callLLMAgentic, type LLMConfig, type LLMContentPart, type LLMMessage, type LLMTool } from "./client.js";
+import { callLLM, callLLMAgentic, type LLMConfig, type LLMContentPart, type LLMMessage, type LLMTool } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
 import type { Treatment } from "./creative-director.js";
 import { SCENE_STORYBOARD_DESIGN_RULES } from "./design-rules.js";
@@ -768,5 +768,86 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
   for (var s of scenes) componentHints += s.components.length;
   console.log(`  Storyboard builder: ${scenes.length} scenes, ${componentHints} component hints`);
 
+  // ── Template enforcement (deterministic, post-storyboard) ──
+  // Policy: wherever a scene template can carry a scene, use it. The main
+  // storyboard call reliably follows the user prompt's component suggestions
+  // over the template preference (verified across three prompt iterations),
+  // so -- like the critique funnel's focused detectors -- assignment runs as
+  // one-job calls AFTER the storyboard, one per eligible scene.
+  await assignSceneTemplates(scenes, opts.componentCatalog, opts.llmConfig);
+
   return { name: name!, scenes } as StoryboardResult;
+}
+
+/**
+ * Map each eligible draft scene onto a scene template (st-*) via a focused
+ * per-scene LLM call: the ONLY decision is "can one template carry ALL of
+ * this scene's essential content -- and with what slot data?". Scenes built
+ * around real footage (screencast-frame, video URLs, b-roll, hero images)
+ * are skipped; scenes the call maps get scene_template + components:[], and
+ * default transitions between two consecutive template scenes upgrade to a
+ * match-cut (mirrors the glass-turn auto-upgrade).
+ */
+export async function assignSceneTemplates(
+  scenes: DraftScene[],
+  catalog: ComponentCatalogEntry[],
+  llmConfig: LLMConfig,
+): Promise<void> {
+  var templates = catalog.filter((c) => c.category === "scene-template");
+  if (templates.length === 0) return;
+
+  var tplText = templates.map((t) => {
+    var slots = Object.entries((t.data || {}) as Record<string, any>)
+      .map(([k, v]) => `    - ${k}: ${v?.label || v?.type || ""}${v?.optional ? " (optional)" : ""}`)
+      .join("\n");
+    return `- ${t.type}: ${t.description}\n  slots:\n${slots}`;
+  }).join("\n");
+
+  var footageRe = /\.(mp4|webm|mov|m4v|ogv)(\?|"|'|\s|$)/i;
+  var eligible = scenes.filter((s) =>
+    !s.scene_template
+    && !(s.components || []).some((c) => c === "screencast-frame" || c === "video" || c.startsWith("screencast"))
+    && !s.broll_query && !s.hero_image
+    && !footageRe.test(JSON.stringify(s)));
+
+  await Promise.all(eligible.map(async (s) => {
+    var beatLines = (Array.isArray(s.beats) ? s.beats : [])
+      .map((b: any) => `  - [${b.duration_seconds}s] ${b.label}: ${b.action}`).join("\n");
+    var user = `TEMPLATES:\n${tplText}\n\nSCENE:\nlabel: ${s.label}\npurpose: ${s.purpose}\nduration: ${s.duration_seconds}s\nvisual_notes: ${s.visual_notes}\n${beatLines ? `beats:\n${beatLines}\n` : ""}voiceover: ${s.voiceover_text || ""}\nsuggested components: ${JSON.stringify(s.components)}\n\nCan ONE template above carry ALL of this scene's essential on-screen content? If yes return {"type": "st-...", "data": {...every slot filled with REAL final copy pulled from this scene's content...}}. If none fits, return null. Pure JSON only.`;
+    try {
+      var raw = await callLLM(llmConfig, [
+        { role: "system", content: "You match ONE storyboard scene to a library of locked, designer-built whole-scene templates. Be decisive: these templates are professionally composed and preferred over custom scenes whenever they can express the scene's content. Only return null when the scene genuinely needs something no template offers (real footage, custom diagrams, bespoke interaction). Respond with pure JSON -- an object {type, data} or null. No markdown, no commentary." },
+        { role: "user", content: user },
+      ], { maxTokens: 1500 });
+      var text = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+      if (!text || text === "null") return;
+      var pick = JSON.parse(text);
+      if (!pick || typeof pick !== "object" || typeof pick.type !== "string") return;
+      var tpl = templates.find((t) => t.type === pick.type);
+      if (!tpl || !pick.data || typeof pick.data !== "object") return;
+      // Every required slot must be filled -- a template with holes ships a
+      // visibly broken scene, worse than letting codegen have it.
+      var missing = Object.entries((tpl.data || {}) as Record<string, any>)
+        .filter(([k, v]) => !v?.optional && (pick.data[k] === undefined || pick.data[k] === ""))
+        .map(([k]) => k);
+      if (missing.length > 0) {
+        console.warn(`  Template assign: ${s.label} -> ${pick.type} rejected (missing required slot(s): ${missing.join(", ")})`);
+        return;
+      }
+      s.scene_template = { type: pick.type, data: pick.data };
+      s.components = [];
+      console.log(`  Template assign: ${s.label} -> ${pick.type}`);
+    } catch (e: any) {
+      console.warn(`  Template assign skipped for "${s.label}": ${e?.message || e}`);
+    }
+  }));
+
+  // Default transitions between consecutive template scenes become match cuts.
+  for (var i = 1; i < scenes.length; i++) {
+    if (!scenes[i].scene_template || !scenes[i - 1].scene_template) continue;
+    var tr = scenes[i].transition_in;
+    if (!tr || tr.type === "crossfade" || tr.type === "blur-crossfade") {
+      scenes[i].transition_in = { type: "match-cut", duration_seconds: 0.6 };
+    }
+  }
 }
