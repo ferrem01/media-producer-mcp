@@ -207,6 +207,29 @@ You build the storyboard by calling the add_scene tool ONCE PER SCENE (in order)
   "transition_in": { "type": "none", "duration_seconds": 0 }
 }
 
+And the SHAPE of a scene carried by a scene template (STEP 0 hit -- note "components" stays empty and the slots hold real final copy):
+
+{
+  "label": "Scene 2 - Four Deliverables From One Brief",
+  "duration_seconds": 12,
+  "purpose": "Land the scale of what one conversation produces",
+  "visual_notes": "st-hero-stat carries the scene: the numeral counts up while the four deliverable tags walk the lower third.",
+  "scene_template": {
+    "type": "st-hero-stat",
+    "data": {
+      "kicker": "ONE CONVERSATION",
+      "headline": "Four deliverables,|zero re-briefing",
+      "supporting": "Invitations, reminders, agenda and follow-up flow from the same brief.",
+      "stat_value": 4,
+      "stat_label": "DELIVERABLES FROM ONE BRIEF",
+      "items": ["Invitation", "Reminder sequence", "Agenda one-sheet", "Follow-up"]
+    }
+  },
+  "components": [],
+  "voiceover_text": "Personalized invitations, a reminder sequence, an agenda one sheet, and a post event follow-up.",
+  "transition_in": { "type": "match-cut", "duration_seconds": 0.6 }
+}
+
 ### CUT vs BEAT (the editorial rule that makes this a FILM, not a slide deck)
 A CUT (new scene) is earned ONLY when the WORLD changes: a different location/metaphor, the arc's emotional pivot, or the intro/outro bookends. Everything else is a BEAT: the idea advances INSIDE a persistent world -- elements morph, move, re-light, and re-arrange, but the world survives. A video that cuts on every new thought reads as a slideshow; a film holds its world and lets the thoughts move through it.
 
@@ -234,13 +257,21 @@ Rules: every card/window/badge the notes mention MUST appear in elements with it
 content. Beat actions should reference elements by name. A scene whose elements all have
 real copy cannot ship an empty skeleton; a scene without an inventory usually does.
 
-### Picking Components -- PREFER THE CATALOG
-List library component types from the catalog that the scene should embed.
-The codegen LLM will receive the component schemas and use <component> tags.
-**Default to a library component whenever one matches the scene's intent.** A vetted
-block is more consistent and higher-quality than hand-rolled custom code, so reach
-for it FIRST. Only leave "components": [] when the catalog genuinely cannot express
-the moment -- not because custom feels more flexible.
+### Picking Components -- TEMPLATE FIRST, THEN THE CATALOG
+**STEP 0 for EVERY scene, before you think about components:** check the
+"scene-template" section of the catalog. If an st-* template can carry the scene's
+content, emit "scene_template" (with every slot filled with real final copy) and
+"components": [] -- and STOP; do not also list components. A template scene is
+instantiated directly: professional by construction, zero codegen, zero critique
+time. Scenes that hold real screen-recording/video footage are the main case a
+template cannot carry.
+Only when no template fits: list library component types from the catalog that the
+scene should embed. The codegen LLM will receive the component schemas and use
+<component> tags. **Default to a library component whenever one matches the scene's
+intent.** A vetted block is more consistent and higher-quality than hand-rolled
+custom code, so reach for it FIRST. Only leave "components": [] (with no
+scene_template) when the catalog genuinely cannot express the moment -- not because
+custom feels more flexible.
 
 Match scene INTENT to a component category (the catalog has blocks for all of these):
 - Metrics / numbers / results -> stat-card, number-counter-row, metric-dashboard, bar-chart, line-chart, progress-bar
