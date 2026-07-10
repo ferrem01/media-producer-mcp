@@ -48,9 +48,15 @@
       .to(cta, { autoAlpha: 1, y: 0, duration: 0.7, ease: 'back.out(1.4)' }, 1.7)
       .to(url, { autoAlpha: 1, y: 0, duration: 0.6 }, 2.0);
 
+    var brandPrimary = getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5';
     if (window.mpAtmosphere) mpAtmosphere(root, { dark: true });
-    if (window.mpGlow && logo) mpGlow(logo, getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5', 0.8);
-    if (window.mpGlow && cta) mpGlow(cta, getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5', 0.5);
+    // Light-theme wordmarks (dark text) go invisible on this dark ground --
+    // mpLogoOnDark measures and flips lightness when needed, then glows.
+    if (logo && data.logo_url) {
+      if (window.mpLogoOnDark) mpLogoOnDark(logo, brandPrimary);
+      else if (window.mpGlow) mpGlow(logo, brandPrimary, 0.8);
+    }
+    if (window.mpGlow && cta) mpGlow(cta, brandPrimary, 0.5);
     if (window.mpShimmer && logo) mpShimmer(tl, q('.stlc-center'), 2.6);
     if (window.mpCameraPush) mpCameraPush(tl, root, ctx.duration, 1.05);
     // Breathe: the CTA pulses gently for the remainder.

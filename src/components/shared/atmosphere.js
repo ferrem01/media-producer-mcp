@@ -102,6 +102,42 @@
       'drop-shadow(0 0 ' + Math.round(18 * i) + 'px ' + c + (0.35 * i) + ')) drop-shadow(0 0 ' + Math.round(60 * i) + 'px ' + c + (0.18 * i) + '))';
   };
 
+  // Dark-ground logo adaptation. Most brand kits only ship a light-theme
+  // wordmark (dark text) -- on a dark scene it disappears. Measure the
+  // logo's opaque-pixel luminance once it loads; when it reads dark, flip
+  // lightness while keeping hue (invert + hue-rotate) on a WRAPPER span so
+  // GSAP filter tweens on the img itself stay untouched. Optional glowColor
+  // adds mpGlow to whichever element ends up outermost (wrapper drop-shadow
+  // runs after the invert, so the glow keeps its brand color).
+  window.mpLogoOnDark = function (img, glowColor) {
+    if (!img) return;
+    function apply() {
+      var target = img;
+      try {
+        var w = Math.max(1, Math.min(220, img.naturalWidth || 0));
+        if (w > 1 || img.naturalWidth === 1) {
+          var h = Math.max(1, Math.round(w * img.naturalHeight / img.naturalWidth));
+          var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+          var g = cv.getContext('2d'); g.drawImage(img, 0, 0, w, h);
+          var d = g.getImageData(0, 0, w, h).data, sum = 0, n = 0;
+          for (var i = 0; i < d.length; i += 4) {
+            if (d[i + 3] > 40) { sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; n++; }
+          }
+          if (n && sum / n < 110 && img.parentElement) {
+            var wrap = document.createElement('span');
+            wrap.style.cssText = 'display:inline-block;line-height:0;filter:invert(1) hue-rotate(180deg);';
+            img.parentElement.insertBefore(wrap, img);
+            wrap.appendChild(img);
+            target = wrap;
+          }
+        }
+      } catch (e) { /* tainted canvas etc. -- leave the logo alone */ }
+      if (window.mpGlow && glowColor) mpGlow(target, glowColor, 0.8);
+    }
+    if (img.complete && img.naturalWidth) apply();
+    else img.addEventListener('load', apply, { once: true });
+  };
+
   // Gradient hairline border (the Framer/Linear card signature): wraps the
   // element in a 1px gradient shell; the element keeps its own background.
   window.mpGradientBorder = function (el, from, to) {
