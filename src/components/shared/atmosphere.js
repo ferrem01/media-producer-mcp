@@ -197,7 +197,9 @@
       el.appendChild(mask);
       return inner;
     });
-    gsap.set(spans, { yPercent: 110 });
+    // 118, not 110: ascenders/descenders overshoot the em box and peek
+    // through the overflow mask before the reveal.
+    gsap.set(spans, { yPercent: 118 });
     tl.to(spans, {
       yPercent: 0, duration: opts.duration || 0.55,
       ease: opts.ease || 'power3.out', stagger: opts.stagger || 0.05,

@@ -122,7 +122,10 @@
     // One takeover per item: giant type-on label, meta breathes in, then the
     // whole item lifts away as the next arrives.
     items.forEach(function(it, i) {
-      var at = setup + i * itemWin;
+      // Overlap the handoff: each item (after the first) starts rising while
+      // its predecessor is still blurring out -- a hard 0.55s dead gap
+      // between takeovers reads as a dropped frame.
+      var at = setup + i * itemWin - (i > 0 ? 0.35 : 0);
       var item = document.createElement('div'); item.className = 'stkl-item';
       var num = document.createElement('div'); num.className = 'stkl-item-n';
       num.textContent = (i < 9 ? '0' : '') + (i + 1) + ' / ' + (n < 10 ? '0' : '') + n;
@@ -146,7 +149,10 @@
       if (m) tl.to(m, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power2.out' }, at + 0.5);
 
       var isLast = i === items.length - 1;
-      var exitAt = at + itemWin - 0.55;
+      // Exit keys off the slot grid (not the shifted start): it begins the
+      // moment the NEXT item starts rising, so the blur-out and the rise
+      // genuinely share the frame.
+      var exitAt = setup + (i + 1) * itemWin - 0.35;
       if (!isLast || resolve > 0) {
         tl.to(item, { autoAlpha: 0, y: -70, filter: 'blur(8px)', duration: 0.55, ease: 'power2.in' }, exitAt);
       }
