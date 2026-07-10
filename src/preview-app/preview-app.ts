@@ -3523,8 +3523,14 @@ export function getPreviewHtml(): string {
             return '<button class="rv-go secondary mp-rate" data-rate="' + r2 + '" style="flex:1;padding:5px 6px;' + (seg.rate === r2 ? 'background:#6366f1;color:#fff;border-color:#6366f1;' : '') + '">' + r2 + '×</button>';
           }).join('') +
         '</div>' +
+        '<div class="sp-row" style="align-items:center;gap:6px;">' +
+          '<input id="mp-rate-custom" type="number" min="0.1" max="16" step="0.1" placeholder="custom ×" style="flex:1;padding:5px 8px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;" />' +
+          '<button class="rv-go secondary" id="mp-rate-apply" style="flex:0 0 auto;padding:5px 12px;">Set ×</button>' +
+        '</div>' +
         '<div class="sp-row">' +
           '<button class="rv-go secondary" id="mp-split" style="flex:1;" title="Split this segment at the playhead">Split at playhead</button>' +
+        '</div>' +
+        '<div class="sp-row">' +
           '<button class="rv-go secondary" id="mp-merge" style="flex:1;" title="Dissolve this segment into its neighbor — the neighboring speed takes over this stretch">⇤ Merge into neighbor</button>' +
         '</div>' +
         '<div class="sp-row">' +
@@ -3592,6 +3598,14 @@ export function getPreviewHtml(): string {
       srcAt = Math.round(srcAt * 10) / 10;
       camPopClose();
       mediaOp(si, target, v, { op: 'split', src: srcAt }, 'Split at ' + srcAt.toFixed(1) + 's');
+    });
+    var rateApply = document.getElementById('mp-rate-apply');
+    if (rateApply) rateApply.addEventListener('click', function() {
+      var inp = document.getElementById('mp-rate-custom');
+      var rv2 = parseFloat(inp && inp.value);
+      if (!(rv2 >= 0.1 && rv2 <= 16)) { studioStatus('Enter a rate between 0.1 and 16.', 'warn'); return; }
+      camPopClose();
+      mediaOp(si, target, v, { op: 'set_rate', region: { src_start: seg.src_start, src_end: seg.src_end, rate: rv2 } }, 'Set to ' + rv2 + '×');
     });
     var mergeBtn = document.getElementById('mp-merge');
     if (mergeBtn) mergeBtn.addEventListener('click', function() {
