@@ -3539,7 +3539,7 @@ export function getPreviewHtml(): string {
           '<button class="rv-go secondary" id="mp-merge" style="flex:1;" title="Dissolve this segment into its neighbor — the neighboring speed takes over this stretch">⇤ Merge into neighbor</button>' +
         '</div>' +
         '<div class="sp-row">' +
-          '<button class="rv-go secondary" id="mp-cut" style="flex:1;color:#dc2626;border-color:#fca5a5;" title="Cut this footage out entirely — everything after it plays sooner">✂ Cut this footage</button>' +
+          '<button class="rv-go secondary" id="mp-cut" style="flex:1;color:#dc2626;border-color:#fca5a5;" title="Remove this footage from the film entirely (restorable via the ✂ chip). To slice the segment in two, use Split.">🗑 Remove this footage (' + (seg.src_end - seg.src_start).toFixed(0) + 's)</button>' +
         '</div>' +
         '<div class="sp-row"><button class="rv-go secondary" id="mp-compress" style="flex:1;" title="Scan JUST this segment for stretches where the screen barely changes and timelapse them at 8x">⚡ Compress waiting in this segment</button></div>' +
         '<div class="sp-row"><button class="rv-go secondary" id="mp-clear" style="flex:1;color:#6b7280;">Delete ALL edits on this video</button></div>';
@@ -3619,9 +3619,19 @@ export function getPreviewHtml(): string {
     });
     var cutBtn = document.getElementById('mp-cut');
     if (cutBtn) cutBtn.addEventListener('click', function() {
+      // Two-click confirm: removing footage is the most consequential edit in
+      // the lane (measured: two accidental removals in one session). First
+      // click arms; second click within the same popover fires.
+      if (!cutBtn.dataset.armed) {
+        cutBtn.dataset.armed = '1';
+        cutBtn.textContent = 'Really remove ' + (seg.src_end - seg.src_start).toFixed(0) + 's? Click again';
+        cutBtn.style.background = '#dc2626';
+        cutBtn.style.color = '#fff';
+        return;
+      }
       camPopClose();
       mediaOp(si, target, v, { op: 'add_cut', cut: { src_start: seg.src_start, src_end: seg.src_end } },
-        'Footage cut ✂ (a marker shows where — click it to restore)');
+        'Footage removed 🗑 (the ✂ chip on the lane restores it)');
     });
     var clearBtn = document.getElementById('mp-clear');
     if (clearBtn) clearBtn.addEventListener('click', function() {
