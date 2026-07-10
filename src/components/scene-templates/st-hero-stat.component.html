@@ -140,7 +140,7 @@
 
     gsap.set(q('.sths-rule'), { scaleX: 0 });
     gsap.set(q('.sths-kicker'), { autoAlpha: 0, x: -12 });
-    gsap.set(lineEls, { yPercent: 110 });
+    gsap.set(lineEls, { yPercent: 110, filter: 'blur(6px)' });
     gsap.set(q('.sths-supporting'), { autoAlpha: 0, y: 14 });
     gsap.set(q('.sths-stat'), { autoAlpha: 0, y: 44 });
     gsap.set(q('.sths-numline'), { scaleX: 0 });
@@ -150,7 +150,7 @@
 
     tl.to(q('.sths-rule'), { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 0.15)
       .to(q('.sths-kicker'), { autoAlpha: 1, x: 0, duration: 0.5, ease: 'power2.out' }, 0.3)
-      .to(lineEls, { yPercent: 0, duration: 0.85, ease: 'power4.out', stagger: 0.12 }, 0.45)
+      .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.85, ease: 'power4.out', stagger: 0.12 }, 0.45)
       .to(ghost, { autoAlpha: 0.05, duration: 1.6, ease: 'power1.inOut' }, 0.6)
       .to(q('.sths-stat'), { autoAlpha: 1, y: 0, duration: 0.9, ease: 'power3.out' }, 0.95)
       .to(q('.sths-numline'), { scaleX: 1, duration: 0.7, ease: 'power2.inOut' }, 1.35)
@@ -174,6 +174,7 @@
     if (window.mpAtmosphere) mpAtmosphere(el.querySelector('.sths'), {});
     if (window.mpCameraPush) mpCameraPush(tl, el.querySelector('.sths'), ctx.duration, 1.035);
     if (window.mpShimmer && num) mpShimmer(tl, q('.sths-stat'), 2.3);
+    if (window.mpGlow && num) mpGlow(num, getComputedStyle(el.querySelector('.sths')).getPropertyValue('--mp-color-primary').trim() || '#4f46e5', 0.55);
     Array.prototype.forEach.call(itemEls, function(it) { if (window.mpLiftShadow) mpLiftShadow(it); });
 
     // ── Beat phases: the scene EVOLVES instead of freezing after the build.
