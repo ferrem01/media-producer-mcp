@@ -138,7 +138,7 @@ export interface SceneBeat {
 }
 
 export interface SceneTransition {
-  type: "crossfade" | "blur-crossfade" | "slide-reveal" | "zoom-through" | "glitch-cut" | "morph-wipe" | "scale-rotate" | "curtain" | "wipe-left" | "wipe-right" | "slide-up" | "slide-down" | "iris" | "glass-turn" | "none";
+  type: "crossfade" | "blur-crossfade" | "slide-reveal" | "zoom-through" | "glitch-cut" | "morph-wipe" | "scale-rotate" | "curtain" | "wipe-left" | "wipe-right" | "slide-up" | "slide-down" | "iris" | "glass-turn" | "match-cut" | "none";
   duration_seconds: number;
 }
 

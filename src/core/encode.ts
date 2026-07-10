@@ -258,6 +258,7 @@ function mapTransitionType(type: string): string {
     "slide-up": "slideup",
     "slide-down": "slidedown",
     "iris": "circleopen",
+    "match-cut": "zoomin",
     "none": "fade",
   };
   return map[type] || "fade";

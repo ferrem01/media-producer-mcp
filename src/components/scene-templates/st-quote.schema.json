@@ -9,5 +9,9 @@
     "theme": { "type": "string", "label": "dark (default) | light", "optional": true },
     "logo_url": { "type": "string", "label": "Wordmark URL", "optional": true },
     "scene_index": { "type": "string", "label": "e.g. 03 / 04", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.45, "y": 0.4 },
+    "exit": { "x": 0.45, "y": 0.4 }
   }
 }

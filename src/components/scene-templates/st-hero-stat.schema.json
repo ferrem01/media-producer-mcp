@@ -12,5 +12,9 @@
     "items": { "type": "object", "label": "Array of item labels (max 6)", "optional": true },
     "logo_url": { "type": "string", "label": "Wordmark image URL", "optional": true },
     "scene_index": { "type": "string", "label": "Scene index text e.g. 01 / 04", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.75, "y": 0.38 },
+    "exit": { "x": 0.75, "y": 0.38 }
   }
 }

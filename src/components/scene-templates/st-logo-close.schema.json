@@ -8,5 +8,9 @@
     "tagline": { "type": "string", "label": "One closing line" },
     "cta": { "type": "string", "label": "CTA pill text", "optional": true },
     "url": { "type": "string", "label": "URL line", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.5 },
+    "exit": { "x": 0.5, "y": 0.5 }
   }
 }

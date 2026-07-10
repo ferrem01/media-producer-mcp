@@ -36,7 +36,7 @@ async function assembleSceneOrSequence(options: {
 import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene, encodeGif, concatSegments, applyFilmGrade } from "./encode.js";
 import { exportPdf } from "./pdf-export.js";
-import { renderTransition, extractFirstFrame, extractLastFrame, getTransitionScript, loadGsapMinimal } from "./transitions.js";
+import { renderTransition, extractFirstFrame, extractLastFrame, getTransitionScript, loadGsapMinimal, templateMatchAnchor } from "./transitions.js";
 import { renderGlassTurnTransition, sceneHasGlassSlab } from "./glass-transition.js";
 import { resolveAssetUrls } from "./scene-assembler.js";
 // Critique now runs during generate, not render
@@ -1038,6 +1038,12 @@ async function renderVideo(
         project.canvas.width, project.canvas.height,
       );
 
+      // Match cuts read the neighbors' declared anchors (scene-template
+      // schemas) so the punch-through lands element-on-element.
+      const matchAnchors = transitionType === "match-cut"
+        ? { a: await templateMatchAnchor(prevScene, "exit"), b: await templateMatchAnchor(scene, "entry") }
+        : undefined;
+
       // Render the transition as a mini video segment
       console.log(`\n  Transition ${i - 1}->${i}: ${transitionType} (${transitionDuration}s)`);
       const transitionMp4 = await renderTransition({
@@ -1050,6 +1056,7 @@ async function renderVideo(
         fps: project.canvas.fps,
         workDir: transWorkDir,
         gsapDir,
+        anchors: matchAnchors,
       });
 
       segments.push(transitionMp4);
