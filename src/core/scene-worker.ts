@@ -38,35 +38,52 @@ interface ExtractedVideo {
 }
 
 async function extractVideoFrames(videoPath: string, fps: number, width: number, height: number): Promise<ExtractedVideo> {
-  // Key the cache on dimensions/fps too: extracting at a different size must not
-  // reuse a previous run's frames (and a failed run's partial frames at the old
-  // size won't be picked up after we change extraction params).
-  const hash = crypto.createHash("md5").update(`${videoPath}|${fps}|${width}x${height}`).digest("hex").slice(0, 12);
+  // Key the cache on dimensions/fps AND format: extracting at a different
+  // size/format must not reuse a previous run's frames.
+  const hash = crypto.createHash("md5").update(`${videoPath}|${fps}|${width}x${height}|jpg`).digest("hex").slice(0, 12);
   const framesDir = `/tmp/vframes_${hash}`;
   try {
     const existing = await fs.readdir(framesDir);
-    const pngFiles = existing.filter((f) => f.endsWith(".png"));
-    if (pngFiles.length > 0) {
-      console.log(`  Reusing ${pngFiles.length} pre-extracted frames for ${path.basename(videoPath)}`);
-      return { framesDir, totalFrames: pngFiles.length };
+    // Reuse requires the .complete sentinel: a dir without it is a partial
+    // extraction (crashed/failed/in-flight) and reusing it would render a
+    // truncated clip.
+    const frameFiles = existing.filter((f) => f.endsWith(".jpg"));
+    if (frameFiles.length > 0 && existing.includes(".complete")) {
+      console.log(`  Reusing ${frameFiles.length} pre-extracted frames for ${path.basename(videoPath)}`);
+      return { framesDir, totalFrames: frameFiles.length };
     }
   } catch { /* will create */ }
   await fs.mkdir(framesDir, { recursive: true });
   console.log(`  Extracting frames from ${path.basename(videoPath)} at ${fps}fps, max ${width}x${height}...`);
-  // Downscale to the canvas size during extraction (never upscale). A source UHD
-  // clip extracted at full res is slow (0.15x) and produces multi-MB PNGs that
-  // blow the 120s timeout / fill /tmp; the frames are displayed at canvas size
-  // anyway. -loglevel error + -nostats keep ffmpeg's progress spam out of stderr
-  // so a real failure is actually visible in the captured worker error.
-  await execFileAsync("ffmpeg", [
-    "-loglevel", "error", "-nostats", "-y",
-    "-i", videoPath,
-    "-vf", `fps=${fps},scale='min(${width},iw)':-2`,
-    "-start_number", "0",
-    `${framesDir}/frame-%06d.png`,
-  ], { timeout: 180_000, maxBuffer: 1 << 20 });
+  // Downscale to the canvas size during extraction (never upscale), and
+  // extract JPEG (q:v 2, visually lossless for footage) instead of PNG: a
+  // 60s+ clip at 30fps is ~1900 frames, and full-res PNGs run ~2.5MB each
+  // (~5GB per clip) -- enough to fill /tmp and kill the render outright.
+  // JPEG lands ~8-10x smaller. -loglevel error + -nostats keep ffmpeg's
+  // progress spam out of stderr so a real failure is actually visible.
+  try {
+    await execFileAsync("ffmpeg", [
+      "-loglevel", "error", "-nostats", "-y",
+      "-i", videoPath,
+      "-vf", `fps=${fps},scale='min(${width},iw)':-2`,
+      "-q:v", "2",
+      "-start_number", "0",
+      `${framesDir}/frame-%06d.jpg`,
+    ], { timeout: 180_000, maxBuffer: 1 << 20 });
+  } catch (e: any) {
+    let diskNote = "";
+    try {
+      const sf = await (fs as any).statfs("/tmp");
+      diskNote = ` [/tmp free: ${Math.round((sf.bavail * sf.bsize) / 1e6)}MB]`;
+    } catch { /* statfs unsupported */ }
+    // A failed extraction can leave gigabytes of partial frames -- free them
+    // now instead of waiting for the sweep.
+    await fs.rm(framesDir, { recursive: true, force: true }).catch(() => {});
+    throw new Error(`ffmpeg frame extraction failed (code=${e.code ?? ""} signal=${e.signal ?? ""})${diskNote}: ${String(e.stderr || e.message || e).slice(-500)}`);
+  }
   const files = await fs.readdir(framesDir);
-  const totalFrames = files.filter((f) => f.endsWith(".png")).length;
+  const totalFrames = files.filter((f) => f.endsWith(".jpg")).length;
+  await fs.writeFile(path.join(framesDir, ".complete"), "").catch(() => {});
   console.log(`  Extracted ${totalFrames} frames from ${path.basename(videoPath)}`);
   return { framesDir, totalFrames };
 }
@@ -83,6 +100,10 @@ async function extractVideoFrames(videoPath: string, fps: number, width: number,
  */
 async function sweepStaleVideoFrameCache(): Promise<void> {
   const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  // Dirs without the .complete sentinel are partial extractions (crashed or
+  // failed runs) holding potentially gigabytes -- sweep those on a much
+  // shorter fuse. 30min safely exceeds any live extraction (180s timeout).
+  const PARTIAL_AGE_MS = 30 * 60 * 1000;
   try {
     const entries = await fs.readdir("/tmp");
     const now = Date.now();
@@ -91,7 +112,8 @@ async function sweepStaleVideoFrameCache(): Promise<void> {
       const dir = `/tmp/${name}`;
       try {
         const stat = await fs.stat(dir);
-        if (now - stat.mtimeMs > MAX_AGE_MS) {
+        const complete = await fs.stat(`${dir}/.complete`).then(() => true).catch(() => false);
+        if (now - stat.mtimeMs > (complete ? MAX_AGE_MS : PARTIAL_AGE_MS)) {
           await fs.rm(dir, { recursive: true, force: true });
         }
       } catch { /* raced with another sweep -- fine */ }
@@ -456,9 +478,9 @@ async function main() {
             ? mapSourceTime(edlSegs, time)
             : Math.max(0, vInfo.startAt + time);
           const frameIndex = Math.min(Math.round(targetTime * args.fps), extracted.totalFrames - 1);
-          const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.png`);
+          const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.jpg`);
           const frameData = await fs.readFile(framePath);
-          const dataUri = `data:image/png;base64,${frameData.toString("base64")}`;
+          const dataUri = `data:image/jpeg;base64,${frameData.toString("base64")}`;
           frameUpdates.push({ imgId: `__render_frame_${vInfo.index}__`, dataUri });
         }
 
