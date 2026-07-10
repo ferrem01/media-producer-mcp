@@ -1,0 +1,170 @@
+<template>
+  <div class="sths">
+    <div class="sths-ghost" aria-hidden="true"></div>
+    <div class="sths-col">
+      <div class="sths-kicker-row">
+        <span class="sths-rule"></span>
+        <span class="sths-kicker">{{kicker}}</span>
+      </div>
+      <h1 class="sths-headline"></h1>
+      <p class="sths-supporting">{{supporting}}</p>
+    </div>
+    <div class="sths-stat">
+      <div class="sths-num">0</div>
+      <div class="sths-numline"></div>
+      <div class="sths-statlabel">{{stat_label}}</div>
+    </div>
+    <div class="sths-items"></div>
+    <img class="sths-wordmark" alt="" />
+    <div class="sths-index">{{scene_index}}</div>
+    <!-- Freeform overlay: the ONLY region codegen may add bespoke elements
+         into. The compositional skeleton around it is template-owned. -->
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-hero-stat: one number carries the scene ──
+     Composition is locked: left text column on an 8vw margin, oversized
+     numeral cluster right-of-center, items baseline in the lower third,
+     ghost numeral as the single atmosphere element. No decorative grids. */
+  .sths {
+    position: absolute; inset: 0; overflow: hidden;
+    background: var(--mp-color-background, #fbfbfd);
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif;
+    color: var(--mp-color-text, #17171c);
+  }
+  .sths-ghost {
+    position: absolute; right: -5vw; top: -28vh; height: 160vh;
+    font-size: 118vh; line-height: 1; font-weight: 600;
+    color: var(--mp-color-primary, #4f46e5); opacity: 0.05;
+    letter-spacing: -0.04em; user-select: none;
+  }
+  .sths-col { position: absolute; left: 8vw; top: 18vh; width: 44vw; }
+  .sths-kicker-row { display: flex; align-items: center; gap: 14px; margin-bottom: 3.2vh; }
+  .sths-rule { display: inline-block; width: 34px; height: 2px; background: var(--mp-color-primary, #4f46e5); transform-origin: left center; }
+  .sths-kicker {
+    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
+    letter-spacing: 0.19em; text-transform: uppercase;
+    color: var(--mp-color-primary, #4f46e5);
+  }
+  .sths-headline {
+    margin: 0 0 3vh 0; font-weight: 500; font-size: 4.6vw; line-height: 1.06;
+    letter-spacing: -0.015em; max-width: 15ch; text-wrap: balance; word-break: keep-all;
+  }
+  .sths-headline .sths-line { display: block; overflow: hidden; }
+  .sths-headline .sths-line > span { display: block; }
+  .sths-supporting {
+    margin: 0; font-family: 'Inter', sans-serif; font-size: 1.15vw; line-height: 1.55;
+    color: var(--mp-color-text-muted, #6b7280); max-width: 42ch;
+  }
+  .sths-stat { position: absolute; right: 10vw; top: 20vh; text-align: right; }
+  .sths-num {
+    font-size: 17.5vw; line-height: 0.9; font-weight: 500; letter-spacing: -0.03em;
+    color: var(--mp-color-primary, #4f46e5);
+    font-variant-numeric: tabular-nums;
+  }
+  .sths-numline { height: 3px; width: 100%; margin: 2.4vh 0 1.6vh; background: linear-gradient(90deg, transparent, var(--mp-color-secondary, #d48c34)); transform-origin: right center; }
+  .sths-statlabel {
+    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
+    letter-spacing: 0.17em; text-transform: uppercase;
+    color: var(--mp-color-text-muted, #6b7280);
+  }
+  .sths-items { position: absolute; left: 8vw; right: 10vw; bottom: 14vh; display: flex; gap: 1.1vw; }
+  .sths-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 18px; border: 1px solid color-mix(in srgb, var(--mp-color-primary, #4f46e5) 26%, transparent);
+    border-radius: 3px; background: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 4%, #ffffff);
+  }
+  .sths-item-n {
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700;
+    color: var(--mp-color-secondary, #d48c34); letter-spacing: 0.06em;
+  }
+  .sths-item-t {
+    font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 600;
+    letter-spacing: 0.13em; text-transform: uppercase; white-space: nowrap;
+  }
+  .sths-wordmark { position: absolute; left: 8vw; bottom: 6vh; height: 26px; width: auto; opacity: 0.85; }
+  .sths-index {
+    position: absolute; right: 10vw; bottom: 6vh;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+    letter-spacing: 0.2em; color: var(--mp-color-text-muted, #9ca3af);
+  }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+
+    // ── Slot fill (DOM only -- the skeleton above never changes) ──
+    var ghost = q('.sths-ghost');
+    var num = q('.sths-num');
+    var statValue = Number(data.stat_value) || 0;
+    if (ghost) ghost.textContent = String(statValue);
+
+    var head = q('.sths-headline');
+    var lines = String(data.headline || '').split('|');
+    if (head) {
+      lines.forEach(function(txt) {
+        var line = document.createElement('span'); line.className = 'sths-line';
+        var inner = document.createElement('span'); inner.textContent = txt.trim();
+        line.appendChild(inner); head.appendChild(line);
+      });
+    }
+
+    var itemsWrap = q('.sths-items');
+    var items = Array.isArray(data.items) ? data.items.slice(0, 6) : [];
+    items.forEach(function(label, i) {
+      var it = document.createElement('div'); it.className = 'sths-item';
+      var n = document.createElement('span'); n.className = 'sths-item-n';
+      n.textContent = (i < 9 ? '0' : '') + (i + 1);
+      var t = document.createElement('span'); t.className = 'sths-item-t';
+      t.textContent = String(label);
+      it.appendChild(n); it.appendChild(t); itemsWrap.appendChild(it);
+    });
+
+    var wm = q('.sths-wordmark');
+    if (wm) { if (data.logo_url) wm.src = data.logo_url; else wm.style.display = 'none'; }
+
+    // ── Choreography: build (0-2.4s), breathe, no self-exit ──
+    var lineEls = el.querySelectorAll('.sths-line > span');
+    var itemEls = el.querySelectorAll('.sths-item');
+    var itemsAt = Math.min(Math.max(2.6, ctx.duration * 0.32), 6);
+
+    gsap.set(q('.sths-rule'), { scaleX: 0 });
+    gsap.set(q('.sths-kicker'), { autoAlpha: 0, x: -12 });
+    gsap.set(lineEls, { yPercent: 110 });
+    gsap.set(q('.sths-supporting'), { autoAlpha: 0, y: 14 });
+    gsap.set(q('.sths-stat'), { autoAlpha: 0, y: 44 });
+    gsap.set(q('.sths-numline'), { scaleX: 0 });
+    gsap.set(itemEls, { autoAlpha: 0, y: 26 });
+    gsap.set(ghost, { autoAlpha: 0 });
+    gsap.set([wm, q('.sths-index')], { autoAlpha: 0 });
+
+    tl.to(q('.sths-rule'), { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 0.15)
+      .to(q('.sths-kicker'), { autoAlpha: 1, x: 0, duration: 0.5, ease: 'power2.out' }, 0.3)
+      .to(lineEls, { yPercent: 0, duration: 0.85, ease: 'power4.out', stagger: 0.12 }, 0.45)
+      .to(ghost, { autoAlpha: 1, duration: 1.6, ease: 'power1.inOut' }, 0.6)
+      .to(q('.sths-stat'), { autoAlpha: 1, y: 0, duration: 0.9, ease: 'power3.out' }, 0.95)
+      .to(q('.sths-numline'), { scaleX: 1, duration: 0.7, ease: 'power2.inOut' }, 1.35)
+      .to(q('.sths-supporting'), { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power2.out' }, 1.5)
+      .to([wm, q('.sths-index')], { autoAlpha: 1, duration: 0.6 }, 1.9)
+      .to(itemEls, { autoAlpha: 1, y: 0, duration: 0.65, ease: 'power3.out', stagger: 0.09 }, itemsAt);
+
+    // Count-up locked to the stat's entrance.
+    if (num) {
+      var counter = { v: 0 };
+      tl.to(counter, {
+        v: statValue, duration: 1.1, ease: 'power2.out',
+        onUpdate: function() { num.textContent = String(Math.round(counter.v)); },
+      }, 0.95);
+    }
+
+    // Breathe: the ghost numeral drifts for the whole scene.
+    if (ghost) tl.to(ghost, { y: -30, duration: Math.max(4, ctx.duration - 1), ease: 'none' }, 1);
+
+    return tl;
+  }
+</script>

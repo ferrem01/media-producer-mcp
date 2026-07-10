@@ -1,0 +1,16 @@
+{
+  "type": "st-hero-stat",
+  "label": "Scene Template: Hero Stat",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: one number carries the scene. Locked composition -- left text column (kicker + masked headline + supporting), oversized count-up numeral right-of-center with a ghost echo, item tags along the lower third, wordmark + scene index anchors. Codegen fills slots only; bespoke additions go in the .st-overlay region.",
+  "data": {
+    "kicker": { "type": "string", "label": "Kicker (small caps intro line)" },
+    "headline": { "type": "string", "label": "Headline; use | for the line break" },
+    "supporting": { "type": "string", "label": "Supporting sentence", "optional": true },
+    "stat_value": { "type": "number", "label": "The number (counts up)" },
+    "stat_label": { "type": "string", "label": "Label under the number" },
+    "items": { "type": "object", "label": "Array of item labels (max 6)", "optional": true },
+    "logo_url": { "type": "string", "label": "Wordmark image URL", "optional": true },
+    "scene_index": { "type": "string", "label": "Scene index text e.g. 01 / 04", "optional": true }
+  }
+}
