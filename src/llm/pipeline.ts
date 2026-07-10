@@ -1050,9 +1050,13 @@ async function critiqueAndRetryScene(opts: {
   // silently destroying the template. The draft's visual_notes describe intent
   // the storyboard wrote before choosing the template, so intent_mismatch /
   // dropped_element flags against them are expected noise, not defects.
+  // `some`, not `every`: st-screencast pairs its shell with a sibling
+  // screencast-frame instance -- still a curated instantiation, still no
+  // codegen source to regenerate. Only template instantiation ever puts an
+  // st-* component on a scene.
   if (
     opts.scene.components.length > 0 &&
-    opts.scene.components.every((c) => typeof c.type === "string" && c.type.startsWith("st-"))
+    opts.scene.components.some((c) => typeof c.type === "string" && c.type.startsWith("st-"))
   ) {
     console.log(`  Critique: scene ${opts.sceneIndex} is a scene-template instantiation, skipping critique/regen`);
     return { scene: opts.scene, customSources: opts.customSources };
@@ -2494,7 +2498,7 @@ async function runUnifiedPipeline(
       // same template -- a fix_scene on one burns the editorial budget on a no-op.
       const isTemplateScene = (idx: number) => {
         const comps = project.scenes[idx]?.components || [];
-        return comps.length > 0 && comps.every((c) => typeof c.type === "string" && c.type.startsWith("st-"));
+        return comps.length > 0 && comps.some((c) => typeof c.type === "string" && c.type.startsWith("st-"));
       };
       const sceneFixes = (editorial.fixes || []).filter(f => f.type === "fix_scene" && typeof f.scene_index === "number" && f.detail && f.scene_index! >= 0 && f.scene_index! < project.scenes.length && !isTemplateScene(f.scene_index!));
       let regen = 0;
