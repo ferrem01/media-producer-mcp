@@ -61,7 +61,8 @@
   .sths-stat { position: absolute; right: 10vw; top: 20vh; text-align: right; }
   .sths-num {
     font-size: 17.5vw; line-height: 0.9; font-weight: 500; letter-spacing: -0.03em;
-    color: var(--mp-color-primary, #4f46e5);
+    background: linear-gradient(160deg, var(--mp-color-primary, #4f46e5) 20%, color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, #8b5cf6) 78%, var(--mp-color-secondary, #d48c34) 130%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
     font-variant-numeric: tabular-nums;
   }
   .sths-numline { height: 3px; width: 100%; margin: 2.4vh 0 1.6vh; background: linear-gradient(90deg, transparent, var(--mp-color-secondary, #d48c34)); transform-origin: right center; }
@@ -83,6 +84,10 @@
   .sths-item-t {
     font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 600;
     letter-spacing: 0.13em; text-transform: uppercase; white-space: nowrap;
+  }
+  .sths-item.is-live {
+    border-color: var(--mp-color-primary, #4f46e5);
+    background: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 9%, #ffffff);
   }
   .sths-wordmark { position: absolute; left: 8vw; bottom: 6vh; height: 26px; width: auto; opacity: 0.85; }
   .sths-index {
@@ -164,6 +169,30 @@
 
     // Breathe: the ghost numeral drifts for the whole scene.
     if (ghost) tl.to(ghost, { y: -30, duration: Math.max(4, ctx.duration - 1), ease: 'none' }, 1);
+
+    // ── Atmosphere: washes + grain + slow push + shimmer + lit tags ──
+    if (window.mpAtmosphere) mpAtmosphere(el.querySelector('.sths'), {});
+    if (window.mpCameraPush) mpCameraPush(tl, el.querySelector('.sths'), ctx.duration, 1.035);
+    if (window.mpShimmer && num) mpShimmer(tl, q('.sths-stat'), 2.3);
+    Array.prototype.forEach.call(itemEls, function(it) { if (window.mpLiftShadow) mpLiftShadow(it); });
+
+    // ── Beat phases: the scene EVOLVES instead of freezing after the build.
+    // Phase 2+: a highlight walks the item tags, one per remaining phase
+    // (or cycling), each pulse lifting its tag while the others calm.
+    var phases = window.mpBeatPhases ? mpBeatPhases(ctx, 4) : [];
+    if (itemEls.length && phases.length > 1) {
+      var walkPhases = phases.slice(1);
+      walkPhases.forEach(function(ph, pi) {
+        var target = itemEls[pi % itemEls.length];
+        var at = Math.max(ph.start, itemsAt + 0.9);
+        if (at >= ctx.duration - 0.5) return;
+        tl.add(function() {}, at); // anchor
+        tl.to(target, { y: -6, scale: 1.04, duration: 0.45, ease: 'power2.out',
+          onStart: function() { target.classList.add('is-live'); } }, at);
+        tl.to(target, { y: 0, scale: 1, duration: 0.5, ease: 'power2.inOut',
+          onComplete: function() { target.classList.remove('is-live'); } }, Math.min(ph.end - 0.4, at + Math.max(1.2, (ph.end - at) - 0.5)));
+      });
+    }
 
     return tl;
   }
