@@ -474,6 +474,13 @@ function buildCompositeTransitionScript(type: string, duration: number, transSta
              `      master.fromTo(sceneEl, { scale: 1.5, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: ${half}, ease: "power2.out" }, ${transStart + half});\n`;
     }
 
+    case "match-cut":
+      // Preview approximation of the render's anchored punch-through
+      // (center-anchored here; the render reads declared template anchors).
+      return `      sceneEl.style.zIndex = "2";\n` +
+             `      master.to(prevSceneEl, { scale: 1.55, autoAlpha: 0, filter: "blur(12px)", transformOrigin: "50% 45%", duration: ${duration}, ease: "power2.in" }, ${transStart});\n` +
+             `      master.fromTo(sceneEl, { scale: 1.3, autoAlpha: 0, filter: "blur(10px)", transformOrigin: "50% 45%" }, { scale: 1, autoAlpha: 1, filter: "blur(0px)", duration: ${duration * 0.62}, ease: "power3.out" }, ${transStart + duration * 0.38});\n`;
+
     case "slide-up":
       return `      sceneEl.style.zIndex = "2";\n` +
              `      master.fromTo(sceneEl, { yPercent: 100, autoAlpha: 1 }, { yPercent: 0, duration: ${duration}, ease: "power2.inOut" }, ${transStart});\n`;

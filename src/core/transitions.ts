@@ -10,6 +10,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { captureScene, captureSingleFrame } from "./capture.js";
 import { encodeScene } from "./encode.js";
+import { config } from "../config.js";
 
 export type TransitionType =
   | "crossfade"
@@ -32,6 +33,7 @@ export type TransitionType =
   | "push"
   | "whip-pan"
   | "cinematic-zoom"
+  | "match-cut"
   // Shader transitions (WebGL)
   | "shader-crosswarp"
   | "shader-ripple"
@@ -67,6 +69,37 @@ export interface TransitionOptions {
   workDir: string;
   /** Path to GSAP vendor directory */
   gsapDir: string;
+  /** Match-cut anchors (normalized 0-1): a = exit anchor of the outgoing
+   * scene, b = entry anchor of the incoming scene. Defaults to center. */
+  anchors?: { a?: MatchAnchor; b?: MatchAnchor };
+}
+
+/** A normalized (0-1) point in the frame where a scene's dominant element sits. */
+export interface MatchAnchor { x: number; y: number }
+
+/**
+ * Read the declared match anchor for a scene's template component, if any.
+ * Scene templates (st-*) declare a "match" block in their schema JSON:
+ *   "match": { "entry": {"x":0.5,"y":0.45}, "exit": {"x":0.5,"y":0.45} }
+ * (a single {"x","y"} point is accepted for both). Non-template scenes
+ * return undefined and the transition falls back to a centered anchor.
+ */
+export async function templateMatchAnchor(
+  scene: { components?: Array<{ type?: string }> } | undefined,
+  key: "entry" | "exit",
+): Promise<MatchAnchor | undefined> {
+  const tpl = scene?.components?.find((c) => typeof c.type === "string" && c.type.startsWith("st-"));
+  if (!tpl) return undefined;
+  try {
+    const raw = await fs.readFile(
+      path.join(config.componentLibDir, "scene-templates", `${tpl.type}.schema.json`),
+      "utf-8",
+    );
+    const match = (JSON.parse(raw) as Record<string, any>).match;
+    const pt = match?.[key] ?? match;
+    if (pt && typeof pt.x === "number" && typeof pt.y === "number") return { x: pt.x, y: pt.y };
+  } catch { /* no schema or no match declaration -- centered fallback */ }
+  return undefined;
 }
 
 /**
@@ -74,7 +107,7 @@ export interface TransitionOptions {
  * Returns the path to the transition MP4.
  */
 export async function renderTransition(opts: TransitionOptions): Promise<string> {
-  const { type, duration, frameA, frameB, width, height, fps, workDir, gsapDir } = opts;
+  const { type, duration, frameA, frameB, width, height, fps, workDir, gsapDir, anchors } = opts;
 
   await fs.mkdir(workDir, { recursive: true });
 
@@ -91,7 +124,7 @@ export async function renderTransition(opts: TransitionOptions): Promise<string>
   }
 
   // Get the animation script for this transition type
-  const animScript = getTransitionScript(type, duration, width);
+  const animScript = getTransitionScript(type, duration, width, anchors);
 
   // Build the HTML
   const html = `<!DOCTYPE html>
@@ -236,7 +269,12 @@ export async function extractFirstFrame(
 /**
  * Get the GSAP animation script for a transition type.
  */
-export function getTransitionScript(type: string, duration: number, width: number = 1920): string {
+export function getTransitionScript(
+  type: string,
+  duration: number,
+  width: number = 1920,
+  anchors?: { a?: MatchAnchor; b?: MatchAnchor },
+): string {
   switch (type) {
     case "crossfade":
       return `
@@ -389,6 +427,24 @@ export function getTransitionScript(type: string, duration: number, width: numbe
   gsap.set(imgB, { xPercent: 120, filter: 'blur(0px)' });
   tl.to(imgA, { xPercent: -120, filter: 'blur(18px)', duration: halfW, ease: 'power3.in' }, 0);
   tl.fromTo(imgB, { xPercent: 120, filter: 'blur(18px)' }, { xPercent: 0, filter: 'blur(0px)', duration: halfW, ease: 'power3.out' }, halfW * 0.85);`;
+
+    case "match-cut": {
+      // Anchored punch-through: the camera drives INTO the outgoing scene's
+      // exit anchor and lands ON the incoming scene's entry anchor -- one
+      // continuous move, so the dominant elements read as handing off.
+      const fmt = (p?: MatchAnchor) => p
+        ? `${(p.x * 100).toFixed(1)}% ${(p.y * 100).toFixed(1)}%`
+        : "50% 45%";
+      return `
+  imgA.style.transformOrigin = '${fmt(anchors?.a)}';
+  imgB.style.transformOrigin = '${fmt(anchors?.b)}';
+  imgB.style.zIndex = '2';
+  gsap.set(imgB, { autoAlpha: 0, scale: 1.3, filter: 'blur(10px)' });
+  tl.to(imgA, { scale: 1.55, filter: 'blur(14px)', duration: dur, ease: 'power2.in' }, 0);
+  tl.to(imgA, { autoAlpha: 0, duration: dur * 0.45, ease: 'power1.in' }, dur * 0.5);
+  tl.to(imgB, { autoAlpha: 1, duration: dur * 0.5, ease: 'power1.out' }, dur * 0.38);
+  tl.to(imgB, { scale: 1, filter: 'blur(0px)', duration: dur * 0.62, ease: 'power3.out' }, dur * 0.38);`;
+    }
 
     case "cinematic-zoom":
       return `
