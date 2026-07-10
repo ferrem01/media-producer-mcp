@@ -70,6 +70,31 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
       if (wmLogo) (stData as any).logo_url = wmLogo.url;
     }
     if (!(stData as any).scene_index) (stData as any).scene_index = `${String(opts.sceneIndex + 1).padStart(2, "0")} / ${String(opts.totalScenes).padStart(2, "0")}`;
+    var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
+    // st-screencast is a SHELL: the footage itself rides in a sibling
+    // screencast-frame instance (browser chrome + crop:'auto' ingest-analysis
+    // chrome removal). The frame's box leaves the shell's bottom band free
+    // for the timed caption chips.
+    if (st.type === "st-screencast") {
+      var src = (stData as any).source || (draft as any).assets?.find?.((a: string) => /\.(mp4|webm|mov|m4v)/i.test(a));
+      if (src) {
+        stComponents.push({
+          id: "tpl_video",
+          type: "screencast-frame",
+          z_index: 20,
+          position: { x: "0%", y: "4%", width: "100%", height: "82%" },
+          data: {
+            video_url: src,
+            frame_style: "macos-browser",
+            crop: "auto",
+            url_text: (stData as any).url_text || "",
+            max_width_pct: Number((stData as any).max_width_pct) || 80,
+          },
+        });
+      } else {
+        console.warn(`  st-screencast: no footage source in slots or draft assets -- shell only`);
+      }
+    }
     return {
       scene: {
         id: sceneId,
@@ -77,7 +102,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
         duration_seconds: draft.duration_seconds || 8,
         transition_in: draft.transition_in as any,
         beats: draft.beats as any,
-        components: [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 } as any],
+        components: stComponents,
         audio_hints: draft.voiceover_text ? { voiceover_text: draft.voiceover_text } : undefined,
       } as any,
     };

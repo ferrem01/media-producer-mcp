@@ -1,0 +1,18 @@
+{
+  "type": "st-screencast",
+  "label": "Scene Template: Screencast Showcase",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template for scenes whose star is a REAL screen recording. Lit atmosphere background, small-caps kicker, the footage presented in a polished macos-browser frame (crop:'auto' removes the recording's own window chrome via ingest analysis), and timed caption chips in a reserved bottom band. Use for ANY screencast/screen-recording scene -- raw footage on a bare canvas is a composition failure. Instantiation adds the screencast-frame component automatically; give this template the footage URL as 'source'.",
+  "data": {
+    "source": { "type": "string", "label": "Footage URL (/assets/... screen recording)" },
+    "kicker": { "type": "string", "label": "Small-caps line above the frame", "optional": true },
+    "url_text": { "type": "string", "label": "Browser address-bar text", "optional": true },
+    "captions": { "type": "object", "label": "Array of {at, text}: caption chips timed in scene seconds", "optional": true },
+    "theme": { "type": "string", "label": "light (default) | dark", "optional": true },
+    "max_width_pct": { "type": "number", "label": "Frame width % of canvas (default 80)", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.47 },
+    "exit": { "x": 0.5, "y": 0.47 }
+  }
+}

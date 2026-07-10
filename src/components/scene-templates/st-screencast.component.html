@@ -1,0 +1,83 @@
+<template>
+  <div class="stsc">
+    <div class="stsc-kicker-row">
+      <span class="stsc-rule"></span>
+      <span class="stsc-kicker">{{kicker}}</span>
+      <span class="stsc-rule stsc-rule--right"></span>
+    </div>
+    <div class="stsc-caps"></div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-screencast: the SHELL around real screen-recording footage. The
+     footage itself is a sibling screencast-frame component (browser chrome +
+     crop:'auto'); this layer owns the lit background, the kicker, and the
+     timed caption chips in the reserved bottom band. Never put raw footage
+     on a bare canvas. */
+  .stsc { position: absolute; inset: 0; overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; color: #17171c; }
+  .stsc.is-dark { color: #f4f4f8; }
+  .stsc-kicker-row { position: absolute; top: 4.2vh; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px; white-space: nowrap; }
+  .stsc-rule { display: inline-block; width: 30px; height: 2px;
+    background: var(--mp-color-primary, #4f46e5); transform-origin: left center; }
+  .stsc-rule--right { transform-origin: right center; }
+  .stsc-kicker { font-size: 13px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--mp-color-primary, #4f46e5); }
+  .stsc-caps { position: absolute; left: 50%; bottom: 4.6vh; transform: translateX(-50%);
+    display: flex; align-items: center; justify-content: center; }
+  .stsc-cap { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    font-size: 15px; font-weight: 500; letter-spacing: 0.01em; color: #17171c;
+    background: rgba(255,255,255,0.92); padding: 11px 26px; border-radius: 100px;
+    border: 1px solid rgba(23,23,28,0.08);
+    box-shadow: 0 2px 6px rgba(23,23,28,0.06), 0 10px 30px rgba(23,23,28,0.10); }
+  .is-dark .stsc-cap { color: #f4f4f8; background: rgba(28,28,38,0.92);
+    border-color: rgba(244,244,248,0.10); }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.stsc');
+    var dark = data.theme === 'dark';
+    if (dark) root.classList.add('is-dark');
+
+    var kickerRow = q('.stsc-kicker-row');
+    if (!data.kicker) { if (kickerRow) kickerRow.style.display = 'none'; }
+    else {
+      gsap.set(q('.stsc-kicker'), { autoAlpha: 0, y: -8 });
+      gsap.set('.stsc-rule', { scaleX: 0 });
+      tl.to(q('.stsc-kicker'), { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power3.out' }, 0.3)
+        .to(el.querySelectorAll('.stsc-rule'), { scaleX: 1, duration: 0.6, ease: 'power2.out' }, 0.35);
+    }
+
+    // Timed caption chips: [{at, text}] in scene seconds. One chip visible at
+    // a time -- the previous slides down as the next rises.
+    var caps = Array.isArray(data.captions) ? data.captions.filter(function (c) {
+      return c && typeof c.text === 'string' && c.text && Number.isFinite(Number(c.at));
+    }) : [];
+    var capHost = q('.stsc-caps');
+    var prev = null;
+    caps.forEach(function (c) {
+      var chip = document.createElement('div');
+      chip.className = 'stsc-cap';
+      chip.textContent = c.text;
+      capHost.appendChild(chip);
+      gsap.set(chip, { autoAlpha: 0, y: 16 });
+      var at = Math.max(0.1, Number(c.at));
+      if (prev) tl.to(prev, { autoAlpha: 0, y: -12, duration: 0.4, ease: 'power2.in' }, at);
+      tl.to(chip, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out' }, at + (prev ? 0.15 : 0));
+      prev = chip;
+    });
+
+    // Lit background behind the sibling video frame. NO camera push here:
+    // the footage is a separate component and a scaling shell would shear
+    // against it.
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: dark });
+    return tl;
+  }
+</script>

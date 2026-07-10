@@ -187,7 +187,7 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
 You think in visual STORIES, not slide decks. Every scene should feel like something the viewer wants to watch, not endure.
 
 ${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n` : ""}## SCENE TEMPLATES (whole-scene compositions -- your FIRST choice)
-Scene templates (types starting "st-") are designer-built full-scene compositions with professional lighting, choreography and beat-phased motion baked in. When a scene's content fits one, emit "scene_template": {"type": "st-...", "data": {...slots from its schema...}} INSTEAD of hand-specifying components -- the scene is instantiated directly and is guaranteed to look professional. Fill every slot with REAL final copy. Give the film light/dark RHYTHM: st-quote and st-logo-close are dark; use a "theme": "dark" slot on others when a contrast beat is wanted. Fall back to components/codegen only when no template fits (e.g. real screencast footage scenes -> screencast-frame component as usual).
+Scene templates (types starting "st-") are designer-built full-scene compositions with professional lighting, choreography and beat-phased motion baked in. When a scene's content fits one, emit "scene_template": {"type": "st-...", "data": {...slots from its schema...}} INSTEAD of hand-specifying components -- the scene is instantiated directly and is guaranteed to look professional. Fill every slot with REAL final copy. Give the film light/dark RHYTHM: st-quote and st-logo-close are dark; use a "theme": "dark" slot on others when a contrast beat is wanted. Screen-recording scenes get st-screencast (footage URL in "source", caption chips from the beats). Fall back to components/codegen only when no template fits.
 When the user prompt SUGGESTS components ("use title-slide, timeline-steps or similar", "kinetic-text", "a stat card"), a scene template that delivers the same content COUNTS as "similar" and is still your first choice -- the user is describing the content they want on screen, not forbidding better compositions. Only skip templates when the prompt EXPLICITLY forbids them or demands a specific component by exact behavior a template cannot deliver.
 
 You build the storyboard by calling the add_scene tool ONCE PER SCENE (in order), then finish_storyboard when every scene is added. Never describe the storyboard in prose -- use the tools. Each scene has visual notes (the visual direction) and a list of component types from the catalog. Below is the SHAPE of one add_scene call's parameters:
@@ -803,20 +803,20 @@ export async function assignSceneTemplates(
     return `- ${t.type}: ${t.description}\n  slots:\n${slots}`;
   }).join("\n");
 
-  var footageRe = /\.(mp4|webm|mov|m4v|ogv)(\?|"|'|\s|$)/i;
-  var eligible = scenes.filter((s) =>
-    !s.scene_template
-    && !(s.components || []).some((c) => c === "screencast-frame" || c === "video" || c.startsWith("screencast"))
-    && !s.broll_query && !s.hero_image
-    && !footageRe.test(JSON.stringify(s)));
+  // B-roll/hero-image scenes keep their cinematic backgrounds (no template
+  // shows a video background); screen-recording scenes ARE eligible -- they
+  // map to st-screencast, which frames the footage properly.
+  var footageUrlRe = /\/[^\s"'`)\]]+\.(?:mp4|webm|mov|m4v|ogv)/i;
+  var eligible = scenes.filter((s) => !s.scene_template && !s.broll_query && !s.hero_image);
 
   await Promise.all(eligible.map(async (s) => {
     var beatLines = (Array.isArray(s.beats) ? s.beats : [])
       .map((b: any) => `  - [${b.duration_seconds}s] ${b.label}: ${b.action}`).join("\n");
-    var user = `TEMPLATES:\n${tplText}\n\nSCENE:\nlabel: ${s.label}\npurpose: ${s.purpose}\nduration: ${s.duration_seconds}s\nvisual_notes: ${s.visual_notes}\n${beatLines ? `beats:\n${beatLines}\n` : ""}voiceover: ${s.voiceover_text || ""}\nsuggested components: ${JSON.stringify(s.components)}\n\nCan ONE template above carry ALL of this scene's essential on-screen content? If yes return {"type": "st-...", "data": {...every slot filled with REAL final copy pulled from this scene's content...}}. If none fits, return null. Pure JSON only.`;
+    var footageUrl = (JSON.stringify(s).match(footageUrlRe) || [])[0];
+    var user = `TEMPLATES:\n${tplText}\n\nSCENE:\nlabel: ${s.label}\npurpose: ${s.purpose}\nduration: ${s.duration_seconds}s\nvisual_notes: ${s.visual_notes}\n${beatLines ? `beats:\n${beatLines}\n` : ""}voiceover: ${s.voiceover_text || ""}\nsuggested components: ${JSON.stringify(s.components)}\n${footageUrl ? `footage in this scene: ${footageUrl}\n` : ""}\nCan ONE template above carry ALL of this scene's essential on-screen content? If yes return {"type": "st-...", "data": {...every slot filled with REAL final copy pulled from this scene's content...}}. If none fits, return null. Pure JSON only.`;
     try {
       var raw = await callLLM(llmConfig, [
-        { role: "system", content: "You match ONE storyboard scene to a library of locked, designer-built whole-scene templates. Be decisive: these templates are professionally composed and preferred over custom scenes whenever they can express the scene's content. Only return null when the scene genuinely needs something no template offers (real footage, custom diagrams, bespoke interaction). Respond with pure JSON -- an object {type, data} or null. No markdown, no commentary." },
+        { role: "system", content: "You match ONE storyboard scene to a library of locked, designer-built whole-scene templates. Be decisive: these templates are professionally composed and preferred over custom scenes whenever they can express the scene's content. A scene whose star is a screen recording maps to st-screencast (put the footage URL in the 'source' slot and derive timed caption chips from the beats). Only return null when the scene genuinely needs something no template offers (custom diagrams, bespoke interaction, multiple videos at once). Respond with pure JSON -- an object {type, data} or null. No markdown, no commentary." },
         { role: "user", content: user },
       ], { maxTokens: 1500 });
       var text = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
