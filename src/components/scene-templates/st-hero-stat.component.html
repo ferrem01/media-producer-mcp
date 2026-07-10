@@ -171,7 +171,18 @@
     if (ghost) tl.to(ghost, { y: -30, duration: Math.max(4, ctx.duration - 1), ease: 'none' }, 1);
 
     // ── Atmosphere: washes + grain + slow push + shimmer + lit tags ──
-    if (window.mpAtmosphere) mpAtmosphere(el.querySelector('.sths'), {});
+    var dark = data.theme === 'dark';
+    if (dark) {
+      el.querySelector('.sths').style.color = '#f4f4f8';
+      var sup = q('.sths-supporting'); if (sup) sup.style.color = 'rgba(244,244,248,0.62)';
+      Array.prototype.forEach.call(el.querySelectorAll('.sths-item'), function(it) {
+        it.style.background = 'rgba(255,255,255,0.05)'; it.style.borderColor = 'rgba(255,255,255,0.16)';
+        var t = it.querySelector('.sths-item-t'); if (t) t.style.color = '#f4f4f8';
+      });
+      var sl = q('.sths-statlabel'); if (sl) sl.style.color = 'rgba(244,244,248,0.55)';
+      var ix = q('.sths-index'); if (ix) ix.style.color = 'rgba(244,244,248,0.4)';
+    }
+    if (window.mpAtmosphere) mpAtmosphere(el.querySelector('.sths'), { dark: dark });
     if (window.mpCameraPush) mpCameraPush(tl, el.querySelector('.sths'), ctx.duration, 1.035);
     if (window.mpShimmer && num) mpShimmer(tl, q('.sths-stat'), 2.3);
     if (window.mpGlow && num) mpGlow(num, getComputedStyle(el.querySelector('.sths')).getPropertyValue('--mp-color-primary').trim() || '#4f46e5', 0.55);

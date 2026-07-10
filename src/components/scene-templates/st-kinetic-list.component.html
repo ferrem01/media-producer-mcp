@@ -1,0 +1,119 @@
+<template>
+  <div class="stkl">
+    <div class="stkl-ghost" aria-hidden="true"></div>
+    <div class="stkl-head">
+      <div class="stkl-kicker-row"><span class="stkl-rule"></span><span class="stkl-kicker">{{kicker}}</span></div>
+      <h1 class="stkl-headline"></h1>
+    </div>
+    <div class="stkl-rows"></div>
+    <img class="stkl-wordmark" alt="" />
+    <div class="stkl-index">{{scene_index}}</div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-kinetic-list: 3-6 parallel things, each owning a full-width row.
+     Rows carry the scene: oversized ghost indices, staggered entries, a
+     beat-phased spotlight that walks the list. */
+  .stkl { position: absolute; inset: 0; overflow: hidden; color: var(--mp-color-text, #17171c);
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stkl-ghost { position: absolute; left: -3vw; bottom: -30vh; font-size: 60vh; line-height: 1; font-weight: 600;
+    color: var(--mp-color-primary, #4f46e5); opacity: 0.045; letter-spacing: -0.05em; }
+  .stkl-head { position: absolute; left: 8vw; top: 10vh; width: 70vw; }
+  .stkl-kicker-row { display: flex; align-items: center; gap: 14px; margin-bottom: 2.4vh; }
+  .stkl-rule { width: 34px; height: 2px; background: var(--mp-color-primary, #4f46e5); transform-origin: left center; }
+  .stkl-kicker { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.19em;
+    text-transform: uppercase; color: var(--mp-color-primary, #4f46e5); }
+  .stkl-headline { margin: 0; font-weight: 500; font-size: 3.4vw; line-height: 1.08; letter-spacing: -0.015em;
+    max-width: 22ch; text-wrap: balance; word-break: keep-all; }
+  .stkl-rows { position: absolute; left: 8vw; right: 8vw; top: 34vh; bottom: 12vh;
+    display: flex; flex-direction: column; justify-content: center; gap: 0; }
+  .stkl-row { display: flex; align-items: center; gap: 2.2vw; padding: 2.1vh 1.4vw;
+    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent); position: relative; }
+  .stkl-row:last-child { border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); }
+  .stkl-row-n { font-size: 2.1vw; font-weight: 500; color: var(--mp-color-primary, #4f46e5);
+    opacity: 0.55; min-width: 3.4vw; font-variant-numeric: tabular-nums; }
+  .stkl-row-t { font-size: 2.2vw; font-weight: 500; letter-spacing: -0.01em; }
+  .stkl-row-m { margin-left: auto; font-family: 'Inter', sans-serif; font-size: 1vw;
+    color: var(--mp-color-text-muted, #8f8f9f); max-width: 30ch; text-align: right; line-height: 1.4; }
+  .stkl-row.is-live .stkl-row-n { opacity: 1; }
+  .stkl-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.85; }
+  .stkl-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif; font-size: 13px;
+    font-weight: 600; letter-spacing: 0.2em; color: var(--mp-color-text-muted, #9ca3af); }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var dark = data.theme === 'dark';
+    var root = q('.stkl');
+    if (dark) {
+      root.style.color = '#f4f4f8';
+      var ix0 = q('.stkl-index'); if (ix0) ix0.style.color = 'rgba(244,244,248,0.4)';
+    }
+
+    var ghost = q('.stkl-ghost');
+    var items = Array.isArray(data.items) ? data.items.slice(0, 6) : [];
+    if (ghost) ghost.textContent = '0' + items.length;
+
+    var head = q('.stkl-headline');
+    String(data.headline || '').split('|').forEach(function(txt) {
+      var line = document.createElement('span'); line.style.cssText = 'display:block;overflow:hidden;';
+      var inner = document.createElement('span'); inner.style.display = 'block'; inner.textContent = txt.trim();
+      line.appendChild(inner); head.appendChild(line);
+    });
+    var lineEls = el.querySelectorAll('.stkl-headline span > span');
+
+    var rowsWrap = q('.stkl-rows');
+    items.forEach(function(it, i) {
+      var row = document.createElement('div'); row.className = 'stkl-row';
+      var n = document.createElement('div'); n.className = 'stkl-row-n'; n.textContent = (i < 9 ? '0' : '') + (i + 1);
+      var t = document.createElement('div'); t.className = 'stkl-row-t'; t.textContent = String(it.label || it);
+      row.appendChild(n); row.appendChild(t);
+      if (it.meta) { var m = document.createElement('div'); m.className = 'stkl-row-m'; m.textContent = String(it.meta); row.appendChild(m); }
+      rowsWrap.appendChild(row);
+    });
+    var rowEls = el.querySelectorAll('.stkl-row');
+
+    var wm = q('.stkl-wordmark');
+    if (wm) { if (data.logo_url) wm.src = data.logo_url; else wm.style.display = 'none'; }
+
+    gsap.set(q('.stkl-rule'), { scaleX: 0 });
+    gsap.set(q('.stkl-kicker'), { autoAlpha: 0, x: -12 });
+    gsap.set(lineEls, { yPercent: 110, filter: 'blur(6px)' });
+    gsap.set(rowEls, { autoAlpha: 0, y: 30 });
+    gsap.set([ghost, wm, q('.stkl-index')], { autoAlpha: 0 });
+
+    tl.to(q('.stkl-rule'), { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 0.15)
+      .to(q('.stkl-kicker'), { autoAlpha: 1, x: 0, duration: 0.5, ease: 'power2.out' }, 0.3)
+      .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.85, ease: 'power4.out', stagger: 0.1 }, 0.45)
+      .to(ghost, { autoAlpha: 0.045, duration: 1.4 }, 0.8)
+      .to(rowEls, { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power3.out', stagger: 0.14 }, 1.1)
+      .to([wm, q('.stkl-index')], { autoAlpha: 1, duration: 0.6 }, 2);
+
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: dark });
+    if (window.mpCameraPush) mpCameraPush(tl, root, ctx.duration, 1.03);
+    if (ghost) tl.to(ghost, { y: -26, duration: Math.max(4, ctx.duration - 1), ease: 'none' }, 1);
+
+    // Beat-phased spotlight: one row per phase, dimming the others.
+    var phases = window.mpBeatPhases ? mpBeatPhases(ctx, items.length + 1) : [];
+    if (rowEls.length && phases.length > 1) {
+      phases.slice(1).forEach(function(ph, pi) {
+        var target = rowEls[pi % rowEls.length];
+        var at = Math.max(ph.start, 2.4);
+        if (at >= ctx.duration - 0.5) return;
+        var others = Array.prototype.filter.call(rowEls, function(r) { return r !== target; });
+        tl.to(others, { opacity: 0.38, duration: 0.5, ease: 'power2.inOut' }, at)
+          .to(target, { x: 10, duration: 0.5, ease: 'power2.out',
+            onStart: function() { target.classList.add('is-live'); } }, at)
+          .to(others, { opacity: 1, duration: 0.5, ease: 'power2.inOut' }, Math.max(at + 1, ph.end - 0.5))
+          .to(target, { x: 0, duration: 0.5, ease: 'power2.inOut',
+            onComplete: function() { target.classList.remove('is-live'); } }, Math.max(at + 1, ph.end - 0.5));
+      });
+    }
+    return tl;
+  }
+</script>
