@@ -31,8 +31,28 @@
       layer.appendChild(w);
       return w;
     }
-    var w1 = wash(primary, 86, 8, 78, dark ? 0.22 : 0.10);
-    var w2 = wash(secondary, 6, 96, 64, dark ? 0.12 : 0.07);
+    var w1 = wash(primary, 86, 8, 78, dark ? 0.22 : 0.16);
+    var w2 = wash(secondary, 6, 96, 64, dark ? 0.12 : 0.10);
+    // Light scenes get a third low wash so the canvas reads LIT, not blank --
+    // the dark ground gets contrast for free; the light one has to earn it.
+    var w3 = dark ? null : wash(primary, 30, 55, 90, 0.06);
+    // Breathing grid: fine structural lines that slowly drift and "breathe"
+    // (opacity oscillation) -- motion the eye feels without reading. On by
+    // default for light scenes (structure replaces the missing contrast);
+    // opt in/out with opts.grid.
+    var wantGrid = opts.grid !== undefined ? !!opts.grid : !dark;
+    var grid = null;
+    if (wantGrid) {
+      var lineColor = dark ? 'rgba(244,244,248,0.05)' : 'rgba(57,59,245,0.055)';
+      grid = document.createElement('div');
+      grid.style.cssText = 'position:absolute;inset:-8%;pointer-events:none;' +
+        'background-image:linear-gradient(' + lineColor + ' 1px, transparent 1px),' +
+        'linear-gradient(90deg, ' + lineColor + ' 1px, transparent 1px);' +
+        'background-size:72px 72px;' +
+        'mask-image:radial-gradient(ellipse 90% 80% at 50% 45%, black 30%, transparent 78%);' +
+        '-webkit-mask-image:radial-gradient(ellipse 90% 80% at 50% 45%, black 30%, transparent 78%);';
+      layer.appendChild(grid);
+    }
     // Film grain: SVG turbulence tile, stepped jitter = animated grain.
     var grain = document.createElement('div');
     var svg = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E\")";
@@ -44,6 +64,11 @@
       gsap.to(grain, { x: 12, y: -8, duration: 0.22, repeat: -1, yoyo: true, ease: 'steps(2)' });
       gsap.to(w1, { xPercent: -6, yPercent: 8, duration: opts.driftSeconds || 14, repeat: -1, yoyo: true, ease: 'sine.inOut' });
       gsap.to(w2, { xPercent: 8, yPercent: -6, duration: (opts.driftSeconds || 14) * 1.3, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+      if (w3) gsap.to(w3, { xPercent: 5, yPercent: -7, duration: (opts.driftSeconds || 14) * 1.7, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+      if (grid) {
+        gsap.to(grid, { x: 26, y: 18, duration: (opts.driftSeconds || 14) * 1.5, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+        gsap.fromTo(grid, { opacity: 0.55 }, { opacity: 1, duration: 3.6, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+      }
     }
     return layer;
   };
@@ -151,6 +176,33 @@
     shell.appendChild(el);
     el.style.border = 'none';
     return shell;
+  };
+
+  // Masked word reveal: split an element's text into per-word spans and
+  // slide them up out of an overflow mask -- the kinetic type-on feel.
+  // Compose into the scene timeline: mpWordReveal(tl, el, at).
+  window.mpWordReveal = function (tl, el, at, opts) {
+    if (!tl || !el) return [];
+    opts = opts || {};
+    var words = String(el.textContent || '').split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    el.textContent = '';
+    var spans = words.map(function (w, i) {
+      var mask = document.createElement('span');
+      mask.style.cssText = 'display:inline-block;overflow:hidden;vertical-align:bottom;';
+      var inner = document.createElement('span');
+      inner.style.cssText = 'display:inline-block;will-change:transform;';
+      inner.textContent = w + (i < words.length - 1 ? ' ' : '');
+      mask.appendChild(inner);
+      el.appendChild(mask);
+      return inner;
+    });
+    gsap.set(spans, { yPercent: 110 });
+    tl.to(spans, {
+      yPercent: 0, duration: opts.duration || 0.55,
+      ease: opts.ease || 'power3.out', stagger: opts.stagger || 0.05,
+    }, at || 0);
+    return spans;
   };
 
   // Blur-to-sharp entrance values (compose into template tweens):

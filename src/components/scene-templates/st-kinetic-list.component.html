@@ -84,26 +84,54 @@
     gsap.set(q('.stkl-rule'), { scaleX: 0 });
     gsap.set(q('.stkl-kicker'), { autoAlpha: 0, x: -12 });
     gsap.set(lineEls, { yPercent: 110, filter: 'blur(6px)' });
-    gsap.set(rowEls, { autoAlpha: 0, y: 30 });
     gsap.set([ghost, wm, q('.stkl-index')], { autoAlpha: 0 });
 
     tl.to(q('.stkl-rule'), { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 0.15)
       .to(q('.stkl-kicker'), { autoAlpha: 1, x: 0, duration: 0.5, ease: 'power2.out' }, 0.3)
       .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.85, ease: 'power4.out', stagger: 0.1 }, 0.45)
       .to(ghost, { autoAlpha: 0.045, duration: 1.4 }, 0.8)
-      .to(rowEls, { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power3.out', stagger: 0.14 }, 1.1)
       .to([wm, q('.stkl-index')], { autoAlpha: 1, duration: 0.6 }, 2);
+
+    // Rows arrive as EVENTS, not a fade: the hairline draws across, the
+    // index numeral drops in behind its mask, the label word-reveals like
+    // it's being typed onto the page, the meta breathes in last.
+    Array.prototype.forEach.call(rowEls, function(row, i) {
+      var at = 1.1 + i * 0.32;
+      var n = row.querySelector('.stkl-row-n');
+      var t = row.querySelector('.stkl-row-t');
+      var m = row.querySelector('.stkl-row-m');
+      gsap.set(row, { autoAlpha: 0 });
+      row.style.borderTopColor = 'transparent';
+      var line = document.createElement('div');
+      line.style.cssText = 'position:absolute;left:0;top:-1px;height:1px;width:100%;transform-origin:left center;' +
+        'transform:scaleX(0);background:currentColor;opacity:0.18;';
+      row.appendChild(line);
+      tl.set(row, { autoAlpha: 1 }, at)
+        .to(line, { scaleX: 1, duration: 0.55, ease: 'power3.inOut' }, at);
+      if (n) {
+        gsap.set(n, { yPercent: -120, autoAlpha: 0 });
+        tl.to(n, { yPercent: 0, autoAlpha: 0.55, duration: 0.5, ease: 'power3.out' }, at + 0.12);
+      }
+      if (t && window.mpWordReveal) mpWordReveal(tl, t, at + 0.18, { stagger: 0.055, duration: 0.5 });
+      else if (t) { gsap.set(t, { autoAlpha: 0, y: 14 }); tl.to(t, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, at + 0.18); }
+      if (m) {
+        gsap.set(m, { autoAlpha: 0, x: 16, filter: 'blur(4px)' });
+        tl.to(m, { autoAlpha: 1, x: 0, filter: 'blur(0px)', duration: 0.55, ease: 'power2.out' }, at + 0.34);
+      }
+    });
 
     if (window.mpAtmosphere) mpAtmosphere(root, { dark: dark });
     if (window.mpCameraPush) mpCameraPush(tl, root, ctx.duration, 1.03);
     if (ghost) tl.to(ghost, { y: -26, duration: Math.max(4, ctx.duration - 1), ease: 'none' }, 1);
 
-    // Beat-phased spotlight: one row per phase, dimming the others.
+    // Beat-phased spotlight: one row per phase, dimming the others. Never
+    // starts before the staggered row entrances have finished.
+    var entranceEnd = 1.1 + rowEls.length * 0.32 + 0.95;
     var phases = window.mpBeatPhases ? mpBeatPhases(ctx, items.length + 1) : [];
     if (rowEls.length && phases.length > 1) {
       phases.slice(1).forEach(function(ph, pi) {
         var target = rowEls[pi % rowEls.length];
-        var at = Math.max(ph.start, 2.4);
+        var at = Math.max(ph.start, entranceEnd);
         if (at >= ctx.duration - 0.5) return;
         var others = Array.prototype.filter.call(rowEls, function(r) { return r !== target; });
         tl.to(others, { opacity: 0.38, duration: 0.5, ease: 'power2.inOut' }, at)
