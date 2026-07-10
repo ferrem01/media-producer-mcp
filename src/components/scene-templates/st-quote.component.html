@@ -1,0 +1,90 @@
+<template>
+  <div class="stq">
+    <div class="stq-mark" aria-hidden="true">&ldquo;</div>
+    <blockquote class="stq-text"></blockquote>
+    <div class="stq-attr-row"><span class="stq-rule"></span><span class="stq-attr">{{attribution}}</span></div>
+    <img class="stq-wordmark" alt="" />
+    <div class="stq-index">{{scene_index}}</div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-quote: one sentence carries the scene. Dark and cinematic by
+     default -- the film's contrast beat. Giant ghost quote mark, line-masked
+     display quote, understated attribution. */
+  .stq { position: absolute; inset: 0; overflow: hidden; color: #f4f4f8;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stq-mark { position: absolute; left: 5vw; top: -16vh; font-size: 46vh; line-height: 1;
+    color: var(--mp-color-primary, #4f46e5); opacity: 0.16; font-weight: 600; }
+  .stq-text { position: absolute; left: 12vw; top: 30vh; width: 66vw; margin: 0;
+    font-size: 3.6vw; font-weight: 500; line-height: 1.28; letter-spacing: -0.01em; text-wrap: balance; }
+  .stq-text .stq-line { display: block; overflow: hidden; }
+  .stq-text .stq-line > span { display: block; }
+  .stq-em { color: var(--mp-color-secondary, #d48c34); }
+  .stq-attr-row { position: absolute; left: 12vw; bottom: 22vh; display: flex; align-items: center; gap: 14px; }
+  .stq-rule { width: 34px; height: 2px; background: var(--mp-color-secondary, #d48c34); transform-origin: left center; }
+  .stq-attr { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
+    letter-spacing: 0.17em; text-transform: uppercase; color: rgba(244,244,248,0.6); }
+  .stq-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.7; filter: brightness(10) grayscale(1); }
+  .stq-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.2em; color: rgba(244,244,248,0.4); }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var root = q('.stq');
+    var light = data.theme === 'light';
+    if (light) {
+      root.style.color = 'var(--mp-color-text, #17171c)';
+      var a = q('.stq-attr'); if (a) a.style.color = 'var(--mp-color-text-muted, #6b7280)';
+      var ix = q('.stq-index'); if (ix) ix.style.color = 'var(--mp-color-text-muted, #9ca3af)';
+      var wm0 = q('.stq-wordmark'); if (wm0) wm0.style.filter = 'none';
+    }
+
+    // Quote: split on | for line breaks; *word* marks the emphasis words.
+    var text = q('.stq-text');
+    String(data.quote || '').split('|').forEach(function(lineTxt) {
+      var line = document.createElement('span'); line.className = 'stq-line';
+      var inner = document.createElement('span');
+      inner.innerHTML = lineTxt.trim().replace(/</g, '&lt;').replace(/\*([^*]+)\*/g, '<em class="stq-em" style="font-style:normal;">$1</em>');
+      line.appendChild(inner); text.appendChild(line);
+    });
+    var lineEls = el.querySelectorAll('.stq-line > span');
+
+    var wm = q('.stq-wordmark');
+    if (wm) { if (data.logo_url) wm.src = data.logo_url; else wm.style.display = 'none'; }
+
+    gsap.set(q('.stq-mark'), { autoAlpha: 0, y: 30 });
+    gsap.set(lineEls, { yPercent: 115, filter: 'blur(7px)' });
+    gsap.set(q('.stq-rule'), { scaleX: 0 });
+    gsap.set([q('.stq-attr'), wm, q('.stq-index')], { autoAlpha: 0 });
+
+    tl.to(q('.stq-mark'), { autoAlpha: 0.16, y: 0, duration: 1.1, ease: 'power3.out' }, 0.1)
+      .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 1.0, ease: 'power4.out', stagger: 0.16 }, 0.4)
+      .to(q('.stq-rule'), { scaleX: 1, duration: 0.55, ease: 'power3.out' }, 1.4)
+      .to(q('.stq-attr'), { autoAlpha: 1, duration: 0.6 }, 1.6)
+      .to([wm, q('.stq-index')], { autoAlpha: 1, duration: 0.6 }, 1.9);
+
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: !light });
+    if (window.mpCameraPush) mpCameraPush(tl, root, ctx.duration, 1.04);
+    if (window.mpGlow) { var em = el.querySelector('.stq-em'); if (em) mpGlow(em, '#d48c34', 0.5); }
+    tl.to(q('.stq-mark'), { y: -24, duration: Math.max(4, ctx.duration - 1), ease: 'none' }, 1);
+
+    // Later phases: the emphasis words re-glow one at a time.
+    var phases = window.mpBeatPhases ? mpBeatPhases(ctx, 3) : [];
+    var ems = el.querySelectorAll('.stq-em');
+    if (ems.length && phases.length > 1) {
+      phases.slice(1).forEach(function(ph, pi) {
+        var t = ems[pi % ems.length];
+        var at = Math.max(ph.start, 2.2);
+        if (at >= ctx.duration - 0.5) return;
+        tl.fromTo(t, { opacity: 1 }, { opacity: 0.75, yoyo: true, repeat: 1, duration: 0.6, ease: 'sine.inOut' }, at);
+      });
+    }
+    return tl;
+  }
+</script>

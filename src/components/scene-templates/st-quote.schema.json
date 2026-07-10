@@ -1,0 +1,13 @@
+{
+  "type": "st-quote",
+  "label": "Scene Template: Quote / Insight",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: one sentence carries the scene -- the film's cinematic contrast beat (dark by default; theme 'light' to invert). Giant ghost quote mark, line-masked display quote with *emphasis* words in the secondary hue, understated attribution. Use for the key insight, customer quote, or thesis line.",
+  "data": {
+    "quote": { "type": "string", "label": "The line; | breaks lines; *word* = emphasis" },
+    "attribution": { "type": "string", "label": "Who/what it's from", "optional": true },
+    "theme": { "type": "string", "label": "dark (default) | light", "optional": true },
+    "logo_url": { "type": "string", "label": "Wordmark URL", "optional": true },
+    "scene_index": { "type": "string", "label": "e.g. 03 / 04", "optional": true }
+  }
+}

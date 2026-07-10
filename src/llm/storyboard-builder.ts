@@ -57,6 +57,7 @@ const SCENE_TOOL_SCHEMA = {
     purpose: { type: "string", description: "What this scene communicates -- its job in the story" },
     visual_notes: { type: "string", description: "The WORLD: setting, layers, what persists (5+ sentences, motion verbs, BG/MG/FG)" },
     components: { type: "array", items: { type: "string" }, description: "Library component types from the catalog" },
+    scene_template: { type: "object", description: "Whole-scene template instantiation: {type: 'st-...', data: {slots}} -- prefer over components/codegen when a scene-template fits", properties: { type: { type: "string" }, data: { type: "object" } } },
     elements: {
       type: "array",
       description: "TACTICAL element inventory: every concrete on-screen element with its EXACT copy. The codegen renders these verbatim -- an element you don't inventory gets invented (badly) or dropped.",
@@ -146,6 +147,10 @@ export interface DraftScene {
   purpose: string;         // what this scene communicates -- its job in the story
   visual_notes: string;    // visual direction (what the viewer experiences, motion verbs, depth layers)
   components: string[];    // library component types to embed, e.g. ["quotient-chat", "dashboard-kpi"]
+  /** Whole-scene composition template (st-*): when set, the scene is
+   *  INSTANTIATED from the template with this slot data -- no codegen. The
+   *  professional-composition path; prefer it whenever a template fits. */
+  scene_template?: { type: string; data: Record<string, unknown> };
   /** Tactical element inventory: concrete on-screen elements with exact copy.
    *  The codegen renders these verbatim; beats reference them by name. */
   elements?: Array<{ name: string; kind: string; content: string; motion?: string }>;
@@ -181,7 +186,10 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
 
 You think in visual STORIES, not slide decks. Every scene should feel like something the viewer wants to watch, not endure.
 
-${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n` : ""}You build the storyboard by calling the add_scene tool ONCE PER SCENE (in order), then finish_storyboard when every scene is added. Never describe the storyboard in prose -- use the tools. Each scene has visual notes (the visual direction) and a list of component types from the catalog. Below is the SHAPE of one add_scene call's parameters:
+${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n` : ""}## SCENE TEMPLATES (whole-scene compositions -- your FIRST choice)
+Scene templates (types starting "st-") are designer-built full-scene compositions with professional lighting, choreography and beat-phased motion baked in. When a scene's content fits one, emit "scene_template": {"type": "st-...", "data": {...slots from its schema...}} INSTEAD of hand-specifying components -- the scene is instantiated directly and is guaranteed to look professional. Fill every slot with REAL final copy. Give the film light/dark RHYTHM: st-quote and st-logo-close are dark; use a "theme": "dark" slot on others when a contrast beat is wanted. Fall back to components/codegen only when no template fits (e.g. real screencast footage scenes -> screencast-frame component as usual).
+
+You build the storyboard by calling the add_scene tool ONCE PER SCENE (in order), then finish_storyboard when every scene is added. Never describe the storyboard in prose -- use the tools. Each scene has visual notes (the visual direction) and a list of component types from the catalog. Below is the SHAPE of one add_scene call's parameters:
 
 {
   "label": "Scene 1 - Connector Discovery",

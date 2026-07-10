@@ -55,6 +55,34 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   var draft = opts.scene;
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
 
+  // ── Scene-template instantiation (no codegen) ──
+  // A storyboard-selected st-* template is a designer-built composition;
+  // the scene is the template + slot data, deterministic and instant. The
+  // professional-composition path -- codegen only runs when no template fit.
+  var st = (draft as any).scene_template;
+  if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
+    console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (scene template ${st.type})`);
+    var stData = (st.data && typeof st.data === "object") ? st.data : {};
+    // Default the wordmark slot from the brand kit when the template wants
+    // one and the storyboard didn't fill it.
+    if (!(stData as any).logo_url && opts.brandKit?.logos?.length) {
+      var wmLogo = opts.brandKit.logos.find((l: any) => l.variant === "wordmark" || l.variant === "full") || opts.brandKit.logos[0];
+      if (wmLogo) (stData as any).logo_url = wmLogo.url;
+    }
+    if (!(stData as any).scene_index) (stData as any).scene_index = `${String(opts.sceneIndex + 1).padStart(2, "0")} / ${String(opts.totalScenes).padStart(2, "0")}`;
+    return {
+      scene: {
+        id: sceneId,
+        label: draft.label,
+        duration_seconds: draft.duration_seconds || 8,
+        transition_in: draft.transition_in as any,
+        beats: draft.beats as any,
+        components: [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 } as any],
+        audio_hints: draft.voiceover_text ? { voiceover_text: draft.voiceover_text } : undefined,
+      } as any,
+    };
+  }
+
   // ── Unified Codegen Path (always active) ──
   // All scenes go through the agentic codegen generator
   // which can use <component> tags to embed library components.

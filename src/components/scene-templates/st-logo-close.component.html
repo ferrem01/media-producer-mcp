@@ -1,0 +1,60 @@
+<template>
+  <div class="stlc">
+    <div class="stlc-center">
+      <img class="stlc-logo" alt="" />
+      <div class="stlc-tagline">{{tagline}}</div>
+      <div class="stlc-cta">{{cta}}</div>
+      <div class="stlc-url">{{url}}</div>
+    </div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-logo-close: the sting. Dark, centered, the logo blooming out of
+     the dark with tagline, CTA pill and url. Ends the film; never fades
+     itself out. */
+  .stlc { position: absolute; inset: 0; overflow: hidden; color: #f4f4f8;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stlc-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center; gap: 3.4vh; text-align: center; }
+  .stlc-logo { height: 72px; width: auto; }
+  .stlc-tagline { font-size: 2.1vw; font-weight: 500; letter-spacing: -0.01em; max-width: 26ch; text-wrap: balance; }
+  .stlc-cta { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: #fff; padding: 14px 34px; border-radius: 100px;
+    background: linear-gradient(135deg, var(--mp-color-primary, #4f46e5), color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, #8b5cf6)); }
+  .stlc-url { font-family: 'Inter', sans-serif; font-size: 14px; letter-spacing: 0.08em; color: rgba(244,244,248,0.55); }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var root = q('.stlc');
+    var logo = q('.stlc-logo');
+    if (logo) { if (data.logo_url) logo.src = data.logo_url; else logo.style.display = 'none'; }
+    var cta = q('.stlc-cta');
+    if (cta && !data.cta) cta.style.display = 'none';
+    var url = q('.stlc-url');
+    if (url && !data.url) url.style.display = 'none';
+
+    gsap.set(logo, { autoAlpha: 0, scale: 0.86, filter: 'blur(8px)' });
+    gsap.set(q('.stlc-tagline'), { autoAlpha: 0, y: 18, filter: 'blur(5px)' });
+    gsap.set([cta, url], { autoAlpha: 0, y: 14 });
+
+    tl.to(logo, { autoAlpha: 1, scale: 1, filter: 'blur(0px)', duration: 1.2, ease: 'power3.out' }, 0.3)
+      .to(q('.stlc-tagline'), { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power3.out' }, 1.0)
+      .to(cta, { autoAlpha: 1, y: 0, duration: 0.7, ease: 'back.out(1.4)' }, 1.7)
+      .to(url, { autoAlpha: 1, y: 0, duration: 0.6 }, 2.0);
+
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: true });
+    if (window.mpGlow && logo) mpGlow(logo, getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5', 0.8);
+    if (window.mpGlow && cta) mpGlow(cta, getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5', 0.5);
+    if (window.mpShimmer && logo) mpShimmer(tl, q('.stlc-center'), 2.6);
+    if (window.mpCameraPush) mpCameraPush(tl, root, ctx.duration, 1.05);
+    // Breathe: the CTA pulses gently for the remainder.
+    if (cta) tl.to(cta, { scale: 1.03, duration: 1.6, repeat: -1, yoyo: true, ease: 'sine.inOut' }, 2.6);
+    return tl;
+  }
+</script>

@@ -1,0 +1,14 @@
+{
+  "type": "st-kinetic-list",
+  "label": "Scene Template: Kinetic List",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: 3-6 parallel things, each owning a full-width row (oversized index, large label, right-aligned meta). Rows enter staggered; a beat-phased spotlight walks the list, dimming the others -- built for 'here are the N pieces' beats. theme 'dark' for a cinematic variant.",
+  "data": {
+    "kicker": { "type": "string", "label": "Kicker" },
+    "headline": { "type": "string", "label": "Headline; | for line break" },
+    "items": { "type": "object", "label": "Array of {label, meta?} (3-6)" },
+    "theme": { "type": "string", "label": "light | dark", "optional": true },
+    "logo_url": { "type": "string", "label": "Wordmark URL", "optional": true },
+    "scene_index": { "type": "string", "label": "e.g. 02 / 04", "optional": true }
+  }
+}
