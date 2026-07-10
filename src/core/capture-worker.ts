@@ -88,7 +88,7 @@ async function extractVideoFrames(
       "-q:v", "2",
       "-start_number", "0",
       `${framesDir}/frame-%06d.jpg`,
-    ], { timeout: 180_000, maxBuffer: 1 << 20 });
+    ], { timeout: 600_000, maxBuffer: 1 << 20 });
   } catch (e: any) {
     let diskNote = "";
     try {

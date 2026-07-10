@@ -69,7 +69,7 @@ async function extractVideoFrames(videoPath: string, fps: number, width: number,
       "-q:v", "2",
       "-start_number", "0",
       `${framesDir}/frame-%06d.jpg`,
-    ], { timeout: 180_000, maxBuffer: 1 << 20 });
+    ], { timeout: 600_000, maxBuffer: 1 << 20 });
   } catch (e: any) {
     let diskNote = "";
     try {
@@ -102,7 +102,7 @@ async function sweepStaleVideoFrameCache(): Promise<void> {
   const MAX_AGE_MS = 24 * 60 * 60 * 1000;
   // Dirs without the .complete sentinel are partial extractions (crashed or
   // failed runs) holding potentially gigabytes -- sweep those on a much
-  // shorter fuse. 30min safely exceeds any live extraction (180s timeout).
+  // shorter fuse. 30min safely exceeds any live extraction (600s timeout).
   const PARTIAL_AGE_MS = 30 * 60 * 1000;
   try {
     const entries = await fs.readdir("/tmp");
