@@ -121,3 +121,58 @@ suggestion; components/agents/Studio can override with exact values.
 - Generation wall-clock (~37 min for a 4-scene narration video) needs profiling
   (suspects: sequential per-scene codegen, huge scene files, critique regen loops).
 - Revise fast-gates once passed a boot-crashing scene (defects:[]) — still unexplained.
+
+## 2026-07-10 — Scene templates, atmosphere kit, match cuts (PRs #239–#246)
+
+The composition strategy shift: **curated whole-scene templates** (the Figma-component
+model — locked composition, data slots, detach later if needed) instead of asking
+codegen to invent professional layouts from adjectives. Codegen remains the fallback
+for footage/bespoke scenes; templates are the storyboard's FIRST choice.
+
+- **Template library** (`src/components/scene-templates/`, category `scene-template`):
+  `st-hero-stat` (count-up numeral, ghost echo, beat-phased tag walk; `theme:"dark"`),
+  `st-kinetic-list` (full-width rows, ghost indices, spotlight walk), `st-quote`
+  (dark contrast beat, `*emphasis*` words in secondary hue), `st-logo-close` (closing
+  sting: logo bloom, pulsing gradient CTA, never self-fades).
+- **Atmosphere kit** (`shared/atmosphere.js`, auto-loaded): `mpAtmosphere` (gradient base +
+  drifting radial washes + animated film grain + vignette), `mpCameraPush`, `mpShimmer`,
+  `mpGlow`, `mpGradientBorder`, `mpBlurFrom/To`, `mpBeatPhases` — one lighting language
+  so every template feels lit by the same studio.
+- **Storyboard selection → direct instantiation**: `DraftScene.scene_template`; prompt
+  section "SCENE TEMPLATES (your FIRST choice)" with light/dark rhythm guidance;
+  `generateScene()` instantiates st-* drafts directly (no codegen call, near-instant,
+  no critique budget).
+- **mpLogoOnDark** (#243): brand kits often ship only a light-theme wordmark — on dark
+  templates it was invisible (Quotient: mean opaque-pixel luma 58.7). Templates measure
+  the loaded logo via canvas and flip lightness keeping hue (invert + hue-rotate on a
+  wrapper span, GSAP-tween-safe); glow rides the wrapper so it keeps brand color.
+- **Match-cut transitions** (#244): new `match-cut` type = anchored punch-through (drive
+  into A's exit anchor, land on B's entry anchor, one continuous move). Anchors are
+  DECLARED in template schemas (`"match": {entry, exit}` normalized points — templates
+  are fixed compositions, so no measurement pass needed); non-template scenes fall back
+  to center. Prompt: default between consecutive template scenes, 0.5–0.7s.
+- **Critique protection** (#245): template scenes skip per-scene critique/regen (a regen
+  would CODEGEN a replacement, destroying the template) and are excluded from editorial
+  `fix_scene` (no source to revise; regen fallback is a no-op that burns the budget).
+- **Slot revise** (#246): Studio revise on a template scene edits slot DATA via one small
+  LLM call (slot list + current data + instruction → updated JSON, with schema-echo and
+  slot-def-scrub guards). Un-expressible asks (layout/size/motion) surface as a
+  `layout_warnings` note instead of silently doing nothing.
+
+### Also in this window (context)
+
+- Generation wall-clock profiled and fixed (one-boot critique captures, trace
+  concurrency, mode=full gate, footage re-attachment): 99U rebuild 21.0 min vs 23.4;
+  remaining cost is LLM output time — template instantiation is the structural fix.
+- Intent-based media edits shipped (pins/cuts/rate-regions first-class, solver derives
+  segments; Studio pin/cut markers, HOLD blocks, custom rates, merge/restore).
+
+### Open items
+
+- Regenerate the 99U film end-to-end to exercise storyboard template selection +
+  match cuts (Marc will review everything at once).
+- Scene-preview PNG can render blank for scenes whose elements enter via timeline
+  (render tool seeks dur/2) — root cause still open.
+- Studio session-log shipper does not capture the scene IFRAME console, only the shell.
+- Render final-stitch ffmpeg frames-race (pre-existing; verify in a real env).
+- Revise fast-gates once passed a boot-crashing scene (defects:[]) — still unexplained.
