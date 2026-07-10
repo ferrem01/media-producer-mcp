@@ -59,16 +59,19 @@ async function extractVideoFrames(
   width: number,
   height: number
 ): Promise<ExtractedVideo> {
-  const hash = crypto.createHash("md5").update(`${videoPath}|${fps}|${width}x${height}`).digest("hex").slice(0, 12);
+  // Same cache and format as scene-worker's extractVideoFrames (shared dirs):
+  // JPEG q:v 2 -- full-res PNGs for a 60s+ clip run ~5GB and fill /tmp.
+  const hash = crypto.createHash("md5").update(`${videoPath}|${fps}|${width}x${height}|jpg`).digest("hex").slice(0, 12);
   const framesDir = `/tmp/vframes_${hash}`;
 
-  // If already extracted (shared src), just count frames
+  // If already extracted (shared src), just count frames. Reuse requires the
+  // .complete sentinel -- a dir without it is a partial extraction.
   try {
     const existing = await fs.readdir(framesDir);
-    const pngFiles = existing.filter((f) => f.endsWith(".png"));
-    if (pngFiles.length > 0) {
-      console.log(`  Reusing ${pngFiles.length} pre-extracted frames for ${path.basename(videoPath)}`);
-      return { framesDir, totalFrames: pngFiles.length };
+    const frameFiles = existing.filter((f) => f.endsWith(".jpg"));
+    if (frameFiles.length > 0 && existing.includes(".complete")) {
+      console.log(`  Reusing ${frameFiles.length} pre-extracted frames for ${path.basename(videoPath)}`);
+      return { framesDir, totalFrames: frameFiles.length };
     }
   } catch {
     // Dir doesn't exist, will create
@@ -77,19 +80,28 @@ async function extractVideoFrames(
   await fs.mkdir(framesDir, { recursive: true });
 
   console.log(`  Extracting frames from ${path.basename(videoPath)} at ${fps}fps, max ${width}x${height}...`);
-  // Downscale to canvas size (never upscale); quiet ffmpeg so real errors aren't
-  // buried in progress spam. Source-res (e.g. UHD) extraction is slow and fills
-  // /tmp -- the frames are shown at canvas size anyway.
-  await execFileAsync("ffmpeg", [
-    "-loglevel", "error", "-nostats", "-y",
-    "-i", videoPath,
-    "-vf", `fps=${fps},scale='min(${width},iw)':-2`,
-    "-start_number", "0",
-    `${framesDir}/frame-%06d.png`,
-  ], { timeout: 180_000, maxBuffer: 1 << 20 });
+  try {
+    await execFileAsync("ffmpeg", [
+      "-loglevel", "error", "-nostats", "-y",
+      "-i", videoPath,
+      "-vf", `fps=${fps},scale='min(${width},iw)':-2`,
+      "-q:v", "2",
+      "-start_number", "0",
+      `${framesDir}/frame-%06d.jpg`,
+    ], { timeout: 180_000, maxBuffer: 1 << 20 });
+  } catch (e: any) {
+    let diskNote = "";
+    try {
+      const sf = await (fs as any).statfs("/tmp");
+      diskNote = ` [/tmp free: ${Math.round((sf.bavail * sf.bsize) / 1e6)}MB]`;
+    } catch { /* statfs unsupported */ }
+    await fs.rm(framesDir, { recursive: true, force: true }).catch(() => {});
+    throw new Error(`ffmpeg frame extraction failed (code=${e.code ?? ""} signal=${e.signal ?? ""})${diskNote}: ${String(e.stderr || e.message || e).slice(-500)}`);
+  }
 
   const files = await fs.readdir(framesDir);
-  const totalFrames = files.filter((f) => f.endsWith(".png")).length;
+  const totalFrames = files.filter((f) => f.endsWith(".jpg")).length;
+  await fs.writeFile(path.join(framesDir, ".complete"), "").catch(() => {});
   console.log(`  Extracted ${totalFrames} frames from ${path.basename(videoPath)}`);
 
   return { framesDir, totalFrames };
@@ -261,7 +273,7 @@ async function main() {
             ? mapSourceTime(edlSegs, time)
             : Math.max(0, vInfo.startAt + time);
           const frameIndex = Math.min(Math.round(targetTime * args.fps), extracted.totalFrames - 1);
-          const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.png`);
+          const framePath = path.join(extracted.framesDir, `frame-${String(frameIndex).padStart(6, "0")}.jpg`);
           frameUpdates.push({ imgId: `__render_frame_${vInfo.index}__`, src: `file://${framePath}` });
         }
 
