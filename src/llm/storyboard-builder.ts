@@ -820,7 +820,10 @@ export async function assignSceneTemplates(
         { role: "user", content: user },
       ], { maxTokens: 1500 });
       var text = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
-      if (!text || text === "null") return;
+      if (!text || text === "null") {
+        console.log(`  Template assign: no template fits "${s.label}" -- staying codegen`);
+        return;
+      }
       var pick = JSON.parse(text);
       if (!pick || typeof pick !== "object" || typeof pick.type !== "string") return;
       var tpl = templates.find((t) => t.type === pick.type);
