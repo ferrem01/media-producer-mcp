@@ -213,18 +213,20 @@ export function getPreviewHtml(): string {
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
   /* Pins: the user's sync anchors -- a diamond above the lane. Color = health. */
-  /* The pin's LEFT edge is the anchor: the stem sits exactly on the pinned
-     film time and the flag hangs to the right -- a point marker, not a blob
-     that straddles the segment seam (read as "the pin moved" when segments
-     re-solved around it). */
-  .ml-pin { position: absolute; top: -6px; margin-left: -1px; width: 18px; height: 30px; text-align: center;
-    font-size: 14px; line-height: 15px; cursor: pointer; pointer-events: auto; z-index: 5; color: #fff;
-    background: #4f46e5; border-radius: 0 9px 9px 0; border-left: 2px solid rgba(255,255,255,0.9);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.35); }
-  .ml-pin::after { content: ''; position: absolute; left: -2px; top: 100%; width: 2px; height: 34px; background: inherit; opacity: 0.9; }
-  .ml-pin:hover { transform: scale(1.2); z-index: 6; }
-  .ml-pin-strained { background: #d97706; }
-  .ml-pin-broken { background: #dc2626; animation: mlPinPulse 1.2s ease-in-out infinite; }
+  /* Pin marker: a clean map-pin head floating ABOVE the lane, tip on the
+     exact pinned film time, with a hairline guide dropping through the
+     blocks toward the timeline. The lane itself keeps only blocks + chips,
+     so co-located edits stop piling into one blob. */
+  .ml-pin { --pin-c: #4f46e5; position: absolute; top: -18px; margin-left: -8px; width: 16px; height: 68px;
+    cursor: pointer; pointer-events: auto; z-index: 5; background: transparent; }
+  .ml-pin::before { content: ''; position: absolute; left: 1px; top: 0; width: 13px; height: 13px;
+    background: var(--pin-c); border: 2px solid #fff; border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg); box-shadow: 0 1px 4px rgba(20,20,40,0.35); transition: transform 0.12s ease; }
+  .ml-pin::after { content: ''; position: absolute; left: 7px; top: 16px; width: 1.5px; height: 52px;
+    background: var(--pin-c); opacity: 0.5; }
+  .ml-pin:hover::before { transform: rotate(-45deg) scale(1.3); }
+  .ml-pin-strained { --pin-c: #d97706; }
+  .ml-pin-broken { --pin-c: #dc2626; animation: mlPinPulse 1.2s ease-in-out infinite; }
   @keyframes mlPinPulse { 50% { opacity: 0.45; } }
   /* Cuts: restorable removed footage -- a scissors chip at the seam. */
   .ml-cut { position: absolute; top: 2px; margin-left: -8px; width: 16px; height: 18px; line-height: 18px; text-align: center;
@@ -3100,7 +3102,7 @@ export function getPreviewHtml(): string {
             var st = ((found.edit.pin_status || []).filter(function(x) { return Math.abs(x.out - pn.out) < 0.25; })[0] || {}).status || 'ok';
             var d = document.createElement('div');
             d.className = 'ml-pin ml-pin-' + st;
-            d.textContent = '📌';
+            
             d.style.left = (((sceneStart + Math.min(pn.out, dur)) / total) * 100).toFixed(2) + '%';
             d.title = 'Pin: at ' + pn.out.toFixed(1) + 's show source ' + pn.src.toFixed(1) + 's' + (st !== 'ok' ? ' — ' + st.toUpperCase() : '') + '. Click to inspect/remove.';
             d.addEventListener('click', function(ev) {
