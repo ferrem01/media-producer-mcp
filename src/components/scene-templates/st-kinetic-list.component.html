@@ -1,11 +1,13 @@
 <template>
   <div class="stkl">
     <div class="stkl-ghost" aria-hidden="true"></div>
-    <div class="stkl-head">
+    <div class="stkl-setup">
       <div class="stkl-kicker-row"><span class="stkl-rule"></span><span class="stkl-kicker">{{kicker}}</span></div>
       <h1 class="stkl-headline"></h1>
     </div>
-    <div class="stkl-rows"></div>
+    <div class="stkl-stage"></div>
+    <div class="stkl-ledger"></div>
+    <div class="stkl-tracker"></div>
     <img class="stkl-wordmark" alt="" />
     <div class="stkl-index">{{scene_index}}</div>
     <div class="st-overlay"></div>
@@ -13,31 +15,47 @@
 </template>
 
 <style scoped>
-  /* ── st-kinetic-list: 3-6 parallel things, each owning a full-width row.
-     Rows carry the scene: oversized ghost indices, staggered entries, a
-     beat-phased spotlight that walks the list. */
+  /* ── st-kinetic-list: N parallel things told as a SEQUENCE, not a layout.
+     Launch-film grammar: setup headline, then each item TAKES OVER the full
+     frame in turn (giant type, ghost index numeral as a parallax depth
+     layer, tracker ticking), and the compact list only assembles at the end
+     as the payoff. A visible 4-row list from second one = a slide. */
   .stkl { position: absolute; inset: 0; overflow: hidden; color: var(--mp-color-text, #17171c);
     font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
-  .stkl-ghost { position: absolute; left: -3vw; bottom: -30vh; font-size: 60vh; line-height: 1; font-weight: 600;
-    color: var(--mp-color-primary, #4f46e5); opacity: 0.045; letter-spacing: -0.05em; }
-  .stkl-head { position: absolute; left: 8vw; top: 10vh; width: 70vw; }
-  .stkl-kicker-row { display: flex; align-items: center; gap: 14px; margin-bottom: 2.4vh; }
+  .stkl-ghost { position: absolute; right: -4vw; top: 50%; transform: translateY(-50%);
+    font-size: 72vh; line-height: 1; font-weight: 600; letter-spacing: -0.05em;
+    color: var(--mp-color-primary, #4f46e5); opacity: 0.06; font-variant-numeric: tabular-nums; }
+  .stkl-setup { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    text-align: center; width: 80vw; }
+  .stkl-kicker-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 3vh; }
   .stkl-rule { width: 34px; height: 2px; background: var(--mp-color-primary, #4f46e5); transform-origin: left center; }
   .stkl-kicker { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.19em;
     text-transform: uppercase; color: var(--mp-color-primary, #4f46e5); }
-  .stkl-headline { margin: 0; font-weight: 500; font-size: 3.4vw; line-height: 1.08; letter-spacing: -0.015em;
-    max-width: 22ch; text-wrap: balance; word-break: keep-all; }
-  .stkl-rows { position: absolute; left: 8vw; right: 8vw; top: 34vh; bottom: 12vh;
-    display: flex; flex-direction: column; justify-content: center; gap: 0; }
-  .stkl-row { display: flex; align-items: center; gap: 2.2vw; padding: 2.1vh 1.4vw;
-    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent); position: relative; }
-  .stkl-row:last-child { border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); }
-  .stkl-row-n { font-size: 2.1vw; font-weight: 500; color: var(--mp-color-primary, #4f46e5);
-    opacity: 0.55; min-width: 3.4vw; font-variant-numeric: tabular-nums; }
-  .stkl-row-t { font-size: 2.2vw; font-weight: 500; letter-spacing: -0.01em; }
-  .stkl-row-m { margin-left: auto; font-family: 'Inter', sans-serif; font-size: 1vw;
-    color: var(--mp-color-text-muted, #8f8f9f); max-width: 30ch; text-align: right; line-height: 1.4; }
-  .stkl-row.is-live .stkl-row-n { opacity: 1; }
+  .stkl-headline { margin: 0; font-weight: 500; font-size: 4.6vw; line-height: 1.06; letter-spacing: -0.02em;
+    text-wrap: balance; word-break: keep-all; }
+  .stkl-stage { position: absolute; left: 9vw; top: 50%; transform: translateY(-50%); width: 72vw; }
+  .stkl-item { position: absolute; left: 0; top: 0; transform: translateY(-50%); width: 100%; }
+  .stkl-item-n { font-size: 1.5vw; font-weight: 600; letter-spacing: 0.16em;
+    color: var(--mp-color-primary, #4f46e5); margin-bottom: 2.2vh; font-variant-numeric: tabular-nums; }
+  .stkl-item-t { font-size: 7.2vw; font-weight: 500; line-height: 1.02; letter-spacing: -0.025em;
+    text-wrap: balance; word-break: keep-all; }
+  .stkl-item-m { margin-top: 2.6vh; font-family: 'Inter', sans-serif; font-size: 1.35vw;
+    color: var(--mp-color-text-muted, #8f8f9f); max-width: 44ch; line-height: 1.5; }
+  .stkl-ledger { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 62vw; }
+  .stkl-led-row { display: flex; align-items: baseline; gap: 1.6vw; padding: 1.5vh 0;
+    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent); }
+  .stkl-led-row:last-child { border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); }
+  .stkl-led-n { font-size: 1.1vw; font-weight: 600; color: var(--mp-color-primary, #4f46e5);
+    min-width: 2.6vw; font-variant-numeric: tabular-nums; }
+  .stkl-led-t { font-size: 1.9vw; font-weight: 500; letter-spacing: -0.01em; }
+  .stkl-led-m { margin-left: auto; font-family: 'Inter', sans-serif; font-size: 0.95vw;
+    color: var(--mp-color-text-muted, #8f8f9f); }
+  .stkl-tracker { position: absolute; left: 9vw; bottom: 11vh; display: flex; gap: 10px; align-items: center; }
+  .stkl-tick { width: 34px; height: 3px; border-radius: 2px;
+    background: color-mix(in srgb, currentColor 16%, transparent); position: relative; overflow: hidden; }
+  .stkl-tick::after { content: ''; position: absolute; inset: 0; transform: scaleX(0); transform-origin: left center;
+    background: var(--mp-color-primary, #4f46e5); transition: none; }
+  .stkl-tick.is-on::after { transform: scaleX(1); }
   .stkl-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.85; }
   .stkl-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif; font-size: 13px;
     font-weight: 600; letter-spacing: 0.2em; color: var(--mp-color-text-muted, #9ca3af); }
@@ -55,10 +73,23 @@
       var ix0 = q('.stkl-index'); if (ix0) ix0.style.color = 'rgba(244,244,248,0.4)';
     }
 
-    var ghost = q('.stkl-ghost');
     var items = Array.isArray(data.items) ? data.items.slice(0, 6) : [];
-    if (ghost) ghost.textContent = '0' + items.length;
+    var n = items.length || 1;
+    var dur = ctx.duration || 12;
 
+    // Sequence plan: setup headline -> one full-frame takeover per item ->
+    // compact ledger resolve (only when the scene has room for it).
+    var setup = Math.min(3.2, dur * 0.2);
+    var resolve = dur >= 13 ? Math.min(3.2, dur * 0.16) : 0;
+    var itemWin = Math.max(1.6, (dur - setup - resolve) / n);
+
+    var ghost = q('.stkl-ghost');
+    var stage = q('.stkl-stage');
+    var tracker = q('.stkl-tracker');
+    var wm = q('.stkl-wordmark');
+    if (wm) { if (data.logo_url) wm.src = data.logo_url; else wm.style.display = 'none'; }
+
+    // Setup: kicker + headline own the center, word-revealed, then lift away.
     var head = q('.stkl-headline');
     String(data.headline || '').split('|').forEach(function(txt) {
       var line = document.createElement('span'); line.style.cssText = 'display:block;overflow:hidden;';
@@ -66,82 +97,81 @@
       line.appendChild(inner); head.appendChild(line);
     });
     var lineEls = el.querySelectorAll('.stkl-headline span > span');
-
-    var rowsWrap = q('.stkl-rows');
-    items.forEach(function(it, i) {
-      var row = document.createElement('div'); row.className = 'stkl-row';
-      var n = document.createElement('div'); n.className = 'stkl-row-n'; n.textContent = (i < 9 ? '0' : '') + (i + 1);
-      var t = document.createElement('div'); t.className = 'stkl-row-t'; t.textContent = String(it.label || it);
-      row.appendChild(n); row.appendChild(t);
-      if (it.meta) { var m = document.createElement('div'); m.className = 'stkl-row-m'; m.textContent = String(it.meta); row.appendChild(m); }
-      rowsWrap.appendChild(row);
-    });
-    var rowEls = el.querySelectorAll('.stkl-row');
-
-    var wm = q('.stkl-wordmark');
-    if (wm) { if (data.logo_url) wm.src = data.logo_url; else wm.style.display = 'none'; }
-
+    var setupEl = q('.stkl-setup');
     gsap.set(q('.stkl-rule'), { scaleX: 0 });
-    gsap.set(q('.stkl-kicker'), { autoAlpha: 0, x: -12 });
-    gsap.set(lineEls, { yPercent: 110, filter: 'blur(6px)' });
-    gsap.set([ghost, wm, q('.stkl-index')], { autoAlpha: 0 });
-
+    gsap.set(q('.stkl-kicker'), { autoAlpha: 0, y: -10 });
+    gsap.set(lineEls, { yPercent: 112, filter: 'blur(6px)' });
+    gsap.set([ghost, wm, q('.stkl-index'), tracker], { autoAlpha: 0 });
     tl.to(q('.stkl-rule'), { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 0.15)
-      .to(q('.stkl-kicker'), { autoAlpha: 1, x: 0, duration: 0.5, ease: 'power2.out' }, 0.3)
-      .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.85, ease: 'power4.out', stagger: 0.1 }, 0.45)
-      .to(ghost, { autoAlpha: 0.045, duration: 1.4 }, 0.8)
-      .to([wm, q('.stkl-index')], { autoAlpha: 1, duration: 0.6 }, 2);
+      .to(q('.stkl-kicker'), { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.25)
+      .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power4.out', stagger: 0.09 }, 0.4)
+      .to(setupEl, { autoAlpha: 0, y: -60, filter: 'blur(8px)', duration: 0.6, ease: 'power2.in' }, setup - 0.55)
+      .to([wm, q('.stkl-index')], { autoAlpha: 1, duration: 0.6 }, setup);
 
-    // Rows arrive as EVENTS, not a fade: the hairline draws across, the
-    // index numeral drops in behind its mask, the label word-reveals like
-    // it's being typed onto the page, the meta breathes in last.
-    Array.prototype.forEach.call(rowEls, function(row, i) {
-      var at = 1.1 + i * 0.32;
-      var n = row.querySelector('.stkl-row-n');
-      var t = row.querySelector('.stkl-row-t');
-      var m = row.querySelector('.stkl-row-m');
-      gsap.set(row, { autoAlpha: 0 });
-      row.style.borderTopColor = 'transparent';
-      var line = document.createElement('div');
-      line.style.cssText = 'position:absolute;left:0;top:-1px;height:1px;width:100%;transform-origin:left center;' +
-        'transform:scaleX(0);background:currentColor;opacity:0.18;';
-      row.appendChild(line);
-      tl.set(row, { autoAlpha: 1 }, at)
-        .to(line, { scaleX: 1, duration: 0.55, ease: 'power3.inOut' }, at);
-      if (n) {
-        gsap.set(n, { yPercent: -120, autoAlpha: 0 });
-        tl.to(n, { yPercent: 0, autoAlpha: 0.55, duration: 0.5, ease: 'power3.out' }, at + 0.12);
-      }
-      if (t && window.mpWordReveal) mpWordReveal(tl, t, at + 0.18, { stagger: 0.055, duration: 0.5 });
-      else if (t) { gsap.set(t, { autoAlpha: 0, y: 14 }); tl.to(t, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, at + 0.18); }
-      if (m) {
-        gsap.set(m, { autoAlpha: 0, x: 16, filter: 'blur(4px)' });
-        tl.to(m, { autoAlpha: 1, x: 0, filter: 'blur(0px)', duration: 0.55, ease: 'power2.out' }, at + 0.34);
+    // Tracker ticks -- the only always-on inventory of the list.
+    var ticks = items.map(function() {
+      var t = document.createElement('div'); t.className = 'stkl-tick'; tracker.appendChild(t); return t;
+    });
+    tl.to(tracker, { autoAlpha: 1, duration: 0.5 }, setup - 0.2);
+
+    // Ghost numeral: the depth layer. Present from the first takeover,
+    // re-numbered per item, drifting against the camera push.
+    tl.to(ghost, { autoAlpha: dark ? 0.08 : 0.06, duration: 0.8 }, setup - 0.3);
+    tl.to(ghost, { y: '-=40', duration: Math.max(3, dur - setup), ease: 'none' }, setup);
+
+    // One takeover per item: giant type-on label, meta breathes in, then the
+    // whole item lifts away as the next arrives.
+    items.forEach(function(it, i) {
+      var at = setup + i * itemWin;
+      var item = document.createElement('div'); item.className = 'stkl-item';
+      var num = document.createElement('div'); num.className = 'stkl-item-n';
+      num.textContent = (i < 9 ? '0' : '') + (i + 1) + ' / ' + (n < 10 ? '0' : '') + n;
+      var t = document.createElement('div'); t.className = 'stkl-item-t'; t.textContent = String(it.label || it);
+      item.appendChild(num); item.appendChild(t);
+      var m = null;
+      if (it.meta) { m = document.createElement('div'); m.className = 'stkl-item-m'; m.textContent = String(it.meta); item.appendChild(m); }
+      stage.appendChild(item);
+
+      gsap.set(item, { autoAlpha: 0 });
+      gsap.set(num, { autoAlpha: 0, x: -20 });
+      if (m) gsap.set(m, { autoAlpha: 0, y: 16, filter: 'blur(4px)' });
+
+      tl.set(item, { autoAlpha: 1 }, at)
+        .call(function() { ghost.textContent = '0' + (i + 1); }, [], at)
+        .fromTo(ghost, { xPercent: 6 }, { xPercent: 0, duration: Math.min(1.2, itemWin * 0.5), ease: 'power2.out' }, at)
+        .to(num, { autoAlpha: 1, x: 0, duration: 0.45, ease: 'power2.out' }, at + 0.05)
+        .call(function() { for (var k = 0; k <= i; k++) ticks[k].classList.add('is-on'); }, [], at + 0.1);
+      if (window.mpWordReveal) mpWordReveal(tl, t, at + 0.12, { stagger: 0.07, duration: 0.6 });
+      else { gsap.set(t, { autoAlpha: 0, y: 24 }); tl.to(t, { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' }, at + 0.12); }
+      if (m) tl.to(m, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power2.out' }, at + 0.5);
+
+      var isLast = i === items.length - 1;
+      var exitAt = at + itemWin - 0.55;
+      if (!isLast || resolve > 0) {
+        tl.to(item, { autoAlpha: 0, y: -70, filter: 'blur(8px)', duration: 0.55, ease: 'power2.in' }, exitAt);
       }
     });
+
+    // Resolve: the compact ledger assembles -- the payoff, not the premise.
+    if (resolve > 0) {
+      var ledger = q('.stkl-ledger');
+      var rAt = dur - resolve;
+      items.forEach(function(it, i) {
+        var row = document.createElement('div'); row.className = 'stkl-led-row';
+        var ln = document.createElement('div'); ln.className = 'stkl-led-n'; ln.textContent = '0' + (i + 1);
+        var lt = document.createElement('div'); lt.className = 'stkl-led-t'; lt.textContent = String(it.label || it);
+        row.appendChild(ln); row.appendChild(lt);
+        if (it.meta) { var lm = document.createElement('div'); lm.className = 'stkl-led-m'; lm.textContent = String(it.meta); row.appendChild(lm); }
+        ledger.appendChild(row);
+      });
+      var rows = el.querySelectorAll('.stkl-led-row');
+      gsap.set(rows, { autoAlpha: 0, y: 26 });
+      tl.to(ghost, { autoAlpha: 0, duration: 0.6 }, rAt - 0.3)
+        .to(rows, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out', stagger: 0.09 }, rAt);
+    }
 
     if (window.mpAtmosphere) mpAtmosphere(root, { dark: dark });
-    if (window.mpCameraPush) mpCameraPush(tl, root, ctx.duration, 1.03);
-    if (ghost) tl.to(ghost, { y: -26, duration: Math.max(4, ctx.duration - 1), ease: 'none' }, 1);
-
-    // Beat-phased spotlight: one row per phase, dimming the others. Never
-    // starts before the staggered row entrances have finished.
-    var entranceEnd = 1.1 + rowEls.length * 0.32 + 0.95;
-    var phases = window.mpBeatPhases ? mpBeatPhases(ctx, items.length + 1) : [];
-    if (rowEls.length && phases.length > 1) {
-      phases.slice(1).forEach(function(ph, pi) {
-        var target = rowEls[pi % rowEls.length];
-        var at = Math.max(ph.start, entranceEnd);
-        if (at >= ctx.duration - 0.5) return;
-        var others = Array.prototype.filter.call(rowEls, function(r) { return r !== target; });
-        tl.to(others, { opacity: 0.38, duration: 0.5, ease: 'power2.inOut' }, at)
-          .to(target, { x: 10, duration: 0.5, ease: 'power2.out',
-            onStart: function() { target.classList.add('is-live'); } }, at)
-          .to(others, { opacity: 1, duration: 0.5, ease: 'power2.inOut' }, Math.max(at + 1, ph.end - 0.5))
-          .to(target, { x: 0, duration: 0.5, ease: 'power2.inOut',
-            onComplete: function() { target.classList.remove('is-live'); } }, Math.max(at + 1, ph.end - 0.5));
-      });
-    }
+    if (window.mpCameraPush) mpCameraPush(tl, root, dur, 1.045);
     return tl;
   }
 </script>

@@ -2,7 +2,7 @@
   "type": "st-kinetic-list",
   "label": "Scene Template: Kinetic List",
   "category": "scene-template",
-  "description": "WHOLE-SCENE template: 3-6 parallel things, each owning a full-width row (oversized index, large label, right-aligned meta). Rows enter staggered; a beat-phased spotlight walks the list, dimming the others -- built for 'here are the N pieces' beats. theme 'dark' for a cinematic variant.",
+  "description": "WHOLE-SCENE template: 3-6 parallel things told as a SEQUENCE (launch-film grammar, not a slide). Setup headline owns the center, then each item TAKES OVER the full frame in turn -- giant type-on label, ghost index numeral as a parallax depth layer, progress tracker ticking -- and the compact list only assembles at the end as the payoff. theme 'dark' for the dark variant.",
   "data": {
     "kicker": { "type": "string", "label": "Kicker" },
     "headline": { "type": "string", "label": "Headline; | for line break" },
