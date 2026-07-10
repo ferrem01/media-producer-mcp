@@ -655,8 +655,9 @@ function buildBrandContext(brandKit: BrandKit): string {
       "Available logo variants:",
     );
     for (var logo of brandKit.logos) {
-      lines.push(`  - ${logo.name} (${logo.variant}, ${logo.theme} theme): ${logo.url}`);
+      lines.push(`  - ${logo.variant} (${logo.theme} theme) -> src="${logo.url}"`);
     }
+    lines.push('COPY the src VERBATIM, character for character. The variant label is NOT a filename -- a src derived from it 404s and ships a broken-image icon.');
     lines.push(
       "Placement rules:",
       "  - Opening, closing, and brand/CTA scenes: feature the 'full' or 'wordmark' variant prominently and animate it in.",

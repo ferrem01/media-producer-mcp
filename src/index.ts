@@ -52,6 +52,7 @@ import { initTenantStoreFromFile } from "./auth/tenant-store.js";
 import { normalizeVideoForWeb } from "./core/video-normalize.js";
 import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/asset-intel.js";
 import { solveMediaEdits, inferIntents } from "./core/media-edl.js";
+import { repairBrandAssetPath } from "./core/scene-assembler.js";
 import { spawn } from "node:child_process";
 import { openSync } from "node:fs";
 
@@ -567,7 +568,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       const brandAssetMatch = urlPath.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);
       if (brandAssetMatch && (method === "GET" || method === "HEAD")) {
         const [, brandTenantId, brandAssetPath] = brandAssetMatch.map(decodeURIComponent);
-        const fullPath = path.join(config.dataDir, brandTenantId, "brand-kit", "assets", brandAssetPath);
+        // repairBrandAssetPath: codegen sometimes writes a logo's NAME as its
+        // filename; serve the closest real file instead of 404ing the logo.
+        const fullPath = repairBrandAssetPath(path.join(config.dataDir, brandTenantId, "brand-kit", "assets", brandAssetPath));
         try {
           await streamFile(req, res, fullPath);
         } catch {

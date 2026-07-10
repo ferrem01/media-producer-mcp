@@ -20,6 +20,7 @@ import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types
 import { beatTimeline } from "./beats.js";
 import { resolveAutoCropData, resolveScreencastAutoCrops } from "./asset-intel.js";
 import fs from "node:fs/promises";
+import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
@@ -961,6 +962,27 @@ export function resolveHtmlAssetUrls(html: string, preview?: boolean): string {
   return html.replace(/(?<![A-Za-z0-9_\-./%:])\/assets\/[A-Za-z0-9_\-./%]+/g, (m) => resolveAssetPath(m, false));
 }
 
+/** Codegen sometimes writes a brand asset's NAME as its filename (e.g.
+ *  logo/extracted-icon-any-2.png for the real extracted-2.png) -- the model
+ *  conflates the two fields. When the requested file doesn't exist, repair
+ *  deterministically: same trailing number wins, else any image in the dir.
+ *  Broken-image logos shipped in RENDERS through this. */
+export function repairBrandAssetPath(abs: string): string {
+  try {
+    if (existsSync(abs)) return abs;
+    const dir = path.dirname(abs);
+    const want = path.basename(abs).toLowerCase();
+    const wantNum = (want.match(/\d+/g) || []).pop();
+    const files = readdirSync(dir).filter((f) => /\.(png|svg|jpe?g|webp)$/i.test(f));
+    const pick = files.find((f) => wantNum && ((f.match(/\d+/g) || []).pop() === wantNum)) || files[0];
+    if (pick) {
+      console.warn(`  [brand-asset] repaired missing ${want} -> ${pick}`);
+      return path.join(dir, pick);
+    }
+  } catch { /* keep original */ }
+  return abs;
+}
+
 /**
  * Resolve relative /assets/ URLs in component data to absolute URLs so they
  * work when loaded via file:// protocol in Playwright.
@@ -1086,7 +1108,8 @@ function resolveAssetPath(urlPath: string, preview?: boolean): string {
   // /assets/{tenant}/brand-kit/{rest} -> {dataDir}/{tenant}/brand-kit/assets/{rest}
   const brandMatch = urlPath.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);
   if (brandMatch) {
-    return `file://${path.resolve(config.dataDir, brandMatch[1], "brand-kit", "assets", brandMatch[2])}`;
+    const abs = path.resolve(config.dataDir, brandMatch[1], "brand-kit", "assets", brandMatch[2]);
+    return `file://${repairBrandAssetPath(abs)}`;
   }
   // /assets/{tenant}/projects/{projectId}/assets/{rest} -> {dataDir}/{tenant}/projects/{projectId}/assets/{rest}
   const projMatch = urlPath.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
