@@ -39,6 +39,39 @@ async function hasAudioStream(filePath: string): Promise<boolean> {
 }
 
 /**
+ * Check whether a media file has a video stream. Audio-only narration
+ * (an .m4a voiceover as the "speaker") is a first-class case: the base
+ * builder must synthesize a canvas-sized video track for it.
+ */
+async function hasVideoStream(filePath: string): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync("ffprobe", [
+      "-v", "quiet",
+      "-select_streams", "v",
+      "-show_entries", "stream=codec_type",
+      "-of", "csv=p=0",
+      filePath,
+    ]);
+    return stdout.trim().length > 0;
+  } catch (e: any) {
+    // Environments with a static ffmpeg but no ffprobe: `ffmpeg -i` exits
+    // non-zero (no output requested) but prints the stream table to stderr.
+    if (e?.code === "ENOENT") {
+      try {
+        await execFileAsync("ffmpeg", ["-hide_banner", "-i", filePath]);
+      } catch (fe: any) {
+        const table = String(fe?.stderr || "");
+        if (/Stream #.*: Video:/.test(table)) return true;
+        if (/Stream #.*: Audio:/.test(table)) return false;
+      }
+    }
+    // Probe failure: assume video (the original behavior) and let the real
+    // ffmpeg run produce the actionable error.
+    return true;
+  }
+}
+
+/**
  * Get the duration of a media file in seconds via ffprobe.
  */
 async function getVideoDuration(filePath: string): Promise<number> {
@@ -89,7 +122,9 @@ export async function buildSpeakerBase(opts: {
   // ── Single clip, simple case ──
   if (clips.length === 1) {
     const clip = clips[0];
-    const args = buildSingleClipArgs(clip, width, height, totalDuration, outputPath);
+    const clipHasVideo = await hasVideoStream(resolveVideoPath(clip.source));
+    if (!clipHasVideo) console.log(`  [speaker-track] Audio-only speaker source -- synthesizing black canvas video track`);
+    const args = buildSingleClipArgs(clip, width, height, totalDuration, outputPath, clipHasVideo);
     console.log(`  [speaker-track] ffmpeg single-clip: ${args.filter(a => !a.startsWith('-')).join(' ')}`);
     await execFileAsync("ffmpeg", args, { maxBuffer: 50 * 1024 * 1024 });
     return outputPath;
@@ -101,7 +136,9 @@ export async function buildSpeakerBase(opts: {
   for (let i = 0; i < clips.length; i++) {
     const clip = clips[i];
     const clipOut = path.join(workDir, `speaker_clip_${i}.mp4`);
-    const args = buildSingleClipArgs(clip, width, height, undefined, clipOut);
+    const clipHasVideo = await hasVideoStream(resolveVideoPath(clip.source));
+    if (!clipHasVideo) console.log(`  [speaker-track] Clip ${i + 1} is audio-only -- synthesizing black canvas video track`);
+    const args = buildSingleClipArgs(clip, width, height, undefined, clipOut, clipHasVideo);
     console.log(`  [speaker-track] Preparing clip ${i + 1}/${clips.length}`);
     await execFileAsync("ffmpeg", args, { maxBuffer: 50 * 1024 * 1024 });
     clipPaths.push(clipOut);
@@ -168,9 +205,33 @@ function buildSingleClipArgs(
   height: number,
   totalDuration: number | undefined,
   outputPath: string,
+  sourceHasVideo: boolean = true,
 ): string[] {
   const trimStart = clip.trim_start ?? clip.start ?? 0;
   const trimEnd = clip.trim_end;
+
+  // Audio-only narration (recorded voiceover, no camera): synthesize a black
+  // canvas-sized video track. Without one the base mp4 carries no video
+  // stream and the final overlay's [0:v] matches nothing, killing the render
+  // at the last step. Scenes over an audio-only track are opaque, so the
+  // black base never shows.
+  if (!sourceHasVideo) {
+    const a: string[] = ["-y"];
+    if (trimStart > 0) a.push("-ss", String(trimStart));
+    a.push("-i", resolveVideoPath(clip.source));
+    a.push("-f", "lavfi", "-i", `color=c=black:s=${width}x${height}:r=30`);
+    a.push("-map", "1:v", "-map", "0:a");
+    const clipDuration = trimEnd !== undefined ? trimEnd - trimStart : undefined;
+    if (clipDuration !== undefined && clipDuration > 0) a.push("-t", String(clipDuration));
+    else if (totalDuration !== undefined) a.push("-t", String(totalDuration));
+    else a.push("-shortest"); // color= is infinite; end with the audio
+    a.push(
+      "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p",
+      "-movflags", "+faststart", "-c:a", "aac", "-b:a", "192k",
+      outputPath,
+    );
+    return a;
+  }
 
   const args: string[] = ["-y"];
 
