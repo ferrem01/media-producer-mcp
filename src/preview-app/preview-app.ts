@@ -217,13 +217,13 @@ export function getPreviewHtml(): string {
      exact pinned film time, with a hairline guide dropping through the
      blocks toward the timeline. The lane itself keeps only blocks + chips,
      so co-located edits stop piling into one blob. */
-  .ml-pin { --pin-c: #4f46e5; position: absolute; top: -18px; margin-left: -8px; width: 16px; height: 68px;
-    cursor: pointer; pointer-events: auto; z-index: 5; background: transparent; }
-  .ml-pin::before { content: ''; position: absolute; left: 1px; top: 0; width: 13px; height: 13px;
-    background: var(--pin-c); border: 2px solid #fff; border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg); box-shadow: 0 1px 4px rgba(20,20,40,0.35); transition: transform 0.12s ease; }
-  .ml-pin::after { content: ''; position: absolute; left: 7px; top: 16px; width: 1.5px; height: 52px;
-    background: var(--pin-c); opacity: 0.5; }
+  .ml-pin { --pin-c: #4f46e5; position: absolute; top: -2px; margin-left: -9px; width: 18px; height: 58px;
+    cursor: pointer; pointer-events: auto; z-index: 6; background: transparent; }
+  .ml-pin::before { content: ''; position: absolute; left: 1px; top: 0; width: 14px; height: 14px;
+    background: var(--pin-c); border: 2.5px solid #fff; border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg); box-shadow: 0 1px 5px rgba(20,20,40,0.45); transition: transform 0.12s ease; }
+  .ml-pin::after { content: ''; position: absolute; left: 8px; top: 16px; width: 1.5px; height: 40px;
+    background: var(--pin-c); opacity: 0.55; }
   .ml-pin:hover::before { transform: rotate(-45deg) scale(1.3); }
   .ml-pin-strained { --pin-c: #d97706; }
   .ml-pin-broken { --pin-c: #dc2626; animation: mlPinPulse 1.2s ease-in-out infinite; }
