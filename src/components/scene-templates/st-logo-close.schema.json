@@ -4,7 +4,7 @@
   "category": "scene-template",
   "description": "WHOLE-SCENE template: the closing sting. Dark and centered -- the logo blooms out of the dark, tagline, gradient CTA pill (gently pulsing), url. Use as the final scene; it never fades itself out.",
   "data": {
-    "logo_url": { "type": "string", "label": "Logo URL (wordmark or full)" },
+    "logo_url": { "type": "string", "label": "Logo URL (wordmark or full); defaults to the brand-kit wordmark", "optional": true },
     "tagline": { "type": "string", "label": "One closing line" },
     "cta": { "type": "string", "label": "CTA pill text", "optional": true },
     "url": { "type": "string", "label": "URL line", "optional": true }
