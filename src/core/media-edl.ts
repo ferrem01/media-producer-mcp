@@ -234,15 +234,20 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
       pinStatus.push({ out: b.out, status: "ok", detail: `holds the pinned frame ${window.toFixed(1)}s (no footage before it)` });
       continue;
     }
-    if (atPref < window - 0.2) {
-      // Less footage than film time: DON'T stretch it into slow-motion soup.
-      // Play at the preferred rates (arriving early), then hold the pinned
-      // frame until the pin's moment.
+    const rawLen = pieces.reduce((t, p) => t + (p.e - p.s), 0);
+    if (rawLen < window - 0.2) {
+      // GENUINELY less footage than film time (even 1x can't fill the
+      // window): play at natural speed, then hold the pinned frame until
+      // the pin's moment. When footage IS sufficient but fast preferences
+      // would arrive early, the scale path below relaxes the rates to fill
+      // the window exactly instead (measured: an 8x preference produced a
+      // 50s hold where a ~3.6x fill was wanted).
       let first0 = true;
-      for (const p of pieces) { push(p.s, p.e, p.pref, p.hard || first0); first0 = false; }
-      const hold = window - atPref;
-      push(b.src, Math.min(srcDur, b.src + 0.1 * hold), 0.1);
-      pinStatus.push({ out: b.out, status: "ok", detail: `arrives early -- holds the pinned frame ${hold.toFixed(1)}s` });
+      for (const p of pieces) { push(p.s, p.e, Math.min(p.pref, 1), p.hard || first0); first0 = false; }
+      const played = pieces.reduce((t, p) => t + (p.e - p.s) / Math.min(p.pref, 1), 0);
+      const hold = window - played;
+      if (hold > 0.1) push(b.src, Math.min(srcDur, b.src + 0.1 * hold), 0.1);
+      pinStatus.push({ out: b.out, status: "ok", detail: `arrives early -- holds the pinned frame ${Math.max(0, hold).toFixed(1)}s` });
       continue;
     }
     // Scale preferences so we arrive exactly on time. Pieces that hit the

@@ -92,6 +92,22 @@ describe("pin solver: pins are constraints", () => {
   });
 });
 
+describe("sufficient footage always fills the window (no phantom holds)", () => {
+  it("a fast preference relaxes to fit instead of arriving early + holding", () => {
+    // 346s of footage, 95s window, 8x preference -> should play ~3.6x, no hold.
+    const { segments, pin_status } = solveMediaEdits({
+      pins: [{ out: 5, src: 29.4 }, { out: 100, src: 375.7 }],
+      rate_regions: [{ src_start: 29.4, src_end: 375.7, rate: 8 }],
+    }, SRC);
+    expect(pin_status.find((x) => x.out === 100)?.status).toBe("ok");
+    expect(mapSourceTime(segments, 100)).toBeCloseTo(375.7, 0);
+    const mid = segments.find((g) => g.src_start >= 29 && g.src_end <= 376 && g.src_end - g.src_start > 100)!;
+    expect(mid.rate).toBeGreaterThan(3);
+    expect(mid.rate).toBeLessThan(4.2);
+    expect(segments.some((g) => g.rate <= 0.12 && g.src_start > 29 && g.src_start < 376)).toBe(false); // no hold
+  });
+});
+
 describe("split + cut between pins (reported failure)", () => {
   it("a split between two pins survives into the derived map as two blocks", () => {
     const intents = {
