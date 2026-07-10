@@ -1045,6 +1045,19 @@ async function critiqueAndRetryScene(opts: {
     return { scene: opts.scene, customSources: opts.customSources };
   }
 
+  // Scene-template instantiations are curated compositions -- there is nothing
+  // for the critic to regenerate, and a regen here would CODEGEN a replacement,
+  // silently destroying the template. The draft's visual_notes describe intent
+  // the storyboard wrote before choosing the template, so intent_mismatch /
+  // dropped_element flags against them are expected noise, not defects.
+  if (
+    opts.scene.components.length > 0 &&
+    opts.scene.components.every((c) => typeof c.type === "string" && c.type.startsWith("st-"))
+  ) {
+    console.log(`  Critique: scene ${opts.sceneIndex} is a scene-template instantiation, skipping critique/regen`);
+    return { scene: opts.scene, customSources: opts.customSources };
+  }
+
   let currentScene = opts.scene;
   let currentCustomSources = opts.customSources;
   let currentDraft = opts.draft;
@@ -2476,7 +2489,14 @@ async function runUnifiedPipeline(
       // would land on the wrong scene -- overwriting an inserted scene and
       // stamping it with a colliding scene id (a duplicated scene).
       const MAX_EDITORIAL_REGEN = 2;
-      const sceneFixes = (editorial.fixes || []).filter(f => f.type === "fix_scene" && typeof f.scene_index === "number" && f.detail && f.scene_index! >= 0 && f.scene_index! < project.scenes.length);
+      // Scene-template instantiations are excluded: there is no codegen source
+      // to surgically revise, and the regen fallback just re-instantiates the
+      // same template -- a fix_scene on one burns the editorial budget on a no-op.
+      const isTemplateScene = (idx: number) => {
+        const comps = project.scenes[idx]?.components || [];
+        return comps.length > 0 && comps.every((c) => typeof c.type === "string" && c.type.startsWith("st-"));
+      };
+      const sceneFixes = (editorial.fixes || []).filter(f => f.type === "fix_scene" && typeof f.scene_index === "number" && f.detail && f.scene_index! >= 0 && f.scene_index! < project.scenes.length && !isTemplateScene(f.scene_index!));
       let regen = 0;
       if (sceneFixes.length > 0) {
         // reviseScene loads the project from disk -- persist the in-memory
