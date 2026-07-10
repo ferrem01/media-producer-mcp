@@ -38,6 +38,7 @@
     var svg = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E\")";
     grain.style.cssText = 'position:absolute;inset:-24px;background-image:' + svg + ';background-size:160px 160px;opacity:' + (dark ? 0.05 : 0.028) + ';mix-blend-mode:multiply;';
     layer.appendChild(grain);
+    if (window.mpVignette) mpVignette(layer, dark);
     host.insertBefore(layer, host.firstChild);
     if (window.gsap) {
       gsap.to(grain, { x: 12, y: -8, duration: 0.22, repeat: -1, yoyo: true, ease: 'steps(2)' });
@@ -77,6 +78,49 @@
     el.style.boxShadow = '0 2px 6px ' + (color || 'rgba(57,59,245,0.10)') + ', 0 14px 34px ' + (color || 'rgba(57,59,245,0.13)') +
       ', inset 0 1px 0 rgba(255,255,255,0.85)';
   };
+
+  // Cinematic vignette: darkened corners; stronger on dark scenes.
+  window.mpVignette = function (layer, dark) {
+    var v = document.createElement('div');
+    v.style.cssText = 'position:absolute;inset:0;pointer-events:none;' +
+      'background:radial-gradient(ellipse 120% 90% at 50% 42%, transparent 58%, rgba(10,10,22,' + (dark ? 0.42 : 0.07) + ') 100%);';
+    layer.appendChild(v);
+    return v;
+  };
+
+  // Bloom: the element emits light in the brand hue (Linear-style glow).
+  window.mpGlow = function (el, color, intensity) {
+    if (!el) return;
+    var c = color || 'rgba(79,70,229,';
+    if (c.indexOf('rgba') !== 0) { // hex -> rgba prefix
+      var h = c.replace('#', '');
+      var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
+      c = 'rgba(' + r + ',' + g + ',' + b + ',';
+    }
+    var i = intensity || 1;
+    el.style.filter = (el.style.filter ? el.style.filter + ' ' : '') +
+      'drop-shadow(0 0 ' + Math.round(18 * i) + 'px ' + c + (0.35 * i) + ')) drop-shadow(0 0 ' + Math.round(60 * i) + 'px ' + c + (0.18 * i) + '))';
+  };
+
+  // Gradient hairline border (the Framer/Linear card signature): wraps the
+  // element in a 1px gradient shell; the element keeps its own background.
+  window.mpGradientBorder = function (el, from, to) {
+    if (!el || !el.parentElement) return;
+    var shell = document.createElement('div');
+    var cs = getComputedStyle(el);
+    shell.style.cssText = 'padding:1px;border-radius:' + (parseFloat(cs.borderRadius) + 1 || 4) + 'px;' +
+      'background:linear-gradient(135deg, ' + (from || 'rgba(255,255,255,0.5)') + ', ' + (to || 'rgba(79,70,229,0.35)') + ');' +
+      'display:' + (cs.display === 'inline' ? 'inline-block' : cs.display) + ';';
+    el.parentElement.insertBefore(shell, el);
+    shell.appendChild(el);
+    el.style.border = 'none';
+    return shell;
+  };
+
+  // Blur-to-sharp entrance values (compose into template tweens):
+  //   gsap.set(el, mpBlurFrom());  tl.to(el, mpBlurTo(dur), at)
+  window.mpBlurFrom = function (px) { return { autoAlpha: 0, filter: 'blur(' + (px || 10) + 'px)' }; };
+  window.mpBlurTo = function (duration) { return { autoAlpha: 1, filter: 'blur(0px)', duration: duration || 0.9, ease: 'power3.out' }; };
 
   // Beat phases: map ctx.beats to [{start,end}] windows; when a scene has no
   // beats, split the duration into `fallbackCount` equal phases. Templates
