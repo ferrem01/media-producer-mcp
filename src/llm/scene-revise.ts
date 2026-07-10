@@ -13,9 +13,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { loadProject } from "../persistence/project.js";
+import { loadProject, saveProject } from "../persistence/project.js";
 import { projectDir } from "../persistence/paths.js";
 import { reviseComponent } from "./component-revise.js";
+import { callLLM } from "./client.js";
 import { assembleSceneAuto } from "../core/scene-assembler.js";
 import { validateSceneRuntime } from "../core/capture.js";
 import { inspectSceneLayout, formatInspectionForPrompt } from "../core/layout-inspect.js";
@@ -327,6 +328,112 @@ export async function verifyAppliedGeometry(
   return warnings;
 }
 
+/**
+ * Revise a scene-template instantiation by editing its slot DATA -- the
+ * composition itself is locked (that is the point of a template). One small
+ * LLM call maps the instruction onto the template's schema slots; the updated
+ * data is persisted on the component and the scene re-assembled for preview.
+ * Asks the slots cannot express (layout/color/motion) come back as a
+ * layout_warnings note instead of silently doing nothing.
+ */
+async function reviseTemplateSlots(
+  opts: ReviseSceneOpts,
+  project: any,
+  scene: any,
+  tplComp: any,
+): Promise<ReviseSceneResult> {
+  // Describe the slots as a compact list -- feeding the raw schema file makes
+  // the model echo the schema's shape back instead of a data object.
+  let slotLines = "";
+  try {
+    const schema = JSON.parse(await fs.readFile(
+      path.join(config.componentLibDir, "scene-templates", `${tplComp.type}.schema.json`),
+      "utf-8",
+    ));
+    slotLines = Object.entries((schema.data || {}) as Record<string, any>)
+      .map(([k, v]) => `- ${k}: ${v?.label || v?.type || ""}${v?.optional ? " (optional)" : ""}`)
+      .join("\n");
+  } catch { /* schema is optional context */ }
+
+  const sys = `You edit the slot data of a scene-template component -- a designer-built, LOCKED composition. You cannot change layout, styling, or animation; you can ONLY change the data slots (the copy and asset URLs the template renders). Return ONLY the updated data object as pure JSON -- the same shape as "Current data", no markdown fences, no commentary, no schema. Keep every existing key, and keep values the instruction does not affect unchanged. To remove an optional slot's content, set it to "". If the instruction asks for something the slots cannot express (layout, color, motion, sizing), leave the slots unchanged and add a "_note" string key explaining what a template's slots cannot do.`;
+  const user = `Template: ${tplComp.type}\n${slotLines ? `Available slots:\n${slotLines}\n` : ""}\nCurrent data:\n${JSON.stringify(tplComp.data || {}, null, 2)}\n\nInstruction: ${opts.instruction.trim()}\n\nReturn ONLY the updated data JSON object (same shape as Current data).`;
+
+  let raw: string;
+  try {
+    raw = await callLLM(opts.llmConfig, [
+      { role: "system", content: sys },
+      { role: "user", content: user },
+    ], { maxTokens: 2000 });
+  } catch (e: any) {
+    return { ok: false, error: `Template slot revise failed: ${e?.message || e}` };
+  }
+
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim());
+  } catch {
+    return { ok: false, error: "Template slot revise returned unparseable JSON -- scene unchanged." };
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { ok: false, error: "Template slot revise returned a non-object -- scene unchanged." };
+  }
+  // Unwrap a schema-shaped echo ({type, label, ..., data: {...}}).
+  const note0 = typeof (data as any)._note === "string" ? (data as any)._note : undefined;
+  if ((data as any).data && typeof (data as any).data === "object" && !Array.isArray((data as any).data)
+      && typeof (data as any).type === "string") {
+    data = (data as any).data;
+  }
+  const note = typeof (data as any)._note === "string" ? (data as any)._note : note0;
+  delete (data as any)._note;
+  // Drop slot-DEFINITION echoes ({type, label} objects) -- keep the current
+  // value for those slots instead of storing schema metadata as content.
+  const prevData = (tplComp.data || {}) as Record<string, unknown>;
+  for (const [k, v] of Object.entries(data)) {
+    if (v && typeof v === "object" && !Array.isArray(v)
+        && typeof (v as any).type === "string" && typeof (v as any).label === "string") {
+      if (k in prevData) data[k] = prevData[k];
+      else delete data[k];
+    }
+  }
+
+  // A garbage response that renames every slot would blank the scene (the
+  // template hides missing slots). Require overlap with the current slots.
+  const prevKeys = Object.keys(tplComp.data || {});
+  if (prevKeys.length > 0 && !Object.keys(data).some((k) => prevKeys.includes(k))) {
+    return { ok: false, error: "Template slot revise dropped every existing slot -- scene unchanged." };
+  }
+
+  tplComp.data = data;
+  await saveProject(project);
+
+  // Re-assemble for the Studio preview (best-effort; the data is already saved).
+  let sceneHtml: string | undefined;
+  try {
+    const sources: { type: string; source: string }[] = [];
+    for (const c of scene.components as any[]) {
+      if (sources.some((s) => s.type === c.type)) continue;
+      const src = await loadSource(c.type, opts.tenantId, opts.projectId);
+      if (src != null) sources.push({ type: c.type, source: src });
+    }
+    sceneHtml = await assembleSceneAuto({
+      scene, components: sources, brandKit: project.brand_kit, canvas: project.canvas,
+      gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: true,
+    });
+  } catch (e: any) {
+    console.warn(`  [revise] template preview assembly failed: ${e?.message || e}`);
+  }
+
+  return {
+    ok: true,
+    componentType: tplComp.type,
+    blocksApplied: 1,
+    fullRewrite: false,
+    sceneHtml,
+    defects: [],
+    layout_warnings: note ? [`template slots: ${note}`] : [],
+  };
+}
+
 export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneResult> {
   if (!opts.instruction?.trim()) return { ok: false, error: "instruction is required" };
 
@@ -336,7 +443,13 @@ export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneRes
   if (!scene) return { ok: false, error: `Scene ${opts.sceneId} not found in project ${opts.projectId}` };
 
   const codegenComp = scene.components.find((c: any) => CODEGEN_PREFIXES.some((p) => c.type.startsWith(p)));
-  if (!codegenComp) return { ok: false, error: `Scene ${opts.sceneId} has no codegen component to revise` };
+  if (!codegenComp) {
+    // Scene-template instantiation: revise means editing the slot data, not
+    // patching source (the composition is deliberately locked).
+    const tplComp = scene.components.find((c: any) => typeof c.type === "string" && c.type.startsWith("st-"));
+    if (tplComp) return reviseTemplateSlots(opts, project, scene, tplComp);
+    return { ok: false, error: `Scene ${opts.sceneId} has no codegen component to revise` };
+  }
   const type = codegenComp.type;
 
   const existingSource = await loadSource(type, opts.tenantId, opts.projectId);
