@@ -644,7 +644,9 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
   // banked survives, so discard the turn (its tool calls may be cut mid-JSON
   // and cannot be trusted), tell the model what's banked, and let it re-send
   // the same work in smaller pieces. Only repeated truncation aborts.
-  var SB_MAX_TOKENS = 8192;
+  // 16k: a kinetic-cut film (10+ scenes, denser items) legitimately writes
+  // bigger turns; 8192 produced triple-truncation aborts with zero banked.
+  var SB_MAX_TOKENS = 16000;
   var truncations = 0;
 
   for (var iteration = 0; iteration < maxIterations && !finished; iteration++) {
@@ -673,7 +675,7 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
       });
       messages.push({
         role: "user",
-        content: `Your last response hit the output-token limit and was DISCARDED -- NONE of its tool calls were applied. Still banked: ${scenes.length} scene(s)${currentSceneIdx >= 0 && scenes[currentSceneIdx]._rawBeats ? ` (current scene has ${scenes[currentSceneIdx]._rawBeats.length} beat(s) so far)` : ""}. Re-send the missing work in SMALLER pieces: ONE tool call per response, shorter visual_notes, and add_beat calls for beats instead of inline arrays. Do not re-add scenes or beats that are already banked.`,
+        content: `Your last response hit the output-token limit and was DISCARDED -- NONE of its tool calls were applied. Still banked: ${scenes.length} scene(s)${currentSceneIdx >= 0 && scenes[currentSceneIdx]._rawBeats ? ` (current scene has ${scenes[currentSceneIdx]._rawBeats.length} beat(s) so far)` : ""}. ${truncations >= 2 ? "FINAL WARNING -- your next response MUST contain exactly ONE add_scene call for ONE scene, visual_notes under 400 characters, NO inline beats (add them with add_beat in later turns). Anything bigger aborts the storyboard." : "Re-send the missing work in SMALLER pieces: ONE tool call per response, shorter visual_notes, and add_beat calls for beats instead of inline arrays."} Do not re-add scenes or beats that are already banked.`,
       });
       continue;
     }
