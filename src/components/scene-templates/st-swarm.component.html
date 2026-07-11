@@ -35,6 +35,21 @@
   .stsw-card-quote { font-size: 13.5px; line-height: 1.5; font-style: italic; opacity: 0.92; }
   .stsw-card img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
   .stsw-card.is-img { padding: 5px; }
+  /* Variety variants -- a swarm of identical gray cards reads as PowerPoint
+     confetti. Solid brand cards pop color, ghosts are outline-only air,
+     pills are compact chips; assigned deterministically when unspecified. */
+  .stsw-card.is-solid { background: var(--mp-color-primary, #4f46e5); border-color: transparent;
+    box-shadow: 0 18px 54px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 45%, transparent); }
+  .stsw-card.is-solid .stsw-card-label { color: rgba(255, 255, 255, 0.78); }
+  .stsw-card.is-solid .stsw-card-body { color: #fff; opacity: 1; }
+  .stsw-card.is-solid .stsw-card-value { background: none; -webkit-background-clip: initial;
+    background-clip: initial; color: #fff; }
+  .stsw-card.is-ghost { background: transparent; box-shadow: none;
+    border: 1.5px solid color-mix(in srgb, currentColor 26%, transparent); backdrop-filter: blur(2px); }
+  .stsw-card.is-pill { border-radius: 999px; padding: 12px 24px; width: auto !important; white-space: nowrap; }
+  .stsw-card.is-pill .stsw-card-body { font-size: 15px; font-weight: 600; opacity: 1; letter-spacing: 0.02em; }
+  .stsw-card.is-big .stsw-card-body { font-size: 17px; line-height: 1.4; }
+  .stsw-card.is-big .stsw-card-value { font-size: 44px; }
   .stsw-focus { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     text-align: center; width: 74vw; z-index: 6; }
   .stsw-kicker-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 2.6vh; }
@@ -69,10 +84,39 @@
     var cloud = q('.stsw-cloud');
     var items = (Array.isArray(data.items) ? data.items : []).slice(0, 18);
     var W = 1920, H = 1080; // proportional: percentages below
+    // Infer richness the storyboard didn't spell out: numbers become stats,
+    // short lines become pills, quoted lines become quotes. Then cycle
+    // visual variants (solid brand / ghost outline / oversized) so an
+    // all-text swarm still has color and scale contrast.
+    function inferKind(it) {
+      if (it.kind) return it.kind;
+      if (it.value !== undefined) return 'stat';
+      if (it.image) return 'image';
+      if (it.quote) return 'quote';
+      var txt = String(it.body || it.text || it.title || '').trim();
+      var full = txt || String(it.label || '').trim();
+      if (/^["“']/.test(full)) return 'quote';
+      if (/\d/.test(full) && full.length <= 40 && /(^|\s)\d[\d,.]*\s*(%|\+|x)?($|\s)/.test(full)) return 'statauto';
+      if (full.length <= 26) return 'pill';
+      return 'text';
+    }
     var cards = items.map(function(it, i) {
       var card = document.createElement('div');
       card.className = 'stsw-card';
-      var kind = it.kind || (it.value !== undefined ? 'stat' : it.image ? 'image' : it.quote ? 'quote' : 'text');
+      var kind = inferKind(it);
+      if (kind === 'statauto') {
+        var full = String(it.body || it.text || it.title || it.label || '').trim();
+        var nm = full.match(/\d[\d,.]*\s*(?:%|\+|x)?/);
+        it = { label: full.replace(nm[0], '').replace(/\s{2,}/g, ' ').trim(), value: nm[0].trim() };
+        kind = 'stat';
+      } else if (kind === 'pill' && !(it.body || it.text)) {
+        it = { body: String(it.label || it.title || '') };
+      }
+      if (kind === 'pill') card.classList.add('is-pill');
+      var variant = (kind === 'pill' || kind === 'text' || kind === 'stat')
+        ? (i % 5 === 1 ? 'is-solid' : i % 4 === 2 ? 'is-ghost' : i % 6 === 3 ? 'is-big' : '') : '';
+      if (variant) card.classList.add(variant);
+      if (kind === 'pill') kind = 'text';
       if (kind === 'image' && it.image) {
         card.classList.add('is-img');
         var im = document.createElement('img'); im.src = it.image; card.appendChild(im);

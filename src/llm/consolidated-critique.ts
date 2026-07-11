@@ -34,8 +34,9 @@ B. PREMIUM — does it feel EXPENSIVE (Apple-keynote quality) rather than amateu
 
 MOOD IS NOT AN EXCUSE: when the visual notes use mood words — "muted", "desaturated", "faded", "gray-tinted", "tired" — they describe SATURATION only, never contrast, visibility, or completeness. Do not excuse weak craft as mood.
 
-C. ONE defect type is yours to report, because it requires holistic judgment:
+C. TWO defect types are yours to report, because they require holistic judgment:
   - "intent_mismatch": the emotional intent stated in the visual notes / purpose (overwhelm, chaos, energy, momentum, calm, relief) is NOT visible in the COMPOSITION across the frames — e.g. visual notes that ask for chaotic / overwhelmed / fighting-for-space rendered as a calm, serene, orderly layout. Judge this from the LAYOUT (density, overlap, arrangement), NOT from apparent motion: a still frame cannot show velocity or motion blur, so NEVER report intent_mismatch because a single frame "looks static / frozen / not mid-explosion." Energy that is purely kinetic (speed, blur, trails) is not judgeable from stills — do not penalize it.
+  - "card_on_photo": the scene has a photographic world (hero image, backdrop photo, footage) and opaque content cards/panels are stacked ON TOP of the photo instead of typography set directly on the image over a diffuse scrim. Boxes floating on a photograph read as PowerPoint and fail the house style. (A framed screen recording is NOT this defect; neither is type sitting on a scrim/gradient.)
 
 You are shown the scene's intended content, the FINAL frame, and (when present) a CONTACT SHEET of frames across the timeline (left→right = earlier→later) for evaluating motion/pacing and the emotional arc. A beat that has clearly happened by the final frame (a transition completed, a transient effect dissolved) is correct, not missing.
 
