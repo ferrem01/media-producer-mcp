@@ -909,6 +909,14 @@ export async function assignSceneTemplates(
         console.warn(`  Template assign: ${s.label} -> ${pick.type} rejected (missing required slot(s): ${missing.join(", ")})`);
         return;
       }
+      // Callout rectangles require SEEING the footage; no LLM in this path
+      // ever does, so mapper-invented geometry rings arbitrary regions of
+      // the recording (blank canvas, half a sidebar). Strip them -- callouts
+      // are added deliberately in Studio or from asset analysis.
+      if (Array.isArray(pick.data.callouts) && pick.data.callouts.length > 0) {
+        console.log(`  Template assign: ${s.label} -- dropped ${pick.data.callouts.length} invented callout region(s) (geometry needs real footage frames; add callouts in Studio)`);
+        delete pick.data.callouts;
+      }
       // LLMs shorten asset paths when copying them into slots; snap any
       // video-path slot value back to the scene's actual footage URL.
       if (footageUrl) {
