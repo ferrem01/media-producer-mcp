@@ -35,7 +35,7 @@
     },
     "presentation": {
       "type": "string",
-      "label": "browser (default, light scenes) | float (dark 3D world: tilted plane, orbit drift, reflection, WebGL ribbon backdrop)",
+      "label": "browser (default, light scenes) | float (3D world: tilted plane, orbit drift, reflection). Float defaults DARK (WebGL ribbon backdrop); float + theme:'light' = white-room float (lit light world, no backdrop).",
       "optional": true
     },
     "callouts": {

@@ -73,11 +73,14 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     // Dark template scenes get the WebGL cinematic backdrop (translucent lit
     // ribbons on three.js) as their z0 world; the template's atmosphere then
     // runs baseless as a lighting pass over it.
+    // Float defaults to the dark world but honors an explicit light theme
+    // (Apple-style white-room float: light atmosphere + grid, no backdrop).
+    if (st.type === "st-screencast" && (stData as any).presentation === "float" && !(stData as any).theme) {
+      (stData as any).theme = "dark";
+    }
     var stIsDark = st.type === "st-logo-close"
       || (st.type === "st-quote" && (stData as any).theme !== "light")
-      || (stData as any).theme === "dark"
-      || (st.type === "st-screencast" && (stData as any).presentation === "float");
-    if (st.type === "st-screencast" && (stData as any).presentation === "float") (stData as any).theme = "dark";
+      || (stData as any).theme === "dark";
     if (stIsDark) (stData as any).backdrop_active = true;
     var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
     if (stIsDark) {
@@ -105,6 +108,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
             video_url: src,
             frame_style: stFloat ? "plain" : "macos-browser",
             presentation: stFloat ? "float" : undefined,
+            theme: (stData as any).theme,
             callouts: Array.isArray((stData as any).callouts) ? (stData as any).callouts : undefined,
             crop: "auto",
             url_text: (stData as any).url_text || "",
