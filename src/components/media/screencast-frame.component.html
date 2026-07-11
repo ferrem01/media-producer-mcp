@@ -326,10 +326,10 @@
         elc.from.s = 1 / z;
         elc.clip.style.width = cardW + 'px';
         elc.clip.style.height = cardH + 'px';
-        elc.mini.style.width = vp.width * z + 'px';
-        elc.mini.style.height = vp.height * z + 'px';
-        elc.mini.style.left = -(c.x / 100) * vp.width * z + 'px';
-        elc.mini.style.top = -(c.y / 100) * vp.height * z + 'px';
+        elc.mini.style.width = vpW * z + 'px';
+        elc.mini.style.height = vpH * z + 'px';
+        elc.mini.style.left = -(c.x / 100) * vpW * z + 'px';
+        elc.mini.style.top = -(c.y / 100) * vpH * z + 'px';
         // The clone reuses the base media's % geometry -- % of the mini
         // viewport, which is the real viewport scaled by z.
         elc.clone.style.position = 'absolute';
