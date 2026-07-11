@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 
 /**
@@ -31,4 +32,45 @@ export function resolveVideoPath(
 
   // Absolute filesystem path or external URL -- use as-is.
   return p;
+}
+
+/**
+ * LLMs occasionally shorten asset URLs while copying them through storyboard
+ * scenes or template slots ("/assets/<tenant>/projects/library/assets/x.mp4"
+ * becomes "/assets/x.mp4"), which 404s at runtime and ships a scene with an
+ * empty video. Given a src that does NOT resolve to a real file, search the
+ * tenant's asset tree for the basename and return the canonical URL of the
+ * match. Returns the original src when it already resolves, when nothing
+ * matches, or when the match is ambiguous across non-library projects.
+ */
+export function recoverAssetUrl(
+  src: string,
+  tenantId: string,
+  dataDir: string = process.env.MP_DATA_DIR || "/data/media-producer",
+): string {
+  if (!src || !tenantId || /^(https?|data):/i.test(src)) return src;
+  try {
+    const resolved = resolveVideoPath(src, dataDir);
+    if (resolved && fs.existsSync(resolved)) return src;
+    const base = path.basename(src);
+    if (!base) return src;
+    const hits: string[] = [];
+    const projRoot = path.join(dataDir, tenantId, "projects");
+    if (fs.existsSync(projRoot)) {
+      for (const proj of fs.readdirSync(projRoot)) {
+        if (fs.existsSync(path.join(projRoot, proj, "assets", base))) {
+          hits.push(`/assets/${tenantId}/projects/${proj}/assets/${base}`);
+        }
+      }
+    }
+    if (fs.existsSync(path.join(dataDir, tenantId, "assets", base))) {
+      hits.push(`/assets/${tenantId}/assets/${base}`);
+    }
+    if (hits.length === 1) return hits[0];
+    // Ambiguous: prefer the shared library project over one-off copies.
+    const lib = hits.find((h) => h.includes("/projects/library/"));
+    return lib || src;
+  } catch {
+    return src;
+  }
 }
