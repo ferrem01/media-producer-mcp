@@ -7,6 +7,7 @@
     "headline": { "type": "string", "label": "The line the chaos resolves into; | breaks lines" },
     "kicker": { "type": "string", "label": "Small caps line above the headline", "optional": true },
     "items": { "type": "object", "label": "Array of 8-18 card specs: {kind: text|stat|quote|image, label?, body?, value?, quote?, image?} -- REAL content (real stats, real quotes, brand-kit image URLs), never lorem" },
+    "style": { "type": "string", "label": "'type' = props render as bare flying typography (giant words, solid brand stamps, outline words) instead of cards; auto-selected when most items are short phrases", "optional": true },
     "theme": { "type": "string", "label": "dark (default) | light", "optional": true },
     "backdrop_image": { "type": "string", "label": "On-brand backdrop image URL (replaces the WebGL world)", "optional": true },
     "seed": { "type": "number", "label": "Layout seed (vary per scene)", "optional": true },

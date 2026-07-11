@@ -50,6 +50,23 @@
   .stsw-card.is-pill .stsw-card-body { font-size: 15px; font-weight: 600; opacity: 1; letter-spacing: 0.02em; }
   .stsw-card.is-big .stsw-card-body { font-size: 17px; line-height: 1.4; }
   .stsw-card.is-big .stsw-card-value { font-size: 44px; }
+  /* Typographic mode: when the swarm is short phrases, the props are BARE
+     TYPE flying through space -- launch-film words, not UI cards. */
+  .stsw-word { position: absolute; line-height: 1.02; letter-spacing: -0.02em; white-space: nowrap;
+    font-weight: 500; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.35); }
+  .is-light .stsw-word { text-shadow: 0 4px 26px rgba(23, 23, 40, 0.14); }
+  .stsw-word.w-solid { background: var(--mp-color-primary, #4f46e5); color: #fff; padding: 0.6vh 1.3vw;
+    border-radius: 10px; text-shadow: none;
+    box-shadow: 0 16px 50px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 45%, transparent); }
+  .stsw-word.w-outline { color: transparent; -webkit-text-stroke: 1.5px rgba(244, 244, 248, 0.75); text-shadow: none; }
+  .is-light .stsw-word.w-outline { -webkit-text-stroke-color: rgba(23, 23, 28, 0.65); }
+  .stsw-word.w-kicker { font-size: 1.05vw !important; font-weight: 700; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--mp-color-primary, #4f46e5); text-shadow: none; }
+  .stsw-word .stsw-word-num { font-weight: 600; letter-spacing: -0.03em;
+    background: linear-gradient(150deg, var(--mp-color-primary, #4f46e5), color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, #8b5cf6));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stsw-word .stsw-word-lbl { font-size: 12px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; opacity: 0.72; margin-top: 6px; }
   .stsw-focus { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     text-align: center; width: 74vw; z-index: 6; }
   .stsw-kicker-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 2.6vh; }
@@ -100,7 +117,45 @@
       if (full.length <= 26) return 'pill';
       return 'text';
     }
+    // Typographic mode: short-phrase swarms fly as bare type, not cards.
+    // Explicit via data.style === 'type', else auto when >=70% of items are
+    // short text (no images/quotes to frame).
+    var txtOf = function(it) { return String(it.body || it.text || it.title || it.label || '').trim(); };
+    var shortish = items.filter(function(it) { return !it.image && !it.quote && txtOf(it).split(/\s+/).length <= 4; });
+    var typeMode = data.style === 'type' || (items.length > 0 && shortish.length / items.length >= 0.7);
+
     var cards = items.map(function(it, i) {
+      if (typeMode && !it.image && !it.quote) {
+        var word = document.createElement('div');
+        word.className = 'stsw-word';
+        var full = txtOf(it);
+        var nm2 = /\d/.test(full) ? full.match(/\d[\d,.]*\s*(?:%|\+|x)?/) : null;
+        if (nm2 && full.length <= 40) {
+          // Stat as giant numeral + tiny label -- scale contrast in the cloud.
+          var numEl = document.createElement('div'); numEl.className = 'stsw-word-num';
+          numEl.textContent = nm2[0].trim();
+          numEl.style.fontSize = (5 + rnd() * 3.4) + 'vw';
+          var lblEl = document.createElement('div'); lblEl.className = 'stsw-word-lbl';
+          lblEl.textContent = full.replace(nm2[0], '').replace(/\s{2,}/g, ' ').trim();
+          word.appendChild(numEl); word.appendChild(lblEl);
+        } else {
+          word.textContent = full;
+          var tier = rnd();
+          word.style.fontSize = (tier < 0.25 ? 1.7 + rnd() * 0.7 : tier < 0.7 ? 2.6 + rnd() * 1.2 : 4.2 + rnd() * 1.8) + 'vw';
+          word.style.fontWeight = String([300, 500, 600, 700][Math.floor(rnd() * 4)]);
+          var wv = i % 5 === 1 ? 'w-solid' : i % 4 === 2 ? 'w-outline' : i % 6 === 3 ? 'w-kicker' : '';
+          if (wv) word.classList.add(wv);
+        }
+        var wang = (i / Math.max(1, items.length)) * Math.PI * 2 + rnd() * 0.9;
+        var wrad = 0.24 + rnd() * 0.22;
+        var wcx = Math.min(86, Math.max(3, 50 + Math.cos(wang) * wrad * 88));
+        var wcy = Math.min(84, Math.max(6, 50 + Math.sin(wang) * wrad * 74));
+        word.style.left = wcx + '%';
+        word.style.top = wcy + '%';
+        word.style.zIndex = String(1 + Math.floor(rnd() * 4));
+        cloud.appendChild(word);
+        return { el: word, rot: (rnd() - 0.5) * 8, i: i };
+      }
       var card = document.createElement('div');
       card.className = 'stsw-card';
       var kind = inferKind(it);

@@ -858,6 +858,7 @@ export function enforceFilmDirection(scenes: DraftScene[]): void {
       if (t === "st-hero-stat") return 2 + items;
       if (t === "st-swarm") return Math.max(items, 10);
       if (t === "st-screencast") return 1 + (Array.isArray(data.captions) ? data.captions.length : 0);
+      if (t === "st-photo-close") return 3 + (Array.isArray(data.items) ? data.items.length : 0);
       return 2; // st-quote / st-logo-close: reveal + resolve
     }
     return Math.max(Array.isArray(s.beats) ? s.beats.length : 0, 1);
@@ -910,11 +911,12 @@ export async function assignSceneTemplates(
     return `- ${t.type}: ${t.description}\n  slots:\n${slots}`;
   }).join("\n");
 
-  // B-roll/hero-image scenes keep their cinematic backgrounds (no template
-  // shows a video background); screen-recording scenes ARE eligible -- they
-  // map to st-screencast, which frames the footage properly.
+  // B-roll scenes keep their cinematic video backgrounds (no template shows
+  // a video background); screen-recording scenes map to st-screencast, and
+  // hero-image scenes ARE eligible -- they map to st-photo-close, which
+  // makes the photo the scene's world (type on scrim, never cards on photo).
   var footageUrlRe = /\/[^\s"'`)\]]+\.(?:mp4|webm|mov|m4v|ogv)/i;
-  var eligible = scenes.filter((s) => !s.scene_template && !s.broll_query && !s.hero_image);
+  var eligible = scenes.filter((s) => !s.scene_template && !s.broll_query);
 
   await Promise.all(eligible.map(async (s) => {
     var beatLines = (Array.isArray(s.beats) ? s.beats : [])
@@ -925,7 +927,7 @@ export async function assignSceneTemplates(
 DENSITY RULE: templates spread their items evenly across the scene's duration, so item count sets the cut rate. Mine the voiceover: derive roughly one item per narration sentence in this scene's span -- target one visual event every 4-8 seconds (a ${s.duration_seconds || 10}s scene wants ~${Math.max(2, Math.round((s.duration_seconds || 10) / 6))} items). NEVER compress several narration sentences into one item; a list-y sentence ("city, date, venue, topic") can even split into an item per element.`;
     try {
       var raw = await callLLM(llmConfig, [
-        { role: "system", content: "You match ONE storyboard scene to a library of locked, designer-built whole-scene templates. Be decisive: these templates are professionally composed and preferred over custom scenes whenever they can express the scene's content. A scene whose star is a screen recording maps to st-screencast (put the footage URL in the 'source' slot and derive timed caption chips from the beats). Only return null when the scene genuinely needs something no template offers (custom diagrams, bespoke interaction, multiple videos at once). Respond with pure JSON -- an object {type, data} or null. No markdown, no commentary." },
+        { role: "system", content: "You match ONE storyboard scene to a library of locked, designer-built whole-scene templates. Be decisive: these templates are professionally composed and preferred over custom scenes whenever they can express the scene's content. A scene whose star is a screen recording maps to st-screencast (put the footage URL in the 'source' slot and derive timed caption chips from the beats). A scene built around a generated/photographic hero image (a place, a room, a person, an emotional close) maps to st-photo-close -- leave backdrop_image empty (the pipeline fills it with the scene's generated image) and put the scene's key line in 'headline'. Only return null when the scene genuinely needs something no template offers (custom diagrams, bespoke interaction, multiple videos at once). Respond with pure JSON -- an object {type, data} or null. No markdown, no commentary." },
         { role: "user", content: user },
       ], { maxTokens: 2500 });
       var text = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
