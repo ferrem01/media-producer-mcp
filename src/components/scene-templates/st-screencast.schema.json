@@ -20,7 +20,7 @@
     },
     "captions": {
       "type": "object",
-      "label": "Array of {at, text}: caption chips timed in scene seconds",
+      "label": "Array of {at, text}: narration-timed lines. HIDDEN by default -- set captions_style to 'beats' (transient lower-third moments) or 'chips' (persistent pill) to show them. Whole-film subtitling is a global concern, not this slot.",
       "optional": true
     },
     "theme": {
@@ -46,6 +46,16 @@
     "backdrop_image": {
       "type": "string",
       "label": "On-brand backdrop image URL (e.g. a brand-kit background asset). Replaces the grid/WebGL world: slow Ken Burns drift + legibility scrim, light or dark theme.",
+      "optional": true
+    },
+    "captions_style": {
+      "type": "string",
+      "label": "'none' (default) | 'beats' (transient beat labels) | 'chips' (legacy persistent pill)",
+      "optional": true
+    },
+    "show_kicker": {
+      "type": "boolean",
+      "label": "Show the small top kicker title (default false -- the footage is the star)",
       "optional": true
     }
   },

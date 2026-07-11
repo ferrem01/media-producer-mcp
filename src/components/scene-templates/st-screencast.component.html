@@ -62,7 +62,9 @@
     if (dark) root.classList.add('is-dark');
 
     var kickerRow = q('.stsc-kicker-row');
-    if (!data.kicker) { if (kickerRow) kickerRow.style.display = 'none'; }
+    // Kicker is OPT-IN (show_kicker: true): the footage is the star of a
+    // screencast scene; a small floating title reads as clutter by default.
+    if (!data.kicker || data.show_kicker !== true) { if (kickerRow) kickerRow.style.display = 'none'; }
     else {
       gsap.set(q('.stsc-kicker'), { autoAlpha: 0, y: -8 });
       gsap.set('.stsc-rule', { scaleX: 0 });
@@ -71,14 +73,14 @@
     }
 
     // Timed captions: [{at, text}] in scene seconds.
-    //   captions_style 'beats' (default): each label is a transient beat --
-    //     it appears at its timestamp, holds ~3s, and LEAVES. Emphasis
-    //     moments, not subtitles (whole-film captioning is a separate,
-    //     global decision).
+    //   captions_style 'none' (DEFAULT): captions are suppressed -- the
+    //     footage is the star, and whole-film captioning is a separate,
+    //     global decision, not component furniture.
+    //   'beats': transient beat labels (appear at the timestamp, hold ~3s,
+    //     leave). Opt-in emphasis moments.
     //   'chips': legacy persistent pill (one always visible).
-    //   'none': suppress entirely.
     var capStyle = data.captions_style === 'chips' ? 'chips'
-      : data.captions_style === 'none' ? 'none' : 'beats';
+      : data.captions_style === 'beats' ? 'beats' : 'none';
     var caps = capStyle === 'none' ? [] : (Array.isArray(data.captions) ? data.captions.filter(function (c) {
       return c && typeof c.text === 'string' && c.text && Number.isFinite(Number(c.at));
     }) : []);
