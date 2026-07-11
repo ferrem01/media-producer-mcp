@@ -1,0 +1,146 @@
+<template>
+  <div class="stcp">
+    <div class="stcp-side stcp-left">
+      <div class="stcp-side-label stcp-left-label">{{left_label}}</div>
+      <div class="stcp-scraps"></div>
+    </div>
+    <div class="stcp-divider"></div>
+    <div class="stcp-side stcp-right">
+      <div class="stcp-side-label stcp-right-label">{{right_label}}</div>
+      <div class="stcp-clean"></div>
+    </div>
+    <h1 class="stcp-headline"></h1>
+    <img class="stcp-wordmark" alt="" />
+    <div class="stcp-index">{{scene_index}}</div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-compare: two worlds, one winner. The old way is a jittering mess
+     of type scraps; the new way is one calm, lit column. The divider draws,
+     the loser collapses, the winner takes the frame with the headline. */
+  .stcp { position: absolute; inset: 0; overflow: hidden; color: #f4f4f8;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stcp.is-light { color: #17171c; }
+  .stcp-side { position: absolute; top: 0; bottom: 0; width: 50%; }
+  .stcp-left { left: 0; }
+  .stcp-right { right: 0; }
+  .stcp-side-label { position: absolute; top: 10vh; left: 50%; transform: translateX(-50%);
+    font-size: 13px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.55; }
+  .stcp-right-label { color: var(--mp-color-primary, #4f46e5); opacity: 1; }
+  .stcp-divider { position: absolute; left: 50%; top: 14vh; bottom: 14vh; width: 2px;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, currentColor 30%, transparent), transparent);
+    transform-origin: center top; }
+  .stcp-scraps { position: absolute; inset: 16vh 6% 12vh; }
+  .stcp-scrap { position: absolute; white-space: nowrap; font-weight: 500; opacity: 0.82;
+    letter-spacing: -0.01em; text-shadow: 0 3px 22px rgba(0, 0, 0, 0.35); }
+  .is-light .stcp-scrap { text-shadow: none; }
+  .stcp-scrap.s-strike { text-decoration: line-through; text-decoration-color: rgba(255, 92, 92, 0.75);
+    text-decoration-thickness: 2px; }
+  .stcp-scrap.s-dim { opacity: 0.45; }
+  .stcp-clean { position: absolute; left: 12%; right: 12%; top: 50%; transform: translateY(-50%); }
+  .stcp-clean-line { display: flex; align-items: baseline; gap: 1vw; padding: 1.9vh 0;
+    border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
+  .stcp-clean-line:last-child { border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
+  .stcp-clean-n { font-size: 1vw; font-weight: 700; color: var(--mp-color-primary, #4f46e5);
+    min-width: 2vw; font-variant-numeric: tabular-nums; }
+  .stcp-clean-t { font-size: 1.75vw; font-weight: 500; letter-spacing: -0.01em; }
+  .stcp-headline { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    margin: 0; z-index: 6; font-weight: 500; font-size: 4.6vw; line-height: 1.05;
+    letter-spacing: -0.02em; text-align: center; width: 76vw; text-wrap: balance; }
+  .stcp-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.85; z-index: 7; }
+  .stcp-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.2em; opacity: 0.5; z-index: 7; }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var root = q('.stcp');
+    var light = data.theme === 'light';
+    if (light) root.classList.add('is-light');
+    var dur = ctx.duration || 12;
+
+    var seed = Number(data.seed) || 7;
+    function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+    var wm = q('.stcp-wordmark');
+    if (wm) { if (data.logo_url) { wm.src = data.logo_url; if (!light && window.mpLogoOnDark) mpLogoOnDark(wm); } else wm.style.display = 'none'; }
+
+    // Left: the mess -- type scraps at chaotic angles, some struck through.
+    var scrapsEl = q('.stcp-scraps');
+    var leftLines = (Array.isArray(data.left_lines) ? data.left_lines : []).slice(0, 8);
+    var scraps = leftLines.map(function(txt, i) {
+      var s = document.createElement('div');
+      s.className = 'stcp-scrap' + (i % 3 === 1 ? ' s-strike' : i % 4 === 3 ? ' s-dim' : '');
+      s.textContent = String(txt);
+      s.style.fontSize = (1.1 + rnd() * 1.5) + 'vw';
+      s.style.left = (rnd() * 58) + '%';
+      s.style.top = (i / Math.max(1, leftLines.length)) * 82 + rnd() * 8 + '%';
+      s.style.transform = 'rotate(' + ((rnd() - 0.5) * 9) + 'deg)';
+      scrapsEl.appendChild(s);
+      return s;
+    });
+
+    // Right: the calm column.
+    var cleanEl = q('.stcp-clean');
+    var rightLines = (Array.isArray(data.right_lines) ? data.right_lines : []).slice(0, 5);
+    var cleans = rightLines.map(function(txt, i) {
+      var row = document.createElement('div'); row.className = 'stcp-clean-line';
+      var n = document.createElement('div'); n.className = 'stcp-clean-n'; n.textContent = '0' + (i + 1);
+      var t = document.createElement('div'); t.className = 'stcp-clean-t'; t.textContent = String(txt);
+      row.appendChild(n); row.appendChild(t); cleanEl.appendChild(row);
+      return row;
+    });
+
+    // ── Choreography ──
+    var flipAt = Math.max(3.2, Math.min(dur * 0.58, dur - 3.4));
+    gsap.set(q('.stcp-divider'), { scaleY: 0 });
+    gsap.set([q('.stcp-left-label'), q('.stcp-right-label')], { autoAlpha: 0, y: -10 });
+    gsap.set([wm, q('.stcp-index')], { autoAlpha: 0 });
+    tl.to(q('.stcp-divider'), { scaleY: 1, duration: 0.8, ease: 'power3.inOut' }, 0.3)
+      .to(q('.stcp-left-label'), { autoAlpha: 1, y: 0, duration: 0.5 }, 0.5)
+      .to(q('.stcp-right-label'), { autoAlpha: 1, y: 0, duration: 0.5 }, 0.7)
+      .to([wm, q('.stcp-index')], { autoAlpha: 1, duration: 0.6 }, 1.0);
+
+    // Scraps tumble in fast with jitter -- the mess is alive and uneasy.
+    scraps.forEach(function(s, i) {
+      var at = 0.6 + i * 0.16 + rnd() * 0.2;
+      if (window.mpThrow) mpThrow(tl, s, at, { fromX: -(240 + rnd() * 320), fromY: (rnd() - 0.5) * 200, duration: 0.5, settle: false });
+      else { gsap.set(s, { autoAlpha: 0 }); tl.to(s, { autoAlpha: 0.82, duration: 0.3 }, at); }
+      tl.to(s, { x: '+=' + ((rnd() - 0.5) * 10), y: '+=' + ((rnd() - 0.5) * 8),
+        duration: 0.9 + rnd(), ease: 'sine.inOut', yoyo: true, repeat: -1 }, at + 0.5);
+    });
+
+    // Clean rows land measured, each a beat -- calm against the jitter.
+    cleans.forEach(function(row, i) {
+      if (window.mpThrow) mpThrow(tl, row, 1.4 + i * 0.55, { fromY: 70, duration: 0.55 });
+      else { gsap.set(row, { autoAlpha: 0, y: 22 }); tl.to(row, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 1.4 + i * 0.55); }
+    });
+
+    // THE FLIP: the old world collapses; the winner takes the whole frame.
+    var headline = q('.stcp-headline');
+    if (data.headline) {
+      String(data.headline).split('|').forEach(function(txt) {
+        var line = document.createElement('span'); line.style.cssText = 'display:block;overflow:hidden;';
+        var inner = document.createElement('span'); inner.style.display = 'block'; inner.textContent = txt.trim();
+        line.appendChild(inner); headline.appendChild(line);
+      });
+      var lineEls = el.querySelectorAll('.stcp-headline span > span');
+      gsap.set(lineEls, { yPercent: 118, filter: 'blur(6px)' });
+      tl.to(q('.stcp-left'), { autoAlpha: 0, x: -120, filter: 'blur(10px)', duration: 0.7, ease: 'power2.in' }, flipAt)
+        .to(q('.stcp-divider'), { autoAlpha: 0, duration: 0.4 }, flipAt + 0.2)
+        .to(q('.stcp-right'), { x: '-=' + '24%', duration: 0.9, ease: 'power3.inOut' }, flipAt + 0.25)
+        .to([q('.stcp-right-label'), cleanEl], { autoAlpha: 0.2, duration: 0.6 }, flipAt + 0.9)
+        .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power4.out', stagger: 0.1 }, flipAt + 1.1);
+      if (window.mpShimmer) mpShimmer(tl, headline, flipAt + 2.2);
+    }
+
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: !light, noBase: !!data.backdrop_active });
+    if (window.mpCameraPush) mpCameraPush(tl, root, dur, 1.045);
+    return tl;
+  }
+</script>

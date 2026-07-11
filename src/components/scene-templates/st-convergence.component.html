@@ -1,0 +1,142 @@
+<template>
+  <div class="stcv">
+    <div class="stcv-cloud"></div>
+    <div class="stcv-hub">
+      <div class="stcv-hub-ring"></div>
+      <div class="stcv-hub-label">{{center_label}}</div>
+    </div>
+    <div class="stcv-outputs"></div>
+    <h1 class="stcv-headline"></h1>
+    <img class="stcv-wordmark" alt="" />
+    <div class="stcv-index">{{scene_index}}</div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-convergence: many -> ONE -> many, clean. Input type-props fly in
+     and get PULLED into the glowing hub; the hub flares; the outputs fan
+     out as a measured row. The visual grammar of "everything through one
+     thing" -- consolidation, funnels, single-source-of-truth beats. */
+  .stcv { position: absolute; inset: 0; overflow: hidden; color: #f4f4f8;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stcv.is-light { color: #17171c; }
+  .stcv-cloud { position: absolute; inset: 0; }
+  .stcv-in { position: absolute; white-space: nowrap; font-weight: 500; letter-spacing: -0.01em;
+    opacity: 0.85; text-shadow: 0 3px 24px rgba(0, 0, 0, 0.35); }
+  .is-light .stcv-in { text-shadow: none; }
+  .stcv-hub { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); z-index: 5;
+    display: flex; flex-direction: column; align-items: center; gap: 2vh; }
+  .stcv-hub-ring { width: 9vw; height: 9vw; border-radius: 50%; position: relative;
+    border: 2px solid color-mix(in srgb, var(--mp-color-primary, #4f46e5) 70%, transparent);
+    box-shadow: 0 0 40px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 35%, transparent),
+      inset 0 0 30px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 25%, transparent); }
+  .stcv-hub-ring::after { content: ''; position: absolute; inset: 18%; border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, transparent), transparent 70%); }
+  .stcv-hub-label { font-size: 1.15vw; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--mp-color-primary, #4f46e5); text-align: center; max-width: 22vw; white-space: normal; }
+  .stcv-outputs { position: absolute; left: 50%; bottom: 15vh; transform: translateX(-50%); z-index: 5;
+    display: flex; gap: 2.6vw; align-items: center; }
+  .stcv-out { display: flex; flex-direction: column; align-items: center; gap: 1vh; }
+  .stcv-out-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--mp-color-primary, #4f46e5);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 70%, transparent); }
+  .stcv-out-t { font-size: 1.2vw; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    white-space: nowrap; }
+  .stcv-headline { position: absolute; left: 50%; top: 20vh; transform: translateX(-50%); margin: 0;
+    z-index: 5; font-weight: 500; font-size: 3.6vw; line-height: 1.06; letter-spacing: -0.02em;
+    text-align: center; width: 74vw; text-wrap: balance; }
+  .stcv-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.85; z-index: 7; }
+  .stcv-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.2em; opacity: 0.5; z-index: 7; }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var root = q('.stcv');
+    var light = data.theme === 'light';
+    if (light) root.classList.add('is-light');
+    var dur = ctx.duration || 12;
+
+    var seed = Number(data.seed) || 5;
+    function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+    var wm = q('.stcv-wordmark');
+    if (wm) { if (data.logo_url) { wm.src = data.logo_url; if (!light && window.mpLogoOnDark) mpLogoOnDark(wm); } else wm.style.display = 'none'; }
+
+    // Inputs: type props scattered in a ring, pulled into the hub.
+    var cloud = q('.stcv-cloud');
+    var inputs = (Array.isArray(data.inputs) ? data.inputs : []).slice(0, 12);
+    var pullAt = Math.max(2.4, Math.min(dur * 0.4, dur - 4.5));
+    var props = inputs.map(function(txt, i) {
+      var p = document.createElement('div'); p.className = 'stcv-in';
+      p.textContent = String(txt);
+      p.style.fontSize = (1.4 + rnd() * 1.6) + 'vw';
+      p.style.fontWeight = String([400, 500, 600][Math.floor(rnd() * 3)]);
+      var ang = (i / Math.max(1, inputs.length)) * Math.PI * 2 + rnd() * 0.7;
+      var rad = 0.26 + rnd() * 0.18;
+      var cx = Math.min(84, Math.max(4, 50 + Math.cos(ang) * rad * 88));
+      var cy = Math.min(78, Math.max(6, 44 + Math.sin(ang) * rad * 70));
+      p.style.left = cx + '%';
+      p.style.top = cy + '%';
+      cloud.appendChild(p);
+      var at = 0.2 + rnd() * 1.3;
+      if (window.mpThrow) mpThrow(tl, p, at, { fromX: (rnd() - 0.5) * 900, fromY: (rnd() - 0.5) * 600, duration: 0.55, settle: false });
+      else { gsap.set(p, { autoAlpha: 0 }); tl.to(p, { autoAlpha: 0.85, duration: 0.3 }, at); }
+      tl.to(p, { x: '+=' + ((rnd() - 0.5) * 24), y: '+=' + ((rnd() - 0.5) * 18),
+        duration: 1.6 + rnd(), ease: 'sine.inOut', yoyo: true, repeat: -1 }, at + 0.6);
+      // The PULL: dragged into the hub with acceleration, dying at the ring.
+      var dx = (50 - cx) * 0.01 * 1920;
+      var dy = (44 - cy) * 0.01 * 1080;
+      tl.to(p, { x: '+=' + dx * 0.92, y: '+=' + dy * 0.92, scale: 0.12, autoAlpha: 0,
+        duration: 0.6 + rnd() * 0.25, ease: 'power3.in' }, pullAt + rnd() * 0.4);
+      return p;
+    });
+
+    // Hub: dormant ring, flares as it swallows the inputs.
+    var ring = q('.stcv-hub-ring');
+    var hubLabel = q('.stcv-hub-label');
+    gsap.set(ring, { scale: 0.6, autoAlpha: 0 });
+    gsap.set(hubLabel, { autoAlpha: 0, y: 10 });
+    tl.to(ring, { scale: 1, autoAlpha: 1, duration: 0.8, ease: 'power3.out' }, 0.8)
+      .to(hubLabel, { autoAlpha: 1, y: 0, duration: 0.5 }, 1.2)
+      .fromTo(ring, { scale: 1 }, { scale: 1.18, duration: 0.22, yoyo: true, repeat: 3, ease: 'power2.inOut' }, pullAt + 0.5);
+    if (window.mpGlow) mpGlow(ring, null, 1.4);
+
+    // Outputs fan out clean after the flare.
+    var outsEl = q('.stcv-outputs');
+    var outputs = (Array.isArray(data.outputs) ? data.outputs : []).slice(0, 6);
+    var outAt = pullAt + 1.5;
+    outputs.forEach(function(txt, i) {
+      var o = document.createElement('div'); o.className = 'stcv-out';
+      var d = document.createElement('div'); d.className = 'stcv-out-dot';
+      var t = document.createElement('div'); t.className = 'stcv-out-t'; t.textContent = String(txt);
+      o.appendChild(d); o.appendChild(t); outsEl.appendChild(o);
+      gsap.set(o, { autoAlpha: 0, y: -30 });
+      tl.to(o, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'back.out(1.8)' }, outAt + i * 0.16);
+    });
+
+    // Headline crowns the resolve.
+    var head = q('.stcv-headline');
+    if (data.headline) {
+      String(data.headline).split('|').forEach(function(txt) {
+        var line = document.createElement('span'); line.style.cssText = 'display:block;overflow:hidden;';
+        var inner = document.createElement('span'); inner.style.display = 'block'; inner.textContent = txt.trim();
+        line.appendChild(inner); head.appendChild(line);
+      });
+      var lineEls = el.querySelectorAll('.stcv-headline span > span');
+      gsap.set(lineEls, { yPercent: 118, filter: 'blur(6px)' });
+      tl.to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power4.out', stagger: 0.1 }, outAt + 0.3);
+    }
+
+    gsap.set([wm, q('.stcv-index')], { autoAlpha: 0 });
+    tl.to([wm, q('.stcv-index')], { autoAlpha: 1, duration: 0.6 }, 1.0);
+    if (window.mpShimmer) mpShimmer(tl, q('.stcv-hub'), outAt + 1.4);
+
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: !light, noBase: !!data.backdrop_active });
+    if (window.mpCameraPush) mpCameraPush(tl, root, dur, 1.05);
+    return tl;
+  }
+</script>

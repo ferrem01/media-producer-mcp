@@ -83,9 +83,8 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     if (st.type === "st-screencast" && (stData as any).presentation === "float" && !(stData as any).theme) {
       (stData as any).theme = "dark";
     }
-    var stIsDark = st.type === "st-logo-close"
-      || (st.type === "st-quote" && (stData as any).theme !== "light")
-      || (st.type === "st-swarm" && (stData as any).theme !== "light")
+    var stDarkDefault = ["st-logo-close", "st-quote", "st-swarm", "st-manifesto", "st-compare", "st-flow", "st-convergence"];
+    var stIsDark = (stDarkDefault.indexOf(st.type) !== -1 && (stData as any).theme !== "light")
       || (stData as any).theme === "dark";
     // An explicit backdrop_image is its own world -- it replaces the WebGL
     // ribbons (two competing backdrops read as noise).

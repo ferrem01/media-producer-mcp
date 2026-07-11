@@ -1,0 +1,150 @@
+<template>
+  <div class="stfl">
+    <div class="stfl-kicker-row"><span class="stfl-rule"></span><span class="stfl-kicker">{{kicker}}</span></div>
+    <div class="stfl-rail-wrap">
+      <div class="stfl-rail"><div class="stfl-rail-fill"></div><div class="stfl-spark"></div></div>
+      <div class="stfl-nodes"></div>
+    </div>
+    <div class="stfl-stage"></div>
+    <img class="stfl-wordmark" alt="" />
+    <div class="stfl-index">{{scene_index}}</div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-flow: a process told as ENERGY TRAVELING A RAIL. The rail draws
+     across the lower third; a spark charges it segment by segment; each
+     node ignites as its step TAKES OVER the frame above in giant type.
+     The rail is the through-line -- one object that survives every beat. */
+  .stfl { position: absolute; inset: 0; overflow: hidden; color: #f4f4f8;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stfl.is-light { color: #17171c; }
+  .stfl-kicker-row { position: absolute; left: 9vw; top: 9vh; display: flex; align-items: center; gap: 14px; }
+  .stfl-rule { width: 34px; height: 2px; background: var(--mp-color-primary, #4f46e5); transform-origin: left center; }
+  .stfl-kicker { font-size: 14px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--mp-color-primary, #4f46e5); }
+  .stfl-rail-wrap { position: absolute; left: 9vw; right: 9vw; bottom: 17vh; height: 8vh; }
+  .stfl-rail { position: absolute; left: 0; right: 0; top: 50%; height: 3px; border-radius: 2px;
+    background: color-mix(in srgb, currentColor 14%, transparent); overflow: visible; }
+  .stfl-rail-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 2px;
+    background: var(--mp-color-primary, #4f46e5); transform-origin: left center; transform: scaleX(0);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 65%, transparent); }
+  .stfl-spark { position: absolute; top: 50%; left: 0; width: 14px; height: 14px; border-radius: 50%;
+    transform: translate(-50%, -50%); background: #fff; opacity: 0;
+    box-shadow: 0 0 22px 6px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 80%, transparent); }
+  .stfl-node { position: absolute; top: 50%; width: 16px; height: 16px; border-radius: 50%;
+    transform: translate(-50%, -50%); background: color-mix(in srgb, currentColor 18%, transparent);
+    border: 2px solid color-mix(in srgb, currentColor 25%, transparent); }
+  .stfl-node.is-on { background: var(--mp-color-primary, #4f46e5); border-color: transparent;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 70%, transparent); }
+  .stfl-node-lbl { position: absolute; top: 2.4vh; left: 50%; transform: translateX(-50%);
+    font-size: 0.85vw; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+    opacity: 0.6; white-space: nowrap; }
+  .stfl-stage { position: absolute; left: 9vw; right: 9vw; top: 20vh; height: 46vh; }
+  .stfl-step { position: absolute; inset: 0; }
+  .stfl-step-n { font-size: 1.4vw; font-weight: 600; letter-spacing: 0.16em;
+    color: var(--mp-color-primary, #4f46e5); margin-bottom: 2vh; font-variant-numeric: tabular-nums; }
+  .stfl-step-t { font-size: 6.4vw; font-weight: 500; line-height: 1.02; letter-spacing: -0.025em;
+    text-wrap: balance; word-break: keep-all; max-width: 74vw; }
+  .stfl-step-m { margin-top: 2.4vh; font-family: 'Inter', sans-serif; font-size: 1.3vw;
+    opacity: 0.68; max-width: 46ch; line-height: 1.5; }
+  .stfl-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.85; }
+  .stfl-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.2em; opacity: 0.5; }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var root = q('.stfl');
+    var light = data.theme === 'light';
+    if (light) root.classList.add('is-light');
+    var dur = ctx.duration || 14;
+
+    var wm = q('.stfl-wordmark');
+    if (wm) { if (data.logo_url) { wm.src = data.logo_url; if (!light && window.mpLogoOnDark) mpLogoOnDark(wm); } else wm.style.display = 'none'; }
+    var kickerRow = q('.stfl-kicker-row');
+    if (!data.kicker) kickerRow.style.display = 'none';
+
+    var steps = (Array.isArray(data.steps) ? data.steps : []).slice(0, 6);
+    var n = Math.max(1, steps.length);
+
+    // Nodes along the rail (evenly spaced, inset from the ends).
+    var nodesEl = q('.stfl-nodes');
+    var nodes = steps.map(function(st, i) {
+      var pct = n === 1 ? 50 : 6 + (i / (n - 1)) * 88;
+      var node = document.createElement('div'); node.className = 'stfl-node'; node.style.left = pct + '%';
+      var lbl = document.createElement('div'); lbl.className = 'stfl-node-lbl';
+      // Fit whole words up to ~18 chars so anchors read as phrases, not
+      // amputations ("Save your memories" -> "Save your memories" if short
+      // enough, else "Save your").
+      var lblWords = String(st.label || st).split(/\s+/);
+      var lblOut = lblWords[0];
+      for (var wi = 1; wi < lblWords.length; wi++) {
+        if ((lblOut + ' ' + lblWords[wi]).length > 18) break;
+        lblOut += ' ' + lblWords[wi];
+      }
+      lbl.textContent = lblOut;
+      node.appendChild(lbl);
+      nodesEl.appendChild(node);
+      return { el: node, pct: pct };
+    });
+
+    // Takeover per step above the rail.
+    var stage = q('.stfl-stage');
+    var setup = 1.2;
+    var stepWin = Math.max(1.6, (dur - setup - 1.2) / n);
+    var fill = q('.stfl-rail-fill');
+    var spark = q('.stfl-spark');
+
+    gsap.set(q('.stfl-rule'), { scaleX: 0 });
+    gsap.set(q('.stfl-kicker'), { autoAlpha: 0, y: -8 });
+    gsap.set(q('.stfl-rail'), { scaleX: 0, transformOrigin: 'left center' });
+    gsap.set([wm, q('.stfl-index')], { autoAlpha: 0 });
+    nodes.forEach(function(nd) { gsap.set(nd.el, { scale: 0 }); });
+
+    tl.to(q('.stfl-rule'), { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 0.15)
+      .to(q('.stfl-kicker'), { autoAlpha: 1, y: 0, duration: 0.5 }, 0.25)
+      .to(q('.stfl-rail'), { scaleX: 1, duration: 0.8, ease: 'power3.inOut' }, 0.35)
+      .to([wm, q('.stfl-index')], { autoAlpha: 1, duration: 0.6 }, 0.9);
+    nodes.forEach(function(nd, i) {
+      tl.to(nd.el, { scale: 1, duration: 0.4, ease: 'back.out(2.4)' }, 0.55 + i * 0.09);
+    });
+    tl.to(spark, { opacity: 1, duration: 0.2 }, setup - 0.1);
+
+    steps.forEach(function(st, i) {
+      var at = setup + i * stepWin;
+      // Spark travels to this node; the fill charges behind it.
+      tl.to(spark, { left: nodes[i].pct + '%', duration: Math.min(0.7, stepWin * 0.3), ease: 'power2.inOut' }, at - 0.35)
+        .to(fill, { scaleX: nodes[i].pct / 100, duration: Math.min(0.7, stepWin * 0.3), ease: 'power2.inOut' }, at - 0.35)
+        .call(function() { nodes[i].el.classList.add('is-on'); }, [], at)
+        .fromTo(nodes[i].el, { scale: 1 }, { scale: 1.5, duration: 0.16, yoyo: true, repeat: 1, ease: 'power2.out' }, at);
+
+      // The step takeover.
+      var step = document.createElement('div'); step.className = 'stfl-step';
+      var num = document.createElement('div'); num.className = 'stfl-step-n';
+      num.textContent = '0' + (i + 1) + ' / 0' + n;
+      var t = document.createElement('div'); t.className = 'stfl-step-t'; t.textContent = String(st.label || st);
+      step.appendChild(num); step.appendChild(t);
+      var m = null;
+      if (st.meta) { m = document.createElement('div'); m.className = 'stfl-step-m'; m.textContent = String(st.meta); step.appendChild(m); }
+      stage.appendChild(step);
+      gsap.set(step, { autoAlpha: 0 });
+      gsap.set(num, { autoAlpha: 0, x: -18 });
+      if (m) gsap.set(m, { autoAlpha: 0, y: 14 });
+      if (window.mpThrow) mpThrow(tl, step, at, { fromY: 110, duration: 0.55 });
+      else tl.set(step, { autoAlpha: 1 }, at);
+      tl.to(num, { autoAlpha: 1, x: 0, duration: 0.4 }, at + 0.05);
+      if (window.mpWordReveal) mpWordReveal(tl, t, at + 0.1, { stagger: 0.06, duration: 0.55 });
+      if (m) tl.to(m, { autoAlpha: 1, y: 0, duration: 0.5 }, at + 0.55);
+      if (i < n - 1) tl.to(step, { autoAlpha: 0, y: -60, filter: 'blur(8px)', duration: 0.5, ease: 'power2.in' }, at + stepWin - 0.35);
+    });
+
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: !light, noBase: !!data.backdrop_active });
+    if (window.mpCameraPush) mpCameraPush(tl, root, dur, 1.05);
+    return tl;
+  }
+</script>

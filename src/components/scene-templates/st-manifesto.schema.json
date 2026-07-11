@@ -1,0 +1,18 @@
+{
+  "type": "st-manifesto",
+  "label": "Scene Template: Kinetic Manifesto",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: the kinetic-type statement beat. ONE sentence owns the frame, landing word by word with scale/weight contrast; accent words slam in brand color with a camera punch. Use for the film's thesis line, a pivotal claim, or a short emotional statement (4-14 words) -- the pure-typography breath between denser scenes. Dark by default.",
+  "data": {
+    "text": { "type": "string", "label": "The sentence (4-14 words). Wrap key words in *stars* to accent them" },
+    "accent_words": { "type": "array", "label": "Alternative to stars: words to accent in brand color", "optional": true },
+    "kicker": { "type": "string", "label": "Small caps line above", "optional": true },
+    "theme": { "type": "string", "label": "dark (default) | light", "optional": true },
+    "logo_url": { "type": "string", "label": "Wordmark URL; defaults to the brand-kit wordmark", "optional": true },
+    "scene_index": { "type": "string", "label": "e.g. 02 / 05", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.5 },
+    "exit": { "x": 0.5, "y": 0.5 }
+  }
+}

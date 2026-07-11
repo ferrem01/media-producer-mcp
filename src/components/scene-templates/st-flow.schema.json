@@ -1,0 +1,17 @@
+{
+  "type": "st-flow",
+  "label": "Scene Template: Process Flow / Charged Rail",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: a process told as energy traveling a rail. The rail draws across the lower third; a glowing spark charges it segment by segment; each node ignites as its step TAKES OVER the frame above in giant type (numbered, word-revealed, meta line). Use for how-it-works, setup steps, pipelines, any 3-6 step sequence. The rail is the persistent through-line object. Dark by default.",
+  "data": {
+    "steps": { "type": "object", "label": "Array of 3-6 steps: {label, meta?} -- label is the giant takeover line, meta one supporting sentence" },
+    "kicker": { "type": "string", "label": "Small caps line, top-left", "optional": true },
+    "theme": { "type": "string", "label": "dark (default) | light", "optional": true },
+    "logo_url": { "type": "string", "label": "Wordmark URL; defaults to the brand-kit wordmark", "optional": true },
+    "scene_index": { "type": "string", "label": "e.g. 02 / 05", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.62 },
+    "exit": { "x": 0.5, "y": 0.62 }
+  }
+}
