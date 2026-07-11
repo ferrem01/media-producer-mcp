@@ -16,11 +16,21 @@
 
 <style scoped>
   .scf-stage {
+    position: relative;
     width: 100%;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  /* Plane-space overlay: shares the frame's exact 3D pose, so rings and
+     callout cards live ON the tilted plane instead of floating screen-flat
+     over it. Sized/positioned to the frame's box each layout. */
+  .scf-3d {
+    position: absolute;
+    transform-style: preserve-3d;
+    pointer-events: none;
   }
 
   /* The frame is the SINGLE clip shape: rounded corners + overflow hidden
@@ -252,10 +262,16 @@
     // Chromium drops it to BLACK for the duration. A translucent panel above
     // the footage never touches the video's layer.
     var dimEl = null;
+    var wrap3d = null;
     if (callouts.length) {
       dimEl = document.createElement('div');
       dimEl.style.cssText = 'position:absolute;inset:0;background:#05050c;opacity:0;pointer-events:none;z-index:3;border-radius:inherit;';
       frame.appendChild(dimEl);
+      // Rings + cards live in PLANE space: this overlay receives the same
+      // pose/drift tweens as the frame, so callouts tilt with the footage.
+      wrap3d = document.createElement('div');
+      wrap3d.className = 'scf-3d';
+      stage.appendChild(wrap3d);
     }
     var calloutEls = callouts.map(function () {
       var card = document.createElement('div'); card.className = 'scf-callout';
@@ -265,31 +281,42 @@
       clone.classList.remove('scf-media');
       mini.appendChild(clone); clip.appendChild(mini); card.appendChild(clip);
       var ring = document.createElement('div'); ring.className = 'scf-callout-ring';
-      stage.appendChild(ring);
-      stage.appendChild(card);
+      wrap3d.appendChild(ring);
+      wrap3d.appendChild(card);
       return { card: card, clip: clip, mini: mini, clone: clone, ring: ring, from: { x: 0, y: 0, s: 1 } };
     });
     function layoutCallouts() {
       if (!calloutEls.length) return;
-      var vp = viewport.getBoundingClientRect();
-      var stageBox2 = stage.getBoundingClientRect();
-      if (vp.width < 4) return;
+      // UNTRANSFORMED offsets (frame space), not getBoundingClientRect: under
+      // the float tilt the client rect is the projected AABB and region math
+      // against it drifts. The wrapper mirrors the frame's box + pose, so
+      // plane-space coordinates land exactly on the footage.
+      var frameW2 = frame.offsetWidth, frameH2 = frame.offsetHeight;
+      if (frameW2 < 4) return;
+      wrap3d.style.left = frame.offsetLeft + 'px';
+      wrap3d.style.top = frame.offsetTop + 'px';
+      wrap3d.style.width = frameW2 + 'px';
+      wrap3d.style.height = frameH2 + 'px';
+      var vpL = viewport.offsetLeft, vpT = viewport.offsetTop;
+      var vpW = viewport.offsetWidth, vpH = viewport.offsetHeight;
       callouts.forEach(function (c, i) {
         var elc = calloutEls[i];
-        var regW = (c.w / 100) * vp.width, regH = (c.h / 100) * vp.height;
+        var regW = (c.w / 100) * vpW, regH = (c.h / 100) * vpH;
         // Zoom the region up, capped so the card never dominates the frame.
-        var z = Math.min(1.9, Math.max(1.35, Math.min((stageBox2.width * 0.42) / regW, (stageBox2.height * 0.5) / regH)));
+        var z = Math.min(1.9, Math.max(1.35, Math.min((frameW2 * 0.5) / regW, (frameH2 * 0.55) / regH)));
         var cardW = regW * z, cardH = regH * z;
-        var cx = (vp.left - stageBox2.left) + (c.x / 100) * vp.width + regW / 2;
-        var cy = (vp.top - stageBox2.top) + (c.y / 100) * vp.height + regH / 2;
-        var left = Math.min(stageBox2.width - cardW - 12, Math.max(12, cx - cardW / 2));
-        var top = Math.min(stageBox2.height - cardH - 12, Math.max(12, cy - cardH / 2 - stageBox2.height * 0.03));
+        var cx = vpL + (c.x / 100) * vpW + regW / 2;
+        var cy = vpT + (c.y / 100) * vpH + regH / 2;
+        // The lifted card may overhang the plane's edges slightly -- it is
+        // off the surface, not clipped by it.
+        var left = Math.min(frameW2 - cardW + frameW2 * 0.06, Math.max(-frameW2 * 0.06, cx - cardW / 2));
+        var top = Math.min(frameH2 - cardH + frameH2 * 0.05, Math.max(-frameH2 * 0.05, cy - cardH / 2 - frameH2 * 0.03));
         elc.card.style.left = left + 'px';
         elc.card.style.top = top + 'px';
         // Anchor ring sits exactly on the source region; the card's FLIP
         // origin transform maps the destination rect back onto that region.
-        var regLeft = (vp.left - stageBox2.left) + (c.x / 100) * vp.width;
-        var regTop = (vp.top - stageBox2.top) + (c.y / 100) * vp.height;
+        var regLeft = vpL + (c.x / 100) * vpW;
+        var regTop = vpT + (c.y / 100) * vpH;
         elc.ring.style.left = regLeft + 'px';
         elc.ring.style.top = regTop + 'px';
         elc.ring.style.width = regW + 'px';
@@ -322,13 +349,16 @@
     }
 
     // ── Float presentation: tilted 3D pose + slow orbit drift ──
+    // The plane-space wrapper receives the SAME tweens, so rings and callout
+    // cards ride the tilt exactly.
+    var pose = { ry: -14, rx: 5 };
     if (isFloat) {
       stage.classList.add('is-float');
-      var pose = { ry: -14, rx: 5 };
-      gsap.set(frame, { rotateY: pose.ry, rotateX: pose.rx, transformOrigin: '50% 50%' });
+      var poseTargets = wrap3d ? [frame, wrap3d] : [frame];
+      gsap.set(poseTargets, { rotateY: pose.ry, rotateX: pose.rx, transformOrigin: '50% 50%' });
       // One slow deterministic sweep across the scene -- the camera never
       // stops. Seek-exact (plain tween on the scene timeline).
-      tl.to(frame, { rotateY: pose.ry + 9, rotateX: pose.rx - 2, duration: Math.max(4, ctx.duration || 8), ease: 'sine.inOut' }, 0);
+      tl.to(poseTargets, { rotateY: pose.ry + 9, rotateX: pose.rx - 2, duration: Math.max(4, ctx.duration || 8), ease: 'sine.inOut' }, 0);
     }
 
     // Callout choreography -- readable in four beats, never a flash:
@@ -347,18 +377,28 @@
       var fx = function () { return elc.from.x; };
       var fy = function () { return elc.from.y; };
       var fs = function () { return elc.from.s; };
+      // The card starts flush ON the plane (z 0, plane rotation inherited via
+      // the wrapper) and lifts along the plane's normal (translateZ) as it
+      // expands; during the hold it eases PARTWAY toward camera-flat (a
+      // counter-rotation of ~55% of the pose) so the zoomed content reads,
+      // then settles back onto the plane for the return.
+      var liftZ = isFloat ? 110 : 0;
+      var counterY = isFloat ? -pose.ry * 0.55 : 0;
+      var counterX = isFloat ? -pose.rx * 0.55 : 0;
       tl.to(elc.ring, { autoAlpha: 1, scale: 1, duration: 0.4, ease: 'power2.out' }, c.at)
         .to(dimEl, { opacity: 0.42, duration: 0.9, ease: 'power2.inOut' }, c.at + 0.35)
         .fromTo(elc.card,
-          { x: fx, y: fy, scale: fs, autoAlpha: 0 },
+          { x: fx, y: fy, scale: fs, z: 0, rotateY: 0, rotateX: 0, autoAlpha: 0 },
           { autoAlpha: 1, duration: 0.25, ease: 'power1.out' }, liftAt)
-        .to(elc.card, { x: 0, y: 0, scale: 1, duration: 0.9, ease: 'power3.inOut' }, liftAt + 0.1);
+        .to(elc.card, { x: 0, y: 0, scale: 1, z: liftZ, duration: 0.9, ease: 'power3.inOut' }, liftAt + 0.1)
+        .to(elc.card, { rotateY: counterY, rotateX: counterX, duration: 0.6, ease: 'power2.out' }, liftAt + 0.55);
       // Gentle hold breathe -- only when the hold is long enough that it
       // finishes before the return starts (overlapping scale tweens fight).
       if (end - liftAt > 3.4) {
         tl.to(elc.card, { scale: 1.012, duration: (end - liftAt - 1.4) / 2, yoyo: true, repeat: 1, ease: 'sine.inOut' }, liftAt + 1.1);
       }
-      tl.to(elc.card, { x: fx, y: fy, scale: fs, duration: 0.7, ease: 'power2.inOut' }, end)
+      tl.to(elc.card, { rotateY: 0, rotateX: 0, duration: 0.45, ease: 'power2.inOut' }, end - 0.15)
+        .to(elc.card, { x: fx, y: fy, scale: fs, z: 0, duration: 0.7, ease: 'power2.inOut' }, end)
         .to(elc.card, { autoAlpha: 0, duration: 0.25, ease: 'power1.in' }, end + 0.5)
         .to(elc.ring, { autoAlpha: 0, scale: 1.05, duration: 0.4, ease: 'power2.in' }, end + 0.55)
         .to(dimEl, { opacity: 0, duration: 0.7, ease: 'power2.inOut' }, end + 0.4);
