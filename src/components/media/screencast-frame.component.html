@@ -104,6 +104,13 @@
     box-shadow: 0 40px 110px rgba(0, 0, 0, 0.6), 0 8px 30px rgba(0, 0, 0, 0.45);
     -webkit-box-reflect: below 2.2vh linear-gradient(to bottom, transparent 62%, rgba(255,255,255,0.14));
   }
+  /* Light float: same physics, softer light -- reflection reads quieter on a
+     lit ground and the shadow must suggest weight, not void. */
+  .scf-stage.is-float.is-light .scf-frame {
+    background: #f4f4f8;
+    box-shadow: 0 30px 80px rgba(23, 23, 40, 0.22), 0 6px 22px rgba(23, 23, 40, 0.14);
+    -webkit-box-reflect: below 2.2vh linear-gradient(to bottom, transparent 66%, rgba(255,255,255,0.10));
+  }
 
   /* ── Region callout: an anchor ring draws ON the region, then the region
      itself grows out of the ring toward the camera in a gradient-glow shell
@@ -358,6 +365,7 @@
     var pose = { ry: -14, rx: 5 };
     if (isFloat) {
       stage.classList.add('is-float');
+      if (data.theme === 'light') stage.classList.add('is-light');
       var poseTargets = wrap3d ? [frame, wrap3d] : [frame];
       gsap.set(poseTargets, { rotateY: pose.ry, rotateX: pose.rx, transformOrigin: '50% 50%' });
       // One slow deterministic sweep across the scene -- the camera never
