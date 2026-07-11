@@ -62,7 +62,7 @@
     },
     "callouts": {
       "type": "object",
-      "label": "Array of {at, dur?, x, y, w, h}: at in scene seconds, region in % of the displayed content -- a zoomed duplicate of that region lifts out in a brand-gradient glow shell while the base dims (the '3D callout')",
+      "label": "Array of {at, dur?, x, y, w, h, travel?}: at in scene seconds, region in % of the displayed content -- a zoomed duplicate of that region lifts out in a brand-gradient glow shell while the base dims (the '3D callout'). travel (0.35-2s, default 0.9) is the flight duration out/back -- the reverse-zoom speed.",
       "optional": true
     },
     "island": {

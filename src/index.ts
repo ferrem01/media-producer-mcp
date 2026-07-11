@@ -1889,6 +1889,27 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // ── API: Component data patch (Studio callout authoring etc.) ──
+      // Scoped successor to the removed generic prop-editor PATCH: merges
+      // the posted data object into ONE component's data and saves.
+      const compPatchMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)\/components\/([^/]+)$/);
+      if (compPatchMatch && method === "PATCH") {
+        const [, tenantId, projectId, sceneId, compId] = compPatchMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        if (!body.data || typeof body.data !== "object") { jsonResponse(res, 400, { error: "data object is required" }); return; }
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const scene = project.scenes.find((s: any) => s.id === sceneId);
+        if (!scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
+        const comp = (scene.components || []).find((c: any) => c.id === compId);
+        if (!comp) { jsonResponse(res, 404, { error: "Component not found" }); return; }
+        (comp as any).data = { ...((comp as any).data || {}), ...(body.data as Record<string, unknown>) };
+        project.updated_at = new Date().toISOString();
+        await saveProject(project);
+        jsonResponse(res, 200, { ok: true, component_id: compId, data: (comp as any).data });
+        return;
+      }
+
       // ── API: Speaker waveform peaks (timeline strip) ──
       const waveMatch = urlPath.match(/^\/api\/speaker-waveform\/([^/]+)\/([^/]+)$/);
       if (waveMatch && method === "GET") {
