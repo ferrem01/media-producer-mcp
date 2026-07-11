@@ -133,15 +133,15 @@
     position: absolute;
   }
   .scf-face--right {
-    right: 0; top: 16px; bottom: 16px; width: 64px;
-    transform-origin: right center; transform: rotateY(64deg);
+    left: 100%; top: 16px; bottom: 16px; width: 64px; margin-left: -1px;
+    transform-origin: left center; transform: rotateY(-64deg);
     background: linear-gradient(to left,
       color-mix(in srgb, var(--mp-color-primary, #4f46e5) 60%, #eeeef8),
       color-mix(in srgb, var(--mp-color-primary, #4f46e5) 34%, #15151f) 75%);
   }
   .scf-face--bottom {
     left: 16px; right: 16px; top: 100%; height: 64px; margin-top: -1px;
-    transform-origin: center top; transform: rotateX(-72deg);
+    transform-origin: center top; transform: rotateX(72deg);
     background: linear-gradient(to bottom,
       color-mix(in srgb, var(--mp-color-primary, #4f46e5) 52%, #e2e2f0),
       color-mix(in srgb, var(--mp-color-primary, #4f46e5) 28%, #101018) 80%);
@@ -481,7 +481,7 @@
       gsap.set(poseTargets, { rotateY: pose.ry, rotateX: pose.rx, transformOrigin: '50% 50%' });
       // One slow deterministic sweep across the scene -- the camera never
       // stops. Seek-exact (plain tween on the scene timeline).
-      tl.to(poseTargets, { rotateY: pose.ry + 9, rotateX: pose.rx - 2, duration: Math.max(4, ctx.duration || 8), ease: 'sine.inOut' }, 0);
+      tl.to(poseTargets, { rotateY: pose.ry - 7, rotateX: pose.rx - 1.5, duration: Math.max(4, ctx.duration || 8), ease: 'sine.inOut' }, 0);
       // The tilt is not symmetric on screen: rotateY(-14) recedes the left
       // edge and swells the right toward the camera, so the PROJECTED image
       // sits right of center even though the box is flex-centered. Measure
