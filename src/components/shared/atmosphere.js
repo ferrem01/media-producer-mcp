@@ -199,6 +199,47 @@
     return shell;
   };
 
+  // Physics move with VELOCITY MOTION BLUR: the element smears while it
+  // flies -- directional stretch + skew + blur scaled to travel distance --
+  // and snaps sharp as it lands (the launch-film "thrown object" feel; a
+  // crisp-at-every-speed move is what reads as a slide transition).
+  //   mpThrow(tl, el, at, { fromX, fromY, duration, ease, settle })
+  // fromX/fromY are px offsets the element arrives FROM. Elements containing
+  // live <video> get transform-only smear (no filter): a CSS filter on a
+  // playing video's layer drops it to black under 3D/reflection compositing.
+  window.mpThrow = function (tl, el, at, opts) {
+    if (!tl || !el) return;
+    opts = opts || {};
+    var fx = Number(opts.fromX) || 0;
+    var fy = opts.fromY === undefined ? 90 : Number(opts.fromY) || 0;
+    var dur = opts.duration || 0.55;
+    var dist = Math.sqrt(fx * fx + fy * fy);
+    var horiz = Math.abs(fx) >= Math.abs(fy);
+    var hasVideo = !!el.querySelector && !!el.querySelector('video');
+    var maxBlur = hasVideo ? 0 : Math.min(24, Math.max(5, dist * 0.05));
+    var stretch = 1 + Math.min(0.16, dist * 0.0006);
+    var skew = Math.min(8, dist * 0.018) * ((horiz ? fx : fy) < 0 ? -1 : 1);
+    gsap.set(el, { x: fx, y: fy, autoAlpha: 0 });
+    tl.to(el, { autoAlpha: 1, duration: Math.min(0.16, dur * 0.3), ease: 'power1.out' }, at)
+      .to(el, { x: 0, y: 0, duration: dur, ease: opts.ease || 'power3.out' }, at)
+      .fromTo(el,
+        {
+          scaleX: horiz ? stretch : 2 - stretch, scaleY: horiz ? 2 - stretch : stretch,
+          skewX: horiz ? skew : 0, skewY: horiz ? 0 : skew,
+          filter: maxBlur ? 'blur(' + maxBlur + 'px)' : 'none',
+        },
+        {
+          scaleX: 1, scaleY: 1, skewX: 0, skewY: 0,
+          filter: maxBlur ? 'blur(0px)' : 'none',
+          duration: dur * 0.82, ease: 'power2.out',
+        }, at);
+    if (opts.settle !== false) {
+      var ov = Math.min(10, dist * 0.03) * ((horiz ? fx : fy) < 0 ? 1 : -1);
+      tl.to(el, horiz ? { x: ov, duration: 0.14, ease: 'power1.out' } : { y: ov, duration: 0.14, ease: 'power1.out' }, at + dur * 0.92)
+        .to(el, { x: 0, y: 0, duration: 0.2, ease: 'power2.inOut' }, at + dur * 0.92 + 0.14);
+    }
+  };
+
   // Speed-contrast physics. The expensive feel = fast snaps against slow
   // drifts. mpSnapIn: fast arrival (blur smear) with a tiny overshoot settle.
   // mpSnapOut: fast lift-away. Compose against the atmosphere's slow drifts.

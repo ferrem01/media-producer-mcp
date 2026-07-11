@@ -1,0 +1,20 @@
+{
+  "type": "st-swarm",
+  "label": "Scene Template: Swarm / Chaos Collage",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: the chaos/abundance beat. A cloud of card-props (tweets, stats, quotes, images) is THROWN in with velocity smears, hovers alive, then CONVERGES into one focused headline -- chaos resolving to clarity. Use for 'the old messy way', 'everything you juggle', social-proof walls, or feature-abundance beats -- then cut to a calm scene for maximum density contrast. Dark by default (WebGL ribbon backdrop).",
+  "data": {
+    "headline": { "type": "string", "label": "The line the chaos resolves into; | breaks lines" },
+    "kicker": { "type": "string", "label": "Small caps line above the headline", "optional": true },
+    "items": { "type": "object", "label": "Array of 8-18 card specs: {kind: text|stat|quote|image, label?, body?, value?, quote?, image?} -- REAL content (real stats, real quotes, brand-kit image URLs), never lorem" },
+    "theme": { "type": "string", "label": "dark (default) | light", "optional": true },
+    "backdrop_image": { "type": "string", "label": "On-brand backdrop image URL (replaces the WebGL world)", "optional": true },
+    "seed": { "type": "number", "label": "Layout seed (vary per scene)", "optional": true },
+    "logo_url": { "type": "string", "label": "Wordmark URL; defaults to the brand-kit wordmark", "optional": true },
+    "scene_index": { "type": "string", "label": "e.g. 01 / 04", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.47 },
+    "exit": { "x": 0.5, "y": 0.47 }
+  }
+}

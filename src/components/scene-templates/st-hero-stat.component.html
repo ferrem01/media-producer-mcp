@@ -152,11 +152,17 @@
       .to(q('.sths-kicker'), { autoAlpha: 1, x: 0, duration: 0.5, ease: 'power2.out' }, 0.3)
       .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.85, ease: 'power4.out', stagger: 0.12 }, 0.45)
       .to(ghost, { autoAlpha: 0.05, duration: 1.6, ease: 'power1.inOut' }, 0.6)
-      .to(q('.sths-stat'), { autoAlpha: 1, y: 0, duration: 0.9, ease: 'power3.out' }, 0.95)
       .to(q('.sths-numline'), { scaleX: 1, duration: 0.7, ease: 'power2.inOut' }, 1.35)
       .to(q('.sths-supporting'), { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power2.out' }, 1.5)
-      .to([wm, q('.sths-index')], { autoAlpha: 1, duration: 0.6 }, 1.9)
-      .to(itemEls, { autoAlpha: 1, y: 0, duration: 0.65, ease: 'power3.out', stagger: 0.09 }, itemsAt);
+      .to([wm, q('.sths-index')], { autoAlpha: 1, duration: 0.6 }, 1.9);
+    // The numeral cluster is THROWN in from below-right with velocity smear;
+    // item chips are thrown with alternating lateral energy.
+    if (window.mpThrow) mpThrow(tl, q('.sths-stat'), 0.95, { fromY: 150, fromX: 70, duration: 0.7 });
+    else tl.to(q('.sths-stat'), { autoAlpha: 1, y: 0, duration: 0.9, ease: 'power3.out' }, 0.95);
+    Array.prototype.forEach.call(itemEls, function(chip, ci) {
+      if (window.mpThrow) mpThrow(tl, chip, itemsAt + ci * 0.09, { fromY: 75, fromX: ci % 2 ? 55 : -55, duration: 0.5 });
+      else tl.to(chip, { autoAlpha: 1, y: 0, duration: 0.65, ease: 'power3.out' }, itemsAt + ci * 0.09);
+    });
 
     // Count-up locked to the stat's entrance.
     if (num) {
