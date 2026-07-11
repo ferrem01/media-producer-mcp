@@ -75,7 +75,9 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     // runs baseless as a lighting pass over it.
     var stIsDark = st.type === "st-logo-close"
       || (st.type === "st-quote" && (stData as any).theme !== "light")
-      || (stData as any).theme === "dark";
+      || (stData as any).theme === "dark"
+      || (st.type === "st-screencast" && (stData as any).presentation === "float");
+    if (st.type === "st-screencast" && (stData as any).presentation === "float") (stData as any).theme = "dark";
     if (stIsDark) (stData as any).backdrop_active = true;
     var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
     if (stIsDark) {
@@ -93,6 +95,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     if (st.type === "st-screencast") {
       var src = (stData as any).source || (draft as any).assets?.find?.((a: string) => /\.(mp4|webm|mov|m4v)/i.test(a));
       if (src) {
+        var stFloat = (stData as any).presentation === "float";
         stComponents.push({
           id: "tpl_video",
           type: "screencast-frame",
@@ -100,10 +103,12 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
           position: { x: "0%", y: "4%", width: "100%", height: "82%" },
           data: {
             video_url: src,
-            frame_style: "macos-browser",
+            frame_style: stFloat ? "plain" : "macos-browser",
+            presentation: stFloat ? "float" : undefined,
+            callouts: Array.isArray((stData as any).callouts) ? (stData as any).callouts : undefined,
             crop: "auto",
             url_text: (stData as any).url_text || "",
-            max_width_pct: Number((stData as any).max_width_pct) || 80,
+            max_width_pct: Number((stData as any).max_width_pct) || (stFloat ? 72 : 80),
           },
         });
       } else {
