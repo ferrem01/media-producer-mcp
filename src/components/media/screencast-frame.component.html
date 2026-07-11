@@ -127,10 +127,14 @@
     background: linear-gradient(128deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.035) 40%,
       color-mix(in srgb, var(--mp-color-primary, #4f46e5) 14%, transparent) 100%);
     border: 1px solid rgba(255, 255, 255, 0.22);
+    /* The material edge: light concentrates along a real glass sheet's
+       bottom rim. This line is the pane's thickness. */
+    border-bottom: 3px solid color-mix(in srgb, var(--mp-color-primary, #4f46e5) 30%, rgba(255, 255, 255, 0.42));
     backdrop-filter: blur(7px);
     -webkit-backdrop-filter: blur(7px);
     box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -8px 18px -8px rgba(255, 255, 255, 0.12);
     -webkit-box-reflect: below 2.2vh linear-gradient(to bottom, transparent 70%, rgba(255,255,255,0.08));
   }
   .scf-glass::after {
@@ -489,11 +493,16 @@
           // pre-transform -- the shared pose does the rest).
           var fw = frame.offsetWidth, fh = frame.offsetHeight;
           if (fw > 4) {
-            var gm = Math.max(18, fw * 0.045);
-            glass.style.left = (frame.offsetLeft - gm) + 'px';
-            glass.style.top = (frame.offsetTop - gm * 0.8) + 'px';
-            glass.style.width = (fw + gm * 2) + 'px';
-            glass.style.height = (fh + gm * 1.7) + 'px';
+            // Asymmetric margins: a uniform surround reads as a picture
+            // FRAME; a thin lip above and a deep ledge below reads as a
+            // panel the video STANDS ON.
+            var gmSide = Math.max(14, fw * 0.032);
+            var gmTop = Math.max(8, fw * 0.012);
+            var gmBottom = Math.max(40, fw * 0.085);
+            glass.style.left = (frame.offsetLeft - gmSide) + 'px';
+            glass.style.top = (frame.offsetTop - gmTop) + 'px';
+            glass.style.width = (fw + gmSide * 2) + 'px';
+            glass.style.height = (fh + gmTop + gmBottom) + 'px';
           }
           var sb = stage.getBoundingClientRect();
           var fb = frame.getBoundingClientRect();
