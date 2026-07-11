@@ -3846,13 +3846,17 @@ export function getPreviewHtml(): string {
     try {
       var scfVid = hitVideo || (inside && inside.target && inside.target !== 'screencast' ? doc.querySelector(inside.target) : null);
       if (scfVid && !scfVid.hasAttribute('data-mp-derived')) {
-        var scfWrap = scfVid.closest('[data-comp-type="screencast-frame"]');
-        if (scfWrap) {
+        // The screencast-frame markup root is .scf-stage; the component
+        // wrapper above it carries data-cid (scene assembler) or
+        // data-comp-id (composite assembler).
+        var stageEl = scfVid.closest('.scf-stage');
+        if (stageEl) {
+          var cidEl = stageEl.closest('[data-cid], [data-comp-id]');
           var vpEl = scfVid.closest('.scf-viewport') || scfVid;
           scf = {
-            compId: scfWrap.getAttribute('data-comp-id'),
+            compId: cidEl ? (cidEl.getAttribute('data-cid') || cidEl.getAttribute('data-comp-id')) : null,
             vpRect: vpEl.getBoundingClientRect(),
-            isFloat: !!scfWrap.querySelector('.is-float'),
+            isFloat: stageEl.classList.contains('is-float'),
           };
         }
       }
