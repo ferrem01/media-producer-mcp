@@ -279,6 +279,10 @@
       var mini = document.createElement('div'); mini.style.cssText = 'position:absolute;';
       var clone = media.cloneNode(true);
       clone.classList.remove('scf-media');
+      // Derived mirror of the base media: playback sync must drive it, but
+      // editing surfaces (Studio media lane, popovers, EDL audits) must not
+      // list it as a second video.
+      clone.setAttribute('data-mp-derived', '1');
       mini.appendChild(clone); clip.appendChild(mini); card.appendChild(clip);
       var ring = document.createElement('div'); ring.className = 'scf-callout-ring';
       wrap3d.appendChild(ring);

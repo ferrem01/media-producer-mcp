@@ -2840,6 +2840,9 @@ export function getPreviewHtml(): string {
       var vids = root.querySelectorAll('video');
       for (var i = 0; i < vids.length; i++) {
         if (vids[i].id === '__mp_speaker_base') continue;
+        // Derived mirrors (callout clones) are synced playback copies of a
+        // base video -- one LOGICAL media, so editing surfaces skip them.
+        if (vids[i].getAttribute('data-mp-derived')) continue;
         out.push(vids[i]);
       }
       return out;
