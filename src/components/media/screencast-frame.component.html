@@ -247,6 +247,16 @@
         h: Math.min(100, Math.max(5, Number(c.h) || 30)),
       };
     }).filter(function (c) { return c.at < (ctx.duration || 1e9) - 2; });
+    // Dim OVERLAY, not a filter: tweening `filter` on the frame re-composites
+    // the live <video> layer (filter + 3D transform + box-reflect) and
+    // Chromium drops it to BLACK for the duration. A translucent panel above
+    // the footage never touches the video's layer.
+    var dimEl = null;
+    if (callouts.length) {
+      dimEl = document.createElement('div');
+      dimEl.style.cssText = 'position:absolute;inset:0;background:#05050c;opacity:0;pointer-events:none;z-index:3;border-radius:inherit;';
+      frame.appendChild(dimEl);
+    }
     var calloutEls = callouts.map(function () {
       var card = document.createElement('div'); card.className = 'scf-callout';
       var clip = document.createElement('div'); clip.className = 'scf-callout-clip';
@@ -338,7 +348,7 @@
       var fy = function () { return elc.from.y; };
       var fs = function () { return elc.from.s; };
       tl.to(elc.ring, { autoAlpha: 1, scale: 1, duration: 0.4, ease: 'power2.out' }, c.at)
-        .to(frame, { filter: 'brightness(0.68) saturate(0.92)', duration: 0.9, ease: 'power2.inOut' }, c.at + 0.35)
+        .to(dimEl, { opacity: 0.42, duration: 0.9, ease: 'power2.inOut' }, c.at + 0.35)
         .fromTo(elc.card,
           { x: fx, y: fy, scale: fs, autoAlpha: 0 },
           { autoAlpha: 1, duration: 0.25, ease: 'power1.out' }, liftAt)
@@ -351,7 +361,7 @@
       tl.to(elc.card, { x: fx, y: fy, scale: fs, duration: 0.7, ease: 'power2.inOut' }, end)
         .to(elc.card, { autoAlpha: 0, duration: 0.25, ease: 'power1.in' }, end + 0.5)
         .to(elc.ring, { autoAlpha: 0, scale: 1.05, duration: 0.4, ease: 'power2.in' }, end + 0.55)
-        .to(frame, { filter: 'brightness(1) saturate(1)', duration: 0.7, ease: 'power2.inOut' }, end + 0.4);
+        .to(dimEl, { opacity: 0, duration: 0.7, ease: 'power2.inOut' }, end + 0.4);
     });
 
     // Entrance only -- real footage NEVER fades itself out; the scene or a
