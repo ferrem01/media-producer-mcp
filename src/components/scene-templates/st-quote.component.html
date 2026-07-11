@@ -69,7 +69,7 @@
       .to(q('.stq-attr'), { autoAlpha: 1, duration: 0.6 }, 1.6)
       .to([wm, q('.stq-index')], { autoAlpha: 1, duration: 0.6 }, 1.9);
 
-    if (window.mpAtmosphere) mpAtmosphere(root, { dark: !light });
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: !light, noBase: !!data.backdrop_active });
     if (window.mpCameraPush) mpCameraPush(tl, root, ctx.duration, 1.04);
     if (window.mpGlow) { var em = el.querySelector('.stq-em'); if (em) mpGlow(em, '#d48c34', 0.5); }
     tl.to(q('.stq-mark'), { y: -24, duration: Math.max(4, ctx.duration - 1), ease: 'none' }, 1);

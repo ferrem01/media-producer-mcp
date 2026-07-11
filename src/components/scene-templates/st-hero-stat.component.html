@@ -182,7 +182,7 @@
       var sl = q('.sths-statlabel'); if (sl) sl.style.color = 'rgba(244,244,248,0.55)';
       var ix = q('.sths-index'); if (ix) ix.style.color = 'rgba(244,244,248,0.4)';
     }
-    if (window.mpAtmosphere) mpAtmosphere(el.querySelector('.sths'), { dark: dark });
+    if (window.mpAtmosphere) mpAtmosphere(el.querySelector('.sths'), { dark: dark, noBase: !!data.backdrop_active });
     if (window.mpCameraPush) mpCameraPush(tl, el.querySelector('.sths'), ctx.duration, 1.035);
     if (window.mpShimmer && num) mpShimmer(tl, q('.sths-stat'), 2.3);
     if (window.mpGlow && num) mpGlow(num, getComputedStyle(el.querySelector('.sths')).getPropertyValue('--mp-color-primary').trim() || '#4f46e5', 0.55);

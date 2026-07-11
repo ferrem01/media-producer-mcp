@@ -1,0 +1,11 @@
+{
+  "type": "webgl-backdrop",
+  "label": "WebGL Cinematic Backdrop",
+  "category": "threed",
+  "description": "Real-3D abstract world for DARK scenes: translucent curved ribbons drifting in fog, lit by brand-colored lights, with film grain and vignette (the launch-film backdrop look). Always z_index 0 with content components above it. Deterministic drift -- seeks exactly under render capture. Dark scene templates receive one automatically; codegen scenes can add it explicitly.",
+  "data": {
+    "primary": { "type": "string", "label": "Key light / ribbon hue (defaults to brand primary)", "optional": true },
+    "secondary": { "type": "string", "label": "Rim light hue (defaults to brand secondary)", "optional": true },
+    "seed": { "type": "number", "label": "Layout seed (vary per scene for different arrangements)", "optional": true }
+  }
+}

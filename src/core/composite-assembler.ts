@@ -33,6 +33,7 @@ import {
 import { config } from "../config.js";
 import { resolveAutoCropData, resolveScreencastAutoCrops } from "./asset-intel.js";
 import { speakerSceneFilmStarts } from "./speaker-track.js";
+import { resolveBrandKitFonts } from "./font-resolve.js";
 import type { Scene, SceneComponent, BrandKit, Canvas } from "./types.js";
 
 export interface CompositeComponentSource {
@@ -57,7 +58,10 @@ export interface CompositeOptions {
  * Assemble all project scenes into a single composite HTML document.
  */
 export async function assembleComposite(options: CompositeOptions): Promise<string> {
-  const { scenes: sceneInputs, brandKit, canvas, speakerUrl } = options;
+  const { scenes: sceneInputs, canvas, speakerUrl } = options;
+  // Resolve brand fonts FIRST so links and --mp-font-family agree on a
+  // family that actually exists (see font-resolve.ts).
+  const brandKit = await resolveBrandKitFonts(options.brandKit);
 
   // Load GSAP + shared utilities once
   const gsapSource = await loadGsapSource(options.gsapDir);

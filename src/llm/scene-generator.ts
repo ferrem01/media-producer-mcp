@@ -70,7 +70,22 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
       if (wmLogo) (stData as any).logo_url = wmLogo.url;
     }
     if (!(stData as any).scene_index) (stData as any).scene_index = `${String(opts.sceneIndex + 1).padStart(2, "0")} / ${String(opts.totalScenes).padStart(2, "0")}`;
+    // Dark template scenes get the WebGL cinematic backdrop (translucent lit
+    // ribbons on three.js) as their z0 world; the template's atmosphere then
+    // runs baseless as a lighting pass over it.
+    var stIsDark = st.type === "st-logo-close"
+      || (st.type === "st-quote" && (stData as any).theme !== "light")
+      || (stData as any).theme === "dark";
+    if (stIsDark) (stData as any).backdrop_active = true;
     var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
+    if (stIsDark) {
+      stComponents.unshift({
+        id: "tpl_bg",
+        type: "webgl-backdrop",
+        z_index: 0,
+        data: { seed: 3 + opts.sceneIndex * 4 },
+      });
+    }
     // st-screencast is a SHELL: the footage itself rides in a sibling
     // screencast-frame instance (browser chrome + crop:'auto' ingest-analysis
     // chrome removal). The frame's box leaves the shell's bottom band free

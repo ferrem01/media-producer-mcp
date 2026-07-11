@@ -49,7 +49,7 @@
       .to(url, { autoAlpha: 1, y: 0, duration: 0.6 }, 2.0);
 
     var brandPrimary = getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5';
-    if (window.mpAtmosphere) mpAtmosphere(root, { dark: true });
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: true, noBase: !!data.backdrop_active });
     // Light-theme wordmarks (dark text) go invisible on this dark ground --
     // mpLogoOnDark measures and flips lightness when needed, then glows.
     if (logo && data.logo_url) {
