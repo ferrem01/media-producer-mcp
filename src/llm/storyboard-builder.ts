@@ -909,6 +909,17 @@ export async function assignSceneTemplates(
         console.warn(`  Template assign: ${s.label} -> ${pick.type} rejected (missing required slot(s): ${missing.join(", ")})`);
         return;
       }
+      // LLMs shorten asset paths when copying them into slots; snap any
+      // video-path slot value back to the scene's actual footage URL.
+      if (footageUrl) {
+        for (var slotKey of Object.keys(pick.data)) {
+          var slotVal = pick.data[slotKey];
+          if (typeof slotVal === "string" && footageUrlRe.test(slotVal) && slotVal !== footageUrl) {
+            console.warn(`  Template assign: ${s.label} slot "${slotKey}" video path corrected to scene footage URL`);
+            pick.data[slotKey] = footageUrl;
+          }
+        }
+      }
       s.scene_template = { type: pick.type, data: pick.data };
       s.components = [];
       console.log(`  Template assign: ${s.label} -> ${pick.type}`);

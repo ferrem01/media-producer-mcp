@@ -15,7 +15,7 @@ import type { BrandKit, Canvas, OutputFormat, ReferenceImage, Scene, SceneTransi
 import { formatBeatSheet } from "../core/beats.js";
 import type { Treatment } from "./creative-director.js";
 import { loadAssetIntel } from "../core/asset-intel.js";
-import { resolveVideoPath } from "../core/video-path.js";
+import { recoverAssetUrl, resolveVideoPath } from "../core/video-path.js";
 
 // ── Types ──
 
@@ -102,6 +102,14 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     if (st.type === "st-screencast") {
       var src = (stData as any).source || (draft as any).assets?.find?.((a: string) => /\.(mp4|webm|mov|m4v)/i.test(a));
       if (src) {
+        // LLMs shorten asset paths in transit; a source that doesn't resolve
+        // on disk ships an empty frame. Recover by basename before wiring.
+        var recoveredSrc = recoverAssetUrl(src, opts.tenantId);
+        if (recoveredSrc !== src) {
+          console.warn(`  st-screencast: source "${src}" not on disk -- recovered to "${recoveredSrc}"`);
+          src = recoveredSrc;
+          (stData as any).source = recoveredSrc;
+        }
         var stFloat = (stData as any).presentation === "float";
         stComponents.push({
           id: "tpl_video",
