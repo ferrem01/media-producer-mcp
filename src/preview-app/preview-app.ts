@@ -1093,6 +1093,7 @@ export function getPreviewHtml(): string {
           end: sceneMeta.start + sceneMeta.duration,
           offset: startAt,
           isSpeaker: !!isSpeakerVideo,
+          derived: !!v.getAttribute('data-mp-derived'),
           lastOffset: null,
           driftSamples: 0
         });
@@ -1179,6 +1180,22 @@ export function getPreviewHtml(): string {
         if (localTime < 0 || localTime > (clip.end - clip.start)) {
           if (!el.paused) el.pause();
           continue;
+        }
+        // Derived mirrors (callout clones) always follow their BASE clip's
+        // adopted source-map: the clone may have been created before the
+        // EDL stamp landed on the base, so its own attrs cannot be trusted.
+        if (clip.derived) {
+          if (!clip.baseClip) {
+            for (var bi = 0; bi < state.mediaClips.length; bi++) {
+              var bc = state.mediaClips[bi];
+              if (bc !== clip && bc.kind === 'scene-video' && !bc.derived && bc.sceneId === clip.sceneId &&
+                  (bc.el.getAttribute('src') || '') === (el.getAttribute('src') || '')) { clip.baseClip = bc; break; }
+            }
+          }
+          if (clip.baseClip) {
+            clip.edl = clip.baseClip.edl;
+            clip.offset = clip.baseClip.offset;
+          }
         }
         // Media source-map: the stamp script writes data-mp-edl during doc
         // parse; read it lazily (once seen, cached on the clip).
@@ -2950,6 +2967,92 @@ export function getPreviewHtml(): string {
         });
         wrap.appendChild(pill);
       });
+      // Callout pills: one per screencast-frame callout, same scrubber, a
+      // distinct glyph. Click opens the callout editor popover.
+      (scene.components || []).forEach(function(comp) {
+        if (comp.type !== 'screencast-frame' || !comp.data || !Array.isArray(comp.data.callouts)) return;
+        comp.data.callouts.forEach(function(c, ci) {
+          var t = sceneStartFor(si) + (c.at || 0);
+          var pct = Math.max(0, Math.min(100, (t / total) * 100));
+          var lift = 0;
+          for (var pi = 0; pi < placed.length; pi++) {
+            if (Math.abs(placed[pi].pct - pct) < 1.1 && placed[pi].lift === lift) { lift++; pi = -1; }
+          }
+          placed.push({ pct: pct, lift: lift });
+          var pill = document.createElement('div');
+          pill.className = 'cam-pill';
+          pill.textContent = '⊙';
+          pill.style.left = pct.toFixed(2) + '%';
+          pill.style.borderColor = 'rgba(124, 92, 255, 0.8)';
+          if (lift) pill.style.top = (-3 - lift * 16) + 'px';
+          pill.title = 'Scene ' + (si + 1) + ': callout [' + Math.round(c.w) + '×' + Math.round(c.h) + '%] @' + Number(c.at || 0).toFixed(1) + 's, hold ' + Number(c.dur || 5).toFixed(1) + 's';
+          pill.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            coPopOpen(si, comp.id, ci, pill);
+          });
+          wrap.appendChild(pill);
+        });
+      });
+    });
+  }
+
+  // ── Callout editor popover (opens from a scrubber pill) ──
+  function coPopOpen(si, compId, ci, pill) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[si];
+    var comp = null;
+    if (scene) (scene.components || []).forEach(function(c) { if (c.id === compId) comp = c; });
+    var co = comp && comp.data && Array.isArray(comp.data.callouts) && comp.data.callouts[ci];
+    var pop = document.getElementById('cam-pop');
+    if (!co || !pop) return;
+    camPopClose();
+    pill.classList.add('active');
+    var sdur = scene.duration_seconds || 5;
+    pop.innerHTML =
+      '<div class="sp-head"><span class="sp-title"><b>Callout</b> — scene ' + (si + 1) + '</span>' +
+      '<button class="sp-x" id="co-x" title="Close (Esc)">✕</button></div>' +
+      '<div class="sp-fields">' +
+        '<label>at <input id="co-at" type="number" min="0" max="' + escAttr('' + Math.max(0, sdur - 2).toFixed(1)) + '" step="0.1" value="' + escAttr('' + (co.at != null ? co.at : 0)) + '">s</label>' +
+        '<label>hold <input id="co-dur" type="number" min="1.5" max="20" step="0.5" value="' + escAttr('' + (co.dur != null ? co.dur : 5)) + '">s</label>' +
+        '<label title="Flight speed out and back">ease <input id="co-travel" type="number" min="0.35" max="2" step="0.05" value="' + escAttr('' + (co.travel || 0.9)) + '">s</label>' +
+      '</div>' +
+      '<div class="sp-fields">' +
+        '<label>x <input id="co-xf" type="number" min="0" max="96" step="0.5" value="' + escAttr('' + (co.x || 0)) + '">%</label>' +
+        '<label>y <input id="co-yf" type="number" min="0" max="96" step="0.5" value="' + escAttr('' + (co.y || 0)) + '">%</label>' +
+        '<label>w <input id="co-wf" type="number" min="2" max="100" step="0.5" value="' + escAttr('' + (co.w || 30)) + '">%</label>' +
+        '<label>h <input id="co-hf" type="number" min="2" max="100" step="0.5" value="' + escAttr('' + (co.h || 30)) + '">%</label>' +
+      '</div>' +
+      '<div class="sp-row">' +
+        '<button class="rv-go secondary" id="co-del" style="flex:0 0 auto;">Delete</button>' +
+        '<button class="rv-go" id="co-save" style="flex:1;">Save</button>' +
+      '</div>';
+    pop.style.display = 'block';
+    var pr = pill.getBoundingClientRect();
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 180;
+    var px = Math.max(8, Math.min(pr.left + pr.width / 2 - pw / 2, window.innerWidth - pw - 8));
+    var py = pr.top - ph - 10;
+    if (py < 8) py = pr.bottom + 10;
+    pop.style.left = px + 'px';
+    pop.style.top = py + 'px';
+    document.getElementById('co-x').addEventListener('click', camPopClose);
+    function num(id, fb) { var v = parseFloat(document.getElementById(id).value); return isNaN(v) ? fb : v; }
+    document.getElementById('co-save').addEventListener('click', function() {
+      var next = comp.data.callouts.slice();
+      next[ci] = {
+        at: Math.max(0, Math.min(sdur - 2, num('co-at', co.at || 0))),
+        dur: Math.max(1.5, num('co-dur', co.dur || 5)),
+        travel: Math.max(0.35, Math.min(2, num('co-travel', co.travel || 0.9))),
+        x: num('co-xf', co.x || 0), y: num('co-yf', co.y || 0),
+        w: num('co-wf', co.w || 30), h: num('co-hf', co.h || 30),
+      };
+      camPopClose();
+      saveCalloutsData(si, comp, next);
+    });
+    document.getElementById('co-del').addEventListener('click', function() {
+      var next = comp.data.callouts.slice();
+      next.splice(ci, 1);
+      camPopClose();
+      saveCalloutsData(si, comp, next);
     });
   }
 
@@ -3953,9 +4056,35 @@ export function getPreviewHtml(): string {
     });
   }
 
-  // Persist a drawn callout onto its screencast-frame component (and mirror
-  // to an st-screencast shell sibling so the scene data stays coherent),
+  // Persist a component's full callout list (append, edit, or delete), mirror
+  // it to an st-screencast shell sibling so the scene data stays coherent,
   // then reboot the composite with the playhead restored.
+  function saveCalloutsData(sceneIndex, comp, callouts) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[sceneIndex];
+    if (!p || !scene || !comp) return;
+    comp.data = comp.data || {};
+    comp.data.callouts = callouts;
+    var shell = null;
+    scene.components.forEach(function(c) { if (c.type === 'st-screencast') shell = c; });
+    studioStatus('Saving callout…', '');
+    var patchPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+    var work = api('PATCH', patchPath, { data: comp.data });
+    if (shell) {
+      shell.data = shell.data || {};
+      shell.data.callouts = callouts;
+      var shellPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + shell.id;
+      work = work.then(function() { return api('PATCH', shellPath, { data: shell.data }); });
+    }
+    work.then(function() {
+      studioStatus('Callout saved ✓ reloading preview…', 'ok');
+      renderCamPills();
+      startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+    }).catch(function(e) {
+      studioStatus('Callout save failed: ' + e.message, 'err');
+    });
+  }
+
   function saveCalloutForComponent(sceneIndex, compId, callout) {
     var p = state.currentProject;
     var scene = p && p.scenes && p.scenes[sceneIndex];
@@ -3964,25 +4093,7 @@ export function getPreviewHtml(): string {
     scene.components.forEach(function(c) { if (c.id === compId) comp = c; });
     if (!comp) { scene.components.forEach(function(c) { if (!comp && c.type === 'screencast-frame') comp = c; }); }
     if (!comp) { studioStatus('No screencast component found for callout', 'err'); return; }
-    comp.data = comp.data || {};
-    comp.data.callouts = (comp.data.callouts || []).concat([callout]);
-    var shell = null;
-    scene.components.forEach(function(c) { if (c.type === 'st-screencast') shell = c; });
-    studioStatus('Saving callout…', '');
-    var patchPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
-    var work = api('PATCH', patchPath, { data: comp.data });
-    if (shell) {
-      shell.data = shell.data || {};
-      shell.data.callouts = comp.data.callouts;
-      var shellPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + shell.id;
-      work = work.then(function() { return api('PATCH', shellPath, { data: shell.data }); });
-    }
-    work.then(function() {
-      studioStatus('Callout saved ✓ reloading preview…', 'ok');
-      startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
-    }).catch(function(e) {
-      studioStatus('Callout save failed: ' + e.message, 'err');
-    });
+    saveCalloutsData(sceneIndex, comp, ((comp.data || {}).callouts || []).concat([callout]));
   }
 
   document.addEventListener('keydown', function(ev) {
