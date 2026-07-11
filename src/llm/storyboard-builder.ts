@@ -778,7 +778,77 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
   // one-job calls AFTER the storyboard, one per eligible scene.
   await assignSceneTemplates(scenes, opts.componentCatalog, opts.llmConfig);
 
+  // ── House-style enforcement + report (deterministic) ──
+  // Prompt guidance regresses; enforcement doesn't. Fix what code can fix,
+  // and print a FILM DIRECTION report so any regression is visible in one
+  // glance instead of discovered scene-by-scene in Studio.
+  enforceFilmDirection(scenes);
+
   return { name: name!, scenes } as StoryboardResult;
+}
+
+/**
+ * Deterministic house-style pass over the final draft scenes:
+ *  - screencast template scenes in a dark-forward film default to FLOAT
+ *  - exactly one world flip: an all-dark template film gets one light pivot
+ *    scene (and an all-light one gets a dark pivot) on themable templates
+ *  - report card: templates used, theme sequence, swarm/float/match-cut
+ *    counts -- the film's style contract, logged every generation.
+ */
+export function enforceFilmDirection(scenes: DraftScene[]): void {
+  const themable = new Set(["st-hero-stat", "st-kinetic-list", "st-screencast", "st-swarm"]);
+  const tpl = (s: DraftScene) => s.scene_template?.type || null;
+  const themeOf = (s: DraftScene): "dark" | "light" | null => {
+    const t = tpl(s);
+    if (!t) return null;
+    const data = (s.scene_template!.data || {}) as Record<string, unknown>;
+    if (t === "st-logo-close") return "dark";
+    if (t === "st-quote") return data.theme === "light" ? "light" : "dark";
+    if (t === "st-swarm") return data.theme === "light" ? "light" : "dark";
+    if (t === "st-screencast") return (data.presentation === "float" && data.theme !== "light") || data.theme === "dark" ? "dark" : "light";
+    return data.theme === "dark" ? "dark" : "light";
+  };
+
+  const tplScenes = scenes.filter((s) => tpl(s));
+  const darkish = tplScenes.filter((s) => themeOf(s) === "dark").length;
+  const darkForward = tplScenes.length > 0 && darkish >= tplScenes.length / 2;
+
+  // Float default for screencast scenes in a dark-forward film.
+  for (const s of scenes) {
+    if (tpl(s) === "st-screencast" && darkForward) {
+      const data = (s.scene_template!.data || {}) as Record<string, unknown>;
+      if (!data.presentation && data.theme !== "light") {
+        data.presentation = "float";
+        s.scene_template!.data = data;
+      }
+    }
+  }
+
+  // One world flip: all-same-theme template films get a pivot scene flipped
+  // (nearest themable template scene to ~55% through the film).
+  const themes = tplScenes.map((s) => themeOf(s));
+  const flips = themes.filter((t, i) => i > 0 && t !== themes[i - 1]).length;
+  if (tplScenes.length >= 3 && flips === 0) {
+    const target = [...scenes]
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => themable.has(tpl(s) || "") && tpl(s) !== "st-screencast")
+      .sort((a, b) => Math.abs(a.i / scenes.length - 0.55) - Math.abs(b.i / scenes.length - 0.55))[0];
+    if (target) {
+      const data = (target.s.scene_template!.data || {}) as Record<string, unknown>;
+      data.theme = themes[0] === "dark" ? "light" : "dark";
+      target.s.scene_template!.data = data;
+      console.log(`  Film direction: no world flip -- pivoting "${target.s.label}" to ${data.theme} (one flip is a story beat)`);
+    }
+  }
+
+  // Report card -- the style contract, visible on every generation.
+  const floats = scenes.filter((s) => tpl(s) === "st-screencast" && ((s.scene_template!.data || {}) as any).presentation === "float").length;
+  const swarms = scenes.filter((s) => tpl(s) === "st-swarm").length;
+  const matchCuts = scenes.filter((s) => s.transition_in?.type === "match-cut").length;
+  const themeSeq = scenes.map((s) => tpl(s) ? (themeOf(s) === "dark" ? "D" : "L") : "c").join("");
+  console.log(`  FILM DIRECTION: ${tplScenes.length}/${scenes.length} scenes templated | themes ${themeSeq} (c=codegen) | swarm ${swarms} | float ${floats} | match-cuts ${matchCuts}`);
+  if (tplScenes.length === 0) console.warn(`  FILM DIRECTION WARNING: zero template scenes -- this film will be all codegen; check the template mapper log above.`);
+  if (swarms === 0 && scenes.length >= 4) console.log(`  Film direction note: no swarm/density beat in this film (fine for demo-led films; a launch film usually wants one).`);
 }
 
 /**

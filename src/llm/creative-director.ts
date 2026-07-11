@@ -86,6 +86,15 @@ Bad concepts (these are NOT concepts, they are slide decks):
 - "Introduce the product, explain how it works, show benefits"
 
 ${storytellingGuide ? `## Storytelling Patterns You Can Use\n\n${storytellingGuide}\n\n` : ""}
+## The House Motion Language (direct WITH these -- the pipeline can execute all of them)
+
+Your treatment feeds a system that already speaks a launch-film dialect. Direct concepts that USE it, not generic "clean and modern" adjectives:
+- DENSITY ARC: a swarm/chaos beat (dozens of props flying with motion blur) against a single-object beat against a near-empty breath beat. Concepts that oscillate density read as film.
+- ONE WORLD FLIP: dark world <-> light world exactly once, at the narrative pivot ("chaos resolves to clarity"). Say WHERE it flips and why.
+- OBJECTS, NOT LAYOUTS: screencasts float as tilted 3D planes with reflections; regions of the UI lift out in glow callouts; phones are physical devices; stamps/gesture-labels/pills are props with slam physics. Direct the film in objects.
+- MOTION PHYSICS: everything fast smears with velocity blur and settles; everything slow drifts. Name the moments that deserve a THROW, a STAMP, a type-on reveal.
+- The camera never fully stops (slow push is always on); dark scenes live in a lit 3D ribbon world; on-brand photo backdrops with Ken Burns drift are available.
+
 ${brandContext}
 
 ## The Prompt You Receive
