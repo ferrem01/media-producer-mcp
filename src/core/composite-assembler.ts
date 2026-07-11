@@ -23,6 +23,7 @@ import {
   buildContentRegionWrapper,
   buildComponentScript,
   loadGsapSource,
+  loadThreeSource,
   loadSharedUtilities,
   loadLibraryComponentSources,
   resolveSpeakerVideoTags,
@@ -66,6 +67,14 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
   // Load GSAP + shared utilities once
   const gsapSource = await loadGsapSource(options.gsapDir);
   const sharedSource = await loadSharedUtilities();
+
+  // three.js is heavy (~660KB) -- inline it only when a scene's component
+  // actually references the global THREE. The render path (scene-assembler)
+  // always did this; the composite (Studio) never did, so WebGL components
+  // silently bailed on their `typeof THREE === 'undefined'` guard and the
+  // backdrop played as a permanently black canvas.
+  const usesThree = options.scenes.some((s) => s.components.some((c) => c.source.includes("THREE")));
+  const threeSource = usesThree ? await loadThreeSource(config.threeDir) : "";
 
   // Codegen scenes embed library components via <component> tags (video,
   // browser frames, charts...). Load the library once if any scene needs it,
@@ -315,7 +324,13 @@ img, video {
 /* ── Scene Styles ── */
 ${sceneStyles.join("\n\n")}
 </style>
+${threeSource ? `<!-- three.js (bundled: three + addons, global THREE). MUST be its own
+     <script>: the bundle opens with "use strict", and concatenating it with the
+     GSAP block below would make that block strict too. -->
 <script>
+${threeSource}
+</script>
+` : ""}<script>
 ${gsapSource}
 
 ${sharedSource}

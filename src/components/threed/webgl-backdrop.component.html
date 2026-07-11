@@ -65,9 +65,13 @@
       mats.push(mat);
     }
 
-    var key = new THREE.PointLight(primary, 90, 0, 1.6); key.position.set(6, 5, 6); scene.add(key);
-    var rim = new THREE.PointLight(secondary, 55, 0, 1.6); rim.position.set(-7, -4, 3); scene.add(rim);
-    scene.add(new THREE.AmbientLight('#20202e', 1.2));
+    var key = new THREE.PointLight(primary, 120, 0, 1.6); key.position.set(6, 5, 6); scene.add(key);
+    var rim = new THREE.PointLight(secondary, 70, 0, 1.6); rim.position.set(-7, -4, 3); scene.add(rim);
+    // Luminance floor: a camera-side fill plus stronger ambient so the
+    // drifting composition can never collapse to plain black -- "dark"
+    // must read as deep lit indigo, never void.
+    var fill = new THREE.PointLight(primary, 45, 0, 1.8); fill.position.set(0, -2, 9); scene.add(fill);
+    scene.add(new THREE.AmbientLight('#2a2a3e', 1.8));
 
     // Deterministic drift: one state tween drives every transform + render,
     // so captured frames track timeline SEEKS exactly (same pattern as

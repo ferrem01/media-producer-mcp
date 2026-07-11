@@ -26,13 +26,29 @@
   .stsc-rule--right { transform-origin: right center; }
   .stsc-kicker { font-size: 13px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase;
     color: var(--mp-color-primary, #4f46e5); }
+  /* Violet-on-near-black fails contrast: on the dark world the kicker text
+     goes near-white and the violet lives in the rules. */
+  .is-dark .stsc-kicker { color: rgba(244, 244, 248, 0.92);
+    text-shadow: 0 1px 14px rgba(0, 0, 0, 0.4); }
   .stsc-caps { position: absolute; left: 50%; bottom: 4.6vh; transform: translateX(-50%); height: 0; }
+  /* Beat labels (default): transient lower-third moments, NOT subtitles --
+     a tick of brand rule + one line of type that appears at its narration
+     beat, holds a breath, and leaves. No pill furniture. */
   .stsc-cap { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); white-space: nowrap;
-    font-size: 15px; font-weight: 500; letter-spacing: 0.01em; color: #17171c;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 16px; font-weight: 600; letter-spacing: 0.04em; color: #17171c; }
+  .is-dark .stsc-cap { color: rgba(244, 244, 248, 0.94);
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.5); }
+  .stsc-cap::before { content: ''; width: 22px; height: 2px; flex: 0 0 auto;
+    background: var(--mp-color-primary, #4f46e5);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 60%, transparent); }
+  /* Legacy persistent chips (captions_style: 'chips'). */
+  .stsc-cap.is-chip { display: block; font-weight: 500; letter-spacing: 0.01em; font-size: 15px;
     background: rgba(255,255,255,0.92); padding: 11px 26px; border-radius: 100px;
-    border: 1px solid rgba(23,23,28,0.08);
+    border: 1px solid rgba(23,23,28,0.08); text-shadow: none;
     box-shadow: 0 2px 6px rgba(23,23,28,0.06), 0 10px 30px rgba(23,23,28,0.10); }
-  .is-dark .stsc-cap { color: #f4f4f8; background: rgba(28,28,38,0.92);
+  .stsc-cap.is-chip::before { display: none; }
+  .is-dark .stsc-cap.is-chip { color: #f4f4f8; background: rgba(28,28,38,0.92);
     border-color: rgba(244,244,248,0.10); }
   .st-overlay { position: absolute; inset: 0; pointer-events: none; }
 </style>
@@ -54,23 +70,39 @@
         .to(el.querySelectorAll('.stsc-rule'), { scaleX: 1, duration: 0.6, ease: 'power2.out' }, 0.35);
     }
 
-    // Timed caption chips: [{at, text}] in scene seconds. One chip visible at
-    // a time -- the previous slides down as the next rises.
-    var caps = Array.isArray(data.captions) ? data.captions.filter(function (c) {
+    // Timed captions: [{at, text}] in scene seconds.
+    //   captions_style 'beats' (default): each label is a transient beat --
+    //     it appears at its timestamp, holds ~3s, and LEAVES. Emphasis
+    //     moments, not subtitles (whole-film captioning is a separate,
+    //     global decision).
+    //   'chips': legacy persistent pill (one always visible).
+    //   'none': suppress entirely.
+    var capStyle = data.captions_style === 'chips' ? 'chips'
+      : data.captions_style === 'none' ? 'none' : 'beats';
+    var caps = capStyle === 'none' ? [] : (Array.isArray(data.captions) ? data.captions.filter(function (c) {
       return c && typeof c.text === 'string' && c.text && Number.isFinite(Number(c.at));
-    }) : [];
+    }) : []);
     var capHost = q('.stsc-caps');
-    var prev = null;
-    caps.forEach(function (c) {
+    var sceneDur = ctx.duration || 1e9;
+    caps.forEach(function (c, i) {
       var chip = document.createElement('div');
-      chip.className = 'stsc-cap';
+      chip.className = 'stsc-cap' + (capStyle === 'chips' ? ' is-chip' : '');
       chip.textContent = c.text;
       capHost.appendChild(chip);
       gsap.set(chip, { autoAlpha: 0, y: 16 });
       var at = Math.max(0.1, Number(c.at));
-      if (prev) tl.to(prev, { autoAlpha: 0, y: -12, duration: 0.4, ease: 'power2.in' }, at);
-      tl.to(chip, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out' }, at + (prev ? 0.15 : 0));
-      prev = chip;
+      if (capStyle === 'chips') {
+        if (i > 0) tl.to(capHost.children[i - 1], { autoAlpha: 0, y: -12, duration: 0.4, ease: 'power2.in' }, at);
+        tl.to(chip, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out' }, at + (i > 0 ? 0.15 : 0));
+        return;
+      }
+      // Beat label: rise in, breathe, leave -- never overlaps its neighbor.
+      var next = caps[i + 1] ? Math.max(0.1, Number(caps[i + 1].at)) : Infinity;
+      var out = Math.min(at + 3.4, next - 0.45, sceneDur - 0.6);
+      tl.to(chip, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, at);
+      if (out > at + 1.2) {
+        tl.to(chip, { autoAlpha: 0, y: -14, filter: 'blur(4px)', duration: 0.45, ease: 'power2.in' }, out);
+      }
     });
 
     // Lit background behind the sibling video frame. NO camera push here:

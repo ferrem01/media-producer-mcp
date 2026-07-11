@@ -113,15 +113,52 @@
   .scf-stage.is-float .scf-frame {
     transform-style: preserve-3d;
     background: #101016;
-    box-shadow: 0 40px 110px rgba(0, 0, 0, 0.6), 0 8px 30px rgba(0, 0, 0, 0.45);
+    /* Slab, not paper: the offset opaque layers along the tilt direction
+       read as the thickness of a smoked-glass panel; the violet ghost is
+       the rim of that edge catching the key light. */
+    box-shadow:
+      -10px 14px 0 -4px rgba(9, 9, 18, 0.92),
+      -12px 17px 0 -4px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 22%, rgba(20, 20, 34, 0.9)),
+      0 40px 110px rgba(0, 0, 0, 0.6), 0 8px 30px rgba(0, 0, 0, 0.45);
     -webkit-box-reflect: below 2.2vh linear-gradient(to bottom, transparent 62%, rgba(255,255,255,0.14));
+  }
+  /* Rim light: the camera-facing edges catch the studio light. Inside the
+     frame (overflow hidden) so it survives the 3D transform. */
+  .scf-stage.is-float .scf-frame::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 6;
+    border-radius: inherit;
+    border-left: 1px solid rgba(255, 255, 255, 0.28);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  /* Floor light pool: a soft elliptical spot beneath the plane so it hovers
+     over a SURFACE, working with the reflection -- not floating in void. */
+  .scf-pool {
+    position: absolute; left: 50%; bottom: -1vh; transform: translateX(-50%);
+    width: 74%; height: 16vh; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse 50% 42% at 50% 60%,
+      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 20%, transparent),
+      transparent 72%);
+    filter: blur(10px);
   }
   /* Light float: same physics, softer light -- reflection reads quieter on a
      lit ground and the shadow must suggest weight, not void. */
   .scf-stage.is-float.is-light .scf-frame {
     background: #f4f4f8;
-    box-shadow: 0 30px 80px rgba(23, 23, 40, 0.22), 0 6px 22px rgba(23, 23, 40, 0.14);
+    box-shadow:
+      -9px 12px 0 -4px rgba(206, 206, 224, 0.95),
+      -11px 15px 0 -4px rgba(23, 23, 40, 0.10),
+      0 30px 80px rgba(23, 23, 40, 0.22), 0 6px 22px rgba(23, 23, 40, 0.14);
     -webkit-box-reflect: below 2.2vh linear-gradient(to bottom, transparent 66%, rgba(255,255,255,0.10));
+  }
+  .scf-stage.is-float.is-light .scf-frame::before {
+    border-left-color: rgba(255, 255, 255, 0.9);
+    border-top-color: rgba(255, 255, 255, 0.6);
+  }
+  .scf-stage.is-float.is-light .scf-pool {
+    background: radial-gradient(ellipse 50% 42% at 50% 60%,
+      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 12%, transparent),
+      transparent 72%);
   }
 
   /* ── Region callout: an anchor ring draws ON the region, then the region
@@ -395,6 +432,14 @@
     if (isFloat) {
       stage.classList.add('is-float');
       if (data.theme === 'light') stage.classList.add('is-light');
+      // Floor light pool under the plane (behind the frame + reflection):
+      // the slab hovers over a lit surface, not a void.
+      var pool = document.createElement('div');
+      pool.className = 'scf-pool';
+      stage.insertBefore(pool, stage.firstChild);
+      gsap.set(pool, { autoAlpha: 0 });
+      tl.to(pool, { autoAlpha: 1, duration: 1.2, ease: 'sine.out' }, 0.4);
+      tl.to(pool, { scale: 1.06, duration: Math.max(4, (ctx.duration || 8) / 2), yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0.4);
       var poseTargets = wrap3d ? [frame, wrap3d] : [frame];
       gsap.set(poseTargets, { rotateY: pose.ry, rotateX: pose.rx, transformOrigin: '50% 50%' });
       // One slow deterministic sweep across the scene -- the camera never
