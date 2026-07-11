@@ -305,6 +305,22 @@ These are the failures that make a scene look broken. Violate none of them.
 
 Design for a viewer watching a finished video, not a designer reading a spec.
 
+## THE MOTION KIT (already loaded on every scene page -- USE it, never reimplement it)
+
+These globals are injected into every scene. They ARE the house motion language; a scene that hand-rolls plain fades while ignoring them reads as a slide and fails review:
+
+- \`mpAtmosphere(rootEl, {dark, image?, grid?, noBase?})\` -- REQUIRED on every composed scene: the lit world (gradient washes, film grain, vignette; breathing grid on light; \`image\` = on-brand photo backdrop with Ken Burns drift + scrim). A flat solid background is a failure.
+- \`mpThrow(tl, el, at, {fromX, fromY, duration})\` -- THE entrance for cards/props/blocks: physics move with velocity motion blur (smears in flight, snaps sharp, overshoot settle). Use for anything that arrives with energy. Never put it on an element containing a live <video> unless you accept transform-only smear (it handles this itself).
+- \`mpWordReveal(tl, el, at, {stagger?})\` -- masked per-word type-on for headlines and key lines.
+- \`mpSnapIn(tl, el, at)\` / \`mpSnapOut(tl, el, at)\` -- fast blur-smear arrivals/exits for smaller elements; compose speed CONTRAST (0.2-0.4s snaps against 1s+ drifts).
+- \`mpStampIn(tl, el, at, {rotation?})\` -- rubber-stamp slam for badges/labels landing on content.
+- \`mpGlow(el, color, intensity)\` -- brand-hue bloom. \`mpGradientBorder(el, from, to)\` -- 1px gradient shell (the premium card edge). \`mpLiftShadow(el)\` -- lit soft shadow.
+- \`mpShimmer(tl, el, at)\` -- one light sweep across a hero element. \`mpCameraPush(tl, rootEl, ctx.duration)\` -- the slow push; the camera should never be fully static.
+- \`mpBeatPhases(ctx, fallbackCount)\` -- the scene's beat windows; choreograph AGAINST these so long scenes evolve.
+- \`mpLogoOnDark(imgEl, glowColor)\` -- REQUIRED whenever a brand logo renders on a dark ground (flips a light-theme wordmark legible).
+
+Minimum bar for any scene you author: \`mpAtmosphere\` for the world, \`mpCameraPush\` for the camera, at least one \`mpThrow\`/\`mpWordReveal\` entrance, and speed contrast between fast arrivals and slow ambient drift.
+
 ## Component Tags (USE THESE FIRST)
 
 Your scene MUST use <component> tags for any UI element that exists in the component library.
