@@ -68,8 +68,13 @@ export interface ComponentTagResult {
  *   <component type="foo" data='{}' />
  *   <component type="foo" data='{}' ></component>
  *   <component type="foo" />
+ *
+ * Quote-aware: a `>` INSIDE a quoted attribute value (JSON data containing
+ * markup like "</div>") must not end the tag -- with a naive [^>]*? the tag
+ * truncates mid-JSON, the component silently binds empty data (ghost panel)
+ * and the JSON remainder leaks into the page as literal text.
  */
-const COMPONENT_TAG_REGEX = /<component\s+([^>]*?)\/?>(?:<\/component>)?/gi;
+const COMPONENT_TAG_REGEX = /<component\s+((?:"[^"]*"|'[^']*'|[^>"'])*?)\/?>(?:<\/component>)?/gi;
 
 /**
  * Extract an attribute value from a tag's attribute string.

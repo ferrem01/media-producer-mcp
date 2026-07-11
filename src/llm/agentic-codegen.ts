@@ -350,6 +350,7 @@ The result is HYBRID: <component> tags for known UI + custom code for everything
 ### Rules
 - The \`type\` must match a component listed in the spec
 - The \`data\` attribute is a JSON string — fill fields from the schema provided in the spec
+- **DATA IS PLAIN TEXT ONLY.** Never put HTML markup, '>' characters, or straight apostrophes inside data strings (a single-quoted attribute DIES at the first apostrophe -- write a curly ’ in copy instead). A broken data attribute renders the component as an EMPTY ghost panel with JSON leaking into the page as text; finish_scene rejects it. If the content will not fit the schema's plain-text fields, do not force it -- author that block as regular markup.
 - Components auto-generate internal GSAP timelines
 - Access component timelines via: ctx.getComponentTimeline('comp_0')
 - **WIRE EVERY COMPONENT YOU EMBED.** For each <component> in your template, you MUST call \`tl.add(ctx.getComponentTimeline('comp_N'), <time>)\` in createTimeline. If you don't, the block's animation -- including ambient background motion -- never plays and the frame sits dead-static. This applies to backgrounds too (gradient-background, mesh-gradient, depth-blur all have ambient loops): wire them at t=0.
@@ -963,6 +964,46 @@ export function findRawTextColors(parts: { template: string; style: string }): s
 }
 
 /**
+ * Broken <component> tag detection, checked at finish_scene. The observed
+ * failure class: the model writes data='{...}' whose JSON contains raw HTML
+ * markup or apostrophes -- the tag regex or the quote pairing then terminates
+ * early, the component binds EMPTY data (renders as a ghost panel) and the
+ * JSON remainder leaks into the page as literal text ("}' />"). Caught here
+ * it costs a same-conversation edit instead of a shipped broken scene.
+ */
+export function findBrokenComponentTags(parts: { template: string }): string[] {
+  var violations: string[] = [];
+  var tpl = parts.template || "";
+  var TAG = /<component\s+((?:"[^"]*"|'[^']*'|[^>"'])*?)\/?>/gi;
+  var covered = "";
+  var m: RegExpExecArray | null;
+  while ((m = TAG.exec(tpl)) !== null) {
+    covered += m[0];
+    var attrs = m[1];
+    var type = (attrs.match(/type\s*=\s*["']([^"']+)["']/i) || [])[1] || "?";
+    if (!/data\s*=/i.test(attrs)) continue;
+    var dm = attrs.match(/data\s*=\s*(?:'([\s\S]*?)'|"([\s\S]*?)")/i);
+    if (!dm) {
+      violations.push(`<component type="${type}">: data attribute has no closing quote -- the tag is truncated and the component will render EMPTY.`);
+      continue;
+    }
+    var raw = dm[1] !== undefined ? dm[1] : (dm[2] || "").replace(/&quot;/g, '"');
+    try {
+      JSON.parse(raw);
+    } catch (e: any) {
+      violations.push(`<component type="${type}">: data attribute is not valid JSON (${String(e.message).slice(0, 80)}). Keep data values PLAIN TEXT -- no HTML markup inside strings, no unescaped apostrophes inside a single-quoted attribute (use a curly ’ in copy).`);
+    }
+  }
+  // Leak signature: JSON/tag remnants sitting in the markup as literal text
+  // mean an earlier <component> tag terminated before its real end.
+  var residue = tpl.replace(TAG, "");
+  if (/\}\s*["']\s*\/>/.test(residue)) {
+    violations.push(`the template contains a dangling \`}' />\` fragment outside any tag -- a <component> tag terminated early (usually a '>' or apostrophe inside its data JSON) and its tail is leaking into the page as visible text.`);
+  }
+  return violations;
+}
+
+/**
  * Revise an already-built scene INSIDE its original codegen conversation.
  *
  * The Write-then-Edit pattern: the session still holds the spec, the model's
@@ -1200,6 +1241,7 @@ async function runAgenticLoop(args: {
           }
         } else if (toolCall.name === "finish_scene") {
           var colorViolations = findRawTextColors(parts);
+          var brokenTags = findBrokenComponentTags(parts);
           var scenePlaceholders = opts.speakerMode ? findSpeakerPlaceholders(parts, opts.speakerMode) : [];
           if (!parts.template || !parts.script) {
             var missing = [!parts.template && "write_template", !parts.script && "write_script"].filter(Boolean).join(" and ");
@@ -1211,6 +1253,10 @@ async function runAgenticLoop(args: {
             toolResult = `REJECTED -- this scene sits on a LIVE SPEAKER TRACK, but the speaker contract is violated:\n` +
               scenePlaceholders.slice(0, 5).map((v) => `  - ${v}`).join("\n") +
               `\nNever draw a person, avatar, monogram, or silhouette -- the real human comes from the camera. Fix with edit_template/edit_style, then call finish_scene again.`;
+          } else if (brokenTags.length > 0) {
+            toolResult = `REJECTED -- broken <component> tags (these render as EMPTY ghost panels with JSON leaking into the page as text):\n` +
+              brokenTags.slice(0, 5).map((v) => `  - ${v}`).join("\n") +
+              `\nComponent data must be a single-quoted attribute containing VALID JSON of plain-text values: no HTML markup inside strings, no straight apostrophes (use ’), no '>' characters. If a component cannot express the content through its data fields, drop the tag and author that block as regular markup instead. Fix with edit_template, then call finish_scene again.`;
           } else if (colorViolations.length > 0) {
             // Static color discipline: raw literals in text-color declarations
             // are THE recurring legibility failure (the model's dark-biased

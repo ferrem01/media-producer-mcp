@@ -180,3 +180,35 @@ describe("buildComponentTimelineScript", () => {
     expect(script).toContain('data-comp-id="comp_0"');
   });
 });
+
+describe("quote-aware tag matching + broken-tag detection", () => {
+  it("a '>' inside a quoted data value does not truncate the tag", () => {
+    // The observed live failure: JSON containing markup ("</div>") ended the
+    // tag at the first '>', binding empty data and leaking the JSON tail.
+    const html = `<component type="quotient-chat" data='{"conversation_title": "a <b>bold</b> title"}' />`;
+    const result = resolveComponentTags(html, buildSourceMap());
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].data.conversation_title).toBe("a <b>bold</b> title");
+    expect(result.html).not.toContain("' />");
+  });
+
+  it("findBrokenComponentTags flags invalid JSON from an apostrophe-broken attribute", async () => {
+    const { findBrokenComponentTags } = await import("../src/llm/agentic-codegen.js");
+    const tpl = `<component type="quotient-chat" data='{"title": "Marc's LinkedIn"}' />`;
+    const v = findBrokenComponentTags({ template: tpl });
+    expect(v.length).toBeGreaterThan(0);
+  });
+
+  it("findBrokenComponentTags flags a dangling }' /> leak", async () => {
+    const { findBrokenComponentTags } = await import("../src/llm/agentic-codegen.js");
+    const tpl = `<div class="plane">"\n}' />\n</div>`;
+    const v = findBrokenComponentTags({ template: tpl });
+    expect(v.some((x) => x.includes("dangling"))).toBe(true);
+  });
+
+  it("findBrokenComponentTags passes clean tags", async () => {
+    const { findBrokenComponentTags } = await import("../src/llm/agentic-codegen.js");
+    const tpl = `<component type="quotient-chat" data='{"title": "Marc’s LinkedIn"}' />`;
+    expect(findBrokenComponentTags({ template: tpl })).toHaveLength(0);
+  });
+});
