@@ -241,3 +241,14 @@ callouts = flight speed.
   clamping the storyboard sum to the speaker-track duration.
 - Callout region % is authored against the float plane's PROJECTED rect (approximation);
   fine-tune via the pill editor if a drawn region needs nudging.
+- **BACKLOG -- WebGL screencast stage (the depth ceiling).** The float depth saga
+  (PRs #288-#294) settled on the glassy-border pane -- Marc's pick -- after proving
+  CSS-composited depth tops out there: painted edges vanish by contrast, 3D-face
+  extrusions hide inside the silhouette at shallow tilt, panes read as stacked
+  windows under camera zoom. The real next level is rendering the screencast INSIDE
+  the three.js world: the video as a texture on a real slab mesh on a real glass
+  plane, lit by the scene's lights -- true thickness, reflections, and parallax at
+  any angle/zoom for free. Machinery half-exists (three.js runtime + deterministic
+  state-tween pattern proven in webgl-backdrop); the hard problem is frame-exact
+  video-texture sync in the capture pipeline (worker seeks video, texture must
+  update per captured frame). Big build; big payoff.
