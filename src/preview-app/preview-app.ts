@@ -3853,8 +3853,12 @@ export function getPreviewHtml(): string {
         if (stageEl) {
           var cidEl = stageEl.closest('[data-cid], [data-comp-id]');
           var vpEl = scfVid.closest('.scf-viewport') || scfVid;
+          // Composite mode namespaces the id ("scene_003__tpl_video");
+          // strip the scene prefix to get the component id.
+          var rawCid = cidEl ? (cidEl.getAttribute('data-cid') || cidEl.getAttribute('data-comp-id')) : null;
+          if (rawCid && rawCid.indexOf('__') !== -1) rawCid = rawCid.slice(rawCid.indexOf('__') + 2);
           scf = {
-            compId: cidEl ? (cidEl.getAttribute('data-cid') || cidEl.getAttribute('data-comp-id')) : null,
+            compId: rawCid,
             vpRect: vpEl.getBoundingClientRect(),
             isFloat: stageEl.classList.contains('is-float'),
           };
