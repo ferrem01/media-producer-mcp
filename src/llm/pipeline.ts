@@ -1059,6 +1059,39 @@ async function critiqueAndRetryScene(opts: {
     opts.scene.components.some((c) => typeof c.type === "string" && c.type.startsWith("st-"))
   ) {
     console.log(`  Critique: scene ${opts.sceneIndex} is a scene-template instantiation, skipping critique/regen`);
+    // BOOT GATE (no LLM, no regen): a template with a runtime bug otherwise
+    // ships silently -- a stale reference once crashed a template mid-boot
+    // and Studio played the unstyled wreck. One assemble + seek sweep; a
+    // crash is stamped on the scene's quality so Studio surfaces it loudly.
+    try {
+      const bootDirs = [opts.compDir, tenantComponentsDir(opts.tenantId)];
+      const bootSources: ComponentSource[] = [];
+      for (const comp of opts.scene.components) {
+        const src = await findComponentSourceForCritique(comp.type, config.componentLibDir, bootDirs);
+        if (src) bootSources.push({ type: comp.type, source: src });
+      }
+      const bootHtml = await assembleSceneAuto({
+        scene: opts.scene, components: bootSources, brandKit: opts.brandKit, canvas: opts.canvas,
+        gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: false,
+      });
+      const bootDir = await fs.mkdtemp(path.join(os.tmpdir(), "tplboot-"));
+      const bootPath = path.join(bootDir, "scene.html");
+      await fs.writeFile(bootPath, bootHtml);
+      const runtime = await validateSceneRuntime({
+        htmlPath: bootPath, width: opts.canvas.width, height: opts.canvas.height,
+        duration: opts.scene.duration_seconds || 8, steps: 6,
+      });
+      await fs.rm(bootDir, { recursive: true, force: true }).catch(() => {});
+      if (!runtime.ok) {
+        console.error(`  [TEMPLATE BOOT CRASH] scene ${opts.sceneIndex} (${opts.scene.components.map((c) => c.type).join("+")}): ${runtime.error}`);
+        (opts.scene as any).quality = {
+          score: -100, passed: false, attempts: 0,
+          unresolved_defects: [`[runtime] template boot crash: ${runtime.error}`],
+        };
+      }
+    } catch (e: any) {
+      console.warn(`  Template boot gate skipped (non-fatal): ${e?.message || e}`);
+    }
     return { scene: opts.scene, customSources: opts.customSources };
   }
 
