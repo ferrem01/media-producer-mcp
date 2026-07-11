@@ -113,33 +113,35 @@
   .scf-stage.is-float .scf-frame {
     transform-style: preserve-3d;
     background: #101016;
-    /* Slab, not paper: the offset opaque layers along the tilt direction
-       read as the thickness of a smoked-glass panel; the violet ghost is
-       the rim of that edge catching the key light. */
+    /* Slab, not paper: a LIT edge band along the visible (left/bottom)
+       faces. Depth cues must be brighter than both the object and the
+       background to read on screen -- a dark band on a dark world is
+       invisible. Inner white catch, violet-lit side, outer hairline. */
     box-shadow:
-      -10px 14px 0 -4px rgba(9, 9, 18, 0.92),
-      -12px 17px 0 -4px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 22%, rgba(20, 20, 34, 0.9)),
+      -3px 4px 0 -1px rgba(255, 255, 255, 0.22),
+      -13px 17px 0 -4px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 48%, #191926),
+      -15px 20px 0 -4px rgba(255, 255, 255, 0.10),
       0 40px 110px rgba(0, 0, 0, 0.6), 0 8px 30px rgba(0, 0, 0, 0.45);
     -webkit-box-reflect: below 2.2vh linear-gradient(to bottom, transparent 62%, rgba(255,255,255,0.14));
   }
-  /* Rim light: the camera-facing edges catch the studio light. Inside the
-     frame (overflow hidden) so it survives the 3D transform. */
+  /* Rim light: the camera-facing edges catch the studio key. */
   .scf-stage.is-float .scf-frame::before {
     content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 6;
     border-radius: inherit;
-    border-left: 1px solid rgba(255, 255, 255, 0.28);
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.05);
+    border-left: 2px solid rgba(255, 255, 255, 0.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.24);
+    border-bottom: 1px solid color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, rgba(255,255,255,0.2));
   }
-  /* Floor light pool: a soft elliptical spot beneath the plane so it hovers
-     over a SURFACE, working with the reflection -- not floating in void. */
+  /* Floor light pool: a definite spot beneath the plane so it hovers over
+     a lit SURFACE, working with the reflection -- not floating in void. */
   .scf-pool {
-    position: absolute; left: 50%; bottom: -1vh; transform: translateX(-50%);
-    width: 74%; height: 16vh; pointer-events: none; z-index: 0;
-    background: radial-gradient(ellipse 50% 42% at 50% 60%,
-      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 20%, transparent),
-      transparent 72%);
-    filter: blur(10px);
+    position: absolute; left: 50%; bottom: -2vh; transform: translateX(-50%);
+    width: 88%; height: 22vh; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse 50% 40% at 50% 58%,
+      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 38%, transparent),
+      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 12%, transparent) 45%,
+      transparent 74%);
+    filter: blur(6px);
   }
   /* Light float: same physics, softer light -- reflection reads quieter on a
      lit ground and the shadow must suggest weight, not void. */
