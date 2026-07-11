@@ -261,6 +261,7 @@
     // overscans the viewport by the crop amounts so the source's own chrome /
     // letterbox sits outside the clip. All values are proportional, so the
     // math holds at any frame size.
+    var centerFloat = null; // assigned by the float rig; layout() re-runs it
     function layout() {
       var srcW = 1920, srcH = 1080;
       if (!isImage && media.videoWidth) { srcW = media.videoWidth; srcH = media.videoHeight; }
@@ -300,6 +301,7 @@
       media.style.left = (-crop.left / cw) * 100 + '%';
       media.style.top = (-crop.top / chh) * 100 + '%';
       layoutCallouts();
+      if (centerFloat) centerFloat();
     }
 
     // ── Region callouts: [{at, dur?, x, y, w, h}] (% of the displayed
@@ -445,6 +447,24 @@
       // One slow deterministic sweep across the scene -- the camera never
       // stops. Seek-exact (plain tween on the scene timeline).
       tl.to(poseTargets, { rotateY: pose.ry + 9, rotateX: pose.rx - 2, duration: Math.max(4, ctx.duration || 8), ease: 'sine.inOut' }, 0);
+      // The tilt is not symmetric on screen: rotateY(-14) recedes the left
+      // edge and swells the right toward the camera, so the PROJECTED image
+      // sits right of center even though the box is flex-centered. Measure
+      // the projection and shift the plane so its visual center is true.
+      var floatXFix = 0;
+      centerFloat = function () {
+        try {
+          var sb = stage.getBoundingClientRect();
+          var fb = frame.getBoundingClientRect();
+          if (sb.width < 4 || fb.width < 4) return;
+          var scale = sb.width / Math.max(1, stage.offsetWidth);
+          var dx = ((sb.left + sb.width / 2) - (fb.left + fb.width / 2)) / scale;
+          if (Math.abs(dx) < 1) return;
+          floatXFix += dx;
+          gsap.set(pool ? poseTargets.concat([pool]) : poseTargets, { x: floatXFix });
+        } catch (e2) {}
+      };
+      centerFloat();
     }
 
     // Callout choreography -- readable in four beats, never a flash:
