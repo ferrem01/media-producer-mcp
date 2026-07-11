@@ -212,3 +212,52 @@ describe("quote-aware tag matching + broken-tag detection", () => {
     expect(findBrokenComponentTags({ template: tpl })).toHaveLength(0);
   });
 });
+
+describe("findOrphanTimelineCode", () => {
+  it("flags beats appended after createTimeline closed (the tl-is-not-defined class)", async () => {
+    const { findOrphanTimelineCode } = await import("../src/llm/agentic-codegen.js");
+    const script = `
+function createTimeline(el, data, ctx) {
+  var tl = gsap.timeline();
+  tl.to('.a', { x: 10 }, 0);
+  return tl;
+}
+
+  // BEAT 3 landed outside the function
+  tl.addLabel('beat3', 2.1);
+  tl.to('.b', { opacity: 1 }, 'beat3');
+`;
+    const v = findOrphanTimelineCode({ script });
+    expect(v).toHaveLength(1);
+    expect(v[0]).toContain("closes too early");
+  });
+
+  it("does not flag helpers that take tl as a parameter after the function", async () => {
+    const { findOrphanTimelineCode } = await import("../src/llm/agentic-codegen.js");
+    const script = `
+function createTimeline(el, data, ctx) {
+  var tl = gsap.timeline();
+  moveCursor(tl, el, 1);
+  return tl;
+}
+function moveCursor(tl, el, at) {
+  tl.to(el, { x: 5 }, at);
+  tl.to(el, { scale: 1 }, at + 0.1);
+}
+`;
+    expect(findOrphanTimelineCode({ script })).toHaveLength(0);
+  });
+
+  it("ignores tl mentions inside strings and comments after the close", async () => {
+    const { findOrphanTimelineCode } = await import("../src/llm/agentic-codegen.js");
+    const script = `
+function createTimeline(el, data, ctx) {
+  var tl = gsap.timeline();
+  return tl;
+}
+// tl.addLabel in a comment is fine
+var note = "tl.to is just text";
+`;
+    expect(findOrphanTimelineCode({ script })).toHaveLength(0);
+  });
+});

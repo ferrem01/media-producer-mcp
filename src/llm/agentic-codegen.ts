@@ -1004,6 +1004,55 @@ export function findBrokenComponentTags(parts: { template: string }): string[] {
 }
 
 /**
+ * Orphaned-timeline-code detection, checked at finish_scene. The observed
+ * failure class (long multi-beat scripts built via append_script): an early
+ * chunk closes createTimeline with "return tl; }" and later appended beats
+ * land AFTER the function at top level -- the page throws "tl is not
+ * defined" at script load, __MP_TIMELINE never builds, and every capture of
+ * the scene (and the whole composite) hangs. Detection: find createTimeline's
+ * real closing brace by brace-walking (strings/comments stripped), then flag
+ * any bare `tl` reference in the tail at depth 0 -- helpers that take tl as
+ * a PARAMETER reference it inside their own braces and are not flagged.
+ */
+export function findOrphanTimelineCode(parts: { script: string }): string[] {
+  var src = parts.script || "";
+  var clean = src
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/\/\/[^\n]*/g, " ")
+    .replace(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g, '""');
+  var fnIdx = clean.search(/function\s+createTimeline\s*\(/);
+  if (fnIdx === -1) return [];
+  var openIdx = clean.indexOf("{", fnIdx);
+  if (openIdx === -1) return [];
+  var depth = 0;
+  var end = -1;
+  for (var i = openIdx; i < clean.length; i++) {
+    var ch = clean[i];
+    if (ch === "{") depth++;
+    else if (ch === "}") { depth--; if (depth === 0) { end = i; break; } }
+  }
+  if (end === -1) return []; // unbalanced braces -- the assembler's own parse handles that
+  var tail = clean.slice(end + 1);
+  var d = 0;
+  var firstHit = -1;
+  var hits = 0;
+  for (var j = 0; j < tail.length; j++) {
+    var c = tail[j];
+    if (c === "{") d++;
+    else if (c === "}") d = Math.max(0, d - 1);
+    else if (d === 0 && c === "t" && /^tl\s*[.[]/.test(tail.slice(j, j + 6)) && !/[\w$.]/.test(tail[j - 1] || " ")) {
+      hits++;
+      if (firstHit === -1) firstHit = j;
+    }
+  }
+  if (hits === 0) return [];
+  var preview = tail.slice(firstHit, firstHit + 70).replace(/\s+/g, " ");
+  return [
+    `createTimeline() closes too early -- ${hits} \`tl\` statement(s) sit AFTER the function's closing brace at top level (first: "${preview}..."). At page load they throw "tl is not defined" and the scene never plays. Delete the premature "return tl; }" so every beat lives INSIDE createTimeline, keeping a single "return tl;" at the very end.`,
+  ];
+}
+
+/**
  * Revise an already-built scene INSIDE its original codegen conversation.
  *
  * The Write-then-Edit pattern: the session still holds the spec, the model's
@@ -1242,6 +1291,7 @@ async function runAgenticLoop(args: {
         } else if (toolCall.name === "finish_scene") {
           var colorViolations = findRawTextColors(parts);
           var brokenTags = findBrokenComponentTags(parts);
+          var orphanCode = findOrphanTimelineCode(parts);
           var scenePlaceholders = opts.speakerMode ? findSpeakerPlaceholders(parts, opts.speakerMode) : [];
           if (!parts.template || !parts.script) {
             var missing = [!parts.template && "write_template", !parts.script && "write_script"].filter(Boolean).join(" and ");
@@ -1253,6 +1303,10 @@ async function runAgenticLoop(args: {
             toolResult = `REJECTED -- this scene sits on a LIVE SPEAKER TRACK, but the speaker contract is violated:\n` +
               scenePlaceholders.slice(0, 5).map((v) => `  - ${v}`).join("\n") +
               `\nNever draw a person, avatar, monogram, or silhouette -- the real human comes from the camera. Fix with edit_template/edit_style, then call finish_scene again.`;
+          } else if (orphanCode.length > 0) {
+            toolResult = `REJECTED -- broken script structure (this throws at page load and the scene renders BLACK):\n` +
+              orphanCode.map((v) => `  - ${v}`).join("\n") +
+              `\nFix with edit_script (delete the premature return+brace, keep the final one), then call finish_scene again.`;
           } else if (brokenTags.length > 0) {
             toolResult = `REJECTED -- broken <component> tags (these render as EMPTY ghost panels with JSON leaking into the page as text):\n` +
               brokenTags.slice(0, 5).map((v) => `  - ${v}`).join("\n") +
