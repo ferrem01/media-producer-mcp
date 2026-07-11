@@ -41,6 +41,9 @@
     text-wrap: balance; word-break: keep-all; }
   .stkl-item-m { margin-top: 2.6vh; font-family: 'Inter', sans-serif; font-size: 1.35vw;
     color: var(--mp-color-text-muted, #8f8f9f); max-width: 44ch; line-height: 1.5; }
+  .stkl-item-mp { margin-top: 1.1vh; padding-left: 1.3vw; position: relative; }
+  .stkl-item-mp::before { content: ''; position: absolute; left: 0; top: 0.72em; width: 0.7vw; height: 2px;
+    background: var(--mp-color-primary, #4f46e5); }
   .stkl-ledger { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 62vw; }
   .stkl-led-row { display: flex; align-items: baseline; gap: 1.6vw; padding: 1.5vh 0;
     border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent); }
@@ -73,7 +76,22 @@
       var ix0 = q('.stkl-index'); if (ix0) ix0.style.color = 'rgba(244,244,248,0.4)';
     }
 
-    var items = Array.isArray(data.items) ? data.items.slice(0, 6) : [];
+    var items = Array.isArray(data.items) ? data.items.slice(0, 8) : [];
+
+    // A long takeover window with one static meta block is a slide. Split the
+    // meta into phrases so a stretched window fills with staged reveals.
+    function splitPhrases(text) {
+      var parts = text.split(/(?<=\.)\s+|\s+--\s+|\s+—\s+|;\s+/).filter(function(p) { return p.trim(); });
+      if (parts.length < 2) {
+        var cs = text.split(/,\s+/);
+        if (cs.length >= 3) {
+          parts = [];
+          var per = Math.ceil(cs.length / 3);
+          for (var ci = 0; ci < cs.length; ci += per) parts.push(cs.slice(ci, ci + per).join(', '));
+        } else parts = [text];
+      }
+      return parts.slice(0, 4);
+    }
     var n = items.length || 1;
     var dur = ctx.duration || 12;
 
@@ -131,13 +149,25 @@
       num.textContent = (i < 9 ? '0' : '') + (i + 1) + ' / ' + (n < 10 ? '0' : '') + n;
       var t = document.createElement('div'); t.className = 'stkl-item-t'; t.textContent = String(it.label || it);
       item.appendChild(num); item.appendChild(t);
-      var m = null;
-      if (it.meta) { m = document.createElement('div'); m.className = 'stkl-item-m'; m.textContent = String(it.meta); item.appendChild(m); }
+      // Stretch mode: window is long enough that a single meta reveal leaves
+      // seconds of dead hold -- stage the meta as phrase-by-phrase sub-beats.
+      var stretch = itemWin > 8;
+      var m = null, mPhrases = null;
+      if (it.meta) {
+        m = document.createElement('div'); m.className = 'stkl-item-m'; item.appendChild(m);
+        if (stretch) {
+          mPhrases = splitPhrases(String(it.meta)).map(function(p) {
+            var d = document.createElement('div'); d.className = 'stkl-item-mp'; d.textContent = p;
+            m.appendChild(d); return d;
+          });
+          if (mPhrases.length < 2) { mPhrases = null; m.textContent = String(it.meta); }
+        } else { m.textContent = String(it.meta); }
+      }
       stage.appendChild(item);
 
       gsap.set(item, { autoAlpha: 0 });
       gsap.set(num, { autoAlpha: 0, x: -20 });
-      if (m) gsap.set(m, { autoAlpha: 0, y: 16, filter: 'blur(4px)' });
+      if (m && !mPhrases) gsap.set(m, { autoAlpha: 0, y: 16, filter: 'blur(4px)' });
 
       // The item is THROWN in -- velocity smear on the container while the
       // label word-reveals inside it (compound motion, launch-film feel).
@@ -149,7 +179,23 @@
         .call(function() { for (var k = 0; k <= i; k++) ticks[k].classList.add('is-on'); }, [], at + 0.1);
       if (window.mpWordReveal) mpWordReveal(tl, t, at + 0.12, { stagger: 0.07, duration: 0.6 });
       else { gsap.set(t, { autoAlpha: 0, y: 24 }); tl.to(t, { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' }, at + 0.12); }
-      if (m) tl.to(m, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power2.out' }, at + 0.5);
+      if (mPhrases) {
+        // Sub-beats: each phrase lands as its own event spread across the
+        // window; the item's tick pulses with every landing so the frame
+        // registers progress, and the whole item creeps upward continuously.
+        var usable = itemWin - 2.4;
+        var gap = Math.max(1.1, usable / mPhrases.length);
+        mPhrases.forEach(function(p, k) {
+          var pAt = at + 0.9 + k * gap;
+          gsap.set(p, { autoAlpha: 0, y: 18, filter: 'blur(4px)' });
+          tl.to(p, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.55, ease: 'power2.out' }, pAt);
+          tl.to(ticks[i], { scaleY: 2.4, duration: 0.16, yoyo: true, repeat: 1, ease: 'power2.out' }, pAt);
+        });
+        tl.to(item, { y: '-=18', duration: Math.max(1, itemWin - 1.6), ease: 'none' }, at + 0.9);
+        tl.to(ghost, { xPercent: -4, duration: itemWin * 0.5, ease: 'sine.inOut' }, at + itemWin * 0.45);
+      } else if (m) {
+        tl.to(m, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power2.out' }, at + 0.5);
+      }
 
       var isLast = i === items.length - 1;
       // Exit keys off the slot grid (not the shifted start): it begins the

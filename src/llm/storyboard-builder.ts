@@ -841,12 +841,45 @@ export function enforceFilmDirection(scenes: DraftScene[]): void {
     }
   }
 
+  // Event rate: a composition that sits still reads as a slide no matter how
+  // well the frame is dressed. Count each scene's visual events (setup +
+  // items/beats/captions) and flag motion-graphics scenes whose average hold
+  // exceeds ~8s. Footage-led scenes are exempt -- the recording itself moves.
+  const mediaRe = /\/[^\s"'`)\]]+\.(?:mp4|webm|mov|m4v|ogv)/i;
+  const eventsOf = (s: DraftScene): number => {
+    const t = tpl(s);
+    const data = (s.scene_template?.data || {}) as Record<string, any>;
+    if (t) {
+      const items = Array.isArray(data.items) ? data.items.length
+        : Array.isArray(data.cards) ? data.cards.length : 0;
+      if (t === "st-kinetic-list") return 1 + Math.min(items, 8) + ((s.duration_seconds || 0) >= 13 ? 1 : 0);
+      if (t === "st-hero-stat") return 2 + items;
+      if (t === "st-swarm") return Math.max(items, 10);
+      if (t === "st-screencast") return 1 + (Array.isArray(data.captions) ? data.captions.length : 0);
+      return 2; // st-quote / st-logo-close: reveal + resolve
+    }
+    return Math.max(Array.isArray(s.beats) ? s.beats.length : 0, 1);
+  };
+  const isFootageLed = (s: DraftScene) =>
+    tpl(s) === "st-screencast" || !!(s as any).broll_query || !!(s as any).hero_image || mediaRe.test(JSON.stringify(s));
+  let slowest = 0;
+  let slowestLabel = "";
+  for (const s of scenes) {
+    const dur = s.duration_seconds || 0;
+    if (!dur || isFootageLed(s)) continue;
+    const perEvent = dur / eventsOf(s);
+    if (perEvent > slowest) { slowest = perEvent; slowestLabel = s.label || ""; }
+    if (perEvent > 8) {
+      console.warn(`  EVENT RATE WARNING: "${s.label}" holds ${dur}s over ${eventsOf(s)} events (${perEvent.toFixed(1)}s/event) -- this reads as a slide; add items/beats or split the scene.`);
+    }
+  }
+
   // Report card -- the style contract, visible on every generation.
   const floats = scenes.filter((s) => tpl(s) === "st-screencast" && ((s.scene_template!.data || {}) as any).presentation === "float").length;
   const swarms = scenes.filter((s) => tpl(s) === "st-swarm").length;
   const matchCuts = scenes.filter((s) => s.transition_in?.type === "match-cut").length;
   const themeSeq = scenes.map((s) => tpl(s) ? (themeOf(s) === "dark" ? "D" : "L") : "c").join("");
-  console.log(`  FILM DIRECTION: ${tplScenes.length}/${scenes.length} scenes templated | themes ${themeSeq} (c=codegen) | swarm ${swarms} | float ${floats} | match-cuts ${matchCuts}`);
+  console.log(`  FILM DIRECTION: ${tplScenes.length}/${scenes.length} scenes templated | themes ${themeSeq} (c=codegen) | swarm ${swarms} | float ${floats} | match-cuts ${matchCuts} | slowest ${slowest ? slowest.toFixed(1) + "s/event" : "n/a"}${slowest > 8 ? ` (${slowestLabel})` : ""}`);
   if (tplScenes.length === 0) console.warn(`  FILM DIRECTION WARNING: zero template scenes -- this film will be all codegen; check the template mapper log above.`);
   if (swarms === 0 && scenes.length >= 4) console.log(`  Film direction note: no swarm/density beat in this film (fine for demo-led films; a launch film usually wants one).`);
 }
@@ -885,12 +918,14 @@ export async function assignSceneTemplates(
     var beatLines = (Array.isArray(s.beats) ? s.beats : [])
       .map((b: any) => `  - [${b.duration_seconds}s] ${b.label}: ${b.action}`).join("\n");
     var footageUrl = (JSON.stringify(s).match(footageUrlRe) || [])[0];
-    var user = `TEMPLATES:\n${tplText}\n\nSCENE:\nlabel: ${s.label}\npurpose: ${s.purpose}\nduration: ${s.duration_seconds}s\nvisual_notes: ${s.visual_notes}\n${beatLines ? `beats:\n${beatLines}\n` : ""}voiceover: ${s.voiceover_text || ""}\nsuggested components: ${JSON.stringify(s.components)}\n${footageUrl ? `footage in this scene: ${footageUrl}\n` : ""}\nCan ONE template above carry ALL of this scene's essential on-screen content? If yes return {"type": "st-...", "data": {...every slot filled with REAL final copy pulled from this scene's content...}}. If none fits, return null. Pure JSON only.`;
+    var user = `TEMPLATES:\n${tplText}\n\nSCENE:\nlabel: ${s.label}\npurpose: ${s.purpose}\nduration: ${s.duration_seconds}s\nvisual_notes: ${s.visual_notes}\n${beatLines ? `beats:\n${beatLines}\n` : ""}voiceover: ${s.voiceover_text || ""}\nsuggested components: ${JSON.stringify(s.components)}\n${footageUrl ? `footage in this scene: ${footageUrl}\n` : ""}\nCan ONE template above carry ALL of this scene's essential on-screen content? If yes return {"type": "st-...", "data": {...every slot filled with REAL final copy pulled from this scene's content...}}. If none fits, return null. Pure JSON only.
+
+DENSITY RULE: templates spread their items evenly across the scene's duration, so item count sets the cut rate. Mine the voiceover: derive roughly one item per narration sentence in this scene's span -- target one visual event every 4-8 seconds (a ${s.duration_seconds || 10}s scene wants ~${Math.max(2, Math.round((s.duration_seconds || 10) / 6))} items). NEVER compress several narration sentences into one item; a list-y sentence ("city, date, venue, topic") can even split into an item per element.`;
     try {
       var raw = await callLLM(llmConfig, [
         { role: "system", content: "You match ONE storyboard scene to a library of locked, designer-built whole-scene templates. Be decisive: these templates are professionally composed and preferred over custom scenes whenever they can express the scene's content. A scene whose star is a screen recording maps to st-screencast (put the footage URL in the 'source' slot and derive timed caption chips from the beats). Only return null when the scene genuinely needs something no template offers (custom diagrams, bespoke interaction, multiple videos at once). Respond with pure JSON -- an object {type, data} or null. No markdown, no commentary." },
         { role: "user", content: user },
-      ], { maxTokens: 1500 });
+      ], { maxTokens: 2500 });
       var text = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
       if (!text || text === "null") {
         console.log(`  Template assign: no template fits "${s.label}" -- staying codegen`);
