@@ -304,6 +304,82 @@
   window.mpBlurFrom = function (px) { return { autoAlpha: 0, filter: 'blur(' + (px || 10) + 'px)' }; };
   window.mpBlurTo = function (duration) { return { autoAlpha: 1, filter: 'blur(0px)', duration: duration || 0.9, ease: 'power3.out' }; };
 
+  // ── Build-first primitives (the HyperFrames grammar): nothing on screen
+  //    appears finished -- numbers COUNT, text TYPES, lists CASCADE. ──
+
+  // Animated number count-up. Reads the target from el's text (keeps any
+  // prefix/suffix like $ % x) or opts.to; preserves thousands separators.
+  // Seek-exact (one tween on the timeline drives the value).
+  //   mpCountUp(tl, el, at, { duration, ease })
+  window.mpCountUp = function (tl, el, at, opts) {
+    opts = opts || {};
+    var raw = String(opts.to !== undefined ? opts.to : (el.textContent || '')).trim();
+    var m = raw.match(/-?[\d,.]*\d/);
+    if (!m) return tl;
+    var numStr = m[0];
+    var prefix = raw.slice(0, m.index);
+    var suffix = raw.slice(m.index + numStr.length);
+    var hasCommas = numStr.indexOf(',') !== -1;
+    var decimals = (numStr.split('.')[1] || '').length;
+    var target = parseFloat(numStr.replace(/,/g, ''));
+    if (!isFinite(target)) return tl;
+    function fmt(v) {
+      var s = decimals ? v.toFixed(decimals) : String(Math.round(v));
+      if (hasCommas) s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return prefix + s + suffix;
+    }
+    var st = { v: 0 };
+    el.textContent = fmt(0);
+    tl.to(st, {
+      v: target,
+      duration: opts.duration || 1.1,
+      ease: opts.ease || 'power2.out',
+      onUpdate: function () { el.textContent = fmt(st.v); },
+    }, at);
+    return tl;
+  };
+
+  // Character-by-character type-on with a blinking cursor. The reveal is
+  // one tween on a counter, so it tracks timeline seeks exactly.
+  //   mpTypeIn(tl, el, at, { cps, cursor: 'hold'?, duration })
+  window.mpTypeIn = function (tl, el, at, opts) {
+    opts = opts || {};
+    var full = el.textContent || '';
+    if (!full) return tl;
+    el.textContent = '';
+    var txt = document.createElement('span');
+    var cur = document.createElement('span');
+    cur.textContent = '▋';
+    cur.style.cssText = 'opacity:0.85;margin-left:1px;';
+    el.appendChild(txt); el.appendChild(cur);
+    var dur = opts.duration || Math.max(0.4, full.length / (opts.cps || 26));
+    var st = { n: 0 };
+    tl.to(st, {
+      n: full.length, duration: dur, ease: 'none',
+      onUpdate: function () { txt.textContent = full.slice(0, Math.round(st.n)); },
+    }, at);
+    tl.to(cur, { opacity: 0.1, duration: 0.4, yoyo: true, repeat: Math.max(1, Math.round(dur / 0.4)), ease: 'steps(1)' }, at);
+    if (opts.cursor !== 'hold') tl.to(cur, { autoAlpha: 0, duration: 0.2 }, at + dur + 0.6);
+    return tl;
+  };
+
+  // Cascade: rows/items build in one after another with a quick rise+snap,
+  // so the list assembles while you watch -- never appears pre-made.
+  //   mpCascade(tl, elements, at, { each, duration, y })
+  window.mpCascade = function (tl, els, at, opts) {
+    opts = opts || {};
+    var arr = els && els.length !== undefined ? Array.prototype.slice.call(els) : [els];
+    arr.forEach(function (el, i) {
+      gsap.set(el, { autoAlpha: 0, y: opts.y !== undefined ? opts.y : 14 });
+      tl.to(el, {
+        autoAlpha: 1, y: 0,
+        duration: opts.duration || 0.34,
+        ease: 'power2.out',
+      }, at + i * (opts.each || 0.14));
+    });
+    return tl;
+  };
+
   // Beat phases: map ctx.beats to [{start,end}] windows; when a scene has no
   // beats, split the duration into `fallbackCount` equal phases. Templates
   // choreograph AGAINST these so a long scene evolves instead of freezing.

@@ -157,7 +157,8 @@ opening world, one or two long living middles (12-18s each), and a closing world
 - The emotional arc must use specific emotions, not "good -> better -> best"
 - Output ONLY valid JSON. No commentary.`;
 
-  var userPrompt = `Create a ${opts.format} for:\n\n${opts.prompt}`;
+  var userPrompt = `Create a ${opts.format} for:
+- ARTIFACT-DRIVEN BEATS: tell each step of a workflow through a mock of the SURFACE where it happens (a chat thread, an agent terminal, a video player, a records list) -- and always show the artifact BUILDING (typed, cascaded, counted, scrubbed), never pre-made. A story told through product surfaces reads as real; a story told through abstract cards reads as slides.\n\n${opts.prompt}`;
 
   // Build user message with optional reference images
   var userContent: string | LLMContentPart[];

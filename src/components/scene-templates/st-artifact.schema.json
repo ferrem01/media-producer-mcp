@@ -1,0 +1,20 @@
+{
+  "type": "st-artifact",
+  "label": "Scene Template: Artifact + Editorial Split",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: a product ARTIFACT builds on one side while big serif editorial type and COUNTING stats own the other -- machine voice meets essay voice. The artifact slot takes a ui-mock component spec ({type: 'ui-chat-thread'|'ui-terminal-agent'|'ui-video-player'|'screencast-frame', data: {...}}) which is instantiated as a sibling and BUILDS on screen (typing, popping messages, advancing scrub bar). Use for 'here is the surface where this step happens, and here is what it means' beats. Light editorial world by default.",
+  "data": {
+    "headline": { "type": "string", "label": "Editorial serif headline; '|' breaks lines (e.g. 'These days,|PRs from agents|are super long')" },
+    "kicker": { "type": "string", "label": "Small caps line above the headline", "optional": true },
+    "stats": { "type": "object", "label": "Array of up to 4 {value, label}: numbers COUNT UP on entrance (e.g. {value: '629', label: 'files changed'})", "optional": true },
+    "note": { "type": "string", "label": "Small footnote under the stats", "optional": true },
+    "artifact": { "type": "object", "label": "The artifact that builds beside the editorial column: {type: component type, data: its slots}. Instantiated automatically as a sibling.", "optional": true },
+    "editorial_side": { "type": "string", "label": "'right' (default) | 'left' -- which side the editorial column takes", "optional": true },
+    "theme": { "type": "string", "label": "light (default) | dark", "optional": true },
+    "scene_index": { "type": "string", "label": "e.g. 02 / 05", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.3, "y": 0.5 },
+    "exit": { "x": 0.3, "y": 0.5 }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "ui-video-player",
+  "label": "UI Mock: Video Player Device",
+  "category": "ui-mocks",
+  "description": "The video-in-video device: a dark player window whose scrub bar ADVANCES in real time, clock counting, scene badge ticking (scene 2/6...). Frames any content (image with Ken Burns, or a brand field) as 'a video the product just made'. THE beat for deliverable-is-a-video stories: the agent hands back a finished film and you watch it playing.",
+  "data": {
+    "title": { "type": "string", "label": "Filename in the title bar, e.g. 'campaign-video.mp4'", "optional": true },
+    "image_url": { "type": "string", "label": "Image shown inside the player (Ken Burns drift); omit for a soft brand field", "optional": true },
+    "runtime_seconds": { "type": "number", "label": "The fake video's total runtime for the clock (default 32)", "optional": true },
+    "scene_count": { "type": "number", "label": "If set (>1), badge ticks 'scene N / M' as playback advances", "optional": true },
+    "badge": { "type": "string", "label": "Static badge text (overrides scene counter)", "optional": true }
+  }
+}
