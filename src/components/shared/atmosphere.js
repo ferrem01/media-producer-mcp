@@ -21,7 +21,22 @@
     // noBase: a webgl-backdrop (or other world layer) sits BEHIND this scene
     // component -- skip the opaque base gradient so it shows through, keep
     // the washes/grain/vignette as the lighting pass over it.
-    if (!opts.noBase) {
+    var image = opts.image || null;
+    if (image) {
+      // Image world: an on-brand photo as the base, kept CINEMATIC -- slow
+      // Ken Burns drift (a still background reads as a slide) and a scrim so
+      // the content above never fights it for contrast.
+      var im = document.createElement('img');
+      im.src = image;
+      im.style.cssText = 'position:absolute;left:-4%;top:-4%;width:108%;height:108%;object-fit:cover;max-width:none;';
+      layer.appendChild(im);
+      var scrim = document.createElement('div');
+      scrim.style.cssText = 'position:absolute;inset:0;background:' + (dark
+        ? 'linear-gradient(180deg, rgba(10,10,20,0.62) 0%, rgba(10,10,20,0.74) 100%)'
+        : 'linear-gradient(180deg, rgba(252,252,255,0.66) 0%, rgba(248,248,253,0.78) 100%)') + ';';
+      layer.appendChild(scrim);
+      if (window.gsap) gsap.to(im, { xPercent: -2.2, yPercent: 1.4, scale: 1.07, duration: (opts.driftSeconds || 14) * 2, ease: 'sine.inOut', yoyo: true, repeat: -1 });
+    } else if (!opts.noBase) {
       var base = document.createElement('div');
       base.style.cssText = 'position:absolute;inset:0;background:' + (dark
         ? 'linear-gradient(180deg,#101019 0%,#16161f 60%,#101019 100%)'
@@ -45,7 +60,8 @@
     // (opacity oscillation) -- motion the eye feels without reading. On by
     // default for light scenes (structure replaces the missing contrast);
     // opt in/out with opts.grid.
-    var wantGrid = opts.grid !== undefined ? !!opts.grid : !dark;
+    // An image world brings its own structure -- the grid defaults OFF there.
+    var wantGrid = opts.grid !== undefined ? !!opts.grid : (!dark && !image);
     var grid = null;
     if (wantGrid) {
       var lineColor = dark ? 'rgba(244,244,248,0.05)' : 'rgba(57,59,245,0.055)';

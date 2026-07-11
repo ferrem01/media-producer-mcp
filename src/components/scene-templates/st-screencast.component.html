@@ -76,7 +76,7 @@
     // Lit background behind the sibling video frame. NO camera push here:
     // the footage is a separate component and a scaling shell would shear
     // against it.
-    if (window.mpAtmosphere) mpAtmosphere(root, { dark: dark, noBase: !!data.backdrop_active });
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: dark, noBase: !!data.backdrop_active, image: data.backdrop_image || null });
     return tl;
   }
 </script>
