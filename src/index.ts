@@ -1701,6 +1701,36 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         }
         if (!isAnalyzableVideo(anPath)) { jsonResponse(res, 400, { error: "not an analyzable video type" }); return; }
         try {
+          // Body {trims: {top?, bottom?, left?, right?}} = a HUMAN CORRECTION:
+          // merge into the existing sidecar (reason 'manual') instead of
+          // re-running detection, so every future crop:"auto" use of this
+          // asset inherits the corrected boundary. Detection is a suggestion;
+          // the correction is the truth.
+          const anBody = await parseBody(req).catch(() => ({} as Record<string, unknown>));
+          const manualTrims = anBody && typeof (anBody as any).trims === "object" && (anBody as any).trims
+            ? (anBody as any).trims as Record<string, unknown> : null;
+          if (manualTrims) {
+            const sidecarPath = `${anPath}.intel.json`;
+            let intel: any = null;
+            try { intel = JSON.parse(await fs.readFile(sidecarPath, "utf-8")); } catch { /* no sidecar yet */ }
+            if (!intel) intel = await analyzeAndSaveIntel(anPath);
+            if (!intel) { jsonResponse(res, 422, { error: "no sidecar and analysis failed -- cannot apply manual trims" }); return; }
+            for (const side of ["top", "bottom", "left", "right"]) {
+              const v = Number((manualTrims as any)[side]);
+              if (Number.isFinite(v) && v >= 0) intel.trims[side] = { px: Math.round(v), reason: "manual" };
+            }
+            intel.content_box = {
+              x: intel.trims.left.px,
+              y: intel.trims.top.px,
+              w: Math.max(1, intel.width - intel.trims.left.px - intel.trims.right.px),
+              h: Math.max(1, intel.height - intel.trims.top.px - intel.trims.bottom.px),
+            };
+            intel.notes = [...(intel.notes || []).filter((n: string) => !n.startsWith("manual trims")), `manual trims applied ${new Date().toISOString()}`];
+            await fs.writeFile(sidecarPath, JSON.stringify(intel, null, 2));
+            console.log(`  analyze-asset: ${anName}: manual trims ${JSON.stringify(manualTrims)}`);
+            jsonResponse(res, 200, { ok: true, intel, manual: true });
+            return;
+          }
           const intel = await analyzeAndSaveIntel(anPath);
           if (!intel) { jsonResponse(res, 422, { error: "analysis produced no result (undecodable or degenerate video)" }); return; }
           console.log(`  analyze-asset: ${anName}: ${intel.notes.join(" | ")}`);
