@@ -1,0 +1,154 @@
+<template>
+  <div class="stsw">
+    <div class="stsw-cloud"></div>
+    <div class="stsw-focus">
+      <div class="stsw-kicker-row"><span class="stsw-rule"></span><span class="stsw-kicker">{{kicker}}</span><span class="stsw-rule stsw-rule--r"></span></div>
+      <h1 class="stsw-headline"></h1>
+    </div>
+    <img class="stsw-wordmark" alt="" />
+    <div class="stsw-index">{{scene_index}}</div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-swarm: the chaos/abundance beat. A cloud of card-props (tweets,
+     stats, images, quotes) THROWN in with velocity smears, hovering with
+     drift, then converging into one focused line -- chaos resolving to
+     clarity. Density is the story; use against calm scenes. */
+  .stsw { position: absolute; inset: 0; overflow: hidden; color: #f4f4f8;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stsw.is-light { color: #17171c; }
+  .stsw-cloud { position: absolute; inset: 0; }
+  .stsw-card { position: absolute; border-radius: 12px; padding: 14px 16px;
+    background: rgba(24, 24, 34, 0.92); border: 1px solid rgba(244, 244, 248, 0.09);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); overflow: hidden;
+    font-family: 'Inter', sans-serif; }
+  .is-light .stsw-card { background: rgba(255, 255, 255, 0.94); border-color: rgba(23, 23, 28, 0.08);
+    box-shadow: 0 14px 40px rgba(23, 23, 40, 0.16); }
+  .stsw-card-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--mp-color-primary, #4f46e5); margin-bottom: 6px; }
+  .stsw-card-body { font-size: 13px; line-height: 1.45; color: inherit; opacity: 0.88; }
+  .stsw-card-value { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1;
+    background: linear-gradient(150deg, var(--mp-color-primary, #4f46e5), color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, #8b5cf6));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stsw-card-quote { font-size: 13.5px; line-height: 1.5; font-style: italic; opacity: 0.92; }
+  .stsw-card img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+  .stsw-card.is-img { padding: 5px; }
+  .stsw-focus { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    text-align: center; width: 74vw; z-index: 6; }
+  .stsw-kicker-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 2.6vh; }
+  .stsw-rule { width: 30px; height: 2px; background: var(--mp-color-primary, #4f46e5); transform-origin: left center; }
+  .stsw-rule--r { transform-origin: right center; }
+  .stsw-kicker { font-size: 14px; font-weight: 600; letter-spacing: 0.19em; text-transform: uppercase;
+    color: var(--mp-color-primary, #4f46e5); }
+  .stsw-headline { margin: 0; font-weight: 500; font-size: 4.8vw; line-height: 1.05; letter-spacing: -0.02em;
+    text-wrap: balance; word-break: keep-all; }
+  .stsw-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.85; z-index: 7; }
+  .stsw-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif; font-size: 13px;
+    font-weight: 600; letter-spacing: 0.2em; opacity: 0.5; z-index: 7; }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var root = q('.stsw');
+    var light = data.theme === 'light';
+    if (light) root.classList.add('is-light');
+    var dur = ctx.duration || 10;
+
+    var seed = Number(data.seed) || 11;
+    function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+    var wm = q('.stsw-wordmark');
+    if (wm) { if (data.logo_url) wm.src = data.logo_url; else wm.style.display = 'none'; }
+
+    // ── Build the cloud: one card per item, seeded pose, center kept clear ──
+    var cloud = q('.stsw-cloud');
+    var items = (Array.isArray(data.items) ? data.items : []).slice(0, 18);
+    var W = 1920, H = 1080; // proportional: percentages below
+    var cards = items.map(function(it, i) {
+      var card = document.createElement('div');
+      card.className = 'stsw-card';
+      var kind = it.kind || (it.value !== undefined ? 'stat' : it.image ? 'image' : it.quote ? 'quote' : 'text');
+      if (kind === 'image' && it.image) {
+        card.classList.add('is-img');
+        var im = document.createElement('img'); im.src = it.image; card.appendChild(im);
+      } else if (kind === 'stat') {
+        if (it.label) { var l = document.createElement('div'); l.className = 'stsw-card-label'; l.textContent = String(it.label); card.appendChild(l); }
+        var v = document.createElement('div'); v.className = 'stsw-card-value'; v.textContent = String(it.value !== undefined ? it.value : it.title || ''); card.appendChild(v);
+      } else if (kind === 'quote') {
+        var qd = document.createElement('div'); qd.className = 'stsw-card-quote'; qd.textContent = '“' + String(it.quote || it.body || '') + '”'; card.appendChild(qd);
+      } else {
+        if (it.label || it.title) { var l2 = document.createElement('div'); l2.className = 'stsw-card-label'; l2.textContent = String(it.label || it.title); card.appendChild(l2); }
+        var b = document.createElement('div'); b.className = 'stsw-card-body'; b.textContent = String(it.body || it.text || ''); card.appendChild(b);
+      }
+      // Seeded pose: ring around the center (center belongs to the focus).
+      var ang = (i / Math.max(1, items.length)) * Math.PI * 2 + rnd() * 0.9;
+      var rad = 0.24 + rnd() * 0.22; // fraction of the canvas diagonal
+      var cx = 50 + Math.cos(ang) * rad * 88;
+      var cy = 50 + Math.sin(ang) * rad * 74;
+      cx = Math.min(88, Math.max(2, cx));
+      cy = Math.min(86, Math.max(4, cy));
+      var wPct = kind === 'image' ? (10 + rnd() * 6) : (11 + rnd() * 7);
+      card.style.left = cx + '%';
+      card.style.top = cy + '%';
+      card.style.width = wPct + 'vw';
+      if (kind === 'image') card.style.height = (wPct * 0.66) + 'vw';
+      card.style.zIndex = String(1 + Math.floor(rnd() * 4));
+      cloud.appendChild(card);
+      return { el: card, rot: (rnd() - 0.5) * 10, i: i };
+    });
+
+    // ── Choreography ──
+    // Phase 1 (0 -> ~1.8s): cards THROWN in from the edges, big smears.
+    // Phase 2: hover drift -- the cloud is alive, never static.
+    // Phase 3 (converge beat): cards fly INTO the center and die as the
+    //          headline word-reveals out of them.
+    var convergeAt = Math.max(2.6, Math.min(dur * 0.55, dur - 3.2));
+    cards.forEach(function(c) {
+      var edge = rnd();
+      var fx = edge < 0.5 ? (rnd() < 0.5 ? -1 : 1) * (500 + rnd() * 700) : (rnd() - 0.5) * 500;
+      var fy = edge < 0.5 ? (rnd() - 0.5) * 400 : (rnd() < 0.5 ? -1 : 1) * (420 + rnd() * 500);
+      var at = 0.15 + rnd() * 1.5;
+      gsap.set(c.el, { rotation: c.rot });
+      if (window.mpThrow) mpThrow(tl, c.el, at, { fromX: fx, fromY: fy, duration: 0.6 + rnd() * 0.25, settle: false });
+      else { gsap.set(c.el, { autoAlpha: 0 }); tl.to(c.el, { autoAlpha: 1, duration: 0.4 }, at); }
+      // Hover drift until convergence.
+      tl.to(c.el, { x: '+=' + ((rnd() - 0.5) * 34), y: '+=' + ((rnd() - 0.5) * 26), rotation: c.rot + (rnd() - 0.5) * 4,
+        duration: 2.6 + rnd() * 2, ease: 'sine.inOut', yoyo: true, repeat: -1 }, at + 0.8);
+      // Convergence: die into the center with a smear.
+      var dx = (50 - parseFloat(c.el.style.left)) * 0.01 * 1920 * 0.6;
+      var dy = (50 - parseFloat(c.el.style.top)) * 0.01 * 1080 * 0.6;
+      tl.to(c.el, { x: '+=' + dx, y: '+=' + dy, scale: 0.3, autoAlpha: 0,
+        duration: 0.55 + rnd() * 0.2, ease: 'power3.in' }, convergeAt + rnd() * 0.35);
+    });
+
+    // Focus reveal out of the convergence point.
+    var head = q('.stsw-headline');
+    String(data.headline || '').split('|').forEach(function(txt) {
+      var line = document.createElement('span'); line.style.cssText = 'display:block;overflow:hidden;';
+      var inner = document.createElement('span'); inner.style.display = 'block'; inner.textContent = txt.trim();
+      line.appendChild(inner); head.appendChild(line);
+    });
+    var lineEls = el.querySelectorAll('.stsw-headline span > span');
+    var kickerRow = q('.stsw-kicker-row');
+    if (!data.kicker) kickerRow.style.display = 'none';
+    gsap.set(el.querySelectorAll('.stsw-rule'), { scaleX: 0 });
+    gsap.set(q('.stsw-kicker'), { autoAlpha: 0, y: -8 });
+    gsap.set(lineEls, { yPercent: 118, filter: 'blur(6px)' });
+    gsap.set([wm, q('.stsw-index')], { autoAlpha: 0 });
+    var fAt = convergeAt + 0.45;
+    tl.to(el.querySelectorAll('.stsw-rule'), { scaleX: 1, duration: 0.5, ease: 'power2.out' }, fAt)
+      .to(q('.stsw-kicker'), { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power2.out' }, fAt + 0.05)
+      .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power4.out', stagger: 0.1 }, fAt + 0.15)
+      .to([wm, q('.stsw-index')], { autoAlpha: 1, duration: 0.6 }, fAt + 0.6);
+    if (window.mpShimmer) mpShimmer(tl, q('.stsw-focus'), fAt + 1.3);
+
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: !light, noBase: !!data.backdrop_active, image: data.backdrop_image || null });
+    if (window.mpCameraPush) mpCameraPush(tl, root, dur, 1.05);
+    return tl;
+  }
+</script>

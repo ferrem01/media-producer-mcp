@@ -401,6 +401,8 @@ finish_storyboard({ "name": "Project Title" })
 - SHADER transitions (shader-*) use WebGL for premium visual effects. Use them for hero transitions between key scenes. shader-crosswarp: warped crossfade, shader-ripple: ripple wave, shader-radial: radial wipe, shader-directional-warp: directional warp morph, shader-burn: warm burn blend, shader-chromatic: RGB split aberration, shader-lens-distortion: gravitational lens. Use 1-3 shader transitions per video for maximum impact. Do not overuse.
 - VARY scene types: don't repeat the same layout. Mix hero text, product demos, stats, visual metaphors, grids, CTAs.
 - Never have two identical layout types in a row.
+- DENSITY ARC (what separates a film from a deck): vary visual density violently across the film -- a SWARM beat (st-swarm: dozens of props flying) against a SINGLE-OBJECT beat (one phone/frame/number in space) against an almost-EMPTY breath beat (1-2s of near-nothing before the payoff). A film that holds constant density reads as slides regardless of how well each frame is dressed. st-swarm is the "everything" beat -- follow it with your calmest scene.
+- WORLD FLIP: flip the film's value ONCE at the narrative pivot (dark world -> light world or the reverse) -- e.g. dark chaos/problem scenes resolving into a light clarity/product scene. One flip is a story beat; multiple flips are noise.
 - For library components: use the EXACT type name from the Available Components catalog. Do not abbreviate or shorten names. Fill ALL required data fields. Use realistic content, not placeholder text.
 
 

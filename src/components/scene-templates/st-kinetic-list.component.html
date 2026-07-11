@@ -139,8 +139,11 @@
       gsap.set(num, { autoAlpha: 0, x: -20 });
       if (m) gsap.set(m, { autoAlpha: 0, y: 16, filter: 'blur(4px)' });
 
-      tl.set(item, { autoAlpha: 1 }, at)
-        .call(function() { ghost.textContent = '0' + (i + 1); }, [], at)
+      // The item is THROWN in -- velocity smear on the container while the
+      // label word-reveals inside it (compound motion, launch-film feel).
+      if (window.mpThrow) mpThrow(tl, item, at, { fromY: 130, duration: 0.6 });
+      else tl.set(item, { autoAlpha: 1 }, at);
+      tl.call(function() { ghost.textContent = '0' + (i + 1); }, [], at)
         .fromTo(ghost, { xPercent: 6 }, { xPercent: 0, duration: Math.min(1.2, itemWin * 0.5), ease: 'power2.out' }, at)
         .to(num, { autoAlpha: 1, x: 0, duration: 0.45, ease: 'power2.out' }, at + 0.05)
         .call(function() { for (var k = 0; k <= i; k++) ticks[k].classList.add('is-on'); }, [], at + 0.1);
@@ -171,9 +174,11 @@
         ledger.appendChild(row);
       });
       var rows = el.querySelectorAll('.stkl-led-row');
-      gsap.set(rows, { autoAlpha: 0, y: 26 });
-      tl.to(ghost, { autoAlpha: 0, duration: 0.6 }, rAt - 0.3)
-        .to(rows, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out', stagger: 0.09 }, rAt);
+      tl.to(ghost, { autoAlpha: 0, duration: 0.6 }, rAt - 0.3);
+      Array.prototype.forEach.call(rows, function(row, ri) {
+        if (window.mpThrow) mpThrow(tl, row, rAt + ri * 0.09, { fromY: 85, duration: 0.5 });
+        else { gsap.set(row, { autoAlpha: 0, y: 26 }); tl.to(row, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out' }, rAt + ri * 0.09); }
+      });
     }
 
     if (window.mpAtmosphere) mpAtmosphere(root, { dark: dark, noBase: !!data.backdrop_active });
