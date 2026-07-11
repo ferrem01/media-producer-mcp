@@ -3826,26 +3826,50 @@ export function getPreviewHtml(): string {
     // (studio.pendingInside) wins; otherwise the video whose rect holds the
     // box center -- smallest wins, so a PiP over a screencast picks the PiP.
     var inside = null;
+    var hitVideo = null;
     if (studio.pendingInside) {
       inside = studio.pendingInside;
       studio.pendingInside = null;
     } else {
       var hit = videoForBox(doc, scene.id, boxPx);
       if (hit) {
+        hitVideo = hit.video;
         var fully = boxPx.left >= hit.rect.left && boxPx.top >= hit.rect.top &&
           boxPx.left + boxPx.width <= hit.rect.right && boxPx.top + boxPx.height <= hit.rect.bottom;
         inside = { target: videoTargetFor(hit.video), label: videoLabelFor(hit.video), checked: fully };
       }
     }
+    // A box on a screencast-frame can also become a CALLOUT (the reverse
+    // zoom: the region lifts OUT toward the camera in a glow shell instead
+    // of the camera diving in). Same gesture, two treatments.
+    var scf = null;
+    try {
+      var scfVid = hitVideo || (inside && inside.target && inside.target !== 'screencast' ? doc.querySelector(inside.target) : null);
+      if (scfVid && !scfVid.hasAttribute('data-mp-derived')) {
+        var scfWrap = scfVid.closest('[data-comp-type="screencast-frame"]');
+        if (scfWrap) {
+          var vpEl = scfVid.closest('.scf-viewport') || scfVid;
+          scf = {
+            compId: scfWrap.getAttribute('data-comp-id'),
+            vpRect: vpEl.getBoundingClientRect(),
+            isFloat: !!scfWrap.querySelector('.is-float'),
+          };
+        }
+      }
+    } catch (e) { scf = null; }
     pop.innerHTML =
       '<div class="sp-head"><span class="sp-title"><b>Zoom here</b> — scene ' + (si + 1) + '</span>' +
       '<button class="sp-x" id="zc-x" title="Cancel (Esc)">✕</button></div>' +
       '<div class="sp-fields">' +
+        (scf ? '<label class="sp-region" title="Zoom in: the camera dives into the region. Call out: the region lifts OUT toward the camera in a glow shell (the reverse zoom -- the float-stage treatment)">treatment <select id="zc-mode">' +
+          '<option value="zoom"' + (scf.isFloat ? '' : ' selected') + '>Zoom in (camera)</option>' +
+          '<option value="callout"' + (scf.isFloat ? ' selected' : '') + '>Call out (lift)</option>' +
+        '</select></label>' : '') +
         '<label>at <input id="zc-at" type="number" min="0" max="' + escAttr('' + Math.max(0, dur - 0.2).toFixed(1)) + '" step="0.1" value="' + escAttr('' + (Math.round(at * 10) / 10)) + '">s</label>' +
         '<label>hold <input id="zc-hold" type="number" min="0" max="10" step="0.5" value="1.5">s</label>' +
         '<label>ease <input id="zc-dur" type="number" min="0.2" max="3" step="0.1" value="0.8">s</label>' +
         '<label title="Ease back to wide afterwards">return <input id="zc-return" type="checkbox" checked></label>' +
-        (inside ? '<label class="sp-region" title="The footage magnifies inside its own frame; everything around it stays put">inside ' + escHtml(inside.label) + ' only <input id="zc-cast" type="checkbox"' + (inside.checked !== false ? ' checked' : '') + '></label>' : '') +
+        (inside ? '<label class="sp-region" id="zc-cast-row" title="The footage magnifies inside its own frame; everything around it stays put">inside ' + escHtml(inside.label) + ' only <input id="zc-cast" type="checkbox"' + (inside.checked !== false ? ' checked' : '') + '></label>' : '') +
       '</div>' +
       '<div class="sp-row">' +
         '<button class="rv-go secondary" id="zc-cancel" style="flex:0 0 auto;">Cancel</button>' +
@@ -3864,10 +3888,45 @@ export function getPreviewHtml(): string {
     function closeCancel() { camPopClose(); if (studio.dragCancel) studio.dragCancel(); }
     document.getElementById('zc-x').addEventListener('click', closeCancel);
     document.getElementById('zc-cancel').addEventListener('click', closeCancel);
+    // Treatment toggle: callout mode hides the camera-only fields and
+    // relabels the confirm (the callout always returns by design).
+    var modeSel = document.getElementById('zc-mode');
+    function zcMode() { return modeSel && modeSel.value === 'callout' ? 'callout' : 'zoom'; }
+    function zcSyncMode() {
+      var isCo = zcMode() === 'callout';
+      var castRow = document.getElementById('zc-cast-row');
+      if (castRow) castRow.style.display = isCo ? 'none' : '';
+      var retInput = document.getElementById('zc-return');
+      if (retInput && retInput.parentElement) retInput.parentElement.style.display = isCo ? 'none' : '';
+      document.getElementById('zc-add').textContent = isCo ? 'Add callout' : 'Add zoom';
+      var head = pop.querySelector('.sp-title');
+      if (head) head.innerHTML = '<b>' + (isCo ? 'Call out here' : 'Zoom here') + '</b> — scene ' + (si + 1);
+    }
+    if (modeSel) { modeSel.addEventListener('change', zcSyncMode); zcSyncMode(); }
     document.getElementById('zc-add').addEventListener('click', function() {
       var atV = parseFloat(document.getElementById('zc-at').value);
+      var atClamped = isNaN(atV) ? Math.round(at * 10) / 10 : Math.max(0, Math.min(dur - 0.2, Math.round(atV * 10) / 10));
+      if (zcMode() === 'callout' && scf && scf.compId) {
+        // Region in % of the DISPLAYED footage (the viewport box), the
+        // coordinate space the callout choreography uses. In float the
+        // viewport rect is the 3D projection -- close enough to author
+        // against; fine-tune numbers in the revise panel if needed.
+        var vr = scf.vpRect;
+        var co = {
+          at: atClamped,
+          dur: Math.max(1.5, parseFloat(document.getElementById('zc-hold').value) || 4),
+          travel: Math.max(0.35, Math.min(2, parseFloat(document.getElementById('zc-dur').value) || 0.9)),
+          x: Math.round(Math.max(0, Math.min(96, ((boxPx.left - vr.left) / vr.width) * 100)) * 10) / 10,
+          y: Math.round(Math.max(0, Math.min(96, ((boxPx.top - vr.top) / vr.height) * 100)) * 10) / 10,
+          w: Math.round(Math.max(2, Math.min(100, (boxPx.width / vr.width) * 100)) * 10) / 10,
+          h: Math.round(Math.max(2, Math.min(100, (boxPx.height / vr.height) * 100)) * 10) / 10,
+        };
+        closeCancel();
+        saveCalloutForComponent(si, scf.compId, co);
+        return;
+      }
       var move = {
-        at: isNaN(atV) ? Math.round(at * 10) / 10 : Math.max(0, Math.min(dur - 0.2, Math.round(atV * 10) / 10)),
+        at: atClamped,
         type: 'zoom',
         x: Math.round(((boxPx.left + boxPx.width / 2) / cw) * 100),
         y: Math.round(((boxPx.top + boxPx.height / 2) / ch) * 100),
@@ -3883,6 +3942,38 @@ export function getPreviewHtml(): string {
       moves.push(move);
       closeCancel();
       saveCameraMovesForScene(si, moves);
+    });
+  }
+
+  // Persist a drawn callout onto its screencast-frame component (and mirror
+  // to an st-screencast shell sibling so the scene data stays coherent),
+  // then reboot the composite with the playhead restored.
+  function saveCalloutForComponent(sceneIndex, compId, callout) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[sceneIndex];
+    if (!p || !scene || !scene.components) return;
+    var comp = null;
+    scene.components.forEach(function(c) { if (c.id === compId) comp = c; });
+    if (!comp) { scene.components.forEach(function(c) { if (!comp && c.type === 'screencast-frame') comp = c; }); }
+    if (!comp) { studioStatus('No screencast component found for callout', 'err'); return; }
+    comp.data = comp.data || {};
+    comp.data.callouts = (comp.data.callouts || []).concat([callout]);
+    var shell = null;
+    scene.components.forEach(function(c) { if (c.type === 'st-screencast') shell = c; });
+    studioStatus('Saving callout…', '');
+    var patchPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+    var work = api('PATCH', patchPath, { data: comp.data });
+    if (shell) {
+      shell.data = shell.data || {};
+      shell.data.callouts = comp.data.callouts;
+      var shellPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + shell.id;
+      work = work.then(function() { return api('PATCH', shellPath, { data: shell.data }); });
+    }
+    work.then(function() {
+      studioStatus('Callout saved ✓ reloading preview…', 'ok');
+      startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+    }).catch(function(e) {
+      studioStatus('Callout save failed: ' + e.message, 'err');
     });
   }
 
