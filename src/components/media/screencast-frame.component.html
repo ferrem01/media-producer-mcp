@@ -116,35 +116,33 @@
     box-shadow: 0 40px 110px rgba(0, 0, 0, 0.6), 0 8px 30px rgba(0, 0, 0, 0.45);
     -webkit-box-reflect: below 2.2vh linear-gradient(to bottom, transparent 62%, rgba(255,255,255,0.14));
   }
-  /* TRUE slab thickness: real side faces extending BACKWARD from the
-     screen's left and bottom edges, foreshortened by the same perspective
-     as everything else. Not a picture of depth -- geometry. The wrapper
-     mirrors the frame's box and pose (preserve-3d), the faces fold back
-     with rotateY/rotateX about their shared edge. */
-  .scf-depth {
+  /* The GLASS the video sits on -- the "glassy border" look: a real
+     second surface in the same 3D space, a true translateZ distance
+     behind the video, frosted blur of the world, hairline highlight
+     border, one diagonal light streak. Drift gives genuine parallax
+     between the two surfaces. */
+  .scf-glass {
     position: absolute; pointer-events: none; z-index: -1;
-    transform-style: preserve-3d;
+    border-radius: 26px;
+    background: linear-gradient(128deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.035) 40%,
+      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 14%, transparent) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    -webkit-box-reflect: below 2.2vh linear-gradient(to bottom, transparent 70%, rgba(255,255,255,0.08));
   }
-  /* With rotateY(-14) rotateX(5), the NEAR edges are the right and bottom
-     -- those are the faces a viewer can see. At a 14-degree tilt an edge
-     foreshortens to sin(14) of its depth, so the slab must be genuinely
-     thick (64px) for the face to read on screen (~15px projected). */
-  .scf-face {
-    position: absolute;
+  .scf-glass::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; overflow: hidden;
+    background: linear-gradient(118deg, transparent 30%, rgba(255, 255, 255, 0.10) 44%,
+      rgba(255, 255, 255, 0.02) 52%, transparent 60%);
   }
-  .scf-face--right {
-    left: 100%; top: 16px; bottom: 16px; width: 64px; margin-left: -1px;
-    transform-origin: left center; transform: rotateY(-64deg);
-    background: linear-gradient(to left,
-      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 60%, #eeeef8),
-      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 34%, #15151f) 75%);
-  }
-  .scf-face--bottom {
-    left: 16px; right: 16px; top: 100%; height: 64px; margin-top: -1px;
-    transform-origin: center top; transform: rotateX(72deg);
-    background: linear-gradient(to bottom,
-      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 52%, #e2e2f0),
-      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 28%, #101018) 80%);
+  .scf-stage.is-float.is-light .scf-glass {
+    background: linear-gradient(128deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.22) 45%,
+      color-mix(in srgb, var(--mp-color-primary, #4f46e5) 10%, transparent) 100%);
+    border-color: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 26px 70px rgba(23, 23, 40, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   }
   /* Rim light: the camera-facing edges catch the studio key. */
   .scf-stage.is-float .scf-frame::before {
@@ -465,20 +463,17 @@
       gsap.set(pool, { autoAlpha: 0 });
       tl.to(pool, { autoAlpha: 1, duration: 1.2, ease: 'sine.out' }, 0.4);
       tl.to(pool, { scale: 1.06, duration: Math.max(4, (ctx.duration || 8) / 2), yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0.4);
-      // Real slab thickness: side faces fold backward from the screen's
-      // left/bottom edges inside a preserve-3d wrapper that shares the
-      // frame's box and pose. Actual foreshortened geometry -- reads as
-      // thickness at any zoom because it IS thickness.
-      var depth3d = document.createElement('div');
-      depth3d.className = 'scf-depth';
-      var faceL = document.createElement('div'); faceL.className = 'scf-face scf-face--right';
-      var faceB = document.createElement('div'); faceB.className = 'scf-face scf-face--bottom';
-      depth3d.appendChild(faceL); depth3d.appendChild(faceB);
-      stage.appendChild(depth3d);
-      gsap.set(depth3d, { autoAlpha: 0 });
-      tl.to(depth3d, { autoAlpha: 1, duration: 0.8, ease: 'power2.out' }, 0.3);
-      var poseTargets = wrap3d ? [frame, wrap3d, depth3d] : [frame, depth3d];
+      // The glass the video sits on: same pose, a real translateZ gap
+      // behind the video -- drift parallax between the two surfaces.
+      var glass = document.createElement('div');
+      glass.className = 'scf-glass';
+      stage.appendChild(glass);
+      gsap.set(glass, { autoAlpha: 0 });
+      tl.to(glass, { autoAlpha: 1, duration: 0.9, ease: 'power2.out' }, 0.25);
+      var poseTargets = wrap3d ? [frame, wrap3d, glass] : [frame, glass];
       gsap.set(poseTargets, { rotateY: pose.ry, rotateX: pose.rx, transformOrigin: '50% 50%' });
+      gsap.set(glass, { z: -48 });
+      gsap.set(wrap3d ? [frame, wrap3d] : [frame], { z: 22 });
       // One slow deterministic sweep across the scene -- the camera never
       // stops. Seek-exact (plain tween on the scene timeline).
       tl.to(poseTargets, { rotateY: pose.ry - 7, rotateX: pose.rx - 1.5, duration: Math.max(4, ctx.duration || 8), ease: 'sine.inOut' }, 0);
@@ -493,12 +488,13 @@
           // pre-transform -- the shared pose does the rest).
           var fw = frame.offsetWidth, fh = frame.offsetHeight;
           if (fw > 4) {
-            // Depth wrapper mirrors the frame's untransformed box; the
-            // shared pose transform does the rest.
-            depth3d.style.left = frame.offsetLeft + 'px';
-            depth3d.style.top = frame.offsetTop + 'px';
-            depth3d.style.width = fw + 'px';
-            depth3d.style.height = fh + 'px';
+            // Glass mirrors the frame's box with an even margin -- the
+            // glassy-border framing.
+            var gm = Math.max(18, fw * 0.045);
+            glass.style.left = (frame.offsetLeft - gm) + 'px';
+            glass.style.top = (frame.offsetTop - gm * 0.8) + 'px';
+            glass.style.width = (fw + gm * 2) + 'px';
+            glass.style.height = (fh + gm * 1.7) + 'px';
           }
           var sb = stage.getBoundingClientRect();
           var fb = frame.getBoundingClientRect();
