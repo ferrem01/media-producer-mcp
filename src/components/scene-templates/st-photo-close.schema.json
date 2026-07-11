@@ -1,0 +1,18 @@
+{
+  "type": "st-photo-close",
+  "label": "Scene Template: Photo-World Close",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: a cinematic close or hero moment IN a photographic world. The hero image fills the frame (Ken Burns drift); typography lives directly on the photo over baked scrim gradients -- kicker with rule, big display headline, optional subline, an interpunct items line, brand logo. Use for emotional closes, place/people moments, any scene whose star is a generated or supplied photograph. Never boxes over the picture.",
+  "data": {
+    "backdrop_image": { "type": "string", "label": "Hero image URL; when the scene has a generated hero image the pipeline fills this automatically", "optional": true },
+    "kicker": { "type": "string", "label": "Small uppercase kicker, top-left", "optional": true },
+    "headline": { "type": "string", "label": "Display headline; '|' splits lines" },
+    "subline": { "type": "string", "label": "One supporting line under the headline", "optional": true },
+    "items": { "type": "array", "label": "Up to 6 short tokens for the bottom interpunct line (e.g. deliverables)", "optional": true },
+    "logo_url": { "type": "string", "label": "Logo URL; defaults to the brand-kit wordmark", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.35, "y": 0.62 },
+    "exit": { "x": 0.5, "y": 0.5 }
+  }
+}

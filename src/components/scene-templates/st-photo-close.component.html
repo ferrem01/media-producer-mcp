@@ -1,0 +1,118 @@
+<template>
+  <div class="stpc">
+    <div class="stpc-scrim stpc-scrim--bottom"></div>
+    <div class="stpc-scrim stpc-scrim--corner"></div>
+    <div class="stpc-kicker-row"><span class="stpc-kicker">{{kicker}}</span><span class="stpc-rule"></span></div>
+    <h1 class="stpc-headline"></h1>
+    <div class="stpc-subline">{{subline}}</div>
+    <div class="stpc-items"></div>
+    <img class="stpc-logo" alt="" />
+    <div class="stpc-index">{{scene_index}}</div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-photo-close: the cinematic photo-world close. A full-bleed hero
+     image IS the scene; typography lives IN the photo over baked scrims --
+     never boxes over the picture. Deterministic contrast: white type on
+     guaranteed-dark gradient regions, whatever the photo's brightness. */
+  .stpc { position: absolute; inset: 0; overflow: hidden; color: #ffffff;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  /* The photo arrives via mpAtmosphere image mode (Ken Burns + base scrim);
+     these two extra scrims guarantee the type regions specifically. */
+  .stpc-scrim { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+  .stpc-scrim--bottom { background: linear-gradient(to top,
+    rgba(7, 8, 14, 0.78) 0%, rgba(7, 8, 14, 0.55) 16%, rgba(7, 8, 14, 0.22) 34%, transparent 55%); }
+  .stpc-scrim--corner { background:
+    radial-gradient(ellipse 46% 38% at 12% 12%, rgba(7, 8, 14, 0.55), transparent 70%); }
+  .stpc-kicker-row { position: absolute; left: 6.5vw; top: 8vh; display: flex; align-items: center;
+    gap: 16px; z-index: 5; }
+  .stpc-kicker { font-size: 14px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.92); text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35); }
+  .stpc-rule { width: 44px; height: 2px; background: var(--mp-color-primary, #4f46e5);
+    transform-origin: left center; }
+  .stpc-headline { position: absolute; left: 6.5vw; bottom: 24vh; margin: 0; z-index: 5;
+    font-weight: 500; font-size: 5vw; line-height: 1.04; letter-spacing: -0.02em; max-width: 68vw;
+    text-wrap: balance; word-break: keep-all; text-shadow: 0 2px 26px rgba(0, 0, 0, 0.45); }
+  .stpc-subline { position: absolute; left: 6.5vw; bottom: 17.5vh; z-index: 5;
+    font-size: 1.35vw; line-height: 1.5; color: rgba(255, 255, 255, 0.82); max-width: 46vw;
+    text-shadow: 0 1px 14px rgba(0, 0, 0, 0.4); }
+  .stpc-items { position: absolute; left: 50%; bottom: 6.2vh; transform: translateX(-50%);
+    display: flex; align-items: baseline; gap: 1.1vw; z-index: 5; white-space: nowrap; }
+  .stpc-item { font-size: 1.25vw; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.95); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.5); }
+  .stpc-dot { color: var(--mp-color-primary, #4f46e5); font-size: 1.25vw; font-weight: 700;
+    text-shadow: 0 0 12px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 60%, transparent); }
+  .stpc-logo { position: absolute; right: 6vw; top: 7.6vh; height: 30px; width: auto; z-index: 5; }
+  .stpc-index { position: absolute; right: 6vw; bottom: 5.6vh; font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.2em; color: rgba(255, 255, 255, 0.55); z-index: 5; }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var root = q('.stpc');
+    var dur = ctx.duration || 10;
+
+    var logo = q('.stpc-logo');
+    if (logo) {
+      if (data.logo_url) { logo.src = data.logo_url; if (window.mpLogoOnDark) mpLogoOnDark(logo); }
+      else logo.style.display = 'none';
+    }
+    var kickerRow = q('.stpc-kicker-row');
+    if (!data.kicker) kickerRow.style.display = 'none';
+    var sub = q('.stpc-subline');
+    if (!data.subline) sub.style.display = 'none';
+
+    // Headline lines ('|' splits), masked for word reveals.
+    var head = q('.stpc-headline');
+    String(data.headline || '').split('|').forEach(function(txt) {
+      var line = document.createElement('span'); line.style.cssText = 'display:block;overflow:hidden;';
+      var inner = document.createElement('span'); inner.style.display = 'block'; inner.textContent = txt.trim();
+      line.appendChild(inner); head.appendChild(line);
+    });
+    var lineEls = el.querySelectorAll('.stpc-headline span > span');
+
+    // Items line: interpunct-separated uppercase tokens, each its own reveal.
+    var itemsEl = q('.stpc-items');
+    var items = (Array.isArray(data.items) ? data.items : []).slice(0, 6).map(function(s) { return String(s); });
+    var tokenEls = [];
+    items.forEach(function(txt, i) {
+      if (i > 0) { var d = document.createElement('span'); d.className = 'stpc-dot'; d.textContent = '·'; itemsEl.appendChild(d); tokenEls.push(d); }
+      var t = document.createElement('span'); t.className = 'stpc-item'; t.textContent = txt; itemsEl.appendChild(t); tokenEls.push(t);
+    });
+    if (items.length === 0) itemsEl.style.display = 'none';
+
+    // ── Choreography: photo breathes first, then the type takes residence ──
+    gsap.set(q('.stpc-rule'), { scaleX: 0 });
+    gsap.set(q('.stpc-kicker'), { autoAlpha: 0, x: -14 });
+    gsap.set(lineEls, { yPercent: 118, filter: 'blur(6px)' });
+    gsap.set([sub, logo, q('.stpc-index')], { autoAlpha: 0 });
+    gsap.set(tokenEls, { autoAlpha: 0, y: 14 });
+    gsap.set(el.querySelectorAll('.stpc-scrim'), { autoAlpha: 0 });
+
+    tl.to(el.querySelectorAll('.stpc-scrim'), { autoAlpha: 1, duration: 1.1, ease: 'sine.out' }, 0.15)
+      .to(q('.stpc-kicker'), { autoAlpha: 1, x: 0, duration: 0.55, ease: 'power2.out' }, 0.5)
+      .to(q('.stpc-rule'), { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 0.62)
+      .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 1.0, ease: 'power4.out', stagger: 0.12 }, 0.9)
+      .to(sub, { autoAlpha: 1, duration: 0.7, ease: 'power2.out' }, 1.7)
+      .to([logo, q('.stpc-index')], { autoAlpha: 1, duration: 0.7 }, 1.4);
+    var itemsAt = Math.min(2.6, dur * 0.35);
+    tokenEls.forEach(function(t, i) {
+      if (window.mpSnapIn) mpSnapIn(tl, t, itemsAt + i * 0.14);
+      else tl.to(t, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, itemsAt + i * 0.14);
+    });
+    if (window.mpShimmer) mpShimmer(tl, head, itemsAt + 1.6);
+
+    if (window.mpAtmosphere) {
+      mpAtmosphere(root, data.backdrop_image
+        ? { dark: true, image: data.backdrop_image }
+        : { dark: true });
+    }
+    if (window.mpCameraPush) mpCameraPush(tl, root, dur, 1.06);
+    return tl;
+  }
+</script>

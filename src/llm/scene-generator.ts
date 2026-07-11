@@ -70,6 +70,11 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
       if (wmLogo) (stData as any).logo_url = wmLogo.url;
     }
     if (!(stData as any).scene_index) (stData as any).scene_index = `${String(opts.sceneIndex + 1).padStart(2, "0")} / ${String(opts.totalScenes).padStart(2, "0")}`;
+    // st-photo-close takes the scene's generated hero image as its world;
+    // the mapper leaves the slot empty because the image is enriched later.
+    if (st.type === "st-photo-close" && !(stData as any).backdrop_image && opts.imageUrl) {
+      (stData as any).backdrop_image = opts.imageUrl;
+    }
     // Dark template scenes get the WebGL cinematic backdrop (translucent lit
     // ribbons on three.js) as their z0 world; the template's atmosphere then
     // runs baseless as a lighting pass over it.
