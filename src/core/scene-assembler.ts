@@ -19,6 +19,7 @@ import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./
 import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types.js";
 import { beatTimeline } from "./beats.js";
 import { resolveAutoCropData, resolveScreencastAutoCrops } from "./asset-intel.js";
+import { resolveBrandKitFonts } from "./font-resolve.js";
 import fs from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -133,7 +134,10 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
  * Assemble a scene into a self-contained HTML document.
  */
 export async function assembleScene(options: AssembleOptions): Promise<string> {
-  const { scene, components, brandKit, canvas, preview, speakerUrl } = options;
+  const { scene, components, canvas, preview, speakerUrl } = options;
+  // Resolve brand fonts FIRST so the font links and --mp-font-family agree
+  // on a family that actually exists (see font-resolve.ts).
+  const brandKit = await resolveBrandKitFonts(options.brandKit);
 
   // Build a lookup of component sources by type
   const sourceMap = new Map<string, ParsedComponent>();
@@ -691,10 +695,13 @@ export async function assembleCodegenScene(options: {
   mediaEdits?: Record<string, import("./types.js").MediaEdit>;
 }): Promise<string> {
   const {
-    sceneSource, componentSources, brandKit, canvas, duration,
+    sceneSource, componentSources, canvas, duration,
     sceneId, beats, gsapDir, background, transparentBackground,
     preview, speakerUrl,
   } = options;
+  // Resolve brand fonts FIRST so the font links and --mp-font-family agree
+  // on a family that actually exists (see font-resolve.ts).
+  const brandKit = await resolveBrandKitFonts(options.brandKit);
 
   // Beat timeline for ctx.beats: resolved (start, end) segments so scene and
   // component timelines can anchor phases to beats instead of guessing.

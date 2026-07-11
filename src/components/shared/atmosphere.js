@@ -18,11 +18,16 @@
     var layer = document.createElement('div');
     layer.className = 'mp-atmosphere';
     layer.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;';
-    var base = document.createElement('div');
-    base.style.cssText = 'position:absolute;inset:0;background:' + (dark
-      ? 'linear-gradient(180deg,#101019 0%,#16161f 60%,#101019 100%)'
-      : 'linear-gradient(180deg,#ffffff 0%,#fafaff 55%,#f4f4fb 100%)') + ';';
-    layer.appendChild(base);
+    // noBase: a webgl-backdrop (or other world layer) sits BEHIND this scene
+    // component -- skip the opaque base gradient so it shows through, keep
+    // the washes/grain/vignette as the lighting pass over it.
+    if (!opts.noBase) {
+      var base = document.createElement('div');
+      base.style.cssText = 'position:absolute;inset:0;background:' + (dark
+        ? 'linear-gradient(180deg,#101019 0%,#16161f 60%,#101019 100%)'
+        : 'linear-gradient(180deg,#ffffff 0%,#fafaff 55%,#f4f4fb 100%)') + ';';
+      layer.appendChild(base);
+    }
     function wash(color, x, y, size, alpha) {
       var w = document.createElement('div');
       w.style.cssText = 'position:absolute;left:' + x + '%;top:' + y + '%;width:' + size + 'vmax;height:' + size +
@@ -176,6 +181,23 @@
     shell.appendChild(el);
     el.style.border = 'none';
     return shell;
+  };
+
+  // Speed-contrast physics. The expensive feel = fast snaps against slow
+  // drifts. mpSnapIn: fast arrival (blur smear) with a tiny overshoot settle.
+  // mpSnapOut: fast lift-away. Compose against the atmosphere's slow drifts.
+  window.mpSnapIn = function (tl, el, at, opts) {
+    if (!tl || !el) return;
+    opts = opts || {};
+    var dur = opts.duration || 0.32;
+    gsap.set(el, { autoAlpha: 0, y: opts.y !== undefined ? opts.y : 42, scale: 0.985, filter: 'blur(10px)' });
+    tl.to(el, { autoAlpha: 1, y: -5, scale: 1.004, filter: 'blur(0px)', duration: dur, ease: 'power3.out' }, at || 0)
+      .to(el, { y: 0, scale: 1, duration: 0.22, ease: 'power2.inOut' }, (at || 0) + dur);
+  };
+  window.mpSnapOut = function (tl, el, at, opts) {
+    if (!tl || !el) return;
+    opts = opts || {};
+    tl.to(el, { autoAlpha: 0, y: opts.y !== undefined ? opts.y : -56, filter: 'blur(9px)', duration: opts.duration || 0.38, ease: 'power2.in' }, at || 0);
   };
 
   // Masked word reveal: split an element's text into per-word spans and
