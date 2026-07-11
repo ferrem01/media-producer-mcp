@@ -99,6 +99,26 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
         data: { seed: 3 + opts.sceneIndex * 4 },
       });
     }
+    // st-artifact is a SHELL: the artifact (a ui-mock or media component
+    // that BUILDS on screen) rides in a sibling instance positioned in the
+    // non-editorial zone.
+    if (st.type === "st-artifact") {
+      var art = (stData as any).artifact;
+      if (art && typeof art.type === "string") {
+        var editorialLeft = (stData as any).editorial_side === "left";
+        stComponents.push({
+          id: "tpl_artifact",
+          type: art.type,
+          z_index: 20,
+          position: editorialLeft
+            ? { x: "42%", y: "10%", width: "55%", height: "80%" }
+            : { x: "3%", y: "10%", width: "55%", height: "80%" },
+          data: (art.data && typeof art.data === "object") ? art.data : {},
+        });
+      } else {
+        console.warn(`  st-artifact: no artifact slot -- editorial column only`);
+      }
+    }
     // st-screencast is a SHELL: the footage itself rides in a sibling
     // screencast-frame instance (browser chrome + crop:'auto' ingest-analysis
     // chrome removal). The frame's box leaves the shell's bottom band free

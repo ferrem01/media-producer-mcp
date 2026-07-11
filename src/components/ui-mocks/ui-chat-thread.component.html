@@ -1,0 +1,128 @@
+<template>
+  <div class="uct">
+    <div class="uct-win">
+      <div class="uct-side">
+        <div class="uct-org">{{workspace}}</div>
+        <div class="uct-chans"></div>
+      </div>
+      <div class="uct-main">
+        <div class="uct-head">{{channel}}</div>
+        <div class="uct-msgs"></div>
+        <div class="uct-composer">{{composer_hint}}</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── ui-chat-thread: a chat workspace mock that BUILDS -- typing dots
+     appear, then each message pops in, in sequence. Generic (Slack-ish
+     layout, brand-colorable sidebar) so it can play any chat product. ── */
+  .uct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'Inter', sans-serif; }
+  .uct-win { width: 74%; max-width: 1160px; height: 68%; display: flex; background: #ffffff;
+    border-radius: 12px; overflow: hidden; border: 1px solid rgba(23, 23, 28, 0.08);
+    box-shadow: 0 30px 90px rgba(23, 23, 40, 0.35), 0 6px 24px rgba(23, 23, 40, 0.18); }
+  .uct-side { flex: 0 0 24%; background: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 78%, #16101e);
+    color: rgba(255, 255, 255, 0.85); padding: 16px 0; }
+  .uct-org { font-weight: 700; font-size: 14.5px; padding: 2px 16px 12px; color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12); margin-bottom: 10px; }
+  .uct-chan { font-size: 12.5px; padding: 4px 16px; opacity: 0.75; }
+  .uct-chan.is-active { background: rgba(255, 255, 255, 0.18); opacity: 1; font-weight: 600; }
+  .uct-main { flex: 1 1 auto; display: flex; flex-direction: column; }
+  .uct-head { font-weight: 700; font-size: 13.5px; color: #17171c; padding: 13px 18px;
+    border-bottom: 1px solid rgba(23, 23, 28, 0.07); }
+  .uct-msgs { flex: 1 1 auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 13px; overflow: hidden; }
+  .uct-msg { display: flex; gap: 10px; align-items: flex-start; }
+  .uct-ava { width: 30px; height: 30px; border-radius: 7px; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+    background: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 18%, #f0f0f5); }
+  .uct-msg-body { min-width: 0; }
+  .uct-msg-name { font-size: 12.5px; font-weight: 700; color: #17171c; }
+  .uct-msg-name .uct-time { font-weight: 400; font-size: 10.5px; color: rgba(23, 23, 28, 0.4); margin-left: 6px; }
+  .uct-msg-text { font-size: 13px; color: rgba(23, 23, 28, 0.85); line-height: 1.45; margin-top: 2px; }
+  .uct-msg-text .uct-mention { color: var(--mp-color-primary, #4f46e5); font-weight: 600; }
+  .uct-msg-text .uct-link { color: var(--mp-color-primary, #4f46e5); text-decoration: underline; }
+  .uct-typing { display: inline-flex; gap: 4px; padding: 8px 12px; border-radius: 12px;
+    background: rgba(23, 23, 28, 0.05); }
+  .uct-typing i { width: 6px; height: 6px; border-radius: 50%; background: rgba(23, 23, 28, 0.35); }
+  .uct-composer { margin: 0 18px 16px; border: 1px solid rgba(23, 23, 28, 0.14); border-radius: 8px;
+    padding: 10px 13px; font-size: 12.5px; color: rgba(23, 23, 28, 0.35); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var win = q('.uct-win');
+
+    if (!data.workspace) q('.uct-org').textContent = 'Workspace';
+    if (!data.channel) q('.uct-head').textContent = '# general';
+    if (!data.composer_hint) q('.uct-composer').textContent = 'Message';
+
+    // Sidebar channels (active = the header channel).
+    var chans = Array.isArray(data.channels) ? data.channels : ['general', 'launches', 'eng'];
+    var chansEl = q('.uct-chans');
+    var active = String(data.channel || '# general').replace(/^#\s*/, '');
+    chans.slice(0, 6).forEach(function (c) {
+      var d = document.createElement('div');
+      d.className = 'uct-chan' + (String(c) === active ? ' is-active' : '');
+      d.textContent = '# ' + c;
+      chansEl.appendChild(d);
+    });
+
+    if (window.mpThrow) mpThrow(tl, win, 0.2, { fromY: 80, duration: 0.6 });
+    else { gsap.set(win, { autoAlpha: 0, y: 26 }); tl.to(win, { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.2); }
+
+    // Messages build in sequence: typing dots pulse, then the message pops.
+    var msgs = Array.isArray(data.messages) ? data.messages.slice(0, 5) : [];
+    var host = q('.uct-msgs');
+    var at = Number(data.first_at) || 1.1;
+    var dur = ctx.duration || 8;
+    var per = Math.max(1.4, Math.min(2.6, (dur - at - 0.6) / Math.max(1, msgs.length)));
+    msgs.forEach(function (m) {
+      var row = document.createElement('div'); row.className = 'uct-msg';
+      var ava = document.createElement('div'); ava.className = 'uct-ava'; ava.textContent = String(m.emoji || '🤖');
+      var body = document.createElement('div'); body.className = 'uct-msg-body';
+      var name = document.createElement('div'); name.className = 'uct-msg-name';
+      name.textContent = String(m.from || 'teammate');
+      var time = document.createElement('span'); time.className = 'uct-time'; time.textContent = String(m.time || '9:41 AM');
+      name.appendChild(time);
+      var text = document.createElement('div'); text.className = 'uct-msg-text';
+      // Light markup: @mentions and bare links get brand styling.
+      String(m.text || '').split(/(\s+)/).forEach(function (tok) {
+        var span = document.createElement('span');
+        if (/^@\w/.test(tok)) { span.className = 'uct-mention'; span.textContent = tok; }
+        else if (/^\w+[.]\w+\/|^https?:\/\//.test(tok)) { span.className = 'uct-link'; span.textContent = tok; }
+        else span.textContent = tok;
+        text.appendChild(span);
+      });
+      body.appendChild(name); body.appendChild(text);
+      row.appendChild(ava); row.appendChild(body);
+
+      // Typing indicator precedes each message, then swaps for the message.
+      var tip = document.createElement('div'); tip.className = 'uct-msg';
+      var tava = ava.cloneNode(true);
+      var tbody = document.createElement('div');
+      var dots = document.createElement('div'); dots.className = 'uct-typing';
+      for (var k = 0; k < 3; k++) dots.appendChild(document.createElement('i'));
+      tbody.appendChild(dots); tip.appendChild(tava); tip.appendChild(tbody);
+      host.appendChild(tip); host.appendChild(row);
+
+      gsap.set(tip, { autoAlpha: 0 });
+      gsap.set(row, { autoAlpha: 0, y: 12, display: 'none' });
+      var tAt = at;
+      tl.to(tip, { autoAlpha: 1, duration: 0.25 }, tAt);
+      Array.prototype.forEach.call(dots.children, function (dot, di) {
+        tl.to(dot, { y: -3, duration: 0.26, yoyo: true, repeat: 3, ease: 'sine.inOut' }, tAt + 0.15 + di * 0.12);
+      });
+      tl.set(tip, { display: 'none' }, tAt + 1.0)
+        .set(row, { display: 'flex' }, tAt + 1.0)
+        .to(row, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'back.out(1.6)' }, tAt + 1.0);
+      at += per;
+    });
+
+    if (window.mpLiftShadow) mpLiftShadow(win);
+    return tl;
+  }
+</script>

@@ -1,0 +1,91 @@
+<template>
+  <div class="uta">
+    <div class="uta-win">
+      <div class="uta-bar">
+        <span class="uta-dot uta-dot--r"></span><span class="uta-dot uta-dot--y"></span><span class="uta-dot uta-dot--g"></span>
+        <span class="uta-title">{{title}}</span>
+      </div>
+      <div class="uta-body">
+        <div class="uta-stream"></div>
+        <div class="uta-promptbox">
+          <div class="uta-input"></div>
+          <div class="uta-meta"><span class="uta-chip">{{badge}}</span><span class="uta-model">{{model_label}}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── ui-terminal-agent: an agent console mock that BUILDS -- the prompt
+     types character by character, then status/thinking lines stream in.
+     The HyperFrames "talk to the agent" beat, brand-colorable. ── */
+  .uta { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace; }
+  .uta-win { width: 76%; max-width: 1180px; background: #101014; border-radius: 14px;
+    border: 1px solid rgba(244, 244, 248, 0.09); overflow: hidden;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55), 0 6px 24px rgba(0, 0, 0, 0.4); }
+  .uta-bar { display: flex; align-items: center; gap: 7px; padding: 12px 16px;
+    background: rgba(244, 244, 248, 0.035); border-bottom: 1px solid rgba(244, 244, 248, 0.06); }
+  .uta-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .uta-dot--r { background: #ff5f57; } .uta-dot--y { background: #febc2e; } .uta-dot--g { background: #28c840; }
+  .uta-title { margin-left: 10px; font-size: 12px; color: rgba(244, 244, 248, 0.45); letter-spacing: 0.02em; }
+  .uta-body { padding: 22px 24px 20px; min-height: 200px; display: flex; flex-direction: column; }
+  .uta-stream { flex: 1 1 auto; display: flex; flex-direction: column; gap: 9px; margin-bottom: 18px; }
+  .uta-line { font-size: 14px; line-height: 1.55; color: rgba(244, 244, 248, 0.78); white-space: pre-wrap; }
+  .uta-line.is-thinking { color: rgba(244, 244, 248, 0.42); font-style: italic; }
+  .uta-line.is-status::before { content: '● '; color: var(--mp-color-primary, #4f46e5); }
+  .uta-line.is-done::before { content: '✓ '; color: #28c840; }
+  .uta-promptbox { border: 1px solid rgba(244, 244, 248, 0.14); border-radius: 10px; padding: 13px 16px 10px;
+    background: rgba(244, 244, 248, 0.02); }
+  .uta-input { font-size: 15px; color: #f4f4f8; min-height: 22px; }
+  .uta-meta { display: flex; align-items: center; margin-top: 10px; }
+  .uta-chip { font-size: 10.5px; padding: 2px 8px; border-radius: 5px; font-weight: 600;
+    background: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 30%, transparent);
+    color: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, #fff); }
+  .uta-model { margin-left: auto; font-size: 11px; color: rgba(244, 244, 248, 0.35); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var win = q('.uta-win');
+    var dur = ctx.duration || 8;
+
+    if (!data.title) q('.uta-title').textContent = 'agent — ~/workspace';
+    if (!data.badge) q('.uta-chip').textContent = 'Auto';
+    if (!data.model_label) q('.uta-model').style.display = 'none';
+
+    // Entrance: the window arrives with physics.
+    if (window.mpThrow) mpThrow(tl, win, 0.2, { fromY: 90, duration: 0.6 });
+    else { gsap.set(win, { autoAlpha: 0, y: 30 }); tl.to(win, { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.2); }
+
+    // The prompt TYPES (the build), then status lines stream in.
+    var input = q('.uta-input');
+    var promptText = String(data.prompt || '');
+    var typeAt = Number(data.type_at) || 1.0;
+    var typeDur = Math.max(0.6, Math.min(3.2, promptText.length / 24));
+    if (promptText) {
+      input.textContent = promptText;
+      if (window.mpTypeIn) mpTypeIn(tl, input, typeAt, { duration: typeDur });
+    }
+
+    var stream = q('.uta-stream');
+    var lines = Array.isArray(data.lines) ? data.lines.slice(0, 8) : [];
+    var lineAt = typeAt + typeDur + 0.5;
+    var gap = Math.max(0.5, Math.min(1.4, (dur - lineAt - 0.8) / Math.max(1, lines.length)));
+    lines.forEach(function (ln, i) {
+      var d = document.createElement('div');
+      var kind = (ln && ln.kind) || 'status';
+      d.className = 'uta-line is-' + kind;
+      d.textContent = String((ln && ln.text) || ln);
+      stream.appendChild(d);
+      gsap.set(d, { autoAlpha: 0, y: 8 });
+      tl.to(d, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power2.out' }, lineAt + i * gap);
+    });
+
+    if (window.mpLiftShadow) mpLiftShadow(win);
+    return tl;
+  }
+</script>

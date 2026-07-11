@@ -1,0 +1,14 @@
+{
+  "type": "ui-terminal-agent",
+  "label": "UI Mock: Agent Terminal",
+  "category": "ui-mocks",
+  "description": "A dark agent-console mock that BUILDS on screen: the prompt types character by character with a cursor, then thinking/status/done lines stream in one at a time. Use for 'ask the agent' beats -- the moment a human hands work to an AI. Brand accent on the mode chip and status dots.",
+  "data": {
+    "prompt": { "type": "string", "label": "The prompt that gets typed (the star of the beat)" },
+    "lines": { "type": "object", "label": "Array of streamed lines after the prompt: {text, kind: 'thinking'|'status'|'done'} or plain strings (status)", "optional": true },
+    "title": { "type": "string", "label": "Window title bar text (default 'agent — ~/workspace')", "optional": true },
+    "badge": { "type": "string", "label": "Mode chip text (default 'Auto')", "optional": true },
+    "model_label": { "type": "string", "label": "Right-side model label (hidden if empty)", "optional": true },
+    "type_at": { "type": "number", "label": "Seconds before the prompt starts typing (default 1.0)", "optional": true }
+  }
+}

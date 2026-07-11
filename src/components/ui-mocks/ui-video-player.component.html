@@ -1,0 +1,100 @@
+<template>
+  <div class="uvp">
+    <div class="uvp-win">
+      <div class="uvp-bar">
+        <span class="uvp-dot uvp-dot--r"></span><span class="uvp-dot uvp-dot--y"></span><span class="uvp-dot uvp-dot--g"></span>
+        <span class="uvp-title">{{title}}</span>
+        <span class="uvp-badge">{{badge}}</span>
+      </div>
+      <div class="uvp-screen"><div class="uvp-content"></div></div>
+      <div class="uvp-controls">
+        <span class="uvp-play">▶</span>
+        <div class="uvp-track"><div class="uvp-fill"></div><div class="uvp-knob"></div></div>
+        <span class="uvp-time">0:00</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── ui-video-player: the video-in-video device -- a dark player window
+     whose scrub bar ADVANCES and whose badge counts scenes, framing any
+     content (an image, a nested media element, or slotted markup) as "a
+     video the product made". The HyperFrames deliverable-is-a-video beat. ── */
+  .uvp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace; }
+  .uvp-win { width: 72%; max-width: 1140px; background: #131317; border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(244, 244, 248, 0.09);
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55), 0 6px 24px rgba(0, 0, 0, 0.4); }
+  .uvp-bar { display: flex; align-items: center; gap: 7px; padding: 11px 15px; }
+  .uvp-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .uvp-dot--r { background: #ff5f57; } .uvp-dot--y { background: #febc2e; } .uvp-dot--g { background: #28c840; }
+  .uvp-title { margin-left: 9px; font-size: 12px; color: rgba(244, 244, 248, 0.55); }
+  .uvp-badge { margin-left: auto; font-size: 11px; color: rgba(244, 244, 248, 0.4); letter-spacing: 0.06em; }
+  .uvp-screen { margin: 0 15px; background: #fbfbfd; border-radius: 6px; overflow: hidden; position: relative;
+    aspect-ratio: 16 / 9; }
+  .uvp-content { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .uvp-content img, .uvp-content video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .uvp-controls { display: flex; align-items: center; gap: 13px; padding: 13px 17px 15px; }
+  .uvp-play { color: rgba(244, 244, 248, 0.85); font-size: 12px; }
+  .uvp-track { flex: 1 1 auto; height: 4px; border-radius: 3px; background: rgba(244, 244, 248, 0.14); position: relative; }
+  .uvp-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+    background: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 60%, #ff6a4d); border-radius: 3px; }
+  .uvp-knob { position: absolute; top: 50%; left: 0; width: 11px; height: 11px; border-radius: 50%;
+    background: #f4f4f8; transform: translate(-50%, -50%); }
+  .uvp-time { font-size: 11px; color: rgba(244, 244, 248, 0.5); font-variant-numeric: tabular-nums; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var win = q('.uvp-win');
+    var dur = ctx.duration || 8;
+
+    if (!data.title) q('.uvp-title').textContent = 'output.mp4';
+
+    // Content: an image URL (Ken Burns), or slotted content via content_html
+    // (sanitized to text/img by the pipeline), else a subtle brand field.
+    var content = q('.uvp-content');
+    if (data.image_url) {
+      var img = document.createElement('img');
+      img.src = data.image_url;
+      content.appendChild(img);
+      tl.fromTo(img, { scale: 1.04 }, { scale: 1.12, duration: Math.max(4, dur), ease: 'none' }, 0);
+    } else {
+      content.style.background =
+        'radial-gradient(ellipse at 30% 30%, color-mix(in srgb, var(--mp-color-primary, #4f46e5) 22%, #ffffff), #fbfbfd 70%)';
+    }
+
+    if (window.mpThrow) mpThrow(tl, win, 0.2, { fromY: 90, duration: 0.6 });
+    else { gsap.set(win, { autoAlpha: 0, y: 30 }); tl.to(win, { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.2); }
+
+    // THE build: the scrub bar advances in real time, the clock counts, and
+    // the scene badge ticks up -- the player is alive, the video is "real".
+    var runtime = Math.max(8, Number(data.runtime_seconds) || 32);
+    var playAt = 0.9;
+    var playSpan = Math.max(2, dur - playAt - 0.3);
+    var frac = Math.min(1, playSpan / runtime);
+    var st = { t: 0 };
+    var fill = q('.uvp-fill'), knob = q('.uvp-knob'), time = q('.uvp-time');
+    var track = q('.uvp-track');
+    var scenes = Math.max(1, Number(data.scene_count) || 0);
+    var badge = q('.uvp-badge');
+    function fmt(s) { var mn = Math.floor(s / 60), sc = Math.floor(s % 60); return mn + ':' + (sc < 10 ? '0' : '') + sc; }
+    if (!data.badge && scenes > 1) badge.textContent = 'scene 1 / ' + scenes;
+    tl.to(st, {
+      t: runtime * frac, duration: playSpan, ease: 'none',
+      onUpdate: function () {
+        var p = (st.t / runtime) * 100;
+        fill.style.width = p + '%';
+        knob.style.left = p + '%';
+        time.textContent = fmt(st.t) + ' / ' + fmt(runtime);
+        if (scenes > 1) badge.textContent = 'scene ' + Math.min(scenes, 1 + Math.floor((st.t / runtime) * scenes)) + ' / ' + scenes;
+      },
+    }, playAt);
+
+    if (window.mpLiftShadow) mpLiftShadow(win);
+    return tl;
+  }
+</script>

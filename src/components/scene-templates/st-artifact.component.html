@@ -1,0 +1,97 @@
+<template>
+  <div class="sta">
+    <div class="sta-editorial">
+      <div class="sta-kicker">{{kicker}}</div>
+      <h1 class="sta-headline"></h1>
+      <div class="sta-stats"></div>
+      <div class="sta-note">{{note}}</div>
+    </div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-artifact: the editorial split (the HyperFrames layout). A product
+     ARTIFACT builds on one side (a sibling ui-mock component added at
+     instantiation); big serif editorial type + counting stats own the
+     other. Machine voice meets essay voice. Light world by default. ── */
+  .sta { position: absolute; inset: 0; overflow: hidden; color: #17171c;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .sta.is-dark { color: #f4f4f8; }
+  .sta-editorial { position: absolute; right: 6vw; top: 50%; transform: translateY(-50%);
+    width: 30vw; }
+  .sta.is-left .sta-editorial { right: auto; left: 6vw; }
+  .sta-kicker { font-size: 13px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--mp-color-primary, #4f46e5); margin-bottom: 2.4vh; }
+  .sta-headline { margin: 0 0 3.4vh; font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    font-weight: 500; font-size: 3.4vw; line-height: 1.12; letter-spacing: -0.015em; text-wrap: balance; }
+  .sta-stats { display: flex; flex-direction: column; }
+  .sta-stat { display: flex; align-items: baseline; gap: 1vw; padding: 1.6vh 0;
+    border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
+  .sta-stat:last-child { border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
+  .sta-stat-v { font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    font-size: 2.6vw; font-weight: 500; color: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 72%, #ff6a4d);
+    font-variant-numeric: tabular-nums; min-width: 8vw; }
+  .sta-stat-l { font-size: 1.05vw; color: color-mix(in srgb, currentColor 62%, transparent); }
+  .sta-note { margin-top: 2.6vh; font-size: 0.95vw; color: color-mix(in srgb, currentColor 45%, transparent);
+    line-height: 1.5; max-width: 30ch; }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.sta');
+    var dark = data.theme === 'dark';
+    if (dark) root.classList.add('is-dark');
+    if (data.editorial_side === 'left') root.classList.add('is-left');
+    var dur = ctx.duration || 10;
+
+    if (!data.kicker) q('.sta-kicker').style.display = 'none';
+    if (!data.note) q('.sta-note').style.display = 'none';
+
+    // Serif headline, '|' line breaks, masked word reveal.
+    var head = q('.sta-headline');
+    String(data.headline || '').split('|').forEach(function (txt) {
+      var line = document.createElement('span'); line.style.cssText = 'display:block;overflow:hidden;';
+      var inner = document.createElement('span'); inner.style.display = 'block'; inner.textContent = txt.trim();
+      line.appendChild(inner); head.appendChild(line);
+    });
+    var lineEls = el.querySelectorAll('.sta-headline span > span');
+
+    // Stats: hairline-separated rows whose numbers COUNT UP.
+    var statsEl = q('.sta-stats');
+    var stats = (Array.isArray(data.stats) ? data.stats : []).slice(0, 4);
+    var statRows = stats.map(function (s) {
+      var row = document.createElement('div'); row.className = 'sta-stat';
+      var v = document.createElement('div'); v.className = 'sta-stat-v'; v.textContent = String(s.value);
+      var l = document.createElement('div'); l.className = 'sta-stat-l'; l.textContent = String(s.label || '');
+      row.appendChild(v); row.appendChild(l); statsEl.appendChild(row);
+      return { row: row, v: v };
+    });
+
+    var kicker = q('.sta-kicker');
+    gsap.set(kicker, { autoAlpha: 0, y: -10 });
+    gsap.set(lineEls, { yPercent: 116, filter: 'blur(5px)' });
+    tl.to(kicker, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.5)
+      .to(lineEls, { yPercent: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power4.out', stagger: 0.11 }, 0.7);
+
+    var statAt = 1.6;
+    statRows.forEach(function (sr, i) {
+      gsap.set(sr.row, { autoAlpha: 0, y: 14 });
+      tl.to(sr.row, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, statAt + i * 0.35);
+      if (window.mpCountUp) mpCountUp(tl, sr.v, statAt + i * 0.35 + 0.1, { duration: 1.1 });
+    });
+
+    var note = q('.sta-note');
+    if (data.note) {
+      gsap.set(note, { autoAlpha: 0 });
+      tl.to(note, { autoAlpha: 1, duration: 0.7 }, statAt + stats.length * 0.35 + 0.8);
+    }
+
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: dark, noBase: !!data.backdrop_active, image: data.backdrop_image || null });
+    if (window.mpCameraPush) mpCameraPush(tl, root, dur, 1.04);
+    return tl;
+  }
+</script>
