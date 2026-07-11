@@ -16,7 +16,7 @@
     },
     "frame_style": {
       "type": "string",
-      "label": "Frame style: none | plain | macos-browser",
+      "label": "Frame style: none | plain | macos-browser | phone (device bezel + island for vertical app footage; composes with presentation:'float' and callouts)",
       "optional": true,
       "default": "plain"
     },
@@ -63,6 +63,11 @@
     "callouts": {
       "type": "object",
       "label": "Array of {at, dur?, x, y, w, h}: at in scene seconds, region in % of the displayed content -- a zoomed duplicate of that region lifts out in a brand-gradient glow shell while the base dims (the '3D callout')",
+      "optional": true
+    },
+    "island": {
+      "type": "boolean",
+      "label": "Phone only: show the floating island pill (default true)",
       "optional": true
     }
   }
