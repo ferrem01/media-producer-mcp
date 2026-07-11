@@ -240,6 +240,19 @@
     }
   };
 
+  // Rubber-stamp slam: scales DOWN onto the surface with a rotation kick and
+  // a one-frame impact flash -- for stamps/badges landing on content.
+  window.mpStampIn = function (tl, el, at, opts) {
+    if (!tl || !el) return;
+    opts = opts || {};
+    var rot = opts.rotation === undefined ? -8 : Number(opts.rotation) || 0;
+    gsap.set(el, { autoAlpha: 0, scale: 1.9, rotation: rot + 10 });
+    tl.to(el, { autoAlpha: 1, duration: 0.08 }, at || 0)
+      .to(el, { scale: 1, rotation: rot, duration: 0.22, ease: 'power4.in' }, at || 0)
+      .to(el, { scale: 1.06, duration: 0.09, ease: 'power1.out' }, (at || 0) + 0.22)
+      .to(el, { scale: 1, duration: 0.14, ease: 'power2.inOut' }, (at || 0) + 0.31);
+  };
+
   // Speed-contrast physics. The expensive feel = fast snaps against slow
   // drifts. mpSnapIn: fast arrival (blur smear) with a tiny overshoot settle.
   // mpSnapOut: fast lift-away. Compose against the atmosphere's slow drifts.

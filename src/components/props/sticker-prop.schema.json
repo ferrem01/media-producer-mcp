@@ -1,0 +1,14 @@
+{
+  "type": "sticker-prop",
+  "label": "Sticker / Prop",
+  "category": "props",
+  "description": "The personality layer: a physical prop that sits ON other content. kind 'stamp' (rotated rubber-stamp slam, e.g. SAVE / SHIPPED), 'gesture' (a small instruction like 'Swipe up to save' -- pair with an arrow in the text), 'pill' (solid label chip, e.g. STONKS), 'ring' (a drawn circle highlighting a spot). Position and size it with the component's position box. Seasoning, never the subject: 1-3 per scene max.",
+  "data": {
+    "kind": { "type": "string", "label": "stamp | gesture | pill | ring" },
+    "text": { "type": "string", "label": "The prop's text (not used for ring)", "optional": true },
+    "color": { "type": "string", "label": "Prop color (defaults: stamp/gesture amber, pill primary, ring green)", "optional": true },
+    "rotation": { "type": "number", "label": "Degrees (stamp defaults to -8)", "optional": true },
+    "at": { "type": "number", "label": "Entrance time in scene seconds (default 0.4)", "optional": true },
+    "hold": { "type": "number", "label": "Seconds before it exits (0/omit = stays)", "optional": true }
+  }
+}
