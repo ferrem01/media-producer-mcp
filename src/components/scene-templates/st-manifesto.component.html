@@ -1,0 +1,117 @@
+<template>
+  <div class="stmf">
+    <div class="stmf-kicker-row"><span class="stmf-rule"></span><span class="stmf-kicker">{{kicker}}</span></div>
+    <div class="stmf-flow"></div>
+    <img class="stmf-wordmark" alt="" />
+    <div class="stmf-index">{{scene_index}}</div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-manifesto: the kinetic-type statement beat. ONE sentence owns the
+     frame, landing word by word with violent scale/weight contrast; accent
+     words slam in brand color. Pure typography as the visual -- the beat
+     between denser scenes where the film says its thesis out loud. */
+  .stmf { position: absolute; inset: 0; overflow: hidden; color: #f4f4f8;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stmf.is-light { color: #17171c; }
+  .stmf-kicker-row { position: absolute; left: 50%; top: 16vh; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px; }
+  .stmf-rule { width: 34px; height: 2px; background: var(--mp-color-primary, #4f46e5);
+    transform-origin: left center; }
+  .stmf-kicker { font-size: 14px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--mp-color-primary, #4f46e5); }
+  .stmf-flow { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 80vw; display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;
+    column-gap: 1.6vw; row-gap: 1.2vh; text-align: center; }
+  .stmf-word { display: inline-block; font-size: 5.2vw; font-weight: 500; line-height: 1.04;
+    letter-spacing: -0.025em; white-space: nowrap; }
+  .stmf-word.is-accent { color: var(--mp-color-primary, #4f46e5); font-weight: 600; }
+  .stmf-word.is-accent.is-slam { text-shadow: 0 0 42px color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, transparent); }
+  .stmf-word.is-small { font-size: 2.6vw; font-weight: 400; opacity: 0.75; }
+  .stmf-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.85; }
+  .stmf-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.2em; opacity: 0.5; }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var root = q('.stmf');
+    var light = data.theme === 'light';
+    if (light) root.classList.add('is-light');
+    var dur = ctx.duration || 8;
+
+    var wm = q('.stmf-wordmark');
+    if (wm) { if (data.logo_url) { wm.src = data.logo_url; if (!light && window.mpLogoOnDark) mpLogoOnDark(wm); } else wm.style.display = 'none'; }
+    var kickerRow = q('.stmf-kicker-row');
+    if (!data.kicker) kickerRow.style.display = 'none';
+
+    // Words: '*word*' marks accents (brand color + slam); small connective
+    // words ('a', 'the', 'of'...) automatically set smaller for scale rhythm.
+    var accents = (Array.isArray(data.accent_words) ? data.accent_words : []).map(function(w) { return String(w).toLowerCase().replace(/[^\w]/g, ''); });
+    var SMALL = { a: 1, an: 1, the: 1, of: 1, to: 1, in: 1, on: 1, and: 1, or: 1, for: 1, with: 1, is: 1, it: 1 };
+    var flow = q('.stmf-flow');
+    // Tokenize with *star groups* intact: every word inside a group is an
+    // accent (a naive whitespace split breaks multi-word accents).
+    var tokens = [];
+    var tokRe = /\*([^*]+)\*|(\S+)/g;
+    var tm;
+    while ((tm = tokRe.exec(String(data.text || ''))) !== null) {
+      if (tm[1] !== undefined) tm[1].split(/\s+/).filter(Boolean).forEach(function(w) { tokens.push({ w: w, star: true }); });
+      else tokens.push({ w: tm[2], star: false });
+    }
+    var words = tokens.map(function(tok) {
+      var star = tok.star;
+      var clean = tok.w.replace(/\*/g, '');
+      var bare = clean.toLowerCase().replace(/[^\w]/g, '');
+      var w = document.createElement('span');
+      w.className = 'stmf-word';
+      w.textContent = clean;
+      var accent = star || accents.indexOf(bare) !== -1;
+      if (accent) w.classList.add('is-accent');
+      else if (SMALL[bare]) w.classList.add('is-small');
+      // Mask wrapper for the rise reveal.
+      var mask = document.createElement('span');
+      mask.style.cssText = 'display:inline-block;overflow:hidden;vertical-align:baseline;';
+      mask.appendChild(w);
+      flow.appendChild(mask);
+      return { el: w, accent: accent };
+    });
+
+    // Pacing: words land across the first ~55% of the scene, bursts of quick
+    // words with a HOLD before each accent (the breath before the hit).
+    var landWindow = Math.max(1.8, Math.min(dur * 0.55, 6.5));
+    var n = Math.max(1, words.length);
+    var base = landWindow / n;
+    var t = 0.45;
+    words.forEach(function(wd) {
+      if (wd.accent) t += base * 1.7; // the breath
+      gsap.set(wd.el, { yPercent: 118 });
+      if (wd.accent && window.mpStampIn) {
+        wd.el.classList.add('is-slam');
+        gsap.set(wd.el, { yPercent: 0 });
+        mpStampIn(tl, wd.el, t, { rotation: -2 });
+        if (window.mpCameraPush) tl.to(root, { scale: '+=0.006', duration: 0.18, ease: 'power2.out' }, t);
+      } else {
+        tl.to(wd.el, { yPercent: 0, duration: 0.5, ease: 'power4.out' }, t);
+      }
+      t += wd.accent ? base * 1.5 : base * 0.7;
+    });
+
+    gsap.set(q('.stmf-rule'), { scaleX: 0 });
+    gsap.set(q('.stmf-kicker'), { autoAlpha: 0, y: -8 });
+    gsap.set([wm, q('.stmf-index')], { autoAlpha: 0 });
+    tl.to(q('.stmf-rule'), { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 0.2)
+      .to(q('.stmf-kicker'), { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.3)
+      .to([wm, q('.stmf-index')], { autoAlpha: 1, duration: 0.6 }, 0.8);
+    if (window.mpShimmer) mpShimmer(tl, flow, Math.min(t + 0.8, dur - 1.2));
+
+    if (window.mpAtmosphere) mpAtmosphere(root, { dark: !light, noBase: !!data.backdrop_active, image: data.backdrop_image || null });
+    if (window.mpCameraPush) mpCameraPush(tl, root, dur, 1.05);
+    return tl;
+  }
+</script>

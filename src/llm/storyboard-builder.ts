@@ -798,7 +798,7 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
  *    counts -- the film's style contract, logged every generation.
  */
 export function enforceFilmDirection(scenes: DraftScene[]): void {
-  const themable = new Set(["st-hero-stat", "st-kinetic-list", "st-screencast", "st-swarm"]);
+  const themable = new Set(["st-hero-stat", "st-kinetic-list", "st-screencast", "st-swarm", "st-manifesto", "st-compare", "st-flow", "st-convergence"]);
   const tpl = (s: DraftScene) => s.scene_template?.type || null;
   const themeOf = (s: DraftScene): "dark" | "light" | null => {
     const t = tpl(s);
@@ -859,6 +859,10 @@ export function enforceFilmDirection(scenes: DraftScene[]): void {
       if (t === "st-swarm") return Math.max(items, 10);
       if (t === "st-screencast") return 1 + (Array.isArray(data.captions) ? data.captions.length : 0);
       if (t === "st-photo-close") return 3 + (Array.isArray(data.items) ? data.items.length : 0);
+      if (t === "st-manifesto") return Math.max(3, Math.ceil(String(data.text || "").split(/\s+/).length / 3));
+      if (t === "st-compare") return 3 + (Array.isArray(data.left_lines) ? data.left_lines.length : 0) + (Array.isArray(data.right_lines) ? data.right_lines.length : 0);
+      if (t === "st-flow") return 1 + (Array.isArray(data.steps) ? data.steps.length * 2 : 0);
+      if (t === "st-convergence") return 2 + (Array.isArray(data.inputs) ? data.inputs.length : 0) / 2 + (Array.isArray(data.outputs) ? data.outputs.length : 0);
       return 2; // st-quote / st-logo-close: reveal + resolve
     }
     return Math.max(Array.isArray(s.beats) ? s.beats.length : 0, 1);

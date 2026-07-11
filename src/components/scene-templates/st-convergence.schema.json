@@ -1,0 +1,20 @@
+{
+  "type": "st-convergence",
+  "label": "Scene Template: Convergence / Many Through One",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: many -> ONE -> many, clean. Scattered input type-props fly in, hover, then get PULLED into a glowing hub ring that flares as it swallows them; the outputs fan out beneath as a measured dotted row and a headline crowns the resolve. THE grammar for consolidation stories: 'everything through one conversation', funnels, single-source-of-truth, N tools become one. Dark by default.",
+  "data": {
+    "inputs": { "type": "array", "label": "4-12 short input phrases (the scattered many)" },
+    "center_label": { "type": "string", "label": "The hub label, e.g. ONE QUOTIENT CONVERSATION" },
+    "outputs": { "type": "array", "label": "2-6 short output tokens (the clean fan-out)", "optional": true },
+    "headline": { "type": "string", "label": "Resolve line above; | breaks lines", "optional": true },
+    "theme": { "type": "string", "label": "dark (default) | light", "optional": true },
+    "seed": { "type": "number", "label": "Layout seed", "optional": true },
+    "logo_url": { "type": "string", "label": "Wordmark URL; defaults to the brand-kit wordmark", "optional": true },
+    "scene_index": { "type": "string", "label": "e.g. 02 / 05", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.44 },
+    "exit": { "x": 0.5, "y": 0.44 }
+  }
+}
