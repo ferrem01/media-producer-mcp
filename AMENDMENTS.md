@@ -176,3 +176,68 @@ for footage/bespoke scenes; templates are the storyboard's FIRST choice.
 - Studio session-log shipper does not capture the scene IFRAME console, only the shell.
 - Render final-stitch ffmpeg frames-race (pre-existing; verify in a real env).
 - Revise fast-gates once passed a boot-crashing scene (defects:[]) — still unexplained.
+
+---
+
+## 2026-07-11 — Event-rate contract, template library ×11, callout authoring (PRs #274–#284)
+
+The 99U prompt became the standing end-to-end contract test; each run's failures
+became platform fixes the same night. The FILM DIRECTION report card went from
+`4/4 templated | themes LLLD | float 0 | swarm 0` (clean but slideshowy) to
+`3/4 | DLDc | swarm 1 | float 1 | slowest 4.3s/event` (launch-film grammar).
+
+### Enforcement (the contract grows teeth)
+
+- **Asset path recovery** (#274): storyboard LLM shortened a footage path → 404 → empty
+  frame. `recoverAssetUrl` (basename search of the tenant asset tree, library preferred)
+  at st-screencast instantiation + mapper slot snap-back to the scene's footage URL.
+- **Invented callout geometry stripped** (#275): no LLM in the storyboard path sees
+  frames, so mapper-returned callout rects ring arbitrary regions (blank canvas, in the
+  live run). Dropped at assign time; Studio is where callouts are born (see below).
+- **Event rate** (#276): a composition holding still >8s reads as a slide regardless of
+  dressing. `enforceFilmDirection` counts per-scene visual events, warns loudly, and the
+  report card gains `slowest N.Ns/event`. st-kinetic-list stretches CONTENT not holds
+  (meta splits into phrase sub-beats with tick pulses when a takeover window runs long;
+  item cap 6→8). Template mapper mines ~one item per narration sentence (34s scene went
+  2 items → 6). Storyboard turn budget 8192→16000 (#277) after a kinetic-cut storyboard
+  triple-truncated with zero scenes banked.
+- **Type-on-photo rule** (#278): codegen NON-NEGOTIABLE #7 (never cards over a photo;
+  scrim + type in the photo's world) + `card_on_photo` blocking critique defect.
+
+### Template library (be greedy: templates for what recurs, codegen for the bespoke)
+
+- **st-photo-close** (#279): the cinematic photo-world close as a locked template —
+  baked scrim gradients guarantee type contrast on ANY image; kicker/headline/subline/
+  interpunct items/logo. Mapper now offers hero-image scenes; instantiation fills
+  `backdrop_image` from the enriched image. Kills the recurring codegen failure class
+  (black frame, ink-on-sky, panels-on-photo — all three happened in one night).
+- **st-swarm upgrades** (#278/#279): kind inference (numbers→stats, short lines→pills,
+  quotes→quotes) + deterministic variants (solid brand pops, ghost outlines, oversized)
+  + full TYPOGRAPHIC MODE (≥70% short items → props are bare flying type, no cards).
+- **Four new templates** (#280): st-manifesto (kinetic type statement, *starred* accent
+  slams), st-compare (old-way scraps vs calm column, loser collapses), st-flow (spark
+  charges a rail, step takeovers), st-convergence (many→hub flare→clean fan-out).
+  Library now 11; all themable, match-anchored, event-counted, boot-tested.
+
+### Callout authoring in Studio (#281–#284)
+
+One zoom gesture, two treatments: the draw-a-zoom crosshairs on a screencast now offer
+"Zoom in (camera)" vs "Call out (lift)" — the callout IS the reverse zoom (region lifts
+OUT toward the camera). Float stage defaults to callout. Fixes from Marc's live use:
+wrapper detection by real structure (`.scf-stage` + `data-cid`, composite prefix
+stripped) (#282/#283); callout pills + editor popover on the scrubber; clone EDL sync
+(component re-copies `data-mp-edl` post-parse AND the preview transport ties derived
+clips to their base clip's source-map — the clone was resurrecting removed segments);
+true plane tilt (hold counter-rotation removed — it fought the orbit drift) (#284).
+New scoped `PATCH /api/projects/.../components/:id` endpoint. `travel` field on
+callouts = flight speed.
+
+### Open items
+
+- proj_d6f9dae6 is the current 99U reference film (type swarm / 6-item lock-in /
+  float screencast / st-photo-close close). Not rendered to mp4 (Marc's call).
+- st-photo-close scrim may read heavy on bright golden imagery — single gradient to tune.
+- Scene durations can overshoot the narration length (~2s on the last scene); consider
+  clamping the storyboard sum to the speaker-track duration.
+- Callout region % is authored against the float plane's PROJECTED rect (approximation);
+  fine-tune via the pill editor if a drawn region needs nudging.
