@@ -42,6 +42,11 @@
       "type": "object",
       "label": "Array of {at, dur?, x, y, w, h}: glow callouts -- a region of the footage (% of frame) lifts out zoomed in a gradient shell at `at` seconds. Derive from beats where narration highlights part of the UI.",
       "optional": true
+    },
+    "backdrop_image": {
+      "type": "string",
+      "label": "On-brand backdrop image URL (e.g. a brand-kit background asset). Replaces the grid/WebGL world: slow Ken Burns drift + legibility scrim, light or dark theme.",
+      "optional": true
     }
   },
   "match": {

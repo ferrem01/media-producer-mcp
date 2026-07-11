@@ -81,9 +81,12 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     var stIsDark = st.type === "st-logo-close"
       || (st.type === "st-quote" && (stData as any).theme !== "light")
       || (stData as any).theme === "dark";
-    if (stIsDark) (stData as any).backdrop_active = true;
+    // An explicit backdrop_image is its own world -- it replaces the WebGL
+    // ribbons (two competing backdrops read as noise).
+    var stWantsWebgl = stIsDark && !(stData as any).backdrop_image;
+    if (stWantsWebgl) (stData as any).backdrop_active = true;
     var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
-    if (stIsDark) {
+    if (stWantsWebgl) {
       stComponents.unshift({
         id: "tpl_bg",
         type: "webgl-backdrop",
