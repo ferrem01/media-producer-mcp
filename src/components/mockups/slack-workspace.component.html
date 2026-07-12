@@ -1211,6 +1211,10 @@
       threadMessages.innerHTML = '';
       var el = createMessageEl(msg, true);
       el.classList.remove('has-gap');
+      // Real Slack shows no reply indicator on the parent inside the panel --
+      // the reply-count divider right below it owns that number.
+      var ri = el.querySelector('.reply-indicator');
+      if (ri) ri.remove();
       threadMessages.appendChild(el);
       threadChannel.textContent = '#' + channelName;
     }
