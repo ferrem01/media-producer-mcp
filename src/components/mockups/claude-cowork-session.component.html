@@ -95,7 +95,10 @@
       </div>
 
       <!-- Right rail -->
-      <div class="cws-rail" data-target="rail" data-anchor="panel">
+      <div class="cws-rail" data-target="rail">
+        <!-- The camera anchor hugs the CARDS, not the full-height rail: a
+             center-zoom on the rail would frame mostly empty space below. -->
+        <div class="cws-cards" data-anchor="panel">
         <div class="cws-card" data-target="progress-card">
           <div class="cws-card-head">
             <span class="cws-card-title">Progress</span>
@@ -123,6 +126,7 @@
           <div class="cws-connectors" data-target="connectors"></div>
           <div class="cws-ctx-label cws-skills-label" data-target="skills-label" style="display:none">Skills</div>
           <div class="cws-connectors" data-target="skills"></div>
+        </div>
         </div>
       </div>
     </div>
@@ -222,7 +226,8 @@
 
   /* Right rail */
   .cws-rail { width: 268px; min-width: 268px; padding: 14px 14px 0 0;
-    display: flex; flex-direction: column; gap: 10px; }
+    display: flex; flex-direction: column; }
+  .cws-cards { display: flex; flex-direction: column; gap: 10px; }
   .cws-card { background: #fff; border: 1px solid #e8e6e0; border-radius: 13px; padding: 12px 14px; }
   .cws-card-head { display: flex; align-items: center; gap: 8px; }
   .cws-card-title { font-size: 13.5px; font-weight: 700; color: #1f1e1d; flex: 0 0 auto; }
