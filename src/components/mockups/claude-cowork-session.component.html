@@ -1,0 +1,510 @@
+<template>
+  <div class="cws">
+    <div class="cws-win" data-target="window">
+      <!-- Sidebar (Home tab) -->
+      <div class="cws-side" data-target="sidebar" data-anchor="sidebar">
+        <div class="cws-lights">
+          <span class="cws-dot cws-dot--r"></span><span class="cws-dot cws-dot--y"></span><span class="cws-dot cws-dot--g"></span>
+          <span class="cws-lights-sp"></span>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M6 2.5v11"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5l3 3"/></svg>
+        </div>
+        <div class="cws-tabs">
+          <div class="cws-tab is-active">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5L8 2l5.5 4.5V13a1 1 0 01-1 1h-3v-4H6.5v4h-3a1 1 0 01-1-1V6.5z"/></svg>
+            Home
+          </div>
+          <div class="cws-tab">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 5L2.5 8l3 3M10.5 5l3 3-3 3"/></svg>
+            Code
+          </div>
+        </div>
+        <div class="cws-nav">
+          <div class="cws-nav-row"><span class="cws-nav-plus">+</span> New</div>
+          <div class="cws-nav-row">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M2 6.5h12"/></svg>
+            Projects
+          </div>
+          <div class="cws-nav-row">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M9.8 6.2l-3.4 3.4M10 9.4l-3.6-3.4"/></svg>
+            Artifacts
+          </div>
+          <div class="cws-nav-row">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>
+            Scheduled
+          </div>
+          <div class="cws-nav-row">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="3" y="2" width="10" height="12" rx="2"/><path d="M6 5.5h4M6 8.5h4"/></svg>
+            Dispatch <span class="cws-beta-pill">Beta</span>
+          </div>
+          <div class="cws-nav-row">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="1.5" y="4.5" width="13" height="9" rx="2"/><path d="M5.5 4.5V3.5a1.5 1.5 0 011.5-1.5h2a1.5 1.5 0 011.5 1.5v1"/></svg>
+            Customize
+          </div>
+        </div>
+        <div class="cws-recents-head"><span>Pinned</span></div>
+        <div class="cws-pin-list" data-target="pin-list"></div>
+        <div class="cws-recents-head"><span>Recents</span>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><path d="M3 5h10M5 8h6M7 11h2"/></svg>
+        </div>
+        <div class="cws-session-list" data-target="recent-list"></div>
+        <div class="cws-side-foot">
+          <div class="cws-update">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#57544c" stroke-width="1.3"><path d="M10 17c4-2 6-5 6-9V4l-6-2-6 2v4c0 4 2 7 6 9z" transform="scale(0.9) translate(1,1)"/></svg>
+            <div class="cws-update-txt"><b>Relaunch to update</b><span>v1.20186.1</span></div>
+            <span class="cws-update-arrow">→</span>
+          </div>
+          <div class="cws-account">
+            <span class="cws-ava" data-target="account-avatar">M</span>
+            <span class="cws-account-name" data-target="account-name">Marc</span>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main -->
+      <div class="cws-main">
+        <div class="cws-head">
+          <svg width="17" height="14" viewBox="0 0 20 16" fill="none" stroke="#57544c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13h9a3.5 3.5 0 100-7 5 5 0 00-9.6-1.4A4 4 0 006 13z"/></svg>
+          <span class="cws-title" data-target="title"></span>
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#57544c" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+          <span class="cws-head-sp"></span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg>
+        </div>
+        <div class="cws-transcript" data-target="transcript" data-anchor="transcript"></div>
+        <div class="cws-inputwrap" data-anchor="input">
+          <div class="cws-inputbox" data-target="input-box">
+            <div class="cws-input" data-target="input"></div>
+            <div class="cws-inputrow">
+              <span class="cws-inrow-ico">+</span>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="4" width="12" height="9" rx="2"/><path d="M6 4V3h4v1M8 7v4M6 9h4"/></svg>
+              <span class="cws-manual">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M8 2v3M8 11v3M2 8h3M11 8h3"/></svg>
+                Manual
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+              </span>
+              <span class="cws-inrow-sp"></span>
+              <span class="cws-model" data-target="model-label">Opus 4.8</span>
+              <span class="cws-effort" data-target="effort-label">High</span>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0010 0M8 12.5V15"/></svg>
+            </div>
+          </div>
+          <div class="cws-disclaimer">Claude is AI and can make mistakes. Please double-check responses. <u>Give us feedback</u></div>
+        </div>
+      </div>
+
+      <!-- Right rail -->
+      <div class="cws-rail" data-target="rail" data-anchor="panel">
+        <div class="cws-card" data-target="progress-card">
+          <div class="cws-card-head">
+            <span class="cws-card-title">Progress</span>
+            <span class="cws-progress-count" data-target="progress-count"></span>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg>
+          </div>
+          <div class="cws-progress-steps" data-target="progress-steps"></div>
+        </div>
+        <div class="cws-card" data-target="outputs-card">
+          <div class="cws-card-head">
+            <span class="cws-card-title">Outputs</span>
+            <span class="cws-card-sp"></span>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg>
+          </div>
+          <div class="cws-outputs" data-target="outputs"></div>
+        </div>
+        <div class="cws-card">
+          <div class="cws-card-head">
+            <span class="cws-card-title">Context</span>
+            <span class="cws-card-sp"></span>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><rect x="3" y="6" width="10" height="6" rx="1.5"/><path d="M5 6V3h6v3M5.5 14h5"/></svg>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+          </div>
+          <div class="cws-ctx-label">Connectors</div>
+          <div class="cws-connectors" data-target="connectors"></div>
+          <div class="cws-ctx-label cws-skills-label" data-target="skills-label" style="display:none">Skills</div>
+          <div class="cws-connectors" data-target="skills"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── claude-cowork-session: a RUNNING Cowork task (from Marc's
+     screenshot). Serif Claude prose in the main pane, and the right rail:
+     Progress (N of M), Outputs, Context with connector chips. Tier:
+     performable-surface. The marketing-agent-at-work beat. ── */
+  .cws { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; color: #1f1e1d; }
+  .cws-win { width: 100%; height: 100%; background: #f7f6f2; border-radius: 12px;
+    border: 1px solid rgba(31, 30, 29, 0.1); overflow: hidden; display: flex;
+    box-shadow: 0 30px 90px rgba(31, 30, 29, 0.25), 0 6px 24px rgba(31, 30, 29, 0.12); }
+
+  /* Sidebar (matches claude-cowork-home) */
+  .cws-side { width: 248px; min-width: 248px; background: #fbfaf7; border-right: 1px solid #e8e6e0;
+    display: flex; flex-direction: column; padding: 12px 12px 10px; }
+  .cws-lights { display: flex; align-items: center; gap: 7px; padding: 2px 4px 12px; }
+  .cws-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .cws-dot--r { background: #ff5f57; } .cws-dot--y { background: #febc2e; } .cws-dot--g { background: #28c840; }
+  .cws-lights-sp { flex: 1; }
+  .cws-tabs { display: flex; gap: 4px; background: #efeee8; border-radius: 9px; padding: 3px; margin-bottom: 12px; }
+  .cws-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 0; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: #57544c; }
+  .cws-tab.is-active { background: #fff; color: #1f1e1d; box-shadow: 0 1px 3px rgba(31,30,29,0.08);
+    border: 1px solid #e8e6e0; }
+  .cws-nav { display: flex; flex-direction: column; gap: 1px; margin-bottom: 8px; }
+  .cws-nav-row { display: flex; align-items: center; gap: 9px; padding: 5.5px 8px; border-radius: 8px;
+    font-size: 13px; color: #1f1e1d; }
+  .cws-nav-plus { width: 14px; text-align: center; font-size: 15px; color: #57544c; }
+  .cws-beta-pill { font-size: 10px; font-weight: 600; color: #57544c; background: #ecebe4;
+    border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+  .cws-recents-head { display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 8px 4px; font-size: 11.5px; font-weight: 600; color: #8a887f; }
+  .cws-pin-list, .cws-session-list { display: flex; flex-direction: column; gap: 1px; }
+  .cws-session-list { flex: 1; overflow: hidden; }
+  .cws-session { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; }
+  .cws-session.is-active { background: #ecebe4; }
+  .cws-sess-ico { flex-shrink: 0; display: flex; color: #8a887f; }
+  .cws-sess-title { flex: 1; font-size: 12.5px; color: #1f1e1d;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cws-side-foot { margin-top: 8px; }
+  .cws-update { display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+    border: 1px solid #e8e6e0; border-radius: 11px; background: #fff; margin-bottom: 7px; }
+  .cws-update-txt { flex: 1; display: flex; flex-direction: column; line-height: 1.3; }
+  .cws-update-txt b { font-size: 12px; color: #1f1e1d; font-weight: 600; }
+  .cws-update-txt span { font-size: 10.5px; color: #8a887f; }
+  .cws-update-arrow { color: #57544c; font-size: 13px; }
+  .cws-account { display: flex; align-items: center; gap: 8px; padding: 4px 6px; }
+  .cws-ava { width: 22px; height: 22px; border-radius: 50%; background: #1f1e1d; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .cws-account-name { flex: 1; font-size: 13px; font-weight: 600; color: #1f1e1d; }
+
+  /* Main */
+  .cws-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .cws-head { display: flex; align-items: center; gap: 8px; padding: 14px 22px 10px; flex-shrink: 0; }
+  .cws-title { font-size: 15px; font-weight: 700; color: #1f1e1d;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cws-head-sp { flex: 1; }
+  .cws-transcript { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 34px 10px 26px;
+    display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+
+  /* Serif Claude prose (Tiempos look) */
+  .cws-text { font-family: 'Tiempos Text', Georgia, 'Times New Roman', serif;
+    font-size: 15.5px; line-height: 1.62; color: #1f1e1d;
+    white-space: pre-wrap; word-break: break-word; }
+  .cws-text strong { font-weight: 700; }
+  .cws-text code { font-family: 'SF Mono', Menlo, monospace; font-size: 13px; color: #b3542e;
+    background: #efeee8; border-radius: 5px; padding: 0 5px; }
+  .cws-htext { font-family: 'Tiempos Headline', Georgia, serif; font-size: 18px; font-weight: 700;
+    color: #1f1e1d; line-height: 1.4; }
+  .cws-user { align-self: flex-end; max-width: 78%; font-size: 13.5px; line-height: 1.55; color: #1f1e1d;
+    background: #ecebe4; border-radius: 14px; padding: 9px 14px; white-space: pre-wrap; word-break: break-word;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; }
+  .cws-working { display: flex; align-items: center; gap: 9px; }
+  .cws-working .star { color: #D97757; font-size: 17px; display: inline-block; }
+  .cws-working-verb { font-size: 13px; color: #8a887f; }
+
+  /* Composer */
+  .cws-inputwrap { flex-shrink: 0; padding: 4px 22px 8px; }
+  .cws-inputbox { background: #fff; border: 1px solid #e2e0d8; border-radius: 15px;
+    padding: 13px 16px 10px; box-shadow: 0 2px 8px rgba(31,30,29,0.05); }
+  .cws-inputbox.is-active { border-color: rgba(217, 119, 87, 0.6); }
+  .cws-input { font-size: 14px; color: #1f1e1d; line-height: 1.5; min-height: 21px;
+    white-space: pre-wrap; word-break: break-word; }
+  .cws-input:empty::before { content: attr(data-placeholder); color: #a5a39a; }
+  .cws-inputrow { display: flex; align-items: center; gap: 11px; padding-top: 9px; }
+  .cws-inrow-ico { color: #57544c; font-size: 16px; }
+  .cws-manual { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #57544c; }
+  .cws-inrow-sp { flex: 1; }
+  .cws-model { font-size: 12.5px; font-weight: 600; color: #1f1e1d; }
+  .cws-effort { font-size: 12.5px; color: #8a887f; }
+  .cws-disclaimer { text-align: center; font-size: 11px; color: #a5a39a; padding-top: 7px; }
+
+  /* Right rail */
+  .cws-rail { width: 268px; min-width: 268px; padding: 14px 14px 0 0;
+    display: flex; flex-direction: column; gap: 10px; }
+  .cws-card { background: #fff; border: 1px solid #e8e6e0; border-radius: 13px; padding: 12px 14px; }
+  .cws-card-head { display: flex; align-items: center; gap: 8px; }
+  .cws-card-title { font-size: 13.5px; font-weight: 700; color: #1f1e1d; flex: 0 0 auto; }
+  .cws-card-sp { flex: 1; }
+  .cws-progress-count { flex: 1; text-align: right; font-size: 12.5px; color: #8a887f; }
+  .cws-progress-steps { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+  .cws-progress-steps:empty { margin-top: 0; }
+  .cws-step { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: #57544c; line-height: 1.4; }
+  .cws-step-dot { width: 13px; height: 13px; border-radius: 50%; border: 1.4px solid #c9c7bf;
+    flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; }
+  .cws-step.done .cws-step-dot { background: #3fa860; border-color: #3fa860; }
+  .cws-step.done .cws-step-dot::after { content: '✓'; color: #fff; font-size: 8px; }
+  .cws-step.active .cws-step-dot { border-color: #D97757; }
+  .cws-step.done { color: #8a887f; }
+  .cws-outputs { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+  .cws-outputs:empty { margin-top: 0; }
+  .cws-output { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #1f1e1d;
+    border: 1px solid #efeee8; background: #fbfaf7; border-radius: 9px; padding: 7px 10px; }
+  .cws-output-ico { display: flex; color: #57544c; flex-shrink: 0; }
+  .cws-ctx-label { font-size: 11.5px; color: #8a887f; margin: 10px 0 7px; }
+  .cws-connectors { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cws-conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #1f1e1d;
+    border: 1px solid #efeee8; background: #fbfaf7; border-radius: 9px; padding: 4px 9px 4px 5px; }
+  .cws-conn.is-live { border-color: rgba(217, 119, 87, 0.55); background: #fdf3ee; }
+  .cws-conn-ico { width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; position: relative;
+    display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
+    color: #fff; overflow: hidden; }
+  .cws-conn-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var win = q('.cws-win');
+    var transcript = q('[data-target="transcript"]');
+    var inputEl = q('[data-target="input"]');
+    var inputBox = q('[data-target="input-box"]');
+    var dur = ctx.duration || 10;
+
+    q('[data-target="title"]').textContent = data.title || 'Launch campaign plan';
+    q('[data-target="model-label"]').textContent = data.model_label || 'Opus 4.8';
+    q('[data-target="effort-label"]').textContent = data.effort_label || 'High';
+    if (data.account_name) q('[data-target="account-name"]').textContent = data.account_name;
+    if (data.account_name) q('[data-target="account-avatar"]').textContent = String(data.account_name).charAt(0).toUpperCase();
+    inputEl.setAttribute('data-placeholder', data.placeholder || 'Write a message…');
+
+    // Sidebar lists (task rows get the checklist glyph, chats the bubble)
+    var TASK_ICO = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M3 4.5l1 1 2-2M3 8.5l1 1 2-2M3 12.5l1 1 2-2M9 4.5h5M9 8.5h5M9 12.5h5" transform="scale(0.95)"/></svg>';
+    var CHAT_ICO = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/></svg>';
+    var pinned = Array.isArray(data.pinned) ? data.pinned : ['Canva Design Hub'];
+    var recents = Array.isArray(data.recents) && data.recents.length ? data.recents : [
+      { title: 'Email access question', kind: 'task' },
+      { title: 'Seniority Healthcare partnership requirements', kind: 'task' },
+      { title: 'Getquotient MCP integration', kind: 'task' },
+      { title: 'Quotient customer information sources', kind: 'task' },
+      { title: 'Integrating Quotient with Boomerang', kind: 'chat' },
+      { title: 'Head of growth role and responsibilities', kind: 'chat' },
+      { title: 'Canva launch image', kind: 'task' },
+    ];
+    var activeIdx = Number(data.active_recent) || 1;
+    var pinList = q('[data-target="pin-list"]');
+    var recentList = q('[data-target="recent-list"]');
+    function rowEl(item, active) {
+      var it = typeof item === 'string' ? { title: item } : item;
+      var d = document.createElement('div');
+      d.className = 'cws-session' + (active ? ' is-active' : '');
+      d.innerHTML = '<span class="cws-sess-ico">' + (it.kind === 'chat' ? CHAT_ICO : TASK_ICO) + '</span>' +
+        '<span class="cws-sess-title">' + (it.title || '') + '</span>';
+      return d;
+    }
+    pinned.forEach(function (t) { pinList.appendChild(rowEl(t, false)); });
+    recents.forEach(function (t, i) { recentList.appendChild(rowEl(t, i === activeIdx)); });
+
+    // ── Right rail ──
+    var progressCount = q('[data-target="progress-count"]');
+    var progressSteps = q('[data-target="progress-steps"]');
+    var progress = data.progress || { current: 0, total: 3 };
+    var steps = Array.isArray(data.progress_steps) ? data.progress_steps.slice() : [];
+    function renderProgress() {
+      progressCount.textContent = progress.total ? (progress.current + ' of ' + progress.total) : '';
+      progressSteps.innerHTML = '';
+      steps.forEach(function (s, i) {
+        var d = document.createElement('div');
+        var done = i < progress.current;
+        var active = i === progress.current && progress.current < (progress.total || steps.length);
+        d.className = 'cws-step' + (done ? ' done' : '') + (active ? ' active' : '');
+        d.innerHTML = '<span class="cws-step-dot"></span><span>' + (s.text || s) + '</span>';
+        progressSteps.appendChild(d);
+      });
+    }
+    renderProgress();
+
+    var outputsEl = q('[data-target="outputs"]');
+    var DOC_ICO = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z"/><path d="M9.5 1.5V5H13"/></svg>';
+    function addOutput(o, animate) {
+      var d = document.createElement('div');
+      d.className = 'cws-output';
+      d.innerHTML = '<span class="cws-output-ico">' + DOC_ICO + '</span>' +
+        '<span>' + (o.name || String(o)) + '</span>';
+      outputsEl.appendChild(d);
+      if (animate !== false) gsap.from(d, { autoAlpha: 0, x: 14, duration: 0.35, ease: 'power2.out' });
+      return d;
+    }
+    (Array.isArray(data.outputs) ? data.outputs : []).forEach(function (o) { addOutput(o, false); });
+
+    var LOGO_DEV = function (domain) {
+      return 'https://img.logo.dev/' + domain + '?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=64&fallback=monogram';
+    };
+    var GLOBE_ICO = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.7 3.7 2.7 6S9.8 12.3 8 14c-1.8-1.7-2.7-3.7-2.7-6S6.2 3.7 8 2z"/></svg>';
+    var connectorsEl = q('[data-target="connectors"]');
+    var connectors = Array.isArray(data.connectors) && data.connectors.length ? data.connectors : [
+      { name: 'Quotient', icon_url: LOGO_DEV('getquotient.ai') },
+      { name: 'Web Search', globe: true },
+    ];
+    var connEls = {};
+    connectors.forEach(function (c) {
+      var d = document.createElement('div');
+      d.className = 'cws-conn';
+      var ico;
+      if (c.globe) ico = '<span class="cws-conn-ico" style="background:transparent">' + GLOBE_ICO + '</span>';
+      else if (c.icon_url) ico = '<span class="cws-conn-ico" style="background:' + (c.color || '#393bf5') + '">' +
+        String(c.name || '?').charAt(0) + '<img class="cws-conn-img" src="' + c.icon_url + '" onerror="this.remove()"/></span>';
+      else ico = '<span class="cws-conn-ico" style="background:' + (c.color || '#57544c') + '">' + String(c.name || '?').charAt(0) + '</span>';
+      d.innerHTML = ico + '<span>' + (c.name || '') + '</span>';
+      connectorsEl.appendChild(d);
+      connEls[String(c.name || '').toLowerCase()] = d;
+    });
+    var skillsEl = q('[data-target="skills"]');
+    var skillsLabel = q('[data-target="skills-label"]');
+    (Array.isArray(data.skills) ? data.skills : []).forEach(function (s) {
+      skillsLabel.style.display = '';
+      var d = document.createElement('div');
+      d.className = 'cws-conn';
+      d.innerHTML = '<span class="cws-conn-ico" style="background:#57544c">' + String(s).charAt(0).toUpperCase() + '</span><span>' + s + '</span>';
+      skillsEl.appendChild(d);
+    });
+
+    // ── Transcript blocks ──
+    function scrollDown() { transcript.scrollTop = transcript.scrollHeight; }
+    function addBlock(node, animate) {
+      transcript.appendChild(node);
+      if (animate !== false) {
+        gsap.set(node, { autoAlpha: 0, y: 8 });
+        gsap.to(node, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' });
+      }
+      scrollDown();
+      return node;
+    }
+    function md(text) {
+      var h = String(text || '');
+      h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+      h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      return h;
+    }
+    function textEl(text, heading) {
+      var d = document.createElement('div');
+      d.className = heading ? 'cws-htext' : 'cws-text';
+      d.innerHTML = md(text);
+      return d;
+    }
+    function userEl(text) {
+      var d = document.createElement('div'); d.className = 'cws-user'; d.textContent = String(text || ''); return d;
+    }
+    var workingEl = null;
+    function showWorking(opts) {
+      opts = opts || {};
+      removeWorking();
+      var d = document.createElement('div');
+      d.className = 'cws-working';
+      d.innerHTML = '<span class="star">✳</span>' +
+        (opts.text ? '<span class="cws-working-verb">' + opts.text + '</span>' : '');
+      addBlock(d);
+      workingEl = d;
+      gsap.to(d.querySelector('.star'), { rotation: 360, duration: 2.6, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
+    }
+    function removeWorking() {
+      if (!workingEl) return;
+      gsap.killTweensOf(workingEl.querySelector('.star'));
+      if (workingEl.parentNode) workingEl.parentNode.removeChild(workingEl);
+      workingEl = null;
+    }
+    function streamText(tlRef, text, at, secs, heading) {
+      var d = textEl('', heading);
+      var words = String(text || '').split(/(\s+)/);
+      var full = md(text);
+      tlRef.call(function () { removeWorking(); addBlock(d); }, null, at);
+      var proxy = { n: 0 };
+      tlRef.to(proxy, {
+        n: words.length, duration: Math.max(0.6, secs || Math.min(3.2, words.length * 0.05)), ease: 'none',
+        onUpdate: function () { d.innerHTML = md(words.slice(0, Math.ceil(proxy.n)).join('')); scrollDown(); },
+        onComplete: function () { d.innerHTML = full; scrollDown(); },
+      }, at + 0.05);
+    }
+
+    // ── Initial history ──
+    (Array.isArray(data.history) ? data.history : []).forEach(function (h) {
+      if (h.type === 'user') addBlock(userEl(h.text), false);
+      else if (h.type === 'heading') addBlock(textEl(h.text, true), false);
+      else addBlock(textEl(h.text), false);
+    });
+
+    // ── Entrance ──
+    gsap.set(win, { autoAlpha: 0, y: 24 });
+    tl.to(win, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.15);
+    var cards = Array.prototype.slice.call(el.querySelectorAll('.cws-card'));
+    gsap.set(cards, { autoAlpha: 0, x: 18 });
+    cards.forEach(function (c, i) {
+      tl.to(c, { autoAlpha: 1, x: 0, duration: 0.45, ease: 'power3.out' }, 0.5 + i * 0.14);
+    });
+    var initBlocks = Array.prototype.slice.call(transcript.children);
+    if (initBlocks.length) {
+      gsap.set(initBlocks, { autoAlpha: 0, y: 8 });
+      initBlocks.forEach(function (b, i) {
+        tl.to(b, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, 0.45 + i * 0.1);
+      });
+    }
+
+    var cursorTargets = data.cursor_targets || {
+      'input': function () {
+        var b = inputBox.getBoundingClientRect();
+        var p = el.getBoundingClientRect();
+        return { x: ((b.left + b.width / 2 - p.left) / p.width * 100) + '%',
+                 y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
+      },
+    };
+
+    // ── Script ──
+    if (data.script && data.script.length > 0) {
+      runScript(tl, el, data.script, cursorTargets, ctx, {
+        'type-message': function (tl, ctr, action, at) {
+          tl.call(function () { inputBox.classList.add('is-active'); }, null, at);
+          typeText(tl, inputEl, action.text || '', at, action.speed || 30);
+        },
+        'send-message': function (tl, ctr, action, at) {
+          tl.call(function () {
+            var txt = inputEl.textContent;
+            if (!txt) return;
+            addBlock(userEl(txt));
+            inputEl.textContent = '';
+            inputBox.classList.remove('is-active');
+          }, null, at);
+        },
+        'working': function (tl, ctr, action, at) {
+          tl.call(function () { showWorking(action); }, null, at);
+        },
+        'stop-working': function (tl, ctr, action, at) { tl.call(removeWorking, null, at); },
+        'respond': function (tl, ctr, action, at) {
+          streamText(tl, action.text || '', at, action.duration, action.heading);
+        },
+        'claude-text': function (tl, ctr, action, at) {
+          tl.call(function () { removeWorking(); addBlock(textEl(action.text || '', action.heading)); }, null, at);
+        },
+        'set-progress': function (tl, ctr, action, at) {
+          tl.call(function () {
+            if (action.total != null) progress.total = Number(action.total);
+            if (action.current != null) progress.current = Number(action.current);
+            if (Array.isArray(action.steps)) steps = action.steps.slice();
+            renderProgress();
+            gsap.from(progressCount, { scale: 1.35, duration: 0.35, ease: 'back.out(2)', transformOrigin: '100% 50%' });
+          }, null, at);
+        },
+        'add-output': function (tl, ctr, action, at) {
+          tl.call(function () { addOutput(action); }, null, at);
+        },
+        'use-connector': function (tl, ctr, action, at) {
+          tl.call(function () {
+            var d = connEls[String(action.name || '').toLowerCase()];
+            if (!d) return;
+            d.classList.add('is-live');
+            gsap.from(d, { scale: 1.12, duration: 0.35, ease: 'back.out(2)' });
+          }, null, at);
+          if (action.duration !== 0) {
+            tl.call(function () {
+              var d = connEls[String(action.name || '').toLowerCase()];
+              if (d) d.classList.remove('is-live');
+            }, null, at + (action.duration || 2.2));
+          }
+        },
+      });
+    }
+
+    return tl;
+  }
+</script>
