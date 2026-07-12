@@ -1,135 +1,117 @@
 <template>
-  <div class="quotient-social">
-    <!-- Top toolbar -->
-    <div class="toolbar">
-      <div class="toolbar-left">
-        <div class="linkedin-icon-badge">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+  <div class="qsp">
+    <!-- Optional app chrome bar (bell / search / New Chat) -->
+    <div class="qsp-appbar" style="display:none">
+      <div class="qsp-appbar-left"></div>
+      <div class="qsp-appbar-right">
+        <div class="qsp-bell">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+          <span class="qsp-bell-badge">480</span>
         </div>
-        <span class="toolbar-title" data-target="toolbar-title"></span>
-      </div>
-      <div class="toolbar-right">
-        <button class="toolbar-btn icon-only" data-target="kebab-btn">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="#555"><circle cx="8" cy="3" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="8" cy="13" r="1.3"/></svg>
+        <div class="qsp-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <span>Search</span>
+          <span class="qsp-kbd">⌘+K</span>
+        </div>
+        <button class="qsp-iconbtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>
         </button>
-        <button class="toolbar-btn icon-only" data-target="share-btn">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#555" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="3" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="13" r="2"/><path d="M5.8 9l4.4 3M10.2 4l-4.4 3"/></svg>
+        <button class="qsp-iconbtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.6" stroke-linecap="round"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 3"/></svg>
         </button>
-        <button class="toolbar-btn pill tag-btn" data-target="tag-btn">
-          <svg class="tag-flag" width="14" height="14" viewBox="0 0 14 14" fill="#0A66C2" stroke="none"><path d="M2 1v12M2 2h8l-2 3 2 3H2"/></svg>
-          <span class="tag-name"></span>
-          <span class="tag-progress"></span>
-          <span class="tag-circle">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#bbb" stroke-width="1.5"><circle cx="7" cy="7" r="5.5"/></svg>
-          </span>
-        </button>
-        <button class="toolbar-btn pill" data-target="threads-btn">
-          <span class="threads-label"></span>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#555" stroke-width="1.5" stroke-linecap="round"><path d="M3 9l3-3 3 3"/><path d="M3 5l3-3 3 3"/></svg>
-        </button>
-        <button class="toolbar-btn pill schedule-btn" data-target="schedule-btn">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#555" stroke-width="1.4" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><path d="M7 4v3.5l2.5 1.5"/></svg>
-          <span>Schedule</span>
-        </button>
-        <button class="toolbar-btn pill" data-target="view-btn">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#555" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 1h3v3"/><path d="M13 1L7.5 6.5"/><path d="M11 7.5V11a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 11V3.5A1.5 1.5 0 012.5 2H6"/></svg>
-          <span>View</span>
+        <button class="qsp-newchat">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          <span>New Chat</span>
         </button>
       </div>
     </div>
 
-    <!-- Post card -->
-    <div class="post-card" data-target="post-card">
-      <!-- Status bar -->
-      <div class="status-bar" data-target="status-bar">
-        <div class="status-left">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="rgba(255,255,255,0.25)"/><path d="M5.5 9.5l2 2 5-5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span class="status-text"></span>
-        </div>
-        <span class="char-count"></span>
+    <!-- Editor toolbar -->
+    <div class="qsp-toolbar" data-anchor="toolbar">
+      <div class="qsp-toolbar-left">
+        <div class="qsp-platform-badge"></div>
+        <span class="qsp-title"></span>
       </div>
+      <div class="qsp-toolbar-right">
+        <button class="qsp-btn qsp-icononly">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="#555"><circle cx="8" cy="3" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="8" cy="13" r="1.3"/></svg>
+        </button>
+        <button class="qsp-btn qsp-icononly">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#555" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="3" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="13" r="2"/><path d="M5.8 9l4.4 3M10.2 4l-4.4 3"/></svg>
+        </button>
+        <button class="qsp-btn qsp-tag">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="#e8590c" stroke="#e8590c" stroke-width="1.5" stroke-linejoin="round"><path d="M4 21V4a1 1 0 011-1h11l-3 4.5L16 12H5"/></svg>
+          <span class="qsp-tag-name"></span>
+          <span class="qsp-tag-prog"></span>
+          <svg class="qsp-tag-circle" width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.2" stroke="#ddd" stroke-width="2"/><circle class="qsp-tag-arc" cx="8" cy="8" r="6.2" stroke="#e8590c" stroke-width="2" stroke-linecap="round" stroke-dasharray="39" stroke-dashoffset="39" transform="rotate(-90 8 8)"/></svg>
+        </button>
+        <button class="qsp-btn qsp-thread">
+          <span>Go to thread</span>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#555" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 1h3v3"/><path d="M13 1L7 7"/><path d="M11 8v3.5A1.5 1.5 0 019.5 13h-7A1.5 1.5 0 011 11.5v-7A1.5 1.5 0 012.5 3H6"/></svg>
+        </button>
+        <button class="qsp-btn qsp-schedule" data-target="schedule-btn">
+          <span class="qsp-schedule-label">Schedule</span>
+          <span class="qsp-schedule-div"></span>
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+        </button>
+        <button class="qsp-btn qsp-view" style="display:none">
+          <span>View</span>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#555" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 1h3v3"/><path d="M13 1L7 7"/><path d="M11 8v3.5A1.5 1.5 0 019.5 13h-7A1.5 1.5 0 011 11.5v-7A1.5 1.5 0 012.5 3H6"/></svg>
+        </button>
+      </div>
+    </div>
 
-      <!-- Post content scrollable area -->
-      <div class="post-content" data-target="post-content">
-        <!-- Author header -->
-        <div class="author-header">
-          <div class="avatar-wrapper">
-            <div class="author-avatar" data-target="author-avatar"></div>
-            <div class="avatar-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-            </div>
+    <!-- Dotted-grid canvas -->
+    <div class="qsp-canvas">
+      <div class="qsp-card" data-anchor="post">
+        <!-- Status bar -->
+        <div class="qsp-status" data-anchor="status">
+          <div class="qsp-status-left">
+            <span class="qsp-status-icon"></span>
+            <span class="qsp-status-text"></span>
           </div>
-          <div class="author-info">
-            <span class="author-name" data-target="author-name"></span>
-            <span class="linkedin-name-badge">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-            </span>
-          </div>
+          <span class="qsp-charcount"></span>
         </div>
 
-        <!-- Post body paragraphs -->
-        <div class="post-body" data-target="post-body"></div>
-
-        <!-- Embedded media card -->
-        <div class="embed-card" data-target="embed-card">
-          <div class="embed-image">
-            <div class="embed-image-bg"></div>
-            <div class="embed-image-content">
-              <div class="embed-text-side">
-                <h2 class="embed-headline" data-target="embed-headline"></h2>
-                <p class="embed-subtext" data-target="embed-subtext"></p>
+        <div class="qsp-scroll">
+          <!-- Author -->
+          <div class="qsp-author">
+            <div class="qsp-ava-wrap">
+              <div class="qsp-ava"></div>
+              <div class="qsp-ava-badge"></div>
+            </div>
+            <div class="qsp-author-lines">
+              <div class="qsp-author-row">
+                <span class="qsp-author-name"></span>
+                <span class="qsp-verified" style="display:none">
+                  <svg width="16" height="16" viewBox="0 0 22 22"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.647.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.776-1.044.908-1.681s.075-1.299-.165-1.903c.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z"/></svg>
+                </span>
+                <span class="qsp-inbadge" style="display:none">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                </span>
               </div>
-              <div class="embed-ui-card" data-target="embed-ui-card">
-                <div class="ui-card-title"></div>
-                <div class="ui-card-subtitle"></div>
-                <div class="ui-card-options"></div>
-                <div class="ui-card-save-row">
-                  <button class="ui-card-save">Save</button>
-                </div>
-              </div>
+              <div class="qsp-handle" style="display:none"></div>
             </div>
           </div>
-        </div>
 
-        <!-- Engagement bar -->
-        <div class="engagement-bar" data-target="engagement-bar">
-          <div class="engage-btn" data-target="like-btn">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#666" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8V15.5H3a1 1 0 01-1-1V9a1 1 0 011-1h2.5zm0 0l2.5-3.5c0-1.5.5-2.5 2-2.5s1.5 1.5 1.5 2.5V7H15a1.5 1.5 0 011.4 2l-1.5 6A1.5 1.5 0 0113.5 16H5.5"/></svg>
-            <span>Like</span>
-          </div>
-          <div class="engage-btn" data-target="comment-btn">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#666" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h14a1 1 0 011 1v8a1 1 0 01-1 1h-4l-3 3v-3H2a1 1 0 01-1-1V4a1 1 0 011-1z"/></svg>
-            <span>Comment</span>
-          </div>
-          <div class="engage-btn" data-target="repost-btn">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#666" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2l2 2-2 2"/><path d="M3 9V7a2 2 0 012-2h10"/><path d="M5 16l-2-2 2-2"/><path d="M15 9v2a2 2 0 01-2 2H3"/></svg>
-            <span>Repost</span>
-          </div>
-          <div class="engage-btn" data-target="send-btn">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#666" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M16 2L8 10"/><path d="M16 2l-5 14-2-6-6-2z"/></svg>
-            <span>Send</span>
-          </div>
-        </div>
+          <!-- Body -->
+          <div class="qsp-body"></div>
 
-        <!-- Footer author row -->
-        <div class="footer-author" data-target="footer-author">
-          <div class="footer-avatar-wrapper">
-            <div class="footer-avatar" data-target="footer-avatar"></div>
-            <div class="footer-avatar-badge">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-            </div>
-          </div>
-          <div class="footer-info">
-            <div class="footer-name-row">
-              <span class="footer-name" data-target="footer-name"></span>
-              <span class="footer-linkedin-badge">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-              </span>
-              <span class="author-tag">Author</span>
-            </div>
-            <div class="footer-url" data-target="footer-url"></div>
-          </div>
+          <!-- Media cards -->
+          <div class="qsp-media" data-anchor="media" style="display:none"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Schedule dropdown (window-last child, positioned from the button) -->
+    <div class="qsp-schedmenu" style="display:none">
+      <div class="qsp-schedmenu-row" data-menu="publish">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+        <span>Publish Now</span>
+      </div>
+      <div class="qsp-schedmenu-row" data-menu="later">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        <span>Schedule for later</span>
       </div>
     </div>
   </div>
@@ -138,749 +120,538 @@
 <style scoped>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-  .quotient-social {
+  .qsp {
     width: 100%; height: 100%;
     position: absolute; top: 0; left: 0;
     display: flex; flex-direction: column;
-    background: #f5f5f5;
-    background-image: radial-gradient(circle, #d4d4d4 1px, transparent 1px);
-    background-size: 22px 22px;
+    background: #faf9f7;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow: hidden;
     color: #1a1a1a;
-    padding: 32px 32px 0 32px;
+  }
+
+  /* ── App chrome bar ── */
+  .qsp-appbar {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 52px; min-height: 52px;
+    padding: 0 18px;
+    background: #fff;
+    border-bottom: 1px solid #ececec;
+  }
+  .qsp-appbar-right { display: flex; align-items: center; gap: 10px; }
+  .qsp-bell { position: relative; display: flex; align-items: center; padding: 6px; }
+  .qsp-bell-badge {
+    position: absolute; top: -3px; right: -8px;
+    background: #e8590c; color: #fff;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 8px;
+  }
+  .qsp-search {
+    display: flex; align-items: center; gap: 7px;
+    border: 1px solid #e4e4e4; border-radius: 9px;
+    padding: 7px 12px; font-size: 13px; color: #888;
+    min-width: 170px;
+  }
+  .qsp-kbd {
+    margin-left: auto; font-size: 11px; color: #aaa;
+    border: 1px solid #e8e8e8; border-radius: 4px; padding: 1px 5px;
+  }
+  .qsp-iconbtn {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px;
+    background: #fff; border: 1px solid #e4e4e4; border-radius: 9px;
+    cursor: pointer;
+  }
+  .qsp-newchat {
+    display: flex; align-items: center; gap: 7px;
+    background: #111; color: #fff;
+    border: none; border-radius: 9px;
+    padding: 8px 14px; font-size: 13px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
   }
 
   /* ── Toolbar ── */
-  .toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    height: 64px;
-    min-height: 64px;
+  .qsp-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 62px; min-height: 62px;
+    padding: 0 20px;
     background: #fff;
-    border-bottom: 1px solid #e8e8e8;
-    flex-shrink: 0;
-    z-index: 10;
-  }
-  .toolbar-left {
-    display: flex;
-    align-items: center;
+    border-bottom: 1px solid #ececec;
     gap: 12px;
-    min-width: 0;
+    z-index: 5;
   }
-  .linkedin-icon-badge {
-    width: 36px; height: 36px;
-    background: #0A66C2;
-    border-radius: 8px;
+  .qsp-toolbar-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .qsp-platform-badge {
+    width: 34px; height: 34px; border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
-  .linkedin-icon-badge svg { width: 18px; height: 18px; }
-  .toolbar-title {
-    font-size: 19px;
-    font-weight: 600;
-    color: #1a1a1a;
-    white-space: nowrap;
+  .qsp-platform-badge.x { background: #000; }
+  .qsp-platform-badge.linkedin { background: #0A66C2; }
+  .qsp-title {
+    font-size: 17px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .qsp-toolbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .qsp-btn {
+    display: flex; align-items: center; gap: 6px;
+    height: 38px; padding: 0 13px;
+    background: #fff; border: 1px solid #e2e2e2; border-radius: 9px;
+    font-size: 13.5px; font-weight: 500; color: #333;
+    font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  .qsp-icononly { width: 38px; padding: 0; justify-content: center; }
+  .qsp-tag { gap: 6px; }
+  .qsp-tag-name { max-width: 132px; overflow: hidden; text-overflow: ellipsis; }
+  .qsp-tag-prog { color: #999; font-size: 12px; }
+  .qsp-schedule {
+    background: #111; border-color: #111; color: #fff;
+    font-weight: 600; gap: 9px; padding: 0 14px;
+  }
+  .qsp-schedule-div { width: 1px; height: 16px; background: rgba(255,255,255,0.28); }
+
+  /* ── Canvas + card ── */
+  .qsp-canvas {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 26px 30px;
+    background-image: radial-gradient(circle, #d9d7d2 1px, transparent 1px);
+    background-size: 20px 20px;
     overflow: hidden;
-    text-overflow: ellipsis;
   }
-  .toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-  .toolbar-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
+  .qsp-card {
+    display: flex; flex-direction: column;
+    width: 100%; max-width: 760px;
+    flex: 1; min-height: 0;
     background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 500;
-    color: #444;
-    cursor: pointer;
-    white-space: nowrap;
-    font-family: inherit;
-    height: 40px;
-  }
-  .toolbar-btn.icon-only {
-    padding: 8px 10px;
-    width: 40px;
-    justify-content: center;
-  }
-  .toolbar-btn:hover {
-    background: #f7f7f7;
-  }
-  .tag-btn {
-    gap: 5px;
-  }
-  .tag-flag { flex-shrink: 0; }
-  .schedule-btn:hover {
-    border-color: #0A66C2;
-    color: #0A66C2;
-  }
-  .schedule-btn:hover svg {
-    stroke: #0A66C2;
-  }
-  .tag-name {
-    max-width: 120px;
+    border: 1px solid #e6e5e2;
+    border-radius: 14px;
+    box-shadow: 0 2px 18px rgba(0,0,0,0.07);
     overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .tag-progress {
-    color: #999;
-    font-size: 12px;
-  }
-  .tag-circle { display: flex; align-items: center; }
-  .threads-label { }
-
-  /* ── Post Card ── */
-  .post-card {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    max-width: 940px;
-    width: 100%;
-    margin: 16px auto 16px;
-    background: #fff;
-    border-radius: 12px;
-    border: 1px solid #e5e5e5;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
-    overflow: hidden;
-    min-height: 0;
   }
 
-  /* ── Status Bar ── */
-  .status-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 13px 22px;
-    background: #5ba974;
-    color: #fff;
+  /* ── Status bar ── */
+  .qsp-status {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 20px;
     flex-shrink: 0;
+    font-size: 13.5px; font-weight: 500;
   }
-  .status-bar.draft { background: #e5a341; }
-  .status-bar.scheduled { background: #5b8fc2; }
-  .status-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .status-text {
-    font-size: 14px;
-    font-weight: 500;
-  }
-  .char-count {
-    font-size: 13px;
-    opacity: 0.85;
-  }
+  .qsp-status.published { background: #47934f; color: #fff; }
+  .qsp-status.draft { background: #f1f0ed; color: #555; border-bottom: 1px solid #e8e7e4; }
+  .qsp-status.scheduled { background: #5b8fc2; color: #fff; }
+  .qsp-status-left { display: flex; align-items: center; gap: 8px; }
+  .qsp-status-icon { display: flex; align-items: center; }
+  .qsp-charcount { font-size: 12.5px; opacity: 0.8; font-variant-numeric: tabular-nums; }
 
-  /* ── Post Content ── */
-  .post-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0;
-  }
+  /* ── Scroll region ── */
+  .qsp-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 22px 24px; }
+  .qsp-scroll::-webkit-scrollbar { width: 6px; }
+  .qsp-scroll::-webkit-scrollbar-thumb { background: #d8d8d8; border-radius: 3px; }
 
-  /* ── Author Header ── */
-  .author-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 22px 24px 0;
-  }
-  .avatar-wrapper {
-    position: relative;
-    flex-shrink: 0;
-  }
-  .author-avatar {
-    width: 52px; height: 52px;
-    border-radius: 50%;
-    background: #c4b5fd;
+  /* ── Author ── */
+  .qsp-author { display: flex; align-items: center; gap: 13px; margin-bottom: 14px; }
+  .qsp-ava-wrap { position: relative; flex-shrink: 0; }
+  .qsp-ava {
+    width: 50px; height: 50px; border-radius: 50%;
+    background: #dfe7f5;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: 700; color: #fff;
-    overflow: hidden;
+    font-size: 17px; font-weight: 700; color: #5b7bb5;
+    overflow: hidden; position: relative;
   }
-  .author-avatar img {
+  .qsp-ava img.qsp-ava-img {
+    position: absolute; inset: 0;
     width: 100%; height: 100%; object-fit: cover;
   }
-  .avatar-badge {
-    position: absolute;
-    bottom: -2px; right: -2px;
-    width: 20px; height: 20px;
-    background: #0A66C2;
-    border-radius: 5px;
+  .qsp-ava-badge {
+    position: absolute; bottom: -3px; right: -3px;
+    width: 19px; height: 19px; border-radius: 5px;
     display: flex; align-items: center; justify-content: center;
     border: 2px solid #fff;
   }
-  .avatar-badge svg { width: 11px; height: 11px; }
-  .author-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .author-name {
-    font-size: 18px;
-    font-weight: 700;
-    color: #1a1a1a;
-  }
-  .linkedin-name-badge {
-    display: flex;
-    align-items: center;
-  }
-  .linkedin-name-badge svg {
-    width: 18px; height: 18px;
-  }
+  .qsp-ava-badge.x { background: #000; }
+  .qsp-ava-badge.linkedin { background: #0A66C2; }
+  .qsp-author-lines { min-width: 0; }
+  .qsp-author-row { display: flex; align-items: center; gap: 5px; }
+  .qsp-author-name { font-size: 16.5px; font-weight: 700; }
+  .qsp-verified, .qsp-inbadge { display: flex; align-items: center; }
+  .qsp-handle { font-size: 13.5px; color: #7a7a7a; margin-top: 1px; }
 
-  /* ── Post Body ── */
-  .post-body {
-    padding: 16px 24px 20px;
-    font-size: 15.5px;
-    line-height: 1.6;
-    color: #1a1a1a;
-  }
-  .post-body p {
-    margin: 0 0 14px 0;
-  }
-  .post-body p:last-child {
-    margin-bottom: 0;
-  }
+  /* ── Body ── */
+  .qsp-body { font-size: 15px; line-height: 1.6; color: #1c1c1c; }
+  .qsp-body p { margin: 0 0 13px; }
+  .qsp-body p:last-child { margin-bottom: 0; }
 
-  /* ── Embed Card ── */
-  .embed-card {
-    margin: 4px 0 0;
+  /* ── Media ── */
+  .qsp-media {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    margin-top: 16px;
   }
-  .embed-image-real {
-    width: 100%;
-    display: block;
-    border-radius: 0;
-  }
-  .embed-image {
+  .qsp-media.single { grid-template-columns: 1fr; }
+  .qsp-media-card {
     position: relative;
-    width: 100%;
-    min-height: 260px;
+    border-radius: 12px;
     overflow: hidden;
+    border: 1px solid #e8e7e4;
+    aspect-ratio: 16 / 10;
+    background: #f6f5f2;
   }
-  .embed-image-bg {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 30%, #2d1b69 55%, #7c3aed 75%, #c084fc 88%, #e9b8f6 95%, #0a0a1a 100%);
-  }
-  .embed-image-bg::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E");
-    opacity: 0.5;
-  }
-  .embed-image-content {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 36px 32px;
-    gap: 28px;
-    min-height: 260px;
-  }
-  .embed-text-side {
-    flex: 0 1 380px;
-    color: #fff;
-  }
-  .embed-headline {
-    font-size: 32px;
-    font-weight: 700;
-    margin: 0 0 12px;
-    color: #fff;
-    line-height: 1.2;
-  }
-  .embed-subtext {
-    font-size: 15px;
-    line-height: 1.55;
-    margin: 0;
-    color: rgba(255,255,255,0.88);
-  }
-
-  /* ── Embedded UI Card ── */
-  .embed-ui-card {
-    flex: 0 1 340px;
-    background: #fff;
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
-    color: #1a1a1a;
-  }
-  .ui-card-title {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    color: #1a1a1a;
-  }
-  .ui-card-subtitle {
-    font-size: 12px;
-    color: #666;
-    line-height: 1.4;
-    margin-bottom: 14px;
-  }
-  .ui-card-options {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-  .ui-option {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-  .ui-option.selected {
-    background: #f8f8f8;
-    border: 1px solid #e0e0e0;
-  }
-  .ui-option:not(.selected) {
-    border: 1px solid transparent;
-  }
-  .ui-radio {
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    border: 2px solid #ccc;
-    flex-shrink: 0;
-    margin-top: 1px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .ui-option.selected .ui-radio {
-    border-color: #1a1a1a;
-  }
-  .ui-radio-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #1a1a1a;
-    display: none;
-  }
-  .ui-option.selected .ui-radio-dot {
-    display: block;
-  }
-  .ui-option-content {
-    flex: 1;
-    min-width: 0;
-  }
-  .ui-option-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #1a1a1a;
-    line-height: 1.3;
-  }
-  .ui-option-desc {
-    font-size: 11px;
-    color: #888;
-    line-height: 1.35;
-    margin-top: 2px;
-  }
-  .ui-option-input {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 8px;
-    font-size: 13px;
-    color: #666;
-  }
-  .ui-option-input .input-box {
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #1a1a1a;
-    min-width: 60px;
-    text-align: left;
-    font-family: inherit;
-    background: #fff;
-  }
-  .ui-card-save-row {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 12px;
-  }
-  .ui-card-save {
-    background: #444;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 6px 18px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  /* ── Engagement Bar ── */
-  .engagement-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-    padding: 10px 24px;
-    border-top: 1px solid #eaeaea;
-    border-bottom: 1px solid #eaeaea;
-  }
-  .engage-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: #666;
-    font-weight: 500;
-    cursor: pointer;
-    padding: 8px 12px;
-    border-radius: 6px;
-    transition: background 0.15s;
-  }
-  .engage-btn:hover {
-    background: #f3f3f3;
-  }
-
-  /* ── Footer Author ── */
-  .footer-author {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 18px 24px 22px;
-  }
-  .footer-avatar-wrapper {
-    position: relative;
-    flex-shrink: 0;
-  }
-  .footer-avatar {
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    background: #c4b5fd;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 700; color: #fff;
-    overflow: hidden;
-  }
-  .footer-avatar img {
+  .qsp-media.single .qsp-media-card { aspect-ratio: 1.91 / 1; }
+  .qsp-media-card img {
+    position: absolute; inset: 0;
     width: 100%; height: 100%; object-fit: cover;
   }
-  .footer-avatar-badge {
-    position: absolute;
-    bottom: -1px; right: -1px;
-    width: 16px; height: 16px;
-    background: #0A66C2;
-    border-radius: 4px;
-    display: flex; align-items: center; justify-content: center;
-    border: 1.5px solid #fff;
+  .qsp-media-grad {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, #0a0a1a 0%, #2d1b69 45%, #7c3aed 75%, #c084fc 100%);
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 20px 22px; color: #fff;
   }
-  .footer-avatar-badge svg { width: 9px; height: 9px; }
-  .footer-info {
-    min-width: 0;
+  .qsp-media-grad .qsp-media-headline {
+    font-size: 21px; font-weight: 700; line-height: 1.2; margin: 0;
   }
-  .footer-name-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  .qsp-media-grad .qsp-media-sub {
+    font-size: 12.5px; line-height: 1.45; margin: 8px 0 0;
+    color: rgba(255,255,255,0.85);
   }
-  .footer-name {
-    font-size: 15px;
-    font-weight: 700;
-    color: #1a1a1a;
+  .qsp-media-files {
+    position: absolute; inset: 0;
+    background: #f1efe9;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 7px;
   }
-  .footer-linkedin-badge {
-    display: flex; align-items: center;
+  .qsp-filechip {
+    display: flex; align-items: center; gap: 8px;
+    background: #fff; border: 1px solid #e4e2dc; border-radius: 8px;
+    padding: 7px 14px; font-size: 12px; font-weight: 600; color: #444;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    min-width: 120px;
   }
-  .author-tag {
-    font-size: 11px;
-    font-weight: 500;
-    color: #666;
-    background: #f0f0f0;
-    padding: 2px 8px;
-    border-radius: 4px;
-  }
-  .footer-url {
-    font-size: 13px;
-    color: #444;
-    margin-top: 3px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .footer-url svg {
-    vertical-align: middle;
-    margin-right: 4px;
+  .qsp-filechip .qsp-filetype {
+    font-size: 9px; font-weight: 800; color: #fff;
+    border-radius: 4px; padding: 2px 5px; letter-spacing: 0.4px;
   }
 
-  /* ── Scrollbar ── */
-  .post-content::-webkit-scrollbar { width: 6px; }
-  .post-content::-webkit-scrollbar-track { background: transparent; }
-  .post-content::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
+  /* ── Schedule dropdown ── */
+  .qsp-schedmenu {
+    position: absolute;
+    background: #fff;
+    border: 1px solid #e4e4e4;
+    border-radius: 11px;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.16);
+    padding: 6px;
+    min-width: 190px;
+    z-index: 50;
+  }
+  .qsp-schedmenu-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 11px; border-radius: 8px;
+    font-size: 13.5px; font-weight: 500; color: #1a1a1a;
+    cursor: pointer;
+  }
+  .qsp-schedmenu-row:hover { background: #f5f4f1; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
-    var social = el.querySelector('.quotient-social');
-    var toolbar = el.querySelector('.toolbar');
-    var postCard = el.querySelector('.post-card');
-    var statusBar = el.querySelector('.status-bar');
-    var authorHeader = el.querySelector('.author-header');
-    var postBody = el.querySelector('.post-body');
-    var embedCard = el.querySelector('.embed-card');
-    var engagementBar = el.querySelector('.engagement-bar');
-    var footerAuthor = el.querySelector('.footer-author');
-    var postContent = el.querySelector('.post-content');
+    var root = el.querySelector('.qsp');
+    var appbar = el.querySelector('.qsp-appbar');
+    var toolbar = el.querySelector('.qsp-toolbar');
+    var card = el.querySelector('.qsp-card');
+    var statusBar = el.querySelector('.qsp-status');
+    var author = el.querySelector('.qsp-author');
+    var body = el.querySelector('.qsp-body');
+    var media = el.querySelector('.qsp-media');
+    var scroll = el.querySelector('.qsp-scroll');
+    var schedBtn = el.querySelector('.qsp-schedule');
+    var viewBtn = el.querySelector('.qsp-view');
+    var schedMenu = el.querySelector('.qsp-schedmenu');
+
+    var LOGO_TOKEN = 'pk_B_cdrQLyTkSFPzSMm52goQ';
+    function logoUrl(domain) {
+      return 'https://img.logo.dev/' + domain + '?token=' + LOGO_TOKEN + '&format=png&size=128&fallback=monogram';
+    }
 
     // ── Data ──
-    var postTitle = data.post_title || 'June 2 Changelog - Max LinkedIn';
-    var status = data.status || 'published';
-    var publishedDate = data.published_date || 'Jun 2, 2026 at 4:06 PM';
-    var authorName = data.author_name || 'Max Davish';
-    var authorAvatarUrl = data.author_avatar_url || '';
-    var authorInitials = data.author_initials || 'MD';
-    var defaultPostText = 'This week\'s running story has been about companies blowing past their AI budgets with insane token bills. I heard one about a guy who accidentally racked up a $500k Claude bill.\n\nI have no idea if that\'s true \u2014 it probably isn\'t \u2014 and I think most of these stories are totally overblown. At Quotient, we\'re some of the most hardcore AI users on the planet and we rarely spend more than a few thousand bucks per person on tokens each month.\n\nThat said, I was a little surprised when I saw a $2,000 Quotient bill last month. Yes, we pay for our own software. It\'s called eating your own dogfood. Maybe you\'ve heard of it. And apparently we were using it a LOT, because we blew straight through our plan\'s token allotment.\n\nNot exactly a $500k nightmare. But still \u2014 a surprise.\n\nSo we immediately shipped spending caps and usage notifications, so our customers never have surprise bills.\n\nThese kinds of controls are going to be crucial now that software is evolving past the seat-based model. Every company is going to spend more and more on tokens in the future, and I think that\'s money well spent. We just need to make sure the controls are in place \u2014 so nobody ends up like the guy who almost bankrupted his company with a Claude bill.';
-    var postText = data.post_text || defaultPostText;
-    var charCount = data.char_count || 1243;
-    var charLimit = data.char_limit || 3000;
-    var embedHeadline = data.embed_headline || 'Spending Caps';
-    var embedSubtext = data.embed_subtext || '';
-    var embedUiCard = data.embed_ui_card || null;
-    var authorUrl = data.author_url || '';
+    var platform = (data.platform || 'linkedin').toLowerCase();
+    if (platform === 'twitter') platform = 'x';
+    var isX = platform === 'x';
+    var status = data.status || 'draft';
+    var postTitle = data.post_title || (isX ? 'Launch announcement — X' : 'Launch announcement — LinkedIn');
+    var publishedDate = data.published_date || 'Jul 9, 2026 at 10:01 AM';
+    var authorName = data.author_name || (isX ? 'Quotient AI' : 'Marc Ferrentino');
+    var authorHandle = data.author_handle || (isX ? '@Quotient_AI_' : '');
+    var authorAvatarUrl = data.author_avatar_url || (isX ? logoUrl('getquotient.ai') : 'https://i.pravatar.cc/128?img=12');
+    var authorInitials = data.author_initials || authorName.split(/\s+/).map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+    var postText = data.post_text || 'Big week at Quotient. We just shipped floating chat — stay in flow while the agent works alongside you.\n\nNo more tab-hopping between your work and your marketing. Ask, review, publish — without leaving the page.';
+    var charCount = data.char_count || postText.length;
+    var charLimit = data.char_limit || (isX ? 25000 : 3000);
     var tagName = data.tag_name || 'Quotient Changelog';
     var tagProgress = data.tag_progress || '0/1';
-    var threadCount = data.thread_count || 2;
+    var verified = data.verified !== undefined ? !!data.verified : isX;
 
-    // ── Populate toolbar ──
-    el.querySelector('.toolbar-title').textContent = postTitle;
-    el.querySelector('.tag-name').textContent = tagName;
-    el.querySelector('.tag-progress').textContent = tagProgress;
-    el.querySelector('.threads-label').textContent = 'Threads (' + threadCount + ')';
+    // media: [{image_url?, headline?, subtext?, kind: 'files'?, files?: ['PDF','DOC']}]
+    var mediaItems = data.media || null;
+    if (!mediaItems && (data.embed_image_url || data.embed_headline)) {
+      mediaItems = [{ image_url: data.embed_image_url || '', headline: data.embed_headline || '', subtext: data.embed_subtext || '' }];
+    }
+
+    // ── Toolbar ──
+    var badge = el.querySelector('.qsp-platform-badge');
+    badge.classList.add(isX ? 'x' : 'linkedin');
+    badge.innerHTML = isX
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>'
+      : '<svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>';
+    el.querySelector('.qsp-title').textContent = postTitle;
+    el.querySelector('.qsp-tag-name').textContent = tagName;
+    el.querySelector('.qsp-tag-prog').textContent = tagProgress;
+    var progParts = String(tagProgress).split('/');
+    var progFrac = (parseFloat(progParts[0]) || 0) / (parseFloat(progParts[1]) || 1);
+    el.querySelector('.qsp-tag-arc').setAttribute('stroke-dashoffset', String(39 * (1 - Math.min(1, progFrac))));
+
+    if (data.show_app_bar) appbar.style.display = 'flex';
 
     // ── Status bar ──
-    var statusTextEl = el.querySelector('.status-text');
-    var charCountEl = el.querySelector('.char-count');
-    if (status === 'published') {
-      statusTextEl.textContent = 'Post published on ' + publishedDate;
-    } else if (status === 'draft') {
-      statusBar.classList.add('draft');
-      statusTextEl.textContent = 'Draft';
-    } else if (status === 'scheduled') {
-      statusBar.classList.add('scheduled');
-      statusTextEl.textContent = 'Scheduled for ' + publishedDate;
-    }
-    charCountEl.textContent = charCount.toLocaleString() + '/' + charLimit.toLocaleString();
-
-    // ── Author avatar ──
-    function setAvatar(container, url, initials) {
-      if (url) {
-        var img = document.createElement('img');
-        img.src = url;
-        container.appendChild(img);
+    var statusIcon = el.querySelector('.qsp-status-icon');
+    var statusText = el.querySelector('.qsp-status-text');
+    var CHECK_SVG = '<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="rgba(255,255,255,0.25)"/><path d="M5.5 9.5l2 2 5-5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var DRAFT_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg>';
+    function applyStatus(st, dateStr) {
+      statusBar.classList.remove('published', 'draft', 'scheduled');
+      statusBar.classList.add(st);
+      if (st === 'published') {
+        statusIcon.innerHTML = CHECK_SVG;
+        statusText.textContent = 'Post published on ' + dateStr;
+      } else if (st === 'scheduled') {
+        statusIcon.innerHTML = CHECK_SVG;
+        statusText.textContent = 'Scheduled for ' + dateStr;
       } else {
-        container.textContent = initials;
+        statusIcon.innerHTML = DRAFT_SVG;
+        statusText.textContent = 'Draft';
       }
     }
-    setAvatar(el.querySelector('.author-avatar'), authorAvatarUrl, authorInitials);
-    setAvatar(el.querySelector('.footer-avatar'), authorAvatarUrl, authorInitials);
+    applyStatus(status, publishedDate);
+    el.querySelector('.qsp-charcount').textContent = charCount.toLocaleString() + '/' + charLimit.toLocaleString();
 
-    // ── Author name ──
-    el.querySelector('[data-target="author-name"]').textContent = authorName;
-    el.querySelector('.footer-name').textContent = authorName;
+    // Published posts show View instead of Schedule
+    if (status === 'published') {
+      schedBtn.style.display = 'none';
+      viewBtn.style.display = 'flex';
+    }
 
-    // ── Post body (split by double newline into paragraphs) ──
-    var paragraphs = postText.split(/\n\n+/);
-    paragraphs.forEach(function(p) {
+    // ── Author ──
+    var ava = el.querySelector('.qsp-ava');
+    ava.textContent = authorInitials;
+    if (authorAvatarUrl) {
+      var img = document.createElement('img');
+      img.className = 'qsp-ava-img';
+      img.src = authorAvatarUrl;
+      img.onerror = function() { this.remove(); };
+      ava.appendChild(img);
+    }
+    var avaBadge = el.querySelector('.qsp-ava-badge');
+    avaBadge.classList.add(isX ? 'x' : 'linkedin');
+    avaBadge.innerHTML = isX
+      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="#fff"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>'
+      : '<svg width="10" height="10" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>';
+
+    el.querySelector('.qsp-author-name').textContent = authorName;
+    if (verified && isX) el.querySelector('.qsp-verified').style.display = 'flex';
+    if (!isX) el.querySelector('.qsp-inbadge').style.display = 'flex';
+    if (authorHandle) {
+      var h = el.querySelector('.qsp-handle');
+      h.textContent = authorHandle;
+      h.style.display = 'block';
+    }
+
+    // ── Body ──
+    postText.split(/\n\n+/).forEach(function(p) {
       var pEl = document.createElement('p');
       pEl.textContent = p.replace(/\n/g, ' ');
-      postBody.appendChild(pEl);
+      body.appendChild(pEl);
     });
 
-    // ── Embed card ──
-    el.querySelector('.embed-headline').textContent = embedHeadline;
-    el.querySelector('.embed-subtext').textContent = embedSubtext;
-
-    // ── Embed UI card ──
-    if (embedUiCard) {
-      var uiTitle = el.querySelector('.ui-card-title');
-      var uiSubtitle = el.querySelector('.ui-card-subtitle');
-      var uiOptions = el.querySelector('.ui-card-options');
-      uiTitle.textContent = embedUiCard.title || 'Spending Cap';
-      uiSubtitle.textContent = embedUiCard.subtitle || '';
-
-      var opts = embedUiCard.options || [
-        { label: 'Default ($100)', description: 'Pause usage at the default spending cap for your plan.', selected: false },
-        { label: 'Set a custom spending cap', description: 'Pause usage once overage charges reach this amount.', selected: true, input_prefix: '$', input_value: '200', input_suffix: 'per billing period' },
-        { label: 'No cap (unlimited overage)', description: 'Continue accruing overage charges with no limit.', selected: false },
-        { label: 'Block all overage', description: 'Pause usage the moment your included allotment is reached.', selected: false }
-      ];
-
-      opts.forEach(function(opt) {
-        var optEl = document.createElement('div');
-        optEl.className = 'ui-option' + (opt.selected ? ' selected' : '');
-        var html = '<div class="ui-radio"><div class="ui-radio-dot"></div></div>';
-        html += '<div class="ui-option-content">';
-        html += '<div class="ui-option-label">' + (opt.label || '') + '</div>';
-        html += '<div class="ui-option-desc">' + (opt.description || '') + '</div>';
-        if (opt.input_value) {
-          html += '<div class="ui-option-input">';
-          if (opt.input_prefix) html += '<span>' + opt.input_prefix + '</span>';
-          html += '<span class="input-box">' + opt.input_value + '</span>';
-          if (opt.input_suffix) html += '<span>' + opt.input_suffix + '</span>';
-          html += '</div>';
+    // ── Media ──
+    var FILE_COLORS = { PDF: '#d64545', DOC: '#3b7dd8', FILE: '#7a7a7a', XLS: '#2f9e6e', PPT: '#e07b39' };
+    if (mediaItems && mediaItems.length) {
+      media.style.display = 'grid';
+      if (mediaItems.length === 1) media.classList.add('single');
+      mediaItems.slice(0, 2).forEach(function(m) {
+        var cardEl = document.createElement('div');
+        cardEl.className = 'qsp-media-card';
+        if (m.kind === 'files' || m.files) {
+          var wrap = document.createElement('div');
+          wrap.className = 'qsp-media-files';
+          (m.files || ['PDF', 'DOC', 'FILE']).slice(0, 3).forEach(function(f) {
+            var chip = document.createElement('div');
+            chip.className = 'qsp-filechip';
+            var ft = document.createElement('span');
+            ft.className = 'qsp-filetype';
+            ft.style.background = FILE_COLORS[f.toUpperCase()] || FILE_COLORS.FILE;
+            ft.textContent = f.toUpperCase();
+            chip.appendChild(ft);
+            var nm = document.createElement('span');
+            nm.textContent = m.label || 'Attachment';
+            chip.appendChild(nm);
+            wrap.appendChild(chip);
+          });
+          cardEl.appendChild(wrap);
+        } else if (m.image_url) {
+          var im = document.createElement('img');
+          im.src = m.image_url;
+          im.onerror = function() {
+            this.remove();
+            var g = document.createElement('div');
+            g.className = 'qsp-media-grad';
+            g.innerHTML = '<p class="qsp-media-headline"></p>';
+            g.querySelector('.qsp-media-headline').textContent = m.headline || '';
+            cardEl.appendChild(g);
+          };
+          cardEl.appendChild(im);
+        } else {
+          var g = document.createElement('div');
+          g.className = 'qsp-media-grad';
+          var hl = document.createElement('p');
+          hl.className = 'qsp-media-headline';
+          hl.textContent = m.headline || '';
+          g.appendChild(hl);
+          if (m.subtext) {
+            var sb = document.createElement('p');
+            sb.className = 'qsp-media-sub';
+            sb.textContent = m.subtext;
+            g.appendChild(sb);
+          }
+          cardEl.appendChild(g);
         }
-        html += '</div>';
-        optEl.innerHTML = html;
-        uiOptions.appendChild(optEl);
-      });
-    } else {
-      // Default UI card
-      var uiTitle = el.querySelector('.ui-card-title');
-      var uiSubtitle = el.querySelector('.ui-card-subtitle');
-      var uiOptions = el.querySelector('.ui-card-options');
-      uiTitle.textContent = 'Spending Cap';
-      uiSubtitle.textContent = 'Choose how overage on the Pro plan is handled once included usage is exhausted.';
-      var defaultOpts = [
-        { label: 'Default ($100)', description: 'Pause usage at the default spending cap for your plan.', selected: false },
-        { label: 'Set a custom spending cap', description: 'Pause usage once overage charges reach this amount.', selected: true, input_prefix: '$', input_value: '200', input_suffix: 'per billing period' },
-        { label: 'No cap (unlimited overage)', description: 'Continue accruing overage charges with no limit.', selected: false },
-        { label: 'Block all overage', description: 'Pause usage the moment your included allotment is reached.', selected: false }
-      ];
-      defaultOpts.forEach(function(opt) {
-        var optEl = document.createElement('div');
-        optEl.className = 'ui-option' + (opt.selected ? ' selected' : '');
-        var html = '<div class="ui-radio"><div class="ui-radio-dot"></div></div>';
-        html += '<div class="ui-option-content">';
-        html += '<div class="ui-option-label">' + (opt.label || '') + '</div>';
-        html += '<div class="ui-option-desc">' + (opt.description || '') + '</div>';
-        if (opt.input_value) {
-          html += '<div class="ui-option-input">';
-          if (opt.input_prefix) html += '<span>' + opt.input_prefix + '</span>';
-          html += '<span class="input-box">' + opt.input_value + '</span>';
-          if (opt.input_suffix) html += '<span>' + opt.input_suffix + '</span>';
-          html += '</div>';
-        }
-        html += '</div>';
-        optEl.innerHTML = html;
-        uiOptions.appendChild(optEl);
+        media.appendChild(cardEl);
       });
     }
 
-    // ── Embed image URL override ──
-    if (data.embed_image_url) {
-      var embedImageDiv = el.querySelector('.embed-image');
-      if (embedImageDiv) {
-        embedImageDiv.innerHTML = '<img class="embed-image-real" src="' + data.embed_image_url + '" alt="" />';
-      }
+    // ── Schedule menu helpers ──
+    function openMenu(tlRef, at) {
+      tlRef.call(function() {
+        var rootRect = root.getBoundingClientRect();
+        var btnRect = schedBtn.getBoundingClientRect();
+        var leftPct = ((btnRect.right - rootRect.left) / rootRect.width) * 100;
+        var topPct = ((btnRect.bottom - rootRect.top) / rootRect.height) * 100;
+        schedMenu.style.right = (100 - leftPct) + '%';
+        schedMenu.style.left = 'auto';
+        schedMenu.style.top = 'calc(' + topPct + '% + 6px)';
+        schedMenu.style.display = 'block';
+        gsap.fromTo(schedMenu, { autoAlpha: 0, y: -6 }, { autoAlpha: 1, y: 0, duration: 0.22, ease: 'power2.out' });
+      }, null, at);
+    }
+    function closeMenu(tlRef, at) {
+      tlRef.call(function() {
+        gsap.to(schedMenu, { autoAlpha: 0, y: -6, duration: 0.16, ease: 'power2.in', onComplete: function() { schedMenu.style.display = 'none'; } });
+      }, null, at);
     }
 
-    // ── Footer URL ──
-    var footerUrlEl = el.querySelector('.footer-url');
-    if (authorUrl) {
-      footerUrlEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#0A66C2" stroke-width="1.3" stroke-linecap="round"><path d="M6.5 9.5a3 3 0 004.24 0l2-2a3 3 0 00-4.24-4.24l-1 1"/><path d="M7.5 4.5a3 3 0 00-4.24 0l-2 2a3 3 0 004.24 4.24l1-1"/></svg>' + authorUrl;
-    }
-
-    // ── Animation ──
+    // ── Entrance ──
     var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.5 : 0.7;
+    gsap.set(root, { autoAlpha: 0 });
+    gsap.set(card, { autoAlpha: 0, y: 22 });
+    gsap.set([statusBar, author, body], { autoAlpha: 0 });
+    if (media.style.display !== 'none') gsap.set(media, { autoAlpha: 0, scale: 0.98 });
 
-    gsap.set(social, { autoAlpha: 0 });
-    gsap.set(postCard, { autoAlpha: 0, y: 24 });
-    gsap.set(statusBar, { autoAlpha: 0 });
-    gsap.set(authorHeader, { autoAlpha: 0, x: -12 });
-    gsap.set(postBody, { autoAlpha: 0 });
-    gsap.set(embedCard, { autoAlpha: 0, scale: 0.97 });
-    gsap.set(engagementBar, { autoAlpha: 0 });
-    gsap.set(footerAuthor, { autoAlpha: 0 });
+    tl.to(root, { autoAlpha: 1, duration: 0.15, ease: 'power2.out' }, 0.05);
+    tl.to(card, { autoAlpha: 1, y: 0, duration: 0.28, ease: 'power3.out' }, 0.08);
+    tl.to(statusBar, { autoAlpha: 1, duration: 0.15 }, 0.14);
+    tl.to(author, { autoAlpha: 1, duration: 0.2 }, 0.18);
+    tl.to(body, { autoAlpha: 1, duration: 0.2 }, 0.22);
+    if (media.style.display !== 'none') {
+      tl.to(media, { autoAlpha: 1, scale: 1, duration: 0.25, ease: 'power2.out' }, 0.28);
+    }
 
-    // Entrance - fast staggered reveal
-    tl.to(social, { autoAlpha: 1, duration: 0.15, ease: 'power2.out' }, 0.05);
-    tl.to(postCard, { autoAlpha: 1, y: 0, duration: 0.25, ease: 'power3.out' }, 0.08);
-    tl.to(statusBar, { autoAlpha: 1, duration: 0.15, ease: 'power2.out' }, 0.12);
-    tl.to(authorHeader, { autoAlpha: 1, x: 0, duration: 0.2, ease: 'power2.out' }, 0.15);
-    tl.to(postBody, { autoAlpha: 1, duration: 0.2, ease: 'power2.out' }, 0.18);
-    tl.to(embedCard, { autoAlpha: 1, scale: 1, duration: 0.25, ease: 'power2.out' }, 0.22);
-    tl.to(engagementBar, { autoAlpha: 1, duration: 0.15, ease: 'power2.out' }, 0.28);
-    tl.to(footerAuthor, { autoAlpha: 1, duration: 0.15, ease: 'power2.out' }, 0.32);
+    var hasScript = data.script && data.script.length > 0;
 
-    // Auto scroll post content to show full post
-    if (ctx.duration > 3) {
-      tl.to(postContent, {
-        scrollTop: function() { return postContent.scrollHeight - postContent.clientHeight; },
+    // Auto scroll long posts when unscripted
+    if (!hasScript && ctx.duration > 3) {
+      tl.to(scroll, {
+        scrollTop: function() { return scroll.scrollHeight - scroll.clientHeight; },
         duration: ctx.duration * 0.5,
         ease: 'power1.inOut'
       }, 2.0);
     }
 
-    // Exit
-    if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.5;
-      tl.to(postCard, {
-        autoAlpha: 0, y: -12,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, exitAt);
-    }
-
     // ── Script actions ──
-    if (data.script && data.script.length > 0) {
+    if (hasScript) {
       var cursorTargets = data.cursor_targets || {
-        'status-bar': { x: '50%', y: '8%' },
-        'post-body': { x: '50%', y: '50%' },
-        'embed-card': { x: '50%', y: '75%' },
-        'like-btn': { x: '20%', y: '88%' },
-        'view-btn': { x: '92%', y: '3%' }
+        'status': { x: '50%', y: '18%' },
+        'schedule': { x: '88%', y: '9%' },
+        'media': { x: '50%', y: '70%' }
       };
 
       runScript(tl, el, data.script, cursorTargets, ctx, {
         'scroll-post': function(tl, ctr, action, at) {
-          var content = ctr.querySelector('.post-content');
+          var content = ctr.querySelector('.qsp-scroll');
           if (!content) return;
           var amt = action.amount || 300;
           var dur = action.duration || 2;
           tl.to(content, { scrollTop: '+=' + amt, duration: dur, ease: 'power1.inOut' }, at);
         },
         'highlight-status': function(tl, ctr, action, at) {
-          var bar = ctr.querySelector('.status-bar');
-          if (!bar) return;
-          tl.to(bar, { boxShadow: '0 0 20px rgba(91,169,116,0.5)', duration: 0.3, ease: 'power2.out' }, at);
-          tl.to(bar, { boxShadow: '0 0 0px rgba(91,169,116,0)', duration: 0.5, ease: 'power2.in' }, at + 0.5);
+          tl.fromTo(statusBar, { boxShadow: '0 0 0px rgba(71,147,79,0)' },
+            { boxShadow: '0 0 22px rgba(71,147,79,0.5)', duration: 0.3, ease: 'power2.out' }, at);
+          tl.to(statusBar, { boxShadow: '0 0 0px rgba(71,147,79,0)', duration: 0.5, ease: 'power2.in' }, at + 0.6);
+        },
+        'highlight-media': function(tl, ctr, action, at) {
+          if (media.style.display === 'none') return;
+          tl.fromTo(media, { scale: 1 }, { scale: 1.015, duration: 0.3, ease: 'power2.out' }, at);
+          tl.to(media, { scale: 1, duration: 0.35, ease: 'power2.inOut' }, at + 0.5);
         },
         'highlight-embed': function(tl, ctr, action, at) {
-          var card = ctr.querySelector('.embed-card');
-          if (!card) return;
-          tl.to(card, { boxShadow: '0 0 24px rgba(124,58,237,0.4)', duration: 0.3, ease: 'power2.out' }, at);
-          tl.to(card, { boxShadow: '0 0 0px rgba(124,58,237,0)', duration: 0.6, ease: 'power2.in' }, at + 0.5);
+          if (media.style.display === 'none') return;
+          tl.fromTo(media, { scale: 1 }, { scale: 1.015, duration: 0.3, ease: 'power2.out' }, at);
+          tl.to(media, { scale: 1, duration: 0.35, ease: 'power2.inOut' }, at + 0.5);
         },
         'show-reactions': function(tl, ctr, action, at) {
-          var btns = ctr.querySelectorAll('.engage-btn');
-          gsap.set(btns, { autoAlpha: 0, y: 8 });
-          btns.forEach(function(btn, i) {
-            tl.to(btn, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, at + i * 0.1);
-          });
+          tl.fromTo(card, { scale: 1 }, { scale: 1.008, duration: 0.25, ease: 'power2.out' }, at);
+          tl.to(card, { scale: 1, duration: 0.3, ease: 'power2.inOut' }, at + 0.3);
+        },
+        'open-schedule-menu': function(tl, ctr, action, at) {
+          tl.to(schedBtn, { scale: 0.96, duration: 0.1, ease: 'power2.in' }, at);
+          tl.to(schedBtn, { scale: 1, duration: 0.14, ease: 'power2.out' }, at + 0.1);
+          openMenu(tl, at + 0.15);
+        },
+        'close-schedule-menu': function(tl, ctr, action, at) {
+          closeMenu(tl, at);
+        },
+        'publish-post': function(tl, ctr, action, at) {
+          var dateStr = (action && action.published_date) || publishedDate;
+          var menuVisible = true;
+          tl.call(function() {
+            var row = schedMenu.querySelector('[data-menu="publish"]');
+            if (schedMenu.style.display === 'none') { menuVisible = false; return; }
+            gsap.fromTo(row, { backgroundColor: 'rgba(0,0,0,0)' },
+              { backgroundColor: '#eeede9', duration: 0.15, yoyo: true, repeat: 1 });
+          }, null, at);
+          closeMenu(tl, at + 0.45);
+          tl.call(function() {
+            applyStatus('published', dateStr);
+            schedBtn.style.display = 'none';
+            viewBtn.style.display = 'flex';
+          }, null, at + 0.7);
+          tl.fromTo(statusBar, { scale: 1 }, { scale: 1.02, duration: 0.3, ease: 'power2.out' }, at + 0.7);
+          tl.to(statusBar, { scale: 1, duration: 0.25, ease: 'back.out(2)' }, at + 1.0);
         },
         'schedule-post': function(tl, ctr, action, at) {
-          var schedBtn = ctr.querySelector('.schedule-btn');
-          var bar = ctr.querySelector('.status-bar');
-          var statusText = ctr.querySelector('.status-text');
-          var scheduledDate = (action && action.scheduled_date) || 'Jun 12, 2026 at 10:00 AM';
-          if (schedBtn) {
-            tl.to(schedBtn, { borderColor: '#0A66C2', color: '#0A66C2', scale: 1.06, duration: 0.25, ease: 'power2.out' }, at);
-            tl.to(schedBtn, { scale: 1, duration: 0.2, ease: 'power2.inOut' }, at + 0.25);
-          }
-          if (bar) {
-            tl.call(function() {
-              bar.classList.remove('draft', 'scheduled');
-              bar.classList.add('scheduled');
-              if (statusText) statusText.textContent = 'Scheduled for ' + scheduledDate;
-            }, null, at + 0.5);
-            tl.to(bar, { backgroundColor: '#5b8fc2', scale: 1.02, duration: 0.35, ease: 'power2.out' }, at + 0.5);
-            tl.to(bar, { scale: 1, duration: 0.25, ease: 'back.out(2)' }, at + 0.85);
-          }
+          var scheduledDate = (action && action.scheduled_date) || 'Jul 15, 2026 at 10:00 AM';
+          tl.to(schedBtn, { scale: 0.96, duration: 0.1, ease: 'power2.in' }, at);
+          tl.to(schedBtn, { scale: 1, duration: 0.14, ease: 'power2.out' }, at + 0.1);
+          tl.call(function() {
+            applyStatus('scheduled', scheduledDate);
+          }, null, at + 0.4);
+          tl.fromTo(statusBar, { scale: 1 }, { scale: 1.02, duration: 0.3, ease: 'power2.out' }, at + 0.4);
+          tl.to(statusBar, { scale: 1, duration: 0.25, ease: 'back.out(2)' }, at + 0.7);
         }
       });
+    }
+
+    // Exit only when unscripted (scripted scenes control their own ending)
+    if (!hasScript && ctx.duration > 2) {
+      tl.to(card, { autoAlpha: 0, y: -12, duration: 0.4, ease: 'power2.in' }, ctx.duration - 0.5);
     }
 
     return tl;
