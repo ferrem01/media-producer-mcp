@@ -896,6 +896,31 @@
     });
 
     // ── Script actions ──
+        // Declarative shorthand -> script compilation. Storyboard LLMs reliably
+    // write intent keys (composer_text, typing_indicator, bot_reply) rather
+    // than script action arrays -- observed across three generations. Compile
+    // the sanctioned shorthand into real script actions when no explicit
+    // script is provided; an explicit script always wins.
+    if ((!data.script || !data.script.length)) {
+      var synth = [];
+      var sDur = ctx.duration || 10;
+      if (data.typing_indicator) {
+        var whoT = typeof data.typing_indicator === 'string' ? data.typing_indicator : ((messages[0] || {}).name || 'Someone');
+        synth.push({ action: 'show-typing-indicator', at: Math.max(0.6, sDur * 0.12), name: whoT });
+        synth.push({ action: 'hide-typing-indicator', at: Math.max(1.6, sDur * 0.2) });
+      }
+      if (data.composer_text) {
+        var tAt2 = Math.max(1.0, sDur * 0.35);
+        var typeDur = Math.min(2.6, Math.max(1.2, String(data.composer_text).length * 0.07));
+        synth.push({ action: 'type-message', at: tAt2, text: String(data.composer_text), duration: typeDur });
+        synth.push({ action: 'send-message', at: tAt2 + typeDur + 0.4 });
+      }
+      if (data.bot_reply && (data.bot_reply.text || typeof data.bot_reply === 'string')) {
+        var br = typeof data.bot_reply === 'string' ? { text: data.bot_reply } : data.bot_reply;
+        synth.push({ action: 'bot-message', at: Math.min(sDur - 2, sDur * 0.62), name: br.name || 'Quotient', text: br.text });
+      }
+      if (synth.length) data.script = synth;
+    }
     if (data.script && data.script.length > 0) {
       runScript(tl, el, data.script, cursorTargets, ctx, {
         'type-message': function(tl, ctr, action, at) {

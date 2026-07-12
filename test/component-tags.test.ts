@@ -311,3 +311,15 @@ describe("cameraMovesScript anchors", () => {
     expect(js).toContain("m.anchor ? ''");
   });
 });
+
+describe("backdrop exclusion from the camera rig", () => {
+  it("cameraMovesScript skips data-mp-backdrop children when building the scene rig", async () => {
+    const { cameraMovesScript, BACKDROP_TYPES } = await import("../src/core/scene-assembler.js");
+    expect(BACKDROP_TYPES.has("webgl-backdrop")).toBe(true);
+    const js = cameraMovesScript(
+      [{ at: 1, type: "zoom", anchor: "slack.composer" } as any],
+      { width: 1920, height: 1080 }, "document.body", "window.__MP_TIMELINE",
+    );
+    expect(js).toContain("data-mp-backdrop");
+  });
+});
