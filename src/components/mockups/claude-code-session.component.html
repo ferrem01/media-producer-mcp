@@ -1,0 +1,368 @@
+<template>
+  <div class="ccs">
+    <div class="ccs-win" data-target="window">
+      <div class="ccs-bar">
+        <span class="ccs-dot ccs-dot--r"></span><span class="ccs-dot ccs-dot--y"></span><span class="ccs-dot ccs-dot--g"></span>
+        <span class="ccs-title" data-target="title"></span>
+      </div>
+      <div class="ccs-body">
+        <div class="ccs-transcript" data-target="transcript" data-anchor="transcript"></div>
+        <div class="ccs-inputwrap" data-anchor="input">
+          <div class="ccs-inputbox" data-target="input-box">
+            <span class="ccs-caret">&gt;</span>
+            <div class="ccs-input" data-target="input"></div>
+          </div>
+          <div class="ccs-hintrow">
+            <span class="ccs-hint">? for shortcuts</span>
+            <span class="ccs-hint-right" data-target="model-label"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── claude-code-session: ONE Claude Code session, full fidelity.
+     Tier: performable-surface. The script performs the whole coding story
+     INSIDE the component: prompts type, the agent works (live spinner with
+     elapsed seconds + climbing token count), tool calls land with results,
+     diffs paint green/red, todos check off, the response streams. ── */
+  .ccs { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace; }
+  .ccs-win { width: 100%; height: 100%; background: #1b1a17; border-radius: 12px;
+    border: 1px solid rgba(250, 249, 245, 0.08); overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5), 0 6px 24px rgba(0, 0, 0, 0.35); }
+  .ccs-bar { display: flex; align-items: center; gap: 7px; padding: 11px 15px; flex-shrink: 0;
+    background: rgba(250, 249, 245, 0.03); border-bottom: 1px solid rgba(250, 249, 245, 0.06); }
+  .ccs-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .ccs-dot--r { background: #ff5f57; } .ccs-dot--y { background: #febc2e; } .ccs-dot--g { background: #28c840; }
+  .ccs-title { margin-left: 10px; font-size: 12px; color: rgba(250, 249, 245, 0.42); letter-spacing: 0.02em; }
+  .ccs-body { flex: 1; display: flex; flex-direction: column; padding: 18px 22px 16px; min-height: 0; }
+  .ccs-transcript { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;
+    gap: 12px; margin-bottom: 14px; scroll-behavior: smooth; }
+
+  /* Banner */
+  .ccs-banner { line-height: 1.5; }
+  .ccs-banner-hello { font-size: 14px; color: #faf9f5; font-weight: 700; }
+  .ccs-banner-hello .star { color: #D97757; margin-right: 8px; }
+  .ccs-banner-sub { font-size: 12.5px; color: rgba(250, 249, 245, 0.4); margin-top: 3px; padding-left: 22px; }
+
+  /* User prompt line */
+  .ccs-user { font-size: 13.5px; line-height: 1.55; color: rgba(250, 249, 245, 0.92);
+    padding: 8px 12px; border-radius: 8px; background: rgba(250, 249, 245, 0.05);
+    border: 1px solid rgba(250, 249, 245, 0.07); white-space: pre-wrap; word-break: break-word; }
+  .ccs-user::before { content: '> '; color: rgba(250, 249, 245, 0.45); }
+
+  /* Claude prose */
+  .ccs-text { font-size: 13.5px; line-height: 1.6; color: rgba(250, 249, 245, 0.86);
+    white-space: pre-wrap; word-break: break-word; }
+  .ccs-text strong { color: #faf9f5; font-weight: 700; }
+  .ccs-text code { background: rgba(250, 249, 245, 0.08); padding: 1px 5px; border-radius: 4px;
+    font-size: 12.5px; color: #e8b4a0; }
+
+  /* Working / thinking spinner */
+  .ccs-working { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+  .ccs-working .star { color: #D97757; font-size: 15px; display: inline-block; }
+  .ccs-working-verb { color: #D97757; }
+  .ccs-working-meta { color: rgba(250, 249, 245, 0.38); font-size: 12px; }
+
+  /* Tool call block */
+  .ccs-tool { line-height: 1.5; }
+  .ccs-tool-head { font-size: 13.5px; color: #faf9f5; }
+  .ccs-tool-head .tdot { color: #D97757; margin-right: 7px; }
+  .ccs-tool-head .tname { font-weight: 700; }
+  .ccs-tool-head .targ { color: rgba(250, 249, 245, 0.6); }
+  .ccs-tool-result { font-size: 12.5px; color: rgba(250, 249, 245, 0.42); padding-left: 20px; margin-top: 2px;
+    white-space: pre-wrap; word-break: break-word; }
+  .ccs-tool-result::before { content: '⎿  '; color: rgba(250, 249, 245, 0.3); }
+
+  /* Diff block */
+  .ccs-diff { margin-top: 6px; margin-left: 20px; border-radius: 7px; overflow: hidden;
+    border: 1px solid rgba(250, 249, 245, 0.08); font-size: 12px; line-height: 1.5; }
+  .ccs-diff-line { padding: 1.5px 12px; white-space: pre-wrap; word-break: break-word;
+    color: rgba(250, 249, 245, 0.75); background: rgba(250, 249, 245, 0.02); }
+  .ccs-diff-line.add { background: rgba(60, 140, 80, 0.22); color: #b6e3c2; }
+  .ccs-diff-line.add::before { content: '+ '; color: #6fbf85; }
+  .ccs-diff-line.del { background: rgba(180, 60, 60, 0.18); color: #e8b4b0; }
+  .ccs-diff-line.del::before { content: '- '; color: #d98880; }
+  .ccs-diff-line.ctx::before { content: '  '; }
+
+  /* Todo checklist */
+  .ccs-todo { font-size: 13px; line-height: 1.7; }
+  .ccs-todo-item { color: rgba(250, 249, 245, 0.78); }
+  .ccs-todo-item::before { content: '☐ '; color: rgba(250, 249, 245, 0.4); }
+  .ccs-todo-item.done { color: rgba(250, 249, 245, 0.45); text-decoration: line-through; }
+  .ccs-todo-item.done::before { content: '☒ '; color: #6fbf85; text-decoration: none; }
+
+  /* Input */
+  .ccs-inputwrap { flex-shrink: 0; }
+  .ccs-inputbox { display: flex; gap: 9px; align-items: flex-start;
+    border: 1px solid rgba(250, 249, 245, 0.16); border-radius: 9px; padding: 11px 14px;
+    background: rgba(250, 249, 245, 0.02); }
+  .ccs-inputbox.is-active { border-color: rgba(217, 119, 87, 0.55); }
+  .ccs-caret { color: rgba(250, 249, 245, 0.5); font-size: 14px; }
+  .ccs-input { flex: 1; font-size: 13.5px; color: #faf9f5; line-height: 1.5; min-height: 20px;
+    white-space: pre-wrap; word-break: break-word; }
+  .ccs-input:empty::before { content: attr(data-placeholder); color: rgba(250, 249, 245, 0.28); }
+  .ccs-hintrow { display: flex; justify-content: space-between; margin-top: 7px; padding: 0 4px; }
+  .ccs-hint, .ccs-hint-right { font-size: 11px; color: rgba(250, 249, 245, 0.3); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var win = q('.ccs-win');
+    var transcript = q('[data-target="transcript"]');
+    var inputEl = q('[data-target="input"]');
+    var inputBox = q('[data-target="input-box"]');
+    var dur = ctx.duration || 10;
+
+    q('[data-target="title"]').textContent = data.title || (data.cwd ? 'claude — ' + data.cwd : 'claude — ~/project');
+    q('[data-target="model-label"]').textContent = data.model_label || '';
+    inputEl.setAttribute('data-placeholder', data.placeholder || 'Try "fix the failing tests"');
+
+    function scrollDown() { transcript.scrollTop = transcript.scrollHeight; }
+    function addBlock(node, animate) {
+      transcript.appendChild(node);
+      if (animate !== false) {
+        gsap.set(node, { autoAlpha: 0, y: 8 });
+        gsap.to(node, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' });
+      }
+      scrollDown();
+      return node;
+    }
+
+    // ── Block builders ──
+    function bannerEl() {
+      var d = document.createElement('div');
+      d.className = 'ccs-banner';
+      d.innerHTML = '<div class="ccs-banner-hello"><span class="star">✳</span>Welcome to Claude Code!</div>' +
+        '<div class="ccs-banner-sub">' + (data.banner_sub || 'cwd: ' + (data.cwd || '~/project')) + '</div>';
+      return d;
+    }
+    function userEl(text) {
+      var d = document.createElement('div');
+      d.className = 'ccs-user';
+      d.textContent = String(text || '');
+      return d;
+    }
+    function md(text) {
+      var h = String(text || '');
+      h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+      h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      return h;
+    }
+    function textEl(text) {
+      var d = document.createElement('div');
+      d.className = 'ccs-text';
+      d.innerHTML = md(text);
+      return d;
+    }
+    function toolEl(t) {
+      var d = document.createElement('div');
+      d.className = 'ccs-tool';
+      var head = '<div class="ccs-tool-head"><span class="tdot">⏺</span><span class="tname">' +
+        (t.tool || 'Bash') + '</span><span class="targ">(' + (t.target || '') + ')</span></div>';
+      var html = head;
+      if (t.result) html += '<div class="ccs-tool-result">' + String(t.result) + '</div>';
+      d.innerHTML = html;
+      if (t.diff && t.diff.length) {
+        var diff = document.createElement('div');
+        diff.className = 'ccs-diff';
+        t.diff.forEach(function (ln) {
+          var row = document.createElement('div');
+          var kind = typeof ln === 'string'
+            ? (ln.charAt(0) === '+' ? 'add' : ln.charAt(0) === '-' ? 'del' : 'ctx')
+            : (ln.kind || 'ctx');
+          var body = typeof ln === 'string' ? ln.replace(/^[+-]\s?/, '') : (ln.text || '');
+          row.className = 'ccs-diff-line ' + kind;
+          row.textContent = body;
+          diff.appendChild(row);
+        });
+        d.appendChild(diff);
+      }
+      return d;
+    }
+    function todoEl(items) {
+      var d = document.createElement('div');
+      d.className = 'ccs-todo';
+      (items || []).forEach(function (it) {
+        var row = document.createElement('div');
+        row.className = 'ccs-todo-item' + (it.done ? ' done' : '');
+        row.textContent = it.text || String(it);
+        d.appendChild(row);
+      });
+      return d;
+    }
+
+    // ── Working spinner ──
+    var workingEl = null;
+    function showWorking(opts) {
+      opts = opts || {};
+      removeWorking();
+      var d = document.createElement('div');
+      d.className = 'ccs-working';
+      d.innerHTML = '<span class="star">✳</span><span class="ccs-working-verb">' +
+        (opts.text || 'Working…') + '</span><span class="ccs-working-meta"></span>';
+      addBlock(d);
+      workingEl = d;
+      gsap.to(d.querySelector('.star'), { rotation: 360, duration: 2.4, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
+    }
+    function removeWorking() {
+      if (!workingEl) return;
+      gsap.killTweensOf(workingEl.querySelector('.star'));
+      if (workingEl.parentNode) workingEl.parentNode.removeChild(workingEl);
+      workingEl = null;
+    }
+    // Elapsed seconds + climbing token count. The counter tween rides the
+    // MASTER timeline (added at script-build time, capped to the scene), so
+    // frame-capture scrubbing sees the same numbers wall-clock would. When
+    // working periods overlap, the later-created tween updates last and wins
+    // -- which is exactly "elapsed since the latest working started".
+    function addWorkingCounter(tlRef, at, opts) {
+      var proxy = { t: 0 };
+      var rate = Number((opts || {}).tokens_per_s) || 260;
+      var span = Math.max(0.5, dur - at);
+      tlRef.to(proxy, {
+        t: span, duration: span, ease: 'none',
+        onUpdate: function () {
+          if (!workingEl) return;
+          var meta = workingEl.querySelector('.ccs-working-meta');
+          if (!meta) return;
+          var s = Math.floor(proxy.t);
+          var tok = proxy.t * rate;
+          var tokLabel = tok >= 1000 ? (tok / 1000).toFixed(1) + 'k' : String(Math.floor(tok));
+          meta.textContent = '(' + s + 's · ↑ ' + tokLabel + ' tokens · esc to interrupt)';
+        },
+      }, at);
+    }
+
+    // ── Streaming response (word by word, scrub-safe) ──
+    function streamText(tlRef, text, at, secs) {
+      var d = textEl('');
+      var words = String(text || '').split(/(\s+)/);
+      var full = md(text);
+      tlRef.call(function () { removeWorking(); addBlock(d); }, null, at);
+      var proxy = { n: 0 };
+      tlRef.to(proxy, {
+        n: words.length, duration: Math.max(0.6, secs || Math.min(2.8, words.length * 0.045)), ease: 'none',
+        onUpdate: function () {
+          var upto = words.slice(0, Math.ceil(proxy.n)).join('');
+          d.innerHTML = md(upto);
+          scrollDown();
+        },
+        onComplete: function () { d.innerHTML = full; scrollDown(); },
+      }, at + 0.05);
+      return d;
+    }
+
+    // ── Initial history ──
+    var history = Array.isArray(data.history) ? data.history : [];
+    if (data.show_banner !== false && history.length === 0) addBlock(bannerEl(), false);
+    history.forEach(function (h) {
+      if (h.type === 'user') addBlock(userEl(h.text), false);
+      else if (h.type === 'tool') addBlock(toolEl(h), false);
+      else if (h.type === 'todo') addBlock(todoEl(h.items), false);
+      else addBlock(textEl(h.text), false);
+    });
+
+    // ── Entrance ──
+    gsap.set(win, { autoAlpha: 0, y: 24 });
+    tl.to(win, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.15);
+    var initBlocks = Array.prototype.slice.call(transcript.children);
+    if (initBlocks.length) {
+      gsap.set(initBlocks, { autoAlpha: 0, y: 8 });
+      initBlocks.forEach(function (b, i) {
+        tl.to(b, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, 0.45 + i * 0.12);
+      });
+    }
+
+    // ── Cursor targets ──
+    var cursorTargets = data.cursor_targets || {
+      'input': function () {
+        var b = inputBox.getBoundingClientRect();
+        var p = el.getBoundingClientRect();
+        return { x: ((b.left + b.width / 2 - p.left) / p.width * 100) + '%',
+                 y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
+      },
+    };
+
+    // ── Declarative shorthand -> script (storyboards write intent keys) ──
+    if (!data.script || !data.script.length) {
+      var synth = [];
+      var t0 = Math.max(0.8, dur * 0.08);
+      if (data.prompt_text) {
+        var pTxt = String(data.prompt_text);
+        var typeDur = Math.min(2.4, Math.max(1.0, pTxt.length * 0.045));
+        synth.push({ action: 'type-prompt', at: t0, text: pTxt });
+        synth.push({ action: 'send-prompt', at: t0 + typeDur + 0.3 });
+        synth.push({ action: 'working', at: t0 + typeDur + 0.7 });
+        t0 = t0 + typeDur + 0.7;
+      }
+      var tcs = Array.isArray(data.tool_calls) ? data.tool_calls : [];
+      if (tcs.length) {
+        var span = Math.max(1.5, (dur * 0.72 - t0));
+        var step = span / tcs.length;
+        tcs.forEach(function (tc, i) {
+          synth.push(Object.assign({ action: 'tool-call', at: t0 + 0.8 + i * step }, tc));
+        });
+        t0 = t0 + 0.8 + tcs.length * step;
+      }
+      if (data.response_text) {
+        synth.push({ action: 'respond', at: Math.min(Math.max(t0 + 0.4, dur * 0.66), dur - 1.6), text: String(data.response_text) });
+      }
+      if (synth.length) data.script = synth;
+    }
+
+    // ── Script actions ──
+    if (data.script && data.script.length > 0) {
+      runScript(tl, el, data.script, cursorTargets, ctx, {
+        'type-prompt': function (tl, ctr, action, at) {
+          tl.call(function () { inputBox.classList.add('is-active'); }, null, at);
+          typeText(tl, inputEl, action.text || '', at, action.speed || 30);
+        },
+        'send-prompt': function (tl, ctr, action, at) {
+          tl.call(function () {
+            var txt = inputEl.textContent;
+            if (!txt) return;
+            addBlock(userEl(txt));
+            inputEl.textContent = '';
+            inputBox.classList.remove('is-active');
+          }, null, at);
+        },
+        'working': function (tl, ctr, action, at) {
+          tl.call(function () { showWorking(action); }, null, at);
+          addWorkingCounter(tl, at, action);
+        },
+        'stop-working': function (tl, ctr, action, at) {
+          tl.call(removeWorking, null, at);
+        },
+        'tool-call': function (tl, ctr, action, at) {
+          tl.call(function () {
+            removeWorking();
+            addBlock(toolEl(action));
+            if (action.then_working !== false) showWorking({ text: action.working_text || 'Working…' });
+          }, null, at);
+          if (action.then_working !== false) addWorkingCounter(tl, at + 0.05, action);
+        },
+        'respond': function (tl, ctr, action, at) {
+          streamText(tl, action.text || '', at, action.duration);
+        },
+        'todo': function (tl, ctr, action, at) {
+          tl.call(function () {
+            removeWorking();
+            addBlock(todoEl(action.items));
+            if (action.then_working) showWorking({});
+          }, null, at);
+        },
+        'claude-text': function (tl, ctr, action, at) {
+          tl.call(function () { removeWorking(); addBlock(textEl(action.text || '')); }, null, at);
+        },
+      });
+    }
+
+    return tl;
+  }
+</script>

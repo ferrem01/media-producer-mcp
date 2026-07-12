@@ -1,0 +1,380 @@
+<template>
+  <div class="cds">
+    <div class="cds-win" data-target="window">
+      <div class="cds-bar">
+        <span class="cds-dot cds-dot--r"></span><span class="cds-dot cds-dot--y"></span><span class="cds-dot cds-dot--g"></span>
+        <span class="cds-title" data-target="app-title"></span>
+      </div>
+      <div class="cds-main">
+        <div class="cds-sidebar" data-target="sidebar" data-anchor="sessions">
+          <div class="cds-side-head">
+            <span class="cds-side-label">Sessions</span>
+            <span class="cds-side-new">+</span>
+          </div>
+          <div class="cds-session-list" data-target="session-list"></div>
+        </div>
+        <div class="cds-pane">
+          <div class="cds-pane-head" data-target="pane-head"></div>
+          <div class="cds-transcript" data-target="transcript" data-anchor="transcript"></div>
+          <div class="cds-inputwrap" data-anchor="input">
+            <div class="cds-inputbox" data-target="input-box">
+              <span class="cds-caret">&gt;</span>
+              <div class="cds-input" data-target="input"></div>
+            </div>
+            <div class="cds-hintrow">
+              <span class="cds-hint">? for shortcuts</span>
+              <span class="cds-hint-right" data-target="model-label"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── claude-desktop: the Claude Code desktop app -- a sessions sidebar
+     with SEVERAL parallel sessions (working / needs-input / done) beside a
+     live session pane. Tier: performable-surface. The fleet story: agents
+     running in parallel while you steer one. ── */
+  .cds { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace; }
+  .cds-win { width: 100%; height: 100%; background: #1b1a17; border-radius: 12px;
+    border: 1px solid rgba(250, 249, 245, 0.08); overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5), 0 6px 24px rgba(0, 0, 0, 0.35); }
+  .cds-bar { display: flex; align-items: center; gap: 7px; padding: 11px 15px; flex-shrink: 0;
+    background: rgba(250, 249, 245, 0.03); border-bottom: 1px solid rgba(250, 249, 245, 0.06); }
+  .cds-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .cds-dot--r { background: #ff5f57; } .cds-dot--y { background: #febc2e; } .cds-dot--g { background: #28c840; }
+  .cds-title { margin-left: 10px; font-size: 12px; color: rgba(250, 249, 245, 0.42); }
+  .cds-main { flex: 1; display: flex; min-height: 0; }
+
+  /* Sidebar */
+  .cds-sidebar { width: 250px; min-width: 250px; border-right: 1px solid rgba(250, 249, 245, 0.07);
+    background: rgba(250, 249, 245, 0.015); display: flex; flex-direction: column; padding: 14px 10px; }
+  .cds-side-head { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 10px; }
+  .cds-side-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: rgba(250, 249, 245, 0.4); }
+  .cds-side-new { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center;
+    justify-content: center; color: rgba(250, 249, 245, 0.6); background: rgba(250, 249, 245, 0.06); font-size: 14px; }
+  .cds-session-list { display: flex; flex-direction: column; gap: 4px; }
+  .cds-session { padding: 9px 10px; border-radius: 9px; cursor: default; }
+  .cds-session.is-active { background: rgba(250, 249, 245, 0.07); }
+  .cds-sess-top { display: flex; align-items: center; gap: 7px; }
+  .cds-sess-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cds-sess-status.working { background: #D97757; }
+  .cds-sess-status.input { background: #febc2e; }
+  .cds-sess-status.done { background: #28c840; }
+  .cds-sess-status.idle { background: rgba(250, 249, 245, 0.25); }
+  .cds-sess-project { font-size: 12.5px; font-weight: 700; color: rgba(250, 249, 245, 0.88);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cds-sess-title { font-size: 11.5px; color: rgba(250, 249, 245, 0.45); margin-top: 3px; padding-left: 15px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cds-sess-badge { margin-left: auto; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 9px; }
+  .cds-sess-badge.input { background: rgba(254, 188, 46, 0.18); color: #febc2e; }
+  .cds-sess-badge.working { background: rgba(217, 119, 87, 0.16); color: #D97757; }
+  .cds-sess-badge.done { background: rgba(40, 200, 64, 0.14); color: #4fd06a; }
+
+  /* Pane */
+  .cds-pane { flex: 1; display: flex; flex-direction: column; padding: 16px 20px 14px; min-width: 0; }
+  .cds-pane-head { font-size: 12px; color: rgba(250, 249, 245, 0.42); padding-bottom: 10px;
+    border-bottom: 1px solid rgba(250, 249, 245, 0.05); margin-bottom: 12px; }
+  .cds-transcript { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;
+    gap: 12px; margin-bottom: 14px; scroll-behavior: smooth; }
+
+  /* Transcript blocks (same visual language as claude-code-session) */
+  .cds-user { font-size: 13px; line-height: 1.55; color: rgba(250, 249, 245, 0.92);
+    padding: 8px 12px; border-radius: 8px; background: rgba(250, 249, 245, 0.05);
+    border: 1px solid rgba(250, 249, 245, 0.07); white-space: pre-wrap; word-break: break-word; }
+  .cds-user::before { content: '> '; color: rgba(250, 249, 245, 0.45); }
+  .cds-text { font-size: 13px; line-height: 1.6; color: rgba(250, 249, 245, 0.86);
+    white-space: pre-wrap; word-break: break-word; }
+  .cds-text strong { color: #faf9f5; }
+  .cds-text code { background: rgba(250, 249, 245, 0.08); padding: 1px 5px; border-radius: 4px;
+    font-size: 12px; color: #e8b4a0; }
+  .cds-working { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+  .cds-working .star { color: #D97757; font-size: 14px; display: inline-block; }
+  .cds-working-verb { color: #D97757; }
+  .cds-working-meta { color: rgba(250, 249, 245, 0.38); font-size: 11.5px; }
+  .cds-tool { line-height: 1.5; }
+  .cds-tool-head { font-size: 13px; color: #faf9f5; }
+  .cds-tool-head .tdot { color: #D97757; margin-right: 7px; }
+  .cds-tool-head .tname { font-weight: 700; }
+  .cds-tool-head .targ { color: rgba(250, 249, 245, 0.6); }
+  .cds-tool-result { font-size: 12px; color: rgba(250, 249, 245, 0.42); padding-left: 20px; margin-top: 2px;
+    white-space: pre-wrap; word-break: break-word; }
+  .cds-tool-result::before { content: '⎿  '; color: rgba(250, 249, 245, 0.3); }
+  .cds-diff { margin-top: 6px; margin-left: 20px; border-radius: 7px; overflow: hidden;
+    border: 1px solid rgba(250, 249, 245, 0.08); font-size: 11.5px; line-height: 1.5; }
+  .cds-diff-line { padding: 1.5px 12px; white-space: pre-wrap; word-break: break-word;
+    color: rgba(250, 249, 245, 0.75); background: rgba(250, 249, 245, 0.02); }
+  .cds-diff-line.add { background: rgba(60, 140, 80, 0.22); color: #b6e3c2; }
+  .cds-diff-line.add::before { content: '+ '; color: #6fbf85; }
+  .cds-diff-line.del { background: rgba(180, 60, 60, 0.18); color: #e8b4b0; }
+  .cds-diff-line.del::before { content: '- '; color: #d98880; }
+  .cds-diff-line.ctx::before { content: '  '; }
+
+  /* Input */
+  .cds-inputwrap { flex-shrink: 0; }
+  .cds-inputbox { display: flex; gap: 9px; align-items: flex-start;
+    border: 1px solid rgba(250, 249, 245, 0.16); border-radius: 9px; padding: 10px 13px;
+    background: rgba(250, 249, 245, 0.02); }
+  .cds-inputbox.is-active { border-color: rgba(217, 119, 87, 0.55); }
+  .cds-caret { color: rgba(250, 249, 245, 0.5); font-size: 13px; }
+  .cds-input { flex: 1; font-size: 13px; color: #faf9f5; line-height: 1.5; min-height: 19px;
+    white-space: pre-wrap; word-break: break-word; }
+  .cds-input:empty::before { content: attr(data-placeholder); color: rgba(250, 249, 245, 0.28); }
+  .cds-hintrow { display: flex; justify-content: space-between; margin-top: 6px; padding: 0 4px; }
+  .cds-hint, .cds-hint-right { font-size: 10.5px; color: rgba(250, 249, 245, 0.3); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var win = q('.cds-win');
+    var transcript = q('[data-target="transcript"]');
+    var inputEl = q('[data-target="input"]');
+    var inputBox = q('[data-target="input-box"]');
+    var sessionList = q('[data-target="session-list"]');
+    var paneHead = q('[data-target="pane-head"]');
+    var dur = ctx.duration || 10;
+
+    q('[data-target="app-title"]').textContent = data.app_title || 'Claude Code';
+    q('[data-target="model-label"]').textContent = data.model_label || '';
+    inputEl.setAttribute('data-placeholder', data.placeholder || 'Reply to Claude…');
+
+    // ── Sessions sidebar ──
+    var sessions = Array.isArray(data.sessions) && data.sessions.length ? data.sessions : [
+      { project: 'acme-api', title: 'Fix flaky auth tests', status: 'working' },
+      { project: 'marketing-site', title: 'Ship pricing page', status: 'input' },
+      { project: 'mobile-app', title: 'Migrate to SDK v3', status: 'done' },
+    ];
+    var activeIdx = Number(data.active_session) || 0;
+    var sessionEls = [];
+    var STATUS_BADGE = { working: 'running', input: 'needs input', done: 'done' };
+    function renderSessionRow(s, i) {
+      var d = document.createElement('div');
+      d.className = 'cds-session' + (i === activeIdx ? ' is-active' : '');
+      d.setAttribute('data-target', 'session-' + i);
+      var badge = s.status && STATUS_BADGE[s.status]
+        ? '<span class="cds-sess-badge ' + s.status + '">' + STATUS_BADGE[s.status] + '</span>' : '';
+      d.innerHTML = '<div class="cds-sess-top">' +
+          '<span class="cds-sess-status ' + (s.status || 'idle') + '"></span>' +
+          '<span class="cds-sess-project">' + (s.project || 'project') + '</span>' + badge +
+        '</div>' +
+        '<div class="cds-sess-title">' + (s.title || '') + '</div>';
+      return d;
+    }
+    sessions.forEach(function (s, i) {
+      var d = renderSessionRow(s, i);
+      sessionList.appendChild(d);
+      sessionEls.push(d);
+    });
+    function setPaneHead(i) {
+      var s = sessions[i] || {};
+      paneHead.textContent = (s.project || 'project') + (s.title ? ' — ' + s.title : '');
+    }
+    setPaneHead(activeIdx);
+
+    function setSessionStatus(i, status) {
+      var s = sessions[i];
+      var elRow = sessionEls[i];
+      if (!s || !elRow) return;
+      s.status = status;
+      var fresh = renderSessionRow(s, i);
+      fresh.className = 'cds-session' + (elRow.classList.contains('is-active') ? ' is-active' : '');
+      elRow.replaceWith(fresh);
+      sessionEls[i] = fresh;
+      var dot = fresh.querySelector('.cds-sess-status');
+      gsap.from(dot, { scale: 0, duration: 0.35, ease: 'back.out(2)' });
+    }
+
+    // ── Transcript blocks ──
+    function scrollDown() { transcript.scrollTop = transcript.scrollHeight; }
+    function addBlock(node, animate) {
+      transcript.appendChild(node);
+      if (animate !== false) {
+        gsap.set(node, { autoAlpha: 0, y: 8 });
+        gsap.to(node, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' });
+      }
+      scrollDown();
+      return node;
+    }
+    function md(text) {
+      var h = String(text || '');
+      h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+      h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      return h;
+    }
+    function userEl(text) {
+      var d = document.createElement('div'); d.className = 'cds-user'; d.textContent = String(text || ''); return d;
+    }
+    function textEl(text) {
+      var d = document.createElement('div'); d.className = 'cds-text'; d.innerHTML = md(text); return d;
+    }
+    function toolEl(t) {
+      var d = document.createElement('div');
+      d.className = 'cds-tool';
+      var html = '<div class="cds-tool-head"><span class="tdot">⏺</span><span class="tname">' +
+        (t.tool || 'Bash') + '</span><span class="targ">(' + (t.target || '') + ')</span></div>';
+      if (t.result) html += '<div class="cds-tool-result">' + String(t.result) + '</div>';
+      d.innerHTML = html;
+      if (t.diff && t.diff.length) {
+        var diff = document.createElement('div');
+        diff.className = 'cds-diff';
+        t.diff.forEach(function (ln) {
+          var row = document.createElement('div');
+          var kind = typeof ln === 'string'
+            ? (ln.charAt(0) === '+' ? 'add' : ln.charAt(0) === '-' ? 'del' : 'ctx')
+            : (ln.kind || 'ctx');
+          row.className = 'cds-diff-line ' + kind;
+          row.textContent = typeof ln === 'string' ? ln.replace(/^[+-]\s?/, '') : (ln.text || '');
+          diff.appendChild(row);
+        });
+        d.appendChild(diff);
+      }
+      return d;
+    }
+
+    // ── Working spinner + master-timeline counter (scrub-safe) ──
+    var workingEl = null;
+    function showWorking(opts) {
+      opts = opts || {};
+      removeWorking();
+      var d = document.createElement('div');
+      d.className = 'cds-working';
+      d.innerHTML = '<span class="star">✳</span><span class="cds-working-verb">' +
+        (opts.text || 'Working…') + '</span><span class="cds-working-meta"></span>';
+      addBlock(d);
+      workingEl = d;
+      gsap.to(d.querySelector('.star'), { rotation: 360, duration: 2.4, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
+    }
+    function removeWorking() {
+      if (!workingEl) return;
+      gsap.killTweensOf(workingEl.querySelector('.star'));
+      if (workingEl.parentNode) workingEl.parentNode.removeChild(workingEl);
+      workingEl = null;
+    }
+    function addWorkingCounter(tlRef, at, opts) {
+      var proxy = { t: 0 };
+      var rate = Number((opts || {}).tokens_per_s) || 260;
+      var span = Math.max(0.5, dur - at);
+      tlRef.to(proxy, {
+        t: span, duration: span, ease: 'none',
+        onUpdate: function () {
+          if (!workingEl) return;
+          var meta = workingEl.querySelector('.cds-working-meta');
+          if (!meta) return;
+          var s = Math.floor(proxy.t);
+          var tok = proxy.t * rate;
+          var tokLabel = tok >= 1000 ? (tok / 1000).toFixed(1) + 'k' : String(Math.floor(tok));
+          meta.textContent = '(' + s + 's · ↑ ' + tokLabel + ' tokens · esc to interrupt)';
+        },
+      }, at);
+    }
+    function streamText(tlRef, text, at, secs) {
+      var d = textEl('');
+      var words = String(text || '').split(/(\s+)/);
+      var full = md(text);
+      tlRef.call(function () { removeWorking(); addBlock(d); }, null, at);
+      var proxy = { n: 0 };
+      tlRef.to(proxy, {
+        n: words.length, duration: Math.max(0.6, secs || Math.min(2.8, words.length * 0.045)), ease: 'none',
+        onUpdate: function () { d.innerHTML = md(words.slice(0, Math.ceil(proxy.n)).join('')); scrollDown(); },
+        onComplete: function () { d.innerHTML = full; scrollDown(); },
+      }, at + 0.05);
+    }
+
+    // ── Initial history for the active pane ──
+    (Array.isArray(data.history) ? data.history : []).forEach(function (h) {
+      if (h.type === 'user') addBlock(userEl(h.text), false);
+      else if (h.type === 'tool') addBlock(toolEl(h), false);
+      else addBlock(textEl(h.text), false);
+    });
+
+    // ── Entrance ──
+    gsap.set(win, { autoAlpha: 0, y: 24 });
+    tl.to(win, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.15);
+    var initRows = sessionEls.concat(Array.prototype.slice.call(transcript.children));
+    gsap.set(initRows, { autoAlpha: 0, y: 8 });
+    initRows.forEach(function (b, i) {
+      tl.to(b, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, 0.4 + i * 0.1);
+    });
+
+    var cursorTargets = data.cursor_targets || {
+      'input': function () {
+        var b = inputBox.getBoundingClientRect();
+        var p = el.getBoundingClientRect();
+        return { x: ((b.left + b.width / 2 - p.left) / p.width * 100) + '%',
+                 y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
+      },
+    };
+    sessions.forEach(function (s, i) {
+      cursorTargets['session-' + i] = function () {
+        var b = sessionEls[i].getBoundingClientRect();
+        var p = el.getBoundingClientRect();
+        return { x: ((b.left + b.width / 2 - p.left) / p.width * 100) + '%',
+                 y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
+      };
+    });
+
+    // ── Script ──
+    if (data.script && data.script.length > 0) {
+      runScript(tl, el, data.script, cursorTargets, ctx, {
+        'type-prompt': function (tl, ctr, action, at) {
+          tl.call(function () { inputBox.classList.add('is-active'); }, null, at);
+          typeText(tl, inputEl, action.text || '', at, action.speed || 30);
+        },
+        'send-prompt': function (tl, ctr, action, at) {
+          tl.call(function () {
+            var txt = inputEl.textContent;
+            if (!txt) return;
+            addBlock(userEl(txt));
+            inputEl.textContent = '';
+            inputBox.classList.remove('is-active');
+          }, null, at);
+        },
+        'working': function (tl, ctr, action, at) {
+          tl.call(function () { showWorking(action); }, null, at);
+          addWorkingCounter(tl, at, action);
+        },
+        'stop-working': function (tl, ctr, action, at) { tl.call(removeWorking, null, at); },
+        'tool-call': function (tl, ctr, action, at) {
+          tl.call(function () {
+            removeWorking();
+            addBlock(toolEl(action));
+            if (action.then_working !== false) showWorking({ text: action.working_text || 'Working…' });
+          }, null, at);
+          if (action.then_working !== false) addWorkingCounter(tl, at + 0.05, action);
+        },
+        'respond': function (tl, ctr, action, at) { streamText(tl, action.text || '', at, action.duration); },
+        'claude-text': function (tl, ctr, action, at) {
+          tl.call(function () { removeWorking(); addBlock(textEl(action.text || '')); }, null, at);
+        },
+        'switch-session': function (tl, ctr, action, at) {
+          tl.call(function () {
+            var idx = Number(action.index) || 0;
+            removeWorking();
+            sessionEls.forEach(function (row, i) { row.classList.toggle('is-active', i === idx); });
+            activeIdx = idx;
+            setPaneHead(idx);
+            if (action.clear !== false) transcript.innerHTML = '';
+            (action.history || []).forEach(function (h) {
+              if (h.type === 'user') addBlock(userEl(h.text), false);
+              else if (h.type === 'tool') addBlock(toolEl(h), false);
+              else addBlock(textEl(h.text), false);
+            });
+            gsap.from(transcript.children.length ? transcript.children : transcript,
+              { autoAlpha: 0, y: 8, duration: 0.3, stagger: 0.06, ease: 'power2.out' });
+          }, null, at);
+        },
+        'session-status': function (tl, ctr, action, at) {
+          tl.call(function () { setSessionStatus(Number(action.index) || 0, action.status || 'done'); }, null, at);
+        },
+      });
+    }
+
+    return tl;
+  }
+</script>

@@ -1,0 +1,69 @@
+{
+  "type": "claude-desktop",
+  "label": "Claude Code Desktop (parallel sessions)",
+  "category": "mockups",
+  "description": "The Claude Code desktop app: a sessions sidebar with SEVERAL parallel sessions (status dots + badges: working / needs input / done) beside a live session pane with the full Claude Code performance (prompts, tool calls, diffs, working spinner with live counters, streaming responses). THE FLEET STORY: agents running in parallel while you steer one -- use switch-session and session-status to play it out. SCRIPTED performable surface; camera anchors: sessions, transcript, input.",
+  "data": {
+    "app_title": {
+      "type": "string",
+      "label": "Window title (default 'Claude Code')",
+      "optional": true
+    },
+    "sessions": {
+      "type": "array",
+      "label": "Sidebar sessions: [{project: 'acme-api', title: 'Fix flaky auth tests', status: 'working'|'input'|'done'|'idle'}]. Defaults to a believable 3-session fleet.",
+      "optional": true
+    },
+    "active_session": {
+      "type": "number",
+      "label": "Index of the highlighted session (default 0)",
+      "optional": true
+    },
+    "history": {
+      "type": "array",
+      "label": "Transcript blocks for the active pane at open: [{type: 'user'|'text'|'tool', ...}]",
+      "optional": true
+    },
+    "model_label": {
+      "type": "string",
+      "label": "Right side of the hint row",
+      "optional": true
+    },
+    "placeholder": {
+      "type": "string",
+      "label": "Input placeholder",
+      "optional": true
+    },
+    "script": {
+      "type": "array",
+      "label": "The full performance: all claude-code-session actions (type-prompt, send-prompt, working, tool-call, respond, claude-text, stop-working) PLUS fleet actions: switch-session {index, history?, clear?} (sidebar highlight moves, the pane swaps to that session's transcript), session-status {index, status: 'working'|'input'|'done'} (a sidebar session's dot + badge change -- e.g. a parallel agent finishes while you watch another). NEVER move the camera from a script -- scene camera_moves with anchors (sessions, transcript, input).",
+      "optional": true
+    },
+    "cursor_targets": {
+      "type": "object",
+      "label": "Named cursor positions (input, session-0..n)",
+      "optional": true
+    }
+  },
+  "script_actions": [
+    { "action": "type-prompt", "description": "Type into the input box", "params": { "text": "string", "speed": "number" } },
+    { "action": "send-prompt", "description": "Post the typed prompt to the transcript" },
+    { "action": "working", "description": "Working spinner with live elapsed/token counter", "params": { "text": "string", "tokens_per_s": "number" } },
+    { "action": "stop-working", "description": "Remove the spinner" },
+    { "action": "tool-call", "description": "⏺ tool block with ⎿ result and optional green/red diff", "params": { "tool": "string", "target": "string", "result": "string", "diff": "array", "then_working": "boolean" } },
+    { "action": "respond", "description": "Stream Claude's response word by word", "params": { "text": "string", "duration": "number" } },
+    { "action": "claude-text", "description": "Instant prose block", "params": { "text": "string" } },
+    {
+      "action": "switch-session",
+      "description": "Move the sidebar highlight to another session and swap the pane to its transcript",
+      "params": { "index": "number - session index", "history": "array - transcript blocks for that session", "clear": "boolean - clear pane first (default true)" }
+    },
+    {
+      "action": "session-status",
+      "description": "Change a sidebar session's status dot + badge (working / input / done) -- a parallel agent finishing while you watch another",
+      "params": { "index": "number", "status": "string - working|input|done" }
+    }
+  ],
+  "default_cursor_targets": { "input": { "x": "60%", "y": "92%" } },
+  "tier": "performable-surface"
+}
