@@ -1,0 +1,573 @@
+<template>
+  <div class="qas">
+    <!-- Left icon rail -->
+    <div class="qas-rail" data-anchor="nav">
+      <div class="qas-rail-top">
+        <div class="qas-rail-btn" data-nav="home">
+          <svg viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="history">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 3"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="campaigns">
+          <svg viewBox="0 0 24 24"><path d="M5 21V4a1 1 0 011-1h10l-2.5 3.5L16 10H6"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="social">
+          <svg viewBox="0 0 24 24"><path d="M7 11v8H4a1 1 0 01-1-1v-6a1 1 0 011-1h3zm0 0l3.5-5c0-2 .7-3.5 2.5-3.5s2 2 2 3.5V9h4.5a2 2 0 012 2.4l-1.6 6A2 2 0 0118 19H7"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="blog">
+          <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V3H6.5A2.5 2.5 0 004 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 006.5 22H20v-5"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="email">
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="assets">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="docs">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="flows">
+          <svg viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><circle cx="4" cy="6" r="1.4"/><circle cx="4" cy="12" r="1.4"/><circle cx="4" cy="18" r="1.4"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="calendar">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="audience">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        </div>
+        <div class="qas-rail-btn" data-nav="memory">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8"/><path d="M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg>
+        </div>
+      </div>
+      <div class="qas-rail-ava"></div>
+    </div>
+
+    <!-- Right side: header + (content | chat panel) -->
+    <div class="qas-main">
+      <div class="qas-header" data-anchor="header">
+        <div class="qas-header-left">
+          <div class="qas-collapse-btn">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+          </div>
+          <div class="qas-crumbs"></div>
+        </div>
+        <div class="qas-header-right">
+          <div class="qas-bell">
+            <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+            <span class="qas-bell-badge"></span>
+          </div>
+          <div class="qas-search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <span>Search</span>
+            <span class="qas-kbd">⌘+K</span>
+          </div>
+          <div class="qas-hist-btn">
+            <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 3"/></svg>
+          </div>
+          <button class="qas-newchat">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+            <span>New Chat</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="qas-body">
+        <!-- Center content well: the scene drops the middle-of-the-app
+             component here (quotient-social, campaign screen, email, ...) -->
+        <div class="qas-content" data-anchor="content"></div>
+
+        <!-- Agent chat panel -->
+        <div class="qas-panel" data-anchor="panel">
+          <div class="qas-panel-head">
+            <div class="qas-tab">
+              <span class="qas-tab-label"></span>
+              <span class="qas-tab-x">×</span>
+            </div>
+            <div class="qas-panel-icons">
+              <div class="qas-pi qas-pi-copies">
+                <svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h3"/></svg>
+                <span class="qas-pi-badge"></span>
+              </div>
+              <div class="qas-pi">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg>
+              </div>
+              <div class="qas-pi qas-pi-close">×</div>
+            </div>
+          </div>
+
+          <div class="qas-msgs" data-anchor="messages"></div>
+
+          <div class="qas-composer" data-anchor="composer">
+            <div class="qas-input">
+              <span class="qas-input-text"></span><span class="qas-caret"></span>
+              <span class="qas-placeholder">Type a message...</span>
+            </div>
+            <div class="qas-input-row">
+              <div class="qas-ir-left">
+                <svg class="qas-clip" viewBox="0 0 24 24"><path d="M21.4 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.2-9.19a4 4 0 015.65 5.66l-9.2 9.19a2 2 0 01-2.82-2.83l8.49-8.48"/></svg>
+                <span class="qas-mode">Auto</span>
+                <svg class="qas-mode-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+              <div class="qas-ir-right">
+                <svg class="qas-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0014 0v-2"/><path d="M12 19v3"/></svg>
+                <div class="qas-send">
+                  <svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  .qas {
+    width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0;
+    display: flex;
+    background: #fbfaf8;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #1a1a1a;
+    overflow: hidden;
+  }
+  .qas svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ── Icon rail ── */
+  .qas-rail {
+    width: 3.4%; min-width: 46px; max-width: 68px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: space-between;
+    padding: 14px 0 16px;
+    border-right: 1px solid #eeedea;
+    background: #fbfaf8;
+    flex-shrink: 0;
+  }
+  .qas-rail-top { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .qas-rail-btn {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    color: #75736e; cursor: pointer;
+  }
+  .qas-rail-btn svg { width: 17px; height: 17px; }
+  .qas-rail-btn.active { background: #eceae4; color: #1a1a1a; }
+  .qas-rail-ava {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #d5e2f5; overflow: hidden; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #5b7bb5;
+  }
+  .qas-rail-ava img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+  /* ── Main column ── */
+  .qas-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  /* ── Header ── */
+  .qas-header {
+    height: 5.6%; min-height: 46px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px 0 12px;
+    flex-shrink: 0;
+  }
+  .qas-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .qas-collapse-btn { color: #75736e; display: flex; }
+  .qas-collapse-btn svg { width: 17px; height: 17px; }
+  .qas-crumbs { display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 0; white-space: nowrap; }
+  .qas-crumb { color: #6f6d68; }
+  .qas-crumb.last { color: #1a1a1a; font-weight: 500; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
+  .qas-crumb-sep { color: #b9b7b1; font-size: 13px; }
+  .qas-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .qas-bell { position: relative; color: #55534e; display: flex; padding: 4px; }
+  .qas-bell svg { width: 18px; height: 18px; }
+  .qas-bell-badge {
+    position: absolute; top: -6px; left: 10px;
+    background: #e8442e; color: #fff;
+    font-size: 10px; font-weight: 700;
+    padding: 1.5px 6px; border-radius: 9px;
+    border: 2px solid #fbfaf8;
+  }
+  .qas-search {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid #e6e4df; border-radius: 10px;
+    background: #fff;
+    padding: 8px 12px; font-size: 13.5px; color: #8b8983;
+    min-width: 210px;
+  }
+  .qas-search svg { width: 14px; height: 14px; color: #8b8983; }
+  .qas-kbd { margin-left: auto; font-size: 11.5px; color: #9c9a94; }
+  .qas-hist-btn { color: #55534e; display: flex; padding: 4px; }
+  .qas-hist-btn svg { width: 17px; height: 17px; }
+  .qas-newchat {
+    display: flex; align-items: center; gap: 7px;
+    background: #17171c; color: #fff;
+    border: none; border-radius: 11px;
+    padding: 9px 15px; font-size: 13.5px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+  }
+  .qas-newchat svg { width: 15px; height: 15px; }
+
+  /* ── Body split ── */
+  .qas-body { flex: 1; min-height: 0; display: flex; }
+  .qas-content { flex: 1; min-width: 0; position: relative; }
+
+  /* ── Agent panel ── */
+  .qas-panel {
+    width: 33%; min-width: 300px;
+    display: flex; flex-direction: column;
+    border-left: 1px solid #eeedea;
+    background: #fbfaf8;
+    flex-shrink: 0;
+  }
+  .qas-panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px;
+    height: 46px; min-height: 46px;
+    border-bottom: 1px solid #eeedea;
+  }
+  .qas-tab {
+    display: flex; align-items: center; gap: 8px;
+    height: 100%;
+    padding: 0 4px;
+    font-size: 13.5px; font-weight: 500;
+    border-bottom: 2px solid #1a1a1a;
+    max-width: 70%;
+  }
+  .qas-tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qas-tab-x { color: #9c9a94; font-size: 15px; }
+  .qas-panel-icons { display: flex; align-items: center; gap: 10px; color: #55534e; }
+  .qas-pi { position: relative; display: flex; align-items: center; cursor: pointer; }
+  .qas-pi svg { width: 16px; height: 16px; }
+  .qas-pi-close { font-size: 18px; color: #55534e; }
+  .qas-pi-badge {
+    position: absolute; top: -7px; right: -7px;
+    background: #17171c; color: #fff;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 4.5px; border-radius: 7px;
+  }
+
+  /* ── Messages ── */
+  .qas-msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 18px; }
+  .qas-msgs::-webkit-scrollbar { width: 5px; }
+  .qas-msgs::-webkit-scrollbar-thumb { background: #dcdad4; border-radius: 3px; }
+
+  .qas-reviewed { margin: 0 0 6px; }
+  .qas-reviewed-verb {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13.5px; color: #8b8983;
+  }
+  .qas-reviewed-title { font-size: 15px; font-weight: 600; margin-top: 5px; color: #1a1a1a; }
+  .qas-plat-ico { display: inline-flex; width: 15px; height: 15px; border-radius: 3px; overflow: hidden; vertical-align: -2px; }
+  .qas-plat-ico svg { width: 100%; height: 100%; }
+
+  .qas-toolcard {
+    border: 1px solid #e8e6e1; border-radius: 12px;
+    background: #fff;
+    margin: 14px 0;
+    overflow: hidden;
+  }
+  .qas-toolcard-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 12px 14px 10px;
+    cursor: pointer;
+  }
+  .qas-toolcard-verb {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: #8b8983;
+  }
+  .qas-toolcard-title { font-size: 14.5px; font-weight: 600; margin-top: 4px; color: #1a1a1a; }
+  .qas-toolcard-chev { color: #8b8983; transition: transform 0.2s; margin-top: 3px; }
+  .qas-toolcard-chev svg { width: 15px; height: 15px; }
+  .qas-toolcard.open .qas-toolcard-chev { transform: rotate(180deg); }
+  .qas-toolcard-body {
+    position: relative;
+    padding: 0 14px;
+    max-height: 0; overflow: hidden;
+  }
+  .qas-toolcard.open .qas-toolcard-body { max-height: none; padding: 0 14px 12px; }
+  .qas-toolcard-preview {
+    font-size: 13.5px; line-height: 1.55; color: #4b4a46;
+    border: 1px solid #efede8;
+    border-radius: 9px;
+    padding: 12px 13px;
+    background: #fdfcfb;
+  }
+  .qas-toolcard-preview p { margin: 0 0 10px; }
+  .qas-toolcard-preview p:first-child { opacity: 0.45; }
+  .qas-toolcard-preview p:last-child { margin-bottom: 0; }
+
+  .qas-agent-msg { font-size: 14px; line-height: 1.6; color: #2a2926; margin: 14px 0; }
+  .qas-agent-msg b { font-weight: 600; }
+  .qas-agent-msg code {
+    font-family: ui-monospace, monospace; font-size: 12.5px;
+    background: #f1efe9; border-radius: 4px; padding: 1px 5px;
+  }
+  .qas-user-msg {
+    margin: 14px 0 14px auto;
+    max-width: 85%;
+    width: fit-content;
+    background: #efede7;
+    border-radius: 14px 14px 4px 14px;
+    padding: 10px 14px;
+    font-size: 14px; line-height: 1.5; color: #1f1e1b;
+  }
+  .qas-typing {
+    display: inline-flex; gap: 4px; margin: 12px 0;
+    padding: 10px 13px; background: #f1efe9; border-radius: 12px;
+  }
+  .qas-typing i {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #a3a19a; display: block;
+    animation: qasBlink 1.2s infinite;
+  }
+  .qas-typing i:nth-child(2) { animation-delay: 0.2s; }
+  .qas-typing i:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes qasBlink { 0%, 60%, 100% { opacity: 0.35; } 30% { opacity: 1; } }
+
+  /* ── Composer ── */
+  .qas-composer {
+    margin: 0 14px 14px;
+    border: 1px solid #e6e4df; border-radius: 16px;
+    background: #fff;
+    padding: 13px 14px 11px;
+    flex-shrink: 0;
+  }
+  .qas-input { position: relative; font-size: 14px; color: #1a1a1a; min-height: 21px; }
+  .qas-placeholder { color: #a3a19a; position: absolute; left: 0; top: 0; }
+  .qas-input.filled .qas-placeholder { display: none; }
+  .qas-caret {
+    display: none; width: 1.5px; height: 15px; background: #1a1a1a;
+    vertical-align: -2px; margin-left: 1px;
+  }
+  .qas-input.typing .qas-caret { display: inline-block; animation: qasCaret 1s steps(1) infinite; }
+  @keyframes qasCaret { 50% { opacity: 0; } }
+  .qas-input-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px;
+  }
+  .qas-ir-left { display: flex; align-items: center; gap: 9px; color: #55534e; }
+  .qas-clip { width: 16px; height: 16px; }
+  .qas-mode { font-size: 13px; color: #55534e; }
+  .qas-mode-chev { width: 13px; height: 13px; }
+  .qas-ir-right { display: flex; align-items: center; gap: 11px; color: #55534e; }
+  .qas-mic { width: 16px; height: 16px; }
+  .qas-send {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #17171c; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qas-send svg { width: 14px; height: 14px; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.qas');
+    var rail = el.querySelector('.qas-rail');
+    var header = el.querySelector('.qas-header');
+    var panel = el.querySelector('.qas-panel');
+    var msgs = el.querySelector('.qas-msgs');
+    var input = el.querySelector('.qas-input');
+    var inputText = el.querySelector('.qas-input-text');
+
+    // ── Data ──
+    var crumbs = data.breadcrumbs || ['Campaigns', 'Marketing Busywork Tax', 'Marc LinkedIn - Marketing Busywor...'];
+    var badgeCount = data.badge_count !== undefined ? data.badge_count : 480;
+    var panelTab = data.panel_tab || 'Draft LinkedIn POV Post';
+    var copiesBadge = data.copies_badge !== undefined ? data.copies_badge : 2;
+    var navActive = data.nav_active || 'campaigns';
+    var userAvatarUrl = data.user_avatar_url || 'https://i.pravatar.cc/128?img=12';
+    var userInitials = data.user_initials || 'M';
+    var showPanel = data.show_panel !== false;
+
+    // ── Populate chrome ──
+    var crumbsEl = el.querySelector('.qas-crumbs');
+    crumbs.forEach(function(c, i) {
+      var s = document.createElement('span');
+      s.className = 'qas-crumb' + (i === crumbs.length - 1 ? ' last' : '');
+      s.textContent = c;
+      crumbsEl.appendChild(s);
+      if (i < crumbs.length - 1) {
+        var sep = document.createElement('span');
+        sep.className = 'qas-crumb-sep';
+        sep.textContent = '›';
+        crumbsEl.appendChild(sep);
+      }
+    });
+    el.querySelector('.qas-bell-badge').textContent = badgeCount;
+    el.querySelector('.qas-tab-label').textContent = panelTab;
+    el.querySelector('.qas-pi-badge').textContent = copiesBadge;
+    var activeBtn = el.querySelector('.qas-rail-btn[data-nav="' + navActive + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+    var avaEl = el.querySelector('.qas-rail-ava');
+    avaEl.textContent = userInitials;
+    if (userAvatarUrl) {
+      var img = document.createElement('img');
+      img.src = userAvatarUrl;
+      img.onerror = function() { this.remove(); };
+      avaEl.appendChild(img);
+    }
+    if (!showPanel) panel.style.display = 'none';
+
+    // ── Message builders ──
+    var IN_SVG = '<svg viewBox="0 0 24 24" style="fill:#0A66C2;stroke:none"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>';
+    var X_SVG = '<svg viewBox="0 0 24 24" style="fill:#000;stroke:none"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>';
+    function platIco(p) {
+      if (p === 'linkedin') return '<span class="qas-plat-ico">' + IN_SVG + '</span>';
+      if (p === 'x') return '<span class="qas-plat-ico">' + X_SVG + '</span>';
+      return '';
+    }
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function md(s) {
+      return esc(s)
+        .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+    }
+    function reviewedEl(verb, platform, title, noun) {
+      var d = document.createElement('div');
+      d.className = 'qas-reviewed';
+      d.innerHTML = '<div class="qas-reviewed-verb">' + esc(verb || 'Reviewed') + ' ' + platIco(platform) +
+        ' ' + esc(noun || 'LinkedIn post') + '</div>' +
+        (title ? '<div class="qas-reviewed-title">' + esc(title) + '</div>' : '');
+      return d;
+    }
+    function toolCardEl(a) {
+      var d = document.createElement('div');
+      d.className = 'qas-toolcard' + (a.open !== false ? ' open' : '');
+      var previewHtml = '';
+      if (a.preview) {
+        var paras = String(a.preview).split(/\n\n+/).map(function(p) { return '<p>' + md(p) + '</p>'; }).join('');
+        previewHtml = '<div class="qas-toolcard-body"><div class="qas-toolcard-preview">' + paras + '</div></div>';
+      }
+      d.innerHTML = '<div class="qas-toolcard-head">' +
+        '<div><div class="qas-toolcard-verb">' + esc(a.verb || 'Updated') + ' ' + platIco(a.platform || 'linkedin') +
+        ' ' + esc(a.noun || 'LinkedIn post') + '</div>' +
+        '<div class="qas-toolcard-title">' + esc(a.title || '') + '</div></div>' +
+        '<div class="qas-toolcard-chev"><svg viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round"><path d="M6 9l6 6 6-6"/></svg></div>' +
+        '</div>' + previewHtml;
+      return d;
+    }
+    function agentEl(text) {
+      var d = document.createElement('div');
+      d.className = 'qas-agent-msg';
+      d.innerHTML = String(text).split(/\n\n+/).map(function(p) { return '<p style="margin:0 0 10px">' + md(p) + '</p>'; }).join('');
+      return d;
+    }
+    function userEl(text) {
+      var d = document.createElement('div');
+      d.className = 'qas-user-msg';
+      d.textContent = text;
+      return d;
+    }
+    function scrollDown() {
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+    function addMsg(node, animate) {
+      msgs.appendChild(node);
+      if (animate !== false) {
+        gsap.fromTo(node, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out', onUpdate: scrollDown, onComplete: scrollDown });
+      }
+      scrollDown();
+      return node;
+    }
+
+    // ── History at open ──
+    (data.history || []).forEach(function(h) {
+      if (h.type === 'user') addMsg(userEl(h.text), false);
+      else if (h.type === 'agent') addMsg(agentEl(h.text), false);
+      else if (h.type === 'tool-card') addMsg(toolCardEl(h), false);
+      else if (h.type === 'reviewed') addMsg(reviewedEl(h.verb, h.platform, h.title, h.noun), false);
+    });
+
+    // ── Entrance ──
+    gsap.set(root, { autoAlpha: 0 });
+    gsap.set(rail, { x: -14, autoAlpha: 0 });
+    gsap.set(header, { y: -10, autoAlpha: 0 });
+    if (showPanel) gsap.set(panel, { x: 22, autoAlpha: 0 });
+    tl.to(root, { autoAlpha: 1, duration: 0.15, ease: 'power2.out' }, 0.05);
+    tl.to(rail, { x: 0, autoAlpha: 1, duration: 0.28, ease: 'power3.out' }, 0.1);
+    tl.to(header, { y: 0, autoAlpha: 1, duration: 0.25, ease: 'power2.out' }, 0.14);
+    if (showPanel) tl.to(panel, { x: 0, autoAlpha: 1, duration: 0.3, ease: 'power3.out' }, 0.18);
+
+    var typingNode = null;
+
+    // ── Script ──
+    if (data.script && data.script.length > 0) {
+      var cursorTargets = data.cursor_targets || {
+        'composer': { x: '83%', y: '86%' },
+        'send': { x: '96%', y: '90%' }
+      };
+
+      runScript(tl, el, data.script, cursorTargets, ctx, {
+        'type-message': function(tl, ctr, action, at) {
+          var text = action.text || '';
+          var speed = action.speed || 0.035;
+          tl.call(function() { input.classList.add('filled', 'typing'); }, null, at);
+          for (var i = 1; i <= text.length; i++) {
+            (function(n) {
+              tl.call(function() { inputText.textContent = text.slice(0, n); }, null, at + n * speed);
+            })(i);
+          }
+          tl.call(function() { input.classList.remove('typing'); }, null, at + text.length * speed + 0.15);
+        },
+        'send-message': function(tl, ctr, action, at) {
+          tl.call(function() {
+            var text = inputText.textContent;
+            inputText.textContent = '';
+            input.classList.remove('filled', 'typing');
+            if (text) addMsg(userEl(text));
+          }, null, at);
+        },
+        'user-message': function(tl, ctr, action, at) {
+          tl.call(function() { addMsg(userEl(action.text || '')); }, null, at);
+        },
+        'agent-message': function(tl, ctr, action, at) {
+          tl.call(function() {
+            if (typingNode) { typingNode.remove(); typingNode = null; }
+            addMsg(agentEl(action.text || ''));
+          }, null, at);
+        },
+        'reviewed-line': function(tl, ctr, action, at) {
+          tl.call(function() { addMsg(reviewedEl(action.verb, action.platform, action.title, action.noun)); }, null, at);
+        },
+        'tool-card': function(tl, ctr, action, at) {
+          tl.call(function() {
+            if (typingNode) { typingNode.remove(); typingNode = null; }
+            addMsg(toolCardEl(action));
+          }, null, at);
+          if (action.collapse_delay) {
+            tl.call(function() {
+              var cards = msgs.querySelectorAll('.qas-toolcard');
+              var card = cards[cards.length - 1];
+              if (card) card.classList.remove('open');
+            }, null, at + action.collapse_delay);
+          }
+        },
+        'show-typing': function(tl, ctr, action, at) {
+          tl.call(function() {
+            if (typingNode) return;
+            typingNode = document.createElement('div');
+            typingNode.className = 'qas-typing';
+            typingNode.innerHTML = '<i></i><i></i><i></i>';
+            addMsg(typingNode);
+          }, null, at);
+        },
+        'hide-typing': function(tl, ctr, action, at) {
+          tl.call(function() {
+            if (typingNode) { typingNode.remove(); typingNode = null; }
+          }, null, at);
+        },
+        'scroll-messages': function(tl, ctr, action, at) {
+          tl.call(scrollDown, null, at);
+        }
+      });
+    }
+
+    return tl;
+  }
+</script>
