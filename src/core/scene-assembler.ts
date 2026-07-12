@@ -26,6 +26,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
 
+/** Component types that are scene BACKDROPS: they stay outside the camera
+ *  rig (the camera moves the subject, not the world) and are skipped by
+ *  wrapper choreography defaults. */
+export const BACKDROP_TYPES = new Set([
+  "webgl-backdrop", "gradient-background", "mesh-gradient", "liquid-background",
+  "depth-blur", "particle-field",
+]);
+
 export interface ComponentSource {
   /** Component type name */
   type: string;
@@ -178,10 +186,13 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     // Position the component
     const posStyle = buildPositionStyle(comp);
 
-    // Wrap in container div
+    // Wrap in container div. Backdrop components are stamped so the camera
+    // rig leaves them OUTSIDE: backgrounds do not ride the camera -- zooming
+    // must not drag the world and expose the canvas edge (SPEC-motion).
+    const isBackdrop = BACKDROP_TYPES.has(comp.type);
     componentBlocks.push(
       `  <!-- Component: ${comp.type} (${comp.id}) -->\n` +
-      `  <div class="mp-component" data-cid="${comp.id}" style="${posStyle}">\n` +
+      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ' data-mp-backdrop="1"' : ""} style="${posStyle}">\n` +
       `    ${boundHtml}\n` +
       `  </div>`
     );
@@ -546,6 +557,11 @@ export function cameraMovesScript(
           var t = n.tagName;
           if (t === 'SCRIPT' || t === 'STYLE') return;
           if (n.id === '__mp_speaker_base') return;
+          // Backdrops stay OUTSIDE the rig: the camera moves the subject,
+          // not the world -- dragging the backdrop exposes the canvas edge.
+          if (n.hasAttribute && n.hasAttribute('data-mp-backdrop')) return;
+          if (n.classList && n.classList.contains('mp-page-bg')) return;
+          if (n.querySelector && n.children.length === 1 && n.firstElementChild && n.firstElementChild.hasAttribute && n.firstElementChild.hasAttribute('data-mp-backdrop')) return;
         }
         cam.appendChild(n);
       });

@@ -30,6 +30,7 @@ import {
   stripEagerVideoLoading,
   cameraMovesScript,
   wrapperChoreoScript,
+  BACKDROP_TYPES,
   mediaEdlScript,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
@@ -187,7 +188,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       }
 
       componentBlocks.push(
-        `    <div class="mp-component" data-cid="${scopedCid}" style="${posStyle}">\n` +
+        `    <div class="mp-component" data-cid="${scopedCid}"${BACKDROP_TYPES.has(comp.type) ? ' data-mp-backdrop="1"' : ""} style="${posStyle}">\n` +
         `      ${boundHtml}\n` +
         `    </div>`
       );
