@@ -1,0 +1,47 @@
+{
+  "type": "claude-cowork-session",
+  "label": "Claude Cowork — running task",
+  "category": "mockups",
+  "description": "A RUNNING Cowork task (built from actual screenshots): Home sidebar, main pane with the task title and Claude's SERIF prose streaming in (the claude.ai reading voice), 'Write a message…' composer with Manual mode + model picker + the 'Claude is AI…' disclaimer, and the RIGHT RAIL -- Progress card ('3 of 3' with optional step checklist), Outputs card (deliverables pop in), and Context card listing the CONNECTORS in play (Quotient via its real logo, Web Search, any others) that light up as the agent uses them. THE marketing-agent-at-work surface. SCRIPTED performable surface; camera anchors: transcript, input, panel (right rail), sidebar.",
+  "data": {
+    "title": { "type": "string", "label": "Task title in the header (e.g. 'Launch campaign plan')", "optional": true },
+    "history": {
+      "type": "array",
+      "label": "Transcript at open: [{type: 'user'|'text'|'heading', text}] -- text renders in serif; heading is the bold serif section line",
+      "optional": true
+    },
+    "progress": { "type": "object", "label": "{current, total} for the Progress card (e.g. {current: 1, total: 3})", "optional": true },
+    "progress_steps": { "type": "array", "label": "Optional step checklist under Progress: [{text}] -- steps before `current` render checked", "optional": true },
+    "outputs": { "type": "array", "label": "Outputs card rows at open: [{name: 'Campaign brief.md'}]", "optional": true },
+    "connectors": {
+      "type": "array",
+      "label": "Context card connector chips: [{name, icon_url?, globe?, color?}]. Defaults to Quotient (real logo via logo.dev) + Web Search.",
+      "optional": true
+    },
+    "skills": { "type": "array", "label": "Optional Skills chips under Connectors (strings)", "optional": true },
+    "recents": { "type": "array", "label": "Sidebar Recents: [{title, kind: 'task'|'chat'}]", "optional": true },
+    "active_recent": { "type": "number", "label": "Highlighted Recents row (default 1)", "optional": true },
+    "model_label": { "type": "string", "label": "Model in the composer row (default 'Opus 4.8')", "optional": true },
+    "effort_label": { "type": "string", "label": "Effort label (default 'High')", "optional": true },
+    "account_name": { "type": "string", "label": "Account row name", "optional": true },
+    "script": {
+      "type": "array",
+      "label": "The task performance: type-message {text} + send-message (user bubble), working {text?} (orange ✳), stop-working, respond {text, heading?, duration?} (SERIF prose streams word by word; **bold** + `code`), claude-text {text, heading?}, set-progress {current, total?, steps?} (the Progress count ticks -- '1 of 3' -> '2 of 3'), add-output {name} (a deliverable row pops into Outputs), use-connector {name, duration?} (that connector chip lights up while the agent uses it -- Quotient glows while it creates the campaign). NEVER move the camera from a script -- scene camera_moves with anchors (transcript, input, panel).",
+      "optional": true
+    },
+    "cursor_targets": { "type": "object", "label": "Named cursor positions (input)", "optional": true }
+  },
+  "script_actions": [
+    { "action": "type-message", "description": "Type into the composer", "params": { "text": "string", "speed": "number" } },
+    { "action": "send-message", "description": "Post the typed text as a user bubble" },
+    { "action": "working", "description": "Orange ✳ spinner in the transcript", "params": { "text": "string" } },
+    { "action": "stop-working", "description": "Remove the spinner" },
+    { "action": "respond", "description": "Stream serif Claude prose word by word", "params": { "text": "string", "heading": "boolean - bold serif section line", "duration": "number" } },
+    { "action": "claude-text", "description": "Instant serif prose block", "params": { "text": "string", "heading": "boolean" } },
+    { "action": "set-progress", "description": "Update the Progress card count (and optional step checklist)", "params": { "current": "number", "total": "number", "steps": "array" } },
+    { "action": "add-output", "description": "A deliverable row pops into the Outputs card", "params": { "name": "string" } },
+    { "action": "use-connector", "description": "A connector chip lights up while in use, then settles", "params": { "name": "string - matches connectors[].name", "duration": "number - seconds lit (default 2.2; 0 = stay lit)" } }
+  ],
+  "default_cursor_targets": { "input": { "x": "45%", "y": "88%" } },
+  "tier": "performable-surface"
+}
