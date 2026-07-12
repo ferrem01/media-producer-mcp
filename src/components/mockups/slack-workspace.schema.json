@@ -181,6 +181,16 @@
                 "type": "string"
               }
             }
+          },
+          "title": {
+            "type": "string",
+            "label": "App-notification bold TITLE line (e.g. 'Task ready for your review')",
+            "optional": true
+          },
+          "link_text": {
+            "type": "string",
+            "label": "Blue action link on its own line (e.g. 'View in Quotient')",
+            "optional": true
           }
         }
       }
@@ -205,6 +215,11 @@
     "cursor_targets": {
       "type": "object",
       "label": "Named cursor positions for move-cursor/click, e.g. {\"composer\": {\"x\": 0.5, \"y\": 0.92}} in 0-1 component coords.",
+      "optional": true
+    },
+    "agents_apps": {
+      "type": "array",
+      "label": "Agents & apps sidebar section (modern Slack): [{name, badge?, color?, active?}] -- app icon squares with unread badge pills; set active on the app the film is 'in'. Defaults to a believable roster with Quotient.",
       "optional": true
     }
   },
