@@ -71,7 +71,7 @@
           <div class="cwh-greeting" data-target="greeting">
             <span class="cwh-logo">
               <svg class="starburst" width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="#D97757" stroke-width="2.6" stroke-linecap="round"><g transform="translate(17,17)"><path d="M0 -13V-4M0 4v9M-13 0h9M4 0h9M-9.2 -9.2l6.4 6.4M2.8 2.8l6.4 6.4M9.2 -9.2l-6.4 6.4M-2.8 2.8l-6.4 6.4M-4.6 -11.1l3.2 7.7M1.4 3.4l3.2 7.7M11.1 -4.6l-7.7 3.2M-3.4 1.4l-7.7 3.2"/></g></svg>
-              <img class="cwh-logo-img" src="https://img.logo.dev/claude.ai?token=pk_B_cdrQLyTkSFPzSMm52goQ&amp;format=png&amp;size=128&amp;fallback=monogram" onerror="this.remove()"/>
+              <img class="cwh-logo-img" src="https://img.logo.dev/claude.ai?token=pk_B_cdrQLyTkSFPzSMm52goQ&amp;format=png&amp;size=128&amp;fallback=monogram" onload="this.previousElementSibling.style.display='none'" onerror="this.remove()"/>
             </span>
             <span data-target="greeting-text"></span>
           </div>
@@ -79,25 +79,6 @@
             <div class="cwh-comp-input" data-target="input"></div>
             <div class="cwh-comp-row">
               <span class="cwh-crow-ico" data-target="plus-btn">+</span>
-              <div class="cwh-plusmenu" data-target="plus-menu">
-                <div class="cwh-pm-row">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M9.5 4.5l-4.6 4.6a2.2 2.2 0 003.1 3.1l5-5a3.6 3.6 0 00-5.1-5.1l-5 5"/></svg>
-                  Add files or photos <span class="cwh-pm-kbd">⌘U</span>
-                </div>
-                <div class="cwh-pm-sep"></div>
-                <div class="cwh-pm-row">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M3 2.5h8a2 2 0 012 2v9l-2-1.5H5a2 2 0 01-2-2v-7.5zM5.5 6h5M5.5 9h3"/></svg>
-                  Skills <span class="cwh-pm-sp"></span><span class="cwh-pm-chev">›</span>
-                </div>
-                <div class="cwh-pm-row">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="6" width="5" height="5" rx="1"/><rect x="9" y="3" width="5" height="5" rx="1"/><path d="M7 8.5h2M11.5 8v3"/></svg>
-                  Connectors <span class="cwh-pm-sp"></span><span class="cwh-pm-warn">⚠ 1</span><span class="cwh-pm-chev">›</span>
-                </div>
-                <div class="cwh-pm-row">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M5 2v4M11 2v4M4 6h8v3a4 4 0 01-8 0V6zM8 13v2"/></svg>
-                  Plugins <span class="cwh-pm-sp"></span><span class="cwh-pm-chev">›</span>
-                </div>
-              </div>
               <div class="cwh-mode" data-target="mode-toggle">
                 <span class="cwh-mode-opt" data-target="mode-chat">Chat</span>
                 <span class="cwh-mode-opt is-active" data-target="mode-cowork">Cowork</span>
@@ -130,6 +111,28 @@
             <div class="cwh-ideas-head">Ideas for you</div>
             <div class="cwh-idea-list" data-target="idea-list"></div>
           </div>
+        </div>
+      </div>
+      <!-- Plus-menu lives as the WINDOW's last child: DOM order guarantees it
+           paints above everything (entrance transforms + preserve-3d defeat
+           z-index inside the pane). Positioned from the + button at open. -->
+      <div class="cwh-plusmenu" data-target="plus-menu">
+        <div class="cwh-pm-row">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M9.5 4.5l-4.6 4.6a2.2 2.2 0 003.1 3.1l5-5a3.6 3.6 0 00-5.1-5.1l-5 5"/></svg>
+          Add files or photos <span class="cwh-pm-kbd">⌘U</span>
+        </div>
+        <div class="cwh-pm-sep"></div>
+        <div class="cwh-pm-row">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M3 2.5h8a2 2 0 012 2v9l-2-1.5H5a2 2 0 01-2-2v-7.5zM5.5 6h5M5.5 9h3"/></svg>
+          Skills <span class="cwh-pm-sp"></span><span class="cwh-pm-chev">›</span>
+        </div>
+        <div class="cwh-pm-row">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="6" width="5" height="5" rx="1"/><rect x="9" y="3" width="5" height="5" rx="1"/><path d="M7 8.5h2M11.5 8v3"/></svg>
+          Connectors <span class="cwh-pm-sp"></span><span class="cwh-pm-warn">⚠ 1</span><span class="cwh-pm-chev">›</span>
+        </div>
+        <div class="cwh-pm-row">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M5 2v4M11 2v4M4 6h8v3a4 4 0 01-8 0V6zM8 13v2"/></svg>
+          Plugins <span class="cwh-pm-sp"></span><span class="cwh-pm-chev">›</span>
         </div>
       </div>
     </div>
@@ -195,22 +198,28 @@
     font-size: 44px; font-weight: 500; color: #2a2925; letter-spacing: -0.01em; }
   .cwh-greeting .starburst { display: inline-block; }
   /* Real Claude mark via logo.dev; the hand-drawn starburst stays underneath
-     as the fallback. multiply blends the logo's white tile into the bone bg
-     so the mark reads naked, like the app. */
+     as the fallback. The logo box paints the page color itself so multiply
+     has the right backdrop INSIDE this stacking context (the greeting's
+     entrance transform isolates it from the real page background) -- the
+     white tile melts away and the mark reads naked, like the app. */
   .cwh-logo { position: relative; width: 42px; height: 42px; display: inline-flex;
-    align-items: center; justify-content: center; flex-shrink: 0; }
+    align-items: center; justify-content: center; flex-shrink: 0; background: #f4f3ee; }
   .cwh-logo-img { position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: contain; mix-blend-mode: multiply; }
   /* No overflow:hidden here -- the plus-menu must float OVER the card edge
-     and the ideas below it, like the real app. The sub-row rounds itself. */
+     and the ideas below it, like the real app. The sub-row rounds itself.
+     Explicit z-index: the entrance tweens leave transforms on the composer
+     AND the ideas section, isolating both stacking contexts -- without it
+     the later-in-DOM ideas paint over the open menu. */
   .cwh-composer { width: 100%; max-width: 760px; background: #fff; border: 1px solid #e2e0d8;
-    border-radius: 16px; box-shadow: 0 4px 16px rgba(31,30,29,0.06); }
+    border-radius: 16px; box-shadow: 0 4px 16px rgba(31,30,29,0.06);
+    position: relative; z-index: 5; }
   .cwh-comp-input { padding: 18px 20px 6px; font-size: 15px; color: #1f1e1d; min-height: 24px;
     line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
   .cwh-comp-input:empty::before { content: attr(data-placeholder); color: #a5a39a; }
   .cwh-comp-row { display: flex; align-items: center; gap: 11px; padding: 8px 16px 12px; position: relative; }
   .cwh-crow-ico { color: #57544c; font-size: 17px; }
-  .cwh-plusmenu { position: absolute; left: 8px; top: calc(100% + 4px); z-index: 20;
+  .cwh-plusmenu { position: absolute; z-index: 50;
     width: 250px; background: #fff; border: 1px solid #e8e6e0; border-radius: 13px;
     box-shadow: 0 10px 34px rgba(31,30,29,0.14); padding: 6px; display: none; }
   .cwh-plusmenu.is-open { display: block; }
@@ -396,7 +405,15 @@
         'open-plus-menu': function (tl, ctr, action, at) {
           tl.call(function () {
             var m = ctr.querySelector('[data-target="plus-menu"]');
+            var plusBtn = ctr.querySelector('[data-target="plus-btn"]');
             if (!m) return;
+            if (plusBtn) {
+              // Position from the + button in window-relative %, scale-safe.
+              var pb = plusBtn.getBoundingClientRect();
+              var wb = win.getBoundingClientRect();
+              m.style.left = ((pb.left - wb.left) / wb.width * 100) + '%';
+              m.style.top = ((pb.bottom - wb.top) / wb.height * 100 + 1) + '%';
+            }
             m.classList.add('is-open');
             gsap.from(m, { autoAlpha: 0, y: -6, duration: 0.25, ease: 'power2.out' });
           }, null, at);
