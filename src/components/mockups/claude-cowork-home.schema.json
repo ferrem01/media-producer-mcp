@@ -1,0 +1,34 @@
+{
+  "type": "claude-cowork-home",
+  "label": "Claude Cowork — Home screen",
+  "category": "mockups",
+  "description": "The Claude desktop Home/Cowork screen (built from actual screenshots): white sidebar with Home tab active (New / Projects / Artifacts / Scheduled / Dispatch / Customize, Pinned + numbered Recents, Design row, account), and the centered hero -- serif greeting with the orange ✳ ('Afternoon, Marc'), the big composer card ('How can I help you today?') with +, Chat/Cowork toggle, model picker (Opus 4.8 High) and mic, the 'Project or folder / Manual / 2× more usage' sub-row, and 'Ideas for you' rows. SCRIPTED performable surface. Camera anchors: composer, ideas, sidebar.",
+  "data": {
+    "greeting": { "type": "string", "label": "Serif greeting text (default 'Afternoon, Marc')", "optional": true },
+    "prompt_text": { "type": "string", "label": "SHORTHAND: types into the composer then sends (working ✳ appears)", "optional": true },
+    "mode": { "type": "string", "label": "'cowork' (default) | 'chat' -- which toggle side is active", "optional": true },
+    "model_label": { "type": "string", "label": "Model in the composer row (default 'Opus 4.8')", "optional": true },
+    "effort_label": { "type": "string", "label": "Effort beside the model (default 'High')", "optional": true },
+    "usage_label": { "type": "string", "label": "Right side of the sub-row (default '2× more usage until August 5')", "optional": true },
+    "account_name": { "type": "string", "label": "Account row name", "optional": true },
+    "pinned": { "type": "array", "label": "Pinned sidebar rows (strings)", "optional": true },
+    "recents": { "type": "array", "label": "Recents sidebar rows (strings)", "optional": true },
+    "ideas": { "type": "array", "label": "'Ideas for you' rows: [{icon: '🌅', label: 'Send me a daily briefing'}]", "optional": true },
+    "script": {
+      "type": "array",
+      "label": "Actions: type-prompt {text} (types into the composer), send-prompt (clears + shows the orange ✳ working under the card), working {text?} / stop-working, switch-mode {mode: 'chat'|'cowork'} (toggle flips), choose-idea {index} (an idea row highlights). Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (composer, ideas, sidebar).",
+      "optional": true
+    },
+    "cursor_targets": { "type": "object", "label": "Named cursor positions (composer, idea-0..n)", "optional": true }
+  },
+  "script_actions": [
+    { "action": "type-prompt", "description": "Type into the composer card", "params": { "text": "string", "speed": "number" } },
+    { "action": "send-prompt", "description": "Clear the composer and show the orange ✳ working line beneath it", "params": { "working_text": "string - optional muted verb" } },
+    { "action": "working", "description": "Show the ✳ working line", "params": { "text": "string" } },
+    { "action": "stop-working", "description": "Remove the ✳" },
+    { "action": "switch-mode", "description": "Flip the Chat/Cowork toggle", "params": { "mode": "string - chat|cowork" } },
+    { "action": "choose-idea", "description": "Highlight an 'Ideas for you' row", "params": { "index": "number" } }
+  ],
+  "default_cursor_targets": { "composer": { "x": "60%", "y": "52%" } },
+  "tier": "performable-surface"
+}

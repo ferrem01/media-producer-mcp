@@ -1,30 +1,84 @@
 <template>
   <div class="cds">
     <div class="cds-win" data-target="window">
-      <div class="cds-bar">
-        <span class="cds-dot cds-dot--r"></span><span class="cds-dot cds-dot--y"></span><span class="cds-dot cds-dot--g"></span>
-        <span class="cds-title" data-target="app-title"></span>
-      </div>
-      <div class="cds-main">
-        <div class="cds-sidebar" data-target="sidebar" data-anchor="sessions">
-          <div class="cds-side-head">
-            <span class="cds-side-label">Sessions</span>
-            <span class="cds-side-new">+</span>
-          </div>
-          <div class="cds-session-list" data-target="session-list"></div>
+      <!-- Sidebar -->
+      <div class="cds-side" data-target="sidebar" data-anchor="sessions">
+        <div class="cds-lights">
+          <span class="cds-dot cds-dot--r"></span><span class="cds-dot cds-dot--y"></span><span class="cds-dot cds-dot--g"></span>
+          <span class="cds-lights-sp"></span>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M6 2.5v11"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5l3 3"/></svg>
         </div>
-        <div class="cds-pane">
-          <div class="cds-pane-head" data-target="pane-head"></div>
-          <div class="cds-transcript" data-target="transcript" data-anchor="transcript"></div>
-          <div class="cds-inputwrap" data-anchor="input">
-            <div class="cds-inputbox" data-target="input-box">
-              <span class="cds-caret">&gt;</span>
-              <div class="cds-input" data-target="input"></div>
-            </div>
-            <div class="cds-hintrow">
-              <span class="cds-hint">? for shortcuts</span>
-              <span class="cds-hint-right" data-target="model-label"></span>
-            </div>
+        <div class="cds-tabs">
+          <div class="cds-tab" data-target="tab-home">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5L8 2l5.5 4.5V13a1 1 0 01-1 1h-3v-4H6.5v4h-3a1 1 0 01-1-1V6.5z"/></svg>
+            Home
+          </div>
+          <div class="cds-tab is-active" data-target="tab-code">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 5L2.5 8l3 3M10.5 5l3 3-3 3"/></svg>
+            Code
+          </div>
+        </div>
+        <div class="cds-nav">
+          <div class="cds-nav-row"><span class="cds-nav-plus">+</span> New session</div>
+          <div class="cds-nav-row">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M9.8 6.2l-3.4 3.4M10 9.4l-3.6-3.4"/></svg>
+            Artifacts
+          </div>
+          <div class="cds-nav-row">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="1.5" y="4.5" width="13" height="9" rx="2"/><path d="M5.5 4.5V3.5a1.5 1.5 0 011.5-1.5h2a1.5 1.5 0 011.5 1.5v1"/></svg>
+            Customize
+          </div>
+          <div class="cds-nav-row cds-nav-more">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.6" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+            More
+          </div>
+        </div>
+        <div class="cds-recents-head">
+          <span>Recents</span>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><path d="M3 5h10M5 8h6M7 11h2"/></svg>
+        </div>
+        <div class="cds-session-list" data-target="session-list"></div>
+        <div class="cds-side-foot">
+          <div class="cds-update">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#57544c" stroke-width="1.3"><path d="M10 17c4-2 6-5 6-9V4l-6-2-6 2v4c0 4 2 7 6 9z" transform="scale(0.9) translate(1,1)"/></svg>
+            <div class="cds-update-txt"><b>Relaunch to update</b><span data-target="version">v1.20186.1</span></div>
+            <span class="cds-update-arrow">→</span>
+          </div>
+          <div class="cds-account">
+            <span class="cds-ava" data-target="account-avatar">M</span>
+            <span class="cds-account-name" data-target="account-name">Marc</span>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main pane -->
+      <div class="cds-pane">
+        <div class="cds-pane-head">
+          <svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#57544c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13h9a3.5 3.5 0 100-7 5 5 0 00-9.6-1.4A4 4 0 006 13z"/></svg>
+          <span class="cds-pane-title" data-target="pane-title"></span>
+          <span class="cds-repo-chip" data-target="repo-chip"></span>
+          <span class="cds-head-sp"></span>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><path d="M8 10V2.5M5 5l3-3 3 3M3 10v3a1 1 0 001 1h8a1 1 0 001-1v-3"/></svg>
+          <span class="cds-kebab"><svg width="15" height="15" viewBox="0 0 16 16" fill="#8a887f"><circle cx="8" cy="3.5" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="8" cy="12.5" r="1.2"/></svg><span class="cds-kebab-dot"></span></span>
+        </div>
+        <div class="cds-transcript" data-target="transcript" data-anchor="transcript"></div>
+        <div class="cds-inputwrap" data-anchor="input">
+          <div class="cds-inputbox" data-target="input-box">
+            <div class="cds-input" data-target="input"></div>
+            <span class="cds-enter">⏎</span>
+          </div>
+          <div class="cds-inputrow">
+            <span class="cds-auto-pill">Auto</span>
+            <span class="cds-inrow-ico">+</span>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0010 0M8 12.5V15"/></svg>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+            <span class="cds-inrow-sp"></span>
+            <span class="cds-model" data-target="model-label">Fable 5</span>
+            <span class="cds-effort" data-target="effort-label">Extra</span>
+            <span class="cds-spin-dot" data-target="spin-dot"></span>
           </div>
         </div>
       </div>
@@ -33,99 +87,122 @@
 </template>
 
 <style scoped>
-  /* ── claude-desktop: the Claude Code desktop app -- a sessions sidebar
-     with SEVERAL parallel sessions (working / needs-input / done) beside a
-     live session pane. Tier: performable-surface. The fleet story: agents
-     running in parallel while you steer one. ── */
+  /* ── claude-desktop: the REAL Claude desktop app, Code tab (from Marc's
+     screenshots). Light bone world, white sidebar card with Home/Code
+     toggle + numbered Recents, claude.ai-style conversation pane with the
+     lone orange ✳ working spinner, "Type / for commands" composer with the
+     Auto pill and model label. Tier: performable-surface. ── */
   .cds { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace; }
-  .cds-win { width: 100%; height: 100%; background: #1b1a17; border-radius: 12px;
-    border: 1px solid rgba(250, 249, 245, 0.08); overflow: hidden; display: flex; flex-direction: column;
-    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5), 0 6px 24px rgba(0, 0, 0, 0.35); }
-  .cds-bar { display: flex; align-items: center; gap: 7px; padding: 11px 15px; flex-shrink: 0;
-    background: rgba(250, 249, 245, 0.03); border-bottom: 1px solid rgba(250, 249, 245, 0.06); }
-  .cds-dot { width: 11px; height: 11px; border-radius: 50%; }
-  .cds-dot--r { background: #ff5f57; } .cds-dot--y { background: #febc2e; } .cds-dot--g { background: #28c840; }
-  .cds-title { margin-left: 10px; font-size: 12px; color: rgba(250, 249, 245, 0.42); }
-  .cds-main { flex: 1; display: flex; min-height: 0; }
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; color: #1f1e1d; }
+  .cds-win { width: 100%; height: 100%; background: #f4f3ee; border-radius: 12px;
+    border: 1px solid rgba(31, 30, 29, 0.1); overflow: hidden; display: flex;
+    box-shadow: 0 30px 90px rgba(31, 30, 29, 0.25), 0 6px 24px rgba(31, 30, 29, 0.12); }
 
   /* Sidebar */
-  .cds-sidebar { width: 250px; min-width: 250px; border-right: 1px solid rgba(250, 249, 245, 0.07);
-    background: rgba(250, 249, 245, 0.015); display: flex; flex-direction: column; padding: 14px 10px; }
-  .cds-side-head { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 10px; }
-  .cds-side-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-    color: rgba(250, 249, 245, 0.4); }
-  .cds-side-new { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center;
-    justify-content: center; color: rgba(250, 249, 245, 0.6); background: rgba(250, 249, 245, 0.06); font-size: 14px; }
-  .cds-session-list { display: flex; flex-direction: column; gap: 4px; }
-  .cds-session { padding: 9px 10px; border-radius: 9px; cursor: default; }
-  .cds-session.is-active { background: rgba(250, 249, 245, 0.07); }
-  .cds-sess-top { display: flex; align-items: center; gap: 7px; }
-  .cds-sess-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .cds-sess-status.working { background: #D97757; }
-  .cds-sess-status.input { background: #febc2e; }
-  .cds-sess-status.done { background: #28c840; }
-  .cds-sess-status.idle { background: rgba(250, 249, 245, 0.25); }
-  .cds-sess-project { font-size: 12.5px; font-weight: 700; color: rgba(250, 249, 245, 0.88);
+  .cds-side { width: 262px; min-width: 262px; background: #fbfaf7; border-right: 1px solid #e8e6e0;
+    display: flex; flex-direction: column; padding: 12px 12px 10px; }
+  .cds-lights { display: flex; align-items: center; gap: 7px; padding: 2px 4px 12px; }
+  .cds-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .cds-dot--r { background: #ff5f57; } .cds-dot--y { background: #febc2e; } .cds-dot--g { background: #28c840; }
+  .cds-lights-sp { flex: 1; }
+  .cds-tabs { display: flex; gap: 4px; background: #efeee8; border-radius: 9px; padding: 3px; margin-bottom: 12px; }
+  .cds-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 0; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: #57544c; }
+  .cds-tab.is-active { background: #fff; color: #1f1e1d; box-shadow: 0 1px 3px rgba(31,30,29,0.08);
+    border: 1px solid #e8e6e0; }
+  .cds-nav { display: flex; flex-direction: column; gap: 1px; margin-bottom: 12px; }
+  .cds-nav-row { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px;
+    font-size: 13px; color: #1f1e1d; }
+  .cds-nav-plus { width: 14px; text-align: center; font-size: 15px; color: #57544c; }
+  .cds-nav-more { color: #8a887f; font-size: 12.5px; }
+  .cds-recents-head { display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 8px 6px; font-size: 11.5px; font-weight: 600; color: #8a887f; }
+  .cds-session-list { flex: 1; display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+  .cds-session { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; }
+  .cds-session.is-active { background: #ecebe4; }
+  .cds-sess-num { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #dedcd4;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #8a887f; flex-shrink: 0; }
+  .cds-sess-title { flex: 1; font-size: 13px; color: #1f1e1d;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cds-sess-title { font-size: 11.5px; color: rgba(250, 249, 245, 0.45); margin-top: 3px; padding-left: 15px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cds-sess-badge { margin-left: auto; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 9px; }
-  .cds-sess-badge.input { background: rgba(254, 188, 46, 0.18); color: #febc2e; }
-  .cds-sess-badge.working { background: rgba(217, 119, 87, 0.16); color: #D97757; }
-  .cds-sess-badge.done { background: rgba(40, 200, 64, 0.14); color: #4fd06a; }
+  .cds-sess-status { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: none; }
+  .cds-sess-status.working { display: block; background: #D97757; }
+  .cds-sess-status.input { display: block; background: #e0a83d; }
+  .cds-sess-status.done { display: block; background: #3fa860; }
+  .cds-side-foot { margin-top: 8px; }
+  .cds-update { display: flex; align-items: center; gap: 9px; padding: 9px 10px;
+    border: 1px solid #e8e6e0; border-radius: 11px; background: #fff; margin-bottom: 8px; }
+  .cds-update-txt { flex: 1; display: flex; flex-direction: column; line-height: 1.3; }
+  .cds-update-txt b { font-size: 12.5px; color: #1f1e1d; font-weight: 600; }
+  .cds-update-txt span { font-size: 11px; color: #8a887f; }
+  .cds-update-arrow { color: #57544c; font-size: 13px; }
+  .cds-account { display: flex; align-items: center; gap: 8px; padding: 4px 6px; }
+  .cds-ava { width: 22px; height: 22px; border-radius: 50%; background: #1f1e1d; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .cds-account-name { flex: 1; font-size: 13px; font-weight: 600; color: #1f1e1d; }
 
-  /* Pane */
-  .cds-pane { flex: 1; display: flex; flex-direction: column; padding: 16px 20px 14px; min-width: 0; }
-  .cds-pane-head { font-size: 12px; color: rgba(250, 249, 245, 0.42); padding-bottom: 10px;
-    border-bottom: 1px solid rgba(250, 249, 245, 0.05); margin-bottom: 12px; }
-  .cds-transcript { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;
-    gap: 12px; margin-bottom: 14px; scroll-behavior: smooth; }
+  /* Main pane */
+  .cds-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f4f3ee; }
+  .cds-pane-head { display: flex; align-items: center; gap: 8px; padding: 13px 20px 11px; flex-shrink: 0; }
+  .cds-pane-title { font-size: 14px; font-weight: 700; color: #1f1e1d; }
+  .cds-repo-chip { font-size: 11.5px; color: #57544c; background: #ecebe4; border-radius: 6px;
+    padding: 2px 8px; font-family: 'SF Mono', Menlo, monospace; }
+  .cds-head-sp { flex: 1; }
+  .cds-kebab { position: relative; display: flex; }
+  .cds-kebab-dot { position: absolute; top: -1px; right: -2px; width: 6px; height: 6px;
+    border-radius: 50%; background: #D97757; }
+  .cds-transcript { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 26px 8px;
+    display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
 
-  /* Transcript blocks (same visual language as claude-code-session) */
-  .cds-user { font-size: 13px; line-height: 1.55; color: rgba(250, 249, 245, 0.92);
-    padding: 8px 12px; border-radius: 8px; background: rgba(250, 249, 245, 0.05);
-    border: 1px solid rgba(250, 249, 245, 0.07); white-space: pre-wrap; word-break: break-word; }
-  .cds-user::before { content: '> '; color: rgba(250, 249, 245, 0.45); }
-  .cds-text { font-size: 13px; line-height: 1.6; color: rgba(250, 249, 245, 0.86);
+  /* Conversation blocks (claude.ai styling) */
+  .cds-user { align-self: flex-end; max-width: 82%; font-size: 13.5px; line-height: 1.55; color: #1f1e1d;
+    background: #ecebe4; border-radius: 14px; padding: 9px 14px; white-space: pre-wrap; word-break: break-word; }
+  .cds-text { font-size: 13.5px; line-height: 1.65; color: #1f1e1d; max-width: 94%;
     white-space: pre-wrap; word-break: break-word; }
-  .cds-text strong { color: #faf9f5; }
-  .cds-text code { background: rgba(250, 249, 245, 0.08); padding: 1px 5px; border-radius: 4px;
-    font-size: 12px; color: #e8b4a0; }
-  .cds-working { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
-  .cds-working .star { color: #D97757; font-size: 14px; display: inline-block; }
-  .cds-working-verb { color: #D97757; }
-  .cds-working-meta { color: rgba(250, 249, 245, 0.38); font-size: 11.5px; }
-  .cds-tool { line-height: 1.5; }
-  .cds-tool-head { font-size: 13px; color: #faf9f5; }
+  .cds-text strong { font-weight: 700; }
+  .cds-text code { background: #ecebe4; border: 1px solid #e2e0d8; padding: 0 5px; border-radius: 5px;
+    font-family: 'SF Mono', Menlo, monospace; font-size: 12px; color: #b3542e; }
+  .cds-working { display: flex; align-items: center; gap: 9px; }
+  .cds-working .star { color: #D97757; font-size: 17px; display: inline-block; }
+  .cds-working-verb { font-size: 12.5px; color: #8a887f; }
+  .cds-tool { border: 1px solid #e8e6e0; background: #fbfaf7; border-radius: 11px;
+    padding: 9px 13px; max-width: 94%; }
+  .cds-tool-head { font-size: 12.5px; color: #1f1e1d; font-family: 'SF Mono', Menlo, monospace; }
   .cds-tool-head .tdot { color: #D97757; margin-right: 7px; }
   .cds-tool-head .tname { font-weight: 700; }
-  .cds-tool-head .targ { color: rgba(250, 249, 245, 0.6); }
-  .cds-tool-result { font-size: 12px; color: rgba(250, 249, 245, 0.42); padding-left: 20px; margin-top: 2px;
-    white-space: pre-wrap; word-break: break-word; }
-  .cds-tool-result::before { content: '⎿  '; color: rgba(250, 249, 245, 0.3); }
-  .cds-diff { margin-top: 6px; margin-left: 20px; border-radius: 7px; overflow: hidden;
-    border: 1px solid rgba(250, 249, 245, 0.08); font-size: 11.5px; line-height: 1.5; }
-  .cds-diff-line { padding: 1.5px 12px; white-space: pre-wrap; word-break: break-word;
-    color: rgba(250, 249, 245, 0.75); background: rgba(250, 249, 245, 0.02); }
-  .cds-diff-line.add { background: rgba(60, 140, 80, 0.22); color: #b6e3c2; }
-  .cds-diff-line.add::before { content: '+ '; color: #6fbf85; }
-  .cds-diff-line.del { background: rgba(180, 60, 60, 0.18); color: #e8b4b0; }
-  .cds-diff-line.del::before { content: '- '; color: #d98880; }
+  .cds-tool-head .targ { color: #8a887f; }
+  .cds-tool-result { font-size: 12px; color: #8a887f; padding-left: 19px; margin-top: 3px;
+    font-family: 'SF Mono', Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+  .cds-tool-result::before { content: '⎿  '; color: #c9c7bf; }
+  .cds-diff { margin-top: 7px; margin-left: 19px; border-radius: 8px; overflow: hidden;
+    border: 1px solid #e8e6e0; font-size: 11.5px; line-height: 1.55;
+    font-family: 'SF Mono', Menlo, monospace; }
+  .cds-diff-line { padding: 2px 12px; white-space: pre-wrap; word-break: break-word;
+    color: #57544c; background: #fff; }
+  .cds-diff-line.add { background: #e4f2e7; color: #22633a; }
+  .cds-diff-line.add::before { content: '+ '; color: #3fa860; }
+  .cds-diff-line.del { background: #fbe9e7; color: #92402c; }
+  .cds-diff-line.del::before { content: '- '; color: #d97757; }
   .cds-diff-line.ctx::before { content: '  '; }
 
-  /* Input */
-  .cds-inputwrap { flex-shrink: 0; }
-  .cds-inputbox { display: flex; gap: 9px; align-items: flex-start;
-    border: 1px solid rgba(250, 249, 245, 0.16); border-radius: 9px; padding: 10px 13px;
-    background: rgba(250, 249, 245, 0.02); }
-  .cds-inputbox.is-active { border-color: rgba(217, 119, 87, 0.55); }
-  .cds-caret { color: rgba(250, 249, 245, 0.5); font-size: 13px; }
-  .cds-input { flex: 1; font-size: 13px; color: #faf9f5; line-height: 1.5; min-height: 19px;
+  /* Composer */
+  .cds-inputwrap { flex-shrink: 0; padding: 8px 22px 14px; }
+  .cds-inputbox { display: flex; align-items: flex-start; gap: 10px;
+    background: #fff; border: 1px solid #e2e0d8; border-radius: 14px; padding: 13px 16px;
+    box-shadow: 0 2px 8px rgba(31,30,29,0.05); }
+  .cds-inputbox.is-active { border-color: rgba(217, 119, 87, 0.6); }
+  .cds-input { flex: 1; font-size: 13.5px; color: #1f1e1d; line-height: 1.5; min-height: 20px;
     white-space: pre-wrap; word-break: break-word; }
-  .cds-input:empty::before { content: attr(data-placeholder); color: rgba(250, 249, 245, 0.28); }
-  .cds-hintrow { display: flex; justify-content: space-between; margin-top: 6px; padding: 0 4px; }
-  .cds-hint, .cds-hint-right { font-size: 10.5px; color: rgba(250, 249, 245, 0.3); }
+  .cds-input:empty::before { content: attr(data-placeholder); color: #a5a39a; }
+  .cds-enter { color: #c9c7bf; font-size: 13px; }
+  .cds-inputrow { display: flex; align-items: center; gap: 10px; padding: 8px 6px 0; }
+  .cds-auto-pill { font-size: 11.5px; font-weight: 600; color: #57544c; background: #ecebe4;
+    border-radius: 7px; padding: 2px 9px; }
+  .cds-inrow-ico { color: #8a887f; font-size: 15px; }
+  .cds-inrow-sp { flex: 1; }
+  .cds-model, .cds-effort { font-size: 12px; color: #57544c; }
+  .cds-spin-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid rgba(217, 119, 87, 0.25); border-top-color: #D97757; }
 </style>
 
 <script>
@@ -137,56 +214,52 @@
     var inputEl = q('[data-target="input"]');
     var inputBox = q('[data-target="input-box"]');
     var sessionList = q('[data-target="session-list"]');
-    var paneHead = q('[data-target="pane-head"]');
     var dur = ctx.duration || 10;
 
-    q('[data-target="app-title"]').textContent = data.app_title || 'Claude Code';
-    q('[data-target="model-label"]').textContent = data.model_label || '';
-    inputEl.setAttribute('data-placeholder', data.placeholder || 'Reply to Claude…');
+    q('[data-target="model-label"]').textContent = data.model_label || 'Fable 5';
+    q('[data-target="effort-label"]').textContent = data.effort_label || 'Extra';
+    if (data.account_name) q('[data-target="account-name"]').textContent = data.account_name;
+    if (data.account_name) q('[data-target="account-avatar"]').textContent = String(data.account_name).charAt(0).toUpperCase();
+    inputEl.setAttribute('data-placeholder', data.placeholder || 'Type / for commands');
+    gsap.to(q('[data-target="spin-dot"]'), { rotation: 360, duration: 1.1, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
 
-    // ── Sessions sidebar ──
+    // ── Sessions (the sidebar Recents list) ──
+    // Recents defaults mirror the real app at rest: plain rows, no status
+    // dots (dots are strictly opt-in via sessions[].status / session-status).
     var sessions = Array.isArray(data.sessions) && data.sessions.length ? data.sessions : [
-      { project: 'acme-api', title: 'Fix flaky auth tests', status: 'working' },
-      { project: 'marketing-site', title: 'Ship pricing page', status: 'input' },
-      { project: 'mobile-app', title: 'Migrate to SDK v3', status: 'done' },
+      { title: 'Megamedia connection' },
+      { title: 'Fix flaky auth tests' },
+      { title: 'Ship pricing page' },
+      { title: 'Migrate to SDK v3' },
+      { title: 'Explore HyperFrames CLI' },
     ];
     var activeIdx = Number(data.active_session) || 0;
     var sessionEls = [];
-    var STATUS_BADGE = { working: 'running', input: 'needs input', done: 'done' };
-    function renderSessionRow(s, i) {
+    sessions.forEach(function (s, i) {
       var d = document.createElement('div');
       d.className = 'cds-session' + (i === activeIdx ? ' is-active' : '');
       d.setAttribute('data-target', 'session-' + i);
-      var badge = s.status && STATUS_BADGE[s.status]
-        ? '<span class="cds-sess-badge ' + s.status + '">' + STATUS_BADGE[s.status] + '</span>' : '';
-      d.innerHTML = '<div class="cds-sess-top">' +
-          '<span class="cds-sess-status ' + (s.status || 'idle') + '"></span>' +
-          '<span class="cds-sess-project">' + (s.project || 'project') + '</span>' + badge +
-        '</div>' +
-        '<div class="cds-sess-title">' + (s.title || '') + '</div>';
-      return d;
-    }
-    sessions.forEach(function (s, i) {
-      var d = renderSessionRow(s, i);
+      d.innerHTML = '<span class="cds-sess-num">' + (i + 1) + '</span>' +
+        '<span class="cds-sess-title">' + (s.title || s.project || 'Session') + '</span>' +
+        '<span class="cds-sess-status ' + (s.status || '') + '"></span>';
       sessionList.appendChild(d);
       sessionEls.push(d);
     });
+    var paneTitle = q('[data-target="pane-title"]');
+    var repoChip = q('[data-target="repo-chip"]');
     function setPaneHead(i) {
       var s = sessions[i] || {};
-      paneHead.textContent = (s.project || 'project') + (s.title ? ' — ' + s.title : '');
+      paneTitle.textContent = s.title || 'Session';
+      var repo = s.repo || data.repo || '';
+      repoChip.textContent = repo;
+      repoChip.style.display = repo ? '' : 'none';
     }
     setPaneHead(activeIdx);
-
     function setSessionStatus(i, status) {
-      var s = sessions[i];
-      var elRow = sessionEls[i];
-      if (!s || !elRow) return;
-      s.status = status;
-      var fresh = renderSessionRow(s, i);
-      fresh.className = 'cds-session' + (elRow.classList.contains('is-active') ? ' is-active' : '');
-      elRow.replaceWith(fresh);
-      sessionEls[i] = fresh;
-      var dot = fresh.querySelector('.cds-sess-status');
+      var row = sessionEls[i];
+      if (!row) return;
+      var dot = row.querySelector('.cds-sess-status');
+      dot.className = 'cds-sess-status ' + (status || '');
       gsap.from(dot, { scale: 0, duration: 0.35, ease: 'back.out(2)' });
     }
 
@@ -237,41 +310,24 @@
       return d;
     }
 
-    // ── Working spinner + master-timeline counter (scrub-safe) ──
+    // ── Working: the lone orange ✳ (the real app's thinking indicator) ──
     var workingEl = null;
     function showWorking(opts) {
       opts = opts || {};
       removeWorking();
       var d = document.createElement('div');
       d.className = 'cds-working';
-      d.innerHTML = '<span class="star">✳</span><span class="cds-working-verb">' +
-        (opts.text || 'Working…') + '</span><span class="cds-working-meta"></span>';
+      d.innerHTML = '<span class="star">✳</span>' +
+        (opts.text ? '<span class="cds-working-verb">' + opts.text + '</span>' : '');
       addBlock(d);
       workingEl = d;
-      gsap.to(d.querySelector('.star'), { rotation: 360, duration: 2.4, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
+      gsap.to(d.querySelector('.star'), { rotation: 360, duration: 2.6, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
     }
     function removeWorking() {
       if (!workingEl) return;
       gsap.killTweensOf(workingEl.querySelector('.star'));
       if (workingEl.parentNode) workingEl.parentNode.removeChild(workingEl);
       workingEl = null;
-    }
-    function addWorkingCounter(tlRef, at, opts) {
-      var proxy = { t: 0 };
-      var rate = Number((opts || {}).tokens_per_s) || 260;
-      var span = Math.max(0.5, dur - at);
-      tlRef.to(proxy, {
-        t: span, duration: span, ease: 'none',
-        onUpdate: function () {
-          if (!workingEl) return;
-          var meta = workingEl.querySelector('.cds-working-meta');
-          if (!meta) return;
-          var s = Math.floor(proxy.t);
-          var tok = proxy.t * rate;
-          var tokLabel = tok >= 1000 ? (tok / 1000).toFixed(1) + 'k' : String(Math.floor(tok));
-          meta.textContent = '(' + s + 's · ↑ ' + tokLabel + ' tokens · esc to interrupt)';
-        },
-      }, at);
     }
     function streamText(tlRef, text, at, secs) {
       var d = textEl('');
@@ -286,7 +342,7 @@
       }, at + 0.05);
     }
 
-    // ── Initial history for the active pane ──
+    // ── Initial history ──
     (Array.isArray(data.history) ? data.history : []).forEach(function (h) {
       if (h.type === 'user') addBlock(userEl(h.text), false);
       else if (h.type === 'tool') addBlock(toolEl(h), false);
@@ -297,10 +353,12 @@
     gsap.set(win, { autoAlpha: 0, y: 24 });
     tl.to(win, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.15);
     var initRows = sessionEls.concat(Array.prototype.slice.call(transcript.children));
-    gsap.set(initRows, { autoAlpha: 0, y: 8 });
-    initRows.forEach(function (b, i) {
-      tl.to(b, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, 0.4 + i * 0.1);
-    });
+    if (initRows.length) {
+      gsap.set(initRows, { autoAlpha: 0, y: 8 });
+      initRows.forEach(function (b, i) {
+        tl.to(b, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, 0.4 + i * 0.08);
+      });
+    }
 
     var cursorTargets = data.cursor_targets || {
       'input': function () {
@@ -337,16 +395,14 @@
         },
         'working': function (tl, ctr, action, at) {
           tl.call(function () { showWorking(action); }, null, at);
-          addWorkingCounter(tl, at, action);
         },
         'stop-working': function (tl, ctr, action, at) { tl.call(removeWorking, null, at); },
         'tool-call': function (tl, ctr, action, at) {
           tl.call(function () {
             removeWorking();
             addBlock(toolEl(action));
-            if (action.then_working !== false) showWorking({ text: action.working_text || 'Working…' });
+            if (action.then_working !== false) showWorking({ text: action.working_text || '' });
           }, null, at);
-          if (action.then_working !== false) addWorkingCounter(tl, at + 0.05, action);
         },
         'respond': function (tl, ctr, action, at) { streamText(tl, action.text || '', at, action.duration); },
         'claude-text': function (tl, ctr, action, at) {
