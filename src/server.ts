@@ -380,6 +380,7 @@ export function createMcpServer(): McpServer {
         at: z.number(),
         type: z.enum(["zoom", "pan", "rotate", "reset"]),
         target: z.string().optional(),
+        anchor: z.string().optional().describe("'componentId.anchorName' — frame a component's [data-anchor] region (preferred over raw x/y)"),
         w: z.number().optional(),
         h: z.number().optional(),
         x: z.number().optional(),
