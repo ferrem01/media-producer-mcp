@@ -332,7 +332,7 @@ ${buildContentRegionWrapper(scene, componentBlocks)}
   }
 
 ${componentScripts.join("\n\n")}
-
+${wrapperChoreoScript(scene.components, scene.duration_seconds)}
   // Fold any orphan animations the components created (loose gsap.to/from not
   // added to the master) ONTO the master, so the renderer -- which seeks the
   // master deterministically -- captures them frame-accurately instead of
@@ -460,6 +460,67 @@ export function mediaEdlScript(
 `;
 }
 
+/**
+ * Stage-level wrapper choreography: pose (standing 3D tilt), enter, and exit
+ * on .mp-component wrappers. This is the L4 lane from
+ * SPEC-motion-architecture -- the stage places and moves component WRAPPERS;
+ * it never reaches inside a component's DOM. Emitted into the master-timeline
+ * IIFE right after the component timelines are wired, so entrances/exits are
+ * captured deterministically like everything else.
+ */
+export function wrapperChoreoScript(
+  components: import("./types.js").SceneComponent[],
+  sceneDuration: number,
+  /** Composite namespaces wrapper ids ("sceneId__compId"); pass the prefix. */
+  cidPrefix = "",
+): string {
+  const moves = components
+    .filter((c) => c.pose || c.enter || c.exit)
+    .map((c) => ({
+      cid: `${cidPrefix}${c.id}`,
+      pose: c.pose || null,
+      enter: c.enter || null,
+      exit: c.exit || null,
+    }));
+  if (!moves.length) return "";
+  return `
+  // ── Stage wrapper choreography (pose / enter / exit) ──
+  (function() {
+    var CHOREO = ${JSON.stringify(moves)};
+    var DUR = ${sceneDuration};
+    var OFF = { 'slide-left': { x: '-115%' }, 'slide-right': { x: '115%' },
+                'slide-up': { y: '-115%' }, 'slide-down': { y: '115%' },
+                'rise': { y: 60, autoAlpha: 0 }, 'pop': { scale: 0.72, autoAlpha: 0 },
+                'fade': { autoAlpha: 0 } };
+    CHOREO.forEach(function(c) {
+      var el = document.querySelector('.mp-component[data-cid="' + c.cid + '"]');
+      if (!el) return;
+      if (c.pose) {
+        gsap.set(el, {
+          rotationY: c.pose.rotate_y || 0,
+          rotationX: c.pose.rotate_x || 0,
+          transformPerspective: 1100,
+        });
+      }
+      if (c.enter) {
+        var eFrom = OFF[c.enter.effect] || OFF['fade'];
+        var eAt = c.enter.at || 0;
+        var eDur = c.enter.duration || 0.8;
+        master.fromTo(el, eFrom,
+          { x: 0, y: 0, scale: 1, autoAlpha: 1, duration: eDur,
+            ease: c.enter.ease || 'power3.out', immediateRender: true }, eAt);
+      }
+      if (c.exit) {
+        var xTo = OFF[c.exit.effect] || OFF['fade'];
+        var xDur = c.exit.duration || 0.8;
+        var xAt = c.exit.at != null ? c.exit.at : Math.max(0, DUR - xDur - 0.1);
+        master.to(el, Object.assign({ duration: xDur, ease: c.exit.ease || 'power3.in' }, xTo), xAt);
+      }
+    });
+  })();
+`;
+}
+
 export function cameraMovesScript(
   moves: import("./types.js").CameraMove[],
   canvas: { width: number; height: number },
@@ -572,13 +633,48 @@ export function cameraMovesScript(
     riggedMedia.push({ media: media, rig: rig });
     return rig;
   }
+  function anchorBox(root, rigEl, spec) {
+    // "componentId.anchorName" -> the [data-anchor] element inside that
+    // component's wrapper (composite ids are namespaced "sceneId__compId",
+    // so match by exact or "__<id>" suffix). Bare name searches the scene.
+    var parts = String(spec).split('.');
+    var name = parts.pop();
+    var comp = parts.join('.');
+    var sel = comp
+      ? '.mp-component[data-cid="' + comp + '"] [data-anchor="' + name + '"], .mp-component[data-cid$="__' + comp + '"] [data-anchor="' + name + '"]'
+      : '[data-anchor="' + name + '"]';
+    var el = null;
+    try { el = root.querySelector(sel); } catch (e) {}
+    if (!el) { try { console.warn('[camera] anchor not found: ' + spec); } catch (e2) {} return null; }
+    var r = el.getBoundingClientRect();
+    var rr = root.getBoundingClientRect();
+    if (!rr.width || !rr.height || !r.width) return null;
+    var sx = CW / rr.width, sy = CH / rr.height;
+    // Viewport px -> canvas px (the root may be display-scaled in Studio).
+    var cx = (r.left + r.width / 2 - rr.left) * sx;
+    var cy = (r.top + r.height / 2 - rr.top) * sy;
+    var w = r.width * sx, h = r.height * sy;
+    // Compensate the rig's CURRENT transform so chained moves measure true
+    // scene coordinates, not the already-zoomed view. Translate+scale about
+    // center is exact; rotation is not compensated -- reset before rotating.
+    try {
+      var gs = parseFloat(gsap.getProperty(rigEl, 'scaleX')) || 1;
+      var gx = parseFloat(gsap.getProperty(rigEl, 'x')) || 0;
+      var gy = parseFloat(gsap.getProperty(rigEl, 'y')) || 0;
+      cx = (cx - CW / 2 - gx) / gs + CW / 2;
+      cy = (cy - CH / 2 - gy) / gs + CH / 2;
+      w = w / gs; h = h / gs;
+    } catch (e3) {}
+    return { cx: cx, cy: cy, w: w, h: h };
+  }
   function apply() {
     var root = ${containerExpr};
     var tl = ${timelineExpr};
     if (!root || !tl || !tl.to) return false;
     var groups = {};
     moves.forEach(function(m) {
-      var k = m.target || '';
+      // Anchored moves always ride the whole-scene camera rig.
+      var k = m.anchor ? '' : (m.target || '');
       (groups[k] = groups[k] || []).push(m);
     });
     Object.keys(groups).forEach(function(k) {
@@ -586,6 +682,38 @@ export function cameraMovesScript(
       if (!rig) return;
       var st = { scale: 1, x: 0, y: 0, rotation: 0 };
       groups[k].slice().sort(function(a, b) { return a.at - b.at; }).forEach(function(m) {
+        if (m.anchor && !k) {
+          // Anchored move: resolve at the tween's FIRST RENDER (function-based
+          // values) so it frames the anchor where it actually is at that
+          // moment -- mid-entrance, posed, drifting -- not where it was when
+          // the timeline was built.
+          var aDur = m.duration || 1;
+          var aEase = m.ease || 'power2.inOut';
+          var computeA = function() {
+            var a = anchorBox(root, rig.el, m.anchor);
+            if (!a) return { scale: 1, x: 0, y: 0 };
+            var sc = m.scale;
+            if (!sc) sc = Math.max(1.05, Math.min(5, Math.min(CW / (a.w * 1.5), CH / (a.h * 1.5))));
+            return { scale: sc, x: (0.5 - a.cx / CW) * CW * sc, y: (0.5 - a.cy / CH) * CH * sc };
+          };
+          if (m.type === 'reset') {
+            tl.to(rig.el, { scale: 1, x: 0, y: 0, rotation: 0, duration: aDur, ease: aEase }, m.at);
+            st = { scale: 1, x: 0, y: 0, rotation: 0 };
+          } else {
+            tl.to(rig.el, {
+              scale: function() { return computeA().scale; },
+              x: function() { return computeA().x; },
+              y: function() { return computeA().y; },
+              duration: aDur, ease: aEase,
+            }, m.at);
+            st = { scale: m.scale || 2, x: 0, y: 0, rotation: 0 };
+            if (m['return']) {
+              tl.to(rig.el, { scale: 1, x: 0, y: 0, rotation: 0, duration: aDur, ease: aEase }, m.at + aDur + (m.hold || 0));
+              st = { scale: 1, x: 0, y: 0, rotation: 0 };
+            }
+          }
+          return;
+        }
         var b = rig.box();
         var W = b.width || CW, H = b.height || CH;
         // Focal point arrives as canvas %, convert to this rig's box %.

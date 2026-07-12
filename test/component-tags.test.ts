@@ -261,3 +261,53 @@ var note = "tl.to is just text";
     expect(findOrphanTimelineCode({ script })).toHaveLength(0);
   });
 });
+
+describe("wrapperChoreoScript (SPEC-motion-architecture L4 lane)", () => {
+  it("emits pose set + enter/exit tweens for declared components only", async () => {
+    const { wrapperChoreoScript } = await import("../src/core/scene-assembler.js");
+    const js = wrapperChoreoScript(
+      [
+        { id: "slack", type: "slack-workspace", data: {},
+          pose: { rotate_y: -15 },
+          enter: { effect: "slide-left", duration: 0.8 },
+          exit: { effect: "slide-right", at: 16.6 } } as any,
+        { id: "bg", type: "webgl-backdrop", data: {} } as any,
+      ],
+      18,
+    );
+    expect(js).toContain('"cid":"slack"');
+    expect(js).not.toContain('"cid":"bg"');
+    expect(js).toContain('"rotate_y":-15');
+    expect(js).toContain("slide-left");
+    expect(js).toContain("master.fromTo");
+    expect(js).toContain("master.to");
+  });
+
+  it("returns empty string when nothing declares choreography", async () => {
+    const { wrapperChoreoScript } = await import("../src/core/scene-assembler.js");
+    expect(wrapperChoreoScript([{ id: "a", type: "x", data: {} } as any], 10)).toBe("");
+  });
+
+  it("namespaces cids for the composite", async () => {
+    const { wrapperChoreoScript } = await import("../src/core/scene-assembler.js");
+    const js = wrapperChoreoScript(
+      [{ id: "slack", type: "slack-workspace", data: {}, enter: { effect: "fade" } } as any],
+      10, "scene_002__",
+    );
+    expect(js).toContain('"cid":"scene_002__slack"');
+  });
+});
+
+describe("cameraMovesScript anchors", () => {
+  it("embeds anchor resolution and function-based tween values", async () => {
+    const { cameraMovesScript } = await import("../src/core/scene-assembler.js");
+    const js = cameraMovesScript(
+      [{ at: 1.4, type: "zoom", anchor: "slack.composer", scale: 1.8 } as any,
+       { at: 4.6, type: "reset" } as any],
+      { width: 1920, height: 1080 }, "document.body", "window.__MP_TIMELINE",
+    );
+    expect(js).toContain("anchorBox");
+    expect(js).toContain("data-anchor");
+    expect(js).toContain("m.anchor ? ''");
+  });
+});

@@ -29,6 +29,7 @@ import {
   resolveSpeakerVideoTags,
   stripEagerVideoLoading,
   cameraMovesScript,
+  wrapperChoreoScript,
   mediaEdlScript,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
@@ -208,6 +209,12 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       // Rewrite "master.add(" to "sceneTl.add(" since each scene has its own timeline
       componentScripts.push(script.replace(/master\.add\(/g, 'sceneTl.add('));
     }
+
+    // Stage wrapper choreography (pose / enter / exit) on this scene's
+    // timeline; the composite namespaces wrapper ids, so pass the prefix.
+    // The generator emits master.* calls -- rewrite to sceneTl like the rest.
+    const choreo = wrapperChoreoScript(scene.components, scene.duration_seconds, `${scene.id}__`);
+    if (choreo) componentScripts.push(choreo.replace(/master\./g, "sceneTl."));
 
     // Media source-maps: stamp each edited video with data-mp-edl so the
     // preview's sync loop plays it through its edit (condensed screencasts).

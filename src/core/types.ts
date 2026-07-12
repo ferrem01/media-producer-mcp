@@ -96,10 +96,23 @@ export interface ComponentPosition {
 }
 
 export interface ComponentAnimation {
+  /** slide-left | slide-right | slide-up | slide-down | fade | rise | pop */
   effect: string;
+  /** Scene-local start time in seconds. Enter defaults to 0; exit defaults
+   *  to scene end minus duration. */
+  at?: number;
   duration?: number;
   stagger?: number;
   ease?: string;
+}
+
+/** Persistent 3D pose of a component wrapper on the stage -- the object
+ *  tilting, not the camera moving (SPEC-motion-architecture: rotate-3d is
+ *  pose, camera is scene-level). Applied as a standing transform on the
+ *  .mp-component wrapper with perspective. */
+export interface ComponentPose {
+  rotate_x?: number;
+  rotate_y?: number;
 }
 
 export interface SceneComponent {
@@ -108,6 +121,7 @@ export interface SceneComponent {
   data: Record<string, unknown>;
   position?: ComponentPosition;
   z_index?: number;
+  pose?: ComponentPose;
   enter?: ComponentAnimation;
   exit?: ComponentAnimation;
 }
@@ -191,6 +205,13 @@ export interface CameraMove {
    *  frame -- the screen content magnifies while browser chrome and PiP stay
    *  fixed. Any other value is a CSS selector for the media element to rig. */
   target?: string;
+  /** Semantic anchor target: "componentId.anchorName" (or just "anchorName"
+   *  to search the whole scene). Resolved at the move's start time by
+   *  measuring [data-anchor=anchorName] inside the component's wrapper --
+   *  works while the component is mid-entrance, posed, or drifting, where a
+   *  drawn rect would go stale (SPEC-motion-architecture). Anchored moves
+   *  ride the whole-scene camera rig; target is ignored when anchor is set. */
+  anchor?: string;
   /** Zoom factor for type=zoom (e.g. 1.8). Ignored when w/h are present. */
   scale?: number;
   /** Drawn-box dimensions as canvas % (x,y = box center). When present, the
