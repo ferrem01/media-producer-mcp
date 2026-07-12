@@ -26,7 +26,7 @@
     "account_name": { "type": "string", "label": "Account row name", "optional": true },
     "script": {
       "type": "array",
-      "label": "The task performance: type-message {text} + send-message (user bubble), working {text?} (orange ✳), stop-working, respond {text, heading?, duration?} (SERIF prose streams word by word; **bold** + `code`), claude-text {text, heading?}, set-progress {current, total?, steps?} (the Progress count ticks -- '1 of 3' -> '2 of 3'), add-output {name} (a deliverable row pops into Outputs), use-connector {name, duration?} (that connector chip lights up while the agent uses it -- Quotient glows while it creates the campaign). NEVER move the camera from a script -- scene camera_moves with anchors (transcript, input, panel).",
+      "label": "The task performance: type-message {text} + send-message (user bubble), working {text?} (orange ✳), stop-working, respond {text, heading?, duration?} (SERIF prose streams word by word; **bold** + `code`), claude-text {text, heading?}, tool-call {connector: 'Quotient', tool: 'create-campaign', label: 'Creating campaign in Quotient', params?: '{ name: \"Free Trial Launch\" }', result: 'Campaign created', duration?: 1.8} (THE tool-use beat: a tool row pops into the transcript with the connector's icon + spinner, the matching rail chip lights up automatically, then it flips to a green check with the result -- use REAL Quotient MCP tool names: create-campaign, create-social-post, create-blog, update-campaign, create-email...), set-progress {current, total?, steps?} (the Progress count ticks), add-output {name} (a deliverable row pops into Outputs), use-connector {name, duration?} (manually light a rail chip). NEVER move the camera from a script -- scene camera_moves with anchors (transcript, input, panel).",
       "optional": true
     },
     "cursor_targets": { "type": "object", "label": "Named cursor positions (input)", "optional": true }
@@ -38,6 +38,20 @@
     { "action": "stop-working", "description": "Remove the spinner" },
     { "action": "respond", "description": "Stream serif Claude prose word by word", "params": { "text": "string", "heading": "boolean - bold serif section line", "duration": "number" } },
     { "action": "claude-text", "description": "Instant serif prose block", "params": { "text": "string", "heading": "boolean" } },
+    {
+      "action": "tool-call",
+      "description": "A tool-use row pops into the transcript: connector icon + label + spinner while running (the matching rail chip lights up automatically), then flips to a green check with the result line. Use real Quotient MCP tool names.",
+      "params": {
+        "connector": "string - matches connectors[].name (icon + rail chip sync)",
+        "tool": "string - e.g. create-campaign, create-social-post, create-blog",
+        "label": "string - human line (e.g. 'Creating campaign in Quotient')",
+        "params": "string - optional mono params preview",
+        "result": "string - result line shown when done",
+        "duration": "number - seconds until done (default 1.8)",
+        "then_working": "boolean - re-show the ✳ after completion",
+        "keep_live": "boolean - leave the rail chip lit"
+      }
+    },
     { "action": "set-progress", "description": "Update the Progress card count (and optional step checklist)", "params": { "current": "number", "total": "number", "steps": "array" } },
     { "action": "add-output", "description": "A deliverable row pops into the Outputs card", "params": { "name": "string" } },
     { "action": "use-connector", "description": "A connector chip lights up while in use, then settles", "params": { "name": "string - matches connectors[].name", "duration": "number - seconds lit (default 2.2; 0 = stay lit)" } }

@@ -208,6 +208,31 @@
   .cws-working .star { color: #D97757; font-size: 17px; display: inline-block; }
   .cws-working-verb { font-size: 13px; color: #8a887f; }
 
+  /* Tool-call row (the real Cowork tool-use treatment): connector icon +
+     what it's doing + spinner while running; check + result when done. */
+  .cws-tcall { max-width: 94%; border: 1px solid #e8e6e0; background: #fff;
+    border-radius: 12px; padding: 10px 13px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; }
+  .cws-tcall-head { display: flex; align-items: center; gap: 9px; }
+  .cws-tcall-ico { width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; position: relative;
+    display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
+    color: #fff; overflow: hidden; }
+  .cws-tcall-label { flex: 1; font-size: 13px; font-weight: 600; color: #1f1e1d;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cws-tcall-tool { font-size: 11.5px; color: #8a887f; font-family: 'SF Mono', Menlo, monospace; }
+  .cws-tcall-spin { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid rgba(217, 119, 87, 0.25); border-top-color: #D97757; }
+  .cws-tcall-check { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; background: #3fa860;
+    display: none; align-items: center; justify-content: center; color: #fff; font-size: 9px; }
+  .cws-tcall.is-done .cws-tcall-spin { display: none; }
+  .cws-tcall.is-done .cws-tcall-check { display: flex; }
+  .cws-tcall-params { margin-top: 7px; font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px;
+    color: #57544c; background: #fbfaf7; border: 1px solid #efeee8; border-radius: 8px;
+    padding: 6px 10px; white-space: pre-wrap; word-break: break-word; }
+  .cws-tcall-result { margin-top: 7px; font-size: 12.5px; color: #57544c; display: none;
+    align-items: center; gap: 6px; }
+  .cws-tcall.is-done .cws-tcall-result { display: flex; }
+
   /* Composer */
   .cws-inputwrap { flex-shrink: 0; padding: 4px 22px 8px; }
   .cws-inputbox { background: #fff; border: 1px solid #e2e0d8; border-radius: 15px;
@@ -392,6 +417,37 @@
     function userEl(text) {
       var d = document.createElement('div'); d.className = 'cws-user'; d.textContent = String(text || ''); return d;
     }
+    // Tool-call rows: pop in running (spinner + the matching rail chip
+    // lights up), flip to done (green check + result) after `duration`.
+    function connIconHtml(name, size) {
+      var key = String(name || '').toLowerCase();
+      var c = null;
+      connectors.forEach(function (cc) { if (String(cc.name || '').toLowerCase() === key) c = cc; });
+      if (c && c.globe) return '<span class="cws-tcall-ico" style="background:transparent">' + GLOBE_ICO + '</span>';
+      if (c && c.icon_url) return '<span class="cws-tcall-ico" style="background:' + (c.color || '#393bf5') + '">' +
+        String(c.name).charAt(0) + '<img class="cws-conn-img" src="' + c.icon_url + '" onerror="this.remove()"/></span>';
+      return '<span class="cws-tcall-ico" style="background:#57544c">' + String(name || '?').charAt(0).toUpperCase() + '</span>';
+    }
+    function toolCallEl(a) {
+      var d = document.createElement('div');
+      d.className = 'cws-tcall';
+      var label = a.label || ((a.tool ? a.tool : 'tool') + (a.connector ? ' in ' + a.connector : ''));
+      var html = '<div class="cws-tcall-head">' + connIconHtml(a.connector) +
+        '<span class="cws-tcall-label">' + label + '</span>' +
+        (a.tool ? '<span class="cws-tcall-tool">' + a.tool + '</span>' : '') +
+        '<span class="cws-tcall-spin"></span><span class="cws-tcall-check">✓</span></div>';
+      if (a.params) html += '<div class="cws-tcall-params">' + String(a.params) + '</div>';
+      html += '<div class="cws-tcall-result">' + (a.result || 'Done') + '</div>';
+      d.innerHTML = html;
+      return d;
+    }
+    function setConnLive(name, live) {
+      var d = connEls[String(name || '').toLowerCase()];
+      if (!d) return;
+      if (live) { d.classList.add('is-live'); gsap.from(d, { scale: 1.12, duration: 0.35, ease: 'back.out(2)' }); }
+      else d.classList.remove('is-live');
+    }
+
     var workingEl = null;
     function showWorking(opts) {
       opts = opts || {};
@@ -481,6 +537,27 @@
         'claude-text': function (tl, ctr, action, at) {
           tl.call(function () { removeWorking(); addBlock(textEl(action.text || '', action.heading)); }, null, at);
         },
+        'tool-call': function (tl, ctr, action, at) {
+          var block = null;
+          tl.call(function () {
+            removeWorking();
+            block = toolCallEl(action);
+            addBlock(block);
+            gsap.to(block.querySelector('.cws-tcall-spin'),
+              { rotation: 360, duration: 0.9, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
+            if (action.connector) setConnLive(action.connector, true);
+          }, null, at);
+          var doneAt = at + (action.duration || 1.8);
+          tl.call(function () {
+            if (!block) return;
+            gsap.killTweensOf(block.querySelector('.cws-tcall-spin'));
+            block.classList.add('is-done');
+            gsap.from(block.querySelector('.cws-tcall-check'), { scale: 0, duration: 0.35, ease: 'back.out(2)' });
+            if (action.connector && action.keep_live !== true) setConnLive(action.connector, false);
+            if (action.then_working) showWorking({});
+            scrollDown();
+          }, null, doneAt);
+        },
         'set-progress': function (tl, ctr, action, at) {
           tl.call(function () {
             if (action.total != null) progress.total = Number(action.total);
@@ -494,17 +571,9 @@
           tl.call(function () { addOutput(action); }, null, at);
         },
         'use-connector': function (tl, ctr, action, at) {
-          tl.call(function () {
-            var d = connEls[String(action.name || '').toLowerCase()];
-            if (!d) return;
-            d.classList.add('is-live');
-            gsap.from(d, { scale: 1.12, duration: 0.35, ease: 'back.out(2)' });
-          }, null, at);
+          tl.call(function () { setConnLive(action.name, true); }, null, at);
           if (action.duration !== 0) {
-            tl.call(function () {
-              var d = connEls[String(action.name || '').toLowerCase()];
-              if (d) d.classList.remove('is-live');
-            }, null, at + (action.duration || 2.2));
+            tl.call(function () { setConnLive(action.name, false); }, null, at + (action.duration || 2.2));
           }
         },
       });
