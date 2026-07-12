@@ -47,7 +47,7 @@
     },
     "direct_messages": {
       "type": "array",
-      "label": "Direct Messages List",
+      "label": "Direct Messages List -- HUMANS ONLY. Apps and agents (incl. Quotient) belong in agents_apps, never here; real Slack does not list apps under Direct messages.",
       "optional": true,
       "items": {
         "type": "object",

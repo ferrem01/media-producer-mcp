@@ -838,9 +838,11 @@
       return 'https://img.logo.dev/' + domain + '?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&fallback=monogram';
     };
     var botAvatarUrl = data.bot_avatar_url !== undefined ? data.bot_avatar_url : LOGO_DEV('getquotient.ai');
+    // DMs are HUMANS only -- apps/agents live in the Agents & apps section
+    // (real Slack never lists an app under Direct messages).
     var directMessages = data.direct_messages || [
       {name:'Marc Ferrentino', avatar_color:'#6366f1', online:true, initials:'MF'},
-      {name:'Quotient', avatar_url: botAvatarUrl, avatar_color:'#7c3aed', online:true, initials:'QB'},
+      {name:'Priya Shah', avatar_color:'#d48c34', online:true, initials:'PS'},
       {name:'Ed', avatar_color:'#2bac76', online:true, initials:'Ed'}
     ];
     // Normalize message field aliases: LLM-authored data drifts from the
