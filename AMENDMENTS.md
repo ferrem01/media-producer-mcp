@@ -390,3 +390,22 @@ that is in draft."
   schema fix. (Symptom to remember: move plays, framing is wrong.)
 - Demo: proj_8446563d scene_social — draft → dropdown → Publish Now →
   green bar, with anchored zooms on qs.status / qs.toolbar.
+
+## 2026-07-12 — quotient-app-shell: the composable app chrome (PR #328)
+
+Marc: "what i really want to do is build a component system. The left nav and
+header......the social edit screen....the message panel to the right. Then i
+can swap out the middle for different parts of the platform."
+
+- **quotient-app-shell** (#328): icon rail (nav_active highlight + avatar),
+  breadcrumb header (bell 480, Search ⌘+K, black New Chat), right AGENT
+  PANEL (tabbed title, reviewed-line, collapsible 'Updated [in] LinkedIn
+  post' tool cards with faded post preview, agent/user messages, typing,
+  composer with Auto + mic + send). The CENTER IS AN EMPTY WELL:
+  content-region contract = shell full-frame → center component at
+  x 3.6%, y 6.2%, 63%×93%. quotient-social drops in today; campaign /
+  email / doc / flow screens reuse the same hole. show_panel:false =
+  full-width well. Anchors: content, panel, messages, composer, header, nav.
+- Demo: proj_8446563d scene_shell — agent panel narrates the edit, user
+  types 'Perfect — publish it.', center editor opens the Schedule menu and
+  flips draft → published green while the panel confirms.
