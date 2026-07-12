@@ -739,6 +739,33 @@
       addMessage(msg, false);
     });
 
+    // No script? PERFORM the thread instead of rendering a static screenshot:
+    // each initial message pops in in sequence, with the typing bar showing
+    // who is writing before it lands. A script, when present, owns all the
+    // choreography and expects the initial messages as an instant backdrop.
+    var hasScript = data.script && data.script.length > 0;
+    if (!hasScript && messageEls.length > 0) {
+      var perfSpan = Math.min((ctx.duration || 10) * 0.6, 2.0 + messageEls.length * 1.7);
+      var perfT0 = 0.5;
+      var perfStep = messageEls.length > 1 ? (perfSpan - perfT0) / (messageEls.length - 1) : 0;
+      var typingDots = typingBar ? typingBar.querySelectorAll('.typing-dot') : null;
+      messageEls.forEach(function(mEl, mi) {
+        var mAt = perfT0 + mi * perfStep;
+        tl.fromTo(mEl, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.38, ease: 'power2.out' }, mAt);
+        tl.call(scrollToBottom, null, mAt + 0.05);
+        if (typingBar && typingWho && perfStep > 0.9) {
+          var whoName = (messageData[mi] && messageData[mi].name) || 'Someone';
+          var tAt = Math.max(0.05, mAt - Math.min(perfStep * 0.55, 1.1));
+          tl.call(function() { typingWho.textContent = whoName + ' is typing'; }, null, tAt);
+          tl.to(typingBar, { opacity: 1, duration: 0.15 }, tAt);
+          if (typingDots && typingDots.length) {
+            tl.to(typingDots, { y: -4, duration: 0.3, stagger: 0.12, ease: 'power1.inOut', yoyo: true, repeat: 3 }, tAt + 0.1);
+          }
+          tl.to(typingBar, { opacity: 0, duration: 0.12 }, mAt - 0.05);
+        }
+      });
+    }
+
     // ── Thread helpers ──
     function renderThreadParent(idx) {
       var msg = messageData[idx];
