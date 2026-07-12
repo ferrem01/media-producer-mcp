@@ -2,7 +2,7 @@
   "type": "claude-chat-composer",
   "label": "Claude Chat Composer",
   "category": "mockups",
-  "description": "Claude AI chat interface with multi-line composer box, two-level tools/connectors menu, and animated UI walkthrough. Supports scripted cursor interactions: click plus, open category menu, hover connectors, show submenu, toggle items.",
+  "description": "Claude AI chat interface with multi-line composer box, two-level tools/connectors menu, and animated UI walkthrough. Supports scripted cursor interactions: click plus, open category menu, hover connectors, show submenu, toggle items. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong.",
   "data": {
     "messages": {
       "type": "array",
@@ -11,8 +11,20 @@
       "items": {
         "type": "object",
         "properties": {
-          "role": { "type": "string", "label": "Role", "required": true, "enum": ["user", "assistant"] },
-          "text": { "type": "string", "label": "Message Text", "required": true }
+          "role": {
+            "type": "string",
+            "label": "Role",
+            "required": true,
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "label": "Message Text",
+            "required": true
+          }
         }
       }
     },
@@ -50,12 +62,38 @@
       "items": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "label": "Connector ID", "optional": true },
-          "name": { "type": "string", "label": "Connector Name", "required": true },
-          "label": { "type": "string", "label": "Display Label", "optional": true },
-          "icon": { "type": "string", "label": "Icon Emoji", "optional": true },
-          "connected": { "type": "boolean", "label": "Initially Connected", "optional": true, "default": false },
-          "enabled": { "type": "boolean", "label": "Initially Enabled", "optional": true, "default": false }
+          "id": {
+            "type": "string",
+            "label": "Connector ID",
+            "optional": true
+          },
+          "name": {
+            "type": "string",
+            "label": "Connector Name",
+            "required": true
+          },
+          "label": {
+            "type": "string",
+            "label": "Display Label",
+            "optional": true
+          },
+          "icon": {
+            "type": "string",
+            "label": "Icon Emoji",
+            "optional": true
+          },
+          "connected": {
+            "type": "boolean",
+            "label": "Initially Connected",
+            "optional": true,
+            "default": false
+          },
+          "enabled": {
+            "type": "boolean",
+            "label": "Initially Enabled",
+            "optional": true,
+            "default": false
+          }
         }
       }
     },
@@ -64,6 +102,16 @@
       "label": "Show Sidebar",
       "optional": true,
       "default": false
+    },
+    "script": {
+      "type": "array",
+      "label": "Scripted timeline: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: type {text}, click, hover-plus / unhover-plus, open-menu / close-menu, hover-connectors, show-connectors, toggle-item {target}, show-typing, show-response {text}, plus base actions move-cursor, highlight, zoom-to, wait, parallel. Drive the whole interaction through this script.",
+      "optional": true
+    },
+    "cursor_targets": {
+      "type": "object",
+      "label": "Named cursor positions for move-cursor/click in 0-1 component coords.",
+      "optional": true
     }
   },
   "script_actions": [
@@ -122,11 +170,29 @@
     }
   ],
   "default_cursor_targets": {
-    "chat-input": { "x": "50%", "y": "75%" },
-    "send-button": { "x": "95%", "y": "86%" },
-    "plus-button": { "x": "8%", "y": "86%" },
-    "mic-button": { "x": "90%", "y": "86%" },
-    "connectors-item": { "x": "28%", "y": "60%" },
-    "quotient-toggle": { "x": "72%", "y": "50%" }
+    "chat-input": {
+      "x": "50%",
+      "y": "75%"
+    },
+    "send-button": {
+      "x": "95%",
+      "y": "86%"
+    },
+    "plus-button": {
+      "x": "8%",
+      "y": "86%"
+    },
+    "mic-button": {
+      "x": "90%",
+      "y": "86%"
+    },
+    "connectors-item": {
+      "x": "28%",
+      "y": "60%"
+    },
+    "quotient-toggle": {
+      "x": "72%",
+      "y": "50%"
+    }
   }
 }

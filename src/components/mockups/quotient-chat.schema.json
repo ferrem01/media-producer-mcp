@@ -2,7 +2,7 @@
   "type": "quotient-chat",
   "label": "Quotient Chat Panel",
   "category": "mockups",
-  "description": "Quotient AI chat interface with rich messaging, tool use indicators, asset cards, and animated scripted interactions. Supports user bubbles with avatars, agent markdown messages, typing indicator, and composer with send button.",
+  "description": "Quotient AI chat interface with rich messaging, tool use indicators, asset cards, and animated scripted interactions. Supports user bubbles with avatars, agent markdown messages, typing indicator, and composer with send button. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong.",
   "data": {
     "conversation_title": {
       "type": "string",
@@ -18,8 +18,20 @@
       "items": {
         "type": "object",
         "properties": {
-          "role": { "type": "string", "label": "Role", "required": true, "enum": ["user", "agent"] },
-          "text": { "type": "string", "label": "Message Text", "required": true }
+          "role": {
+            "type": "string",
+            "label": "Role",
+            "required": true,
+            "enum": [
+              "user",
+              "agent"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "label": "Message Text",
+            "required": true
+          }
         }
       }
     },
@@ -47,7 +59,10 @@
       "label": "Display Mode",
       "optional": true,
       "default": "panel",
-      "enum": ["panel", "full"]
+      "enum": [
+        "panel",
+        "full"
+      ]
     },
     "show_progress": {
       "type": "boolean",
@@ -61,6 +76,16 @@
       "optional": true,
       "default": "Type a message...",
       "placeholder": "Type a message..."
+    },
+    "script": {
+      "type": "array",
+      "label": "Scripted timeline that plays the conversation INSIDE the component: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: type-message {text,duration} (user types in composer), send-message (posts it), show-typing / hide-typing (agent thinking dots), agent-message {text} (agent reply streams in, markdown ok), tool-use {label} (tool-call indicator chip), asset-card {title,subtitle} (rich asset result card), agent-image {url}, scroll-to-bottom. Plus base actions: move-cursor, click, type, highlight, zoom-to, wait, parallel. Write the ENTIRE conversation here -- never animate the component's internals from outside.",
+      "optional": true
+    },
+    "cursor_targets": {
+      "type": "object",
+      "label": "Named cursor positions for move-cursor/click in 0-1 component coords.",
+      "optional": true
     }
   },
   "script_actions": [
@@ -85,7 +110,7 @@
     },
     {
       "action": "tool-use",
-      "description": "Show a tool use indicator: 🟢 Used **action** on **Service**",
+      "description": "Show a tool use indicator: \ud83d\udfe2 Used **action** on **Service**",
       "params": {
         "action": "string - Tool action name (e.g. generate-design)",
         "service": "string - Service name (e.g. Canva)"
@@ -123,8 +148,17 @@
     }
   ],
   "default_cursor_targets": {
-    "composer": { "x": "50%", "y": "82%" },
-    "send-button": { "x": "93%", "y": "90%" },
-    "expand-btn": { "x": "88%", "y": "3%" }
+    "composer": {
+      "x": "50%",
+      "y": "82%"
+    },
+    "send-button": {
+      "x": "93%",
+      "y": "90%"
+    },
+    "expand-btn": {
+      "x": "88%",
+      "y": "3%"
+    }
   }
 }

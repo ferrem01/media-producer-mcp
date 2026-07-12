@@ -180,3 +180,84 @@ describe("buildComponentTimelineScript", () => {
     expect(script).toContain('data-comp-id="comp_0"');
   });
 });
+
+describe("quote-aware tag matching + broken-tag detection", () => {
+  it("a '>' inside a quoted data value does not truncate the tag", () => {
+    // The observed live failure: JSON containing markup ("</div>") ended the
+    // tag at the first '>', binding empty data and leaking the JSON tail.
+    const html = `<component type="quotient-chat" data='{"conversation_title": "a <b>bold</b> title"}' />`;
+    const result = resolveComponentTags(html, buildSourceMap());
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].data.conversation_title).toBe("a <b>bold</b> title");
+    expect(result.html).not.toContain("' />");
+  });
+
+  it("findBrokenComponentTags flags invalid JSON from an apostrophe-broken attribute", async () => {
+    const { findBrokenComponentTags } = await import("../src/llm/agentic-codegen.js");
+    const tpl = `<component type="quotient-chat" data='{"title": "Marc's LinkedIn"}' />`;
+    const v = findBrokenComponentTags({ template: tpl });
+    expect(v.length).toBeGreaterThan(0);
+  });
+
+  it("findBrokenComponentTags flags a dangling }' /> leak", async () => {
+    const { findBrokenComponentTags } = await import("../src/llm/agentic-codegen.js");
+    const tpl = `<div class="plane">"\n}' />\n</div>`;
+    const v = findBrokenComponentTags({ template: tpl });
+    expect(v.some((x) => x.includes("dangling"))).toBe(true);
+  });
+
+  it("findBrokenComponentTags passes clean tags", async () => {
+    const { findBrokenComponentTags } = await import("../src/llm/agentic-codegen.js");
+    const tpl = `<component type="quotient-chat" data='{"title": "Marc’s LinkedIn"}' />`;
+    expect(findBrokenComponentTags({ template: tpl })).toHaveLength(0);
+  });
+});
+
+describe("findOrphanTimelineCode", () => {
+  it("flags beats appended after createTimeline closed (the tl-is-not-defined class)", async () => {
+    const { findOrphanTimelineCode } = await import("../src/llm/agentic-codegen.js");
+    const script = `
+function createTimeline(el, data, ctx) {
+  var tl = gsap.timeline();
+  tl.to('.a', { x: 10 }, 0);
+  return tl;
+}
+
+  // BEAT 3 landed outside the function
+  tl.addLabel('beat3', 2.1);
+  tl.to('.b', { opacity: 1 }, 'beat3');
+`;
+    const v = findOrphanTimelineCode({ script });
+    expect(v).toHaveLength(1);
+    expect(v[0]).toContain("closes too early");
+  });
+
+  it("does not flag helpers that take tl as a parameter after the function", async () => {
+    const { findOrphanTimelineCode } = await import("../src/llm/agentic-codegen.js");
+    const script = `
+function createTimeline(el, data, ctx) {
+  var tl = gsap.timeline();
+  moveCursor(tl, el, 1);
+  return tl;
+}
+function moveCursor(tl, el, at) {
+  tl.to(el, { x: 5 }, at);
+  tl.to(el, { scale: 1 }, at + 0.1);
+}
+`;
+    expect(findOrphanTimelineCode({ script })).toHaveLength(0);
+  });
+
+  it("ignores tl mentions inside strings and comments after the close", async () => {
+    const { findOrphanTimelineCode } = await import("../src/llm/agentic-codegen.js");
+    const script = `
+function createTimeline(el, data, ctx) {
+  var tl = gsap.timeline();
+  return tl;
+}
+// tl.addLabel in a comment is fine
+var note = "tl.to is just text";
+`;
+    expect(findOrphanTimelineCode({ script })).toHaveLength(0);
+  });
+});
