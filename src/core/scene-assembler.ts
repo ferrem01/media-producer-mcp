@@ -731,7 +731,14 @@ export function cameraMovesScript(
             if (!a) return { scale: 1, x: 0, y: 0 };
             var sc = m.scale;
             if (!sc) sc = Math.max(1.05, Math.min(5, Math.min(CW / (a.w * 1.5), CH / (a.h * 1.5))));
-            return { scale: sc, x: (0.5 - a.cx / CW) * CW * sc, y: (0.5 - a.cy / CH) * CH * sc };
+            // Cover-clamp: the camera never frames outside the canvas. An
+            // edge-hugging anchor (a sidebar, a top-aligned transcript) would
+            // otherwise drag the rig past the frame, cropping content and
+            // exposing the backdrop.
+            var mx = (sc - 1) * CW / 2, my = (sc - 1) * CH / 2;
+            return { scale: sc,
+              x: Math.max(-mx, Math.min(mx, (0.5 - a.cx / CW) * CW * sc)),
+              y: Math.max(-my, Math.min(my, (0.5 - a.cy / CH) * CH * sc)) };
           };
           if (m.type === 'reset') {
             tl.to(rig.el, { scale: 1, x: 0, y: 0, rotation: 0, duration: aDur, ease: aEase }, m.at);
@@ -775,6 +782,12 @@ export function cameraMovesScript(
             y: (0.5 - py) * H * sc,
             rotation: m.type === 'rotate' ? (m.angle || 0) : st.rotation,
           };
+          if (!k) {
+            // Whole-scene rig: same cover-clamp as anchored moves.
+            var mx2 = (sc - 1) * CW / 2, my2 = (sc - 1) * CH / 2;
+            to.x = Math.max(-mx2, Math.min(mx2, to.x));
+            to.y = Math.max(-my2, Math.min(my2, to.y));
+          }
         }
         var dur = m.duration || 1;
         var ease = m.ease || 'power2.inOut';
