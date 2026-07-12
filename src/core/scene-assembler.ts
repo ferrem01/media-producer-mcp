@@ -640,11 +640,17 @@ export function cameraMovesScript(
     var parts = String(spec).split('.');
     var name = parts.pop();
     var comp = parts.join('.');
+    // Match by component id (exact or composite "__id" suffix), by component
+    // TYPE (storyboards naturally write "slack-workspace.composer"), or fall
+    // back to the bare anchor name anywhere in the scene.
     var sel = comp
-      ? '.mp-component[data-cid="' + comp + '"] [data-anchor="' + name + '"], .mp-component[data-cid$="__' + comp + '"] [data-anchor="' + name + '"]'
+      ? '.mp-component[data-cid="' + comp + '"] [data-anchor="' + name + '"], ' +
+        '.mp-component[data-cid$="__' + comp + '"] [data-anchor="' + name + '"], ' +
+        '[data-comp-type="' + comp + '"] [data-anchor="' + name + '"]'
       : '[data-anchor="' + name + '"]';
     var el = null;
     try { el = root.querySelector(sel); } catch (e) {}
+    if (!el && comp) { try { el = root.querySelector('[data-anchor="' + name + '"]'); } catch (e1) {} }
     if (!el) { try { console.warn('[camera] anchor not found: ' + spec); } catch (e2) {} return null; }
     var r = el.getBoundingClientRect();
     var rr = root.getBoundingClientRect();
