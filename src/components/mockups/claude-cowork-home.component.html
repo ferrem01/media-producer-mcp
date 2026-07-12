@@ -69,7 +69,10 @@
         </div>
         <div class="cwh-center">
           <div class="cwh-greeting" data-target="greeting">
-            <svg class="starburst" width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="#D97757" stroke-width="2.6" stroke-linecap="round"><g transform="translate(17,17)"><path d="M0 -13V-4M0 4v9M-13 0h9M4 0h9M-9.2 -9.2l6.4 6.4M2.8 2.8l6.4 6.4M9.2 -9.2l-6.4 6.4M-2.8 2.8l-6.4 6.4M-4.6 -11.1l3.2 7.7M1.4 3.4l3.2 7.7M11.1 -4.6l-7.7 3.2M-3.4 1.4l-7.7 3.2"/></g></svg>
+            <span class="cwh-logo">
+              <svg class="starburst" width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="#D97757" stroke-width="2.6" stroke-linecap="round"><g transform="translate(17,17)"><path d="M0 -13V-4M0 4v9M-13 0h9M4 0h9M-9.2 -9.2l6.4 6.4M2.8 2.8l6.4 6.4M9.2 -9.2l-6.4 6.4M-2.8 2.8l-6.4 6.4M-4.6 -11.1l3.2 7.7M1.4 3.4l3.2 7.7M11.1 -4.6l-7.7 3.2M-3.4 1.4l-7.7 3.2"/></g></svg>
+              <img class="cwh-logo-img" src="https://img.logo.dev/claude.ai?token=pk_B_cdrQLyTkSFPzSMm52goQ&amp;format=png&amp;size=128&amp;fallback=monogram" onerror="this.remove()"/>
+            </span>
             <span data-target="greeting-text"></span>
           </div>
           <div class="cwh-composer" data-target="composer" data-anchor="composer">
@@ -191,8 +194,17 @@
     font-family: 'Tiempos Headline', Georgia, 'Times New Roman', serif;
     font-size: 44px; font-weight: 500; color: #2a2925; letter-spacing: -0.01em; }
   .cwh-greeting .starburst { display: inline-block; }
+  /* Real Claude mark via logo.dev; the hand-drawn starburst stays underneath
+     as the fallback. multiply blends the logo's white tile into the bone bg
+     so the mark reads naked, like the app. */
+  .cwh-logo { position: relative; width: 42px; height: 42px; display: inline-flex;
+    align-items: center; justify-content: center; flex-shrink: 0; }
+  .cwh-logo-img { position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: contain; mix-blend-mode: multiply; }
+  /* No overflow:hidden here -- the plus-menu must float OVER the card edge
+     and the ideas below it, like the real app. The sub-row rounds itself. */
   .cwh-composer { width: 100%; max-width: 760px; background: #fff; border: 1px solid #e2e0d8;
-    border-radius: 16px; box-shadow: 0 4px 16px rgba(31,30,29,0.06); overflow: hidden; }
+    border-radius: 16px; box-shadow: 0 4px 16px rgba(31,30,29,0.06); }
   .cwh-comp-input { padding: 18px 20px 6px; font-size: 15px; color: #1f1e1d; min-height: 24px;
     line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
   .cwh-comp-input:empty::before { content: attr(data-placeholder); color: #a5a39a; }
@@ -217,7 +229,7 @@
   .cwh-model { font-size: 13px; font-weight: 600; color: #1f1e1d; }
   .cwh-effort { font-size: 13px; color: #8a887f; }
   .cwh-comp-sub { display: flex; align-items: center; gap: 14px; padding: 9px 16px;
-    background: #fbfaf7; border-top: 1px solid #efeee8; }
+    background: #fbfaf7; border-top: 1px solid #efeee8; border-radius: 0 0 15px 15px; }
   .cwh-sub-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #57544c; }
   .cwh-sub-sp { flex: 1; }
   .cwh-usage { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #57544c; }
