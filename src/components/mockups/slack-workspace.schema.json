@@ -62,6 +62,11 @@
             "label": "Avatar Color",
             "required": true
           },
+          "avatar_url": {
+            "type": "string",
+            "label": "Avatar image url (photo) -- renders instead of initials",
+            "optional": true
+          },
           "online": {
             "type": "boolean",
             "label": "Online Status",
@@ -100,6 +105,11 @@
             "type": "string",
             "label": "Avatar Color",
             "required": true
+          },
+          "avatar_url": {
+            "type": "string",
+            "label": "Avatar IMAGE url (photo or logo) -- renders instead of the initial block. Bot messages default to the brand logo via logo.dev automatically.",
+            "optional": true
           },
           "initials": {
             "type": "string",
@@ -194,6 +204,9 @@
               },
               "icon_color": {
                 "type": "string"
+              },
+              "icon_url": {
+                "type": "string"
               }
             }
           },
@@ -244,7 +257,22 @@
     },
     "agents_apps": {
       "type": "array",
-      "label": "Agents & apps sidebar section (modern Slack): [{name, badge?, color?, active?}] -- app icon squares with unread badge pills; set active on the app the film is 'in'. Defaults to a believable roster with Quotient.",
+      "label": "Agents & apps sidebar section (modern Slack): [{name, badge?, color?, icon_url?, active?}] -- app icon squares (icon_url renders the real logo; the default roster uses logo.dev logos incl. Quotient) with unread badge pills; set active on the app the film is 'in'.",
+      "optional": true
+    },
+    "bot_avatar_url": {
+      "type": "string",
+      "label": "Avatar image for bot/agent messages and the thinking indicator. Defaults to the Quotient logo via logo.dev; set to another brand's logo.dev URL or '' to fall back to initials.",
+      "optional": true
+    },
+    "self_avatar_url": {
+      "type": "string",
+      "label": "Photo for the current user: the rail self-avatar and any send-message/send-thread posts without an explicit avatar.",
+      "optional": true
+    },
+    "workspace_icon_url": {
+      "type": "string",
+      "label": "Image for the workspace tile in the rail (defaults to the workspace initial).",
       "optional": true
     },
     "tabs": {
@@ -289,10 +317,11 @@
     },
     {
       "action": "bot-message",
-      "description": "Show a bot or other user message in the channel",
+      "description": "Show a bot or other user message in the channel. Bot avatar defaults to the brand logo (bot_avatar_url).",
       "params": {
         "name": "string - Sender name",
-        "avatar_color": "string - Avatar color",
+        "avatar_url": "string - Avatar image (defaults to the brand logo for bots)",
+        "avatar_color": "string - Avatar color (used when no image)",
         "initials": "string - Initials",
         "text": "string - Message text",
         "timestamp": "string - Timestamp"
