@@ -366,3 +366,27 @@ desktop component" → then "I want to focus on cowork specifically."
   rail's card stack), not full-height containers (#319).
 - Demo films: proj_5b7edf4f (terminal + Code desktop), proj_eb454668
   (Cowork home → running task with scripted Quotient tool calls).
+
+## 2026-07-12 — Quotient Social fidelity (PRs #325, #326)
+
+Marc: "lets take a look at quotient chat and quotient social... here is the
+screenshots. here is social. one is a post that has been published and one
+that is in draft."
+
+- **quotient-social rebuilt** (#325) from the real editor screenshots:
+  platform-aware ('x' | 'linkedin' — toolbar tile, author treatment,
+  char-limit default 25,000/3,000), campaign-tag pill with progress ring,
+  'Go to thread ↗', and the black Schedule split-button whose dropdown
+  (Publish Now / Schedule for later) is a window-last child positioned from
+  the button. Post card on the dotted grid: green '✓ Post published on …'
+  bar vs gray '✎ Draft' bar + char counter, X author (brand avatar, corner
+  badge, verified check, @handle) vs LinkedIn (photo, in badges), up to two
+  side-by-side media cards (image / gradient headline / file chips).
+  publish-post is the money beat: menu row flashes, bar flips green,
+  Schedule → View. Legacy embed_*/schedule-post still map through.
+- **update tool camera_moves accepted `target` but stripped `anchor`**
+  (#326): zod's default key-stripping silently dropped the documented
+  anchor grammar, so MCP-saved moves zoomed on frame center. One-line
+  schema fix. (Symptom to remember: move plays, framing is wrong.)
+- Demo: proj_8446563d scene_social — draft → dropdown → Publish Now →
+  green bar, with anchored zooms on qs.status / qs.toolbar.
