@@ -409,3 +409,22 @@ can swap out the middle for different parts of the platform."
 - Demo: proj_8446563d scene_shell — agent panel narrates the edit, user
   types 'Perfect — publish it.', center editor opens the Schedule menu and
   flips draft → published green while the panel confirms.
+
+## 2026-07-12 — quotient-campaign: the campaign center (PR #330)
+
+Marc's screenshots: Brief / Tasks / Activation / Deliverables tabs.
+
+- **quotient-campaign** (#330): tab bar + four working views. Brief =
+  rich-text doc (updated line, title, Date Range chips, Owner row,
+  sections with bullets). Tasks = 'Completed 0/6' counter, To-do group,
+  rows with dashed-circle checkbox / red priority bars / owner avatar /
+  deliverable platform icon / 'Get Started' Quotient chip. Activation =
+  week calendar (time gutter, day columns, deliverable cards with
+  Published/Draft/Launched). Deliverables = green-rocket status table.
+  Actions: switch-tab, complete-task (counter ticks), move-event (card
+  lifts + glides between days -- the drag beat), set-event-status,
+  set-deliverable-status, scroll-view. Anchors: tabs/brief/tasks/
+  calendar/deliverables. Second center for quotient-app-shell.
+- Demo: proj_8446563d scene_campaign — brief → tasks (2 checked) →
+  activation (Marc's post dragged to Friday) → deliverables (last row
+  flips Published), agent panel narrating each move.
