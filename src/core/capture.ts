@@ -346,6 +346,23 @@ export async function captureFrameSequence(options: {
     const framePathCache: Record<string, string> = {}; // src__targetTime -> extracted png
     let extractCount = 0;
 
+    // One-time bounded wait for remote images (avatars, logo.dev logos)
+    // before the frame loop: they load once, but the first frames of a scene
+    // would otherwise capture half-loaded identity blocks.
+    await page.evaluate(() =>
+      new Promise<void>((resolve) => {
+        const imgs = Array.from(document.images).filter((i) => !i.complete);
+        if (imgs.length === 0) { resolve(); return; }
+        let pending = imgs.length;
+        const done = () => { if (--pending <= 0) resolve(); };
+        imgs.forEach((img) => {
+          img.addEventListener("load", () => done(), { once: true });
+          img.addEventListener("error", () => done(), { once: true });
+        });
+        setTimeout(() => resolve(), 4000);
+      })
+    ).catch(() => {});
+
     for (const frame of frames) {
       await page.evaluate((t: number) => {
         try { (window as any).__MP_TIMELINE.time(t); } catch { /* capture current state */ }
@@ -937,6 +954,23 @@ export async function captureSingleFrame(options: {
         return { vw, vh, pageBg, surfaces, contentBoxes, hasRichFullBleedBg, clippedTexts };
       }, { vw: width, vh: height });
     }
+
+    // Wait (bounded) for ALL images -- remote avatars/logos (logo.dev,
+    // photo avatars) race the screenshot otherwise and captured stills show
+    // half-loaded identity blocks.
+    await page.evaluate(() =>
+      new Promise<void>((resolve) => {
+        const imgs = Array.from(document.images).filter((i) => !i.complete);
+        if (imgs.length === 0) { resolve(); return; }
+        let pending = imgs.length;
+        const done = () => { if (--pending <= 0) resolve(); };
+        imgs.forEach((img) => {
+          img.addEventListener("load", () => done(), { once: true });
+          img.addEventListener("error", () => done(), { once: true });
+        });
+        setTimeout(() => resolve(), 4000);
+      })
+    ).catch(() => {});
 
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
