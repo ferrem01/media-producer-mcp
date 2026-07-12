@@ -42,6 +42,11 @@
       "type": "string",
       "label": "e.g. 02 / 05",
       "optional": true
+    },
+    "voice": {
+      "type": "string",
+      "label": "'brand' (default -- the brand kit display font carries the claims) | 'serif' (borrowed editorial serif voice)",
+      "optional": true
     }
   },
   "match": {

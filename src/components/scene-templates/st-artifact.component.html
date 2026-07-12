@@ -23,13 +23,14 @@
   .sta.is-left .sta-editorial { right: auto; left: 6vw; }
   .sta-kicker { font-size: 13px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
     color: var(--mp-color-primary, #4f46e5); margin-bottom: 2.4vh; }
-  .sta-headline { margin: 0 0 3.4vh; font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
-    font-weight: 500; font-size: 3.4vw; line-height: 1.12; letter-spacing: -0.015em; text-wrap: balance; }
+  .sta-headline { margin: 0 0 3.4vh; font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif;
+    font-weight: 600; font-size: 3.4vw; line-height: 1.12; letter-spacing: -0.015em; text-wrap: balance; }
+  .sta.is-serif .sta-headline { font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif; font-weight: 500; }
   .sta-stats { display: flex; flex-direction: column; }
   .sta-stat { display: flex; align-items: baseline; gap: 1vw; padding: 1.6vh 0;
     border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
   .sta-stat:last-child { border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
-  .sta-stat-v { font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  .sta-stat-v { font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif;
     font-size: 2.6vw; font-weight: 500; color: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 72%, #ff6a4d);
     font-variant-numeric: tabular-nums; min-width: 8vw; }
   .sta-stat-l { font-size: 1.05vw; color: color-mix(in srgb, currentColor 62%, transparent); }
@@ -46,6 +47,10 @@
     var dark = data.theme === 'dark';
     if (dark) root.classList.add('is-dark');
     if (data.editorial_side === 'left') root.classList.add('is-left');
+    // Typographic voice: BRAND display type by default (the brand kit is the
+    // voice of the film); voice:'serif' opts into the borrowed editorial
+    // serif from the HyperFrames reference grammar.
+    if (data.voice === 'serif') root.classList.add('is-serif');
     var dur = ctx.duration || 10;
 
     if (!data.kicker) q('.sta-kicker').style.display = 'none';
