@@ -390,7 +390,7 @@
     display: flex; align-items: center; gap: 8px;
   }
   .msg-avatar {
-    width: 36px; height: 36px; border-radius: 4px;
+    width: 36px; height: 36px; border-radius: 9px;
     display: flex; align-items: center; justify-content: center;
     font-size: 14px; font-weight: 700; color: #fff;
     flex-shrink: 0;
@@ -450,7 +450,7 @@
   }
   .reply-avatars { display: flex; }
   .reply-avatar {
-    width: 20px; height: 20px; border-radius: 4px;
+    width: 20px; height: 20px; border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
     font-size: 8px; font-weight: 700; color: #fff;
     margin-right: -4px; border: 2px solid #fff;
@@ -955,7 +955,6 @@
     var agentsApps = data.agents_apps || [
       { name: 'Brex', badge: '9+', color: '#1f1f1f', icon_url: LOGO_DEV('brex.com') },
       { name: 'Google Drive', badge: '2', color: '#0F9D58', icon_url: LOGO_DEV('google.com') },
-      { name: 'Jarvis', badge: '9+', color: '#5f6ac4' },
       { name: 'Quotient', color: '#393bf5', icon_url: LOGO_DEV('getquotient.ai'), active: data.active_app !== undefined ? data.active_app === 'Quotient' : false },
       { name: 'Calendly', color: '#006BFF', icon_url: LOGO_DEV('calendly.com') },
       { name: 'Slack', color: '#611f69', icon_url: LOGO_DEV('slack.com') },
