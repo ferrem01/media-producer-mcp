@@ -162,6 +162,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
         duration_seconds: draft.duration_seconds || 8,
         transition_in: draft.transition_in as any,
         beats: draft.beats as any,
+        camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
         components: stComponents,
         audio_hints: draft.voiceover_text ? { voiceover_text: draft.voiceover_text } : undefined,
       } as any,
@@ -314,6 +315,7 @@ async function generateCodegenScene(
     duration_seconds: draft.duration_seconds || 5,
     transition_in: transition,
     beats: Array.isArray(draft.beats) && draft.beats.length >= 2 ? draft.beats : undefined,
+    camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
     components: [{
       id: "comp_0",
       type: compName,

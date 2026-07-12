@@ -77,7 +77,7 @@
           </button>
         </div>
       </div>
-      <div class="messages-area" data-target="messages-area"></div>
+      <div class="messages-area" data-target="messages-area" data-anchor="messages"></div>
       <!-- Typing indicator -->
       <div class="typing-bar" data-target="typing-bar">
         <div class="typing-dots">
@@ -87,7 +87,7 @@
       </div>
       <!-- Composer -->
       <div class="composer-wrapper">
-        <div class="composer-box" data-target="composer-box">
+        <div class="composer-box" data-target="composer-box" data-anchor="composer">
           <div class="composer-input" data-target="composer-input"></div>
           <div class="composer-toolbar">
             <button class="comp-icon plus-btn">
@@ -112,7 +112,7 @@
     </div>
 
     <!-- Thread Panel -->
-    <div class="thread-panel" data-target="thread-panel">
+    <div class="thread-panel" data-target="thread-panel" data-anchor="thread-panel">
       <div class="thread-header">
         <div class="thread-title-area">
           <span class="thread-title">Thread</span>
@@ -756,33 +756,6 @@
       addMessage(msg, false);
     });
 
-    // No script? PERFORM the thread instead of rendering a static screenshot:
-    // each initial message pops in in sequence, with the typing bar showing
-    // who is writing before it lands. A script, when present, owns all the
-    // choreography and expects the initial messages as an instant backdrop.
-    var hasScript = data.script && data.script.length > 0;
-    if (!hasScript && messageEls.length > 0) {
-      var perfSpan = Math.min((ctx.duration || 10) * 0.6, 2.0 + messageEls.length * 1.7);
-      var perfT0 = 0.5;
-      var perfStep = messageEls.length > 1 ? (perfSpan - perfT0) / (messageEls.length - 1) : 0;
-      var typingDots = typingBar ? typingBar.querySelectorAll('.typing-dot') : null;
-      messageEls.forEach(function(mEl, mi) {
-        var mAt = perfT0 + mi * perfStep;
-        tl.fromTo(mEl, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.38, ease: 'power2.out' }, mAt);
-        tl.call(scrollToBottom, null, mAt + 0.05);
-        if (typingBar && typingWho && perfStep > 0.9) {
-          var whoName = (messageData[mi] && messageData[mi].name) || 'Someone';
-          var tAt = Math.max(0.05, mAt - Math.min(perfStep * 0.55, 1.1));
-          tl.call(function() { typingWho.textContent = whoName + ' is typing'; }, null, tAt);
-          tl.to(typingBar, { opacity: 1, duration: 0.15 }, tAt);
-          if (typingDots && typingDots.length) {
-            tl.to(typingDots, { y: -4, duration: 0.3, stagger: 0.12, ease: 'power1.inOut', yoyo: true, repeat: 3 }, tAt + 0.1);
-          }
-          tl.to(typingBar, { opacity: 0, duration: 0.12 }, mAt - 0.05);
-        }
-      });
-    }
-
     // ── Thread helpers ──
     function renderThreadParent(idx) {
       var msg = messageData[idx];
@@ -852,12 +825,34 @@
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
 
     tl.to(chat, { autoAlpha: 1, duration: speed * 0.5, ease: 'power2.out' }, 0.2);
-    var t = 0.4;
-    initMsgEls.forEach(function(mel) {
+    // With a script, initial messages are a fast backdrop (the script owns
+    // the choreography). Without one, PERFORM the thread: pace the messages
+    // across the scene's opening so the conversation reads as happening,
+    // with the typing bar showing who is writing before each lands.
+    var hasScript = data.script && data.script.length > 0;
+    var introT0 = 0.4;
+    var introStep = 0.15;
+    if (!hasScript && initMsgEls.length > 1) {
+      var perfSpan = Math.min((ctx.duration || 10) * 0.6, 2.0 + initMsgEls.length * 1.7);
+      introStep = Math.max(0.15, (perfSpan - introT0) / (initMsgEls.length - 1));
+    }
+    var typingDotsEls = typingBar ? typingBar.querySelectorAll('.typing-dot') : null;
+    var t = introT0;
+    initMsgEls.forEach(function(mel, mi) {
+      if (!hasScript && typingBar && typingWho && introStep > 0.9) {
+        var whoName = (messageData[mi] && messageData[mi].name) || 'Someone';
+        var tAt = Math.max(0.05, t - Math.min(introStep * 0.55, 1.1));
+        tl.call(function() { typingWho.textContent = whoName + ' is typing'; }, null, tAt);
+        tl.to(typingBar, { opacity: 1, duration: 0.15 }, tAt);
+        if (typingDotsEls && typingDotsEls.length) {
+          tl.to(typingDotsEls, { y: -4, duration: 0.3, stagger: 0.12, ease: 'power1.inOut', yoyo: true, repeat: 3 }, tAt + 0.1);
+        }
+        tl.to(typingBar, { opacity: 0, duration: 0.12 }, t - 0.05);
+      }
       tl.to(mel, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, t);
-      t += 0.15;
+      tl.call(scrollToBottom, null, t + 0.05);
+      t += introStep;
     });
-    tl.call(function() { scrollToBottom(); }, null, t);
 
     // ── Cursor targets ──
     var cursorTargets = data.cursor_targets || {

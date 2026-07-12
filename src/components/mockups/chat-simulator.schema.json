@@ -2,7 +2,7 @@
   "type": "chat-simulator",
   "label": "Chat Simulator",
   "category": "mockups",
-  "description": "Slack/Discord/iMessage style chat interface. Messages appear one by one with typing indicators. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong.",
+  "description": "Slack/Discord/iMessage style chat interface. Messages appear one by one with typing indicators. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong. CAMERA ANCHORS: publishes data-anchor regions (composer, messages) -- target them from scene camera_moves as {anchor: 'componentId.anchorName'}; the ONE stage camera does all zooming (never zoom inside the component).",
   "data": {
     "platform": {
       "type": "string",
@@ -54,7 +54,7 @@
     },
     "script": {
       "type": "array",
-      "label": "Scripted timeline: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: show-typing, show-response {text}, plus base actions move-cursor, click, type {text}, highlight, zoom-to, wait, parallel. Drive the whole exchange through this script.",
+      "label": "Scripted timeline: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: show-typing, show-response {text}, plus base actions move-cursor, click, type {text}, highlight, wait, parallel. Drive the whole exchange through this script. NEVER move the camera from a script (no zoom/pan actions) -- camera moves are scene-level camera_moves targeting this component via {anchor} (one stage camera).",
       "optional": true
     },
     "cursor_targets": {
@@ -90,5 +90,6 @@
       "x": "92%",
       "y": "90%"
     }
-  }
+  },
+  "tier": "performable-surface"
 }

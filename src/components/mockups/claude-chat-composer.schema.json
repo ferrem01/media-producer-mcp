@@ -2,7 +2,7 @@
   "type": "claude-chat-composer",
   "label": "Claude Chat Composer",
   "category": "mockups",
-  "description": "Claude AI chat interface with multi-line composer box, two-level tools/connectors menu, and animated UI walkthrough. Supports scripted cursor interactions: click plus, open category menu, hover connectors, show submenu, toggle items. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong.",
+  "description": "Claude AI chat interface with multi-line composer box, two-level tools/connectors menu, and animated UI walkthrough. Supports scripted cursor interactions: click plus, open category menu, hover connectors, show submenu, toggle items. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong. CAMERA ANCHORS: publishes data-anchor regions (composer) -- target them from scene camera_moves as {anchor: 'componentId.anchorName'}; the ONE stage camera does all zooming (never zoom inside the component).",
   "data": {
     "messages": {
       "type": "array",
@@ -105,7 +105,7 @@
     },
     "script": {
       "type": "array",
-      "label": "Scripted timeline: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: type {text}, click, hover-plus / unhover-plus, open-menu / close-menu, hover-connectors, show-connectors, toggle-item {target}, show-typing, show-response {text}, plus base actions move-cursor, highlight, zoom-to, wait, parallel. Drive the whole interaction through this script.",
+      "label": "Scripted timeline: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: type {text}, click, hover-plus / unhover-plus, open-menu / close-menu, hover-connectors, show-connectors, toggle-item {target}, show-typing, show-response {text}, plus base actions move-cursor, highlight, wait, parallel. Drive the whole interaction through this script. NEVER move the camera from a script (no zoom/pan actions) -- camera moves are scene-level camera_moves targeting this component via {anchor} (one stage camera).",
       "optional": true
     },
     "cursor_targets": {
@@ -194,5 +194,6 @@
       "x": "72%",
       "y": "50%"
     }
-  }
+  },
+  "tier": "performable-surface"
 }

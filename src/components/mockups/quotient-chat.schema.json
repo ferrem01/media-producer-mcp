@@ -2,7 +2,7 @@
   "type": "quotient-chat",
   "label": "Quotient Chat Panel",
   "category": "mockups",
-  "description": "Quotient AI chat interface with rich messaging, tool use indicators, asset cards, and animated scripted interactions. Supports user bubbles with avatars, agent markdown messages, typing indicator, and composer with send button. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong.",
+  "description": "Quotient AI chat interface with rich messaging, tool use indicators, asset cards, and animated scripted interactions. Supports user bubbles with avatars, agent markdown messages, typing indicator, and composer with send button. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong. CAMERA ANCHORS: publishes data-anchor regions (composer, messages) -- target them from scene camera_moves as {anchor: 'componentId.anchorName'}; the ONE stage camera does all zooming (never zoom inside the component).",
   "data": {
     "conversation_title": {
       "type": "string",
@@ -79,7 +79,7 @@
     },
     "script": {
       "type": "array",
-      "label": "Scripted timeline that plays the conversation INSIDE the component: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: type-message {text,duration} (user types in composer), send-message (posts it), show-typing / hide-typing (agent thinking dots), agent-message {text} (agent reply streams in, markdown ok), tool-use {label} (tool-call indicator chip), asset-card {title,subtitle} (rich asset result card), agent-image {url}, scroll-to-bottom. Plus base actions: move-cursor, click, type, highlight, zoom-to, wait, parallel. Write the ENTIRE conversation here -- never animate the component's internals from outside.",
+      "label": "Scripted timeline that plays the conversation INSIDE the component: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: type-message {text,duration} (user types in composer), send-message (posts it), show-typing / hide-typing (agent thinking dots), agent-message {text} (agent reply streams in, markdown ok), tool-use {label} (tool-call indicator chip), asset-card {title,subtitle} (rich asset result card), agent-image {url}, scroll-to-bottom. Plus base actions: move-cursor, click, type, highlight, wait, parallel. Write the ENTIRE conversation here -- never animate the component's internals from outside. NEVER move the camera from a script (no zoom/pan actions) -- camera moves are scene-level camera_moves targeting this component via {anchor} (one stage camera).",
       "optional": true
     },
     "cursor_targets": {
@@ -160,5 +160,6 @@
       "x": "88%",
       "y": "3%"
     }
-  }
+  },
+  "tier": "performable-surface"
 }

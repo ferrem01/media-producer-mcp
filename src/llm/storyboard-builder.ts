@@ -81,6 +81,21 @@ const SCENE_TOOL_SCHEMA = {
     voiceover_text: { type: "string", description: "Scene narration (concatenation of beat narration when the scene has beats)" },
     broll_query: { type: "string", description: "Cinematic stock-footage search phrase (mutually exclusive with hero_image)" },
     hero_image: { type: "string", description: "AI-generated still image prompt (mutually exclusive with broll_query)" },
+    camera_moves: {
+      type: "array",
+      description: "Stage-camera moves on this scene (the ONE camera). ONLY anchored moves are allowed here: {at, type:'zoom', anchor:'componentId.anchorName', scale?, duration?} or {at, type:'reset', duration?}. Anchors come from performable components' CAMERA ANCHORS (e.g. slack-workspace publishes composer, messages, thread-panel -- 'tpl_artifact.composer'). Zoom in while the surface performs, reset before the next thought. Max 4 per scene.",
+      items: {
+        type: "object",
+        properties: {
+          at: { type: "number" },
+          type: { type: "string", description: "zoom | reset" },
+          anchor: { type: "string", description: "componentId.anchorName (omit for reset)" },
+          scale: { type: "number", description: "1.3-2.6; omit to auto-fit the anchor" },
+          duration: { type: "number" },
+        },
+        required: ["at", "type"],
+      },
+    },
   },
   required: ["label", "duration_seconds", "purpose", "visual_notes"],
 };
@@ -151,6 +166,9 @@ export interface DraftScene {
    *  INSTANTIATED from the template with this slot data -- no codegen. The
    *  professional-composition path; prefer it whenever a template fits. */
   scene_template?: { type: string; data: Record<string, unknown> };
+  /** Anchored stage-camera moves authored by the storyboard (sanitized:
+   *  anchored zooms + resets only). Carried onto the final Scene. */
+  camera_moves?: import("../core/types.js").CameraMove[];
   /** Tactical element inventory: concrete on-screen elements with exact copy.
    *  The codegen renders these verbatim; beats reference them by name. */
   elements?: Array<{ name: string; kind: string; content: string; motion?: string }>;
@@ -187,7 +205,7 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
 You think in visual STORIES, not slide decks. Every scene should feel like something the viewer wants to watch, not endure.
 
 ${storytellingGuide ? `## Visual Storytelling Guide\n\n${storytellingGuide}\n\n` : ""}## SCENE TEMPLATES (whole-scene compositions -- your FIRST choice)
-Scene templates (types starting "st-") are designer-built full-scene compositions with professional lighting, choreography and beat-phased motion baked in. When a scene's content fits one, emit "scene_template": {"type": "st-...", "data": {...slots from its schema...}} INSTEAD of hand-specifying components -- the scene is instantiated directly and is guaranteed to look professional. Fill every slot with REAL final copy. Give the film a DARK-FORWARD cinematic rhythm: dark template scenes are the default world (they automatically carry a real-3D WebGL backdrop -- lit translucent ribbons drifting behind the type, the launch-film look) -- use "theme": "dark" on st-hero-stat / st-kinetic-list for most scenes; st-quote and st-logo-close are dark already. Reserve LIGHT scenes as the contrast beat (one per film, or where the content is inherently light, e.g. a light-UI screencast). ARTIFACT BEATS -- the strongest way to show a product STEP is a mock of the surface where it happens, always seen BUILDING: st-artifact stages a ui-mock component (ui-chat-thread: messages pop in with typing dots; ui-terminal-agent: a prompt types and status lines stream; ui-video-player: a player whose scrub bar advances over a generated deliverable) beside serif editorial type and counting stats. When the story happens in a REAL product surface the library already mocks, stage THAT component as the artifact instead of a generic one: slack-workspace (full Slack simulator -- channels, threads, reactions, typing) for anything happening in Slack, quotient-chat (the Quotient agent chat panel -- user bubbles, agent markdown, tool-use indicators) for conversations with Quotient. These are SCRIPTED simulators: put the full interaction sequence in their data.script ([{action, at, text, ...}] -- type-message, send-message, bot-message, thread-reply, add-reaction, agent-message, tool-use...) so the surface PERFORMS the story itself, with enough messages/steps to fill its window -- a two-line thread in a big empty panel is an empty_skeleton defect. Prefer an artifact beat over an abstract card whenever the narration describes someone DOING something in a product. Screen-recording scenes get st-screencast (footage URL in "source", caption chips from the beats). In a dark-forward film set its "presentation": "float" -- the footage becomes a tilted 3D plane with orbit drift and reflection over the WebGL world -- and add "callouts" ({at, dur, x, y, w, h} in % of the frame) where the narration points at a specific part of the UI: the region lifts out zoomed in a brand-gradient glow shell. Keep the browser presentation for light films or when the recording's own UI is the whole story. Fall back to components/codegen only when no template fits.
+Scene templates (types starting "st-") are designer-built full-scene compositions with professional lighting, choreography and beat-phased motion baked in. When a scene's content fits one, emit "scene_template": {"type": "st-...", "data": {...slots from its schema...}} INSTEAD of hand-specifying components -- the scene is instantiated directly and is guaranteed to look professional. Fill every slot with REAL final copy. Give the film a DARK-FORWARD cinematic rhythm: dark template scenes are the default world (they automatically carry a real-3D WebGL backdrop -- lit translucent ribbons drifting behind the type, the launch-film look) -- use "theme": "dark" on st-hero-stat / st-kinetic-list for most scenes; st-quote and st-logo-close are dark already. Reserve LIGHT scenes as the contrast beat (one per film, or where the content is inherently light, e.g. a light-UI screencast). ARTIFACT BEATS -- the strongest way to show a product STEP is a mock of the surface where it happens, always seen BUILDING: st-artifact stages a performable component (chat-simulator: a generic scripted chat; ui-terminal-agent: a prompt types and status lines stream; ui-video-player: a player whose scrub bar advances over a generated deliverable) beside serif editorial type and counting stats. When the story happens in a REAL product surface the library already mocks, stage THAT component as the artifact instead of a generic one: slack-workspace (full Slack simulator -- channels, threads, reactions, typing) for anything happening in Slack, quotient-chat (the Quotient agent chat panel -- user bubbles, agent markdown, tool-use indicators) for conversations with Quotient. These are SCRIPTED simulators: put the full interaction sequence in their data.script ([{action, at, text, ...}] -- type-message, send-message, bot-message, thread-reply, add-reaction, agent-message, tool-use...) so the surface PERFORMS the story itself, with enough messages/steps to fill its window -- a two-line thread in a big empty panel is an empty_skeleton defect. While a surface performs, you may drive the ONE stage camera with the scene's camera_moves: anchored zooms only ({at, type:'zoom', anchor:'tpl_artifact.composer'}) with a reset before the next thought -- zoom in while the typing happens, out when it sends. Prefer an artifact beat over an abstract card whenever the narration describes someone DOING something in a product. Screen-recording scenes get st-screencast (footage URL in "source", caption chips from the beats). In a dark-forward film set its "presentation": "float" -- the footage becomes a tilted 3D plane with orbit drift and reflection over the WebGL world -- and add "callouts" ({at, dur, x, y, w, h} in % of the frame) where the narration points at a specific part of the UI: the region lifts out zoomed in a brand-gradient glow shell. Keep the browser presentation for light films or when the recording's own UI is the whole story. Fall back to components/codegen only when no template fits.
 When the user prompt SUGGESTS components ("use title-slide, timeline-steps or similar", "kinetic-text", "a stat card"), a scene template that delivers the same content COUNTS as "similar" and is still your first choice -- the user is describing the content they want on screen, not forbidding better compositions. Only skip templates when the prompt EXPLICITLY forbids them or demands a specific component by exact behavior a template cannot deliver.
 
 You build the storyboard by calling the add_scene tool ONCE PER SCENE (in order), then finish_storyboard when every scene is added. HARD CHUNKING RULE: at most ONE add_scene call per response -- never batch several scenes into one response (a response that overruns the output budget is DISCARDED whole and you redo the work). A scene with more than 3 beats: send add_scene with the first beats, then add_beat calls in later responses. Never describe the storyboard in prose -- use the tools. Each scene has visual notes (the visual direction) and a list of component types from the catalog. Below is the SHAPE of one add_scene call's parameters:
@@ -579,6 +597,28 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
    */
   function normalizeSceneMeta(scene: any): string[] {
     var notes: string[] = [];
+
+    // Camera moves from the LLM: ANCHORED zooms and resets only -- blind
+    // rects are a human-eyes affordance (Studio), an LLM ringing a guessed
+    // rectangle is the invented-callout failure class. Clamp everything.
+    if (Array.isArray(scene.camera_moves)) {
+      var dur0 = Number(scene.duration_seconds) || 10;
+      var cleaned = scene.camera_moves
+        .filter((m: any) => m && typeof m === "object")
+        .filter((m: any) => m.type === "reset" || (m.type === "zoom" && typeof m.anchor === "string" && m.anchor.length > 0))
+        .map((m: any) => ({
+          at: Math.max(0, Math.min(dur0 - 0.5, Number(m.at) || 0)),
+          type: m.type,
+          ...(m.type === "zoom" ? { anchor: String(m.anchor).trim() } : {}),
+          ...(m.scale ? { scale: Math.max(1.3, Math.min(2.6, Number(m.scale) || 1.8)) } : {}),
+          duration: Math.max(0.4, Math.min(1.6, Number(m.duration) || 0.9)),
+        }))
+        .slice(0, 4);
+      if (cleaned.length < scene.camera_moves.length) {
+        notes.push(`dropped ${scene.camera_moves.length - cleaned.length} camera move(s) (anchored zooms and resets only)`);
+      }
+      scene.camera_moves = cleaned;
+    }
 
     if (!scene.components || !Array.isArray(scene.components)) {
       scene.components = [];

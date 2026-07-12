@@ -2,7 +2,7 @@
   "type": "slack-workspace",
   "label": "Slack Workspace",
   "category": "mockups",
-  "description": "Modern Slack desktop simulator with sidebar, channels, DMs, messages, threads, reactions, link unfurls, typing indicators, and animated scripted interactions. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong.",
+  "description": "Modern Slack desktop simulator with sidebar, channels, DMs, messages, threads, reactions, link unfurls, typing indicators, and animated scripted interactions. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong. CAMERA ANCHORS: publishes data-anchor regions (composer, messages, thread-panel) -- target them from scene camera_moves as {anchor: 'componentId.anchorName'}; the ONE stage camera does all zooming (never zoom inside the component).",
   "data": {
     "workspace_name": {
       "type": "string",
@@ -199,7 +199,7 @@
     },
     "script": {
       "type": "array",
-      "label": "THE COMPONENT'S MAIN POWER -- a scripted timeline that plays out the whole Slack story INSIDE the component: [{\"action\": \"...\", \"at\": seconds, ...}]. Slack actions: type-message {text,duration} (types into the composer), send-message (posts what was typed as the current user), show-typing-indicator {name} / hide-typing-indicator, bot-message {name,text} (a bot/app reply pops in), add-reaction {emoji,count}, open-thread / close-thread, thread-reply {name,text}, type-thread {text} + send-thread (typed thread reply), switch-channel {name}, unfurl-link. Plus base actions: move-cursor {target|x,y}, click, type {text}, highlight {target}, zoom-to {target,scale}, zoom-out, wait, parallel {actions:[...]}. Write the ENTIRE message sequence here -- never animate the component's internals from outside.",
+      "label": "THE COMPONENT'S MAIN POWER -- a scripted timeline that plays out the whole Slack story INSIDE the component: [{\"action\": \"...\", \"at\": seconds, ...}]. Slack actions: type-message {text,duration} (types into the composer), send-message (posts what was typed as the current user), show-typing-indicator {name} / hide-typing-indicator, bot-message {name,text} (a bot/app reply pops in), add-reaction {emoji,count}, open-thread / close-thread, thread-reply {name,text}, type-thread {text} + send-thread (typed thread reply), switch-channel {name}, unfurl-link. Plus base actions: move-cursor {target|x,y}, click, type {text}, highlight {target}, wait, parallel {actions:[...]}. Write the ENTIRE message sequence here -- never animate the component's internals from outside. NEVER move the camera from a script (no zoom/pan actions) -- camera moves are scene-level camera_moves targeting this component via {anchor} (one stage camera).",
       "optional": true
     },
     "cursor_targets": {
@@ -334,5 +334,6 @@
       "x": "55%",
       "y": "50%"
     }
-  }
+  },
+  "tier": "performable-surface"
 }

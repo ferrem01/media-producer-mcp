@@ -2,13 +2,38 @@
   "type": "ui-chat-thread",
   "label": "UI Mock: Chat Thread",
   "category": "ui-mocks",
-  "description": "A chat-workspace mock (Slack-ish layout, brand-colored sidebar) that BUILDS: typing dots pulse, then each message pops in, in sequence. @mentions and links auto-style in brand color. Use for 'the conversation where work happens' beats -- a teammate or agent asking/announcing something.",
+  "description": "DEPRECATED -- do not use in new scenes. Duplicates chat-simulator's role (generic scripted chat); real Slack moments use slack-workspace, Quotient conversations use quotient-chat, and other generic chat beats use chat-simulator (all performable surfaces with data.script). Kept only so existing projects keep rendering. A chat-workspace mock (Slack-ish layout, brand-colored sidebar) that BUILDS: typing dots pulse, then each message pops in, in sequence. @mentions and links auto-style in brand color. Use for 'the conversation where work happens' beats -- a teammate or agent asking/announcing something.",
   "data": {
-    "workspace": { "type": "string", "label": "Workspace name in the sidebar", "optional": true },
-    "channel": { "type": "string", "label": "Channel header, e.g. '# eng-reviews'", "optional": true },
-    "channels": { "type": "object", "label": "Sidebar channel names (array of strings)", "optional": true },
-    "messages": { "type": "object", "label": "Array of {from, text, emoji?, time?}: each message is preceded by typing dots. @words and links auto-style." },
-    "composer_hint": { "type": "string", "label": "Composer placeholder text", "optional": true },
-    "first_at": { "type": "number", "label": "Seconds before the first typing indicator (default 1.1)", "optional": true }
-  }
+    "workspace": {
+      "type": "string",
+      "label": "Workspace name in the sidebar",
+      "optional": true
+    },
+    "channel": {
+      "type": "string",
+      "label": "Channel header, e.g. '# eng-reviews'",
+      "optional": true
+    },
+    "channels": {
+      "type": "object",
+      "label": "Sidebar channel names (array of strings)",
+      "optional": true
+    },
+    "messages": {
+      "type": "object",
+      "label": "Array of {from, text, emoji?, time?}: each message is preceded by typing dots. @words and links auto-style."
+    },
+    "composer_hint": {
+      "type": "string",
+      "label": "Composer placeholder text",
+      "optional": true
+    },
+    "first_at": {
+      "type": "number",
+      "label": "Seconds before the first typing indicator (default 1.1)",
+      "optional": true
+    }
+  },
+  "tier": "animated-prop",
+  "deprecated": true
 }
