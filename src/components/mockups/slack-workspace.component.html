@@ -1,6 +1,37 @@
 <template>
   <div class="slack-workspace">
-    <!-- Left Sidebar -->
+    <!-- Left rail: workspace icon + primary nav (modern Slack) -->
+    <div class="rail">
+      <div class="rail-ws" data-target="rail-ws"></div>
+      <div class="rail-items">
+        <div class="rail-item is-active">
+          <div class="rail-ico"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5L8 2l5.5 4.5V13a1 1 0 01-1 1h-3v-4H6.5v4h-3a1 1 0 01-1-1V6.5z"/></svg></div>
+          <span>Home</span>
+        </div>
+        <div class="rail-item">
+          <div class="rail-ico"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h12a1 1 0 011 1v7a1 1 0 01-1 1H5l-3 2.5V4a1 1 0 011-1z"/></svg></div>
+          <span>DMs</span>
+        </div>
+        <div class="rail-item">
+          <div class="rail-ico"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 2a5.5 5.5 0 015.5 5.5c0 1.2-.4 2.3-1 3.2l-1.7 3.5a.8.8 0 01-1.4 0L8 12l-1.4 2.2a.8.8 0 01-1.4 0l-1.7-3.5A5.5 5.5 0 018 2z"/></svg></div>
+          <span>Activity</span>
+        </div>
+        <div class="rail-item">
+          <div class="rail-ico"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h10a1 1 0 011 1v9a1 1 0 01-1 1H3a1 1 0 01-1-1v-9a1 1 0 011-1z"/><path d="M6 6.5l2.5 2 2.5-2"/></svg></div>
+          <span>Later</span>
+        </div>
+        <div class="rail-item">
+          <div class="rail-ico"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="4" cy="8" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="12" cy="8" r="1.2" fill="currentColor"/></svg></div>
+          <span>More</span>
+        </div>
+      </div>
+      <div class="rail-bottom">
+        <div class="rail-plus">+</div>
+        <div class="rail-self" data-target="rail-self"></div>
+      </div>
+    </div>
+
+    <!-- Conversation column -->
     <div class="sidebar">
       <div class="sidebar-header">
         <span class="workspace-name"></span>
@@ -11,46 +42,24 @@
         </button>
       </div>
       <div class="sidebar-search">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.4" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5l3 3"/></svg>
-        <span class="search-text">Search</span>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.4" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5l3 3"/></svg>
+        <span class="search-text">Find a conversation...</span>
       </div>
-      <div class="sidebar-nav">
-        <div class="nav-item">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5L8 2l5.5 4.5V13a1 1 0 01-1 1h-3v-4H6.5v4h-3a1 1 0 01-1-1V6.5z"/></svg>
-          <span>Home</span>
-        </div>
-        <div class="nav-item">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h12a1 1 0 011 1v7a1 1 0 01-1 1H5l-3 2.5V4a1 1 0 011-1z"/></svg>
-          <span>DMs</span>
-        </div>
-        <div class="nav-item">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round"><path d="M8 2a5.5 5.5 0 015.5 5.5c0 1.2-.4 2.3-1 3.2l-1.7 3.5a.8.8 0 01-1.4 0L8 12l-1.4 2.2a.8.8 0 01-1.4 0l-1.7-3.5A5.5 5.5 0 018 2z"/></svg>
-          <span>Activity</span>
-        </div>
-        <div class="nav-item">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h10a1 1 0 011 1v9a1 1 0 01-1 1H3a1 1 0 01-1-1v-9a1 1 0 011-1z"/><path d="M6 6.5l2.5 2 2.5-2"/></svg>
-          <span>Later</span>
-        </div>
-        <div class="nav-item">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round"><circle cx="4" cy="8" r="1.2" fill="#fff"/><circle cx="8" cy="8" r="1.2" fill="#fff"/><circle cx="12" cy="8" r="1.2" fill="#fff"/></svg>
-          <span>More</span>
-        </div>
-      </div>
-      <div class="sidebar-divider"></div>
       <div class="section-header">
-        <svg class="section-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"><path d="M3 2.5l3 3-3 3"/></svg>
+        <svg class="section-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"><path d="M3 2.5l3 3-3 3"/></svg>
         <span>Channels</span>
-        <div class="section-spacer"></div>
-        <svg class="section-plus" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"><path d="M6 2v8M2 6h8"/></svg>
       </div>
       <div class="channel-list" data-target="channel-list"></div>
       <div class="section-header">
-        <svg class="section-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"><path d="M3 2.5l3 3-3 3"/></svg>
-        <span>Direct Messages</span>
-        <div class="section-spacer"></div>
-        <svg class="section-plus" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"><path d="M6 2v8M2 6h8"/></svg>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.4" stroke-linecap="round"><path d="M2 8a6 6 0 0112 0v3a1.5 1.5 0 01-3 0V8.8"/><path d="M2 8v3a1.5 1.5 0 003 0V8.8"/></svg>
+        <span>Direct messages</span>
       </div>
       <div class="dm-list" data-target="dm-list"></div>
+      <div class="section-header">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+        <span>Agents &amp; apps</span>
+      </div>
+      <div class="apps-list" data-target="apps-list"></div>
     </div>
 
     <!-- Main Channel Area -->
@@ -85,27 +94,40 @@
         </div>
         <span class="typing-who" data-target="typing-who"></span>
       </div>
-      <!-- Composer -->
+      <!-- Composer: formatting bar ABOVE the field, action row below (real Slack) -->
       <div class="composer-wrapper">
         <div class="composer-box" data-target="composer-box" data-anchor="composer">
+          <div class="composer-fmtbar">
+            <span class="fmt-ico fmt-b">B</span>
+            <span class="fmt-ico fmt-i">I</span>
+            <span class="fmt-ico fmt-u">U</span>
+            <span class="fmt-ico fmt-s">S</span>
+            <span class="fmt-sep"></span>
+            <span class="fmt-ico"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 9.5l3-3M5 11l-1.2 1.2a2.5 2.5 0 01-3.5-3.5L2.5 6.5M11 5l1.2-1.2a2.5 2.5 0 013.5 3.5L13.5 9.5" transform="scale(0.9)"/></svg></span>
+            <span class="fmt-ico"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 3.5h8M6 8h8M6 12.5h8"/><text x="1" y="6" font-size="5" fill="currentColor" stroke="none">1</text><text x="1" y="15" font-size="5" fill="currentColor" stroke="none">2</text></svg></span>
+            <span class="fmt-ico"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 3.5h8M6 8h8M6 12.5h8"/><circle cx="2.5" cy="3.5" r="1" fill="currentColor" stroke="none"/><circle cx="2.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="2.5" cy="12.5" r="1" fill="currentColor" stroke="none"/></svg></span>
+            <span class="fmt-sep"></span>
+            <span class="fmt-ico"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 2v12M6.5 4.5h7M6.5 8h7M6.5 11.5h7"/></svg></span>
+            <span class="fmt-ico fmt-code">&lt;/&gt;</span>
+            <span class="fmt-ico"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M5.5 6l-2 2 2 2M10.5 6l2 2-2 2"/></svg></span>
+          </div>
           <div class="composer-input" data-target="composer-input"></div>
           <div class="composer-toolbar">
             <button class="comp-icon plus-btn">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#616061" stroke-width="1.5" stroke-linecap="round"><circle cx="9" cy="9" r="7"/><path d="M9 5.5v7M5.5 9h7"/></svg>
+              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 4v10M4 9h10"/></svg>
             </button>
-            <div class="format-group">
-              <button class="comp-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#616061" stroke-width="2" stroke-linecap="round"><path d="M4 3v8M4 7h5M9 3v8"/></svg></button>
-              <button class="comp-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#616061" stroke-width="1.8" stroke-linecap="round"><path d="M5 3l4 8M9 3L5 11"/></svg></button>
-              <button class="comp-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#616061" stroke-width="1.5" stroke-linecap="round"><path d="M3 7h8"/><path d="M4 4c0 0 1.5-1 3-1s3 1 3 1"/><path d="M4 10c0 0 1.5 1 3 1s3-1 3-1"/></svg></button>
-              <button class="comp-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#616061" stroke-width="1.4" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><path d="M6 6h2M6 8h2"/></svg></button>
-            </div>
+            <span class="comp-aa">Aa</span>
+            <button class="comp-icon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M5.5 9.5c.8 1 1.5 1.2 2.5 1.2s1.7-.3 2.5-1.2"/><circle cx="6" cy="6.5" r=".8" fill="currentColor"/><circle cx="10" cy="6.5" r=".8" fill="currentColor"/></svg></button>
+            <button class="comp-icon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M10.5 5.5v4a2.5 2.5 0 11-1-2" /></svg></button>
+            <span class="fmt-sep"></span>
+            <button class="comp-icon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="4" width="9" height="8" rx="1.5"/><path d="M10.5 7.5l4-2.5v6l-4-2.5"/></svg></button>
+            <button class="comp-icon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0010 0M8 12.5V15"/></svg></button>
+            <button class="comp-icon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="M9.5 5l-3 6"/></svg></button>
             <div class="toolbar-spacer"></div>
-            <button class="comp-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#616061" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M5.5 9.5c.8 1 1.5 1.2 2.5 1.2s1.7-.3 2.5-1.2"/><circle cx="6" cy="6.5" r=".8" fill="#616061"/><circle cx="10" cy="6.5" r=".8" fill="#616061"/></svg></button>
-            <button class="comp-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#616061" stroke-width="1.3" stroke-linecap="round"><path d="M2.5 8c0-3 2.5-5.5 5.5-5.5S13.5 5 13.5 8s-2.5 5.5-5.5 5.5"/><path d="M5.5 10l-3 3.5"/></svg></button>
-            <button class="comp-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#616061" stroke-width="1.3" stroke-linecap="round"><path d="M4 12l8-8M12 4v0M4 12v0"/></svg></button>
             <button class="send-btn" data-target="send-button">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="#fff" stroke="none"><path d="M1.5 2.2c0-.6.6-1 1.1-.7l12 5.8c.5.3.5 1 0 1.3l-12 5.8c-.5.3-1.1-.1-1.1-.7l1.6-5.2c.1-.2.1-.4 0-.6L1.5 2.2z"/></svg>
             </button>
+            <span class="send-chevron"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg></span>
           </div>
         </div>
       </div>
@@ -155,101 +177,155 @@
     background: #fff;
   }
 
-  /* ── Left Sidebar ── */
+  /* ── Left rail (workspace icon + primary nav) ── */
+  .rail {
+    width: 64px; min-width: 64px; flex-shrink: 0;
+    background: #350D36;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 0 12px; gap: 4px;
+  }
+  .rail-ws {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: #fff; color: #4A154B;
+    font-size: 18px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .rail-items { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .rail-item {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    color: rgba(255,255,255,0.82); font-size: 10.5px; font-weight: 600;
+    cursor: default; width: 56px;
+  }
+  .rail-ico {
+    width: 34px; height: 26px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rail-item.is-active .rail-ico { background: rgba(255,255,255,0.22); }
+  .rail-item.is-active { color: #fff; }
+  .rail-bottom { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .rail-plus {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.16); color: rgba(255,255,255,0.9);
+    font-size: 18px; font-weight: 400;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rail-self {
+    width: 32px; height: 32px; border-radius: 8px; position: relative;
+    background: linear-gradient(135deg, #7c5cff, #b46bff);
+    color: #fff; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    background-size: cover; background-position: center;
+  }
+  .rail-self::after {
+    content: ''; position: absolute; right: -2px; bottom: -2px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #2BAC76; border: 2px solid #3F0E40;
+  }
+
+  /* ── Conversation column ── */
   .sidebar {
-    width: 260px; min-width: 260px;
+    width: 236px; min-width: 236px;
     background: #4A154B;
     display: flex; flex-direction: column;
     overflow-y: auto; overflow-x: hidden;
     flex-shrink: 0;
+    padding-bottom: 10px;
   }
   .sidebar-header {
     display: flex; align-items: center; gap: 4px;
-    padding: 12px 16px 8px;
+    padding: 12px 14px 8px;
   }
   .workspace-name {
-    font-size: 16px; font-weight: 700; color: #fff;
+    font-size: 17px; font-weight: 800; color: #fff;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .ws-chevron { flex-shrink: 0; margin-top: 2px; }
   .header-spacer { flex: 1; }
   .sidebar-icon-btn {
-    width: 28px; height: 28px; border-radius: 6px;
-    background: rgba(255,255,255,0.15); border: none;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #fff; border: none;
     display: flex; align-items: center; justify-content: center;
     cursor: default; flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
   }
+  .sidebar-icon-btn svg { stroke: #4A154B; }
   .sidebar-search {
     display: flex; align-items: center; gap: 8px;
-    margin: 4px 12px 10px; padding: 5px 10px;
-    background: rgba(255,255,255,0.15); border-radius: 6px;
+    margin: 2px 12px 10px; padding: 6px 10px;
+    background: rgba(255,255,255,0.12); border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
   }
-  .search-text { font-size: 13px; color: rgba(255,255,255,0.7); }
+  .search-text { font-size: 13px; color: rgba(255,255,255,0.65); }
 
-  .sidebar-nav { padding: 0 8px 4px; }
-  .nav-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 4px 8px; border-radius: 6px;
-    color: rgba(255,255,255,0.85); font-size: 14px;
-    cursor: default;
-  }
-  .nav-item:hover { background: rgba(255,255,255,0.08); }
-  .nav-item svg { flex-shrink: 0; }
-
-  .sidebar-divider {
-    height: 1px; background: rgba(255,255,255,0.15);
-    margin: 6px 16px;
-  }
   .section-header {
-    display: flex; align-items: center; gap: 4px;
-    padding: 6px 12px 2px;
-    font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7);
+    display: flex; align-items: center; gap: 7px;
+    padding: 12px 14px 4px;
+    font-size: 14.5px; font-weight: 600; color: rgba(255,255,255,0.82);
     cursor: default;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
   }
   .section-chevron { flex-shrink: 0; }
   .section-spacer { flex: 1; }
   .section-plus { flex-shrink: 0; opacity: 0; }
-  .section-header:hover .section-plus { opacity: 1; }
 
   .channel-item {
     display: flex; align-items: center; gap: 6px;
-    padding: 3px 8px 3px 20px; margin: 0 8px;
-    border-radius: 6px; cursor: default;
-    font-size: 14px; color: rgba(255,255,255,0.85);
+    padding: 4px 10px 4px 12px; margin: 0 8px;
+    border-radius: 8px; cursor: default;
+    font-size: 14.5px; color: rgba(255,255,255,0.78);
   }
-  .channel-item:hover { background: rgba(255,255,255,0.08); }
-  .channel-item.active { background: rgba(255,255,255,0.18); color: #fff; font-weight: 700; }
-  .channel-item .ch-hash { color: rgba(255,255,255,0.6); font-size: 13px; margin-right: 2px; }
+  .channel-item.active {
+    background: #fff; color: #1d1c1d; font-weight: 700;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  }
+  .channel-item.active .ch-hash { color: #1d1c1d; }
+  .channel-item.unread { color: #fff; font-weight: 700; }
+  .channel-item .ch-hash { color: rgba(255,255,255,0.6); font-size: 13.5px; margin-right: 2px; }
   .channel-item .ch-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .channel-item .ch-badge {
-    background: rgba(255,255,255,0.25); color: #fff;
-    font-size: 11px; font-weight: 700; padding: 1px 6px;
-    border-radius: 10px; min-width: 18px; text-align: center;
+    background: rgba(255,255,255,0.28); color: #fff;
+    font-size: 11.5px; font-weight: 700; padding: 1px 8px;
+    border-radius: 12px; min-width: 20px; text-align: center;
   }
+  .channel-item.active .ch-badge { background: #611f69; color: #fff; }
 
-  .dm-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 3px 8px 3px 20px; margin: 0 8px;
-    border-radius: 6px; cursor: default;
-    font-size: 14px; color: rgba(255,255,255,0.85);
+  .dm-item, .app-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 3.5px 10px 3.5px 12px; margin: 0 8px;
+    border-radius: 8px; cursor: default;
+    font-size: 14.5px; color: rgba(255,255,255,0.78);
   }
-  .dm-item:hover { background: rgba(255,255,255,0.08); }
+  .dm-item.active, .app-item.active {
+    background: #fff; color: #1d1c1d; font-weight: 700;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  }
+  .dm-item.unread, .app-item.unread { color: #fff; font-weight: 700; }
+  .dm-name, .app-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dm-badge, .app-badge {
+    background: rgba(255,255,255,0.28); color: #fff;
+    font-size: 11.5px; font-weight: 700; padding: 1px 8px;
+    border-radius: 12px; min-width: 20px; text-align: center;
+  }
+  .app-item.active .app-badge, .dm-item.active .dm-badge { background: #611f69; }
   .dm-avatar {
-    width: 20px; height: 20px; border-radius: 4px;
+    width: 21px; height: 21px; border-radius: 5px; flex-shrink: 0; position: relative;
     display: flex; align-items: center; justify-content: center;
-    font-size: 9px; font-weight: 700; color: #fff;
-    flex-shrink: 0; position: relative;
+    font-size: 11px; font-weight: 800; color: #fff;
   }
   .dm-status {
-    position: absolute; bottom: -2px; right: -2px;
+    position: absolute; right: -3px; bottom: -3px;
     width: 8px; height: 8px; border-radius: 50%;
     border: 2px solid #4A154B;
   }
-  .dm-status.online { background: #2bac76; }
-  .dm-status.offline { background: transparent; border-color: rgba(255,255,255,0.4); }
-  .dm-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dm-status.online { background: #2BAC76; }
+  .dm-status.offline { background: transparent; border-color: rgba(255,255,255,0.5); }
+
+  .app-ico {
+    width: 21px; height: 21px; border-radius: 5px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; color: #fff;
+    background-size: cover; background-position: center;
+  }
 
   /* ── Main Area ── */
   .main-area {
@@ -333,6 +409,8 @@
   }
   .msg-text s, .msg-text-compact s { text-decoration: line-through; color: #616061; }
   .msg-text a, .msg-text-compact a { color: #1264a3; text-decoration: none; }
+  .msg-title { font-size: 15px; font-weight: 800; color: #1d1c1d; line-height: 1.45; margin-top: 1px; }
+  .msg-action-link { font-size: 15px; color: #1264a3; line-height: 1.5; margin-top: 6px; cursor: default; }
 
   /* Reactions */
   .reactions-row {
@@ -416,11 +494,30 @@
   .composer-wrapper { padding: 0 20px 16px; flex-shrink: 0; }
   .composer-box {
     display: flex; flex-direction: column;
-    border: 1px solid #ccc; border-radius: 12px;
+    border: 1px solid #c9c9cd; border-radius: 10px;
     min-height: 44px; background: #fff;
     overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
-  .composer-box:focus-within { border-color: #1264a3; }
+  .composer-box:focus-within { border-color: #a3a3a8; }
+  .composer-fmtbar {
+    display: flex; align-items: center; gap: 2px;
+    padding: 6px 10px 2px;
+    color: #616061;
+  }
+  .fmt-ico {
+    min-width: 24px; height: 22px; padding: 0 3px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12.5px; color: #616061; font-weight: 700;
+  }
+  .fmt-b { font-weight: 800; }
+  .fmt-i { font-style: italic; font-family: Georgia, serif; font-weight: 600; }
+  .fmt-u { text-decoration: underline; }
+  .fmt-s { text-decoration: line-through; }
+  .fmt-code { font-family: Monaco, monospace; font-size: 10px; font-weight: 600; }
+  .fmt-sep { width: 1px; height: 16px; background: #e0e0e0; margin: 0 5px; }
+  .comp-aa { font-size: 13px; font-weight: 700; color: #616061; padding: 0 5px; text-decoration: underline; }
+  .send-chevron { color: #616061; padding: 0 4px; display: flex; align-items: center; }
   .composer-input {
     flex: 1; padding: 10px 14px 4px;
     font-size: 14px; color: #1d1c1d; line-height: 1.5;
@@ -449,10 +546,10 @@
   }
   .toolbar-spacer { flex: 1; }
   .send-btn {
-    width: 32px; height: 32px; border-radius: 4px;
-    background: #007a5a; border: none; cursor: default;
+    width: 30px; height: 28px; border-radius: 6px 0 0 6px;
+    background: #007a5a; border: none;
     display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; opacity: 0; transition: opacity 0.15s;
+    cursor: default; flex-shrink: 0;
   }
   .send-btn.visible { opacity: 1; }
 
@@ -581,6 +678,8 @@
         reactions: m.reactions,
         replies: m.replies,
         unfurl: m.unfurl,
+        title: m.title || m.headline,
+        link_text: m.link_text || m.link || m.cta,
       };
     });
     var activeChannel = data.active_channel || channelName;
@@ -595,7 +694,11 @@
 
     // ── Setup sidebar ──
     wsNameEl.textContent = workspaceName;
-    searchTextEl.textContent = 'Search ' + workspaceName;
+    searchTextEl.textContent = 'Find a conversation...';
+    var railWs = el.querySelector('[data-target="rail-ws"]');
+    if (railWs) railWs.textContent = String(workspaceName).charAt(0).toUpperCase();
+    var railSelf = el.querySelector('[data-target="rail-self"]');
+    if (railSelf) railSelf.textContent = 'Me';
     channelNameHeader.textContent = channelName;
     if (channelTopic) channelTopicEl.textContent = channelTopic;
     composerInput.setAttribute('data-placeholder', 'Message #' + channelName);
@@ -620,6 +723,29 @@
         '<div class="dm-status ' + (dm.online ? 'online' : 'offline') + '"></div></div>' +
         '<span class="dm-name">' + dm.name + '</span>';
       dmList.appendChild(item);
+    });
+
+    // Build Agents & apps list (the modern sidebar section). Defaults show a
+    // believable roster with Quotient selected; override via data.agents_apps
+    // ([{name, badge, color, active}]).
+    var appsList = el.querySelector('[data-target="apps-list"]');
+    var agentsApps = data.agents_apps || [
+      { name: 'Brex', badge: '9+', color: '#1f1f1f' },
+      { name: 'Google Drive', badge: '2', color: '#0F9D58' },
+      { name: 'Jarvis', badge: '9+', color: '#5f6ac4' },
+      { name: 'Quotient', color: '#393bf5', active: data.active_app !== undefined ? data.active_app === 'Quotient' : false },
+      { name: 'Calendly', color: '#006BFF' },
+      { name: 'Slack', color: '#611f69' },
+    ];
+    if (appsList) agentsApps.forEach(function(app) {
+      var item = document.createElement('div');
+      item.className = 'app-item' + (app.active ? ' active' : '') + (app.badge && !app.active ? ' unread' : '');
+      item.setAttribute('data-target', 'sidebar-app-' + app.name);
+      var html = '<div class="app-ico" style="background:' + (app.color || '#611f69') + '">' + String(app.name).charAt(0) + '</div>' +
+        '<span class="app-name">' + app.name + '</span>';
+      if (app.badge) html += '<span class="app-badge">' + app.badge + '</span>';
+      item.innerHTML = html;
+      appsList.appendChild(item);
     });
 
     // ── Markdown parser ──
@@ -664,10 +790,24 @@
         block.appendChild(header);
       }
 
+      // App-notification grammar (real Slack): bold TITLE line, body, then a
+      // blue action link on its own line ("View in Quotient").
+      if (msg.title) {
+        var titleEl = document.createElement('div');
+        titleEl.className = 'msg-title';
+        titleEl.textContent = msg.title;
+        block.appendChild(titleEl);
+      }
       var textEl = document.createElement('div');
-      textEl.className = showFull ? 'msg-text' : 'msg-text-compact';
+      textEl.className = showFull && !msg.title ? 'msg-text' : 'msg-text-compact';
       textEl.innerHTML = parseMd(msg.text || '');
       block.appendChild(textEl);
+      if (msg.link_text) {
+        var linkEl = document.createElement('div');
+        linkEl.className = 'msg-action-link';
+        linkEl.textContent = msg.link_text;
+        block.appendChild(linkEl);
+      }
 
       // Reactions
       if (msg.reactions && msg.reactions.length > 0) {
