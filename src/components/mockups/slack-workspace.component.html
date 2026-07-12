@@ -788,6 +788,15 @@
     color: #fff; font-size: 9px; font-weight: 800;
   }
   .quf-footer { font-size: 12px; color: #616061; }
+
+  /* Image-over-initial avatars: the img covers the colored initial block
+     once loaded; onerror removes it, degrading to the classic look. */
+  .ava-img {
+    position: absolute; left: 0; top: 0;
+    width: 100%; height: 100%;
+    object-fit: cover; border-radius: inherit;
+  }
+  .dm-status { z-index: 2; }
 </style>
 
 <script>
@@ -874,18 +883,17 @@
     searchTextEl.textContent = 'Find a conversation...';
     var railWs = el.querySelector('[data-target="rail-ws"]');
     if (railWs) {
+      railWs.textContent = String(workspaceName).charAt(0).toUpperCase();
       if (data.workspace_icon_url) {
-        railWs.style.cssText += ";background-image:url('" + data.workspace_icon_url + "');background-size:cover;background-position:center";
-      } else {
-        railWs.textContent = String(workspaceName).charAt(0).toUpperCase();
+        railWs.style.position = 'relative';
+        railWs.insertAdjacentHTML('beforeend', avaImg(data.workspace_icon_url));
       }
     }
     var railSelf = el.querySelector('[data-target="rail-self"]');
     if (railSelf) {
+      railSelf.textContent = 'Me';
       if (data.self_avatar_url) {
-        railSelf.style.cssText += ";background-image:url('" + data.self_avatar_url + "');background-size:cover;background-position:center";
-      } else {
-        railSelf.textContent = 'Me';
+        railSelf.insertAdjacentHTML('beforeend', avaImg(data.self_avatar_url));
       }
     }
     channelNameHeader.textContent = channelName;
@@ -934,7 +942,7 @@
       item.className = 'dm-item';
       var dmUrl = dm.avatar_url || dm.avatar_image || '';
       item.innerHTML = '<div class="dm-avatar" style="' + avatarCss(dmUrl, dm.avatar_color) + '">' +
-        (dmUrl ? '' : (dm.initials || dm.name.charAt(0))) +
+        (dm.initials || dm.name.charAt(0)) + avaImg(dmUrl) +
         '<div class="dm-status ' + (dm.online ? 'online' : 'offline') + '"></div></div>' +
         '<span class="dm-name">' + dm.name + '</span>';
       dmList.appendChild(item);
@@ -958,18 +966,22 @@
       item.setAttribute('data-target', 'sidebar-app-' + app.name);
       var appUrl = app.icon_url || app.avatar_url || '';
       var html = '<div class="app-ico" style="' + avatarCss(appUrl, app.color || '#611f69') + '">' +
-        (appUrl ? '' : String(app.name).charAt(0)) + '</div>' +
+        String(app.name).charAt(0) + avaImg(appUrl) + '</div>' +
         '<span class="app-name">' + app.name + '</span>';
       if (app.badge) html += '<span class="app-badge">' + app.badge + '</span>';
       item.innerHTML = html;
       appsList.appendChild(item);
     });
 
-    // Image-or-initial avatar styling: returns a cssText string.
+    // Image-over-initial avatars: the colored initial block ALWAYS renders;
+    // when a url is given an <img> child covers it once loaded and removes
+    // itself on error -- slow or failed loads degrade to the classic look
+    // instead of an invisible white square.
     function avatarCss(url, color) {
-      return url
-        ? "background-image:url('" + url + "');background-size:cover;background-position:center;background-color:#fff"
-        : 'background:' + (color || '#6366f1');
+      return 'position:relative;background:' + (color || '#6366f1');
+    }
+    function avaImg(url) {
+      return url ? '<img class="ava-img" src="' + url + '" onerror="this.remove()"/>' : '';
     }
 
     // ── Markdown parser ──
@@ -1006,7 +1018,8 @@
         var avatar = document.createElement('div');
         avatar.className = 'msg-avatar';
         avatar.style.cssText = avatarCss(msg.avatar_url, msg.avatar_color);
-        avatar.textContent = msg.avatar_url ? '' : (msg.initials || String(msg.name || '?').charAt(0));
+        avatar.textContent = msg.initials || String(msg.name || '?').charAt(0);
+        if (msg.avatar_url) avatar.insertAdjacentHTML('beforeend', avaImg(msg.avatar_url));
         header.appendChild(avatar);
 
         var meta = document.createElement('div');
@@ -1073,7 +1086,7 @@
         var avStack = '<div class="reply-avatars">';
         (msg.replies.avatars || []).forEach(function(a) {
           var aUrl = a.avatar_url || a.src || '';
-          avStack += '<div class="reply-avatar" style="' + avatarCss(aUrl, a.color) + '">' + (aUrl ? '' : (a.initials || '')) + '</div>';
+          avStack += '<div class="reply-avatar" style="' + avatarCss(aUrl, a.color) + '">' + (a.initials || '') + avaImg(aUrl) + '</div>';
         });
         avStack += '</div>';
         ri.innerHTML = avStack +
@@ -1115,7 +1128,7 @@
         wrap.innerHTML = '<div class="quf-app">' + appName + ' ' + chevSm + '</div>' +
           '<div class="quf-card">' +
             '<div class="quf-head">' +
-              '<div class="quf-ico" style="' + avatarCss(qufIconUrl, u.icon_color || u.color || '#393bf5') + '">' + (qufIconUrl ? '' : String(appName).charAt(0)) + '</div>' +
+              '<div class="quf-ico" style="' + avatarCss(qufIconUrl, u.icon_color || u.color || '#393bf5') + '">' + String(appName).charAt(0) + avaImg(qufIconUrl) + '</div>' +
               '<div class="quf-titles">' +
                 '<div class="quf-title">' + (u.title || '') + '</div>' +
                 '<div class="quf-sub">' + (u.subtitle || 'Campaign in ' + appName) + '</div>' +
@@ -1263,7 +1276,7 @@
       var thinkUrl = opts.avatar_url !== undefined ? opts.avatar_url : botAvatarUrl;
       block.innerHTML = '<div class="msg-header">' +
         '<div class="msg-avatar" style="' + avatarCss(thinkUrl, opts.avatar_color || '#393bf5') + '">' +
-          (thinkUrl ? '' : (opts.initials || String(name).charAt(0))) + '</div>' +
+          (opts.initials || String(name).charAt(0)) + avaImg(thinkUrl) + '</div>' +
         '<div class="msg-meta"><span class="msg-name">' + name + '</span>' +
           '<span class="msg-app-badge">APP</span></div></div>' +
         '<div class="msg-text thinking-text"><em>' + (opts.text || 'Thinking') + '</em>' +
