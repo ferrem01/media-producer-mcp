@@ -305,3 +305,31 @@ failure turned into a deterministic rule:
   compiler's typing window are aligned by hand today (observed: a zoom landing on
   an already-cleared composer). Consider auto-snapping composer-anchored zooms to
   the compiled type-message window at assembly.
+
+## 2026-07-12 (later) — Slack simulator fidelity, from Marc's real screenshots
+
+Marc supplied two rounds of real Slack screenshots ("I can send you screenshots
+of what it really looks like and you can upgrade it").
+
+- **Round 1 — DM views** (#305): modern left rail (64px #350D36: workspace tile,
+  Home/DMs/Activity/Later/More with labels, +, self avatar w/ presence) beside
+  the 236px #4A154B conversation column; "Find a conversation..." search;
+  sentence-case section headers; **Agents & apps** section (icon squares, badge
+  pills, active = white pill w/ #611f69 badge); app-notification message grammar
+  (bold `title` line + body + blue `link_text` action link); composer rebuilt to
+  the real layout — formatting bar ABOVE the field, action row below, green
+  #007a5a send + chevron.
+- **Round 2 — channel views + script actions** (#306): **rich Quotient unfurl
+  card** ("Quotient ▾" over a white bordered card: app icon, bold title,
+  "Campaign in Quotient", Start/End/Owner field chips w/ avatar, "As of ..."
+  footer) — from `messages[].unfurl` AND as a script action (`unfurl`) so the
+  card animates in mid-story ("unfurled items in the script to show the real
+  thing"); **`thinking` script action** (bot block with pulsing "Thinking..."
+  dots; next bot-message auto-replaces it; `bot_thinking` shorthand); channel
+  tabs row; huddle split button; blue @Name / gold @channel mention pills;
+  image-attachment block (filename + chevron + rounded image); date divider
+  pills; `hover-message` floating action toolbar; thread "Also send to
+  #channel" row. Contract untouched: 3 camera anchors, message_index
+  addressing, shorthand compiler all verified by DOM probe.
+
+The round-1 open item ("Slack simulator fidelity upgrade") is DONE.
