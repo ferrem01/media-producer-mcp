@@ -555,7 +555,8 @@
 
     // ── Data ──
     var workspaceName = data.workspace_name || 'Quotient';
-    var channelName = data.channel_name || 'product';
+    var channelName = data.channel_name ||
+      (typeof data.channel === 'string' ? data.channel.replace(/^#/, '') : '') || 'product';
     var channelTopic = data.channel_topic || '';
     var channels = data.channels || [
       {name:'general'}, {name:'product'}, {name:'engineering'}, {name:'design'}, {name:'random'}
@@ -565,7 +566,23 @@
       {name:'Quotient Bot', avatar_color:'#7c3aed', online:true, initials:'QB'},
       {name:'Ed', avatar_color:'#2bac76', online:true, initials:'Ed'}
     ];
-    var messages = data.messages || [];
+    // Normalize message field aliases: LLM-authored data drifts from the
+    // schema ({author, time, body, from} for {name, timestamp, text}), and a
+    // missing name used to throw in createMessageEl -- killing the whole
+    // timeline and rendering an EMPTY channel. Tolerate the common aliases.
+    var messages = (data.messages || []).map(function(m) {
+      return {
+        role: m.role || (/(bot|quotient|app)/i.test(m.name || m.author || '') ? 'bot' : 'user'),
+        name: m.name || m.author || m.from || 'Teammate',
+        avatar_color: m.avatar_color || m.color,
+        initials: m.initials,
+        text: m.text || m.body || m.message || '',
+        timestamp: m.timestamp || m.time || '',
+        reactions: m.reactions,
+        replies: m.replies,
+        unfurl: m.unfurl,
+      };
+    });
     var activeChannel = data.active_channel || channelName;
     var showThread = data.show_thread || false;
 
@@ -635,7 +652,7 @@
         var avatar = document.createElement('div');
         avatar.className = 'msg-avatar';
         avatar.style.background = msg.avatar_color || '#6366f1';
-        avatar.textContent = msg.initials || msg.name.charAt(0);
+        avatar.textContent = msg.initials || String(msg.name || '?').charAt(0);
         header.appendChild(avatar);
 
         var meta = document.createElement('div');
