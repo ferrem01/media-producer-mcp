@@ -2,7 +2,7 @@
   "type": "slack-workspace",
   "label": "Slack Workspace",
   "category": "mockups",
-  "description": "Modern Slack desktop simulator with sidebar, channels, DMs, messages, threads, reactions, link unfurls, typing indicators, and animated scripted interactions.",
+  "description": "Modern Slack desktop simulator with sidebar, channels, DMs, messages, threads, reactions, link unfurls, typing indicators, and animated scripted interactions. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong.",
   "data": {
     "workspace_name": {
       "type": "string",
@@ -32,8 +32,16 @@
       "items": {
         "type": "object",
         "properties": {
-          "name": { "type": "string", "label": "Channel Name", "required": true },
-          "unread_count": { "type": "number", "label": "Unread Count", "optional": true }
+          "name": {
+            "type": "string",
+            "label": "Channel Name",
+            "required": true
+          },
+          "unread_count": {
+            "type": "number",
+            "label": "Unread Count",
+            "optional": true
+          }
         }
       }
     },
@@ -44,10 +52,26 @@
       "items": {
         "type": "object",
         "properties": {
-          "name": { "type": "string", "label": "Name", "required": true },
-          "avatar_color": { "type": "string", "label": "Avatar Color", "required": true },
-          "online": { "type": "boolean", "label": "Online Status", "optional": true },
-          "initials": { "type": "string", "label": "Initials", "optional": true }
+          "name": {
+            "type": "string",
+            "label": "Name",
+            "required": true
+          },
+          "avatar_color": {
+            "type": "string",
+            "label": "Avatar Color",
+            "required": true
+          },
+          "online": {
+            "type": "boolean",
+            "label": "Online Status",
+            "optional": true
+          },
+          "initials": {
+            "type": "string",
+            "label": "Initials",
+            "optional": true
+          }
         }
       }
     },
@@ -58,12 +82,40 @@
       "items": {
         "type": "object",
         "properties": {
-          "role": { "type": "string", "label": "Role", "required": true, "enum": ["user", "bot"] },
-          "name": { "type": "string", "label": "Sender Name", "required": true },
-          "avatar_color": { "type": "string", "label": "Avatar Color", "required": true },
-          "initials": { "type": "string", "label": "Initials", "optional": true },
-          "text": { "type": "string", "label": "Message Text", "required": true },
-          "timestamp": { "type": "string", "label": "Timestamp", "optional": true },
+          "role": {
+            "type": "string",
+            "label": "Role",
+            "required": true,
+            "enum": [
+              "user",
+              "bot"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "label": "Sender Name",
+            "required": true
+          },
+          "avatar_color": {
+            "type": "string",
+            "label": "Avatar Color",
+            "required": true
+          },
+          "initials": {
+            "type": "string",
+            "label": "Initials",
+            "optional": true
+          },
+          "text": {
+            "type": "string",
+            "label": "Message Text",
+            "required": true
+          },
+          "timestamp": {
+            "type": "string",
+            "label": "Timestamp",
+            "optional": true
+          },
           "reactions": {
             "type": "array",
             "label": "Reactions",
@@ -71,9 +123,18 @@
             "items": {
               "type": "object",
               "properties": {
-                "emoji": { "type": "string", "label": "Emoji" },
-                "count": { "type": "number", "label": "Count" },
-                "active": { "type": "boolean", "label": "Active" }
+                "emoji": {
+                  "type": "string",
+                  "label": "Emoji"
+                },
+                "count": {
+                  "type": "number",
+                  "label": "Count"
+                },
+                "active": {
+                  "type": "boolean",
+                  "label": "Active"
+                }
               }
             }
           },
@@ -82,9 +143,18 @@
             "label": "Reply Indicator",
             "optional": true,
             "properties": {
-              "count": { "type": "number" },
-              "avatars": { "type": "array", "items": { "type": "object" } },
-              "last_reply": { "type": "string" }
+              "count": {
+                "type": "number"
+              },
+              "avatars": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "last_reply": {
+                "type": "string"
+              }
             }
           },
           "unfurl": {
@@ -92,12 +162,24 @@
             "label": "Link Unfurl",
             "optional": true,
             "properties": {
-              "color": { "type": "string" },
-              "favicon": { "type": "string" },
-              "site_name": { "type": "string" },
-              "title": { "type": "string" },
-              "description": { "type": "string" },
-              "thumbnail": { "type": "string" }
+              "color": {
+                "type": "string"
+              },
+              "favicon": {
+                "type": "string"
+              },
+              "site_name": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "thumbnail": {
+                "type": "string"
+              }
             }
           }
         }
@@ -114,6 +196,16 @@
       "label": "Start with Thread Open",
       "optional": true,
       "default": false
+    },
+    "script": {
+      "type": "array",
+      "label": "THE COMPONENT'S MAIN POWER -- a scripted timeline that plays out the whole Slack story INSIDE the component: [{\"action\": \"...\", \"at\": seconds, ...}]. Slack actions: type-message {text,duration} (types into the composer), send-message (posts what was typed as the current user), show-typing-indicator {name} / hide-typing-indicator, bot-message {name,text} (a bot/app reply pops in), add-reaction {emoji,count}, open-thread / close-thread, thread-reply {name,text}, type-thread {text} + send-thread (typed thread reply), switch-channel {name}, unfurl-link. Plus base actions: move-cursor {target|x,y}, click, type {text}, highlight {target}, zoom-to {target,scale}, zoom-out, wait, parallel {actions:[...]}. Write the ENTIRE message sequence here -- never animate the component's internals from outside.",
+      "optional": true
+    },
+    "cursor_targets": {
+      "type": "object",
+      "label": "Named cursor positions for move-cursor/click, e.g. {\"composer\": {\"x\": 0.5, \"y\": 0.92}} in 0-1 component coords.",
+      "optional": true
     }
   },
   "script_actions": [
@@ -222,10 +314,25 @@
     }
   ],
   "default_cursor_targets": {
-    "composer": { "x": "55%", "y": "92%" },
-    "send-button": { "x": "93%", "y": "95%" },
-    "thread-composer": { "x": "85%", "y": "92%" },
-    "thread-send": { "x": "97%", "y": "95%" },
-    "message-last": { "x": "55%", "y": "50%" }
+    "composer": {
+      "x": "55%",
+      "y": "92%"
+    },
+    "send-button": {
+      "x": "93%",
+      "y": "95%"
+    },
+    "thread-composer": {
+      "x": "85%",
+      "y": "92%"
+    },
+    "thread-send": {
+      "x": "97%",
+      "y": "95%"
+    },
+    "message-last": {
+      "x": "55%",
+      "y": "50%"
+    }
   }
 }

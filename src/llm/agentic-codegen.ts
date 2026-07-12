@@ -357,6 +357,7 @@ The result is HYBRID: <component> tags for known UI + custom code for everything
 - Component IDs are auto-assigned: comp_0, comp_1, comp_2... in DOM order
 - You can add \`class\` and \`style\` attributes to the <component> tag for positioning
 - Chat scenes MUST use a chat component. Dashboard scenes MUST use dashboard components.
+- **SCRIPTED COMPONENTS PERFORM THEMSELVES.** If a component's schema has a \`script\` field (slack-workspace, quotient-chat, chat-simulator, claude-chat-composer), the ENTIRE interaction — typing, sending, bot replies, threads, reactions, cursor moves — is written as the \`script\` action array in its data, and you wire its timeline ONCE. Never animate the component's internal elements from your own timeline, never add your own composer/header/cursor on top of it, never wrap it in extra chrome or dim it — the component IS the surface, and overlaying it produces colliding text and double composers.
 - Code editor scenes MUST use a code editor component. Chart scenes MUST use chart components.
 
 ### Timeline Integration

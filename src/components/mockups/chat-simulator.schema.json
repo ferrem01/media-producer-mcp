@@ -2,7 +2,7 @@
   "type": "chat-simulator",
   "label": "Chat Simulator",
   "category": "mockups",
-  "description": "Slack/Discord/iMessage style chat interface. Messages appear one by one with typing indicators.",
+  "description": "Slack/Discord/iMessage style chat interface. Messages appear one by one with typing indicators. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong.",
   "data": {
     "platform": {
       "type": "string",
@@ -51,6 +51,16 @@
           }
         }
       }
+    },
+    "script": {
+      "type": "array",
+      "label": "Scripted timeline: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: show-typing, show-response {text}, plus base actions move-cursor, click, type {text}, highlight, zoom-to, wait, parallel. Drive the whole exchange through this script.",
+      "optional": true
+    },
+    "cursor_targets": {
+      "type": "object",
+      "label": "Named cursor positions for move-cursor/click in 0-1 component coords.",
+      "optional": true
     }
   },
   "script_actions": [
