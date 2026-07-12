@@ -74,8 +74,9 @@
           <button class="header-icon-btn">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#616061" stroke-width="1.3" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/></svg>
           </button>
-          <button class="header-icon-btn">
+          <button class="header-icon-btn huddle-btn">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#616061" stroke-width="1.3" stroke-linecap="round"><path d="M2 12a3 3 0 003-3V5a3 3 0 016 0v4a3 3 0 003 3"/><circle cx="8" cy="5" r="1" fill="#616061"/></svg>
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#616061" stroke-width="1.6" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
           </button>
           <button class="header-icon-btn">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#616061" stroke-width="1.3" stroke-linecap="round"><path d="M3 3l2.5 10L8 8.5l4.5 4.5L10 3z"/></svg>
@@ -85,6 +86,14 @@
             <span class="members-count"></span>
           </button>
         </div>
+      </div>
+      <!-- Channel tabs (real Slack: Messages / Files / Pins / +) -->
+      <div class="channel-tabs" data-target="channel-tabs"></div>
+      <!-- Floating in-channel search pill (opt-in via data.show_search_pill) -->
+      <div class="search-pill" data-target="search-pill">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#616061" stroke-width="1.4" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5l3 3"/></svg>
+        <span>Search messages in this channel</span>
+        <span class="kbd">&#8984;F</span>
       </div>
       <div class="messages-area" data-target="messages-area" data-anchor="messages"></div>
       <!-- Typing indicator -->
@@ -152,6 +161,10 @@
       <div class="thread-composer-wrapper">
         <div class="thread-composer-box" data-target="thread-composer-box">
           <div class="thread-composer-input" data-target="thread-composer-input"></div>
+          <div class="thread-alsosend" data-target="thread-alsosend">
+            <span class="ts-check"></span>
+            <span class="ts-label" data-target="thread-alsosend-label"></span>
+          </div>
           <div class="thread-composer-toolbar">
             <div class="toolbar-spacer"></div>
             <button class="send-btn thread-send-btn" data-target="thread-send">
@@ -624,6 +637,157 @@
     width: 28px; height: 28px; border-radius: 4px;
     background: #007a5a;
   }
+  .thread-alsosend {
+    display: flex; align-items: center; gap: 7px;
+    padding: 2px 12px 4px;
+    font-size: 13px; color: #616061;
+  }
+  .ts-check {
+    width: 14px; height: 14px; border-radius: 4px;
+    border: 1.4px solid #b9b9bd; background: #fff; flex-shrink: 0;
+  }
+
+  /* ── Channel tabs row ── */
+  .channel-tabs {
+    display: flex; align-items: flex-end; gap: 2px;
+    padding: 0 16px;
+    border-bottom: 1px solid #e0e0e0;
+    height: 38px; min-height: 38px; flex-shrink: 0;
+  }
+  .channel-tab {
+    padding: 8px 10px 9px; margin-bottom: -1px;
+    font-size: 13px; font-weight: 600; color: #616061;
+    border-bottom: 2px solid transparent;
+    cursor: default; white-space: nowrap;
+  }
+  .channel-tab.is-active {
+    color: #1d1c1d;
+    border-bottom-color: #1d1c1d;
+  }
+  .channel-tab.tab-plus { font-size: 15px; font-weight: 400; padding: 6px 8px 8px; }
+
+  /* Huddle split button */
+  .huddle-btn {
+    width: auto; padding: 0 7px; gap: 3px;
+    border: 1px solid #dddddd; border-radius: 8px;
+  }
+
+  /* Floating in-channel search pill */
+  .search-pill {
+    display: none; align-items: center; gap: 7px;
+    position: absolute; top: 102px; left: 50%; transform: translateX(-50%);
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 24px;
+    padding: 6px 14px; z-index: 6;
+    font-size: 13px; color: #616061;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    white-space: nowrap;
+  }
+  .search-pill .kbd {
+    font-size: 11px; color: #616061;
+    border: 1px solid #e0e0e0; border-radius: 4px;
+    padding: 0 4px; background: #f8f8f8;
+  }
+
+  /* ── Date divider (white pill on hairline) ── */
+  .date-divider {
+    position: relative; display: flex; justify-content: center;
+    margin: 14px 0 8px; flex-shrink: 0;
+  }
+  .date-divider::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 50%;
+    height: 1px; background: #e8e8e8;
+  }
+  .date-pill {
+    position: relative;
+    display: flex; align-items: center; gap: 4px;
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 24px;
+    padding: 3px 12px;
+    font-size: 12.5px; font-weight: 700; color: #1d1c1d;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  /* ── Mention pills ── */
+  .mention {
+    background: rgba(29,155,209,0.1); color: #1264a3;
+    padding: 0 3px; border-radius: 3px; font-weight: 500;
+  }
+  .mention-bcast {
+    background: rgba(242,199,68,0.28); color: #8f6c14; font-weight: 600;
+  }
+
+  /* ── Image attachment block ── */
+  .attach-block { margin-left: 44px; margin-top: 6px; }
+  .attach-meta {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12.5px; color: #616061; margin-bottom: 4px;
+  }
+  .attach-img {
+    display: block; max-width: 380px; border-radius: 12px;
+    border: 1px solid #e0e0e0;
+  }
+  .attach-ph {
+    width: 380px; height: 200px;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.95); font-size: 17px; font-weight: 800;
+    letter-spacing: 0.3px; text-align: center; padding: 0 24px;
+  }
+
+  /* ── Bot "thinking" indicator ── */
+  .thinking-text { color: #616061; display: flex; align-items: baseline; gap: 1px; }
+  .thinking-text em { font-style: italic; }
+  .think-dots span { font-style: italic; color: #616061; }
+
+  /* ── Hover toolbar (floating message actions) ── */
+  .msg-block { position: relative; }
+  .msg-block.is-hovered { background: #f8f8f8; border-radius: 6px; }
+  .hover-toolbar {
+    position: absolute; top: -14px; right: 8px; z-index: 8;
+    display: flex; align-items: center; gap: 2px;
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 3px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .ht-btn {
+    width: 26px; height: 26px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    color: #616061; font-size: 13px;
+  }
+
+  /* ── Quotient rich unfurl (campaign card) ── */
+  .q-unfurl { margin-left: 44px; margin-top: 6px; max-width: 480px; }
+  .quf-app {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12.5px; font-weight: 700; color: #616061;
+    margin-bottom: 4px;
+  }
+  .quf-card {
+    border: 1px solid #e0e0e0; border-radius: 12px;
+    background: #fff; padding: 12px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .quf-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .quf-ico {
+    width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 16px; font-weight: 800;
+  }
+  .quf-title { font-size: 15px; font-weight: 800; color: #1d1c1d; line-height: 1.3; }
+  .quf-sub { font-size: 13px; color: #616061; margin-top: 1px; }
+  .quf-fields {
+    display: flex; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 10px;
+  }
+  .quf-field { display: flex; flex-direction: column; gap: 4px; }
+  .quf-label { font-size: 12px; font-weight: 700; color: #1d1c1d; }
+  .quf-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #f4f4f4; border: 1px solid #e8e8e8; border-radius: 6px;
+    padding: 3px 9px; font-size: 13px; color: #1d1c1d;
+  }
+  .quf-ava {
+    width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 9px; font-weight: 800;
+  }
+  .quf-footer { font-size: 12px; color: #616061; }
 </style>
 
 <script>
@@ -668,6 +832,9 @@
     // missing name used to throw in createMessageEl -- killing the whole
     // timeline and rendering an EMPTY channel. Tolerate the common aliases.
     var messages = (data.messages || []).map(function(m) {
+      if (m.divider || m.type === 'divider') {
+        return { divider: m.divider === true ? (m.label || 'Today') : (m.divider || m.label || 'Today') };
+      }
       return {
         role: m.role || (/(bot|quotient|app)/i.test(m.name || m.author || '') ? 'bot' : 'user'),
         name: m.name || m.author || m.from || 'Teammate',
@@ -678,6 +845,7 @@
         reactions: m.reactions,
         replies: m.replies,
         unfurl: m.unfurl,
+        attachment: m.attachment || m.image,
         title: m.title || m.headline,
         link_text: m.link_text || m.link || m.cta,
       };
@@ -702,6 +870,31 @@
     channelNameHeader.textContent = channelName;
     if (channelTopic) channelTopicEl.textContent = channelTopic;
     composerInput.setAttribute('data-placeholder', 'Message #' + channelName);
+
+    // Channel tabs row (Messages / Files / Pins / +); hide via show_tabs:false
+    var tabsEl = el.querySelector('[data-target="channel-tabs"]');
+    if (tabsEl) {
+      if (data.show_tabs === false) {
+        tabsEl.style.display = 'none';
+      } else {
+        var tabNames = data.tabs || ['Messages', 'Files', 'Pins'];
+        var activeTab = data.active_tab || tabNames[0];
+        tabNames.forEach(function(tn) {
+          var td = document.createElement('div');
+          td.className = 'channel-tab' + (tn === activeTab ? ' is-active' : '');
+          td.textContent = tn;
+          tabsEl.appendChild(td);
+        });
+        var plusTab = document.createElement('div');
+        plusTab.className = 'channel-tab tab-plus';
+        plusTab.textContent = '+';
+        tabsEl.appendChild(plusTab);
+      }
+    }
+    var searchPill = el.querySelector('[data-target="search-pill"]');
+    if (searchPill && data.show_search_pill) searchPill.style.display = 'flex';
+    var alsoSendLabel = el.querySelector('[data-target="thread-alsosend-label"]');
+    if (alsoSendLabel) alsoSendLabel.textContent = 'Also send to #' + channelName;
 
     // Build channel list
     channels.forEach(function(ch) {
@@ -762,6 +955,10 @@
       // Links
       html = html.replace(/<(https?:\/\/[^>|]+)\|([^>]+)>/g, '<a href="$1">$2</a>');
       html = html.replace(/<(https?:\/\/[^>]+)>/g, '<a href="$1">$1</a>');
+      // Mentions: @channel/@here/@everyone get the gold broadcast pill,
+      // @Name gets the blue member pill (real Slack treatment).
+      html = html.replace(/(^|[\s(])@(channel|here|everyone)\b/g, '$1<span class="mention mention-bcast">@$2</span>');
+      html = html.replace(/(^|[\s(])@(?!channel\b|here\b|everyone\b)([A-Za-z][A-Za-z0-9._-]*(?: [A-Z][A-Za-z0-9._-]*)?)/g, '$1<span class="mention">@$2</span>');
       // Newlines
       html = html.replace(/\n/g, '<br>');
       return html;
@@ -809,6 +1006,21 @@
         block.appendChild(linkEl);
       }
 
+      // Image attachment (filename row + collapse chevron + rounded image).
+      // No src -> a labeled gradient placeholder stands in for the asset.
+      if (msg.attachment) {
+        var att = typeof msg.attachment === 'string' ? { filename: msg.attachment } : msg.attachment;
+        var ab = document.createElement('div');
+        ab.className = 'attach-block';
+        var chev = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#616061" stroke-width="1.6" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>';
+        ab.innerHTML = '<div class="attach-meta">' + (att.filename || 'image.png') + ' ' + chev + '</div>' +
+          (att.src
+            ? '<img class="attach-img" src="' + att.src + '"/>'
+            : '<div class="attach-img attach-ph" style="background:linear-gradient(135deg,' +
+                (att.color1 || '#7c5cff') + ',' + (att.color2 || '#3b82f6') + ')">' + (att.label || '') + '</div>');
+        block.appendChild(ab);
+      }
+
       // Reactions
       if (msg.reactions && msg.reactions.length > 0) {
         var rRow = document.createElement('div');
@@ -847,6 +1059,40 @@
     }
 
     function createUnfurlEl(u) {
+      // Rich app unfurl (the real Quotient campaign card): "Quotient v" label
+      // above a white bordered card with app icon, bold title, subtitle,
+      // labeled field chips (Start Date / End Date / Owner) and an "As of"
+      // footer. Triggered by fields/subtitle/card; plain link unfurls keep
+      // the legacy accent-bar card below.
+      if (u.fields || u.subtitle || u.card === 'campaign') {
+        var wrap = document.createElement('div');
+        wrap.className = 'q-unfurl';
+        var appName = u.app_name || u.site_name || 'Quotient';
+        var chevSm = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#616061" stroke-width="1.6" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>';
+        var fieldsHtml = (u.fields || []).map(function(f) {
+          var val;
+          if (f.avatar || f.avatar_color) {
+            val = '<span class="quf-chip"><span class="quf-ava" style="background:' + (f.avatar_color || '#6366f1') + '">' +
+              (f.avatar || String(f.value || '?').charAt(0)) + '</span>' + (f.value || '') + '</span>';
+          } else {
+            val = '<span class="quf-chip">' + (f.value || '') + '</span>';
+          }
+          return '<div class="quf-field"><div class="quf-label">' + (f.label || '') + '</div>' + val + '</div>';
+        }).join('');
+        wrap.innerHTML = '<div class="quf-app">' + appName + ' ' + chevSm + '</div>' +
+          '<div class="quf-card">' +
+            '<div class="quf-head">' +
+              '<div class="quf-ico" style="background:' + (u.icon_color || u.color || '#393bf5') + '">' + String(appName).charAt(0) + '</div>' +
+              '<div class="quf-titles">' +
+                '<div class="quf-title">' + (u.title || '') + '</div>' +
+                '<div class="quf-sub">' + (u.subtitle || 'Campaign in ' + appName) + '</div>' +
+              '</div>' +
+            '</div>' +
+            (fieldsHtml ? '<div class="quf-fields">' + fieldsHtml + '</div>' : '') +
+            (u.footer ? '<div class="quf-footer">' + u.footer + '</div>' : '') +
+          '</div>';
+        return wrap;
+      }
       var card = document.createElement('div');
       card.className = 'unfurl-card';
       card.innerHTML = '<div class="unfurl-accent" style="background:' + (u.color || '#1264a3') + '"></div>' +
@@ -862,6 +1108,18 @@
       return card;
     }
 
+    // ── Date divider (white pill on hairline; forces full header after) ──
+    var forceFullNext = false;
+    function addDivider(label) {
+      var d = document.createElement('div');
+      d.className = 'date-divider';
+      d.innerHTML = '<span class="date-pill">' + label +
+        ' <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#1d1c1d" stroke-width="1.6" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg></span>';
+      messagesArea.appendChild(d);
+      forceFullNext = true;
+      return d;
+    }
+
     // ── Add message to channel ──
     function addMessage(msg, animate) {
       var showFull = true;
@@ -872,7 +1130,9 @@
           showFull = false;
         }
       }
+      if (forceFullNext) { showFull = true; forceFullNext = false; }
       var el = createMessageEl(msg, showFull);
+      el.__mpName = msg.name;
       messagesArea.appendChild(el);
       messageEls.push(el);
       messageData.push(msg);
@@ -893,6 +1153,7 @@
 
     // ── Render initial messages ──
     messages.forEach(function(msg) {
+      if (msg.divider) { addDivider(msg.divider); return; }
       addMessage(msg, false);
     });
 
@@ -957,9 +1218,70 @@
       scrollToBottom();
     }
 
+    // ── Bot "thinking" indicator (agent processing before it replies) ──
+    var thinkingEl = null;
+    function showThinking(opts) {
+      opts = opts || {};
+      removeThinking();
+      var inThread = !!opts.in_thread;
+      var name = opts.name || 'Quotient';
+      var block = document.createElement('div');
+      block.className = 'msg-block has-gap thinking-block';
+      block.innerHTML = '<div class="msg-header">' +
+        '<div class="msg-avatar" style="background:' + (opts.avatar_color || '#393bf5') + '">' +
+          (opts.initials || String(name).charAt(0)) + '</div>' +
+        '<div class="msg-meta"><span class="msg-name">' + name + '</span>' +
+          '<span class="msg-app-badge">APP</span></div></div>' +
+        '<div class="msg-text thinking-text"><em>' + (opts.text || 'Thinking') + '</em>' +
+          '<span class="think-dots"><span>.</span><span>.</span><span>.</span></span></div>';
+      var host = inThread ? threadReplies : messagesArea;
+      host.appendChild(block);
+      thinkingEl = block;
+      gsap.from(block, { autoAlpha: 0, y: 10, duration: 0.3, ease: 'power2.out' });
+      var dots = block.querySelectorAll('.think-dots span');
+      gsap.set(dots, { opacity: 0.2 });
+      gsap.to(dots, { opacity: 1, duration: 0.4, stagger: 0.18, repeat: -1, yoyo: true, ease: 'power1.inOut' });
+      if (inThread) { scrollThreadToBottom(); } else { scrollToBottom(); }
+    }
+    function removeThinking() {
+      if (!thinkingEl) return;
+      gsap.killTweensOf(thinkingEl.querySelectorAll('.think-dots span'));
+      if (thinkingEl.parentNode) thinkingEl.parentNode.removeChild(thinkingEl);
+      thinkingEl = null;
+    }
+
+    // ── Hover toolbar (floating message actions card) ──
+    function hoverMsg(idx) {
+      if (idx < 0) idx = messageEls.length + idx;
+      var msgEl = messageEls[idx];
+      if (!msgEl) return;
+      unhoverAll();
+      msgEl.classList.add('is-hovered');
+      var tb = document.createElement('div');
+      tb.className = 'hover-toolbar';
+      tb.innerHTML =
+        '<span class="ht-btn"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="7" cy="8" r="5.5"/><path d="M4.8 9.3c.6.8 1.3 1.1 2.2 1.1s1.6-.3 2.2-1.1"/><circle cx="5.3" cy="6.8" r=".7" fill="currentColor"/><circle cx="8.7" cy="6.8" r=".7" fill="currentColor"/><path d="M13 3.5v4M11 5.5h4"/></svg></span>' +
+        '<span class="ht-btn"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11a1 1 0 011 1v6a1 1 0 01-1 1H6l-3.5 2.5V4.5a1 1 0 011-1z"/></svg></span>' +
+        '<span class="ht-btn"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 3.5L13.5 8l-5 4.5V10C5 10 3 11.5 2 13.5c0-4 2-7 6.5-7.5V3.5z"/></svg></span>' +
+        '<span class="ht-btn"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5h7v11L8 10.5 4.5 13.5v-11z"/></svg></span>' +
+        '<span class="ht-btn"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="3.5" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1.1" fill="currentColor" stroke="none"/></svg></span>';
+      msgEl.appendChild(tb);
+      gsap.from(tb, { autoAlpha: 0, y: 4, duration: 0.2, ease: 'power2.out' });
+    }
+    function unhoverAll() {
+      messageEls.forEach(function(m) {
+        m.classList.remove('is-hovered');
+        var tb = m.querySelector('.hover-toolbar');
+        if (tb) tb.remove();
+      });
+    }
+
     // ── Initial state ──
     gsap.set(chat, { autoAlpha: 0 });
-    var initMsgEls = messageEls.slice();
+    // Intro animates ALL initial children of the messages area (messages AND
+    // date dividers) in document order; script-index bookkeeping (messageEls)
+    // stays message-only so message_index addressing is unaffected.
+    var initMsgEls = Array.prototype.slice.call(messagesArea.children);
     gsap.set(initMsgEls, { autoAlpha: 0, y: 12 });
 
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.6 : 0.8;
@@ -979,8 +1301,8 @@
     var typingDotsEls = typingBar ? typingBar.querySelectorAll('.typing-dot') : null;
     var t = introT0;
     initMsgEls.forEach(function(mel, mi) {
-      if (!hasScript && typingBar && typingWho && introStep > 0.9) {
-        var whoName = (messageData[mi] && messageData[mi].name) || 'Someone';
+      if (!hasScript && typingBar && typingWho && introStep > 0.9 && mel.__mpName) {
+        var whoName = mel.__mpName || 'Someone';
         var tAt = Math.max(0.05, t - Math.min(introStep * 0.55, 1.1));
         tl.call(function() { typingWho.textContent = whoName + ' is typing'; }, null, tAt);
         tl.to(typingBar, { opacity: 1, duration: 0.15 }, tAt);
@@ -1049,18 +1371,40 @@
         synth.push({ action: 'show-typing-indicator', at: Math.max(0.6, sDur * 0.12), name: whoT });
         synth.push({ action: 'hide-typing-indicator', at: Math.max(1.6, sDur * 0.2) });
       }
+      var sendDone = 0;
       if (data.composer_text) {
         var tAt2 = Math.max(1.0, sDur * 0.35);
         var typeDur = Math.min(2.6, Math.max(1.2, String(data.composer_text).length * 0.07));
         synth.push({ action: 'type-message', at: tAt2, text: String(data.composer_text), duration: typeDur });
         synth.push({ action: 'send-message', at: tAt2 + typeDur + 0.4 });
+        sendDone = tAt2 + typeDur + 0.4;
       }
       if (data.bot_reply && (data.bot_reply.text || typeof data.bot_reply === 'string')) {
         var br = typeof data.bot_reply === 'string' ? { text: data.bot_reply } : data.bot_reply;
-        synth.push({ action: 'bot-message', at: Math.min(sDur - 2, sDur * 0.62), name: br.name || 'Quotient', text: br.text });
+        var brAt = Math.max(sendDone + 1.2, Math.min(sDur - 2, sDur * 0.62));
+        // bot_thinking: the agent visibly processes before it answers
+        // (bot-message auto-removes the indicator when the reply lands).
+        if (data.bot_thinking) {
+          var bt = typeof data.bot_thinking === 'object' ? data.bot_thinking : {};
+          synth.push({ action: 'thinking', at: Math.max(0.8, sendDone + 0.5), name: bt.name || br.name || 'Quotient' });
+        }
+        synth.push({ action: 'bot-message', at: brAt, name: br.name || 'Quotient', text: br.text });
       }
       if (synth.length) data.script = synth;
     }
+    // Shared handlers for aliased script actions. The unfurl action passes
+    // the whole action object through so the rich campaign-card fields
+    // (subtitle, fields, footer, app_name) reach createUnfurlEl; a plain
+    // {site_name, title, description} still renders the legacy link card.
+    var unfurlAction = function(tl, ctr, action, at) {
+      tl.call(function() {
+        var idx = action.message_index !== undefined ? action.message_index : -1;
+        addUnfurlToMsg(idx, action.unfurl || action);
+      }, null, at);
+    };
+    var thinkingAction = function(tl, ctr, action, at) {
+      tl.call(function() { showThinking(action); }, null, at);
+    };
     if (data.script && data.script.length > 0) {
       runScript(tl, el, data.script, cursorTargets, ctx, {
         'type-message': function(tl, ctr, action, at) {
@@ -1091,7 +1435,8 @@
         },
         'bot-message': function(tl, ctr, action, at) {
           tl.call(function() {
-            // Hide typing bar
+            // Hide typing bar + any thinking indicator (the reply replaces it)
+            removeThinking();
             gsap.to(typingBar, { opacity: 0, duration: 0.15 });
             var dots = typingBar.querySelectorAll('.typing-dot');
             gsap.killTweensOf(dots);
@@ -1133,6 +1478,7 @@
         },
         'thread-reply': function(tl, ctr, action, at) {
           tl.call(function() {
+            removeThinking();
             threadDivider.style.display = 'flex';
             addThreadReply({
               role: action.role || 'user',
@@ -1167,18 +1513,21 @@
             input.textContent = '';
           }, null, at);
         },
-        'unfurl-link': function(tl, ctr, action, at) {
+        'unfurl-link': unfurlAction,
+        'unfurl': unfurlAction,
+        'thinking': thinkingAction,
+        'show-thinking': thinkingAction,
+        'hide-thinking': function(tl, ctr, action, at) {
+          tl.call(removeThinking, null, at);
+        },
+        'hover-message': function(tl, ctr, action, at) {
           tl.call(function() {
             var idx = action.message_index !== undefined ? action.message_index : -1;
-            addUnfurlToMsg(idx, {
-              color: action.color || '#1264a3',
-              site_name: action.site_name || '',
-              title: action.title || '',
-              description: action.description || '',
-              favicon: action.favicon || '',
-              thumbnail: action.thumbnail || ''
-            });
+            hoverMsg(idx);
           }, null, at);
+        },
+        'unhover-message': function(tl, ctr, action, at) {
+          tl.call(unhoverAll, null, at);
         },
         'show-typing-indicator': function(tl, ctr, action, at) {
           var bar = ctr.querySelector('[data-target="typing-bar"]');

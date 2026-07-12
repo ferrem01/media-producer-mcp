@@ -159,7 +159,7 @@
           },
           "unfurl": {
             "type": "object",
-            "label": "Link Unfurl",
+            "label": "Link Unfurl. TWO FORMS: (1) plain link card {site_name, title, description, color, favicon, thumbnail}; (2) RICH APP CARD (the real Quotient campaign unfurl -- 'Quotient v' label over a white bordered card with app icon, bold title, subtitle, labeled value chips, footer): {app_name: 'Quotient', title: 'Quotient Free Trial Launch', subtitle: 'Campaign in Quotient', fields: [{label: 'Start Date', value: '05/19/2026'}, {label: 'End Date', value: '06/02/2026'}, {label: 'Owner', value: 'Marc Ferrentino', avatar_color: '#6366f1'}], footer: 'As of May 17', icon_color: '#393bf5'}. Presence of fields/subtitle selects the rich card.",
             "optional": true,
             "properties": {
               "color": {
@@ -179,8 +179,33 @@
               },
               "thumbnail": {
                 "type": "string"
+              },
+              "app_name": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "array"
+              },
+              "footer": {
+                "type": "string"
+              },
+              "icon_color": {
+                "type": "string"
               }
             }
+          },
+          "attachment": {
+            "type": "object",
+            "label": "Image attachment: {filename, src?, label?, color1?, color2?} -- filename row with collapse chevron above a rounded image; without src a labeled gradient placeholder renders.",
+            "optional": true
+          },
+          "divider": {
+            "type": "string",
+            "label": "Instead of a message, render a date divider pill (e.g. {divider: 'Today'} or {divider: 'Monday, May 17th'}). The next message shows a full header.",
+            "optional": true
           },
           "title": {
             "type": "string",
@@ -209,7 +234,7 @@
     },
     "script": {
       "type": "array",
-      "label": "THE COMPONENT'S MAIN POWER -- a scripted timeline that plays out the whole Slack story INSIDE the component: [{\"action\": \"...\", \"at\": seconds, ...}]. Slack actions: type-message {text,duration} (types into the composer), send-message (posts what was typed as the current user), show-typing-indicator {name} / hide-typing-indicator, bot-message {name,text} (a bot/app reply pops in), add-reaction {emoji,count}, open-thread / close-thread, thread-reply {name,text}, type-thread {text} + send-thread (typed thread reply), switch-channel {name}, unfurl-link. Plus base actions: move-cursor {target|x,y}, click, type {text}, highlight {target}, wait, parallel {actions:[...]}. Write the ENTIRE message sequence here -- never animate the component's internals from outside. NEVER move the camera from a script (no zoom/pan actions) -- camera moves are scene-level camera_moves targeting this component via {anchor} (one stage camera).",
+      "label": "THE COMPONENT'S MAIN POWER -- a scripted timeline that plays out the whole Slack story INSIDE the component: [{\"action\": \"...\", \"at\": seconds, ...}]. Slack actions: type-message {text,duration} (types into the composer), send-message (posts what was typed as the current user), show-typing-indicator {name} / hide-typing-indicator, thinking {name} (the agent visibly processes -- 'Thinking...' with pulsing dots; auto-removed when its bot-message lands), bot-message {name,text} (a bot/app reply pops in), add-reaction {emoji,count}, open-thread / close-thread, thread-reply {name,text}, type-thread {text} + send-thread (typed thread reply), switch-channel {name}, unfurl {title,subtitle,fields,footer} (rich Quotient campaign card pops in below a message -- show the REAL thing), hover-message {message_index} (floating action toolbar appears over a message). Plus base actions: move-cursor {target|x,y}, click, type {text}, highlight {target}, wait, parallel {actions:[...]}. Write the ENTIRE message sequence here -- never animate the component's internals from outside. NEVER move the camera from a script (no zoom/pan actions) -- camera moves are scene-level camera_moves targeting this component via {anchor} (one stage camera).",
       "optional": true
     },
     "cursor_targets": {
@@ -220,6 +245,26 @@
     "agents_apps": {
       "type": "array",
       "label": "Agents & apps sidebar section (modern Slack): [{name, badge?, color?, active?}] -- app icon squares with unread badge pills; set active on the app the film is 'in'. Defaults to a believable roster with Quotient.",
+      "optional": true
+    },
+    "tabs": {
+      "type": "array",
+      "label": "Channel tab row names (default ['Messages','Files','Pins'] + '+'); active_tab selects the underlined one; show_tabs:false hides the row (DM views).",
+      "optional": true
+    },
+    "active_tab": {
+      "type": "string",
+      "label": "Which channel tab is active (default first)",
+      "optional": true
+    },
+    "show_tabs": {
+      "type": "boolean",
+      "label": "Show the channel tabs row (default true; set false for DM views)",
+      "optional": true
+    },
+    "show_search_pill": {
+      "type": "boolean",
+      "label": "Show the floating 'Search messages in this channel (Cmd-F)' pill",
       "optional": true
     }
   },
@@ -298,14 +343,32 @@
       "description": "Send typed text as a thread reply"
     },
     {
-      "action": "unfurl-link",
-      "description": "Add a link unfurl card below a message",
+      "action": "unfurl",
+      "description": "Animate an unfurl card in below a message (alias: unfurl-link). Pass rich campaign-card fields to show the REAL Quotient unfurl: app_name/title/subtitle/fields/footer (same shape as messages[].unfurl rich form); or plain site_name/title/description for a legacy link card.",
       "params": {
-        "color": "string - Left accent color",
-        "site_name": "string - Site name text",
-        "title": "string - Unfurl title",
-        "description": "string - Unfurl description",
-        "favicon": "string - Favicon URL",
+        "title": "string - Card title (bold)",
+        "subtitle": "string - e.g. 'Campaign in Quotient' (selects the rich card)",
+        "fields": "array - [{label, value, avatar_color?}] labeled value chips (Start Date / End Date / Owner)",
+        "footer": "string - e.g. 'As of May 17'",
+        "app_name": "string - App label above the card (default Quotient)",
+        "icon_color": "string - App icon square color",
+        "message_index": "number - Message index (-1 for last)"
+      }
+    },
+    {
+      "action": "thinking",
+      "description": "Show the agent 'Thinking...' indicator as a bot message block with pulsing dots (alias: show-thinking; hide-thinking removes it manually). The next bot-message or thread-reply automatically replaces it.",
+      "params": {
+        "name": "string - Agent name (default Quotient)",
+        "text": "string - Indicator text (default 'Thinking')",
+        "avatar_color": "string - Avatar color (default #393bf5)",
+        "in_thread": "boolean - Show inside the open thread panel instead of the channel"
+      }
+    },
+    {
+      "action": "hover-message",
+      "description": "Float the message action toolbar (emoji, reply, share, bookmark, more) over a message with a hover highlight; unhover-message clears it.",
+      "params": {
         "message_index": "number - Message index (-1 for last)"
       }
     },
