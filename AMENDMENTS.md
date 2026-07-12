@@ -252,3 +252,56 @@ callouts = flight speed.
   state-tween pattern proven in webgl-backdrop); the hard problem is frame-exact
   video-texture sync in the capture pipeline (worker seeks video, texture must
   update per captured frame). Big build; big payoff.
+
+## 2026-07-12 — Motion architecture + the silent kinetic-type explainer (PRs #297–#303)
+
+The Quotient-in-Slack explainer became the forcing function for the biggest
+architecture consolidation since beats. Three generations of the same film, each
+failure turned into a deterministic rule:
+
+- **Scripted-mock contract** (#297): slack-workspace/quotient-chat/chat-simulator/
+  claude-chat-composer all had full `runScript` engines that no schema documented —
+  codegen embedded them as static props and hand-animated over their DOM (double
+  composers, header collisions). Schemas now document `script` + `cursor_targets` +
+  action vocabularies; codegen rule "scripted components perform themselves";
+  finish_scene validators for broken `<component data>` attrs and orphaned
+  timeline code (`tl is not defined` after a premature `return tl;}` from
+  append_script); storyboard truncation hardened (one add_scene per response,
+  consecutive-only abort); `max_revisions` param on generate.
+- **slack-workspace resilience** (#298, #301): no-script intro performs the thread
+  (paced pops + typing bar) instead of a static screenshot; LLM alias keys
+  normalized (author/time → name/timestamp — a missing name crashed the whole
+  timeline into an EMPTY channel); declarative shorthand compiled to script
+  (`composer_text`, `typing_indicator`, `bot_reply`) — three generations proved
+  storyboards write intent keys, never action arrays.
+- **SPEC-motion-architecture.md + v1 implementation** (#299, #300): four layers
+  with single ownership; ONE stage camera with semantic anchors
+  (`CameraMove.anchor` = "component.anchorName", resolved at tween start with
+  transform compensation — frames a moving/posed component where drawn rects go
+  stale; type-qualified matching in #301); pose/enter/exit as first-class wrapper
+  fields in both assemblers; component tiers (performable-surface/animated-prop/
+  static-prop); template pass-through rule; script-runner camera actions
+  deprecated (rotate-3d reclassified as pose); ui-chat-thread deprecated;
+  storyboard may author ANCHORED camera moves (sanitized, max 4). Backdrops
+  stamped `data-mp-backdrop` and excluded from the camera rig — the camera moves
+  the subject, not the world (#301, Marc's catch).
+- **Brand voice** (#302, #303): st-artifact claims default to the BRAND display
+  font (`voice:'serif'` opts into the borrowed HyperFrames editorial look);
+  logo.dev URL baking mirrored into the direct-component path (hand-authored
+  logo components rendered invisibly).
+- **The film** (proj_2ad23344, silent by design): logo-lockup manifesto intro →
+  two claim scenes over the performing slack-workspace (camera riding the typing
+  via anchors) → pure kinetic-text takeover (st-manifesto) → scripted thread
+  demonstration → settings-toggle close. Marc: "looks like a real hype video."
+
+### Open items (added)
+
+- **Slack simulator fidelity upgrade** (Marc): the slack-workspace mock is good
+  enough to star but reads slightly simplified up close — richer message
+  rendering (link unfurls in flight, hover states, attachments, member chips),
+  smoother thread-panel open, real scroll physics. Worth a dedicated pass now
+  that it is the workhorse surface of product films.
+- Lane-timing coordination: storyboard-authored camera moves vs the shorthand
+  compiler's typing window are aligned by hand today (observed: a zoom landing on
+  an already-cleared composer). Consider auto-snapping composer-anchored zooms to
+  the compiled type-message window at assembly.
