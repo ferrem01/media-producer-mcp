@@ -1896,14 +1896,23 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       if (compPatchMatch && method === "PATCH") {
         const [, tenantId, projectId, sceneId, compId] = compPatchMatch.map(decodeURIComponent);
         const body = await parseBody(req);
-        if (!body.data || typeof body.data !== "object") { jsonResponse(res, 400, { error: "data object is required" }); return; }
+        const hasStage = body.pose !== undefined || body.enter !== undefined || body.exit !== undefined || body.position !== undefined;
+        if ((!body.data || typeof body.data !== "object") && !hasStage) { jsonResponse(res, 400, { error: "data object (or pose/enter/exit/position) is required" }); return; }
         const project = await loadProject(tenantId, projectId);
         if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
         const scene = project.scenes.find((s: any) => s.id === sceneId);
         if (!scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
         const comp = (scene.components || []).find((c: any) => c.id === compId);
         if (!comp) { jsonResponse(res, 404, { error: "Component not found" }); return; }
-        (comp as any).data = { ...((comp as any).data || {}), ...(body.data as Record<string, unknown>) };
+        if (body.data && typeof body.data === "object") {
+          (comp as any).data = { ...((comp as any).data || {}), ...(body.data as Record<string, unknown>) };
+        }
+        // Stage-lane fields (SPEC-motion-architecture L4): pose/enter/exit/
+        // position live on the wrapper, not in data. null clears a field.
+        for (const k of ["pose", "enter", "exit", "position"]) {
+          if (body[k] === null) delete (comp as any)[k];
+          else if (body[k] !== undefined) (comp as any)[k] = body[k];
+        }
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         jsonResponse(res, 200, { ok: true, component_id: compId, data: (comp as any).data });
