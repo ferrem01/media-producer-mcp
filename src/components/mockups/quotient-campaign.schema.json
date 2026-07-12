@@ -1,0 +1,50 @@
+{
+  "type": "quotient-campaign",
+  "label": "Quotient Campaign screen (Brief / Tasks / Activation / Deliverables)",
+  "category": "mockups",
+  "description": "The Quotient campaign screen (built from actual screenshots), designed as a CENTER component for quotient-app-shell (use its content-region contract) or standalone. White card with the tab bar -- Brief / Tasks / Activation / Deliverables / Chats -- and four working views: BRIEF is the rich-text doc ('Last updated', big title, Date Range chips + Owner row with avatar, headed sections with paragraphs and bullets); TASKS is the table ('Tasks · Completed 0/6', Filters/Grouping/black New, 'To-do 6' group, rows with dashed-circle checkbox, due date, red priority bars, owner avatar, deliverable platform icon, and the 'Get Started' Quotient chat chip); ACTIVATION is the week calendar (time gutter, day columns, deliverable cards with platform badge, title, time, avatar, and Published/Draft/Launched status) where cards can be DRAGGED between days; DELIVERABLES is the status table (type icon, name, green-rocket Published vs dashed Draft, date, linked task). SCRIPTED performable surface. Camera anchors: tabs, brief, tasks, calendar, deliverables.",
+  "data": {
+    "title": { "type": "string", "label": "Campaign title (default 'Founding Marketer Hiring Push')", "optional": true },
+    "updated": { "type": "string", "label": "'Last updated: 6 days ago' line", "optional": true },
+    "date_from": { "type": "string", "label": "Date range start (default 'Jul 05, 2026')", "optional": true },
+    "date_to": { "type": "string", "label": "Date range end (default 'Jul 19, 2026')", "optional": true },
+    "owner": { "type": "object", "label": "{name, avatar_url} for the Owner row", "optional": true },
+    "active_tab": { "type": "string", "label": "Tab at open: brief (default) | tasks | activation | deliverables", "optional": true },
+    "brief_sections": {
+      "type": "array",
+      "label": "Brief doc sections: [{heading, paragraphs: [..], bullets: [..]}]",
+      "optional": true
+    },
+    "tasks": {
+      "type": "array",
+      "label": "Task rows: [{text, due: 'Jul 5', priority: 'high'|'medium'|'low', owner: 'Marc F...', avatar_url, platform: 'linkedin'|'x', deliverable: 'Marc LinkedI...', done?}]",
+      "optional": true
+    },
+    "calendar": {
+      "type": "object",
+      "label": "Activation calendar: {days: 5, hours: [{label: '9 AM', pct: 34}], events: [{day: 0-4, top: %, type: 'Social Post'|'Email Broadcast'|'Blog', platform: 'linkedin'|'x'|'email'|'blog', title, time: '9:00 AM', status: 'published'|'draft'|'launched', avatar_url}]}",
+      "optional": true
+    },
+    "deliverables": {
+      "type": "array",
+      "label": "Deliverable rows: [{platform, kind: 'Social Post', name, status: 'published'|'draft'|'scheduled', date, task}]",
+      "optional": true
+    },
+    "script": {
+      "type": "array",
+      "label": "Actions: switch-tab {tab: 'brief'|'tasks'|'activation'|'deliverables'} (tab press + view crossfade -- THE tour beat), complete-task {index} (checkbox fills green, Completed count ticks), move-event {index, day, top?} (the calendar card LIFTS with a shadow and glides to another day column -- the drag-and-drop beat), set-event-status {index, status} (calendar card status flips, e.g. draft -> published), set-deliverable-status {index, status} (table status flips to the green rocket), scroll-view {amount, duration}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (tabs, brief, tasks, calendar, deliverables).",
+      "optional": true
+    },
+    "cursor_targets": { "type": "object", "label": "Named cursor positions (tabs, table)", "optional": true }
+  },
+  "script_actions": [
+    { "action": "switch-tab", "description": "Press a tab; the view crossfades in", "params": { "tab": "string - brief|tasks|activation|deliverables|chats" } },
+    { "action": "complete-task", "description": "A task's dashed circle fills green with a check; the Completed counter ticks up", "params": { "index": "number - row index" } },
+    { "action": "move-event", "description": "The drag-and-drop beat: the calendar card lifts (scale + shadow) and glides to another day column / time", "params": { "index": "number - event index", "day": "number - target day column 0-4", "top": "number - optional target top %" } },
+    { "action": "set-event-status", "description": "Flip a calendar card's status pill (draft -> published gets the green rocket)", "params": { "index": "number", "status": "string" } },
+    { "action": "set-deliverable-status", "description": "Flip a Deliverables row's status", "params": { "index": "number", "status": "string" } },
+    { "action": "scroll-view", "description": "Scroll the active view", "params": { "amount": "number - px (default 300)", "duration": "number - seconds" } }
+  ],
+  "default_cursor_targets": { "tabs": { "x": "30%", "y": "8%" }, "table": { "x": "50%", "y": "45%" } },
+  "tier": "performable-surface"
+}

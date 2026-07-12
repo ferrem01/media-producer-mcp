@@ -1,0 +1,620 @@
+<template>
+  <div class="qcp">
+    <div class="qcp-card">
+      <!-- Tab bar -->
+      <div class="qcp-tabs" data-anchor="tabs">
+        <div class="qcp-tab" data-tab="brief">
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+          <span>Brief</span>
+        </div>
+        <div class="qcp-tab" data-tab="tasks">
+          <svg viewBox="0 0 24 24"><path d="M2 12l4 4 8-9"/><path d="M10 16l2 2 10-11"/></svg>
+          <span>Tasks</span>
+        </div>
+        <div class="qcp-tab" data-tab="activation">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          <span>Activation</span>
+        </div>
+        <div class="qcp-tab" data-tab="deliverables">
+          <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="19" rx="2"/><path d="M9 3v3h6V3"/><path d="M8 11h8M8 15h8"/></svg>
+          <span>Deliverables</span>
+        </div>
+        <div class="qcp-tab" data-tab="chats">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span>Chats</span>
+        </div>
+        <div class="qcp-kebab">
+          <svg viewBox="0 0 24 24" style="fill:#555;stroke:none"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+        </div>
+      </div>
+
+      <!-- ── Brief ── -->
+      <div class="qcp-view qcp-brief" data-view="brief" data-anchor="brief">
+        <div class="qcp-brief-inner">
+          <div class="qcp-updated"></div>
+          <h1 class="qcp-title"></h1>
+          <div class="qcp-meta">
+            <div class="qcp-meta-row">
+              <span class="qcp-meta-label">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                Date Range
+              </span>
+              <span class="qcp-date-chip"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span class="qcp-date-from"></span></span>
+              <span class="qcp-meta-to">to</span>
+              <span class="qcp-date-chip"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span class="qcp-date-to"></span></span>
+            </div>
+            <div class="qcp-meta-row">
+              <span class="qcp-meta-label">
+                <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Owner
+              </span>
+              <span class="qcp-owner">
+                <span class="qcp-owner-ava"></span>
+                <span class="qcp-owner-name"></span>
+              </span>
+              <svg class="qcp-owner-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div class="qcp-sections"></div>
+        </div>
+      </div>
+
+      <!-- ── Tasks ── -->
+      <div class="qcp-view qcp-tasks" data-view="tasks" data-anchor="tasks">
+        <div class="qcp-view-head">
+          <div class="qcp-view-title">
+            Tasks
+            <span class="qcp-completed-chip"><span class="qcp-ring"></span> Completed <span class="qcp-completed-count"></span></span>
+          </div>
+          <div class="qcp-view-actions">
+            <button class="qcp-btn"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filters</button>
+            <button class="qcp-btn"><svg viewBox="0 0 24 24"><path d="M3 6h13M3 12h9M3 18h5"/><path d="M19 8v10m0 0l-3-3m3 3l3-3"/></svg>Grouping</button>
+            <button class="qcp-btn qcp-btn-dark"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New</button>
+          </div>
+        </div>
+        <div class="qcp-group-row">
+          <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+          <span class="qcp-ring"></span>
+          <span class="qcp-group-label">To-do</span>
+          <span class="qcp-group-count"></span>
+        </div>
+        <div class="qcp-table">
+          <div class="qcp-thead qcp-task-grid">
+            <span>Task</span><span>Due date</span><span>Priority</span><span>Owner</span><span>Deliverable</span><span>Chat</span>
+          </div>
+          <div class="qcp-task-rows"></div>
+        </div>
+      </div>
+
+      <!-- ── Activation ── -->
+      <div class="qcp-view qcp-activation" data-view="activation" data-anchor="calendar">
+        <div class="qcp-cal">
+          <div class="qcp-cal-gutter"></div>
+          <div class="qcp-cal-days"></div>
+        </div>
+      </div>
+
+      <!-- ── Deliverables ── -->
+      <div class="qcp-view qcp-deliverables" data-view="deliverables" data-anchor="deliverables">
+        <div class="qcp-view-head">
+          <div class="qcp-view-title">Deliverables</div>
+          <div class="qcp-view-actions">
+            <span class="qcp-toggle">
+              <svg viewBox="0 0 24 24"><rect x="3" y="4" width="4" height="4" rx="1"/><path d="M10 6h11"/><rect x="3" y="14" width="4" height="4" rx="1"/><path d="M10 16h11"/></svg>
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            </span>
+            <button class="qcp-btn"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filters</button>
+          </div>
+        </div>
+        <div class="qcp-table">
+          <div class="qcp-thead qcp-del-grid">
+            <span>Type</span><span>Name</span><span>Status</span><span>Date</span><span>Tasks</span>
+          </div>
+          <div class="qcp-del-rows"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  .qcp {
+    width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #1a1a1a;
+    padding: 6px 4px;
+  }
+  .qcp svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .qcp-card {
+    width: 100%; height: 100%;
+    background: #fff;
+    border: 1px solid #e9e8e4;
+    border-radius: 14px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.05);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Tabs ── */
+  .qcp-tabs {
+    display: flex; align-items: center; gap: 4px;
+    padding: 0 18px;
+    height: 54px; min-height: 54px;
+    border-bottom: 1px solid #efeeea;
+  }
+  .qcp-tab {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 14px; height: 100%;
+    font-size: 14.5px; font-weight: 500; color: #8b8983;
+    border-bottom: 2px solid transparent;
+    cursor: pointer; position: relative; top: 1px;
+  }
+  .qcp-tab svg { width: 16px; height: 16px; }
+  .qcp-tab.active { color: #17171c; font-weight: 600; border-bottom-color: #17171c; }
+  .qcp-kebab {
+    margin-left: auto;
+    width: 36px; height: 36px;
+    border: 1px solid #e6e4df; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qcp-kebab svg { width: 15px; height: 15px; }
+
+  /* ── Views ── */
+  .qcp-view { flex: 1; min-height: 0; overflow-y: auto; display: none; }
+  .qcp-view.active { display: block; }
+  .qcp-view::-webkit-scrollbar { width: 6px; }
+  .qcp-view::-webkit-scrollbar-thumb { background: #dcdad4; border-radius: 3px; }
+
+  /* ── Brief ── */
+  .qcp-brief-inner { max-width: 760px; margin: 0 auto; padding: 30px 28px 40px; }
+  .qcp-updated { font-size: 13.5px; color: #9c9a94; margin-bottom: 16px; }
+  .qcp-title { font-size: 32px; font-weight: 700; margin: 0 0 22px; letter-spacing: -0.5px; }
+  .qcp-meta { display: flex; flex-direction: column; gap: 12px; margin-bottom: 34px; }
+  .qcp-meta-row { display: flex; align-items: center; gap: 12px; font-size: 14.5px; }
+  .qcp-meta-label { display: flex; align-items: center; gap: 9px; color: #8b8983; min-width: 130px; }
+  .qcp-meta-label svg { width: 16px; height: 16px; }
+  .qcp-date-chip { display: flex; align-items: center; gap: 7px; font-weight: 600; }
+  .qcp-date-chip svg { width: 15px; height: 15px; color: #55534e; }
+  .qcp-meta-to { color: #8b8983; }
+  .qcp-owner { display: flex; align-items: center; gap: 9px; font-weight: 600; }
+  .qcp-owner-ava {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: #d5e2f5; overflow: hidden; position: relative; display: inline-block;
+  }
+  .qcp-owner-ava img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .qcp-owner-chev { width: 15px; height: 15px; color: #8b8983; margin-left: 130px; }
+  .qcp-section-h { font-size: 20px; font-weight: 700; margin: 26px 0 12px; }
+  .qcp-section-p { font-size: 15px; line-height: 1.65; color: #33322f; margin: 0 0 12px; }
+  .qcp-section-p a, .qcp-section-p .qcp-link { color: #33322f; }
+  .qcp-section-ul { margin: 4px 0 12px; padding: 0; list-style: none; }
+  .qcp-section-ul li {
+    font-size: 15px; line-height: 1.65; color: #33322f;
+    padding-left: 22px; position: relative; margin-bottom: 6px;
+  }
+  .qcp-section-ul li::before {
+    content: ''; position: absolute; left: 6px; top: 0.62em;
+    width: 5px; height: 5px; border-radius: 50%; background: #b9b7b1;
+  }
+
+  /* ── Shared table bits ── */
+  .qcp-view-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px 14px;
+  }
+  .qcp-view-title { font-size: 21px; font-weight: 700; display: flex; align-items: center; gap: 14px; }
+  .qcp-completed-chip { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 500; color: #55534e; }
+  .qcp-completed-count { color: #9c9a94; }
+  .qcp-ring {
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 1.6px solid #c6c4be; display: inline-block; flex-shrink: 0;
+  }
+  .qcp-ring.dashed { border-style: dashed; }
+  .qcp-ring.done { background: #47934f; border-color: #47934f; position: relative; }
+  .qcp-ring.done::after {
+    content: ''; position: absolute; left: 3.5px; top: 5.5px;
+    width: 6px; height: 3px;
+    border-left: 1.6px solid #fff; border-bottom: 1.6px solid #fff;
+    transform: rotate(-45deg) translateY(-1px);
+  }
+  .qcp-view-actions { display: flex; align-items: center; gap: 9px; }
+  .qcp-btn {
+    display: flex; align-items: center; gap: 7px;
+    height: 36px; padding: 0 14px;
+    background: #fff; border: 1px solid #e6e4df; border-radius: 10px;
+    font-size: 13.5px; font-weight: 500; color: #33322f;
+    font-family: inherit; cursor: pointer;
+  }
+  .qcp-btn svg { width: 14px; height: 14px; }
+  .qcp-btn-dark { background: #17171c; border-color: #17171c; color: #fff; font-weight: 600; }
+  .qcp-toggle {
+    display: flex; align-items: center; gap: 4px;
+    border: 1px solid #e6e4df; border-radius: 10px; padding: 5px 7px;
+  }
+  .qcp-toggle svg { width: 15px; height: 15px; color: #55534e; }
+  .qcp-toggle svg:last-child { color: #b9b7b1; }
+  .qcp-group-row {
+    display: flex; align-items: center; gap: 9px;
+    padding: 4px 26px 10px;
+    font-size: 14.5px; font-weight: 600;
+  }
+  .qcp-group-row > svg { width: 14px; height: 14px; color: #55534e; }
+  .qcp-group-row .qcp-ring { border-style: dashed; }
+  .qcp-group-count { color: #9c9a94; font-weight: 500; }
+  .qcp-table { margin: 0 24px 24px; border: 1px solid #eceae6; border-radius: 12px; overflow: hidden; }
+  .qcp-thead {
+    display: grid; align-items: center;
+    padding: 10px 16px;
+    font-size: 12.5px; font-weight: 500; color: #9c9a94;
+    border-bottom: 1px solid #f0efeb;
+    gap: 10px;
+  }
+  .qcp-task-grid { grid-template-columns: 1fr 90px 80px 110px 150px 110px; }
+  .qcp-del-grid { grid-template-columns: 150px 1fr 130px 110px 1fr; }
+  .qcp-row {
+    display: grid; align-items: center; gap: 10px;
+    padding: 13px 16px;
+    font-size: 13.5px;
+    border-bottom: 1px solid #f4f3ef;
+  }
+  .qcp-row:last-child { border-bottom: none; }
+  .qcp-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .qcp-cell-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qcp-task-name { font-weight: 500; }
+  .qcp-cal-ico { width: 14px; height: 14px; color: #55534e; flex-shrink: 0; }
+  .qcp-pri { display: flex; align-items: end; gap: 1.5px; height: 12px; flex-shrink: 0; }
+  .qcp-pri i { width: 3px; background: #d64545; border-radius: 1px; display: block; }
+  .qcp-pri i:nth-child(1) { height: 5px; }
+  .qcp-pri i:nth-child(2) { height: 8px; }
+  .qcp-pri i:nth-child(3) { height: 11px; }
+  .qcp-pri.medium i { background: #e0a13d; }
+  .qcp-pri.medium i:nth-child(3) { opacity: 0.25; }
+  .qcp-pri.low i { background: #9c9a94; }
+  .qcp-pri.low i:nth-child(2), .qcp-pri.low i:nth-child(3) { opacity: 0.25; }
+  .qcp-mini-ava {
+    width: 21px; height: 21px; border-radius: 50%;
+    background: #d5e2f5; overflow: hidden; position: relative; flex-shrink: 0;
+  }
+  .qcp-mini-ava img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .qcp-plat {
+    width: 19px; height: 19px; border-radius: 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .qcp-plat svg { width: 12px; height: 12px; }
+  .qcp-plat.linkedin { background: #0A66C2; }
+  .qcp-plat.x { background: #000; }
+  .qcp-plat.email { background: transparent; }
+  .qcp-plat.email svg { width: 17px; height: 17px; color: #d48c34; }
+  .qcp-plat.blog { background: transparent; }
+  .qcp-plat.blog svg { width: 17px; height: 17px; color: #55534e; }
+  .qcp-chat-chip {
+    display: flex; align-items: center; gap: 7px;
+    border: 1px solid #e6e4df; border-radius: 9px;
+    padding: 6px 11px;
+    font-size: 12.5px; font-weight: 500; white-space: nowrap;
+  }
+  .qcp-chat-chip img { width: 16px; height: 16px; border-radius: 4px; }
+  .qcp-status { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; }
+  .qcp-status svg { width: 15px; height: 15px; }
+  .qcp-status.published, .qcp-status.launched { color: #47934f; }
+  .qcp-status.draft { color: #8b8983; }
+  .qcp-status.scheduled { color: #5b8fc2; }
+
+  /* ── Activation calendar ── */
+  .qcp-activation { overflow: hidden; }
+  .qcp-cal { display: flex; height: 100%; }
+  .qcp-cal-gutter {
+    width: 62px; flex-shrink: 0;
+    border-right: 1px solid #f0efeb;
+    position: relative;
+  }
+  .qcp-cal-hour {
+    position: absolute; right: 10px;
+    font-size: 12px; color: #9c9a94;
+    transform: translateY(-50%);
+  }
+  .qcp-cal-days { flex: 1; display: flex; position: relative; }
+  .qcp-cal-day { flex: 1; border-right: 1px solid #f0efeb; position: relative; }
+  .qcp-cal-day:last-child { border-right: none; }
+  .qcp-cal-line { position: absolute; left: 0; right: 0; height: 1px; background: #f0efeb; }
+  .qcp-ev {
+    position: absolute; left: 5%; width: 90%;
+    background: #fff;
+    border: 1px solid #eceae6; border-radius: 11px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+    padding: 10px 12px;
+    z-index: 2;
+  }
+  .qcp-ev-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+  .qcp-ev-kind { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #8b8983; font-weight: 500; }
+  .qcp-ev-title { font-size: 13px; font-weight: 600; line-height: 1.35; margin-bottom: 3px; }
+  .qcp-ev-time { font-size: 11.5px; color: #9c9a94; margin-bottom: 8px; }
+  .qcp-ev-foot { display: flex; align-items: center; justify-content: space-between; }
+  .qcp-ev .qcp-mini-ava { width: 19px; height: 19px; }
+  .qcp-rocket { color: #47934f; }
+
+  /* ── Deliverables rows ── */
+  .qcp-del-name { font-weight: 600; line-height: 1.35; }
+  .qcp-type-label { font-size: 13px; font-weight: 500; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.qcp-card');
+
+    var IN_PATH = '<path style="fill:#fff;stroke:none" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>';
+    var X_PATH = '<path style="fill:#fff;stroke:none" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>';
+    function platEl(p) {
+      if (p === 'linkedin') return '<span class="qcp-plat linkedin"><svg viewBox="0 0 24 24">' + IN_PATH + '</svg></span>';
+      if (p === 'x') return '<span class="qcp-plat x"><svg viewBox="0 0 24 24">' + X_PATH + '</svg></span>';
+      if (p === 'email') return '<span class="qcp-plat email"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span>';
+      if (p === 'blog') return '<span class="qcp-plat blog"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V3H6.5A2.5 2.5 0 004 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 006.5 22H20v-5"/></svg></span>';
+      return '';
+    }
+    var ROCKET = '<svg class="qcp-rocket" viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 00-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 012-3.95A12.88 12.88 0 0122 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 01-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>';
+    var DASHED = '<span class="qcp-ring dashed"></span>';
+    var CAL_ICO = '<svg class="qcp-cal-ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
+    var esc = function(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+    function statusEl(st) {
+      var cls = String(st || 'draft').toLowerCase();
+      var label = cls.charAt(0).toUpperCase() + cls.slice(1);
+      var icon = (cls === 'published' || cls === 'launched') ? ROCKET : DASHED;
+      return '<span class="qcp-status ' + cls + '">' + icon + ' ' + esc(label) + '</span>';
+    }
+    function avaEl(url, cls) {
+      return '<span class="' + (cls || 'qcp-mini-ava') + '">' + (url ? '<img src="' + esc(url) + '" onerror="this.remove()"/>' : '') + '</span>';
+    }
+
+    // ── Data ──
+    var AVA = { marc: 'https://i.pravatar.cc/96?img=12', max: 'https://i.pravatar.cc/96?img=68' };
+    var QUOTIENT_ICON = 'https://img.logo.dev/getquotient.ai?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=64&fallback=monogram';
+    var title = data.title || 'Founding Marketer Hiring Push';
+    var updated = data.updated || 'Last updated: 6 days ago';
+    var dateFrom = data.date_from || 'Jul 05, 2026';
+    var dateTo = data.date_to || 'Jul 19, 2026';
+    var owner = data.owner || { name: 'Max Davish', avatar_url: AVA.max };
+    var activeTab = data.active_tab || 'brief';
+    var sections = data.brief_sections || [
+      { heading: 'Campaign Details and Goals', paragraphs: [
+        "A social media micro-campaign to promote Quotient's open Founding Marketer role across all personal and company accounts. Goal is to drive qualified applicants to the job description page and generate awareness within the marketing, startup, and AI communities in New York.",
+        'Job Description: https://www.getquotient.ai/careers/founding-marketer'
+      ]},
+      { heading: 'Accounts', bullets: ['Max Davish — LinkedIn + X', 'Marc Ferrentino — LinkedIn + X', 'Quotient Company — LinkedIn + X'] },
+      { heading: 'Messaging Themes', paragraphs: [
+        "The central tension: Quotient has been using its own AI platform to run all of its marketing, but AI has a ceiling. It can't build relationships, own strategy, or represent the brand in a room. This is the human hire that takes it the rest of the way."
+      ]}
+    ];
+    var tasks = data.tasks || [
+      { text: 'Write LinkedIn post for Marc: Founding Marketer', due: 'Jul 5', priority: 'high', owner: 'Marc F...', avatar_url: AVA.marc, platform: 'linkedin', deliverable: 'Marc LinkedI...' },
+      { text: 'Write X post for Quotient: Founding Marketer', due: 'Jul 5', priority: 'high', owner: 'Max D...', avatar_url: AVA.max, platform: 'x', deliverable: 'Quotient X: F...' },
+      { text: 'Write X post for Marc: Founding Marketer', due: 'Jul 5', priority: 'high', owner: 'Marc F...', avatar_url: AVA.marc, platform: 'x', deliverable: 'Marc X: Fou...' },
+      { text: 'Write X post for Max: Founding Marketer', due: 'Jul 5', priority: 'high', owner: 'Max D...', avatar_url: AVA.max, platform: 'x', deliverable: 'Max X: Foun...' },
+      { text: 'Write LinkedIn post for Quotient: Founding Marketer', due: 'Jul 5', priority: 'high', owner: 'Max D...', avatar_url: AVA.max, platform: 'linkedin', deliverable: 'Quotient Lin...' },
+      { text: 'Write LinkedIn post for Max: Founding Marketer', due: 'Jul 5', priority: 'high', owner: 'Max D...', avatar_url: AVA.max, platform: 'linkedin', deliverable: 'Max LinkedI...' }
+    ];
+    var calendar = data.calendar || {
+      hours: [{ label: '6 AM', pct: 12 }, { label: '9 AM', pct: 34 }, { label: '12 PM', pct: 62 }, { label: '3 PM', pct: 88 }],
+      days: 5,
+      events: [
+        { day: 1, top: 30, type: 'Social Post', platform: 'linkedin', title: 'Max LinkedIn: Founding Marketer', time: '9:00 AM', status: 'published', avatar_url: AVA.max },
+        { day: 1, top: 56, type: 'Social Post', platform: 'x', title: 'Max X: Founding Marketer', time: '9:00 AM', status: 'published', avatar_url: AVA.max },
+        { day: 2, top: 30, type: 'Social Post', platform: 'linkedin', title: 'Quotient LinkedIn: Founding Marketer', time: '9:00 AM', status: 'published', avatar_url: AVA.max },
+        { day: 3, top: 30, type: 'Social Post', platform: 'linkedin', title: 'Marc LinkedIn - Marketing Busywork...', time: '9:00 AM', status: 'draft', avatar_url: AVA.marc },
+        { day: 0, top: 66, type: 'Social Post', platform: 'linkedin', title: 'Quotient LinkedIn: Analyze Your...', time: '10:00 AM', status: 'draft', avatar_url: AVA.max },
+        { day: 3, top: 66, type: 'Email Broadcast', platform: 'email', title: 'Quotient Changelog: July 2, 2026', time: '10:00 AM', status: 'launched', avatar_url: AVA.max }
+      ]
+    };
+    var deliverables = data.deliverables || [
+      { platform: 'linkedin', kind: 'Social Post', name: 'Max LinkedIn: Founding Marketer', status: 'published', date: 'Jul 7, 2026', task: 'Write LinkedIn post ...' },
+      { platform: 'linkedin', kind: 'Social Post', name: 'Marc LinkedIn: Founding Marketer', status: 'published', date: 'Jul 7, 2026', task: 'Write LinkedIn post ...' },
+      { platform: 'linkedin', kind: 'Social Post', name: 'Quotient LinkedIn: Founding Marketer', status: 'published', date: 'Jul 8, 2026', task: 'Write LinkedIn post ...' },
+      { platform: 'x', kind: 'Social Post', name: 'Max X: Founding Marketer', status: 'published', date: 'Jul 7, 2026', task: 'Write X post for Ma...' },
+      { platform: 'x', kind: 'Social Post', name: 'Marc X: Founding Marketer', status: 'published', date: 'Jul 7, 2026', task: 'Write X post for Ma...' },
+      { platform: 'x', kind: 'Social Post', name: 'Quotient X: Founding Marketer', status: 'draft', date: 'Jul 8, 2026', task: 'Write X post for Qu...' }
+    ];
+
+    // ── Populate brief ──
+    el.querySelector('.qcp-updated').textContent = updated;
+    el.querySelector('.qcp-title').textContent = title;
+    el.querySelector('.qcp-date-from').textContent = dateFrom;
+    el.querySelector('.qcp-date-to').textContent = dateTo;
+    el.querySelector('.qcp-owner-name').textContent = owner.name || '';
+    el.querySelector('.qcp-owner-ava').innerHTML = owner.avatar_url ? '<img src="' + esc(owner.avatar_url) + '" onerror="this.remove()"/>' : '';
+    var secWrap = el.querySelector('.qcp-sections');
+    sections.forEach(function(s) {
+      if (s.heading) {
+        var h = document.createElement('h2');
+        h.className = 'qcp-section-h';
+        h.textContent = s.heading;
+        secWrap.appendChild(h);
+      }
+      (s.paragraphs || []).forEach(function(p) {
+        var pe = document.createElement('p');
+        pe.className = 'qcp-section-p';
+        pe.textContent = p;
+        secWrap.appendChild(pe);
+      });
+      if (s.bullets && s.bullets.length) {
+        var ul = document.createElement('ul');
+        ul.className = 'qcp-section-ul';
+        s.bullets.forEach(function(b) {
+          var li = document.createElement('li');
+          li.textContent = b;
+          ul.appendChild(li);
+        });
+        secWrap.appendChild(ul);
+      }
+    });
+
+    // ── Populate tasks ──
+    var doneCount = tasks.filter(function(t) { return t.done; }).length;
+    function refreshCounts() {
+      el.querySelector('.qcp-completed-count').textContent = doneCount + '/' + tasks.length;
+      el.querySelector('.qcp-group-count').textContent = String(tasks.length - doneCount);
+    }
+    refreshCounts();
+    var taskRows = el.querySelector('.qcp-task-rows');
+    tasks.forEach(function(t) {
+      var row = document.createElement('div');
+      row.className = 'qcp-row qcp-task-grid';
+      var pri = (t.priority || 'high').toLowerCase();
+      row.innerHTML =
+        '<span class="qcp-cell"><span class="qcp-ring ' + (t.done ? 'done' : 'dashed') + '"></span><span class="qcp-cell-txt qcp-task-name">' + esc(t.text) + '</span></span>' +
+        '<span class="qcp-cell">' + CAL_ICO + '<span>' + esc(t.due || '') + '</span></span>' +
+        '<span class="qcp-cell"><span class="qcp-pri ' + pri + '"><i></i><i></i><i></i></span><span>' + esc(pri.charAt(0).toUpperCase() + pri.slice(1)) + '</span></span>' +
+        '<span class="qcp-cell">' + avaEl(t.avatar_url) + '<span class="qcp-cell-txt">' + esc(t.owner || '') + '</span></span>' +
+        '<span class="qcp-cell">' + platEl(t.platform) + '<span class="qcp-cell-txt">' + esc(t.deliverable || '') + '</span></span>' +
+        '<span class="qcp-cell"><span class="qcp-chat-chip"><img src="' + QUOTIENT_ICON + '" onerror="this.remove()"/>Get Started</span></span>';
+      taskRows.appendChild(row);
+    });
+
+    // ── Populate calendar ──
+    var gutter = el.querySelector('.qcp-cal-gutter');
+    (calendar.hours || []).forEach(function(h) {
+      var s = document.createElement('span');
+      s.className = 'qcp-cal-hour';
+      s.style.top = h.pct + '%';
+      s.textContent = h.label;
+      gutter.appendChild(s);
+    });
+    var daysWrap = el.querySelector('.qcp-cal-days');
+    var nDays = calendar.days || 5;
+    for (var d = 0; d < nDays; d++) {
+      var col = document.createElement('div');
+      col.className = 'qcp-cal-day';
+      daysWrap.appendChild(col);
+    }
+    (calendar.hours || []).forEach(function(h) {
+      var line = document.createElement('div');
+      line.className = 'qcp-cal-line';
+      line.style.top = h.pct + '%';
+      daysWrap.appendChild(line);
+    });
+    var evEls = [];
+    (calendar.events || []).forEach(function(ev) {
+      var day = Math.min(nDays - 1, ev.day || 0);
+      var node = document.createElement('div');
+      node.className = 'qcp-ev';
+      node.style.left = (day * (100 / nDays) + 0.6) + '%';
+      node.style.width = (100 / nDays - 1.2) + '%';
+      node.style.top = (ev.top || 30) + '%';
+      node.innerHTML =
+        '<div class="qcp-ev-head"><span class="qcp-ev-kind">' + platEl(ev.platform) + esc(ev.type || 'Social Post') + '</span>' + avaEl(ev.avatar_url) + '</div>' +
+        '<div class="qcp-ev-title">' + esc(ev.title || '') + '</div>' +
+        '<div class="qcp-ev-time">' + esc(ev.time || '') + '</div>' +
+        '<div class="qcp-ev-foot">' + statusEl(ev.status) + platEl(ev.platform) + '</div>';
+      daysWrap.appendChild(node);
+      evEls.push(node);
+    });
+
+    // ── Populate deliverables ──
+    var delRows = el.querySelector('.qcp-del-rows');
+    var delEls = [];
+    deliverables.forEach(function(dv) {
+      var row = document.createElement('div');
+      row.className = 'qcp-row qcp-del-grid';
+      row.innerHTML =
+        '<span class="qcp-cell">' + platEl(dv.platform) + '<span class="qcp-type-label">' + esc(dv.kind || 'Social Post') + '</span></span>' +
+        '<span class="qcp-cell"><span class="qcp-del-name">' + esc(dv.name || '') + '</span></span>' +
+        '<span class="qcp-cell qcp-del-status">' + statusEl(dv.status) + '</span>' +
+        '<span class="qcp-cell">' + CAL_ICO + '<span>' + esc(dv.date || '') + '</span></span>' +
+        '<span class="qcp-cell">' + DASHED + '<span class="qcp-cell-txt">' + esc(dv.task || '') + '</span></span>';
+      delRows.appendChild(row);
+      delEls.push(row);
+    });
+
+    // ── Tab switching ──
+    var tabs = el.querySelectorAll('.qcp-tab');
+    var views = el.querySelectorAll('.qcp-view');
+    function setTab(name) {
+      tabs.forEach(function(t) { t.classList.toggle('active', t.dataset.tab === name); });
+      views.forEach(function(v) {
+        var on = v.dataset.view === name;
+        v.classList.toggle('active', on);
+        if (on) gsap.fromTo(v, { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.28, ease: 'power2.out' });
+      });
+    }
+    setTab(activeTab);
+
+    // ── Entrance ──
+    gsap.set(card, { autoAlpha: 0, y: 16 });
+    tl.to(card, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 0.1);
+
+    // ── Script ──
+    if (data.script && data.script.length > 0) {
+      var cursorTargets = data.cursor_targets || {
+        'tabs': { x: '30%', y: '8%' },
+        'table': { x: '50%', y: '45%' }
+      };
+
+      runScript(tl, el, data.script, cursorTargets, ctx, {
+        'switch-tab': function(tl, ctr, action, at) {
+          var tab = el.querySelector('.qcp-tab[data-tab="' + action.tab + '"]');
+          if (tab) {
+            tl.to(tab, { scale: 0.95, duration: 0.09, ease: 'power2.in' }, at);
+            tl.to(tab, { scale: 1, duration: 0.12, ease: 'power2.out' }, at + 0.09);
+          }
+          tl.call(function() { setTab(action.tab); }, null, at + 0.16);
+        },
+        'complete-task': function(tl, ctr, action, at) {
+          var idx = action.index || 0;
+          tl.call(function() {
+            var row = taskRows.children[idx];
+            if (!row) return;
+            var ring = row.querySelector('.qcp-ring');
+            ring.classList.remove('dashed');
+            ring.classList.add('done');
+            gsap.fromTo(ring, { scale: 0.6 }, { scale: 1, duration: 0.3, ease: 'back.out(2.5)' });
+            doneCount++;
+            refreshCounts();
+          }, null, at);
+        },
+        'move-event': function(tl, ctr, action, at) {
+          var idx = action.index || 0;
+          var node = evEls[idx];
+          if (!node) return;
+          var toDay = Math.min(nDays - 1, action.day !== undefined ? action.day : 0);
+          var toTop = action.top;
+          tl.call(function() {
+            gsap.to(node, { scale: 1.04, boxShadow: '0 10px 28px rgba(0,0,0,0.16)', zIndex: 9, duration: 0.18, ease: 'power2.out' });
+            var target = { left: (toDay * (100 / nDays) + 0.6) + '%', duration: 0.65, ease: 'power2.inOut', delay: 0.2 };
+            if (toTop !== undefined) target.top = toTop + '%';
+            gsap.to(node, target);
+            gsap.to(node, { scale: 1, boxShadow: '0 1px 6px rgba(0,0,0,0.05)', duration: 0.25, ease: 'power2.out', delay: 0.9 });
+          }, null, at);
+        },
+        'set-event-status': function(tl, ctr, action, at) {
+          var idx = action.index || 0;
+          tl.call(function() {
+            var node = evEls[idx];
+            if (!node) return;
+            var stEl = node.querySelector('.qcp-status');
+            if (stEl) stEl.outerHTML = statusEl(action.status || 'published');
+            gsap.fromTo(node, { scale: 1 }, { scale: 1.03, duration: 0.2, yoyo: true, repeat: 1, ease: 'power2.out' });
+          }, null, at);
+        },
+        'set-deliverable-status': function(tl, ctr, action, at) {
+          var idx = action.index || 0;
+          tl.call(function() {
+            var row = delEls[idx];
+            if (!row) return;
+            var cell = row.querySelector('.qcp-del-status');
+            cell.innerHTML = statusEl(action.status || 'published');
+            gsap.fromTo(cell, { scale: 0.9 }, { scale: 1, duration: 0.3, ease: 'back.out(2)' });
+          }, null, at);
+        },
+        'scroll-view': function(tl, ctr, action, at) {
+          var view = el.querySelector('.qcp-view.active');
+          if (!view) return;
+          tl.to(view, { scrollTop: '+=' + (action.amount || 300), duration: action.duration || 1.6, ease: 'power1.inOut' }, at);
+        }
+      });
+    }
+
+    return tl;
+  }
+</script>
