@@ -1,173 +1,76 @@
 {
   "type": "quotient-social",
-  "label": "Quotient Social Post",
+  "label": "Quotient Social — post editor",
   "category": "mockups",
-  "description": "Quotient social post editor/preview showing a LinkedIn-style published post with author info, rich text content, embedded media card, engagement actions, and status bar. Supports animated entrance and optional scripted interactions.",
+  "description": "The Quotient social post editor (built from actual screenshots): white toolbar with the platform badge (X black tile or LinkedIn blue) + post title, kebab/share buttons, the orange flag campaign-tag pill with progress ring, 'Go to thread ↗', and the BLACK Schedule split-button with a Publish Now / Schedule for later dropdown (published posts show 'View ↗' instead); below it the dotted-grid canvas with the post card -- GREEN '✓ Post published on {date}' bar (or gray '✎ Draft') with the char counter ('652/25,000'), the author row (X: brand avatar + X corner badge + blue verified check + @handle; LinkedIn: photo + in corner badge + in name badge), the body text, and up to two side-by-side media cards (image, gradient headline placeholder, or file stack). SCRIPTED performable surface. Camera anchors: post, status, media, toolbar.",
   "data": {
-    "post_title": {
+    "platform": {
       "type": "string",
-      "label": "Post Title (top bar)",
+      "label": "'x' or 'linkedin' (default linkedin) -- switches badges, author treatment, and char limit default",
       "optional": true,
-      "default": "June 2 Changelog - Max LinkedIn",
-      "placeholder": "June 2 Changelog - Max LinkedIn"
+      "enum": ["x", "linkedin"]
     },
     "status": {
       "type": "string",
-      "label": "Post Status",
+      "label": "Post status (default draft). Published shows the green bar + View button; draft shows the gray ✎ bar + black Schedule button.",
       "optional": true,
-      "default": "published",
       "enum": ["published", "draft", "scheduled"]
     },
-    "published_date": {
-      "type": "string",
-      "label": "Published Date",
-      "optional": true,
-      "default": "Jun 2, 2026 at 4:06 PM",
-      "placeholder": "Jun 2, 2026 at 4:06 PM"
+    "post_title": { "type": "string", "label": "Toolbar title (e.g. 'July 9 Changelog — Quotient X')", "optional": true },
+    "published_date": { "type": "string", "label": "Date in the published/scheduled bar (e.g. 'Jul 9, 2026 at 10:01 AM')", "optional": true },
+    "author_name": { "type": "string", "label": "Author display name (default: 'Quotient AI' on X, 'Marc Ferrentino' on LinkedIn)", "optional": true },
+    "author_handle": { "type": "string", "label": "X handle under the name (default '@Quotient_AI_' on X; hidden on LinkedIn)", "optional": true },
+    "author_avatar_url": { "type": "string", "label": "Avatar image URL (default: Quotient logo via logo.dev on X, photo on LinkedIn)", "optional": true },
+    "author_initials": { "type": "string", "label": "Fallback initials if the avatar image fails", "optional": true },
+    "verified": { "type": "boolean", "label": "Blue verified check beside the name (default true on X)", "optional": true },
+    "post_text": { "type": "string", "label": "Post body (\\n\\n = paragraph break)", "optional": true },
+    "char_count": { "type": "number", "label": "Char counter numerator (default: post length)", "optional": true },
+    "char_limit": { "type": "number", "label": "Char counter denominator (default 25000 on X, 3000 on LinkedIn)", "optional": true },
+    "media": {
+      "type": "array",
+      "label": "Up to 2 side-by-side media cards: [{image_url} | {headline, subtext?} (gradient placeholder) | {kind: 'files', files: ['PDF','DOC'], label}]",
+      "optional": true
     },
-    "author_name": {
-      "type": "string",
-      "label": "Author Name",
-      "optional": true,
-      "default": "Max Davish",
-      "placeholder": "Max Davish"
+    "tag_name": { "type": "string", "label": "Campaign tag pill text (default 'Quotient Changelog')", "optional": true },
+    "tag_progress": { "type": "string", "label": "Tag progress fraction shown in the pill + ring (default '0/1')", "optional": true },
+    "show_app_bar": { "type": "boolean", "label": "Show the app chrome bar above the toolbar (bell, Search ⌘+K, New Chat)", "optional": true },
+    "embed_image_url": { "type": "string", "label": "LEGACY: single media card image (prefer `media`)", "optional": true },
+    "embed_headline": { "type": "string", "label": "LEGACY: single gradient card headline (prefer `media`)", "optional": true },
+    "embed_subtext": { "type": "string", "label": "LEGACY: gradient card subtext (prefer `media`)", "optional": true },
+    "script": {
+      "type": "array",
+      "label": "Actions: scroll-post {amount, duration}, highlight-status, highlight-media, open-schedule-menu (the black button's Publish Now / Schedule for later dropdown drops down), close-schedule-menu, publish-post {published_date?} (Publish Now row flashes, menu closes, the bar flips GREEN '✓ Post published on …' and Schedule becomes View -- THE money beat), schedule-post {scheduled_date}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (post, status, media, toolbar).",
+      "optional": true
     },
-    "author_avatar_url": {
-      "type": "string",
-      "label": "Author Avatar URL",
-      "optional": true,
-      "default": "",
-      "placeholder": "https://example.com/avatar.jpg"
-    },
-    "author_initials": {
-      "type": "string",
-      "label": "Author Initials (fallback)",
-      "optional": true,
-      "default": "MD",
-      "placeholder": "MD"
-    },
-    "post_text": {
-      "type": "string",
-      "label": "Post Body Text (use \\n\\n for paragraph breaks)",
-      "optional": true,
-      "default": "This week's running story has been about companies blowing past their AI budgets with insane token bills. I heard one about a guy who accidentally racked up a $500k Claude bill.\n\nI have no idea if that's true — it probably isn't — and I think most of these stories are totally overblown. At Quotient, we're some of the most hardcore AI users on the planet and we rarely spend more than a few thousand bucks per person on tokens each month.\n\nThat said, I was a little surprised when I saw a $2,000 Quotient bill last month. Yes, we pay for our own software. It's called eating your own dogfood. Maybe you've heard of it. And apparently we were using it a LOT, because we blew straight through our plan's token allotment.\n\nNot exactly a $500k nightmare. But still — a surprise.\n\nSo we immediately shipped spending caps and usage notifications, so our customers never have surprise bills.\n\nThese kinds of controls are going to be crucial now that software is evolving past the seat-based model. Every company is going to spend more and more on tokens in the future, and I think that's money well spent. We just need to make sure the controls are in place — so nobody ends up like the guy who almost bankrupted his company with a Claude bill."
-    },
-    "char_count": {
-      "type": "number",
-      "label": "Character Count",
-      "optional": true,
-      "default": 1243
-    },
-    "char_limit": {
-      "type": "number",
-      "label": "Character Limit",
-      "optional": true,
-      "default": 3000
-    },
-    "embed_image_url": {
-      "type": "string",
-      "label": "Embed Image URL (replaces gradient+UI card)",
-      "optional": true,
-      "default": "",
-      "placeholder": "https://example.com/image.png"
-    },
-    "embed_headline": {
-      "type": "string",
-      "label": "Embed Card Headline",
-      "optional": true,
-      "default": "Spending Caps",
-      "placeholder": "Spending Caps"
-    },
-    "embed_subtext": {
-      "type": "string",
-      "label": "Embed Card Description",
-      "optional": true,
-      "default": "Set a custom spending cap for your organization and receive notifications as you approach your plan's limits."
-    },
-    "embed_ui_card": {
-      "type": "object",
-      "label": "Embed UI Card (product mockup overlay)",
-      "optional": true,
-      "properties": {
-        "title": { "type": "string", "label": "Card Title", "default": "Spending Cap" },
-        "subtitle": { "type": "string", "label": "Card Subtitle", "default": "Choose how overage on the Pro plan is handled once included usage is exhausted." },
-        "options": {
-          "type": "array",
-          "label": "Radio Options",
-          "items": {
-            "type": "object",
-            "properties": {
-              "label": { "type": "string" },
-              "description": { "type": "string" },
-              "selected": { "type": "boolean" },
-              "input_prefix": { "type": "string", "optional": true },
-              "input_value": { "type": "string", "optional": true },
-              "input_suffix": { "type": "string", "optional": true }
-            }
-          }
-        }
-      }
-    },
-    "author_url": {
-      "type": "string",
-      "label": "Author Profile/Article URL",
-      "optional": true,
-      "default": "https://www.getquotient.ai/blog/quotient-changelog-june-2-2026"
-    },
-    "tag_name": {
-      "type": "string",
-      "label": "Tag/Campaign Name",
-      "optional": true,
-      "default": "Quotient Changelog",
-      "placeholder": "Quotient Changelog"
-    },
-    "tag_progress": {
-      "type": "string",
-      "label": "Tag Progress (e.g. 0/1)",
-      "optional": true,
-      "default": "0/1"
-    },
-    "thread_count": {
-      "type": "number",
-      "label": "Thread Count",
-      "optional": true,
-      "default": 2
-    }
+    "cursor_targets": { "type": "object", "label": "Named cursor positions (status, schedule, media)", "optional": true }
   },
   "script_actions": [
     {
       "action": "scroll-post",
-      "description": "Smoothly scroll the post content area down",
-      "params": {
-        "amount": "number - Pixels to scroll (default 300)",
-        "duration": "number - Scroll duration in seconds (default 2)"
-      }
+      "description": "Smoothly scroll the post card content down",
+      "params": { "amount": "number - pixels (default 300)", "duration": "number - seconds (default 2)" }
     },
+    { "action": "highlight-status", "description": "Pulse a glow on the status bar" },
+    { "action": "highlight-media", "description": "Gently scale-pulse the media cards" },
+    { "action": "highlight-embed", "description": "LEGACY alias of highlight-media" },
+    { "action": "show-reactions", "description": "LEGACY: subtle card pulse" },
+    { "action": "open-schedule-menu", "description": "Press the black Schedule button; the Publish Now / Schedule for later dropdown opens beneath it" },
+    { "action": "close-schedule-menu", "description": "Dismiss the dropdown" },
     {
-      "action": "highlight-status",
-      "description": "Pulse the status bar to draw attention"
-    },
-    {
-      "action": "highlight-embed",
-      "description": "Pulse the embedded media card"
-    },
-    {
-      "action": "show-reactions",
-      "description": "Animate the engagement buttons appearing"
+      "action": "publish-post",
+      "description": "The publish beat: the Publish Now row flashes, the menu closes, the status bar flips to the green '✓ Post published on {date}' treatment and the Schedule button becomes View ↗",
+      "params": { "published_date": "string - date text for the green bar" }
     },
     {
       "action": "schedule-post",
-      "description": "Animate clicking Schedule and transitioning status from draft to scheduled",
-      "params": {
-        "scheduled_date": "string - Date text for the scheduled status (default 'Jun 12, 2026 at 10:00 AM')"
-      }
+      "description": "Flip the status bar to the blue 'Scheduled for {date}' treatment",
+      "params": { "scheduled_date": "string - date text (default 'Jul 15, 2026 at 10:00 AM')" }
     }
   ],
   "default_cursor_targets": {
-    "status-bar": { "x": "50%", "y": "8%" },
-    "post-body": { "x": "50%", "y": "50%" },
-    "embed-card": { "x": "50%", "y": "75%" },
-    "like-btn": { "x": "20%", "y": "88%" },
-    "view-btn": { "x": "92%", "y": "3%" }
-  }
+    "status": { "x": "50%", "y": "18%" },
+    "schedule": { "x": "88%", "y": "9%" },
+    "media": { "x": "50%", "y": "70%" }
+  },
+  "tier": "performable-surface"
 }
