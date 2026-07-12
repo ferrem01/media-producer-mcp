@@ -1220,11 +1220,53 @@
       threadReplyEls.push(msg);
       replyCountNum = threadReplyEls.length;
       threadReplyCount.textContent = replyCountNum + ' repl' + (replyCountNum === 1 ? 'y' : 'ies');
+      syncReplyIndicator(msg);
       if (animate) {
         gsap.from(el, { autoAlpha: 0, y: 12, duration: 0.35, ease: 'power2.out' });
       }
       scrollThreadToBottom();
       return el;
+    }
+
+    // Keep the CHANNEL message's reply indicator in lockstep with the live
+    // thread: same count as the panel divider, "last reply just now", and the
+    // replier's avatar joins the stack. The seeded (static) stack is reset on
+    // the first live reply so both surfaces tell one story.
+    var riSynced = false;
+    function syncReplyIndicator(msg) {
+      if (threadParentIdx < 0) return;
+      var parentEl = messageEls[threadParentIdx];
+      if (!parentEl) return;
+      var ri = parentEl.querySelector('.reply-indicator');
+      if (!ri) {
+        ri = document.createElement('div');
+        ri.className = 'reply-indicator';
+        ri.innerHTML = '<div class="reply-avatars"></div>' +
+          '<span class="reply-text"></span><span class="reply-time"></span>';
+        parentEl.appendChild(ri);
+      }
+      var stack = ri.querySelector('.reply-avatars');
+      if (!riSynced && stack) { stack.innerHTML = ''; riSynced = true; }
+      var txt = ri.querySelector('.reply-text');
+      if (txt) txt.textContent = replyCountNum + ' repl' + (replyCountNum === 1 ? 'y' : 'ies');
+      var tm = ri.querySelector('.reply-time');
+      if (tm) tm.textContent = 'Last reply just now';
+      if (stack && msg) {
+        var rn = String(msg.name || '?');
+        var seen = false;
+        for (var si = 0; si < stack.children.length; si++) {
+          if (stack.children[si].getAttribute('data-rn') === rn) { seen = true; break; }
+        }
+        if (!seen && stack.children.length < 5) {
+          var d = document.createElement('div');
+          d.className = 'reply-avatar';
+          d.setAttribute('data-rn', rn);
+          d.style.cssText = avatarCss(msg.avatar_url, msg.avatar_color);
+          d.textContent = msg.initials || rn.charAt(0);
+          if (msg.avatar_url) d.insertAdjacentHTML('beforeend', avaImg(msg.avatar_url));
+          stack.appendChild(d);
+        }
+      }
     }
 
     // ── Add reaction to a message ──
@@ -1513,6 +1555,7 @@
             threadParentIdx = idx;
             threadReplyEls = [];
             replyCountNum = 0;
+            riSynced = false;
             threadReplies.innerHTML = '';
             renderThreadParent(idx);
             threadDivider.style.display = 'none';
