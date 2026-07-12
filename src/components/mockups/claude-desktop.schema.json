@@ -1,17 +1,12 @@
 {
   "type": "claude-desktop",
-  "label": "Claude Code Desktop (parallel sessions)",
+  "label": "Claude Desktop — Code tab",
   "category": "mockups",
-  "description": "The Claude Code desktop app: a sessions sidebar with SEVERAL parallel sessions (status dots + badges: working / needs input / done) beside a live session pane with the full Claude Code performance (prompts, tool calls, diffs, working spinner with live counters, streaming responses). THE FLEET STORY: agents running in parallel while you steer one -- use switch-session and session-status to play it out. SCRIPTED performable surface; camera anchors: sessions, transcript, input.",
+  "description": "The REAL Claude desktop app, Code tab (built from actual screenshots): light bone theme, white sidebar with the Home/Code toggle, '+ New session', numbered Recents list (active highlighted, optional live status dots), 'Relaunch to update' card and account row; main pane with session title + repo chip, claude.ai-style conversation (user bubbles right, Claude prose left, tool cards with green/red diffs, the lone orange ✳ working spinner), and the 'Type / for commands' composer with the Auto pill and model label. SCRIPTED performable surface -- the fleet story: switch-session / session-status while a live session performs. Camera anchors: sessions, transcript, input.",
   "data": {
-    "app_title": {
-      "type": "string",
-      "label": "Window title (default 'Claude Code')",
-      "optional": true
-    },
     "sessions": {
       "type": "array",
-      "label": "Sidebar sessions: [{project: 'acme-api', title: 'Fix flaky auth tests', status: 'working'|'input'|'done'|'idle'}]. Defaults to a believable 3-session fleet.",
+      "label": "Sidebar Recents: [{title, repo?, status?: 'working'|'input'|'done'}]. Status renders a small live dot on the row (orange/amber/green); omit for plain rows like the real app at rest.",
       "optional": true
     },
     "active_session": {
@@ -19,51 +14,38 @@
       "label": "Index of the highlighted session (default 0)",
       "optional": true
     },
+    "repo": {
+      "type": "string",
+      "label": "Repo chip beside the pane title (e.g. 'media-producer-mcp'); per-session via sessions[].repo",
+      "optional": true
+    },
     "history": {
       "type": "array",
-      "label": "Transcript blocks for the active pane at open: [{type: 'user'|'text'|'tool', ...}]",
+      "label": "Transcript blocks at open: [{type: 'user'|'text'|'tool', ...}] -- tool takes {tool, target, result, diff}",
       "optional": true
     },
-    "model_label": {
-      "type": "string",
-      "label": "Right side of the hint row",
-      "optional": true
-    },
-    "placeholder": {
-      "type": "string",
-      "label": "Input placeholder",
-      "optional": true
-    },
+    "model_label": { "type": "string", "label": "Model name right of the composer (default 'Fable 5')", "optional": true },
+    "effort_label": { "type": "string", "label": "Effort label beside the model (default 'Extra')", "optional": true },
+    "account_name": { "type": "string", "label": "Account row name (default 'Marc')", "optional": true },
+    "placeholder": { "type": "string", "label": "Composer placeholder (default 'Type / for commands')", "optional": true },
     "script": {
       "type": "array",
-      "label": "The full performance: all claude-code-session actions (type-prompt, send-prompt, working, tool-call, respond, claude-text, stop-working) PLUS fleet actions: switch-session {index, history?, clear?} (sidebar highlight moves, the pane swaps to that session's transcript), session-status {index, status: 'working'|'input'|'done'} (a sidebar session's dot + badge change -- e.g. a parallel agent finishes while you watch another). NEVER move the camera from a script -- scene camera_moves with anchors (sessions, transcript, input).",
+      "label": "The full performance: type-prompt {text}, send-prompt (posts as a right-aligned user bubble), working {text?} (the lone orange ✳; auto-removed by the next tool-call/respond), stop-working, tool-call {tool, target, result, diff?, then_working?} (light tool card with ⎿ result + green/red diff), respond {text, duration?} (streams Claude prose word by word; **bold** and `code`), claude-text {text}, switch-session {index, history?, clear?} (sidebar highlight moves, pane swaps), session-status {index, status: 'working'|'input'|'done'} (live dot appears on a Recents row). NEVER move the camera from a script -- scene camera_moves with anchors (sessions, transcript, input).",
       "optional": true
     },
-    "cursor_targets": {
-      "type": "object",
-      "label": "Named cursor positions (input, session-0..n)",
-      "optional": true
-    }
+    "cursor_targets": { "type": "object", "label": "Named cursor positions (input, session-0..n)", "optional": true }
   },
   "script_actions": [
-    { "action": "type-prompt", "description": "Type into the input box", "params": { "text": "string", "speed": "number" } },
-    { "action": "send-prompt", "description": "Post the typed prompt to the transcript" },
-    { "action": "working", "description": "Working spinner with live elapsed/token counter", "params": { "text": "string", "tokens_per_s": "number" } },
+    { "action": "type-prompt", "description": "Type into the composer", "params": { "text": "string", "speed": "number" } },
+    { "action": "send-prompt", "description": "Post the typed prompt as a user bubble" },
+    { "action": "working", "description": "The lone orange ✳ spinner (the real app's thinking indicator)", "params": { "text": "string - optional muted verb" } },
     { "action": "stop-working", "description": "Remove the spinner" },
-    { "action": "tool-call", "description": "⏺ tool block with ⎿ result and optional green/red diff", "params": { "tool": "string", "target": "string", "result": "string", "diff": "array", "then_working": "boolean" } },
-    { "action": "respond", "description": "Stream Claude's response word by word", "params": { "text": "string", "duration": "number" } },
+    { "action": "tool-call", "description": "Light tool card: ⏺ Tool(target), ⎿ result, optional green/red diff", "params": { "tool": "string", "target": "string", "result": "string", "diff": "array", "then_working": "boolean" } },
+    { "action": "respond", "description": "Stream Claude's answer word by word", "params": { "text": "string", "duration": "number" } },
     { "action": "claude-text", "description": "Instant prose block", "params": { "text": "string" } },
-    {
-      "action": "switch-session",
-      "description": "Move the sidebar highlight to another session and swap the pane to its transcript",
-      "params": { "index": "number - session index", "history": "array - transcript blocks for that session", "clear": "boolean - clear pane first (default true)" }
-    },
-    {
-      "action": "session-status",
-      "description": "Change a sidebar session's status dot + badge (working / input / done) -- a parallel agent finishing while you watch another",
-      "params": { "index": "number", "status": "string - working|input|done" }
-    }
+    { "action": "switch-session", "description": "Move the sidebar highlight and swap the pane to that session's transcript", "params": { "index": "number", "history": "array", "clear": "boolean" } },
+    { "action": "session-status", "description": "A live status dot appears/changes on a Recents row (working/input/done) -- a parallel agent finishing while you watch another", "params": { "index": "number", "status": "string" } }
   ],
-  "default_cursor_targets": { "input": { "x": "60%", "y": "92%" } },
+  "default_cursor_targets": { "input": { "x": "60%", "y": "90%" } },
   "tier": "performable-surface"
 }
