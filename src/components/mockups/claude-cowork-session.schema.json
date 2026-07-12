@@ -40,14 +40,16 @@
     { "action": "claude-text", "description": "Instant serif prose block", "params": { "text": "string", "heading": "boolean" } },
     {
       "action": "tool-call",
-      "description": "A tool-use row pops into the transcript: connector icon + label + spinner while running (the matching rail chip lights up automatically), then flips to a green check with the result line. Use real Quotient MCP tool names.",
+      "description": "The REAL Cowork tool-use treatment: a muted group titled with the humanized tool name ('list-social-posts' -> 'List Social Posts') containing a vertical timeline -- optional clock-icon thinking text (with `code` chips), the tool row with the connector's icon and a 'Result' pill, an orange dotted 'Using Quotient…' spinner while running, then ✓ Done -- and the whole group AUTO-COLLAPSES to a one-liner with a chevron ('List Social Posts ›'). The matching rail chip lights up in sync.",
       "params": {
         "connector": "string - matches connectors[].name (icon + rail chip sync)",
-        "tool": "string - e.g. create-campaign, create-social-post, create-blog",
-        "label": "string - human line (e.g. 'Creating campaign in Quotient')",
-        "params": "string - optional mono params preview",
-        "result": "string - result line shown when done",
+        "tool": "string - real MCP tool name, e.g. list-social-posts, create-campaign, create-social-post",
+        "title": "string - override the humanized group title",
+        "thinking": "string - clock-icon reasoning line ('I already have the `list-social-posts` tool loaded with the `PUBLISHED` filter. Let me call it.')",
+        "done_label": "string - final row text (default 'Done')",
         "duration": "number - seconds until done (default 1.8)",
+        "collapse": "boolean - auto-collapse to the one-liner (default true)",
+        "collapse_delay": "number - seconds after done before collapsing (default 1.0)",
         "then_working": "boolean - re-show the ✳ after completion",
         "keep_live": "boolean - leave the rail chip lit"
       }
