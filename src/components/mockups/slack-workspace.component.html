@@ -822,9 +822,16 @@
     var channels = data.channels || [
       {name:'general'}, {name:'product'}, {name:'engineering'}, {name:'design'}, {name:'random'}
     ];
+    // Real-image identity: any avatar/icon slot accepts an image URL and
+    // renders it instead of the initial block. The bot defaults to the
+    // brand's real logo via logo.dev (overridable via data.bot_avatar_url).
+    var LOGO_DEV = function(domain) {
+      return 'https://img.logo.dev/' + domain + '?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=128&fallback=monogram';
+    };
+    var botAvatarUrl = data.bot_avatar_url !== undefined ? data.bot_avatar_url : LOGO_DEV('getquotient.ai');
     var directMessages = data.direct_messages || [
       {name:'Marc Ferrentino', avatar_color:'#6366f1', online:true, initials:'MF'},
-      {name:'Quotient Bot', avatar_color:'#7c3aed', online:true, initials:'QB'},
+      {name:'Quotient', avatar_url: botAvatarUrl, avatar_color:'#7c3aed', online:true, initials:'QB'},
       {name:'Ed', avatar_color:'#2bac76', online:true, initials:'Ed'}
     ];
     // Normalize message field aliases: LLM-authored data drifts from the
@@ -835,9 +842,11 @@
       if (m.divider || m.type === 'divider') {
         return { divider: m.divider === true ? (m.label || 'Today') : (m.divider || m.label || 'Today') };
       }
+      var role = m.role || (/(bot|quotient|app)/i.test(m.name || m.author || '') ? 'bot' : 'user');
       return {
-        role: m.role || (/(bot|quotient|app)/i.test(m.name || m.author || '') ? 'bot' : 'user'),
+        role: role,
         name: m.name || m.author || m.from || 'Teammate',
+        avatar_url: m.avatar_url !== undefined ? m.avatar_url : (m.avatar_image || (role === 'bot' ? botAvatarUrl : '')),
         avatar_color: m.avatar_color || m.color,
         initials: m.initials,
         text: m.text || m.body || m.message || '',
@@ -864,9 +873,21 @@
     wsNameEl.textContent = workspaceName;
     searchTextEl.textContent = 'Find a conversation...';
     var railWs = el.querySelector('[data-target="rail-ws"]');
-    if (railWs) railWs.textContent = String(workspaceName).charAt(0).toUpperCase();
+    if (railWs) {
+      if (data.workspace_icon_url) {
+        railWs.style.cssText += ";background-image:url('" + data.workspace_icon_url + "');background-size:cover;background-position:center";
+      } else {
+        railWs.textContent = String(workspaceName).charAt(0).toUpperCase();
+      }
+    }
     var railSelf = el.querySelector('[data-target="rail-self"]');
-    if (railSelf) railSelf.textContent = 'Me';
+    if (railSelf) {
+      if (data.self_avatar_url) {
+        railSelf.style.cssText += ";background-image:url('" + data.self_avatar_url + "');background-size:cover;background-position:center";
+      } else {
+        railSelf.textContent = 'Me';
+      }
+    }
     channelNameHeader.textContent = channelName;
     if (channelTopic) channelTopicEl.textContent = channelTopic;
     composerInput.setAttribute('data-placeholder', 'Message #' + channelName);
@@ -911,8 +932,9 @@
     directMessages.forEach(function(dm) {
       var item = document.createElement('div');
       item.className = 'dm-item';
-      item.innerHTML = '<div class="dm-avatar" style="background:' + dm.avatar_color + '">' +
-        (dm.initials || dm.name.charAt(0)) +
+      var dmUrl = dm.avatar_url || dm.avatar_image || '';
+      item.innerHTML = '<div class="dm-avatar" style="' + avatarCss(dmUrl, dm.avatar_color) + '">' +
+        (dmUrl ? '' : (dm.initials || dm.name.charAt(0))) +
         '<div class="dm-status ' + (dm.online ? 'online' : 'offline') + '"></div></div>' +
         '<span class="dm-name">' + dm.name + '</span>';
       dmList.appendChild(item);
@@ -923,23 +945,32 @@
     // ([{name, badge, color, active}]).
     var appsList = el.querySelector('[data-target="apps-list"]');
     var agentsApps = data.agents_apps || [
-      { name: 'Brex', badge: '9+', color: '#1f1f1f' },
-      { name: 'Google Drive', badge: '2', color: '#0F9D58' },
+      { name: 'Brex', badge: '9+', color: '#1f1f1f', icon_url: LOGO_DEV('brex.com') },
+      { name: 'Google Drive', badge: '2', color: '#0F9D58', icon_url: LOGO_DEV('google.com') },
       { name: 'Jarvis', badge: '9+', color: '#5f6ac4' },
-      { name: 'Quotient', color: '#393bf5', active: data.active_app !== undefined ? data.active_app === 'Quotient' : false },
-      { name: 'Calendly', color: '#006BFF' },
-      { name: 'Slack', color: '#611f69' },
+      { name: 'Quotient', color: '#393bf5', icon_url: LOGO_DEV('getquotient.ai'), active: data.active_app !== undefined ? data.active_app === 'Quotient' : false },
+      { name: 'Calendly', color: '#006BFF', icon_url: LOGO_DEV('calendly.com') },
+      { name: 'Slack', color: '#611f69', icon_url: LOGO_DEV('slack.com') },
     ];
     if (appsList) agentsApps.forEach(function(app) {
       var item = document.createElement('div');
       item.className = 'app-item' + (app.active ? ' active' : '') + (app.badge && !app.active ? ' unread' : '');
       item.setAttribute('data-target', 'sidebar-app-' + app.name);
-      var html = '<div class="app-ico" style="background:' + (app.color || '#611f69') + '">' + String(app.name).charAt(0) + '</div>' +
+      var appUrl = app.icon_url || app.avatar_url || '';
+      var html = '<div class="app-ico" style="' + avatarCss(appUrl, app.color || '#611f69') + '">' +
+        (appUrl ? '' : String(app.name).charAt(0)) + '</div>' +
         '<span class="app-name">' + app.name + '</span>';
       if (app.badge) html += '<span class="app-badge">' + app.badge + '</span>';
       item.innerHTML = html;
       appsList.appendChild(item);
     });
+
+    // Image-or-initial avatar styling: returns a cssText string.
+    function avatarCss(url, color) {
+      return url
+        ? "background-image:url('" + url + "');background-size:cover;background-position:center;background-color:#fff"
+        : 'background:' + (color || '#6366f1');
+    }
 
     // ── Markdown parser ──
     function parseMd(text) {
@@ -974,8 +1005,8 @@
         header.className = 'msg-header';
         var avatar = document.createElement('div');
         avatar.className = 'msg-avatar';
-        avatar.style.background = msg.avatar_color || '#6366f1';
-        avatar.textContent = msg.initials || String(msg.name || '?').charAt(0);
+        avatar.style.cssText = avatarCss(msg.avatar_url, msg.avatar_color);
+        avatar.textContent = msg.avatar_url ? '' : (msg.initials || String(msg.name || '?').charAt(0));
         header.appendChild(avatar);
 
         var meta = document.createElement('div');
@@ -1041,7 +1072,8 @@
         ri.className = 'reply-indicator';
         var avStack = '<div class="reply-avatars">';
         (msg.replies.avatars || []).forEach(function(a) {
-          avStack += '<div class="reply-avatar" style="background:' + a.color + '">' + (a.initials || '') + '</div>';
+          var aUrl = a.avatar_url || a.src || '';
+          avStack += '<div class="reply-avatar" style="' + avatarCss(aUrl, a.color) + '">' + (aUrl ? '' : (a.initials || '')) + '</div>';
         });
         avStack += '</div>';
         ri.innerHTML = avStack +
@@ -1079,10 +1111,11 @@
           }
           return '<div class="quf-field"><div class="quf-label">' + (f.label || '') + '</div>' + val + '</div>';
         }).join('');
+        var qufIconUrl = u.icon_url !== undefined ? u.icon_url : (appName === 'Quotient' ? LOGO_DEV('getquotient.ai') : '');
         wrap.innerHTML = '<div class="quf-app">' + appName + ' ' + chevSm + '</div>' +
           '<div class="quf-card">' +
             '<div class="quf-head">' +
-              '<div class="quf-ico" style="background:' + (u.icon_color || u.color || '#393bf5') + '">' + String(appName).charAt(0) + '</div>' +
+              '<div class="quf-ico" style="' + avatarCss(qufIconUrl, u.icon_color || u.color || '#393bf5') + '">' + (qufIconUrl ? '' : String(appName).charAt(0)) + '</div>' +
               '<div class="quf-titles">' +
                 '<div class="quf-title">' + (u.title || '') + '</div>' +
                 '<div class="quf-sub">' + (u.subtitle || 'Campaign in ' + appName) + '</div>' +
@@ -1227,9 +1260,10 @@
       var name = opts.name || 'Quotient';
       var block = document.createElement('div');
       block.className = 'msg-block has-gap thinking-block';
+      var thinkUrl = opts.avatar_url !== undefined ? opts.avatar_url : botAvatarUrl;
       block.innerHTML = '<div class="msg-header">' +
-        '<div class="msg-avatar" style="background:' + (opts.avatar_color || '#393bf5') + '">' +
-          (opts.initials || String(name).charAt(0)) + '</div>' +
+        '<div class="msg-avatar" style="' + avatarCss(thinkUrl, opts.avatar_color || '#393bf5') + '">' +
+          (thinkUrl ? '' : (opts.initials || String(name).charAt(0))) + '</div>' +
         '<div class="msg-meta"><span class="msg-name">' + name + '</span>' +
           '<span class="msg-app-badge">APP</span></div></div>' +
         '<div class="msg-text thinking-text"><em>' + (opts.text || 'Thinking') + '</em>' +
@@ -1424,6 +1458,7 @@
             addMessage({
               role: 'user',
               name: action.name || 'You',
+              avatar_url: action.avatar_url || data.self_avatar_url || '',
               avatar_color: action.avatar_color || '#2bac76',
               initials: action.initials || 'Y',
               text: msgText,
@@ -1444,6 +1479,7 @@
             addMessage({
               role: action.role || 'bot',
               name: action.name || 'Bot',
+              avatar_url: action.avatar_url !== undefined ? action.avatar_url : ((action.role || 'bot') === 'bot' ? botAvatarUrl : ''),
               avatar_color: action.avatar_color || '#7c3aed',
               initials: action.initials || 'B',
               text: action.text || '',
@@ -1483,6 +1519,7 @@
             addThreadReply({
               role: action.role || 'user',
               name: action.name || 'User',
+              avatar_url: action.avatar_url !== undefined ? action.avatar_url : (action.role === 'bot' && !action.avatar_color ? botAvatarUrl : ''),
               avatar_color: action.avatar_color || '#6366f1',
               initials: action.initials || 'U',
               text: action.text || '',
@@ -1505,6 +1542,7 @@
             addThreadReply({
               role: 'user',
               name: action.name || 'You',
+              avatar_url: action.avatar_url || data.self_avatar_url || '',
               avatar_color: action.avatar_color || '#2bac76',
               initials: action.initials || 'Y',
               text: msgText,
