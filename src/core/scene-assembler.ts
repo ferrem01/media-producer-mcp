@@ -14,7 +14,7 @@
  */
 
 import { normalizeHtmlUrls } from "./normalize-urls.js";
-import { resolveComponentTags, buildComponentTimelineScript } from "./component-tags.js";
+import { resolveComponentTags, buildComponentTimelineScript, buildLogoDevUrl } from "./component-tags.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types.js";
 import { beatTimeline } from "./beats.js";
@@ -25,6 +25,21 @@ import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
+
+/** Bake the logo.dev URL for a DIRECT logo component (scene.components[]).
+ *  The codegen <component> path bakes __logoUrl in resolveComponentTags;
+ *  the direct path skipped it, so hand-authored/template-sibling logo
+ *  components rendered an img with no src -- an invisible logo. */
+export function bakeDirectLogoData(comp: { type: string; data: Record<string, unknown> }): Record<string, unknown> {
+  if (comp.type !== "logo") return comp.data;
+  const ld: Record<string, any> = { ...(comp.data || {}) };
+  const isProminent = ld.prominent === true || ld.prominent === "true";
+  ld.size = Number(ld.size) || 128;
+  if (isProminent) ld.size = Math.max(ld.size, 480);
+  ld.__logoUrl = buildLogoDevUrl(ld, config.logoDevToken);
+  ld.__prominentClass = isProminent ? "prominent" : "";
+  return ld;
+}
 
 /** Component types that are scene BACKDROPS: they stay outside the camera
  *  rig (the camera moves the subject, not the world) and are skipped by
@@ -173,7 +188,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
 
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol
-    const preData = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : comp.data;
+    const preData = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData(comp);
     const resolvedData = resolveAssetUrls(preData, preview, speakerUrl);
     let boundHtml = bindTemplate(parsed.template, resolvedData);
 

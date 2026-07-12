@@ -31,6 +31,7 @@ import {
   cameraMovesScript,
   wrapperChoreoScript,
   BACKDROP_TYPES,
+  bakeDirectLogoData,
   mediaEdlScript,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
@@ -138,7 +139,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       const parsed = sourceMap.get(comp.type);
       if (!parsed) continue;
 
-      const preData = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : comp.data;
+      const preData = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData(comp);
       const resolvedData = resolveAssetUrls(preData, true, speakerUrl);
       let boundHtml = bindTemplate(parsed.template, resolvedData);
       // Resolve raw <video src="speaker"> PiP tags (same contract as the
