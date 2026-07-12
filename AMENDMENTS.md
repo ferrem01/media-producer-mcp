@@ -333,3 +333,36 @@ of what it really looks like and you can upgrade it").
   addressing, shorthand compiler all verified by DOM probe.
 
 The round-1 open item ("Slack simulator fidelity upgrade") is DONE.
+
+## 2026-07-12 (later still) — Claude surfaces at screenshot fidelity
+
+Marc: "the next component I wanna work on and make really good is the Claude
+desktop component" → then "I want to focus on cowork specifically."
+
+- **Taxonomy** (corrected by Marc's screenshots): terminal CLI /
+  Claude Code desktop (Code tab) / Claude Cowork desktop (Home tab).
+- **claude-code-session** (#315): the terminal — banner, tool blocks with
+  diffs, working spinner with LIVE elapsed/token counter riding the master
+  timeline, todos, streaming responses. Shorthand: prompt_text/tool_calls/
+  response_text.
+- **claude-desktop** (#315, rebuilt #317): the real Code tab — light bone
+  theme, Home/Code toggle, numbered Recents (status dots opt-in), claude.ai-
+  style pane, 'Type / for commands' composer. The invented dark fleet
+  sidebar was deleted.
+- **claude-cowork-home** (#317, fidelity #318/#322/#323): starburst greeting
+  (real mark via logo.dev claude.ai + multiply-blend against a locally
+  painted backdrop; SVG fallback), composer with Chat/Cowork toggle, plus-
+  menu (hoisted to window-last child — entrance transforms + wrapper
+  preserve-3d defeat z-index; DOM order is the only reliable layer), ideas.
+- **claude-cowork-session** (#318, tool grammar #320/#321): the running
+  task — serif prose, right rail (Progress N-of-M + step checklist,
+  Outputs, Context/Connectors chips that light while in use), and the REAL
+  tool-group treatment: humanized title, clock-icon thinking with code
+  chips, Result pill, dotted 'Using Quotient…' spinner, ✓ Done, then
+  auto-collapse to 'List Social Posts ›'. Real Quotient MCP tool names
+  throughout (create-campaign, create-social-post...).
+- **Camera cover-clamp** (#316): anchored/whole-scene zooms can never frame
+  outside the canvas (|x| ≤ (s−1)·W/2). Anchors should hug CONTENT (the
+  rail's card stack), not full-height containers (#319).
+- Demo films: proj_5b7edf4f (terminal + Code desktop), proj_eb454668
+  (Cowork home → running task with scripted Quotient tool calls).
