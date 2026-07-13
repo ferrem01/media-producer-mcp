@@ -460,3 +460,23 @@ social post."
   flag, thumbs-up, book, mail, image, file, flows NODES, calendar, people,
   scheduled CLOCK-BOX, memory BRAIN; avatar at bottom. nav_active +=
   'scheduled'.
+
+## 2026-07-13 — quotient-chat = THE agent panel, composed into the shell (PR #337)
+
+Marc: "the right agent panel in app shell ideally would be the same one in
+quotient-chat... mainly bc it is the same one in real life."
+
+- **quotient-chat rebuilt** from the 5 panel screenshots: tab row (running
+  tab with spinning ✳, copies badge → References popover), color-coded
+  verb lines (linkedin blue / x black / email+doc orange / task+campaign
+  blue / blog+memory dark), **content-card = the streaming box** (the
+  created/updated doc types itself into a white inner box under a top
+  fade, floating scroll-down button while streaming, collapse_delay),
+  task-status ('Marked N task(s) as ◑ In review' + checkbox rows),
+  'Conversation summarized' divider, pink-initials user bubbles, composer.
+  Legacy tool-use/asset-card actions alias to verb lines.
+- **One panel everywhere**: shell keeps a simple built-in panel; fidelity
+  composition = shell show_panel:false + quotient-chat at the panel slot
+  (x 67.6%, y 8%, 30.5%×87% with the standard inset shell). Demo
+  scene_campaign now runs the 3-component composition (shell + campaign
+  center + real panel), scene_chat showcases the panel standalone.
