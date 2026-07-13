@@ -1,0 +1,49 @@
+{
+  "type": "annotation",
+  "label": "Annotation (narration beside the evidence)",
+  "category": "titles",
+  "description": "Narration that lives BESIDE a product window, never on its own slide: a display line (house line-rise entrance, *stars* = color-only accent), optional counting stat numerals, optional chip pile. Dock it left/right of a window in the same frame. Lines with later `at` values SWAP the previous line. size 'label' = the small bold montage label (top-left, parallel structure). Camera anchor: body.",
+  "data": {
+    "lines": {
+      "type": "array",
+      "label": "[{text: 'Work the idea in *Claude*.', at: 0.3}] -- later lines swap earlier ones at their `at`",
+      "optional": true
+    },
+    "text": {
+      "type": "string",
+      "label": "Shorthand for a single line (equivalent to lines: [{text, at: 0.3}])",
+      "optional": true
+    },
+    "stats": {
+      "type": "object",
+      "label": "{at, items: [{value: '87,291', label: 'lines removed'}]} -- numerals count up (the only type allowed to perform)",
+      "optional": true
+    },
+    "chips": {
+      "type": "object",
+      "label": "{at, items: ['brief','tasks','calendar']} -- muted pill pile (the busywork visual)",
+      "optional": true
+    },
+    "align": {
+      "type": "string",
+      "label": "left (default) | right | center",
+      "optional": true
+    },
+    "size": {
+      "type": "string",
+      "label": "display (default, 44px) | label (24px bold montage label)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "light (default, ink on light canvas) | dark",
+      "optional": true
+    },
+    "exit_at": {
+      "type": "number",
+      "label": "Fade the whole block at this second (e.g. just before a cut)",
+      "optional": true
+    }
+  },
+  "tier": "annotation"
+}

@@ -1,0 +1,151 @@
+<template>
+  <div class="anno" data-anchor="body">
+    <div class="anno-lines"></div>
+    <div class="anno-stats"></div>
+    <div class="anno-chips"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── annotation: narration that lives BESIDE the evidence, never on its own
+     slide. A display line (house line-rise entrance), optional counting
+     numerals, optional chip pile. Docks left/right of a window; the window
+     glides aside and this fills the cleared space. House type system applies:
+     one entrance, color-only accents, numbers are the only performers. ── */
+  .anno {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    gap: 26px; padding: 12px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    color: var(--anno-ink, #17171c);
+  }
+  .anno.align-left { align-items: flex-start; text-align: left; }
+  .anno.align-right { align-items: flex-end; text-align: right; }
+  .anno.align-center { align-items: center; text-align: center; }
+  .anno.is-dark { --anno-ink: #f4f2ec; --anno-muted: #9a99a8; --anno-accent: #7c86ff; --anno-chip-bg: rgba(255,255,255,0.07); --anno-chip-line: rgba(255,255,255,0.16); }
+  .anno { --anno-muted: #6f6f7c; --anno-accent: var(--mp-color-primary, #393bf5); --anno-chip-bg: rgba(23,23,28,0.045); --anno-chip-line: rgba(23,23,28,0.14); }
+
+  .anno-lines { position: relative; width: 100%; }
+  .anno-line {
+    font-size: 44px; font-weight: 650; line-height: 1.16; letter-spacing: -0.02em;
+    max-width: 100%;
+  }
+  .anno.size-label .anno-line { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .anno-line .anno-accent { color: var(--anno-accent); }
+  .anno-line + .anno-line { position: absolute; top: 0; left: 0; right: 0; }
+  .anno.align-right .anno-line + .anno-line { left: auto; }
+
+  .anno-stats { display: flex; gap: 34px; }
+  .anno.align-right .anno-stats { flex-direction: row-reverse; }
+  .anno-stat { display: flex; flex-direction: column; gap: 2px; }
+  .anno-stat .v {
+    font-size: 46px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--anno-accent); font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .anno-stat .l { font-size: 14.5px; font-weight: 500; color: var(--anno-muted); }
+
+  .anno-chips { display: flex; flex-wrap: wrap; gap: 8px; max-width: 100%; }
+  .anno.align-right .anno-chips { justify-content: flex-end; }
+  .anno-chip {
+    font-size: 15px; font-weight: 500; color: var(--anno-muted);
+    background: var(--anno-chip-bg); border: 1px solid var(--anno-chip-line);
+    border-radius: 999px; padding: 5px 14px; white-space: nowrap;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.anno');
+    root.classList.add('align-' + (data.align || 'left'));
+    if (data.theme === 'dark') root.classList.add('is-dark');
+    if (data.size === 'label') root.classList.add('size-label');
+
+    function accentify(target, text) {
+      var re = /\*([^*]+)\*|([^*]+)/g, m;
+      while ((m = re.exec(String(text))) !== null) {
+        if (m[1] !== undefined) {
+          var s = document.createElement('span');
+          s.className = 'anno-accent';
+          s.textContent = m[1];
+          target.appendChild(s);
+        } else target.appendChild(document.createTextNode(m[2]));
+      }
+    }
+    function rise(elm, at) {
+      if (window.mpLineRise) mpLineRise(tl, elm, at);
+      else { gsap.set(elm, { autoAlpha: 0, y: 10 }); tl.to(elm, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, at); }
+    }
+
+    // Lines: first rises at its `at`; each later line swaps the previous
+    // (fade out, new line rises). Exits are fades. Nothing floats away.
+    var linesHost = el.querySelector('.anno-lines');
+    var lines = Array.isArray(data.lines) ? data.lines : (data.text ? [{ text: data.text, at: 0.3 }] : []);
+    var prev = null;
+    lines.forEach(function(ln, i) {
+      var d = document.createElement('div');
+      d.className = 'anno-line';
+      accentify(d, ln.text);
+      gsap.set(d, { autoAlpha: 0 });
+      linesHost.appendChild(d);
+      var at = ln.at !== undefined ? ln.at : 0.3 + i * 2.5;
+      if (prev) tl.to(prev, { autoAlpha: 0, duration: 0.22, ease: 'power2.in' }, Math.max(0, at - 0.24));
+      rise(d, at);
+      prev = d;
+    });
+
+    // Stats: the only type allowed to perform -- numerals count up.
+    var statsHost = el.querySelector('.anno-stats');
+    if (data.stats && Array.isArray(data.stats.items) && data.stats.items.length) {
+      var sAt = data.stats.at !== undefined ? data.stats.at : 1.2;
+      data.stats.items.forEach(function(it, i) {
+        var box = document.createElement('div');
+        box.className = 'anno-stat';
+        var v = document.createElement('div'); v.className = 'v';
+        var l = document.createElement('div'); l.className = 'l';
+        var raw = String(it.value);
+        var target = parseFloat(raw.replace(/[^0-9.]/g, '')) || 0;
+        var prefix = (raw.match(/^[^0-9]*/) || [''])[0];
+        var suffix = (raw.match(/[^0-9.,]*$/) || [''])[0];
+        v.textContent = prefix + '0' + suffix;
+        l.textContent = it.label || '';
+        box.appendChild(v); box.appendChild(l);
+        statsHost.appendChild(box);
+        var when = sAt + i * 0.12;
+        rise(box, when);
+        var counter = { n: 0 };
+        tl.to(counter, {
+          n: target, duration: 0.9, ease: 'power2.out',
+          onUpdate: function() {
+            v.textContent = prefix + Math.round(counter.n).toLocaleString('en-US') + suffix;
+          },
+        }, when);
+      });
+    }
+
+    // Chips: the busywork pile. Small staggered fades, no theatrics.
+    var chipsHost = el.querySelector('.anno-chips');
+    if (data.chips && Array.isArray(data.chips.items) && data.chips.items.length) {
+      var cAt = data.chips.at !== undefined ? data.chips.at : 2;
+      var chipEls = data.chips.items.map(function(txt) {
+        var c = document.createElement('div');
+        c.className = 'anno-chip';
+        c.textContent = txt;
+        chipsHost.appendChild(c);
+        return c;
+      });
+      if (window.mpLineRise) mpLineRise(tl, chipEls, cAt, { stagger: 0.12 });
+      else {
+        gsap.set(chipEls, { autoAlpha: 0, y: 10 });
+        tl.to(chipEls, { autoAlpha: 1, y: 0, duration: 0.3, stagger: 0.12, ease: 'power3.out' }, cAt);
+      }
+    }
+
+    // Optional whole-block exit (fade), e.g. before a cut.
+    if (data.exit_at !== undefined) {
+      tl.to(root, { autoAlpha: 0, duration: 0.28, ease: 'power2.in' }, data.exit_at);
+    }
+
+    return tl;
+  }
+</script>
