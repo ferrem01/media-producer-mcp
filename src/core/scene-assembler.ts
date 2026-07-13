@@ -1392,7 +1392,10 @@ export function generateBrandCSS(brand: BrandKit, sceneBackground?: string, prev
   }
 
   // ── Background image (pick before text colors so tags can refine theme) ──
-  const bgResult = pickBrandBackground(brand, sceneIsDark);
+  // An EXPLICIT scene background is a director's choice of a flat canvas --
+  // it suppresses the brand-kit background image entirely. (Before this, the
+  // harvested brand "background" asset painted OVER every flat-color scene.)
+  const bgResult = sceneBackground ? null : pickBrandBackground(brand, sceneIsDark);
   if (bgResult) {
     // Let the picked background image's tags override the theme.
     // If the brand bg color is light but we picked a dark-tagged image,
