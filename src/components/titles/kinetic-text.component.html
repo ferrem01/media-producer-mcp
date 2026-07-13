@@ -68,6 +68,8 @@
     var mode = data.mode || 'word';
     var effect = data.effect || 'fade-up';
 
+    if (data.color) container.style.color = data.color;
+
     container.innerHTML = '';
     container.textContent = text;
 
