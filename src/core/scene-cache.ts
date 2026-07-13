@@ -29,7 +29,7 @@ import path from "path";
 import { projectDir } from "../persistence/paths.js";
 import type { Project } from "./types.js";
 
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2; // 2: camera rig z-index fix in scene-assembler
 
 export function sceneCacheEnabled(): boolean {
   return process.env.MP_SCENE_CACHE !== "0";
