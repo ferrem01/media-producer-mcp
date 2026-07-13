@@ -38,6 +38,7 @@ import { encodeScene, encodeGif, concatSegments, applyFilmGrade } from "./encode
 import { exportPdf } from "./pdf-export.js";
 import { renderTransition, extractFirstFrame, extractLastFrame, getTransitionScript, loadGsapMinimal, templateMatchAnchor } from "./transitions.js";
 import { renderGlassTurnTransition, sceneHasGlassSlab } from "./glass-transition.js";
+import { sceneCacheEnabled, sceneCacheKey, getCachedSceneMp4, putCachedSceneMp4 } from "./scene-cache.js";
 import { resolveAssetUrls } from "./scene-assembler.js";
 // Critique now runs during generate, not render
 import { config } from "../config.js";
@@ -289,6 +290,32 @@ async function renderSingleSceneWorker(
 
   await fs.mkdir(sceneDir, { recursive: true });
 
+  const totalFramesForScene = Math.ceil(scene.duration_seconds * project.canvas.fps);
+
+  // ── Scene cache: skip Playwright capture entirely when nothing that feeds
+  // this scene's pixels changed since its last render. Critique renders are
+  // excluded (the worker may regenerate the scene as it runs).
+  let cacheKey: string | null = null;
+  if (sceneCacheEnabled() && !critiqueOpts?.critique && project.tenant_id && project.project_id) {
+    try {
+      const sceneSources = await loadComponentSources(
+        { ...project, scenes: [scene] } as Project,
+        config.componentLibDir,
+        extraComponentDirs,
+      );
+      cacheKey = await sceneCacheKey(project, sceneIndex, sceneSources, config.componentLibDir);
+      const cached = await getCachedSceneMp4(project, scene.id, cacheKey);
+      if (cached) {
+        await fs.copyFile(cached, mp4Path);
+        console.log(`  Scene ${sceneIndex + 1}${scene.label ? ` "${scene.label}"` : ""}: cache HIT, reusing rendered clip`);
+        return { mp4Path, frameCount: totalFramesForScene };
+      }
+    } catch (e: any) {
+      console.warn(`  Scene cache lookup failed (rendering normally): ${e.message}`);
+      cacheKey = null;
+    }
+  }
+
   // Brand asset shortcut: if scene is a pre-rendered video (brand intro/outro),
   // re-encode to match project canvas settings instead of going through Playwright capture.
   if (scene.components.length === 1 && scene.components[0].type === "video" && scene.components[0].data?.src) {
@@ -424,8 +451,13 @@ async function renderSingleSceneWorker(
   await fs.unlink(projectJsonPath).catch(() => {});
   await fs.unlink(argsPath).catch(() => {});
 
-  const totalFrames = Math.ceil(scene.duration_seconds * project.canvas.fps);
-  return { mp4Path, frameCount: totalFrames };
+  if (cacheKey) {
+    await putCachedSceneMp4(project, scene.id, cacheKey, mp4Path).catch((e) =>
+      console.warn(`  Scene cache store failed: ${e.message}`),
+    );
+  }
+
+  return { mp4Path, frameCount: totalFramesForScene };
 }
 
 /**
