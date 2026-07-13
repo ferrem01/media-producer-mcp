@@ -1,164 +1,165 @@
 {
   "type": "quotient-chat",
-  "label": "Quotient Chat Panel",
+  "label": "Quotient Chat — the agent panel",
   "category": "mockups",
-  "description": "Quotient AI chat interface with rich messaging, tool use indicators, asset cards, and animated scripted interactions. Supports user bubbles with avatars, agent markdown messages, typing indicator, and composer with send button. SCRIPTED: pass the full interaction sequence in data.script (see the script field) -- the component performs it itself; embedding it static and animating over it is wrong. CAMERA ANCHORS: publishes data-anchor regions (composer, messages) -- target them from scene camera_moves as {anchor: 'componentId.anchorName'}; the ONE stage camera does all zooming (never zoom inside the component).",
+  "description": "THE Quotient agent chat panel (built from actual screenshots) -- the SAME surface that appears as the right panel of quotient-app-shell; place THIS component over the shell's panel slot for full fidelity (shell show_panel: false, panel slot = x shellX+0.68·shellW, y shellY+0.062·shellH, w 0.31·shellW, h 0.90·shellH; with the standard inset shell that is x 67.6%, y 8%, width 30.5%, height 87%). White rounded panel with the TAB ROW (active tab underlined with ×, optional second tab with the spinning ✳ = a running chat, copies icon with count badge -> References popover, split, ×), the transcript, and the composer (Type a message..., paperclip, Auto, mic, gray send). THE TRANSCRIPT GRAMMAR (all color-coded by entity): verb-line ('Reviewed [in] LinkedIn post' + bold title, or inline 'Created ✉ Weekly AI Marketing Newsletter July 13 2026'); content-card -- the STREAMING box: 'Created/Updated [entity] ...' header + bold title + chevron, and the document content STREAMS word-by-word into a white inner box whose older lines slide up under a top fade (the live-edit treatment for posts/docs/emails/memory); task-status ('Marked 1 task(s) as ◑ In review' + blue-checkbox task rows); agent prose; user bubbles (right-aligned, pink initials avatar); 'Conversation summarized' divider. Entity icons: linkedin (blue tile), x (black tile), email + doc/template (orange), task + campaign (blue), blog/memory (dark). SCRIPTED performable surface; camera anchors: messages, composer, tabs.",
   "data": {
-    "conversation_title": {
-      "type": "string",
-      "label": "Conversation Title",
-      "optional": true,
-      "default": "New Conversation",
-      "placeholder": "Canva Image Generation Feature"
-    },
-    "messages": {
+    "tabs": {
       "type": "array",
-      "label": "Initial Messages",
-      "optional": true,
-      "items": {
-        "type": "object",
-        "properties": {
-          "role": {
-            "type": "string",
-            "label": "Role",
-            "required": true,
-            "enum": [
-              "user",
-              "agent"
-            ]
-          },
-          "text": {
-            "type": "string",
-            "label": "Message Text",
-            "required": true
-          }
-        }
-      }
+      "label": "Tab row: [{label, running?: true (spinning ✳, muted)}]. First tab is active with the ×.",
+      "optional": true
     },
-    "user_avatar": {
-      "type": "string",
-      "label": "User Avatar (URL or initials)",
-      "optional": true,
-      "default": "",
-      "placeholder": "MF"
-    },
-    "user_avatar_color": {
-      "type": "string",
-      "label": "User Avatar Background Color",
-      "optional": true,
-      "default": "#6366f1"
-    },
-    "badge_count": {
+    "copies_badge": {
       "type": "number",
-      "label": "Clipboard Badge Count",
-      "optional": true,
-      "default": 0
+      "label": "Count badge on the copies icon (default 2)",
+      "optional": true
     },
-    "mode": {
+    "user_initials": {
       "type": "string",
-      "label": "Display Mode",
-      "optional": true,
-      "default": "panel",
-      "enum": [
-        "panel",
-        "full"
-      ]
+      "label": "User bubble avatar initials (default 'JM', pink disc)",
+      "optional": true
     },
-    "show_progress": {
-      "type": "boolean",
-      "label": "Show Progress Bar",
-      "optional": true,
-      "default": true
-    },
-    "composer_placeholder": {
+    "user_avatar_url": {
       "type": "string",
-      "label": "Composer Placeholder Text",
-      "optional": true,
-      "default": "Type a message...",
-      "placeholder": "Type a message..."
+      "label": "User bubble avatar photo (covers the initials)",
+      "optional": true
+    },
+    "history": {
+      "type": "array",
+      "label": "Transcript at open: [{type: 'user'|'agent'|'verb-line'|'content-card'|'task-status'|'summarized', ...same params as the script actions}] -- content-card takes content (rendered instantly) and open: false to start collapsed.",
+      "optional": true
     },
     "script": {
       "type": "array",
-      "label": "Scripted timeline that plays the conversation INSIDE the component: [{\"action\": \"...\", \"at\": seconds, ...}]. Actions: type-message {text,duration} (user types in composer), send-message (posts it), show-typing / hide-typing (agent thinking dots), agent-message {text} (agent reply streams in, markdown ok), tool-use {label} (tool-call indicator chip), asset-card {title,subtitle} (rich asset result card), agent-image {url}, scroll-to-bottom. Plus base actions: move-cursor, click, type, highlight, wait, parallel. Write the ENTIRE conversation here -- never animate the component's internals from outside. NEVER move the camera from a script (no zoom/pan actions) -- camera moves are scene-level camera_moves targeting this component via {anchor} (one stage camera).",
+      "label": "The performance: type-message {text} + send-message, user-message {text}, show-typing/hide-typing, agent-message {text} (**bold** + `code`), verb-line {verb: 'Reviewed'|'Created'|'Updated'|'Marked', entity: 'linkedin'|'x'|'email'|'doc'|'template'|'task'|'campaign'|'blog'|'memory', title, inline_title?: true (title on the verb line, like 'Created ✉ Weekly AI Marketing Newsletter July 13 2026'), noun?}, content-card {verb, entity, title, content: 'the doc text...\\n\\n...', duration: 3, collapse_delay?} (THE streaming beat: the content types itself into the faded box while the scroll-down button floats), task-status {status: 'In review', tasks: ['Draft LinkedIn POV post'], count}, summarized {label?}, open-references {items: [{entity, title, kind: 'Social Post'|'Task'|...}]} / close-references (the popover under the copies icon), switch-tab {index}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (messages, composer, tabs).",
       "optional": true
     },
     "cursor_targets": {
       "type": "object",
-      "label": "Named cursor positions for move-cursor/click in 0-1 component coords.",
+      "label": "Named cursor positions (composer, copies)",
+      "optional": true
+    },
+    "conversation_title": {
+      "type": "string",
+      "label": "LEGACY: first tab label (prefer tabs)",
+      "optional": true
+    },
+    "badge_count": {
+      "type": "number",
+      "label": "LEGACY alias of copies_badge",
+      "optional": true
+    },
+    "user_avatar": {
+      "type": "string",
+      "label": "LEGACY alias of user_avatar_url",
       "optional": true
     }
   },
   "script_actions": [
     {
-      "action": "type",
-      "description": "Type text into the composer input character by character",
+      "action": "type-message",
+      "description": "Type into the composer",
       "params": {
-        "text": "string - Text to type",
-        "speed": "number - Characters per second (default 28)"
+        "text": "string",
+        "speed": "number - sec/char (default 0.035)"
       }
     },
     {
       "action": "send-message",
-      "description": "Send the currently typed text as a user message bubble with avatar, clears composer"
+      "description": "Post the typed text as a user bubble (pink initials avatar above, white bordered bubble)"
+    },
+    {
+      "action": "user-message",
+      "description": "Instant user bubble",
+      "params": {
+        "text": "string"
+      }
     },
     {
       "action": "agent-message",
-      "description": "Show an agent response with markdown support (**bold**, `code`, *italic*, bullet lists, emoji)",
+      "description": "Agent prose (removes typing dots)",
       "params": {
-        "text": "string - Agent response text with optional markdown"
+        "text": "string - **bold** + `code`, \\n\\n paragraphs"
       }
     },
     {
-      "action": "tool-use",
-      "description": "Show a tool use indicator: \ud83d\udfe2 Used **action** on **Service**",
+      "action": "verb-line",
+      "description": "Color-coded did-a-thing line: muted verb + entity icon + noun, bold title beneath (or inline_title for one-liners)",
       "params": {
-        "action": "string - Tool action name (e.g. generate-design)",
-        "service": "string - Service name (e.g. Canva)"
+        "verb": "string",
+        "entity": "string - linkedin|x|email|doc|template|task|campaign|blog|memory",
+        "title": "string",
+        "inline_title": "boolean",
+        "noun": "string - override"
       }
     },
     {
-      "action": "asset-card",
-      "description": "Show an asset reference card with document icon, title, and subtitle",
+      "action": "content-card",
+      "description": "THE streaming box: 'Created/Updated [entity]' header + bold title + chevron; the content STREAMS word-by-word into the white inner box, older lines sliding up under the top fade; the floating scroll-down button shows while streaming",
       "params": {
-        "title": "string - Asset card title",
-        "subtitle": "string - Asset card subtitle (default: Asset)"
+        "verb": "string",
+        "entity": "string",
+        "title": "string",
+        "content": "string - \\n\\n paragraphs",
+        "duration": "number - stream seconds (default 3)",
+        "collapse_delay": "number - fold shut after done"
       }
     },
     {
-      "action": "agent-image",
-      "description": "Show an image in the chat as an agent message",
+      "action": "task-status",
+      "description": "'Marked N task(s) as ◑ In review' + blue-checkbox task rows",
       "params": {
-        "src": "string - Image URL or file path",
-        "alt": "string - Alt text (default 'Generated image')",
-        "width": "string - CSS width (default '100%')",
-        "max_height": "string - CSS max-height (default '200px')"
+        "status": "string",
+        "tasks": "array of strings",
+        "count": "number"
+      }
+    },
+    {
+      "action": "summarized",
+      "description": "The 'Conversation summarized' hairline divider",
+      "params": {
+        "label": "string"
+      }
+    },
+    {
+      "action": "open-references",
+      "description": "References popover under the copies icon: entity icon + title + kind per row",
+      "params": {
+        "items": "array - [{entity, title, kind}]"
+      }
+    },
+    {
+      "action": "close-references",
+      "description": "Dismiss the popover"
+    },
+    {
+      "action": "switch-tab",
+      "description": "Move the active underline to another tab",
+      "params": {
+        "index": "number"
       }
     },
     {
       "action": "show-typing",
-      "description": "Show a typing indicator with animated bouncing dots"
+      "description": "Typing dots"
     },
     {
       "action": "hide-typing",
-      "description": "Hide the typing indicator"
+      "description": "Remove the typing dots"
     },
     {
-      "action": "scroll-to-bottom",
-      "description": "Smooth scroll messages area to bottom"
+      "action": "scroll-messages",
+      "description": "Snap the transcript to the bottom"
     }
   ],
   "default_cursor_targets": {
     "composer": {
       "x": "50%",
-      "y": "82%"
+      "y": "86%"
     },
-    "send-button": {
-      "x": "93%",
-      "y": "90%"
-    },
-    "expand-btn": {
-      "x": "88%",
-      "y": "3%"
+    "copies": {
+      "x": "86%",
+      "y": "4%"
     }
   },
   "tier": "performable-surface"
