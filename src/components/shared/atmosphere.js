@@ -104,19 +104,10 @@
     }, 0);
   };
 
-  // One shimmer sweep across an element (headline, numeral, logo).
-  window.mpShimmer = function (tl, el, at) {
-    if (!tl || !el) return;
-    var sweep = document.createElement('div');
-    sweep.style.cssText = 'position:absolute;top:-10%;bottom:-10%;width:34%;left:-40%;pointer-events:none;' +
-      'background:linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%);' +
-      'mix-blend-mode:overlay;filter:blur(2px);';
-    var cs = getComputedStyle(el);
-    if (cs.position === 'static') el.style.position = 'relative';
-    el.style.overflow = 'hidden';
-    el.appendChild(sweep);
-    tl.to(sweep, { left: '120%', duration: 0.9, ease: 'power2.inOut' }, at || 2);
-  };
+  // RETIRED (kept as a no-op so template call sites don't break): the light
+  // sweep read as a cheesy lens flare on kinetic type -- director's note is
+  // that hero elements land and HOLD, no glint.
+  window.mpShimmer = function () {};
 
   // Colored soft shadow (light direction consistent with the washes).
   window.mpLiftShadow = function (el, color) {

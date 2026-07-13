@@ -317,7 +317,7 @@ These globals are injected into every scene. They ARE the house motion language;
 - \`mpSnapIn(tl, el, at)\` / \`mpSnapOut(tl, el, at)\` -- fast blur-smear arrivals/exits for smaller elements; compose speed CONTRAST (0.2-0.4s snaps against 1s+ drifts).
 - \`mpStampIn(tl, el, at, {rotation?})\` -- rubber-stamp slam for badges/labels landing on content.
 - \`mpGlow(el, color, intensity)\` -- brand-hue bloom. \`mpGradientBorder(el, from, to)\` -- 1px gradient shell (the premium card edge). \`mpLiftShadow(el)\` -- lit soft shadow.
-- \`mpShimmer(tl, el, at)\` -- one light sweep across a hero element. \`mpCameraPush(tl, rootEl, ctx.duration)\` -- the slow push; the camera should never be fully static.
+- \`mpCameraPush(tl, rootEl, ctx.duration)\` -- the slow push; the camera should never be fully static. (No light sweeps/glints across type -- hero elements land and HOLD.)
 - \`mpBeatPhases(ctx, fallbackCount)\` -- the scene's beat windows; choreograph AGAINST these so long scenes evolve.
 - BUILD-FIRST primitives -- nothing on screen appears finished: \`mpCountUp(tl, el, at)\` animates numbers counting to the value in el's text (keeps $ % , formatting); \`mpTypeIn(tl, el, at, {cps})\` types el's text character-by-character with a cursor; \`mpCascade(tl, rows, at, {each})\` builds list rows in one at a time. Any UI you draw (a chat, a table, a terminal, stats) must be SEEN building via these -- a pre-made UI screenshot is a slide.
 - \`mpLogoOnDark(imgEl, glowColor)\` -- REQUIRED whenever a brand logo renders on a dark ground (flips a light-theme wordmark legible).
