@@ -22,6 +22,11 @@
       "optional": true,
       "enum": ["fade-up", "slide-right", "scale", "rotate"],
       "default": "fade-up"
+    },
+    "color": {
+      "type": "string",
+      "label": "Text color override (CSS color). Default is the brand text color -- on dark scenes/WebGL worlds set an explicit light color, e.g. #f5f6fa.",
+      "optional": true
     }
   }
 }
