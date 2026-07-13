@@ -136,6 +136,19 @@ function genProgress(j: { progress?: { step: string; percent: number; detail?: s
   };
 }
 
+/** Enrich a project response with its live Studio link + the iterate-first
+ *  workflow nudge. Studio plays scenes live in the browser (motion included)
+ *  with NO render, so edits should be reviewed there before any render job. */
+function withStudio(project: { tenant_id: string; project_id: string } & Record<string, unknown>) {
+  return {
+    ...project,
+    studio_url: previewUrl(project.tenant_id, project.project_id),
+    workflow_hint:
+      "Iterate BEFORE rendering: review this edit live in studio_url (plays scenes with motion, no render). " +
+      "Proof stills with render{scene_id}. First full motion pass: render{quality:'preview'}. Production render only to ship.",
+  };
+}
+
 /** Enrich a job object with preview_url when tenant and project are known. */
 function jobWithPreview(job: Record<string, unknown>): Record<string, unknown> {
   const tenantId = job.tenantId as string | undefined;
@@ -174,7 +187,7 @@ export function createMcpServer(): McpServer {
         preset: params.preset,
         fps: params.fps,
       });
-      return ok(project);
+      return ok(withStudio(project));
     },
   );
 
@@ -238,7 +251,7 @@ export function createMcpServer(): McpServer {
         return ok(scene);
       }
 
-      return ok(project);
+      return ok(withStudio(project));
     },
   );
 
@@ -322,7 +335,7 @@ export function createMcpServer(): McpServer {
           params.component as SceneComponent,
         );
         if (!project) return err("Project or scene not found");
-        return ok(project);
+        return ok(withStudio(project));
       }
 
       if (params.scene) {
@@ -334,7 +347,7 @@ export function createMcpServer(): McpServer {
           params.position,
         );
         if (!project) return err("Project not found");
-        return ok(project);
+        return ok(withStudio(project));
       }
 
       return err("Provide either 'scene' (to add a scene), 'scene_id' + 'component' (to add a component)");
@@ -702,7 +715,7 @@ export function createMcpServer(): McpServer {
     async (params) => {
       const project = await reorderScenes(params.tenant_id, params.project_id, params.scene_ids);
       if (!project) return err("Project not found or invalid scene IDs");
-      return ok(project);
+      return ok(withStudio(project));
     },
   );
 
@@ -918,7 +931,13 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "render",
-    "Render a project to its output format, or render a single scene as a preview image. Pass scene_id for scene preview.",
+    "Render a project to its output format, or render a single scene as a preview image (pass scene_id). " +
+      "ITERATE BEFORE YOU RENDER -- the cheap-to-expensive ladder: (1) paper-edit the beats and get sign-off, " +
+      "(2) proof layout with single-scene stills (scene_id), (3) review motion LIVE in the project's studio_url " +
+      "(every project response includes it; Studio plays scenes in the browser with no render), " +
+      "(4) first full motion pass with quality:'preview' (lower fps, much faster), (5) production render only to ship. " +
+      "A production render captures every scene frame-by-frame (~2min/scene cold; unchanged scenes are free via the scene cache). " +
+      "NEVER edit a project while its render job runs.",
     {
       tenant_id: z.string(),
       project_id: z.string(),
