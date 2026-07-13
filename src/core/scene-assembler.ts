@@ -566,7 +566,10 @@ export function cameraMovesScript(
     if (!target) {
       var cam = document.createElement('div');
       cam.className = '__mp_camera_rig';
-      cam.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;will-change:transform;transform-origin:50% 50%;';
+      // z-index 2: will-change makes the rig a stacking context (unit z 0/auto),
+      // so backdrops left OUTSIDE the rig (z 1) would paint OVER the whole rig.
+      // Bit the Studio composite: every camera_moves scene showed backdrop only.
+      cam.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;will-change:transform;transform-origin:50% 50%;z-index:2;';
       Array.prototype.slice.call(root.childNodes).forEach(function(n) {
         if (n.nodeType === 1) {
           var t = n.tagName;
