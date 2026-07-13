@@ -2,75 +2,194 @@
   "type": "quotient-social",
   "label": "Quotient Social — post editor",
   "category": "mockups",
-  "description": "The Quotient social post editor (built from actual screenshots): white toolbar with the platform badge (X black tile or LinkedIn blue) + post title, kebab/share buttons, the orange flag campaign-tag pill with progress ring, 'Go to thread ↗', and the BLACK Schedule split-button with a Publish Now / Schedule for later dropdown (published posts show 'View ↗' instead); below it the dotted-grid canvas with the post card -- GREEN '✓ Post published on {date}' bar (or gray '✎ Draft') with the char counter ('652/25,000'), the author row (X: brand avatar + X corner badge + blue verified check + @handle; LinkedIn: photo + in corner badge + in name badge), the body text, and up to two side-by-side media cards (image, gradient headline placeholder, or file stack). SCRIPTED performable surface. Camera anchors: post, status, media, toolbar.",
+  "description": "The Quotient social post editor (built from actual screenshots): white toolbar with the platform badge (X black tile or LinkedIn blue) + post title, kebab/share buttons, the orange flag campaign-tag pill with progress ring, 'Go to thread ↗', and the BLACK Schedule split-button with a Publish Now / Schedule for later dropdown (published posts show 'View ↗' instead); below it the dotted-grid canvas with the post card -- GREEN '✓ Post published on {date}' bar (or gray '✎ Draft') with the char counter ('652/25,000'), the author row (X: brand avatar + X corner badge + blue verified check + @handle; LinkedIn: photo + in corner badge + in name badge), the body text, up to two side-by-side media cards (image, gradient headline placeholder, or file stack), the muted Likes/Comments/Reposts/Forwards engagement row, and the footer AUTHOR block (avatar + name + platform badge + gray Author chip + the first comment, e.g. 'Apply here: {url}'). SCRIPTED performable surface. Camera anchors: post, status, media, toolbar.",
   "data": {
     "platform": {
       "type": "string",
       "label": "'x' or 'linkedin' (default linkedin) -- switches badges, author treatment, and char limit default",
       "optional": true,
-      "enum": ["x", "linkedin"]
+      "enum": [
+        "x",
+        "linkedin"
+      ]
     },
     "status": {
       "type": "string",
       "label": "Post status (default draft). Published shows the green bar + View button; draft shows the gray ✎ bar + black Schedule button.",
       "optional": true,
-      "enum": ["published", "draft", "scheduled"]
+      "enum": [
+        "published",
+        "draft",
+        "scheduled"
+      ]
     },
-    "post_title": { "type": "string", "label": "Toolbar title (e.g. 'July 9 Changelog — Quotient X')", "optional": true },
-    "published_date": { "type": "string", "label": "Date in the published/scheduled bar (e.g. 'Jul 9, 2026 at 10:01 AM')", "optional": true },
-    "author_name": { "type": "string", "label": "Author display name (default: 'Quotient AI' on X, 'Marc Ferrentino' on LinkedIn)", "optional": true },
-    "author_handle": { "type": "string", "label": "X handle under the name (default '@Quotient_AI_' on X; hidden on LinkedIn)", "optional": true },
-    "author_avatar_url": { "type": "string", "label": "Avatar image URL (default: Quotient logo via logo.dev on X, photo on LinkedIn)", "optional": true },
-    "author_initials": { "type": "string", "label": "Fallback initials if the avatar image fails", "optional": true },
-    "verified": { "type": "boolean", "label": "Blue verified check beside the name (default true on X)", "optional": true },
-    "post_text": { "type": "string", "label": "Post body (\\n\\n = paragraph break)", "optional": true },
-    "char_count": { "type": "number", "label": "Char counter numerator (default: post length)", "optional": true },
-    "char_limit": { "type": "number", "label": "Char counter denominator (default 25000 on X, 3000 on LinkedIn)", "optional": true },
+    "post_title": {
+      "type": "string",
+      "label": "Toolbar title (e.g. 'July 9 Changelog — Quotient X')",
+      "optional": true
+    },
+    "published_date": {
+      "type": "string",
+      "label": "Date in the published/scheduled bar (e.g. 'Jul 9, 2026 at 10:01 AM')",
+      "optional": true
+    },
+    "author_name": {
+      "type": "string",
+      "label": "Author display name (default: 'Quotient AI' on X, 'Marc Ferrentino' on LinkedIn)",
+      "optional": true
+    },
+    "author_handle": {
+      "type": "string",
+      "label": "X handle under the name (default '@Quotient_AI_' on X; hidden on LinkedIn)",
+      "optional": true
+    },
+    "author_avatar_url": {
+      "type": "string",
+      "label": "Avatar image URL (default: Quotient logo via logo.dev on X, photo on LinkedIn)",
+      "optional": true
+    },
+    "author_initials": {
+      "type": "string",
+      "label": "Fallback initials if the avatar image fails",
+      "optional": true
+    },
+    "verified": {
+      "type": "boolean",
+      "label": "Blue verified check beside the name (default true on X)",
+      "optional": true
+    },
+    "post_text": {
+      "type": "string",
+      "label": "Post body (\\n\\n = paragraph break)",
+      "optional": true
+    },
+    "char_count": {
+      "type": "number",
+      "label": "Char counter numerator (default: post length)",
+      "optional": true
+    },
+    "char_limit": {
+      "type": "number",
+      "label": "Char counter denominator (default 25000 on X, 3000 on LinkedIn)",
+      "optional": true
+    },
     "media": {
       "type": "array",
       "label": "Up to 2 side-by-side media cards: [{image_url} | {headline, subtext?} (gradient placeholder) | {kind: 'files', files: ['PDF','DOC'], label}]",
       "optional": true
     },
-    "tag_name": { "type": "string", "label": "Campaign tag pill text (default 'Quotient Changelog')", "optional": true },
-    "tag_progress": { "type": "string", "label": "Tag progress fraction shown in the pill + ring (default '0/1')", "optional": true },
-    "show_app_bar": { "type": "boolean", "label": "Show the app chrome bar above the toolbar (bell, Search ⌘+K, New Chat)", "optional": true },
-    "embed_image_url": { "type": "string", "label": "LEGACY: single media card image (prefer `media`)", "optional": true },
-    "embed_headline": { "type": "string", "label": "LEGACY: single gradient card headline (prefer `media`)", "optional": true },
-    "embed_subtext": { "type": "string", "label": "LEGACY: gradient card subtext (prefer `media`)", "optional": true },
+    "tag_name": {
+      "type": "string",
+      "label": "Campaign tag pill text (default 'Quotient Changelog')",
+      "optional": true
+    },
+    "tag_progress": {
+      "type": "string",
+      "label": "Tag progress fraction shown in the pill + ring (default '0/1')",
+      "optional": true
+    },
+    "show_app_bar": {
+      "type": "boolean",
+      "label": "Show the app chrome bar above the toolbar (bell, Search ⌘+K, New Chat)",
+      "optional": true
+    },
+    "embed_image_url": {
+      "type": "string",
+      "label": "LEGACY: single media card image (prefer `media`)",
+      "optional": true
+    },
+    "embed_headline": {
+      "type": "string",
+      "label": "LEGACY: single gradient card headline (prefer `media`)",
+      "optional": true
+    },
+    "embed_subtext": {
+      "type": "string",
+      "label": "LEGACY: gradient card subtext (prefer `media`)",
+      "optional": true
+    },
     "script": {
       "type": "array",
       "label": "Actions: scroll-post {amount, duration}, highlight-status, highlight-media, open-schedule-menu (the black button's Publish Now / Schedule for later dropdown drops down), close-schedule-menu, publish-post {published_date?} (Publish Now row flashes, menu closes, the bar flips GREEN '✓ Post published on …' and Schedule becomes View -- THE money beat), schedule-post {scheduled_date}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (post, status, media, toolbar).",
       "optional": true
     },
-    "cursor_targets": { "type": "object", "label": "Named cursor positions (status, schedule, media)", "optional": true }
+    "cursor_targets": {
+      "type": "object",
+      "label": "Named cursor positions (status, schedule, media)",
+      "optional": true
+    },
+    "author_comment": {
+      "type": "string",
+      "label": "Footer author block: the author's first comment under the post (e.g. 'Apply here: https://...') -- shows the avatar + name + platform badge + gray Author chip. Legacy author_url maps here.",
+      "optional": true
+    },
+    "show_engagement": {
+      "type": "boolean",
+      "label": "Muted Likes / Comments / Reposts / Forwards row under the post (default true)",
+      "optional": true
+    }
   },
   "script_actions": [
     {
       "action": "scroll-post",
       "description": "Smoothly scroll the post card content down",
-      "params": { "amount": "number - pixels (default 300)", "duration": "number - seconds (default 2)" }
+      "params": {
+        "amount": "number - pixels (default 300)",
+        "duration": "number - seconds (default 2)"
+      }
     },
-    { "action": "highlight-status", "description": "Pulse a glow on the status bar" },
-    { "action": "highlight-media", "description": "Gently scale-pulse the media cards" },
-    { "action": "highlight-embed", "description": "LEGACY alias of highlight-media" },
-    { "action": "show-reactions", "description": "LEGACY: subtle card pulse" },
-    { "action": "open-schedule-menu", "description": "Press the black Schedule button; the Publish Now / Schedule for later dropdown opens beneath it" },
-    { "action": "close-schedule-menu", "description": "Dismiss the dropdown" },
+    {
+      "action": "highlight-status",
+      "description": "Pulse a glow on the status bar"
+    },
+    {
+      "action": "highlight-media",
+      "description": "Gently scale-pulse the media cards"
+    },
+    {
+      "action": "highlight-embed",
+      "description": "LEGACY alias of highlight-media"
+    },
+    {
+      "action": "show-reactions",
+      "description": "LEGACY: subtle card pulse"
+    },
+    {
+      "action": "open-schedule-menu",
+      "description": "Press the black Schedule button; the Publish Now / Schedule for later dropdown opens beneath it"
+    },
+    {
+      "action": "close-schedule-menu",
+      "description": "Dismiss the dropdown"
+    },
     {
       "action": "publish-post",
       "description": "The publish beat: the Publish Now row flashes, the menu closes, the status bar flips to the green '✓ Post published on {date}' treatment and the Schedule button becomes View ↗",
-      "params": { "published_date": "string - date text for the green bar" }
+      "params": {
+        "published_date": "string - date text for the green bar"
+      }
     },
     {
       "action": "schedule-post",
       "description": "Flip the status bar to the blue 'Scheduled for {date}' treatment",
-      "params": { "scheduled_date": "string - date text (default 'Jul 15, 2026 at 10:00 AM')" }
+      "params": {
+        "scheduled_date": "string - date text (default 'Jul 15, 2026 at 10:00 AM')"
+      }
     }
   ],
   "default_cursor_targets": {
-    "status": { "x": "50%", "y": "18%" },
-    "schedule": { "x": "88%", "y": "9%" },
-    "media": { "x": "50%", "y": "70%" }
+    "status": {
+      "x": "50%",
+      "y": "18%"
+    },
+    "schedule": {
+      "x": "88%",
+      "y": "9%"
+    },
+    "media": {
+      "x": "50%",
+      "y": "70%"
+    }
   },
   "tier": "performable-surface"
 }
