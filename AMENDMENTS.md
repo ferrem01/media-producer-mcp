@@ -480,3 +480,28 @@ quotient-chat... mainly bc it is the same one in real life."
   (x 67.6%, y 8%, 30.5%×87% with the standard inset shell). Demo
   scene_campaign now runs the 3-component composition (shell + campaign
   center + real panel), scene_chat showcases the panel standalone.
+
+## 2026-07-13 — Connector explainer restyled HyperFrames + render write-back gotcha (PR #339)
+
+Marc: "WebGL backgrounds to each scene... components smaller so they're
+contained... no voiceover — classic hyperframes: kinetic text, then a
+scene... intro slide with the Claude logo and the Quotient logo." Then:
+"the pitch is work on the idea in Claude... execute in Quotient... then
+list out all the features of quotient that work."
+
+- **proj_0890a34e restructured**: intro (logos × logos, 'Now connected.')
+  → 4 manifesto interstitials (THE IDEA / THE WORK / EXECUTE / SHIP) each
+  cutting to its product scene (Cowork ask, Cowork run, Quotient campaign
+  trio, publish trio) → **st-swarm feature roll** ('All of Quotient. One
+  connector.' over 12 flying feature words) → hero close. All product
+  windows inset over webgl-backdrop worlds (Cowork 84%, shell trio 88%).
+- **kinetic-text data.color** (PR #339): the component inherited
+  --mp-color-text (near-black on light brands) — illegible on dark
+  worlds. Optional CSS color override added.
+- **GOTCHA (unfixed, real bug): editing a project while a render job is
+  running gets CLOBBERED** — the job holds the project in memory and
+  writes it back on completion, silently reverting any edit made
+  mid-render (lost the feature-roll scene + manifesto rewrites once).
+  Rule: never update/add while a render runs; re-apply after it
+  completes. Product fix: render completion should patch status/output
+  fields only, not write the whole project snapshot.
