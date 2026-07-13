@@ -109,6 +109,24 @@
   // that hero elements land and HOLD, no glint.
   window.mpShimmer = function () {};
 
+  // THE one editorial type entrance (house type system): the whole line rises
+  // ~10px and fades in over ~300ms. Stagger per LINE, never per word -- the
+  // reader parses at their own speed, not the animation's. No masks, no
+  // clips, no rotation, no scale, no glow. Pass an element or an array of
+  // line elements (staggered 90ms apart).
+  window.mpLineRise = function (tl, els, at, opts) {
+    if (!tl || !els) return;
+    var list = Array.isArray(els) || (els.length !== undefined && !els.nodeType) ? Array.prototype.slice.call(els) : [els];
+    var o = opts || {};
+    gsap.set(list, { autoAlpha: 0, y: o.rise || 10 });
+    tl.to(list, {
+      autoAlpha: 1, y: 0,
+      duration: o.duration || 0.3,
+      stagger: o.stagger !== undefined ? o.stagger : 0.09,
+      ease: 'power3.out',
+    }, at || 0);
+  };
+
   // Colored soft shadow (light direction consistent with the washes).
   window.mpLiftShadow = function (el, color) {
     if (!el) return;

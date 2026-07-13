@@ -2,30 +2,26 @@
   "type": "kinetic-text",
   "label": "Kinetic Text",
   "category": "titles",
-  "description": "Per-word or per-character text animation with staggered entrance effects.",
+  "description": "Editorial text line with the house entrance: the whole line rises ~10px and fades in (~300ms). No per-word effects. Emphasis via *stars* = brand-color accent, color only.",
   "data": {
     "text": {
       "type": "string",
-      "label": "Text",
+      "label": "Text. Wrap key words in *stars* to accent them in brand color.",
       "required": true
-    },
-    "mode": {
-      "type": "string",
-      "label": "Split Mode",
-      "optional": true,
-      "enum": ["word", "char"],
-      "default": "word"
-    },
-    "effect": {
-      "type": "string",
-      "label": "Effect",
-      "optional": true,
-      "enum": ["fade-up", "slide-right", "scale", "rotate"],
-      "default": "fade-up"
     },
     "color": {
       "type": "string",
-      "label": "Text color override (CSS color). Default is the brand text color -- on dark scenes/WebGL worlds set an explicit light color, e.g. #f5f6fa.",
+      "label": "Text color override (CSS color). Default is the brand text color -- on dark scenes set an explicit light color, e.g. #f5f6fa.",
+      "optional": true
+    },
+    "mode": {
+      "type": "string",
+      "label": "LEGACY (ignored): all text now enters as a whole line",
+      "optional": true
+    },
+    "effect": {
+      "type": "string",
+      "label": "LEGACY (ignored): the house line-rise is the only entrance",
       "optional": true
     }
   }
