@@ -238,10 +238,14 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       ));
     }
 
-    // Determine scene background
+    // Determine scene background. An explicit scene.background must be used
+    // LITERALLY: the composite defines --mp-color-background once globally,
+    // so var(--mp-color-background, <scene color>) never reaches the
+    // fallback -- dark scenes rendered on the global light canvas in Studio
+    // while the per-scene render path got them right.
     const sceneBg = isTransparent
       ? 'transparent'
-      : `var(--mp-color-background, ${scene.background || canvas.background || "#000000"})`;
+      : scene.background || `var(--mp-color-background, ${canvas.background || "#000000"})`;
 
     // Build content region wrapper for this scene
     const contentRegion = buildContentRegionWrapper(scene, componentBlocks);
