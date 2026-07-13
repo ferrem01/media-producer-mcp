@@ -2,16 +2,48 @@
   "type": "quotient-app-shell",
   "label": "Quotient app shell (nav + header + agent panel)",
   "category": "mockups",
-  "description": "The Quotient application chrome (built from actual screenshots): left icon rail (home, history, campaigns, social, blog, email, assets, docs, flows, calendar, audience, memory + avatar), breadcrumb header (collapse icon, 'Campaigns › {campaign} › {item}', bell with count badge, Search ⌘+K, history, black New Chat button), and the RIGHT AGENT PANEL -- tabbed title ('Draft LinkedIn POV Post ×'), messages area with 'Reviewed/Updated [in] LinkedIn post' tool cards (collapsible, with faded post-preview body), agent prose, user bubbles, and the composer ('Type a message...', paperclip, Auto picker, mic, black send). THE COMPOSABLE SHELL: the center is an EMPTY CONTENT WELL -- place any center component (quotient-social, campaign screen, email, doc, flow) as a SEPARATE scene component over it. The shell is a rounded floating WINDOW (radius + border + shadow) -- ALWAYS place it INSET, never full-bleed, so scene drift/zoom can't crop the rail or header. CONTENT REGION CONTRACT: shell at x 1.2%, y 2%, width 97.6%, height 96% → center component at x 4.7%, y 8%, width 61.5%, height 89%. (General rule: center x = shellX + 0.036·shellW, y = shellY + 0.062·shellH, w = 0.63·shellW, h = 0.93·shellH; with show_panel false, w = 0.96·shellW.) SCRIPTED performable surface; camera anchors: content, panel, messages, composer, header, nav.",
+  "description": "The Quotient application chrome (built from actual screenshots): left icon rail matching the real app (panel-collapse at the very top, then home, history, campaigns flag, social thumbs-up, blog book, email, assets image, docs file, flows nodes, calendar, audience people, scheduled clock-box, memory brain + avatar at the bottom), breadcrumb header (collapse icon, 'Campaigns › {campaign} › {item}', bell with count badge, Search ⌘+K, history, black New Chat button), and the RIGHT AGENT PANEL -- tabbed title ('Draft LinkedIn POV Post ×'), messages area with 'Reviewed/Updated [in] LinkedIn post' tool cards (collapsible, with faded post-preview body), agent prose, user bubbles, and the composer ('Type a message...', paperclip, Auto picker, mic, black send). THE COMPOSABLE SHELL: the center is an EMPTY CONTENT WELL -- place any center component (quotient-social, campaign screen, email, doc, flow) as a SEPARATE scene component over it. The shell is a rounded floating WINDOW (radius + border + shadow) -- ALWAYS place it INSET, never full-bleed, so scene drift/zoom can't crop the rail or header. CONTENT REGION CONTRACT: shell at x 1.2%, y 2%, width 97.6%, height 96% → center component at x 4.7%, y 8%, width 61.5%, height 89%. (General rule: center x = shellX + 0.036·shellW, y = shellY + 0.062·shellH, w = 0.63·shellW, h = 0.93·shellH; with show_panel false, w = 0.96·shellW.) SCRIPTED performable surface; camera anchors: content, panel, messages, composer, header, nav.",
   "data": {
-    "breadcrumbs": { "type": "array", "label": "Header breadcrumb strings, e.g. ['Campaigns', 'Free Trial Launch', 'Post 1 — LinkedIn']", "optional": true },
-    "nav_active": { "type": "string", "label": "Highlighted rail icon: home|history|campaigns|social|blog|email|assets|docs|flows|calendar|audience|memory (default campaigns)", "optional": true },
-    "badge_count": { "type": "number", "label": "Bell notification count (default 480)", "optional": true },
-    "panel_tab": { "type": "string", "label": "Agent panel tab title (default 'Draft LinkedIn POV Post')", "optional": true },
-    "copies_badge": { "type": "number", "label": "Count badge on the panel's copies icon (default 2)", "optional": true },
-    "show_panel": { "type": "boolean", "label": "Show the right agent panel (default true). False = full-width content well.", "optional": true },
-    "user_avatar_url": { "type": "string", "label": "Avatar photo at the rail bottom", "optional": true },
-    "user_initials": { "type": "string", "label": "Avatar fallback initials", "optional": true },
+    "breadcrumbs": {
+      "type": "array",
+      "label": "Header breadcrumb strings, e.g. ['Campaigns', 'Free Trial Launch', 'Post 1 — LinkedIn']",
+      "optional": true
+    },
+    "nav_active": {
+      "type": "string",
+      "label": "Highlighted rail icon: home|history|campaigns|social|blog|email|assets|docs|flows|calendar|audience|scheduled|memory (default campaigns)",
+      "optional": true
+    },
+    "badge_count": {
+      "type": "number",
+      "label": "Bell notification count (default 480)",
+      "optional": true
+    },
+    "panel_tab": {
+      "type": "string",
+      "label": "Agent panel tab title (default 'Draft LinkedIn POV Post')",
+      "optional": true
+    },
+    "copies_badge": {
+      "type": "number",
+      "label": "Count badge on the panel's copies icon (default 2)",
+      "optional": true
+    },
+    "show_panel": {
+      "type": "boolean",
+      "label": "Show the right agent panel (default true). False = full-width content well.",
+      "optional": true
+    },
+    "user_avatar_url": {
+      "type": "string",
+      "label": "Avatar photo at the rail bottom",
+      "optional": true
+    },
+    "user_initials": {
+      "type": "string",
+      "label": "Avatar fallback initials",
+      "optional": true
+    },
     "history": {
       "type": "array",
       "label": "Panel transcript at open: [{type: 'user'|'agent'|'reviewed'|'tool-card', text?, verb?, platform?, noun?, title?, preview?, open?}]",
@@ -22,23 +54,84 @@
       "label": "Panel performance: type-message {text}, send-message, user-message {text}, show-typing / hide-typing, agent-message {text} (**bold** + `code`), reviewed-line {verb: 'Reviewed', platform: 'linkedin'|'x', noun: 'LinkedIn post', title} (the muted did-a-thing line + bold title), tool-card {verb: 'Updated', platform, noun, title, preview: 'post text...\\n\\n...', open: true, collapse_delay?: 2} (the collapsible white card with the faded post preview -- THE agent-worked-on-your-content beat). Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (content, panel, messages, composer).",
       "optional": true
     },
-    "cursor_targets": { "type": "object", "label": "Named cursor positions (composer, send)", "optional": true }
+    "cursor_targets": {
+      "type": "object",
+      "label": "Named cursor positions (composer, send)",
+      "optional": true
+    }
   },
   "script_actions": [
-    { "action": "type-message", "description": "Type into the panel composer", "params": { "text": "string", "speed": "number - sec/char (default 0.035)" } },
-    { "action": "send-message", "description": "Post the typed text as a user bubble" },
-    { "action": "user-message", "description": "Instant user bubble", "params": { "text": "string" } },
-    { "action": "agent-message", "description": "Agent prose block (removes typing dots)", "params": { "text": "string - **bold** + `code`" } },
-    { "action": "reviewed-line", "description": "Muted 'Reviewed [in] LinkedIn post' line + bold item title", "params": { "verb": "string", "platform": "string - linkedin|x", "noun": "string", "title": "string" } },
+    {
+      "action": "type-message",
+      "description": "Type into the panel composer",
+      "params": {
+        "text": "string",
+        "speed": "number - sec/char (default 0.035)"
+      }
+    },
+    {
+      "action": "send-message",
+      "description": "Post the typed text as a user bubble"
+    },
+    {
+      "action": "user-message",
+      "description": "Instant user bubble",
+      "params": {
+        "text": "string"
+      }
+    },
+    {
+      "action": "agent-message",
+      "description": "Agent prose block (removes typing dots)",
+      "params": {
+        "text": "string - **bold** + `code`"
+      }
+    },
+    {
+      "action": "reviewed-line",
+      "description": "Muted 'Reviewed [in] LinkedIn post' line + bold item title",
+      "params": {
+        "verb": "string",
+        "platform": "string - linkedin|x",
+        "noun": "string",
+        "title": "string"
+      }
+    },
     {
       "action": "tool-card",
       "description": "The collapsible tool card: 'Updated [in] LinkedIn post' + item title + chevron, with a faded preview of the content the agent touched",
-      "params": { "verb": "string", "platform": "string - linkedin|x", "noun": "string", "title": "string", "preview": "string - \\n\\n paragraphs", "open": "boolean (default true)", "collapse_delay": "number - seconds until it folds shut" }
+      "params": {
+        "verb": "string",
+        "platform": "string - linkedin|x",
+        "noun": "string",
+        "title": "string",
+        "preview": "string - \\n\\n paragraphs",
+        "open": "boolean (default true)",
+        "collapse_delay": "number - seconds until it folds shut"
+      }
     },
-    { "action": "show-typing", "description": "Typing dots in the panel" },
-    { "action": "hide-typing", "description": "Remove the typing dots" },
-    { "action": "scroll-messages", "description": "Snap the panel scroll to the bottom" }
+    {
+      "action": "show-typing",
+      "description": "Typing dots in the panel"
+    },
+    {
+      "action": "hide-typing",
+      "description": "Remove the typing dots"
+    },
+    {
+      "action": "scroll-messages",
+      "description": "Snap the panel scroll to the bottom"
+    }
   ],
-  "default_cursor_targets": { "composer": { "x": "83%", "y": "86%" }, "send": { "x": "96%", "y": "90%" } },
+  "default_cursor_targets": {
+    "composer": {
+      "x": "83%",
+      "y": "86%"
+    },
+    "send": {
+      "x": "96%",
+      "y": "90%"
+    }
+  },
   "tier": "performable-surface"
 }
