@@ -428,3 +428,21 @@ Marc's screenshots: Brief / Tasks / Activation / Deliverables tabs.
 - Demo: proj_8446563d scene_campaign — brief → tasks (2 checked) →
   activation (Marc's post dragged to Friday) → deliverables (last row
   flips Published), agent panel narrating each move.
+
+## 2026-07-12 — polish: social footer + shell inset window (PR #332)
+
+Marc: shell "getting clipped in your test film... make it smaller so i can
+be sure the entire app is visible"; social "we lost the bottom part of the
+social post."
+
+- **quotient-social**: engagement row (Likes/Comments/Reposts/Forwards,
+  show_engagement) + footer AUTHOR block (avatar w/ corner badge, name +
+  badge + gray Author chip, first comment via author_comment e.g.
+  'Apply here: {url}') restored from the real screenshot.
+- **quotient-app-shell** is now a rounded floating window (radius/border/
+  shadow) placed INSET, never full-bleed: shell {x 1.2%, y 2%, 97.6%×96%} →
+  center {x 4.7%, y 8%, 61.5%×89%} (formula in the schema). Full-bleed
+  placement + scene drift is what cropped the rail/header.
+- Note: final-mp4 duration ≠ sum of scene durations (crossfades add time);
+  compute frame-grab timestamps from ffprobe/Duration, not scene math —
+  "clipped" end frames were actually mid-zoom camera moments.
