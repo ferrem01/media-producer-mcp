@@ -195,9 +195,15 @@ async function runRender(
     );
     trace.setOutcome("success");
 
-    // Update project status
-    project.status = "rendered";
-    await saveProject(project);
+    // Update project status. RELOAD from disk first: `project` is the
+    // snapshot loaded when the job STARTED -- renders run for many minutes,
+    // and saving the stale object here silently clobbers any edit the user
+    // made mid-render (scenes added, copy changed). Patch status only.
+    const projectAtEnd = await loadProject(job.tenantId, projectId);
+    if (projectAtEnd) {
+      projectAtEnd.status = "rendered";
+      await saveProject(projectAtEnd);
+    }
   } catch (err: any) {
     job.status = "failed";
     job.error = err.message || "Unknown error";
