@@ -139,7 +139,7 @@ function genProgress(j: { progress?: { step: string; percent: number; detail?: s
 /** Enrich a project response with its live Studio link + the iterate-first
  *  workflow nudge. Studio plays scenes live in the browser (motion included)
  *  with NO render, so edits should be reviewed there before any render job. */
-function withStudio(project: { tenant_id: string; project_id: string } & Record<string, unknown>) {
+function withStudio<T extends { tenant_id: string; project_id: string }>(project: T) {
   return {
     ...project,
     studio_url: previewUrl(project.tenant_id, project.project_id),
