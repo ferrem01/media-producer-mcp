@@ -446,3 +446,17 @@ social post."
 - Note: final-mp4 duration ≠ sum of scene durations (crossfades add time);
   compute frame-grab timestamps from ffprobe/Duration, not scene math —
   "clipped" end frames were actually mid-zoom camera moments.
+
+## 2026-07-12 — social bottom = the real editor; rail = the real icons (PR #334)
+
+- **quotient-social bottom**: drafts show the action strip (emoji + image +
+  'Ask for Changes' with the Quotient mark); published shows the muted
+  Likes/Comments/Reposts/Forwards row; publish-post swaps them live.
+  Below the card: Comments section ('Comments' + 'Write a comment...'
+  composer, show_comments). Long cards: script scroll-post to reveal the
+  bottom on camera.
+- **quotient-app-shell rail** rebuilt to Marc's screenshot: panel-collapse
+  pinned at the very top (moved out of the header), then home, history,
+  flag, thumbs-up, book, mail, image, file, flows NODES, calendar, people,
+  scheduled CLOCK-BOX, memory BRAIN; avatar at bottom. nav_active +=
+  'scheduled'.
