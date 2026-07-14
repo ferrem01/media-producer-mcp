@@ -1,0 +1,49 @@
+{
+  "type": "composer",
+  "label": "Composer (detail cut)",
+  "category": "mockups",
+  "description": "The DETAIL CUT: just an input box isolated huge on the canvas -- no window chrome, no sidebar. Types a prompt char-by-char (scrub-safe) and presses send. Use when the story beat is 'the ask', cropped to the one element that matters instead of a whole app window. Size it wide and shallow (e.g. w 46%, h 22%).",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "The prompt that gets typed",
+      "required": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When typing starts (default 0.5; card rises 0.4s earlier)",
+      "optional": true
+    },
+    "speed": {
+      "type": "number",
+      "label": "Seconds per character (default 0.035)",
+      "optional": true
+    },
+    "send_at": {
+      "type": "number",
+      "label": "When the send button presses (default: 0.5s after typing ends). Pass null to never send.",
+      "optional": true
+    },
+    "clear_on_send": {
+      "type": "boolean",
+      "label": "Clear the field right after send",
+      "optional": true
+    },
+    "accent": {
+      "type": "string",
+      "label": "Send-button / caret color (default warm terracotta #c2612e; set brand primary for Quotient beats)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "light (default) | dark",
+      "optional": true
+    },
+    "exit_at": {
+      "type": "number",
+      "label": "Fade the whole block at this second",
+      "optional": true
+    }
+  },
+  "tier": "animated-prop"
+}

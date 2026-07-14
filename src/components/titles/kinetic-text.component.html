@@ -5,9 +5,12 @@
 </template>
 
 <style scoped>
-  /* House type system: editorial type gets ONE entrance -- the whole line
-     rises ~10px and fades in. No per-word/char stagger, no masks, no glow,
-     no ambient bloom. Emphasis is color only (data.accent_words / *stars*). */
+  /* House type system: editorial type gets TWO sanctioned entrances.
+     1. line-rise (default): the whole line rises ~10px and fades in.
+     2. type-on: words appear IN PLACE in reading order on a fixed interval;
+        hidden words take no space, so a centered line reflows as it grows
+        (the tempo-cut build-up look). No motion paths, no per-word styling --
+        the only variable is TIME. Emphasis is color only (*stars*). */
   .kinetic-text {
     display: flex;
     align-items: center;
@@ -47,22 +50,49 @@
     container.innerHTML = '';
     var re = /\*([^*]+)\*|([^*]+)/g;
     var m;
-    while ((m = re.exec(text)) !== null) {
-      if (m[1] !== undefined) {
-        var span = document.createElement('span');
-        span.className = 'kt-accent';
-        span.textContent = m[1];
-        container.appendChild(span);
-      } else {
-        container.appendChild(document.createTextNode(m[2]));
-      }
-    }
 
-    if (window.mpLineRise) {
-      mpLineRise(tl, container, 0.25);
+    if (data.entrance === 'type-on') {
+      // Word-by-word build-up. Every word is in the DOM up front but takes
+      // no space until its beat, so the line re-centers as it grows. Words
+      // APPEAR -- no fade, no travel; scrub-safe (pure tl.set).
+      var words = [];
+      while ((m = re.exec(text)) !== null) {
+        var isAccent = m[1] !== undefined;
+        String(isAccent ? m[1] : m[2]).split(/\s+/).forEach(function (w) {
+          if (w) words.push({ w: w, accent: isAccent });
+        });
+      }
+      var at = data.at !== undefined ? Number(data.at) : 0.3;
+      var step = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.14;
+      words.forEach(function (it, i) {
+        var span = document.createElement('span');
+        if (it.accent) span.className = 'kt-accent';
+        // The joining space lives INSIDE the span so hidden words add none.
+        span.textContent = (i > 0 ? ' ' : '') + it.w;
+        span.style.display = 'none';
+        container.appendChild(span);
+        var when = Array.isArray(data.word_times) && data.word_times[i] !== undefined
+          ? Number(data.word_times[i]) : at + i * step;
+        tl.set(span, { display: 'inline' }, when);
+      });
     } else {
-      gsap.set(container, { autoAlpha: 0, y: 10 });
-      tl.to(container, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 0.25);
+      while ((m = re.exec(text)) !== null) {
+        if (m[1] !== undefined) {
+          var span = document.createElement('span');
+          span.className = 'kt-accent';
+          span.textContent = m[1];
+          container.appendChild(span);
+        } else {
+          container.appendChild(document.createTextNode(m[2]));
+        }
+      }
+
+      if (window.mpLineRise) {
+        mpLineRise(tl, container, 0.25);
+      } else {
+        gsap.set(container, { autoAlpha: 0, y: 10 });
+        tl.to(container, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 0.25);
+      }
     }
 
     // Exit: fade only. Nothing floats away.

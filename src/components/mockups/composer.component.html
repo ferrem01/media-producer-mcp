@@ -1,0 +1,101 @@
+<template>
+  <div class="cmpz">
+    <div class="cmpz-card">
+      <div class="cmpz-line"><span class="cmpz-chars"></span><span class="cmpz-caret"></span></div>
+      <div class="cmpz-send">
+        <svg viewBox="0 0 24 24"><path d="M12 19V6M6 12l6-6 6 6"/></svg>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── composer: the DETAIL CUT. Just the input box, isolated huge on the
+     canvas -- no window chrome, no sidebar, nothing else. Types a prompt
+     char-by-char and submits. Use it when the story beat is "the ask",
+     cropped to the one element that matters. ── */
+  .cmpz {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+  }
+  .cmpz-card {
+    position: relative; width: 100%;
+    background: #ffffff; border-radius: 22px;
+    box-shadow: 0 2px 6px rgba(23, 23, 28, 0.05), 0 18px 50px rgba(23, 23, 28, 0.09);
+    padding: 34px 110px 58px 38px;
+    min-height: 150px;
+  }
+  .cmpz.is-dark .cmpz-card { background: #232329; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); }
+  .cmpz-line { font-size: 34px; font-weight: 450; line-height: 1.35; color: #1c1b18; letter-spacing: -0.01em; }
+  .cmpz.is-dark .cmpz-line { color: #f0eee8; }
+  .cmpz-caret {
+    display: inline-block; width: 2.5px; height: 1em; vertical-align: -0.12em;
+    background: var(--cmpz-accent, #c2612e); margin-left: 2px;
+  }
+  .cmpz-send {
+    position: absolute; right: 26px; bottom: 26px;
+    width: 62px; height: 62px; border-radius: 50%;
+    background: var(--cmpz-accent, #c2612e);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--cmpz-accent, #c2612e) 35%, transparent);
+  }
+  .cmpz-send svg { width: 28px; height: 28px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.cmpz');
+    var chars = el.querySelector('.cmpz-chars');
+    var caret = el.querySelector('.cmpz-caret');
+    var send = el.querySelector('.cmpz-send');
+    if (data.theme === 'dark') root.classList.add('is-dark');
+    if (data.accent) root.style.setProperty('--cmpz-accent', data.accent);
+
+    var text = String(data.text || '');
+    var at = data.at !== undefined ? Number(data.at) : 0.5;
+    var speed = Number(data.speed) > 0 ? Number(data.speed) : 0.035;
+
+    // Card enters with the house line-rise; caret blinks on a standalone
+    // repeating tween (blink phase needn't scrub-sync).
+    var card = el.querySelector('.cmpz-card');
+    if (window.mpLineRise) mpLineRise(tl, card, Math.max(0, at - 0.4));
+    else { gsap.set(card, { autoAlpha: 0, y: 10 }); tl.to(card, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, Math.max(0, at - 0.4)); }
+    gsap.to(caret, { opacity: 0, duration: 0.45, repeat: -1, yoyo: true, ease: 'steps(1)' });
+
+    // Type char-by-char: spans pre-built, revealed by pure tl.set (scrub-safe).
+    // The joining space rides INSIDE the next char's span so hidden text adds none.
+    var pendingSpace = '';
+    var spans = [];
+    text.split('').forEach(function (ch) {
+      if (ch === ' ') { pendingSpace = ' '; return; }
+      var s = document.createElement('span');
+      s.textContent = pendingSpace + ch;
+      pendingSpace = '';
+      s.style.display = 'none';
+      chars.appendChild(s);
+      spans.push(s);
+    });
+    spans.forEach(function (s, i) {
+      tl.set(s, { display: 'inline' }, at + i * speed);
+    });
+    var typedEnd = at + spans.length * speed;
+
+    // Submit: the send button presses. Optionally clear the field after.
+    var sendAt = data.send_at !== undefined ? Number(data.send_at) : typedEnd + 0.5;
+    if (data.send_at !== null) {
+      tl.to(send, { scale: 0.84, duration: 0.09, ease: 'power2.in' }, sendAt);
+      tl.to(send, { scale: 1, duration: 0.16, ease: 'power2.out' }, sendAt + 0.09);
+      if (data.clear_on_send) {
+        spans.forEach(function (s) { tl.set(s, { display: 'none' }, sendAt + 0.22); });
+      }
+    }
+
+    if (data.exit_at !== undefined) {
+      tl.to(root, { autoAlpha: 0, duration: 0.25, ease: 'power2.in' }, Number(data.exit_at));
+    }
+
+    return tl;
+  }
+</script>

@@ -2,7 +2,7 @@
   "type": "kinetic-text",
   "label": "Kinetic Text",
   "category": "titles",
-  "description": "Editorial text line with the house entrance: the whole line rises ~10px and fades in (~300ms). No per-word effects. Emphasis via *stars* = brand-color accent, color only.",
+  "description": "Editorial text line with the two sanctioned entrances. Default: house line-rise (whole line rises ~10px, fades in ~300ms). entrance:'type-on': words appear in place in reading order on a beat interval and the centered line reflows as it grows (tempo-cut build-up). No per-word effects in either mode. Emphasis via *stars* = brand-color accent, color only.",
   "data": {
     "text": {
       "type": "string",
@@ -14,14 +14,34 @@
       "label": "Text color override (CSS color). Default is the brand text color -- on dark scenes set an explicit light color, e.g. #f5f6fa.",
       "optional": true
     },
+    "entrance": {
+      "type": "string",
+      "label": "rise (default, whole-line house entrance) | type-on (word-by-word build-up with live reflow)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "type-on only: when the first word lands (default 0.3)",
+      "optional": true
+    },
+    "word_interval": {
+      "type": "number",
+      "label": "type-on only: seconds between words (default 0.14). Set to the beat subdivision to cut on music.",
+      "optional": true
+    },
+    "word_times": {
+      "type": "array",
+      "label": "type-on only: explicit per-word times in seconds (overrides word_interval; e.g. beat-grid times)",
+      "optional": true
+    },
     "mode": {
       "type": "string",
-      "label": "LEGACY (ignored): all text now enters as a whole line",
+      "label": "LEGACY (ignored)",
       "optional": true
     },
     "effect": {
       "type": "string",
-      "label": "LEGACY (ignored): the house line-rise is the only entrance",
+      "label": "LEGACY (ignored)",
       "optional": true
     }
   }
