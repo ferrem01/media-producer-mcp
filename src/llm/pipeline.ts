@@ -85,6 +85,9 @@ export interface PipelineOpts {
   sceneCount?: number;      // storyboard builder decides if not set
   generateImages?: boolean; // default: true
   creativity?: number;      // default: 0.5 (0-1, biases library vs custom)
+  /** L4 film grammar override. When set, the creative director must commit to
+   *  it; otherwise the director chooses and downstream reads the choice. */
+  film_grammar?: import("./creative-director.js").FilmGrammar;
   voiceover?: boolean;      // default: false. Generate TTS voiceover per scene.
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // TTS voice (default: nova)
   backgroundMusic?: boolean;  // default: false. Add background music with voiceover ducking.
@@ -1993,6 +1996,8 @@ async function runUnifiedPipeline(
         llmConfig: opts.llmConfig,
         brandKit,
         referenceImages: processedRefs,
+        filmGrammar: opts.film_grammar,
+        hasSpeaker: !!opts.speaker_source || pipelineHasNarration,
       });
       // Inject creative direction into the prompt for the storyboard builder
       var conceptContext = formatTreatmentForStoryboard(treatment);
@@ -2006,17 +2011,24 @@ async function runUnifiedPipeline(
     trace?.endEvent({ concept: treatment?.concept });
   }
 
-  // ── TEMPO-CUT grammar clamp ──
-  // The grammar's materials exist as library components (composer, kinetic-text
-  // type-on, annotation, the product mocks). High creativity tells codegen to
-  // hand-roll custom scenes, which is exactly how montage labels and theme
-  // whiplash sneak back in -- so a tempo-cut film forces component-first
-  // assembly unless the caller explicitly set creativity themselves.
-  const isTempoCut =
-    /tempo-cut/i.test(treatment?.visualStyle?.motionPersonality || "") ||
-    /tempo-cut/i.test(treatment?.directorNote || "") ||
-    /tempo-cut/i.test(opts.prompt || "");
-  if (isTempoCut && opts.creativity === undefined) {
+  // ── L4 film grammar: resolve once, read as DATA downstream ──
+  // Precedence: caller override > director's committed choice > text fallback
+  // (older projects whose treatments predate the field) > speaker implication.
+  const filmGrammar: import("./creative-director.js").FilmGrammar =
+    opts.film_grammar ||
+    treatment?.filmGrammar ||
+    (/tempo-cut/i.test(
+      (treatment?.visualStyle?.motionPersonality || "") + (treatment?.directorNote || "") + (opts.prompt || ""),
+    ) ? "tempo-cut"
+      : (opts.speaker_source || pipelineHasNarration) ? "speaker-screencast" : "launch-film");
+  console.log(`  Film grammar: ${filmGrammar}`);
+
+  // Assembly policy per grammar: tempo-cut's materials exist as library
+  // components (composer, kinetic-text type-on, annotation, product mocks) --
+  // high creativity tells codegen to hand-roll custom scenes, which is exactly
+  // how montage labels and theme whiplash sneak back in. Caller's explicit
+  // creativity always wins.
+  if (filmGrammar === "tempo-cut" && opts.creativity === undefined) {
     opts.creativity = 0.15;
     creativity = 0.15;
     console.log("  Tempo-cut grammar: creativity clamped to 0.15 (component-first assembly)");
@@ -2077,6 +2089,7 @@ async function runUnifiedPipeline(
     referenceImages: processedRefs,
     treatment,
     beatGrid: beatMap ? { bpm: beatMap.bpm, barSec: beatMap.barSec } : undefined,
+    filmGrammar,
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 

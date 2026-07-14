@@ -140,6 +140,9 @@ export interface StoryboardBuilderOpts {
   /** Beat grid of the pre-selected background music (music-first timeline).
    *  When set, scene durations should be authored in whole bars. */
   beatGrid?: { bpm: number; barSec: number };
+  /** L4 film grammar the treatment committed to. Activates the matching
+   *  contract section below as MANDATORY rather than conditional prose. */
+  filmGrammar?: import("./creative-director.js").FilmGrammar;
 }
 
 export interface StoryboardComponent {
@@ -258,8 +261,10 @@ Beat authoring rules:
 - Each beat may carry its own short "voiceover_text" (~2.5 words/second of beat); the scene's voiceover_text is their concatenation.
 - The scene's visual_notes describe the WORLD (setting, layers, what persists); the beats describe what HAPPENS in it, in order.
 
-### TEMPO-CUT FILMS (when the director's treatment names "tempo-cut")
-When the treatment's motionPersonality or directorNote commits to TEMPO-CUT, the editorial contract above FLIPS from few-long-worlds to many-short-worlds. Obey this contract exactly:
+${opts.filmGrammar ? `### THIS FILM'S GRAMMAR: ${opts.filmGrammar.toUpperCase()} (committed by the treatment -- its contract section below is MANDATORY, not advisory)
+
+` : ""}### TEMPO-CUT FILMS (${opts.filmGrammar === "tempo-cut" ? "ACTIVE for this film" : 'when the director\'s treatment names "tempo-cut"'})
+When the treatment commits to TEMPO-CUT, the editorial contract above FLIPS from few-long-worlds to many-short-worlds. Obey this contract exactly:
 - THE EDIT: 6-9 scenes in 30-45s, each 2-5 bars long${opts.beatGrid ? ` (one bar = ${opts.beatGrid.barSec.toFixed(2)}s -- quantize every scene duration to whole bars)` : " (quantize to the music's bar length)"}; every transition_in is {"type":"none"} -- hard cuts land on downbeats. No crossfades, no wipes.
 - ONE THOUGHT PER CUT: each scene carries exactly one idea. If a scene needs a second annotation line swap, that is fine; if it needs a second WORLD, cut.
 - TEXT IS THE VOICEOVER: no narrator. Every narration line lives in an annotation or kinetic-text DOCKED BESIDE the evidence -- never a statement slide mid-film (title open and CTA close are the only pure-type scenes). Long lines use kinetic-text entrance:"type-on" with word_interval on the beat subdivision.
@@ -268,6 +273,14 @@ When the treatment's motionPersonality or directorNote commits to TEMPO-CUT, the
 - MUSIC FIRST: the film assumes a driving bed; scripted-surface actions (tool-calls, tab switches, sends) should land near beat boundaries, not between them.
 - ONE GAG maximum: a single prop-strike card ("we killed ___") beside a setup line, if the story earns a joke.
 - BUILD FROM THE KIT: every tempo-cut scene is composed from library components or an st-template -- composer (the ask), kinetic-text entrance:"type-on" (build-up lines), annotation (narration beside a window), the product mocks (quotient-*, claude-*), prop-strike (the gag). Do NOT invent custom scenes in this grammar: hand-rolled surfaces are how corner labels, theme whiplash and clipped type sneak back in. NO montage/scene-name labels anywhere; the film keeps ONE canvas color end to end (a single deliberate dark beat is the only exception). Generic simulators (chat-simulator, ui-terminal-agent) are a LAST resort: if the beat happens in Quotient, Claude, Slack, LinkedIn or X, staging the SPECIFIC product mock is mandatory -- a no-name chat standing in for a named product is a blocking defect (generic_surface).
+
+### SPEAKER-SCREENCAST FILMS (${opts.filmGrammar === "speaker-screencast" ? "ACTIVE for this film" : "when a speaker recording drives the film"})
+The human on camera owns the film; everything else supports them. The contract:
+- THE VOICE IS THE CLOCK: the speaker's sentences decide when scenes cut and when content enters. Author scene/beat durations against what is being SAID, never against an abstract rhythm -- a cut mid-sentence is a failure.
+- THE HUMAN NARRATES: no text-as-voiceover, no statement slides, no annotation lines that duplicate what the speaker is saying out loud. On-screen text is limited to labels/callouts that ADD to the speech (a metric, a name, a step number).
+- LAYOUT: use the two speaker scene modes (speaker-visible content region vs takeover-with-PiP -- mechanics below). Content overlays enter with the house line-rise ON the sentence that introduces them, and leave when the speaker moves on.
+- EVIDENCE: screencasts/product mocks appear when the speaker refers to them, framed in the content region; camera zooms follow what the speaker is pointing AT (anchored zoom, reset before the next thought).
+- MUSIC: absent, or a bed ducked far under the voice. The voice is always the loudest thing.
 
 ### Writing Great Visual Notes
 Visual notes MUST be 5+ sentences with specific motion verbs, depth layers (BG/MG/FG), and choreography.

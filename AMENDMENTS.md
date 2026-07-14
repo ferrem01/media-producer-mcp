@@ -505,3 +505,25 @@ list out all the features of quotient that work."
   Rule: never update/add while a render runs; re-apply after it
   completes. Product fix: render completion should patch status/output
   fields only, not write the whole project snapshot.
+
+## L4 film grammar (this session, after the two tempo-cut generation tests)
+
+- **`filmGrammar` is now a structured Treatment field** (`launch-film` |
+  `tempo-cut` | `speaker-screencast`), not prose. The creative director
+  commits to exactly one (caller can force it via the generate tool's
+  `film_grammar` param); the pipeline reads it as DATA: it activates the
+  matching storyboard contract section as MANDATORY, clamps creativity to
+  0.15 for tempo-cut (component-first assembly), and falls back to text
+  detection only for treatments that predate the field.
+- **speaker-screencast codified as the third grammar** so the earlier
+  speaker-track work stays first-class: the voice is the clock (cuts on
+  sentences, never mid-sentence), the human narrates (no text-as-VO, no
+  statement slides), overlays line-rise on the sentence that introduces
+  them, music absent or ducked far under the voice. Mechanics (content
+  region, takeover + PiP) were already in the speaker instructions; the
+  grammar adds the editorial contract.
+- Why: two A/B generation tests proved prompt-only contracts drift — run 1
+  (prose only) broke scene budget/music/labels; run 2 (fixes) still picked
+  a generic chat surface over the real product mock and leaked a stage
+  direction. Grammar-as-data + the `generic_surface` and
+  `stage_direction_leak` gates is the enforcement stack.
