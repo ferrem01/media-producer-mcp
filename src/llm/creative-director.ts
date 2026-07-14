@@ -28,12 +28,24 @@ import {
 
 // ── Types ──
 
+/** The L4 abstraction: a film grammar is the contract that governs everything
+ *  cross-cutting -- who narrates, what earns a cut, the music's role, the
+ *  camera policy, and how scenes are assembled. Components (L1), scene
+ *  templates (L2) and scenes/beats (L3) all live INSIDE one of these. */
+export type FilmGrammar = "launch-film" | "tempo-cut" | "speaker-screencast";
+
+export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "speaker-screencast"];
+
 export interface ConceptDirectorOpts {
   prompt: string;
   format: OutputFormat;
   llmConfig: LLMConfig;
   brandKit: BrandKit;
   referenceImages?: ReferenceImage[];
+  /** Caller-fixed film grammar: the director must commit to it, not choose. */
+  filmGrammar?: FilmGrammar;
+  /** A speaker video is attached (forces/implies speaker-screencast). */
+  hasSpeaker?: boolean;
 }
 
 export interface Treatment {
@@ -62,6 +74,10 @@ export interface Treatment {
   directorNote: string;
   /** Recommended number of scenes (the director decides the structure). */
   sceneCount?: number;
+  /** The film grammar this treatment commits to (L4). Downstream stages read
+   *  this as DATA: it activates the matching storyboard contract, sets the
+   *  assembly policy (component-first vs codegen), and the music policy. */
+  filmGrammar?: FilmGrammar;
 }
 
 /**
@@ -94,7 +110,15 @@ Your treatment feeds a system that already speaks a launch-film dialect. Direct 
 - OBJECTS, NOT LAYOUTS: screencasts float as tilted 3D planes with reflections; regions of the UI lift out in glow callouts; phones are physical devices; stamps/gesture-labels/pills are props with slam physics. Direct the film in objects.
 - MOTION PHYSICS: everything fast smears with velocity blur and settles; everything slow drifts. Name the moments that deserve a THROW, a STAMP, a type-on reveal.
 - The camera never fully stops (slow push is always on); dark scenes live in a lit 3D ribbon world; on-brand photo backdrops with Ken Burns drift are available.
-- TEMPO-CUT: a named FILM GRAMMAR you may commit a whole film to (set motionPersonality to "tempo-cut ..."). The HeyGen-explainer dialect: a driving music bed picked FIRST, 6-9 hard cuts in 30-45s each quantized to the track's bars, ONE thought per cut, on-screen type IS the voiceover (no narrator, no statement slides mid-film), evidence appears as DETAIL CUTS (one cropped element huge -- an isolated composer typing the ask -- not a whole miniaturized app), captions at display scale BESIDE windows, one brand accent, at most one gag (a prop-strike card). Choose it for product explainers, connector demos, and launch clips that should feel fast, confident and music-driven; do NOT choose it for emotional brand films that need breath.
+## FILM GRAMMAR (the first commitment you make -- output it as "filmGrammar")
+
+Every film commits to exactly ONE grammar. It is not a mood -- it is the contract that decides who narrates, what earns a cut, the music's role, and how scenes are assembled. The three:
+
+- "launch-film" (the default): few long WORLDS with 3-6 beats inside each, dark-forward cinematic look, density arcs, throws/stamps, crossfades earned at world changes. For brand films, launches, and emotional arcs that need breath.
+- "tempo-cut": the HeyGen-explainer dialect. A driving music bed picked FIRST, 6-9 hard cuts in 30-45s each quantized to the track's bars, ONE thought per cut, on-screen type IS the voiceover (no narrator, no statement slides mid-film), evidence appears as DETAIL CUTS (one cropped element huge -- an isolated composer typing the ask -- not a whole miniaturized app), captions at display scale BESIDE windows, one brand accent, at most one gag (a prop-strike card). Scenes are assembled from the component kit, not custom codegen. For product explainers, connector demos, and launch clips that should feel fast, confident, music-driven. The story must be told through the REAL product surfaces (the library's product mocks), never through invented abstractions.
+- "speaker-screencast": a human on camera owns the film. The speaker video is the base layer and THE CLOCK -- cuts and content entrances follow the speaker's sentences, overlays dock in a content region beside the speaker or take over with the speaker in PiP, the human voice narrates (no text-as-VO), music absent or ducked far under the voice. Only choose it when a speaker recording exists.
+
+Echo the grammar in visualStyle.motionPersonality (e.g. "tempo-cut: ..."), and let every other choice serve it.
 
 ${brandContext}
 
@@ -148,6 +172,7 @@ thought (2-5 bars), because in that grammar the cut itself is the rhythm instrum
   ],
   "selected": 0,
   "selectionReason": "Why this concept is strongest",
+  "filmGrammar": "launch-film | tempo-cut | speaker-screencast",
   "sceneCount": 3,
   "directorNote": "3-5 sentence creative direction summary that the storyboard should follow"
 }
@@ -160,8 +185,17 @@ thought (2-5 bars), because in that grammar the cut itself is the rhythm instrum
 - The emotional arc must use specific emotions, not "good -> better -> best"
 - Output ONLY valid JSON. No commentary.`;
 
+  var grammarDirective = "";
+  if (opts.filmGrammar) {
+    grammarDirective = `\n\nTHE CALLER HAS FIXED THE FILM GRAMMAR: "${opts.filmGrammar}". Commit to it -- output it as filmGrammar and shape every choice around its contract.`;
+  } else if (opts.hasSpeaker) {
+    grammarDirective = `\n\nA speaker recording IS attached to this project -- "speaker-screencast" is almost certainly the right filmGrammar.`;
+  } else {
+    grammarDirective = `\n\nNo speaker recording exists -- do NOT choose "speaker-screencast".`;
+  }
+
   var userPrompt = `Create a ${opts.format} for:
-- ARTIFACT-DRIVEN BEATS: tell each step of a workflow through a mock of the SURFACE where it happens (a chat thread, an agent terminal, a video player, a records list) -- and always show the artifact BUILDING (typed, cascaded, counted, scrubbed), never pre-made. A story told through product surfaces reads as real; a story told through abstract cards reads as slides.\n\n${opts.prompt}`;
+- ARTIFACT-DRIVEN BEATS: tell each step of a workflow through a mock of the SURFACE where it happens (a chat thread, an agent terminal, a video player, a records list) -- and always show the artifact BUILDING (typed, cascaded, counted, scrubbed), never pre-made. A story told through product surfaces reads as real; a story told through abstract cards reads as slides.\n\n${opts.prompt}${grammarDirective}`;
 
   // Build user message with optional reference images
   var userContent: string | LLMContentPart[];
@@ -212,7 +246,18 @@ thought (2-5 bars), because in that grammar the cut itself is the rhythm instrum
       : undefined,
     directorNote: result.directorNote || `Concept: ${selected.idea}. Pattern: ${selected.pattern}. Through-line: ${selected.throughLine}.`,
     sceneCount: typeof result.sceneCount === "number" ? result.sceneCount : undefined,
+    filmGrammar: resolveFilmGrammar(opts, result.filmGrammar),
   };
+}
+
+/** The caller's grammar always wins; otherwise validate the director's pick
+ *  (with a text fallback for models that echo it in motionPersonality). */
+function resolveFilmGrammar(opts: ConceptDirectorOpts, raw: unknown): FilmGrammar {
+  if (opts.filmGrammar) return opts.filmGrammar;
+  if (typeof raw === "string" && (FILM_GRAMMARS as string[]).includes(raw.trim())) {
+    return raw.trim() as FilmGrammar;
+  }
+  return opts.hasSpeaker ? "speaker-screencast" : "launch-film";
 }
 
 /**
@@ -221,7 +266,9 @@ thought (2-5 bars), because in that grammar the cut itself is the rhythm instrum
 export function formatTreatmentForStoryboard(bible: Treatment): string {
   return `## Creative Direction (FOLLOW THIS -- every scene must serve this concept)
 
-**THE CONCEPT:** ${bible.concept}
+${bible.filmGrammar ? `**FILM GRAMMAR: ${bible.filmGrammar}** -- this contract governs cutting, narration, music, and assembly for the whole film; its named contract section in your instructions is ACTIVE.
+
+` : ""}**THE CONCEPT:** ${bible.concept}
 
 **Storytelling Pattern:** ${bible.pattern}
 **Visual Through-Line:** ${bible.throughLine} -- this element must persist or evolve across scenes.
