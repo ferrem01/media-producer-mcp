@@ -119,6 +119,8 @@ A scene is a WORLD that persists while ideas advance INSIDE it as beats -- not o
 per scene. Scene counts: 1-2 for short-form (12-20s), 3-4 for standard (30-60s), 4-6 for
 a deep dive (60-120s). Each scene carries 3-6 beats; a 30-45s film is typically an
 opening world, one or two long living middles (12-18s each), and a closing world.
+EXCEPTION: a TEMPO-CUT film inverts this -- set sceneCount to 6-9, each scene one short
+thought (2-5 bars), because in that grammar the cut itself is the rhythm instrument.
 
 ## Output Format (valid JSON, no markdown fences)
 

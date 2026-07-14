@@ -309,6 +309,15 @@ These are the failures that make a scene look broken. Violate none of them.
 
 Design for a viewer watching a finished video, not a designer reading a spec.
 
+## TEMPO-CUT SCENES (applies whenever the visual notes or creative direction name "tempo-cut")
+
+In this grammar the CUT carries the energy, so each scene stays disciplined:
+- BUILD FROM THE KIT: stage the library components via \`<component>\` tags — \`composer\` for a typed ask (never hand-roll an input box), \`kinetic-text\` with \`entrance:"type-on"\` for build-up lines, \`annotation\` for narration docked beside a window, the product mocks for surfaces. Hand-rolled versions of surfaces the kit already has are a failure.
+- NO corner labels, montage labels, scene-name chips, timestamps, or "session/live" badges anywhere. The frame carries the one thought and nothing else.
+- ONE CANVAS: the scene keeps the film's canvas color (the scene background it was given). Never invert to a different world than the neighboring scenes.
+- EDGE SAFETY: nothing within 4% of any frame edge. Clipped type at the frame boundary is an automatic failure.
+- ONE THOUGHT: if the composition needs a second cluster of content to explain itself, it is two scenes — stage the one thing huge with real negative space instead (rule 2's fill-the-frame still applies: one BIG element with breathing room, not many small ones).
+
 ## THE MOTION KIT (already loaded on every scene page -- USE it, never reimplement it)
 
 These globals are injected into every scene. They ARE the house motion language; a scene that hand-rolls plain fades while ignoring them reads as a slide and fails review:

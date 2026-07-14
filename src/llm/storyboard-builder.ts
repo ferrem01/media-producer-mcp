@@ -195,7 +195,7 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
   var sceneCountGuide = opts.sceneCount
     ? `Exactly ${opts.sceneCount} scenes.`
     : (opts.format === "video"
-      ? "3-4 scenes for films up to 45s -- this is a HARD budget, not a suggestion (5 only for 60s+). A scene is a WORLD and you only cut when the world changes (see CUT vs BEAT). The shape of a 30-45s film: an opening world, one or two long living middles (12-24s each, 4-6 beats), a closing CTA world. Before you output, AUDIT your scene list: if two consecutive scenes share the same setting/canvas/metaphor, they are ONE world -- merge them into one scene and turn each of their moments into a beat. Emitting a new scene for every idea is the #1 storyboard failure."
+      ? "3-4 scenes for films up to 45s -- this is a HARD budget, not a suggestion (5 only for 60s+). EXCEPTION: a TEMPO-CUT film (see TEMPO-CUT FILMS below) inverts this budget -- 6-9 short scenes; the tempo-cut contract wins over this line. Otherwise: a scene is a WORLD and you only cut when the world changes (see CUT vs BEAT). The shape of a 30-45s film: an opening world, one or two long living middles (12-24s each, 4-6 beats), a closing CTA world. Before you output, AUDIT your scene list: if two consecutive scenes share the same setting/canvas/metaphor, they are ONE world -- merge them into one scene and turn each of their moments into a beat. Emitting a new scene for every idea is the #1 storyboard failure."
       : "5-8 scenes (scale to content complexity).");
 
   var storytellingGuide = getStorytellingGuide();
@@ -267,6 +267,7 @@ When the treatment's motionPersonality or directorNote commits to TEMPO-CUT, the
 - SCALE INVERSION: captions at display scale (the annotation component's default), windows <=60% of frame width, real negative space around both.
 - MUSIC FIRST: the film assumes a driving bed; scripted-surface actions (tool-calls, tab switches, sends) should land near beat boundaries, not between them.
 - ONE GAG maximum: a single prop-strike card ("we killed ___") beside a setup line, if the story earns a joke.
+- BUILD FROM THE KIT: every tempo-cut scene is composed from library components or an st-template -- composer (the ask), kinetic-text entrance:"type-on" (build-up lines), annotation (narration beside a window), the product mocks (quotient-*, claude-*), prop-strike (the gag). Do NOT invent custom scenes in this grammar: hand-rolled surfaces are how corner labels, theme whiplash and clipped type sneak back in. NO montage/scene-name labels anywhere; the film keeps ONE canvas color end to end (a single deliberate dark beat is the only exception).
 
 ### Writing Great Visual Notes
 Visual notes MUST be 5+ sentences with specific motion verbs, depth layers (BG/MG/FG), and choreography.
