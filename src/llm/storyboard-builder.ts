@@ -258,6 +258,16 @@ Beat authoring rules:
 - Each beat may carry its own short "voiceover_text" (~2.5 words/second of beat); the scene's voiceover_text is their concatenation.
 - The scene's visual_notes describe the WORLD (setting, layers, what persists); the beats describe what HAPPENS in it, in order.
 
+### TEMPO-CUT FILMS (when the director's treatment names "tempo-cut")
+When the treatment's motionPersonality or directorNote commits to TEMPO-CUT, the editorial contract above FLIPS from few-long-worlds to many-short-worlds. Obey this contract exactly:
+- THE EDIT: 6-9 scenes in 30-45s, each 2-5 bars long${opts.beatGrid ? ` (one bar = ${opts.beatGrid.barSec.toFixed(2)}s -- quantize every scene duration to whole bars)` : " (quantize to the music's bar length)"}; every transition_in is {"type":"none"} -- hard cuts land on downbeats. No crossfades, no wipes.
+- ONE THOUGHT PER CUT: each scene carries exactly one idea. If a scene needs a second annotation line swap, that is fine; if it needs a second WORLD, cut.
+- TEXT IS THE VOICEOVER: no narrator. Every narration line lives in an annotation or kinetic-text DOCKED BESIDE the evidence -- never a statement slide mid-film (title open and CTA close are the only pure-type scenes). Long lines use kinetic-text entrance:"type-on" with word_interval on the beat subdivision.
+- DETAIL CUTS over full windows: when the beat is "the ask", stage the composer component (an isolated input box huge on canvas, typing + send) instead of a whole app window; keep it at the SAME frame position across ask beats so repeats read as match cuts. Crop to the one element that matters; a full app shell is earned only when the story is the whole surface.
+- SCALE INVERSION: captions at display scale (the annotation component's default), windows <=60% of frame width, real negative space around both.
+- MUSIC FIRST: the film assumes a driving bed; scripted-surface actions (tool-calls, tab switches, sends) should land near beat boundaries, not between them.
+- ONE GAG maximum: a single prop-strike card ("we killed ___") beside a setup line, if the story earns a joke.
+
 ### Writing Great Visual Notes
 Visual notes MUST be 5+ sentences with specific motion verbs, depth layers (BG/MG/FG), and choreography.
 NOT "show the feature" — describe what HAPPENS frame by frame.
