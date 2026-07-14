@@ -1,0 +1,83 @@
+<template>
+  <div class="pstk">
+    <div class="pstk-card">
+      <span class="pstk-text"></span>
+      <svg class="pstk-x" viewBox="0 0 100 60" preserveAspectRatio="none">
+        <path class="pstk-x1" d="M7 5 C 28 18, 62 38, 94 55" />
+        <path class="pstk-x2" d="M93 4 C 68 22, 33 40, 6 56" />
+      </svg>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── prop-strike: the gag prop. A card carrying a word or logo gets a
+     hand-drawn X struck through it ("we killed ___"). One joke per scene;
+     the card is the punchline, not the subject. ── */
+  .pstk {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+  }
+  .pstk-card {
+    position: relative;
+    background: #ffffff; border-radius: 14px;
+    box-shadow: 0 3px 9px rgba(23, 23, 28, 0.07), 0 16px 44px rgba(23, 23, 28, 0.11);
+    padding: 26px 52px;
+  }
+  .pstk-text {
+    font-size: 44px; font-weight: 700; letter-spacing: -0.01em;
+    color: #a9adb6; white-space: nowrap;
+  }
+  .pstk-card img { display: block; max-height: 64px; }
+  .pstk-x { position: absolute; inset: -12% -6%; width: 112%; height: 124%; overflow: visible; }
+  .pstk-x path {
+    fill: none; stroke: var(--pstk-ink, #17171c); stroke-width: 4.2;
+    stroke-linecap: round;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.pstk-card');
+    var textEl = el.querySelector('.pstk-text');
+
+    if (data.image) {
+      var img = document.createElement('img');
+      img.src = data.image;
+      card.insertBefore(img, textEl);
+      textEl.remove();
+    } else {
+      textEl.textContent = String(data.text || '');
+      if (data.text_color) textEl.style.color = data.text_color;
+    }
+    if (data.ink) card.style.setProperty('--pstk-ink', data.ink);
+
+    var rot = data.rotation === undefined ? -3 : Number(data.rotation) || 0;
+    gsap.set(card, { rotation: rot });
+
+    // Card enters with the house line-rise.
+    var at = Math.max(0, Number(data.at) || 0.4);
+    if (window.mpLineRise) mpLineRise(tl, card, at);
+    else { gsap.set(card, { autoAlpha: 0, y: 10 }); tl.to(card, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, at); }
+
+    // The strike: two hand-drawn strokes draw in fast, card takes the hit.
+    var strikeAt = data.strike_at !== undefined ? Number(data.strike_at) : at + 0.9;
+    var paths = el.querySelectorAll('.pstk-x path');
+    paths.forEach(function (p, i) {
+      var len = p.getTotalLength();
+      gsap.set(p, { strokeDasharray: len, strokeDashoffset: len });
+      tl.to(p, { strokeDashoffset: 0, duration: 0.2, ease: 'power2.in' }, strikeAt + i * 0.14);
+    });
+    tl.to(card, { rotation: rot - 1.6, duration: 0.06, ease: 'power2.in' }, strikeAt + 0.14);
+    tl.to(card, { rotation: rot, duration: 0.22, ease: 'power2.out' }, strikeAt + 0.2);
+
+    var hold = Number(data.hold) || 0; // 0 = stays for the scene
+    if (hold > 0) tl.to(card, { autoAlpha: 0, duration: 0.28, ease: 'power2.in' }, strikeAt + hold);
+    if (data.exit_at !== undefined) tl.to(card, { autoAlpha: 0, duration: 0.28, ease: 'power2.in' }, Number(data.exit_at));
+
+    return tl;
+  }
+</script>

@@ -187,6 +187,11 @@ async function searchJamendo(mood: string, minDuration?: number): Promise<MusicT
       tags: mood,
       limit: "3",
       order: "popularity_total",
+      // Commercial-safe only: these videos ship as marketing, so exclude
+      // NonCommercial licenses; syncing into a video is a derivative, so
+      // exclude NoDerivs too. CC-BY / CC-BY-SA survive.
+      ccnc: "false",
+      ccnd: "false",
     });
 
     if (minDuration) {
