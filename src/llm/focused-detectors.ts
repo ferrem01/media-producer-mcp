@@ -105,7 +105,42 @@ NOT defects: intentional UI mockups that belong to the scene; brand logos.
 For each instance, quote its text as evidence when there is any.
 ${OUTPUT_RULE}`,
   },
+  {
+    type: "generic_surface",
+    verifyAgainst: "spec",
+    system: `You are a defect detector with ONE job: check that the story's beat happens in the RIGHT product surface.
+Read the spec (purpose + visual notes). A defect = the spec says the action happens in a NAMED real product -- the Quotient agent / Quotient app (campaign, social editor), Claude (Cowork, Code, desktop), Slack, a LinkedIn or X editor -- but the frame stages a GENERIC unbranded mock instead: a no-name chat window with placeholder channels ("# general", "# random"), "User" bubbles with "?" avatars, a generic terminal, or some other product's UI standing in for the named one.
+NOT defects: the actual named product's mock (branded header, its real layout); deliberately abstract scenes with no UI window at all; tiny miniature thumbnails of earlier scenes used as recap props; a generic surface when the spec itself only asks for "a chat" with no product named.
+As evidence, quote the spec phrase that names the product.
+${OUTPUT_RULE}`,
+  },
 ];
+
+// ── Deterministic: stage-direction leaks ──
+// Storyboard parentheticals sometimes survive into rendered pixels
+// ("AGENT THREAD (MINIATURE, TOP-LEFT)"). That text exists verbatim in the
+// scene DOM, so no vision model is needed -- a text scan catches it with
+// zero hallucination risk. Patterns stay conservative: layout/authoring
+// vocabulary inside parentheses, plus unambiguous authoring markers.
+const STAGE_DIRECTION_PATTERNS: RegExp[] = [
+  /\([^)]*\b(?:top|bottom)[- ](?:left|right)\b[^)]*\)/i,
+  /\([^)]*\b(?:miniature|off[- ]screen|foreground|midground|camera|zoom (?:in|out)|scene \d|beat \d|stagger|z-index)\b[^)]*\)/i,
+  /\b(?:lorem ipsum|todo:|placeholder text|stage direction)/i,
+];
+
+export function detectStageDirectionLeaks(sceneText: string): CorrectnessDefect[] {
+  const defects: CorrectnessDefect[] = [];
+  for (const re of STAGE_DIRECTION_PATTERNS) {
+    const m = sceneText.match(re);
+    if (m) {
+      defects.push({
+        type: "stage_direction_leak",
+        detail: `"${m[0].slice(0, 120)}" -- authoring/stage-direction text is rendered as visible content; remove it from the scene (it belongs in the storyboard, not the pixels).`,
+      });
+    }
+  }
+  return defects.slice(0, 3);
+}
 
 /** Detectors that only run under specific conditions. */
 function conditionalDetectors(opts: FocusedDetectorOpts): DetectorSpec[] {
@@ -170,7 +205,7 @@ async function runDetector(
   ctx: { sceneText?: string; specText?: string },
 ): Promise<DetectorResult> {
   const userContent: LLMContentPart[] = [];
-  if (spec.type === "dropped_element") {
+  if (spec.type === "dropped_element" || spec.type === "generic_surface") {
     userContent.push({ type: "text", text: `VISUAL NOTES:\n${opts.specText}` });
   }
   userContent.push({ type: "text", text: "FINAL frame:" });
@@ -233,6 +268,11 @@ export async function runFocusedDetectors(opts: FocusedDetectorOpts): Promise<{
   const results: DetectorResult[] = [];
   for (const s of settled) {
     if (s.status === "fulfilled") results.push(s.value);
+  }
+  // Deterministic text scan runs unconditionally -- costs nothing, never hallucinates.
+  if (ctx.sceneText) {
+    const leaks = detectStageDirectionLeaks(ctx.sceneText);
+    if (leaks.length) results.push({ type: "stage_direction_leak", defects: leaks, droppedInstances: 0 });
   }
   const defects = results.flatMap((r) => r.defects);
   const droppedTotal = results.reduce((sum, r) => sum + r.droppedInstances, 0);
