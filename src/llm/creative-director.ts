@@ -94,6 +94,7 @@ Your treatment feeds a system that already speaks a launch-film dialect. Direct 
 - OBJECTS, NOT LAYOUTS: screencasts float as tilted 3D planes with reflections; regions of the UI lift out in glow callouts; phones are physical devices; stamps/gesture-labels/pills are props with slam physics. Direct the film in objects.
 - MOTION PHYSICS: everything fast smears with velocity blur and settles; everything slow drifts. Name the moments that deserve a THROW, a STAMP, a type-on reveal.
 - The camera never fully stops (slow push is always on); dark scenes live in a lit 3D ribbon world; on-brand photo backdrops with Ken Burns drift are available.
+- TEMPO-CUT: a named FILM GRAMMAR you may commit a whole film to (set motionPersonality to "tempo-cut ..."). The HeyGen-explainer dialect: a driving music bed picked FIRST, 6-9 hard cuts in 30-45s each quantized to the track's bars, ONE thought per cut, on-screen type IS the voiceover (no narrator, no statement slides mid-film), evidence appears as DETAIL CUTS (one cropped element huge -- an isolated composer typing the ask -- not a whole miniaturized app), captions at display scale BESIDE windows, one brand accent, at most one gag (a prop-strike card). Choose it for product explainers, connector demos, and launch clips that should feel fast, confident and music-driven; do NOT choose it for emotional brand films that need breath.
 
 ${brandContext}
 
