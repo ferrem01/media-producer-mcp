@@ -2006,6 +2006,22 @@ async function runUnifiedPipeline(
     trace?.endEvent({ concept: treatment?.concept });
   }
 
+  // ── TEMPO-CUT grammar clamp ──
+  // The grammar's materials exist as library components (composer, kinetic-text
+  // type-on, annotation, the product mocks). High creativity tells codegen to
+  // hand-roll custom scenes, which is exactly how montage labels and theme
+  // whiplash sneak back in -- so a tempo-cut film forces component-first
+  // assembly unless the caller explicitly set creativity themselves.
+  const isTempoCut =
+    /tempo-cut/i.test(treatment?.visualStyle?.motionPersonality || "") ||
+    /tempo-cut/i.test(treatment?.directorNote || "") ||
+    /tempo-cut/i.test(opts.prompt || "");
+  if (isTempoCut && opts.creativity === undefined) {
+    opts.creativity = 0.15;
+    creativity = 0.15;
+    console.log("  Tempo-cut grammar: creativity clamped to 0.15 (component-first assembly)");
+  }
+
   // ── Music-first timeline (QUALITY-ROADMAP Pillar 1) ──
   // Professional edits pick the track FIRST and cut to it. When background
   // music is on, select the track and beat-map it BEFORE storyboarding: the
@@ -2093,6 +2109,26 @@ async function runUnifiedPipeline(
     treatment: treatment,
     film_grade: format === "video" || format === "slideshow" ? "cinematic" : undefined,
   };
+
+  // Music-first ATTACH: selection without attachment was a silent failure --
+  // the beat grid quantized the whole cut while the film rendered mute.
+  // trim_start aligns the track's first downbeat with video t=0 so the bar
+  // math the storyboard was cut against is the bar math the viewer hears.
+  if (musicTrack) {
+    project.audio = {
+      tracks: [{
+        id: "music_bed",
+        type: "music",
+        source: musicTrack.path,
+        volume: opts.voiceover ? 0.18 : 0.45,
+        trim_start: beatMap && beatMap.firstDownbeatSec > 0.05 ? beatMap.firstDownbeatSec : undefined,
+        loop: false,
+        fade_in: 0.3,
+        fade_out: 1.8,
+      }],
+    };
+    console.log(`  Music-first: attached "${musicTrack.title}" (${musicTrack.license || "license unknown"}) as music_bed`);
+  }
 
   // ── Storyboard-only mode: save storyboard and return early ──
   if (opts.storyboardOnly) {
