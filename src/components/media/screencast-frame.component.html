@@ -347,7 +347,13 @@
       var stageBox = stage.getBoundingClientRect();
       if (stageBox.width < 4 || stageBox.height < 4) return;
       var full = frameStyle === 'none';
-      var maxWPct = full ? 100 : Math.min(100, Math.max(8, Number(data.max_width_pct) || (isPhone ? 26 : isFloat ? 72 : 90)));
+      // full (frame_style:'none') defaults to 100% (edge-to-edge), but an
+      // explicit max_width_pct is honored so a full-bleed screencast can be
+      // inset with a margin. Below ~95% it becomes width-constrained and the
+      // aspect ratio pulls the height in too, giving a balanced margin all round.
+      var maxWPct = full
+        ? (data.max_width_pct === undefined ? 100 : Math.min(100, Math.max(8, Number(data.max_width_pct))))
+        : Math.min(100, Math.max(8, Number(data.max_width_pct) || (isPhone ? 26 : isFloat ? 72 : 90)));
       var padV = full ? 1.0 : (isFloat || isPhone ? 0.8 : 0.94);
 
       var frameW = stageBox.width * (maxWPct / 100);
