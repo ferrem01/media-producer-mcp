@@ -236,4 +236,71 @@ describe("update tool — speaker_track persistence + PiP guardrail", () => {
     // The unrelated field on the same update still lands.
     expect((comp?.data as any)?.pip_position).toBe("bottom-right");
   });
+
+  // ── Parity pass: knobs the update tool was missing (media_edits, pose,
+  //    audio_hints, speaker_track clear). Same class of hand-build gap. ──
+
+  it("sets and clears scene media_edits (null and {} both drop the media lane)", async () => {
+    const edit = { 'video[src*="camera.mp4"]': { segments: [{ src_start: 0, src_end: 10, rate: 1 }] } };
+    let r = await callUpdate({ project_id: projectId, scene_id: "s_main", media_edits: edit });
+    expect(r.isError).toBe(false);
+    let p = await loadProject(TENANT, projectId);
+    expect(p?.scenes?.[0]?.media_edits).toBeDefined();
+
+    r = await callUpdate({ project_id: projectId, scene_id: "s_main", media_edits: null });
+    expect(r.isError).toBe(false);
+    p = await loadProject(TENANT, projectId);
+    expect(p?.scenes?.[0]?.media_edits).toBeUndefined();
+
+    // {} also clears (robust against clients that strip null).
+    await callUpdate({ project_id: projectId, scene_id: "s_main", media_edits: edit });
+    r = await callUpdate({ project_id: projectId, scene_id: "s_main", media_edits: {} });
+    expect(r.isError).toBe(false);
+    p = await loadProject(TENANT, projectId);
+    expect(p?.scenes?.[0]?.media_edits).toBeUndefined();
+  });
+
+  it("sets and clears a component pose", async () => {
+    let r = await callUpdate({ project_id: projectId, scene_id: "s_main", component_id: "sc", pose: { rotate_y: 12 } });
+    expect(r.isError).toBe(false);
+    let p = await loadProject(TENANT, projectId);
+    expect((p?.scenes?.[0]?.components?.[0] as any)?.pose?.rotate_y).toBe(12);
+
+    r = await callUpdate({ project_id: projectId, scene_id: "s_main", component_id: "sc", pose: null });
+    expect(r.isError).toBe(false);
+    p = await loadProject(TENANT, projectId);
+    expect((p?.scenes?.[0]?.components?.[0] as any)?.pose).toBeUndefined();
+  });
+
+  it("sets and clears scene audio_hints", async () => {
+    let r = await callUpdate({ project_id: projectId, scene_id: "s_main", audio_hints: { voiceover_text: "hello" } });
+    expect(r.isError).toBe(false);
+    let p = await loadProject(TENANT, projectId);
+    expect((p?.scenes?.[0] as any)?.audio_hints?.voiceover_text).toBe("hello");
+
+    r = await callUpdate({ project_id: projectId, scene_id: "s_main", audio_hints: null });
+    expect(r.isError).toBe(false);
+    p = await loadProject(TENANT, projectId);
+    expect((p?.scenes?.[0] as any)?.audio_hints).toBeUndefined();
+  });
+
+  it("clears the speaker_track via null and via an empty clips array", async () => {
+    // seed a track first
+    await callUpdate({ project_id: projectId, speaker_track: { clips: [{ source: CAM, start: 0 }] } });
+    let p = await loadProject(TENANT, projectId);
+    expect(p?.speaker_track?.clips?.[0]?.source).toBe(CAM);
+
+    // null clears
+    let r = await callUpdate({ project_id: projectId, speaker_track: null });
+    expect(r.isError).toBe(false);
+    p = await loadProject(TENANT, projectId);
+    expect(p?.speaker_track).toBeUndefined();
+
+    // empty clips also clears
+    await callUpdate({ project_id: projectId, speaker_track: { clips: [{ source: CAM, start: 0 }] } });
+    r = await callUpdate({ project_id: projectId, speaker_track: { clips: [] } });
+    expect(r.isError).toBe(false);
+    p = await loadProject(TENANT, projectId);
+    expect(p?.speaker_track).toBeUndefined();
+  });
 });

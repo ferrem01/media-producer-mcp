@@ -91,6 +91,23 @@ const beatSchema = z.object({
   voiceover_text: z.string().optional(),
 });
 
+/** Component 3D pose (static tilt). */
+const poseSchema = z.object({
+  rotate_x: z.number().optional(),
+  rotate_y: z.number().optional(),
+}).nullable().optional();
+
+/** Scene audio hints (voiceover text + sync points). */
+const audioHintsSchema = z.object({
+  voiceover_text: z.string().optional(),
+  sync_points: z.array(z.object({ at: z.number(), label: z.string() })).optional(),
+}).nullable().optional();
+
+/** Scene media edits (source-map EDL per media target). Permissive on the
+ *  MediaEdit shape -- normally authored in Studio; the API needs set/clear.
+ *  Pass null or {} to clear all media edits on the scene. */
+const mediaEditsSchema = z.record(z.any()).nullable().optional();
+
 
 function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -407,6 +424,8 @@ export function createMcpServer(): McpServer {
         return: z.boolean().optional(),
         ease: z.string().optional(),
       })).nullable().optional().describe("Deterministic scene-camera moves (zoom/pan/rotate at a time+point). Pass null to clear."),
+      media_edits: mediaEditsSchema.describe("Scene media source-maps (EDL) keyed by media target selector (e.g. 'screencast' or 'video[src*=\"cam.mp4\"]'). Normally authored in Studio; here you can replace the whole map or clear it. Pass null or {} to remove ALL media edits on the scene (drops the media lane)."),
+      audio_hints: audioHintsSchema.describe("Scene audio hints (voiceover_text + sync_points). Pass null to clear."),
 
       // Component-level updates
       data: z.record(z.unknown()).optional(),
@@ -414,6 +433,7 @@ export function createMcpServer(): McpServer {
       z_index: z.number().optional(),
       enter: animationSchema,
       exit: animationSchema,
+      pose: poseSchema.describe("Component static 3D tilt (rotate_x / rotate_y degrees). Pass null to clear."),
 
       // Overlay-level updates
 
@@ -425,7 +445,7 @@ export function createMcpServer(): McpServer {
           trim_start: z.number().optional(),
           trim_end: z.number().optional(),
         })).optional(),
-      }).optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time."),
+      }).nullable().optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time. Pass null (or an empty clips array) to CLEAR the speaker track."),
 
       // Storyboard modifications (direct edits, no LLM)
       storyboard: z.object({
@@ -586,7 +606,13 @@ export function createMcpServer(): McpServer {
         // scene_id -- gating it behind the scene branch below silently dropped
         // it on `update({canvas, speaker_track})` while still reporting success.
         if (params.speaker_track !== undefined) {
-          project.speaker_track = params.speaker_track as any;
+          const st = params.speaker_track as any;
+          // null, or an empty clips array, clears the speaker track entirely.
+          if (st === null || !st.clips || st.clips.length === 0) {
+            delete project.speaker_track;
+          } else {
+            project.speaker_track = st;
+          }
           updated = true;
         }
 
@@ -613,6 +639,20 @@ export function createMcpServer(): McpServer {
           if (params.camera_moves !== undefined) {
             if (params.camera_moves === null) delete scene.camera_moves;
             else scene.camera_moves = params.camera_moves as any;
+            updated = true;
+          }
+          if (params.media_edits !== undefined) {
+            // null or {} clears ALL media edits (drops the media lane).
+            if (params.media_edits === null || Object.keys(params.media_edits).length === 0) {
+              delete scene.media_edits;
+            } else {
+              scene.media_edits = params.media_edits as any;
+            }
+            updated = true;
+          }
+          if (params.audio_hints !== undefined) {
+            if (params.audio_hints === null) delete scene.audio_hints;
+            else scene.audio_hints = params.audio_hints as any;
             updated = true;
           }
           // (speaker_track is handled at the project level above -- it is not a
@@ -650,6 +690,11 @@ export function createMcpServer(): McpServer {
           if (params.z_index !== undefined) { comp.z_index = params.z_index; updated = true; }
           if (params.enter !== undefined) { comp.enter = params.enter; updated = true; }
           if (params.exit !== undefined) { comp.exit = params.exit; updated = true; }
+          if (params.pose !== undefined) {
+            if (params.pose === null) delete (comp as any).pose;
+            else (comp as any).pose = params.pose;
+            updated = true;
+          }
         }
 
         if (updated) {
