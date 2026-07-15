@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sS -p -x \"$HTTPS_PROXY\" -X POST \"http://159.203.115.164:3200/api/deploy*)",
+      "Bash(curl -sS -p -x \"$HTTPS_PROXY\" \"http://159.203.115.164:3200/health*)"
+    ]
+  }
+}
