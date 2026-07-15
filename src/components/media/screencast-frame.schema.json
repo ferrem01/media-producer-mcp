@@ -69,6 +69,31 @@
       "type": "boolean",
       "label": "Phone only: show the floating island pill (default true)",
       "optional": true
+    },
+    "pip_source": {
+      "type": "string",
+      "label": "Camera PiP: a video URL (/assets/... a talking-head/camera clip) shown as a small bubble pinned to a corner over the screencast. Muted -- put the camera's audio on a project audio track (or use it as the speaker track). Pass the literal 'speaker' in speaker-track mode to auto-bind the camera + sync.",
+      "optional": true
+    },
+    "pip_position": {
+      "type": "string",
+      "label": "PiP corner: bottom-right (default) | bottom-left | top-right | top-left",
+      "optional": true
+    },
+    "pip_size": {
+      "type": "number",
+      "label": "PiP width as % of the frame (default 22, clamped 8-42)",
+      "optional": true
+    },
+    "pip_shape": {
+      "type": "string",
+      "label": "PiP shape: rounded (default, 16:9 rounded rect) | circle",
+      "optional": true
+    },
+    "pip_start_at": {
+      "type": "number",
+      "label": "Seconds into the camera clip where this scene's PiP starts (default 0; speaker-track mode sets it automatically)",
+      "optional": true
     }
   }
 }
