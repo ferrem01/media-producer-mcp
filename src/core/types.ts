@@ -239,8 +239,14 @@ export interface MediaSegment {
   src_start: number;
   /** Seconds into the SOURCE file where this stretch ends (exclusive). */
   src_end: number;
-  /** Playback rate (1 = real time, 8 = timelapse). Must be > 0. */
+  /** Playback rate (1 = real time, 8 = timelapse). Must be > 0. Ignored (0)
+   *  for a freeze/hold segment. */
   rate: number;
+  /** FREEZE/HOLD: when set (> 0), this segment holds frame `src_start` frozen
+   *  for `hold` seconds of OUTPUT time -- the source clock does not advance.
+   *  `src_end` equals `src_start` and `rate` is 0. This is a TRUE freeze (one
+   *  frame parked), not slow playback. */
+  hold?: number;
 }
 
 /** A media element's edit: ordered segments (monotonic source times). When

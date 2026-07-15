@@ -12,23 +12,36 @@ import type { MediaEdit, MediaSegment } from "./types.js";
  * FREEZE on the final frame when the map is exhausted.
  */
 
-/** Sanitize: drop degenerate segments, clamp rate to something playable. */
+/** A freeze/hold segment: holds frame `src_start` for `hold` OUTPUT seconds,
+ *  source clock parked (a TRUE freeze, not slow playback). */
+export function isHoldSegment(s: MediaSegment): boolean {
+  return typeof s.hold === "number" && s.hold > 0;
+}
+
+/** Output-clock duration a single segment occupies. */
+function segOutDur(s: MediaSegment): number {
+  return isHoldSegment(s) ? s.hold! : (s.src_end - s.src_start) / s.rate;
+}
+
+/** Sanitize: keep hold segments (frame freezes), drop other degenerate
+ *  segments, clamp rate to something playable. */
 export function normalizeSegments(segments: MediaSegment[]): MediaSegment[] {
   return (segments || [])
-    .filter((s) => s && s.src_end > s.src_start)
-    .map((s) => ({
-      src_start: Math.max(0, s.src_start),
-      src_end: s.src_end,
-      rate: Math.min(16, Math.max(0.1, s.rate || 1)),
-    }));
+    .filter((s) => s && (isHoldSegment(s) || s.src_end > s.src_start))
+    .map((s) =>
+      isHoldSegment(s)
+        ? { src_start: Math.max(0, s.src_start), src_end: Math.max(0, s.src_start), rate: 0, hold: s.hold }
+        : {
+            src_start: Math.max(0, s.src_start),
+            src_end: s.src_end,
+            rate: Math.min(16, Math.max(0.1, s.rate || 1)),
+          },
+    );
 }
 
 /** Total output-clock duration the map produces. */
 export function edlOutputDuration(segments: MediaSegment[]): number {
-  return normalizeSegments(segments).reduce(
-    (sum, s) => sum + (s.src_end - s.src_start) / s.rate,
-    0,
-  );
+  return normalizeSegments(segments).reduce((sum, s) => sum + segOutDur(s), 0);
 }
 
 /** Map an output time to the source time that should be showing.
@@ -38,15 +51,17 @@ export function mapSourceTime(segments: MediaSegment[], outputTime: number): num
   if (segs.length === 0) return outputTime;
   let acc = 0;
   for (const s of segs) {
-    const outDur = (s.src_end - s.src_start) / s.rate;
+    const outDur = segOutDur(s);
     if (outputTime < acc + outDur) {
-      return s.src_start + (outputTime - acc) * s.rate;
+      // Hold: park on src_start for the whole window (frame frozen).
+      return isHoldSegment(s) ? s.src_start : s.src_start + (outputTime - acc) * s.rate;
     }
     acc += outDur;
   }
   // Exhausted: freeze on the final frame (a hair before src_end so a frame
   // exists to seek to).
-  return Math.max(segs[segs.length - 1].src_start, segs[segs.length - 1].src_end - 0.05);
+  const lastSeg = segs[segs.length - 1];
+  return isHoldSegment(lastSeg) ? lastSeg.src_start : Math.max(lastSeg.src_start, lastSeg.src_end - 0.05);
 }
 
 /** The segment active at an output time (null once frozen). Used by the
@@ -59,7 +74,7 @@ export function activeSegmentAt(
   let acc = 0;
   for (let i = 0; i < segs.length; i++) {
     const s = segs[i];
-    const outDur = (s.src_end - s.src_start) / s.rate;
+    const outDur = segOutDur(s);
     if (outputTime < acc + outDur) {
       return { segment: s, index: i, outStart: acc, outEnd: acc + outDur };
     }
@@ -76,6 +91,12 @@ function __mpMapSourceTime(segs, t) {
   var acc = 0;
   for (var i = 0; i < segs.length; i++) {
     var s = segs[i];
+    var isHold = typeof s.hold === 'number' && s.hold > 0;
+    if (isHold) {
+      if (t < acc + s.hold) return s.src_start;   // frozen frame
+      acc += s.hold;
+      continue;
+    }
     var rate = Math.min(16, Math.max(0.1, s.rate || 1));
     if (s.src_end <= s.src_start) continue;
     var outDur = (s.src_end - s.src_start) / rate;
@@ -83,6 +104,7 @@ function __mpMapSourceTime(segs, t) {
     acc += outDur;
   }
   var last = segs[segs.length - 1];
+  if (typeof last.hold === 'number' && last.hold > 0) return last.src_start;
   return Math.max(last.src_start, last.src_end - 0.05);
 }`;
 
@@ -220,6 +242,13 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
     if (!hard && last && Math.abs(last.src_end - s) < 0.005 && Math.abs(last.rate - rate) < 0.001) last.src_end = e;
     else segments.push({ src_start: s, src_end: e, rate: Math.round(rate * 1000) / 1000 });
   };
+  // Push a TRUE freeze: hold frame `src` for `holdSeconds` of OUTPUT time, the
+  // source clock parked. Replaces the old "0.1x forward micro-sliver" that
+  // visibly crept through footage and then rewound to the pinned frame.
+  const pushHold = (src: number, holdSeconds: number) => {
+    if (holdSeconds <= 0.01) return;
+    segments.push({ src_start: src, src_end: src, rate: 0, hold: Math.round(holdSeconds * 1000) / 1000 });
+  };
 
   for (let i = 0; i < chain.length - 1; i++) {
     const a = chain[i], b = chain[i + 1];
@@ -227,10 +256,9 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
     const pieces = piecesBetween(a.src, b.src, cuts, regions);
     const atPref = pieces.reduce((t, p) => t + (p.e - p.s) / p.pref, 0);
     if (!pieces.length) {
-      // Nothing to show before this pin: hold the PINNED frame for the whole
-      // window (a forward micro-sliver at the 0.1x floor -- visually a
-      // freeze, rendered as HOLD in the lane).
-      push(b.src, Math.min(srcDur, b.src + 0.1 * window), 0.1);
+      // Nothing to show before this pin: freeze the PINNED frame for the whole
+      // window (a true hold -- source parked, rendered as HOLD in the lane).
+      pushHold(b.src, window);
       pinStatus.push({ out: b.out, status: "ok", detail: `holds the pinned frame ${window.toFixed(1)}s (no footage before it)` });
       continue;
     }
@@ -246,7 +274,9 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
       for (const p of pieces) { push(p.s, p.e, Math.min(p.pref, 1), p.hard || first0); first0 = false; }
       const played = pieces.reduce((t, p) => t + (p.e - p.s) / Math.min(p.pref, 1), 0);
       const hold = window - played;
-      if (hold > 0.1) push(b.src, Math.min(srcDur, b.src + 0.1 * hold), 0.1);
+      // Freeze the pinned frame (b.src) for the leftover window -- a true hold,
+      // so playback resumes from the SAME frame with no rewind.
+      pushHold(b.src, hold);
       pinStatus.push({ out: b.out, status: "ok", detail: `arrives early -- holds the pinned frame ${Math.max(0, hold).toFixed(1)}s` });
       continue;
     }
@@ -304,6 +334,9 @@ export function inferIntents(edit: MediaEdit, srcDur: number): MediaIntents {
   const rate_regions: MediaRateRegion[] = [];
   let cursor = 0;
   for (const s of segs) {
+    // Freezes are a consequence of a pin, not an intent -- the pin persists and
+    // re-solving reproduces the hold. Never recover a hold as a rate region.
+    if (isHoldSegment(s)) continue;
     if (s.src_start > cursor + 0.05) cuts.push({ src_start: cursor, src_end: s.src_start });
     if (Math.abs(s.rate - 1) > 0.01) rate_regions.push({ src_start: s.src_start, src_end: s.src_end, rate: s.rate });
     cursor = Math.max(cursor, s.src_end);
