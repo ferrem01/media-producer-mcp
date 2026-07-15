@@ -360,6 +360,15 @@
       frame.style.width = frameW + 'px';
       frame.style.borderRadius = radius + 'px';
       if (full || data.shadow === false) frame.style.boxShadow = 'none';
+      // frame_style:'none' is TRULY frameless: clear the dark matte the frame /
+      // viewport / media carry for the float look, so a full-bleed screencast
+      // has no black edge -- any uncovered pixel shows the scene (e.g. white),
+      // not #000. (Framed styles keep the matte so letterbox reads intentional.)
+      if (full) {
+        frame.style.background = 'transparent';
+        viewport.style.background = 'transparent';
+        media.style.background = 'transparent';
+      }
 
       if (frameStyle === 'macos-browser') {
         chrome.style.display = 'flex';
