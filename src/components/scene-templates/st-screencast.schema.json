@@ -60,7 +60,7 @@
     },
     "pip_source": {
       "type": "string",
-      "label": "Camera PiP: a video URL (a talking-head/camera clip) shown as a small bubble pinned to a corner over the screencast. Muted -- put the camera's audio on a project audio (or speaker) track. Omit for no camera bubble.",
+      "label": "Camera PiP: a small talking-head bubble pinned to a corner over the screencast. BEST PRACTICE when the camera is the film's speaker track: pass the literal 'speaker' -- the system binds the bubble to the speaker clip and auto-syncs it, so there is ONE camera reference (no duplicate media, no PiP/voice drift). Otherwise pass a plain camera video URL (muted; put its audio on a project audio track). Omit for no camera bubble.",
       "optional": true
     },
     "pip_position": {

@@ -40,6 +40,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit, SpeakerTrack } from "./core/types.js";
 import { normalizeBeats } from "./core/beats.js";
+import { normalizeSpeakerPipRefs } from "./core/scene-assembler.js";
 import { generateTTS } from "./audio/tts.js";
 import { searchMusic, downloadTrack } from "./audio/music.js";
 import { isAuthEnabled, validateToken } from "./auth/auth.js";
@@ -579,6 +580,14 @@ export function createMcpServer(): McpServer {
           Object.assign(project.canvas, params.canvas);
           updated = true;
         }
+        // speaker_track is a PROJECT-level field (the film's canonical camera +
+        // audio). It must persist on a project-level update, independent of any
+        // scene_id -- gating it behind the scene branch below silently dropped
+        // it on `update({canvas, speaker_track})` while still reporting success.
+        if (params.speaker_track !== undefined) {
+          project.speaker_track = params.speaker_track as any;
+          updated = true;
+        }
 
         // Scene-level property updates (non-removal)
         if (params.scene_id && !params.component_id) {
@@ -604,16 +613,37 @@ export function createMcpServer(): McpServer {
             else scene.camera_moves = params.camera_moves as any;
             updated = true;
           }
-          if (params.speaker_track !== undefined) { project.speaker_track = params.speaker_track as any; updated = true; }
+          // (speaker_track is handled at the project level above -- it is not a
+          // scene-scoped field.)
         }
 
         // Component-level property updates (non-removal)
+        let pipWarning: string | undefined;
         if (params.scene_id && params.component_id) {
           const scene = project.scenes.find((s: any) => s.id === params.scene_id);
           if (!scene) return err("Scene not found");
           const comp = scene.components.find((c: any) => c.id === params.component_id);
           if (!comp) return err("Component not found");
-          if (params.data !== undefined) { Object.assign(comp.data, params.data); updated = true; }
+          if (params.data !== undefined) {
+            Object.assign(comp.data, params.data);
+            // Option-A guardrail: if this component's PiP/source now points at
+            // the SAME clip that is the project's speaker_track (by URL rather
+            // than the "speaker" token), that is a redundant, drift-prone second
+            // reference. Auto-correct it to "speaker" (single source, muted +
+            // render-synced) and tell the caller what we did.
+            const spkSource = project.speaker_track?.clips?.[0]?.source;
+            if (spkSource) {
+              const { data: fixed, corrected } = normalizeSpeakerPipRefs(comp.data, spkSource);
+              if (corrected.length) {
+                comp.data = fixed;
+                pipWarning =
+                  `Auto-corrected ${corrected.join(", ")} to "speaker": it referenced the same clip as the ` +
+                  `speaker track by URL, which duplicates the camera and breaks PiP<->voice sync. ` +
+                  `The PiP now binds to the single speaker track.`;
+              }
+            }
+            updated = true;
+          }
           if (params.position !== undefined) { comp.position = params.position; updated = true; }
           if (params.z_index !== undefined) { comp.z_index = params.z_index; updated = true; }
           if (params.enter !== undefined) { comp.enter = params.enter; updated = true; }
@@ -623,7 +653,7 @@ export function createMcpServer(): McpServer {
         if (updated) {
           project.updated_at = new Date().toISOString();
           await saveProject(project);
-          return ok({ status: "updated", project_id: project.project_id });
+          return ok({ status: "updated", project_id: project.project_id, ...(pipWarning ? { warning: pipWarning } : {}) });
         }
       }
 
