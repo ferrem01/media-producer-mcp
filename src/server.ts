@@ -383,6 +383,7 @@ export function createMcpServer(): McpServer {
       label: z.string().optional(),
       duration_seconds: z.number().optional(),
       background: z.string().optional(),
+      transparent_background: z.boolean().optional().describe("Speaker films: whether this scene composites OVER the camera (true = transparent, camera shows through -- floating content) or covers it (false = opaque, e.g. a full-frame screencast with the camera only in a PiP). When a speaker_track is set, scenes default to transparent unless this is explicitly false. Set false for an opaque full-frame screencast that should hide the camera base except in its PiP bubble."),
       transition_in: transitionSchema,
       beats: z.array(beatSchema).optional().describe("Replace the scene's beat timeline"),
       content_region: z.object({
@@ -596,6 +597,7 @@ export function createMcpServer(): McpServer {
           if (params.label !== undefined) { scene.label = params.label; updated = true; }
           if (params.duration_seconds !== undefined) { scene.duration_seconds = params.duration_seconds; updated = true; }
           if (params.background !== undefined) { scene.background = params.background; updated = true; }
+          if (params.transparent_background !== undefined) { scene.transparent_background = params.transparent_background; updated = true; }
           if (params.transition_in !== undefined) { scene.transition_in = params.transition_in; updated = true; }
           if (params.beats !== undefined) {
             // Normalize against the scene's (possibly just-updated) duration;

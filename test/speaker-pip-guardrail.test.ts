@@ -189,6 +189,22 @@ describe("update tool — speaker_track persistence + PiP guardrail", () => {
     expect(persisted?.speaker_track?.clips?.[0]?.source).toBe(CAM);
   });
 
+  it("persists scene transparent_background:false (opaque screencast over a speaker track)", async () => {
+    // The hand-build gap that broke Studio: with a speaker_track set, scenes
+    // default to transparent (camera shows through). An opaque full-frame
+    // screencast (camera only in its PiP) needs transparent_background:false,
+    // and the update tool must be able to SET it. Lock both true and false.
+    const rFalse = await callUpdate({ project_id: projectId, scene_id: "s_main", transparent_background: false });
+    expect(rFalse.isError).toBe(false);
+    let persisted = await loadProject(TENANT, projectId);
+    expect(persisted?.scenes?.[0]?.transparent_background).toBe(false);
+
+    const rTrue = await callUpdate({ project_id: projectId, scene_id: "s_main", transparent_background: true });
+    expect(rTrue.isError).toBe(false);
+    persisted = await loadProject(TENANT, projectId);
+    expect(persisted?.scenes?.[0]?.transparent_background).toBe(true);
+  });
+
   it("auto-corrects a by-URL PiP to 'speaker' and warns (Option A)", async () => {
     const r = await callUpdate({
       project_id: projectId,
