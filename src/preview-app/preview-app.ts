@@ -1366,13 +1366,20 @@ export function getPreviewHtml(): string {
       clip._wasStarved = false;
     }
 
-    // Smooth catch-up: a healthy, PLAYING, muted scene video that's
-    // moderately off chases sync (1.6x behind / 0.7x ahead) instead of
-    // hard-seeking -- the seek is a visible snap, the chase is invisible on
-    // screen content. Speaker-sourced video is excluded (its audio is the
-    // clock; never bend its rate). Cuts (offsetJumped) still seek.
-    var chaseEligible = isSceneVideo && !clip.isSpeaker && isPlayingMedia && el.readyState >= 3;
-    if (chaseEligible && drift > 0.3 && drift <= 3 && !firstTick && !(prevOffset !== null && Math.abs(offset - prevOffset) > 0.5)) {
+    // Smooth catch-up: a healthy, PLAYING, muted scene video that's moderately
+    // off chases sync (1.6x behind / 0.7x ahead) instead of hard-seeking -- the
+    // seek is a visible snap, the chase is invisible on screen content.
+    //
+    // The speaker PiP is a MUTED picture of the camera whose audio lives on the
+    // separate speaker-bg element (the clock). It must chase that clock TIGHTLY
+    // or the face lip-syncs ~0.5s off the voice. Bending a muted bubble's rate
+    // is inaudible, so it chases like any other scene video -- just to a tighter
+    // lock. (The actual audio element is kind:'speaker', handled elsewhere and
+    // never reaches here, so its rate is still never bent.) Cuts still seek.
+    var chaseStart = clip.isSpeaker ? 0.1 : 0.3;   // start locking sooner for the PiP
+    var chaseEnd = clip.isSpeaker ? 0.05 : 0.12;   // and hold it tighter (~1 frame)
+    var chaseEligible = isSceneVideo && isPlayingMedia && el.readyState >= 3;
+    if (chaseEligible && drift > chaseStart && drift <= 3 && !firstTick && !(prevOffset !== null && Math.abs(offset - prevOffset) > 0.5)) {
       var base = clip._baseRate || 1;
       var chase = (target > el.currentTime) ? Math.min(4, base * 1.6) : Math.max(0.5, base * 0.7);
       if (el.playbackRate !== chase) { try { el.playbackRate = chase; } catch (e6) {} }
@@ -1382,7 +1389,7 @@ export function getPreviewHtml(): string {
       clip._chasing = true;
       return;
     }
-    if (clip._chasing && (drift <= 0.12 || !isPlayingMedia)) {
+    if (clip._chasing && (drift <= chaseEnd || !isPlayingMedia)) {
       var base2 = clip._baseRate || 1;
       if (el.playbackRate !== base2) { try { el.playbackRate = base2; } catch (e7) {} }
       clip._chasing = false;
