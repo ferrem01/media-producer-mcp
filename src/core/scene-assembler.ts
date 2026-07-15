@@ -188,7 +188,12 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
 
     // Bind data to template
     // Resolve relative asset URLs to absolute for file:// protocol
-    const preData = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData(comp);
+    const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData(comp);
+    // Option-A backstop: a PiP pointing at the speaker clip by URL becomes the
+    // "speaker" token regardless of how it was authored (generate, hand-edit,
+    // or a client that skipped the update-tool guardrail) -- so preview dedups
+    // and render sync-binds it. Keyed on speakerUrl (the resolved speaker clip).
+    const preData = speakerUrl ? normalizeSpeakerPipRefs(preData0, speakerUrl).data : preData0;
     const resolvedData = resolveAssetUrls(preData, preview, speakerUrl);
     let boundHtml = bindTemplate(parsed.template, resolvedData);
 
@@ -1212,6 +1217,60 @@ export function speakerUnderlayHtml(speakerUrl: string, offsetSeconds: number): 
 })();
 </scr` + `ipt>
 `;
+}
+
+/**
+ * Component-data key that carries the camera PiP reference. Deliberately scoped
+ * to `pip_source` only: `source`/`src` are a component's MAIN media (e.g. the
+ * screencast footage in st-screencast), and rewriting those would be wrong. A
+ * PiP, by definition, is the camera bubble -- if it points at the speaker clip
+ * it should be the "speaker" token.
+ */
+const SPEAKER_PIP_KEYS = ["pip_source"] as const;
+
+/** Last path segment of an /assets/ url or file path (for basename compare). */
+function assetBasename(v: string): string {
+  const noQuery = v.split(/[?#]/)[0];
+  const seg = noQuery.split("/").filter(Boolean).pop() || noQuery;
+  return seg.toLowerCase();
+}
+
+/**
+ * Option-A guardrail (single source of truth for the camera).
+ *
+ * When a screencast/PiP component references the SAME clip that is already the
+ * project's speaker_track -- but does so by a plain URL instead of the literal
+ * "speaker" token -- that is the redundant, drift-prone anti-pattern: two
+ * independent references to one camera (Studio shows a duplicate media file,
+ * and the PiP is not sync-bound to the speaker track at render time). This
+ * rewrites any such plain-URL PiP reference to "speaker" so there is exactly
+ * one reference, muted + auto-synced. Returns the (possibly new) data object
+ * and the list of keys it corrected, so callers can surface a warning.
+ *
+ * `speakerSource` is the raw stored speaker clip source (e.g.
+ * "/assets/<tenant>/.../camera.mp4"); matching is by exact value OR basename so
+ * it holds across the /assets vs file:// vs http url forms of the same file.
+ */
+export function normalizeSpeakerPipRefs(
+  data: Record<string, any>,
+  speakerSource: string | undefined | null,
+): { data: Record<string, any>; corrected: string[] } {
+  if (!data || !speakerSource || typeof speakerSource !== "string") {
+    return { data, corrected: [] };
+  }
+  const targetBase = assetBasename(speakerSource);
+  const corrected: string[] = [];
+  let out: Record<string, any> | null = null;
+  for (const key of SPEAKER_PIP_KEYS) {
+    const val = data[key];
+    if (typeof val !== "string" || val === "speaker" || val.length === 0) continue;
+    if (val === speakerSource || assetBasename(val) === targetBase) {
+      if (!out) out = { ...data };
+      out[key] = "speaker";
+      corrected.push(key);
+    }
+  }
+  return { data: out || data, corrected };
 }
 
 export function resolveAssetUrls(data: Record<string, any>, preview?: boolean, speakerUrl?: string): Record<string, any> {
