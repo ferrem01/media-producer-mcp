@@ -12,6 +12,7 @@
       </div>
       <div class="scf-island"></div>
     </div>
+    <video class="scf-pip" src="{{pip_source}}" muted playsinline preload="auto"></video>
   </div>
 </template>
 
@@ -53,6 +54,20 @@
     background: #e7e7ea;
     padding: 0 1.1em;
     border-radius: 0;
+  }
+
+  /* ── Speaker / camera PiP: a small camera bubble pinned to a corner over
+     the screencast. Sized/positioned/shaped by the script. Muted -- the
+     camera's audio rides the project audio (or speaker) track, not this
+     element. ── */
+  .scf-pip {
+    display: none;
+    position: absolute;
+    object-fit: cover;
+    background: #000;
+    border: 3px solid #ffffff;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.42), 0 3px 10px rgba(0, 0, 0, 0.28);
+    z-index: 8;
   }
 
   .scf-dot { width: 0.62em; height: 0.62em; border-radius: 50%; display: inline-block; }
@@ -245,6 +260,44 @@
     }
     if (!isImage && data.video_start_at) {
       media.setAttribute('data-start-at', String(data.video_start_at));
+    }
+
+    // ── Speaker / camera PiP ──
+    // data.pip_source is a plain camera video URL (works in Studio + render),
+    // or the literal "speaker" (the speaker-track render swaps it for the
+    // camera and sets data.start_at to this scene's film time). The bubble is
+    // pinned to a corner, muted (audio rides the project/speaker track), and
+    // frame-swapped by the render like any <video>.
+    var pip = el.querySelector('.scf-pip');
+    if (!data.pip_source) {
+      if (pip) { pip.parentNode.removeChild(pip); pip = null; }
+    } else if (pip) {
+      var pipStart = data.pip_start_at !== undefined ? data.pip_start_at
+        : (data.start_at !== undefined ? data.start_at : data.video_start_at);
+      if (pipStart) pip.setAttribute('data-start-at', String(pipStart));
+      var pipShape = data.pip_shape || 'rounded'; // rounded | circle
+      var pipPos = data.pip_position || 'bottom-right';
+      var pipLayout = function () {
+        var sb = stage.getBoundingClientRect();
+        if (sb.width < 4) return;
+        var sizePct = Math.min(42, Math.max(8, Number(data.pip_size) || 22));
+        var w = sb.width * (sizePct / 100);
+        var h = pipShape === 'circle' ? w : w * 0.5625; // 16:9 camera bubble
+        var m = sb.width * 0.022;
+        pip.style.width = w + 'px';
+        pip.style.height = h + 'px';
+        pip.style.borderRadius = pipShape === 'circle' ? '50%' : Math.round(w * 0.055) + 'px';
+        pip.style.top = pip.style.bottom = pip.style.left = pip.style.right = 'auto';
+        if (pipPos.indexOf('top') === 0) pip.style.top = m + 'px'; else pip.style.bottom = m + 'px';
+        if (pipPos.indexOf('right') >= 0) pip.style.right = m + 'px'; else pip.style.left = m + 'px';
+      };
+      pipLayout();
+      pip.style.display = 'block';
+      window.addEventListener('resize', pipLayout);
+      // Slide in from its corner, then hold (footage never fades itself out).
+      var pipFromY = pipPos.indexOf('top') === 0 ? -28 : 28;
+      gsap.set(pip, { autoAlpha: 0, y: pipFromY });
+      tl.to(pip, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.45);
     }
 
     // ── Crop resolution ──
