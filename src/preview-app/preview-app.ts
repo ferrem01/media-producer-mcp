@@ -2811,6 +2811,20 @@ export function getPreviewHtml(): string {
     return source;
   }
 
+  // Robust "is this video the speaker?" check. The naive /speaker/ test only
+  // catches the __mp_speaker_base underlay; a PiP bound to the speaker resolves
+  // to the camera's real filename (e.g. camera.mp4), which has no "speaker" in
+  // its src -- so also match the actual speaker clip by url/basename. Without
+  // this the PiP camera shows as a SECOND editable video in the media lane.
+  function isSpeakerVideoSrc(src) {
+    if (!src) return false;
+    if (/speaker/i.test(src)) return true;
+    var spk = getSpeakerClipUrl();
+    if (!spk) return false;
+    var base = spk.split('/').pop();
+    return src === spk || (!!base && src.indexOf(base) >= 0);
+  }
+
   function isSpeakerScene(sceneIndex) {
     var project = state.currentProject;
     if (!project || !project.scenes || !project.speaker_track) return false;
@@ -3067,7 +3081,7 @@ export function getPreviewHtml(): string {
     if (edits['screencast']) {
       var best = null, bestA = 0;
       vids.forEach(function(x) {
-        if (/speaker/i.test(x.getAttribute('src') || '')) return;
+        if (isSpeakerVideoSrc(x.getAttribute('src') || '')) return;
         var r = x.getBoundingClientRect();
         if (r.width * r.height > bestA) { bestA = r.width * r.height; best = x; }
       });
@@ -3090,7 +3104,7 @@ export function getPreviewHtml(): string {
     p.scenes.forEach(function(scene) {
       if (!scene.media_edits || !Object.keys(scene.media_edits).length) return;
       var vids = sceneVideos(doc, scene.id).filter(function(v) {
-        return !/speaker/i.test(v.getAttribute('src') || '');
+        return !isSpeakerVideoSrc(v.getAttribute('src') || '');
       });
       vids.forEach(function(v) {
         var found = editForVideo(scene, v, vids);
@@ -3117,7 +3131,7 @@ export function getPreviewHtml(): string {
     if (!doc) return;
     p.scenes.forEach(function(scene, si) {
       var vids = sceneVideos(doc, scene.id).filter(function(v) {
-        return !/speaker/i.test(v.getAttribute('src') || '');
+        return !isSpeakerVideoSrc(v.getAttribute('src') || '');
       });
       var sceneStart = sceneStartFor(si);
       var dur = scene.duration_seconds || 5;
@@ -3494,7 +3508,7 @@ export function getPreviewHtml(): string {
     var doc;
     try { doc = els.previewIframe.contentDocument; } catch (e) { return; }
     var vids = sceneVideos(doc, scene.id).filter(function(x) {
-      return !/speaker/i.test(x.getAttribute('src') || '');
+      return !isSpeakerVideoSrc(x.getAttribute('src') || '');
     });
     if (!vids.length) return;
     var best = vids[0], bestA = 0;
@@ -3571,7 +3585,7 @@ export function getPreviewHtml(): string {
         var vids0 = sceneVideos(doc, scene.id);
         var best0 = null, bestA0 = 0;
         vids0.forEach(function(x) {
-          if (/speaker/i.test(x.getAttribute('src') || '')) return;
+          if (isSpeakerVideoSrc(x.getAttribute('src') || '')) return;
           var r0 = x.getBoundingClientRect();
           if (r0.width * r0.height > bestA0) { bestA0 = r0.width * r0.height; best0 = x; }
         });
