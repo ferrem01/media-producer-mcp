@@ -15,6 +15,7 @@ import { fork, execFile, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { assembleSceneAuto, type ComponentSource } from "./scene-assembler.js";
+import { sceneCompositesOverSpeaker } from "./speaker-mode.js";
 
 /**
  * Choose the right assembler based on scene type and assemble to HTML.
@@ -808,7 +809,9 @@ async function renderSceneTransparentFrames(
   // Only force transparency if the scene hasn't explicitly set transparent_background = false.
   // Scenes that want opaque backgrounds (e.g. screencast, Brady grid) set this to false.
   const projectClone = JSON.parse(JSON.stringify(project));
-  if (projectClone.scenes[sceneIndex].transparent_background !== false) {
+  // This path only runs in speaker-track render (camera is the base), so the
+  // speaker is always present here.
+  if (sceneCompositesOverSpeaker(projectClone.scenes[sceneIndex], true)) {
     projectClone.scenes[sceneIndex].transparent_background = true;
   }
 

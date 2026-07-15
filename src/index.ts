@@ -52,6 +52,7 @@ import { initTenantStoreFromFile } from "./auth/tenant-store.js";
 import { normalizeVideoForWeb } from "./core/video-normalize.js";
 import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/asset-intel.js";
 import { solveMediaEdits, inferIntents } from "./core/media-edl.js";
+import { sceneCompositesOverSpeaker } from "./core/speaker-mode.js";
 import { repairBrandAssetPath } from "./core/scene-assembler.js";
 import { spawn } from "node:child_process";
 import { openSync } from "node:fs";
@@ -1003,7 +1004,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         const spStarts = speakerSceneFilmStarts(project.scenes);
         const spIdx = project.scenes.findIndex((s) => s.id === scene.id);
         const spOffset = spIdx >= 0 ? spStarts[spIdx] : 0;
-        const sceneForPreview = spUrl && scene.transparent_background !== false
+        const sceneForPreview = sceneCompositesOverSpeaker(scene, !!spUrl)
           ? { ...scene, transparent_background: true }
           : scene;
         // assembleSceneAuto routes codegen scenes through the codegen

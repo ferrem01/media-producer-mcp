@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { assembleSceneAuto } from "./scene-assembler.js";
+import { sceneCompositesOverSpeaker } from "./speaker-mode.js";
 import type { ComponentSource } from "./scene-assembler.js";
 import { captureSingleFrame } from "./capture.js";
 import { speakerSceneFilmStarts } from "./speaker-track.js";
@@ -125,7 +126,7 @@ async function buildSceneThumbnail(
     // (unless opted out) over the camera underlay, seeked to this scene's
     // film start -- the still shows what the viewer actually sees.
     const sceneForCapture =
-      speakerUrl && scene.transparent_background !== false
+      sceneCompositesOverSpeaker(scene, !!speakerUrl)
         ? { ...scene, transparent_background: true }
         : scene;
     const html = await assembleSceneAuto({
