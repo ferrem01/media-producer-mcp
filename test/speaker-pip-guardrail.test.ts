@@ -303,4 +303,28 @@ describe("update tool — speaker_track persistence + PiP guardrail", () => {
     p = await loadProject(TENANT, projectId);
     expect(p?.speaker_track).toBeUndefined();
   });
+
+  it("coerces string-serialized object/null params (clients that stringify)", async () => {
+    // Observed: this client sends media_edits:{} as the STRING "{}" and
+    // media_edits:null as "null". Both must parse and clear.
+    const edit = { 'video[src*="camera.mp4"]': { segments: [{ src_start: 0, src_end: 10, rate: 1 }] } };
+
+    await callUpdate({ project_id: projectId, scene_id: "s_main", media_edits: edit });
+    let r = await callUpdate({ project_id: projectId, scene_id: "s_main", media_edits: "null" as unknown as Record<string, unknown> });
+    expect(r.isError).toBe(false);
+    let p = await loadProject(TENANT, projectId);
+    expect(p?.scenes?.[0]?.media_edits).toBeUndefined();
+
+    await callUpdate({ project_id: projectId, scene_id: "s_main", media_edits: edit });
+    r = await callUpdate({ project_id: projectId, scene_id: "s_main", media_edits: "{}" as unknown as Record<string, unknown> });
+    expect(r.isError).toBe(false);
+    p = await loadProject(TENANT, projectId);
+    expect(p?.scenes?.[0]?.media_edits).toBeUndefined();
+
+    // a pose passed as a JSON string still sets
+    r = await callUpdate({ project_id: projectId, scene_id: "s_main", component_id: "sc", pose: '{"rotate_y":8}' as unknown as Record<string, unknown> });
+    expect(r.isError).toBe(false);
+    p = await loadProject(TENANT, projectId);
+    expect((p?.scenes?.[0]?.components?.[0] as any)?.pose?.rotate_y).toBe(8);
+  });
 });

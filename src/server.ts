@@ -91,22 +91,32 @@ const beatSchema = z.object({
   voiceover_text: z.string().optional(),
 });
 
+/** Some MCP clients serialize object/null params as JSON strings (the same way
+ *  they stringify booleans). Parse a string back to JSON so object-shaped and
+ *  nullable params (and their clears) work regardless of client. */
+const parseJsonParam = (v: unknown): unknown => {
+  if (typeof v !== "string") return v;
+  const s = v.trim();
+  if (s === "" || s === "undefined") return undefined;
+  try { return JSON.parse(s); } catch { return v; }
+};
+
 /** Component 3D pose (static tilt). */
-const poseSchema = z.object({
+const poseSchema = z.preprocess(parseJsonParam, z.object({
   rotate_x: z.number().optional(),
   rotate_y: z.number().optional(),
-}).nullable().optional();
+}).nullable()).optional();
 
 /** Scene audio hints (voiceover text + sync points). */
-const audioHintsSchema = z.object({
+const audioHintsSchema = z.preprocess(parseJsonParam, z.object({
   voiceover_text: z.string().optional(),
   sync_points: z.array(z.object({ at: z.number(), label: z.string() })).optional(),
-}).nullable().optional();
+}).nullable()).optional();
 
 /** Scene media edits (source-map EDL per media target). Permissive on the
  *  MediaEdit shape -- normally authored in Studio; the API needs set/clear.
  *  Pass null or {} to clear all media edits on the scene. */
-const mediaEditsSchema = z.record(z.any()).nullable().optional();
+const mediaEditsSchema = z.preprocess(parseJsonParam, z.record(z.any()).nullable()).optional();
 
 
 function ok(data: unknown) {
