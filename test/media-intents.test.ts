@@ -1,7 +1,57 @@
 import { describe, it, expect } from "vitest";
-import { solveMediaEdits, inferIntents, mapSourceTime, edlOutputDuration } from "../src/core/media-edl.js";
+import { solveMediaEdits, inferIntents, mapSourceTime, edlOutputDuration, normalizeSegments } from "../src/core/media-edl.js";
 
 const SRC = 600; // 10-minute recording
+
+describe("freeze / hold: a pin that arrives early parks the exact frame", () => {
+  // Regression for the real bug: "hold" was faked as a 0.1x forward micro-
+  // sliver -- it crept through footage in slow-mo and then rewound to the pin.
+  it("emits a TRUE freeze segment (rate 0, hold>0), not a 0.1x creep", () => {
+    const { segments } = solveMediaEdits({ pins: [{ out: 20, src: 3.1 }] }, SRC);
+    const hold = segments.find((s) => s.hold);
+    expect(hold).toBeDefined();
+    expect(hold!.hold).toBeCloseTo(16.9, 1); // 20s window - 3.1s of real footage
+    expect(hold!.rate).toBe(0);
+    expect(hold!.src_start).toBeCloseTo(3.1, 2);
+    expect(hold!.src_end).toBeCloseTo(3.1, 2);
+    // No old-style 0.1x slow-play segment anywhere.
+    expect(segments.some((s) => !s.hold && Math.abs(s.rate - 0.1) < 0.001)).toBe(false);
+    // Playback resumes from the pinned frame -- no overshoot, no rewind.
+    const hi = segments.indexOf(hold!);
+    if (segments[hi + 1]) expect(segments[hi + 1].src_start).toBeCloseTo(3.1, 1);
+  });
+
+  it("holds the frame: mapSourceTime is constant across the whole window", () => {
+    const { segments } = solveMediaEdits({ pins: [{ out: 20, src: 3.1 }] }, SRC);
+    expect(mapSourceTime(segments, 3.1)).toBeCloseTo(3.1, 1);
+    expect(mapSourceTime(segments, 10)).toBeCloseTo(3.1, 1);   // mid-hold frozen (old bug: ~3.79)
+    expect(mapSourceTime(segments, 19.9)).toBeCloseTo(3.1, 1); // still frozen (old bug: ~4.79)
+  });
+
+  it("never rewinds across the hold boundary (monotonic), pin still lands", () => {
+    const { segments, pin_status } = solveMediaEdits(
+      { pins: [{ out: 20, src: 3.1 }, { out: 30, src: 13.7 }] }, SRC);
+    expect(pin_status.every((p) => p.status === "ok")).toBe(true);
+    const before = mapSourceTime(segments, 19.9);
+    const after = mapSourceTime(segments, 20.1);
+    expect(before).toBeCloseTo(3.1, 1);            // frozen at the pin, not crept to 4.79
+    expect(after).toBeGreaterThanOrEqual(before - 0.05); // no backward jump
+    expect(mapSourceTime(segments, 30)).toBeCloseTo(13.7, 1); // the next pin lands
+  });
+
+  it("output duration counts the hold seconds", () => {
+    const { segments } = solveMediaEdits({ pins: [{ out: 20, src: 3.1 }] }, SRC);
+    // play (0->3.1 @1x = 3.1s) + freeze (16.9s) = 20s up to the pin.
+    expect(edlOutputDuration(segments.slice(0, 2))).toBeCloseTo(20, 0);
+  });
+
+  it("normalizeSegments preserves a hold segment (not dropped as degenerate)", () => {
+    const segs = normalizeSegments([{ src_start: 3.1, src_end: 3.1, rate: 0, hold: 5 }]);
+    expect(segs).toHaveLength(1);
+    expect(segs[0].hold).toBe(5);
+    expect(segs[0].rate).toBe(0);
+  });
+});
 
 describe("pin solver: pins are constraints", () => {
   it("no intents: plays 1x straight through", () => {
@@ -48,7 +98,11 @@ describe("pin solver: pins are constraints", () => {
     expect(pin_status[0].status).toBe("ok");
     expect(pin_status[0].detail).toMatch(/holds/);
     expect(segments[0]).toEqual({ src_start: 5, src_end: 10, rate: 1 });
-    expect(segments[1].rate).toBeCloseTo(0.1, 3); // the hold sliver
+    // A TRUE freeze: hold frame 10 for the remaining 15s (was a 0.1x creep).
+    expect(segments[1].rate).toBe(0);
+    expect(segments[1].hold).toBeCloseTo(15, 0);
+    expect(segments[1].src_start).toBeCloseTo(10, 2);
+    expect(mapSourceTime(segments, 12)).toBeCloseTo(10, 1); // frozen mid-hold
     expect(edlOutputDuration(segments.slice(0, 2))).toBeCloseTo(20, 0);
   });
 

@@ -1108,6 +1108,13 @@ export function getPreviewHtml(): string {
     var acc = 0;
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i];
+      // Hold/freeze: park frame src_start for its hold-seconds (frozen so the
+      // preview holds the exact frame instead of creeping at 0.1x).
+      if (typeof s.hold === 'number' && s.hold > 0) {
+        if (t < acc + s.hold) return { src: s.src_start, rate: 0, frozen: true };
+        acc += s.hold;
+        continue;
+      }
       var rate = Math.min(16, Math.max(0.1, s.rate || 1));
       if (s.src_end <= s.src_start) continue;
       var outDur = (s.src_end - s.src_start) / rate;
@@ -1115,6 +1122,7 @@ export function getPreviewHtml(): string {
       acc += outDur;
     }
     var last = segs[segs.length - 1];
+    if (last && typeof last.hold === 'number' && last.hold > 0) return { src: last.src_start, rate: 1, frozen: true };
     return { src: Math.max(last.src_start, last.src_end - 0.05), rate: 1, frozen: true };
   }
 
@@ -3159,12 +3167,16 @@ export function getPreviewHtml(): string {
           var segs = found.edit.segments || [];
           var acc = 0;
           segs.forEach(function(s, i2) {
+            var holdS = (typeof s.hold === 'number' && s.hold > 0) ? s.hold : 0;
             var rate = Math.min(16, Math.max(0.1, s.rate || 1));
-            var outDur = (s.src_end - s.src_start) / rate;
-            var isHold = rate <= 0.12;
+            var outDur = holdS || ((s.src_end - s.src_start) / rate);
+            var isHold = holdS > 0;
             var cls = isHold ? 'r-freeze' : (rate >= 6 ? 'r-turbo' : (rate > 1.2 ? 'r-fast' : 'r-normal'));
             var from = acc, to = Math.min(dur, acc + outDur);
-            if (to > from) block(from, to, cls, label + ' — ' + rate + 'x  src ' + s.src_start.toFixed(1) + '-' + s.src_end.toFixed(1) + 's', (function(idx) {
+            var ttl = isHold
+              ? (label + ' — HOLD ' + holdS.toFixed(1) + 's on frame ' + s.src_start.toFixed(1) + 's')
+              : (label + ' — ' + rate + 'x  src ' + s.src_start.toFixed(1) + '-' + s.src_end.toFixed(1) + 's');
+            if (to > from) block(from, to, cls, ttl, (function(idx) {
               return function(el2) { mediaPopOpen(si, found.key, v, found.edit, idx, el2); };
             })(i2), isHold ? 'HOLD' : (rate !== 1 ? (rate + '×') : ''));
             acc += outDur;
@@ -3180,6 +3192,11 @@ export function getPreviewHtml(): string {
             var a2 = 0;
             for (var k2 = 0; k2 < segs.length; k2++) {
               var g2 = segs[k2];
+              if (typeof g2.hold === 'number' && g2.hold > 0) {
+                if (srcT <= g2.src_start) return a2;
+                a2 += g2.hold;   // a freeze occupies output time but no source range
+                continue;
+              }
               var rr = Math.min(16, Math.max(0.1, g2.rate || 1));
               if (srcT <= g2.src_start) return a2;
               if (srcT <= g2.src_end) return a2 + (srcT - g2.src_start) / rr;
