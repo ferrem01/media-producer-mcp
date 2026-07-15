@@ -149,6 +149,14 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
             crop: "auto",
             url_text: (stData as any).url_text || "",
             max_width_pct: Number((stData as any).max_width_pct) || (stFloat ? 72 : 80),
+            // Camera PiP pass-through: the template exposes the pip_* slots and
+            // forwards them verbatim to the footage frame, which owns the
+            // bubble. Only set when the caller provides a camera source.
+            pip_source: (stData as any).pip_source || undefined,
+            pip_position: (stData as any).pip_position || undefined,
+            pip_size: (stData as any).pip_size !== undefined ? Number((stData as any).pip_size) : undefined,
+            pip_shape: (stData as any).pip_shape || undefined,
+            pip_start_at: (stData as any).pip_start_at !== undefined ? Number((stData as any).pip_start_at) : undefined,
           },
         });
       } else {
