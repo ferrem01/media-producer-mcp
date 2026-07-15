@@ -333,7 +333,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.media_edits && Object.keys(scene.media_edits).length ? `<script>${mediaEdlScript(scene.media_edits, "document.body")}</script>` : "")}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
+${preview && speakerUrl && isTransparent ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.media_edits && Object.keys(scene.media_edits).length ? `<script>${mediaEdlScript(scene.media_edits, "document.body")}</script>` : "")}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? '' : '<div class="mp-ambient"></div>'}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
@@ -1029,7 +1029,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(options.mediaEdits && Object.keys(options.mediaEdits).length ? `<script>${mediaEdlScript(options.mediaEdits, "document.body")}</script>` : "")}${(options.cameraMoves && options.cameraMoves.length ? `<script>${cameraMovesScript(options.cameraMoves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
+${preview && speakerUrl && isTransparent ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(options.mediaEdits && Object.keys(options.mediaEdits).length ? `<script>${mediaEdlScript(options.mediaEdits, "document.body")}</script>` : "")}${(options.cameraMoves && options.cameraMoves.length ? `<script>${cameraMovesScript(options.cameraMoves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}
