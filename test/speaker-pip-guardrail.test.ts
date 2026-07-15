@@ -205,6 +205,21 @@ describe("update tool — speaker_track persistence + PiP guardrail", () => {
     expect(persisted?.scenes?.[0]?.transparent_background).toBe(true);
   });
 
+  it("accepts string 'false'/'true' from clients that serialize booleans as strings", async () => {
+    // The observed failure: an MCP client sent the boolean as the string
+    // "false", which a strict z.boolean() rejected. It must coerce to a real
+    // boolean so the flag actually persists.
+    const rs = await callUpdate({ project_id: projectId, scene_id: "s_main", transparent_background: "false" as unknown as boolean });
+    expect(rs.isError).toBe(false);
+    let persisted = await loadProject(TENANT, projectId);
+    expect(persisted?.scenes?.[0]?.transparent_background).toBe(false);
+
+    const rs2 = await callUpdate({ project_id: projectId, scene_id: "s_main", transparent_background: "true" as unknown as boolean });
+    expect(rs2.isError).toBe(false);
+    persisted = await loadProject(TENANT, projectId);
+    expect(persisted?.scenes?.[0]?.transparent_background).toBe(true);
+  });
+
   it("auto-corrects a by-URL PiP to 'speaker' and warns (Option A)", async () => {
     const r = await callUpdate({
       project_id: projectId,

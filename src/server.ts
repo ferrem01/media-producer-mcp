@@ -383,7 +383,7 @@ export function createMcpServer(): McpServer {
       label: z.string().optional(),
       duration_seconds: z.number().optional(),
       background: z.string().optional(),
-      transparent_background: z.boolean().optional().describe("Speaker films: whether this scene composites OVER the camera (true = transparent, camera shows through -- floating content) or covers it (false = opaque, e.g. a full-frame screencast with the camera only in a PiP). When a speaker_track is set, scenes default to transparent unless this is explicitly false. Set false for an opaque full-frame screencast that should hide the camera base except in its PiP bubble."),
+      transparent_background: z.union([z.boolean(), z.enum(["true", "false"])]).transform((v) => v === true || v === "true").optional().describe("Speaker films: whether this scene composites OVER the camera (true = transparent, camera shows through -- floating content) or covers it (false = opaque, e.g. a full-frame screencast with the camera only in a PiP). When a speaker_track is set, scenes default to transparent unless this is explicitly false. Set false for an opaque full-frame screencast that should hide the camera base except in its PiP bubble. (Accepts a boolean or the strings \"true\"/\"false\" -- some MCP clients serialize booleans as strings.)"),
       transition_in: transitionSchema,
       beats: z.array(beatSchema).optional().describe("Replace the scene's beat timeline"),
       content_region: z.object({
