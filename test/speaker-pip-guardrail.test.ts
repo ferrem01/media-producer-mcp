@@ -107,13 +107,15 @@ describe("update tool — speaker_track persistence + PiP guardrail", () => {
   let client: import("@modelcontextprotocol/sdk/client/index.js").Client;
   let projectId: string;
 
-  const callUpdate = async (args: Record<string, unknown>) => {
-    const res: any = await client.callTool({ name: "update", arguments: { tenant_id: TENANT, ...args } });
+  const callTool = async (name: string, args: Record<string, unknown>) => {
+    const res: any = await client.callTool({ name, arguments: { tenant_id: TENANT, ...args } });
     const text = res?.content?.[0]?.text ?? "";
     let json: any = undefined;
     try { json = JSON.parse(text); } catch { /* err() returns plain text */ }
     return { isError: !!res?.isError, text, json };
   };
+  const callUpdate = (args: Record<string, unknown>) => callTool("update", args);
+  const callAdd = (args: Record<string, unknown>) => callTool("add", args);
 
   beforeAll(async () => {
     // Auth is enforced at the transport, not the tool layer; keep it off so the
@@ -152,6 +154,16 @@ describe("update tool — speaker_track persistence + PiP guardrail", () => {
   afterAll(async () => {
     try { await client?.close(); } catch { /* ignore */ }
     await fs.rm(TEST_DATA_DIR, { recursive: true, force: true });
+  });
+
+  it("add tool persists speaker_track at the project level (the proven path)", async () => {
+    // The `add` tool has been the correct entry point since day one; lock it so
+    // it can never silently regress the way the `update` path did.
+    const altCam = `/assets/${TENANT}/projects/library/assets/camera-add.mp4`;
+    const r = await callAdd({ project_id: projectId, speaker_track: { clips: [{ source: altCam, start: 0 }] } });
+    expect(r.isError).toBe(false);
+    const persisted = await loadProject(TENANT, projectId);
+    expect(persisted?.speaker_track?.clips?.[0]?.source).toBe(altCam);
   });
 
   it("persists speaker_track on a PROJECT-level update (no scene_id) — the regression", async () => {
