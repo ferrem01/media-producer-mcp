@@ -356,7 +356,14 @@
       if (frameW / ar + chromeH > maxH) frameW = Math.max(1, (maxH - chromeH) * ar);
       chromeH = frameStyle === 'macos-browser' ? Math.min(64, Math.max(40, frameW * 0.034)) : 0;
 
-      var radius = full ? 0 : (data.corner_radius === undefined ? (isPhone ? 44 : 16) : Math.max(0, Number(data.corner_radius) || 0));
+      // full (frame_style:'none') defaults to radius 0 (truly frameless), but an
+      // explicit corner_radius is honored even in full mode: a full-bleed
+      // screencast recorded from a ROUNDED window carries black in the source's
+      // own corners (outside the window's radius). Rounding the frame's clip by
+      // that same radius masks those baked-in black corners with the scene.
+      var radius = data.corner_radius === undefined
+        ? (full ? 0 : (isPhone ? 44 : 16))
+        : Math.max(0, Number(data.corner_radius) || 0);
       frame.style.width = frameW + 'px';
       frame.style.borderRadius = radius + 'px';
       if (full || data.shadow === false) frame.style.boxShadow = 'none';
@@ -368,6 +375,10 @@
         frame.style.background = 'transparent';
         viewport.style.background = 'transparent';
         media.style.background = 'transparent';
+        // The viewport is the innermost clip around the media; round it too so
+        // the video's own corners (with any baked-in black) are masked, not just
+        // the frame box.
+        viewport.style.borderRadius = radius + 'px';
       }
 
       if (frameStyle === 'macos-browser') {
