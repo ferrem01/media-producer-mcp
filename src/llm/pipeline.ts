@@ -28,6 +28,7 @@ import { critiqueAndReviseScene } from "./revision-critique.js";
 import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
+import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
 import { loadProject, saveProject } from "../persistence/project.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
@@ -1158,7 +1159,7 @@ async function critiqueAndRetryScene(opts: {
       // Speaker films: mirror the render's transparency rule so the critique
       // judges the scene COMPOSITED over the real camera (captureSingleFrame
       // swaps the underlay video for the correct camera frame via ffmpeg).
-      const sceneForCritique = opts.speakerUrl && currentScene.transparent_background !== false
+      const sceneForCritique = sceneCompositesOverSpeaker(currentScene, !!opts.speakerUrl)
         ? { ...currentScene, transparent_background: true }
         : currentScene;
       const assembledHtml = await assembleSceneAuto({

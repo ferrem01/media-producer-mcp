@@ -13,6 +13,7 @@
  */
 
 import { normalizeHtmlUrls } from "./normalize-urls.js";
+import { sceneCompositesOverSpeaker } from "./speaker-mode.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import { resolveComponentTags } from "./component-tags.js";
 import {
@@ -126,7 +127,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
     // scene's brand background where the render shows the human -- the
     // composite looked nothing like the film.
     const isTransparent = speakerUrl
-      ? scene.transparent_background !== false
+      ? sceneCompositesOverSpeaker(scene, true)
       : scene.transparent_background === true;
     const sceneBgCSS = generateBrandCSS(brandKit, scene.background, true);
 
