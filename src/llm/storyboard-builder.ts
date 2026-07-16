@@ -578,10 +578,17 @@ This video uses a speaker track -- a continuous camera recording of the speaker 
 the base layer for the WHOLE film. Every scene is composited ON TOP of it. Two scene
 modes; choose per scene and SAY WHICH in the visual notes:
 
-1. SPEAKER-VISIBLE content scene: the speaker stays on screen; content occupies a region
-   beside them (e.g. right two-thirds, or a lower-third band). The scene background must
-   stay TRANSPARENT so the camera shows through -- say "transparent background, speaker
-   visible left" in the notes, and keep content out of the speaker's area.
+1. SPEAKER-VISIBLE scene: the speaker stays on camera; the scene is TRANSPARENT so the
+   camera shows through. Prefer a scene_template (deterministic, no codegen):
+   - "st-speaker-lowerthird" -- speaker full-frame with a name/title (or key-line) card in
+     a bottom corner. Slots: { name, title?, kicker?, position: "bottom-left"|"bottom-right",
+     theme }. Use for the intro ('who's talking') or a persistent identifier.
+   - "st-speaker-split" -- speaker on ONE side, an opaque content panel on the other with
+     the key points (or a graphic). Slots: { side: "right"(default)|"left", headline, body?,
+     bullets?[], kicker?, content?: {type,data} for a paired chart/stat/mock, theme }. Use
+     when the speaker explains something WHILE it appears beside them.
+   Only fall back to hand-specified components (transparent background + content_region) when
+   neither template fits.
 2. SCREENCAST / demo scene (REAL screen recording + speaker in the corner): this is THE
    most common speaker pattern -- emit the scene_template "st-speaker-screencast" (do NOT
    hand-roll a browser mock or PiP bubble, and do NOT go through codegen). It stamps out

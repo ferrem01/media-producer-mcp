@@ -1,0 +1,48 @@
+{
+  "type": "st-speaker-split",
+  "label": "Scene Template: Speaker Side-by-Side",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template for the speaker BESIDE their content: the film's speaker on camera on one side (live, full-height) and an opaque content panel on the other with the key points or a graphic. Instantiation is deterministic (NO codegen, NO critique): the scene is TRANSPARENT so the speaker-track camera shows on the clear side, and this shell paints the opaque panel over the camera on the content side. Fill the panel with text (headline + body + bullets) OR pass a 'content' component (a stat, chart, mock, or motion graphic) that rides in the panel. Use when the narration is 'the speaker explains X while X appears beside them'.",
+  "data": {
+    "side": {
+      "type": "string",
+      "label": "Which side the CONTENT panel occupies: right (default -- speaker on the left) | left. Put the panel OPPOSITE the speaker's face.",
+      "optional": true,
+      "default": "right"
+    },
+    "headline": {
+      "type": "string",
+      "label": "Panel headline -- the point being made."
+    },
+    "body": {
+      "type": "string",
+      "label": "Supporting sentence under the headline.",
+      "optional": true
+    },
+    "bullets": {
+      "type": "object",
+      "label": "Array of short strings -- key points with brand-dot markers. Ignored when a 'content' component is supplied. Keep to 2-4.",
+      "optional": true
+    },
+    "kicker": {
+      "type": "string",
+      "label": "Optional small eyebrow above the headline.",
+      "optional": true
+    },
+    "content": {
+      "type": "object",
+      "label": "Optional paired component to ride in the panel's lower zone instead of bullets: {type: '<library component>', data: {...}} -- e.g. a stat, chart, ui-mock, or motion graphic. Its own schema governs the data.",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "dark (default -- deep brand panel, light type) | light (bright panel, dark type).",
+      "optional": true,
+      "default": "dark"
+    }
+  },
+  "match": {
+    "entry": { "x": 0.75, "y": 0.5 },
+    "exit": { "x": 0.75, "y": 0.5 }
+  }
+}

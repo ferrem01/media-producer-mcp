@@ -1,0 +1,89 @@
+<template>
+  <div class="stsp">
+    <div class="stsp-panel">
+      <div class="stsp-inner">
+        <span class="stsp-kicker">{{kicker}}</span>
+        <h2 class="stsp-headline">{{headline}}</h2>
+        <p class="stsp-body">{{body}}</p>
+        <ul class="stsp-bullets"></ul>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-speaker-split: the speaker on ONE side (live camera through the
+     transparent scene) and an OPAQUE content panel on the other. The panel
+     covers the camera on its side; the speaker's side stays transparent so the
+     camera shows. Text points fill the panel; when a paired component (chart /
+     stat / motion graphic) is added by instantiation it rides in the panel's
+     lower zone and the copy top-aligns above it. ── */
+  .stsp { position: absolute; inset: 0; overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+
+  .stsp-panel { position: absolute; top: 0; height: 100%; width: 54%; right: 0;
+    background:
+      radial-gradient(120% 90% at 85% 8%, color-mix(in srgb, var(--mp-color-primary, #393bf5) 26%, transparent), transparent 60%),
+      linear-gradient(160deg, #14142a 0%, #10101f 100%);
+    box-shadow: -40px 0 90px rgba(0,0,0,0.35); }
+  .stsp.side-left .stsp-panel { right: auto; left: 0; box-shadow: 40px 0 90px rgba(0,0,0,0.35); }
+  .stsp.is-light .stsp-panel {
+    background:
+      radial-gradient(120% 90% at 85% 8%, color-mix(in srgb, var(--mp-color-primary, #393bf5) 12%, transparent), transparent 60%),
+      linear-gradient(160deg, #ffffff 0%, #eef0fb 100%); }
+
+  .stsp-inner { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center;
+    gap: 14px; padding: 8% 8% 8% 9%; box-sizing: border-box; }
+  /* When a paired graphic occupies the lower panel, the copy sits at the top. */
+  .stsp.has-slot .stsp-inner { justify-content: flex-start; padding-top: 9%; gap: 10px; }
+  .stsp-kicker { font-size: 13px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+    color: color-mix(in srgb, var(--mp-color-primary, #6d6ff8) 75%, #fff); }
+  .stsp.is-light .stsp-kicker { color: var(--mp-color-primary, #393bf5); }
+  .stsp-headline { margin: 0; font-size: 42px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.08;
+    color: #f4f4f8; text-wrap: balance; }
+  .stsp.has-slot .stsp-headline { font-size: 34px; }
+  .stsp.is-light .stsp-headline { color: #17171c; }
+  .stsp-body { margin: 0; font-size: 20px; font-weight: 400; line-height: 1.5; color: rgba(244,244,248,0.72); }
+  .stsp.is-light .stsp-body { color: #55556a; }
+  .stsp-bullets { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .stsp-bullets li { position: relative; padding-left: 26px; font-size: 19px; line-height: 1.4; color: rgba(244,244,248,0.9); }
+  .stsp.is-light .stsp-bullets li { color: #26263a; }
+  .stsp-bullets li::before { content: ''; position: absolute; left: 0; top: 0.5em; width: 10px; height: 10px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--mp-color-primary, #393bf5), var(--mp-color-secondary, #1c82ff)); }
+  .stsp.has-slot .stsp-bullets { display: none; }
+  .stsp-kicker:empty, .stsp-headline:empty, .stsp-body:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.stsp');
+    if (data.theme === 'light') root.classList.add('is-light');
+    if (data.side === 'left') root.classList.add('side-left');
+    if (data.has_slot) root.classList.add('has-slot');
+
+    var panel = el.querySelector('.stsp-panel');
+    var kicker = el.querySelector('.stsp-kicker');
+    var headline = el.querySelector('.stsp-headline');
+    var body = el.querySelector('.stsp-body');
+    var bulletsHost = el.querySelector('.stsp-bullets');
+
+    var bullets = (!data.has_slot && Array.isArray(data.bullets))
+      ? data.bullets.filter(function (b) { return typeof b === 'string' && b; }) : [];
+    bullets.forEach(function (b) { var li = document.createElement('li'); li.textContent = b; bulletsHost.appendChild(li); });
+
+    var reveal = [];
+    if (data.kicker) reveal.push(kicker);
+    if (data.headline) reveal.push(headline);
+    if (data.body) reveal.push(body);
+    Array.prototype.push.apply(reveal, Array.prototype.slice.call(bulletsHost.children));
+
+    var speed = ctx.motion === 'minimal' ? 0.7 : ctx.motion === 'punchy' ? 0.9 : 1.0;
+    var fromX = root.classList.contains('side-left') ? -60 : 60;
+    gsap.set(panel, { autoAlpha: 0, x: fromX });
+    gsap.set(reveal, { autoAlpha: 0, y: 14 });
+    tl.to(panel, { autoAlpha: 1, x: 0, duration: speed * 0.6, ease: 'power3.out' }, 0.15)
+      .to(reveal, { autoAlpha: 1, y: 0, duration: speed * 0.5, stagger: 0.09, ease: 'power2.out' }, 0.35);
+    return tl;
+  }
+</script>

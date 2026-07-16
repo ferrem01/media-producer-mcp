@@ -125,3 +125,46 @@ describe("st-speaker-screencast template instantiates the recipe (no codegen)", 
     expect(sc.data.pip_size).toBe(20);
   });
 });
+
+async function instantiateTpl(type: string, slots: Record<string, unknown>) {
+  const draft = { label: "S", duration_seconds: 8, scene_template: { type, data: slots } };
+  const res = await generateScene({
+    scene: draft as any, sceneIndex: 0, totalScenes: 3, prompt: "demo",
+    format: "video", llmConfig: {} as any, brandKit, canvas,
+    tenantId: "t", projectId: "p", hasSpeakerTrack: true,
+  } as any);
+  return res.scene as any;
+}
+
+describe("st-speaker-lowerthird / st-speaker-split stay TRANSPARENT over the camera", () => {
+  it("lowerthird: transparent scene, shell only, NO webgl backdrop (would cover the camera)", async () => {
+    const scene = await instantiateTpl("st-speaker-lowerthird", { name: "Marc", title: "Founder", theme: "dark" });
+    expect(scene.transparent_background).not.toBe(false); // transparent -> camera shows
+    expect(scene.components.some((c: any) => c.type === "webgl-backdrop")).toBe(false);
+    expect(scene.components.some((c: any) => c.type === "st-speaker-lowerthird")).toBe(true);
+    expect(scene.components.some((c: any) => c.type === "screencast-frame")).toBe(false);
+  });
+
+  it("split (text): transparent, panel shell only, no paired component, no webgl", async () => {
+    const scene = await instantiateTpl("st-speaker-split", { headline: "Faster", bullets: ["a", "b"], theme: "dark" });
+    expect(scene.transparent_background).not.toBe(false);
+    expect(scene.components.some((c: any) => c.type === "webgl-backdrop")).toBe(false);
+    const shell = scene.components.find((c: any) => c.type === "st-speaker-split");
+    expect(shell).toBeTruthy();
+    expect(shell.data.has_slot).toBe(false);
+    expect(scene.components.length).toBe(1);
+  });
+
+  it("split (with content): adds the paired component in the panel + flags the shell", async () => {
+    const scene = await instantiateTpl("st-speaker-split", {
+      headline: "Growth", side: "right", content: { type: "stat-block", data: { value: "3x" } },
+    });
+    const shell = scene.components.find((c: any) => c.type === "st-speaker-split");
+    expect(shell.data.has_slot).toBe(true);
+    const paired = scene.components.find((c: any) => c.type === "stat-block");
+    expect(paired).toBeTruthy();
+    expect(paired.position.width).toBe("44%");
+    // content on the right -> paired component sits in the right half
+    expect(paired.position.x).toBe("50%");
+  });
+});

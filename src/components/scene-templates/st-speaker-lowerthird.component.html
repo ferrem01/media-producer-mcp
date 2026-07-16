@@ -1,0 +1,78 @@
+<template>
+  <div class="stlt">
+    <div class="stlt-card">
+      <span class="stlt-bar"></span>
+      <div class="stlt-text">
+        <span class="stlt-kicker">{{kicker}}</span>
+        <span class="stlt-name">{{name}}</span>
+        <span class="stlt-title">{{title}}</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-speaker-lowerthird: a name/title lower-third over the LIVE speaker.
+     The scene is TRANSPARENT -- the camera fills the frame and shows through
+     everywhere this shell doesn't paint. Only the card is drawn; a frosted
+     scrim keeps the type legible over any footage. ── */
+  .stlt { position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stlt-card { position: absolute; left: 5.2%; bottom: 8.5%;
+    display: flex; align-items: stretch; gap: 16px;
+    padding: 16px 26px 16px 18px; border-radius: 14px;
+    background: linear-gradient(120deg, rgba(15,15,25,0.62), rgba(15,15,25,0.42));
+    backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08); }
+  .stlt.pos-right .stlt-card { left: auto; right: 5.2%; }
+  .stlt.pos-center .stlt-card { left: 50%; transform: translateX(-50%); }
+  /* Light theme: a bright frosted card with dark text (for light/blown-out rooms). */
+  .stlt.is-light .stlt-card { background: linear-gradient(120deg, rgba(255,255,255,0.78), rgba(255,255,255,0.6));
+    box-shadow: 0 18px 50px rgba(23,23,40,0.18), inset 0 1px 0 rgba(255,255,255,0.7); }
+
+  .stlt-bar { width: 4px; border-radius: 3px; flex: 0 0 auto;
+    background: linear-gradient(180deg, var(--mp-color-primary, #393bf5), var(--mp-color-secondary, #1c82ff)); }
+  .stlt-text { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+  .stlt-kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+    color: color-mix(in srgb, var(--mp-color-primary, #6d6ff8) 70%, #fff); margin-bottom: 3px; }
+  .stlt.is-light .stlt-kicker { color: var(--mp-color-primary, #393bf5); }
+  .stlt-name { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.05; color: #fff; }
+  .stlt.is-light .stlt-name { color: #17171c; }
+  .stlt-title { font-size: 18px; font-weight: 400; line-height: 1.3; color: rgba(255,255,255,0.74); }
+  .stlt.is-light .stlt-title { color: #55556a; }
+  .stlt-kicker:empty, .stlt-title:empty, .stlt-name:empty { display: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.stlt');
+    if (data.theme === 'light') root.classList.add('is-light');
+    var pos = data.position || 'bottom-left';
+    if (pos.indexOf('right') >= 0) root.classList.add('pos-right');
+    else if (pos.indexOf('center') >= 0) root.classList.add('pos-center');
+
+    var card = el.querySelector('.stlt-card');
+    var bar = el.querySelector('.stlt-bar');
+    var lines = el.querySelectorAll('.stlt-kicker, .stlt-name, .stlt-title');
+    var centered = root.classList.contains('pos-center');
+
+    // Slide the card in from the frame edge, draw the bar, rise the lines.
+    var fromX = centered ? 0 : (root.classList.contains('pos-right') ? 40 : -40);
+    gsap.set(card, { autoAlpha: 0, x: fromX, y: centered ? 20 : 0 });
+    gsap.set(bar, { scaleY: 0, transformOrigin: 'top center' });
+    gsap.set(lines, { autoAlpha: 0, y: 10 });
+
+    var speed = ctx.motion === 'minimal' ? 0.7 : ctx.motion === 'punchy' ? 0.9 : 1.0;
+    tl.to(card, { autoAlpha: 1, x: 0, y: 0, duration: speed * 0.55, ease: 'power3.out' }, 0.25)
+      .to(bar, { scaleY: 1, duration: speed * 0.5, ease: 'power2.out' }, 0.35)
+      .to(lines, { autoAlpha: 1, y: 0, duration: speed * 0.45, stagger: 0.08, ease: 'power2.out' }, 0.4);
+
+    // Lower-thirds are transient: leave near the end so they don't overstay.
+    if ((ctx.duration || 0) > 4) {
+      var out = ctx.duration - 0.7;
+      tl.to(card, { autoAlpha: 0, y: 12, duration: 0.4, ease: 'power2.in' }, out);
+    }
+    return tl;
+  }
+</script>

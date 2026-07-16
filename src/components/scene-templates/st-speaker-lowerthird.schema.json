@@ -1,0 +1,38 @@
+{
+  "type": "st-speaker-lowerthird",
+  "label": "Scene Template: Speaker Lower-Third",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template for a talking-head beat where the film's speaker is on camera FULL-FRAME and a lower-third card names them (or states a key line). Instantiation is deterministic (NO codegen, NO critique): the scene is TRANSPARENT so the speaker-track camera fills the frame, and this shell paints only a legible frosted name/title card in a bottom corner. Use for the speaker intro ('here's who's talking'), a guest/quote attribution, or a persistent identifier while they talk. Do NOT use for screencasts (use st-speaker-screencast) or for content beside the speaker (use st-speaker-split).",
+  "data": {
+    "name": {
+      "type": "string",
+      "label": "Primary line -- the speaker's name (or a short key statement)."
+    },
+    "title": {
+      "type": "string",
+      "label": "Secondary line -- role / company / subtitle.",
+      "optional": true
+    },
+    "kicker": {
+      "type": "string",
+      "label": "Optional small eyebrow above the name (e.g. 'FOUNDER' or 'LIVE').",
+      "optional": true
+    },
+    "position": {
+      "type": "string",
+      "label": "Card position: bottom-left (default) | bottom-right | bottom-center. Keep it OFF the side the speaker's face occupies.",
+      "optional": true,
+      "default": "bottom-left"
+    },
+    "theme": {
+      "type": "string",
+      "label": "dark (default -- frosted dark card, white type; best over most footage) | light (bright card, dark type; for bright/blown-out rooms).",
+      "optional": true,
+      "default": "dark"
+    }
+  },
+  "match": {
+    "entry": { "x": 0.2, "y": 0.85 },
+    "exit": { "x": 0.2, "y": 0.85 }
+  }
+}

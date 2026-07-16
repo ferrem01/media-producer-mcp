@@ -86,9 +86,14 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     var stDarkDefault = ["st-logo-close", "st-quote", "st-swarm", "st-manifesto", "st-compare", "st-flow", "st-convergence"];
     var stIsDark = (stDarkDefault.indexOf(st.type) !== -1 && (stData as any).theme !== "light")
       || (stData as any).theme === "dark";
+    // Speaker templates composite over the live camera (transparent) or cover it
+    // with their own footage/panel (screencast). A z0 WebGL backdrop would paint
+    // over the camera -- never add one for the speaker family.
+    var stSpeakerTemplate = st.type === "st-speaker-screencast"
+      || st.type === "st-speaker-lowerthird" || st.type === "st-speaker-split";
     // An explicit backdrop_image is its own world -- it replaces the WebGL
     // ribbons (two competing backdrops read as noise).
-    var stWantsWebgl = stIsDark && !(stData as any).backdrop_image;
+    var stWantsWebgl = stIsDark && !(stData as any).backdrop_image && !stSpeakerTemplate;
     if (stWantsWebgl) (stData as any).backdrop_active = true;
     var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
     if (stWantsWebgl) {
@@ -203,6 +208,26 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
         stSpeakerOpaque = true; // full-frame screencast covers the speaker base
       } else {
         console.warn(`  st-speaker-screencast: no footage source in slots or draft assets -- shell only`);
+      }
+    }
+    // st-speaker-split is TRANSPARENT (camera shows on the clear side); the shell
+    // paints the opaque panel on the content side. An optional paired component
+    // (chart / stat / mock / motion graphic) rides in the panel's lower zone.
+    if (st.type === "st-speaker-split") {
+      var ssContent = (stData as any).content;
+      var ssHasSlot = ssContent && typeof ssContent.type === "string";
+      (stData as any).has_slot = !!ssHasSlot; // shell top-aligns copy above the graphic
+      if (ssHasSlot) {
+        var splitRight = ((stData as any).side || "right") !== "left"; // content on right by default
+        stComponents.push({
+          id: "tpl_content",
+          type: ssContent.type,
+          z_index: 20,
+          position: splitRight
+            ? { x: "50%", y: "40%", width: "44%", height: "50%" }
+            : { x: "6%", y: "40%", width: "44%", height: "50%" },
+          data: (ssContent.data && typeof ssContent.data === "object") ? ssContent.data : {},
+        });
       }
     }
     return {
