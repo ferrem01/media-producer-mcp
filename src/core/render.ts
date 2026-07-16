@@ -47,6 +47,7 @@ import type { LLMConfig } from "../llm/client.js";
 import type { Project, Scene } from "./types.js";
 import { mixAudio, type AudioTrackInput } from "../audio/mixer.js";
 import { buildSpeakerBase, compositeContentOverlay, speakerSceneFilmStarts } from "./speaker-track.js";
+import { resolveVideoPath } from "./video-path.js";
 import { projectAssetsDir } from "../persistence/paths.js";
 
 /**
@@ -192,7 +193,7 @@ async function renderAudioOnly(
 
     const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
     const audioTracks: AudioTrackInput[] = project.audio.tracks.map((t) => ({
-      path: t.source,
+      path: resolveVideoPath(t.source),
       type: t.type,
       volume: t.volume,
       startTime: t.start_time,
@@ -747,7 +748,7 @@ async function renderVideoWithSpeakerTrack(
 [speaker-track] Mixing ${project.audio.tracks.length} audio track(s)...`);
     const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
     const audioTracks = project.audio.tracks.map((t) => ({
-      path: t.source,
+      path: resolveVideoPath(t.source),
       type: t.type,
       volume: t.volume,
       startTime: t.start_time,
@@ -1126,7 +1127,7 @@ async function renderVideo(
 
     const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
     const audioTracks: AudioTrackInput[] = project.audio.tracks.map((t) => ({
-      path: t.source,
+      path: resolveVideoPath(t.source),
       type: t.type,
       volume: t.volume,
       startTime: t.start_time,
