@@ -2702,6 +2702,31 @@ async function runUnifiedPipeline(
     }
   }
 
+  // ── Auto-compress the waiting (screen recordings) ──
+  // Any scene generate produced around a screen recording gets the dead
+  // "waiting" stretches time-lapsed automatically -- the same proposal the
+  // manual `add` path makes -- fit to the narration length when the film has
+  // a recorded voiceover so the condensed video lands on the voice (no frozen
+  // tail). Deterministic, best-effort, and only touches scenes without an
+  // existing media edit.
+  try {
+    const { proposeSceneCompression, probeMediaDuration } = await import("../core/auto-compress.js");
+    const narrationSrc =
+      (project.audio?.tracks || []).find((t: any) => t.type === "voiceover" && t.source)?.source ||
+      (project.speaker_track?.clips?.[0]?.source);
+    const targetDuration = narrationSrc ? await probeMediaDuration(narrationSrc) : 0;
+    for (const scene of project.scenes) {
+      const res = await proposeSceneCompression(scene as any, {
+        targetDuration: targetDuration > 0.5 ? targetDuration : undefined,
+      });
+      if (res.applied.length) {
+        console.log(`  Auto-compress: "${scene.label}": ${res.applied.map((a) => `${a.source_duration}s->${a.output_duration}s @${a.idle_rate}x`).join(", ")}${res.scene_duration ? ` | scene->${res.scene_duration}s` : ""}`);
+      }
+    }
+  } catch (e: any) {
+    console.warn(`  Auto-compress pass skipped: ${e?.message || e}`);
+  }
+
   // ── Proactive scene duration sync ──
   // Estimate TTS duration from word count BEFORE generating audio.
   // Prevents reactive extension and keeps animations/visuals in sync.

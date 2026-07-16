@@ -16,6 +16,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { detectIdleRanges } from "./compress-waiting.js";
+import { loadAssetIntel } from "./asset-intel.js";
 import { solveMediaEdits } from "./media-edl.js";
 import { resolveVideoPath } from "./video-path.js";
 import type { Scene, SceneComponent } from "./types.js";
@@ -90,7 +91,12 @@ export async function proposeSceneCompression(
     if (edits[target] && Array.isArray(edits[target].segments) && edits[target].segments.length) continue;
     try {
       const videoPath = resolveVideoPath(src, opts?.dataDir);
-      const det = await detectIdleRanges(videoPath, minIdle, -40);
+      // Prefer the idle scan cached at ingest (instant); fall back to a live
+      // decode when there's no sidecar (asset predates the cache).
+      const cached = await loadAssetIntel(videoPath).catch(() => null);
+      const det = cached?.idle?.ranges?.length
+        ? { ranges: cached.idle.ranges as Array<{ start: number; end: number }>, duration: cached.idle.duration }
+        : await detectIdleRanges(videoPath, minIdle, -40);
       if (!det.ranges.length) continue; // nothing dead to compress
       const idleTotal = det.ranges.reduce((t, r) => t + (r.end - r.start), 0);
       const activeTotal = Math.max(0, det.duration - idleTotal);
