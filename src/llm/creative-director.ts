@@ -214,7 +214,9 @@ thought (2-5 bars), because in that grammar the cut itself is the rhythm instrum
   var raw = await callLLM(opts.llmConfig, [
     { role: "system", content: systemPrompt },
     { role: "user", content: userContent },
-  ], { temperature: 0.9, maxTokens: 8192 });
+    // 8192 truncated the treatment (esp. with a long recorded-narration prompt),
+    // stalling the concept step in truncate-retry; match the storyboard builder's cap.
+  ], { temperature: 0.9, maxTokens: 16000 });
 
   var result = parseJsonResponse(raw);
 
