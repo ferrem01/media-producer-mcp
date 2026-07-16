@@ -127,6 +127,34 @@ function err(msg: string) {
   return { content: [{ type: "text" as const, text: msg }], isError: true as const };
 }
 
+/** Normalize a cloud-storage SHARE link into a direct-download URL the server
+ *  can fetch() as raw bytes. A Drive/Dropbox "share" URL serves an HTML preview
+ *  page, not the file -- fetching it would save HTML. Converts the common forms;
+ *  returns the URL unchanged when it's already direct or unrecognized. */
+export function normalizeDownloadUrl(raw: string): string {
+  let u: URL;
+  try { u = new URL(raw); } catch { return raw; }
+  const host = u.hostname.replace(/^www\./, "");
+
+  // Google Drive: /file/d/<ID>/view  |  ?id=<ID>  ->  uc?export=download&id=<ID>
+  if (host === "drive.google.com") {
+    const m = u.pathname.match(/\/file\/d\/([^/]+)/);
+    const id = m ? m[1] : u.searchParams.get("id");
+    if (id) return `https://drive.google.com/uc?export=download&id=${id}&confirm=t`;
+  }
+  // Google Docs "export?format=" links are already direct; leave them.
+
+  // Dropbox: ?dl=0 / preview links -> force the raw bytes (dl=1)
+  if (host === "dropbox.com" || host.endsWith(".dropbox.com")) {
+    u.searchParams.set("dl", "1");
+    return u.toString();
+  }
+  // Dropbox CDN already-direct
+  if (host === "dl.dropboxusercontent.com") return raw;
+
+  return raw;
+}
+
 /** Build the Studio SPA URL for a tenant + project.
  *  When auth is enabled, every Studio/API route is token-gated, so embed a
  *  tenant-scoped token in the link — otherwise the URL 401s on open. The token
@@ -1144,9 +1172,9 @@ export function createMcpServer(): McpServer {
         if (!params.url) return err("url is required for brand asset upload");
         const assetType = params.asset_type || "other";
 
-        // Download the file from URL
+        // Download the file from URL (normalize Drive/Dropbox share links first)
         try {
-          const response = await fetch(params.url);
+          const response = await fetch(normalizeDownloadUrl(params.url));
           if (!response.ok) return err(`Failed to download: HTTP ${response.status}`);
           const buffer = Buffer.from(await response.arrayBuffer());
 
@@ -1296,7 +1324,7 @@ export function createMcpServer(): McpServer {
       if (!params.url) return err("url is required for asset upload");
 
       try {
-        const response = await fetch(params.url);
+        const response = await fetch(normalizeDownloadUrl(params.url));
         if (!response.ok) return err(`Failed to download: HTTP ${response.status}`);
         const buffer = Buffer.from(await response.arrayBuffer());
 
