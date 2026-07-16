@@ -370,6 +370,7 @@ export function createMcpServer(): McpServer {
           start: z.number().optional(),
           trim_start: z.number().optional(),
           trim_end: z.number().optional(),
+          fit: z.boolean().optional().describe("Time-fit this clip to the film's total duration (single-clip bases). Use when a raw screen recording runs longer than a separately de-silenced narration so the whole walkthrough plays start-to-finish instead of being truncated."),
         })),
       }).optional().describe("Speaker track: continuous speaker video as base layer with content overlaid on top. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to the string \"speaker\" — the render pipeline resolves it to the actual speaker video path automatically."),
     },
@@ -482,6 +483,7 @@ export function createMcpServer(): McpServer {
           start: z.number().optional(),
           trim_start: z.number().optional(),
           trim_end: z.number().optional(),
+          fit: z.boolean().optional().describe("Time-fit this clip to the film's total duration (single-clip bases). Use when a raw screen recording runs longer than a separately de-silenced narration so the whole walkthrough plays start-to-finish instead of being truncated."),
         })).optional(),
       }).nullable().optional().describe("Update speaker track configuration. To show the speaker as PiP inside a component, set the component data prop \"source\" or \"pip_source\" to \"speaker\" — resolved automatically at render time. Pass null (or an empty clips array) to CLEAR the speaker track."),
 
