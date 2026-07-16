@@ -124,7 +124,36 @@ export async function buildSpeakerBase(opts: {
     const clip = clips[0];
     const clipHasVideo = await hasVideoStream(resolveVideoPath(clip.source));
     if (!clipHasVideo) console.log(`  [speaker-track] Audio-only speaker source -- synthesizing black canvas video track`);
-    const args = buildSingleClipArgs(clip, width, height, totalDuration, outputPath, clipHasVideo);
+    // Time-fit: remap the whole (trimmed) recording to exactly totalDuration.
+    // The rate is computed from the probed source duration -- e.g. a 400s raw
+    // screencast under a 286s de-silenced narration plays start-to-finish at
+    // ~1.4x instead of being truncated at 286s. Video-only (no audio speed
+    // change needed: the base's audio is ignored; narration rides as a
+    // separate project audio track).
+    let fitSpeedFactor: number | undefined;
+    if (clip.fit && clipHasVideo) {
+      try {
+        const srcDur = await getVideoDuration(resolveVideoPath(clip.source));
+        const winStart = clip.trim_start ?? clip.start ?? 0;
+        const winEnd = clip.trim_end ?? srcDur;
+        const win = Math.max(0, winEnd - winStart);
+        if (win > 0 && totalDuration > 0) {
+          // setpts multiplier: new_PTS = factor * old_PTS. To fit `win`
+          // seconds into `totalDuration`, factor = totalDuration / win.
+          fitSpeedFactor = totalDuration / win;
+          console.log(`  [speaker-track] fit: source ${srcDur.toFixed(1)}s (window ${win.toFixed(1)}s) -> ${totalDuration.toFixed(1)}s (setpts x${fitSpeedFactor.toFixed(3)}, ${(1 / fitSpeedFactor).toFixed(2)}x speed)`);
+        }
+      } catch (e: any) {
+        console.warn(`  [speaker-track] fit: could not probe source duration (${e?.message || e}) -- falling back to truncate`);
+      }
+    } else {
+      // Always report the source duration so the log makes drift diagnosable.
+      try {
+        const srcDur = await getVideoDuration(resolveVideoPath(clip.source));
+        console.log(`  [speaker-track] single clip source duration: ${srcDur.toFixed(1)}s (film totalDuration ${totalDuration.toFixed(1)}s)`);
+      } catch { /* best-effort log only */ }
+    }
+    const args = buildSingleClipArgs(clip, width, height, totalDuration, outputPath, clipHasVideo, fitSpeedFactor);
     console.log(`  [speaker-track] ffmpeg single-clip: ${args.filter(a => !a.startsWith('-')).join(' ')}`);
     await execFileAsync("ffmpeg", args, { maxBuffer: 50 * 1024 * 1024 });
     return outputPath;
@@ -206,6 +235,9 @@ function buildSingleClipArgs(
   totalDuration: number | undefined,
   outputPath: string,
   sourceHasVideo: boolean = true,
+  /** When set, prepend setpts=<factor>*PTS to the video filter chain to
+   *  time-remap the (trimmed) clip to totalDuration. Video-only. */
+  fitSpeedFactor?: number,
 ): string[] {
   const trimStart = clip.trim_start ?? clip.start ?? 0;
   const trimEnd = clip.trim_end;
@@ -244,8 +276,12 @@ function buildSingleClipArgs(
   // ffmpeg needs the real filesystem path (same mapping scene-worker uses).
   args.push("-i", resolveVideoPath(clip.source));
 
-  // Duration from trim_start to trim_end
-  if (trimEnd !== undefined) {
+  // Output duration cap. When fitting, the setpts remap maps the whole
+  // (trimmed) window onto totalDuration, so the cap is ALWAYS totalDuration
+  // (the source-window length would cap post-setpts output far too early).
+  if (fitSpeedFactor && fitSpeedFactor > 0 && totalDuration !== undefined) {
+    args.push("-t", String(totalDuration));
+  } else if (trimEnd !== undefined) {
     const clipDuration = trimEnd - trimStart;
     if (clipDuration > 0) {
       args.push("-t", String(clipDuration));
@@ -254,9 +290,15 @@ function buildSingleClipArgs(
     args.push("-t", String(totalDuration));
   }
 
-  // Scale to canvas dimensions, preserve aspect ratio with letterbox/pillarbox black
+  // Scale to canvas dimensions, preserve aspect ratio with letterbox/pillarbox black.
+  // When fitting, prepend a setpts remap so the whole (trimmed) clip plays in
+  // totalDuration; the -t totalDuration above then caps it cleanly.
+  // setpts only rewrites timestamps (all source frames survive at a new
+  // cadence); normalise to a stable 30fps so the downstream overlay composite
+  // and stitch see the same frame rate the black-canvas synth path uses.
+  const setptsPrefix = fitSpeedFactor && fitSpeedFactor > 0 ? `setpts=${fitSpeedFactor.toFixed(6)}*PTS,fps=30,` : "";
   args.push(
-    "-vf", `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
+    "-vf", `${setptsPrefix}scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
     "-c:v", "libx264",
     "-preset", "medium",
     "-crf", "23",

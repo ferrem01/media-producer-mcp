@@ -503,6 +503,13 @@ export interface SpeakerTrackClip {
   trim_start?: number;
   /** Trim: stop using video at this timestamp */
   trim_end?: number;
+  /** Time-fit: remap this clip (or its trimmed window) to EXACTLY the film's
+   *  total duration. For a screen recording whose narration was de-silenced
+   *  separately (so the raw recording runs longer than the voiceover), this
+   *  plays the whole walkthrough start-to-finish under the narration instead
+   *  of truncating the tail. The rate is computed at render time from the
+   *  probed source duration -- no manual timecodes. Single-clip bases only. */
+  fit?: boolean;
 }
 
 export interface SpeakerTrack {
