@@ -35,7 +35,7 @@ import { runGeneratePipeline, type PipelineTarget } from "./llm/pipeline.js";
 import { llmConfigFromEnv } from "./llm/client.js";
 import { reviseScene } from "./llm/scene-revise.js";
 import { config } from "./config.js";
-import { proposeSceneCompression } from "./core/auto-compress.js";
+import { proposeSceneCompression, probeMediaDuration } from "./core/auto-compress.js";
 import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -414,10 +414,18 @@ export function createMcpServer(): McpServer {
           const added = project.scenes.find((s) => s.id === addedId);
           if (added) {
             try {
-              const res = await proposeSceneCompression(added, { dataDir: config.dataDir });
+              // Fit the compression to the narration length when the project
+              // has a voiceover: the talk track IS the film's real length, so
+              // solve the idle-rate to land the video on it (no frozen tail).
+              const vo = (project.audio?.tracks || []).find((t: any) => t.type === "voiceover" && t.source);
+              const targetDuration = vo ? await probeMediaDuration(vo.source, config.dataDir) : 0;
+              const res = await proposeSceneCompression(added, {
+                dataDir: config.dataDir,
+                targetDuration: targetDuration > 0.5 ? targetDuration : undefined,
+              });
               if (res.applied.length) {
                 await saveProject(project);
-                console.log(`  auto-compress: ${addedId}: ${res.applied.map((a) => `${a.target} ${a.source_duration}s->${a.output_duration}s (${a.idle_ranges} idle)`).join(", ")}`);
+                console.log(`  auto-compress: ${addedId}: ${res.applied.map((a) => `${a.target} ${a.source_duration}s->${a.output_duration}s @${a.idle_rate}x (${a.idle_ranges} idle)`).join(", ")}${res.scene_duration ? ` | scene->${res.scene_duration}s${targetDuration > 0.5 ? ` (fit to ${Math.round(targetDuration)}s VO)` : ""}` : ""}`);
               }
             } catch (e: any) {
               console.warn(`  auto-compress skipped for scene ${addedId}: ${e?.message || e}`);
