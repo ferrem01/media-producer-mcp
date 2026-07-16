@@ -49,6 +49,11 @@ export interface AssetIntel {
   theme: "light" | "dark" | "mixed";
   /** Human-readable summary lines, ready to inject into a codegen prompt. */
   notes: string[];
+  /** Cached "compress the waiting" scan: dead/static stretches (agent spinners,
+   *  loading, reading) as source-time ranges, computed once at ingest so a
+   *  scene that uses this recording can propose the time-lapse instantly
+   *  without re-decoding the whole clip. */
+  idle?: { ranges: Array<{ start: number; end: number }>; duration: number };
   analyzed_at: string;
 }
 
@@ -396,7 +401,19 @@ const sidecarPath = (filePath: string) => filePath + ".intel.json";
 /** Analyze and persist the sidecar next to the asset. Best-effort. */
 export async function analyzeAndSaveIntel(filePath: string): Promise<AssetIntel | null> {
   const intel = await analyzeVideoAsset(filePath);
-  if (intel) await fs.writeFile(sidecarPath(filePath), JSON.stringify(intel, null, 2)).catch(() => {});
+  if (intel) {
+    // Cache the "compress the waiting" scan at ingest so placing this recording
+    // in a scene can propose the time-lapse instantly (no re-decode). Best-effort.
+    try {
+      const { detectIdleRanges } = await import("./compress-waiting.js");
+      const det = await detectIdleRanges(filePath, 2);
+      if (det.ranges.length) {
+        intel.idle = { ranges: det.ranges.map((r) => ({ start: r.start, end: r.end })), duration: det.duration };
+        intel.notes.push(`compress-the-waiting: ${det.ranges.length} idle stretch(es) totalling ${Math.round(det.ranges.reduce((t, r) => t + (r.end - r.start), 0))}s (cached).`);
+      }
+    } catch { /* idle scan is optional -- never block the sidecar on it */ }
+    await fs.writeFile(sidecarPath(filePath), JSON.stringify(intel, null, 2)).catch(() => {});
+  }
   return intel;
 }
 
