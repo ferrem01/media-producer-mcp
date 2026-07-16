@@ -2,7 +2,7 @@
   "type": "screencast-frame",
   "label": "Screencast / Browser Frame",
   "category": "media",
-  "description": "THE component for presenting real screen recordings (or screenshots) -- never hand-roll a browser mock around a <video>. Renders the footage in a polished device frame: frame_style 'macos-browser' draws a mac window bar (traffic lights + address pill), 'plain' is a clean rounded card, 'none' is edge-to-edge. crop:'auto' reads the footage's ingest analysis and crops any window chrome the RECORDING ITSELF contains (a screencast of a full browser window carries its own address bar -- framing it without cropping shows two stacked headers).",
+  "description": "THE component for presenting real screen recordings (or screenshots) -- never hand-roll a browser mock around a <video>. Renders the footage in a polished device frame: frame_style 'macos-browser' draws a mac window bar (traffic lights + address pill), 'plain' is a clean rounded card, 'none' is edge-to-edge. crop:'auto' reads the footage's ingest analysis and crops any window chrome the RECORDING ITSELF contains (a screencast of a full browser window carries its own address bar -- framing it without cropping shows two stacked headers).\n\nSPEAKER-SCREENCAST RECIPE (product walkthrough / demo where the presenter's camera rides along as a corner bubble): set the SCENE to transparent_background:false (opaque), wire a project speaker_track to the camera clip, and configure THIS component as { frame_style:'none', max_width_pct:88 (inset ~20px top/bottom so it floats, not edge-to-edge), corner_radius:28-32, pip_source:'speaker', pip_shape:'circle', pip_size:15, pip_position:'bottom-right' }. corner_radius is REQUIRED here even in 'none' mode: screen recordings captured from a ROUNDED-corner window carry opaque BLACK in the source's own corners (outside the window's radius); the rounded frame clip masks that black with the scene background. A flat/edge-to-edge full-bleed recording from a rounded window WILL show black corner wedges -- round it. Give the scene a background (brand gradient or color) since the inset reveals it around the card.",
   "data": {
     "video_url": {
       "type": "string",
@@ -16,7 +16,7 @@
     },
     "frame_style": {
       "type": "string",
-      "label": "Frame style: none | plain | macos-browser | phone (device bezel + island for vertical app footage; composes with presentation:'float' and callouts)",
+      "label": "Frame style: none (edge-to-edge / full-bleed; honors corner_radius + max_width_pct for an inset floating card -- use for speaker screencasts) | plain | macos-browser | phone (device bezel + island for vertical app footage; composes with presentation:'float' and callouts)",
       "optional": true,
       "default": "plain"
     },
@@ -33,13 +33,13 @@
     },
     "corner_radius": {
       "type": "number",
-      "label": "Frame corner radius px",
+      "label": "Frame corner radius px. Honored in ALL frame_styles including 'none'. For a full-bleed ('none') recording from a rounded-corner window, set 28-32 to mask the black corner wedges baked into the source.",
       "optional": true,
       "default": 16
     },
     "max_width_pct": {
       "type": "number",
-      "label": "Frame width as % of the component box",
+      "label": "Frame width as % of the component box. Honored in 'none' mode too: set ~88 to inset a full-bleed screencast ~20px top/bottom so it floats as a card over the scene background (aspect ratio pulls the sides in proportionally).",
       "optional": true,
       "default": 90
     },
@@ -82,7 +82,7 @@
     },
     "pip_size": {
       "type": "number",
-      "label": "PiP width as % of the frame (default 22, clamped 8-42)",
+      "label": "PiP width as % of the frame (default 22, clamped 8-42). A talking-head bubble reads best around 14-16 -- 22+ dominates the frame ('a quarter of the screen').",
       "optional": true
     },
     "pip_shape": {

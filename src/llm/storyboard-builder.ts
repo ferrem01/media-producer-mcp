@@ -578,18 +578,28 @@ This video uses a speaker track -- a continuous camera recording of the speaker 
 the base layer for the WHOLE film. Every scene is composited ON TOP of it. Two scene
 modes; choose per scene and SAY WHICH in the visual notes:
 
-1. SPEAKER-VISIBLE content scene: the speaker stays on screen; content occupies a region
-   beside them (e.g. right two-thirds, or a lower-third band). The scene background must
-   stay TRANSPARENT so the camera shows through -- say "transparent background, speaker
-   visible left" in the notes, and keep content out of the speaker's area.
-2. SCREENCAST / demo scene: content fills the whole frame with its own OPAQUE background
-   (browser-frame / device-mockup / code and terminal components for the screen
-   recording look), and the speaker shrinks to a small circular PiP -- inventory it as an
-   element (kind "ui-window", e.g. name "speaker-pip", content "circular camera bubble
-   playing the LIVE speaker video via <video src=\"speaker\">, 220px, bottom-right, thin
-   white border, soft shadow"). The literal src value "speaker" is a renderer token that
-   becomes the time-synced camera -- the bubble must NEVER contain a drawn avatar or
-   placeholder person.
+1. SPEAKER-VISIBLE scene: the speaker stays on camera; the scene is TRANSPARENT so the
+   camera shows through. Prefer a scene_template (deterministic, no codegen):
+   - "st-speaker-lowerthird" -- speaker full-frame with a name/title (or key-line) card in
+     a bottom corner. Slots: { name, title?, kicker?, position: "bottom-left"|"bottom-right",
+     theme }. Use for the intro ('who's talking') or a persistent identifier.
+   - "st-speaker-split" -- speaker on ONE side, an opaque content panel on the other with
+     the key points (or a graphic). Slots: { side: "right"(default)|"left", headline, body?,
+     bullets?[], kicker?, content?: {type,data} for a paired chart/stat/mock, theme }. Use
+     when the speaker explains something WHILE it appears beside them.
+   Only fall back to hand-specified components (transparent background + content_region) when
+   neither template fits.
+2. SCREENCAST / demo scene (REAL screen recording + speaker in the corner): this is THE
+   most common speaker pattern -- emit the scene_template "st-speaker-screencast" (do NOT
+   hand-roll a browser mock or PiP bubble, and do NOT go through codegen). It stamps out
+   the known-good composite deterministically: opaque scene over a brand-gradient
+   background, the recording in a frameless rounded card inset ~20px, and the camera bubble
+   wired to the speaker track. Slots: { source: <the screen-recording asset URL>,
+   pip_source: "speaker" (default -- the time-synced camera; NEVER a drawn avatar),
+   theme: "dark"|"light", plus optional kicker / captions }. The recipe defaults
+   (corner_radius 30, max_width_pct 88, circular PiP size 15, bottom-right) are baked in --
+   only override a slot when the beat needs it. (If the recording is a SIMULATED/mock UI
+   rather than real footage, use the matching mock component instead, still with a PiP.)
 
 Never leave the speaker both invisible and un-PiPed -- every scene either shows the
 speaker beside the content or carries the PiP bubble. And NEVER direct a drawn person,

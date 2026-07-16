@@ -86,9 +86,14 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     var stDarkDefault = ["st-logo-close", "st-quote", "st-swarm", "st-manifesto", "st-compare", "st-flow", "st-convergence"];
     var stIsDark = (stDarkDefault.indexOf(st.type) !== -1 && (stData as any).theme !== "light")
       || (stData as any).theme === "dark";
+    // Speaker templates composite over the live camera (transparent) or cover it
+    // with their own footage/panel (screencast). A z0 WebGL backdrop would paint
+    // over the camera -- never add one for the speaker family.
+    var stSpeakerTemplate = st.type === "st-speaker-screencast"
+      || st.type === "st-speaker-lowerthird" || st.type === "st-speaker-split";
     // An explicit backdrop_image is its own world -- it replaces the WebGL
     // ribbons (two competing backdrops read as noise).
-    var stWantsWebgl = stIsDark && !(stData as any).backdrop_image;
+    var stWantsWebgl = stIsDark && !(stData as any).backdrop_image && !stSpeakerTemplate;
     if (stWantsWebgl) (stData as any).backdrop_active = true;
     var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
     if (stWantsWebgl) {
@@ -163,12 +168,77 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
         console.warn(`  st-screencast: no footage source in slots or draft assets -- shell only`);
       }
     }
+    // st-speaker-screencast is a SHELL too: the recording + camera bubble ride
+    // in a sibling screencast-frame stamped with the known-good speaker-screencast
+    // recipe (frameless, rounded, inset, circular PiP wired to the speaker track).
+    // The scene is OPAQUE so it covers the speaker base except the PiP.
+    var stSpeakerOpaque = false;
+    if (st.type === "st-speaker-screencast") {
+      var ssSrc = (stData as any).source || (draft as any).assets?.find?.((a: string) => /\.(mp4|webm|mov|m4v)/i.test(a));
+      if (ssSrc) {
+        var ssRecovered = recoverAssetUrl(ssSrc, opts.tenantId);
+        if (ssRecovered !== ssSrc) {
+          console.warn(`  st-speaker-screencast: source "${ssSrc}" not on disk -- recovered to "${ssRecovered}"`);
+          ssSrc = ssRecovered;
+        }
+        // pip_source defaults to the "speaker" token (bind to the speaker track);
+        // "none"/null hides the bubble; anything else is a plain camera URL.
+        var ssPipRaw = (stData as any).pip_source;
+        var ssPip = ssPipRaw === undefined ? "speaker" : ssPipRaw;
+        var ssPipSource = (ssPip === "none" || ssPip === null || ssPip === "") ? undefined : ssPip;
+        stComponents.push({
+          id: "tpl_video",
+          type: "screencast-frame",
+          z_index: 20,
+          position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+          data: {
+            video_url: ssSrc,
+            frame_style: "none",
+            crop: "auto",
+            shadow: false,
+            corner_radius: (stData as any).corner_radius !== undefined ? Number((stData as any).corner_radius) : 30,
+            max_width_pct: (stData as any).max_width_pct !== undefined ? Number((stData as any).max_width_pct) : 88,
+            pip_source: ssPipSource,
+            pip_shape: "circle",
+            pip_size: (stData as any).pip_size !== undefined ? Number((stData as any).pip_size) : 15,
+            pip_position: (stData as any).pip_position || "bottom-right",
+            pip_start_at: (stData as any).pip_start_at !== undefined ? Number((stData as any).pip_start_at) : undefined,
+          },
+        });
+        stSpeakerOpaque = true; // full-frame screencast covers the speaker base
+      } else {
+        console.warn(`  st-speaker-screencast: no footage source in slots or draft assets -- shell only`);
+      }
+    }
+    // st-speaker-split is TRANSPARENT (camera shows on the clear side); the shell
+    // paints the opaque panel on the content side. An optional paired component
+    // (chart / stat / mock / motion graphic) rides in the panel's lower zone.
+    if (st.type === "st-speaker-split") {
+      var ssContent = (stData as any).content;
+      var ssHasSlot = ssContent && typeof ssContent.type === "string";
+      (stData as any).has_slot = !!ssHasSlot; // shell top-aligns copy above the graphic
+      if (ssHasSlot) {
+        var splitRight = ((stData as any).side || "right") !== "left"; // content on right by default
+        stComponents.push({
+          id: "tpl_content",
+          type: ssContent.type,
+          z_index: 20,
+          position: splitRight
+            ? { x: "50%", y: "40%", width: "44%", height: "50%" }
+            : { x: "6%", y: "40%", width: "44%", height: "50%" },
+          data: (ssContent.data && typeof ssContent.data === "object") ? ssContent.data : {},
+        });
+      }
+    }
     return {
       scene: {
         id: sceneId,
         label: draft.label,
         duration_seconds: draft.duration_seconds || 8,
         transition_in: draft.transition_in as any,
+        // Opaque so the full-frame screencast composites OVER the speaker base
+        // (camera shows only in the PiP), matching sceneCompositesOverSpeaker.
+        ...(stSpeakerOpaque ? { transparent_background: false } : {}),
         beats: draft.beats as any,
         camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
         components: stComponents,

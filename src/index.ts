@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { createMcpServer } from "./server.js";
 import { config } from "./config.js";
 import { getPreviewHtml } from "./preview-app/preview-app.js";
+import { getUploadHtml } from "./upload-page.js";
 import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts } from "./core/speaker-track.js";
@@ -694,6 +695,15 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       if (urlPath.startsWith("/studio") || urlPath.startsWith("/preview")) {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
         res.end(previewHtml);
+        return;
+      }
+
+      // ── Upload page: browser drag-drop uploader (public HTML shell; the
+      // upload POST it fires carries the token). Bypasses the AI client's
+      // attachment cap -- file goes browser -> server directly. ──
+      if (urlPath === "/upload") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(getUploadHtml());
         return;
       }
 
