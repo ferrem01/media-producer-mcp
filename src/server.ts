@@ -1618,6 +1618,7 @@ export function createMcpServer(): McpServer {
       background_music: z.boolean().optional().describe("Add royalty-free background music with voiceover ducking (requires JAMENDO_CLIENT_ID)"),
       voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS voice for voiceover (default: nova)"),
       speaker_source: z.string().optional().describe("Path or URL to speaker video. When provided, uses speaker track mode: speaker video plays full-screen as base layer with content overlaid on top."),
+      screencast_source: z.string().optional().describe("Path or URL to a SCREEN RECORDING to feature. Providing this selects the deterministic film_grammar:'speaker-screencast' path (NO LLM storyboard, NO codegen): the recording's dead 'waiting' stretches are auto-time-lapsed and fit to the narration length, bookended by the brand intro/outro. Pair with speaker_source as the narration (audio-only narration = no camera; a camera+voice recording = talking head). The fast, reliable path for a narrated product walkthrough."),
       speaker_start: z.number().optional().describe("Start offset in seconds into the speaker video (skip dead air at start)"),
       speaker_trim_start: z.number().optional().describe("Trim: only use speaker video from this timestamp"),
       speaker_trim_end: z.number().optional().describe("Trim: stop using speaker video at this timestamp"),
@@ -1642,6 +1643,46 @@ export function createMcpServer(): McpServer {
         return err("Invalid token");
       }
       try {
+        // ── film_grammar: "speaker-screencast" (deterministic) ──
+        // A screencast_source is the speaker-screencast declaration: skip the
+        // LLM entirely and stamp the known-good narrated-walkthrough recipe --
+        // brand intro -> the recording (dead-air time-lapsed, fit to the
+        // narration) -> brand outro, narration as the soundtrack.
+        if (params.screencast_source && params.target !== "image") {
+          let project = params.project_id
+            ? await loadProject(params.tenant_id, params.project_id)
+            : null;
+          if (!project) {
+            project = await createProject({
+              tenant_id: params.tenant_id,
+              name: (params.prompt || "Narrated Screencast").slice(0, 60),
+              format: "video",
+              preset: params.canvas_width && params.canvas_height && params.canvas_height > params.canvas_width ? "vertical" : "landscape",
+              fps: 30,
+            });
+          }
+          // Narration owns the clock: explicit speaker_source, else a narration
+          // the project already carries (speaker_track clip or a voiceover track).
+          const narrationSource =
+            params.speaker_source ||
+            project.speaker_track?.clips?.[0]?.source ||
+            (project.audio?.tracks || []).find((t: any) => t.type === "voiceover" && t.source)?.source;
+          const { assembleNarratedScreencast } = await import("./llm/narrated-screencast.js");
+          const res = await assembleNarratedScreencast({
+            project,
+            screencastSource: params.screencast_source,
+            narrationSource,
+            dataDir: config.dataDir,
+          });
+          await saveProject(res.project);
+          console.log(`  ${res.summary}`);
+          return ok(withStudio({
+            ...res.project,
+            _summary: res.summary,
+            _film_grammar: "speaker-screencast",
+          } as any));
+        }
+
         // ── Storyboard mode: run unified pipeline in storyboard-only mode ──
         if (params.mode === "storyboard") {
           let llmConfig;
