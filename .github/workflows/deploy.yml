@@ -1,0 +1,116 @@
+name: Deploy to droplet
+
+# Continuous deploy for the media-producer-mcp droplet.
+#
+#   * Every push to master  -> production redeploys automatically.
+#   * "Run workflow" button  -> deploy ANY branch on demand (branch input),
+#                               e.g. to preview a feature branch before merge.
+#
+# One-time setup (Repo -> Settings -> Secrets and variables -> Actions):
+#   Secrets:
+#     MP_AUTH_TOKEN    the tenant/preview auth token (e.g. preview123)
+#     MP_DEPLOY_TOKEN  the server's MP_DEPLOY_TOKEN value
+#   Variables (optional):
+#     MP_DEPLOY_URL    base URL of the droplet (defaults to the IP below)
+#
+# The droplet's POST /api/deploy runs scripts/deploy.sh detached (git reset
+# --hard origin/<branch> + pm2 reload). Secrets travel as request HEADERS,
+# never in a URL, and GitHub masks them in logs.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy (defaults to the branch this run is launched from)"
+        required: false
+        type: string
+      force:
+        description: "Deploy even if generate/render jobs are in flight (a pm2 reload kills them)"
+        required: false
+        default: false
+        type: boolean
+
+# Never let two deploys race the same box.
+concurrency:
+  group: droplet-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target branch
+        id: target
+        run: |
+          if [ -n "${{ inputs.branch }}" ]; then
+            echo "branch=${{ inputs.branch }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Target branch: $( [ -n "${{ inputs.branch }}" ] && echo "${{ inputs.branch }}" || echo "${GITHUB_REF_NAME}" )"
+
+      - name: Trigger deploy
+        env:
+          HOST: ${{ vars.MP_DEPLOY_URL || 'http://159.203.115.164:3200' }}
+          AUTH_TOKEN: ${{ secrets.MP_AUTH_TOKEN }}
+          DEPLOY_TOKEN: ${{ secrets.MP_DEPLOY_TOKEN }}
+          BRANCH: ${{ steps.target.outputs.branch }}
+          FORCE: ${{ inputs.force || false }}
+        run: |
+          set -euo pipefail
+          echo "Deploying '$BRANCH' to $HOST"
+          resp="$(curl -sS -w '\n%{http_code}' -X POST "$HOST/api/deploy" \
+            -H "Authorization: Bearer $AUTH_TOKEN" \
+            -H "x-deploy-token: $DEPLOY_TOKEN" \
+            -H "content-type: application/json" \
+            -d "{\"branch\":\"$BRANCH\",\"force\":$FORCE}")"
+          code="$(printf '%s' "$resp" | tail -n1)"
+          body="$(printf '%s' "$resp" | sed '$d')"
+          echo "HTTP $code"
+          echo "$body"
+          if [ "$code" != "202" ] && [ "$code" != "200" ]; then
+            if [ "$code" = "409" ]; then
+              echo "::error::Jobs in flight -- re-run this workflow with force=true to deploy anyway."
+            else
+              echo "::error::Deploy request failed (HTTP $code)."
+            fi
+            exit 1
+          fi
+
+      - name: Wait for the reload and verify health
+        env:
+          HOST: ${{ vars.MP_DEPLOY_URL || 'http://159.203.115.164:3200' }}
+        run: |
+          set -uo pipefail
+          echo "Waiting for pm2 reload to settle..."
+          deployed=""
+          for i in $(seq 1 24); do
+            sleep 5
+            commit="$(curl -sS --max-time 10 "$HOST/health" 2>/dev/null | sed -n 's/.*"commit":"\([^"]*\)".*/\1/p')" || true
+            if [ -n "$commit" ]; then
+              deployed="$commit"
+              echo "Attempt $i: /health ok, commit=$commit"
+            else
+              echo "Attempt $i: health not ready yet"
+            fi
+          done
+          if [ -z "$deployed" ]; then
+            echo "::error::Droplet did not report healthy after the deploy."
+            exit 1
+          fi
+          echo "## Deployed commit: \`$deployed\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tail deploy log
+        if: always()
+        env:
+          HOST: ${{ vars.MP_DEPLOY_URL || 'http://159.203.115.164:3200' }}
+          AUTH_TOKEN: ${{ secrets.MP_AUTH_TOKEN }}
+          DEPLOY_TOKEN: ${{ secrets.MP_DEPLOY_TOKEN }}
+        run: |
+          set -uo pipefail
+          echo "----- deploy.sh output -----"
+          curl -sS --max-time 15 "$HOST/api/deploy/log" \
+            -H "Authorization: Bearer $AUTH_TOKEN" \
+            -H "x-deploy-token: $DEPLOY_TOKEN" || echo "(deploy log unavailable)"
