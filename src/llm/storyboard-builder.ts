@@ -582,17 +582,17 @@ modes; choose per scene and SAY WHICH in the visual notes:
    beside them (e.g. right two-thirds, or a lower-third band). The scene background must
    stay TRANSPARENT so the camera shows through -- say "transparent background, speaker
    visible left" in the notes, and keep content out of the speaker's area.
-2. SCREENCAST / demo scene (REAL screen recording + speaker in the corner): set the scene
-   transparent_background:false (OPAQUE) and give it a background (brand gradient/color).
-   Do NOT hand-roll a browser mock or a PiP bubble -- use the built-in "screencast-frame"
-   component, which owns BOTH the footage and the camera bubble. Configure it exactly:
-   { video_url: <the screen-recording asset>, frame_style: "none", max_width_pct: 88
-   (insets it ~20px top/bottom so it floats as a card), corner_radius: 30 (REQUIRED --
-   recordings from a rounded window carry black in the source corners; the rounded clip
-   hides it), pip_source: "speaker" (renderer token -> the time-synced camera; NEVER a
-   drawn avatar), pip_shape: "circle", pip_size: 15, pip_position: "bottom-right" }.
-   (If the recording is a SIMULATED/mock UI rather than real footage, use the matching
-   mock component instead, still with the speaker PiP beside it.)
+2. SCREENCAST / demo scene (REAL screen recording + speaker in the corner): this is THE
+   most common speaker pattern -- emit the scene_template "st-speaker-screencast" (do NOT
+   hand-roll a browser mock or PiP bubble, and do NOT go through codegen). It stamps out
+   the known-good composite deterministically: opaque scene over a brand-gradient
+   background, the recording in a frameless rounded card inset ~20px, and the camera bubble
+   wired to the speaker track. Slots: { source: <the screen-recording asset URL>,
+   pip_source: "speaker" (default -- the time-synced camera; NEVER a drawn avatar),
+   theme: "dark"|"light", plus optional kicker / captions }. The recipe defaults
+   (corner_radius 30, max_width_pct 88, circular PiP size 15, bottom-right) are baked in --
+   only override a slot when the beat needs it. (If the recording is a SIMULATED/mock UI
+   rather than real footage, use the matching mock component instead, still with a PiP.)
 
 Never leave the speaker both invisible and un-PiPed -- every scene either shows the
 speaker beside the content or carries the PiP bubble. And NEVER direct a drawn person,

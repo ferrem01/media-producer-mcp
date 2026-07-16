@@ -1,0 +1,82 @@
+{
+  "type": "st-speaker-screencast",
+  "label": "Scene Template: Speaker Screencast (camera PiP)",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template for THE most common speaker pattern: a full-frame screen recording (product walkthrough / demo) with the film's speaker riding along as a small circular camera bubble in the corner. Instantiation is deterministic (NO codegen, NO critique) -- give it the footage URL as 'source' and it stamps out the known-good composite: an OPAQUE scene over a brand-gradient background, the recording in a frameless rounded card inset ~20px (corner_radius masks the black corners a rounded-window recording bakes into its source), and the camera PiP wired to the project speaker track. Use whenever the film has a speaker_track AND a screen recording to show. For the SPEAKER-VISIBLE modes (speaker beside content, or lower-third) keep the scene transparent and lay content in the content_region instead.",
+  "data": {
+    "source": {
+      "type": "string",
+      "label": "Footage URL (/assets/... the screen recording)"
+    },
+    "pip_source": {
+      "type": "string",
+      "label": "Camera PiP source. DEFAULT 'speaker' -- binds the bubble to the project speaker track and auto-syncs it (one camera reference, no drift). Pass a plain camera video URL only for a non-speaker-track camera. Set to 'none' to hide the bubble.",
+      "optional": true,
+      "default": "speaker"
+    },
+    "theme": {
+      "type": "string",
+      "label": "dark (default -- brand-gradient world) | light (soft lavender world)",
+      "optional": true,
+      "default": "dark"
+    },
+    "backdrop_image": {
+      "type": "string",
+      "label": "Optional brand background image URL -- replaces the gradient (slow Ken Burns + scrim).",
+      "optional": true
+    },
+    "corner_radius": {
+      "type": "number",
+      "label": "Footage card corner radius px (default 30 -- masks the black corners of a rounded-window recording).",
+      "optional": true,
+      "default": 30
+    },
+    "max_width_pct": {
+      "type": "number",
+      "label": "Footage card width % (default 88 -- insets ~20px top/bottom so it floats).",
+      "optional": true,
+      "default": 88
+    },
+    "pip_position": {
+      "type": "string",
+      "label": "PiP corner: bottom-right (default) | bottom-left | top-right | top-left",
+      "optional": true,
+      "default": "bottom-right"
+    },
+    "pip_size": {
+      "type": "number",
+      "label": "PiP width as % of the frame (default 15 -- a tasteful bubble; 22+ dominates).",
+      "optional": true,
+      "default": 15
+    },
+    "pip_start_at": {
+      "type": "number",
+      "label": "Seconds into the camera clip where this scene's PiP starts (speaker-track mode sets it automatically).",
+      "optional": true
+    },
+    "kicker": {
+      "type": "string",
+      "label": "Optional small-caps line at the top (opt-in via show_kicker).",
+      "optional": true
+    },
+    "show_kicker": {
+      "type": "boolean",
+      "label": "Show the top kicker (default false -- the footage is the star).",
+      "optional": true
+    },
+    "captions": {
+      "type": "object",
+      "label": "Array of {at, text}: narration-timed lower-third beats. Hidden unless captions_style is 'beats'.",
+      "optional": true
+    },
+    "captions_style": {
+      "type": "string",
+      "label": "'none' (default) | 'beats' (transient lower-third labels)",
+      "optional": true
+    }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.5 },
+    "exit": { "x": 0.5, "y": 0.5 }
+  }
+}

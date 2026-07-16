@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { assembleScene } from "../src/core/scene-assembler.js";
 import { sceneCompositesOverSpeaker } from "../src/core/speaker-mode.js";
+import { generateScene } from "../src/llm/scene-generator.js";
 import type { BrandKit, Canvas, Scene } from "../src/core/types.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -84,5 +85,43 @@ describe("speaker-screencast recipe assembles to the known-good composite", () =
     // recipe data reaches the component runtime (data-driven, so present in the doc)
     expect(html).toMatch(/corner_radius/);
     expect(html).toMatch(/max_width_pct/);
+  });
+});
+
+describe("st-speaker-screencast template instantiates the recipe (no codegen)", () => {
+  async function instantiate(slots: Record<string, unknown>) {
+    const draft = {
+      label: "Walkthrough", duration_seconds: 12,
+      scene_template: { type: "st-speaker-screencast", data: slots },
+    };
+    const res = await generateScene({
+      scene: draft as any, sceneIndex: 0, totalScenes: 1, prompt: "demo",
+      format: "video", llmConfig: {} as any, brandKit, canvas,
+      tenantId: "t", projectId: "p", hasSpeakerTrack: true,
+    } as any);
+    return res.scene as any;
+  }
+
+  it("stamps an OPAQUE scene with a frameless, rounded, inset screencast-frame + circular speaker PiP", async () => {
+    const scene = await instantiate({ source: SCREEN });
+    expect(scene.transparent_background).toBe(false);
+    const sc = scene.components.find((c: any) => c.type === "screencast-frame");
+    expect(sc).toBeTruthy();
+    expect(sc.data.frame_style).toBe("none");
+    expect(sc.data.corner_radius).toBe(30);
+    expect(sc.data.max_width_pct).toBe(88);
+    expect(sc.data.pip_source).toBe("speaker");
+    expect(sc.data.pip_shape).toBe("circle");
+    expect(sc.data.pip_size).toBe(15);
+    // and the shell is present as the background layer
+    expect(scene.components.some((c: any) => c.type === "st-speaker-screencast")).toBe(true);
+  });
+
+  it("honors slot overrides and hides the PiP when pip_source:'none'", async () => {
+    const scene = await instantiate({ source: SCREEN, pip_source: "none", corner_radius: 12, pip_size: 20 });
+    const sc = scene.components.find((c: any) => c.type === "screencast-frame");
+    expect(sc.data.pip_source).toBeUndefined();
+    expect(sc.data.corner_radius).toBe(12);
+    expect(sc.data.pip_size).toBe(20);
   });
 });

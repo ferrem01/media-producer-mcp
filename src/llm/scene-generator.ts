@@ -163,12 +163,57 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
         console.warn(`  st-screencast: no footage source in slots or draft assets -- shell only`);
       }
     }
+    // st-speaker-screencast is a SHELL too: the recording + camera bubble ride
+    // in a sibling screencast-frame stamped with the known-good speaker-screencast
+    // recipe (frameless, rounded, inset, circular PiP wired to the speaker track).
+    // The scene is OPAQUE so it covers the speaker base except the PiP.
+    var stSpeakerOpaque = false;
+    if (st.type === "st-speaker-screencast") {
+      var ssSrc = (stData as any).source || (draft as any).assets?.find?.((a: string) => /\.(mp4|webm|mov|m4v)/i.test(a));
+      if (ssSrc) {
+        var ssRecovered = recoverAssetUrl(ssSrc, opts.tenantId);
+        if (ssRecovered !== ssSrc) {
+          console.warn(`  st-speaker-screencast: source "${ssSrc}" not on disk -- recovered to "${ssRecovered}"`);
+          ssSrc = ssRecovered;
+        }
+        // pip_source defaults to the "speaker" token (bind to the speaker track);
+        // "none"/null hides the bubble; anything else is a plain camera URL.
+        var ssPipRaw = (stData as any).pip_source;
+        var ssPip = ssPipRaw === undefined ? "speaker" : ssPipRaw;
+        var ssPipSource = (ssPip === "none" || ssPip === null || ssPip === "") ? undefined : ssPip;
+        stComponents.push({
+          id: "tpl_video",
+          type: "screencast-frame",
+          z_index: 20,
+          position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+          data: {
+            video_url: ssSrc,
+            frame_style: "none",
+            crop: "auto",
+            shadow: false,
+            corner_radius: (stData as any).corner_radius !== undefined ? Number((stData as any).corner_radius) : 30,
+            max_width_pct: (stData as any).max_width_pct !== undefined ? Number((stData as any).max_width_pct) : 88,
+            pip_source: ssPipSource,
+            pip_shape: "circle",
+            pip_size: (stData as any).pip_size !== undefined ? Number((stData as any).pip_size) : 15,
+            pip_position: (stData as any).pip_position || "bottom-right",
+            pip_start_at: (stData as any).pip_start_at !== undefined ? Number((stData as any).pip_start_at) : undefined,
+          },
+        });
+        stSpeakerOpaque = true; // full-frame screencast covers the speaker base
+      } else {
+        console.warn(`  st-speaker-screencast: no footage source in slots or draft assets -- shell only`);
+      }
+    }
     return {
       scene: {
         id: sceneId,
         label: draft.label,
         duration_seconds: draft.duration_seconds || 8,
         transition_in: draft.transition_in as any,
+        // Opaque so the full-frame screencast composites OVER the speaker base
+        // (camera shows only in the PiP), matching sceneCompositesOverSpeaker.
+        ...(stSpeakerOpaque ? { transparent_background: false } : {}),
         beats: draft.beats as any,
         camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
         components: stComponents,

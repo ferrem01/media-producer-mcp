@@ -1,0 +1,107 @@
+<template>
+  <div class="stss">
+    <div class="stss-bg"></div>
+    <div class="stss-kicker-row">
+      <span class="stss-rule"></span>
+      <span class="stss-kicker">{{kicker}}</span>
+      <span class="stss-rule stss-rule--right"></span>
+    </div>
+    <div class="stss-caps"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-speaker-screencast: the SHELL behind a full-bleed screen recording
+     that has the film's speaker riding in a corner PiP. This layer owns only
+     the BACKGROUND the inset footage-card floats on (brand gradient by
+     default) plus an optional kicker + timed caption chips. The footage +
+     camera bubble ride in a sibling screencast-frame the instantiation adds
+     (frame_style:'none', rounded, inset, pip_source:'speaker'). The scene is
+     OPAQUE (covers the speaker base except the PiP). */
+  .stss { position: absolute; inset: 0; overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; color: #17171c; }
+  .stss.is-dark { color: #f4f4f8; }
+
+  /* Background the card floats on. Default: a soft diagonal brand gradient.
+     A backdrop_image (set by the script) replaces it with a cover image. */
+  .stss-bg { position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(120% 120% at 15% 10%, color-mix(in srgb, var(--mp-color-primary, #393bf5) 22%, transparent), transparent 60%),
+      linear-gradient(135deg,
+        color-mix(in srgb, var(--mp-color-primary, #393bf5) 92%, #000 0%),
+        color-mix(in srgb, var(--mp-color-secondary, #1c82ff) 88%, #000 0%));
+    background-size: cover; background-position: center; }
+  .stss.is-light .stss-bg {
+    background:
+      radial-gradient(120% 120% at 15% 10%, color-mix(in srgb, var(--mp-color-primary, #393bf5) 12%, transparent), transparent 55%),
+      linear-gradient(160deg, #eef0fb 0%, #dfe3f7 55%, #cdd4f2 100%); }
+
+  .stss-kicker-row { position: absolute; z-index: 3; top: 3.4vh; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px; white-space: nowrap; }
+  .stss-rule { display: inline-block; width: 30px; height: 2px;
+    background: color-mix(in srgb, #fff 82%, transparent); transform-origin: left center; }
+  .stss-rule--right { transform-origin: right center; }
+  .stss-kicker { font-size: 13px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase;
+    color: color-mix(in srgb, #fff 92%, transparent); text-shadow: 0 1px 12px rgba(0,0,0,0.35); }
+  .stss.is-light .stss-rule { background: var(--mp-color-primary, #393bf5); }
+  .stss.is-light .stss-kicker { color: var(--mp-color-primary, #393bf5); text-shadow: none; }
+
+  .stss-caps { position: absolute; z-index: 3; left: 50%; bottom: 3.2vh; transform: translateX(-50%); height: 0; }
+  .stss-cap { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); white-space: nowrap;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 16px; font-weight: 600; letter-spacing: 0.02em; color: #fff;
+    text-shadow: 0 2px 16px rgba(0,0,0,0.5); }
+  .stss.is-light .stss-cap { color: #17171c; text-shadow: none; }
+  .stss-cap::before { content: ''; width: 22px; height: 2px; flex: 0 0 auto;
+    background: color-mix(in srgb, #fff 85%, transparent); }
+  .stss.is-light .stss-cap::before { background: var(--mp-color-primary, #393bf5); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+    var root = q('.stss');
+    if (data.theme === 'light') root.classList.add('is-light'); else root.classList.add('is-dark');
+
+    // A backdrop image (brand asset) replaces the gradient world.
+    if (data.backdrop_image) {
+      var bg = q('.stss-bg');
+      bg.style.background = "linear-gradient(rgba(10,10,20,0.28), rgba(10,10,20,0.42)), url('" + data.backdrop_image + "') center/cover no-repeat";
+      // Slow Ken Burns drift so the ground is alive but never distracting.
+      gsap.fromTo(bg, { scale: 1.06 }, { scale: 1.12, duration: Math.max(6, ctx.duration || 8), ease: 'sine.inOut' });
+    }
+
+    // Kicker is OPT-IN (the footage is the star).
+    var kickerRow = q('.stss-kicker-row');
+    if (!data.kicker || data.show_kicker !== true) { if (kickerRow) kickerRow.style.display = 'none'; }
+    else {
+      gsap.set(q('.stss-kicker'), { autoAlpha: 0, y: -8 });
+      gsap.set(el.querySelectorAll('.stss-rule'), { scaleX: 0 });
+      tl.to(q('.stss-kicker'), { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power3.out' }, 0.3)
+        .to(el.querySelectorAll('.stss-rule'), { scaleX: 1, duration: 0.6, ease: 'power2.out' }, 0.35);
+    }
+
+    // Timed caption beats [{at, text}] -- transient lower-thirds, opt-in.
+    var capStyle = data.captions_style === 'beats' ? 'beats' : 'none';
+    var caps = capStyle === 'none' ? [] : (Array.isArray(data.captions) ? data.captions.filter(function (c) {
+      return c && typeof c.text === 'string' && c.text && Number.isFinite(Number(c.at));
+    }) : []);
+    var capHost = q('.stss-caps');
+    var sceneDur = ctx.duration || 1e9;
+    caps.forEach(function (c, i) {
+      var chip = document.createElement('div');
+      chip.className = 'stss-cap';
+      chip.textContent = c.text;
+      capHost.appendChild(chip);
+      gsap.set(chip, { autoAlpha: 0, y: 16 });
+      var at = Math.max(0.1, Number(c.at));
+      var next = caps[i + 1] ? Math.max(0.1, Number(caps[i + 1].at)) : Infinity;
+      var out = Math.min(at + 3.4, next - 0.45, sceneDur - 0.6);
+      tl.to(chip, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, at);
+      if (out > at + 1.2) tl.to(chip, { autoAlpha: 0, y: -14, filter: 'blur(4px)', duration: 0.45, ease: 'power2.in' }, out);
+    });
+
+    return tl;
+  }
+</script>
