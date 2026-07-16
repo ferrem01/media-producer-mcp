@@ -35,6 +35,7 @@ import { runGeneratePipeline, type PipelineTarget } from "./llm/pipeline.js";
 import { llmConfigFromEnv } from "./llm/client.js";
 import { reviseScene } from "./llm/scene-revise.js";
 import { config } from "./config.js";
+import { proposeSceneCompression } from "./core/auto-compress.js";
 import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -358,6 +359,7 @@ export function createMcpServer(): McpServer {
         components: z.array(componentSchema).default([]),
       }).optional(),
       position: z.number().optional().describe("Insert position for scene (0-based, appends if omitted)"),
+      auto_compress: z.boolean().optional().describe("When adding a scene that contains a screen recording, auto-detect the dead 'waiting' stretches and attach a PROPOSED compress-the-waiting media-EDL (idle stretches time-lapsed 8x, active parts at 1x) so Studio opens with it on the timeline, fully editable. Default true; set false to add the raw clip untouched."),
 
       // Component fields (when adding a component to a scene)
       component: componentSchema.optional(),
@@ -404,6 +406,24 @@ export function createMcpServer(): McpServer {
           params.position,
         );
         if (!project) return err("Project not found");
+        // Auto-propose compress-the-waiting on any screen recording in the new
+        // scene: detect dead stretches and attach a PROPOSED media-EDL so Studio
+        // opens with the time-lapse already on the timeline (fully editable).
+        if (params.auto_compress !== false) {
+          const addedId = (params.scene as Scene).id;
+          const added = project.scenes.find((s) => s.id === addedId);
+          if (added) {
+            try {
+              const res = await proposeSceneCompression(added, { dataDir: config.dataDir });
+              if (res.applied.length) {
+                await saveProject(project);
+                console.log(`  auto-compress: ${addedId}: ${res.applied.map((a) => `${a.target} ${a.source_duration}s->${a.output_duration}s (${a.idle_ranges} idle)`).join(", ")}`);
+              }
+            } catch (e: any) {
+              console.warn(`  auto-compress skipped for scene ${addedId}: ${e?.message || e}`);
+            }
+          }
+        }
         return ok(withStudio(project));
       }
 
