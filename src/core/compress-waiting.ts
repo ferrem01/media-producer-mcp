@@ -171,21 +171,49 @@ export interface FocusEvent {
 
 /** Localized activity -> focus events. A second is a "focus second" when it
  *  has real motion whose union bbox stays small (a full-frame repaint or a
- *  scroll is NOT focus). Consecutive overlapping focus seconds merge.
+ *  scroll is NOT focus). Consecutive overlapping focus seconds merge, and
+ *  the emitted box is the MEDIAN of the run's per-second boxes -- the union
+ *  compounds every stray flicker over a long run until the box covers half
+ *  the screen (measured: every proposed callout slammed the height cap).
  *  Exported for tests. */
 export function focusEventsFromChanges(changes: FrameChange[], fps = FPS): FocusEvent[] {
   const secCount = Math.ceil(changes.length / fps);
   const events: FocusEvent[] = [];
-  let cur: (FocusEvent & { n: number }) | null = null;
+  let cur: { start: number; end: number; boxes: Array<{ x: number; y: number; w: number; h: number }> } | null = null;
 
-  const overlaps = (a: FocusEvent, b: FocusEvent) =>
+  const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
     a.x < b.x + b.w + 0.08 && b.x < a.x + a.w + 0.08 &&
     a.y < b.y + b.h + 0.08 && b.y < a.y + a.h + 0.08;
+
+  const median = (vals: number[]) => {
+    const s = vals.slice().sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  };
+  const flush = () => {
+    if (cur && cur.end - cur.start >= 2) {
+      // Median center + median size: the run's TYPICAL activity region, not
+      // the accumulation of everything that ever flickered during it.
+      const cx = median(cur.boxes.map((b) => b.x + b.w / 2));
+      const cy = median(cur.boxes.map((b) => b.y + b.h / 2));
+      const w = median(cur.boxes.map((b) => b.w));
+      const h = median(cur.boxes.map((b) => b.h));
+      if (w * h <= 0.16) {
+        events.push({
+          start: cur.start, end: cur.end,
+          x: Math.round(Math.max(0, cx - w / 2) * 1000) / 1000,
+          y: Math.round(Math.max(0, cy - h / 2) * 1000) / 1000,
+          w: Math.round(w * 1000) / 1000,
+          h: Math.round(h * 1000) / 1000,
+        });
+      }
+    }
+    cur = null;
+  };
 
   for (let s = 0; s < secCount; s++) {
     const chunk = changes.slice(s * fps, (s + 1) * fps);
     const active = chunk.filter((c) => c.box && c.score >= 0.35);
-    let sec: FocusEvent | null = null;
+    let sec: { x: number; y: number; w: number; h: number } | null = null;
     if (active.length) {
       let minX = 1, minY = 1, maxX = 0, maxY = 0;
       for (const c of active) {
@@ -195,43 +223,21 @@ export function focusEventsFromChanges(changes: FrameChange[], fps = FPS): Focus
         maxY = Math.max(maxY, c.box!.y + c.box!.h);
       }
       const w = maxX - minX, h = maxY - minY;
-      // Concentrated: the second's whole activity fits in <= ~28% of the
+      // Concentrated: this second's whole activity fits in <= ~20% of the
       // frame area. A scroll or page change blows well past this.
-      if (w * h <= 0.28 && w > 0.01 && h > 0.01) {
-        sec = { start: s, end: s + 1, x: minX, y: minY, w, h };
+      if (w * h <= 0.2 && w > 0.01 && h > 0.01) {
+        sec = { x: minX, y: minY, w, h };
       }
     }
-    if (sec && cur && overlaps(cur, sec) && sec.start <= cur.end + 1) {
-      // Merge: extend time, widen the union box.
-      const maxX = Math.max(cur.x + cur.w, sec.x + sec.w);
-      const maxY = Math.max(cur.y + cur.h, sec.y + sec.h);
-      cur.x = Math.min(cur.x, sec.x);
-      cur.y = Math.min(cur.y, sec.y);
-      cur.w = maxX - cur.x;
-      cur.h = maxY - cur.y;
-      cur.end = sec.end;
-      cur.n++;
-      // A merged run that grew past the concentration cap stops being focus.
-      if (cur.w * cur.h > 0.35) cur = null;
+    if (sec && cur && overlaps(cur.boxes[cur.boxes.length - 1], sec) && s <= cur.end + 1) {
+      cur.boxes.push(sec);
+      cur.end = s + 1;
     } else {
-      if (cur && cur.end - cur.start >= 2) {
-        events.push({
-          start: cur.start, end: cur.end,
-          x: Math.round(cur.x * 1000) / 1000, y: Math.round(cur.y * 1000) / 1000,
-          w: Math.round(cur.w * 1000) / 1000, h: Math.round(cur.h * 1000) / 1000,
-        });
-      }
-      cur = sec ? { ...sec, n: 1 } : null;
+      flush();
+      cur = sec ? { start: s, end: s + 1, boxes: [sec] } : null;
     }
   }
-  if (cur && (cur as FocusEvent).end - (cur as FocusEvent).start >= 2) {
-    const c = cur as FocusEvent;
-    events.push({
-      start: c.start, end: c.end,
-      x: Math.round(c.x * 1000) / 1000, y: Math.round(c.y * 1000) / 1000,
-      w: Math.round(c.w * 1000) / 1000, h: Math.round(c.h * 1000) / 1000,
-    });
-  }
+  flush();
   return events;
 }
 
