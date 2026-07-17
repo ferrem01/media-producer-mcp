@@ -255,16 +255,19 @@ export function getPreviewHtml(): string {
     width: 12px; height: 12px; border-radius: 50%;
     background: #6366f1; cursor: pointer; border: none;
   }
+  /* Status cluster (left of the scrubber): time + scene. Fixed width so the
+     ticking clock never reflows the timeline. */
   .time-display {
     font-size: 11px; font-variant-numeric: tabular-nums;
     font-family: 'JetBrains Mono', 'SF Mono', monospace;
-    color: #6b7280; min-width: 100px; text-align: right; flex-shrink: 0;
+    color: #6b7280; min-width: 104px; text-align: left; flex-shrink: 0;
+    display: inline-block;
   }
   /* Rate badge floats above the time display, out of the flex flow, so its
      appearing/resizing never reflows the timeline. */
   #time-stack { position: relative; flex-shrink: 0; display: inline-block; }
   #rate-badge {
-    display: none; position: absolute; right: 0; bottom: calc(100% + 3px);
+    display: none; position: absolute; left: 0; bottom: calc(100% + 3px);
     font: 600 9px Inter, sans-serif; padding: 1px 6px; border-radius: 999px;
     white-space: nowrap; pointer-events: none;
   }
@@ -274,23 +277,34 @@ export function getPreviewHtml(): string {
     font-size: 11px; color: #6b7280; white-space: nowrap; flex-shrink: 0;
     background: #f3f4f6; padding: 2px 8px; border-radius: 10px;
   }
+  .scene-indicator:empty { display: none; }
 
-  /* Audio indicator */
-  .audio-indicator {
-    font-size: 11px; color: #6b7280; white-space: nowrap; flex-shrink: 0;
-    display: flex; align-items: center; gap: 4px;
-  }
-  .audio-indicator .audio-icon {
-    font-size: 13px;
-  }
-  .audio-indicator.has-audio { color: #6366f1; }
-
+  /* Audio cluster (right edge): one ♪ icon = mute toggle + track-count chip;
+     the volume slider lives in a hover/focus flyout so it costs no bar width. */
   .vol-control {
-    display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+    position: relative; display: flex; align-items: center; gap: 4px;
+    flex-shrink: 0; padding: 4px 6px; border-radius: 8px;
   }
-  .vol-control .vol-icon { font-size: 13px; color: #6b7280; }
+  .vol-control:hover { background: #f3f4f6; }
+  .vol-control .vol-icon { font-size: 14px; color: #6b7280; cursor: pointer; user-select: none; }
   .vol-control .vol-icon.muted { color: #cbd5e1; }
-  #vol-slider { width: 70px; cursor: pointer; accent-color: #6366f1; }
+  .audio-indicator {
+    font-size: 10px; font-weight: 600; color: #9ca3af; white-space: nowrap;
+    background: #f3f4f6; padding: 0 5px; border-radius: 999px; line-height: 15px;
+  }
+  .audio-indicator:empty { display: none; }
+  .audio-indicator.has-audio { color: #4f46e5; background: #eef2ff; }
+  .vol-flyout {
+    position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 20;
+    display: flex; align-items: center; padding: 8px 10px;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
+  }
+  /* Invisible bridge over the 6px gap so the flyout survives the mouse travel. */
+  .vol-flyout::after { content: ''; position: absolute; top: 100%; left: 0; right: 0; height: 10px; }
+  .vol-control:hover .vol-flyout, .vol-control:focus-within .vol-flyout { opacity: 1; pointer-events: auto; }
+  #vol-slider { width: 90px; cursor: pointer; accent-color: #6366f1; display: block; }
 
   /* Bottom panels */
   #bottom-panels {
@@ -676,6 +690,8 @@ export function getPreviewHtml(): string {
           <polygon points="3,1 12,7 3,13"/>
         </svg>
       </button>
+      <span id="time-stack"><span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock"></span><span class="time-display" id="time-display">0.0s / 0.0s</span></span>
+      <span class="scene-indicator" id="scene-indicator"></span>
       <span id="slider-wrap">
         <div id="timeline-track">
         <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
@@ -691,13 +707,11 @@ export function getPreviewHtml(): string {
         <button id="tl-zoom-in" class="scene-sb-btn" title="Zoom timeline in">+</button>
         <button id="tl-zoom-out" class="scene-sb-btn" title="Zoom timeline out">&minus;</button>
       </span>
-      <span id="time-stack"><span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock"></span><span class="time-display" id="time-display">0.0s / 0.0s</span></span>
-      <span class="audio-indicator" id="audio-indicator"></span>
-      <span class="vol-control" title="Volume">
-        <span class="vol-icon" id="vol-icon">&#9834;</span>
-        <input type="range" id="vol-slider" min="0" max="100" value="100" step="1">
+      <span class="vol-control" id="vol-control">
+        <span class="vol-icon" id="vol-icon" title="Mute / unmute" tabindex="0">&#9834;</span>
+        <span class="audio-indicator" id="audio-indicator"></span>
+        <span class="vol-flyout"><input type="range" id="vol-slider" min="0" max="100" value="100" step="1"></span>
       </span>
-      <span class="scene-indicator" id="scene-indicator"></span>
     </div>
   </div>
 
@@ -1510,7 +1524,10 @@ export function getPreviewHtml(): string {
     });
 
     if (count > 0) {
-      els.audioIndicator.innerHTML = '<span class="audio-icon">\\u266A</span>' + count + ' track' + (count > 1 ? 's' : '');
+      // Compact count chip next to the volume icon; the word "tracks" lives
+      // in the tooltip so the bar stays narrow.
+      els.audioIndicator.textContent = String(count);
+      els.audioIndicator.title = count + ' audio track' + (count > 1 ? 's' : '');
       els.audioIndicator.className = 'audio-indicator has-audio';
     } else {
       els.audioIndicator.innerHTML = '';
@@ -4409,6 +4426,17 @@ export function getPreviewHtml(): string {
         }
       });
       if (els.volIcon) els.volIcon.className = state.masterVolume === 0 ? 'vol-icon muted' : 'vol-icon';
+    });
+  }
+  // Click the ♪ icon = mute toggle (restores the pre-mute level). Reuses the
+  // slider's input handler so there is exactly one volume code path.
+  if (els.volIcon && els.volSlider) {
+    els.volIcon.addEventListener('click', function() {
+      var cur = parseInt(els.volSlider.value, 10);
+      if (isNaN(cur)) cur = 100;
+      if (cur > 0) { state._preMuteVol = cur; els.volSlider.value = '0'; }
+      else { els.volSlider.value = String(state._preMuteVol || 100); }
+      els.volSlider.dispatchEvent(new Event('input'));
     });
   }
 
