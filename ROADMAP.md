@@ -87,7 +87,12 @@ revise = element vs scene).
    approval gate (we already have the preview + plan editing).
 6. **Export the composition as editable, standalone HTML the user owns** (HyperFrames'
    "code you own" model) — bridges the ownership/transparency gap for power users.
-7. **Auto-callouts retry** (parked 2026-07-17 behind `MP_AUTO_CALLOUTS=1`) — vision-grounded
+7. **HTTPS for the droplet** (domain + TLS, e.g. Caddy) — Studio on a bare-IP http
+   origin is not a secure context, so `navigator.mediaDevices` doesn't exist: the
+   narration booth needs the `unsafely-treat-insecure-origin-as-secure` Chrome flag
+   today (booth shows instructions). Also unlocks clipboard APIs, service workers,
+   and removes the mixed-content ceiling generally.
+8. **Auto-callouts retry** (parked 2026-07-17 behind `MP_AUTO_CALLOUTS=1`) — vision-grounded
    region callouts on narrated screencasts. Renderer + pixel-dialect conversion are solved;
    the open problem is time × semantics (cues land on content seams; narrator references
    future-tense UI). See the AMENDMENTS parking entry for the four learnings + promising
