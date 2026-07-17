@@ -100,7 +100,16 @@
   window.addEventListener("scroll", onScroll, true);
   nav(); // initial route
 
+  // Keepalive: MV3 service workers suspend after ~30s without events, and
+  // the core use case (waiting for agents) is exactly a long stretch with
+  // none. A 20s ping resets the idle timer so the session survives. Pings
+  // are NOT activity marks -- idle detection ignores them.
+  const heartbeat = setInterval(() => {
+    try { chrome.runtime.sendMessage({ type: "qr-ping" }); } catch (e) {}
+  }, 20000);
+
   const stop = () => {
+    clearInterval(heartbeat);
     document.removeEventListener("click", onClick, true);
     document.removeEventListener("keydown", onKey, true);
     window.removeEventListener("scroll", onScroll, true);
