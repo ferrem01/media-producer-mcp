@@ -70,16 +70,59 @@ async function motionScores(
   });
 }
 
-export async function detectIdleRanges(
+/** Isolated high-motion spikes in a frame-diff score series = hard visual
+ *  transitions (page navigations, screen switches). Sustained high motion
+ *  (scrolling, streaming text, animation) is NOT a transition: only short
+ *  bursts count, and nearby bursts collapse into one. Exported for tests. */
+export function transitionsFromScores(scores: number[], fps = FPS): number[] {
+  if (scores.length < fps) return [];
+  const sorted = scores.slice().sort((a, b) => a - b);
+  const p95 = sorted[Math.floor(0.95 * (sorted.length - 1))];
+  const median = sorted[Math.floor(0.5 * (sorted.length - 1))];
+  // A page change repaints most of the frame: score far above both the
+  // clip's busy level and an absolute floor no typing/cursor activity hits.
+  const T = Math.max(10, p95 * 1.25, median * 6);
+
+  const transitions: number[] = [];
+  let run: { start: number; peak: number } | null = null;
+  const flush = (endIdx: number) => {
+    if (!run) return;
+    const lenSec = (endIdx - run.start) / fps;
+    // Bursts longer than ~1.2s are scroll/animation, not a cut.
+    if (lenSec <= 1.2) {
+      const at = run.start / fps;
+      const last = transitions[transitions.length - 1];
+      // Collapse transitions closer than 3s (multi-step navigations).
+      if (last === undefined || at - last >= 3) transitions.push(Math.round(at * 10) / 10);
+    }
+    run = null;
+  };
+  for (let i = 0; i < scores.length; i++) {
+    if (scores[i] >= T) { if (!run) run = { start: i, peak: scores[i] }; }
+    else flush(i);
+  }
+  flush(scores.length);
+  return transitions;
+}
+
+export interface MotionAnalysis {
+  ranges: IdleRange[];
+  /** Source seconds of hard visual transitions (page changes). */
+  transitions: number[];
+  duration: number;
+}
+
+/** One decode, both signals: idle stretches (compress-the-waiting) and hard
+ *  visual transitions (chapter-pin snap points). */
+export async function analyzeMotion(
   videoPath: string,
   minIdleSeconds = 2,
-  _noiseDb = -40, // kept for API compatibility; superseded by the motion profile
   range?: { start: number; end: number },
-): Promise<{ ranges: IdleRange[]; duration: number }> {
+): Promise<MotionAnalysis> {
   const { scores, duration } = await motionScores(videoPath, range);
   const offset = range ? range.start : 0;
   const total = range ? range.end : duration;
-  if (!scores.length) return { ranges: [], duration: total };
+  if (!scores.length) return { ranges: [], transitions: [], duration: total };
 
   // Adaptive idle threshold: a fraction of the clip's own busy level, with a
   // floor so a fully-static recording still reads idle and a ceiling so a
@@ -107,7 +150,18 @@ export async function detectIdleRanges(
       runStart = null;
     }
   }
-  return { ranges, duration: total };
+  const transitions = transitionsFromScores(scores).map((t) => Math.round((t + offset) * 10) / 10);
+  return { ranges, transitions, duration: total };
+}
+
+export async function detectIdleRanges(
+  videoPath: string,
+  minIdleSeconds = 2,
+  _noiseDb = -40, // kept for API compatibility; superseded by the motion profile
+  range?: { start: number; end: number },
+): Promise<{ ranges: IdleRange[]; duration: number }> {
+  const { ranges, duration } = await analyzeMotion(videoPath, minIdleSeconds, range);
+  return { ranges, duration };
 }
 
 /** Idle ranges -> a full source-map: active stretches at 1x, idle at

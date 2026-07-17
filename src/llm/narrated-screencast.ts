@@ -13,7 +13,7 @@
  */
 
 import path from "node:path";
-import { proposeSceneCompression, probeMediaDuration } from "../core/auto-compress.js";
+import { proposeSceneCompression, probeMediaDuration, proposeChapterPins } from "../core/auto-compress.js";
 import { getSentenceSpine, type SentenceSpine } from "../core/sentence-spine.js";
 import { resolveVideoPath } from "../core/video-path.js";
 import { callLLM, type LLMConfig } from "./client.js";
@@ -129,6 +129,7 @@ export async function assembleNarratedScreencast(opts: {
   // times (film minus introDur). Degrades to the caption-less assembly when
   // whisper isn't installed or the take transcribes to nothing.
   let spine: SentenceSpine | null = null;
+  let pinResult: { pinned: number; dropped: number } | null = null;
   if (narrationSource && narrationDur > 0.5) {
     const cacheDir = path.join(
       opts.dataDir || process.env.MP_DATA_DIR || "/data/media-producer",
@@ -163,6 +164,21 @@ export async function assembleNarratedScreencast(opts: {
       data: { captions, chapters: chapterMoments },
     } as any);
 
+    // Chapter pins: snap the footage to the narration's chapter boundaries
+    // wherever the screencast has a hard visual transition nearby, so the
+    // sync is semantic (right screen while it's being talked about), not just
+    // durational. Pins land in the media lane -- visible, draggable, human-
+    // owned. Conservative: boundaries with no confident visual seam stay
+    // unpinned, and strained pins are dropped.
+    pinResult = await proposeChapterPins(
+      screencastScene,
+      spine.chapters.map((ch, i) => ({
+        out: ch.start - offset,
+        label: titles[i] || `Chapter ${i + 1}`,
+      })),
+      { dataDir: opts.dataDir },
+    );
+
     project.spine = {
       sentences: spine.sentences,
       chapters: spine.chapters.map((ch, i) => ({ ...ch, title: titles[i] || ch.title })),
@@ -184,6 +200,9 @@ export async function assembleNarratedScreencast(opts: {
       : `screencast (no compressible idle found)`,
     outro ? `outro ${Math.round(outroDur)}s` : null,
     spine ? `spine ${spine.sentences.length} sentences / ${spine.chapters.length} chapters` : `no spine (whisper unavailable)`,
+    pinResult && pinResult.pinned
+      ? `${pinResult.pinned} chapter pin(s) snapped to visual transitions${pinResult.dropped ? ` (${pinResult.dropped} dropped as strained)` : ""}`
+      : null,
   ].filter(Boolean);
   const summary = `Narrated screencast assembled: ${parts.join(" | ")}${narrationDur > 0.5 ? ` | narration ${Math.round(narrationDur)}s` : " | no narration track"}.`;
 

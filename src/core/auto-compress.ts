@@ -15,11 +15,11 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { detectIdleRanges } from "./compress-waiting.js";
+import { detectIdleRanges, analyzeMotion } from "./compress-waiting.js";
 import { loadAssetIntel } from "./asset-intel.js";
-import { solveMediaEdits } from "./media-edl.js";
+import { solveMediaEdits, mapSourceTime } from "./media-edl.js";
 import { resolveVideoPath } from "./video-path.js";
-import type { Scene, SceneComponent } from "./types.js";
+import type { Scene, SceneComponent, MediaPin } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -138,4 +138,134 @@ export async function proposeSceneCompression(
     result.scene_duration = scene.duration_seconds;
   }
   return result;
+}
+
+// ── Chapter pins ────────────────────────────────────────────────────────────
+// The audio gives chapter boundaries; the footage's own hard visual
+// transitions (page changes, from the same motion profile as idle detection)
+// give snap points. A pin at each confident match makes the sync SEMANTIC --
+// "when the narrator starts chapter 3, the screencast shows chapter 3's
+// screen" -- instead of merely durational, and drift stops accumulating
+// across chapters. Pins are first-class media-edit intents: visible and
+// draggable in Studio's media lane, so the machine proposes and the human
+// owns the last 10%.
+
+export interface ChapterPinInput {
+  /** Scene-local output second where the chapter starts. */
+  out: number;
+  /** Label shown on the pin in Studio (the chapter title). */
+  label?: string;
+}
+
+/**
+ * Plan pins for chapter boundaries -- PURE (exported for tests).
+ * For each boundary: take the proportional guess (where the current solve
+ * already lands at that output time), snap it to the nearest hard transition
+ * within `snapWindow` seconds, and keep only confident, monotonic results.
+ * Boundaries with no nearby transition get NO pin -- a wrong pin is worse
+ * than no pin. An end-pin (scene end -> source end) is always added so the
+ * re-solve still lands the narration fit exactly.
+ */
+export function planChapterPins(
+  chapters: ChapterPinInput[],
+  segments: Array<{ src_start: number; src_end: number; rate: number; hold?: number }>,
+  transitions: number[],
+  srcDur: number,
+  sceneDur: number,
+  opts?: { snapWindow?: number; minSpacing?: number },
+): MediaPin[] {
+  const snapWindow = opts?.snapWindow ?? 6;
+  const minSpacing = opts?.minSpacing ?? 4;
+  const pins: MediaPin[] = [];
+  for (const ch of chapters) {
+    // Too close to the scene edges: the implicit opening anchor / end pin
+    // already govern there.
+    if (ch.out < 3 || ch.out > sceneDur - 5) continue;
+    const guess = mapSourceTime(segments as any, ch.out);
+    let best: number | null = null;
+    for (const t of transitions) {
+      if (Math.abs(t - guess) > snapWindow) continue;
+      if (best === null || Math.abs(t - guess) < Math.abs(best - guess)) best = t;
+    }
+    if (best === null) continue; // no confident visual seam near this boundary
+    const prev = pins[pins.length - 1];
+    if (prev && (best <= prev.src + minSpacing || ch.out <= prev.out + minSpacing)) continue;
+    if (best <= 0.5 || best >= srcDur - minSpacing) continue;
+    pins.push({ out: Math.round(ch.out * 100) / 100, src: best, ...(ch.label ? { word: ch.label } : {}) });
+  }
+  // End pin: consume the source exactly by scene end, so snapped pins can't
+  // drift the tail off the narration length.
+  if (pins.length && sceneDur > (pins[pins.length - 1]?.out || 0) + minSpacing) {
+    pins.push({ out: Math.round(sceneDur * 100) / 100, src: srcDur, word: "end" });
+  }
+  return pins;
+}
+
+export interface ChapterPinResult {
+  pinned: number;
+  dropped: number;
+  pin_status?: Array<{ out: number; status: string; detail?: string }>;
+}
+
+/**
+ * Snap the scene's primary screencast to its chapter boundaries. Requires a
+ * prior proposeSceneCompression (uses its rate_regions as the elastic
+ * preferences between pins). Strained pins are dropped and the solve rerun --
+ * conservative by design. Mutates the scene's media_edits. Never throws.
+ */
+export async function proposeChapterPins(
+  scene: Scene,
+  chapters: ChapterPinInput[],
+  opts?: { dataDir?: string },
+): Promise<ChapterPinResult> {
+  const none: ChapterPinResult = { pinned: 0, dropped: 0 };
+  try {
+    const [primary] = findSceneScreencasts(scene);
+    const edit = primary && (scene as any).media_edits?.[primary.target];
+    if (!edit || !Array.isArray(edit.segments) || !edit.segments.length) return none;
+    if (Array.isArray(edit.pins) && edit.pins.length) return none; // human already pinned
+
+    const videoPath = resolveVideoPath(primary.src, opts?.dataDir);
+    const cached = await loadAssetIntel(videoPath).catch(() => null);
+    let transitions = cached?.transitions;
+    let srcDur = cached?.idle?.duration;
+    if (!transitions || !transitions.length || !srcDur) {
+      const det = await analyzeMotion(videoPath, 2);
+      transitions = det.transitions;
+      srcDur = det.duration;
+    }
+    if (!transitions.length || !srcDur) return none;
+
+    const sceneDur = scene.duration_seconds || 0;
+    let pins = planChapterPins(chapters, edit.segments, transitions, srcDur, sceneDur);
+    if (!pins.length) return none;
+
+    const rate_regions = edit.rate_regions || [];
+    let solved = solveMediaEdits({ cuts: edit.cuts || [], rate_regions, pins }, srcDur);
+    // A strained pin means the footage can't reach that moment in time even
+    // at the rate clamps -- drop those pins and re-solve rather than ship
+    // visibly wrong pacing.
+    const strainedOuts = new Set(
+      solved.pin_status.filter((p) => p.status !== "ok").map((p) => p.out),
+    );
+    let dropped = 0;
+    if (strainedOuts.size) {
+      dropped = pins.filter((p) => strainedOuts.has(p.out)).length;
+      pins = pins.filter((p) => !strainedOuts.has(p.out));
+      solved = solveMediaEdits({ cuts: edit.cuts || [], rate_regions, pins }, srcDur);
+      if (solved.pin_status.some((p) => p.status !== "ok")) {
+        // Still strained with the survivors: leave the un-pinned solve alone.
+        return { pinned: 0, dropped: pins.length + dropped };
+      }
+    }
+    if (!pins.length) return { pinned: 0, dropped };
+
+    edit.pins = pins;
+    edit.segments = solved.segments;
+    edit.pin_status = solved.pin_status;
+    edit.proposed = true;
+    return { pinned: pins.length, dropped, pin_status: solved.pin_status };
+  } catch {
+    return none;
+  }
 }

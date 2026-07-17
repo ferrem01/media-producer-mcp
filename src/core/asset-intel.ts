@@ -54,6 +54,9 @@ export interface AssetIntel {
    *  scene that uses this recording can propose the time-lapse instantly
    *  without re-decoding the whole clip. */
   idle?: { ranges: Array<{ start: number; end: number }>; duration: number };
+  /** Hard visual transitions (page changes) in source seconds -- snap points
+   *  for chapter pins. Cached at ingest from the same motion profile. */
+  transitions?: number[];
   analyzed_at: string;
 }
 
@@ -405,13 +408,17 @@ export async function analyzeAndSaveIntel(filePath: string): Promise<AssetIntel 
     // Cache the "compress the waiting" scan at ingest so placing this recording
     // in a scene can propose the time-lapse instantly (no re-decode). Best-effort.
     try {
-      const { detectIdleRanges } = await import("./compress-waiting.js");
-      const det = await detectIdleRanges(filePath, 2);
+      const { analyzeMotion } = await import("./compress-waiting.js");
+      const det = await analyzeMotion(filePath, 2);
       if (det.ranges.length) {
         intel.idle = { ranges: det.ranges.map((r) => ({ start: r.start, end: r.end })), duration: det.duration };
         intel.notes.push(`compress-the-waiting: ${det.ranges.length} idle stretch(es) totalling ${Math.round(det.ranges.reduce((t, r) => t + (r.end - r.start), 0))}s (cached).`);
       }
-    } catch { /* idle scan is optional -- never block the sidecar on it */ }
+      if (det.transitions.length) {
+        intel.transitions = det.transitions;
+        intel.notes.push(`${det.transitions.length} hard visual transition(s) (chapter-pin snap points, cached).`);
+      }
+    } catch { /* motion scan is optional -- never block the sidecar on it */ }
     await fs.writeFile(sidecarPath(filePath), JSON.stringify(intel, null, 2)).catch(() => {});
   }
   return intel;
