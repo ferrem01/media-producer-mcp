@@ -32,21 +32,17 @@ describe("transitionsFromScores", () => {
 });
 
 describe("planChapterPins", () => {
-  // A simple compressed map: 0-60 active 1x, 60-120 idle 4x, 120-180 active 1x
+  // Compressed map: 0-60 active 1x, 60-120 idle 4x, 120-180 active 1x
   // Output timeline: 0-60 (src 0-60), 60-75 (src 60-120), 75-135 (src 120-180)
-  const segments = [
-    { src_start: 0, src_end: 60, rate: 1 },
-    { src_start: 60, src_end: 120, rate: 4 },
-    { src_start: 120, src_end: 180, rate: 1 },
-  ];
+  const regions = [{ src_start: 60, src_end: 120, rate: 4 }];
   const srcDur = 180;
-  const sceneDur = 135;
+  const sceneDur = 135; // == natural output, so the end pin is drift-neutral here
 
   it("snaps a boundary to a nearby transition and adds the end pin", () => {
-    // Chapter at out=80 -> proportional src = 125; transition at 128 is within 6s
+    // Chapter at out=80 -> guess src 125; transition at 128 is within 6s
     const pins = planChapterPins(
       [{ out: 80, label: "Reviewing Broadcasts" }],
-      segments, [30, 128, 170], srcDur, sceneDur,
+      regions, [30, 128, 170], srcDur, sceneDur,
     );
     expect(pins.length).toBe(2);
     expect(pins[0]).toMatchObject({ out: 80, src: 128, word: "Reviewing Broadcasts" });
@@ -54,28 +50,53 @@ describe("planChapterPins", () => {
   });
 
   it("skips boundaries with no confident transition nearby", () => {
-    const pins = planChapterPins([{ out: 80 }], segments, [30, 170], srcDur, sceneDur);
-    expect(pins).toEqual([]); // nothing within 6s of src 125 -> no pins, no end pin
+    const pins = planChapterPins([{ out: 80 }], regions, [30, 170], srcDur, sceneDur);
+    expect(pins).toEqual([]); // nothing within 6s of src 125 -> no pins at all
   });
 
   it("keeps pins monotonic and respects scene edges", () => {
     const pins = planChapterPins(
       [{ out: 1 }, { out: 40 }, { out: 41 }, { out: 133 }],
-      segments, [2, 39, 41.5, 176], srcDur, sceneDur,
+      regions, [2, 39, 41.5, 176], srcDur, sceneDur,
     );
-    // out=1 (< 3s) and out=133 (> sceneDur-5) skipped; 40+41 too close -> one survives
-    expect(pins.filter((p) => p.word !== "end").length).toBe(1);
-    expect(pins[0].out).toBe(40);
+    // out=1 (< 3s) and out=133 (> sceneDur-5) skipped; 40 vs 41 violate min
+    // spacing -- the iterative planner keeps the closest match (41 -> 41.5).
+    const chapterPins = pins.filter((p) => p.word !== "end");
+    expect(chapterPins.length).toBe(1);
+    expect(chapterPins[0]).toMatchObject({ out: 41, src: 41.5 });
   });
 
   it("pinned solve lands chapters on their transitions and keeps total duration", () => {
-    const pins = planChapterPins([{ out: 80 }], segments, [128], srcDur, sceneDur);
-    const rate_regions = [{ src_start: 60, src_end: 120, rate: 4 }];
-    const solved = solveMediaEdits({ cuts: [], rate_regions, pins }, srcDur);
+    const pins = planChapterPins([{ out: 80 }], regions, [128], srcDur, sceneDur);
+    const solved = solveMediaEdits({ cuts: [], rate_regions: regions, pins }, srcDur);
     expect(solved.pin_status.every((p) => p.status === "ok")).toBe(true);
     // At out=80 the source now shows the transition frame (128), not 125.
     expect(Math.abs(mapSourceTime(solved.segments, 80) - 128)).toBeLessThan(0.5);
     // End pin holds the narration fit: total output stays the scene duration.
     expect(Math.abs(edlOutputDuration(solved.segments) - sceneDur)).toBeLessThan(0.5);
+  });
+
+  it("refines guesses off the end pin: catches a seam the raw map misses", () => {
+    // Fit target (200s) is TIGHTER than the natural output (225s): every raw
+    // guess is early. Raw map: out 20 -> src 80; the real seam sits at 86
+    // (Δ6.2 -- just outside the window). The end-pin-corrected map guesses
+    // src 90 -> Δ4 -> pinned. The single-pass planner missed exactly this.
+    const pins = planChapterPins(
+      [{ out: 20, label: "Drafting" }],
+      [{ src_start: 0, src_end: 100, rate: 4 }],
+      [86],
+      300,
+      200,
+    );
+    const chapterPins = pins.filter((p) => p.word !== "end");
+    expect(chapterPins.length).toBe(1);
+    expect(chapterPins[0]).toMatchObject({ out: 20, src: 86 });
+    // And the full solve is healthy.
+    const solved = solveMediaEdits(
+      { cuts: [], rate_regions: [{ src_start: 0, src_end: 100, rate: 4 }], pins },
+      300,
+    );
+    expect(solved.pin_status.every((p) => p.status === "ok")).toBe(true);
+    expect(Math.abs(edlOutputDuration(solved.segments) - 200)).toBeLessThan(0.5);
   });
 });

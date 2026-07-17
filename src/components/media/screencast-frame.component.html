@@ -521,12 +521,15 @@
         elc.mini.style.left = -(c.x / 100) * vpW * z + 'px';
         elc.mini.style.top = -(c.y / 100) * vpH * z + 'px';
         // The clone reuses the base media's % geometry -- % of the mini
-        // viewport, which is the real viewport scaled by z.
+        // viewport, which is the real viewport scaled by z. Height comes from
+        // the base's EXPLICIT height (layout() sets it), not 'auto': on
+        // capture pages a metadata-less video's auto height collapses to the
+        // 150px fallback and the mini shows the clip's black backing.
         elc.clone.style.position = 'absolute';
         elc.clone.style.width = media.style.width || '100%';
         elc.clone.style.left = media.style.left || '0';
         elc.clone.style.top = media.style.top || '0';
-        elc.clone.style.height = 'auto';
+        elc.clone.style.height = media.style.height || 'auto';
       });
     }
 

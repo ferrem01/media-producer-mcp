@@ -15,7 +15,7 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { detectIdleRanges, analyzeMotion } from "./compress-waiting.js";
+import { detectIdleRanges } from "./compress-waiting.js";
 import { loadAssetIntel } from "./asset-intel.js";
 import { solveMediaEdits, mapSourceTime } from "./media-edl.js";
 import { resolveVideoPath } from "./video-path.js";
@@ -159,16 +159,24 @@ export interface ChapterPinInput {
 
 /**
  * Plan pins for chapter boundaries -- PURE (exported for tests).
- * For each boundary: take the proportional guess (where the current solve
- * already lands at that output time), snap it to the nearest hard transition
- * within `snapWindow` seconds, and keep only confident, monotonic results.
- * Boundaries with no nearby transition get NO pin -- a wrong pin is worse
- * than no pin. An end-pin (scene end -> source end) is always added so the
- * re-solve still lands the narration fit exactly.
+ *
+ * ITERATIVE refinement, not a single pass: the proportional guess for a
+ * boundary drifts with every un-modeled pause and pace change before it, so
+ * a fixed window around the raw guess misses seams that are actually
+ * correct (measured Δ19s on two of three boundaries of the newsletter
+ * walkthrough). Instead: start from the end-pin (source end lands on scene
+ * end), then repeatedly (1) re-solve the map with the pins so far, (2)
+ * recompute every unpinned boundary's guess on the CORRECTED map, (3) pin
+ * the single most confident seam match. Each accepted pin re-anchors the
+ * map, pulling the remaining guesses toward truth.
+ *
+ * Still conservative: a boundary with no seam inside the window gets no
+ * pin, monotonicity is enforced, and a pin whose solve comes back strained
+ * is discarded permanently.
  */
 export function planChapterPins(
   chapters: ChapterPinInput[],
-  segments: Array<{ src_start: number; src_end: number; rate: number; hold?: number }>,
+  rateRegions: Array<{ src_start: number; src_end: number; rate: number }>,
   transitions: number[],
   srcDur: number,
   sceneDur: number,
@@ -176,28 +184,63 @@ export function planChapterPins(
 ): MediaPin[] {
   const snapWindow = opts?.snapWindow ?? 6;
   const minSpacing = opts?.minSpacing ?? 4;
-  const pins: MediaPin[] = [];
-  for (const ch of chapters) {
-    // Too close to the scene edges: the implicit opening anchor / end pin
-    // already govern there.
-    if (ch.out < 3 || ch.out > sceneDur - 5) continue;
-    const guess = mapSourceTime(segments as any, ch.out);
-    let best: number | null = null;
-    for (const t of transitions) {
-      if (Math.abs(t - guess) > snapWindow) continue;
-      if (best === null || Math.abs(t - guess) < Math.abs(best - guess)) best = t;
+
+  // Boundaries eligible at all (edges are governed by the implicit opening
+  // anchor / end pin).
+  const candidates = chapters
+    .filter((ch) => ch.out >= 3 && ch.out <= sceneDur - 5)
+    .map((ch) => ({ ...ch, out: Math.round(ch.out * 100) / 100 }));
+  if (!candidates.length) return [];
+
+  const endPin: MediaPin = { out: Math.round(sceneDur * 100) / 100, src: srcDur, word: "end" };
+  const pins: MediaPin[] = [endPin];
+  const discarded = new Set<number>();
+  const solve = () => solveMediaEdits({ cuts: [], rate_regions: rateRegions, pins }, srcDur);
+  let solved = solve();
+
+  const monotonicOk = (out: number, src: number) => {
+    for (const p of pins) {
+      if (out < p.out !== src < p.src) return false; // order must agree on both axes
+      if (Math.abs(out - p.out) < minSpacing || Math.abs(src - p.src) < minSpacing) return false;
     }
-    if (best === null) continue; // no confident visual seam near this boundary
-    const prev = pins[pins.length - 1];
-    if (prev && (best <= prev.src + minSpacing || ch.out <= prev.out + minSpacing)) continue;
-    if (best <= 0.5 || best >= srcDur - minSpacing) continue;
-    pins.push({ out: Math.round(ch.out * 100) / 100, src: best, ...(ch.label ? { word: ch.label } : {}) });
+    return true;
+  };
+
+  for (let iter = 0; iter < candidates.length; iter++) {
+    // Best remaining match on the current (re-anchored) map.
+    let best: { ch: ChapterPinInput; src: number; delta: number } | null = null;
+    for (const ch of candidates) {
+      if (discarded.has(ch.out) || pins.some((p) => p.out === ch.out)) continue;
+      const guess = mapSourceTime(solved.segments, ch.out);
+      for (const t of transitions) {
+        const delta = Math.abs(t - guess);
+        if (delta > snapWindow) continue;
+        if (t <= 0.5 || t >= srcDur - minSpacing) continue;
+        if (!monotonicOk(ch.out, t)) continue;
+        if (!best || delta < best.delta) best = { ch, src: t, delta };
+      }
+    }
+    if (!best) break;
+
+    const pin: MediaPin = {
+      out: best.ch.out,
+      src: best.src,
+      ...(best.ch.label ? { word: best.ch.label } : {}),
+    };
+    pins.push(pin);
+    pins.sort((a, b) => a.out - b.out);
+    const trial = solve();
+    if (trial.pin_status.some((p) => p.status !== "ok")) {
+      // This pin makes the map infeasible -- drop it for good and keep going.
+      pins.splice(pins.indexOf(pin), 1);
+      discarded.add(best.ch.out);
+      continue;
+    }
+    solved = trial;
   }
-  // End pin: consume the source exactly by scene end, so snapped pins can't
-  // drift the tail off the narration length.
-  if (pins.length && sceneDur > (pins[pins.length - 1]?.out || 0) + minSpacing) {
-    pins.push({ out: Math.round(sceneDur * 100) / 100, src: srcDur, word: "end" });
-  }
+
+  // Only the end pin survived: nothing was confidently matched -- report none.
+  if (pins.length === 1) return [];
   return pins;
 }
 
@@ -226,22 +269,18 @@ export async function proposeChapterPins(
     if (Array.isArray(edit.pins) && edit.pins.length) return none; // human already pinned
 
     const videoPath = resolveVideoPath(primary.src, opts?.dataDir);
-    const cached = await loadAssetIntel(videoPath).catch(() => null);
-    let transitions = cached?.transitions;
-    let srcDur = cached?.idle?.duration;
-    if (!transitions || !transitions.length || !srcDur) {
-      const det = await analyzeMotion(videoPath, 2);
-      transitions = det.transitions;
-      srcDur = det.duration;
-    }
+    const { ensureMotionIntel } = await import("./asset-intel.js");
+    const { transitions, duration: srcDur } = await ensureMotionIntel(videoPath);
     if (!transitions.length || !srcDur) {
       console.log(`  Chapter pins: no transitions detected in ${primary.src.split("/").pop()} -- skipping`);
       return none;
     }
 
     const sceneDur = scene.duration_seconds || 0;
-    // Per-boundary diagnostics: guess vs nearest seam, so a quiet result is
-    // explainable from the log alone.
+    // Per-boundary diagnostics: the RAW guess vs nearest seam. The planner
+    // refines these iteratively (each accepted pin re-anchors the map), so a
+    // big raw delta can still end up pinned -- this line shows the starting
+    // point.
     for (const ch of chapters) {
       if (ch.out < 3 || ch.out > sceneDur - 5) continue;
       const guess = mapSourceTime(edit.segments as any, ch.out);
@@ -250,40 +289,28 @@ export async function proposeChapterPins(
         null,
       );
       console.log(
-        `  Chapter pins: "${(ch.label || "").slice(0, 30)}" out=${ch.out.toFixed(1)}s guess=src ${guess.toFixed(1)}s, nearest seam ${nearest === null ? "none" : `${nearest.toFixed(1)}s (Δ${Math.abs(nearest - guess).toFixed(1)}s)`}`,
+        `  Chapter pins: "${(ch.label || "").slice(0, 30)}" out=${ch.out.toFixed(1)}s raw guess=src ${guess.toFixed(1)}s, nearest seam ${nearest === null ? "none" : `${nearest.toFixed(1)}s (Δ${Math.abs(nearest - guess).toFixed(1)}s)`}`,
       );
     }
-    let pins = planChapterPins(chapters, edit.segments, transitions, srcDur, sceneDur);
+
+    const rate_regions = edit.rate_regions || [];
+    const pins = planChapterPins(chapters, rate_regions, transitions, srcDur, sceneDur);
     if (!pins.length) {
       console.log(`  Chapter pins: no confident matches (${transitions.length} seams available) -- leaving unpinned`);
       return none;
     }
+    const solved = solveMediaEdits({ cuts: edit.cuts || [], rate_regions, pins }, srcDur);
+    if (solved.pin_status.some((p) => p.status !== "ok")) return none; // planner guarantees ok; belt-and-suspenders
 
-    const rate_regions = edit.rate_regions || [];
-    let solved = solveMediaEdits({ cuts: edit.cuts || [], rate_regions, pins }, srcDur);
-    // A strained pin means the footage can't reach that moment in time even
-    // at the rate clamps -- drop those pins and re-solve rather than ship
-    // visibly wrong pacing.
-    const strainedOuts = new Set(
-      solved.pin_status.filter((p) => p.status !== "ok").map((p) => p.out),
+    const chapterPinCount = pins.filter((p) => p.word !== "end").length;
+    console.log(
+      `  Chapter pins: pinned ${chapterPinCount}/${chapters.filter((c) => c.out >= 3 && c.out <= sceneDur - 5).length} boundaries: ${pins.filter((p) => p.word !== "end").map((p) => `${p.out.toFixed(0)}s->src ${p.src.toFixed(0)}s`).join(", ")}`,
     );
-    let dropped = 0;
-    if (strainedOuts.size) {
-      dropped = pins.filter((p) => strainedOuts.has(p.out)).length;
-      pins = pins.filter((p) => !strainedOuts.has(p.out));
-      solved = solveMediaEdits({ cuts: edit.cuts || [], rate_regions, pins }, srcDur);
-      if (solved.pin_status.some((p) => p.status !== "ok")) {
-        // Still strained with the survivors: leave the un-pinned solve alone.
-        return { pinned: 0, dropped: pins.length + dropped };
-      }
-    }
-    if (!pins.length) return { pinned: 0, dropped };
-
     edit.pins = pins;
     edit.segments = solved.segments;
     edit.pin_status = solved.pin_status;
     edit.proposed = true;
-    return { pinned: pins.length, dropped, pin_status: solved.pin_status };
+    return { pinned: pins.length, dropped: 0, pin_status: solved.pin_status };
   } catch {
     return none;
   }

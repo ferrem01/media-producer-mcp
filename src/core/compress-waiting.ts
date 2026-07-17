@@ -26,11 +26,23 @@ const H = 36;
 const FPS = 4;
 const FRAME_BYTES = W * H;
 
-/** Decode downscaled gray frames and return one motion score per frame gap. */
+/** Where a frame's change happened: bounding box (grid-cell fractions of the
+ *  frame, 0-1) + how many cells changed. */
+export interface FrameChange {
+  /** Mean absolute pixel difference (the motion score). */
+  score: number;
+  /** Fraction of pixels that changed meaningfully (|diff| > 24). */
+  changedFrac: number;
+  /** Bounding box of changed pixels as frame fractions; null when nothing changed. */
+  box: { x: number; y: number; w: number; h: number } | null;
+}
+
+/** Decode downscaled gray frames; per frame-gap return the motion score AND
+ *  where the change happened (for focus/callout localization). */
 async function motionScores(
   videoPath: string,
   range?: { start: number; end: number },
-): Promise<{ scores: number[]; duration: number }> {
+): Promise<{ scores: number[]; changes: FrameChange[]; duration: number }> {
   const args = [
     ...(range ? ["-ss", String(range.start), "-to", String(range.end)] : []),
     "-i", videoPath,
@@ -46,6 +58,7 @@ async function motionScores(
     let prev: Buffer | null = null;
     let frames = 0;
     const scores: number[] = [];
+    const changes: FrameChange[] = [];
     ff.stdout.on("data", (c: Buffer) => {
       buf = Buffer.concat([buf, c]);
       while (buf.length >= FRAME_BYTES) {
@@ -53,8 +66,27 @@ async function motionScores(
         buf = buf.subarray(FRAME_BYTES);
         if (prev) {
           let sum = 0;
-          for (let p = 0; p < FRAME_BYTES; p++) sum += Math.abs(frame[p] - prev[p]);
+          let minX = W, minY = H, maxX = -1, maxY = -1, changed = 0;
+          for (let p = 0; p < FRAME_BYTES; p++) {
+            const d = Math.abs(frame[p] - prev[p]);
+            sum += d;
+            if (d > 24) {
+              changed++;
+              const x = p % W, y = (p / W) | 0;
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
           scores.push(sum / FRAME_BYTES);
+          changes.push({
+            score: sum / FRAME_BYTES,
+            changedFrac: changed / FRAME_BYTES,
+            box: maxX >= 0
+              ? { x: minX / W, y: minY / H, w: (maxX - minX + 1) / W, h: (maxY - minY + 1) / H }
+              : null,
+          });
         }
         prev = Buffer.from(frame);
         frames++;
@@ -64,7 +96,7 @@ async function motionScores(
     ff.stderr.on("data", (c) => errs.push(c));
     ff.on("error", reject);
     ff.on("close", (code) => {
-      if (code === 0) resolve({ scores, duration: frames / FPS });
+      if (code === 0) resolve({ scores, changes, duration: frames / FPS });
       else reject(new Error(`ffmpeg motion decode failed (${code}): ${Buffer.concat(errs).toString().slice(-300)}`));
     });
   });
@@ -125,10 +157,90 @@ export function transitionsFromScores(scores: number[], fps = FPS): number[] {
   return transitions;
 }
 
+/** A stretch of CONCENTRATED activity: something happened in one small part
+ *  of the frame (typing in a field, clicking a button, a panel updating) --
+ *  the natural target for a callout/punch-in. Box is frame fractions 0-1. */
+export interface FocusEvent {
+  start: number;
+  end: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Localized activity -> focus events. A second is a "focus second" when it
+ *  has real motion whose union bbox stays small (a full-frame repaint or a
+ *  scroll is NOT focus). Consecutive overlapping focus seconds merge.
+ *  Exported for tests. */
+export function focusEventsFromChanges(changes: FrameChange[], fps = FPS): FocusEvent[] {
+  const secCount = Math.ceil(changes.length / fps);
+  const events: FocusEvent[] = [];
+  let cur: (FocusEvent & { n: number }) | null = null;
+
+  const overlaps = (a: FocusEvent, b: FocusEvent) =>
+    a.x < b.x + b.w + 0.08 && b.x < a.x + a.w + 0.08 &&
+    a.y < b.y + b.h + 0.08 && b.y < a.y + a.h + 0.08;
+
+  for (let s = 0; s < secCount; s++) {
+    const chunk = changes.slice(s * fps, (s + 1) * fps);
+    const active = chunk.filter((c) => c.box && c.score >= 0.35);
+    let sec: FocusEvent | null = null;
+    if (active.length) {
+      let minX = 1, minY = 1, maxX = 0, maxY = 0;
+      for (const c of active) {
+        minX = Math.min(minX, c.box!.x);
+        minY = Math.min(minY, c.box!.y);
+        maxX = Math.max(maxX, c.box!.x + c.box!.w);
+        maxY = Math.max(maxY, c.box!.y + c.box!.h);
+      }
+      const w = maxX - minX, h = maxY - minY;
+      // Concentrated: the second's whole activity fits in <= ~28% of the
+      // frame area. A scroll or page change blows well past this.
+      if (w * h <= 0.28 && w > 0.01 && h > 0.01) {
+        sec = { start: s, end: s + 1, x: minX, y: minY, w, h };
+      }
+    }
+    if (sec && cur && overlaps(cur, sec) && sec.start <= cur.end + 1) {
+      // Merge: extend time, widen the union box.
+      const maxX = Math.max(cur.x + cur.w, sec.x + sec.w);
+      const maxY = Math.max(cur.y + cur.h, sec.y + sec.h);
+      cur.x = Math.min(cur.x, sec.x);
+      cur.y = Math.min(cur.y, sec.y);
+      cur.w = maxX - cur.x;
+      cur.h = maxY - cur.y;
+      cur.end = sec.end;
+      cur.n++;
+      // A merged run that grew past the concentration cap stops being focus.
+      if (cur.w * cur.h > 0.35) cur = null;
+    } else {
+      if (cur && cur.end - cur.start >= 2) {
+        events.push({
+          start: cur.start, end: cur.end,
+          x: Math.round(cur.x * 1000) / 1000, y: Math.round(cur.y * 1000) / 1000,
+          w: Math.round(cur.w * 1000) / 1000, h: Math.round(cur.h * 1000) / 1000,
+        });
+      }
+      cur = sec ? { ...sec, n: 1 } : null;
+    }
+  }
+  if (cur && (cur as FocusEvent).end - (cur as FocusEvent).start >= 2) {
+    const c = cur as FocusEvent;
+    events.push({
+      start: c.start, end: c.end,
+      x: Math.round(c.x * 1000) / 1000, y: Math.round(c.y * 1000) / 1000,
+      w: Math.round(c.w * 1000) / 1000, h: Math.round(c.h * 1000) / 1000,
+    });
+  }
+  return events;
+}
+
 export interface MotionAnalysis {
   ranges: IdleRange[];
   /** Source seconds of hard visual transitions (page changes). */
   transitions: number[];
+  /** Concentrated-activity stretches (callout targets), source seconds. */
+  focus: FocusEvent[];
   duration: number;
 }
 
@@ -139,10 +251,10 @@ export async function analyzeMotion(
   minIdleSeconds = 2,
   range?: { start: number; end: number },
 ): Promise<MotionAnalysis> {
-  const { scores, duration } = await motionScores(videoPath, range);
+  const { scores, changes, duration } = await motionScores(videoPath, range);
   const offset = range ? range.start : 0;
   const total = range ? range.end : duration;
-  if (!scores.length) return { ranges: [], transitions: [], duration: total };
+  if (!scores.length) return { ranges: [], transitions: [], focus: [], duration: total };
 
   // Adaptive idle threshold: a fraction of the clip's own busy level, with a
   // floor so a fully-static recording still reads idle and a ceiling so a
@@ -171,14 +283,19 @@ export async function analyzeMotion(
     }
   }
   const transitions = transitionsFromScores(scores).map((t) => Math.round((t + offset) * 10) / 10);
-  // Diagnostics: when pins don't land, this line says whether detection or
-  // snapping was the problem.
+  const focus = focusEventsFromChanges(changes).map((f) => ({
+    ...f,
+    start: Math.round((f.start + offset) * 10) / 10,
+    end: Math.round((f.end + offset) * 10) / 10,
+  }));
+  // Diagnostics: when pins/callouts don't land, this line says whether
+  // detection or matching was the problem.
   const smax = Math.max(...scores);
   const med = sorted[Math.floor(0.5 * (sorted.length - 1))];
   console.log(
-    `  Motion: ${scores.length} samples over ${Math.round(total)}s -- median ${med.toFixed(2)}, p95 ${p95.toFixed(2)}, max ${smax.toFixed(1)} | ${ranges.length} idle range(s), ${transitions.length} transition(s)`,
+    `  Motion: ${scores.length} samples over ${Math.round(total)}s -- median ${med.toFixed(2)}, p95 ${p95.toFixed(2)}, max ${smax.toFixed(1)} | ${ranges.length} idle range(s), ${transitions.length} transition(s), ${focus.length} focus event(s)`,
   );
-  return { ranges, transitions, duration: total };
+  return { ranges, transitions, focus, duration: total };
 }
 
 export async function detectIdleRanges(

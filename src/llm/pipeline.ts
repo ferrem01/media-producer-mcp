@@ -2025,6 +2025,9 @@ async function runUnifiedPipeline(
         narrationSource: prep.screencast.narrationSource,
         dataDir: config.dataDir,
         llmConfig: opts.llmConfig,
+        // The grammar's recipe includes the ducked bed; only an explicit
+        // background_music:false opts out.
+        music: opts.backgroundMusic !== false,
       });
       asm.project.prompt = opts.prompt;
       if (!asm.project.created_at) asm.project.created_at = new Date().toISOString();

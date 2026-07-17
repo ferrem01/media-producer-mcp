@@ -99,6 +99,9 @@ export async function assembleNarratedScreencast(opts: {
   /** Enables the one small chapter-titling call. Captions themselves are
    *  deterministic (whisper on the box) and don't need this. */
   llmConfig?: LLMConfig;
+  /** Soft ducked music bed under the narration (default ON for this grammar;
+   *  pass false to opt out). */
+  music?: boolean;
 }): Promise<NarratedScreencastResult> {
   const { project, screencastSource } = opts;
   const narrationSource = opts.narrationSource;
@@ -130,6 +133,7 @@ export async function assembleNarratedScreencast(opts: {
   // whisper isn't installed or the take transcribes to nothing.
   let spine: SentenceSpine | null = null;
   let pinResult: { pinned: number; dropped: number } | null = null;
+  let calloutCount = 0;
   if (narrationSource && narrationDur > 0.5) {
     const cacheDir = path.join(
       opts.dataDir || process.env.MP_DATA_DIR || "/data/media-producer",
@@ -179,6 +183,37 @@ export async function assembleNarratedScreencast(opts: {
       { dataDir: opts.dataDir },
     );
 
+    // Auto-callouts: when an action-cue sentence ("now click Broadcasts...")
+    // coincides with CONCENTRATED on-screen activity, glow/lift that region.
+    // Mapped through the PINNED media map (so they stay honest after the pin
+    // solve), proposed conservatively, editable as plain component data.
+    try {
+      const { planCallouts } = await import("../core/callout-plan.js");
+      const { ensureMotionIntel } = await import("../core/asset-intel.js");
+      const edit = (screencastScene as any).media_edits?.screencast;
+      const intel = await ensureMotionIntel(resolveVideoPath(screencastSource, opts.dataDir));
+      if (edit?.segments?.length && intel.focus.length) {
+        const callouts = planCallouts(
+          captions, chapterMoments, edit.segments, intel.focus,
+          screencastScene.duration_seconds,
+        );
+        if (callouts.length) {
+          const scfComp = (screencastScene.components as any[]).find((c) => c.type === "screencast-frame");
+          if (scfComp) {
+            scfComp.data = { ...(scfComp.data || {}), callouts };
+            calloutCount = callouts.length;
+            console.log(
+              `  Callouts: ${callouts.length} proposed at ${callouts.map((c) => `${c.at.toFixed(0)}s`).join(", ")}`,
+            );
+          }
+        } else {
+          console.log(`  Callouts: no confident matches (${intel.focus.length} focus events available)`);
+        }
+      }
+    } catch (e: any) {
+      console.warn(`  Callouts: proposal failed (${e?.message || e}) -- skipping`);
+    }
+
     project.spine = {
       sentences: spine.sentences,
       chapters: spine.chapters.map((ch, i) => ({ ...ch, title: titles[i] || ch.title })),
@@ -186,8 +221,39 @@ export async function assembleNarratedScreencast(opts: {
   }
 
   project.scenes = scenes;
+  let musicTitle: string | null = null;
   if (narrationSource) {
     project.audio = { tracks: [{ id: "narration", type: "voiceover", source: narrationSource, volume: 1 }] } as any;
+
+    // Soft music bed under the narration, ducked while the narrator speaks
+    // and swelling in the gaps + bookends. Part of the grammar's known-good
+    // recipe (opt out with music:false); the film still ships if selection
+    // comes up empty.
+    if (opts.music !== false) {
+      try {
+        const { selectMusic } = await import("../audio/music.js");
+        const bed = await selectMusic({
+          mood: "calm",
+          brandKit: project.brand_kit,
+          tenantId: project.tenant_id,
+          minDuration: Math.min(narrationDur, 180),
+        });
+        if (bed) {
+          (project.audio as any).tracks.push({
+            id: "music_bed", type: "music", source: bed.path,
+            volume: 0.22, loop: true, fade_in: 0.8, fade_out: 2.5,
+          });
+          (project.audio as any).ducking = {
+            enabled: true, duck_track: "music_bed", trigger_track: "narration",
+            ducked_volume: 0.35, attack: 0.4, release: 0.9,
+          };
+          musicTitle = bed.title;
+          console.log(`  Music bed: "${bed.title}" by ${bed.artist} (${bed.source}) -- ducked under narration`);
+        }
+      } catch (e: any) {
+        console.warn(`  Music bed: selection failed (${e?.message || e}) -- continuing without`);
+      }
+    }
   }
   project.status = "generated";
   project.updated_at = new Date().toISOString();
@@ -205,6 +271,8 @@ export async function assembleNarratedScreencast(opts: {
         ? `${pinResult.pinned} chapter pin(s) snapped to visual transitions${pinResult.dropped ? ` (${pinResult.dropped} dropped as strained)` : ""}`
         : `no chapter pins (no confident visual seams${pinResult.dropped ? `; ${pinResult.dropped} strained` : ""})`
       : null,
+    calloutCount ? `${calloutCount} auto-callout(s)` : null,
+    musicTitle ? `music bed "${musicTitle}" ducked under narration` : null,
   ].filter(Boolean);
   const summary = `Narrated screencast assembled: ${parts.join(" | ")}${narrationDur > 0.5 ? ` | narration ${Math.round(narrationDur)}s` : " | no narration track"}.`;
 
