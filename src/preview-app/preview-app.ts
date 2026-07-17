@@ -4532,6 +4532,20 @@ export function getPreviewHtml(): string {
       studioStatus('Load the preview first, then start the take', 'err');
       return;
     }
+    // Mic access only exists in secure contexts (https / localhost). Studio
+    // on a bare-IP http origin has NO navigator.mediaDevices at all -- guard
+    // with instructions instead of a TypeError banner.
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      boothCard(
+        '<h3>&#127908; Narration booth</h3>' +
+        '<p>The browser blocks microphone access on plain-HTTP pages. To record here, tell Chrome to treat this origin as secure:</p>' +
+        '<p style="font-family:monospace;font-size:11px;user-select:all;background:#f3f4f6;border-radius:6px;padding:6px 8px;">chrome://flags/#unsafely-treat-insecure-origin-as-secure</p>' +
+        '<p>Add <span style="font-family:monospace;font-size:11px;user-select:all;">' + escHtml(location.origin) + '</span>, set it to Enabled, relaunch Chrome, and start the take again. (Long-term fix: serve Studio over HTTPS.)</p>' +
+        '<div class="booth-row"><button class="btn btn-secondary" id="booth-cancel">Close</button></div>'
+      );
+      document.getElementById('booth-cancel').addEventListener('click', boothClose);
+      return;
+    }
     var ready = booth.stream
       ? Promise.resolve(booth.stream)
       : navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
