@@ -200,8 +200,10 @@ export async function assembleNarratedScreencast(opts: {
       : `screencast (no compressible idle found)`,
     outro ? `outro ${Math.round(outroDur)}s` : null,
     spine ? `spine ${spine.sentences.length} sentences / ${spine.chapters.length} chapters` : `no spine (whisper unavailable)`,
-    pinResult && pinResult.pinned
-      ? `${pinResult.pinned} chapter pin(s) snapped to visual transitions${pinResult.dropped ? ` (${pinResult.dropped} dropped as strained)` : ""}`
+    pinResult
+      ? pinResult.pinned
+        ? `${pinResult.pinned} chapter pin(s) snapped to visual transitions${pinResult.dropped ? ` (${pinResult.dropped} dropped as strained)` : ""}`
+        : `no chapter pins (no confident visual seams${pinResult.dropped ? `; ${pinResult.dropped} strained` : ""})`
       : null,
   ].filter(Boolean);
   const summary = `Narrated screencast assembled: ${parts.join(" | ")}${narrationDur > 0.5 ? ` | narration ${Math.round(narrationDur)}s` : " | no narration track"}.`;

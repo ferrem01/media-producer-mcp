@@ -73,32 +73,52 @@ async function motionScores(
 /** Isolated high-motion spikes in a frame-diff score series = hard visual
  *  transitions (page navigations, screen switches). Sustained high motion
  *  (scrolling, streaming text, animation) is NOT a transition: only short
- *  bursts count, and nearby bursts collapse into one. Exported for tests. */
+ *  bursts count, and nearby bursts collapse into one.
+ *
+ *  Detection is LOCAL-contrast, not a global percentile: an SPA page change
+ *  keeps nav bars and chrome in place, so its score is modest in absolute
+ *  terms -- what marks it is being several times its own neighborhood's
+ *  baseline. A global threshold tuned on a scroll-heavy clip misses every
+ *  real navigation (measured on the newsletter walkthrough). Exported for
+ *  tests. */
 export function transitionsFromScores(scores: number[], fps = FPS): number[] {
-  if (scores.length < fps) return [];
-  const sorted = scores.slice().sort((a, b) => a - b);
-  const p95 = sorted[Math.floor(0.95 * (sorted.length - 1))];
-  const median = sorted[Math.floor(0.5 * (sorted.length - 1))];
-  // A page change repaints most of the frame: score far above both the
-  // clip's busy level and an absolute floor no typing/cursor activity hits.
-  const T = Math.max(10, p95 * 1.25, median * 6);
+  if (scores.length < fps * 2) return [];
+  const HALF = 8 * fps; // +/-8s neighborhood
+
+  const spike: boolean[] = new Array(scores.length).fill(false);
+  for (let i = 0; i < scores.length; i++) {
+    const s = scores[i];
+    if (s < 4) continue; // below any real repaint, skip the sort
+    const from = Math.max(0, i - HALF);
+    const to = Math.min(scores.length, i + HALF);
+    const hood: number[] = [];
+    for (let j = from; j < to; j++) {
+      if (Math.abs(j - i) > fps) hood.push(scores[j]); // exclude the burst itself
+    }
+    if (hood.length < fps) continue;
+    hood.sort((a, b) => a - b);
+    const base = hood[Math.floor(hood.length / 2)];
+    // 4x its own surroundings, with a floor so noise on a quiet clip
+    // (base ~0) still needs a real repaint to count.
+    spike[i] = s >= Math.max(6, base * 4);
+  }
 
   const transitions: number[] = [];
-  let run: { start: number; peak: number } | null = null;
+  let runStart = -1;
   const flush = (endIdx: number) => {
-    if (!run) return;
-    const lenSec = (endIdx - run.start) / fps;
+    if (runStart < 0) return;
+    const lenSec = (endIdx - runStart) / fps;
     // Bursts longer than ~1.2s are scroll/animation, not a cut.
     if (lenSec <= 1.2) {
-      const at = run.start / fps;
+      const at = runStart / fps;
       const last = transitions[transitions.length - 1];
       // Collapse transitions closer than 3s (multi-step navigations).
       if (last === undefined || at - last >= 3) transitions.push(Math.round(at * 10) / 10);
     }
-    run = null;
+    runStart = -1;
   };
   for (let i = 0; i < scores.length; i++) {
-    if (scores[i] >= T) { if (!run) run = { start: i, peak: scores[i] }; }
+    if (spike[i]) { if (runStart < 0) runStart = i; }
     else flush(i);
   }
   flush(scores.length);
@@ -151,6 +171,13 @@ export async function analyzeMotion(
     }
   }
   const transitions = transitionsFromScores(scores).map((t) => Math.round((t + offset) * 10) / 10);
+  // Diagnostics: when pins don't land, this line says whether detection or
+  // snapping was the problem.
+  const smax = Math.max(...scores);
+  const med = sorted[Math.floor(0.5 * (sorted.length - 1))];
+  console.log(
+    `  Motion: ${scores.length} samples over ${Math.round(total)}s -- median ${med.toFixed(2)}, p95 ${p95.toFixed(2)}, max ${smax.toFixed(1)} | ${ranges.length} idle range(s), ${transitions.length} transition(s)`,
+  );
   return { ranges, transitions, duration: total };
 }
 
