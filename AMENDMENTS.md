@@ -6,6 +6,38 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-17 — Auto-callouts PARKED (feature off by default)
+
+After six iterations in one day, auto-callouts still shipped boxes that miss
+on real footage — set aside deliberately rather than polished forever. The
+machinery is intact (`vision-grounding.ts` groundCallouts, `callout-plan.ts`,
+focus events, tests) behind **`MP_AUTO_CALLOUTS=1`**; the assemble path skips
+it by default. Manual callouts via screencast-frame `data.callouts` still
+work and render beautifully — the RENDERER was never the problem.
+
+**What we learned (start here on the retry):**
+1. Claude models answer bounding boxes in PIXELS of the shown image no matter
+   how the prompt demands percentages (computer-use training). Ask in pixels,
+   convert. This part is solved.
+2. Rendering/geometry is pixel-exact (verified with the layout probe): ring,
+   zoom-clone crop, source→screen mapping all correct. Never re-debug those.
+3. The hard problem is TIME × SEMANTICS: cues land at content-change moments;
+   through a ~3-4x timelapse, fractions of a second of output cross content
+   seams; and the narrator references things that aren't on screen yet
+   ("it will draft the template" = future tense). Frame-sampling strategies
+   (start/end verification, shift-late) reduced but did not eliminate misses.
+4. Verification passes don't converge: the verifier judges a static frame,
+   the viewer judges motion. Whatever ships next must be validated against
+   the RENDERED WINDOW (e.g. a filmstrip of 3-4 frames judged together), or
+   anchor callouts to UI elements tracked across frames, not to boxes.
+
+**Promising directions for the retry:** filmstrip verification (one call, all
+window frames); anchoring on idle stretches only (static by definition);
+element-level tracking; or making callouts a Studio-first manual feature with
+vision as a suggestion UI (human confirms before it ships).
+
+---
+
 ## 2026-07-17 — Vision grounding: pins and callouts get eyes
 
 Motion analysis sees THAT pixels changed, never WHAT they are — the root
