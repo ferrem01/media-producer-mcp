@@ -18,6 +18,16 @@ Palmier: edit the timeline). Our moat is **"on-brand, correct video from a promp
 
 ## Top 3 (do next)
 
+### 0. The Quotient Recorder — Chrome extension + instrumented capture  *(specced: `SPEC-recorder.md`)*
+Record → Stop → link to a finished film. The extension captures the tab PLUS an
+events sidecar (clicks with element boxes, navigations, idle spans) — ground truth
+that replaces every heuristic the speaker-screencast grammar reverse-engineers from
+pixels, and un-parks auto-callouts as a deterministic lookup. Flagship mode:
+"narrate against the compressed cut" (picture lock, then VO) — kills the
+separate-voice/condensed-video sync problem class entirely. MVP order in the spec:
+foundation (record+sidecar+upload+auto-generate) → Mode B booth → Mode A live.
+
+
 ### 1. `website-to-video` one-shot  *(from HyperFrames — highest leverage, lowest effort)*
 One tool/skill: a **URL in → an on-brand rendered launch video out**. We already
 have every piece (`extract_brand_from_website` → `generate` → `render`); this is
