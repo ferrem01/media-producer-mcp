@@ -456,6 +456,12 @@ const motionIntelInflight = new Map<string, Promise<{
   duration: number;
 }>>();
 
+/** Drop the in-process motion-intel memo for a path (e.g. when a recorder
+ *  events sidecar lands after the intel was first computed). */
+export function invalidateMotionIntel(filePath: string): void {
+  motionIntelInflight.delete(filePath);
+}
+
 /** Motion intel for an asset -- idle ranges, transitions, focus events --
  *  loaded from the sidecar when present, computed ONCE and written back when
  *  the sidecar predates a signal (so older uploads upgrade in place and the
@@ -483,6 +489,27 @@ async function ensureMotionIntelUncached(filePath: string): Promise<{
   duration: number;
 }> {
   const cached = await loadAssetIntel(filePath).catch(() => null);
+  // Recorder-instrumented footage: the events sidecar is GROUND TRUTH
+  // (SPEC-recorder.md) -- idle spans, page navigations, clicked-element
+  // boxes recorded by the browser itself. Prefer it over every pixel
+  // heuristic and skip the decode entirely.
+  try {
+    const { loadRecorderEvents, eventsToMotionIntel } = await import("./recorder-events.js");
+    const events = await loadRecorderEvents(filePath);
+    if (events) {
+      const dur = cached?.duration || cached?.idle?.duration ||
+        (await probeVideoMeta(filePath))?.duration || 0;
+      const truth = eventsToMotionIntel(events, dur);
+      if (cached) {
+        cached.idle = truth.idle;
+        cached.transitions = truth.transitions;
+        cached.focus = truth.focus;
+        cached.motion_v = MOTION_INTEL_V;
+        await fs.writeFile(sidecarPath(filePath), JSON.stringify(cached, null, 2)).catch(() => {});
+      }
+      return { idle: truth.idle, transitions: truth.transitions, focus: truth.focus, duration: truth.idle.duration };
+    }
+  } catch { /* fall through to heuristics */ }
   if (cached?.idle && cached.transitions !== undefined && cached.focus !== undefined && cached.motion_v === MOTION_INTEL_V) {
     return {
       idle: cached.idle,
