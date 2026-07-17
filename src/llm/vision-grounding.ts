@@ -48,8 +48,13 @@ function visionConfig(llmConfig: LLMConfig, task: "match" | "bbox"): LLMConfig {
     : { ...llmConfig };
 }
 
-/** Extract one downscaled JPEG still and return it as a data URL. */
-async function stillDataUrl(videoPath: string, at: number, tmpDir: string): Promise<string | null> {
+/** Extract one downscaled JPEG still; returns the file path + data URL.
+ *  Caller's tmpDir is removed wholesale, so no per-file cleanup here. */
+async function extractStill(
+  videoPath: string,
+  at: number,
+  tmpDir: string,
+): Promise<{ path: string; url: string } | null> {
   const out = path.join(tmpDir, `vg_${Math.round(at * 10)}_${crypto.randomBytes(3).toString("hex")}.jpg`);
   try {
     await execFileAsync("ffmpeg", [
@@ -57,11 +62,34 @@ async function stillDataUrl(videoPath: string, at: number, tmpDir: string): Prom
       "-frames:v", "1", "-vf", "scale=1024:-2", "-q:v", "6", "-y", out,
     ], { timeout: 30_000 });
     const buf = await fs.readFile(out);
+    return { path: out, url: `data:image/jpeg;base64,${buf.toString("base64")}` };
+  } catch {
+    return null;
+  }
+}
+
+async function stillDataUrl(videoPath: string, at: number, tmpDir: string): Promise<string | null> {
+  const still = await extractStill(videoPath, at, tmpDir);
+  return still?.url ?? null;
+}
+
+/** Draw a red rectangle (pixel coords) on a still; returns the data URL. */
+async function drawBoxDataUrl(
+  stillPath: string,
+  box: { x: number; y: number; w: number; h: number },
+  tmpDir: string,
+): Promise<string | null> {
+  const out = path.join(tmpDir, `vgbox_${crypto.randomBytes(3).toString("hex")}.jpg`);
+  try {
+    await execFileAsync("ffmpeg", [
+      "-i", stillPath,
+      "-vf", `drawbox=x=${Math.round(box.x)}:y=${Math.round(box.y)}:w=${Math.round(box.w)}:h=${Math.round(box.h)}:color=red:t=5`,
+      "-q:v", "6", "-y", out,
+    ], { timeout: 15_000 });
+    const buf = await fs.readFile(out);
     return `data:image/jpeg;base64,${buf.toString("base64")}`;
   } catch {
     return null;
-  } finally {
-    await fs.unlink(out).catch(() => {});
   }
 }
 
@@ -205,10 +233,26 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
       if (prev && at - prev.at < minSpacing) continue;
 
       const srcT = mapSourceTime(opts.segments, at + 0.5);
-      const url = await stillDataUrl(opts.videoPath, srcT, tmpDir);
-      if (!url) continue;
+      const still = await extractStill(opts.videoPath, srcT, tmpDir);
+      if (!still) continue;
+
+      // Accept a numeric box in either dialect; return PIXELS or null.
+      const toPixelBox = (ans: any): { x: number; y: number; w: number; h: number } | null => {
+        const nums = [ans?.x, ans?.y, ans?.w, ans?.h];
+        if (!nums.every((v: any) => typeof v === "number" && v >= 0)) return null;
+        if (nums.every((v: number) => v <= 100) && ans.x + ans.w <= 104 && ans.y + ans.h <= 104) {
+          if (ans.w < 2 || ans.h < 1.5) return null;
+          return { x: (ans.x / 100) * imgW, y: (ans.y / 100) * imgH, w: (ans.w / 100) * imgW, h: (ans.h / 100) * imgH };
+        }
+        if (ans.x < imgW && ans.y < imgH && ans.x + ans.w <= imgW * 1.04 && ans.y + ans.h <= imgH * 1.04) {
+          if (ans.w < imgW * 0.02 || ans.h < imgH * 0.015) return null;
+          return { x: ans.x, y: ans.y, w: ans.w, h: ans.h };
+        }
+        return null;
+      };
 
       try {
+        // ── Propose ──
         const raw = await callLLM(cfg, [{
           role: "user",
           content: [
@@ -226,44 +270,76 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
               `If nothing specific is clearly identifiable, reply {"found": false}. ` +
               `Prefer {"found": false} over guessing.`,
             ),
-            img(url),
+            img(still.url),
           ],
         }], { maxTokens: 500, temperature: 0 });
         const ans = parseLlmJson(raw, "callout-grounding");
-        const nums = [ans?.x, ans?.y, ans?.w, ans?.h];
-        const numeric = nums.every((v: any) => typeof v === "number" && v >= 0);
-        let px = 0, py = 0, pw = 0, ph = 0, valid = false;
-        if (ans?.found === true && numeric) {
-          if (nums.every((v: number) => v <= 100) && ans.x + ans.w <= 104 && ans.y + ans.h <= 104) {
-            // Some answers still come back as percentages -- accept both dialects.
-            px = ans.x; py = ans.y; pw = ans.w; ph = ans.h;
-            valid = pw >= 2 && ph >= 1.5;
-          } else if (ans.x < imgW && ans.y < imgH && ans.x + ans.w <= imgW * 1.04 && ans.y + ans.h <= imgH * 1.04) {
-            px = (ans.x / imgW) * 100; py = (ans.y / imgH) * 100;
-            pw = (ans.w / imgW) * 100; ph = (ans.h / imgH) * 100;
-            valid = pw >= 2 && ph >= 1.5;
-          }
-        }
-        if (ans?.found === true && !valid) {
-          console.warn(`  Vision callouts: rejected malformed box at ${at.toFixed(0)}s -- raw: ${String(raw).slice(0, 160)}`);
-        } else if (ans?.found !== true) {
+        if (ans?.found !== true) {
           console.log(`  Vision callouts: ${at.toFixed(0)}s -> not found -- raw: ${String(raw).slice(0, 140).replace(/\n/g, " ")}`);
+          continue;
         }
-        if (valid) {
-          const x = Math.min(92, Math.max(0, px));
-          const y = Math.min(92, Math.max(0, py));
-          const w = Math.min(60, Math.max(8, pw), 100 - x);
-          const h = Math.min(55, Math.max(6, ph), 100 - y);
-          out.push({
-            at: Math.round(at * 100) / 100,
-            dur: Math.round(Math.min(6, Math.max(3.5, cue.end - cue.start)) * 10) / 10,
-            x: Math.round(x * 10) / 10,
-            y: Math.round(y * 10) / 10,
-            w: Math.round(w * 10) / 10,
-            h: Math.round(h * 10) / 10,
-          });
-          console.log(`  Vision callouts: ${at.toFixed(0)}s "${cue.text.slice(0, 40)}..." -> box ${x.toFixed(0)},${y.toFixed(0)} ${w.toFixed(0)}x${h.toFixed(0)}%`);
+        let box = toPixelBox(ans);
+        if (!box) {
+          console.warn(`  Vision callouts: rejected malformed box at ${at.toFixed(0)}s -- raw: ${String(raw).slice(0, 160)}`);
+          continue;
         }
+
+        // ── Verify (aim check): draw the box, ask if it actually covers the
+        // element; one correction round allowed, then drop. This catches
+        // every coordinate-mismatch source at once (aspect math, rotation
+        // metadata, plain bad aim), because it judges the VISUAL result --
+        // the same picture the viewer would see. ──
+        let verified = false;
+        for (let round = 0; round < 2 && !verified; round++) {
+          const boxedUrl = await drawBoxDataUrl(still.path, box, tmpDir);
+          if (!boxedUrl) { verified = true; break; } // drawing infra failed, not the box -- ship unverified
+          const vraw = await callLLM(cfg, [{
+            role: "user",
+            content: [
+              txt(
+                `The red rectangle on this ${imgW}x${imgH} image is a proposed highlight ` +
+                `for what the narrator says: "${cue.text.slice(0, 240)}"\n\n` +
+                `Does the red rectangle correctly cover the COMPLETE container of the ` +
+                `referenced element? Reply with ONLY JSON:\n` +
+                `{"ok": true} if it does;\n` +
+                `{"ok": false, "x": <left px>, "y": <top px>, "w": <width px>, "h": <height px>} ` +
+                `with a corrected box in pixels of this image if it misses or is badly sized;\n` +
+                `{"ok": false} if the referenced element isn't actually visible.`,
+              ),
+              img(boxedUrl),
+            ],
+          }], { maxTokens: 500, temperature: 0 });
+          const vans = parseLlmJson(vraw, "callout-verify");
+          if (vans?.ok === true) { verified = true; break; }
+          const corrected = toPixelBox(vans);
+          if (!corrected) {
+            console.log(`  Vision callouts: ${at.toFixed(0)}s -> verify says miss, no usable correction -- dropped`);
+            box = null as any;
+            break;
+          }
+          box = corrected; // second round verifies the correction
+        }
+        if (!box) continue;
+        if (!verified) {
+          console.log(`  Vision callouts: ${at.toFixed(0)}s -> correction did not verify -- dropped`);
+          continue;
+        }
+
+        const px = (box.x / imgW) * 100, py = (box.y / imgH) * 100;
+        const pw = (box.w / imgW) * 100, ph = (box.h / imgH) * 100;
+        const x = Math.min(92, Math.max(0, px));
+        const y = Math.min(92, Math.max(0, py));
+        const w = Math.min(60, Math.max(8, pw), 100 - x);
+        const h = Math.min(55, Math.max(6, ph), 100 - y);
+        out.push({
+          at: Math.round(at * 100) / 100,
+          dur: Math.round(Math.min(6, Math.max(3.5, cue.end - cue.start)) * 10) / 10,
+          x: Math.round(x * 10) / 10,
+          y: Math.round(y * 10) / 10,
+          w: Math.round(w * 10) / 10,
+          h: Math.round(h * 10) / 10,
+        });
+        console.log(`  Vision callouts: ${at.toFixed(0)}s "${cue.text.slice(0, 40)}..." -> verified box ${x.toFixed(0)},${y.toFixed(0)} ${w.toFixed(0)}x${h.toFixed(0)}%`);
       } catch (e: any) {
         console.warn(`  Vision callouts: call failed at ${at.toFixed(0)}s (${e?.message || e})`);
       }
