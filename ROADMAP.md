@@ -77,6 +77,12 @@ revise = element vs scene).
    approval gate (we already have the preview + plan editing).
 6. **Export the composition as editable, standalone HTML the user owns** (HyperFrames'
    "code you own" model) — bridges the ownership/transparency gap for power users.
+7. **Auto-callouts retry** (parked 2026-07-17 behind `MP_AUTO_CALLOUTS=1`) — vision-grounded
+   region callouts on narrated screencasts. Renderer + pixel-dialect conversion are solved;
+   the open problem is time × semantics (cues land on content seams; narrator references
+   future-tense UI). See the AMENDMENTS parking entry for the four learnings + promising
+   directions (filmstrip verification, idle-stretch anchoring, element tracking, or
+   Studio-first suggestion UI with human confirm).
 
 ---
 

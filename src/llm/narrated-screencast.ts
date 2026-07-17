@@ -247,12 +247,13 @@ export async function assembleNarratedScreencast(opts: {
     }
     chapterPinCount = Math.max(0, ((edit?.pins || []) as Array<{ word?: string }>).filter((p) => p.word !== "end").length);
 
-    // Auto-callouts. With an LLM: vision grounding -- the narrator names the
-    // element ("now click Broadcasts..."), the model finds it in the frame at
-    // that moment; nothing clearly referenced -> no callout. Without an LLM:
-    // the motion-only heuristic (concentrated-activity regions). Either way
-    // the result is plain component data, editable in Studio.
-    try {
+    // Auto-callouts -- PARKED (2026-07-17, see AMENDMENTS). Six iterations of
+    // vision grounding (pixel dialect, draw-and-verify, window sampling,
+    // stability checks) still shipped boxes that miss on real footage; a
+    // wrong callout damages a walkthrough more than no callout. The full
+    // machinery stays (vision-grounding.ts, callout-plan.ts, tests) behind
+    // MP_AUTO_CALLOUTS=1 for future work.
+    if (process.env.MP_AUTO_CALLOUTS === "1") try {
       const { planCallouts, isActionCue } = await import("../core/callout-plan.js");
       const { ensureMotionIntel } = await import("../core/asset-intel.js");
       if (edit?.segments?.length) {
