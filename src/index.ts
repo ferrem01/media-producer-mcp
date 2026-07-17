@@ -1622,6 +1622,97 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // ── API: Recorder events sidecar (SPEC-recorder.md) ──
+      // POST /api/recorder-events/{tenant}/{project}?name=<assetFile>
+      // Ground truth from the Quotient Recorder extension: clicks (with
+      // element boxes), navigations, idle spans. Stored next to the asset and
+      // immediately converted into motion intel, replacing pixel heuristics.
+      const recEventsMatch = urlPath.match(/^\/api\/recorder-events\/([^/]+)\/([^/]+)$/);
+      if (recEventsMatch && method === "POST") {
+        const [, reTenant, reProject] = recEventsMatch.map(decodeURIComponent);
+        const reName = path.basename(new URL(url, "http://localhost").searchParams.get("name") || "");
+        if (!reName) { jsonResponse(res, 400, { error: "name query param required" }); return; }
+        const videoPath = path.join(config.dataDir, reTenant, "projects", reProject, "assets", reName);
+        try {
+          await fs.access(videoPath);
+        } catch {
+          jsonResponse(res, 404, { error: `asset not found: ${reName} (upload the video first)` });
+          return;
+        }
+        try {
+          const body = await parseBody(req);
+          const { saveRecorderEvents, loadRecorderEvents } = await import("./core/recorder-events.js");
+          if (body?.version !== 1 || !body?.recording) {
+            jsonResponse(res, 400, { error: "invalid events sidecar (need version:1 + recording)" });
+            return;
+          }
+          await saveRecorderEvents(videoPath, body as any);
+          const saved = await loadRecorderEvents(videoPath);
+          // Convert to motion intel now (and drop any stale memo) so
+          // compression/pins built from this asset use recorder truth.
+          const { ensureMotionIntel, invalidateMotionIntel } = await import("./core/asset-intel.js");
+          invalidateMotionIntel(videoPath);
+          const intel = await ensureMotionIntel(videoPath);
+          console.log(
+            `  recorder-events: ${reName} -- ${saved?.clicks?.length || 0} clicks, ${saved?.navigations?.length || 0} navigations, ` +
+            `${intel.idle?.ranges.length || 0} idle range(s), ${intel.transitions.length} transition(s), ${intel.focus.length} focus event(s)`,
+          );
+          jsonResponse(res, 200, {
+            ok: true,
+            applied: {
+              idle_ranges: intel.idle?.ranges.length || 0,
+              transitions: intel.transitions.length,
+              focus_events: intel.focus.length,
+            },
+          });
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
+      // ── API: Recorder-triggered generate ──
+      // POST /api/recorder-generate/{tenant}  { video_url, narration_url?, prompt? }
+      // Fire-and-forget: kicks the speaker-screencast assemble and returns
+      // immediately; the extension points the user at Studio for the result.
+      const recGenMatch = urlPath.match(/^\/api\/recorder-generate\/([^/]+)$/);
+      if (recGenMatch && method === "POST") {
+        const [, rgTenant] = recGenMatch.map(decodeURIComponent);
+        try {
+          const body = await parseBody(req);
+          const videoUrl = body?.video_url as string;
+          if (!videoUrl) { jsonResponse(res, 400, { error: "video_url required" }); return; }
+          const { runGeneratePipeline } = await import("./llm/pipeline.js");
+          const { llmConfigFromEnv } = await import("./llm/client.js");
+          const { loadBrandKit } = await import("./persistence/brand-kit.js");
+          let llmConfig;
+          try { llmConfig = llmConfigFromEnv(); } catch (e: any) {
+            jsonResponse(res, 500, { error: `LLM not configured: ${e.message}` });
+            return;
+          }
+          const brandKit = await loadBrandKit(rgTenant);
+          const prompt = (body?.prompt as string) || "Recorded walkthrough";
+          // Async on purpose: assembly takes minutes (whisper on first run).
+          void runGeneratePipeline({
+            prompt,
+            target: "video",
+            tenant_id: rgTenant,
+            llmConfig,
+            brandKit: (brandKit || {}) as any,
+            canvas: { width: 1920, height: 1080, preset: "landscape", fps: 30, background: "#0f172a" } as any,
+            film_grammar: "speaker-screencast",
+            screencast_source: videoUrl,
+            speaker_source: (body?.narration_url as string) || undefined,
+          } as any)
+            .then((r: any) => console.log(`  recorder-generate: done -> ${r?.project?.project_id || "?"} ("${prompt}")`))
+            .catch((e: any) => console.error(`  recorder-generate: FAILED (${e?.message || e})`));
+          jsonResponse(res, 202, { ok: true, started: true, note: "Assembling; the project will appear in Studio when done." });
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       // ── API: Studio session logs ──
       // POST /api/studio-log/{tenant}?session=sid  -- the Studio client ships
       // its console ring buffer here every few seconds, so a remote debugger

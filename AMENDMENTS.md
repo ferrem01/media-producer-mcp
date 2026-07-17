@@ -6,6 +6,32 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-17 — Quotient Recorder foundation (SPEC-recorder.md, MVP step 1)
+
+Record → Stop → the film assembles itself. First slice of the recorder:
+
+- **`recorder-extension/`** — MV3 Chrome extension, no build step. Popup
+  (server/tenant/token config + record/stop), background orchestrator
+  (tabCapture stream id, event collection on the recording clock, idle
+  derivation from activity marks), offscreen doc (MediaRecorder WebM/VP9 +
+  uploads directly: video → events sidecar → trigger generate), content
+  script (clicks with element boxes + accessible names, SPA navigations via
+  history hooks, DOM-mutation activity pings, ⌘/Ctrl+Shift+N chapter marks).
+- **`src/core/recorder-events.ts`** — sidecar types + `eventsToMotionIntel`
+  (pure, tested): idle ranges ← mutationsIdle, transitions ← navigations,
+  focus ← clicked-element boxes as viewport fractions (devicePixelRatio-safe).
+- **`ensureMotionIntel` prefers the sidecar** over every pixel heuristic and
+  skips the decode entirely — compression + chapter pins upgrade to ground
+  truth with zero changes elsewhere. Heuristics remain the Mode-C fallback.
+- **Routes**: `POST /api/recorder-events/{tenant}/{project}?name=` (store
+  sidecar + convert to intel immediately), `POST /api/recorder-generate/
+  {tenant}` (fire-and-forget speaker-screencast assemble).
+
+Next slices per spec: Mode B booth (narrate against the compressed cut),
+then Mode A (live mic + idle∩silence compression + teleprompter).
+
+---
+
 ## 2026-07-17 — Auto-callouts PARKED (feature off by default)
 
 After six iterations in one day, auto-callouts still shipped boxes that miss

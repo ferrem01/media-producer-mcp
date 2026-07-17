@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font: 13px/1.45 -apple-system, "Segoe UI", sans-serif; width: 300px; margin: 0; padding: 14px; color: #17171c; }
+      h1 { font-size: 14px; margin: 0 0 10px; }
+      label { display: block; font-size: 11px; color: #6b7280; margin: 8px 0 2px; }
+      input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; }
+      #record { width: 100%; margin-top: 14px; padding: 10px; border: 0; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: #393bf5; color: #fff; }
+      #record.recording { background: #dc2626; }
+      #status { margin-top: 8px; font-size: 11px; color: #6b7280; min-height: 14px; }
+      .hint { font-size: 10px; color: #9ca3af; margin-top: 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>Quotient Recorder</h1>
+    <label>Server</label><input id="server" placeholder="http://159.203.115.164:3200" />
+    <label>Tenant</label><input id="tenant" placeholder="marc-getquotient-ai" />
+    <label>Token</label><input id="token" type="password" placeholder="token" />
+    <label>Library project</label><input id="project" placeholder="library" />
+    <button id="record">● Record this tab</button>
+    <div id="status"></div>
+    <div class="hint">While recording: ⌘/Ctrl+Shift+N marks a chapter. Stop from this popup; the film assembles automatically and appears in Studio.</div>
+    <script src="popup.js"></script>
+  </body>
+</html>
