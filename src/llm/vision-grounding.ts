@@ -36,9 +36,16 @@ import type { PlannedCallout, CalloutCaption } from "../core/callout-plan.js";
 
 const execFileAsync = promisify(execFile);
 
-/** Small vision calls only need a small model; override with MP_VISION_MODEL. */
-function visionConfig(llmConfig: LLMConfig): LLMConfig {
-  return { ...llmConfig, model: process.env.MP_VISION_MODEL || "claude-haiku-4-5-20251001" };
+/** Vision model selection. Screen MATCHING (pins: "which screenshot is it")
+ *  is easy -- a small model handles it. Bounding-box ESTIMATION (callouts)
+ *  is not: haiku persistently answered in pixels regardless of prompt, so
+ *  callouts use the session's main model. Override both with MP_VISION_MODEL. */
+function visionConfig(llmConfig: LLMConfig, task: "match" | "bbox"): LLMConfig {
+  const override = process.env.MP_VISION_MODEL;
+  if (override) return { ...llmConfig, model: override };
+  return task === "match"
+    ? { ...llmConfig, model: "claude-haiku-4-5-20251001" }
+    : { ...llmConfig };
 }
 
 /** Extract one downscaled JPEG still and return it as a data URL. */
@@ -84,7 +91,7 @@ export interface GroundPinsOpts {
  */
 export async function groundChapterPins(opts: GroundPinsOpts): Promise<MediaPin[]> {
   const window = opts.window ?? 30;
-  const cfg = visionConfig(opts.llmConfig);
+  const cfg = visionConfig(opts.llmConfig, "match");
   const tmpDir = path.join(os.tmpdir(), `mp_vg_${crypto.randomBytes(4).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true });
   const pins: MediaPin[] = [];
@@ -172,7 +179,7 @@ export interface GroundCalloutsOpts {
 export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedCallout[]> {
   const maxCallouts = opts.maxCallouts ?? 6;
   const minSpacing = opts.minSpacing ?? 18;
-  const cfg = visionConfig(opts.llmConfig);
+  const cfg = visionConfig(opts.llmConfig, "bbox");
   const tmpDir = path.join(os.tmpdir(), `mp_vg_${crypto.randomBytes(4).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true });
   const out: PlannedCallout[] = [];
@@ -217,6 +224,9 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
         // Pixel-looking answers (anything past 100) are REJECTED, not clamped:
         // clamping flattened them all into an identical bottom-right sliver.
         const validPct = nums.every((v: any) => typeof v === "number" && v >= 0 && v <= 100);
+        if (ans?.found === true && !(validPct && ans.w >= 2 && ans.h >= 1.5)) {
+          console.warn(`  Vision callouts: rejected malformed box at ${at.toFixed(0)}s -- raw: ${String(raw).slice(0, 160)}`);
+        }
         if (ans?.found === true && validPct && ans.w >= 2 && ans.h >= 1.5 && ans.x + ans.w <= 104 && ans.y + ans.h <= 104) {
           const x = Math.min(92, Math.max(0, ans.x));
           const y = Math.min(92, Math.max(0, ans.y));
