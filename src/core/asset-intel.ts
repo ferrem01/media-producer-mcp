@@ -57,6 +57,9 @@ export interface AssetIntel {
   /** Hard visual transitions (page changes) in source seconds -- snap points
    *  for chapter pins. Cached at ingest from the same motion profile. */
   transitions?: number[];
+  /** Concentrated-activity stretches (typing in a field, clicking a button):
+   *  callout/punch-in targets. Source seconds; box in frame fractions. */
+  focus?: Array<{ start: number; end: number; x: number; y: number; w: number; h: number }>;
   analyzed_at: string;
 }
 
@@ -410,12 +413,15 @@ export async function analyzeAndSaveIntel(filePath: string): Promise<AssetIntel 
     try {
       const { analyzeMotion } = await import("./compress-waiting.js");
       const det = await analyzeMotion(filePath, 2);
+      intel.idle = { ranges: det.ranges.map((r) => ({ start: r.start, end: r.end })), duration: det.duration };
       if (det.ranges.length) {
-        intel.idle = { ranges: det.ranges.map((r) => ({ start: r.start, end: r.end })), duration: det.duration };
         intel.notes.push(`compress-the-waiting: ${det.ranges.length} idle stretch(es) totalling ${Math.round(det.ranges.reduce((t, r) => t + (r.end - r.start), 0))}s (cached).`);
       }
+      // Always set (even empty) so ensureMotionIntel can trust the sidecar
+      // and never re-decode a clip that genuinely has no seams/focus.
+      intel.transitions = det.transitions;
+      intel.focus = det.focus;
       if (det.transitions.length) {
-        intel.transitions = det.transitions;
         intel.notes.push(`${det.transitions.length} hard visual transition(s) (chapter-pin snap points, cached).`);
       }
     } catch { /* motion scan is optional -- never block the sidecar on it */ }
@@ -433,6 +439,61 @@ export async function loadAssetIntel(filePath: string): Promise<AssetIntel | nul
   } catch {
     return null;
   }
+}
+
+const motionIntelInflight = new Map<string, Promise<{
+  idle: { ranges: Array<{ start: number; end: number }>; duration: number } | null;
+  transitions: number[];
+  focus: Array<{ start: number; end: number; x: number; y: number; w: number; h: number }>;
+  duration: number;
+}>>();
+
+/** Motion intel for an asset -- idle ranges, transitions, focus events --
+ *  loaded from the sidecar when present, computed ONCE and written back when
+ *  the sidecar predates a signal (so older uploads upgrade in place and the
+ *  decode never runs twice). Concurrent callers share one computation. */
+export function ensureMotionIntel(filePath: string): Promise<{
+  idle: { ranges: Array<{ start: number; end: number }>; duration: number } | null;
+  transitions: number[];
+  focus: Array<{ start: number; end: number; x: number; y: number; w: number; h: number }>;
+  duration: number;
+}> {
+  const existing = motionIntelInflight.get(filePath);
+  if (existing) return existing;
+  const job = ensureMotionIntelUncached(filePath);
+  motionIntelInflight.set(filePath, job);
+  // Keep successful results memoized for the process lifetime (the sidecar
+  // is the durable cache); forget failures so a retry can succeed.
+  job.catch(() => motionIntelInflight.delete(filePath));
+  return job;
+}
+
+async function ensureMotionIntelUncached(filePath: string): Promise<{
+  idle: { ranges: Array<{ start: number; end: number }>; duration: number } | null;
+  transitions: number[];
+  focus: Array<{ start: number; end: number; x: number; y: number; w: number; h: number }>;
+  duration: number;
+}> {
+  const cached = await loadAssetIntel(filePath).catch(() => null);
+  if (cached?.idle && cached.transitions !== undefined && cached.focus !== undefined) {
+    return {
+      idle: cached.idle,
+      transitions: cached.transitions || [],
+      focus: cached.focus || [],
+      duration: cached.idle.duration,
+    };
+  }
+  const { analyzeMotion } = await import("./compress-waiting.js");
+  const det = await analyzeMotion(filePath, 2);
+  const idle = { ranges: det.ranges.map((r) => ({ start: r.start, end: r.end })), duration: det.duration };
+  // Write back into the sidecar (best-effort) so the next assemble is instant.
+  if (cached) {
+    cached.idle = idle;
+    cached.transitions = det.transitions;
+    cached.focus = det.focus;
+    await fs.writeFile(sidecarPath(filePath), JSON.stringify(cached, null, 2)).catch(() => {});
+  }
+  return { idle, transitions: det.transitions, focus: det.focus, duration: det.duration };
 }
 
 /** True for file extensions analyzeVideoAsset can handle. */

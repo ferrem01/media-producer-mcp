@@ -6,6 +6,38 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-17 — Pins v2 (iterative), auto-callouts, ducked music bed
+
+Rungs 3-4 of the speaker-screencast ladder + the pin upgrade:
+
+- **Pins v2 — iterative refinement** (`planChapterPins` rewritten): the
+  proportional guess drifts with every un-modeled pace change, so a fixed
+  window around the raw guess misses correct seams (measured Δ19s). Now:
+  start from the end-pin, then repeatedly (1) re-solve the map with pins so
+  far, (2) recompute unpinned guesses on the CORRECTED map, (3) pin the
+  single most confident match. Each accepted pin re-anchors the map. Still
+  conservative (no seam in window → no pin; infeasible pin → discarded).
+- **Auto-callouts** (`core/callout-plan.ts` + focus events in
+  `compress-waiting.ts`): the narration says WHEN (action-cue sentences:
+  click/open/type/...), the footage says WHERE (focus events = seconds of
+  motion whose union bbox stays small — typing in a field, a panel
+  updating; scrolls/repaints rejected, ≥2s only). A callout is proposed
+  only when both agree, mapped through the PINNED media map, and rides
+  screencast-frame's existing region-glow/lift rendering as plain editable
+  component data. Caps: ≤6, ≥18s apart, never over a chapter card.
+  (Also fixed: callout clones forced `height:auto` — collapsed to the 150px
+  fallback on capture pages; now inherit the base's explicit height.)
+- **Ducked music bed**: the assemble recipe now attaches a calm
+  commercial-safe bed at 0.22 volume, looped, with `audio.ducking` (to 0.35×
+  while the narration speaks, swelling in gaps + bookends) — the render
+  mixer's existing envelope ducking does the work. Opt out with
+  `background_music: false`.
+- **Motion intel unified**: `ensureMotionIntel` — idle + transitions + focus
+  from ONE decode, sidecar write-back upgrades older assets in place,
+  in-process memoization for concurrent callers.
+
+---
+
 ## 2026-07-17 — Chapter pins: semantic audio↔video sync (speaker-screencast)
 
 Before this, narration and footage were only **durationally** synced (the
