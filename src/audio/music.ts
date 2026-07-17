@@ -180,77 +180,82 @@ async function searchJamendo(mood: string, minDuration?: number): Promise<MusicT
     return null; // Jamendo not configured, silently skip
   }
 
-  try {
+  // Jamendo's tag search is flaky: exact `tags=` frequently returns 0 for a
+  // valid tag, and even a good query intermittently comes back empty (cache /
+  // rate-limit). Treating one empty as "give up" shipped mute films silently.
+  // So: use FUZZY tags, and walk a chain of reliably-populated fallback tags
+  // (each retried once) before giving up -- always keeping the commercial-safe
+  // license filter (these ship as marketing). Log every empty so it is never
+  // silent again.
+  const dur = minDuration ? `${Math.max(30, Math.floor(minDuration * 0.8))}_600` : undefined;
+  // Primary mood first, then broad tags that consistently return CC-BY/BY-SA
+  // tracks, so the default "corporate" (which flakes) still lands something.
+  const FALLBACKS = ["electronic", "pop", "happy", "chill", "rock", "calm"];
+  const tagChain = [mood, ...FALLBACKS.filter((t) => t !== mood)];
+
+  const queryOnce = async (tag: string, withDuration: boolean) => {
     const params = new URLSearchParams({
       client_id: clientId,
       format: "json",
-      tags: mood,
-      limit: "3",
+      fuzzytags: tag,          // fuzzy: exact `tags=` is brittle and often empty
+      limit: "5",
       order: "popularity_total",
-      // Commercial-safe only: these videos ship as marketing, so exclude
-      // NonCommercial licenses; syncing into a video is a derivative, so
-      // exclude NoDerivs too. CC-BY / CC-BY-SA survive.
-      ccnc: "false",
-      ccnd: "false",
+      ccnc: "false",           // commercial-safe: exclude NonCommercial
+      ccnd: "false",           // and NoDerivs (syncing into video is a derivative)
     });
-
-    if (minDuration) {
-      params.set("durationbetween", `${Math.max(30, Math.floor(minDuration * 0.8))}_600`);
-    }
-
-    const url = `https://api.jamendo.com/v3.0/tracks?${params.toString()}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn(`  Music: Jamendo API error ${res.status}`);
-      return null;
-    }
-
+    if (withDuration && dur) params.set("durationbetween", dur);
+    const res = await fetch(`https://api.jamendo.com/v3.0/tracks?${params.toString()}`);
+    if (!res.ok) { console.warn(`  Music: Jamendo API error ${res.status} (tag "${tag}")`); return null; }
     const data = (await res.json()) as {
-      results: Array<{
-        id: string;
-        name: string;
-        artist_name: string;
-        duration: number;
-        audio: string;
-        audiodownload: string;
-        license_ccurl: string;
-      }>;
+      headers?: { status?: string; error_message?: string };
+      results?: Array<{ id: string; name: string; artist_name: string; duration: number; audio: string; audiodownload: string; license_ccurl: string }>;
     };
-
-    if (!data.results || data.results.length === 0) {
-      return null;
+    // Jamendo returns HTTP 200 even on auth failure -- the real status is in the body.
+    if (data.headers?.status && data.headers.status !== "success") {
+      console.warn(`  Music: Jamendo auth/query failed: ${data.headers.error_message || data.headers.status}`);
+      return "AUTH_FAIL" as const;
     }
+    const results = data.results || [];
+    if (!results.length) return null;
+    return results.find((t) => t.audiodownload || t.audio) || null;
+  };
 
-    const track = data.results[0];
-    const downloadUrl = track.audiodownload || track.audio;
-    if (!downloadUrl) return null;
-
-    // Download to a temp location
-    const tmpDir = path.join(config.dataDir, "_system", "cache", "jamendo");
-    await fs.mkdir(tmpDir, { recursive: true });
-    const trackPath = path.join(tmpDir, `${track.id}.mp3`);
-
-    // Check if already cached
-    try {
-      await fs.access(trackPath);
-    } catch {
-      const audioRes = await fetch(downloadUrl);
-      if (!audioRes.ok) return null;
-      const buffer = Buffer.from(await audioRes.arrayBuffer());
-      await fs.writeFile(trackPath, buffer);
+  try {
+    // Two passes: with the duration window, then without it (relax on empty).
+    for (const withDuration of [true, false]) {
+      for (const tag of tagChain) {
+        for (let attempt = 0; attempt < 2; attempt++) { // retry the flaky empty
+          const hit = await queryOnce(tag, withDuration);
+          if (hit === "AUTH_FAIL") return null; // credentials bad -- no point retrying
+          if (hit) {
+            const track = hit;
+            const downloadUrl = track.audiodownload || track.audio;
+            const tmpDir = path.join(config.dataDir, "_system", "cache", "jamendo");
+            await fs.mkdir(tmpDir, { recursive: true });
+            const trackPath = path.join(tmpDir, `${track.id}.mp3`);
+            try {
+              await fs.access(trackPath);
+            } catch {
+              const audioRes = await fetch(downloadUrl);
+              if (!audioRes.ok) { console.warn(`  Music: Jamendo download failed ${audioRes.status} for "${track.name}"`); continue; }
+              await fs.writeFile(trackPath, Buffer.from(await audioRes.arrayBuffer()));
+            }
+            console.log(`  Music: using Jamendo track "${track.name}" by ${track.artist_name} (tag "${tag}"${withDuration ? "" : ", no duration filter"})`);
+            return {
+              id: `jamendo-${track.id}`,
+              title: track.name,
+              artist: track.artist_name,
+              duration: track.duration,
+              path: trackPath,
+              source: "jamendo",
+              license: track.license_ccurl || "CC",
+            };
+          }
+        }
+      }
     }
-
-    console.log(`  Music: using Jamendo track "${track.name}" by ${track.artist_name}`);
-
-    return {
-      id: `jamendo-${track.id}`,
-      title: track.name,
-      artist: track.artist_name,
-      duration: track.duration,
-      path: trackPath,
-      source: "jamendo",
-      license: track.license_ccurl || "CC",
-    };
+    console.warn(`  Music: Jamendo returned no usable track for "${mood}" after fuzzy + ${tagChain.length}-tag fallback (film will be mute)`);
+    return null;
   } catch (e: any) {
     console.warn(`  Music: Jamendo search failed: ${e.message}`);
     return null;
