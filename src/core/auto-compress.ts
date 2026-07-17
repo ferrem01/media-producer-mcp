@@ -234,11 +234,30 @@ export async function proposeChapterPins(
       transitions = det.transitions;
       srcDur = det.duration;
     }
-    if (!transitions.length || !srcDur) return none;
+    if (!transitions.length || !srcDur) {
+      console.log(`  Chapter pins: no transitions detected in ${primary.src.split("/").pop()} -- skipping`);
+      return none;
+    }
 
     const sceneDur = scene.duration_seconds || 0;
+    // Per-boundary diagnostics: guess vs nearest seam, so a quiet result is
+    // explainable from the log alone.
+    for (const ch of chapters) {
+      if (ch.out < 3 || ch.out > sceneDur - 5) continue;
+      const guess = mapSourceTime(edit.segments as any, ch.out);
+      const nearest = transitions.reduce(
+        (b: number | null, t: number) => (b === null || Math.abs(t - guess) < Math.abs(b - guess) ? t : b),
+        null,
+      );
+      console.log(
+        `  Chapter pins: "${(ch.label || "").slice(0, 30)}" out=${ch.out.toFixed(1)}s guess=src ${guess.toFixed(1)}s, nearest seam ${nearest === null ? "none" : `${nearest.toFixed(1)}s (Δ${Math.abs(nearest - guess).toFixed(1)}s)`}`,
+      );
+    }
     let pins = planChapterPins(chapters, edit.segments, transitions, srcDur, sceneDur);
-    if (!pins.length) return none;
+    if (!pins.length) {
+      console.log(`  Chapter pins: no confident matches (${transitions.length} seams available) -- leaving unpinned`);
+      return none;
+    }
 
     const rate_regions = edit.rate_regions || [];
     let solved = solveMediaEdits({ cuts: edit.cuts || [], rate_regions, pins }, srcDur);
