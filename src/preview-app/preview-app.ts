@@ -1835,7 +1835,7 @@ export function getPreviewHtml(): string {
           state.compositeLoaded = true;
           buildMediaClips();
           state.totalDuration = w.__MP_DURATION || state.totalDuration;
-          setTimeout(auditEdlStamps, 6000);
+          setTimeout(function() { auditEdlStamps(0); }, 6000);
           cb(w.__MP_TIMELINE);
         }
       } catch(e) { clearInterval(check); }
@@ -3133,7 +3133,13 @@ export function getPreviewHtml(): string {
   // its video. If the lane shows a map the runtime never attached (selector
   // no longer matches the file, or a stale key claimed the element first),
   // say so loudly instead of silently playing the wrong thing at 1x.
-  function auditEdlStamps() {
+  //
+  // Retried before it accuses: a single check 6s after boot lands while a
+  // large later-scene video is still booting into the composite (an intro
+  // bookend is ~6s, so the timer hit exactly at that seam) and cried wolf on
+  // every project with a big screencast. Only a mismatch that PERSISTS
+  // across three checks is a real detachment.
+  function auditEdlStamps(attempt) {
     var p = state.currentProject;
     if (!p || !p.scenes || !state.compositeLoaded) return;
     var doc;
@@ -3153,6 +3159,10 @@ export function getPreviewHtml(): string {
       });
     });
     if (bad.length) {
+      if ((attempt || 0) < 2) {
+        setTimeout(function() { auditEdlStamps((attempt || 0) + 1); }, 5000);
+        return;
+      }
       try { console.warn('[edl] stamp mismatch on:', bad.join(', ')); } catch (e2) {}
       studioStatus('⚠ Media edit didn’t attach to ' + bad.join(', ') + ' — playback may ignore it. Try re-saving the edit on that video.', 'err');
     }
