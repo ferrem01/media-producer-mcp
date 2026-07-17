@@ -29,7 +29,9 @@ import { generateScene } from "./scene-generator.js";
 import { enrichProjectMedia } from "./media-enrichment.js";
 import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
-import { loadProject, saveProject } from "../persistence/project.js";
+import { loadProject, saveProject, createProject } from "../persistence/project.js";
+import { runGrammarPrep, pickMusicMood } from "./grammar-prep.js";
+import { assembleNarratedScreencast } from "./narrated-screencast.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
@@ -114,6 +116,10 @@ export interface PipelineOpts {
   speaker_start?: number;
   speaker_trim_start?: number;
   speaker_trim_end?: number;
+  /** A screen recording to feature. Selects the deterministic "assemble"
+   *  mandate of the speaker-screencast grammar (place + compress-to-narration,
+   *  no LLM storyboard). */
+  screencast_source?: string;
 
   // Storyboard-only mode: run concept director + storyboard builder, save storyboard, stop before scene generation
   storyboardOnly?: boolean;
@@ -1984,6 +1990,53 @@ async function runUnifiedPipeline(
     console.log(`  Reference images: ${processedRefs.length} processed`);
   }
 
+  // ── Per-grammar PREP: ASSEMBLE mandate (early short-circuit) ──
+  // speaker-screencast with a GIVEN screen recording: the visuals are provided,
+  // so there is nothing for the creative director / storyboard / codegen to
+  // invent. Run the deterministic prep + placement and return. Same pipeline
+  // entry, same project/render model -- the LLM steps simply don't run, because
+  // the grammar's mandate is "assemble", not "generate".
+  if (opts.screencast_source && format === "video" && !opts.storyboardOnly) {
+    trace?.beginEvent("grammar_prep_assemble");
+    const prep = await runGrammarPrep("speaker-screencast", {
+      prompt: opts.prompt,
+      brandKit,
+      tenantId: opts.tenant_id,
+      format,
+      screencastSource: opts.screencast_source,
+      narrationSource: opts.speaker_source,
+      sceneCount,
+    });
+    if (prep.mandate === "assemble" && prep.screencast) {
+      opts.onProgress?.({ step: "assembling", percent: 20, detail: "Placing + compressing the screen recording" });
+      let project = opts.project_id ? await loadProject(opts.tenant_id, opts.project_id) : null;
+      if (!project) {
+        project = await createProject({
+          tenant_id: opts.tenant_id,
+          name: (opts.name || opts.prompt || "Narrated Screencast").slice(0, 60),
+          format: "video",
+          preset: canvas.preset,
+          fps: canvas.fps,
+        });
+      }
+      const asm = await assembleNarratedScreencast({
+        project,
+        screencastSource: prep.screencast.source,
+        narrationSource: prep.screencast.narrationSource,
+        dataDir: config.dataDir,
+      });
+      asm.project.prompt = opts.prompt;
+      if (!asm.project.created_at) asm.project.created_at = new Date().toISOString();
+      asm.project.updated_at = new Date().toISOString();
+      await saveProject(asm.project);
+      console.log(`  [assemble:speaker-screencast] ${asm.summary}`);
+      trace?.endEvent({ mandate: "assemble", scenes: asm.project.scenes.length });
+      opts.onProgress?.({ step: "complete", percent: 100, detail: asm.summary });
+      return { status: "completed", target: opts.target, project: asm.project };
+    }
+    trace?.endEvent({ mandate: prep.mandate });
+  }
+
   // Creative Director: reads the raw prompt, fills the gaps as the expert,
   // commits to ONE concept + look, and decides the scene count.
   var treatment: Treatment | undefined;
@@ -2035,46 +2088,23 @@ async function runUnifiedPipeline(
     console.log("  Tempo-cut grammar: creativity clamped to 0.15 (component-first assembly)");
   }
 
-  // ── Music-first timeline (QUALITY-ROADMAP Pillar 1) ──
-  // Professional edits pick the track FIRST and cut to it. When background
-  // music is on, select the track and beat-map it BEFORE storyboarding: the
-  // storyboard authors durations against the beat grid, and a deterministic
-  // pass below quantizes every scene to whole bars so cuts land on downbeats.
-  var musicTrack: import("../audio/music.js").MusicTrack | null = null;
-  var beatMap: import("../audio/beat-map.js").BeatMap | undefined;
-  if (opts.backgroundMusic && (format === "video" || format === "slideshow")) {
-    trace?.beginEvent("music_first");
-    try {
-      const { selectMusic } = await import("../audio/music.js");
-      const mood = pickMusicMood(richPrompt);
-      const estDuration = (sceneCount || 6) * 5.5;
-      console.log(`  Music-first: searching for "${mood}" mood...`);
-      musicTrack = await selectMusic({
-        mood,
-        brandKit,
-        tenantId: opts.tenant_id,
-        minDuration: Math.max(30, Math.floor(estDuration * 0.8)),
-      });
-      if (musicTrack) {
-        const { analyzeBeats } = await import("../audio/beat-map.js");
-        const map = await analyzeBeats(musicTrack.path);
-        if (map.confidence >= 0.2) {
-          beatMap = map;
-          console.log(
-            `  Music-first: "${musicTrack.title}" by ${musicTrack.artist} -- ` +
-            `${map.bpm} BPM, bar=${map.barSec}s, downbeat@${map.firstDownbeatSec}s (conf ${map.confidence})`
-          );
-        } else {
-          console.log(`  Music-first: "${musicTrack.title}" beat grid too uncertain (conf ${map.confidence}), cutting unquantized`);
-        }
-      }
-    } catch (e: any) {
-      console.warn(`  Music-first selection failed (non-fatal): ${e.message}`);
-      musicTrack = null;
-      beatMap = undefined;
-    }
-    trace?.endEvent({ bpm: beatMap?.bpm });
-  }
+  // ── Per-grammar PREP: "generate" mandate (music-first spine) ──
+  // The generalized prep: for any grammar with background music on, pick the
+  // track and beat-map it BEFORE the storyboard so the shared storyboard
+  // authors durations in bars and the quantize pass below snaps cuts to
+  // downbeats. (The "assemble" mandate already returned earlier.)
+  trace?.beginEvent("grammar_prep");
+  const prep = await runGrammarPrep(filmGrammar, {
+    prompt: richPrompt,
+    brandKit,
+    tenantId: opts.tenant_id,
+    format,
+    backgroundMusic: opts.backgroundMusic,
+    sceneCount,
+  });
+  var musicTrack: import("../audio/music.js").MusicTrack | null = prep.music || null;
+  var beatMap: import("../audio/beat-map.js").BeatMap | undefined = prep.beatMap;
+  trace?.endEvent({ mandate: prep.mandate, bpm: beatMap?.bpm });
 
   var storyboard = await buildStoryboard({
     prompt: richPrompt,
@@ -2999,19 +3029,6 @@ function unifyCaptionStyle(scenes: Array<{ components?: string[] }>): void {
     s.components = rewritten.filter((c, i) => c !== chosen || rewritten.indexOf(c) === i);
   }
   console.log(`  Motif discipline: unified ${counts.size} caption styles -> "${chosen}" (${swaps} swaps)`);
-}
-
-/**
- * Mood keyword heuristic for music selection (shared by the music-first
- * selection and the legacy post-scenes fallback).
- */
-function pickMusicMood(prompt: string): string {
-  const p = prompt.toLowerCase();
-  if (p.includes("exciting") || p.includes("launch") || p.includes("announcement")) return "upbeat";
-  if (p.includes("calm") || p.includes("elegant") || p.includes("premium")) return "calm";
-  if (p.includes("tech") || p.includes("ai") || p.includes("data")) return "electronic";
-  if (p.includes("emotion") || p.includes("story") || p.includes("inspire")) return "inspiring";
-  return "corporate";
 }
 
 /**

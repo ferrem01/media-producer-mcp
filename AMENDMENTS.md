@@ -6,6 +6,40 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-16 — Unified grammar pipeline: prep + mandate (the "hard" L4)
+
+**North-star architecture for how every `film_grammar` runs.** L4 originally made
+`filmGrammar` a structured *field* but only a **soft** signal — it whispered to the LLM
+storyboard (mandatory contract sections + a tempo-cut creativity clamp) and everything
+still flowed through the same LLM generate. Music-first was the one exception: it was
+already `prep (pick track → beat grid) → constrain the shared storyboard`. This
+generalizes that shape to **every grammar**.
+
+**The model — ONE pipeline, per-grammar PREP + MANDATE** (`src/llm/grammar-prep.ts`,
+`runGrammarPrep`): before the storyboard, each grammar contributes
+1. a **mandate** — `"generate"` (LLM invents the visuals) or `"assemble"` (materials are
+   GIVEN, place them deterministically);
+2. a timing **spine** the cut snaps to (music **bars** / narration **sentences**); and
+3. the **given materials** it brings (music bed / a screen recording).
+
+The deterministic-vs-LLM split is now an **emergent property of the mandate, not a
+separate code path**. `runGeneratePipeline` calls `runGrammarPrep`; on `"assemble"`
+(speaker-screencast + a `screencast_source`) it short-circuits *before the creative
+director* into `assembleNarratedScreencast` (place the recording + compress-the-waiting
+fit to the narration + brand bookends) and returns — same pipeline entry, same
+project/render model, the LLM steps simply don't run. On `"generate"` it's the existing
+music-first path (spine = bars) feeding the shared storyboard.
+
+- `generate`'s `screencast_source` now routes *through* the pipeline (it was a standalone
+  handler branch); `pickMusicMood` moved into `grammar-prep.ts`.
+- **Backlog (logged here, not yet built):** (a) make `tempo-cut` *imply* music-first
+  instead of being gated on the `background_music` flag; (b) let the selected track inform
+  the *treatment*, not just the storyboard (music is picked after the concept today);
+  (c) give speaker-screencast a real sentence **spine** so the shared assembly can lay
+  captions/overlays timed to the narration (transcription already exists).
+
+---
+
 ## 2026-06-30 → 07-01 — Visual-quality system + one scene vocabulary
 
 **Shipped: PR #85 → merged to `master` (squash `3df01d5`).** Follow-up on branch
