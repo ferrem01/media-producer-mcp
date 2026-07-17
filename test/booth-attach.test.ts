@@ -1,0 +1,129 @@
+/**
+ * Mode B booth attach (SPEC-recorder.md): narration recorded AGAINST the
+ * locked cut is laid on top of the project without touching picture. These
+ * tests mock the media probes (ffmpeg/whisper) and verify the pure assembly
+ * logic: scene targeting + offset, caption shifting, retake idempotence, and
+ * the picture-lock guarantee.
+ */
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("../src/core/auto-compress.js", () => ({
+  probeMediaDuration: vi.fn(async () => 38.2),
+  proposeSceneCompression: vi.fn(),
+  proposeChapterPins: vi.fn(),
+}));
+vi.mock("../src/core/sentence-spine.js", () => ({
+  getSentenceSpine: vi.fn(async () => ({
+    sentences: [
+      { text: "Welcome to the walkthrough.", start: 1.0, end: 3.0, words: 4 },
+      { text: "Here we open chat history.", start: 8.0, end: 10.5, words: 5 },
+      { text: "And this caption lands after the scene ends.", start: 40.0, end: 42.0, words: 8 },
+    ],
+    chapters: [
+      { title: "", start: 1.0, end: 10.5, firstSentence: 0, lastSentence: 1 },
+    ],
+  })),
+}));
+vi.mock("../src/audio/music.js", () => ({
+  selectMusic: vi.fn(async () => ({ path: "/music/bed.mp3", title: "Calm Bed", artist: "Test", source: "jamendo" })),
+}));
+
+import { attachBoothNarration } from "../src/llm/narrated-screencast.js";
+import { getSentenceSpine } from "../src/core/sentence-spine.js";
+import { selectMusic } from "../src/audio/music.js";
+
+function recorderProject(): any {
+  return {
+    project_id: "proj_test",
+    tenant_id: "t",
+    scenes: [
+      {
+        id: "intro", label: "Branded Intro", duration_seconds: 6.1,
+        components: [{ id: "intro_v", type: "screencast-frame", data: {} }],
+      },
+      {
+        id: "screencast", label: "Walkthrough", duration_seconds: 26.9,
+        components: [{ id: "screencast_v", type: "screencast-frame", data: {} }],
+        media_edits: {
+          screencast: {
+            segments: [{ src_start: 0, src_end: 74.25, rate: 2.76 }],
+            pins: [], cuts: [],
+            rate_regions: [{ src_start: 0.5, src_end: 3.8, rate: 8 }],
+          },
+        },
+      },
+      {
+        id: "outro", label: "Branded Outro", duration_seconds: 5.2,
+        components: [{ id: "outro_v", type: "screencast-frame", data: {} }],
+      },
+    ],
+  };
+}
+
+describe("attachBoothNarration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("attaches narration + shifted captions to the media-edits scene", async () => {
+    const project = recorderProject();
+    const res = await attachBoothNarration({ project, narrationSource: "/assets/t/take.webm" });
+
+    const tracks = (project.audio as any).tracks;
+    expect(tracks[0]).toMatchObject({ id: "narration", source: "/assets/t/take.webm" });
+    expect((project.audio as any).ducking).toMatchObject({ duck_track: "music_bed", trigger_track: "narration" });
+
+    const overlay = project.scenes[1].components.find((c: any) => c.id === "narration_overlay");
+    expect(overlay).toBeTruthy();
+    // Captions shift by the 6.1s intro: the sentence spoken DURING the intro
+    // (1-3s) and the one past the 26.9s scene end both drop; only the 8s one
+    // lands, at scene-local time.
+    expect(overlay.data.captions).toHaveLength(1);
+    expect(overlay.data.captions[0].start).toBeCloseTo(8.0 - 6.1, 2);
+    expect(res.captions).toBe(1);
+    expect(project.status).toBe("generated");
+  });
+
+  it("never touches picture: scenes, durations and media edits stay identical", async () => {
+    const project = recorderProject();
+    const before = JSON.parse(JSON.stringify(project.scenes)).map((s: any) => {
+      delete s.components; // overlay add is the one allowed change
+      return s;
+    });
+    await attachBoothNarration({ project, narrationSource: "/assets/t/take.webm" });
+    const after = JSON.parse(JSON.stringify(project.scenes)).map((s: any) => {
+      delete s.components;
+      return s;
+    });
+    expect(after).toEqual(before);
+  });
+
+  it("retake replaces the narration track and overlay without duplicating, and keeps the bed", async () => {
+    const project = recorderProject();
+    await attachBoothNarration({ project, narrationSource: "/assets/t/take1.webm" });
+    await attachBoothNarration({ project, narrationSource: "/assets/t/take2.webm" });
+
+    const tracks = (project.audio as any).tracks;
+    expect(tracks.filter((t: any) => t.id === "narration")).toHaveLength(1);
+    expect(tracks.find((t: any) => t.id === "narration").source).toBe("/assets/t/take2.webm");
+    expect(tracks.filter((t: any) => t.id === "music_bed")).toHaveLength(1);
+    expect(selectMusic).toHaveBeenCalledTimes(1); // bed picked once, kept on retake
+
+    const overlays = project.scenes[1].components.filter((c: any) => c.id === "narration_overlay");
+    expect(overlays).toHaveLength(1);
+  });
+
+  it("throws on a project with no screencast scene", async () => {
+    const project: any = { project_id: "p", tenant_id: "t", scenes: [{ id: "s1", duration_seconds: 5, components: [{ type: "kinetic-text" }] }] };
+    await expect(attachBoothNarration({ project, narrationSource: "/x.webm" })).rejects.toThrow(/no screencast scene/);
+  });
+
+  it("degrades to bare narration when whisper is unavailable", async () => {
+    (getSentenceSpine as any).mockResolvedValueOnce(null);
+    const project = recorderProject();
+    const res = await attachBoothNarration({ project, narrationSource: "/assets/t/take.webm" });
+    expect(res.captions).toBe(0);
+    expect(res.summary).toContain("no spine");
+    expect((project.audio as any).tracks[0].id).toBe("narration");
+  });
+});

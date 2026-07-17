@@ -1713,6 +1713,58 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // ── API: Narration booth take (Mode B, SPEC-recorder.md) ──
+      // POST /api/booth-narration/{tenant}/{project}?name=take.webm with the
+      // raw audio bytes. The take was performed against the locked cut in the
+      // Studio booth, so this only attaches sound + spine on top -- scenes and
+      // media edits are never touched. Synchronous: whisper on a booth-length
+      // take is seconds, and the booth UI waits to show captions arrived.
+      const boothMatch = urlPath.match(/^\/api\/booth-narration\/([^/]+)\/([^/]+)$/);
+      if (boothMatch && method === "POST") {
+        const [, bnTenant, bnProject] = boothMatch.map(decodeURIComponent);
+        const bnQuery = new URL(req.url || "/", "http://localhost").searchParams;
+        const bnName = path.basename(bnQuery.get("name") || `narration-${Date.now()}.webm`).replace(/[^a-zA-Z0-9._-]/g, "_");
+        try {
+          const project = await loadProject(bnTenant, bnProject);
+          if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+          const MAX_TAKE = 128 * 1024 * 1024;
+          const chunks: Buffer[] = [];
+          let received = 0;
+          await new Promise<void>((resolve, reject) => {
+            req.on("data", (c: Buffer) => {
+              received += c.length;
+              if (received > MAX_TAKE) { reject(new Error("take exceeds 128MB limit")); req.destroy(); return; }
+              chunks.push(c);
+            });
+            req.on("end", () => resolve());
+            req.on("error", reject);
+          });
+          const takeBuffer = Buffer.concat(chunks);
+          if (takeBuffer.length < 1024) { jsonResponse(res, 400, { error: "take is empty" }); return; }
+          const bnDir = path.join(config.dataDir, bnTenant, "projects", bnProject, "assets");
+          await fs.mkdir(bnDir, { recursive: true });
+          await fs.writeFile(path.join(bnDir, bnName), takeBuffer);
+          const narrationUrl = `/assets/${bnTenant}/projects/${bnProject}/assets/${bnName}`;
+
+          const { attachBoothNarration } = await import("./llm/narrated-screencast.js");
+          let bnLlm;
+          try { bnLlm = llmConfigFromEnv(); } catch { bnLlm = undefined; }
+          const result = await attachBoothNarration({
+            project,
+            narrationSource: narrationUrl,
+            dataDir: config.dataDir,
+            llmConfig: bnLlm,
+          });
+          await saveProject(project);
+          console.log(`  booth-narration: ${bnProject} -- ${result.summary}`);
+          jsonResponse(res, 200, { ok: true, url: narrationUrl, ...result });
+        } catch (e: any) {
+          console.error(`  booth-narration: FAILED (${e?.message || e})`);
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       // ── API: Studio session logs ──
       // POST /api/studio-log/{tenant}?session=sid  -- the Studio client ships
       // its console ring buffer here every few seconds, so a remote debugger
