@@ -2024,6 +2024,7 @@ async function runUnifiedPipeline(
         screencastSource: prep.screencast.source,
         narrationSource: prep.screencast.narrationSource,
         dataDir: config.dataDir,
+        llmConfig: opts.llmConfig,
       });
       asm.project.prompt = opts.prompt;
       if (!asm.project.created_at) asm.project.created_at = new Date().toISOString();

@@ -1,0 +1,163 @@
+<template>
+  <div class="ntrk">
+    <div class="ntrk-veil"></div>
+    <div class="ntrk-chapter">
+      <div class="ntrk-chapter-kicker"></div>
+      <div class="ntrk-chapter-title"></div>
+    </div>
+    <div class="ntrk-captions"></div>
+  </div>
+</template>
+
+<style scoped>
+  .ntrk {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    overflow: hidden;
+  }
+
+  /* ── Lower-third captions: one pill per sentence, timeline-toggled. A real
+     scrim pill (not bare text) keeps every word legible over footage. ── */
+  .ntrk-captions {
+    position: absolute;
+    left: 50%;
+    bottom: 4.6%;
+    transform: translateX(-50%);
+    width: 74%;
+    display: flex;
+    justify-content: center;
+  }
+  .ntrk-cap {
+    position: absolute;
+    bottom: 0;
+    max-width: 100%;
+    padding: 0.5em 1.1em;
+    border-radius: 14px;
+    background: rgba(10, 10, 16, 0.72);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    color: #ffffff;
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1.32;
+    letter-spacing: 0.01em;
+    text-align: center;
+    text-wrap: balance;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  }
+  .ntrk-cap b {
+    font-weight: 700;
+    color: var(--mp-color-primary-bright, #a5b4fc);
+  }
+
+  /* ── Chapter moment: brief dim veil + big title with an accent bar. ── */
+  .ntrk-veil {
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 6, 12, 0.56);
+    opacity: 0;
+  }
+  .ntrk-chapter {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    opacity: 0;
+  }
+  .ntrk-chapter-kicker {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: var(--mp-color-primary-bright, #a5b4fc);
+  }
+  .ntrk-chapter-kicker::after {
+    content: '';
+    display: block;
+    margin: 14px auto 0;
+    width: 64px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--mp-color-primary, #6366f1);
+  }
+  .ntrk-chapter-title {
+    font-size: 84px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-align: center;
+    max-width: 80%;
+    line-height: 1.08;
+    text-shadow: 0 4px 28px rgba(0, 0, 0, 0.5);
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var capWrap = el.querySelector('.ntrk-captions');
+    var veil = el.querySelector('.ntrk-veil');
+    var chapterEl = el.querySelector('.ntrk-chapter');
+    var kickerEl = el.querySelector('.ntrk-chapter-kicker');
+    var titleEl = el.querySelector('.ntrk-chapter-title');
+    if (!capWrap) return tl;
+
+    var dur = ctx.duration || 1e9;
+    var captions = (Array.isArray(data.captions) ? data.captions : [])
+      .filter(function (c) { return c && c.text && typeof c.start === 'number' && c.start < dur; });
+    var chapters = (Array.isArray(data.chapters) ? data.chapters : [])
+      .filter(function (c) { return c && c.title && typeof c.at === 'number' && c.at < dur; });
+
+    // ── Captions ──
+    for (var i = 0; i < captions.length; i++) {
+      var c = captions[i];
+      var div = document.createElement('div');
+      div.className = 'ntrk-cap';
+      div.textContent = c.text;
+      // Long sentences shrink instead of stacking three lines deep.
+      var len = c.text.length;
+      if (len > 70) div.style.fontSize = Math.max(24, Math.round(34 * (70 / len) + 6)) + 'px';
+      capWrap.appendChild(div);
+
+      var start = Math.max(0, c.start);
+      var end = Math.min(dur, Math.max((typeof c.end === 'number' ? c.end : start + 2.4), start + 0.8));
+      // Hold each caption until the next one arrives when the gap is short --
+      // a lower third that blinks off for 300ms between sentences reads as
+      // flicker, not rhythm.
+      var next = captions[i + 1];
+      if (next && next.start - end < 0.6) end = Math.min(dur, Math.max(start + 0.8, next.start - 0.12));
+
+      gsap.set(div, { autoAlpha: 0, y: 16 });
+      tl.to(div, { autoAlpha: 1, y: 0, duration: 0.28, ease: 'power2.out' }, start);
+      if (end < dur - 0.05) tl.to(div, { autoAlpha: 0, y: -10, duration: 0.22, ease: 'power2.in' }, end);
+    }
+
+    // ── Chapter moments ──
+    for (var k = 0; k < chapters.length; k++) {
+      var ch = chapters[k];
+      var at = Math.max(0.2, ch.at);
+      var hold = 2.2;
+      // Freeze the DOM state for this moment via callbacks so ONE title/kicker
+      // element serves every chapter (set text just before showing it).
+      (function (title, index, atT) {
+        tl.call(function () {
+          if (titleEl) titleEl.textContent = title;
+          if (kickerEl) kickerEl.textContent = 'Chapter ' + (index + 1);
+        }, null, Math.max(0, atT - 0.05));
+      })(ch.title, k, at);
+      tl.to(veil, { opacity: 1, duration: 0.35, ease: 'power2.out' }, at);
+      tl.fromTo(chapterEl, { opacity: 0, y: 26, scale: 0.98 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'power3.out' }, at + 0.08);
+      var out = Math.min(dur - 0.1, at + hold);
+      tl.to(chapterEl, { opacity: 0, y: -18, duration: 0.35, ease: 'power2.in' }, out);
+      tl.to(veil, { opacity: 0, duration: 0.4, ease: 'power2.inOut' }, out + 0.05);
+    }
+
+    return tl;
+  }
+</script>
