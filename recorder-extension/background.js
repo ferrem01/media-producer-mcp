@@ -58,6 +58,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
         await ensureOffscreen();
         session = { tabId: tab.id, startedMs: Date.now(), events: freshEvents(tab, settings), settings };
+        // Skeleton persisted so a suspended-and-restarted worker can still
+        // finish the upload on Stop (see qr-ping handler).
+        await chrome.storage.session?.set({ qrSession: { tabId: tab.id, startedMs: session.startedMs, settings } });
 
         // Instrument the tab. Injected (not declared) so only recorded tabs
         // ever run the capture script.
@@ -72,6 +75,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!session) { sendResponse({ ok: false, error: "Not recording." }); return; }
         const s = session;
         session = null;
+        await chrome.storage.session?.remove("qrSession");
         try { await chrome.tabs.sendMessage(s.tabId, { type: "qr-content-stop" }); } catch (e) {}
         const durationMs = Date.now() - s.startedMs;
         s.events.recording.durationMs = durationMs;
@@ -124,6 +128,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           });
         }
         chrome.storage.session?.set({ qrLastStatus: { state: msg.state, error: msg.error || null, at: Date.now() } });
+        return;
+      }
+
+      if (msg.type === "qr-ping") {
+        // Keepalive from the recorded tab: receiving any message resets the
+        // MV3 suspend timer. If the worker DID restart (session lost),
+        // rebuild a skeleton from storage so Stop can still upload the
+        // video; events captured during the dead window are gone, which
+        // degrades idle detection but never the recording itself.
+        if (!session) {
+          const { qrSession } = (await chrome.storage.session?.get("qrSession")) || {};
+          if (qrSession) {
+            session = { ...qrSession, events: qrSession.events || freshEvents({ url: "" }, qrSession.settings) };
+            console.warn("QuotientRecorder: service worker restarted mid-recording; session skeleton restored");
+          }
+        }
         return;
       }
 
