@@ -199,8 +199,11 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
               `If the frame clearly shows the specific UI element the narrator is referring to ` +
               `(a button, tab, field, panel), reply with ONLY JSON:\n` +
               `{"found": true, "x": <left %>, "y": <top %>, "w": <width %>, "h": <height %>}\n` +
-              `where the box tightly covers that element plus a little breathing room ` +
               `(percentages of the full frame, 0-100).\n` +
+              `The box must cover the element's COMPLETE visual container -- the whole ` +
+              `input box, card, button, or panel including its border and any controls ` +
+              `inside it -- never just the text within it. When the narrator references a ` +
+              `message being typed, that means the entire composer box.\n` +
               `If nothing specific is clearly identifiable, reply {"found": false}. ` +
               `Prefer {"found": false} over guessing.`,
             ),
