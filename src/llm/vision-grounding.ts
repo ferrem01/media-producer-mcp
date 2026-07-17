@@ -232,10 +232,6 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
       const prev = out[out.length - 1];
       if (prev && at - prev.at < minSpacing) continue;
 
-      const srcT = mapSourceTime(opts.segments, at + 0.5);
-      const still = await extractStill(opts.videoPath, srcT, tmpDir);
-      if (!still) continue;
-
       // Accept a numeric box in either dialect; return PIXELS or null.
       const toPixelBox = (ans: any): { x: number; y: number; w: number; h: number } | null => {
         const nums = [ans?.x, ans?.y, ans?.w, ans?.h];
@@ -252,37 +248,54 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
       };
 
       try {
-        // ── Propose ──
-        const raw = await callLLM(cfg, [{
-          role: "user",
-          content: [
-            txt(
-              `This ${imgW}x${imgH} image is a frame from a narrated product walkthrough. ` +
-              `The narrator says: "${cue.text.slice(0, 240)}"\n\n` +
-              `If the frame clearly shows the specific UI element the narrator is referring to ` +
-              `(a button, tab, field, panel), reply with ONLY JSON -- the bounding box in ` +
-              `PIXELS of this ${imgW}x${imgH} image:\n` +
-              `{"found": true, "x": <left px>, "y": <top px>, "w": <width px>, "h": <height px>}\n` +
-              `The box must cover the element's COMPLETE visual container -- the whole ` +
-              `input box, card, button, or panel including its border and any controls ` +
-              `inside it -- never just the text within it. When the narrator references a ` +
-              `message being typed, that means the entire composer box.\n` +
-              `If nothing specific is clearly identifiable, reply {"found": false}. ` +
-              `Prefer {"found": false} over guessing.`,
-            ),
-            img(still.url),
-          ],
-        }], { maxTokens: 500, temperature: 0 });
-        const ans = parseLlmJson(raw, "callout-grounding");
-        if (ans?.found !== true) {
-          console.log(`  Vision callouts: ${at.toFixed(0)}s -> not found -- raw: ${String(raw).slice(0, 140).replace(/\n/g, " ")}`);
-          continue;
+        // ── Propose, sampling the callout's ACTUAL first displayed frame.
+        // Cues sit right at content-change moments (the narrator announces
+        // the thing as it appears), and through a ~3-4x timelapse even half
+        // a second of output time crosses the seam: a "+0.5s" nudge showed
+        // the model the world AFTER the change while the callout's opening
+        // seconds displayed the world BEFORE it -- box perfect, content one
+        // seam ahead (measured via the segment map + the Studio src
+        // tooltip). If the first frame doesn't show the referenced thing
+        // yet, shift the callout 2s later once and retry, so the callout
+        // appears WHEN the thing does. ──
+        let calloutAt = at;
+        let still: { path: string; url: string } | null = null;
+        let box: { x: number; y: number; w: number; h: number } | null = null;
+        for (const shift of [0, 2]) {
+          calloutAt = at + shift;
+          if (calloutAt > opts.sceneDur - 8) break;
+          if (opts.chapterMoments.some((c) => Math.abs(c.at - calloutAt) < 5)) continue;
+          still = await extractStill(opts.videoPath, mapSourceTime(opts.segments, calloutAt + 0.1), tmpDir);
+          if (!still) continue;
+          const raw = await callLLM(cfg, [{
+            role: "user",
+            content: [
+              txt(
+                `This ${imgW}x${imgH} image is a frame from a narrated product walkthrough. ` +
+                `The narrator says: "${cue.text.slice(0, 240)}"\n\n` +
+                `If the frame clearly shows the specific UI element the narrator is referring to ` +
+                `(a button, tab, field, panel), reply with ONLY JSON -- the bounding box in ` +
+                `PIXELS of this ${imgW}x${imgH} image:\n` +
+                `{"found": true, "x": <left px>, "y": <top px>, "w": <width px>, "h": <height px>}\n` +
+                `The box must cover the element's COMPLETE visual container -- the whole ` +
+                `input box, card, button, or panel including its border and any controls ` +
+                `inside it -- never just the text within it. When the narrator references a ` +
+                `message being typed, that means the entire composer box.\n` +
+                `If nothing specific is clearly identifiable, reply {"found": false}. ` +
+                `Prefer {"found": false} over guessing.`,
+              ),
+              img(still.url),
+            ],
+          }], { maxTokens: 500, temperature: 0 });
+          const ans = parseLlmJson(raw, "callout-grounding");
+          if (ans?.found === true) {
+            box = toPixelBox(ans);
+            if (!box) console.warn(`  Vision callouts: rejected malformed box at ${calloutAt.toFixed(0)}s -- raw: ${String(raw).slice(0, 160)}`);
+            break;
+          }
+          console.log(`  Vision callouts: ${calloutAt.toFixed(0)}s -> not found${shift === 0 ? " (will try +2s)" : ""} -- raw: ${String(raw).slice(0, 120).replace(/\n/g, " ")}`);
         }
-        let box = toPixelBox(ans);
-        if (!box) {
-          console.warn(`  Vision callouts: rejected malformed box at ${at.toFixed(0)}s -- raw: ${String(raw).slice(0, 160)}`);
-          continue;
-        }
+        if (!box || !still) continue;
 
         // ── Verify (aim check): draw the box, ask if it actually covers the
         // element; one correction round allowed, then drop. This catches
@@ -334,9 +347,9 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
         // on the window's LAST frame; on failure shrink the callout to its
         // minimum length and retry once, else drop. ──
         let dur = Math.min(6, Math.max(3.5, cue.end - cue.start));
-        const startSrc = srcT;
+        const startSrc = mapSourceTime(opts.segments, calloutAt + 0.1);
         for (let attempt = 0; attempt < 2; attempt++) {
-          const endSrc = mapSourceTime(opts.segments, at + dur);
+          const endSrc = mapSourceTime(opts.segments, calloutAt + dur - 0.2); // the window's actual last frame
           if (Math.abs(endSrc - startSrc) < 1.5) break; // source barely advances -- stable
           const endStill = await extractStill(opts.videoPath, endSrc, tmpDir);
           if (!endStill) break;
@@ -373,14 +386,14 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
         const w = Math.min(60, Math.max(8, pw), 100 - x);
         const h = Math.min(55, Math.max(6, ph), 100 - y);
         out.push({
-          at: Math.round(at * 100) / 100,
+          at: Math.round(calloutAt * 100) / 100,
           dur: Math.round(dur * 10) / 10,
           x: Math.round(x * 10) / 10,
           y: Math.round(y * 10) / 10,
           w: Math.round(w * 10) / 10,
           h: Math.round(h * 10) / 10,
         });
-        console.log(`  Vision callouts: ${at.toFixed(0)}s "${cue.text.slice(0, 40)}..." -> verified box ${x.toFixed(0)},${y.toFixed(0)} ${w.toFixed(0)}x${h.toFixed(0)}%`);
+        console.log(`  Vision callouts: ${calloutAt.toFixed(0)}s "${cue.text.slice(0, 40)}..." -> verified box ${x.toFixed(0)},${y.toFixed(0)} ${w.toFixed(0)}x${h.toFixed(0)}%`);
       } catch (e: any) {
         console.warn(`  Vision callouts: call failed at ${at.toFixed(0)}s (${e?.message || e})`);
       }
