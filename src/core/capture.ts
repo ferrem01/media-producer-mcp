@@ -13,6 +13,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import { fork, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { resolveVideoPath } from "./video-path.js";
@@ -73,6 +74,109 @@ process.once("exit", () => { try { pooledBrowser?.close(); } catch { /* */ } });
 
 
 const execFileAsync = promisify(execFile);
+
+// ── Capture-page media grounding ────────────────────────────────────────────
+// Captures load scene HTML via file://, where a <video> can never supply its
+// intrinsic size: server-relative /assets/... srcs resolve to file:///assets/
+// (not found), and even a reachable H.264 file won't decode -- Playwright's
+// Chromium ships without proprietary codecs (the reason all captures swap in
+// ffmpeg-extracted stills). With no metadata the element's intrinsic height
+// collapses to the 150px replaced-element fallback, a component that sizes
+// itself from videoWidth/videoHeight lays out against defaults, and the still
+// swap then faithfully copies that BROKEN geometry -- a full-bleed screencast
+// lands as a ~230px letterboxed postage stamp (Studio thumbnails, critique
+// frames). Fix at the source of truth: probe each video's real dimensions
+// with ffmpeg and stamp them as data-mp-dims for component layout code
+// (see screencast-frame) to use in place of the missing metadata. Asset srcs
+// are also rewritten to real file:// paths so images (logos, photos) load.
+// The prepared copy sits NEXT TO the original so relative references keep
+// working.
+
+const videoDimsCache = new Map<string, string | null>(); // fs path -> "WxH"
+async function probeVideoDims(filePath: string): Promise<string | null> {
+  const cached = videoDimsCache.get(filePath);
+  if (cached !== undefined) return cached;
+  let dims: string | null = null;
+  try {
+    // `ffmpeg -i` exits non-zero without an output, but stderr carries the
+    // stream info; ffprobe isn't guaranteed alongside minimal ffmpeg builds.
+    await execFileAsync("ffmpeg", ["-i", filePath], { timeout: 15_000 });
+  } catch (e: any) {
+    const m = String(e?.stderr || "").match(/Stream .*Video.*?(\d{2,5})x(\d{2,5})/);
+    if (m) dims = `${m[1]}x${m[2]}`;
+  }
+  videoDimsCache.set(filePath, dims);
+  return dims;
+}
+
+async function prepareCaptureHtml(
+  htmlPath: string,
+): Promise<{ path: string; cleanup: () => Promise<void> }> {
+  const passthrough = { path: htmlPath, cleanup: async () => {} };
+  let raw: string;
+  try { raw = await fs.readFile(htmlPath, "utf-8"); }
+  catch { return passthrough; }
+
+  const resolveExisting = (url: string): string | null => {
+    let p = resolveVideoPath(url);
+    if (p.startsWith("file://")) p = p.slice(7);
+    if (!p.startsWith("/")) return null;
+    return fsSync.existsSync(p) ? p : null;
+  };
+
+  // Stamp real dimensions onto <video> tags (from ffmpeg probe), and point
+  // their src at the real file so non-H.264 sources still load.
+  const videoTags = raw.match(/<video\b[^>]*>/gi) || [];
+  let rewritten = raw;
+  for (const tag of videoTags) {
+    if (/data-mp-dims=/.test(tag)) continue;
+    const srcMatch = tag.match(/src=(["'])([^"']+)\1/i);
+    if (!srcMatch) continue;
+    const filePath = resolveExisting(srcMatch[2]);
+    if (!filePath || !/\.(mp4|webm|mov|m4v|ogv)$/i.test(filePath)) continue;
+    const dims = await probeVideoDims(filePath);
+    let newTag = tag.replace(srcMatch[0], `src=${srcMatch[1]}file://${filePath}${srcMatch[1]}`);
+    if (dims) newTag = newTag.replace(/^<video\b/i, `<video data-mp-dims="${dims}"`);
+    rewritten = rewritten.replace(tag, newTag);
+  }
+
+  rewritten = rewritten
+    // src="/assets/..." | src='/assets/...' on remaining elements (img, source)
+    .replace(/(src=)(["'])(\/assets\/[^"']+)\2/gi, (m, attr, q, url) => {
+      const p = resolveExisting(url);
+      return p ? `${attr}${q}file://${p}${q}` : m;
+    })
+    // CSS url(/assets/...) | url("/assets/...") in inline styles/<style>
+    .replace(/url\((["']?)(\/assets\/[^"')]+)\1\)/gi, (m, q, url) => {
+      const p = resolveExisting(url);
+      return p ? `url(${q}file://${p}${q})` : m;
+    });
+  if (rewritten === raw) return passthrough;
+
+  const tmp = path.join(
+    path.dirname(htmlPath),
+    `.${path.basename(htmlPath).replace(/\.html?$/i, "")}.cap-${crypto.randomBytes(4).toString("hex")}.html`,
+  );
+  await fs.writeFile(tmp, rewritten, "utf-8");
+  return { path: tmp, cleanup: () => fs.unlink(tmp).catch(() => {}) };
+}
+
+/** Bounded wait for every <video> with a real source to settle (metadata for
+ *  decodable sources, an error for codec-less H.264), plus one paint, so any
+ *  metadata/dims-driven layout has run before geometry is read or captured. */
+async function waitForVideoMetadata(page: Page, timeoutMs = 8000): Promise<void> {
+  await page
+    .waitForFunction(
+      () =>
+        Array.from(document.querySelectorAll("video")).every(
+          (v) => !v.currentSrc || v.readyState >= 1 || v.error !== null,
+        ),
+      undefined,
+      { timeout: timeoutMs },
+    )
+    .catch(() => {}); // bounded: a stuck video must not fail the capture
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))).catch(() => {});
+}
 
 export interface CaptureOptions {
   /** Path to the assembled scene HTML file */
@@ -292,6 +396,7 @@ export async function captureFrameSequence(options: {
   let ownBrowser: Browser | undefined;
   const tempDirs = new Set<string>();
   let runtime: { ok: boolean; error?: string; atTime?: number } = { ok: true };
+  const prepared = await prepareCaptureHtml(htmlPath);
   try {
     let browser: Browser;
     try { browser = await getPooledBrowser(); }
@@ -301,8 +406,9 @@ export async function captureFrameSequence(options: {
     let pageError: string | undefined;
     page.on("pageerror", (e) => { if (!pageError) pageError = String((e as any)?.message || e); });
 
-    await page.goto(`file://${path.resolve(htmlPath)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(`file://${path.resolve(prepared.path)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForFunction(() => (window as any).__MP_READY === true, undefined, { timeout: 60000 });
+    await waitForVideoMetadata(page);
 
     // Runtime sweep first (cheap seeks, no capture): catches throws at times
     // BETWEEN the sampled frames, like the old validateSceneRuntime did.
@@ -446,6 +552,7 @@ export async function captureFrameSequence(options: {
   } finally {
     await page?.close().catch(() => {});
     await ownBrowser?.close().catch(() => {});
+    await prepared.cleanup();
     for (const dir of tempDirs) await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
@@ -547,6 +654,7 @@ export async function captureSingleFrame(options: {
   let ownBrowser: Browser | undefined;
   let page: Page | undefined;
   const tempDirs = new Set<string>();
+  const prepared = await prepareCaptureHtml(htmlPath);
 
   try {
     let browser: Browser;
@@ -555,7 +663,7 @@ export async function captureSingleFrame(options: {
     page = await browser.newPage({ ignoreHTTPSErrors: true });
     await page.setViewportSize({ width, height });
 
-    const fileUrl = `file://${path.resolve(htmlPath)}`;
+    const fileUrl = `file://${path.resolve(prepared.path)}`;
     await page.goto(fileUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
 
     await page.waitForFunction(
@@ -563,6 +671,7 @@ export async function captureSingleFrame(options: {
       undefined,
       { timeout: 60000 }
     );
+    await waitForVideoMetadata(page);
 
     // If a specific time is requested, advance the timeline. Swallow a throwing
     // component callback so one fragile scene doesn't abort the capture.
@@ -988,6 +1097,7 @@ export async function captureSingleFrame(options: {
   } finally {
     if (page) await page.close().catch(() => {});
     if (ownBrowser) await ownBrowser.close().catch(() => {});  // only close a one-off; keep the pool alive
+    await prepared.cleanup();
     // Cleanup temp dirs
     for (const dir of tempDirs) {
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});

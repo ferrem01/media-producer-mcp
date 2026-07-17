@@ -340,6 +340,13 @@
       var srcW = 1920, srcH = 1080;
       if (!isImage && media.videoWidth) { srcW = media.videoWidth; srcH = media.videoHeight; }
       else if (isImage && media.naturalWidth) { srcW = media.naturalWidth; srcH = media.naturalHeight; }
+      else {
+        // Capture pages (file://) can't decode H.264, so videoWidth stays 0
+        // there; the capture prep probes the source with ffmpeg and stamps
+        // data-mp-dims="WxH" so the geometry matches the live preview.
+        var dm = (media.getAttribute('data-mp-dims') || '').split('x');
+        if (parseInt(dm[0], 10) > 0 && parseInt(dm[1], 10) > 0) { srcW = parseInt(dm[0], 10); srcH = parseInt(dm[1], 10); }
+      }
       var cw = Math.max(1, srcW - crop.left - crop.right);
       var chh = Math.max(1, srcH - crop.top - crop.bottom);
       var ar = cw / chh;
@@ -398,6 +405,10 @@
 
       viewport.style.aspectRatio = cw + ' / ' + chh;
       media.style.width = (srcW / cw) * 100 + '%';
+      // Explicit height, not auto: identical to auto when the media's
+      // intrinsic ratio is known, but on capture pages (no decodable
+      // metadata) auto collapses to the 150px replaced-element fallback.
+      media.style.height = (srcH / chh) * 100 + '%';
       media.style.left = (-crop.left / cw) * 100 + '%';
       media.style.top = (-crop.top / chh) * 100 + '%';
       layoutCallouts();
