@@ -325,6 +325,47 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
           continue;
         }
 
+        // ── Stability check: the box is verified for ONE instant, but the
+        // callout holds for several seconds of OUTPUT time -- which can be
+        // 4x that in source time through a timelapsed stretch. If the
+        // footage moves on (bubble collapses, page scrolls), the target
+        // walks out from under the box (measured: geometry pixel-exact,
+        // content different by the end of the window). Verify the same box
+        // on the window's LAST frame; on failure shrink the callout to its
+        // minimum length and retry once, else drop. ──
+        let dur = Math.min(6, Math.max(3.5, cue.end - cue.start));
+        const startSrc = srcT;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const endSrc = mapSourceTime(opts.segments, at + dur);
+          if (Math.abs(endSrc - startSrc) < 1.5) break; // source barely advances -- stable
+          const endStill = await extractStill(opts.videoPath, endSrc, tmpDir);
+          if (!endStill) break;
+          const endBoxed = await drawBoxDataUrl(endStill.path, box, tmpDir);
+          if (!endBoxed) break;
+          const eraw = await callLLM(cfg, [{
+            role: "user",
+            content: [
+              txt(
+                `The red rectangle on this ${imgW}x${imgH} image is a highlight for what the ` +
+                `narrator says: "${cue.text.slice(0, 240)}"\n\n` +
+                `Does the red rectangle still cover that element in THIS frame? ` +
+                `Reply ONLY JSON: {"ok": true} or {"ok": false}.`,
+              ),
+              img(endBoxed),
+            ],
+          }], { maxTokens: 200, temperature: 0 });
+          const eans = parseLlmJson(eraw, "callout-stability");
+          if (eans?.ok === true) break;
+          if (attempt === 0 && dur > 3.5) {
+            dur = 3.5; // try the shortest window before giving up
+            continue;
+          }
+          console.log(`  Vision callouts: ${at.toFixed(0)}s -> target moves during the window -- dropped`);
+          box = null as any;
+          break;
+        }
+        if (!box) continue;
+
         const px = (box.x / imgW) * 100, py = (box.y / imgH) * 100;
         const pw = (box.w / imgW) * 100, ph = (box.h / imgH) * 100;
         const x = Math.min(92, Math.max(0, px));
@@ -333,7 +374,7 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
         const h = Math.min(55, Math.max(6, ph), 100 - y);
         out.push({
           at: Math.round(at * 100) / 100,
-          dur: Math.round(Math.min(6, Math.max(3.5, cue.end - cue.start)) * 10) / 10,
+          dur: Math.round(dur * 10) / 10,
           x: Math.round(x * 10) / 10,
           y: Math.round(y * 10) / 10,
           w: Math.round(w * 10) / 10,
