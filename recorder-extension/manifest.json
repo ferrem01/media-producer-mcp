@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Quotient Recorder",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Record a tab + ground-truth events (clicks, navigations, idle) and turn it into a finished walkthrough film via the Quotient media producer.",
   "permissions": ["tabCapture", "offscreen", "storage", "scripting", "activeTab", "notifications"],
   "host_permissions": ["<all_urls>"],
