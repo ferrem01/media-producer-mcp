@@ -255,29 +255,29 @@ export function getPreviewHtml(): string {
     width: 12px; height: 12px; border-radius: 50%;
     background: #6366f1; cursor: pointer; border: none;
   }
-  /* Status cluster (left of the scrubber): time + scene. Fixed width so the
-     ticking clock never reflows the timeline. */
-  .time-display {
-    font-size: 11px; font-variant-numeric: tabular-nums;
-    font-family: 'JetBrains Mono', 'SF Mono', monospace;
-    color: #6b7280; min-width: 104px; text-align: left; flex-shrink: 0;
-    display: inline-block;
+  /* Transport column: play button with the clock stacked beneath it. A fixed
+     narrow width (vs an inline time readout) hands ~160px back to the
+     scrubber, and the ticking clock still never reflows the timeline. */
+  #transport-left {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    flex-shrink: 0; width: 56px;
   }
-  /* Rate badge floats above the time display, out of the flex flow, so its
+  .time-display {
+    display: flex; flex-direction: column; align-items: center;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-variant-numeric: tabular-nums; line-height: 1.3;
+  }
+  #time-cur { font-size: 11px; color: #374151; font-weight: 500; }
+  #time-total { font-size: 9px; color: #9ca3af; }
+  /* Rate badge floats below the clock, out of the flex flow, so its
      appearing/resizing never reflows the timeline. */
   #time-stack { position: relative; flex-shrink: 0; display: inline-block; }
   #rate-badge {
-    display: none; position: absolute; left: 0; bottom: calc(100% + 3px);
+    display: none; position: absolute; left: 50%; transform: translateX(-50%);
+    top: calc(100% + 3px);
     font: 600 9px Inter, sans-serif; padding: 1px 6px; border-radius: 999px;
     white-space: nowrap; pointer-events: none;
   }
-
-  /* Scene indicator in playback bar */
-  .scene-indicator {
-    font-size: 11px; color: #6b7280; white-space: nowrap; flex-shrink: 0;
-    background: #f3f4f6; padding: 2px 8px; border-radius: 10px;
-  }
-  .scene-indicator:empty { display: none; }
 
   /* Audio cluster (right edge): one ♪ icon = mute toggle + track-count chip;
      the volume slider lives in a hover/focus flyout so it costs no bar width. */
@@ -685,13 +685,14 @@ export function getPreviewHtml(): string {
     </div>
 
     <div id="playback-bar">
-      <button class="play-btn" id="play-btn" disabled>
-        <svg id="play-icon" width="14" height="14" viewBox="0 0 14 14">
-          <polygon points="3,1 12,7 3,13"/>
-        </svg>
-      </button>
-      <span id="time-stack"><span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock"></span><span class="time-display" id="time-display">0.0s / 0.0s</span></span>
-      <span class="scene-indicator" id="scene-indicator"></span>
+      <span id="transport-left">
+        <button class="play-btn" id="play-btn" disabled>
+          <svg id="play-icon" width="14" height="14" viewBox="0 0 14 14">
+            <polygon points="3,1 12,7 3,13"/>
+          </svg>
+        </button>
+        <span id="time-stack"><span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock"></span><span class="time-display" id="time-display"><span id="time-cur">0.0s</span><span id="time-total">0.0s</span></span></span>
+      </span>
       <span id="slider-wrap">
         <div id="timeline-track">
         <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
@@ -772,8 +773,8 @@ export function getPreviewHtml(): string {
     playBtn: document.getElementById('play-btn'),
     playIcon: document.getElementById('play-icon'),
     slider: document.getElementById('timeline-slider'),
-    timeDisplay: document.getElementById('time-display'),
-    sceneIndicator: document.getElementById('scene-indicator'),
+    timeCur: document.getElementById('time-cur'),
+    timeTotal: document.getElementById('time-total'),
     bufferOverlay: document.getElementById('buffer-overlay'),
     audioIndicator: document.getElementById('audio-indicator'),
     volSlider: document.getElementById('vol-slider'),
@@ -4368,7 +4369,8 @@ export function getPreviewHtml(): string {
 
   function updateTimeDisplay(globalTime) {
     var total = state.totalDuration || 0;
-    els.timeDisplay.textContent = fmtTime(globalTime || 0) + ' / ' + fmtTime(total);
+    els.timeCur.textContent = fmtTime(globalTime || 0);
+    els.timeTotal.textContent = fmtTime(total);
     try { updateRateBadge(globalTime || 0); } catch (eRB) {}
   }
 
@@ -4381,12 +4383,9 @@ export function getPreviewHtml(): string {
   }
 
   function updateSceneIndicator() {
-    var project = state.currentProject;
-    if (!project || !project.scenes || state.currentSceneIndex < 0) {
-      els.sceneIndicator.textContent = '';
-      return;
-    }
-    els.sceneIndicator.textContent = 'Scene ' + (state.currentSceneIndex + 1) + '/' + project.scenes.length;
+    // The bar's "Scene N/M" pill is gone -- the scene list in the left nav
+    // already shows which scene is active. Kept as a no-op so the six
+    // scene-change call sites stay untouched.
   }
 
   function updatePlayIcon() {
