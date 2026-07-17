@@ -1643,44 +1643,34 @@ export function createMcpServer(): McpServer {
         return err("Invalid token");
       }
       try {
-        // ── film_grammar: "speaker-screencast" (deterministic) ──
-        // A screencast_source is the speaker-screencast declaration: skip the
-        // LLM entirely and stamp the known-good narrated-walkthrough recipe --
-        // brand intro -> the recording (dead-air time-lapsed, fit to the
-        // narration) -> brand outro, narration as the soundtrack.
+        // ── film_grammar: "speaker-screencast" (deterministic assemble) ──
+        // A screencast_source is the speaker-screencast declaration. Route it
+        // through the SHARED pipeline: runGrammarPrep returns the "assemble"
+        // mandate and the pipeline places + compresses the recording (no LLM
+        // storyboard). Run inline (it's fast) rather than as a background job.
         if (params.screencast_source && params.target !== "image") {
-          let project = params.project_id
-            ? await loadProject(params.tenant_id, params.project_id)
-            : null;
-          if (!project) {
-            project = await createProject({
-              tenant_id: params.tenant_id,
-              name: (params.prompt || "Narrated Screencast").slice(0, 60),
-              format: "video",
-              preset: params.canvas_width && params.canvas_height && params.canvas_height > params.canvas_width ? "vertical" : "landscape",
-              fps: 30,
-            });
-          }
-          // Narration owns the clock: explicit speaker_source, else a narration
-          // the project already carries (speaker_track clip or a voiceover track).
-          const narrationSource =
-            params.speaker_source ||
-            project.speaker_track?.clips?.[0]?.source ||
-            (project.audio?.tracks || []).find((t: any) => t.type === "voiceover" && t.source)?.source;
-          const { assembleNarratedScreencast } = await import("./llm/narrated-screencast.js");
-          const res = await assembleNarratedScreencast({
-            project,
-            screencastSource: params.screencast_source,
-            narrationSource,
-            dataDir: config.dataDir,
+          let llmConfig;
+          try { llmConfig = llmConfigFromEnv(); } catch (e: any) { return err(`LLM not configured: ${e.message}`); }
+          const brandKit = await loadBrandKit(params.tenant_id);
+          const preset = (params.canvas_width && params.canvas_height && params.canvas_height > params.canvas_width) ? "vertical" as const : "landscape" as const;
+          const canvas = (preset === "vertical"
+            ? { width: 1080, height: 1920, preset, fps: 30, background: "#0f172a" }
+            : { width: 1920, height: 1080, preset, fps: 30, background: "#0f172a" }) as any;
+          const result = await runGeneratePipeline({
+            prompt: params.prompt || "Narrated Screencast",
+            target: "video" as PipelineTarget,
+            tenant_id: params.tenant_id,
+            project_id: params.project_id,
+            llmConfig,
+            brandKit: (brandKit || {}) as any,
+            canvas,
+            film_grammar: "speaker-screencast",
+            screencast_source: params.screencast_source,
+            speaker_source: params.speaker_source,
           });
-          await saveProject(res.project);
-          console.log(`  ${res.summary}`);
-          return ok(withStudio({
-            ...res.project,
-            _summary: res.summary,
-            _film_grammar: "speaker-screencast",
-          } as any));
+          const project = (result as any).project;
+          if (!project) return err("Narrated-screencast assembly produced no project");
+          return ok(withStudio(project));
         }
 
         // ── Storyboard mode: run unified pipeline in storyboard-only mode ──
