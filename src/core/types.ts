@@ -468,6 +468,13 @@ export interface Project {
    *  cross-scene consistency (subtle S-curve + saturation + grain).
    *  "none" disables. The generate pipeline defaults videos to "cinematic". */
   film_grade?: "cinematic" | "none";
+  /** Sentence spine of the narration (speaker-screencast grammar): what was
+   *  said, when, grouped into chapters. Times are FILM seconds. Feeds
+   *  captions/chapter cards at assembly and future clipping/social cuts. */
+  spine?: {
+    sentences: Array<{ text: string; start: number; end: number }>;
+    chapters: Array<{ title: string; start: number; end: number; firstSentence: number; lastSentence: number }>;
+  };
 
   // ── Lifecycle ──
   /** Creative bible from the concept director (structured, not prose) */

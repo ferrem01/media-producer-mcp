@@ -12,7 +12,12 @@
  * the narration length so audio and picture stay together with no frozen tail.
  */
 
+import path from "node:path";
 import { proposeSceneCompression, probeMediaDuration } from "../core/auto-compress.js";
+import { getSentenceSpine, type SentenceSpine } from "../core/sentence-spine.js";
+import { resolveVideoPath } from "../core/video-path.js";
+import { callLLM, type LLMConfig } from "./client.js";
+import { parseLlmJson } from "./json-repair.js";
 import type { Project, Scene, BrandAsset } from "../core/types.js";
 
 /** A full-frame video scene (screen recording or a brand bookend clip). */
@@ -38,6 +43,48 @@ export interface NarratedScreencastResult {
   narration_duration: number;
 }
 
+/** One short title per chapter via a single small LLM call. Returns titles
+ *  aligned to `spine.chapters`; empty strings on failure (callers then skip
+ *  the chapter cards -- a walkthrough without section titles beats one with
+ *  "Part 3" filler). */
+export async function titleChapters(
+  spine: SentenceSpine,
+  llmConfig: LLMConfig,
+): Promise<string[]> {
+  const blocks = spine.chapters.map((ch, i) => {
+    const text = spine.sentences
+      .slice(ch.firstSentence, ch.lastSentence + 1)
+      .map((s) => s.text)
+      .join(" ")
+      .slice(0, 700);
+    return `Chapter ${i + 1} (${Math.round(ch.start)}s-${Math.round(ch.end)}s): ${text}`;
+  });
+  try {
+    const raw = await callLLM(
+      llmConfig,
+      [{
+        role: "user",
+        content:
+          `These are the chapters of a narrated product walkthrough video. ` +
+          `Give each a short section title: 2-4 words, Title Case, no punctuation, ` +
+          `concrete (name the thing being done, not "Introduction"/"Overview" filler).\n\n` +
+          blocks.join("\n\n") +
+          `\n\nReply with ONLY a JSON array of ${spine.chapters.length} strings, in order.`,
+      }],
+      { maxTokens: 400, temperature: 0.4 },
+    );
+    const arr = parseLlmJson(raw, "chapter-titles");
+    if (Array.isArray(arr)) {
+      return spine.chapters.map((_, i) =>
+        typeof arr[i] === "string" ? arr[i].trim().slice(0, 48) : "",
+      );
+    }
+  } catch (e: any) {
+    console.warn(`  Spine: chapter titling failed (${e?.message || e}) -- skipping chapter cards`);
+  }
+  return spine.chapters.map(() => "");
+}
+
 /**
  * Assemble the narrated-screencast film in place on `project`. Sets
  * project.scenes, project.audio (narration), and status='generated'. The
@@ -49,6 +96,9 @@ export async function assembleNarratedScreencast(opts: {
   /** The narration that owns the clock (audio, or a camera+voice recording). */
   narrationSource?: string;
   dataDir?: string;
+  /** Enables the one small chapter-titling call. Captions themselves are
+   *  deterministic (whisper on the box) and don't need this. */
+  llmConfig?: LLMConfig;
 }): Promise<NarratedScreencastResult> {
   const { project, screencastSource } = opts;
   const narrationSource = opts.narrationSource;
@@ -73,6 +123,52 @@ export async function assembleNarratedScreencast(opts: {
 
   if (outro) scenes.push(videoScene("outro", "Branded Outro", outro.url, outroDur || 5));
 
+  // ── Sentence spine: captions + chapter cards timed to the narration ──
+  // The narration owns the film clock, so spine times ARE film times; the
+  // walkthrough scene starts after the intro, so its overlay gets scene-local
+  // times (film minus introDur). Degrades to the caption-less assembly when
+  // whisper isn't installed or the take transcribes to nothing.
+  let spine: SentenceSpine | null = null;
+  if (narrationSource && narrationDur > 0.5) {
+    const cacheDir = path.join(
+      opts.dataDir || process.env.MP_DATA_DIR || "/data/media-producer",
+      project.tenant_id, "projects", project.project_id, "thumbs",
+    );
+    spine = await getSentenceSpine(resolveVideoPath(narrationSource, opts.dataDir), cacheDir);
+  }
+  if (spine) {
+    const offset = intro ? introDur : 0;
+    const sceneDur = screencastScene.duration_seconds;
+    const captions = spine.sentences
+      .map((s) => ({
+        text: s.text,
+        start: Math.max(0, Math.round((s.start - offset) * 100) / 100),
+        end: Math.round((s.end - offset) * 100) / 100,
+      }))
+      .filter((c) => c.end > 0.3 && c.start < sceneDur - 0.5);
+
+    let titles: string[] = spine.chapters.map(() => "");
+    if (opts.llmConfig && spine.chapters.length > 1) {
+      titles = await titleChapters(spine, opts.llmConfig);
+    }
+    const chapterMoments = spine.chapters
+      .map((ch, i) => ({ title: titles[i], at: Math.max(1.0, Math.round((ch.start - offset) * 100) / 100) }))
+      .filter((c) => c.title && c.at < sceneDur - 4);
+
+    screencastScene.components.push({
+      id: "narration_overlay",
+      type: "narration-track",
+      z_index: 50,
+      position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+      data: { captions, chapters: chapterMoments },
+    } as any);
+
+    project.spine = {
+      sentences: spine.sentences,
+      chapters: spine.chapters.map((ch, i) => ({ ...ch, title: titles[i] || ch.title })),
+    };
+  }
+
   project.scenes = scenes;
   if (narrationSource) {
     project.audio = { tracks: [{ id: "narration", type: "voiceover", source: narrationSource, volume: 1 }] } as any;
@@ -87,6 +183,7 @@ export async function assembleNarratedScreencast(opts: {
       ? `screencast ${applied.source_duration}s->${applied.output_duration}s @${applied.idle_rate}x (${applied.idle_ranges} idle stretches)`
       : `screencast (no compressible idle found)`,
     outro ? `outro ${Math.round(outroDur)}s` : null,
+    spine ? `spine ${spine.sentences.length} sentences / ${spine.chapters.length} chapters` : `no spine (whisper unavailable)`,
   ].filter(Boolean);
   const summary = `Narrated screencast assembled: ${parts.join(" | ")}${narrationDur > 0.5 ? ` | narration ${Math.round(narrationDur)}s` : " | no narration track"}.`;
 

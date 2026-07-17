@@ -1,0 +1,20 @@
+{
+  "type": "narration-track",
+  "label": "Narration Track (captions + chapters)",
+  "category": "captions",
+  "description": "Timeline-driven caption lane for narrated footage: a lower-third pill per sentence (from the sentence spine) plus optional full-frame chapter title moments. Designed as a full-frame overlay above a screencast.",
+  "data": {
+    "captions": {
+      "type": "array",
+      "label": "Captions",
+      "required": true,
+      "description": "[{ text, start, end }] in scene-local seconds -- one entry per spoken sentence."
+    },
+    "chapters": {
+      "type": "array",
+      "label": "Chapter Moments",
+      "optional": true,
+      "description": "[{ title, at }] in scene-local seconds -- brief dimmed full-frame section titles."
+    }
+  }
+}

@@ -6,6 +6,33 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-17 — Speaker-screencast sentence spine: captions + chapters
+
+The grammar's own spine, realized (the backlog item from the prep+mandate entry).
+Tempo-cut snaps to **bars**; the narrated walkthrough now snaps to **sentences**.
+
+- **`src/core/sentence-spine.ts`** — whisper word segments (transcribe.ts, on-box)
+  → `buildSentences` (terminal punctuation / real pause / run-on guard) →
+  `buildChapters` (breaks at long narration pauses past a min length, force-closes
+  before 75s). Pure + unit-tested; leading-silence onset correction shared with the
+  Studio words lane.
+- **`components/captions/narration-track`** — one full-frame overlay: a lower-third
+  scrim pill per sentence (auto-shrink, no flicker between back-to-back sentences)
+  plus brief dimmed **chapter title moments** (kicker "CHAPTER N" + accent bar).
+- **`assembleNarratedScreencast`** — builds the spine from the narration (narration
+  time IS film time; overlay times are scene-local, minus the intro bookend), titles
+  chapters via ONE small LLM call (`titleChapters`; on failure chapter cards are
+  skipped — captions never depend on the LLM), stamps the overlay onto the
+  walkthrough scene, and stores **`project.spine`** (film-time sentences + chapters)
+  for Studio and the future clipping/social-cut grammar.
+- Degrades cleanly: no whisper on the box → the exact pre-spine assembly.
+
+Backlog next (rungs 3-4 of the speaker-screencast ladder): narration-timed region
+callouts/punch-ins on the screencast; ducked music bed under narration; PiP camera
+when a camera file exists; speaker-name lower third on the intro.
+
+---
+
 ## 2026-07-16 — Unified grammar pipeline: prep + mandate (the "hard" L4)
 
 **North-star architecture for how every `film_grammar` runs.** L4 originally made
