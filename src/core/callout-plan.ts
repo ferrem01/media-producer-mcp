@@ -75,12 +75,14 @@ export function planCallouts(
     }
     if (!best) continue;
 
-    // Frame fractions -> padded percent box, clamped sane.
+    // Frame fractions -> padded percent box, clamped sane. Focus boxes are
+    // median-sized (<= ~16% area), so a callout region reads as "this field/
+    // panel", never half the screen.
     const pad = 0.035;
     const x = Math.max(0, (best.x - pad)) * 100;
     const y = Math.max(0, (best.y - pad)) * 100;
-    let w = Math.min(0.62, best.w + pad * 2) * 100;
-    let h = Math.min(0.56, best.h + pad * 2) * 100;
+    let w = Math.min(0.5, best.w + pad * 2) * 100;
+    let h = Math.min(0.45, best.h + pad * 2) * 100;
     w = Math.max(14, Math.min(w, 100 - x));
     h = Math.max(12, Math.min(h, 100 - y));
 

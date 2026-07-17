@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-17 — Watch-test fixes: real ducking in Studio, instrumental bed, median callout boxes
+
+First human watch of the full recipe surfaced three defects:
+
+- **Studio preview ducking used `ducked_volume` as an ABSOLUTE level** while
+  the render mixer applies it as a relative multiplier -- so "ducking" RAISED
+  a 0.22 bed to 0.35 for the whole narration. Preview now matches the mixer
+  (base × ducked_volume). Renders were always correct.
+- **Bed with lyrics fights the narrator**: `selectMusic` gained
+  `instrumental: true` (Jamendo `vocalinstrumental=instrumental`); the
+  narrated bed uses it, volume trimmed to 0.18.
+- **Callout boxes were union-inflated**: a long focus run accumulated every
+  stray flicker until the box hit the size caps (all four proposals at h=56%).
+  Focus events now emit the MEDIAN per-second box (typical activity region),
+  per-second concentration cap 0.2, event area cap 0.16, callout caps 50/45%.
+- Sidecar cache versioned (`motion_v`, MOTION_INTEL_V=2) so stale cached
+  focus/transitions recompute once and upgrade in place.
+
+---
+
 ## 2026-07-17 — Pins v2 (iterative), auto-callouts, ducked music bed
 
 Rungs 3-4 of the speaker-screencast ladder + the pin upgrade:

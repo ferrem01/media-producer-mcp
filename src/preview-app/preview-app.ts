@@ -1650,7 +1650,13 @@ export function getPreviewHtml(): string {
       var curMv = (typeof state.masterVolume === 'number') ? state.masterVolume : 1;
       state.audioElements.forEach(function(audio) {
         if (audio._trackType === 'music') {
-          audio.volume = (voActive ? duckedVolume : audio._baseVolume) * curMv;
+          // ducked_volume is a RELATIVE multiplier of the track's own level --
+          // matching the render mixer, which applies volume=duckedVol on top
+          // of the already-volume-filtered track. Treating it as an absolute
+          // level made "ducking" RAISE a quiet bed (0.22 base, 0.35 ducked)
+          // for the whole narration.
+          var base = audio._baseVolume != null ? audio._baseVolume : 1;
+          audio.volume = Math.min(1, (voActive ? base * duckedVolume : base) * curMv);
         }
       });
     }, 100);

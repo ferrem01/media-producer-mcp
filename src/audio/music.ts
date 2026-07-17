@@ -27,6 +27,9 @@ export interface MusicSelectOptions {
   brandKit?: BrandKit | null;
   tenantId?: string;
   minDuration?: number;  // minimum track duration in seconds
+  /** Instrumental tracks only (Jamendo filter): a bed under narration must
+   *  not carry lyrics that fight the speaker. */
+  instrumental?: boolean;
 }
 
 interface StockManifest {
@@ -96,7 +99,7 @@ export async function selectMusic(opts: MusicSelectOptions): Promise<MusicTrack 
   }
 
   // 3. Jamendo (if configured)
-  const jamendoTrack = await searchJamendo(mood, opts.minDuration);
+  const jamendoTrack = await searchJamendo(mood, opts.minDuration, opts.instrumental);
   if (jamendoTrack) {
     return jamendoTrack;
   }
@@ -174,7 +177,7 @@ async function selectStockMusic(mood: string, minDuration?: number): Promise<Mus
 /**
  * Search and download from Jamendo (requires JAMENDO_CLIENT_ID).
  */
-async function searchJamendo(mood: string, minDuration?: number): Promise<MusicTrack | null> {
+async function searchJamendo(mood: string, minDuration?: number, instrumental?: boolean): Promise<MusicTrack | null> {
   const clientId = process.env.JAMENDO_CLIENT_ID;
   if (!clientId) {
     return null; // Jamendo not configured, silently skip
@@ -203,6 +206,8 @@ async function searchJamendo(mood: string, minDuration?: number): Promise<MusicT
       ccnc: "false",           // commercial-safe: exclude NonCommercial
       ccnd: "false",           // and NoDerivs (syncing into video is a derivative)
     });
+    // A bed under narration must not carry lyrics that fight the speaker.
+    if (instrumental) params.set("vocalinstrumental", "instrumental");
     if (withDuration && dur) params.set("durationbetween", dur);
     const res = await fetch(`https://api.jamendo.com/v3.0/tracks?${params.toString()}`);
     if (!res.ok) { console.warn(`  Music: Jamendo API error ${res.status} (tag "${tag}")`); return null; }

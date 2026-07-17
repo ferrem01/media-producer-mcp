@@ -60,6 +60,10 @@ export interface AssetIntel {
   /** Concentrated-activity stretches (typing in a field, clicking a button):
    *  callout/punch-in targets. Source seconds; box in frame fractions. */
   focus?: Array<{ start: number; end: number; x: number; y: number; w: number; h: number }>;
+  /** Version of the motion-analysis algorithms that produced idle/transitions/
+   *  focus. Bump MOTION_INTEL_V to invalidate cached sidecars when detection
+   *  changes (e.g. v2: median focus boxes instead of runaway unions). */
+  motion_v?: number;
   analyzed_at: string;
 }
 
@@ -421,6 +425,7 @@ export async function analyzeAndSaveIntel(filePath: string): Promise<AssetIntel 
       // and never re-decode a clip that genuinely has no seams/focus.
       intel.transitions = det.transitions;
       intel.focus = det.focus;
+      intel.motion_v = MOTION_INTEL_V;
       if (det.transitions.length) {
         intel.notes.push(`${det.transitions.length} hard visual transition(s) (chapter-pin snap points, cached).`);
       }
@@ -440,6 +445,9 @@ export async function loadAssetIntel(filePath: string): Promise<AssetIntel | nul
     return null;
   }
 }
+
+/** Bump when idle/transition/focus detection changes shape or semantics. */
+export const MOTION_INTEL_V = 2;
 
 const motionIntelInflight = new Map<string, Promise<{
   idle: { ranges: Array<{ start: number; end: number }>; duration: number } | null;
@@ -475,7 +483,7 @@ async function ensureMotionIntelUncached(filePath: string): Promise<{
   duration: number;
 }> {
   const cached = await loadAssetIntel(filePath).catch(() => null);
-  if (cached?.idle && cached.transitions !== undefined && cached.focus !== undefined) {
+  if (cached?.idle && cached.transitions !== undefined && cached.focus !== undefined && cached.motion_v === MOTION_INTEL_V) {
     return {
       idle: cached.idle,
       transitions: cached.transitions || [],
@@ -491,6 +499,7 @@ async function ensureMotionIntelUncached(filePath: string): Promise<{
     cached.idle = idle;
     cached.transitions = det.transitions;
     cached.focus = det.focus;
+    cached.motion_v = MOTION_INTEL_V;
     await fs.writeFile(sidecarPath(filePath), JSON.stringify(cached, null, 2)).catch(() => {});
   }
   return { idle, transitions: det.transitions, focus: det.focus, duration: det.duration };

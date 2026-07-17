@@ -237,11 +237,12 @@ export async function assembleNarratedScreencast(opts: {
           brandKit: project.brand_kit,
           tenantId: project.tenant_id,
           minDuration: Math.min(narrationDur, 180),
+          instrumental: true, // lyrics fight the narrator
         });
         if (bed) {
           (project.audio as any).tracks.push({
             id: "music_bed", type: "music", source: bed.path,
-            volume: 0.22, loop: true, fade_in: 0.8, fade_out: 2.5,
+            volume: 0.18, loop: true, fade_in: 0.8, fade_out: 2.5,
           });
           (project.audio as any).ducking = {
             enabled: true, duck_track: "music_bed", trigger_track: "narration",
