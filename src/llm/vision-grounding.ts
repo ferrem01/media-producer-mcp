@@ -183,6 +183,18 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
   const tmpDir = path.join(os.tmpdir(), `mp_vg_${crypto.randomBytes(4).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true });
   const out: PlannedCallout[] = [];
+
+  // The stills are scaled to 1024 wide; height follows the source's aspect.
+  // Claude's grounding training speaks PIXELS -- every model kept answering
+  // in pixels no matter how loudly the prompt demanded percentages. So ask
+  // in its native dialect and convert deterministically.
+  let imgW = 1024, imgH = 576;
+  try {
+    const { probeVideoMeta } = await import("../core/asset-intel.js");
+    const meta = await probeVideoMeta(opts.videoPath);
+    if (meta?.width && meta?.height) imgH = Math.round((1024 * meta.height) / meta.width / 2) * 2;
+  } catch { /* default 16:9 */ }
+
   try {
     for (const cue of opts.cues) {
       if (out.length >= maxCallouts) break;
@@ -201,14 +213,12 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
           role: "user",
           content: [
             txt(
-              `This frame is from a narrated product walkthrough. The narrator says: ` +
-              `"${cue.text.slice(0, 240)}"\n\n` +
+              `This ${imgW}x${imgH} image is a frame from a narrated product walkthrough. ` +
+              `The narrator says: "${cue.text.slice(0, 240)}"\n\n` +
               `If the frame clearly shows the specific UI element the narrator is referring to ` +
-              `(a button, tab, field, panel), reply with ONLY JSON in PERCENTAGES of the ` +
-              `frame (0-100, NOT pixels):\n` +
-              `{"found": true, "x": <left edge as % of frame width>, "y": <top edge as % of ` +
-              `frame height>, "w": <width %>, "h": <height %>}\n` +
-              `Example: {"found": true, "x": 31, "y": 62, "w": 38, "h": 14}\n` +
+              `(a button, tab, field, panel), reply with ONLY JSON -- the bounding box in ` +
+              `PIXELS of this ${imgW}x${imgH} image:\n` +
+              `{"found": true, "x": <left px>, "y": <top px>, "w": <width px>, "h": <height px>}\n` +
               `The box must cover the element's COMPLETE visual container -- the whole ` +
               `input box, card, button, or panel including its border and any controls ` +
               `inside it -- never just the text within it. When the narrator references a ` +
@@ -221,19 +231,29 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
         }], { maxTokens: 500, temperature: 0 });
         const ans = parseLlmJson(raw, "callout-grounding");
         const nums = [ans?.x, ans?.y, ans?.w, ans?.h];
-        // Pixel-looking answers (anything past 100) are REJECTED, not clamped:
-        // clamping flattened them all into an identical bottom-right sliver.
-        const validPct = nums.every((v: any) => typeof v === "number" && v >= 0 && v <= 100);
-        if (ans?.found === true && !(validPct && ans.w >= 2 && ans.h >= 1.5)) {
+        const numeric = nums.every((v: any) => typeof v === "number" && v >= 0);
+        let px = 0, py = 0, pw = 0, ph = 0, valid = false;
+        if (ans?.found === true && numeric) {
+          if (nums.every((v: number) => v <= 100) && ans.x + ans.w <= 104 && ans.y + ans.h <= 104) {
+            // Some answers still come back as percentages -- accept both dialects.
+            px = ans.x; py = ans.y; pw = ans.w; ph = ans.h;
+            valid = pw >= 2 && ph >= 1.5;
+          } else if (ans.x < imgW && ans.y < imgH && ans.x + ans.w <= imgW * 1.04 && ans.y + ans.h <= imgH * 1.04) {
+            px = (ans.x / imgW) * 100; py = (ans.y / imgH) * 100;
+            pw = (ans.w / imgW) * 100; ph = (ans.h / imgH) * 100;
+            valid = pw >= 2 && ph >= 1.5;
+          }
+        }
+        if (ans?.found === true && !valid) {
           console.warn(`  Vision callouts: rejected malformed box at ${at.toFixed(0)}s -- raw: ${String(raw).slice(0, 160)}`);
         } else if (ans?.found !== true) {
           console.log(`  Vision callouts: ${at.toFixed(0)}s -> not found -- raw: ${String(raw).slice(0, 140).replace(/\n/g, " ")}`);
         }
-        if (ans?.found === true && validPct && ans.w >= 2 && ans.h >= 1.5 && ans.x + ans.w <= 104 && ans.y + ans.h <= 104) {
-          const x = Math.min(92, Math.max(0, ans.x));
-          const y = Math.min(92, Math.max(0, ans.y));
-          const w = Math.min(60, Math.max(8, ans.w), 100 - x);
-          const h = Math.min(55, Math.max(6, ans.h), 100 - y);
+        if (valid) {
+          const x = Math.min(92, Math.max(0, px));
+          const y = Math.min(92, Math.max(0, py));
+          const w = Math.min(60, Math.max(8, pw), 100 - x);
+          const h = Math.min(55, Math.max(6, ph), 100 - y);
           out.push({
             at: Math.round(at * 100) / 100,
             dur: Math.round(Math.min(6, Math.max(3.5, cue.end - cue.start)) * 10) / 10,
