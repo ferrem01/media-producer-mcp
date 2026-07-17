@@ -137,7 +137,7 @@ export async function groundChapterPins(opts: GroundPinsOpts): Promise<MediaPin[
       );
 
       try {
-        const raw = await callLLM(cfg, [{ role: "user", content }], { maxTokens: 100, temperature: 0 });
+        const raw = await callLLM(cfg, [{ role: "user", content }], { maxTokens: 300, temperature: 0 });
         const ans = parseLlmJson(raw, "pin-grounding");
         const letter = typeof ans?.match === "string" ? ans.match.trim().toUpperCase() : "NONE";
         const hit = labeled.find((l) => l.letter === letter);
@@ -218,7 +218,7 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
             ),
             img(url),
           ],
-        }], { maxTokens: 120, temperature: 0 });
+        }], { maxTokens: 500, temperature: 0 });
         const ans = parseLlmJson(raw, "callout-grounding");
         const nums = [ans?.x, ans?.y, ans?.w, ans?.h];
         // Pixel-looking answers (anything past 100) are REJECTED, not clamped:
