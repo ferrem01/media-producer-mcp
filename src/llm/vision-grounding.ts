@@ -197,9 +197,11 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
               `This frame is from a narrated product walkthrough. The narrator says: ` +
               `"${cue.text.slice(0, 240)}"\n\n` +
               `If the frame clearly shows the specific UI element the narrator is referring to ` +
-              `(a button, tab, field, panel), reply with ONLY JSON:\n` +
-              `{"found": true, "x": <left %>, "y": <top %>, "w": <width %>, "h": <height %>}\n` +
-              `(percentages of the full frame, 0-100).\n` +
+              `(a button, tab, field, panel), reply with ONLY JSON in PERCENTAGES of the ` +
+              `frame (0-100, NOT pixels):\n` +
+              `{"found": true, "x": <left edge as % of frame width>, "y": <top edge as % of ` +
+              `frame height>, "w": <width %>, "h": <height %>}\n` +
+              `Example: {"found": true, "x": 31, "y": 62, "w": 38, "h": 14}\n` +
               `The box must cover the element's COMPLETE visual container -- the whole ` +
               `input box, card, button, or panel including its border and any controls ` +
               `inside it -- never just the text within it. When the narrator references a ` +
@@ -211,7 +213,11 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
           ],
         }], { maxTokens: 120, temperature: 0 });
         const ans = parseLlmJson(raw, "callout-grounding");
-        if (ans?.found === true && [ans.x, ans.y, ans.w, ans.h].every((v: any) => typeof v === "number")) {
+        const nums = [ans?.x, ans?.y, ans?.w, ans?.h];
+        // Pixel-looking answers (anything past 100) are REJECTED, not clamped:
+        // clamping flattened them all into an identical bottom-right sliver.
+        const validPct = nums.every((v: any) => typeof v === "number" && v >= 0 && v <= 100);
+        if (ans?.found === true && validPct && ans.w >= 2 && ans.h >= 1.5 && ans.x + ans.w <= 104 && ans.y + ans.h <= 104) {
           const x = Math.min(92, Math.max(0, ans.x));
           const y = Math.min(92, Math.max(0, ans.y));
           const w = Math.min(60, Math.max(8, ans.w), 100 - x);
