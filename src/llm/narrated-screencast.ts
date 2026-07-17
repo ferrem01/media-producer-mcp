@@ -134,6 +134,7 @@ export async function assembleNarratedScreencast(opts: {
   let spine: SentenceSpine | null = null;
   let pinResult: { pinned: number; dropped: number } | null = null;
   let calloutCount = 0;
+  let chapterPinCount = 0;
   if (narrationSource && narrationDur > 0.5) {
     const cacheDir = path.join(
       opts.dataDir || process.env.MP_DATA_DIR || "/data/media-producer",
@@ -183,20 +184,93 @@ export async function assembleNarratedScreencast(opts: {
       { dataDir: opts.dataDir },
     );
 
-    // Auto-callouts: when an action-cue sentence ("now click Broadcasts...")
-    // coincides with CONCENTRATED on-screen activity, glow/lift that region.
-    // Mapped through the PINNED media map (so they stay honest after the pin
-    // solve), proposed conservatively, editable as plain component data.
+    const videoPath = resolveVideoPath(screencastSource, opts.dataDir);
+    const edit = (screencastScene as any).media_edits?.screencast;
+
+    // Vision pass over the UNPINNED boundaries: motion snapping only trusts
+    // seams within ~6s of the blind guess; with a model verifying "is this
+    // the screen the narration starts describing?", the search widens to
+    // +/-30s safely. Confident matches become ordinary pins; "none" is a
+    // valid answer and everything degrades to the motion result.
+    if (opts.llmConfig && edit?.segments?.length) {
+      try {
+        const { groundChapterPins } = await import("./vision-grounding.js");
+        const { ensureMotionIntel } = await import("../core/asset-intel.js");
+        const { solveMediaEdits } = await import("../core/media-edl.js");
+        const intel = await ensureMotionIntel(videoPath);
+        const pinnedOuts = new Set(((edit.pins || []) as Array<{ out: number }>).map((p) => p.out));
+        const unpinned = spine.chapters
+          .map((ch, i) => ({
+            out: Math.round((ch.start - offset) * 100) / 100,
+            label: titles[i] || `Chapter ${i + 1}`,
+            openingText: spine.sentences
+              .slice(ch.firstSentence, Math.min(ch.firstSentence + 3, ch.lastSentence + 1))
+              .map((s) => s.text)
+              .join(" "),
+          }))
+          .filter((b) => b.out >= 3 && b.out <= sceneDur - 5 && !pinnedOuts.has(b.out));
+        if (unpinned.length && intel.transitions.length) {
+          const vpins = await groundChapterPins({
+            videoPath,
+            boundaries: unpinned,
+            segments: edit.segments,
+            transitions: intel.transitions,
+            srcDur: intel.duration,
+            llmConfig: opts.llmConfig,
+          });
+          if (vpins.length) {
+            // Merge with the motion pins, keep monotonic, re-solve; if the
+            // merged solve strains, fall back to the pre-vision map.
+            const merged = [...(edit.pins || []), ...vpins].sort((a: any, b: any) => a.out - b.out);
+            const monotonic: any[] = [];
+            for (const p of merged) {
+              const prev = monotonic[monotonic.length - 1];
+              if (!prev || (p.out > prev.out + 2 && p.src > prev.src + 2)) monotonic.push(p);
+            }
+            const solved = solveMediaEdits(
+              { cuts: edit.cuts || [], rate_regions: edit.rate_regions || [], pins: monotonic },
+              intel.duration,
+            );
+            if (solved.pin_status.every((s) => s.status === "ok")) {
+              edit.pins = monotonic;
+              edit.segments = solved.segments;
+              edit.pin_status = solved.pin_status;
+              edit.proposed = true;
+            } else {
+              console.log(`  Vision pins: merged solve strained -- keeping motion-only pins`);
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn(`  Vision pins: pass failed (${e?.message || e}) -- keeping motion pins`);
+      }
+    }
+    chapterPinCount = Math.max(0, ((edit?.pins || []) as Array<{ word?: string }>).filter((p) => p.word !== "end").length);
+
+    // Auto-callouts. With an LLM: vision grounding -- the narrator names the
+    // element ("now click Broadcasts..."), the model finds it in the frame at
+    // that moment; nothing clearly referenced -> no callout. Without an LLM:
+    // the motion-only heuristic (concentrated-activity regions). Either way
+    // the result is plain component data, editable in Studio.
     try {
-      const { planCallouts } = await import("../core/callout-plan.js");
+      const { planCallouts, isActionCue } = await import("../core/callout-plan.js");
       const { ensureMotionIntel } = await import("../core/asset-intel.js");
-      const edit = (screencastScene as any).media_edits?.screencast;
-      const intel = await ensureMotionIntel(resolveVideoPath(screencastSource, opts.dataDir));
-      if (edit?.segments?.length && intel.focus.length) {
-        const callouts = planCallouts(
-          captions, chapterMoments, edit.segments, intel.focus,
-          screencastScene.duration_seconds,
-        );
+      if (edit?.segments?.length) {
+        let callouts;
+        if (opts.llmConfig) {
+          const { groundCallouts } = await import("./vision-grounding.js");
+          callouts = await groundCallouts({
+            videoPath,
+            cues: captions.filter((c) => isActionCue(c.text)).slice(0, 10),
+            chapterMoments,
+            segments: edit.segments,
+            sceneDur,
+            llmConfig: opts.llmConfig,
+          });
+        } else {
+          const intel = await ensureMotionIntel(videoPath);
+          callouts = planCallouts(captions, chapterMoments, edit.segments, intel.focus, sceneDur);
+        }
         if (callouts.length) {
           const scfComp = (screencastScene.components as any[]).find((c) => c.type === "screencast-frame");
           if (scfComp) {
@@ -207,7 +281,7 @@ export async function assembleNarratedScreencast(opts: {
             );
           }
         } else {
-          console.log(`  Callouts: no confident matches (${intel.focus.length} focus events available)`);
+          console.log(`  Callouts: nothing confidently referenced -- none proposed`);
         }
       }
     } catch (e: any) {
@@ -268,9 +342,9 @@ export async function assembleNarratedScreencast(opts: {
     outro ? `outro ${Math.round(outroDur)}s` : null,
     spine ? `spine ${spine.sentences.length} sentences / ${spine.chapters.length} chapters` : `no spine (whisper unavailable)`,
     pinResult
-      ? pinResult.pinned
-        ? `${pinResult.pinned} chapter pin(s) snapped to visual transitions${pinResult.dropped ? ` (${pinResult.dropped} dropped as strained)` : ""}`
-        : `no chapter pins (no confident visual seams${pinResult.dropped ? `; ${pinResult.dropped} strained` : ""})`
+      ? chapterPinCount
+        ? `${chapterPinCount} chapter boundary pin(s) (motion + vision grounded)`
+        : `no chapter pins (no confident visual seams)`
       : null,
     calloutCount ? `${calloutCount} auto-callout(s)` : null,
     musicTitle ? `music bed "${musicTitle}" ducked under narration` : null,

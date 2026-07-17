@@ -6,6 +6,31 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-17 — Vision grounding: pins and callouts get eyes
+
+Motion analysis sees THAT pixels changed, never WHAT they are — the root
+cause of both watch-test complaints (pins too conservative, callouts
+arbitrary). `src/llm/vision-grounding.ts` adds a small-model vision pass at
+the two decision points of the assemble step:
+
+- **`groundChapterPins`** — for each boundary the motion pass left unpinned,
+  extract stills just after the candidate seams in a **±30s** window (wide is
+  safe now: a model verifies) and ask which screen — if any — is what the
+  chapter's opening narration describes. `{"match":"none"}` is valid and
+  common. Confident matches merge with the motion pins (monotonic-checked,
+  re-solved, strain-reverted).
+- **`groundCallouts`** — for each action-cue sentence, extract the frame at
+  that mapped moment and ask for the bounding box of the element the
+  narrator names, or `found:false`. Replaces the motion-only callouts when
+  an LLM is configured; motion heuristic remains the no-LLM fallback.
+
+Model: `MP_VISION_MODEL` (default `claude-haiku-4-5`); ~10–15 small calls
+per assemble. Character preserved: vision only grounds proposals, no
+confident answer → nothing ships, everything stays editable in Studio, and
+every failure degrades to the motion-only behavior.
+
+---
+
 ## 2026-07-17 — Watch-test fixes: real ducking in Studio, instrumental bed, median callout boxes
 
 First human watch of the full recipe surfaced three defects:

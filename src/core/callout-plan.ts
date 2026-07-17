@@ -37,6 +37,9 @@ export interface PlannedCallout {
 /** Sentences that name a concrete on-screen action. */
 const CUE_RE = /\b(click(?:s|ing)?|select(?:s|ing)?|open(?:s|ing)?|choos(?:e|es|ing)|press(?:es|ing)?|typ(?:e|es|ing)|enter(?:s|ing)?|tap(?:s|ping)?|toggl(?:e|es|ing)|drag(?:s|ging)?|edit(?:s|ing)?|submit(?:s|ting)?|sav(?:e|es|ing)|schedul(?:e|es|ing)|creat(?:e|es|ing)|add(?:s|ing)?)\b/i;
 
+/** True when a sentence names a concrete on-screen action (callout cue). */
+export const isActionCue = (text: string): boolean => CUE_RE.test(text);
+
 export function planCallouts(
   captions: CalloutCaption[],
   chapterMoments: Array<{ at: number }>,
