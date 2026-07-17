@@ -73,6 +73,20 @@ export function getPreviewHtml(): string {
   .btn-secondary:hover { background: #e5e7eb; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+  /* Narration booth (Mode B): bottom-right card so the film stays watchable
+     while recording. */
+  #booth-overlay { position: fixed; inset: 0; display: none; align-items: flex-end; justify-content: flex-end; padding: 20px 20px 76px; pointer-events: none; z-index: 300; }
+  #booth-card { pointer-events: auto; width: 320px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.18); padding: 16px; font-size: 12.5px; color: #111827; }
+  #booth-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  #booth-card p { color: #6b7280; line-height: 1.5; margin-bottom: 10px; }
+  #booth-card .booth-row { display: flex; gap: 8px; margin-top: 10px; }
+  #booth-card .booth-row .btn { flex: 1; padding: 8px 10px; }
+  .booth-count { font-size: 64px; font-weight: 700; text-align: center; padding: 18px 0; color: #4f46e5; font-variant-numeric: tabular-nums; }
+  .booth-live { display: flex; align-items: center; gap: 8px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .booth-dot { width: 10px; height: 10px; border-radius: 50%; background: #dc2626; animation: boothPulse 1.2s ease-in-out infinite; }
+  @keyframes boothPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  #booth-card audio { width: 100%; margin: 8px 0 2px; }
+
   /* Sidebar - spans rows 2 and 3 */
   #sidebar {
     grid-row: 2 / 4;
@@ -666,6 +680,7 @@ export function getPreviewHtml(): string {
       <label>Project</label>
       <select id="project-select" disabled><option value="">-- load tenant first --</option></select>
       <button class="btn btn-primary" id="load-btn">Load</button>
+      <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
     </div>
   </header>
 
@@ -717,6 +732,8 @@ export function getPreviewHtml(): string {
   </div>
 
 </div>
+
+<div id="booth-overlay"><div id="booth-card"></div></div>
 
 <div id="studio-toast"></div>
 <div id="studio-ctx"></div>
@@ -1890,6 +1907,16 @@ export function getPreviewHtml(): string {
 
       // Initialize audio tracks once for the project
       initAudio();
+
+      // Narration booth: offered whenever the film has screencast footage to
+      // narrate over (the attach endpoint needs a screencast scene).
+      var boothBtnEl = document.getElementById('booth-btn');
+      if (boothBtnEl) {
+        var hasScreencast = (project.scenes || []).some(function(s) {
+          return (s.components || []).some(function(c) { return c.type === 'screencast-frame'; });
+        });
+        boothBtnEl.style.display = hasScreencast ? '' : 'none';
+      }
 
       // Mobile: don't boot the composite (all scenes' runtimes in one doc)
       // until the user asks for it.
@@ -4454,6 +4481,181 @@ export function getPreviewHtml(): string {
       els.volSlider.dispatchEvent(new Event('input'));
     });
   }
+
+  // ─────────────────────────────────────────────
+  // Narration booth (Mode B, SPEC-recorder.md): play the locked cut from 0
+  // while recording the mic; the take becomes the film's soundtrack with
+  // captions + chapters attached server-side. Picture is never re-solved.
+  // ─────────────────────────────────────────────
+  var booth = { phase: 'closed', stream: null, rec: null, chunks: [], blob: null, url: null, startTs: 0, mon: null };
+
+  function boothCard(html) {
+    document.getElementById('booth-overlay').style.display = 'flex';
+    document.getElementById('booth-card').innerHTML = html;
+  }
+
+  function boothClose() {
+    booth.phase = 'closed';
+    if (booth.mon) { clearInterval(booth.mon); booth.mon = null; }
+    if (booth.rec && booth.rec.state === 'recording') { try { booth.rec.stop(); } catch (e) {} }
+    booth.rec = null;
+    if (booth.stream) { booth.stream.getTracks().forEach(function(t) { t.stop(); }); booth.stream = null; }
+    if (booth.url) { URL.revokeObjectURL(booth.url); booth.url = null; }
+    boothMute(false);
+    document.getElementById('booth-overlay').style.display = 'none';
+  }
+
+  // Program audio must not bleed into the take (or fight the narrator's
+  // ears): everything the transport can sound goes silent while recording.
+  function boothMute(m) {
+    state.audioElements.forEach(function(a) { a.muted = !!m; });
+    if (els.speakerBg) {
+      if (m) { booth._spkWasMuted = els.speakerBg.muted; els.speakerBg.muted = true; }
+      else if (booth._spkWasMuted !== undefined) { els.speakerBg.muted = booth._spkWasMuted; booth._spkWasMuted = undefined; }
+    }
+  }
+
+  function boothIdleCard() {
+    booth.phase = 'idle';
+    boothCard(
+      '<h3>&#127908; Narration booth</h3>' +
+      '<p>The film plays from the start while your mic records. Watch and narrate &mdash; your take becomes the soundtrack, and captions + chapter cards are built from it automatically. The cut itself never changes.</p>' +
+      '<div class="booth-row"><button class="btn btn-primary" id="booth-start">&#9210; Start take</button>' +
+      '<button class="btn btn-secondary" id="booth-cancel">Close</button></div>'
+    );
+    document.getElementById('booth-start').addEventListener('click', boothBegin);
+    document.getElementById('booth-cancel').addEventListener('click', boothClose);
+  }
+
+  function boothBegin() {
+    if (!state.compositeLoaded || !(state.totalDuration > 0)) {
+      studioStatus('Load the preview first, then start the take', 'err');
+      return;
+    }
+    var ready = booth.stream
+      ? Promise.resolve(booth.stream)
+      : navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    ready.then(function(stream) {
+      booth.stream = stream;
+      boothCountdown(3);
+    }).catch(function(e) {
+      boothCard('<h3>&#127908; Narration booth</h3><p>Microphone unavailable: ' + escHtml(e.message || String(e)) +
+        '. Allow mic access for this site and try again.</p>' +
+        '<div class="booth-row"><button class="btn btn-secondary" id="booth-cancel">Close</button></div>');
+      document.getElementById('booth-cancel').addEventListener('click', boothClose);
+    });
+  }
+
+  function boothCountdown(n) {
+    booth.phase = 'countdown';
+    if (n <= 0) { boothRecord(); return; }
+    boothCard('<div class="booth-count">' + n + '</div>');
+    setTimeout(function() { if (booth.phase === 'countdown') boothCountdown(n - 1); }, 900);
+  }
+
+  function boothRecord() {
+    scrub(0);
+    boothMute(true);
+    var mime = (window.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) ? 'audio/webm;codecs=opus' : 'audio/webm';
+    try {
+      booth.rec = new MediaRecorder(booth.stream, { mimeType: mime, audioBitsPerSecond: 128000 });
+    } catch (e) {
+      boothMute(false);
+      studioStatus('Recording not supported in this browser: ' + e.message, 'err');
+      boothClose();
+      return;
+    }
+    booth.chunks = [];
+    booth.rec.ondataavailable = function(e) { if (e.data && e.data.size) booth.chunks.push(e.data); };
+    booth.rec.onstop = boothReview;
+    booth.rec.start(500);
+    booth.startTs = performance.now();
+    booth.phase = 'recording';
+    if (!state.playing) togglePlay();
+    boothCard(
+      '<h3><span class="booth-dot"></span> Recording</h3>' +
+      '<p class="booth-live" id="booth-elapsed">0.0s / ' + fmtTime(state.totalDuration) + '</p>' +
+      '<p>Speak as you watch. The take stops itself when the film ends.</p>' +
+      '<div class="booth-row"><button class="btn btn-secondary" id="booth-stop">&#9209; Stop</button></div>'
+    );
+    document.getElementById('booth-stop').addEventListener('click', boothStopTake);
+    booth.mon = setInterval(function() {
+      if (booth.phase !== 'recording') return;
+      boothMute(true); // idempotent guard: audio elements can be rebuilt under us
+      var el = document.getElementById('booth-elapsed');
+      if (el) el.textContent = fmtTime((performance.now() - booth.startTs) / 1000) + ' / ' + fmtTime(state.totalDuration);
+      if (!state.playing || state.masterTime >= state.totalDuration - 0.05) boothStopTake();
+    }, 250);
+  }
+
+  function boothStopTake() {
+    if (booth.phase !== 'recording') return;
+    booth.phase = 'review';
+    if (booth.mon) { clearInterval(booth.mon); booth.mon = null; }
+    if (state.playing) togglePlay();
+    boothMute(false);
+    try { booth.rec.stop(); } catch (e) { boothReview(); }
+  }
+
+  function boothReview() {
+    if (booth.phase !== 'review') return;
+    booth.blob = new Blob(booth.chunks, { type: 'audio/webm' });
+    if (booth.url) URL.revokeObjectURL(booth.url);
+    booth.url = URL.createObjectURL(booth.blob);
+    var secs = ((performance.now() - booth.startTs) / 1000);
+    boothCard(
+      '<h3>&#127908; Take recorded (' + fmtTime(secs) + ')</h3>' +
+      '<audio controls src="' + booth.url + '"></audio>' +
+      '<div class="booth-row"><button class="btn btn-primary" id="booth-use">Use this take</button>' +
+      '<button class="btn btn-secondary" id="booth-retake">Retake</button>' +
+      '<button class="btn btn-secondary" id="booth-discard">Discard</button></div>'
+    );
+    document.getElementById('booth-use').addEventListener('click', boothUpload);
+    document.getElementById('booth-retake').addEventListener('click', function() { boothCountdown(3); });
+    document.getElementById('booth-discard').addEventListener('click', boothClose);
+  }
+
+  function boothUpload() {
+    var p = state.currentProject;
+    if (!p || !booth.blob) return;
+    booth.phase = 'uploading';
+    boothCard('<h3>&#127908; Attaching narration&hellip;</h3><p>Uploading the take, transcribing it, and building captions + chapter cards. This takes a moment.</p>');
+    var name = 'booth-take-' + new Date().toISOString().replace(/[:.]/g, '-') + '.webm';
+    var url = withToken('/api/booth-narration/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '?name=' + encodeURIComponent(name));
+    var opts = { method: 'POST', body: booth.blob, headers: { 'Content-Type': 'application/octet-stream' } };
+    if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
+    fetch(url, opts).then(function(r) {
+      return r.json().then(function(j) {
+        if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        return j;
+      });
+    }).then(function(j) {
+      booth.phase = 'done';
+      boothCard(
+        '<h3>&#10003; Narration attached</h3>' +
+        '<p>' + escHtml(j.summary || 'Done.') + '</p>' +
+        '<div class="booth-row"><button class="btn btn-primary" id="booth-done">Close</button></div>'
+      );
+      document.getElementById('booth-done').addEventListener('click', boothClose);
+      // Reload so the captions overlay, audio lanes and spine show up.
+      loadProject(p.project_id);
+    }).catch(function(e) {
+      booth.phase = 'review';
+      boothCard(
+        '<h3>Upload failed</h3><p>' + escHtml(e.message || String(e)) + '</p>' +
+        '<div class="booth-row"><button class="btn btn-primary" id="booth-use">Retry</button>' +
+        '<button class="btn btn-secondary" id="booth-discard">Discard</button></div>'
+      );
+      document.getElementById('booth-use').addEventListener('click', boothUpload);
+      document.getElementById('booth-discard').addEventListener('click', boothClose);
+    });
+  }
+
+  var boothBtn = document.getElementById('booth-btn');
+  if (boothBtn) boothBtn.addEventListener('click', function() {
+    if (booth.phase === 'closed') boothIdleCard();
+    else if (booth.phase === 'idle' || booth.phase === 'done') boothClose();
+  });
 
   // Global error handler - show errors visually
   window.addEventListener('error', function(e) {

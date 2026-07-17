@@ -113,12 +113,13 @@ What each stream replaces:
 
 ## MVP order (build after spec sign-off)
 
-1. **Foundation** (shared by A/B): extension records tab + events sidecar,
-   uploads, auto-fires generate. No mic yet. Immediate payoff: deterministic
-   compression + chapter anchors + (behind `MP_AUTO_CALLOUTS=1`) sidecar-driven
-   callouts on real recordings.
-2. **Mode B booth**: compressed-cut playback + mic recording + punch-in
-   retakes. This is the flagship UX.
+1. **Foundation** — ✅ SHIPPED 2026-07-17 (extension + sidecar + auto-generate;
+   first live recording proved the chain same day: proj_cac63a35's 74s tab
+   recording → 27s sidecar-compressed cut, zero pixel decoding).
+2. **Mode B booth** — ✅ SHIPPED 2026-07-17 (Studio 🎙 Narrate: locked-cut
+   playback + mic recording + whole-take retakes; `attachBoothNarration` +
+   `POST /api/booth-narration`). Punch-in retakes deferred — whole-take
+   retake is cheap at walkthrough lengths.
 3. **Mode A**: simultaneous mic + idle∩silence compression + teleprompter.
 
 ## Non-goals (v1)

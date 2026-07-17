@@ -6,6 +6,39 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-17 — Mode B narration booth (SPEC-recorder.md, MVP step 2)
+
+First live extension recording worked end-to-end same day (proj_cac63a35:
+74s tab recording → 27s sidecar-compressed cut, zero pixel decoding). Mode B
+lands on top of it — narrate AGAINST the locked cut, so the "voice recorded
+separately vs. video needs condensing" conflict can't exist:
+
+- **`attachBoothNarration`** (`narrated-screencast.ts`): lays a booth take
+  onto an assembled project. Picture is LOCKED — scenes, durations and media
+  edits untouched, no fit-solve, no pins (the take was performed to the cut,
+  sync is by construction). Attaches: narration track (replaces prior take;
+  retake-idempotent), whisper spine → captions + chapter cards (scene-local
+  offset past the intro; captions spoken during the intro drop), ducked
+  instrumental bed (picked once, kept across retakes), `project.spine`.
+  Tested with mocked probes (`test/booth-attach.test.ts`).
+- **Route** `POST /api/booth-narration/{tenant}/{project}?name=` — raw audio
+  body (MediaRecorder webm/opus), saves the take as a project asset, runs the
+  attach synchronously (whisper on a booth-length take is seconds).
+- **Studio booth UI** (`preview-app.ts`): 🎙 Narrate button (shown when the
+  film has a screencast scene) → bottom-right booth card: mic permission →
+  3-2-1 countdown → seeks to 0 and plays the film with ALL program audio
+  muted while MediaRecorder records → auto-stops at film end → review with
+  audio playback → Use take / Retake / Discard → upload + reload. Program
+  mute is re-asserted every monitor tick (audio elements can be rebuilt).
+- **Extension popup** now reacts to live upload status (runtime broadcast +
+  storage.session change listener) instead of freezing on "uploading…".
+
+Punch-in retakes (re-record from a timeline point) deferred; whole-take
+retake is cheap at walkthrough lengths. Next slice: Mode A (live mic +
+idle∩silence compression + teleprompter).
+
+---
+
 ## 2026-07-17 — Quotient Recorder foundation (SPEC-recorder.md, MVP step 1)
 
 Record → Stop → the film assembles itself. First slice of the recorder:

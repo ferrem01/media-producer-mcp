@@ -85,6 +85,154 @@ export async function titleChapters(
   return spine.chapters.map(() => "");
 }
 
+export interface BoothAttachResult {
+  summary: string;
+  captions: number;
+  chapters: number;
+  narration_duration: number;
+}
+
+/**
+ * Mode B (SPEC-recorder.md): attach a voiceover that was PERFORMED AGAINST the
+ * already-assembled cut (the Studio narration booth plays the film from 0
+ * while recording the mic). The picture is locked -- scenes, durations and
+ * media edits are not touched, and no fit-solving happens, because the
+ * narration clock IS the film clock by construction. This only lays sound and
+ * spine artifacts on top: narration track, captions + chapter cards from the
+ * whisper spine, and the grammar's ducked instrumental bed.
+ */
+export async function attachBoothNarration(opts: {
+  project: Project;
+  /** Asset URL/path of the recorded take (audio webm/opus from MediaRecorder). */
+  narrationSource: string;
+  dataDir?: string;
+  /** Enables chapter titling (one small call); captions are deterministic. */
+  llmConfig?: LLMConfig;
+  /** Ducked music bed (default ON, matching the assemble path). */
+  music?: boolean;
+}): Promise<BoothAttachResult> {
+  const { project, narrationSource } = opts;
+  const narrationDur = await probeMediaDuration(narrationSource, opts.dataDir);
+  if (!(narrationDur > 0.5)) throw new Error("narration take is empty or unreadable");
+
+  // The scene the VO narrates over: the one carrying media edits (the
+  // compressed walkthrough), else the longest screencast-frame scene.
+  const scenes: Scene[] = project.scenes || [];
+  const target =
+    scenes.find((s) => (s as any).media_edits) ||
+    scenes
+      .filter((s) => (s.components || []).some((c: any) => c.type === "screencast-frame"))
+      .sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0))[0];
+  if (!target) throw new Error("project has no screencast scene to narrate");
+  const offset = scenes
+    .slice(0, scenes.indexOf(target))
+    .reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
+  const sceneDur = target.duration_seconds || 0;
+  const filmDur = scenes.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
+  if (Math.abs(narrationDur - filmDur) > 3) {
+    console.log(
+      `  Booth: take is ${Math.round(narrationDur)}s vs film ${Math.round(filmDur)}s -- picture stays locked, audio just ends ${narrationDur < filmDur ? "early" : "late"}`,
+    );
+  }
+
+  // Spine: captions + chapter cards. Booth takes start at film time 0, so
+  // spine times are film times; the walkthrough overlay gets scene-local
+  // times. Degrades to bare narration when whisper is unavailable.
+  const cacheDir = path.join(
+    opts.dataDir || process.env.MP_DATA_DIR || "/data/media-producer",
+    project.tenant_id, "projects", project.project_id, "thumbs",
+  );
+  const spine = await getSentenceSpine(resolveVideoPath(narrationSource, opts.dataDir), cacheDir);
+  let captionCount = 0;
+  let chapterCount = 0;
+  if (spine) {
+    const captions = spine.sentences
+      .map((s) => ({
+        text: s.text,
+        start: Math.max(0, Math.round((s.start - offset) * 100) / 100),
+        end: Math.round((s.end - offset) * 100) / 100,
+      }))
+      .filter((c) => c.end > 0.3 && c.start < sceneDur - 0.5);
+
+    let titles: string[] = spine.chapters.map(() => "");
+    if (opts.llmConfig && spine.chapters.length > 1) {
+      titles = await titleChapters(spine, opts.llmConfig);
+    }
+    const chapterMoments = spine.chapters
+      .map((ch, i) => ({ title: titles[i], at: Math.max(1.0, Math.round((ch.start - offset) * 100) / 100) }))
+      .filter((c) => c.title && c.at < sceneDur - 4);
+
+    const overlay = {
+      id: "narration_overlay",
+      type: "narration-track",
+      z_index: 50,
+      position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+      data: { captions, chapters: chapterMoments },
+    } as any;
+    const existing = (target.components as any[]).findIndex((c) => c.id === "narration_overlay");
+    if (existing >= 0) (target.components as any[])[existing] = overlay;
+    else (target.components as any[]).push(overlay);
+
+    project.spine = {
+      sentences: spine.sentences,
+      chapters: spine.chapters.map((ch, i) => ({ ...ch, title: titles[i] || ch.title })),
+    };
+    captionCount = captions.length;
+    chapterCount = chapterMoments.length;
+  }
+
+  // Sound: narration replaces any prior take; the bed is added once and kept
+  // across retakes.
+  const audio: any = (project.audio as any) || { tracks: [] };
+  audio.tracks = (audio.tracks || []).filter((t: any) => t.id !== "narration");
+  audio.tracks.unshift({ id: "narration", type: "voiceover", source: narrationSource, volume: 1 });
+  let musicTitle: string | null = null;
+  const hasBed = audio.tracks.some((t: any) => t.id === "music_bed");
+  if (opts.music !== false && !hasBed) {
+    try {
+      const { selectMusic } = await import("../audio/music.js");
+      const bed = await selectMusic({
+        mood: "calm",
+        brandKit: project.brand_kit,
+        tenantId: project.tenant_id,
+        minDuration: Math.min(narrationDur, 180),
+        instrumental: true,
+      });
+      if (bed) {
+        audio.tracks.push({
+          id: "music_bed", type: "music", source: bed.path,
+          volume: 0.18, loop: true, fade_in: 0.8, fade_out: 2.5,
+        });
+        musicTitle = bed.title;
+        console.log(`  Booth: music bed "${bed.title}" by ${bed.artist} (${bed.source})`);
+      }
+    } catch (e: any) {
+      console.warn(`  Booth: music selection failed (${e?.message || e}) -- continuing without`);
+    }
+  }
+  audio.ducking = {
+    enabled: true, duck_track: "music_bed", trigger_track: "narration",
+    ducked_volume: 0.35, attack: 0.4, release: 0.9,
+  };
+  project.audio = audio;
+  project.status = "generated";
+  project.updated_at = new Date().toISOString();
+
+  const parts = [
+    `narration ${Math.round(narrationDur)}s attached (picture locked)`,
+    spine
+      ? `spine ${captionCount} captions / ${chapterCount} chapter card(s)`
+      : `no spine (whisper unavailable)`,
+    musicTitle ? `music bed "${musicTitle}" ducked under narration` : hasBed ? `existing music bed kept` : null,
+  ].filter(Boolean);
+  return {
+    summary: `Booth narration attached: ${parts.join(" | ")}.`,
+    captions: captionCount,
+    chapters: chapterCount,
+    narration_duration: Math.round(narrationDur * 10) / 10,
+  };
+}
+
 /**
  * Assemble the narrated-screencast film in place on `project`. Sets
  * project.scenes, project.audio (narration), and status='generated'. The

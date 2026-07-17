@@ -8,9 +8,25 @@ async function load() {
   const { recording } = await chrome.runtime.sendMessage({ type: "qr-status" }) || {};
   setRecording(!!recording);
   const { qrLastStatus } = (await chrome.storage.session?.get("qrLastStatus")) || {};
-  if (qrLastStatus?.state === "error") $("status").textContent = "Last upload failed: " + qrLastStatus.error;
-  else if (qrLastStatus?.state === "done") $("status").textContent = "Last recording uploaded — assembling in Studio.";
+  showStatus(qrLastStatus);
 }
+
+function showStatus(st) {
+  if (!st) return;
+  if (st.state === "uploading") $("status").textContent = "Uploading…";
+  else if (st.state === "done") $("status").textContent = "Uploaded ✓ — assembling now; the film appears in Studio in a few minutes.";
+  else if (st.state === "error") $("status").textContent = "Upload failed: " + (st.error || "unknown error");
+}
+
+// Live updates while the popup stays open: the offscreen uploader broadcasts
+// progress, and the terminal state also lands in storage.session (covers a
+// popup opened after the fact).
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === "qr-offscreen-status") showStatus({ state: msg.state, error: msg.error });
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "session" && changes.qrLastStatus?.newValue) showStatus(changes.qrLastStatus.newValue);
+});
 
 function setRecording(on) {
   const b = $("record");
