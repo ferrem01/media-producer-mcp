@@ -2,9 +2,19 @@
 const $ = (id) => document.getElementById(id);
 const FIELDS = ["server", "tenant", "token", "project"];
 
+// First-run defaults: everything but the token, so a fresh install is one
+// field away from recording. (Settings persist across reinstalls anyway --
+// the manifest "key" pins the extension ID that chrome.storage.sync keys on.)
+const DEFAULTS = {
+  server: "http://159.203.115.164:3200",
+  tenant: "marc-getquotient-ai",
+  token: "",
+  project: "library",
+};
+
 async function load() {
-  const s = await chrome.storage.sync.get({ server: "", tenant: "", token: "", project: "library" });
-  FIELDS.forEach((f) => { $(f).value = s[f] || ""; });
+  const s = await chrome.storage.sync.get(DEFAULTS);
+  FIELDS.forEach((f) => { $(f).value = s[f] || DEFAULTS[f] || ""; });
   const { recording } = await chrome.runtime.sendMessage({ type: "qr-status" }) || {};
   setRecording(!!recording);
   const { qrLastStatus } = (await chrome.storage.session?.get("qrLastStatus")) || {};
