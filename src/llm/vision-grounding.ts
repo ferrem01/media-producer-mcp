@@ -226,6 +226,8 @@ export async function groundCallouts(opts: GroundCalloutsOpts): Promise<PlannedC
         const validPct = nums.every((v: any) => typeof v === "number" && v >= 0 && v <= 100);
         if (ans?.found === true && !(validPct && ans.w >= 2 && ans.h >= 1.5)) {
           console.warn(`  Vision callouts: rejected malformed box at ${at.toFixed(0)}s -- raw: ${String(raw).slice(0, 160)}`);
+        } else if (ans?.found !== true) {
+          console.log(`  Vision callouts: ${at.toFixed(0)}s -> not found -- raw: ${String(raw).slice(0, 140).replace(/\n/g, " ")}`);
         }
         if (ans?.found === true && validPct && ans.w >= 2 && ans.h >= 1.5 && ans.x + ans.w <= 104 && ans.y + ans.h <= 104) {
           const x = Math.min(92, Math.max(0, ans.x));
