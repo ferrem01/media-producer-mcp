@@ -6,6 +6,37 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-17 — Chapter pins: semantic audio↔video sync (speaker-screencast)
+
+Before this, narration and footage were only **durationally** synced (the
+compression solve matches totals) — nothing guaranteed the screencast SHOWS the
+broadcast screen while the narrator talks about it, and an early mismatch
+drifted through the whole film. Now the spine's chapter boundaries become
+**pins** on the screencast's media map:
+
+- **`transitionsFromScores`** (`compress-waiting.ts`, now `analyzeMotion` — one
+  decode, both signals): hard visual transitions = short isolated spikes in the
+  same frame-diff profile idle detection uses. Sustained motion (scrolls,
+  animations) is rejected; multi-step navigations within 3s collapse to one.
+  Cached at ingest as `intel.transitions`.
+- **`planChapterPins`** (`auto-compress.ts`, pure): per chapter boundary, take
+  the proportional guess (where the current solve already lands), snap to the
+  nearest transition within ±6s, keep only monotonic confident matches — **a
+  boundary with no visual seam nearby gets NO pin** (a wrong pin is worse than
+  none). An end-pin (scene end → source end) keeps the narration fit exact.
+- **`proposeChapterPins`**: re-solves via `solveMediaEdits` (idle rate_regions
+  stay the elastic between pins); **strained pins are dropped** and re-solved.
+  Pins carry the chapter title as their label → they land in Studio's media
+  lane named, visible, draggable. Machine proposes; human owns the last 10%.
+- Wired into `assembleNarratedScreencast` after the spine; summary reports
+  `N chapter pin(s) snapped to visual transitions`.
+
+Drift is now bounded per chapter and re-anchored at every pinned boundary.
+This also sets up rung 3 (callouts/punch-ins): anchored off pins, callouts
+survive a human dragging one.
+
+---
+
 ## 2026-07-17 — Speaker-screencast sentence spine: captions + chapters
 
 The grammar's own spine, realized (the backlog item from the prep+mandate entry).
