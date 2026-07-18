@@ -5108,6 +5108,41 @@ export function getPreviewHtml(): string {
     rvPopShow();
   }
 
+  // Speaker-bubble placement: corner presets + S/M/L sizes as canvas
+  // percentages (16:9 box on the 16:9 canvas -> h% == w%). Keeps a bottom
+  // margin so the bubble never sits on the caption band.
+  function bubblePlace(compId, corner, size) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[state.currentSceneIndex];
+    if (!p || !scene) return;
+    var comp = null;
+    (scene.components || []).forEach(function(c) { if (c.id === compId) comp = c; });
+    if (!comp) return;
+    var pos = comp.position || { x: '74%', y: '58%', width: '23%', height: '30%' };
+    var w = parseFloat(pos.width) || 23;
+    if (size) w = size === 'S' ? 15 : size === 'L' ? 30 : 22;
+    var h = w; // 16:9 box on a 16:9 canvas
+    var x = parseFloat(pos.x) || 74;
+    var y = parseFloat(pos.y) || 58;
+    if (corner) {
+      x = (corner === 'tl' || corner === 'bl') ? 3 : 97 - w;
+      y = (corner === 'tl' || corner === 'tr') ? 5 : 88 - h;
+    } else {
+      // Size-only change: keep the current corner's anchor edges.
+      x = x > 50 ? 97 - w : 3;
+      y = y > 40 ? 88 - h : 5;
+    }
+    comp.position = { x: x + '%', y: y + '%', width: w + '%', height: h + '%' };
+    studioStatus('Placing bubble…', '');
+    var patchPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+    api('PATCH', patchPath, { position: comp.position }).then(function() {
+      studioStatus('Bubble placed ✓ reloading preview…', 'ok');
+      startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+    }).catch(function(e) {
+      studioStatus('Bubble placement failed: ' + e.message, 'err');
+    });
+  }
+
   // ── Floating revise popover: opens next to the clicked element so surgical
   // revisions happen where you're looking, not in the bottom panel. ──
   function rvPopClose() {
@@ -5136,6 +5171,20 @@ export function getPreviewHtml(): string {
       camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
         (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '');
     }
+    // Speaker bubble selected: direct placement beats prose. Corners + sizes
+    // write the component position through the PATCH route -- no LLM, instant.
+    var isBubble = !isScene && sel && (sel.compId === 'camera_pip' || sel.compId === 'booth_pip');
+    var bubbleRow = isBubble
+      ? '<div class="sp-row" style="gap:4px;" title="Place the camera bubble">' +
+          ['tl:&#8598;', 'tr:&#8599;', 'bl:&#8601;', 'br:&#8600;'].map(function(c) {
+            var p = c.split(':');
+            return '<button class="rv-go secondary rv-bub-corner" data-corner="' + p[0] + '" style="flex:1;">' + p[1] + '</button>';
+          }).join('') +
+          ['S', 'M', 'L'].map(function(s) {
+            return '<button class="rv-go secondary rv-bub-size" data-size="' + s + '" style="flex:1;">' + s + '</button>';
+          }).join('') +
+        '</div>'
+      : '';
     pop.innerHTML =
       '<div class="sp-head"><span class="sp-title" id="rv-pop-title"></span>' +
       '<button class="sp-x" id="rv-pop-x" title="Close (Esc)">✕</button></div>' +
@@ -5144,6 +5193,7 @@ export function getPreviewHtml(): string {
         '<button class="rv-go secondary" id="rv-pop-undo" style="flex:0 0 auto;" title="Undo the last revise on this scene">Undo</button>' +
         '<button class="rv-go" id="rv-pop-go" style="flex:1;">' + (isScene ? 'Revise scene' : 'Revise') + '</button>' +
       '</div>' +
+      bubbleRow +
       '<div class="sp-row">' + camRow + '</div>' +
       '<div class="sp-status" id="rv-pop-status"></div>';
     document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
@@ -5159,6 +5209,14 @@ export function getPreviewHtml(): string {
       studioStatus('Drag on the scene to draw the zoom region (Esc cancels).', '');
       if (els.camHint) els.camHint.textContent = 'Drag on the scene to draw the zoom region (Esc cancels).';
     });
+    if (isBubble) {
+      pop.querySelectorAll('.rv-bub-corner').forEach(function(b) {
+        b.addEventListener('click', function() { bubblePlace(sel.compId, b.getAttribute('data-corner'), null); });
+      });
+      pop.querySelectorAll('.rv-bub-size').forEach(function(b) {
+        b.addEventListener('click', function() { bubblePlace(sel.compId, null, b.getAttribute('data-size')); });
+      });
+    }
     var ta = document.getElementById('rv-pop-input');
     ta.value = keepText;
     ta.addEventListener('keydown', function(e) {
