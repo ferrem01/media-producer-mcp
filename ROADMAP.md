@@ -202,6 +202,17 @@ a single-scene revision regenerates only that scene and **skips the editorial pa
 - Delete the dead `template` field on `PlannedScene`.
 
 ## Backlog — open follow-ups (b-roll / legibility / theme work)
+- **Timelapse-over-silence (parked 2026-07-18 at Marc's call).** When the
+  speaker goes quiet >~4s but the SCREEN is active, the auto-cut correctly
+  keeps the footage — leaving real dead air in the film (seen live: 9.4s on
+  proj_34d1497c while a campaign was being created on screen). The treatment
+  would speed the screen 4–8× through the voice gap (film ripples shorter,
+  same as a cut but the picture fast-forwards instead of disappearing).
+  Detection is already solved (silencedetect spans, the word-snap fix uses
+  them); what's undesigned is the UX. Marc: "I wanna face the issue in a real
+  example and try to understand exactly how I would want it to work" — revisit
+  after a few more real recordings, likely as a Studio suggestion rather than
+  an automatic edit.
 - **Codegen first-pass layout quality (overlap / off-canvas clipping).** The
   critique *catches* overlap/clipping/missing-element and regenerates, but that's
   the bulk of the retry cost. Improving first-pass layout (safe areas, no text on
