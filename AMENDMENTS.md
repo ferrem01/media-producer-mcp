@@ -6,6 +6,41 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-18 — First-contact hardening (the day real use found the plumbing)
+
+Four bugs, one pattern: detection worked, the joint between stages dropped
+the result. All found by real recordings, none by tests-in-isolation.
+
+- **Duration-less MediaRecorder files**: Chrome writes no duration header;
+  probes read 0 and "empty recording" surfaced three layers away. Remux at
+  ingest + probe fallback to `ffmpeg -i` parsing (envs without ffprobe).
+- **Upload ordering vs intel**: video intel analyzes before the events
+  sidecar arrives, so tab captures got static-band trims of their own UI
+  (271px of product sidebar read as "chrome"). recorder-events now
+  re-refines saved intel on sidecar arrival (`refineSavedIntelForRecorder`).
+- **Idle-range shape mismatch**: sidecar idle is `{start,end}`; the Mode A
+  cut intersector read `{from,to}` -- every live-narrated film shipped
+  uncut while logs showed perfect detection. Regression test drives the
+  real shapes end-to-end.
+- **MP_AUTO_CALLOUTS resurrection**: the parked feature's env-flag gate was
+  still set in the droplet's `/etc/media-producer/env` -- parked features
+  must be re-enabled by code change, not config residue. Auto-invocation
+  deleted outright.
+- **GOTCHA (open, systemic): deploys kill in-flight generations.**
+  `recorder-generate` work runs fire-and-forget inside the server process;
+  a CD deploy restarts pm2 and the assembly dies silently, leaving a draft
+  shell (same class as the render-clobber gotcha). Don't merge while an
+  assembly is in flight; product fix = restart-surviving job queue or
+  deploy draining.
+- **Recorder recipe v2** shipped the same day: brand backdrop + macOS
+  browser frame (chrome bar shows the recorded host from the sidecar),
+  ~matted at 96% width, crop:"auto". Deterministic component config -- the
+  matte also makes crop imprecision invisible in a way full-bleed never did.
+- **Backlogged**: editable cuts on narrated films with audio re-derive +
+  independent speaker/media cut editing (ROADMAP second tier).
+
+---
+
 ## 2026-07-18 — Recorder complete: teleprompter, Mode A, closed loop
 
 All three spec modes now exist. This slice:
