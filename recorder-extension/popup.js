@@ -59,17 +59,21 @@ async function save() {
   await chrome.storage.sync.set(s);
 }
 
-// Mode A needs mic permission for the extension origin. The offscreen doc
-// that records can't show a permission prompt, so prime it HERE (the popup
-// can) the moment the toggle goes on -- one prompt, remembered forever.
+// Mode A needs mic permission for the extension origin, and a permission
+// prompt can't live in this popup (the prompt steals focus, the popup
+// closes, the prompt cancels itself). If not yet granted, open a dedicated
+// setup tab that hosts the prompt; it flips the stored toggle on success.
 $("mic").addEventListener("change", async (e) => {
   if (e.target.checked) {
+    let granted = false;
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-      s.getTracks().forEach((t) => t.stop());
-    } catch (err) {
-      e.target.checked = false;
-      $("status").textContent = "Mic permission needed for live narration: " + (err && err.message || err);
+      const p = await navigator.permissions.query({ name: "microphone" });
+      granted = p.state === "granted";
+    } catch (err) { /* fall through to the setup tab */ }
+    if (!granted) {
+      e.target.checked = false; // mic.js sets it true once actually granted
+      chrome.tabs.create({ url: chrome.runtime.getURL("mic.html") });
+      return;
     }
   }
   save();

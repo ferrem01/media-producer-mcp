@@ -54,6 +54,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) { sendResponse({ ok: false, error: "No active tab." }); return; }
+        // Chrome forbids extensions on its own pages -- fail with directions,
+        // not a cryptic "Cannot access a chrome:// URL".
+        if (/^(chrome|chrome-extension|edge|about|devtools|view-source):/.test(tab.url || "")) {
+          sendResponse({ ok: false, error: "This page can't be recorded. Switch to the tab you want to demo (a normal website), then hit Record." });
+          return;
+        }
 
         const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
         await ensureOffscreen();
