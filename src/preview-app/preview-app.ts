@@ -4585,21 +4585,50 @@ export function getPreviewHtml(): string {
     booth.rec.start(500);
     booth.startTs = performance.now();
     booth.phase = 'recording';
+    booth.desynced = false;
+    booth.lastFilmT = 0;
     if (!state.playing) togglePlay();
-    boothCard(
-      '<h3><span class="booth-dot"></span> Recording</h3>' +
-      '<p class="booth-live" id="booth-elapsed">0.0s / ' + fmtTime(state.totalDuration) + '</p>' +
-      '<p>Speak as you watch. The take stops itself when the film ends.</p>' +
-      '<div class="booth-row"><button class="btn btn-secondary" id="booth-stop">&#9209; Stop</button></div>'
-    );
-    document.getElementById('booth-stop').addEventListener('click', boothStopTake);
+    boothRecCard(false);
+    // The recorder is glued to the FILM clock: pausing the transport pauses
+    // the take (catch your breath, then press play to resume -- both pick up
+    // together), and only reaching the end of the film ends it.
     booth.mon = setInterval(function() {
       if (booth.phase !== 'recording') return;
       boothMute(true); // idempotent guard: audio elements can be rebuilt under us
+      if (state.masterTime >= state.totalDuration - 0.05) { boothStopTake(); return; }
+      var paused = booth.rec.state === 'paused';
+      if (!state.playing && !paused) {
+        try { booth.rec.pause(); } catch (e) {}
+        boothRecCard(true);
+      } else if (state.playing && paused) {
+        try { booth.rec.resume(); } catch (e) {}
+        boothRecCard(false);
+      }
+      // A scrub while paused breaks the film-clock == take-clock invariant;
+      // flag it so the review card can suggest a retake.
+      if (!state.playing && Math.abs(state.masterTime - booth.lastFilmT) > 0.6) booth.desynced = true;
+      booth.lastFilmT = state.masterTime;
       var el = document.getElementById('booth-elapsed');
-      if (el) el.textContent = fmtTime((performance.now() - booth.startTs) / 1000) + ' / ' + fmtTime(state.totalDuration);
-      if (!state.playing || state.masterTime >= state.totalDuration - 0.05) boothStopTake();
+      if (el) el.textContent = fmtTime(state.masterTime) + ' / ' + fmtTime(state.totalDuration);
     }, 250);
+  }
+
+  function boothRecCard(paused) {
+    boothCard(
+      (paused
+        ? '<h3>&#9208; Paused</h3><p class="booth-live" id="booth-elapsed"></p>' +
+          '<p>Recording is paused with the film. Press play (or Resume) and both continue together. Don\\'t scrub the timeline &mdash; the take is glued to the film clock.</p>' +
+          '<div class="booth-row"><button class="btn btn-primary" id="booth-resume">&#9205; Resume</button>' +
+          '<button class="btn btn-secondary" id="booth-stop">&#9209; Finish take</button></div>'
+        : '<h3><span class="booth-dot"></span> Recording</h3><p class="booth-live" id="booth-elapsed"></p>' +
+          '<p>Speak as you watch. Pause the film to catch your breath &mdash; the recording pauses with it. The take ends itself when the film does.</p>' +
+          '<div class="booth-row"><button class="btn btn-secondary" id="booth-stop">&#9209; Stop</button></div>')
+    );
+    var rs = document.getElementById('booth-resume');
+    if (rs) rs.addEventListener('click', function() { if (!state.playing) togglePlay(); });
+    document.getElementById('booth-stop').addEventListener('click', boothStopTake);
+    var el = document.getElementById('booth-elapsed');
+    if (el) el.textContent = fmtTime(state.masterTime) + ' / ' + fmtTime(state.totalDuration);
   }
 
   function boothStopTake() {
@@ -4616,9 +4645,9 @@ export function getPreviewHtml(): string {
     booth.blob = new Blob(booth.chunks, { type: 'audio/webm' });
     if (booth.url) URL.revokeObjectURL(booth.url);
     booth.url = URL.createObjectURL(booth.blob);
-    var secs = ((performance.now() - booth.startTs) / 1000);
     boothCard(
-      '<h3>&#127908; Take recorded (' + fmtTime(secs) + ')</h3>' +
+      '<h3>&#127908; Take recorded (' + fmtTime(state.masterTime) + ' of film covered)</h3>' +
+      (booth.desynced ? '<p style="color:#b45309;">&#9888; The timeline was scrubbed mid-take, so voice and picture may be out of step &mdash; listen before using, or retake.</p>' : '') +
       '<audio controls src="' + booth.url + '"></audio>' +
       '<div class="booth-row"><button class="btn btn-primary" id="booth-use">Use this take</button>' +
       '<button class="btn btn-secondary" id="booth-retake">Retake</button>' +

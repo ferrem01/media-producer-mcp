@@ -40,6 +40,23 @@ function runFfmpeg(args: string[]): Promise<{ code: number; stderr: string }> {
   });
 }
 
+/** MediaRecorder output (booth takes, extension recordings) streams straight
+ *  into the blob with NO duration or seek cues in the container header --
+ *  ffprobe reports N/A and every downstream duration probe sees an empty
+ *  file. A stream-copy remux rewrites the container with real metadata in
+ *  milliseconds. Rewrites in place; failure leaves the original untouched. */
+export async function remuxMediaRecorderFile(filePath: string): Promise<boolean> {
+  const ext = path.extname(filePath) || ".webm";
+  const tmp = filePath.slice(0, filePath.length - ext.length) + ".remux" + ext;
+  const { code } = await runFfmpeg(["-y", "-i", filePath, "-c", "copy", tmp]).catch(() => ({ code: -1, stderr: "" }));
+  if (code === 0) {
+    await fs.rename(tmp, filePath);
+    return true;
+  }
+  await fs.unlink(tmp).catch(() => {});
+  return false;
+}
+
 export async function probeVideo(filePath: string): Promise<VideoProbe> {
   const { stderr } = await runFfmpeg(["-i", filePath]).catch(() => ({ code: -1, stderr: "" }));
   const v = stderr.match(/Stream[^\n]*Video:\s*([a-z0-9_]+)/i);
