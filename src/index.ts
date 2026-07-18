@@ -1724,8 +1724,12 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             film_grammar: "speaker-screencast",
             screencast_source: videoUrl,
             // Mode A: the recording carries its own live narration -- flagged
-            // by pointing the narration at the video itself.
-            speaker_source: body?.narration_embedded ? videoUrl : ((body?.narration_url as string) || undefined),
+            // by pointing the narration at the video itself. With a camera,
+            // the voice (and PiP face) live in the same-clock camera file.
+            speaker_source: body?.camera_url
+              ? (body.camera_url as string)
+              : body?.narration_embedded ? videoUrl : ((body?.narration_url as string) || undefined),
+            live_speaker_clock: !!(body?.camera_url || body?.narration_embedded),
           } as any)
             .then((r: any) => {
               // The pipeline catches internally and returns {status:'error'}

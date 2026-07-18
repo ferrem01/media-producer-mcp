@@ -27,10 +27,15 @@ vi.mock("../src/core/sentence-spine.js", () => ({
 vi.mock("../src/audio/music.js", () => ({
   selectMusic: vi.fn(async () => ({ path: "/music/bed.mp3", title: "Calm Bed", artist: "Test", source: "jamendo" })),
 }));
+vi.mock("../src/core/video-normalize.js", () => ({
+  probeVideo: vi.fn(async () => ({ videoCodec: null, audioCodec: "opus" })),
+  remuxMediaRecorderFile: vi.fn(async () => false),
+}));
 
 import { attachBoothNarration } from "../src/llm/narrated-screencast.js";
 import { getSentenceSpine } from "../src/core/sentence-spine.js";
 import { selectMusic } from "../src/audio/music.js";
+import { probeVideo } from "../src/core/video-normalize.js";
 
 function recorderProject(): any {
   return {
@@ -125,6 +130,28 @@ describe("attachBoothNarration", () => {
     expect(overlay.data.captions.map((c: any) => c.start)).toEqual([1.0, 8.0]);
     const narr = (project.audio as any).tracks.find((t: any) => t.id === "narration");
     expect(narr.start_time).toBeCloseTo(6.1, 3);
+  });
+
+  it("camera take (video booth recording): PiP bubble with film-offset EDL", async () => {
+    (probeVideo as any).mockResolvedValueOnce({ videoCodec: "vp9", audioCodec: "opus" });
+    const project = recorderProject();
+    await attachBoothNarration({ project, narrationSource: "/assets/t/booth-take-1.webm" });
+
+    const scene = project.scenes[1];
+    const pip = scene.components.find((c: any) => c.id === "booth_pip");
+    expect(pip).toBeTruthy();
+    expect(pip.data.video_url).toBe("/assets/t/booth-take-1.webm");
+    // Take runs on the film clock from 0; the walkthrough starts at 6.1s, so
+    // the bubble's EDL offsets 6.1s into the take for the scene's 26.9s.
+    const key = Object.keys(scene.media_edits).find((k) => k.includes("booth-take-1.webm"))!;
+    expect(scene.media_edits[key].segments[0].src_start).toBeCloseTo(6.1, 2);
+    expect(scene.media_edits[key].segments[0].src_end).toBeCloseTo(Math.min(38.2, 6.1 + 26.9), 1);
+  });
+
+  it("audio-only take adds no bubble", async () => {
+    const project = recorderProject();
+    await attachBoothNarration({ project, narrationSource: "/assets/t/take.webm" });
+    expect(project.scenes[1].components.find((c: any) => c.id === "booth_pip")).toBeUndefined();
   });
 
   it("throws on a project with no screencast scene", async () => {

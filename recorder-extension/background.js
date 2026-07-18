@@ -5,9 +5,13 @@
 // clock, and on stop hands the offscreen doc everything it needs to upload
 // (video + events sidecar) and trigger generate.
 
-let session = null; // { tabId, startedMs, events: {...}, settings }
+// session.phase: 'armed' (waiting for the in-page roll click) -> 'recording'
+// -> optionally 'paused' <-> 'recording'. startedMs is set at ROLL, not at
+// arm, and pausedMs accumulates so event timestamps stay on the RECORDED
+// clock (the film has no paused footage, so events must not either).
+let session = null; // { tabId, phase, startedMs, pausedMs, pauseBegan, events, settings, prompterWin }
 
-const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: false };
+const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: false, camera: false };
 
 async function getSettings() {
   const s = await chrome.storage.sync.get(DEFAULTS);
@@ -74,16 +78,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           dims = r?.result || null;
         } catch (e) { /* capture still works, server cropdetect covers bars */ }
         await ensureOffscreen();
-        session = { tabId: tab.id, startedMs: Date.now(), events: freshEvents(tab, settings), settings };
+        session = { tabId: tab.id, phase: "armed", startedMs: 0, pausedMs: 0, pauseBegan: 0, events: freshEvents(tab, settings), settings };
         // Skeleton persisted so a suspended-and-restarted worker can still
         // finish the upload on Stop (see qr-ping handler).
-        await chrome.storage.session?.set({ qrSession: { tabId: tab.id, startedMs: session.startedMs, settings } });
+        await chrome.storage.session?.set({ qrSession: { tabId: tab.id, phase: "armed", startedMs: 0, pausedMs: 0, settings } });
 
         // Instrument the tab. Injected (not declared) so only recorded tabs
         // ever run the capture script.
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
 
-        await chrome.runtime.sendMessage({ type: "qr-offscreen-start", streamId, mic: !!settings.mic, dims });
+        // Prep media (getUserMedia + MediaRecorder objects) now; recording
+        // starts on qr-roll after the in-page click-to-roll + countdown.
+        await chrome.runtime.sendMessage({ type: "qr-offscreen-prep", streamId, mic: !!settings.mic, camera: !!settings.camera, dims });
+        await chrome.tabs.sendMessage(tab.id, { type: "qr-arm" });
 
         // Mode A gets a teleprompter in a SEPARATE window: tab capture films
         // the tab, so anything injected into the page would end up on film.
@@ -99,18 +106,58 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
 
+      if (msg.type === "qr-roll") {
+        // Countdown finished in the page: recording truly begins NOW.
+        if (!session || session.phase !== "armed") return;
+        session.phase = "recording";
+        session.startedMs = Date.now();
+        session.events.recording.startedAt = new Date().toISOString();
+        await chrome.storage.session?.set({ qrSession: { tabId: session.tabId, phase: "recording", startedMs: session.startedMs, pausedMs: 0, settings: session.settings } });
+        chrome.runtime.sendMessage({ type: "qr-offscreen-begin" });
+        chrome.action?.setBadgeBackgroundColor?.({ color: "#dc2626" });
+        chrome.action?.setBadgeText?.({ text: "REC" });
+        return;
+      }
+
+      if (msg.type === "qr-pause") {
+        if (!session || session.phase !== "recording") return;
+        session.phase = "paused";
+        session.pauseBegan = Date.now();
+        chrome.runtime.sendMessage({ type: "qr-offscreen-pause" });
+        chrome.action?.setBadgeText?.({ text: "⏸" });
+        return;
+      }
+
+      if (msg.type === "qr-resume") {
+        if (!session || session.phase !== "paused") return;
+        session.pausedMs += Date.now() - session.pauseBegan;
+        session.phase = "recording";
+        chrome.runtime.sendMessage({ type: "qr-offscreen-resume" });
+        chrome.action?.setBadgeText?.({ text: "REC" });
+        return;
+      }
+
       if (msg.type === "qr-stop") {
         if (!session) { sendResponse({ ok: false, error: "Not recording." }); return; }
         const s = session;
         session = null;
         await chrome.storage.session?.remove("qrSession");
+        chrome.action?.setBadgeText?.({ text: "" });
         try { await chrome.tabs.sendMessage(s.tabId, { type: "qr-content-stop" }); } catch (e) {}
         if (s.prompterWin) { try { await chrome.windows.remove(s.prompterWin); } catch (e) {} }
-        const durationMs = Date.now() - s.startedMs;
+        if (s.phase === "armed" || !s.startedMs) {
+          // Never rolled: nothing recorded, nothing to upload.
+          chrome.runtime.sendMessage({ type: "qr-offscreen-abort" });
+          sendResponse({ ok: true, aborted: true });
+          return;
+        }
+        const pausedTail = s.phase === "paused" ? Date.now() - s.pauseBegan : 0;
+        const durationMs = Date.now() - s.startedMs - s.pausedMs - pausedTail;
         s.events.recording.durationMs = durationMs;
         s.events.mutationsIdle = idleFromActivity(s.events._activity, durationMs);
         delete s.events._activity;
-        // Offscreen owns the blob; it uploads video -> events -> generate.
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        // Offscreen owns the blobs; it uploads video (+camera) -> events -> generate.
         await chrome.runtime.sendMessage({
           type: "qr-offscreen-stop",
           upload: {
@@ -118,9 +165,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             tenant: s.settings.tenant,
             token: s.settings.token,
             project: s.settings.project || "library",
-            name: `recording-${new Date().toISOString().replace(/[:.]/g, "-")}.webm`,
+            name: `recording-${stamp}.webm`,
+            cameraName: `camera-${stamp}.webm`,
             events: s.events,
             mic: !!s.settings.mic,
+            camera: !!s.settings.camera,
           },
         });
         sendResponse({ ok: true });
@@ -128,9 +177,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       if (msg.type === "qr-event") {
-        // From the content script: stamp onto the recording clock.
+        // From the content script: stamp onto the RECORDED clock (armed and
+        // paused moments produce no footage, so they get no events either).
         if (!session || sender.tab?.id !== session.tabId) return;
-        const t = Date.now() - session.startedMs;
+        if (session.phase !== "recording") return;
+        const t = Date.now() - session.startedMs - session.pausedMs;
         const ev = session.events;
         if (msg.kind === "click") ev.clicks.push({ t, ...msg.data });
         else if (msg.kind === "input") ev.inputs.push({ t, ...msg.data });

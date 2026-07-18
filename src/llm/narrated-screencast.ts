@@ -180,14 +180,21 @@ export interface BoothAttachResult {
  */
 export async function assembleLiveNarration(opts: {
   project: Project;
-  /** The recording carrying BOTH streams (extension Mode A webm). */
+  /** The tab recording (extension Mode A webm; carries the voice unless a
+   *  separate camera file does). */
   source: string;
+  /** Optional same-clock camera+voice recording: the voice (and the PiP
+   *  bubble) come from here; the tab file is video-only. Both recorders
+   *  started in the same tick, so one clock rules both. */
+  speakerSource?: string;
   dataDir?: string;
   llmConfig?: LLMConfig;
   music?: boolean;
 }): Promise<NarratedScreencastResult> {
   const { project, source } = opts;
   const videoPath = resolveVideoPath(source, opts.dataDir);
+  const voiceSource = opts.speakerSource || source;
+  const voicePath = resolveVideoPath(voiceSource, opts.dataDir);
   let srcDur = await probeMediaDuration(source, opts.dataDir);
   if (!(srcDur > 1)) {
     // Assets uploaded before ingest-time repair existed: MediaRecorder webm
@@ -212,13 +219,14 @@ export async function assembleLiveNarration(opts: {
   const idle = (intel?.idle?.ranges || [])
     .map((r: any) => ({ from: Number(r.start ?? r.from), to: Number(r.end ?? r.to) }))
     .filter((r) => Number.isFinite(r.from) && Number.isFinite(r.to) && r.to > r.from);
-  const silence = (await detectSilence(videoPath)).map((r) => ({ from: r.from, to: Math.min(r.to, srcDur) }));
+  // Silence comes from wherever the VOICE lives (camera file when present).
+  const silence = (await detectSilence(voicePath)).map((r) => ({ from: r.from, to: Math.min(r.to, srcDur) }));
   const cuts = shrinkRanges(intersectRanges(idle, silence), 0.35, 2.5);
   const kept = complementRanges(cuts, srcDur);
   const keptDur = kept.reduce((s, r) => s + (r.to - r.from), 0);
   console.log(
     `  Mode A: ${Math.round(srcDur)}s recording, ${cuts.length} idle+silent cut(s) -> ${Math.round(keptDur)}s ` +
-    `(idle ${idle.length} span(s), silence ${silence.length} span(s))`,
+    `(idle ${idle.length} span(s), silence ${silence.length} span(s)${opts.speakerSource ? ", camera bubble" : ""})`,
   );
 
   // Video: EDL hard cuts, presented in the browser frame on the brand matte.
@@ -245,7 +253,36 @@ export async function assembleLiveNarration(opts: {
     };
   }
 
-  // Audio: the same cuts, as a standalone narration file the mixer owns.
+  // Camera bubble: the speaker recording rides as a rounded PiP over the
+  // framed screencast, carrying the SAME cuts (same clock, same EDL) via its
+  // own media-edits target so face and footage jump together.
+  if (opts.speakerSource) {
+    const camFile = opts.speakerSource.split("/").pop() || opts.speakerSource;
+    (scene.components as any[]).push({
+      id: "camera_pip",
+      type: "screencast-frame",
+      z_index: 40,
+      position: { x: "74%", y: "58%", width: "23%", height: "30%" },
+      data: { video_url: opts.speakerSource, frame_style: "none", corner_radius: 18 },
+    });
+    if (cuts.length) {
+      const camSolved = solveMediaEdits(
+        { cuts: cuts.map((c) => ({ src_start: c.from, src_end: c.to })), rate_regions: [], pins: [] },
+        srcDur,
+      );
+      (scene as any).media_edits = {
+        ...((scene as any).media_edits || {}),
+        [`video[src*="${camFile}"]`]: {
+          segments: camSolved.segments,
+          cuts: cuts.map((c) => ({ src_start: c.from, src_end: c.to })),
+          pins: [], rate_regions: [], pin_status: camSolved.pin_status, proposed: true,
+        },
+      };
+    }
+  }
+
+  // Audio: the same cuts, as a standalone narration file the mixer owns --
+  // sliced from the voice-carrying recording.
   const assetsDir = path.join(
     opts.dataDir || process.env.MP_DATA_DIR || "/data/media-producer",
     project.tenant_id, "projects", project.project_id, "assets",
@@ -253,7 +290,7 @@ export async function assembleLiveNarration(opts: {
   const { mkdir } = await import("node:fs/promises");
   await mkdir(assetsDir, { recursive: true });
   const narrationName = `narration-live-${Date.now()}.m4a`;
-  await cutAudioTo(videoPath, kept, path.join(assetsDir, narrationName));
+  await cutAudioTo(voicePath, kept, path.join(assetsDir, narrationName));
   const narrationUrl = `/assets/${project.tenant_id}/projects/${project.project_id}/assets/${narrationName}`;
 
   // Bookends + scene list, then the booth attach lays sound + spine on top.
@@ -382,6 +419,38 @@ export async function attachBoothNarration(opts: {
     captionCount = captions.length;
     chapterCount = chapterMoments.length;
   }
+
+  // Camera takes (booth recorded with the webcam on): the take is a VIDEO --
+  // show it as a rounded PiP bubble over the locked cut. The take runs on the
+  // film clock from 0, so the bubble's EDL simply offsets into the take by
+  // the scene's film position. Retakes replace the previous bubble.
+  try {
+    const { probeVideo } = await import("../core/video-normalize.js");
+    const hasCamera = !!(await probeVideo(resolveVideoPath(narrationSource, opts.dataDir))).videoCodec;
+    const takeFile = narrationSource.split("/").pop() || narrationSource;
+    target.components = (target.components as any[]).filter((c) => c.id !== "booth_pip");
+    const me: any = (target as any).media_edits || {};
+    for (const k of Object.keys(me)) if (/booth-take/.test(k)) delete me[k];
+    if (hasCamera) {
+      (target.components as any[]).push({
+        id: "booth_pip",
+        type: "screencast-frame",
+        z_index: 40,
+        position: { x: "74%", y: "58%", width: "23%", height: "30%" },
+        data: { video_url: narrationSource, frame_style: "none", corner_radius: 18 },
+      });
+      const sceneFilmStart = offset + startsAt; // film second this scene begins
+      me[`video[src*="${takeFile}"]`] = {
+        segments: [{
+          src_start: Math.max(0, Math.round(sceneFilmStart * 100) / 100),
+          src_end: Math.round(Math.min(narrationDur, sceneFilmStart + sceneDur) * 100) / 100,
+          rate: 1,
+        }],
+        cuts: [], pins: [], rate_regions: [], pin_status: [], proposed: true,
+      };
+      (target as any).media_edits = me;
+    }
+  } catch { /* audio-only take, or probe failed -- no bubble */ }
 
   // Sound: narration replaces any prior take; the bed is added once and kept
   // across retakes.
