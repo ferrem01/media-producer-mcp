@@ -24,6 +24,9 @@ async function load() {
 
 function showStatus(st) {
   if (!st) return;
+  // No re-record while a take is still uploading -- the offscreen recorder
+  // is busy with the blob and a second session would collide with it.
+  $("record").disabled = st.state === "uploading";
   if (st.state === "uploading") $("status").textContent = "Uploading…";
   else if (st.state === "done") $("status").textContent = "Uploaded ✓ — assembling now; the film appears in Studio in a few minutes.";
   else if (st.state === "error") $("status").textContent = "Upload failed: " + (st.error || "unknown error");

@@ -110,9 +110,18 @@ export async function assembleLiveNarration(opts: {
   music?: boolean;
 }): Promise<NarratedScreencastResult> {
   const { project, source } = opts;
-  const srcDur = await probeMediaDuration(source, opts.dataDir);
-  if (!(srcDur > 1)) throw new Error("recording is empty or unreadable");
   const videoPath = resolveVideoPath(source, opts.dataDir);
+  let srcDur = await probeMediaDuration(source, opts.dataDir);
+  if (!(srcDur > 1)) {
+    // Assets uploaded before ingest-time repair existed: MediaRecorder webm
+    // with no duration header. Fix in place and retry once.
+    const { remuxMediaRecorderFile } = await import("../core/video-normalize.js");
+    if (await remuxMediaRecorderFile(videoPath)) {
+      srcDur = await probeMediaDuration(source, opts.dataDir);
+      console.log(`  Mode A: recording had no duration header -- remuxed (${Math.round(srcDur)}s)`);
+    }
+  }
+  if (!(srcDur > 1)) throw new Error("recording is empty or unreadable");
 
   const { intersectRanges, complementRanges, shrinkRanges, detectSilence, cutAudioTo } =
     await import("../core/idle-silence.js");

@@ -119,7 +119,11 @@ async function pollForProject(upload, prompt) {
       const res = await fetch(`${base}/api/projects/${encodeURIComponent(upload.tenant)}?token=${encodeURIComponent(upload.token)}`);
       if (!res.ok) continue;
       const list = await res.json();
-      const hit = Array.isArray(list) && list.find((p) => p.name === prompt.slice(0, 60));
+      // The pipeline creates the project record FIRST and assembles into it
+      // after -- a name match alone links the user to an empty shell. Only
+      // fire once scenes exist (assembly finished).
+      const hit = Array.isArray(list) && list.find((p) =>
+        p.name === prompt.slice(0, 60) && (p.scene_count || 0) > 0 && p.status !== "draft" && p.status !== "failed");
       if (hit) { status("ready", null, studioUrl(hit.project_id)); return; }
     } catch (e) { /* transient; keep polling */ }
   }
