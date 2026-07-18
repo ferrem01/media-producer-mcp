@@ -120,7 +120,14 @@ What each stream replaces:
    playback + mic recording + whole-take retakes; `attachBoothNarration` +
    `POST /api/booth-narration`). Punch-in retakes deferred — whole-take
    retake is cheap at walkthrough lengths.
-3. **Mode A**: simultaneous mic + idle∩silence compression + teleprompter.
+3. **Mode A** — ✅ SHIPPED 2026-07-18 (popup mic toggle primes permission for
+   the offscreen recorder; mic muxed onto the tab video's clock; idle∩silent
+   spans HARD-CUT from both streams — `assembleLiveNarration`, no timelapse in
+   v1 so the embedded voice can't chipmunk; teleprompter in a separate window
+   because tab capture would film an in-page overlay). Timelapse-over-silence
+   remains future polish. Plus: booth teleprompter with LLM-drafted scripts
+   timed to the cut (`/api/booth-script`), and the extension now closes the
+   loop — it polls until the film exists and notifies with the Studio link.
 
 ## Non-goals (v1)
 

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Teleprompter — Quotient Recorder</title>
+    <style>
+      body { margin: 0; background: #0f1220; color: #f3f4f6; font: 15px/1.6 -apple-system, "Segoe UI", sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+      #bar { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: #171a2c; font-size: 12px; }
+      #bar button { background: #393bf5; color: #fff; border: 0; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+      #bar button.ghost { background: #262a44; }
+      #speed { color: #9ca3af; min-width: 56px; text-align: center; }
+      #edit { flex: 1; margin: 0; padding: 12px; background: #0f1220; color: #f3f4f6; border: 0; resize: none; font: 14px/1.6 inherit; outline: none; }
+      #view { flex: 1; padding: 18px 22px 60vh; overflow-y: auto; display: none; font-size: 21px; font-weight: 500; line-height: 1.7; white-space: pre-wrap; cursor: pointer; }
+      .hint { color: #6b7280; font-size: 11px; margin-left: auto; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <button id="toggle">▶ Scroll</button>
+      <button id="slower" class="ghost">−</button>
+      <span id="speed">30 px/s</span>
+      <button id="faster" class="ghost">+</button>
+      <button id="reset" class="ghost">⤒ Top</button>
+      <span class="hint">click text = pause · edits save automatically</span>
+    </div>
+    <textarea id="edit" placeholder="Paste or write your narration script here. It saves automatically and will be waiting next time. Hit ▶ Scroll when you start talking."></textarea>
+    <div id="view"></div>
+    <script src="prompter.js"></script>
+  </body>
+</html>

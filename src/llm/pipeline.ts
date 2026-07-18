@@ -2019,16 +2019,29 @@ async function runUnifiedPipeline(
           fps: canvas.fps,
         });
       }
-      const asm = await assembleNarratedScreencast({
-        project,
-        screencastSource: prep.screencast.source,
-        narrationSource: prep.screencast.narrationSource,
-        dataDir: config.dataDir,
-        llmConfig: opts.llmConfig,
-        // The grammar's recipe includes the ducked bed; only an explicit
-        // background_music:false opts out.
-        music: opts.backgroundMusic !== false,
-      });
+      // Mode A (recorder live narration): voice and video share ONE file --
+      // signalled by narration == screencast. Cuts idle∩silent instead of
+      // fitting picture to a separate take.
+      const liveNarrated = prep.screencast.narrationSource
+        && prep.screencast.narrationSource === prep.screencast.source;
+      const asm = liveNarrated
+        ? await (await import("./narrated-screencast.js")).assembleLiveNarration({
+            project,
+            source: prep.screencast.source,
+            dataDir: config.dataDir,
+            llmConfig: opts.llmConfig,
+            music: opts.backgroundMusic !== false,
+          })
+        : await assembleNarratedScreencast({
+            project,
+            screencastSource: prep.screencast.source,
+            narrationSource: prep.screencast.narrationSource,
+            dataDir: config.dataDir,
+            llmConfig: opts.llmConfig,
+            // The grammar's recipe includes the ducked bed; only an explicit
+            // background_music:false opts out.
+            music: opts.backgroundMusic !== false,
+          });
       asm.project.prompt = opts.prompt;
       if (!asm.project.created_at) asm.project.created_at = new Date().toISOString();
       asm.project.updated_at = new Date().toISOString();

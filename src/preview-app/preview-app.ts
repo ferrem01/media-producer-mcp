@@ -86,6 +86,12 @@ export function getPreviewHtml(): string {
   .booth-dot { width: 10px; height: 10px; border-radius: 50%; background: #dc2626; animation: boothPulse 1.2s ease-in-out infinite; }
   @keyframes boothPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
   #booth-card audio { width: 100%; margin: 8px 0 2px; }
+  #booth-card textarea { width: 100%; box-sizing: border-box; height: 180px; font: 11px/1.5 'JetBrains Mono', monospace; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px; resize: vertical; }
+
+  /* Teleprompter: bottom-center, above the playback bar, out of the film's way. */
+  #prompter-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 96px; width: min(760px, 68vw); background: rgba(15,18,32,0.9); color: #fff; border-radius: 12px; padding: 14px 22px; z-index: 290; display: none; text-align: center; box-shadow: 0 10px 32px rgba(0,0,0,0.35); }
+  #prompter-cur { font-size: 19px; font-weight: 600; line-height: 1.45; min-height: 27px; }
+  #prompter-next { font-size: 13.5px; color: rgba(255,255,255,0.55); margin-top: 6px; line-height: 1.4; }
 
   /* Sidebar - spans rows 2 and 3 */
   #sidebar {
@@ -734,6 +740,7 @@ export function getPreviewHtml(): string {
 </div>
 
 <div id="booth-overlay"><div id="booth-card"></div></div>
+<div id="prompter-bar"><div id="prompter-cur"></div><div id="prompter-next"></div></div>
 
 <div id="studio-toast"></div>
 <div id="studio-ctx"></div>
@@ -1917,6 +1924,7 @@ export function getPreviewHtml(): string {
         });
         boothBtnEl.style.display = hasScreencast ? '' : 'none';
       }
+      try { booth.script = null; } catch (eBS) {} // re-fetch per project
 
       // Mobile: don't boot the composite (all scenes' runtimes in one doc)
       // until the user asks for it.
@@ -4487,7 +4495,7 @@ export function getPreviewHtml(): string {
   // while recording the mic; the take becomes the film's soundtrack with
   // captions + chapters attached server-side. Picture is never re-solved.
   // ─────────────────────────────────────────────
-  var booth = { phase: 'closed', stream: null, rec: null, chunks: [], blob: null, url: null, startTs: 0, mon: null };
+  var booth = { phase: 'closed', stream: null, rec: null, chunks: [], blob: null, url: null, startTs: 0, mon: null, script: null };
 
   function boothCard(html) {
     document.getElementById('booth-overlay').style.display = 'flex';
@@ -4503,6 +4511,7 @@ export function getPreviewHtml(): string {
     if (booth.url) { URL.revokeObjectURL(booth.url); booth.url = null; }
     boothMute(false);
     document.getElementById('booth-overlay').style.display = 'none';
+    document.getElementById('prompter-bar').style.display = 'none';
   }
 
   // Program audio must not bleed into the take (or fight the narrator's
@@ -4515,16 +4524,108 @@ export function getPreviewHtml(): string {
     }
   }
 
+  // ── Teleprompter script plumbing ──
+  function boothScriptPath() {
+    var p = state.currentProject;
+    return '/booth-script/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id);
+  }
+
+  function fmtCue(t) {
+    var m = Math.floor(t / 60);
+    var s = t - m * 60;
+    return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+  }
+
+  function cuesToText(cues) {
+    return (cues || []).map(function(c) { return '[' + fmtCue(c.at) + '] ' + c.text; }).join('\\n');
+  }
+
+  function textToCues(text) {
+    var cues = [];
+    (text || '').split('\\n').forEach(function(line) {
+      var m = line.match(/^\\s*\\[([0-9:.]+)\\]\\s*(.+)$/);
+      if (!m) { if (line.trim() && cues.length) cues[cues.length - 1].text += ' ' + line.trim(); return; }
+      var parts = m[1].split(':');
+      var at = parts.length === 2 ? parseInt(parts[0], 10) * 60 + parseFloat(parts[1]) : parseFloat(m[1]);
+      if (!isNaN(at)) cues.push({ at: at, text: m[2].trim() });
+    });
+    return cues;
+  }
+
   function boothIdleCard() {
     booth.phase = 'idle';
+    var scriptLine = booth.script && booth.script.length
+      ? 'Script ready: ' + booth.script.length + ' cue(s) &mdash; the teleprompter will scroll it in sync.'
+      : 'No script yet &mdash; you can improvise, or draft one from the film.';
     boothCard(
       '<h3>&#127908; Narration booth</h3>' +
       '<p>The film plays from the start while your mic records. Watch and narrate &mdash; your take becomes the soundtrack, and captions + chapter cards are built from it automatically. The cut itself never changes.</p>' +
+      '<p id="booth-script-line">' + scriptLine + '</p>' +
       '<div class="booth-row"><button class="btn btn-primary" id="booth-start">&#9210; Start take</button>' +
+      '<button class="btn btn-secondary" id="booth-script-btn">' + (booth.script && booth.script.length ? 'Edit script' : '&#128220; Draft script') + '</button>' +
       '<button class="btn btn-secondary" id="booth-cancel">Close</button></div>'
     );
     document.getElementById('booth-start').addEventListener('click', boothBegin);
     document.getElementById('booth-cancel').addEventListener('click', boothClose);
+    document.getElementById('booth-script-btn').addEventListener('click', function() {
+      if (booth.script && booth.script.length) boothScriptCard();
+      else boothDraftScript();
+    });
+    // Lazy-load a stored script the first time the booth opens on a project.
+    if (booth.script === null) {
+      api(boothScriptPath()).then(function(j) {
+        booth.script = (j.script && j.script.cues) || [];
+        if (booth.phase === 'idle') boothIdleCard();
+      }).catch(function() { booth.script = []; });
+    }
+  }
+
+  function boothDraftScript() {
+    boothCard('<h3>&#128220; Drafting script&hellip;</h3><p>Reading the cut &mdash; its real-time spans, timelapses, pages and clicks &mdash; and writing narration timed to the clock. ~15s.</p>');
+    api('POST', boothScriptPath(), {}).then(function(j) {
+      booth.script = (j.script && j.script.cues) || [];
+      boothScriptCard();
+    }).catch(function(e) {
+      studioStatus('Script drafting failed: ' + e.message, 'err');
+      boothIdleCard();
+    });
+  }
+
+  function boothScriptCard() {
+    booth.phase = 'script';
+    boothCard(
+      '<h3>&#128220; Narration script</h3>' +
+      '<p>One cue per line: [m:ss] what you\\'ll say. Edit freely &mdash; times are when each line should start on the film clock.</p>' +
+      '<textarea id="booth-script-text"></textarea>' +
+      '<div class="booth-row"><button class="btn btn-primary" id="booth-script-save">Save</button>' +
+      '<button class="btn btn-secondary" id="booth-script-redraft">Re-draft</button>' +
+      '<button class="btn btn-secondary" id="booth-script-back">Back</button></div>'
+    );
+    document.getElementById('booth-script-text').value = cuesToText(booth.script);
+    document.getElementById('booth-script-save').addEventListener('click', function() {
+      var cues = textToCues(document.getElementById('booth-script-text').value);
+      if (!cues.length) { studioStatus('No usable cues -- lines look like [0:12] text', 'err'); return; }
+      api('POST', boothScriptPath(), { cues: cues }).then(function(j) {
+        booth.script = (j.script && j.script.cues) || cues;
+        boothIdleCard();
+      }).catch(function(e) { studioStatus('Script save failed: ' + e.message, 'err'); });
+    });
+    document.getElementById('booth-script-redraft').addEventListener('click', boothDraftScript);
+    document.getElementById('booth-script-back').addEventListener('click', boothIdleCard);
+  }
+
+  // Prompter: current cue lands ~1.2s early so the eye leads the clock.
+  function boothPrompterTick(t) {
+    var bar = document.getElementById('prompter-bar');
+    if (!booth.script || !booth.script.length) { bar.style.display = 'none'; return; }
+    bar.style.display = '';
+    var cur = null, next = null;
+    for (var i = 0; i < booth.script.length; i++) {
+      if (booth.script[i].at <= t + 1.2) cur = booth.script[i];
+      else { next = booth.script[i]; break; }
+    }
+    document.getElementById('prompter-cur').textContent = cur ? cur.text : '\\u2014';
+    document.getElementById('prompter-next').textContent = next ? ('[' + fmtCue(next.at) + '] ' + next.text) : '';
   }
 
   function boothBegin() {
@@ -4608,9 +4709,11 @@ export function getPreviewHtml(): string {
       // flag it so the review card can suggest a retake.
       if (!state.playing && Math.abs(state.masterTime - booth.lastFilmT) > 0.6) booth.desynced = true;
       booth.lastFilmT = state.masterTime;
+      boothPrompterTick(state.masterTime);
       var el = document.getElementById('booth-elapsed');
       if (el) el.textContent = fmtTime(state.masterTime) + ' / ' + fmtTime(state.totalDuration);
     }, 250);
+    boothPrompterTick(0);
   }
 
   function boothRecCard(paused) {
@@ -4635,6 +4738,7 @@ export function getPreviewHtml(): string {
     if (booth.phase !== 'recording') return;
     booth.phase = 'review';
     if (booth.mon) { clearInterval(booth.mon); booth.mon = null; }
+    document.getElementById('prompter-bar').style.display = 'none';
     if (state.playing) togglePlay();
     boothMute(false);
     try { booth.rec.stop(); } catch (e) { boothReview(); }

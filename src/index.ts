@@ -1702,7 +1702,9 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             canvas: { width: 1920, height: 1080, preset: "landscape", fps: 30, background: "#0f172a" } as any,
             film_grammar: "speaker-screencast",
             screencast_source: videoUrl,
-            speaker_source: (body?.narration_url as string) || undefined,
+            // Mode A: the recording carries its own live narration -- flagged
+            // by pointing the narration at the video itself.
+            speaker_source: body?.narration_embedded ? videoUrl : ((body?.narration_url as string) || undefined),
           } as any)
             .then((r: any) => console.log(`  recorder-generate: done -> ${r?.project?.project_id || "?"} ("${prompt}")`))
             .catch((e: any) => console.error(`  recorder-generate: FAILED (${e?.message || e})`));
@@ -1765,6 +1767,43 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           jsonResponse(res, 200, { ok: true, url: narrationUrl, ...result });
         } catch (e: any) {
           console.error(`  booth-narration: FAILED (${e?.message || e})`);
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
+      // ── API: Booth teleprompter script (Mode B upgrade) ──
+      // GET  /api/booth-script/{tenant}/{project}          -> stored script or null
+      // POST /api/booth-script/{tenant}/{project}          -> draft via LLM (body {})
+      //                                                       or save edits (body {cues})
+      const scriptMatch = urlPath.match(/^\/api\/booth-script\/([^/]+)\/([^/]+)$/);
+      if (scriptMatch && (method === "GET" || method === "POST")) {
+        const [, bsTenant, bsProject] = scriptMatch.map(decodeURIComponent);
+        try {
+          const project = await loadProject(bsTenant, bsProject);
+          if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+          if (method === "GET") {
+            jsonResponse(res, 200, { ok: true, script: project.booth_script || null });
+            return;
+          }
+          const body = (await parseBody(req).catch(() => ({}))) as { cues?: unknown };
+          const { sanitizeCues, draftBoothScript } = await import("./llm/booth-script.js");
+          if (Array.isArray(body?.cues)) {
+            // User edit from the booth: sanitize + persist.
+            const filmDur = (project.scenes || []).reduce((s, sc) => s + (sc.duration_seconds || 0), 0);
+            const cues = sanitizeCues(body.cues, filmDur);
+            if (!cues.length) { jsonResponse(res, 400, { error: "no usable cues" }); return; }
+            project.booth_script = { cues, drafted_at: project.booth_script?.drafted_at || new Date().toISOString(), edited: true };
+          } else {
+            const bsLlm = llmConfigFromEnv();
+            project.booth_script = await draftBoothScript({ project, dataDir: config.dataDir, llmConfig: bsLlm });
+          }
+          project.updated_at = new Date().toISOString();
+          await saveProject(project);
+          console.log(`  booth-script: ${bsProject} -- ${project.booth_script.cues.length} cue(s)${project.booth_script.edited ? " (edited)" : " (drafted)"}`);
+          jsonResponse(res, 200, { ok: true, script: project.booth_script });
+        } catch (e: any) {
+          console.error(`  booth-script: FAILED (${e?.message || e})`);
           jsonResponse(res, 500, { error: e?.message || String(e) });
         }
         return;

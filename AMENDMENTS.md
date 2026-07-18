@@ -6,6 +6,44 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-18 — Recorder complete: teleprompter, Mode A, closed loop
+
+All three spec modes now exist. This slice:
+
+- **Booth teleprompter** (`booth-script.ts` + `/api/booth-script` +
+  Studio prompter bar): the LLM drafts narration cues TIMED TO THE CUT --
+  it sees real-time vs timelapse spans, sidecar pages/clicks/chapter marks
+  mapped src→film through the EDL, and budgets ~2.4 words/sec per span.
+  Editable in the booth (`[m:ss] text` lines); prompter shows current+next
+  cue with 1.2s lead, driven by the film clock (pauses with pause). Since
+  the script is known, captions stop depending on whisper's hearing.
+- **Mode A — narrate live while demoing** (`assembleLiveNarration`): mic
+  muxed onto the tab recording's clock (vp9+opus, one file). Cuts =
+  sidecar idle ∩ ffmpeg silencedetect, shrunk 0.35s, min 2.5s — applied as
+  HARD CUTS to video (EDL) and audio (atrim/concat → standalone m4a
+  narration track) so A/V sync survives by construction; v1 deliberately
+  skips timelapse (would chipmunk/desync the embedded voice — future
+  polish is atempo over silent spans). `attachBoothNarration` gained
+  `narrationStartsAt` so live narration (starts WITH the demo) and booth
+  takes (start at film 0) share one attach path. Signalled by
+  `narration_embedded` → `speaker_source === screencast_source`.
+  Teleprompter opens in a SEPARATE window — tab capture films the tab, an
+  in-page overlay would be in the film.
+- **Booth pause = breather** (earlier same day): transport pause pauses
+  the MediaRecorder; play resumes both; scrub-while-paused flags a desync
+  warning. And MediaRecorder blobs (no duration header — Chrome quirk) are
+  remuxed on arrival, fixing "narration take is empty or unreadable".
+- **Closed loop**: after generate, the offscreen doc polls the projects
+  list and notifies with a clickable Studio link (notification click opens
+  the film; popup shows the link). Extension 0.5.0; 0.4.0 pinned the
+  extension ID via manifest `key` so settings survive reinstalls.
+- **Secure-context guard**: Studio on bare-IP http has no
+  `navigator.mediaDevices`; the booth explains the
+  `unsafely-treat-insecure-origin-as-secure` workaround instead of
+  crashing. Real fix (domain + TLS) is on the roadmap.
+
+---
+
 ## 2026-07-17 — Mode B narration booth (SPEC-recorder.md, MVP step 2)
 
 First live extension recording worked end-to-end same day (proj_cac63a35:

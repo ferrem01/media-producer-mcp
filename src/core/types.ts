@@ -475,6 +475,14 @@ export interface Project {
     sentences: Array<{ text: string; start: number; end: number }>;
     chapters: Array<{ title: string; start: number; end: number; firstSentence: number; lastSentence: number }>;
   };
+  /** Teleprompter script for the Studio narration booth (Mode B): cues timed
+   *  to the film clock, drafted by the LLM from the cut's structure and
+   *  editable by the user before recording. */
+  booth_script?: {
+    cues: Array<{ at: number; text: string }>;
+    drafted_at: string;
+    edited?: boolean;
+  };
 
   // ── Lifecycle ──
   /** Creative bible from the concept director (structured, not prose) */

@@ -13,8 +13,9 @@ const DEFAULTS = {
 };
 
 async function load() {
-  const s = await chrome.storage.sync.get(DEFAULTS);
+  const s = await chrome.storage.sync.get({ ...DEFAULTS, mic: false });
   FIELDS.forEach((f) => { $(f).value = s[f] || DEFAULTS[f] || ""; });
+  $("mic").checked = !!s.mic;
   const { recording } = await chrome.runtime.sendMessage({ type: "qr-status" }) || {};
   setRecording(!!recording);
   const { qrLastStatus } = (await chrome.storage.session?.get("qrLastStatus")) || {};
@@ -26,6 +27,14 @@ function showStatus(st) {
   if (st.state === "uploading") $("status").textContent = "Uploading…";
   else if (st.state === "done") $("status").textContent = "Uploaded ✓ — assembling now; the film appears in Studio in a few minutes.";
   else if (st.state === "error") $("status").textContent = "Upload failed: " + (st.error || "unknown error");
+  else if (st.state === "ready" && st.projectUrl) {
+    $("status").innerHTML = "";
+    const a = document.createElement("a");
+    a.href = st.projectUrl;
+    a.target = "_blank";
+    a.textContent = "✓ Your walkthrough is ready — open in Studio";
+    $("status").appendChild(a);
+  }
 }
 
 // Live updates while the popup stays open: the offscreen uploader broadcasts
@@ -45,10 +54,26 @@ function setRecording(on) {
 }
 
 async function save() {
-  const s = {};
+  const s = { mic: $("mic").checked };
   FIELDS.forEach((f) => { s[f] = $(f).value.trim(); });
   await chrome.storage.sync.set(s);
 }
+
+// Mode A needs mic permission for the extension origin. The offscreen doc
+// that records can't show a permission prompt, so prime it HERE (the popup
+// can) the moment the toggle goes on -- one prompt, remembered forever.
+$("mic").addEventListener("change", async (e) => {
+  if (e.target.checked) {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach((t) => t.stop());
+    } catch (err) {
+      e.target.checked = false;
+      $("status").textContent = "Mic permission needed for live narration: " + (err && err.message || err);
+    }
+  }
+  save();
+});
 
 $("record").addEventListener("click", async () => {
   await save();
