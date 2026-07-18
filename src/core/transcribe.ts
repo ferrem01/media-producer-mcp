@@ -62,6 +62,68 @@ export function parseWhisperJson(raw: string): TranscriptSegment[] {
     .filter((s: TranscriptSegment) => s.text && s.end > s.start);
 }
 
+/**
+ * Whisper smears word timestamps across long mid-take silences: the words
+ * spoken just before (or after) a pause get stretched INTO it to bridge the
+ * gap. The word lane and the captions then promise speech where the track is
+ * silent -- and word-anchored edits (pins, speaker cuts) aim at the wrong
+ * times. The waveform knows better: given detected silence spans, pull every
+ * word whose middle sits inside a silence back to real speech. Words up to
+ * the last sentence-terminal finish the sentence BEFORE the pause (packed
+ * against its left edge, compressed to the room available); the rest open
+ * the sentence AFTER it.
+ */
+export function snapWordsOutOfSilences(
+  segments: TranscriptSegment[],
+  silences: Array<{ from: number; to: number }>,
+  minSilence = 1.5,
+): TranscriptSegment[] {
+  const out = segments.map((w) => ({ ...w }));
+  for (const sil of silences) {
+    if (sil.to - sil.from < minSilence) continue;
+    let first = -1;
+    let last = -1;
+    for (let i = 0; i < out.length; i++) {
+      const w = out[i];
+      const mid = (w.start + w.end) / 2;
+      if (mid > sil.from + 0.2 && mid < sil.to - 0.2) {
+        if (first === -1) first = i;
+        last = i;
+      } else if (w.start < sil.from - 0.1 && w.end > sil.from + 0.5) {
+        w.end = sil.from; // spoken word stretched into the pause: it ended at the pause
+      } else if (w.end > sil.to + 0.1 && w.start < sil.to - 0.5) {
+        w.start = sil.to; // stretched backward into the pause: it started at speech onset
+      }
+    }
+    if (first === -1) continue;
+    const inside = out.slice(first, last + 1);
+    let split = inside.length;
+    for (let i = inside.length - 1; i >= 0; i--) {
+      if (/[.?!]["')\]]?$/.test(inside[i].text.trim())) { split = i + 1; break; }
+    }
+    if (split > 0) {
+      const prevEnd = first > 0 ? Math.min(out[first - 1].end, sil.from) : 0;
+      const per = Math.min(0.45, Math.max(0.2, sil.from - prevEnd) / split);
+      for (let i = 0; i < split; i++) {
+        const w = inside[i];
+        w.start = Math.max(0, sil.from - (split - i) * per);
+        w.end = w.start + per;
+      }
+    }
+    if (split < inside.length) {
+      const n = inside.length - split;
+      const nextStart = last + 1 < out.length ? Math.max(out[last + 1].start, sil.to) : sil.to + n * 0.45;
+      const per = Math.min(0.45, Math.max(0.2, nextStart - sil.to) / n);
+      for (let i = split; i < inside.length; i++) {
+        const w = inside[i];
+        w.start = sil.to + (i - split) * per;
+        w.end = w.start + per;
+      }
+    }
+  }
+  return out;
+}
+
 /** Whisper anchors the opening word(s) at t=0 even when the recording
  *  starts with silence. Given the waveform's speech onset, pack the words
  *  that "start" clearly inside the leading silence into the ~0.3s/word

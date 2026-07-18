@@ -12,8 +12,9 @@
  * film time; callers offset into scene-local time where needed.
  */
 
-import { getTranscript, whisperAvailable, snapLeadingWords, type TranscriptSegment } from "./transcribe.js";
+import { getTranscript, whisperAvailable, snapLeadingWords, snapWordsOutOfSilences, type TranscriptSegment } from "./transcribe.js";
 import { getWaveformPeaks } from "./waveform.js";
+import { detectSilence } from "./idle-silence.js";
 
 export interface SpineSentence {
   text: string;
@@ -128,6 +129,13 @@ export async function getSentenceSpine(
       const onsetIdx = wf.peaks.findIndex((pk) => pk > 0.08);
       if (onsetIdx > 0) words = snapLeadingWords(words, onsetIdx / wf.bucketsPerSecond);
     } catch { /* waveform optional */ }
+    // Whisper smears words across long mid-take pauses; the waveform's
+    // silence spans are ground truth. Without this, captions promise
+    // speech over dead air and word-anchored edits aim at the wrong times.
+    try {
+      const silences = await detectSilence(audioPath);
+      if (silences.length) words = snapWordsOutOfSilences(words, silences);
+    } catch { /* ffmpeg optional */ }
     const sentences = buildSentences(words);
     if (!sentences.length) return null;
     return { sentences, chapters: buildChapters(sentences) };
