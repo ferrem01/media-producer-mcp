@@ -343,8 +343,11 @@ export function getPreviewHtml(): string {
   }
   .audio-indicator:empty { display: none; }
   .audio-indicator.has-audio { color: #4f46e5; background: #eef2ff; }
+  /* In the left transport column: clear the floating rate badge, and open
+     the flyout to the RIGHT (right:0 would push it off the screen edge). */
+  #transport-left .vol-control { margin-top: 8px; }
   .vol-flyout {
-    position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 20;
+    position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 20;
     display: flex; align-items: center; padding: 8px 10px;
     background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.12);
@@ -736,12 +739,21 @@ export function getPreviewHtml(): string {
 
     <div id="playback-bar">
       <span id="transport-left">
+        <span style="display:flex;gap:3px;">
+          <button id="tl-zoom-in" class="scene-sb-btn" title="Zoom timeline in">+</button>
+          <button id="tl-zoom-out" class="scene-sb-btn" title="Zoom timeline out">&minus;</button>
+        </span>
         <button class="play-btn" id="play-btn" disabled>
           <svg id="play-icon" width="14" height="14" viewBox="0 0 14 14">
             <polygon points="3,1 12,7 3,13"/>
           </svg>
         </button>
         <span id="time-stack"><span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock"></span><span class="time-display" id="time-display"><span id="time-cur">0.0s</span><span id="time-total">0.0s</span></span></span>
+        <span class="vol-control" id="vol-control">
+          <span class="vol-icon" id="vol-icon" title="Mute / unmute" tabindex="0">&#9834;</span>
+          <span class="audio-indicator" id="audio-indicator"></span>
+          <span class="vol-flyout"><input type="range" id="vol-slider" min="0" max="100" value="100" step="1"></span>
+        </span>
       </span>
       <span id="lane-gutter"></span>
       <span id="slider-wrap">
@@ -755,15 +767,6 @@ export function getPreviewHtml(): string {
         <div id="word-lane"></div>
         <div id="playhead-line" style="display:none"></div>
         </div>
-      </span>
-      <span style="display:flex;flex-direction:column;gap:3px;">
-        <button id="tl-zoom-in" class="scene-sb-btn" title="Zoom timeline in">+</button>
-        <button id="tl-zoom-out" class="scene-sb-btn" title="Zoom timeline out">&minus;</button>
-      </span>
-      <span class="vol-control" id="vol-control">
-        <span class="vol-icon" id="vol-icon" title="Mute / unmute" tabindex="0">&#9834;</span>
-        <span class="audio-indicator" id="audio-indicator"></span>
-        <span class="vol-flyout"><input type="range" id="vol-slider" min="0" max="100" value="100" step="1"></span>
       </span>
     </div>
   </div>
