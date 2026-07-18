@@ -264,6 +264,15 @@ export function getPreviewHtml(): string {
   }
   .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
   #wave-strip { position: absolute; left: 0; right: 0; top: 94px; height: 26px; pointer-events: none; opacity: 0.16; }
+
+  /* Lane gutter labels: the timeline reads as tracks, not implementation.
+     (ROADMAP #8 stage 3 -- SCREEN / SPEAKER / MUSIC + the linked badge.) */
+  .lane-label { position: absolute; left: 2px; z-index: 6; font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #9ca3af; background: rgba(255,255,255,0.82); border-radius: 3px; padding: 0 4px; pointer-events: none; text-transform: uppercase; }
+  #lane-link { position: absolute; left: 2px; z-index: 6; font-size: 8px; font-weight: 600; color: #4f46e5; background: rgba(238,239,255,0.92); border-radius: 3px; padding: 0 4px; pointer-events: auto; cursor: help; }
+
+  /* Word-cut selection (stage 4): shift-click two words to mark a span. */
+  .wl-word.wl-sel { background: #fde68a; border-color: #f59e0b; color: #78350f; }
+  #word-cut-btn { position: absolute; z-index: 40; font: 600 10px Inter, sans-serif; background: #b91c1c; color: #fff; border: 0; border-radius: 6px; padding: 3px 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
   #timeline-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 12px; height: 12px;
     border-radius: 50%; background: #6366f1; cursor: pointer;
@@ -3217,9 +3226,16 @@ export function getPreviewHtml(): string {
     var doc;
     try { doc = els.previewIframe.contentDocument; } catch (e) { return; }
     if (!doc) return;
+    // The speaker's video rendering (camera bubble) is a FOLLOWER of the
+    // speaker lane, not independent footage -- keep it off the SCREEN rows.
+    var spkSrcs = (((p.speaker || {}).clips) || []).map(function(c) { return (c.source || '').split('/').pop(); }).filter(Boolean);
     p.scenes.forEach(function(scene, si) {
       var vids = sceneVideos(doc, scene.id).filter(function(v) {
-        return !isSpeakerVideoSrc(v.getAttribute('src') || '');
+        var src = v.getAttribute('src') || '';
+        if (isSpeakerVideoSrc(src)) return false;
+        if (spkSrcs.some(function(n) { return src.indexOf(n) !== -1; })) return false;
+        if (v.closest && v.closest('.scf-callout')) return false;
+        return true;
       });
       var sceneStart = sceneStartFor(si);
       var dur = scene.duration_seconds || 5;
@@ -3332,10 +3348,121 @@ export function getPreviewHtml(): string {
         wrap.appendChild(rowEl);
       });
     });
+    renderLaneLabels();
   }
 
   // Words lane: each beat's voiceover text at its film position. Click a
   // phrase to jump the playhead there -- the alignment anchor for edits.
+  // Lane gutter labels + linked badge (ROADMAP #8 stage 3): the timeline
+  // reads as SCREEN / SPEAKER / MUSIC tracks, and the recorder's shared cut
+  // list shows as an explicit 🔗 instead of an invisible convention.
+  function renderLaneLabels() {
+    var track = document.getElementById('timeline-track');
+    if (!track) return;
+    track.querySelectorAll('.lane-label, #lane-link').forEach(function(n) { n.remove(); });
+    var p = state.currentProject;
+    if (!p) return;
+    function lab(text, top) {
+      var el = document.createElement('div');
+      el.className = 'lane-label';
+      el.textContent = text;
+      el.style.top = top + 'px';
+      track.appendChild(el);
+    }
+    lab('screen', 2);
+    var hasSpeaker = !!(p.speaker && p.speaker.clips && p.speaker.clips.length);
+    if (hasSpeaker || (state._transcript && state._transcript.length)) lab('speaker', 96);
+    if (((p.audio || {}).tracks || []).some(function(t) { return t.type === 'music'; })) lab('music', 78);
+    if (hasSpeaker && p.speaker.clips.length === 1) {
+      var spkCuts = (p.speaker.clips[0].edl && p.speaker.clips[0].edl.cuts) || [];
+      var scCuts = null;
+      (p.scenes || []).forEach(function(s) {
+        var m = (s.media_edits || {}).screencast;
+        if (m && scCuts === null) scCuts = m.cuts || [];
+      });
+      if (scCuts !== null && JSON.stringify(spkCuts) === JSON.stringify(scCuts)) {
+        var lk = document.createElement('div');
+        lk.id = 'lane-link';
+        lk.textContent = '\\uD83D\\uDD17 linked';
+        lk.style.top = '96px';
+        lk.style.left = '58px';
+        lk.title = 'Screen and speaker share one cut list: a cut on either removes the same film time from both. Shift-click two words below to cut the span between them.';
+        track.appendChild(lk);
+      }
+    }
+  }
+
+  // Where the speaker's audio clock sits on the FILM clock: transcript and
+  // waveform times are file-relative (0 = first sample), but the narration
+  // is placed after the intro (speaker clip "at" / track start_time).
+  function speakerFilmOffset() {
+    var p = state.currentProject;
+    if (!p) return 0;
+    var clips = ((p.speaker || {}).clips) || [];
+    if (clips.length === 1 && clips[0].at > 0) return clips[0].at;
+    var narr = (((p.audio || {}).tracks) || []).filter(function(t) { return t.id === 'narration' || t.type === 'voiceover'; })[0];
+    return (narr && narr.start_time) || 0;
+  }
+
+  // ── Word-cut selection (ROADMAP #8 stage 4): shift-click the first and
+  // last word of a span, confirm, and the referee removes that film time
+  // from speaker + screen + captions + audio in one pass. ──
+  var wcut = { a: null, b: null };
+
+  function wordCutClear() {
+    document.querySelectorAll('.wl-word.wl-sel').forEach(function(n) { n.classList.remove('wl-sel'); });
+    document.getElementById('word-cut-btn')?.remove();
+    wcut.a = null; wcut.b = null;
+  }
+
+  function wordCutSelect(seg, el) {
+    var p = state.currentProject;
+    if (!p || !p.speaker || !p.speaker.clips || p.speaker.clips.length !== 1) {
+      studioStatus('This film has no speaker lane to cut (older project?)', 'err');
+      return;
+    }
+    if (!wcut.a) {
+      wcut.a = { seg: seg, el: el };
+      el.classList.add('wl-sel');
+      studioStatus('First word marked — shift-click the LAST word of the span to cut', '');
+      return;
+    }
+    wcut.b = { seg: seg, el: el };
+    el.classList.add('wl-sel');
+    var off = speakerFilmOffset() - (state.speakerTrimStart || 0);
+    var from = Math.min(wcut.a.seg.start, wcut.b.seg.start) + off - 0.06;
+    var to = Math.max(wcut.a.seg.end, wcut.b.seg.end) + off + 0.06;
+    var btn = document.createElement('button');
+    btn.id = 'word-cut-btn';
+    btn.textContent = '\\u2702 Cut ' + (to - from).toFixed(1) + 's';
+    btn.title = 'Remove this span of speech AND the matching screen time from the film';
+    var track = document.getElementById('timeline-track');
+    var total = state.totalDuration || 1;
+    btn.style.left = Math.min(97, ((to / total) * 100)).toFixed(2) + '%';
+    btn.style.top = '122px';
+    btn.addEventListener('click', function() {
+      btn.disabled = true;
+      btn.textContent = 'Cutting\\u2026';
+      api('POST', '/speaker-cut/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { from: Math.max(0, from), to: to })
+        .then(function(r) {
+          wordCutClear();
+          state.currentProject = r.project;
+          state.totalDuration = calcTotalDuration();
+          state.masterTime = Math.min(state.masterTime, Math.max(0, from - 1));
+          studioStatus('\\u2702 Cut ' + r.removed_seconds + 's \\u2014 voice, screen and captions all rippled. Reloading\\u2026', 'ok');
+          initAudio();
+          renderSceneList();
+          startCompositePreview(r.project, { time: state.masterTime });
+        })
+        .catch(function(e) {
+          btn.disabled = false;
+          btn.textContent = '\\u2702 Cut failed';
+          studioStatus('Cut failed: ' + e.message, 'err');
+        });
+    });
+    track.appendChild(btn);
+  }
+
   function renderWordLane() {
     var wrap = document.getElementById('word-lane');
     if (!wrap) return;
@@ -3343,6 +3470,8 @@ export function getPreviewHtml(): string {
     var p = state.currentProject;
     var total = state.totalDuration || calcTotalDuration();
     if (!p || !p.scenes || !(total > 0)) return;
+    wordCutClear();
+    renderLaneLabels();
     function addSpan(t0, dur2, text) {
       var span = document.createElement('div');
       span.className = 'wl-word';
@@ -3365,16 +3494,19 @@ export function getPreviewHtml(): string {
       // staggered across two mini-rows so neighbors don't collide. Clicking
       // a word seeks there and opens the pin picker -- "pin the media to
       // this word".
+      var wOff = speakerFilmOffset() - (state.speakerTrimStart || 0);
       state._transcript.forEach(function(seg2) {
-        var t0 = Math.max(0, seg2.start - (state.speakerTrimStart || 0));
-        if (seg2.end - (state.speakerTrimStart || 0) <= 0 || t0 >= total) return;
+        var t0 = Math.max(0, seg2.start + wOff);
+        if (seg2.end + wOff <= 0 || t0 >= total) return;
         var sp = document.createElement('div');
         sp.className = 'wl-word';
         sp.style.left = ((t0 / total) * 100).toFixed(2) + '%';
         sp.textContent = seg2.text;
-        sp.title = '“' + seg2.text + '” — ' + t0.toFixed(1) + 's. Click: jump here and pin the screencast to this word.';
+        sp.title = '“' + seg2.text + '” — ' + t0.toFixed(1) + 's. Click: jump here and pin the screencast to this word. Shift-click: mark it for a speaker cut.';
         sp.addEventListener('click', function(ev) {
           ev.stopPropagation();
+          if (ev.shiftKey) { wordCutSelect(seg2, sp); return; }
+          wordCutClear();
           scrub(Math.round((t0 / total) * 1000));
           els.slider.value = Math.round((t0 / total) * 1000);
           followPlayhead(true);
@@ -3482,9 +3614,11 @@ export function getPreviewHtml(): string {
       ctx.clearRect(0, 0, cv.width, cv.height);
       ctx.fillStyle = '#818cf8';
       var bps = r.buckets_per_second || 6;
-      var visible = Math.min(r.peaks.length, Math.ceil(total * bps));
+      var wvOff = speakerFilmOffset() - (state.speakerTrimStart || 0);
+      var visible = Math.min(r.peaks.length, Math.ceil((total - wvOff) * bps));
       for (var i = 0; i < visible; i++) {
-        var x = (i / (total * bps)) * cv.width;
+        var x = ((wvOff + i / bps) / total) * cv.width;
+        if (x < 0) continue;
         var h = Math.max(1, r.peaks[i] * cv.height);
         ctx.fillRect(x, (cv.height - h) / 2, Math.max(1, cv.width / (total * bps) - 0.5), h);
       }
