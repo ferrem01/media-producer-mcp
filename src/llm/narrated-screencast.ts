@@ -516,47 +516,13 @@ export async function assembleNarratedScreencast(opts: {
     }
     chapterPinCount = Math.max(0, ((edit?.pins || []) as Array<{ word?: string }>).filter((p) => p.word !== "end").length);
 
-    // Auto-callouts -- PARKED (2026-07-17, see AMENDMENTS). Six iterations of
-    // vision grounding (pixel dialect, draw-and-verify, window sampling,
-    // stability checks) still shipped boxes that miss on real footage; a
-    // wrong callout damages a walkthrough more than no callout. The full
-    // machinery stays (vision-grounding.ts, callout-plan.ts, tests) behind
-    // MP_AUTO_CALLOUTS=1 for future work.
-    if (process.env.MP_AUTO_CALLOUTS === "1") try {
-      const { planCallouts, isActionCue } = await import("../core/callout-plan.js");
-      const { ensureMotionIntel } = await import("../core/asset-intel.js");
-      if (edit?.segments?.length) {
-        let callouts;
-        if (opts.llmConfig) {
-          const { groundCallouts } = await import("./vision-grounding.js");
-          callouts = await groundCallouts({
-            videoPath,
-            cues: captions.filter((c) => isActionCue(c.text)).slice(0, 10),
-            chapterMoments,
-            segments: edit.segments,
-            sceneDur,
-            llmConfig: opts.llmConfig,
-          });
-        } else {
-          const intel = await ensureMotionIntel(videoPath);
-          callouts = planCallouts(captions, chapterMoments, edit.segments, intel.focus, sceneDur);
-        }
-        if (callouts.length) {
-          const scfComp = (screencastScene.components as any[]).find((c) => c.type === "screencast-frame");
-          if (scfComp) {
-            scfComp.data = { ...(scfComp.data || {}), callouts };
-            calloutCount = callouts.length;
-            console.log(
-              `  Callouts: ${callouts.length} proposed at ${callouts.map((c) => `${c.at.toFixed(0)}s`).join(", ")}`,
-            );
-          }
-        } else {
-          console.log(`  Callouts: nothing confidently referenced -- none proposed`);
-        }
-      }
-    } catch (e: any) {
-      console.warn(`  Callouts: proposal failed (${e?.message || e}) -- skipping`);
-    }
+    // Auto-callouts -- REMOVED from the assemble path (2026-07-17 parking,
+    // hardened 2026-07-18: the MP_AUTO_CALLOUTS=1 escape hatch resurrected
+    // the feature via a stale env file on a deploy target, shipping black
+    // boxes into a real film). The machinery (vision-grounding.ts,
+    // callout-plan.ts, tests) stays for the roadmap retry, but re-enabling
+    // is a code change now, not a config one. Callouts remain a Studio
+    // feature the human places.
 
     project.spine = {
       sentences: spine.sentences,

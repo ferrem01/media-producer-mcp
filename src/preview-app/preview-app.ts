@@ -3184,7 +3184,11 @@ export function getPreviewHtml(): string {
     p.scenes.forEach(function(scene) {
       if (!scene.media_edits || !Object.keys(scene.media_edits).length) return;
       var vids = sceneVideos(doc, scene.id).filter(function(v) {
-        return !isSpeakerVideoSrc(v.getAttribute('src') || '');
+        if (isSpeakerVideoSrc(v.getAttribute('src') || '')) return false;
+        // Callout clones are frozen still-frame copies inside .scf-callout --
+        // they intentionally carry no EDL stamp and must not trip the audit.
+        if (v.closest && v.closest('.scf-callout')) return false;
+        return true;
       });
       vids.forEach(function(v) {
         var found = editForVideo(scene, v, vids);
