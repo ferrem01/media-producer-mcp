@@ -13,9 +13,10 @@ const DEFAULTS = {
 };
 
 async function load() {
-  const s = await chrome.storage.sync.get({ ...DEFAULTS, mic: false });
+  const s = await chrome.storage.sync.get({ ...DEFAULTS, mic: false, camera: false });
   FIELDS.forEach((f) => { $(f).value = s[f] || DEFAULTS[f] || ""; });
   $("mic").checked = !!s.mic;
+  $("camera").checked = !!s.camera;
   const { recording } = await chrome.runtime.sendMessage({ type: "qr-status" }) || {};
   setRecording(!!recording);
   const { qrLastStatus } = (await chrome.storage.session?.get("qrLastStatus")) || {};
@@ -57,9 +58,21 @@ function setRecording(on) {
 }
 
 async function save() {
-  const s = { mic: $("mic").checked };
+  const s = { mic: $("mic").checked, camera: $("camera").checked };
   FIELDS.forEach((f) => { s[f] = $(f).value.trim(); });
   await chrome.storage.sync.set(s);
+}
+
+async function ensurePermission(name, withCam) {
+  // A permission prompt can't live in this popup (it steals focus, the
+  // popup closes, the prompt cancels itself) -- the setup tab hosts it.
+  let granted = false;
+  try {
+    const p = await navigator.permissions.query({ name });
+    granted = p.state === "granted";
+  } catch (e) { /* fall through to the setup tab */ }
+  if (!granted) chrome.tabs.create({ url: chrome.runtime.getURL("mic.html") + (withCam ? "?cam=1" : "") });
+  return granted;
 }
 
 // Mode A needs mic permission for the extension origin, and a permission
@@ -67,17 +80,17 @@ async function save() {
 // closes, the prompt cancels itself). If not yet granted, open a dedicated
 // setup tab that hosts the prompt; it flips the stored toggle on success.
 $("mic").addEventListener("change", async (e) => {
-  if (e.target.checked) {
-    let granted = false;
-    try {
-      const p = await navigator.permissions.query({ name: "microphone" });
-      granted = p.state === "granted";
-    } catch (err) { /* fall through to the setup tab */ }
-    if (!granted) {
-      e.target.checked = false; // mic.js sets it true once actually granted
-      chrome.tabs.create({ url: chrome.runtime.getURL("mic.html") });
-      return;
-    }
+  if (e.target.checked && !(await ensurePermission("microphone", false))) {
+    e.target.checked = false; // mic.js sets it true once actually granted
+    return;
+  }
+  save();
+});
+
+$("camera").addEventListener("change", async (e) => {
+  if (e.target.checked && !(await ensurePermission("camera", true))) {
+    e.target.checked = false; // mic.js sets it true once actually granted
+    return;
   }
   save();
 });

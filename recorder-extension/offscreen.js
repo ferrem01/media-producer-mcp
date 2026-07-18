@@ -1,20 +1,33 @@
-// Quotient Recorder -- offscreen document: MediaRecorder + uploader.
+// Quotient Recorder -- offscreen document: MediaRecorder(s) + uploader.
 // MV3 service workers can't run MediaRecorder, so this document records the
-// tab stream and, on stop, uploads straight from here (video -> events
-// sidecar -> trigger generate) to avoid shuttling a large blob through
-// extension messaging.
+// tab stream (and optionally the camera+mic as a second, same-clock
+// recording) and, on stop, uploads straight from here (video [-> camera]
+// -> events sidecar -> trigger generate) to avoid shuttling large blobs
+// through extension messaging.
+//
+// Lifecycle: PREP (getUserMedia + recorders created, nothing rolling) ->
+// BEGIN (recorders start together after the in-page countdown) ->
+// PAUSE/RESUME (both recorders in lockstep; the film has no paused footage)
+// -> STOP (upload) or ABORT (armed-but-never-rolled).
 
-let recorder = null;
+let recorder = null;       // tab video (+ mic when no camera)
+let camRecorder = null;    // camera + mic (its own file, same clock)
 let chunks = [];
+let camChunks = [];
 let trackDims = { width: 0, height: 0 };
 let micStream = null;
+let camStream = null;
 
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === "qr-offscreen-start") start(msg.streamId, msg.mic, msg.dims);
+  if (msg.type === "qr-offscreen-prep") prep(msg.streamId, msg.mic, msg.camera, msg.dims);
+  else if (msg.type === "qr-offscreen-begin") begin();
+  else if (msg.type === "qr-offscreen-pause") { try { recorder?.pause(); camRecorder?.pause(); } catch (e) {} }
+  else if (msg.type === "qr-offscreen-resume") { try { recorder?.resume(); camRecorder?.resume(); } catch (e) {} }
+  else if (msg.type === "qr-offscreen-abort") abort();
   else if (msg.type === "qr-offscreen-stop") stop(msg.upload);
 });
 
-async function start(streamId, mic, dims) {
+async function prep(streamId, mic, camera, dims) {
   try {
     // Pinning min==max==tab size makes Chrome deliver tab-exact frames
     // instead of display-sized frames with the tab letterboxed inside.
@@ -22,60 +35,102 @@ async function start(streamId, mic, dims) {
       ? { minWidth: dims.w, minHeight: dims.h, maxWidth: dims.w, maxHeight: dims.h }
       : {};
     const tab = await navigator.mediaDevices.getUserMedia({
-      audio: false, // tab audio stays out -- Mode A wants the VOICE, not page sounds
+      audio: false, // tab audio stays out -- we want the VOICE, not page sounds
       video: {
         mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId, ...sizing },
       },
     });
-    const tracks = [tab.getVideoTracks()[0]];
+    const tabTracks = [tab.getVideoTracks()[0]];
     let mimeType = "video/webm;codecs=vp9";
-    if (mic) {
-      // Mode A: mic on the SAME recording clock as the tab video -- born in
-      // sync. Permission was primed by the popup (offscreen can't prompt).
+
+    if (mic || camera) {
+      // Permission was primed by the setup tab (offscreen can't prompt).
       micStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        ...(camera ? { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } } : {}),
       });
-      tracks.push(micStream.getAudioTracks()[0]);
-      mimeType = "video/webm;codecs=vp9,opus";
+      if (camera && micStream.getVideoTracks().length) {
+        // Camera mode: voice lives WITH the face in its own recording; the
+        // tab file stays video-only. Both recorders start in the same tick,
+        // so the two files share one clock.
+        camStream = micStream;
+        camRecorder = new MediaRecorder(camStream, { mimeType: "video/webm;codecs=vp9,opus", videoBitsPerSecond: 2_500_000 });
+        camChunks = [];
+        camRecorder.ondataavailable = (e) => { if (e.data && e.data.size) camChunks.push(e.data); };
+      } else {
+        // Mic only: voice muxes into the tab recording (Mode A classic).
+        tabTracks.push(micStream.getAudioTracks()[0]);
+        mimeType = "video/webm;codecs=vp9,opus";
+      }
     }
+
     const settings = tab.getVideoTracks()[0]?.getSettings?.() || {};
     trackDims = { width: settings.width || 0, height: settings.height || 0 };
     chunks = [];
-    recorder = new MediaRecorder(new MediaStream(tracks), { mimeType, videoBitsPerSecond: 8_000_000 });
+    recorder = new MediaRecorder(new MediaStream(tabTracks), { mimeType, videoBitsPerSecond: 8_000_000 });
     recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-    recorder.start(1000);
   } catch (e) {
     status("error", "capture failed: " + (e && e.message || e));
   }
+}
+
+function begin() {
+  try {
+    if (!recorder) { status("error", "not prepped"); return; }
+    recorder.start(1000);
+    camRecorder?.start(1000);
+  } catch (e) {
+    status("error", "start failed: " + (e && e.message || e));
+  }
+}
+
+function releaseStreams() {
+  try { recorder?.stream?.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  try { camStream?.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  try { micStream?.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  recorder = null; camRecorder = null; micStream = null; camStream = null;
+  chunks = []; camChunks = [];
+}
+
+function abort() {
+  releaseStreams();
+}
+
+async function stopRecorder(rec) {
+  if (!rec || rec.state === "inactive") return;
+  await new Promise((resolve) => { rec.onstop = resolve; try { rec.stop(); } catch (e) { resolve(); } });
 }
 
 async function stop(upload) {
   try {
     if (!recorder) { status("error", "not recording"); return; }
     const rec = recorder;
-    recorder = null;
-    await new Promise((resolve) => {
-      rec.onstop = resolve;
-      rec.stop();
-      rec.stream.getTracks().forEach((t) => t.stop());
-    });
-    if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
+    const cam = camRecorder;
+    await stopRecorder(rec);
+    await stopRecorder(cam);
     const blob = new Blob(chunks, { type: "video/webm" });
-    chunks = [];
+    const camBlob = cam ? new Blob(camChunks, { type: "video/webm" }) : null;
+    releaseStreams();
     if (!blob.size) { status("error", "empty recording"); return; }
 
     status("uploading");
     const base = upload.server;
     const q = (extra) => `token=${encodeURIComponent(upload.token)}${extra || ""}`;
+    const uploadAsset = async (name, body) => {
+      const r = await fetch(
+        `${base}/api/upload-asset/${encodeURIComponent(upload.tenant)}/${encodeURIComponent(upload.project)}?${q(`&name=${encodeURIComponent(name)}`)}`,
+        { method: "POST", body },
+      );
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || `upload HTTP ${r.status}`);
+      return j;
+    };
 
-    // 1. Video (raw body, existing endpoint).
-    const upRes = await fetch(
-      `${base}/api/upload-asset/${encodeURIComponent(upload.tenant)}/${encodeURIComponent(upload.project)}?${q(`&name=${encodeURIComponent(upload.name)}`)}`,
-      { method: "POST", body: blob },
-    );
-    const upJson = await upRes.json();
-    if (!upRes.ok || !upJson.ok) throw new Error(upJson.error || `upload HTTP ${upRes.status}`);
+    // 1. Tab video, then the camera take when there is one.
+    const upJson = await uploadAsset(upload.name, blob);
     const finalName = upJson.url.split("/").pop();
+    let camJson = null;
+    if (camBlob && camBlob.size) camJson = await uploadAsset(upload.cameraName, camBlob);
 
     // 2. Events sidecar (recording dims from the actual track).
     const events = upload.events;
@@ -88,7 +143,8 @@ async function stop(upload) {
     const evJson = await evRes.json();
     if (!evRes.ok || !evJson.ok) throw new Error(evJson.error || `events HTTP ${evRes.status}`);
 
-    // 3. Fire generate. Mode A recordings carry the live narration.
+    // 3. Fire generate. Voice location: camera file if present, else muxed
+    // into the tab recording (narration_embedded).
     const prompt = `Recorded walkthrough ${new Date().toLocaleString()}`;
     const genRes = await fetch(
       `${base}/api/recorder-generate/${encodeURIComponent(upload.tenant)}?${q()}`,
@@ -98,7 +154,8 @@ async function stop(upload) {
         body: JSON.stringify({
           video_url: upJson.url,
           prompt,
-          narration_embedded: !!upload.mic,
+          narration_embedded: !!upload.mic && !camJson,
+          camera_url: camJson ? camJson.url : undefined,
         }),
       },
     );

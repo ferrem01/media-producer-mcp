@@ -2019,15 +2019,19 @@ async function runUnifiedPipeline(
           fps: canvas.fps,
         });
       }
-      // Mode A (recorder live narration): voice and video share ONE file --
-      // signalled by narration == screencast. Cuts idle∩silent instead of
-      // fitting picture to a separate take.
+      // Mode A (recorder live narration): voice and video share ONE CLOCK --
+      // either muxed into the tab recording (narration == screencast) or as
+      // a same-clock camera file (live_speaker_clock from the recorder
+      // route). Cuts idle∩silent instead of fitting picture to a take.
       const liveNarrated = prep.screencast.narrationSource
-        && prep.screencast.narrationSource === prep.screencast.source;
+        && (prep.screencast.narrationSource === prep.screencast.source || (opts as any).live_speaker_clock);
       const asm = liveNarrated
         ? await (await import("./narrated-screencast.js")).assembleLiveNarration({
             project,
             source: prep.screencast.source,
+            speakerSource: prep.screencast.narrationSource !== prep.screencast.source
+              ? prep.screencast.narrationSource
+              : undefined,
             dataDir: config.dataDir,
             llmConfig: opts.llmConfig,
             music: opts.backgroundMusic !== false,

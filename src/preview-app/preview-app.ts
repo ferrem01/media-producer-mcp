@@ -4499,7 +4499,7 @@ export function getPreviewHtml(): string {
   // while recording the mic; the take becomes the film's soundtrack with
   // captions + chapters attached server-side. Picture is never re-solved.
   // ─────────────────────────────────────────────
-  var booth = { phase: 'closed', stream: null, rec: null, chunks: [], blob: null, url: null, startTs: 0, mon: null, script: null };
+  var booth = { phase: 'closed', stream: null, rec: null, chunks: [], blob: null, url: null, startTs: 0, mon: null, script: null, wantCam: false };
 
   function boothCard(html) {
     document.getElementById('booth-overlay').style.display = 'flex';
@@ -4565,10 +4565,17 @@ export function getPreviewHtml(): string {
       '<h3>&#127908; Narration booth</h3>' +
       '<p>The film plays from the start while your mic records. Watch and narrate &mdash; your take becomes the soundtrack, and captions + chapter cards are built from it automatically. The cut itself never changes.</p>' +
       '<p id="booth-script-line">' + scriptLine + '</p>' +
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;">' +
+      '<input type="checkbox" id="booth-cam"' + (booth.wantCam ? ' checked' : '') + ' style="margin:0;"> &#128247; Include camera bubble (face + voice)</label>' +
       '<div class="booth-row"><button class="btn btn-primary" id="booth-start">&#9210; Start take</button>' +
       '<button class="btn btn-secondary" id="booth-script-btn">' + (booth.script && booth.script.length ? 'Edit script' : '&#128220; Draft script') + '</button>' +
       '<button class="btn btn-secondary" id="booth-cancel">Close</button></div>'
     );
+    document.getElementById('booth-cam').addEventListener('change', function(e) {
+      booth.wantCam = !!e.target.checked;
+      // A camera-less stream can't grow a camera track -- re-request on next take.
+      if (booth.stream) { booth.stream.getTracks().forEach(function(t) { t.stop(); }); booth.stream = null; }
+    });
     document.getElementById('booth-start').addEventListener('click', boothBegin);
     document.getElementById('booth-cancel').addEventListener('click', boothClose);
     document.getElementById('booth-script-btn').addEventListener('click', function() {
@@ -4653,7 +4660,10 @@ export function getPreviewHtml(): string {
     }
     var ready = booth.stream
       ? Promise.resolve(booth.stream)
-      : navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      : navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: booth.wantCam ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false
+        });
     ready.then(function(stream) {
       booth.stream = stream;
       boothCountdown(3);
@@ -4675,9 +4685,14 @@ export function getPreviewHtml(): string {
   function boothRecord() {
     scrub(0);
     boothMute(true);
-    var mime = (window.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) ? 'audio/webm;codecs=opus' : 'audio/webm';
+    var hasCam = booth.stream && booth.stream.getVideoTracks().length > 0;
+    var mime = hasCam
+      ? (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm')
+      : ((window.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) ? 'audio/webm;codecs=opus' : 'audio/webm');
     try {
-      booth.rec = new MediaRecorder(booth.stream, { mimeType: mime, audioBitsPerSecond: 128000 });
+      booth.rec = new MediaRecorder(booth.stream, hasCam
+        ? { mimeType: mime, audioBitsPerSecond: 128000, videoBitsPerSecond: 2500000 }
+        : { mimeType: mime, audioBitsPerSecond: 128000 });
     } catch (e) {
       boothMute(false);
       studioStatus('Recording not supported in this browser: ' + e.message, 'err');
@@ -4721,16 +4736,21 @@ export function getPreviewHtml(): string {
   }
 
   function boothRecCard(paused) {
+    var hasCam = booth.stream && booth.stream.getVideoTracks().length > 0;
     boothCard(
       (paused
         ? '<h3>&#9208; Paused</h3><p class="booth-live" id="booth-elapsed"></p>' +
-          '<p>Recording is paused with the film. Press play (or Resume) and both continue together. Don\\'t scrub the timeline &mdash; the take is glued to the film clock.</p>' +
-          '<div class="booth-row"><button class="btn btn-primary" id="booth-resume">&#9205; Resume</button>' +
-          '<button class="btn btn-secondary" id="booth-stop">&#9209; Finish take</button></div>'
+          '<p>Recording is paused with the film. Press play (or Resume) and both continue together. Don\\'t scrub the timeline &mdash; the take is glued to the film clock.</p>'
         : '<h3><span class="booth-dot"></span> Recording</h3><p class="booth-live" id="booth-elapsed"></p>' +
-          '<p>Speak as you watch. Pause the film to catch your breath &mdash; the recording pauses with it. The take ends itself when the film does.</p>' +
-          '<div class="booth-row"><button class="btn btn-secondary" id="booth-stop">&#9209; Stop</button></div>')
+          '<p>Speak as you watch. Pause the film to catch your breath &mdash; the recording pauses with it. The take ends itself when the film does.</p>') +
+      (hasCam ? '<video id="booth-selfview" muted autoplay playsinline style="width:100%;border-radius:10px;margin:4px 0 8px;transform:scaleX(-1);"></video>' : '') +
+      (paused
+        ? '<div class="booth-row"><button class="btn btn-primary" id="booth-resume">&#9205; Resume</button>' +
+          '<button class="btn btn-secondary" id="booth-stop">&#9209; Finish take</button></div>'
+        : '<div class="booth-row"><button class="btn btn-secondary" id="booth-stop">&#9209; Stop</button></div>')
     );
+    var sv = document.getElementById('booth-selfview');
+    if (sv) { try { sv.srcObject = booth.stream; } catch (eSV) {} }
     var rs = document.getElementById('booth-resume');
     if (rs) rs.addEventListener('click', function() { if (!state.playing) togglePlay(); });
     document.getElementById('booth-stop').addEventListener('click', boothStopTake);
@@ -4750,13 +4770,16 @@ export function getPreviewHtml(): string {
 
   function boothReview() {
     if (booth.phase !== 'review') return;
-    booth.blob = new Blob(booth.chunks, { type: 'audio/webm' });
+    var camTake = booth.stream && booth.stream.getVideoTracks().length > 0;
+    booth.blob = new Blob(booth.chunks, { type: camTake ? 'video/webm' : 'audio/webm' });
     if (booth.url) URL.revokeObjectURL(booth.url);
     booth.url = URL.createObjectURL(booth.blob);
     boothCard(
       '<h3>&#127908; Take recorded (' + fmtTime(state.masterTime) + ' of film covered)</h3>' +
       (booth.desynced ? '<p style="color:#b45309;">&#9888; The timeline was scrubbed mid-take, so voice and picture may be out of step &mdash; listen before using, or retake.</p>' : '') +
-      '<audio controls src="' + booth.url + '"></audio>' +
+      (camTake
+        ? '<video controls playsinline src="' + booth.url + '" style="width:100%;border-radius:10px;margin:8px 0 2px;"></video>'
+        : '<audio controls src="' + booth.url + '"></audio>') +
       '<div class="booth-row"><button class="btn btn-primary" id="booth-use">Use this take</button>' +
       '<button class="btn btn-secondary" id="booth-retake">Retake</button>' +
       '<button class="btn btn-secondary" id="booth-discard">Discard</button></div>'
