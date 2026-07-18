@@ -47,6 +47,79 @@ export interface NarratedScreencastResult {
   narration_duration: number;
 }
 
+/** Best brand backdrop for the walkthrough matte: an explicit background
+ *  asset first, then an abstract/atmospheric harvested image. Null -> the
+ *  caller falls back to a brand gradient. */
+function pickBrandBackdrop(brandKit: Project["brand_kit"] | undefined): string | null {
+  const assets = (brandKit?.assets || []) as BrandAsset[];
+  const bg = assets.find((a) => a.type === "background" && a.url);
+  if (bg) return bg.url;
+  const atmospheric = assets.find(
+    (a) =>
+      a.type === "image" && a.url &&
+      /abstract|gradient|particle|wave|glow|light|neon/i.test(
+        [a.description || "", ...(a.tags || [])].join(" "),
+      ),
+  );
+  return atmospheric?.url || null;
+}
+
+/**
+ * The recorder's presentation recipe: the recording sits in a macOS browser
+ * frame on a brand backdrop -- matted, shadowed, chrome bar showing the real
+ * recorded host. Deterministic component config (no codegen), and the frame
+ * makes crop imprecision invisible in a way full-bleed never did.
+ */
+function framedWalkthroughScene(opts: {
+  id: string;
+  label: string;
+  videoUrl: string;
+  durationSeconds: number;
+  brandKit?: Project["brand_kit"];
+  /** Recorded page URL from the events sidecar (chrome bar text). */
+  pageUrl?: string;
+}): Scene {
+  const backdrop = pickBrandBackdrop(opts.brandKit);
+  let urlText = "";
+  try { if (opts.pageUrl) urlText = new URL(opts.pageUrl).host; } catch { /* keep empty */ }
+  const components: any[] = [
+    backdrop
+      ? {
+          id: `${opts.id}_bg`,
+          type: "image",
+          z_index: 1,
+          position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+          data: { src: backdrop, overlay_opacity: 0.45, overlay_color: "#0f172a" },
+        }
+      : {
+          id: `${opts.id}_bg`,
+          type: "gradient-background",
+          z_index: 1,
+          position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+          data: {},
+        },
+    {
+      id: `${opts.id}_v`,
+      type: "screencast-frame",
+      z_index: 10,
+      position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+      data: {
+        video_url: opts.videoUrl,
+        frame_style: "macos-browser",
+        max_width_pct: 96,
+        crop: "auto",
+        ...(urlText ? { url_text: urlText } : {}),
+      },
+    },
+  ];
+  return {
+    id: opts.id,
+    label: opts.label,
+    duration_seconds: Math.max(0.5, Math.round(opts.durationSeconds * 10) / 10),
+    components,
+  } as unknown as Scene;
+}
+
 /** One short title per chapter via a single small LLM call. Returns titles
  *  aligned to `spine.chapters`; empty strings on failure (callers then skip
  *  the chapter cards -- a walkthrough without section titles beats one with
@@ -145,8 +218,16 @@ export async function assembleLiveNarration(opts: {
     `(idle ${idle.length} span(s), silence ${silence.length} span(s))`,
   );
 
-  // Video: EDL hard cuts.
-  const scene = videoScene("screencast", "Walkthrough", source, keptDur, { autoCrop: true });
+  // Video: EDL hard cuts, presented in the browser frame on the brand matte.
+  let livePageUrl: string | undefined;
+  try {
+    const { loadRecorderEvents } = await import("../core/recorder-events.js");
+    livePageUrl = (await loadRecorderEvents(videoPath))?.recording?.url || undefined;
+  } catch { /* chrome bar just stays blank */ }
+  const scene = framedWalkthroughScene({
+    id: "screencast", label: "Walkthrough", videoUrl: source, durationSeconds: keptDur,
+    brandKit: project.brand_kit, pageUrl: livePageUrl,
+  });
   if (cuts.length) {
     const solved = solveMediaEdits(
       { cuts: cuts.map((c) => ({ src_start: c.from, src_end: c.to })), rate_regions: [], pins: [] },
@@ -388,7 +469,16 @@ export async function assembleNarratedScreencast(opts: {
 
   // The screen recording, compressed and fit to the narration MINUS the
   // bookends so the whole film equals the narration length exactly.
-  const screencastScene = videoScene("screencast", "Walkthrough", screencastSource, narrationDur > 0.5 ? narrationDur : 573, { autoCrop: true });
+  let pageUrl: string | undefined;
+  try {
+    const { loadRecorderEvents } = await import("../core/recorder-events.js");
+    pageUrl = (await loadRecorderEvents(resolveVideoPath(screencastSource, opts.dataDir)))?.recording?.url || undefined;
+  } catch { /* chrome bar just stays blank */ }
+  const screencastScene = framedWalkthroughScene({
+    id: "screencast", label: "Walkthrough", videoUrl: screencastSource,
+    durationSeconds: narrationDur > 0.5 ? narrationDur : 573,
+    brandKit: project.brand_kit, pageUrl,
+  });
   const fitTarget = narrationDur > 0.5 ? Math.max(5, narrationDur - introDur - outroDur) : undefined;
   const compress = await proposeSceneCompression(screencastScene, { dataDir: opts.dataDir, targetDuration: fitTarget });
   scenes.push(screencastScene);
