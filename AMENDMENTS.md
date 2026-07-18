@@ -6,6 +6,36 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-18 — Merged speaker lane + wave-strip zoom bug (PRs #421, #422, #423)
+
+The full stage-3 promise from ROADMAP #8: the speaker's four scattered
+timeline artifacts (voiceover audio-line, waveform strip, word lane, camera
+row) now read as ONE speaker lane.
+
+- **`.spk-clip` block** spans where the voice sits on the film clock (clip
+  `at` + narration element duration; falls back to film end until metadata
+  loads); inserted below the waveform + words in stacking order so they read
+  as content OF the clip. Speaker EDL cuts draw as ✂ seams at their film
+  positions (source→bake→film through prior cuts). The orange voiceover
+  audio-lane line is suppressed when a speaker lane exists.
+- **Wave-strip zoom bug (pre-existing, exposed by the lane):** a canvas's
+  `width` attribute over-constrains `left:0;right:0`, so `#wave-strip`'s
+  rect stayed at the UNZOOMED width — at any timeline zoom the whole wave
+  squeezed into the film's first ~10% while words/blocks spread. Found by
+  bitmap-probing the live page (headless chromium via the tunnel): canvas
+  cssW 901px vs track 9405px. Fix: size bitmap AND css width from
+  `#timeline-track` each draw (#423). Peaks also now fetch once per project
+  and draw synchronously (#422) — fetch-in-the-draw could resolve out of
+  order; the word-cut success path invalidates peaks + transcript caches.
+- Verified on proj_2b5f790e (regenerated from the 7/18 camera recording
+  with the new pipeline: speaker EDL + snapped captions) — screenshot
+  audit: block at 4.84%, 1 speaker seam, labels, 🔗, 207 words, camera
+  row suppressed, intro region clean.
+- Known gap (deliberate): restoring a SCREEN cut via its ✂ popover on a
+  linked film edits only the screen list (speaker keeps the time) — the
+  reverse referee (reinsert time everywhere) doesn't exist yet. Unlink /
+  restore flows are future work.
+
 ## 2026-07-18 — "Voice and camera not playing" debug: stale JS + whisper silence-smear (PRs #418, #419)
 
 Marc reported proj_34d1497c playing without voice or camera. Remote debugging
