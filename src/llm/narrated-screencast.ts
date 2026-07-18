@@ -206,9 +206,12 @@ export async function assembleLiveNarration(opts: {
   const { solveMediaEdits } = await import("../core/media-edl.js");
 
   // idle ∩ silent, with breathing room. Either signal missing -> no cuts
-  // (a long honest film beats a clipped word).
+  // (a long honest film beats a clipped word). Intel idle ranges use
+  // {start,end} (recorder-events shape) -- normalize to the Range shape.
   const intel = await ensureMotionIntel(videoPath).catch(() => null);
-  const idle = (intel?.idle?.ranges || []).map((r: any) => ({ from: r.from, to: r.to }));
+  const idle = (intel?.idle?.ranges || [])
+    .map((r: any) => ({ from: Number(r.start ?? r.from), to: Number(r.end ?? r.to) }))
+    .filter((r) => Number.isFinite(r.from) && Number.isFinite(r.to) && r.to > r.from);
   const silence = (await detectSilence(videoPath)).map((r) => ({ from: r.from, to: Math.min(r.to, srcDur) }));
   const cuts = shrinkRanges(intersectRanges(idle, silence), 0.35, 2.5);
   const kept = complementRanges(cuts, srcDur);
