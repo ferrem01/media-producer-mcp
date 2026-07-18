@@ -209,7 +209,7 @@ export function getPreviewHtml(): string {
   /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
   #audio-lanes { position: absolute; left: 0; right: 0; top: 86px; height: 10px; pointer-events: none; }
   .audio-lane-seg { position: absolute; height: 4px; border-radius: 2px; pointer-events: auto; }
-  .audio-lane-seg.music { top: 0; background: linear-gradient(90deg, rgba(99,102,241,0.15), rgba(99,102,241,0.55) 12%, rgba(99,102,241,0.55)); }
+  .audio-lane-seg.music { top: 0; height: 6px; background: linear-gradient(90deg, rgba(99,102,241,0.15), rgba(99,102,241,0.55) 12%, rgba(99,102,241,0.55)); }
   .audio-lane-seg.voiceover { top: 5px; background: #f59e0b; opacity: 0.75; }
   .audio-lane-seg.sfx { top: 5px; background: #10b981; opacity: 0.6; }
   #timeline-slider {
@@ -3401,11 +3401,13 @@ export function getPreviewHtml(): string {
       (state._transcript && state._transcript.length) ||
       tracks.some(function(t) { return t.type === 'voiceover'; }));
     var hasMusic = tracks.some(function(t) { return t.type === 'music'; });
-    var y = { ruler: 0, rulerH: 18, screen: 22, screenH: 52, speaker: -1, music: -1 };
-    var top = y.screen + y.screenH + 4;
-    if (hasSpk) { y.speaker = top; top += 32; }
-    if (hasMusic) { y.music = top + 2; top += 16; }
-    y.total = Math.max(top + 2, 80);
+    // Roomy bands with real gaps between beds: squeezing speaker + music
+    // against the bottom edge made them read as one smudge.
+    var y = { ruler: 0, rulerH: 18, screen: 24, screenH: 52, speakerH: 36, musicH: 16, speaker: -1, music: -1 };
+    var top = y.screen + y.screenH + 8;
+    if (hasSpk) { y.speaker = top; top += y.speakerH + 8; }
+    if (hasMusic) { y.music = top; top += y.musicH + 6; }
+    y.total = Math.max(top + 2, 84);
     return y;
   }
 
@@ -3434,9 +3436,9 @@ export function getPreviewHtml(): string {
     setTop('beat-ticks', 7);
     setTop('cam-pills', y.ruler + y.rulerH - 4);
     setTop('media-lane', y.screen);
-    setTop('wave-strip', y.speaker + 3, y.speaker >= 0);
-    setTop('word-lane', y.speaker + 3, y.speaker >= 0);
-    setTop('audio-lanes', y.music, y.music >= 0);
+    setTop('wave-strip', y.speaker + 5, y.speaker >= 0);
+    setTop('word-lane', y.speaker + 5, y.speaker >= 0);
+    setTop('audio-lanes', y.music + 5, y.music >= 0);
     // Lane beds (recreated each pass; painted below all content).
     track.querySelectorAll('.lane-bed').forEach(function(n) { n.remove(); });
     function bed(cls, top, h) {
@@ -3448,13 +3450,14 @@ export function getPreviewHtml(): string {
     }
     bed('ruler', y.ruler, y.rulerH);
     bed('screen', y.screen - 2, y.screenH + 4);
-    if (y.speaker >= 0) bed('speaker', y.speaker, 32);
-    if (y.music >= 0) bed('music', y.music - 3, 13);
-    // Fixed gutter icons: stationary no matter the scroll/zoom.
+    if (y.speaker >= 0) bed('speaker', y.speaker, y.speakerH);
+    if (y.music >= 0) bed('music', y.music, y.musicH);
+    // Fixed gutter icons: stationary no matter the scroll/zoom, each
+    // vertically centered on its bed.
     if (gut) {
       var html = '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="Screen track">' + LG_ICONS.screen + '</span>';
-      if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + 8) + 'px" title="Speaker track">' + LG_ICONS.speaker + '</span>';
-      if (y.music >= 0) html += '<span class="lg-ic" style="top:' + (y.music - 5) + 'px" title="Music track">' + LG_ICONS.music + '</span>';
+      if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="Speaker track">' + LG_ICONS.speaker + '</span>';
+      if (y.music >= 0) html += '<span class="lg-ic" style="top:' + (y.music + y.musicH / 2 - 8) + 'px" title="Music track">' + LG_ICONS.music + '</span>';
       gut.innerHTML = html;
     }
     var ph = document.getElementById('playhead-line');
@@ -3495,7 +3498,7 @@ export function getPreviewHtml(): string {
       if (blkEnd > clipAt) {
         var blk = document.createElement('div');
         blk.className = 'spk-clip';
-        blk.style.top = (y.speaker + 3) + 'px';
+        blk.style.top = (y.speaker + 5) + 'px';
         blk.style.left = ((clipAt / total) * 100).toFixed(2) + '%';
         blk.style.width = (((blkEnd - clipAt) / total) * 100).toFixed(2) + '%';
         blk.title = 'Speaker clip: ' + clipAt.toFixed(1) + 's \\u2192 ' + blkEnd.toFixed(1) + 's';
@@ -3513,7 +3516,7 @@ export function getPreviewHtml(): string {
         var sc = document.createElement('div');
         sc.className = 'spk-cut';
         sc.textContent = '\\u2702';
-        sc.style.top = (y.speaker + 6) + 'px';
+        sc.style.top = (y.speaker + 9) + 'px';
         sc.style.left = ((seamFilm / total) * 100).toFixed(2) + '%';
         sc.title = (c.src_end - c.src_start).toFixed(1) + 's of speech removed here (voice and screen together). Shift-click two words to cut another span.';
         track.appendChild(sc);
@@ -3532,7 +3535,7 @@ export function getPreviewHtml(): string {
         var lk = document.createElement('span');
         lk.id = 'lg-link';
         lk.textContent = '\\uD83D\\uDD17';
-        lk.style.top = (y.speaker + 20) + 'px';
+        lk.style.top = (y.speaker + 28) + 'px';
         lk.title = 'Linked: screen and speaker share one cut list -- a cut on either removes the same film time from both. Shift-click two words to cut a span.';
         gut2.appendChild(lk);
       }
@@ -3586,7 +3589,7 @@ export function getPreviewHtml(): string {
     var track = document.getElementById('timeline-track');
     var total = state.totalDuration || 1;
     btn.style.left = Math.min(97, ((to / total) * 100)).toFixed(2) + '%';
-    btn.style.top = (laneLayout().speaker + 34) + 'px';
+    btn.style.top = (laneLayout().speaker + 44) + 'px';
     btn.addEventListener('click', function() {
       btn.disabled = true;
       btn.textContent = 'Cutting\\u2026';
