@@ -214,9 +214,11 @@ export function getPreviewHtml(): string {
   .audio-lane-seg.sfx { top: 5px; background: #10b981; opacity: 0.6; }
   #timeline-slider {
     position: absolute; left: 0; top: 66px; width: 100%; -webkit-appearance: none; appearance: none;
-    height: 3px; background: #e5e7eb; border-radius: 3px;
-    outline: none; cursor: pointer;
+    height: 18px; background: transparent;
+    outline: none; cursor: pointer; margin: 0; z-index: 4;
   }
+  #timeline-slider::-webkit-slider-runnable-track { height: 3px; background: #e5e7eb; border-radius: 3px; margin-top: 7px; }
+  #timeline-slider::-moz-range-track { height: 3px; background: #e5e7eb; border-radius: 3px; }
   /* Beat/scene markers over the timeline: scene cuts are strong ticks, beats are soft ticks. */
   #beat-ticks { position: absolute; left: 0; right: 0; top: 66px; height: 5px; pointer-events: none; }
   .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #a5b4fc; opacity: 0.75; border-radius: 1px; }
@@ -293,16 +295,21 @@ export function getPreviewHtml(): string {
   /* Word-cut selection (stage 4): shift-click two words to mark a span. */
   .wl-word.wl-sel { background: #fde68a; border-color: #f59e0b; color: #78350f; }
   #word-cut-btn { position: absolute; z-index: 40; font: 600 10px Inter, sans-serif; background: #b91c1c; color: #fff; border: 0; border-radius: 6px; padding: 3px 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+  /* The native thumb is INVISIBLE (it keeps a fat grab/drag target over the
+     ruler) -- the visible circle is drawn on the playhead line instead. A
+     range thumb's center travels a band inset by half the thumb width, so
+     it can never line up with percent-positioned lanes at the edges. */
   #timeline-slider::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 12px; height: 12px;
-    border-radius: 50%; background: #6366f1; cursor: pointer;
-    box-shadow: 0 1px 3px rgba(99,102,241,0.3);
-    transition: transform 0.1s ease;
+    -webkit-appearance: none; width: 20px; height: 18px; opacity: 0; cursor: pointer;
   }
-  #timeline-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
   #timeline-slider::-moz-range-thumb {
+    width: 20px; height: 18px; opacity: 0; cursor: pointer; border: none;
+  }
+  #playhead-line::before {
+    content: ''; position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
     width: 12px; height: 12px; border-radius: 50%;
-    background: #6366f1; cursor: pointer; border: none;
+    background: #4f46e5; border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(79,70,229,0.45);
   }
   /* Transport column: play button with the clock stacked beneath it. A fixed
      narrow width (vs an inline time readout) hands ~160px back to the
@@ -3435,7 +3442,7 @@ export function getPreviewHtml(): string {
     }
     // Ruler band on top: scrubber + beat ticks live in it; the camera-move
     // pills sit at the seam between ruler and the screen lane.
-    setTop('timeline-slider', 7);
+    setTop('timeline-slider', 0); // 18px-tall input covers the whole ruler band
     setTop('beat-ticks', 7);
     setTop('cam-pills', y.ruler + y.rulerH - 4);
     setTop('media-lane', y.screen);
