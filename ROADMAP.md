@@ -92,15 +92,34 @@ revise = element vs scene).
    narration booth needs the `unsafely-treat-insecure-origin-as-secure` Chrome flag
    today (booth shows instructions). Also unlocks clipboard APIs, service workers,
    and removes the mixed-content ceiling generally.
-8. **Editable cuts on narrated films (audio re-derive)** — Mode A bakes matching
-   cuts into video EDL and narration audio at assembly; hand-editing a cut in
-   Studio today desyncs the voice (only the video map changes). Fix: on cut
-   save, re-slice the narration from the original recording (source is kept)
-   and re-shift captions. The deeper ask this unlocks: editing SPEAKER cuts and
-   MEDIA cuts independently — trim a rambling sentence without touching the
-   footage, or tighten footage without touching the voice — with the solver
-   keeping the two clocks reconciled. Backlogged 2026-07-18 pending real
-   editing demand; the current sidecar∩silence proposals have been choosing well.
+8. **Speaker/Screen symmetric EDLs — PLAN OF RECORD (agreed 2026-07-18).**
+   The film is three tracks on ONE clock: SCREEN, SPEAKER, MUSIC. Today only
+   video is EDL'd (declarative source-map: cuts/rates/pins → segments);
+   voice edits are baked into new audio files at assembly. The plan promotes
+   the speaker to the same primitive:
+   - **Speaker = ordered clips, each `{at, source, edl}`** — `at` places the
+     clip on the film clock (subsumes audio `start_time` AND adds inter-clip
+     gaps, which the old end-to-end `speaker_track` couldn't express); the
+     per-clip EDL subsumes trims (head/tail cuts) and enables word-deletes
+     (mid-clip cuts). Audio-only vs camera+voice is the SAME structure with
+     one vs two renderings (waveform lane; + PiP bubble following the map).
+   - **The speaker is the film's master clock.** Speaker cuts ripple the film
+     shorter (screen fills by cut-or-timelapse); screen-only edits may not
+     steal time from speech — they resolve as rate changes unless the span is
+     silent. The pin/fit solver enforces both.
+   - **Linked vs unlinked**: recorder films default to one shared cut list
+     (🔗 shown in the timeline gutter — the current invisible camera-mirror
+     made visible); unlinking gives each lane its own list with the solver
+     reconciling. Baking becomes a render-time detail, never a data event.
+   - **Timeline reconciliation**: lanes match the mental model, not the
+     implementation — labeled SCREEN / SPEAKER / MUSIC, with the speaker's
+     four current artifacts (camera EDL row, narration line, waveform strip,
+     word lane) merged into ONE speaker lane (waveform + words drawn in it).
+   - **Shippable stages**: (1) speaker-EDL type + render/mixer application
+     (the atrim/concat code exists from Mode A, moves to render time);
+     (2) preview playback honoring audio EDLs (the genuinely new work);
+     (3) merged speaker lane + labels + 🔗 state; (4) word-delete cutting
+     with caption/chapter reshift from the spine.
 9. **Auto-callouts retry** (removed from the assemble path 2026-07-18) — vision-grounded
    region callouts on narrated screencasts. Renderer + pixel-dialect conversion are solved;
    the open problem is time × semantics (cues land on content seams; narrator references
