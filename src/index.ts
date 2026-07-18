@@ -1743,7 +1743,12 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           if (takeBuffer.length < 1024) { jsonResponse(res, 400, { error: "take is empty" }); return; }
           const bnDir = path.join(config.dataDir, bnTenant, "projects", bnProject, "assets");
           await fs.mkdir(bnDir, { recursive: true });
-          await fs.writeFile(path.join(bnDir, bnName), takeBuffer);
+          const bnPath = path.join(bnDir, bnName);
+          await fs.writeFile(bnPath, takeBuffer);
+          // MediaRecorder blobs carry no duration header; remux so probes work.
+          const { remuxMediaRecorderFile } = await import("./core/video-normalize.js");
+          const remuxed = await remuxMediaRecorderFile(bnPath);
+          if (!remuxed) console.warn(`  booth-narration: remux failed for ${bnName} -- probing the raw blob`);
           const narrationUrl = `/assets/${bnTenant}/projects/${bnProject}/assets/${bnName}`;
 
           const { attachBoothNarration } = await import("./llm/narrated-screencast.js");
