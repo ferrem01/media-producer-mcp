@@ -3684,8 +3684,14 @@ export function getPreviewHtml(): string {
   function drawWaveStrip(cv, r) {
     var total = state.totalDuration || calcTotalDuration();
     if (!(total > 0)) return;
-    var rect = cv.getBoundingClientRect();
-    cv.width = Math.max(300, Math.min(8000, Math.round(rect.width)));
+    // Size from the TRACK, not the canvas: a canvas's width attribute
+    // over-constrains left:0;right:0, so its own rect stays at the
+    // unzoomed width and the wave squeezes into the film's head while
+    // every other lane spreads with the zoom.
+    var trackEl = document.getElementById('timeline-track');
+    var w = (trackEl ? trackEl.getBoundingClientRect().width : cv.getBoundingClientRect().width) || 300;
+    cv.style.width = Math.round(w) + 'px';
+    cv.width = Math.max(300, Math.min(8000, Math.round(w)));
     cv.height = 15;
     var ctx = cv.getContext('2d');
     ctx.clearRect(0, 0, cv.width, cv.height);
