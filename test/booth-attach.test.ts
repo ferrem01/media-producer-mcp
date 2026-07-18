@@ -154,6 +154,14 @@ describe("attachBoothNarration", () => {
     expect(project.scenes[1].components.find((c: any) => c.id === "booth_pip")).toBeUndefined();
   });
 
+  it("records the take as the SPEAKER lane (no EDL -- locked-cut take plays straight)", async () => {
+    const project = recorderProject();
+    await attachBoothNarration({ project, narrationSource: "/assets/t/take2.webm" });
+    expect((project as any).speaker.clips).toEqual([
+      { at: 0, source: "/assets/t/take2.webm", derived_audio: "/assets/t/take2.webm" },
+    ]);
+  });
+
   it("throws on a project with no screencast scene", async () => {
     const project: any = { project_id: "p", tenant_id: "t", scenes: [{ id: "s1", duration_seconds: 5, components: [{ type: "kinetic-text" }] }] };
     await expect(attachBoothNarration({ project, narrationSource: "/x.webm" })).rejects.toThrow(/no screencast scene/);

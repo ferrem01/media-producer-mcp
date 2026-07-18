@@ -483,6 +483,30 @@ export interface Project {
     drafted_at: string;
     edited?: boolean;
   };
+  /** The SPEAKER lane (symmetric-EDL plan of record, ROADMAP #8): the
+   *  declarative truth for the film's voice. Ordered clips placed on the
+   *  film clock, each with an optional source-map (same EDL primitive as
+   *  media_edits) over the ORIGINAL recording -- audio-only or camera+voice,
+   *  one structure. The narration audio track is a DERIVED rendering of
+   *  this (re-baked whenever the EDL changes); never edit the bake, edit
+   *  the EDL. The speaker is the film's master clock. */
+  speaker?: {
+    clips: Array<{
+      /** Film-clock second this clip begins (inter-clip gaps = later `at`). */
+      at: number;
+      /** The original recording asset (audio webm/m4a, or camera+voice video). */
+      source: string;
+      /** Source-map applied to the audio (and any bubble rendering).
+       *  Absent = the clip plays straight through. */
+      edl?: {
+        cuts: Array<{ src_start: number; src_end: number }>;
+        segments: Array<{ src_start: number; src_end: number; rate: number }>;
+      };
+      /** Cache: derived audio rendering of source x edl + its cache key. */
+      derived_audio?: string;
+      derived_key?: string;
+    }>;
+  };
 
   // ── Lifecycle ──
   /** Creative bible from the concept director (structured, not prose) */
