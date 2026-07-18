@@ -191,6 +191,21 @@ export function getPreviewHtml(): string {
   #slider-wrap { position: relative; flex: 1; height: 122px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   #slider-wrap::-webkit-scrollbar { display: none; }
   #timeline-track { position: relative; height: 100%; min-width: 100%; width: 100%; }
+  /* Fixed lane gutter: one icon per visible lane, stationary at the left of
+     the timeline no matter where the track is scrolled. */
+  #lane-gutter { position: relative; width: 22px; flex: none; align-self: flex-start; }
+  .lg-ic { position: absolute; left: 2px; width: 16px; height: 16px; color: #94a3b8; }
+  .lg-ic svg { width: 16px; height: 16px; display: block; }
+  #lg-link { position: absolute; left: 0; font-size: 9px; cursor: help; }
+  /* Lane beds: each track paints on its own surface so the layers read as
+     layers; the ruler band on top is visually a different kind of thing. */
+  .lane-bed { position: absolute; left: 0; right: 0; pointer-events: none; box-sizing: border-box; }
+  .lane-bed.ruler { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .lane-bed.screen { background: rgba(148,163,184,0.07); border: 1px solid rgba(148,163,184,0.20); border-radius: 6px; }
+  .lane-bed.speaker { background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.18); border-radius: 6px; }
+  .lane-bed.music { background: rgba(148,163,184,0.08); border: 1px solid rgba(148,163,184,0.16); border-radius: 5px; }
+  /* The playhead: one line through every lane, driven by the master clock. */
+  #playhead-line { position: absolute; top: 18px; bottom: 0; width: 1.5px; background: #4f46e5; opacity: 0.45; z-index: 5; pointer-events: none; }
   /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
   #audio-lanes { position: absolute; left: 0; right: 0; top: 86px; height: 10px; pointer-events: none; }
   .audio-lane-seg { position: absolute; height: 4px; border-radius: 2px; pointer-events: auto; }
@@ -269,16 +284,11 @@ export function getPreviewHtml(): string {
      a block spanning where the voice sits on the film clock, with the
      waveform and the words drawn inside it and the speaker EDL's own cut
      seams marked on it. */
-  .spk-clip { position: absolute; top: 94px; height: 26px; box-sizing: border-box;
-    background: rgba(238,242,255,0.85); border: 1px solid #c7d2fe; border-radius: 5px; pointer-events: none; }
-  .spk-cut { position: absolute; top: 96px; margin-left: -8px; width: 16px; height: 18px; line-height: 17px; text-align: center;
+  .spk-clip { position: absolute; height: 26px; box-sizing: border-box;
+    background: rgba(238,242,255,0.9); border: 1px solid #c7d2fe; border-radius: 5px; pointer-events: none; }
+  .spk-cut { position: absolute; margin-left: -8px; width: 16px; height: 18px; line-height: 17px; text-align: center;
     font-size: 11px; z-index: 5; color: #4f46e5; background: #fff; border: 1px solid #a5b4fc; border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12); pointer-events: auto; cursor: help; }
-
-  /* Lane gutter labels: the timeline reads as tracks, not implementation.
-     (ROADMAP #8 stage 3 -- SCREEN / SPEAKER / MUSIC + the linked badge.) */
-  .lane-label { position: absolute; left: 2px; z-index: 6; font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #9ca3af; background: rgba(255,255,255,0.82); border-radius: 3px; padding: 0 4px; pointer-events: none; text-transform: uppercase; }
-  #lane-link { position: absolute; left: 2px; z-index: 6; font-size: 8px; font-weight: 600; color: #4f46e5; background: rgba(238,239,255,0.92); border-radius: 3px; padding: 0 4px; pointer-events: auto; cursor: help; }
 
   /* Word-cut selection (stage 4): shift-click two words to mark a span. */
   .wl-word.wl-sel { background: #fde68a; border-color: #f59e0b; color: #78350f; }
@@ -733,6 +743,7 @@ export function getPreviewHtml(): string {
         </button>
         <span id="time-stack"><span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock"></span><span class="time-display" id="time-display"><span id="time-cur">0.0s</span><span id="time-total">0.0s</span></span></span>
       </span>
+      <span id="lane-gutter"></span>
       <span id="slider-wrap">
         <div id="timeline-track">
         <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
@@ -742,6 +753,7 @@ export function getPreviewHtml(): string {
         <div id="media-lane"></div>
         <canvas id="wave-strip"></canvas>
         <div id="word-lane"></div>
+        <div id="playhead-line" style="display:none"></div>
         </div>
       </span>
       <span style="display:flex;flex-direction:column;gap:3px;">
@@ -1597,8 +1609,7 @@ export function getPreviewHtml(): string {
     if (!(total > 0) || !state.audioElements.length) return;
     // With a speaker lane, the narration is drawn as the speaker clip block
     // (waveform + words inside it) -- the extra voiceover line is noise.
-    var pAl = state.currentProject;
-    var hasSpkLane = !!(pAl && pAl.speaker && pAl.speaker.clips && pAl.speaker.clips.length);
+    var hasSpkLane = laneLayout().speaker >= 0;
     state.audioElements.forEach(function(audio) {
       if (hasSpkLane && audio._trackType === 'voiceover') return;
       var start = audio._startTime || 0;
@@ -3376,11 +3387,91 @@ export function getPreviewHtml(): string {
     renderLaneLabels();
   }
 
-  // Words lane: each beat's voiceover text at its film position. Click a
-  // phrase to jump the playhead there -- the alignment anchor for edits.
-  // Lane gutter labels + linked badge (ROADMAP #8 stage 3): the timeline
-  // reads as SCREEN / SPEAKER / MUSIC tracks, and the recorder's shared cut
-  // list shows as an explicit 🔗 instead of an invisible convention.
+  // ── Timeline v2 layout (Marc, 2026-07-18): the timeline reads as LAYERS
+  // on lane beds -- SCREEN / SPEAKER / MUSIC top to bottom -- with the
+  // ruler+scrubber on TOP as a visually separate, non-layer thing
+  // (Descript-style), stationary lane icons in a fixed left gutter, and a
+  // playhead line dropping through every lane. Lanes a film doesn't have
+  // (no speaker, no music) don't render, and the whole strip shrinks. ──
+
+  function laneLayout() {
+    var p = state.currentProject || {};
+    var tracks = ((p.audio || {}).tracks) || [];
+    var hasSpk = !!((p.speaker && p.speaker.clips && p.speaker.clips.length) ||
+      (state._transcript && state._transcript.length) ||
+      tracks.some(function(t) { return t.type === 'voiceover'; }));
+    var hasMusic = tracks.some(function(t) { return t.type === 'music'; });
+    var y = { ruler: 0, rulerH: 18, screen: 22, screenH: 52, speaker: -1, music: -1 };
+    var top = y.screen + y.screenH + 4;
+    if (hasSpk) { y.speaker = top; top += 32; }
+    if (hasMusic) { y.music = top + 2; top += 16; }
+    y.total = Math.max(top + 2, 80);
+    return y;
+  }
+
+  var LG_ICONS = {
+    screen: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1.7" y="3" width="12.6" height="8.2" rx="1.4"/><path d="M5.6 14h4.8"/></svg>',
+    speaker: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="5.2" r="2.6"/><path d="M2.8 14c0.8-3 2.8-4.4 5.2-4.4S12.4 11 13.2 14"/></svg>',
+    music: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="12.2" r="1.9"/><path d="M6.9 12.2V3.6l6-1.4v8.4"/><circle cx="11" cy="10.6" r="1.9"/></svg>',
+  };
+
+  function applyLaneLayout(y) {
+    var sw = document.getElementById('slider-wrap');
+    var track = document.getElementById('timeline-track');
+    var gut = document.getElementById('lane-gutter');
+    if (!sw || !track) return;
+    sw.style.height = y.total + 'px';
+    if (gut) gut.style.height = y.total + 'px';
+    function setTop(id, top, show) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.style.top = top + 'px';
+      if (show === false) el.style.display = 'none'; else el.style.display = '';
+    }
+    // Ruler band on top: scrubber + beat ticks live in it; the camera-move
+    // pills sit at the seam between ruler and the screen lane.
+    setTop('timeline-slider', 7);
+    setTop('beat-ticks', 7);
+    setTop('cam-pills', y.ruler + y.rulerH - 4);
+    setTop('media-lane', y.screen);
+    setTop('wave-strip', y.speaker + 3, y.speaker >= 0);
+    setTop('word-lane', y.speaker + 3, y.speaker >= 0);
+    setTop('audio-lanes', y.music, y.music >= 0);
+    // Lane beds (recreated each pass; painted below all content).
+    track.querySelectorAll('.lane-bed').forEach(function(n) { n.remove(); });
+    function bed(cls, top, h) {
+      var b = document.createElement('div');
+      b.className = 'lane-bed ' + cls;
+      b.style.top = top + 'px';
+      b.style.height = h + 'px';
+      track.insertBefore(b, track.firstChild);
+    }
+    bed('ruler', y.ruler, y.rulerH);
+    bed('screen', y.screen - 2, y.screenH + 4);
+    if (y.speaker >= 0) bed('speaker', y.speaker, 32);
+    if (y.music >= 0) bed('music', y.music - 3, 13);
+    // Fixed gutter icons: stationary no matter the scroll/zoom.
+    if (gut) {
+      var html = '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="Screen track">' + LG_ICONS.screen + '</span>';
+      if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + 8) + 'px" title="Speaker track">' + LG_ICONS.speaker + '</span>';
+      if (y.music >= 0) html += '<span class="lg-ic" style="top:' + (y.music - 5) + 'px" title="Music track">' + LG_ICONS.music + '</span>';
+      gut.innerHTML = html;
+    }
+    var ph = document.getElementById('playhead-line');
+    if (ph) { ph.style.top = y.rulerH + 'px'; ph.style.display = ''; }
+    movePlayhead();
+  }
+
+  function movePlayhead() {
+    var ph = document.getElementById('playhead-line');
+    var total = state.totalDuration || 0;
+    if (!ph || !(total > 0)) return;
+    ph.style.left = (((state.masterTime || 0) / total) * 100).toFixed(3) + '%';
+  }
+
+  // Words lane companion: the speaker clip block, its cut seams, and the
+  // linked badge (ROADMAP #8 stage 3); layout applied here since this runs
+  // on every project/lane change.
   function renderLaneLabels() {
     var track = document.getElementById('timeline-track');
     if (!track) return;
@@ -3388,17 +3479,9 @@ export function getPreviewHtml(): string {
     var p = state.currentProject;
     if (!p) return;
     var total = state.totalDuration || calcTotalDuration();
-    function lab(text, top) {
-      var el = document.createElement('div');
-      el.className = 'lane-label';
-      el.textContent = text;
-      el.style.top = top + 'px';
-      track.appendChild(el);
-    }
-    lab('screen', 2);
+    var y = laneLayout();
+    applyLaneLayout(y);
     var hasSpeaker = !!(p.speaker && p.speaker.clips && p.speaker.clips.length);
-    if (hasSpeaker || (state._transcript && state._transcript.length)) lab('speaker', 96);
-    if (((p.audio || {}).tracks || []).some(function(t) { return t.type === 'music'; })) lab('music', 78);
     if (hasSpeaker && p.speaker.clips.length === 1 && total > 0) {
       var clip = p.speaker.clips[0];
       var spkCuts = (clip.edl && clip.edl.cuts) || [];
@@ -3412,6 +3495,7 @@ export function getPreviewHtml(): string {
       if (blkEnd > clipAt) {
         var blk = document.createElement('div');
         blk.className = 'spk-clip';
+        blk.style.top = (y.speaker + 3) + 'px';
         blk.style.left = ((clipAt / total) * 100).toFixed(2) + '%';
         blk.style.width = (((blkEnd - clipAt) / total) * 100).toFixed(2) + '%';
         blk.title = 'Speaker clip: ' + clipAt.toFixed(1) + 's \\u2192 ' + blkEnd.toFixed(1) + 's';
@@ -3429,6 +3513,7 @@ export function getPreviewHtml(): string {
         var sc = document.createElement('div');
         sc.className = 'spk-cut';
         sc.textContent = '\\u2702';
+        sc.style.top = (y.speaker + 6) + 'px';
         sc.style.left = ((seamFilm / total) * 100).toFixed(2) + '%';
         sc.title = (c.src_end - c.src_start).toFixed(1) + 's of speech removed here (voice and screen together). Shift-click two words to cut another span.';
         track.appendChild(sc);
@@ -3438,14 +3523,18 @@ export function getPreviewHtml(): string {
         var m = (s.media_edits || {}).screencast;
         if (m && scCuts === null) scCuts = m.cuts || [];
       });
-      if (scCuts !== null && JSON.stringify(spkCuts) === JSON.stringify(scCuts)) {
-        var lk = document.createElement('div');
-        lk.id = 'lane-link';
-        lk.textContent = '\\uD83D\\uDD17 linked';
-        lk.style.top = '96px';
-        lk.style.left = '58px';
-        lk.title = 'Screen and speaker share one cut list: a cut on either removes the same film time from both. Shift-click two words below to cut the span between them.';
-        track.appendChild(lk);
+      // Linked state lives in the STATIONARY gutter, chained to the speaker
+      // icon -- it is lane state, not a moment on the clock.
+      var gut2 = document.getElementById('lane-gutter');
+      var oldLk = document.getElementById('lg-link');
+      if (oldLk) oldLk.remove();
+      if (gut2 && scCuts !== null && JSON.stringify(spkCuts) === JSON.stringify(scCuts)) {
+        var lk = document.createElement('span');
+        lk.id = 'lg-link';
+        lk.textContent = '\\uD83D\\uDD17';
+        lk.style.top = (y.speaker + 20) + 'px';
+        lk.title = 'Linked: screen and speaker share one cut list -- a cut on either removes the same film time from both. Shift-click two words to cut a span.';
+        gut2.appendChild(lk);
       }
     }
   }
@@ -3497,7 +3586,7 @@ export function getPreviewHtml(): string {
     var track = document.getElementById('timeline-track');
     var total = state.totalDuration || 1;
     btn.style.left = Math.min(97, ((to / total) * 100)).toFixed(2) + '%';
-    btn.style.top = '122px';
+    btn.style.top = (laneLayout().speaker + 34) + 'px';
     btn.addEventListener('click', function() {
       btn.disabled = true;
       btn.textContent = 'Cutting\\u2026';
@@ -4667,6 +4756,7 @@ export function getPreviewHtml(): string {
     els.timeCur.textContent = fmtTime(globalTime || 0);
     els.timeTotal.textContent = fmtTime(total);
     try { updateRateBadge(globalTime || 0); } catch (eRB) {}
+    try { movePlayhead(); } catch (ePh) {}
   }
 
   function fmtTime(sec) {
