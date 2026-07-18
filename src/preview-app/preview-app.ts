@@ -1213,7 +1213,7 @@ export function getPreviewHtml(): string {
         } else {
           syncElement(clip, el, target, playing, false);
         }
-        if (playing && el.paused) { try { el.play().catch(function() {}); } catch (eS) {} }
+        if (playing && el.paused) { try { el.play().catch(function(eP) { if (!clip._playFailLogged) { clip._playFailLogged = true; console.warn('[play-fail] speaker', eP && eP.name, String((eP && eP.message) || '').slice(0, 100)); } }); } catch (eS) {} }
         else if (!playing && !el.paused) el.pause();
         // Unmute when playing (audio should be heard even on non-speaker scenes)
         el.muted = !playing;
@@ -1496,9 +1496,11 @@ export function getPreviewHtml(): string {
       el.play().catch(function(err) {
         // A rejected play() is invisible otherwise -- the element just sits
         // paused while the film rolls (the autoplay-policy failure mode).
-        if (window.__MP_SYNCDEBUG && !clip._playFailLogged) {
+        // Always logged (once per element): it lands in the session log so
+        // remote debugging sees WHY sound/picture stayed dead.
+        if (!clip._playFailLogged) {
           clip._playFailLogged = true;
-          try { console.log('[play-fail]', (el.currentSrc || el.src || '?').split('/').pop().slice(0, 40), err && err.name, String((err && err.message) || '').slice(0, 100)); } catch (eF) {}
+          try { console.warn('[play-fail]', (el.currentSrc || el.src || '?').split('/').pop().slice(0, 40), err && err.name, String((err && err.message) || '').slice(0, 100)); } catch (eF) {}
         }
       });
     } else if (!playing && !el.paused) {
@@ -1643,7 +1645,12 @@ export function getPreviewHtml(): string {
       }
       // Unlock the element within the gesture; syncMedia pauses out-of-window
       // clips synchronously on the same tick, so nothing overlaps audibly.
-      if (audio.paused) audio.play().catch(function() {});
+      if (audio.paused) audio.play().catch(function(eP) {
+        if (!audio._playFailLogged) {
+          audio._playFailLogged = true;
+          console.warn('[play-fail] audio', (audio.src || '?').split('/').pop().split('?')[0].slice(0, 40), eP && eP.name, String((eP && eP.message) || '').slice(0, 100));
+        }
+      });
     });
     state.musicStarted = true;
     startDucking();
@@ -4349,6 +4356,28 @@ export function getPreviewHtml(): string {
     }
   });
 
+  // One-line playback health snapshot -> console -> session log. Answers
+  // "which element is silently dead" without asking the user for devtools:
+  // per element: ready(0-4) / t=currentTime / p=paused / e=media-error code.
+  function reportMediaHealth(tag) {
+    try {
+      var parts = [];
+      (state.audioElements || []).forEach(function(a) {
+        parts.push('a:' + (a._trackType || '?') + '/' + (a.src || '').split('/').pop().split('?')[0].slice(0, 24) +
+          ' r' + a.readyState + ' t' + a.currentTime.toFixed(1) + (a.paused ? ' PAUSED' : '') +
+          ' v' + a.volume.toFixed(2) + (a.muted ? ' MUTED' : '') + (a.error ? ' ERR' + a.error.code : ''));
+      });
+      (state.mediaClips || []).forEach(function(c) {
+        if (c.kind !== 'scene-video' && c.kind !== 'speaker') return;
+        var el2 = c.el;
+        parts.push('v:' + ((el2.currentSrc || el2.src || el2.getAttribute('src') || '?').split('/').pop().split('?')[0].slice(0, 24)) +
+          ' r' + el2.readyState + ' t' + el2.currentTime.toFixed(1) + (el2.paused ? ' PAUSED' : '') +
+          (el2.error ? ' ERR' + el2.error.code : ''));
+      });
+      console.log('[media]', tag, 'film=' + (state.masterTime || 0).toFixed(1), parts.join(' | '));
+    } catch (eH) {}
+  }
+
   function togglePlay() {
     if (state.playing) {
       // PAUSE
@@ -4387,6 +4416,8 @@ export function getPreviewHtml(): string {
         playAudio();
         syncMedia(globalTime, true);
         state.forceSync = false;
+        setTimeout(function() { if (state.playing) reportMediaHealth('play+2.5s'); }, 2500);
+        setTimeout(function() { if (state.playing) reportMediaHealth('play+10s'); }, 10000);
         animLoop();
         return;
       }
