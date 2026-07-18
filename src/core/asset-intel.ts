@@ -452,37 +452,63 @@ export async function detectLetterboxBars(
   return bars;
 }
 
+/**
+ * Recorder footage (events sidecar present) is a TAB capture: OS chrome
+ * (dock, menu bar) is impossible by construction, so any static band is the
+ * app's own UI -- content, never trimmable (a product's fixed sidebar is
+ * exactly as static as window chrome, and the heuristics can't tell them
+ * apart). Chrome DOES letterbox the tab into the stream when aspects
+ * mismatch, so bars are measured with cropdetect ground truth instead.
+ * No-op when no sidecar exists. Mutates `intel`; returns true if applied.
+ */
+export async function refineRecorderTrims(filePath: string, intel: AssetIntel): Promise<boolean> {
+  try {
+    const { loadRecorderEvents } = await import("./recorder-events.js");
+    if (!(await loadRecorderEvents(filePath))) return false;
+    const zero = { px: 0, reason: null as null };
+    intel.trims = { top: { ...zero }, bottom: { ...zero }, left: { ...zero }, right: { ...zero } };
+    intel.has_own_chrome = false;
+    intel.notes = intel.notes.filter((n) => !/static band|letterbox bar/.test(n));
+    const bars = await detectLetterboxBars(filePath, intel.width, intel.height, intel.duration);
+    if (bars) {
+      for (const edge of ["top", "bottom", "left", "right"] as const) {
+        if (bars[edge] >= 8) intel.trims[edge] = { px: bars[edge], reason: "letterbox", rawPx: bars[edge] } as any;
+      }
+      intel.notes.push(
+        `tab capture letterbox (cropdetect): top ${bars.top}px, bottom ${bars.bottom}px, left ${bars.left}px, right ${bars.right}px.`,
+      );
+    }
+    intel.content_box = {
+      x: intel.trims.left.px,
+      y: intel.trims.top.px,
+      w: intel.width - intel.trims.left.px - intel.trims.right.px,
+      h: intel.height - intel.trims.top.px - intel.trims.bottom.px,
+    };
+    return true;
+  } catch {
+    return false; // refinement is best-effort
+  }
+}
+
+/**
+ * Upload ordering fix: the video (and its intel) lands BEFORE the events
+ * sidecar does, so ingest-time analysis can't know it's a tab capture and
+ * the static-band heuristics may have trimmed real UI. Called when the
+ * sidecar arrives: re-refine the SAVED intel in place (cheap -- no motion
+ * re-decode, just the cropdetect window).
+ */
+export async function refineSavedIntelForRecorder(filePath: string): Promise<AssetIntel | null> {
+  const intel = await loadAssetIntel(filePath);
+  if (!intel) return null;
+  const applied = await refineRecorderTrims(filePath, intel);
+  if (applied) await fs.writeFile(sidecarPath(filePath), JSON.stringify(intel, null, 2)).catch(() => {});
+  return intel;
+}
+
 export async function analyzeAndSaveIntel(filePath: string): Promise<AssetIntel | null> {
   const intel = await analyzeVideoAsset(filePath);
   if (intel) {
-    // Recorder footage (events sidecar present) is a TAB capture: OS chrome
-    // (dock, menu bar) is impossible by construction, so any static band is
-    // the app's own UI -- content, never trimmable. Chrome DOES letterbox the
-    // tab into the stream when aspects mismatch, so bars are measured with
-    // cropdetect ground truth instead of the static-band heuristics.
-    try {
-      const { loadRecorderEvents } = await import("./recorder-events.js");
-      if (await loadRecorderEvents(filePath)) {
-        const zero = { px: 0, reason: null as null };
-        intel.trims = { top: { ...zero }, bottom: { ...zero }, left: { ...zero }, right: { ...zero } };
-        intel.has_own_chrome = false;
-        const bars = await detectLetterboxBars(filePath, intel.width, intel.height, intel.duration);
-        if (bars) {
-          for (const edge of ["top", "bottom", "left", "right"] as const) {
-            if (bars[edge] >= 8) intel.trims[edge] = { px: bars[edge], reason: "letterbox", rawPx: bars[edge] } as any;
-          }
-          intel.notes.push(
-            `tab capture letterbox (cropdetect): top ${bars.top}px, bottom ${bars.bottom}px, left ${bars.left}px, right ${bars.right}px.`,
-          );
-        }
-        intel.content_box = {
-          x: intel.trims.left.px,
-          y: intel.trims.top.px,
-          w: intel.width - intel.trims.left.px - intel.trims.right.px,
-          h: intel.height - intel.trims.top.px - intel.trims.bottom.px,
-        };
-      }
-    } catch { /* recorder refinement is best-effort */ }
+    await refineRecorderTrims(filePath, intel);
     // Cache the "compress the waiting" scan at ingest so placing this recording
     // in a scene can propose the time-lapse instantly (no re-decode). Best-effort.
     try {
