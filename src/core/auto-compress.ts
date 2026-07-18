@@ -23,17 +23,26 @@ import type { Scene, SceneComponent, MediaPin } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
-/** Duration of a media file in seconds (video OR audio). 0 on failure. */
+/** Duration of a media file in seconds (video OR audio). 0 on failure.
+ *  Prefers ffprobe; falls back to parsing `ffmpeg -i` stderr, because some
+ *  environments ship ffmpeg without ffprobe and a silent 0 here cascades
+ *  into "recording is empty" failures far from the real cause. */
 export async function probeMediaDuration(src: string, dataDir?: string): Promise<number> {
+  const filePath = resolveVideoPath(src, dataDir);
   try {
     const { stdout } = await execFileAsync("ffprobe", [
       "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0",
-      resolveVideoPath(src, dataDir),
+      filePath,
     ]);
-    return parseFloat(stdout.trim()) || 0;
-  } catch {
-    return 0;
-  }
+    const d = parseFloat(stdout.trim()) || 0;
+    if (d > 0) return d;
+  } catch { /* fall through to ffmpeg */ }
+  try {
+    const { stderr } = await execFileAsync("ffmpeg", ["-i", filePath]).catch((e: any) => e);
+    const m = String(stderr || "").match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+    if (m) return parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseFloat(m[3]);
+  } catch { /* unreadable */ }
+  return 0;
 }
 
 const VIDEO_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i;

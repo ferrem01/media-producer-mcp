@@ -1595,6 +1595,22 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           } catch (normErr: any) {
             console.warn(`  upload-asset: normalization skipped: ${normErr?.message || normErr}`);
           }
+          // MediaRecorder files (extension recordings) stream to disk with no
+          // duration header -- every downstream probe then reads 0.0s. Repair
+          // the container at ingest so nothing else has to care.
+          if (/\.(webm|mkv)$/i.test(finalPath)) {
+            try {
+              const { probeMediaDuration } = await import("./core/auto-compress.js");
+              if (!((await probeMediaDuration(finalPath)) > 0)) {
+                const { remuxMediaRecorderFile } = await import("./core/video-normalize.js");
+                if (await remuxMediaRecorderFile(finalPath)) {
+                  console.log(`  upload-asset: ${path.basename(finalPath)} had no duration header -- remuxed`);
+                }
+              }
+            } catch (remuxErr: any) {
+              console.warn(`  upload-asset: duration repair skipped: ${remuxErr?.message || remuxErr}`);
+            }
+          }
           const finalName = path.basename(finalPath);
           const finalSize = (await fs.stat(finalPath)).size;
           // Asset intelligence: understand the footage once, at ingest --
@@ -1706,7 +1722,12 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             // by pointing the narration at the video itself.
             speaker_source: body?.narration_embedded ? videoUrl : ((body?.narration_url as string) || undefined),
           } as any)
-            .then((r: any) => console.log(`  recorder-generate: done -> ${r?.project?.project_id || "?"} ("${prompt}")`))
+            .then((r: any) => {
+              // The pipeline catches internally and returns {status:'error'}
+              // instead of throwing -- surface that as a failure, loudly.
+              if (r?.status === "completed") console.log(`  recorder-generate: done -> ${r?.project?.project_id || "?"} ("${prompt}")`);
+              else console.error(`  recorder-generate: FAILED (${r?.error || r?.status || "unknown"}) ("${prompt}")`);
+            })
             .catch((e: any) => console.error(`  recorder-generate: FAILED (${e?.message || e})`));
           jsonResponse(res, 202, { ok: true, started: true, note: "Assembling; the project will appear in Studio when done." });
         } catch (e: any) {
