@@ -92,7 +92,16 @@ revise = element vs scene).
    narration booth needs the `unsafely-treat-insecure-origin-as-secure` Chrome flag
    today (booth shows instructions). Also unlocks clipboard APIs, service workers,
    and removes the mixed-content ceiling generally.
-8. **Auto-callouts retry** (parked 2026-07-17 behind `MP_AUTO_CALLOUTS=1`) — vision-grounded
+8. **Editable cuts on narrated films (audio re-derive)** — Mode A bakes matching
+   cuts into video EDL and narration audio at assembly; hand-editing a cut in
+   Studio today desyncs the voice (only the video map changes). Fix: on cut
+   save, re-slice the narration from the original recording (source is kept)
+   and re-shift captions. The deeper ask this unlocks: editing SPEAKER cuts and
+   MEDIA cuts independently — trim a rambling sentence without touching the
+   footage, or tighten footage without touching the voice — with the solver
+   keeping the two clocks reconciled. Backlogged 2026-07-18 pending real
+   editing demand; the current sidecar∩silence proposals have been choosing well.
+9. **Auto-callouts retry** (removed from the assemble path 2026-07-18) — vision-grounded
    region callouts on narrated screencasts. Renderer + pixel-dialect conversion are solved;
    the open problem is time × semantics (cues land on content seams; narrator references
    future-tense UI). See the AMENDMENTS parking entry for the four learnings + promising
