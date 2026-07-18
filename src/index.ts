@@ -1830,6 +1830,31 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // ── API: Re-run asset intelligence in place ──
+      // POST /api/reanalyze-asset/{tenant}/{project}?name=<assetFile>
+      // Ops path: intel improves over time (letterbox detection, motion
+      // versioning) and re-uploading a multi-GB recording through a proxy to
+      // trigger it is silly. Re-analyzes the existing file where it lives.
+      const reanalyzeMatch = urlPath.match(/^\/api\/reanalyze-asset\/([^/]+)\/([^/]+)$/);
+      if (reanalyzeMatch && method === "POST") {
+        const [, raTenant, raProject] = reanalyzeMatch.map(decodeURIComponent);
+        const raName = path.basename(new URL(url, "http://localhost").searchParams.get("name") || "");
+        if (!raName) { jsonResponse(res, 400, { error: "name query param required" }); return; }
+        const raPath = path.join(config.dataDir, raTenant, "projects", raProject, "assets", raName);
+        try {
+          await fs.access(raPath);
+          const { invalidateMotionIntel } = await import("./core/asset-intel.js");
+          invalidateMotionIntel(raPath);
+          const intel = await analyzeAndSaveIntel(raPath);
+          if (!intel) { jsonResponse(res, 422, { error: "analysis produced no intel (unreadable file?)" }); return; }
+          console.log(`  reanalyze-asset: ${raName} -- ${intel.notes.join(" | ")}`);
+          jsonResponse(res, 200, { ok: true, trims: intel.trims, content_box: intel.content_box, notes: intel.notes });
+        } catch (e: any) {
+          jsonResponse(res, e?.code === "ENOENT" ? 404 : 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       // ── API: Studio session logs ──
       // POST /api/studio-log/{tenant}?session=sid  -- the Studio client ships
       // its console ring buffer here every few seconds, so a remote debugger
