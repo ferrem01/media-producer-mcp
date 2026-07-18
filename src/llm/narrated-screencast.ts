@@ -20,8 +20,12 @@ import { callLLM, type LLMConfig } from "./client.js";
 import { parseLlmJson } from "./json-repair.js";
 import type { Project, Scene, BrandAsset } from "../core/types.js";
 
-/** A full-frame video scene (screen recording or a brand bookend clip). */
-function videoScene(id: string, label: string, url: string, durationSeconds: number): Scene {
+/** A full-frame video scene (screen recording or a brand bookend clip).
+ *  Screen recordings get crop:"auto": the frame component then trims whatever
+ *  the asset's intel says (baked-in letterbox bars, window chrome) -- resolved
+ *  at scene-assembly time, and re-resolved if the asset is ever re-analyzed.
+ *  Brand bookends skip it (their full frame IS the content). */
+function videoScene(id: string, label: string, url: string, durationSeconds: number, opts?: { autoCrop?: boolean }): Scene {
   return {
     id,
     label,
@@ -31,7 +35,7 @@ function videoScene(id: string, label: string, url: string, durationSeconds: num
       type: "screencast-frame",
       z_index: 10,
       position: { x: "0%", y: "0%", width: "100%", height: "100%" },
-      data: { video_url: url, frame_style: "none", corner_radius: 0 },
+      data: { video_url: url, frame_style: "none", corner_radius: 0, ...(opts?.autoCrop ? { crop: "auto" } : {}) },
     }],
   } as unknown as Scene;
 }
@@ -142,7 +146,7 @@ export async function assembleLiveNarration(opts: {
   );
 
   // Video: EDL hard cuts.
-  const scene = videoScene("screencast", "Walkthrough", source, keptDur);
+  const scene = videoScene("screencast", "Walkthrough", source, keptDur, { autoCrop: true });
   if (cuts.length) {
     const solved = solveMediaEdits(
       { cuts: cuts.map((c) => ({ src_start: c.from, src_end: c.to })), rate_regions: [], pins: [] },
@@ -384,7 +388,7 @@ export async function assembleNarratedScreencast(opts: {
 
   // The screen recording, compressed and fit to the narration MINUS the
   // bookends so the whole film equals the narration length exactly.
-  const screencastScene = videoScene("screencast", "Walkthrough", screencastSource, narrationDur > 0.5 ? narrationDur : 573);
+  const screencastScene = videoScene("screencast", "Walkthrough", screencastSource, narrationDur > 0.5 ? narrationDur : 573, { autoCrop: true });
   const fitTarget = narrationDur > 0.5 ? Math.max(5, narrationDur - introDur - outroDur) : undefined;
   const compress = await proposeSceneCompression(screencastScene, { dataDir: opts.dataDir, targetDuration: fitTarget });
   scenes.push(screencastScene);
