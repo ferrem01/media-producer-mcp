@@ -409,9 +409,80 @@ export async function analyzeVideoAsset(filePath: string): Promise<AssetIntel | 
 const sidecarPath = (filePath: string) => filePath + ".intel.json";
 
 /** Analyze and persist the sidecar next to the asset. Best-effort. */
+/**
+ * Ground-truth letterbox measurement via ffmpeg cropdetect (majority vote
+ * over a sampled window, strict luma threshold so dark app themes never read
+ * as bars). Returns per-edge bar sizes, or null when nothing confident.
+ */
+export async function detectLetterboxBars(
+  filePath: string,
+  width: number,
+  height: number,
+  duration: number,
+): Promise<{ top: number; bottom: number; left: number; right: number } | null> {
+  if (!(width > 0 && height > 0)) return null;
+  const start = Math.min(8, Math.max(0, duration * 0.15));
+  const span = Math.max(6, Math.min(30, duration - start - 1));
+  const stderr = await new Promise<string>((resolve) => {
+    const ff = spawn("ffmpeg", [
+      "-ss", start.toFixed(1), "-i", filePath, "-t", span.toFixed(1),
+      "-vf", "cropdetect=limit=12:round=2:reset=0", "-f", "null", "-",
+    ]);
+    const chunks: Buffer[] = [];
+    ff.stderr.on("data", (c) => chunks.push(c));
+    ff.on("error", () => resolve(""));
+    ff.on("close", () => resolve(Buffer.concat(chunks).toString()));
+  });
+  const counts = new Map<string, number>();
+  for (const m of stderr.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)) {
+    const key = m.slice(1, 5).join(":");
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  let best: string | null = null;
+  let bestN = 0;
+  let total = 0;
+  for (const [k, n] of counts) { total += n; if (n > bestN) { best = k; bestN = n; } }
+  if (!best || total < 10 || bestN / total < 0.8) return null; // unstable -> don't trust
+  const [w, h, x, y] = best.split(":").map(Number);
+  const bars = { top: y, bottom: height - y - h, left: x, right: width - x - w };
+  if (Object.values(bars).some((v) => v < 0)) return null;
+  if (Object.values(bars).every((v) => v < 8)) return null; // no real bars
+  // A "bar" spanning over a third of an axis is content going dark, not matte.
+  if (bars.top + bars.bottom > height * 0.38 || bars.left + bars.right > width * 0.38) return null;
+  return bars;
+}
+
 export async function analyzeAndSaveIntel(filePath: string): Promise<AssetIntel | null> {
   const intel = await analyzeVideoAsset(filePath);
   if (intel) {
+    // Recorder footage (events sidecar present) is a TAB capture: OS chrome
+    // (dock, menu bar) is impossible by construction, so any static band is
+    // the app's own UI -- content, never trimmable. Chrome DOES letterbox the
+    // tab into the stream when aspects mismatch, so bars are measured with
+    // cropdetect ground truth instead of the static-band heuristics.
+    try {
+      const { loadRecorderEvents } = await import("./recorder-events.js");
+      if (await loadRecorderEvents(filePath)) {
+        const zero = { px: 0, reason: null as null };
+        intel.trims = { top: { ...zero }, bottom: { ...zero }, left: { ...zero }, right: { ...zero } };
+        intel.has_own_chrome = false;
+        const bars = await detectLetterboxBars(filePath, intel.width, intel.height, intel.duration);
+        if (bars) {
+          for (const edge of ["top", "bottom", "left", "right"] as const) {
+            if (bars[edge] >= 8) intel.trims[edge] = { px: bars[edge], reason: "letterbox", rawPx: bars[edge] } as any;
+          }
+          intel.notes.push(
+            `tab capture letterbox (cropdetect): top ${bars.top}px, bottom ${bars.bottom}px, left ${bars.left}px, right ${bars.right}px.`,
+          );
+        }
+        intel.content_box = {
+          x: intel.trims.left.px,
+          y: intel.trims.top.px,
+          w: intel.width - intel.trims.left.px - intel.trims.right.px,
+          h: intel.height - intel.trims.top.px - intel.trims.bottom.px,
+        };
+      }
+    } catch { /* recorder refinement is best-effort */ }
     // Cache the "compress the waiting" scan at ingest so placing this recording
     // in a scene can propose the time-lapse instantly (no re-decode). Best-effort.
     try {

@@ -62,6 +62,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
+        // Capture at EXACTLY the tab viewport's pixel size. Without size
+        // constraints Chrome sizes the stream to the display and letterboxes
+        // the tab into it -- black bars burned into every frame.
+        let dims = null;
+        try {
+          const [r] = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => ({ w: Math.round(window.innerWidth * devicePixelRatio), h: Math.round(window.innerHeight * devicePixelRatio) }),
+          });
+          dims = r?.result || null;
+        } catch (e) { /* capture still works, server cropdetect covers bars */ }
         await ensureOffscreen();
         session = { tabId: tab.id, startedMs: Date.now(), events: freshEvents(tab, settings), settings };
         // Skeleton persisted so a suspended-and-restarted worker can still
@@ -72,7 +83,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // ever run the capture script.
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
 
-        await chrome.runtime.sendMessage({ type: "qr-offscreen-start", streamId, mic: !!settings.mic });
+        await chrome.runtime.sendMessage({ type: "qr-offscreen-start", streamId, mic: !!settings.mic, dims });
 
         // Mode A gets a teleprompter in a SEPARATE window: tab capture films
         // the tab, so anything injected into the page would end up on film.
