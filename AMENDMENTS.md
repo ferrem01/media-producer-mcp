@@ -6,6 +6,44 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-18 — Symmetric speaker EDL stages 2–4: the referee + word-cutting (ROADMAP #8)
+
+Stage 1 made the speaker lane declarative (EDL truth, bake as cache). These
+stages make it EDITABLE and make the timeline read as tracks.
+
+- **`applySpeakerCut(project, filmFrom, filmTo)`** (`speaker-edl.ts`) — the
+  referee. ONE atomic op: "remove this span of FILM time." The speaker is
+  the master clock, so a speaker cut removes time itself; the op writes every
+  consequence in one pass: speaker cut mapped film→bake→ORIGINAL source
+  through existing kept spans (`bakeToSourceTime`), same film span mapped
+  through every media_edits target's OWN segments to its OWN source clock
+  (so a cut through an 8× timelapse window removes the wider source span),
+  re-solve + pin-drop, scene duration shrink, caption/chapter shift
+  (scene-local), spine shift (bake clock), booth-script cue shift (film
+  clock), and a re-derived bake via `ensureSpeakerDerived`. Route:
+  `POST /api/speaker-cut/{tenant}/{project}` `{from,to}` → result + saved
+  project. Tests: `test/speaker-cut.test.ts` (mapping through existing cuts,
+  timelapse-region widening, one-pass consequence audit, scene-bounds guard).
+- **Stage 3, Studio lanes** (`preview-app.ts`): gutter labels name the rows
+  (`screen` / `speaker` / `music`); the camera bubble's video is suppressed
+  from the SCREEN rows (it's a FOLLOWER of the speaker lane, matched by
+  speaker-clip source filename); a **🔗 linked** badge shows when speaker and
+  screencast cut lists are identical — the recorder's shared-cut convention
+  made visible.
+- **Stage 4, word-cutting**: shift-click the first and last word in the
+  transcript lane → ✂ Cut button for the span (+60ms pad each side) → POST
+  speaker-cut → project reloads with voice, screen, captions and duration
+  all rippled. Plain click still scrubs + opens the pin picker.
+- **Clock fix found while wiring**: transcript + waveform times are
+  FILE-relative, but Mode A narration is placed at `clip.at` (after the
+  6.1s intro) — the word lane and wave strip drew everything ~6s left of
+  reality on recorder films. `speakerFilmOffset()` (speaker clip `at`, else
+  narration `start_time`) now shifts word placement, the wave strip, and the
+  cut span sent to the referee.
+- Gotcha for future studio edits: the Studio app is ONE template literal —
+  a backtick inside a comment terminates it (tsc error pages away from the
+  real cause). Parse-check the emitted `<script>` after edits.
+
 ## 2026-07-18 — First-contact hardening (the day real use found the plumbing)
 
 Four bugs, one pattern: detection worked, the joint between stages dropped

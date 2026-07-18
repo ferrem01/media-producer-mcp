@@ -1839,6 +1839,36 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // ── API: Speaker cut (symmetric-EDL stages 2+4, ROADMAP #8) ──
+      // POST /api/speaker-cut/{tenant}/{project}  { from, to }  (film seconds)
+      // The referee: removes a span of FILM TIME from the speaker and writes
+      // every consequence -- speaker EDL, linked screen/camera EDLs, scene
+      // duration, captions/chapters/spine/script shifts, re-derived bake.
+      const spkCutMatch = urlPath.match(/^\/api\/speaker-cut\/([^/]+)\/([^/]+)$/);
+      if (spkCutMatch && method === "POST") {
+        const [, scTenant, scProject] = spkCutMatch.map(decodeURIComponent);
+        try {
+          const body = (await parseBody(req)) as { from?: number; to?: number };
+          const from = Number(body?.from);
+          const to = Number(body?.to);
+          if (!Number.isFinite(from) || !Number.isFinite(to)) {
+            jsonResponse(res, 400, { error: "from and to (film seconds) required" });
+            return;
+          }
+          const project = await loadProject(scTenant, scProject);
+          if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+          const { applySpeakerCut } = await import("./core/speaker-edl.js");
+          const result = await applySpeakerCut(project, from, to, config.dataDir);
+          await saveProject(project);
+          console.log(`  speaker-cut: ${scProject} -- removed ${result.removed_seconds}s of film at ${from}s`);
+          jsonResponse(res, 200, { ok: true, ...result, project });
+        } catch (e: any) {
+          console.error(`  speaker-cut: FAILED (${e?.message || e})`);
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       // ── API: Re-run asset intelligence in place ──
       // POST /api/reanalyze-asset/{tenant}/{project}?name=<assetFile>
       // Ops path: intel improves over time (letterbox detection, motion
