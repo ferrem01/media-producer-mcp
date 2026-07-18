@@ -263,7 +263,17 @@ export function getPreviewHtml(): string {
     cursor: pointer; pointer-events: auto; border-radius: 3px;
   }
   .wl-word:hover { color: #4f46e5; background: rgba(99,102,241,0.07); }
-  #wave-strip { position: absolute; left: 0; right: 0; top: 94px; height: 26px; pointer-events: none; opacity: 0.16; }
+  #wave-strip { position: absolute; left: 0; right: 0; top: 94px; height: 26px; pointer-events: none; opacity: 0.28; }
+
+  /* Merged speaker lane (ROADMAP #8): ONE row reads as the speaker's clip --
+     a block spanning where the voice sits on the film clock, with the
+     waveform and the words drawn inside it and the speaker EDL's own cut
+     seams marked on it. */
+  .spk-clip { position: absolute; top: 94px; height: 26px; box-sizing: border-box;
+    background: rgba(238,242,255,0.85); border: 1px solid #c7d2fe; border-radius: 5px; pointer-events: none; }
+  .spk-cut { position: absolute; top: 96px; margin-left: -8px; width: 16px; height: 18px; line-height: 17px; text-align: center;
+    font-size: 11px; z-index: 5; color: #4f46e5; background: #fff; border: 1px solid #a5b4fc; border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12); pointer-events: auto; cursor: help; }
 
   /* Lane gutter labels: the timeline reads as tracks, not implementation.
      (ROADMAP #8 stage 3 -- SCREEN / SPEAKER / MUSIC + the linked badge.) */
@@ -1585,7 +1595,12 @@ export function getPreviewHtml(): string {
     wrap.innerHTML = '';
     var total = state.totalDuration || calcTotalDuration();
     if (!(total > 0) || !state.audioElements.length) return;
+    // With a speaker lane, the narration is drawn as the speaker clip block
+    // (waveform + words inside it) -- the extra voiceover line is noise.
+    var pAl = state.currentProject;
+    var hasSpkLane = !!(pAl && pAl.speaker && pAl.speaker.clips && pAl.speaker.clips.length);
     state.audioElements.forEach(function(audio) {
+      if (hasSpkLane && audio._trackType === 'voiceover') return;
       var start = audio._startTime || 0;
       var dur = (audio.duration && isFinite(audio.duration)) ? audio.duration : 0;
       // Looping music covers from its start to the end of the film.
@@ -1601,6 +1616,9 @@ export function getPreviewHtml(): string {
         + (audio.loop ? ' (loops)' : '');
       wrap.appendChild(seg);
     });
+    // The speaker clip block sizes itself from the narration element's
+    // duration -- redraw the lane once metadata is in (same trigger as us).
+    renderLaneLabels();
   }
 
   function destroyAudio() {
@@ -3366,9 +3384,10 @@ export function getPreviewHtml(): string {
   function renderLaneLabels() {
     var track = document.getElementById('timeline-track');
     if (!track) return;
-    track.querySelectorAll('.lane-label, #lane-link').forEach(function(n) { n.remove(); });
+    track.querySelectorAll('.lane-label, #lane-link, .spk-clip, .spk-cut').forEach(function(n) { n.remove(); });
     var p = state.currentProject;
     if (!p) return;
+    var total = state.totalDuration || calcTotalDuration();
     function lab(text, top) {
       var el = document.createElement('div');
       el.className = 'lane-label';
@@ -3380,8 +3399,40 @@ export function getPreviewHtml(): string {
     var hasSpeaker = !!(p.speaker && p.speaker.clips && p.speaker.clips.length);
     if (hasSpeaker || (state._transcript && state._transcript.length)) lab('speaker', 96);
     if (((p.audio || {}).tracks || []).some(function(t) { return t.type === 'music'; })) lab('music', 78);
-    if (hasSpeaker && p.speaker.clips.length === 1) {
-      var spkCuts = (p.speaker.clips[0].edl && p.speaker.clips[0].edl.cuts) || [];
+    if (hasSpeaker && p.speaker.clips.length === 1 && total > 0) {
+      var clip = p.speaker.clips[0];
+      var spkCuts = (clip.edl && clip.edl.cuts) || [];
+      // The clip BLOCK: where the voice sits on the film clock. Duration =
+      // the baked audio's length (the narration element plays that file);
+      // until metadata arrives, span to the film's end.
+      var clipAt = clip.at || 0;
+      var narrEl = (state.audioElements || []).filter(function(a) { return a._trackType === 'voiceover'; })[0];
+      var bakeDur = (narrEl && isFinite(narrEl.duration) && narrEl.duration > 0) ? narrEl.duration : (total - clipAt);
+      var blkEnd = Math.min(total, clipAt + bakeDur);
+      if (blkEnd > clipAt) {
+        var blk = document.createElement('div');
+        blk.className = 'spk-clip';
+        blk.style.left = ((clipAt / total) * 100).toFixed(2) + '%';
+        blk.style.width = (((blkEnd - clipAt) / total) * 100).toFixed(2) + '%';
+        blk.title = 'Speaker clip: ' + clipAt.toFixed(1) + 's \\u2192 ' + blkEnd.toFixed(1) + 's';
+        // Insert BELOW the waveform + words (positioned siblings stack in
+        // DOM order), so the block reads as the surface they sit on.
+        track.insertBefore(blk, document.getElementById('wave-strip'));
+      }
+      // The speaker EDL's own seams: one ✂ per cut, at the film position
+      // where the removed speech used to be (source -> bake -> film).
+      var removedSoFar = 0;
+      spkCuts.slice().sort(function(a, b) { return a.src_start - b.src_start; }).forEach(function(c) {
+        var seamFilm = clipAt + (c.src_start - removedSoFar);
+        removedSoFar += (c.src_end - c.src_start);
+        if (!(seamFilm >= 0 && seamFilm <= total)) return;
+        var sc = document.createElement('div');
+        sc.className = 'spk-cut';
+        sc.textContent = '\\u2702';
+        sc.style.left = ((seamFilm / total) * 100).toFixed(2) + '%';
+        sc.title = (c.src_end - c.src_start).toFixed(1) + 's of speech removed here (voice and screen together). Shift-click two words to cut another span.';
+        track.appendChild(sc);
+      });
       var scCuts = null;
       (p.scenes || []).forEach(function(s) {
         var m = (s.media_edits || {}).screencast;
