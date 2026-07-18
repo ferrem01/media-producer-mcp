@@ -10,16 +10,21 @@ let trackDims = { width: 0, height: 0 };
 let micStream = null;
 
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === "qr-offscreen-start") start(msg.streamId, msg.mic);
+  if (msg.type === "qr-offscreen-start") start(msg.streamId, msg.mic, msg.dims);
   else if (msg.type === "qr-offscreen-stop") stop(msg.upload);
 });
 
-async function start(streamId, mic) {
+async function start(streamId, mic, dims) {
   try {
+    // Pinning min==max==tab size makes Chrome deliver tab-exact frames
+    // instead of display-sized frames with the tab letterboxed inside.
+    const sizing = dims && dims.w > 0
+      ? { minWidth: dims.w, minHeight: dims.h, maxWidth: dims.w, maxHeight: dims.h }
+      : {};
     const tab = await navigator.mediaDevices.getUserMedia({
       audio: false, // tab audio stays out -- Mode A wants the VOICE, not page sounds
       video: {
-        mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
+        mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId, ...sizing },
       },
     });
     const tracks = [tab.getVideoTracks()[0]];

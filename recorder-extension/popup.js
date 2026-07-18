@@ -88,7 +88,13 @@ $("record").addEventListener("click", async () => {
   const res = await chrome.runtime.sendMessage({ type: recording ? "qr-stop" : "qr-start" });
   if (res && res.ok === false) { $("status").textContent = res.error; return; }
   setRecording(!recording);
-  $("status").textContent = recording ? "Stopped — uploading…" : "Recording… demo away.";
+  if (recording) {
+    // Stopping -> upload begins; lock the button until a terminal status.
+    $("record").disabled = true;
+    $("status").textContent = "Stopped — uploading…";
+  } else {
+    $("status").textContent = "Recording… demo away.";
+  }
 });
 
 FIELDS.forEach((f) => $(f).addEventListener("change", save));
