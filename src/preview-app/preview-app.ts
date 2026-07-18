@@ -3505,6 +3505,8 @@ export function getPreviewHtml(): string {
         .then(function(r) {
           wordCutClear();
           state.currentProject = r.project;
+          state._wavePeaksFor = null; // narration re-baked -- refetch peaks
+          state._transcriptFor = null; // word times shifted with the cut
           state.totalDuration = calcTotalDuration();
           state.masterTime = Math.min(state.masterTime, Math.max(0, from - 1));
           studioStatus('\\u2702 Cut ' + r.removed_seconds + 's \\u2014 voice, screen and captions all rippled. Reloading\\u2026', 'ok');
@@ -3661,26 +3663,42 @@ export function getPreviewHtml(): string {
     var cv = document.getElementById('wave-strip');
     var p = state.currentProject;
     if (!cv || !p) return;
+    // Peaks are fetched ONCE per project and drawn synchronously from the
+    // cache. Fetch-in-the-draw raced: an early call (project/zoom state not
+    // yet settled) could resolve LAST and leave a stale unshifted bitmap.
+    if (state._wavePeaksFor === p.project_id && state._wavePeaks) {
+      drawWaveStrip(cv, state._wavePeaks);
+      return;
+    }
+    if (state._wavePeaksLoading === p.project_id) return;
+    state._wavePeaksLoading = p.project_id;
     api('/speaker-waveform/' + state.tenantId + '/' + p.project_id).then(function(r) {
+      state._wavePeaksLoading = null;
       if (!r || !r.peaks || !r.peaks.length) return;
-      var total = state.totalDuration || calcTotalDuration();
-      if (!(total > 0)) return;
-      var rect = cv.getBoundingClientRect();
-      cv.width = Math.max(300, Math.min(8000, Math.round(rect.width)));
-      cv.height = 15;
-      var ctx = cv.getContext('2d');
-      ctx.clearRect(0, 0, cv.width, cv.height);
-      ctx.fillStyle = '#818cf8';
-      var bps = r.buckets_per_second || 6;
-      var wvOff = speakerFilmOffset() - (state.speakerTrimStart || 0);
-      var visible = Math.min(r.peaks.length, Math.ceil((total - wvOff) * bps));
-      for (var i = 0; i < visible; i++) {
-        var x = ((wvOff + i / bps) / total) * cv.width;
-        if (x < 0) continue;
-        var h = Math.max(1, r.peaks[i] * cv.height);
-        ctx.fillRect(x, (cv.height - h) / 2, Math.max(1, cv.width / (total * bps) - 0.5), h);
-      }
-    }).catch(function() {});
+      state._wavePeaks = r;
+      state._wavePeaksFor = p.project_id;
+      drawWaveStrip(cv, r);
+    }).catch(function() { state._wavePeaksLoading = null; });
+  }
+
+  function drawWaveStrip(cv, r) {
+    var total = state.totalDuration || calcTotalDuration();
+    if (!(total > 0)) return;
+    var rect = cv.getBoundingClientRect();
+    cv.width = Math.max(300, Math.min(8000, Math.round(rect.width)));
+    cv.height = 15;
+    var ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#818cf8';
+    var bps = r.buckets_per_second || 6;
+    var wvOff = speakerFilmOffset() - (state.speakerTrimStart || 0);
+    var visible = Math.min(r.peaks.length, Math.ceil((total - wvOff) * bps));
+    for (var i = 0; i < visible; i++) {
+      var x = ((wvOff + i / bps) / total) * cv.width;
+      if (x < 0) continue;
+      var h = Math.max(1, r.peaks[i] * cv.height);
+      ctx.fillRect(x, (cv.height - h) / 2, Math.max(1, cv.width / (total * bps) - 0.5), h);
+    }
   }
 
   // Pins ("when I say X, show Y") compile into ordinary segments: an
