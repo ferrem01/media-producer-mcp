@@ -746,7 +746,7 @@ export function getPreviewHtml(): string {
       <span id="lane-gutter"></span>
       <span id="slider-wrap">
         <div id="timeline-track">
-        <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="1" disabled>
+        <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="any" disabled>
         <div id="beat-ticks"></div>
         <div id="audio-lanes"></div>
         <div id="cam-pills"></div>
@@ -4642,8 +4642,10 @@ export function getPreviewHtml(): string {
         masterTl.time(globalTime);
       }
 
-      // Update UI
-      els.slider.value = totalDur > 0 ? Math.round((globalTime / totalDur) * 1000) : 0;
+      // Update UI. Fractional value + step="any": at timeline zoom the
+      // track is thousands of px wide, so 1000 integer steps made the
+      // thumb hop ~9px at a time.
+      els.slider.value = totalDur > 0 ? (globalTime / totalDur) * 1000 : 0;
       followPlayhead(false);
       updateTimeDisplay(globalTime);
 
@@ -4796,7 +4798,7 @@ export function getPreviewHtml(): string {
     if (val) loadProject(val);
   });
   els.playBtn.addEventListener('click', togglePlay);
-  els.slider.addEventListener('input', function() { scrub(parseInt(els.slider.value, 10)); });
+  els.slider.addEventListener('input', function() { scrub(parseFloat(els.slider.value)); });
   if (els.volSlider) {
     els.volSlider.addEventListener('input', function() {
       var v = parseInt(els.volSlider.value, 10);
