@@ -56,6 +56,14 @@ describe("assembleLiveNarration cuts", () => {
     // The 40.1-43.27 overlap shrinks under the 2.5s floor and is rightly dropped.
     expect(res.summary).toContain("1 idle+silent cut(s)");
     expect(scene.duration_seconds).toBeCloseTo(91.2 - (31.68 - 23.55), 0);
+
+    // SPEAKER lane (ROADMAP #8): truth = ORIGINAL recording + the cut EDL;
+    // the narration the mixer plays is the derived bake, not the source.
+    const clip = project.speaker.clips[0];
+    expect(clip.source).toBe("/assets/t/projects/p/assets/r.webm");
+    expect(clip.edl.cuts).toEqual(me.cuts);
+    expect(clip.derived_audio).toMatch(/speaker-derived-.*\.m4a$/);
+    expect(project.audio.tracks[0].source).toBe(clip.derived_audio);
   });
 
   it("camera mode: voice + PiP from the speaker file, same cuts on both video targets", async () => {

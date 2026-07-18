@@ -207,7 +207,7 @@ export async function assembleLiveNarration(opts: {
   }
   if (!(srcDur > 1)) throw new Error("recording is empty or unreadable");
 
-  const { intersectRanges, complementRanges, shrinkRanges, detectSilence, cutAudioTo } =
+  const { intersectRanges, complementRanges, shrinkRanges, detectSilence } =
     await import("../core/idle-silence.js");
   const { ensureMotionIntel } = await import("../core/asset-intel.js");
   const { solveMediaEdits } = await import("../core/media-edl.js");
@@ -281,19 +281,9 @@ export async function assembleLiveNarration(opts: {
     }
   }
 
-  // Audio: the same cuts, as a standalone narration file the mixer owns --
-  // sliced from the voice-carrying recording.
-  const assetsDir = path.join(
-    opts.dataDir || process.env.MP_DATA_DIR || "/data/media-producer",
-    project.tenant_id, "projects", project.project_id, "assets",
-  );
-  const { mkdir } = await import("node:fs/promises");
-  await mkdir(assetsDir, { recursive: true });
-  const narrationName = `narration-live-${Date.now()}.m4a`;
-  await cutAudioTo(voicePath, kept, path.join(assetsDir, narrationName));
-  const narrationUrl = `/assets/${project.tenant_id}/projects/${project.project_id}/assets/${narrationName}`;
-
-  // Bookends + scene list, then the booth attach lays sound + spine on top.
+  // Bookends + scene list first (the speaker clip's film placement needs the
+  // intro duration), then the SPEAKER lane as declarative truth, then the
+  // booth attach lays sound + spine on top of its derived rendering.
   const assets: BrandAsset[] = (project.brand_kit?.assets || []) as BrandAsset[];
   const intro = assets.find((a) => a.type === "intro" && a.url);
   const outro = assets.find((a) => a.type === "outro" && a.url);
@@ -302,6 +292,24 @@ export async function assembleLiveNarration(opts: {
   scenes.push(scene);
   if (outro) scenes.push(videoScene("outro", "Branded Outro", outro.url, outro.duration || 5));
   project.scenes = scenes;
+  const introDur = intro ? scenes[0].duration_seconds : 0;
+
+  // SPEAKER lane (ROADMAP #8): the voice's truth is the ORIGINAL recording
+  // plus this EDL; the narration audio the mixer plays is derived from it.
+  project.speaker = {
+    clips: [{
+      at: introDur,
+      source: voiceSource,
+      ...(cuts.length ? {
+        edl: {
+          cuts: cuts.map((c) => ({ src_start: c.from, src_end: c.to })),
+          segments: ((scene as any).media_edits?.screencast?.segments || []) as any,
+        },
+      } : {}),
+    }],
+  };
+  const { ensureSpeakerDerived } = await import("../core/speaker-edl.js");
+  const narrationUrl = (await ensureSpeakerDerived(project, opts.dataDir))!;
 
   // Live narration starts WITH the demo scene, not the intro.
   const attach = await attachBoothNarration({
@@ -310,7 +318,8 @@ export async function assembleLiveNarration(opts: {
     dataDir: opts.dataDir,
     llmConfig: opts.llmConfig,
     music: opts.music,
-    narrationStartsAt: intro ? scenes[0].duration_seconds : 0,
+    narrationStartsAt: introDur,
+    speakerLane: false, // this fn owns the speaker lane (original source, not the bake)
   });
 
   const summary =
@@ -346,6 +355,10 @@ export async function attachBoothNarration(opts: {
    *  rolls over the intro); Mode A live narration starts WITH the demo scene
    *  (pass the intro duration). Audio-track offset + caption shifting follow. */
   narrationStartsAt?: number;
+  /** Set false when the caller owns project.speaker (Mode A passes a DERIVED
+   *  bake here; the lane must keep pointing at the original recording).
+   *  Default: this attach records the take as the speaker lane's truth. */
+  speakerLane?: boolean;
 }): Promise<BoothAttachResult> {
   const { project, narrationSource } = opts;
   const narrationDur = await probeMediaDuration(narrationSource, opts.dataDir);
@@ -451,6 +464,13 @@ export async function attachBoothNarration(opts: {
       (target as any).media_edits = me;
     }
   } catch { /* audio-only take, or probe failed -- no bubble */ }
+
+  // SPEAKER lane (ROADMAP #8): a booth take IS the speaker -- one clip on the
+  // film clock, no EDL (the take was performed against the locked cut and
+  // plays straight through). Retakes replace it.
+  if (opts.speakerLane !== false) {
+    project.speaker = { clips: [{ at: startsAt, source: narrationSource, derived_audio: narrationSource }] };
+  }
 
   // Sound: narration replaces any prior take; the bed is added once and kept
   // across retakes.
