@@ -6,6 +6,26 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-18 — Timeline v2: Marc's layout pass (PR #425)
+
+Marc on the merged lanes: "good, not great... icons not words, stationary...
+timeline at top or bottom... visual separation is kinda crap... would you
+even show those tracks?" The layout is now:
+
+- **Lane order SCREEN / SPEAKER / MUSIC top-to-bottom**, each on its own
+  bordered lane bed; the **ruler+scrubber is a distinct TOP band**
+  (Descript-style) with a playhead line dropping through every lane.
+- **Stationary inline-SVG icons** (screen / person / note) in a fixed left
+  gutter OUTSIDE the scroller — always visible, always aligned, at any
+  scroll/zoom. The 🔗 linked badge lives in the gutter under the speaker
+  icon (lane state, not a clock moment).
+- **Conditional lanes**: `laneLayout()` computes tops from what the film
+  has; no speaker / no music → lane absent, strip shrinks (verified on
+  proj_2ad23344, which has no audio at all → ruler + screen only).
+- Known trade-off: beat-films (no voiceover) no longer show storyboard
+  beat text in a words lane — no speaker, no speaker lane. The text
+  remains in the scene list; revisit if scrub-by-script is missed.
+
 ## 2026-07-18 — Merged speaker lane + wave-strip zoom bug (PRs #421, #422, #423)
 
 The full stage-3 promise from ROADMAP #8: the speaker's four scattered
