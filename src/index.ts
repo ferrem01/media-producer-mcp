@@ -2247,6 +2247,15 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             const onsetIdx = wf2.peaks.findIndex((pk) => pk > 0.08);
             if (onsetIdx > 0) segs2 = snapLeadingWords(segs2, onsetIdx / wf2.bucketsPerSecond);
           } catch { /* waveform optional */ }
+          // Whisper smears words across long mid-take pauses; snap them back
+          // to real speech so the lane shows the gap the listener hears (and
+          // word-anchored pins/cuts aim at actual speech).
+          try {
+            const { detectSilence } = await import("./core/idle-silence.js");
+            const { snapWordsOutOfSilences } = await import("./core/transcribe.js");
+            const silences2 = await detectSilence(resolveVideoPath(audioSrc2));
+            if (silences2.length) segs2 = snapWordsOutOfSilences(segs2, silences2);
+          } catch { /* ffmpeg optional */ }
           jsonResponse(res, 200, { ok: true, available: true, segments: segs2 });
         } catch (err: any) {
           jsonResponse(res, 500, { error: `Transcription failed: ${err?.message || err}` });
