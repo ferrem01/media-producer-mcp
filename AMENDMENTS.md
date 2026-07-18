@@ -6,6 +6,44 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-18 — "Voice and camera not playing" debug: stale JS + whisper silence-smear (PRs #418, #419)
+
+Marc reported proj_34d1497c playing without voice or camera. Remote debugging
+from the sandbox (agent-proxy notes below), two real findings:
+
+- **Playback itself was fine** — the report was a stale pre-deploy Studio tab;
+  a hard refresh fixed it. What made it undiagnosable was that a rejected
+  `play()` was only logged under `__MP_SYNCDEBUG`. **PR #418**: `[play-fail]`
+  is now always logged (once per element), and `reportMediaHealth` ships a
+  per-element snapshot (readyState/currentTime/paused/volume/error) to the
+  session log at play+2.5s and play+10s. A silent-playback report is now a
+  one-line remote read.
+- **Whisper smears word timestamps across long pauses** (PR #419). The film's
+  baked narration is silent 71.95–81.30s, but whisper timestamped ten words
+  ("and a social post example. Great. Here we go. All right,") evenly across
+  the gap — the word lane and captions promised speech over dead air, and
+  word-anchored edits (pins, speaker cuts) would aim at silence. Fix:
+  `snapWordsOutOfSilences` (transcribe.ts) uses ffmpeg silencedetect spans as
+  ground truth — words with midpoints inside a ≥1.5s silence are pulled to
+  real speech, sentence-aware (through the last sentence-terminal → close the
+  sentence BEFORE the pause; the rest → open the one AFTER); edge-straddlers
+  clamp. Applied in `getSentenceSpine` (assembly captions) and
+  `/api/speaker-transcript` (Studio lane + word-cutting). Regression test
+  from the film's literal numbers in `test/word-snap.test.ts`.
+- The film's remaining 9.4s of dead air is REAL (screen busy, speaker quiet —
+  idle∩silence correctly kept it). The systemic answer stays parked:
+  timelapse-over-silence (speed the screen through voice gaps).
+
+**Sandbox remote-debugging notes** (cost an hour, don't rediscover):
+- The agent proxy 502s ANY tunneled request carrying an `Authorization`
+  header (even garbage, even /health) — Studio also auths via `?token=`, so
+  strip the header when forwarding. A local CONNECT-tunnel forwarder
+  (scratchpad `forward.js`: http server → CONNECT → droplet, Host rewritten
+  to match the CONNECT target, retries on transient 5xx) lets headless
+  Chromium drive the live droplet Studio.
+- `/opt/pw-browsers/chromium` has NO AAC/H.264 — `DEMUXER_ERROR_NO_SUPPORTED_
+  STREAMS` on m4a/mp4 is the sandbox browser, not the app; VP9/mp3 play.
+
 ## 2026-07-18 — Symmetric speaker EDL stages 2–4: the referee + word-cutting (ROADMAP #8)
 
 Stage 1 made the speaker lane declarative (EDL truth, bake as cache). These
