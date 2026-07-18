@@ -23,15 +23,24 @@ describe("assembleNarratedScreencast", () => {
     const res = await assembleNarratedScreencast({ project, screencastSource: SCREEN, narrationSource: NARR, dataDir: "/nonexistent" });
     const ids = res.project.scenes.map((s) => s.id);
     expect(ids).toEqual(["intro", "screencast", "outro"]);
-    // each scene is a full-frame screencast-frame video
-    for (const s of res.project.scenes) {
+    // Bookends stay full-bleed (their full frame IS the content).
+    for (const s of [res.project.scenes[0], res.project.scenes[2]]) {
       const c = (s.components || [])[0] as any;
       expect(c.type).toBe("screencast-frame");
       expect(c.data.frame_style).toBe("none");
       expect(c.position.width).toBe("100%");
     }
-    // the middle scene carries the screen recording
-    expect(((res.project.scenes[1].components[0] as any).data.video_url)).toBe(SCREEN);
+    // The walkthrough is the recipe-v2 presentation: brand backdrop (gradient
+    // fallback here -- the shell kit has no backdrop asset) under a matted
+    // macOS browser frame carrying the recording, crop resolved from intel.
+    const [bg, frame] = res.project.scenes[1].components as any[];
+    expect(bg.type).toBe("gradient-background");
+    expect(bg.z_index).toBeLessThan(frame.z_index);
+    expect(frame.type).toBe("screencast-frame");
+    expect(frame.data.frame_style).toBe("macos-browser");
+    expect(frame.data.max_width_pct).toBe(96);
+    expect(frame.data.crop).toBe("auto");
+    expect(frame.data.video_url).toBe(SCREEN);
     // narration wired as the soundtrack
     expect((res.project.audio as any).tracks[0]).toMatchObject({ type: "voiceover", source: NARR });
     expect(res.project.status).toBe("generated");

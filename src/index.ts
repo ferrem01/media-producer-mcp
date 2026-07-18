@@ -1666,8 +1666,13 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           const saved = await loadRecorderEvents(videoPath);
           // Convert to motion intel now (and drop any stale memo) so
           // compression/pins built from this asset use recorder truth.
-          const { ensureMotionIntel, invalidateMotionIntel } = await import("./core/asset-intel.js");
+          const { ensureMotionIntel, invalidateMotionIntel, refineSavedIntelForRecorder } = await import("./core/asset-intel.js");
           invalidateMotionIntel(videoPath);
+          // The video's intel was analyzed BEFORE this sidecar existed, so the
+          // static-band heuristics may have trimmed the app's own fixed UI.
+          // Now that we know it's a tab capture, redo the trims properly.
+          const refined = await refineSavedIntelForRecorder(videoPath);
+          if (refined) console.log(`  recorder-events: trims refined for ${reName} -- content_box ${refined.content_box.w}x${refined.content_box.h} at (${refined.content_box.x},${refined.content_box.y})`);
           const intel = await ensureMotionIntel(videoPath);
           console.log(
             `  recorder-events: ${reName} -- ${saved?.clicks?.length || 0} clicks, ${saved?.navigations?.length || 0} navigations, ` +
