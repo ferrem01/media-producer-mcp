@@ -93,6 +93,104 @@ export interface BoothAttachResult {
 }
 
 /**
+ * Mode A (SPEC-recorder.md): the demo was narrated LIVE -- voice and video
+ * share the recording clock inside ONE file. Compression must never touch
+ * speech, so the cut list is idle (sidecar) ∩ silent (silencedetect), applied
+ * as HARD CUTS to both streams: the video gets EDL cuts, the audio is
+ * concatenated from the kept spans into a standalone narration track, and the
+ * two stay in sync by construction. Spine/captions/bed then ride on the cut
+ * narration via the same attach used by the booth.
+ */
+export async function assembleLiveNarration(opts: {
+  project: Project;
+  /** The recording carrying BOTH streams (extension Mode A webm). */
+  source: string;
+  dataDir?: string;
+  llmConfig?: LLMConfig;
+  music?: boolean;
+}): Promise<NarratedScreencastResult> {
+  const { project, source } = opts;
+  const srcDur = await probeMediaDuration(source, opts.dataDir);
+  if (!(srcDur > 1)) throw new Error("recording is empty or unreadable");
+  const videoPath = resolveVideoPath(source, opts.dataDir);
+
+  const { intersectRanges, complementRanges, shrinkRanges, detectSilence, cutAudioTo } =
+    await import("../core/idle-silence.js");
+  const { ensureMotionIntel } = await import("../core/asset-intel.js");
+  const { solveMediaEdits } = await import("../core/media-edl.js");
+
+  // idle ∩ silent, with breathing room. Either signal missing -> no cuts
+  // (a long honest film beats a clipped word).
+  const intel = await ensureMotionIntel(videoPath).catch(() => null);
+  const idle = (intel?.idle?.ranges || []).map((r: any) => ({ from: r.from, to: r.to }));
+  const silence = (await detectSilence(videoPath)).map((r) => ({ from: r.from, to: Math.min(r.to, srcDur) }));
+  const cuts = shrinkRanges(intersectRanges(idle, silence), 0.35, 2.5);
+  const kept = complementRanges(cuts, srcDur);
+  const keptDur = kept.reduce((s, r) => s + (r.to - r.from), 0);
+  console.log(
+    `  Mode A: ${Math.round(srcDur)}s recording, ${cuts.length} idle+silent cut(s) -> ${Math.round(keptDur)}s ` +
+    `(idle ${idle.length} span(s), silence ${silence.length} span(s))`,
+  );
+
+  // Video: EDL hard cuts.
+  const scene = videoScene("screencast", "Walkthrough", source, keptDur);
+  if (cuts.length) {
+    const solved = solveMediaEdits(
+      { cuts: cuts.map((c) => ({ src_start: c.from, src_end: c.to })), rate_regions: [], pins: [] },
+      srcDur,
+    );
+    (scene as any).media_edits = {
+      screencast: {
+        segments: solved.segments,
+        cuts: cuts.map((c) => ({ src_start: c.from, src_end: c.to })),
+        pins: [], rate_regions: [], pin_status: solved.pin_status, proposed: true,
+      },
+    };
+  }
+
+  // Audio: the same cuts, as a standalone narration file the mixer owns.
+  const assetsDir = path.join(
+    opts.dataDir || process.env.MP_DATA_DIR || "/data/media-producer",
+    project.tenant_id, "projects", project.project_id, "assets",
+  );
+  const { mkdir } = await import("node:fs/promises");
+  await mkdir(assetsDir, { recursive: true });
+  const narrationName = `narration-live-${Date.now()}.m4a`;
+  await cutAudioTo(videoPath, kept, path.join(assetsDir, narrationName));
+  const narrationUrl = `/assets/${project.tenant_id}/projects/${project.project_id}/assets/${narrationName}`;
+
+  // Bookends + scene list, then the booth attach lays sound + spine on top.
+  const assets: BrandAsset[] = (project.brand_kit?.assets || []) as BrandAsset[];
+  const intro = assets.find((a) => a.type === "intro" && a.url);
+  const outro = assets.find((a) => a.type === "outro" && a.url);
+  const scenes: Scene[] = [];
+  if (intro) scenes.push(videoScene("intro", "Branded Intro", intro.url, intro.duration || 6));
+  scenes.push(scene);
+  if (outro) scenes.push(videoScene("outro", "Branded Outro", outro.url, outro.duration || 5));
+  project.scenes = scenes;
+
+  // Live narration starts WITH the demo scene, not the intro.
+  const attach = await attachBoothNarration({
+    project,
+    narrationSource: narrationUrl,
+    dataDir: opts.dataDir,
+    llmConfig: opts.llmConfig,
+    music: opts.music,
+    narrationStartsAt: intro ? scenes[0].duration_seconds : 0,
+  });
+
+  const summary =
+    `Live-narrated screencast assembled: ${Math.round(srcDur)}s -> ${Math.round(keptDur)}s ` +
+    `(${cuts.length} idle+silent cut(s)) | ${attach.summary}`;
+  return {
+    project,
+    summary,
+    scene_duration: scene.duration_seconds,
+    narration_duration: attach.narration_duration,
+  };
+}
+
+/**
  * Mode B (SPEC-recorder.md): attach a voiceover that was PERFORMED AGAINST the
  * already-assembled cut (the Studio narration booth plays the film from 0
  * while recording the mic). The picture is locked -- scenes, durations and
@@ -110,6 +208,10 @@ export async function attachBoothNarration(opts: {
   llmConfig?: LLMConfig;
   /** Ducked music bed (default ON, matching the assemble path). */
   music?: boolean;
+  /** Film-clock second the take begins at. Booth takes start at 0 (the take
+   *  rolls over the intro); Mode A live narration starts WITH the demo scene
+   *  (pass the intro duration). Audio-track offset + caption shifting follow. */
+  narrationStartsAt?: number;
 }): Promise<BoothAttachResult> {
   const { project, narrationSource } = opts;
   const narrationDur = await probeMediaDuration(narrationSource, opts.dataDir);
@@ -124,14 +226,17 @@ export async function attachBoothNarration(opts: {
       .filter((s) => (s.components || []).some((c: any) => c.type === "screencast-frame"))
       .sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0))[0];
   if (!target) throw new Error("project has no screencast scene to narrate");
+  const startsAt = opts.narrationStartsAt || 0;
+  // Narration-file second n == film second n + startsAt; scene-local caption
+  // times shift by (scene offset - startsAt).
   const offset = scenes
     .slice(0, scenes.indexOf(target))
-    .reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
+    .reduce((sum, s) => sum + (s.duration_seconds || 0), 0) - startsAt;
   const sceneDur = target.duration_seconds || 0;
   const filmDur = scenes.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
-  if (Math.abs(narrationDur - filmDur) > 3) {
+  if (Math.abs(narrationDur - (filmDur - startsAt)) > 3) {
     console.log(
-      `  Booth: take is ${Math.round(narrationDur)}s vs film ${Math.round(filmDur)}s -- picture stays locked, audio just ends ${narrationDur < filmDur ? "early" : "late"}`,
+      `  Booth: take is ${Math.round(narrationDur)}s vs film ${Math.round(filmDur - startsAt)}s -- picture stays locked, audio just ends ${narrationDur < filmDur - startsAt ? "early" : "late"}`,
     );
   }
 
@@ -185,7 +290,10 @@ export async function attachBoothNarration(opts: {
   // across retakes.
   const audio: any = (project.audio as any) || { tracks: [] };
   audio.tracks = (audio.tracks || []).filter((t: any) => t.id !== "narration");
-  audio.tracks.unshift({ id: "narration", type: "voiceover", source: narrationSource, volume: 1 });
+  audio.tracks.unshift({
+    id: "narration", type: "voiceover", source: narrationSource, volume: 1,
+    ...(startsAt > 0 ? { start_time: startsAt } : {}),
+  });
   let musicTitle: string | null = null;
   const hasBed = audio.tracks.some((t: any) => t.id === "music_bed");
   if (opts.music !== false && !hasBed) {

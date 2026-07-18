@@ -7,7 +7,7 @@
 
 let session = null; // { tabId, startedMs, events: {...}, settings }
 
-const DEFAULTS = { server: "", tenant: "", token: "", project: "library" };
+const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: false };
 
 async function getSettings() {
   const s = await chrome.storage.sync.get(DEFAULTS);
@@ -66,7 +66,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // ever run the capture script.
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
 
-        await chrome.runtime.sendMessage({ type: "qr-offscreen-start", streamId });
+        await chrome.runtime.sendMessage({ type: "qr-offscreen-start", streamId, mic: !!settings.mic });
+
+        // Mode A gets a teleprompter in a SEPARATE window: tab capture films
+        // the tab, so anything injected into the page would end up on film.
+        if (settings.mic) {
+          try {
+            const win = await chrome.windows.create({
+              url: "prompter.html", type: "popup", width: 480, height: 360, focused: false,
+            });
+            session.prompterWin = win.id;
+          } catch (e) { /* prompter is a nicety, never a blocker */ }
+        }
         sendResponse({ ok: true });
         return;
       }
@@ -77,6 +88,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         session = null;
         await chrome.storage.session?.remove("qrSession");
         try { await chrome.tabs.sendMessage(s.tabId, { type: "qr-content-stop" }); } catch (e) {}
+        if (s.prompterWin) { try { await chrome.windows.remove(s.prompterWin); } catch (e) {} }
         const durationMs = Date.now() - s.startedMs;
         s.events.recording.durationMs = durationMs;
         s.events.mutationsIdle = idleFromActivity(s.events._activity, durationMs);
@@ -91,6 +103,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             project: s.settings.project || "library",
             name: `recording-${new Date().toISOString().replace(/[:.]/g, "-")}.webm`,
             events: s.events,
+            mic: !!s.settings.mic,
           },
         });
         sendResponse({ ok: true });
@@ -112,7 +125,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       if (msg.type === "qr-offscreen-status") {
         // Progress + terminal states from the offscreen uploader.
-        if (msg.state === "done") {
+        if (msg.state === "ready" && msg.projectUrl) {
+          chrome.notifications?.create("qr-ready", {
+            type: "basic",
+            iconUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+            title: "Quotient Recorder",
+            message: "Your walkthrough is ready — click to open it in Studio.",
+          });
+        } else if (msg.state === "done") {
           chrome.notifications?.create({
             type: "basic",
             iconUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -127,7 +147,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             message: "Upload failed: " + (msg.error || "unknown error"),
           });
         }
-        chrome.storage.session?.set({ qrLastStatus: { state: msg.state, error: msg.error || null, at: Date.now() } });
+        chrome.storage.session?.set({ qrLastStatus: { state: msg.state, error: msg.error || null, projectUrl: msg.projectUrl || null, at: Date.now() } });
         return;
       }
 
@@ -156,6 +176,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
   })();
   return true; // async sendResponse
+});
+
+// Ready notification -> open the film in Studio.
+chrome.notifications?.onClicked.addListener(async (id) => {
+  if (id !== "qr-ready") return;
+  const { qrLastStatus } = (await chrome.storage.session?.get("qrLastStatus")) || {};
+  if (qrLastStatus?.projectUrl) chrome.tabs.create({ url: qrLastStatus.projectUrl });
+  chrome.notifications.clear(id);
 });
 
 // Activity marks (any input or DOM mutation ping) -> idle spans: a gap with

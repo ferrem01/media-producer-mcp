@@ -113,6 +113,20 @@ describe("attachBoothNarration", () => {
     expect(overlays).toHaveLength(1);
   });
 
+  it("narrationStartsAt (Mode A): captions stay scene-local, track gets start_time", async () => {
+    const project = recorderProject();
+    await attachBoothNarration({
+      project,
+      narrationSource: "/assets/t/live.m4a",
+      narrationStartsAt: 6.1, // live narration begins WITH the demo scene
+    });
+    const overlay = project.scenes[1].components.find((c: any) => c.id === "narration_overlay");
+    // Narration-file times ARE scene times now: 1.0s and 8.0s both land unshifted.
+    expect(overlay.data.captions.map((c: any) => c.start)).toEqual([1.0, 8.0]);
+    const narr = (project.audio as any).tracks.find((t: any) => t.id === "narration");
+    expect(narr.start_time).toBeCloseTo(6.1, 3);
+  });
+
   it("throws on a project with no screencast scene", async () => {
     const project: any = { project_id: "p", tenant_id: "t", scenes: [{ id: "s1", duration_seconds: 5, components: [{ type: "kinetic-text" }] }] };
     await expect(attachBoothNarration({ project, narrationSource: "/x.webm" })).rejects.toThrow(/no screencast scene/);

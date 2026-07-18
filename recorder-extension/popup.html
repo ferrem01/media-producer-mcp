@@ -19,6 +19,11 @@
     <label>Tenant</label><input id="tenant" placeholder="marc-getquotient-ai" />
     <label>Token</label><input id="token" type="password" placeholder="token" />
     <label>Library project</label><input id="project" placeholder="library" />
+    <label style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer;font-size:12px;color:#17171c;">
+      <input type="checkbox" id="mic" style="width:auto;margin:0;" />
+      &#127897; Narrate live (record my mic while demoing)
+    </label>
+    <div id="mic-hint" style="font-size:10px;color:#9ca3af;margin:2px 0 0 20px;">Only idle moments where you're also silent get cut. A teleprompter window opens when you start.</div>
     <button id="record">● Record this tab</button>
     <div id="status"></div>
     <div class="hint">While recording: ⌘/Ctrl+Shift+N marks a chapter. Stop from this popup; the film assembles automatically and appears in Studio.</div>
