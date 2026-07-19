@@ -9,6 +9,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.ts",
     "typecheck": "tsc --noEmit",
+    "build:ext": "zip -r -q recorder-extension.zip recorder-extension -x '*.DS_Store'",
     "test": "vitest run",
     "test:watch": "vitest"
   },

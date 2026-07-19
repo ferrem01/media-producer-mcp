@@ -61,26 +61,27 @@ EOF
 `pm2 startup` (once) makes the app survive droplet reboots; the script already
 runs `pm2 save` after each deploy.
 
-## HTTPS with Caddy (optional but recommended)
+## HTTPS with Caddy (automatic)
 
-Caddy in front gives you a real domain + automatic TLS. Point DNS at the
-droplet, then:
+Every deploy runs `scripts/setup-caddy.sh` (idempotent, best-effort): it
+installs Caddy, writes `/etc/caddy/Caddyfile` (`reverse_proxy 127.0.0.1:$MP_PORT`),
+opens 80/443 in ufw, points `MP_PUBLIC_URL` in the env file at the HTTPS
+domain, and reloads. Controls in `/etc/media-producer/env`:
 
-```bash
-sudo apt install -y caddy
-sudo tee /etc/caddy/Caddyfile >/dev/null <<'EOF'
-media.yourdomain.com {
-    reverse_proxy 127.0.0.1:3200
-}
-EOF
-sudo systemctl reload caddy
-```
+- `MP_CADDY_DOMAIN=media.yourdomain.com` — the domain to serve (point its DNS
+  A record at the droplet first). **If unset**, the script falls back to
+  `<ip-with-dashes>.sslip.io` (e.g. `159-203-115-164.sslip.io`), which
+  resolves to the droplet with zero DNS setup — so HTTPS works before you own
+  a domain. Set a real domain later and redeploy; one variable, done.
+- `MP_CADDY_DISABLE=1` — opt out entirely.
+- A hand-written `/etc/caddy/Caddyfile` (no "managed by media-producer-mcp"
+  header) is never touched — the script defers to it and tells you so.
 
-Then set `MP_PUBLIC_URL=https://media.yourdomain.com` in
-`/etc/media-producer/env` and redeploy — every `preview_url` the server hands
-out switches to the HTTPS domain automatically. (Caddy passes the
-`Authorization` header through by default; the Studio front-end also carries
-the token as a query param, so either path works.)
+Once live, every `preview_url` the server hands out uses the HTTPS domain
+automatically. (Caddy passes the `Authorization` header through by default;
+the Studio front-end also carries the token as a query param, so either path
+works.) HTTPS also unlocks `getUserMedia` for the Recorder extension without
+the insecure-origins Chrome flag.
 
 Note: bare-IP links (`http://IP:3200/...`) never pass through Caddy — Caddy
 only answers for the domain on ports 80/443.

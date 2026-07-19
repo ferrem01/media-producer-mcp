@@ -239,6 +239,14 @@ function renderMcpLanding(server: unknown): string {
   th { color: #8f8f9f; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
   td:first-child { white-space: nowrap; }
   .muted { color: #6b6b7b; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .card { background: #15151f; border: 1px solid #262633; border-radius: 12px; padding: 18px 20px; }
+  .card h3 { margin: 0 0 10px; font-size: 15px; color: #e7e7ef; }
+  .card p { margin: 0 0 12px; }
+  .card ol { margin: 0; padding-left: 20px; }
+  .card ol li { margin-bottom: 8px; }
+  .btn { display: inline-block; background: #7c3aed; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 9px 16px; border-radius: 9px; }
+  .btn:hover { background: #6d28d9; }
 </style></head>
 <body><div class="wrap">
   <header><h1>Media Producer MCP</h1><span class="status">● healthy</span><span class="ver">v${SERVICE_VERSION}</span></header>
@@ -247,9 +255,43 @@ function renderMcpLanding(server: unknown): string {
   <nav>
     <a href="/architecture">Architecture &amp; docs</a>
     <a href="/studio">Studio</a>
+    <a href="/upload">Upload</a>
     <a href="/playground">Playground</a>
     <a href="/health">Health (JSON)</a>
   </nav>
+
+  <h2>Get started</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>1 · Connect an AI client</h3>
+      <p>Point any MCP-capable client (claude.ai custom connector, Claude Desktop,
+      Cowork) at the endpoint above. On claude.ai: <em>Settings → Connectors →
+      Add custom connector</em>, paste the MCP URL. Then ask it to
+      <em>"make a launch video for my product"</em> — it has every tool listed below,
+      from brand extraction through generation, editing and rendering.</p>
+      <p class="muted">You'll need a tenant id and access token from whoever runs this
+      server — the server owner configures those.</p>
+    </div>
+    <div class="card">
+      <h3>2 · Record walkthroughs</h3>
+      <p>The <b>Quotient Recorder</b> Chrome extension captures a tab + your voice
+      (and camera), and this server assembles it into a branded, captioned,
+      auto-edited film — no editor required.</p>
+      <p><a class="btn" href="/extension.zip" download>⬇ Download the extension</a></p>
+      <ol>
+        <li>Unzip, open <code>chrome://extensions</code>, enable <b>Developer mode</b>,
+        click <b>Load unpacked</b> and pick the unzipped folder. Pin it.</li>
+        <li>Open the popup: set <b>Server</b> to this server's URL, plus your
+        tenant + token. Tick <b>Narrate</b> (and <b>Camera</b> if you want your face
+        in a bubble).</li>
+        <li>Open the page you're demoing, hit <b>Record</b>, click anywhere to roll
+        after the 3-2-1, and talk while you drive. Pause/stop from the floating HUD.</li>
+        <li>When you stop, everything uploads and the film builds itself —
+        the popup hands you a Studio link to review, edit and render.</li>
+      </ol>
+    </div>
+  </div>
+
   <h2>Tools <span class="muted">(${tools.length})</span></h2>
   <table><thead><tr><th>Tool</th><th>Description</th></tr></thead><tbody>
 ${rows}
@@ -620,6 +662,24 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       if (urlPath === "/" || url === "/") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         res.end(renderMcpLanding(server));
+        return;
+      }
+
+      // ── Recorder extension download (unauthenticated; linked from the landing page) ──
+      if (urlPath === "/extension.zip" && method === "GET") {
+        const zipPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "recorder-extension.zip");
+        try {
+          const zip = await fs.readFile(zipPath);
+          res.writeHead(200, {
+            "Content-Type": "application/zip",
+            "Content-Disposition": 'attachment; filename="quotient-recorder.zip"',
+            "Content-Length": zip.length,
+          });
+          res.end(zip);
+        } catch {
+          res.writeHead(404, { "Content-Type": "text/plain" });
+          res.end("Extension bundle not found on this server");
+        }
         return;
       }
 
@@ -1858,34 +1918,10 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           const project = await loadProject(scTenant, scProject);
           if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
           const oldNarrSrc = (project as any).audio?.tracks?.find((t: any) => t.id === "narration")?.source as string | undefined;
-          const { applySpeakerCut } = await import("./core/speaker-edl.js");
+          const { applySpeakerCut, maintainTranscriptCacheAfterCut } = await import("./core/speaker-edl.js");
           const result = await applySpeakerCut(project, from, to, config.dataDir);
           await saveProject(project);
-          // The words didn't change -- only their times. Shift the cached
-          // transcript and re-key it to the new bake so the word lane never
-          // waits a minute for a re-transcription. CRITICAL: snap the raw
-          // cache against the OLD audio first -- users cut on the snapped
-          // clock, and raw whisper words smeared across a silence would be
-          // torn out by the drop (that ate "Here we go." on the first live
-          // silence cut).
-          try {
-            if (result.narration_url) {
-              const { rekeyShiftTranscriptCache, snapWordsOutOfSilences, shiftWordsForCut } = await import("./core/transcribe.js");
-              const { detectSilence } = await import("./core/idle-silence.js");
-              const cacheDir = path.join(config.dataDir, scTenant, "projects", scProject, "thumbs");
-              let oldSilences: Array<{ from: number; to: number }> = [];
-              if (oldNarrSrc) {
-                try { oldSilences = await detectSilence(resolveVideoPath(oldNarrSrc, config.dataDir)); } catch { /* optional */ }
-              }
-              await rekeyShiftTranscriptCache(cacheDir, resolveVideoPath(result.narration_url, config.dataDir), (segs) =>
-                shiftWordsForCut(
-                  oldSilences.length ? snapWordsOutOfSilences(segs, oldSilences) : segs,
-                  result.bake_from,
-                  result.bake_to,
-                ),
-              );
-            }
-          } catch { /* cache maintenance is best-effort */ }
+          await maintainTranscriptCacheAfterCut(scTenant, scProject, oldNarrSrc, result, config.dataDir);
           console.log(`  speaker-cut: ${scProject} -- removed ${result.removed_seconds}s of film at ${from}s`);
           jsonResponse(res, 200, { ok: true, ...result, project });
         } catch (e: any) {
@@ -1911,14 +1947,10 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           }
           const project = await loadProject(srTenant, srProject);
           if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-          const { applySpeakerRestore } = await import("./core/speaker-edl.js");
+          const { applySpeakerRestore, dropTranscriptCache } = await import("./core/speaker-edl.js");
           const result = await applySpeakerRestore(project, s0, s1, config.dataDir);
           await saveProject(project);
-          // The restored span's words were dropped from the cache at cut
-          // time -- delete it so the next fetch re-transcribes the full take.
-          try {
-            await fs.unlink(path.join(config.dataDir, srTenant, "projects", srProject, "thumbs", "transcript.json"));
-          } catch { /* no cache -- fine */ }
+          await dropTranscriptCache(srTenant, srProject, config.dataDir);
           console.log(`  speaker-restore: ${srProject} -- restored ${result.restored_seconds}s of film`);
           jsonResponse(res, 200, { ok: true, ...result, project });
         } catch (e: any) {

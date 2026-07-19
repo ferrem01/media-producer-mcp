@@ -134,3 +134,23 @@ What each stream replaces:
 - Cross-browser (Chrome first), webcam PiP overlay, in-extension editing
   beyond retake marks, desktop/native capture. All possible later; none block
   the value.
+
+## Amendment 2026-07-19 — the RE-FIT editing model (supersedes linked cuts)
+
+Editing a recorder film's talk track no longer mirrors cuts into the
+screen. The agreed model (see ROADMAP #8 amendment + AMENDMENTS 2026-07-19):
+
+- **A speaker cut removes TIME, never screen content.** The film shortens;
+  the screen's source-map re-solves through pins (tagged seam + terminal
+  anchors) so all footage still plays, compressed. Only the camera bubble
+  (the voice's own take) mirrors the cut — lips must match.
+- **Studio editing = the media-lane interaction:** click a speaker piece →
+  Play / Split at playhead / Remove; shift-click two words → ✂ Cut; click a
+  ✂ seam → Restore (the reverse referee gives the time back and the screen
+  relaxes). `edit_speaker` MCP tool exposes cut/restore/list for agents.
+- **Transcript maintenance:** speaker edits shift the cached word times
+  (snap-before-shift — never operate on raw whisper output, it smears words
+  across silences); restores drop the cache for re-transcription.
+- The assembly-time idle∩silence cut remains cut-both (screen proven idle).
+- Open design question: a booth retake after speaker edits replaces the
+  clip but leaves the screen's re-fit anchors from the old voice.

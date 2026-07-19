@@ -296,6 +296,51 @@ export async function applySpeakerCut(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Transcript-cache maintenance around speaker edits (shared by the HTTP
+// routes and the MCP edit_speaker tool). A cut changes word TIMES, not
+// words: shift + re-key the cache so the lane never waits on a re-whisper.
+// MUST snap against the OLD bake first -- users cut on the snapped clock
+// (raw whisper smears words across silences; see PR #435). A restore drops
+// the cache: the cut span's words are gone from it, so re-transcribe.
+// ─────────────────────────────────────────────────────────────────────────
+
+export async function maintainTranscriptCacheAfterCut(
+  tenantId: string,
+  projectId: string,
+  oldNarrSrc: string | undefined,
+  result: SpeakerCutResult,
+  dataDir?: string,
+): Promise<void> {
+  try {
+    if (!result.narration_url) return;
+    const { rekeyShiftTranscriptCache, snapWordsOutOfSilences, shiftWordsForCut } = await import("./transcribe.js");
+    const { detectSilence } = await import("./idle-silence.js");
+    const base = dataDir || process.env.MP_DATA_DIR || "/data/media-producer";
+    const cacheDir = path.join(base, tenantId, "projects", projectId, "thumbs");
+    let oldSilences: Array<{ from: number; to: number }> = [];
+    if (oldNarrSrc) {
+      try { oldSilences = await detectSilence(resolveVideoPath(oldNarrSrc, dataDir)); } catch { /* optional */ }
+    }
+    await rekeyShiftTranscriptCache(cacheDir, resolveVideoPath(result.narration_url, dataDir), (segs) =>
+      shiftWordsForCut(
+        oldSilences.length ? snapWordsOutOfSilences(segs, oldSilences) : segs,
+        result.bake_from,
+        result.bake_to,
+      ),
+    );
+  } catch { /* cache maintenance is best-effort */ }
+}
+
+export async function dropTranscriptCache(
+  tenantId: string,
+  projectId: string,
+  dataDir?: string,
+): Promise<void> {
+  const base = dataDir || process.env.MP_DATA_DIR || "/data/media-producer";
+  try { await fs.unlink(path.join(base, tenantId, "projects", projectId, "thumbs", "transcript.json")); } catch { /* none */ }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // applySpeakerRestore -- the reverse referee: give a cut's time back.
 // The film grows by the cut's length at the seam; the re-fit anchors this
 // cut planted are lifted, user pins and captions/spine/cues shift right,

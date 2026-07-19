@@ -33,6 +33,11 @@ npm run build
 # leaves transcription off -- Studio falls back to the storyboard script).
 bash scripts/setup-whisper.sh || echo "whisper setup skipped"
 
+# Caddy for HTTPS (idempotent, best-effort). Runs BEFORE the env load below
+# because it may rewrite MP_PUBLIC_URL in the env file to the https domain --
+# sourcing after means the app picks that up in this same deploy.
+MP_ENV_FILE="$ENV_FILE" bash scripts/setup-caddy.sh || echo "caddy setup skipped"
+
 # Environment: secrets and instance config live OUTSIDE the repo.
 if [ -f "$ENV_FILE" ]; then
   set -a
