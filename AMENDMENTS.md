@@ -1069,3 +1069,25 @@ list out all the features of quotient that work."
   `MP_CADDY_DOMAIN`, falling back to `<ip-with-dashes>.sslip.io` (zero-DNS);
   `MP_CADDY_DISABLE=1` opts out; a hand-written Caddyfile is never touched.
   HTTPS also retires the insecure-origins Chrome flag for getUserMedia.
+
+## Post-deploy verification findings (same day, after the tooling batch shipped)
+
+- **REAL BUG (fixed): applySpeakerCut only re-fitted media-edits entries that
+  already existed.** A film whose assembly made no idle-silence cuts has no
+  entries at all — a speaker cut then shrank the scene but silently truncated
+  the screen's tail (content loss, against the re-fit contract) and never
+  mirrored into the camera bubble (lip desync). Now the cut SEEDS identity
+  entries first: screen = [0, oldDur] of its own clock; camera follower = the
+  speaker's clock with its existing cuts. 3 new referee tests cover seed,
+  seed-with-prior-cuts, and seeded round-trip. (Found because Marc's real
+  film proj_2b5f790e is in exactly this state — screencast entry absent,
+  camera entry present.)
+- A stray NUL byte had landed in speaker-edl.ts (a python edit script wrote
+  "\0" where "" was meant — in a Python string literal \0 IS the NUL byte).
+  Harmless at runtime (unused fallback branch) but the file scanned as
+  binary. Fixed; lesson: grep -P '\x00' after scripted edits.
+- **Composite-ready window 10s → 30s** (waitForCompositeReady): on a cold
+  server/slow pipe the composite takes >10s to register its timelines; the
+  old window stranded the Studio in per-scene fallback with EMPTY media and
+  word lanes (looked like data loss, was a timeout). studio-smoke now polls
+  readiness up to 75s instead of a fixed 15s nap.
