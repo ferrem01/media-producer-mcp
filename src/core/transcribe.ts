@@ -89,6 +89,29 @@ export async function rekeyShiftTranscriptCache(
 }
 
 /**
+ * Drop a cut span's words and close the gap. MUST run on SNAPPED words --
+ * the clock users see and cut against; running it on raw whisper output
+ * tears out words the silence-snap had rescued from a smeared gap.
+ * Mid-based, so a word stretched across a boundary follows the side its
+ * bulk is on; shifted starts clamp at the seam.
+ */
+export function shiftWordsForCut(
+  segments: TranscriptSegment[],
+  bakeFrom: number,
+  bakeTo: number,
+): TranscriptSegment[] {
+  const d = bakeTo - bakeFrom;
+  return segments
+    .filter((w) => { const m = (w.start + w.end) / 2; return !(m >= bakeFrom && m < bakeTo); })
+    .map((w) => {
+      const m = (w.start + w.end) / 2;
+      if (m < bakeTo) return w;
+      const start = Math.max(bakeFrom, Math.round((w.start - d) * 100) / 100);
+      return { ...w, start, end: Math.max(start + 0.05, Math.round((w.end - d) * 100) / 100) };
+    });
+}
+
+/**
  * Whisper smears word timestamps across long mid-take silences: the words
  * spoken just before (or after) a pause get stretched INTO it to bridge the
  * gap. The word lane and the captions then promise speech where the track is
