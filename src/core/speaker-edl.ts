@@ -147,6 +147,10 @@ export interface SpeakerCutResult {
   speaker_cut: CutRange;
   screen_cut: CutRange | null;
   narration_url: string | null;
+  /** The removed span on the PREVIOUS bake's clock -- what transcript and
+   *  waveform consumers need to shift their word/peak times. */
+  bake_from: number;
+  bake_to: number;
 }
 
 export async function applySpeakerCut(
@@ -286,6 +290,8 @@ export async function applySpeakerCut(
     speaker_cut: speakerCut,
     screen_cut: screenCut,
     narration_url: narrationUrl,
+    bake_from: Math.round(bakeFrom * 100) / 100,
+    bake_to: Math.round(bakeTo * 100) / 100,
   };
 }
 
@@ -303,6 +309,8 @@ export interface SpeakerRestoreResult {
   restored_seconds: number;
   scene_id: string;
   narration_url: string | null;
+  /** Where the time came back, on the pre-restore bake clock. */
+  bake_seam: number;
 }
 
 export async function applySpeakerRestore(
@@ -407,5 +415,6 @@ export async function applySpeakerRestore(
     restored_seconds: Math.round(d * 100) / 100,
     scene_id: target.id,
     narration_url: narrationUrl,
+    bake_seam: Math.round(bakeSeam * 100) / 100,
   };
 }

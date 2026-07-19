@@ -286,11 +286,13 @@ export function getPreviewHtml(): string {
      a block spanning where the voice sits on the film clock, with the
      waveform and the words drawn inside it and the speaker EDL's own cut
      seams marked on it. */
+  /* Speaker pieces read exactly like media segments: white-bordered blocks
+     whose shared edges form the seam (no extra divider lines). */
   .spk-clip { position: absolute; height: 26px; box-sizing: border-box;
-    background: rgba(238,242,255,0.9); border: 1px solid #c7d2fe; border-radius: 5px;
+    background: rgba(224,231,255,0.95); border: 1px solid #fff; border-radius: 4px;
+    box-shadow: inset 0 0 0 1px rgba(99,102,241,0.28);
     pointer-events: auto; cursor: pointer; }
-  .spk-clip:hover { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1 inset; }
-  .spk-split { position: absolute; width: 2px; background: #6366f1; opacity: 0.8; z-index: 4; pointer-events: none; border-radius: 1px; }
+  .spk-clip:hover { box-shadow: 0 0 0 1.5px #4f46e5; z-index: 2; }
   .spk-cut { position: absolute; margin-left: -8px; width: 16px; height: 18px; line-height: 17px; text-align: center;
     font-size: 11px; z-index: 5; color: #4f46e5; background: #fff; border: 1px solid #a5b4fc; border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12); pointer-events: auto; cursor: pointer; }
@@ -3524,15 +3526,6 @@ export function getPreviewHtml(): string {
           track.insertBefore(blk, document.getElementById('wave-strip'));
         })(bounds[bi2], bounds[bi2 + 1]);
       }
-      spkSplits().forEach(function(s) {
-        if (!(s > 0.2 && s < bakeDur - 0.2)) return;
-        var sm = document.createElement('div');
-        sm.className = 'spk-split';
-        sm.style.top = (y.speaker + 3) + 'px';
-        sm.style.height = '30px';
-        sm.style.left = (((clipAt + s) / total) * 100).toFixed(2) + '%';
-        track.appendChild(sm);
-      });
       // The speaker EDL's own seams: one ✂ per cut, at the film position
       // where the removed speech used to be (source -> bake -> film).
       var removedSoFar = 0;
@@ -3621,12 +3614,33 @@ export function getPreviewHtml(): string {
     camPopClose();
     state.currentProject = r.project;
     state._wavePeaksFor = null;
-    state._transcriptFor = null;
     state._spkSplits = [];
+    // The words didn't change -- only their times. Shift the local
+    // transcript in place (the server re-keys its cache the same way), so
+    // the lane is correct IMMEDIATELY instead of stale-then-empty while
+    // whisper re-runs.
+    if (state._transcript && r.bake_from != null) {
+      var dC = r.bake_to - r.bake_from;
+      state._transcript = state._transcript
+        .filter(function(w) { var m = (w.start + w.end) / 2; return !(m >= r.bake_from && m < r.bake_to); })
+        .map(function(w) { return w.start >= r.bake_to ? { start: w.start - dC, end: w.end - dC, text: w.text } : w; });
+      state._transcriptFor = r.project.project_id;
+    } else if (state._transcript && r.bake_seam != null) {
+      var dR = r.restored_seconds || 0;
+      state._transcript = state._transcript
+        .map(function(w) { return w.start >= r.bake_seam - 0.01 ? { start: w.start + dR, end: w.end + dR, text: w.text } : w; });
+      state._transcriptFor = r.project.project_id;
+      // The restored span's words are unknown locally; a page reload will
+      // re-transcribe the full take (the server dropped its cache).
+    } else {
+      state._transcript = null;
+      state._transcriptFor = null;
+    }
     state.totalDuration = calcTotalDuration();
     state.masterTime = Math.max(0, Math.min(seekTo || 0, state.totalDuration - 0.1));
     initAudio();
     renderSceneList();
+    renderWordLane();
     startCompositePreview(r.project, { time: state.masterTime });
   }
 

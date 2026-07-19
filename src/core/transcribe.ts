@@ -63,6 +63,32 @@ export function parseWhisperJson(raw: string): TranscriptSegment[] {
 }
 
 /**
+ * Speaker edits change the narration FILE but not the words in it -- only
+ * their times. Re-running whisper after every cut costs up to a minute and
+ * empties the word lane meanwhile; instead the editing routes transform the
+ * cached transcript (drop/shift word times) and re-key the cache to the new
+ * file, so the very next fetch is instant and correct. Returns false when
+ * there is no usable cache (callers fall back to a fresh transcription).
+ */
+export async function rekeyShiftTranscriptCache(
+  cacheDir: string,
+  newAudioPath: string,
+  transform: (segments: TranscriptSegment[]) => TranscriptSegment[],
+): Promise<boolean> {
+  const cacheFile = path.join(cacheDir, "transcript.json");
+  try {
+    const cached = JSON.parse(await fs.readFile(cacheFile, "utf-8"));
+    if (!Array.isArray(cached.segments)) return false;
+    const st = await fs.stat(newAudioPath);
+    const key = `${st.size}-${Math.round(st.mtimeMs)}-${path.basename(WHISPER_MODEL())}-ml1sow`;
+    await fs.writeFile(cacheFile, JSON.stringify({ key, segments: transform(cached.segments) }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Whisper smears word timestamps across long mid-take silences: the words
  * spoken just before (or after) a pause get stretched INTO it to bridge the
  * gap. The word lane and the captions then promise speech where the track is
