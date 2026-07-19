@@ -62,7 +62,16 @@ fi
 
 # 2. Caddyfile (write only on change; keep a stamp of what we manage).
 CADDYFILE="/etc/caddy/Caddyfile"
+# The email gives Caddy an ACME account for BOTH CAs -- without it the
+# ZeroSSL fallback can't issue, which matters on shared fallback domains
+# (sslip.io) where Let's Encrypt per-domain rate limits are often exhausted.
+# Default is the repo owner's operational contact; override with
+# MP_CADDY_EMAIL in the env file (cert-expiry notices go here).
+ACME_EMAIL="${MP_CADDY_EMAIL:-marc@getquotient.ai}"
 WANT="# managed by media-producer-mcp scripts/setup-caddy.sh
+{
+    email $ACME_EMAIL
+}
 $DOMAIN {
     reverse_proxy 127.0.0.1:$PORT
 }"
