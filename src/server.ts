@@ -865,6 +865,69 @@ export function createMcpServer(): McpServer {
   );
 
   // ─────────────────────────────────────────────
+  // edit_speaker - Cut/restore talk-track time (the re-fit referee)
+  // ─────────────────────────────────────────────
+
+  server.tool(
+    "edit_speaker",
+    "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'.",
+    {
+      tenant_id: z.string(),
+      project_id: z.string(),
+      action: z.enum(["list", "cut", "restore"]),
+      from: z.number().optional().describe("cut: film-time start in seconds"),
+      to: z.number().optional().describe("cut: film-time end in seconds"),
+      src_start: z.number().optional().describe("restore: the cut's src_start (from action='list')"),
+      src_end: z.number().optional().describe("restore: the cut's src_end (from action='list')"),
+    },
+    async (params) => {
+      const project = await loadProject(params.tenant_id, params.project_id);
+      if (!project) return err("Project not found");
+      const { applySpeakerCut, applySpeakerRestore, maintainTranscriptCacheAfterCut, dropTranscriptCache } =
+        await import("./core/speaker-edl.js");
+
+      if (params.action === "list") {
+        const clips = (project as any).speaker?.clips || [];
+        if (!clips.length) return err("This film has no speaker lane (assembled before the speaker EDL existed?). Regenerate it from the recording to edit the talk track.");
+        const clip = clips[0];
+        const cuts: Array<{ src_start: number; src_end: number }> = clip.edl?.cuts || [];
+        let removedBefore = 0;
+        const listed = cuts.map((c) => {
+          const seamFilm = (clip.at || 0) + (c.src_start - removedBefore);
+          removedBefore += c.src_end - c.src_start;
+          return {
+            src_start: c.src_start,
+            src_end: c.src_end,
+            seconds: Math.round((c.src_end - c.src_start) * 100) / 100,
+            film_seam: Math.round(seamFilm * 100) / 100,
+          };
+        });
+        return ok({ clip: { at: clip.at, source: clip.source }, cuts: listed });
+      }
+
+      if (params.action === "cut") {
+        if (params.from == null || params.to == null) return err("cut requires from and to (film seconds)");
+        const oldNarr = (project as any).audio?.tracks?.find((t: { id: string }) => t.id === "narration")?.source as string | undefined;
+        const result = await applySpeakerCut(project, params.from, params.to, config.dataDir);
+        await saveProject(project);
+        await maintainTranscriptCacheAfterCut(params.tenant_id, params.project_id, oldNarr, result, config.dataDir);
+        return ok({
+          status: "cut",
+          removed_seconds: result.removed_seconds,
+          speaker_cut: result.speaker_cut,
+          note: "Screen footage preserved (re-fit through pins); the camera bubble mirrored the cut.",
+        });
+      }
+
+      if (params.src_start == null || params.src_end == null) return err("restore requires src_start and src_end -- run action='list' first");
+      const result = await applySpeakerRestore(project, params.src_start, params.src_end, config.dataDir);
+      await saveProject(project);
+      await dropTranscriptCache(params.tenant_id, params.project_id, config.dataDir);
+      return ok({ status: "restored", restored_seconds: result.restored_seconds });
+    },
+  );
+
+  // ─────────────────────────────────────────────
   // brand - Get/set brand kit, manage brand assets
   // ─────────────────────────────────────────────
 
@@ -1601,7 +1664,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "generate",
-    "Generate media from a natural language prompt. Use mode='storyboard' to produce just the storyboard (script + per-scene breakdown + asset requirements) for review. Use mode='full' (default) to produce the scenes: if the project already has a storyboard it builds from that (honoring your edits), otherwise it creates the storyboard first, then builds. Rendering to a final video is a separate step (the render tool). Recommended flow: storyboard -> review/edit -> full -> preview/edit -> render.",
+    "Generate media from a natural language prompt. Use mode='storyboard' to produce just the storyboard (script + per-scene breakdown + asset requirements) for review. Use mode='full' (default) to produce the scenes: if the project already has a storyboard it builds from that (honoring your edits), otherwise it creates the storyboard first, then builds. Rendering to a final video is a separate step (the render tool). Recommended flow: storyboard -> review/edit -> full -> preview/edit -> render. Recorder films (screen recordings from the Quotient Recorder extension) assemble automatically on upload and get a SPEAKER lane -- edit their talk track with the edit_speaker tool, not by regenerating.",
     {
       tenant_id: z.string(),
       prompt: z.string().default("").describe("Description of what to generate. Optional when the project already has a storyboard (uses its narrative)."),

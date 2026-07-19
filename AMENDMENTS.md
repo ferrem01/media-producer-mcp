@@ -1037,3 +1037,35 @@ list out all the features of quotient that work."
   a generic chat surface over the real product mock and leaked a stage
   direction. Grammar-as-data + the `generic_surface` and
   `stage_direction_leak` gates is the enforcement stack.
+
+## Testing, tooling & distribution batch (2026-07-19, after the re-fit editing model)
+
+- **TESTPLAN.md** — the 15-minute golden-path manual script: record with the
+  extension (camera + narrate + deliberate pause + 8s silence-over-activity),
+  audit auto-assembly, exercise re-fit speaker editing (word-cut, piece
+  split/play/remove, restore), screen + effects edits, camera bubble + booth,
+  and finish with a real render — the mp4 is the only proof of the audio mix.
+- **scripts/studio-smoke.mjs** — automated post-deploy invariants driven
+  through a real browser (Playwright): boot without JS errors, lane geometry
+  uniform, gutter icons labeled, fx/screen blocks open their editors, speaker
+  pieces + word lane sane, transcript monotonic; `--edit` adds a speaker
+  cut/restore referee round-trip through the API (mutates — use a throwaway
+  film). Verified 11/11 against the live droplet.
+- **`edit_speaker` MCP tool** (server.ts) — list/cut/restore on the talk
+  track, so an AI client can do what the Studio word-lane does. Reuses
+  applySpeakerCut/applySpeakerRestore + the shared transcript-cache
+  maintenance now extracted into speaker-edl.ts
+  (`maintainTranscriptCacheAfterCut` / `dropTranscriptCache`, also used by the
+  HTTP routes — one code path for both surfaces).
+- **Landing page is now a real front door**: MCP endpoint, a Get-started
+  section (connect an AI client; download + install the recorder extension),
+  and `/extension.zip` serving `recorder-extension.zip` from the repo root
+  (rebuild with `npm run build:ext`; extension defaults contain NO server
+  URL/tenant/token — verified before zipping).
+- **HTTPS via Caddy is part of deploy** (`scripts/setup-caddy.sh`, called from
+  deploy.sh before the env load): idempotent apt install, managed Caddyfile
+  (`reverse_proxy 127.0.0.1:$MP_PORT`), ufw 80/443, rewrites `MP_PUBLIC_URL`
+  to the https domain so preview links flip automatically. Domain =
+  `MP_CADDY_DOMAIN`, falling back to `<ip-with-dashes>.sslip.io` (zero-DNS);
+  `MP_CADDY_DISABLE=1` opts out; a hand-written Caddyfile is never touched.
+  HTTPS also retires the insecure-origins Chrome flag for getUserMedia.
