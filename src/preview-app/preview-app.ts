@@ -316,10 +316,10 @@ export function getPreviewHtml(): string {
     width: 20px; height: 18px; opacity: 0; cursor: pointer; border: none;
   }
   #playhead-line::before {
-    content: ''; position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
-    width: 12px; height: 12px; border-radius: 50%;
-    background: #4f46e5; border: 2px solid #fff;
-    box-shadow: 0 1px 4px rgba(79,70,229,0.45);
+    content: ''; position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #3730a3; border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(55,48,163,0.5);
   }
   /* Transport column: play button with the clock stacked beneath it. A fixed
      narrow width (vs an inline time readout) hands ~160px back to the
