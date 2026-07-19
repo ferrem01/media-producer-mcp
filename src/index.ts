@@ -1860,6 +1860,21 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           const { applySpeakerCut } = await import("./core/speaker-edl.js");
           const result = await applySpeakerCut(project, from, to, config.dataDir);
           await saveProject(project);
+          // The words didn't change -- only their times. Shift the cached
+          // transcript and re-key it to the new bake so the word lane never
+          // waits a minute for a re-transcription.
+          try {
+            if (result.narration_url) {
+              const { rekeyShiftTranscriptCache } = await import("./core/transcribe.js");
+              const cacheDir = path.join(config.dataDir, scTenant, "projects", scProject, "thumbs");
+              const bd = result.bake_to - result.bake_from;
+              await rekeyShiftTranscriptCache(cacheDir, resolveVideoPath(result.narration_url, config.dataDir), (segs) =>
+                segs
+                  .filter((w) => { const m = (w.start + w.end) / 2; return !(m >= result.bake_from && m < result.bake_to); })
+                  .map((w) => (w.start >= result.bake_to ? { ...w, start: Math.round((w.start - bd) * 100) / 100, end: Math.round((w.end - bd) * 100) / 100 } : w)),
+              );
+            }
+          } catch { /* cache maintenance is best-effort */ }
           console.log(`  speaker-cut: ${scProject} -- removed ${result.removed_seconds}s of film at ${from}s`);
           jsonResponse(res, 200, { ok: true, ...result, project });
         } catch (e: any) {
@@ -1888,6 +1903,11 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           const { applySpeakerRestore } = await import("./core/speaker-edl.js");
           const result = await applySpeakerRestore(project, s0, s1, config.dataDir);
           await saveProject(project);
+          // The restored span's words were dropped from the cache at cut
+          // time -- delete it so the next fetch re-transcribes the full take.
+          try {
+            await fs.unlink(path.join(config.dataDir, srTenant, "projects", srProject, "thumbs", "transcript.json"));
+          } catch { /* no cache -- fine */ }
           console.log(`  speaker-restore: ${srProject} -- restored ${result.restored_seconds}s of film`);
           jsonResponse(res, 200, { ok: true, ...result, project });
         } catch (e: any) {
