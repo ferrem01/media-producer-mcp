@@ -6,6 +6,42 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-19 — RE-FIT model + speaker piece editing (design: Marc; ROADMAP #8 amended)
+
+Marc, on cutting 9s of recorded silence: "I would not want you to also cut
+9s from the media. I would want you to adjust things bc they are pinned in
+the media track but not also delete the same 9s from the media clip."
+That replaced the linked mirror-cut model shipped the day before.
+
+- **applySpeakerCut rewritten (re-fit):** a speaker cut removes TIME, never
+  screen content. Screen targets keep every frame and RE-SOLVE into the
+  shorter scene through pins: an implicit anchor at the cut seam (sync is
+  frozen up to it) + a terminal anchor at the new scene end (remaining
+  footage compresses to fit), both tagged `auto: refit-<src>` /
+  `refit-end` so restore can lift them; user pins ride their words left.
+  FOLLOWERS (the camera bubble = the voice's own take) still mirror the
+  cut in source terms — lips must lose what the voice lost. "Cut both" as
+  a speaker option is REJECTED (flubbed screen action → user cuts the
+  screen lane themselves). Assembly-time idle∩silence stays cut-both.
+  Note: re-fit is timelapse-over-silence by another door — cutting silent
+  talk now compresses the screen through the gap instead of deleting it.
+- **applySpeakerRestore (reverse referee):** removes the cut, film grows at
+  the seam, this cut's anchors lifted, user pins/captions/spine/cues shift
+  right, follower cut removed, screens relax, bake re-derived (zero cuts →
+  narration repoints at the original take, no bake). Route:
+  `POST /api/speaker-restore {src_start, src_end}`.
+- **Studio speaker pieces = the media-lane interaction** (Marc: "shouldn't
+  we just make it the same as we have for media?"): click the clip (or a
+  piece between split markers) → popover with ▶ Play this piece (arms a
+  `_stopAt` audition stop), Split at playhead, 🗑 Remove this piece; ✂
+  seams → Restore popover. Split markers are session-local sketch lines
+  (bake clock) cleared on any edit. Shift-click words still cuts;
+  word-cut + piece-remove share one `speakerCutRequest`/`afterSpeakerEdit`
+  path (invalidates wave/transcript caches, reloads). 🔗 badge now means
+  voice↔camera (the screen re-fits, it doesn't mirror).
+- Backlogged selection sugar: click-the-gap (silence auto-select) and
+  drag-select (see ROADMAP backlog).
+
 ## 2026-07-18 — Timeline v2: Marc's layout pass (PR #425)
 
 Marc on the merged lanes: "good, not great... icons not words, stationary...

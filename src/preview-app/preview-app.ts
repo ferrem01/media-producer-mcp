@@ -287,10 +287,14 @@ export function getPreviewHtml(): string {
      waveform and the words drawn inside it and the speaker EDL's own cut
      seams marked on it. */
   .spk-clip { position: absolute; height: 26px; box-sizing: border-box;
-    background: rgba(238,242,255,0.9); border: 1px solid #c7d2fe; border-radius: 5px; pointer-events: none; }
+    background: rgba(238,242,255,0.9); border: 1px solid #c7d2fe; border-radius: 5px;
+    pointer-events: auto; cursor: pointer; }
+  .spk-clip:hover { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1 inset; }
+  .spk-split { position: absolute; width: 2px; background: #6366f1; opacity: 0.8; z-index: 4; pointer-events: none; border-radius: 1px; }
   .spk-cut { position: absolute; margin-left: -8px; width: 16px; height: 18px; line-height: 17px; text-align: center;
     font-size: 11px; z-index: 5; color: #4f46e5; background: #fff; border: 1px solid #a5b4fc; border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12); pointer-events: auto; cursor: help; }
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12); pointer-events: auto; cursor: pointer; }
+  .spk-cut:hover { transform: scale(1.15); }
 
   /* Word-cut selection (stage 4): shift-click two words to mark a span. */
   .wl-word.wl-sel { background: #fde68a; border-color: #f59e0b; color: #78350f; }
@@ -3488,7 +3492,7 @@ export function getPreviewHtml(): string {
   function renderLaneLabels() {
     var track = document.getElementById('timeline-track');
     if (!track) return;
-    track.querySelectorAll('.lane-label, #lane-link, .spk-clip, .spk-cut').forEach(function(n) { n.remove(); });
+    track.querySelectorAll('.lane-label, #lane-link, .spk-clip, .spk-cut, .spk-split').forEach(function(n) { n.remove(); });
     var p = state.currentProject;
     if (!p) return;
     var total = state.totalDuration || calcTotalDuration();
@@ -3498,24 +3502,37 @@ export function getPreviewHtml(): string {
     if (hasSpeaker && p.speaker.clips.length === 1 && total > 0) {
       var clip = p.speaker.clips[0];
       var spkCuts = (clip.edl && clip.edl.cuts) || [];
-      // The clip BLOCK: where the voice sits on the film clock. Duration =
-      // the baked audio's length (the narration element plays that file);
-      // until metadata arrives, span to the film's end.
+      // The clip renders as PIECES between split markers -- same interaction
+      // as the media lane: click a piece for Play / Split / Remove.
       var clipAt = clip.at || 0;
       var narrEl = (state.audioElements || []).filter(function(a) { return a._trackType === 'voiceover'; })[0];
       var bakeDur = (narrEl && isFinite(narrEl.duration) && narrEl.duration > 0) ? narrEl.duration : (total - clipAt);
-      var blkEnd = Math.min(total, clipAt + bakeDur);
-      if (blkEnd > clipAt) {
-        var blk = document.createElement('div');
-        blk.className = 'spk-clip';
-        blk.style.top = (y.speaker + 5) + 'px';
-        blk.style.left = ((clipAt / total) * 100).toFixed(2) + '%';
-        blk.style.width = (((blkEnd - clipAt) / total) * 100).toFixed(2) + '%';
-        blk.title = 'Speaker clip: ' + clipAt.toFixed(1) + 's \\u2192 ' + blkEnd.toFixed(1) + 's';
-        // Insert BELOW the waveform + words (positioned siblings stack in
-        // DOM order), so the block reads as the surface they sit on.
-        track.insertBefore(blk, document.getElementById('wave-strip'));
+      var bounds = [0].concat(spkSplits().filter(function(s) { return s > 0.2 && s < bakeDur - 0.2; })).concat([bakeDur]);
+      for (var bi2 = 0; bi2 < bounds.length - 1; bi2++) {
+        (function(from2, to2) {
+          var f = Math.min(total, clipAt + from2), t2 = Math.min(total, clipAt + to2);
+          if (t2 - f < 0.05) return;
+          var blk = document.createElement('div');
+          blk.className = 'spk-clip';
+          blk.style.top = (y.speaker + 5) + 'px';
+          blk.style.left = ((f / total) * 100).toFixed(2) + '%';
+          blk.style.width = (((t2 - f) / total) * 100).toFixed(2) + '%';
+          blk.title = 'Speaker: ' + (to2 - from2).toFixed(1) + 's of talk. Click: play, split at playhead, or remove this piece (the screen keeps its footage and re-fits).';
+          blk.addEventListener('click', function(ev) { ev.stopPropagation(); spkPopOpen(from2, to2, blk); });
+          // Insert BELOW the waveform + words (positioned siblings stack in
+          // DOM order), so the pieces read as the surface they sit on.
+          track.insertBefore(blk, document.getElementById('wave-strip'));
+        })(bounds[bi2], bounds[bi2 + 1]);
       }
+      spkSplits().forEach(function(s) {
+        if (!(s > 0.2 && s < bakeDur - 0.2)) return;
+        var sm = document.createElement('div');
+        sm.className = 'spk-split';
+        sm.style.top = (y.speaker + 3) + 'px';
+        sm.style.height = '30px';
+        sm.style.left = (((clipAt + s) / total) * 100).toFixed(2) + '%';
+        track.appendChild(sm);
+      });
       // The speaker EDL's own seams: one ✂ per cut, at the film position
       // where the removed speech used to be (source -> bake -> film).
       var removedSoFar = 0;
@@ -3528,25 +3545,29 @@ export function getPreviewHtml(): string {
         sc.textContent = '\\u2702';
         sc.style.top = (y.speaker + 9) + 'px';
         sc.style.left = ((seamFilm / total) * 100).toFixed(2) + '%';
-        sc.title = (c.src_end - c.src_start).toFixed(1) + 's of speech removed here (voice and screen together). Shift-click two words to cut another span.';
+        sc.title = (c.src_end - c.src_start).toFixed(1) + 's of talk removed here. Click to restore \\u2014 the film grows back and the screen relaxes.';
+        sc.addEventListener('click', function(ev) { ev.stopPropagation(); spkRestoreOpen(c, seamFilm, sc); });
         track.appendChild(sc);
       });
-      var scCuts = null;
-      (p.scenes || []).forEach(function(s) {
-        var m = (s.media_edits || {}).screencast;
-        if (m && scCuts === null) scCuts = m.cuts || [];
-      });
       // Linked state lives in the STATIONARY gutter, chained to the speaker
-      // icon -- it is lane state, not a moment on the clock.
+      // icon. Under the re-fit model the CAMERA is the linked lane (the face
+      // loses exactly the spans the voice does); the screen re-fits instead.
+      var spkName2 = (clip.source || '').split('/').pop() || ' ';
+      var camCuts = null;
+      (p.scenes || []).forEach(function(s) {
+        Object.keys(s.media_edits || {}).forEach(function(k) {
+          if (camCuts === null && k.indexOf(spkName2) !== -1) camCuts = (s.media_edits[k].cuts || []);
+        });
+      });
       var gut2 = document.getElementById('lane-gutter');
       var oldLk = document.getElementById('lg-link');
       if (oldLk) oldLk.remove();
-      if (gut2 && scCuts !== null && JSON.stringify(spkCuts) === JSON.stringify(scCuts)) {
+      if (gut2 && camCuts !== null && JSON.stringify(spkCuts) === JSON.stringify(camCuts)) {
         var lk = document.createElement('span');
         lk.id = 'lg-link';
         lk.textContent = '\\uD83D\\uDD17';
         lk.style.top = (y.speaker + 28) + 'px';
-        lk.title = 'Linked: screen and speaker share one cut list -- a cut on either removes the same film time from both. Shift-click two words to cut a span.';
+        lk.title = 'Linked: the camera bubble follows the voice -- cutting talk cuts the same span of face. The screen keeps its footage and re-fits.';
         gut2.appendChild(lk);
       }
     }
@@ -3562,6 +3583,146 @@ export function getPreviewHtml(): string {
     if (clips.length === 1 && clips[0].at > 0) return clips[0].at;
     var narr = (((p.audio || {}).tracks) || []).filter(function(t) { return t.id === 'narration' || t.type === 'voiceover'; })[0];
     return (narr && narr.start_time) || 0;
+  }
+
+  // ── Speaker piece editing (re-fit model, 2026-07-19) ──
+  // The speaker lane mirrors the media lane's interaction: click a piece
+  // for Play / Split at playhead / Remove; click a ✂ seam to restore.
+  // Removing talk removes TIME -- the film shortens and the screen re-fits
+  // through its pins; no screen footage is deleted.
+
+  function spkClipInfo() {
+    var p = state.currentProject;
+    var clips = (((p || {}).speaker) || {}).clips || [];
+    if (clips.length !== 1) return null;
+    var clip = clips[0];
+    var narrEl = (state.audioElements || []).filter(function(a) { return a._trackType === 'voiceover'; })[0];
+    var total = state.totalDuration || calcTotalDuration();
+    var at = clip.at || 0;
+    var bakeDur = (narrEl && isFinite(narrEl.duration) && narrEl.duration > 0) ? narrEl.duration : Math.max(1, total - at);
+    return { clip: clip, at: at, bakeDur: bakeDur };
+  }
+
+  // Split markers are session-local sketch lines (bake clock): they become
+  // real the moment a piece between them is removed. Cleared on any edit
+  // (the bake clock changes underneath them) and per project.
+  function spkSplits() {
+    var p = state.currentProject;
+    if (!p) return [];
+    if (state._spkSplitsFor !== p.project_id) { state._spkSplitsFor = p.project_id; state._spkSplits = []; }
+    if (!state._spkSplits) state._spkSplits = [];
+    return state._spkSplits;
+  }
+
+  // One reload path for every speaker edit: swap in the returned project,
+  // invalidate everything derived from the narration, reload.
+  function afterSpeakerEdit(r, seekTo) {
+    wordCutClear();
+    camPopClose();
+    state.currentProject = r.project;
+    state._wavePeaksFor = null;
+    state._transcriptFor = null;
+    state._spkSplits = [];
+    state.totalDuration = calcTotalDuration();
+    state.masterTime = Math.max(0, Math.min(seekTo || 0, state.totalDuration - 0.1));
+    initAudio();
+    renderSceneList();
+    startCompositePreview(r.project, { time: state.masterTime });
+  }
+
+  function speakerCutRequest(fromFilm, toFilm, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Cutting\\u2026'; }
+    api('POST', '/speaker-cut/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(state.currentProject.project_id), { from: Math.max(0, fromFilm), to: toFilm })
+      .then(function(r) {
+        studioStatus('\\u2702 Removed ' + r.removed_seconds + 's of talk \\u2014 the screen keeps its footage and re-fits. Reloading\\u2026', 'ok');
+        afterSpeakerEdit(r, fromFilm - 1);
+      })
+      .catch(function(e) {
+        if (btn) { btn.disabled = false; btn.textContent = '\\u2702 Cut failed'; }
+        studioStatus('Cut failed: ' + e.message, 'err');
+      });
+  }
+
+  function spkPopPlace(pop, anchorEl) {
+    pop.style.display = 'block';
+    var r = anchorEl.getBoundingClientRect();
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 140;
+    pop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 8)) + 'px';
+    var py = r.top - ph - 10;
+    if (py < 8) py = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
+    pop.style.top = py + 'px';
+  }
+
+  function spkPopOpen(fromBake, toBake, anchorEl) {
+    var info = spkClipInfo();
+    var pop = document.getElementById('cam-pop');
+    if (!info || !pop) return;
+    camPopClose();
+    rvPopClose();
+    wordCutClear();
+    var filmFrom = info.at + fromBake;
+    var filmTo = info.at + toBake;
+    var len = toBake - fromBake;
+    var html = '<div class="sp-head"><span class="sp-title"><b>Speaker take</b> \\u2014 ' + fmtTime(filmFrom) + ' \\u2192 ' + fmtTime(filmTo) + '</span><button class="sp-x" id="sp-x2">\\u2715</button></div>' +
+      '<div class="sp-region" style="margin-bottom:7px;">Removing talk removes TIME: the film gets ' + len.toFixed(1) + 's shorter and the screen re-fits around its pins \\u2014 no screen footage is deleted.</div>' +
+      '<div class="sp-row"><button class="rv-go secondary" id="sp-play" style="flex:1;">\\u25B6 Play this piece</button></div>' +
+      '<div class="sp-row"><button class="rv-go secondary" id="sp-split" style="flex:1;" title="Drop a seam at the playhead \\u2014 then click a piece to remove or play just it">Split at playhead</button></div>' +
+      '<div class="sp-row"><button class="rv-go secondary" id="sp-remove" style="flex:1;color:#dc2626;border-color:#fca5a5;">\\uD83D\\uDDD1 Remove this piece (' + len.toFixed(1) + 's)</button></div>' +
+      (spkSplits().length ? '<div class="sp-row"><button class="rv-go secondary" id="sp-clear-splits" style="flex:1;color:#6b7280;">Clear split markers</button></div>' : '');
+    pop.innerHTML = html;
+    spkPopPlace(pop, anchorEl);
+    document.getElementById('sp-x2').addEventListener('click', camPopClose);
+    document.getElementById('sp-play').addEventListener('click', function() {
+      camPopClose();
+      var total = state.totalDuration || 1;
+      scrub((filmFrom / total) * 1000);
+      els.slider.value = (filmFrom / total) * 1000;
+      if (!state.playing) togglePlay();
+      state._stopAt = filmTo;
+    });
+    document.getElementById('sp-split').addEventListener('click', function() {
+      var bake = (state.masterTime || 0) - info.at;
+      if (bake <= 0.2 || bake >= info.bakeDur - 0.2) { studioStatus('Park the playhead inside the speaker clip first', 'err'); return; }
+      var sp = spkSplits();
+      if (!sp.some(function(s) { return Math.abs(s - bake) < 0.15; })) sp.push(bake);
+      sp.sort(function(a, b) { return a - b; });
+      camPopClose();
+      renderLaneLabels();
+      studioStatus('Seam dropped at ' + fmtTime(state.masterTime || 0) + ' \\u2014 click a piece to play or remove it', '');
+    });
+    document.getElementById('sp-remove').addEventListener('click', function() {
+      speakerCutRequest(filmFrom, filmTo, this);
+    });
+    var cs = document.getElementById('sp-clear-splits');
+    if (cs) cs.addEventListener('click', function() { state._spkSplits = []; camPopClose(); renderLaneLabels(); });
+  }
+
+  function spkRestoreOpen(cut, seamFilm, anchorEl) {
+    var pop = document.getElementById('cam-pop');
+    if (!pop) return;
+    camPopClose();
+    rvPopClose();
+    var len = cut.src_end - cut.src_start;
+    pop.innerHTML = '<div class="sp-head"><span class="sp-title"><b>Removed talk</b> \\u2014 ' + len.toFixed(1) + 's</span><button class="sp-x" id="sp-x3">\\u2715</button></div>' +
+      '<div class="sp-region" style="margin-bottom:7px;">Restoring puts the time back: the film grows ' + len.toFixed(1) + 's at this seam and the screen relaxes toward its natural pace. (Captions inside the span were derived text \\u2014 they do not come back.)</div>' +
+      '<div class="sp-row"><button class="rv-go" id="sp-restore" style="flex:1;">\\u21A9 Restore ' + len.toFixed(1) + 's</button></div>';
+    spkPopPlace(pop, anchorEl);
+    document.getElementById('sp-x3').addEventListener('click', camPopClose);
+    document.getElementById('sp-restore').addEventListener('click', function() {
+      var btn = this;
+      btn.disabled = true;
+      btn.textContent = 'Restoring\\u2026';
+      api('POST', '/speaker-restore/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(state.currentProject.project_id), { src_start: cut.src_start, src_end: cut.src_end })
+        .then(function(r) {
+          studioStatus('\\u21A9 Restored ' + r.restored_seconds + 's of talk. Reloading\\u2026', 'ok');
+          afterSpeakerEdit(r, seamFilm - 1);
+        })
+        .catch(function(e) {
+          btn.disabled = false;
+          btn.textContent = 'Restore failed';
+          studioStatus('Restore failed: ' + e.message, 'err');
+        });
+    });
   }
 
   // ── Word-cut selection (ROADMAP #8 stage 4): shift-click the first and
@@ -3601,26 +3762,7 @@ export function getPreviewHtml(): string {
     btn.style.left = Math.min(97, ((to / total) * 100)).toFixed(2) + '%';
     btn.style.top = (laneLayout().speaker + 44) + 'px';
     btn.addEventListener('click', function() {
-      btn.disabled = true;
-      btn.textContent = 'Cutting\\u2026';
-      api('POST', '/speaker-cut/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), { from: Math.max(0, from), to: to })
-        .then(function(r) {
-          wordCutClear();
-          state.currentProject = r.project;
-          state._wavePeaksFor = null; // narration re-baked -- refetch peaks
-          state._transcriptFor = null; // word times shifted with the cut
-          state.totalDuration = calcTotalDuration();
-          state.masterTime = Math.min(state.masterTime, Math.max(0, from - 1));
-          studioStatus('\\u2702 Cut ' + r.removed_seconds + 's \\u2014 voice, screen and captions all rippled. Reloading\\u2026', 'ok');
-          initAudio();
-          renderSceneList();
-          startCompositePreview(r.project, { time: state.masterTime });
-        })
-        .catch(function(e) {
-          btn.disabled = false;
-          btn.textContent = '\\u2702 Cut failed';
-          studioStatus('Cut failed: ' + e.message, 'err');
-        });
+      speakerCutRequest(Math.max(0, from), to, btn);
     });
     track.appendChild(btn);
   }
@@ -4564,6 +4706,7 @@ export function getPreviewHtml(): string {
       }
       state.playing = false;
       state.playAll = false;
+      state._stopAt = null;
       updatePlayIcon();
 
       // Composite mode: master timeline is always paused, we just stop the clock
@@ -4722,6 +4865,7 @@ export function getPreviewHtml(): string {
   function scrub(sliderVal) {
     var totalDur = state.totalDuration;
     if (totalDur <= 0) return;
+    state._stopAt = null;
     var targetGlobal = (sliderVal / 1000) * totalDur;
 
     var project = state.currentProject;
@@ -4772,6 +4916,11 @@ export function getPreviewHtml(): string {
     els.timeTotal.textContent = fmtTime(total);
     try { updateRateBadge(globalTime || 0); } catch (eRB) {}
     try { movePlayhead(); } catch (ePh) {}
+    // Piece audition: "Play this piece" arms a stop point.
+    if (state._stopAt != null && state.playing && (globalTime || 0) >= state._stopAt - 0.05) {
+      state._stopAt = null;
+      togglePlay();
+    }
   }
 
   function fmtTime(sec) {
