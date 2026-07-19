@@ -1091,3 +1091,18 @@ list out all the features of quotient that work."
   old window stranded the Studio in per-scene fallback with EMPTY media and
   word lanes (looked like data loss, was a timeout). studio-smoke now polls
   readiness up to 75s instead of a fixed 15s nap.
+
+## Render-mix bug from Marc's first ground-truth watch (2026-07-19 night)
+
+- **Ducking never engaged on speaker films (fixed).** The mixer matches its
+  ducking config to mix inputs by PATH EQUALITY; inputs are built with
+  resolveVideoPath but resolveDucking passed RAW track sources. Generated
+  films' VO sources are already filesystem paths (match), but speaker films
+  carry web-style `/assets/...` narration sources -- the trigger never
+  matched and ducking silently skipped: full-blast music bed, drowned voice.
+  resolveDucking now resolves both sides identically. Symptom log line to
+  look for: "Ducking: duckIdx=N triggers=0".
+- Marc also reported "no zoom in the render" -- frame extraction shows the
+  zoom IS in the mp4 (7.6-10.7s film time, matching the stored move at
+  scene-local 1.5s with return). Likely blink-and-miss; awaiting his
+  re-check on the re-render.

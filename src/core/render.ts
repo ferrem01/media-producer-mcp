@@ -75,9 +75,13 @@ function resolveDucking(project: Project): Parameters<typeof mixAudio>[0]["ducki
   }
 
   console.log(`  Ducking: ${duckTrackObj.id} ducked by ${triggers.map((t) => t.id).join(", ")}`);
+  // The mixer matches ducking config to its inputs by PATH EQUALITY, and the
+  // inputs are built with resolveVideoPath -- so these must be resolved the
+  // same way. Raw web-style sources (/assets/... narration on speaker films)
+  // otherwise never match and ducking silently skips: full-blast music bed.
   return {
-    duckTrack: duckTrackObj.source,
-    triggerTracks: triggers.map((t) => t.source),
+    duckTrack: resolveVideoPath(duckTrackObj.source),
+    triggerTracks: triggers.map((t) => resolveVideoPath(t.source)),
     duckedVolume: d.ducked_volume,
     attack: d.attack ?? 0.3,
     release: d.release ?? 0.5,
