@@ -1945,7 +1945,10 @@ export function getPreviewHtml(): string {
           cb(w.__MP_TIMELINE);
         }
       } catch(e) { clearInterval(check); }
-      if (attempts > 200) {
+      // 30s: a cold server + slow pipe can take >10s to hand over the
+      // composite's GSAP + scene registrations; giving up too early strands
+      // the Studio in per-scene mode with empty media/word lanes.
+      if (attempts > 600) {
         clearInterval(check);
         console.warn('[preview] composite ready timeout, falling back to per-scene mode');
       }

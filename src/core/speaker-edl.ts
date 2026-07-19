@@ -195,7 +195,44 @@ export async function applySpeakerCut(
   const newDur = Math.max(0.5, Math.round((target.duration_seconds - d) * 10) / 10);
   const me: any = (target as any).media_edits || {};
   const cutTag = `refit-${speakerCut.src_start.toFixed(2)}`;
-  const spkSrcName = (clip.source || "").split("/").pop() || " ";
+  const spkSrcName = (clip.source || "").split("/").pop() || "";
+
+  // Films whose assembly made no idle-silence cuts have NO media-edits
+  // entries at all. The loop below only re-fits entries that EXIST, so
+  // without seeding, a speaker cut would silently truncate the screen's
+  // tail and leave the camera bubble un-mirrored. Seed identity maps over
+  // what is currently visible: screen = [0, oldDur] of its own clock;
+  // camera follower = the speaker's clock with its existing cuts.
+  const oldDur = target.duration_seconds || 0;
+  {
+    const keys = Object.keys(me);
+    const isFollowerKey = (k: string) => !!spkSrcName && k.includes(spkSrcName);
+    let hasFollower = keys.some(isFollowerKey);
+    let hasScreen = keys.some((k) => !isFollowerKey(k));
+    for (const c of (target.components || []) as any[]) {
+      const u = c?.data?.video_url || "";
+      if (!u || /brand-kit/.test(u)) continue;
+      const name = u.split("/").pop() || "";
+      if (spkSrcName && name === spkSrcName) {
+        if (!hasFollower) {
+          const seedCuts = existing.map((x) => ({ ...x }));
+          const spkSrcEnd = Math.round(bakeToSourceTime(existing, oldDur) * 1000) / 1000;
+          const solved = solveMediaEdits({ cuts: seedCuts, rate_regions: [], pins: [] }, spkSrcEnd);
+          me[`video[src*="${name}"]`] = {
+            segments: solved.segments, cuts: seedCuts,
+            pins: [], rate_regions: [], pin_status: solved.pin_status, proposed: false,
+          };
+          hasFollower = true;
+        }
+      } else if (!hasScreen) {
+        me.screencast = {
+          segments: [{ src_start: 0, src_end: oldDur, rate: 1 }],
+          cuts: [], pins: [], rate_regions: [], pin_status: [], proposed: false,
+        };
+        hasScreen = true;
+      }
+    }
+  }
   let screenCut: CutRange | null = null;
   for (const key of Object.keys(me)) {
     const edit = me[key];

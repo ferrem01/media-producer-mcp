@@ -51,7 +51,16 @@ try {
   page.on("pageerror", (e) => consoleErrors.push(e.message));
 
   await page.goto(`${BASE}/studio?tenant=${TENANT}&project=${PROJECT}${q.replace("&", "&")}`, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForTimeout(15000);
+  // Wait for the composite preview (it gates the media + word lanes); a cold
+  // server or slow pipe can take tens of seconds. Cap at 75s, then assert on
+  // whatever state we reached.
+  for (let waited = 0; waited < 75000; waited += 3000) {
+    await page.waitForTimeout(3000);
+    const ready = await page.evaluate(() =>
+      !!(window.state && window.state.compositeLoaded) && document.querySelectorAll(".wl-word").length > 0);
+    if (ready) break;
+  }
+  await page.waitForTimeout(2000);
 
   // ── 1. Boot + no JS errors ──
   ok("no page errors", consoleErrors.length === 0, consoleErrors[0]);

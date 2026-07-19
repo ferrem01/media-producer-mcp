@@ -219,3 +219,67 @@ describe("applySpeakerRestore (reverse referee)", () => {
     await expect(applySpeakerRestore(p, 1, 2, "/nonexistent")).rejects.toThrow(/no matching/);
   });
 });
+
+describe("applySpeakerCut on a film with NO media-edits entries (seeding)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function bareFilm(): any {
+    // Same film, but assembly made no idle-silence cuts, so the scene has
+    // no media_edits at all -- the common case for a clean recording. The
+    // camera bubble still exists as a component (assembly always adds it
+    // when a camera track was recorded).
+    const p = film();
+    delete p.scenes[1].media_edits;
+    p.scenes[1].components.push({
+      id: "camera_pip", type: "screencast-frame",
+      data: { video_url: "/assets/t/projects/p/assets/cam.webm", frame_style: "none" },
+    });
+    return p;
+  }
+
+  it("seeds screen + follower entries so the cut re-fits instead of truncating", async () => {
+    const p = bareFilm();
+    const res = await applySpeakerCut(p, 26.1, 32.1, "/nonexistent"); // scene-local 20..26
+    expect(res.removed_seconds).toBeCloseTo(6, 2);
+    expect(p.scenes[1].duration_seconds).toBeCloseTo(54, 1);
+
+    // SCREEN: entry created; all previously-visible footage still mapped.
+    const sc = p.scenes[1].media_edits.screencast;
+    expect(sc).toBeTruthy();
+    expect(sc.cuts).toEqual([]);
+    expect(sc.pins.some((x: any) => x.auto === "refit-20.00")).toBe(true);
+    expect(sc.pins.find((x: any) => x.auto === "refit-end").out).toBeCloseTo(54, 1);
+    expect(outLen(sc.segments)).toBeCloseTo(54, 0);
+    expect(srcCovered(sc.segments, 58)).toBe(true); // the tail survives
+
+    // FOLLOWER: entry created carrying the mirrored cut (lips match).
+    const cam = p.scenes[1].media_edits['video[src*="cam.webm"]'];
+    expect(cam).toBeTruthy();
+    expect(cam.cuts).toEqual([{ src_start: 20, src_end: 26 }]);
+    expect(p.speaker.clips[0].edl.cuts).toEqual([{ src_start: 20, src_end: 26 }]);
+  });
+
+  it("follower seed carries EXISTING speaker cuts, then mirrors the new one", async () => {
+    const p = bareFilm();
+    p.speaker.clips[0].edl.cuts = [{ src_start: 10, src_end: 20 }];
+    await applySpeakerCut(p, 26.1, 29.1, "/nonexistent"); // bake 20..23 -> source 30..33
+    const cam = p.scenes[1].media_edits['video[src*="cam.webm"]'];
+    expect(cam.cuts).toEqual([
+      { src_start: 10, src_end: 20 },
+      { src_start: 30, src_end: 33 },
+    ]);
+  });
+
+  it("round-trips: restore after a seeded cut returns the full scene", async () => {
+    const p = bareFilm();
+    await applySpeakerCut(p, 26.1, 32.1, "/nonexistent");
+    const res = await applySpeakerRestore(p, 20, 26, "/nonexistent");
+    expect(res.restored_seconds).toBeCloseTo(6, 2);
+    expect(p.scenes[1].duration_seconds).toBeCloseTo(60, 1);
+    const sc = p.scenes[1].media_edits.screencast;
+    expect(sc.pins.some((x: any) => x.auto && x.auto !== "refit-end")).toBe(false);
+    expect(outLen(sc.segments)).toBeCloseTo(60, 0);
+    const cam = p.scenes[1].media_edits['video[src*="cam.webm"]'];
+    expect(cam.cuts).toEqual([]);
+  });
+});
