@@ -3607,7 +3607,12 @@ export function getPreviewHtml(): string {
       var dC = r.bake_to - r.bake_from;
       state._transcript = state._transcript
         .filter(function(w) { var m = (w.start + w.end) / 2; return !(m >= r.bake_from && m < r.bake_to); })
-        .map(function(w) { return w.start >= r.bake_to ? { start: w.start - dC, end: w.end - dC, text: w.text } : w; });
+        .map(function(w) {
+          var m2 = (w.start + w.end) / 2;
+          if (m2 < r.bake_to) return w;
+          var s2 = Math.max(r.bake_from, w.start - dC);
+          return { start: s2, end: Math.max(s2 + 0.05, w.end - dC), text: w.text };
+        });
       state._transcriptFor = r.project.project_id;
     } else if (state._transcript && r.bake_seam != null) {
       var dR = r.restored_seconds || 0;

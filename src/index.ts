@@ -1857,21 +1857,32 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           }
           const project = await loadProject(scTenant, scProject);
           if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+          const oldNarrSrc = (project as any).audio?.tracks?.find((t: any) => t.id === "narration")?.source as string | undefined;
           const { applySpeakerCut } = await import("./core/speaker-edl.js");
           const result = await applySpeakerCut(project, from, to, config.dataDir);
           await saveProject(project);
           // The words didn't change -- only their times. Shift the cached
           // transcript and re-key it to the new bake so the word lane never
-          // waits a minute for a re-transcription.
+          // waits a minute for a re-transcription. CRITICAL: snap the raw
+          // cache against the OLD audio first -- users cut on the snapped
+          // clock, and raw whisper words smeared across a silence would be
+          // torn out by the drop (that ate "Here we go." on the first live
+          // silence cut).
           try {
             if (result.narration_url) {
-              const { rekeyShiftTranscriptCache } = await import("./core/transcribe.js");
+              const { rekeyShiftTranscriptCache, snapWordsOutOfSilences, shiftWordsForCut } = await import("./core/transcribe.js");
+              const { detectSilence } = await import("./core/idle-silence.js");
               const cacheDir = path.join(config.dataDir, scTenant, "projects", scProject, "thumbs");
-              const bd = result.bake_to - result.bake_from;
+              let oldSilences: Array<{ from: number; to: number }> = [];
+              if (oldNarrSrc) {
+                try { oldSilences = await detectSilence(resolveVideoPath(oldNarrSrc, config.dataDir)); } catch { /* optional */ }
+              }
               await rekeyShiftTranscriptCache(cacheDir, resolveVideoPath(result.narration_url, config.dataDir), (segs) =>
-                segs
-                  .filter((w) => { const m = (w.start + w.end) / 2; return !(m >= result.bake_from && m < result.bake_to); })
-                  .map((w) => (w.start >= result.bake_to ? { ...w, start: Math.round((w.start - bd) * 100) / 100, end: Math.round((w.end - bd) * 100) / 100 } : w)),
+                shiftWordsForCut(
+                  oldSilences.length ? snapWordsOutOfSilences(segs, oldSilences) : segs,
+                  result.bake_from,
+                  result.bake_to,
+                ),
               );
             }
           } catch { /* cache maintenance is best-effort */ }
@@ -2280,6 +2291,11 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (!(await whisperAvailable())) {
           jsonResponse(res, 200, { ok: true, available: false, segments: [] });
           return;
+        }
+        // ?fresh=1 -- drop the cached transcript first (heals a cache that
+        // was maintained by older, buggier shift code).
+        if (new URL(req.url || "/", "http://localhost").searchParams.get("fresh") === "1") {
+          try { await fs.unlink(path.join(config.dataDir, tenantId, "projects", projectId, "thumbs", "transcript.json")); } catch { /* none */ }
         }
         const spSrc2 = (project as any).speaker_track?.clips?.[0]?.source as string | undefined;
         const voTrack2 = (project as any).audio?.tracks?.find((t: any) => t.type === "voiceover" && t.source);
