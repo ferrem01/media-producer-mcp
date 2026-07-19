@@ -238,6 +238,17 @@ export function getPreviewHtml(): string {
   }
   .cam-pill:hover { transform: translateX(-50%) scale(1.3); }
   .cam-pill.active { background: #312e81; transform: translateX(-50%) scale(1.3); }
+  /* Effects lane: zooms/pans/rotates/callouts as DURATION blocks -- how
+     long each effect is in force, not just where it starts. */
+  #fx-lane { position: absolute; left: 0; right: 0; height: 20px; pointer-events: none; }
+  .fx-seg { position: absolute; top: 1px; height: 18px; box-sizing: border-box; border-radius: 4px;
+    border: 1px solid #fff; background: #ddd6fe; color: #5b21b6;
+    box-shadow: inset 0 0 0 1px rgba(124,58,237,0.28);
+    font-size: 10px; font-weight: 600; line-height: 16px; padding: 0 4px;
+    overflow: hidden; white-space: nowrap; pointer-events: auto; cursor: pointer; }
+  .fx-seg:hover { box-shadow: 0 0 0 1.5px #7c3aed, inset 0 0 0 1px rgba(124,58,237,0.28); }
+  .fx-seg.active { box-shadow: 0 0 0 1.5px #5b21b6, inset 0 0 0 1px rgba(124,58,237,0.4); }
+  .lane-bed.fx { background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.18); border-radius: 6px; }
   /* Media lane: each video's source-map as blocks (color = rate). */
   #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 52px; pointer-events: none; }
   .ml-row { position: absolute; left: 0; right: 0; height: 24px; }
@@ -779,6 +790,7 @@ export function getPreviewHtml(): string {
         <div id="beat-ticks"></div>
         <div id="audio-lanes"></div>
         <div id="cam-pills"></div>
+        <div id="fx-lane"></div>
         <div id="media-lane"></div>
         <canvas id="wave-strip"></canvas>
         <div id="word-lane"></div>
@@ -3089,61 +3101,62 @@ export function getPreviewHtml(): string {
 
   // Camera moves live on the scrubber: one pill per move, across ALL scenes.
   // Clicking a pill opens the editor popover (edit / preview / delete).
+  // The EFFECTS LANE (name kept for its call sites): every zoom / pan /
+  // rotate / callout as a DURATION block. A camera move holds until the
+  // next move in its scene (or the scene end); a reset is a thin end-cap;
+  // callouts carry their own dur. Clicking a block opens the same editor
+  // the old pills did.
   function renderCamPills() {
-    var wrap = document.getElementById('cam-pills');
+    var wrap = document.getElementById('fx-lane');
     if (!wrap) return;
     wrap.innerHTML = '';
     var p = state.currentProject;
     var total = state.totalDuration || calcTotalDuration();
     if (!p || !p.scenes || !(total > 0)) return;
-    var placed = [];
+    var glyph = { zoom: '\u2922', pan: '\u2194', rotate: '\u21BB', reset: '\u21A9' };
+    function block(from, to, cls, text, title, onClick) {
+      var b = document.createElement('div');
+      b.className = 'fx-seg ' + cls;
+      b.textContent = text;
+      b.style.left = ((from / total) * 100).toFixed(2) + '%';
+      b.style.width = Math.max(0.4, (((to - from) / total) * 100)).toFixed(2) + '%';
+      b.title = title;
+      b.addEventListener('click', function(ev) { ev.stopPropagation(); onClick(b); });
+      wrap.appendChild(b);
+    }
     p.scenes.forEach(function(scene, si) {
-      (scene.camera_moves || []).forEach(function(m, mi) {
-        var t = sceneStartFor(si) + (m.at || 0);
-        var pct = Math.max(0, Math.min(100, (t / total) * 100));
-        // Moves at (nearly) the same time stack upward instead of hiding
-        // each other -- every pill must stay clickable.
-        var lift = 0;
-        for (var pi = 0; pi < placed.length; pi++) {
-          if (Math.abs(placed[pi].pct - pct) < 1.1 && placed[pi].lift === lift) { lift++; pi = -1; }
+      var sceneStart = sceneStartFor(si);
+      var dur = scene.duration_seconds || 5;
+      var raw = scene.camera_moves || [];
+      var moves = raw.slice().sort(function(a, b) { return (a.at || 0) - (b.at || 0); });
+      moves.forEach(function(m) {
+        var mi = raw.indexOf(m);
+        var from = sceneStart + (m.at || 0);
+        var to;
+        var holdNote;
+        if (m.type === 'reset') {
+          to = from + 0.001; // end-cap: rendered at minimum width
+          holdNote = 'release the camera';
+        } else {
+          var next = moves.filter(function(n) { return (n.at || 0) > (m.at || 0) + 0.01; })[0];
+          to = sceneStart + (next ? (next.at || 0) : dur);
+          holdNote = next ? ('holds until the next move at ' + (next.at || 0).toFixed(1) + 's')
+                          : 'holds until the scene ends';
         }
-        placed.push({ pct: pct, lift: lift });
-        var pill = document.createElement('div');
-        pill.className = 'cam-pill';
-        pill.textContent = '\u2922';
-        pill.style.left = pct.toFixed(2) + '%';
-        if (lift) pill.style.top = (-3 - lift * 16) + 'px';
-        pill.title = 'Scene ' + (si + 1) + ': ' + camMoveDesc(m);
-        pill.addEventListener('click', function(ev) {
-          ev.stopPropagation();
-          camPopOpen(si, mi, pill);
-        });
-        wrap.appendChild(pill);
+        block(from, to, 'fx-' + m.type,
+          (glyph[m.type] || '\u2922') + ' ' + (m.type || 'zoom'),
+          'Scene ' + (si + 1) + ': ' + camMoveDesc(m) + ' \u2014 ' + holdNote + '. Click to edit.',
+          function(el2) { camPopOpen(si, mi, el2); });
       });
-      // Callout pills: one per screencast-frame callout, same scrubber, a
-      // distinct glyph. Click opens the callout editor popover.
       (scene.components || []).forEach(function(comp) {
         if (comp.type !== 'screencast-frame' || !comp.data || !Array.isArray(comp.data.callouts)) return;
         comp.data.callouts.forEach(function(c, ci) {
-          var t = sceneStartFor(si) + (c.at || 0);
-          var pct = Math.max(0, Math.min(100, (t / total) * 100));
-          var lift = 0;
-          for (var pi = 0; pi < placed.length; pi++) {
-            if (Math.abs(placed[pi].pct - pct) < 1.1 && placed[pi].lift === lift) { lift++; pi = -1; }
-          }
-          placed.push({ pct: pct, lift: lift });
-          var pill = document.createElement('div');
-          pill.className = 'cam-pill';
-          pill.textContent = '⊙';
-          pill.style.left = pct.toFixed(2) + '%';
-          pill.style.borderColor = 'rgba(124, 92, 255, 0.8)';
-          if (lift) pill.style.top = (-3 - lift * 16) + 'px';
-          pill.title = 'Scene ' + (si + 1) + ': callout [' + Math.round(c.w) + '×' + Math.round(c.h) + '%] @' + Number(c.at || 0).toFixed(1) + 's, hold ' + Number(c.dur || 5).toFixed(1) + 's';
-          pill.addEventListener('click', function(ev) {
-            ev.stopPropagation();
-            coPopOpen(si, comp.id, ci, pill);
-          });
-          wrap.appendChild(pill);
+          var from = sceneStart + (c.at || 0);
+          var to = from + (c.dur || 5);
+          block(from, Math.min(sceneStart + dur, to), 'fx-callout',
+            '\u2299 callout',
+            'Scene ' + (si + 1) + ': callout [' + Math.round(c.w) + '\u00D7' + Math.round(c.h) + '%] @' + Number(c.at || 0).toFixed(1) + 's for ' + Number(c.dur || 5).toFixed(1) + 's. Click to edit.',
+            function(el2) { coPopOpen(si, comp.id, ci, el2); });
         });
       });
     });
@@ -3295,11 +3308,13 @@ export function getPreviewHtml(): string {
       });
       var sceneStart = sceneStartFor(si);
       var dur = scene.duration_seconds || 5;
-      vids.slice(0, 2).forEach(function(v, row) {
+      // ONE row: the primary video per scene (followers/callout clones are
+      // already filtered; the effects lane owns everything overlay-shaped).
+      vids.slice(0, 1).forEach(function(v, row) {
         var found = editForVideo(scene, v, vids);
         var rowEl = document.createElement('div');
         rowEl.className = 'ml-row';
-        rowEl.style.top = (row * 26) + 'px';
+        rowEl.style.top = '2px';
         function block(fromLocal, toLocal, cls, title, onClick, text) {
           var b = document.createElement('div');
           b.className = 'ml-seg ' + cls;
@@ -3423,8 +3438,16 @@ export function getPreviewHtml(): string {
     var hasMusic = tracks.some(function(t) { return t.type === 'music'; });
     // Roomy bands with real gaps between beds: squeezing speaker + music
     // against the bottom edge made them read as one smudge.
-    var y = { ruler: 0, rulerH: 18, screen: 24, screenH: 52, speakerH: 36, musicH: 16, speaker: -1, music: -1 };
-    var top = y.screen + y.screenH + 8;
+    var hasFx = ((p || {}).scenes || []).some(function(s2) {
+      if ((s2.camera_moves || []).length) return true;
+      return (s2.components || []).some(function(c2) {
+        return c2.type === 'screencast-frame' && c2.data && Array.isArray(c2.data.callouts) && c2.data.callouts.length;
+      });
+    });
+    var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 20, screenH: 28, speakerH: 36, musicH: 16, speaker: -1, music: -1 };
+    var top = 22;
+    if (hasFx) { y.fx = top; top += y.fxH + 6; }
+    y.screen = top; top += y.screenH + 8;
     if (hasSpk) { y.speaker = top; top += y.speakerH + 8; }
     if (hasMusic) { y.music = top; top += y.musicH + 6; }
     y.total = Math.max(top + 2, 84);
@@ -3432,6 +3455,7 @@ export function getPreviewHtml(): string {
   }
 
   var LG_ICONS = {
+    fx: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M8 2 L9.3 6.7 L14 8 L9.3 9.3 L8 14 L6.7 9.3 L2 8 L6.7 6.7 Z"/><path d="M12.8 2.2 L13.2 3.6 L14.6 4 L13.2 4.4 L12.8 5.8 L12.4 4.4 L11 4 L12.4 3.6 Z" stroke-width="0.9"/></svg>',
     screen: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1.7" y="3" width="12.6" height="8.2" rx="1.4"/><path d="M5.6 14h4.8"/></svg>',
     speaker: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="5.2" r="2.6"/><path d="M2.8 14c0.8-3 2.8-4.4 5.2-4.4S12.4 11 13.2 14"/></svg>',
     music: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="12.2" r="1.9"/><path d="M6.9 12.2V3.6l6-1.4v8.4"/><circle cx="11" cy="10.6" r="1.9"/></svg>',
@@ -3454,11 +3478,13 @@ export function getPreviewHtml(): string {
     // pills sit at the seam between ruler and the screen lane.
     setTop('timeline-slider', 0); // 18px-tall input covers the whole ruler band
     setTop('beat-ticks', 7);
-    // Camera-move pills live INSIDE the ruler band (15px pill centered in
-    // the 18px band) -- straddling the band edge let the scene blocks slice
-    // across the circle.
-    setTop('cam-pills', y.ruler + 4);
+    // Camera pills are retired -- effects render as duration blocks in
+    // their own lane above the screen.
+    setTop('cam-pills', 0, false);
+    setTop('fx-lane', y.fx + 1, y.fx >= 0);
     setTop('media-lane', y.screen);
+    var mlEl = document.getElementById('media-lane');
+    if (mlEl) mlEl.style.height = y.screenH + 'px';
     setTop('wave-strip', y.speaker + 5, y.speaker >= 0);
     setTop('word-lane', y.speaker + 5, y.speaker >= 0);
     setTop('audio-lanes', y.music + 5, y.music >= 0);
@@ -3472,13 +3498,16 @@ export function getPreviewHtml(): string {
       track.insertBefore(b, track.firstChild);
     }
     bed('ruler', y.ruler, y.rulerH);
+    if (y.fx >= 0) bed('fx', y.fx, y.fxH + 2);
     bed('screen', y.screen - 2, y.screenH + 4);
     if (y.speaker >= 0) bed('speaker', y.speaker, y.speakerH);
     if (y.music >= 0) bed('music', y.music, y.musicH);
     // Fixed gutter icons: stationary no matter the scroll/zoom, each
     // vertically centered on its bed.
     if (gut) {
-      var html = '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="Screen track">' + LG_ICONS.screen + '</span>';
+      var html = '';
+      if (y.fx >= 0) html += '<span class="lg-ic" style="top:' + (y.fx + y.fxH / 2 - 7) + 'px" title="Effects track (zooms, pans, callouts)">' + LG_ICONS.fx + '</span>';
+      html += '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="Screen track">' + LG_ICONS.screen + '</span>';
       if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="Speaker track">' + LG_ICONS.speaker + '</span>';
       if (y.music >= 0) html += '<span class="lg-ic" style="top:' + (y.music + y.musicH / 2 - 8) + 'px" title="Music track">' + LG_ICONS.music + '</span>';
       gut.innerHTML = html;
@@ -4402,7 +4431,7 @@ export function getPreviewHtml(): string {
     var pop = document.getElementById('cam-pop');
     if (pop) { pop.style.display = 'none'; pop.style.width = '280px'; }
     camPop.si = camPop.mi = -1;
-    document.querySelectorAll('.cam-pill.active').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('.cam-pill.active, .fx-seg.active').forEach(function(el) { el.classList.remove('active'); });
   }
 
   function camPopOpen(si, mi, pill) {
