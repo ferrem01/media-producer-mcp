@@ -1425,7 +1425,7 @@ export function getPreviewHtml(): string {
         if (isFinite(actual) && actual >= 0) meas = ' · actual ' + actual.toFixed(1) + '×';
       }
       state._rbPrev = { clip: best.clip, ct: ct, time: time };
-      label = '▶ ' + rate + '×' + meas;
+      label = '\u25B6 ' + fmtRate(rate) + meas;
       bg = rate >= 6 ? '#fee2e2' : (rate > 1.2 ? '#fef3c7' : '#eef2ff');
       fg = rate >= 6 ? '#b91c1c' : (rate > 1.2 ? '#92400e' : '#4338ca');
     }
@@ -3299,6 +3299,13 @@ export function getPreviewHtml(): string {
     }
   }
 
+  // Display rounding for playback rates: one decimal, integers bare, and
+  // anything within a hair of 1x shows no label (it IS normal speed).
+  function fmtRate(r) {
+    var v = Math.round(r * 10) / 10;
+    return (v === Math.round(v) ? Math.round(v) : v) + '\u00D7';
+  }
+
   function renderMediaLane() {
     var wrap = document.getElementById('media-lane');
     if (!wrap) return;
@@ -3356,10 +3363,10 @@ export function getPreviewHtml(): string {
             var from = acc, to = Math.min(dur, acc + outDur);
             var ttl = isHold
               ? (label + ' — HOLD ' + holdS.toFixed(1) + 's on frame ' + s.src_start.toFixed(1) + 's')
-              : (label + ' — ' + rate + 'x  src ' + s.src_start.toFixed(1) + '-' + s.src_end.toFixed(1) + 's');
+              : (label + ' — ' + fmtRate(rate) + '  src ' + s.src_start.toFixed(1) + '-' + s.src_end.toFixed(1) + 's');
             if (to > from) block(from, to, cls, ttl, (function(idx) {
               return function(el2) { mediaPopOpen(si, found.key, v, found.edit, idx, el2); };
-            })(i2), isHold ? 'HOLD' : (rate !== 1 ? (rate + '×') : ''));
+            })(i2), isHold ? 'HOLD' : (Math.abs(rate - 1) >= 0.05 ? fmtRate(rate) : ''));
             acc += outDur;
           });
           if (acc < dur - 0.05) {
