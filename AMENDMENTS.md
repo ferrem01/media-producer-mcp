@@ -1106,3 +1106,28 @@ list out all the features of quotient that work."
   zoom IS in the mp4 (7.6-10.7s film time, matching the stored move at
   scene-local 1.5s with return). Likely blink-and-miss; awaiting his
   re-check on the re-render.
+
+## Camera-bubble sync investigation (2026-07-19 late night)
+
+Marc reported the camera bubble out of sync with the voice on the rendered
+film. What forensics on the mp4 established (methods: motion-event matching,
+A/V envelope cross-correlation, droplet cache-frame content checks via the
+new /api/render-probe):
+
+- The narration AUDIO is placed exactly right (verified at two points:
+  pre-cut offset +6.10s, post-cut film 96 -> source 95.92 vs expected 95.93).
+- The bubble is IN SYNC in the pre-cut region (correlation peak at 0.0s lag).
+- The droplet's frame extraction + cache are content-exact (probed at 4
+  indices; ffmpeg 4.4.2 vs sandbox 7.0 -- initial suspicion of VFR resample
+  divergence was WRONG; do not chase it again).
+- Post-cut verdicts were unreliable on this footage: the speaker sits nearly
+  motionless, so pixel methods can't discriminate candidate maps. UNRESOLVED
+  whether the rendered bubble mis-maps after the seams; need Marc's eyes
+  (where/when/lead-or-lag) to narrow it.
+- REAL data bug found and fixed regardless: applySpeakerCut/Restore updated
+  clip.edl.cuts but carried clip.edl.segments STALE (Marc's film had cuts
+  [74.85, 84.88] but segments encoding only 74.85). Both now re-derive
+  segments from the merged cuts (speakerSegmentsFor). No active consumer of
+  the stale field was identified -- media_edits carried the correct map into
+  both the render and the Studio composite -- but two encodings of one fact
+  must not disagree.
