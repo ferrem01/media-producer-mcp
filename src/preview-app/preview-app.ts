@@ -231,7 +231,10 @@ export function getPreviewHtml(): string {
     font-size: 9px; line-height: 12px; text-align: center;
     cursor: pointer; pointer-events: auto; box-sizing: border-box;
     box-shadow: 0 1px 4px rgba(79,70,229,0.45);
-    transition: transform 0.1s ease; z-index: 3;
+    transition: transform 0.1s ease;
+    /* Above the (invisible, 18px-tall) scrub input z:4 and the playhead
+       line z:5 -- below them the pill is visually buried and unclickable. */
+    z-index: 6;
   }
   .cam-pill:hover { transform: translateX(-50%) scale(1.3); }
   .cam-pill.active { background: #312e81; transform: translateX(-50%) scale(1.3); }
