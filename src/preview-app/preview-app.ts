@@ -199,7 +199,7 @@ export function getPreviewHtml(): string {
   /* Lane beds: each track paints on its own surface so the layers read as
      layers; the ruler band on top is visually a different kind of thing. */
   .lane-bed { position: absolute; left: 0; right: 0; pointer-events: none; box-sizing: border-box; }
-  .lane-bed.ruler { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .lane-bed.ruler { background: #eef1f6; border-bottom: 1px solid #cbd5e1; }
   .lane-bed.screen { background: rgba(148,163,184,0.07); border: 1px solid rgba(148,163,184,0.20); border-radius: 6px; }
   .lane-bed.speaker { background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.18); border-radius: 6px; }
   .lane-bed.music { background: rgba(148,163,184,0.08); border: 1px solid rgba(148,163,184,0.16); border-radius: 5px; }
@@ -216,8 +216,8 @@ export function getPreviewHtml(): string {
     height: 18px; background: transparent;
     outline: none; cursor: pointer; margin: 0; z-index: 4;
   }
-  #timeline-slider::-webkit-slider-runnable-track { height: 3px; background: #e5e7eb; border-radius: 3px; margin-top: 7px; }
-  #timeline-slider::-moz-range-track { height: 3px; background: #e5e7eb; border-radius: 3px; }
+  #timeline-slider::-webkit-slider-runnable-track { height: 3px; background: #c7cdd8; border-radius: 3px; margin-top: 7px; }
+  #timeline-slider::-moz-range-track { height: 3px; background: #c7cdd8; border-radius: 3px; }
   /* Beat/scene markers over the timeline: scene cuts are strong ticks, beats are soft ticks. */
   #beat-ticks { position: absolute; left: 0; right: 0; top: 66px; height: 5px; pointer-events: none; }
   .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #a5b4fc; opacity: 0.75; border-radius: 1px; }
@@ -240,11 +240,11 @@ export function getPreviewHtml(): string {
   .cam-pill.active { background: #312e81; transform: translateX(-50%) scale(1.3); }
   /* Effects lane: zooms/pans/rotates/callouts as DURATION blocks -- how
      long each effect is in force, not just where it starts. */
-  #fx-lane { position: absolute; left: 0; right: 0; height: 20px; pointer-events: none; }
-  .fx-seg { position: absolute; top: 1px; height: 18px; box-sizing: border-box; border-radius: 4px;
+  #fx-lane { position: absolute; left: 0; right: 0; height: 32px; pointer-events: none; }
+  .fx-seg { position: absolute; top: 3px; height: 26px; box-sizing: border-box; border-radius: 4px;
     border: 1px solid #fff; background: #ddd6fe; color: #5b21b6;
     box-shadow: inset 0 0 0 1px rgba(124,58,237,0.28);
-    font-size: 10px; font-weight: 600; line-height: 16px; padding: 0 4px;
+    font-size: 11px; font-weight: 600; line-height: 24px; padding: 0 5px;
     overflow: hidden; white-space: nowrap; pointer-events: auto; cursor: pointer; }
   .fx-seg:hover { box-shadow: 0 0 0 1.5px #7c3aed, inset 0 0 0 1px rgba(124,58,237,0.28); }
   .fx-seg.active { box-shadow: 0 0 0 1.5px #5b21b6, inset 0 0 0 1px rgba(124,58,237,0.4); }
@@ -256,10 +256,10 @@ export function getPreviewHtml(): string {
   .lane-bed.fx { background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.18); border-radius: 6px; }
   /* Media lane: each video's source-map as blocks (color = rate). */
   #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 52px; pointer-events: none; }
-  .ml-row { position: absolute; left: 0; right: 0; height: 24px; }
+  .ml-row { position: absolute; left: 0; right: 0; height: 26px; }
   .ml-seg { position: absolute; height: 100%; border-radius: 4px; pointer-events: auto; cursor: pointer; opacity: 0.92; box-sizing: border-box;
     border: 1px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.10);
-    font-size: 12px; line-height: 22px; font-weight: 600; color: rgba(255,255,255,0.97); text-align: center; overflow: hidden; white-space: nowrap; }
+    font-size: 12px; line-height: 24px; font-weight: 600; color: rgba(255,255,255,0.97); text-align: center; overflow: hidden; white-space: nowrap; }
   .ml-seg.r-plain, .ml-seg.r-freeze { color: #6b7280; }
   .ml-seg:hover { opacity: 1; box-shadow: 0 0 0 1.5px #4f46e5; z-index: 2; }
   .ml-seg.r-normal { background: #a5b4fc; }
@@ -3458,7 +3458,7 @@ export function getPreviewHtml(): string {
         return c2.type === 'screencast-frame' && c2.data && Array.isArray(c2.data.callouts) && c2.data.callouts.length;
       });
     });
-    var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 20, screenH: 28, speakerH: 36, musicH: 16, speaker: -1, music: -1 };
+    var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 32, screenH: 32, speakerH: 32, musicH: 16, speaker: -1, music: -1 };
     var top = 22;
     if (hasFx) { y.fx = top; top += y.fxH + 6; }
     y.screen = top; top += y.screenH + 8;
@@ -3495,12 +3495,12 @@ export function getPreviewHtml(): string {
     // Camera pills are retired -- effects render as duration blocks in
     // their own lane above the screen.
     setTop('cam-pills', 0, false);
-    setTop('fx-lane', y.fx + 1, y.fx >= 0);
+    setTop('fx-lane', y.fx, y.fx >= 0);
     setTop('media-lane', y.screen);
     var mlEl = document.getElementById('media-lane');
     if (mlEl) mlEl.style.height = y.screenH + 'px';
-    setTop('wave-strip', y.speaker + 5, y.speaker >= 0);
-    setTop('word-lane', y.speaker + 5, y.speaker >= 0);
+    setTop('wave-strip', y.speaker + 3, y.speaker >= 0);
+    setTop('word-lane', y.speaker + 3, y.speaker >= 0);
     setTop('audio-lanes', y.music + 5, y.music >= 0);
     // Lane beds (recreated each pass; painted below all content).
     track.querySelectorAll('.lane-bed').forEach(function(n) { n.remove(); });
@@ -3512,7 +3512,7 @@ export function getPreviewHtml(): string {
       track.insertBefore(b, track.firstChild);
     }
     bed('ruler', y.ruler, y.rulerH);
-    if (y.fx >= 0) bed('fx', y.fx, y.fxH + 2);
+    if (y.fx >= 0) bed('fx', y.fx - 2, y.fxH + 4);
     bed('screen', y.screen - 2, y.screenH + 4);
     if (y.speaker >= 0) bed('speaker', y.speaker, y.speakerH);
     if (y.music >= 0) bed('music', y.music, y.musicH);
@@ -3566,7 +3566,7 @@ export function getPreviewHtml(): string {
           if (t2 - f < 0.05) return;
           var blk = document.createElement('div');
           blk.className = 'spk-clip';
-          blk.style.top = (y.speaker + 5) + 'px';
+          blk.style.top = (y.speaker + 3) + 'px';
           blk.style.left = ((f / total) * 100).toFixed(2) + '%';
           blk.style.width = (((t2 - f) / total) * 100).toFixed(2) + '%';
           blk.title = 'Speaker: ' + (to2 - from2).toFixed(1) + 's of talk. Click: play, split at playhead, or remove this piece (the screen keeps its footage and re-fits).';
@@ -3586,7 +3586,7 @@ export function getPreviewHtml(): string {
         var sc = document.createElement('div');
         sc.className = 'spk-cut';
         sc.textContent = '\\u2702';
-        sc.style.top = (y.speaker + 9) + 'px';
+        sc.style.top = (y.speaker + 7) + 'px';
         sc.style.left = ((seamFilm / total) * 100).toFixed(2) + '%';
         sc.title = (c.src_end - c.src_start).toFixed(1) + 's of talk removed here. Click to restore \\u2014 the film grows back and the screen relaxes.';
         sc.addEventListener('click', function(ev) { ev.stopPropagation(); spkRestoreOpen(c, seamFilm, sc); });
@@ -3812,7 +3812,7 @@ export function getPreviewHtml(): string {
     var track = document.getElementById('timeline-track');
     var total = state.totalDuration || 1;
     btn.style.left = Math.min(97, ((to / total) * 100)).toFixed(2) + '%';
-    btn.style.top = (laneLayout().speaker + 44) + 'px';
+    btn.style.top = (laneLayout().speaker + 40) + 'px';
     btn.addEventListener('click', function() {
       speakerCutRequest(Math.max(0, from), to, btn);
     });
