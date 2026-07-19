@@ -6,7 +6,7 @@ const FIELDS = ["server", "tenant", "token", "project"];
 // field away from recording. (Settings persist across reinstalls anyway --
 // the manifest "key" pins the extension ID that chrome.storage.sync keys on.)
 const DEFAULTS = {
-  server: "http://159.203.115.164:3200",
+  server: "https://159-203-115-164.nip.io",
   tenant: "marc-getquotient-ai",
   token: "",
   project: "library",

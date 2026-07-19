@@ -1161,3 +1161,22 @@ OPEN QUESTION (preview-render parity): the Studio's film clock has no
 transitions, the render's does -- so rendered timestamps run ahead of
 studio timestamps by 0.5s per boundary. Consider OVERLAPPING transitions
 (no inserted time) instead, which would unify the clocks; needs a call.
+
+## HTTPS resolution (2026-07-19 night): it was already working
+
+Marc was right to be surprised: this droplet has a WORKING hand-written
+Caddy setup from before — caddy v2.11.2 active, valid Let's Encrypt cert
+for **159-203-115-164.nip.io** (rsa4096), reverse_proxy to :3200, plus a
+/hyperframes/* route to :3001. setup-caddy.sh correctly refused to touch
+the unmanaged Caddyfile, but the debugging session then probed its OWN
+invented fallback (sslip.io) instead of discovering the configured domain
+— hence "no cert" for 35 minutes of head-scratching. Lesson: inspect the
+box's actual state (now possible via GET /api/caddy-status) before
+concluding anything about it.
+
+Changes: setup-caddy.sh now ADOPTS an existing hand-written Caddyfile
+that proxies our port (uses its site address for MP_PUBLIC_URL, touches
+nothing); fresh installs use nip.io + `key_type rsa4096` per the proven
+recipe; extension default server + docs point at
+https://159-203-115-164.nip.io. Do NOT overwrite the hand-written
+Caddyfile on this droplet — it carries the /hyperframes route.

@@ -70,12 +70,18 @@ domain, and reloads. Controls in `/etc/media-producer/env`:
 
 - `MP_CADDY_DOMAIN=media.yourdomain.com` — the domain to serve (point its DNS
   A record at the droplet first). **If unset**, the script falls back to
-  `<ip-with-dashes>.sslip.io` (e.g. `159-203-115-164.sslip.io`), which
-  resolves to the droplet with zero DNS setup — so HTTPS works before you own
-  a domain. Set a real domain later and redeploy; one variable, done.
+  `<ip-with-dashes>.nip.io` (e.g. `159-203-115-164.nip.io`), which resolves
+  to the droplet with zero DNS setup — so HTTPS works before you own a
+  domain. Set a real domain later and redeploy; one variable, done. (The
+  managed Caddyfile pins `key_type rsa4096` — avoids occasional Let's
+  Encrypt ECDSA issuance failures.)
 - `MP_CADDY_DISABLE=1` — opt out entirely.
 - A hand-written `/etc/caddy/Caddyfile` (no "managed by media-producer-mcp"
-  header) is never touched — the script defers to it and tells you so.
+  header) is never overwritten. If it already reverse-proxies the app's
+  port, the script ADOPTS its site address as the HTTPS domain (and flips
+  `MP_PUBLIC_URL` to it); otherwise it defers and tells you so.
+- `GET /api/caddy-status` (tenant auth) reports the box's live state:
+  version, service, Caddyfile, cert domains, recent journal.
 
 Once live, every `preview_url` the server hands out uses the HTTPS domain
 automatically. (Caddy passes the `Authorization` header through by default;
