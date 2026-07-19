@@ -6,6 +6,21 @@ session can pick up mid-thread.
 
 ---
 
+## 2026-07-19 — Words-lag-audio drift: the cache shift ran on RAW words (PR #435)
+
+Marc: after cutting, "the words in speaker track are way behind what the
+actual track sounds like." Live repro (proj_7b064560): cutting the 9s
+silence tore out "a social post example. Great. Here we go. All right,"
+and produced non-monotonic times. Root cause: the transcript-cache shift
+ran on RAW whisper words -- which are SMEARED ACROSS silences -- while
+users cut on the SNAPPED clock the lane shows; dropping the cut span ate
+words the snap had rescued. Fix: the cut route snaps the cached words
+against the OLD bake's silences before `shiftWordsForCut` (mid-based,
+seam-clamped); the client in-memory shift matches;
+`GET /api/speaker-transcript?fresh=1` drops a damaged cache (used to heal
+proj_2b5f790e). Rule of thumb recorded: ANY consumer that edits word
+times must operate on the snapped clock, never raw whisper output.
+
 ## 2026-07-19 — RE-FIT model + speaker piece editing (design: Marc; ROADMAP #8 amended)
 
 Marc, on cutting 9s of recorded silence: "I would not want you to also cut
