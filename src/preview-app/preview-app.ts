@@ -248,6 +248,11 @@ export function getPreviewHtml(): string {
     overflow: hidden; white-space: nowrap; pointer-events: auto; cursor: pointer; }
   .fx-seg:hover { box-shadow: 0 0 0 1.5px #7c3aed, inset 0 0 0 1px rgba(124,58,237,0.28); }
   .fx-seg.active { box-shadow: 0 0 0 1.5px #5b21b6, inset 0 0 0 1px rgba(124,58,237,0.4); }
+  /* Open-ended effect (no return): fades out instead of hard-stopping --
+     the effect stays applied, there is no end to draw. */
+  .fx-seg.fx-open { border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0;
+    -webkit-mask-image: linear-gradient(to right, #000 72%, transparent);
+    mask-image: linear-gradient(to right, #000 72%, transparent); }
   .lane-bed.fx { background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.18); border-radius: 6px; }
   /* Media lane: each video's source-map as blocks (color = rate). */
   #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 52px; pointer-events: none; }
@@ -3134,16 +3139,25 @@ export function getPreviewHtml(): string {
         var from = sceneStart + (m.at || 0);
         var to;
         var holdNote;
+        var open = false;
         if (m.type === 'reset') {
           to = from + 0.001; // end-cap: rendered at minimum width
           holdNote = 'release the camera';
+        } else if (m.return) {
+          // A returning move has a real arc: ease in + hold + ease back.
+          var easeS = (m.duration != null ? Number(m.duration) : 1);
+          to = from + easeS + (m.hold != null ? Number(m.hold) : 0) + easeS;
+          holdNote = 'eases in ' + easeS.toFixed(1) + 's, holds ' + (m.hold != null ? Number(m.hold).toFixed(1) : '0.0') + 's, returns';
         } else {
+          // No return: the effect stays applied -- open-ended until the
+          // next move takes over or the scene ends (drawn with a fade).
           var next = moves.filter(function(n) { return (n.at || 0) > (m.at || 0) + 0.01; })[0];
           to = sceneStart + (next ? (next.at || 0) : dur);
-          holdNote = next ? ('holds until the next move at ' + (next.at || 0).toFixed(1) + 's')
-                          : 'holds until the scene ends';
+          open = true;
+          holdNote = 'no return \u2014 stays applied until ' + (next ? ('the next move at ' + (next.at || 0).toFixed(1) + 's') : 'the scene ends');
         }
-        block(from, to, 'fx-' + m.type,
+        to = Math.min(to, sceneStart + dur);
+        block(from, to, 'fx-' + m.type + (open ? ' fx-open' : ''),
           (glyph[m.type] || '\u2922') + ' ' + (m.type || 'zoom'),
           'Scene ' + (si + 1) + ': ' + camMoveDesc(m) + ' \u2014 ' + holdNote + '. Click to edit.',
           function(el2) { camPopOpen(si, mi, el2); });
