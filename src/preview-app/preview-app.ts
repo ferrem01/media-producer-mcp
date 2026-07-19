@@ -3451,7 +3451,10 @@ export function getPreviewHtml(): string {
     // pills sit at the seam between ruler and the screen lane.
     setTop('timeline-slider', 0); // 18px-tall input covers the whole ruler band
     setTop('beat-ticks', 7);
-    setTop('cam-pills', y.ruler + y.rulerH - 4);
+    // Camera-move pills live INSIDE the ruler band (15px pill centered in
+    // the 18px band) -- straddling the band edge let the scene blocks slice
+    // across the circle.
+    setTop('cam-pills', y.ruler + 4);
     setTop('media-lane', y.screen);
     setTop('wave-strip', y.speaker + 5, y.speaker >= 0);
     setTop('word-lane', y.speaker + 5, y.speaker >= 0);
