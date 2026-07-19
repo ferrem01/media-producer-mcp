@@ -120,6 +120,16 @@ revise = element vs scene).
      (2) preview playback honoring audio EDLs (the genuinely new work);
      (3) merged speaker lane + labels + 🔗 state; (4) word-delete cutting
      with caption/chapter reshift from the spine.
+   - **AMENDED 2026-07-19 (Marc): the RE-FIT model.** A speaker cut removes
+     TIME, never screen content. Screens re-solve into the shorter film
+     through pins (implicit tagged anchors at the cut seam + scene end;
+     user pins ride their words); only FOLLOWERS (the camera bubble — the
+     same take as the voice) mirror the cut so lips match. "Cut both" as a
+     speaker-side option is explicitly rejected — a flubbed screen action
+     is cut on the SCREEN lane by the user. The recorder's assembly-time
+     idle∩silence cut stays cut-both (the screen there is proven idle).
+     🔗 now means voice↔camera, not voice↔screen. Restore = the reverse
+     referee (time back, anchors lifted, screens relax).
 9. **Auto-callouts retry** (removed from the assemble path 2026-07-18) — vision-grounded
    region callouts on narrated screencasts. Renderer + pixel-dialect conversion are solved;
    the open problem is time × semantics (cues land on content seams; narrator references
@@ -202,6 +212,13 @@ a single-scene revision regenerates only that scene and **skips the editorial pa
 - Delete the dead `template` field on `PlannedScene`.
 
 ## Backlog — open follow-ups (b-roll / legibility / theme work)
+- **Speaker-lane selection sugar (parked 2026-07-19, Marc liked both).**
+  Two richer ways to pick a talk span beyond split-at-playhead and
+  shift-click-words: (a) **click-the-gap** — clicking inside a flat
+  waveform stretch auto-selects the whole silence (edges from
+  silencedetect, the same data the word-snap uses) → ✂ in two clicks;
+  (b) **drag-select** across the speaker lane with word-boundary snapping
+  near speech. Both funnel into the existing re-fit cut request.
 - **Timelapse-over-silence (parked 2026-07-18 at Marc's call).** When the
   speaker goes quiet >~4s but the SCREEN is active, the auto-cut correctly
   keeps the footage — leaving real dead air in the film (seen live: 9.4s on

@@ -95,17 +95,22 @@ export async function ensureSpeakerDerived(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// applySpeakerCut -- the referee (ROADMAP #8 stages 2+4).
+// applySpeakerCut -- the referee (ROADMAP #8, re-fit model agreed 2026-07-19).
 //
 // ONE atomic operation: "remove this span of FILM time from the speaker."
-// The speaker is the film's master clock, so a speaker cut removes time
-// itself; this op writes every consequence in one pass:
+// The speaker is the film's master clock, so a speaker cut removes TIME --
+// never screen content. This op writes every consequence in one pass:
 //   - the cut lands in the speaker clip's EDL (mapped through its existing
 //     kept spans to ORIGINAL-source time), and the bake is re-derived;
-//   - the linked screen (and camera-follower) EDLs get the same film span
-//     removed, mapped through their own segments to their own source clocks;
-//   - the scene shrinks; captions/chapters/spine/booth-script shift left;
-//   - pins inside the removed span are dropped.
+//   - SCREEN targets keep every frame: their maps RE-SOLVE into the shorter
+//     scene through pins -- an implicit anchor at the cut seam (sync is
+//     preserved up to the seam) and a terminal anchor at the new scene end
+//     (the remaining footage compresses to fit), both tagged so restore can
+//     remove them; user pins shift with their words;
+//   - FOLLOWER targets (the camera bubble -- the same take as the voice)
+//     mirror the cut in source terms: the lips must lose exactly the span
+//     the voice did;
+//   - the scene shrinks; captions/chapters/spine/booth-script shift left.
 // ─────────────────────────────────────────────────────────────────────────
 
 interface CutRange { src_start: number; src_end: number }
@@ -180,33 +185,60 @@ export async function applySpeakerCut(
   };
   clip.edl = { cuts: mergeCut(existing, speakerCut), segments: clip.edl?.segments || [] };
 
-  // ── Screen (linked): film -> scene-local -> screen-source clock ──
+  // ── Screen re-fits, followers mirror ──
   const localFrom = filmFrom - sceneStart;
   const localTo = filmTo - sceneStart;
+  const newDur = Math.max(0.5, Math.round((target.duration_seconds - d) * 10) / 10);
   const me: any = (target as any).media_edits || {};
+  const cutTag = `refit-${speakerCut.src_start.toFixed(2)}`;
+  const spkSrcName = (clip.source || "").split("/").pop() || " ";
   let screenCut: CutRange | null = null;
   for (const key of Object.keys(me)) {
     const edit = me[key];
     const segments = edit.segments || [];
-    const sFrom = Math.round(mapSourceTime(segments, localFrom) * 1000) / 1000;
-    const sTo = Math.round(mapSourceTime(segments, localTo) * 1000) / 1000;
-    if (!(sTo > sFrom)) continue; // span fell inside a hold -- nothing to remove
-    const cuts = mergeCut(edit.cuts || [], { src_start: sFrom, src_end: sTo });
-    // Pins inside the removed footage can no longer hold; drop them.
-    const pins = (edit.pins || []).filter((p: any) => !(p.src > sFrom && p.src < sTo));
-    const srcEnd = segments.length ? segments[segments.length - 1].src_end : sTo;
-    const solved = solveMediaEdits({ cuts, rate_regions: edit.rate_regions || [], pins }, srcEnd);
-    edit.cuts = cuts;
+    if (!segments.length) continue;
+    const srcEnd = segments[segments.length - 1].src_end;
+
+    if (key.includes(spkSrcName)) {
+      // FOLLOWER (camera bubble): same clock as the voice -- mirror the cut
+      // in source terms so the face loses exactly the span the voice did.
+      const cuts = mergeCut(edit.cuts || [], { ...speakerCut });
+      const pins = (edit.pins || []).filter((p: any) => !(p.src > speakerCut.src_start && p.src < speakerCut.src_end));
+      const solved = solveMediaEdits({ cuts, rate_regions: edit.rate_regions || [], pins }, srcEnd);
+      edit.cuts = cuts;
+      edit.pins = pins;
+      edit.segments = solved.segments;
+      edit.pin_status = solved.pin_status;
+      edit.proposed = false;
+      screenCut = { ...speakerCut };
+      continue;
+    }
+
+    // SCREEN: keep all content; re-solve the map into the shorter scene.
+    // The seam anchor freezes sync up to the cut; the terminal anchor makes
+    // the remaining footage compress to fit; both carry the cut's tag so a
+    // restore can lift them cleanly.
+    const seamSrc = Math.round(mapSourceTime(segments, localFrom) * 1000) / 1000;
+    let pins = (edit.pins || [])
+      .filter((p: any) => !(p.out >= localFrom && p.out < localTo))
+      .map((p: any) => (p.out >= localTo ? { ...p, out: Math.round((p.out - d) * 100) / 100 } : p));
+    if (localFrom > 0.3 && !pins.some((p: any) => Math.abs(p.out - localFrom) < 0.3)) {
+      pins.push({ out: Math.round(localFrom * 100) / 100, src: seamSrc, word: "⚓", auto: cutTag });
+    }
+    const terminal = pins.find((p: any) => p.auto === "refit-end");
+    if (terminal) terminal.out = newDur;
+    else pins.push({ out: newDur, src: srcEnd, word: "⚓", auto: "refit-end" });
+    pins = pins.sort((a: any, b: any) => a.out - b.out);
+    const solved = solveMediaEdits({ cuts: edit.cuts || [], rate_regions: edit.rate_regions || [], pins }, srcEnd);
     edit.pins = pins;
     edit.segments = solved.segments;
     edit.pin_status = solved.pin_status;
-    edit.proposed = false; // a human made this
-    if (key === "screencast") screenCut = { src_start: sFrom, src_end: sTo };
+    edit.proposed = false;
   }
   (target as any).media_edits = me;
 
   // ── Time ripple: the film is now shorter ──
-  target.duration_seconds = Math.max(0.5, Math.round((target.duration_seconds - d) * 10) / 10);
+  target.duration_seconds = newDur;
 
   const shift = (t: number) => (t >= localTo ? t - d : t);
   const dropIn = (a: number, b: number) => a >= localFrom && b <= localTo;
@@ -253,6 +285,127 @@ export async function applySpeakerCut(
     scene_id: target.id,
     speaker_cut: speakerCut,
     screen_cut: screenCut,
+    narration_url: narrationUrl,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// applySpeakerRestore -- the reverse referee: give a cut's time back.
+// The film grows by the cut's length at the seam; the re-fit anchors this
+// cut planted are lifted, user pins and captions/spine/cues shift right,
+// the follower's mirrored cut is removed, screens re-solve (they relax
+// back toward their natural rates), and the bake is re-derived. Captions
+// that were dropped by the original cut are gone for good -- restoring
+// brings back TIME and the voice, not derived text.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface SpeakerRestoreResult {
+  restored_seconds: number;
+  scene_id: string;
+  narration_url: string | null;
+}
+
+export async function applySpeakerRestore(
+  project: Project,
+  srcStart: number,
+  srcEnd: number,
+  dataDir?: string,
+): Promise<SpeakerRestoreResult> {
+  const clips = project.speaker?.clips || [];
+  if (clips.length !== 1) throw new Error("speaker restore currently supports single-clip films");
+  const clip = clips[0];
+  const cuts = clip.edl?.cuts || [];
+  const idx = cuts.findIndex(
+    (c) => Math.abs(c.src_start - srcStart) < 0.05 && Math.abs(c.src_end - srcEnd) < 0.05,
+  );
+  if (idx === -1) throw new Error("no matching speaker cut to restore");
+  const cut = cuts[idx];
+  const d = cut.src_end - cut.src_start;
+
+  // Seam position on the CURRENT (pre-restore) clocks: source -> bake -> film.
+  const removedBefore = cuts
+    .filter((c) => c.src_start < cut.src_start)
+    .reduce((t, c) => t + (c.src_end - c.src_start), 0);
+  const bakeSeam = cut.src_start - removedBefore;
+  const filmSeam = clip.at + bakeSeam;
+
+  const scenes: Scene[] = project.scenes || [];
+  let sceneStart = 0;
+  let target: Scene | null = null;
+  for (const s of scenes) {
+    const dur = s.duration_seconds || 0;
+    const hasMedia = !!(s as any).media_edits || (s.components || []).some((c: any) => c.type === "screencast-frame" && !/brand-kit/.test(c.data?.video_url || ""));
+    if (hasMedia && filmSeam >= sceneStart - 0.01 && filmSeam <= sceneStart + dur + 0.01) { target = s; break; }
+    sceneStart += dur;
+  }
+  if (!target) throw new Error("the restored span does not land in a narrated scene");
+  const localSeam = filmSeam - sceneStart;
+  const newDur = Math.round((target.duration_seconds + d) * 10) / 10;
+
+  // Speaker EDL: lift the cut.
+  clip.edl = { cuts: cuts.filter((_, i) => i !== idx), segments: clip.edl?.segments || [] };
+
+  const cutTag = `refit-${cut.src_start.toFixed(2)}`;
+  const spkSrcName = (clip.source || "").split("/").pop() || " ";
+  const me: any = (target as any).media_edits || {};
+  for (const key of Object.keys(me)) {
+    const edit = me[key];
+    const segments = edit.segments || [];
+    if (!segments.length) continue;
+    const srcEnd2 = segments[segments.length - 1].src_end;
+
+    if (key.includes(spkSrcName)) {
+      // Follower: remove the mirrored cut.
+      const fCuts = (edit.cuts || []).filter(
+        (c: any) => !(Math.abs(c.src_start - cut.src_start) < 0.05 && Math.abs(c.src_end - cut.src_end) < 0.05),
+      );
+      const solved = solveMediaEdits({ cuts: fCuts, rate_regions: edit.rate_regions || [], pins: edit.pins || [] }, srcEnd2);
+      edit.cuts = fCuts;
+      edit.segments = solved.segments;
+      edit.pin_status = solved.pin_status;
+      continue;
+    }
+
+    // Screen: lift this cut's anchors, shift everything after the seam
+    // right, keep the terminal anchor on the (new) scene end, re-solve.
+    let pins = (edit.pins || []).filter((p: any) => p.auto !== cutTag);
+    pins = pins.map((p: any) => {
+      if (p.auto === "refit-end") return { ...p, out: newDur };
+      if (p.out >= localSeam - 0.01) return { ...p, out: Math.round((p.out + d) * 100) / 100 };
+      return p;
+    });
+    const solved = solveMediaEdits({ cuts: edit.cuts || [], rate_regions: edit.rate_regions || [], pins }, srcEnd2);
+    edit.pins = pins;
+    edit.segments = solved.segments;
+    edit.pin_status = solved.pin_status;
+  }
+  (target as any).media_edits = me;
+
+  target.duration_seconds = newDur;
+
+  const shift = (t: number) => (t >= localSeam - 0.01 ? Math.round((t + d) * 100) / 100 : t);
+  for (const c of target.components as any[]) {
+    if (c.type !== "narration-track" || !c.data) continue;
+    c.data.captions = (c.data.captions || []).map((cap: any) => ({ ...cap, start: shift(cap.start), end: shift(cap.end) }));
+    c.data.chapters = (c.data.chapters || []).map((ch: any) => ({ ...ch, at: shift(ch.at) }));
+  }
+  if (project.spine) {
+    const bShift = (t: number) => (t >= bakeSeam - 0.01 ? Math.round((t + d) * 100) / 100 : t);
+    project.spine.sentences = (project.spine.sentences || []).map((s: any) => ({ ...s, start: bShift(s.start), end: bShift(s.end) }));
+    project.spine.chapters = (project.spine.chapters || []).map((ch: any) => ({ ...ch, start: bShift(ch.start), end: bShift(ch.end) }));
+  }
+  if (project.booth_script) {
+    project.booth_script.cues = (project.booth_script.cues || []).map((cue) => ({
+      ...cue,
+      at: cue.at >= filmSeam - 0.01 ? Math.round((cue.at + d) * 10) / 10 : cue.at,
+    }));
+  }
+
+  const narrationUrl = await ensureSpeakerDerived(project, dataDir);
+  project.updated_at = new Date().toISOString();
+  return {
+    restored_seconds: Math.round(d * 100) / 100,
+    scene_id: target.id,
     narration_url: narrationUrl,
   };
 }

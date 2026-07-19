@@ -1869,6 +1869,34 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // POST /api/speaker-restore/{tenant}/{project}  { src_start, src_end }
+      // The reverse referee: gives a speaker cut's time back -- film grows at
+      // the seam, follower cut lifted, screens relax, bake re-derived.
+      const spkRestoreMatch = urlPath.match(/^\/api\/speaker-restore\/([^/]+)\/([^/]+)$/);
+      if (spkRestoreMatch && method === "POST") {
+        const [, srTenant, srProject] = spkRestoreMatch.map(decodeURIComponent);
+        try {
+          const body = (await parseBody(req)) as { src_start?: number; src_end?: number };
+          const s0 = Number(body?.src_start);
+          const s1 = Number(body?.src_end);
+          if (!Number.isFinite(s0) || !Number.isFinite(s1)) {
+            jsonResponse(res, 400, { error: "src_start and src_end (speaker source seconds) required" });
+            return;
+          }
+          const project = await loadProject(srTenant, srProject);
+          if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+          const { applySpeakerRestore } = await import("./core/speaker-edl.js");
+          const result = await applySpeakerRestore(project, s0, s1, config.dataDir);
+          await saveProject(project);
+          console.log(`  speaker-restore: ${srProject} -- restored ${result.restored_seconds}s of film`);
+          jsonResponse(res, 200, { ok: true, ...result, project });
+        } catch (e: any) {
+          console.error(`  speaker-restore: FAILED (${e?.message || e})`);
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       // ── API: Re-run asset intelligence in place ──
       // POST /api/reanalyze-asset/{tenant}/{project}?name=<assetFile>
       // Ops path: intel improves over time (letterbox detection, motion
