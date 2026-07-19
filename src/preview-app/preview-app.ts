@@ -3460,7 +3460,7 @@ export function getPreviewHtml(): string {
     });
     var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 32, screenH: 32, speakerH: 32, musicH: 16, speaker: -1, music: -1 };
     var top = 22;
-    if (hasFx) { y.fx = top; top += y.fxH + 6; }
+    if (hasFx) { y.fx = top; top += y.fxH + 8; }
     y.screen = top; top += y.screenH + 8;
     if (hasSpk) { y.speaker = top; top += y.speakerH + 8; }
     if (hasMusic) { y.music = top; top += y.musicH + 6; }
@@ -3514,16 +3514,16 @@ export function getPreviewHtml(): string {
     bed('ruler', y.ruler, y.rulerH);
     if (y.fx >= 0) bed('fx', y.fx - 2, y.fxH + 4);
     bed('screen', y.screen - 2, y.screenH + 4);
-    if (y.speaker >= 0) bed('speaker', y.speaker, y.speakerH);
+    if (y.speaker >= 0) bed('speaker', y.speaker - 2, y.speakerH + 4);
     if (y.music >= 0) bed('music', y.music, y.musicH);
     // Fixed gutter icons: stationary no matter the scroll/zoom, each
     // vertically centered on its bed.
     if (gut) {
       var html = '';
-      if (y.fx >= 0) html += '<span class="lg-ic" style="top:' + (y.fx + y.fxH / 2 - 7) + 'px" title="Effects track (zooms, pans, callouts)">' + LG_ICONS.fx + '</span>';
-      html += '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="Screen track">' + LG_ICONS.screen + '</span>';
-      if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="Speaker track">' + LG_ICONS.speaker + '</span>';
-      if (y.music >= 0) html += '<span class="lg-ic" style="top:' + (y.music + y.musicH / 2 - 8) + 'px" title="Music track">' + LG_ICONS.music + '</span>';
+      if (y.fx >= 0) html += '<span class="lg-ic" style="top:' + (y.fx + y.fxH / 2 - 7) + 'px" title="EFFECTS \u2014 zooms, pans, rotates and callouts. Click a block to edit it.">' + LG_ICONS.fx + '</span>';
+      html += '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="SCREEN \u2014 your recording. Click a block to split, speed up or remove footage.">' + LG_ICONS.screen + '</span>';
+      if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="SPEAKER \u2014 your voice (and camera). Click a piece to play, split or remove talk.">' + LG_ICONS.speaker + '</span>';
+      if (y.music >= 0) html += '<span class="lg-ic" style="top:' + (y.music + y.musicH / 2 - 8) + 'px" title="MUSIC \u2014 the bed under the film, ducked while you speak.">' + LG_ICONS.music + '</span>';
       gut.innerHTML = html;
     }
     var ph = document.getElementById('playhead-line');
