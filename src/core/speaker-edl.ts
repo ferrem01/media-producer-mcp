@@ -129,6 +129,19 @@ export function mergeCut(cuts: CutRange[], add: CutRange): CutRange[] {
 
 /** Map a BAKE-clock time (the derived audio's clock) to ORIGINAL-source
  *  time through the clip's existing cuts. Exported for tests. */
+/** Re-derive a speaker clip's kept-span segments from its cuts (rate 1).
+ *  The source's total length comes from the OLD segments; with no prior
+ *  segments there is nothing to re-derive and the empty list stands. */
+function speakerSegmentsFor(
+  cuts: CutRange[],
+  oldSegments: Array<{ src_start: number; src_end: number; rate?: number }>,
+): Array<{ src_start: number; src_end: number; rate: number }> {
+  const srcEnd = oldSegments.length ? oldSegments[oldSegments.length - 1].src_end : 0;
+  if (!(srcEnd > 0)) return oldSegments.map((s) => ({ src_start: s.src_start, src_end: s.src_end, rate: s.rate || 1 }));
+  return complementRanges(cuts.map((c) => ({ from: c.src_start, to: c.src_end })), srcEnd)
+    .map((r) => ({ src_start: r.from, src_end: r.to, rate: 1 }));
+}
+
 export function bakeToSourceTime(cuts: CutRange[], bakeTime: number): number {
   let remaining = bakeTime;
   let cursor = 0;
@@ -187,7 +200,10 @@ export async function applySpeakerCut(
     src_start: Math.round(bakeToSourceTime(existing, Math.max(0, bakeFrom)) * 1000) / 1000,
     src_end: Math.round(bakeToSourceTime(existing, bakeTo) * 1000) / 1000,
   };
-  clip.edl = { cuts: mergeCut(existing, speakerCut), segments: clip.edl?.segments || [] };
+  // Keep segments CONSISTENT with cuts: they are the same fact in two
+  // encodings, and a consumer reading stale segments desyncs from the bake.
+  const mergedCuts = mergeCut(existing, speakerCut);
+  clip.edl = { cuts: mergedCuts, segments: speakerSegmentsFor(mergedCuts, clip.edl?.segments || []) };
 
   // ── Screen re-fits, followers mirror ──
   const localFrom = filmFrom - sceneStart;
@@ -433,7 +449,8 @@ export async function applySpeakerRestore(
   const newDur = Math.round((target.duration_seconds + d) * 10) / 10;
 
   // Speaker EDL: lift the cut.
-  clip.edl = { cuts: cuts.filter((_, i) => i !== idx), segments: clip.edl?.segments || [] };
+  const remainingCuts = cuts.filter((_, i) => i !== idx);
+  clip.edl = { cuts: remainingCuts, segments: speakerSegmentsFor(remainingCuts, clip.edl?.segments || []) };
 
   const cutTag = `refit-${cut.src_start.toFixed(2)}`;
   const spkSrcName = (clip.source || "").split("/").pop() || " ";
