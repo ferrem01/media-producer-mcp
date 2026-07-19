@@ -878,6 +878,45 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
+      // ── API: Caddy status -- what HTTPS state does THIS box actually have? ──
+      // Read-only diagnostic (tenant auth): whether caddy is installed/active,
+      // the current Caddyfile, and which domains hold certificates. Exists
+      // because setup-caddy.sh defers to any Caddyfile it didn't author, and
+      // without shell access there was no way to see WHY https wasn't up.
+      if (urlPath === "/api/caddy-status" && method === "GET") {
+        const { execFile: cExecFile } = await import("node:child_process");
+        const { promisify: cPromisify } = await import("node:util");
+        const cRun = cPromisify(cExecFile);
+        const out: any = {};
+        try { out.version = (await cRun("caddy", ["version"])).stdout.trim(); }
+        catch { out.version = null; }
+        try { out.service = (await cRun("systemctl", ["is-active", "caddy"])).stdout.trim(); }
+        catch (e: any) { out.service = String(e?.stdout || e?.message || "unknown").trim(); }
+        try {
+          out.caddyfile = await fs.readFile("/etc/caddy/Caddyfile", "utf-8");
+          out.caddyfile_managed = out.caddyfile.startsWith("# managed by media-producer-mcp");
+        } catch { out.caddyfile = null; }
+        // Cert store: one directory per issuer, then per domain.
+        out.certificates = [];
+        for (const base of ["/var/lib/caddy/.local/share/caddy/certificates", "/root/.local/share/caddy/certificates"]) {
+          try {
+            for (const issuer of await fs.readdir(base)) {
+              try {
+                for (const domain of await fs.readdir(path.join(base, issuer))) {
+                  out.certificates.push({ issuer, domain, store: base });
+                }
+              } catch { /* not a dir */ }
+            }
+          } catch { /* store absent */ }
+        }
+        try {
+          const j = await cRun("journalctl", ["-u", "caddy", "-n", "40", "--no-pager", "-o", "cat"]);
+          out.recent_log = j.stdout.split("\n").slice(-40).join("\n");
+        } catch { out.recent_log = null; }
+        jsonResponse(res, 200, out);
+        return;
+      }
+
       // GET /api/deploy/log -- tail of the last deploy's output (same secret).
       if (urlPath === "/api/deploy/log" && method === "GET") {
         const deploySecret = process.env.MP_DEPLOY_TOKEN;

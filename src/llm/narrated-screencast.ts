@@ -506,7 +506,7 @@ export async function attachBoothNarration(opts: {
   }
   audio.ducking = {
     enabled: true, duck_track: "music_bed", trigger_track: "narration",
-    ducked_volume: 0.35, attack: 0.4, release: 0.9,
+    ducked_volume: 0.22, attack: 0.4, release: 0.9,
   };
   project.audio = audio;
   project.status = "generated";
@@ -738,7 +738,7 @@ export async function assembleNarratedScreencast(opts: {
           });
           (project.audio as any).ducking = {
             enabled: true, duck_track: "music_bed", trigger_track: "narration",
-            ducked_volume: 0.35, attack: 0.4, release: 0.9,
+            ducked_volume: 0.22, attack: 0.4, release: 0.9,
           };
           musicTitle = bed.title;
           console.log(`  Music bed: "${bed.title}" by ${bed.artist} (${bed.source}) -- ducked under narration`);
