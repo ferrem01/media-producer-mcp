@@ -291,7 +291,9 @@ export function getPreviewHtml(): string {
     background: rgba(224,231,255,0.95); border: 1px solid #fff; border-radius: 4px;
     box-shadow: inset 0 0 0 1px rgba(99,102,241,0.28);
     pointer-events: auto; cursor: pointer; }
-  .spk-clip:hover { box-shadow: 0 0 0 1.5px #4f46e5; z-index: 2; }
+  /* Hover highlights WITHOUT raising the piece: the words (and their pin
+     targets) always stay on top of the block. */
+  .spk-clip:hover { box-shadow: 0 0 0 1.5px #4f46e5, inset 0 0 0 1px rgba(99,102,241,0.28); }
   .spk-cut { position: absolute; margin-left: -8px; width: 16px; height: 18px; line-height: 17px; text-align: center;
     font-size: 11px; z-index: 5; color: #4f46e5; background: #fff; border: 1px solid #a5b4fc; border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12); pointer-events: auto; cursor: pointer; }
