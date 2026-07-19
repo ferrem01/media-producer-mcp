@@ -9,7 +9,7 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createMcpServer } from "./server.js";
@@ -817,6 +817,57 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           branch,
           message: "Deploy started detached. Tail it at GET /api/deploy/log; verify with GET /health (commit field).",
         });
+        return;
+      }
+
+      // ── API: Render probe -- what does THIS box's ffmpeg do with a clip? ──
+      // Read-only diagnostic for frame-extraction timing (VFR MediaRecorder
+      // webms resample differently across ffmpeg builds; a shifted extraction
+      // shows up as lip-sync error on the camera bubble). Reports the ffmpeg
+      // version, the fps-filter frame count over a probe window, the native
+      // (decoder) frame count + first/last PTS, and the state of the
+      // scene-worker's /tmp/vframes cache for the clip.
+      if (urlPath === "/api/render-probe" && method === "POST") {
+        const probeBody = await parseBody(req);
+        const probeSrc = String(probeBody.source || "");
+        if (!probeSrc) { jsonResponse(res, 400, { error: "source required" }); return; }
+        const probeFile = resolveVideoPath(probeSrc);
+        const probeSecs = Math.max(1, Math.min(120, Number(probeBody.seconds) || 20));
+        const { execFile: pExecFile } = await import("node:child_process");
+        const { promisify: pPromisify } = await import("node:util");
+        const pRun = pPromisify(pExecFile);
+        const probeOut: any = { source: probeSrc, file: probeFile, probe_seconds: probeSecs };
+        try { probeOut.ffmpeg_version = (await pRun("ffmpeg", ["-version"])).stdout.split("\n")[0].trim(); }
+        catch (e: any) { probeOut.ffmpeg_version = "ERROR: " + (e?.message || e); }
+        // 1. Production extraction command (fps filter) over the window -- how
+        //    many frames does THIS build's fps filter emit?
+        try {
+          const r = await pRun("ffmpeg", ["-loglevel", "info", "-y", "-t", String(probeSecs), "-i", probeFile,
+            "-vf", "fps=30,scale='min(1920,iw)':-2", "-f", "null", "-"], { maxBuffer: 16 << 20, timeout: 300_000 });
+          const fm = [...String(r.stderr).matchAll(/frame=\s*(\d+)/g)].pop();
+          probeOut.fps_filter_frames = fm ? parseInt(fm[1], 10) : null;
+        } catch (e: any) { probeOut.fps_filter_frames = "ERROR: " + String(e?.stderr || e?.message || e).slice(-300); }
+        // 2. Native decode (showinfo, no resample) -- true frame count + PTS range.
+        try {
+          const r = await pRun("ffmpeg", ["-loglevel", "info", "-y", "-t", String(probeSecs), "-i", probeFile,
+            "-vf", "showinfo", "-f", "null", "-"], { maxBuffer: 64 << 20, timeout: 300_000 });
+          const pts = [...String(r.stderr).matchAll(/pts_time:\s*([0-9.eE+-]+)/g)].map((m) => parseFloat(m[1]));
+          probeOut.native = { frames: pts.length, first_pts: pts[0] ?? null, last_pts: pts[pts.length - 1] ?? null };
+        } catch (e: any) { probeOut.native = "ERROR: " + String(e?.stderr || e?.message || e).slice(-300); }
+        // 3. Scene-worker frame-cache state for this clip at production settings.
+        try {
+          const cacheKey = createHash("md5").update(`${probeFile}|30|1920x1080|jpg`).digest("hex").slice(0, 12);
+          const cacheDir = `/tmp/vframes_${cacheKey}`;
+          const entries = await fs.readdir(cacheDir);
+          const st = await fs.stat(cacheDir);
+          probeOut.vframes_cache = {
+            dir: cacheDir,
+            frames: entries.filter((f) => f.endsWith(".jpg")).length,
+            complete: entries.includes(".complete"),
+            mtime: st.mtime.toISOString(),
+          };
+        } catch { probeOut.vframes_cache = null; }
+        jsonResponse(res, 200, probeOut);
         return;
       }
 
