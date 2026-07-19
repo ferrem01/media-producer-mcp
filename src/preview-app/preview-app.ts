@@ -196,7 +196,6 @@ export function getPreviewHtml(): string {
   #lane-gutter { position: relative; width: 22px; flex: none; align-self: flex-start; }
   .lg-ic { position: absolute; left: 2px; width: 16px; height: 16px; color: #94a3b8; }
   .lg-ic svg { width: 16px; height: 16px; display: block; }
-  #lg-link { position: absolute; left: 0; font-size: 9px; cursor: help; }
   /* Lane beds: each track paints on its own surface so the layers read as
      layers; the ruler band on top is visually a different kind of thing. */
   .lane-bed { position: absolute; left: 0; right: 0; pointer-events: none; box-sizing: border-box; }
@@ -3542,27 +3541,10 @@ export function getPreviewHtml(): string {
         sc.addEventListener('click', function(ev) { ev.stopPropagation(); spkRestoreOpen(c, seamFilm, sc); });
         track.appendChild(sc);
       });
-      // Linked state lives in the STATIONARY gutter, chained to the speaker
-      // icon. Under the re-fit model the CAMERA is the linked lane (the face
-      // loses exactly the spans the voice does); the screen re-fits instead.
-      var spkName2 = (clip.source || '').split('/').pop() || ' ';
-      var camCuts = null;
-      (p.scenes || []).forEach(function(s) {
-        Object.keys(s.media_edits || {}).forEach(function(k) {
-          if (camCuts === null && k.indexOf(spkName2) !== -1) camCuts = (s.media_edits[k].cuts || []);
-        });
-      });
-      var gut2 = document.getElementById('lane-gutter');
+      // No linked badge: camera and voice are ALWAYS one take (the follower
+      // mirrors every cut by construction), so there is nothing to signal.
       var oldLk = document.getElementById('lg-link');
       if (oldLk) oldLk.remove();
-      if (gut2 && camCuts !== null && JSON.stringify(spkCuts) === JSON.stringify(camCuts)) {
-        var lk = document.createElement('span');
-        lk.id = 'lg-link';
-        lk.textContent = '\\uD83D\\uDD17';
-        lk.style.top = (y.speaker + 28) + 'px';
-        lk.title = 'Linked: the camera bubble follows the voice -- cutting talk cuts the same span of face. The screen keeps its footage and re-fits.';
-        gut2.appendChild(lk);
-      }
     }
   }
 
