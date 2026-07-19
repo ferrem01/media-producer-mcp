@@ -866,6 +866,13 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
             complete: entries.includes(".complete"),
             mtime: st.mtime.toISOString(),
           };
+          // Optional: return one cached frame (base64) so a remote debugger
+          // can check WHICH source moment a given slot actually contains.
+          const wantFrame = Number(probeBody.cache_frame);
+          if (Number.isInteger(wantFrame) && wantFrame >= 0) {
+            const fbuf = await fs.readFile(path.join(cacheDir, `frame-${String(wantFrame).padStart(6, "0")}.jpg`)).catch(() => null);
+            probeOut.cache_frame = fbuf ? { index: wantFrame, jpg_base64: fbuf.toString("base64") } : { index: wantFrame, error: "not found" };
+          }
         } catch { probeOut.vframes_cache = null; }
         jsonResponse(res, 200, probeOut);
         return;
