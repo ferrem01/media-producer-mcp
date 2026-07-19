@@ -1131,3 +1131,33 @@ new /api/render-probe):
   the stale field was identified -- media_edits carried the correct map into
   both the render and the Studio composite -- but two encodings of one fact
   must not disagree.
+
+## Camera-sync ROOT CAUSE (2026-07-19, after Marc's 13-16s pointer)
+
+**Found and fixed: the stitch INSERTS transition segments (default 0.5s
+crossfade at every scene boundary) into the video, while every audio track
+is placed at its raw content-clock start_time.** Result: ALL scene video
+after the first boundary runs late vs the audio by the accumulated
+transition time -- on Marc's film exactly +0.50s from film 6.6 onward,
+measured at 0.92-0.97 correlation by region-matched video-to-video
+alignment (bubble AND screen; the audio itself was placed exactly). The
+container math sealed it: 123.2s content + 2x0.5s inserted = 124.2s
+observed duration. Preview is unaffected (no inserted transitions), which
+is why the Studio looked perfect.
+
+Fix: renderVideo records every inserted transition (content-time, seconds)
+and shifts each audio track's start by the insertions at/before it; the mix
+duration includes inserted time. renderAudioOnly computes the same from
+project data (expectedInsertedTransitions, unit-tested).
+
+Investigation debris worth keeping: droplet ffmpeg 4.4.2 and sandbox 7.0
+produce BYTE-IDENTICAL fps-filter extractions (verified frame-by-frame with
+a downloaded 4.4.1 static build) -- do not suspect VFR resampling again.
+Statistical A/V-lag methods (motion-vs-envelope correlation) FAIL on
+sitting-still footage; region-matched video-to-video correlation is the
+reliable instrument.
+
+OPEN QUESTION (preview-render parity): the Studio's film clock has no
+transitions, the render's does -- so rendered timestamps run ahead of
+studio timestamps by 0.5s per boundary. Consider OVERLAPPING transitions
+(no inserted time) instead, which would unify the clocks; needs a call.
