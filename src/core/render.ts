@@ -169,6 +169,27 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
 }
 
 /**
+ * The transitions renderVideo will insert between scenes, computed from
+ * project data (same defaults as the stitch loop): every boundary gets a
+ * 0.5s crossfade unless the scene declares transition_in "none" or its own
+ * duration. Used where the actual stitch record isn't available (audio-only
+ * re-mux onto an existing video).
+ */
+export function expectedInsertedTransitions(project: Project): Array<{ atContentTime: number; seconds: number }> {
+  const out: Array<{ atContentTime: number; seconds: number }> = [];
+  let acc = 0;
+  for (let i = 0; i < project.scenes.length; i++) {
+    if (i > 0) {
+      const t = project.scenes[i].transition_in;
+      const type = t?.type || "crossfade";
+      if (type !== "none") out.push({ atContentTime: acc, seconds: t?.duration_seconds || 0.5 });
+    }
+    acc += project.scenes[i].duration_seconds || 0;
+  }
+  return out;
+}
+
+/**
  * Audio-only render: skip scene rendering, just re-apply audio mix
  * onto the already-rendered video file.
  */
@@ -189,7 +210,13 @@ async function renderAudioOnly(
 
   console.log(`Audio-only render: muxing audio onto existing video`);
 
-  const totalDuration = project.scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
+  // The existing video contains inserted transitions; place audio on the
+  // stitched clock, not the raw content clock (see renderVideo).
+  const inserted = expectedInsertedTransitions(project);
+  const insertedBefore = (contentTime: number): number =>
+    inserted.reduce((s, tr) => s + (tr.atContentTime <= contentTime + 0.001 ? tr.seconds : 0), 0);
+  const totalDuration = project.scenes.reduce((sum, s) => sum + s.duration_seconds, 0)
+    + inserted.reduce((s, tr) => s + tr.seconds, 0);
 
   // ── Audio mixing ──
   if (project.audio && project.audio.tracks.length > 0) {
@@ -200,7 +227,7 @@ async function renderAudioOnly(
       path: resolveVideoPath(t.source),
       type: t.type,
       volume: t.volume,
-      startTime: t.start_time,
+      startTime: t.start_time != null ? t.start_time + insertedBefore(t.start_time) : t.start_time,
       trimStart: t.trim_start,
       fadeIn: t.fade_in,
       fadeOut: t.fade_out,
@@ -1006,6 +1033,13 @@ async function renderVideo(
   const sceneMp4s = sceneResults.map((r) => r.mp4Path);
   const totalFrames = sceneResults.reduce((sum, r) => sum + r.frameCount, 0);
 
+  // Inserted transitions ADD time to the video that the project's content
+  // clock knows nothing about. Record every insertion (content-time position
+  // + seconds) so audio placement below can shift with the picture -- without
+  // this, every voiceover after a boundary plays EARLY by the accumulated
+  // transition time (heard as lip-sync error on speaker films).
+  const insertedTransitions: Array<{ atContentTime: number; seconds: number }> = [];
+
   // Build the final segment list: scene + transition + scene + transition + ...
   if (sceneMp4s.length > 1) {
     const segments: string[] = [sceneMp4s[0]];
@@ -1050,6 +1084,10 @@ async function renderVideo(
               componentSource: glassSource,
             });
             segments.push(mp4);
+            insertedTransitions.push({
+              atContentTime: project.scenes.slice(0, i).reduce((s, sc) => s + sc.duration_seconds, 0),
+              seconds: transitionDuration,
+            });
             segments.push(sceneMp4s[i]);
             continue;
           } catch (e: any) {
@@ -1100,6 +1138,10 @@ async function renderVideo(
       });
 
       segments.push(transitionMp4);
+      insertedTransitions.push({
+        atContentTime: project.scenes.slice(0, i).reduce((s, sc) => s + sc.duration_seconds, 0),
+        seconds: transitionDuration,
+      });
       segments.push(sceneMp4s[i]);
     }
 
@@ -1124,17 +1166,26 @@ async function renderVideo(
   }
 
   // ── Audio mixing ──
-  const totalDuration = project.scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
+  // A track's start_time lives on the CONTENT clock; the stitched video runs
+  // on content + inserted transitions. Shift each track by the transition
+  // time inserted at or before its start so voice stays on the speaker's lips.
+  const insertedBefore = (contentTime: number): number =>
+    insertedTransitions.reduce((s, tr) => s + (tr.atContentTime <= contentTime + 0.001 ? tr.seconds : 0), 0);
+  const totalInserted = insertedTransitions.reduce((s, tr) => s + tr.seconds, 0);
+  const totalDuration = project.scenes.reduce((sum, s) => sum + s.duration_seconds, 0) + totalInserted;
 
   if (project.audio && project.audio.tracks.length > 0) {
     console.log(`\n  Mixing ${project.audio.tracks.length} audio track(s)...`);
+    if (totalInserted > 0) {
+      console.log(`  Transitions inserted ${totalInserted.toFixed(2)}s of video; shifting timed audio tracks to match.`);
+    }
 
     const audioOutput = outputPath.replace(/\.mp4$/, "-with-audio.mp4");
     const audioTracks: AudioTrackInput[] = project.audio.tracks.map((t) => ({
       path: resolveVideoPath(t.source),
       type: t.type,
       volume: t.volume,
-      startTime: t.start_time,
+      startTime: t.start_time != null ? t.start_time + insertedBefore(t.start_time) : t.start_time,
       trimStart: t.trim_start,
       fadeIn: t.fade_in,
       fadeOut: t.fade_out,
