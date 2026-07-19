@@ -47,7 +47,7 @@ if [ -z "$DOMAIN" ]; then
       exit 0
       ;;
   esac
-  DOMAIN="${IP//./-}.sslip.io"
+  DOMAIN="${IP//./-}.nip.io"
   echo "caddy:   MP_CADDY_DOMAIN unset -- using zero-DNS fallback $DOMAIN"
 fi
 
@@ -73,16 +73,34 @@ WANT="# managed by media-producer-mcp scripts/setup-caddy.sh
     email $ACME_EMAIL
 }
 $DOMAIN {
+    tls {
+        key_type rsa4096
+    }
     reverse_proxy 127.0.0.1:$PORT
 }"
 if [ "$($SUDO cat "$CADDYFILE" 2>/dev/null)" != "$WANT" ]; then
   if [ -f "$CADDYFILE" ] && ! $SUDO head -1 "$CADDYFILE" 2>/dev/null | grep -q "managed by media-producer-mcp"; then
-    echo "caddy:   $CADDYFILE exists and is NOT managed by this script -- leaving it alone."
-    echo "caddy:   add 'reverse_proxy 127.0.0.1:$PORT' for $DOMAIN yourself, or delete the file and redeploy."
-    exit 0
+    # A hand-written Caddyfile that already fronts our port is a WORKING
+    # setup, not an obstacle: adopt its site address as the HTTPS domain
+    # (so MP_PUBLIC_URL flips to it below) and change nothing.
+    if $SUDO grep -Eq "reverse_proxy (localhost|127\.0\.0\.1):$PORT" "$CADDYFILE"; then
+      FOUND="$($SUDO grep -Eo '^[A-Za-z0-9.-]+[[:space:]]*\{' "$CADDYFILE" | head -1 | tr -d ' {')"
+      if [ -n "$FOUND" ]; then
+        DOMAIN="$FOUND"
+        echo "caddy:   adopting existing hand-written config for $DOMAIN (file untouched)"
+      else
+        echo "caddy:   existing config proxies :$PORT but no site address found; leaving it alone."
+        exit 0
+      fi
+    else
+      echo "caddy:   $CADDYFILE exists, is NOT managed by this script, and does not proxy :$PORT -- leaving it alone."
+      echo "caddy:   add 'reverse_proxy 127.0.0.1:$PORT' for $DOMAIN yourself, or delete the file and redeploy."
+      exit 0
+    fi
+  else
+    printf '%s\n' "$WANT" | $SUDO tee "$CADDYFILE" >/dev/null
+    CHANGED=1
   fi
-  printf '%s\n' "$WANT" | $SUDO tee "$CADDYFILE" >/dev/null
-  CHANGED=1
 fi
 
 # 3. Firewall: Caddy needs 80 (ACME challenge) + 443.
