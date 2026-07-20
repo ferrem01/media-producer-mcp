@@ -422,6 +422,13 @@ export async function attachBoothNarration(opts: {
       data: { captions, chapters: chapterMoments },
     } as any;
     const existing = (target.components as any[]).findIndex((c) => c.id === "narration_overlay");
+    // The spine only DRAFTS chapters; once the user has edited them in
+    // Studio (chapters_edited), a re-attach keeps their list verbatim.
+    const prevData = existing >= 0 ? ((target.components as any[])[existing]?.data || {}) : {};
+    if (prevData.chapters_edited) {
+      overlay.data.chapters = prevData.chapters || [];
+      overlay.data.chapters_edited = true;
+    }
     if (existing >= 0) (target.components as any[])[existing] = overlay;
     else (target.components as any[]).push(overlay);
 

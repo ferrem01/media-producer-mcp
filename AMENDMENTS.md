@@ -1315,3 +1315,25 @@ booth_pip component path his films use:
 - The bubble is now DIRECTLY draggable in the preview: grabbing it moves
   the bubble (the zoom marquee still owns drags that start anywhere
   else); release PATCHes position -- no preview reload needed.
+
+## Chapters become first-class edits (Marc, 2026-07-20)
+
+Design settled through debate: a chapter card is "an overlay that says
+chapter on it" -- an EFFECT, not a ruler marker (Marc: "the time scrubber
+should be sacred... your main navigational UI construct"; nothing lives
+on the ruler, ever). Data stays where the renderer reads it, the callout
+pattern: narration-track's data.chapters [{title, at, dur?}].
+
+- Effects lane renders ⚑ blocks (white/indigo) from data.chapters; click
+  → popover: title / at / shows-for / Delete → component PATCH.
+- Add: click the actual screen → revise popover gains "⚑ Add chapter
+  here…" (drops one at the playhead); clicking the on-screen chapter
+  card itself offers "⚑ Edit this chapter…".
+- chapters_edited flag: the sentence spine only DRAFTS the chapter list;
+  once Studio has written it, re-attaching narration keeps the user's
+  list verbatim (auto never overwrites edits).
+- narration-track honors per-chapter dur (card hold, default 2.2s).
+
+Auto policy unchanged for now: the spine still drafts chapters on first
+assembly. If living with editable chapters still annoys, downgrading the
+draft to a suggestion is a one-line policy change on this same UI.

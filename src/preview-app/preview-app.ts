@@ -253,6 +253,11 @@ export function getPreviewHtml(): string {
   .fx-seg.fx-open { border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0;
     -webkit-mask-image: linear-gradient(to right, #000 72%, transparent);
     mask-image: linear-gradient(to right, #000 72%, transparent); }
+  /* Chapter cards: title overlays drawn on the film -- effects, per Marc's
+     ruling ("the scrubber is sacred; a chapter card is an overlay"). */
+  .fx-chap { background: #fff; color: #312e81; border: 1.5px solid #6366f1;
+    box-shadow: inset 0 0 0 1px rgba(99,102,241,0.15); }
+  .fx-chap:hover { box-shadow: 0 0 0 1.5px #4f46e5; }
   .lane-bed.fx { background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.18); border-radius: 6px; }
   /* Media lane: each video's source-map as blocks (color = rate). */
   #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 52px; pointer-events: none; }
@@ -3197,6 +3202,20 @@ export function getPreviewHtml(): string {
             function(el2) { coPopOpen(si, comp.id, ci, el2); });
         });
       });
+      // Chapter cards: title overlays from the narration-track component.
+      // The spine drafts them; these blocks are how the user OWNS them.
+      (scene.components || []).forEach(function(comp) {
+        if (comp.type !== 'narration-track' || !comp.data || !Array.isArray(comp.data.chapters)) return;
+        comp.data.chapters.forEach(function(ch, ci) {
+          if (!ch || typeof ch.at !== 'number') return;
+          var from = sceneStart + ch.at;
+          var hold = (typeof ch.dur === 'number' && ch.dur >= 0.5) ? ch.dur : 2.2;
+          block(from, Math.min(sceneStart + dur, from + hold + 0.4), 'fx-chap',
+            '⚑ ' + (ch.title || 'Chapter'),
+            'Scene ' + (si + 1) + ': chapter card "' + (ch.title || '') + '" @' + Number(ch.at).toFixed(1) + 's, shows ' + hold.toFixed(1) + 's. Click to rename, retime, or delete.',
+            function(el2) { chapPopOpen(si, comp.id, ci, el2); });
+        });
+      });
     });
   }
 
@@ -3258,6 +3277,85 @@ export function getPreviewHtml(): string {
       camPopClose();
       saveCalloutsData(si, comp, next);
     });
+  }
+
+  // ── Chapter editor popover: the chapter card is a first-class edit --
+  // rename / retime / resize / delete, saved to the narration-track
+  // component's data. The spine only DRAFTS chapters; the chapters_edited
+  // flag written here stops it from ever overwriting the user's list. ──
+  function chapPopOpen(si, compId, ci, anchorEl) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[si];
+    var comp = null;
+    if (scene) (scene.components || []).forEach(function(c) { if (c.id === compId) comp = c; });
+    var chs = comp && comp.data && Array.isArray(comp.data.chapters) ? comp.data.chapters : null;
+    var isNew = ci < 0;
+    var ch = isNew
+      ? { title: '', at: Math.max(0.2, Math.round(((state.masterTime || 0) - sceneStartFor(si)) * 10) / 10), dur: 2.2 }
+      : (chs && chs[ci]);
+    var pop = document.getElementById('cam-pop');
+    if (!comp || !ch || !pop) return;
+    camPopClose();
+    rvPopClose();
+    if (anchorEl && anchorEl.classList) anchorEl.classList.add('active');
+    var sdur = scene.duration_seconds || 5;
+    pop.innerHTML =
+      '<div class="sp-head"><span class="sp-title"><b>⚑ Chapter</b> — scene ' + (si + 1) + '</span>' +
+      '<button class="sp-x" id="chp-x" title="Close (Esc)">✕</button></div>' +
+      '<div class="sp-fields"><label style="flex:1;">title <input id="chp-title" type="text" value="' + escAttr(ch.title || '') + '" placeholder="e.g. The Build" style="width:100%;"></label></div>' +
+      '<div class="sp-fields">' +
+        '<label>at <input id="chp-at" type="number" min="0.2" max="' + escAttr('' + Math.max(0.2, sdur - 1).toFixed(1)) + '" step="0.1" value="' + escAttr('' + (ch.at != null ? ch.at : 1)) + '">s</label>' +
+        '<label>shows <input id="chp-dur" type="number" min="0.5" max="10" step="0.1" value="' + escAttr('' + (ch.dur != null ? ch.dur : 2.2)) + '">s</label>' +
+      '</div>' +
+      '<div class="sp-row">' +
+      (isNew ? '' : '<button class="rv-go secondary" id="chp-del" style="flex:0 0 auto;color:#dc2626;border-color:#fca5a5;">Delete</button>') +
+      '<button class="rv-go" id="chp-save" style="flex:1;">' + (isNew ? 'Add chapter' : 'Save') + '</button></div>';
+    pop.style.display = 'block';
+    var pr = anchorEl && anchorEl.getBoundingClientRect
+      ? anchorEl.getBoundingClientRect()
+      : { left: window.innerWidth / 2 - 20, width: 40, top: window.innerHeight / 2, bottom: window.innerHeight / 2 };
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 170;
+    var px = Math.max(8, Math.min(pr.left + pr.width / 2 - pw / 2, window.innerWidth - pw - 8));
+    var py = pr.top - ph - 10;
+    if (py < 8) py = pr.bottom + 10;
+    pop.style.left = px + 'px';
+    pop.style.top = py + 'px';
+    document.getElementById('chp-x').addEventListener('click', camPopClose);
+    function save(nextList, msg) {
+      nextList.sort(function(a, b) { return a.at - b.at; });
+      camPopClose();
+      studioStatus(msg, '');
+      comp.data = Object.assign({}, comp.data || {}, { chapters: nextList, chapters_edited: true });
+      var patchPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+      api('PATCH', patchPath, { data: { chapters: nextList, chapters_edited: true } }).then(function() {
+        studioStatus('Chapters saved ✓ reloading preview…', 'ok');
+        renderCamPills();
+        startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+      }).catch(function(e) { studioStatus('Chapter save failed: ' + e.message, 'err'); });
+    }
+    document.getElementById('chp-save').addEventListener('click', function() {
+      var title = (document.getElementById('chp-title').value || '').trim();
+      if (!title) { studioStatus('Give the chapter a name.', 'warn'); return; }
+      var at = parseFloat(document.getElementById('chp-at').value);
+      var dr = parseFloat(document.getElementById('chp-dur').value);
+      var entry = {
+        title: title,
+        at: isNaN(at) ? (ch.at || 1) : Math.max(0.2, Math.min(sdur - 1, at)),
+        dur: isNaN(dr) ? 2.2 : Math.max(0.5, Math.min(10, dr)),
+      };
+      var next = (chs || []).slice();
+      if (isNew) next.push(entry); else next[ci] = entry;
+      save(next, isNew ? 'Adding chapter…' : 'Saving chapter…');
+    });
+    var del = document.getElementById('chp-del');
+    if (del) del.addEventListener('click', function() {
+      var next = (chs || []).slice();
+      next.splice(ci, 1);
+      save(next, 'Deleting chapter…');
+    });
+    var ti = document.getElementById('chp-title');
+    ti.focus();
+    ti.addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('chp-save').click(); });
   }
 
   // ── Timelapse popover: create (from a suggestion or auto), resize, remove ──
@@ -3598,7 +3696,8 @@ export function getPreviewHtml(): string {
     var hasFx = ((p || {}).scenes || []).some(function(s2) {
       if ((s2.camera_moves || []).length) return true;
       return (s2.components || []).some(function(c2) {
-        return c2.type === 'screencast-frame' && c2.data && Array.isArray(c2.data.callouts) && c2.data.callouts.length;
+        if (c2.type === 'screencast-frame' && c2.data && Array.isArray(c2.data.callouts) && c2.data.callouts.length) return true;
+        return c2.type === 'narration-track' && c2.data && Array.isArray(c2.data.chapters) && c2.data.chapters.length;
       });
     });
     var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 32, screenH: 32, speakerH: 32, musicH: 16, speaker: -1, music: -1 };
@@ -5976,6 +6075,18 @@ export function getPreviewHtml(): string {
         '</div>' +
         '<div class="sp-status">Or just drag the bubble to place it anywhere.</div>'
       : '';
+    // Chapter card: an overlay on the film (an effect). Clicking the card
+    // itself edits that chapter; clicking anywhere else offers "add here".
+    var chapComp = null;
+    var chapSceneEnt = currentSceneEntry();
+    if (chapSceneEnt) (chapSceneEnt.components || []).forEach(function(c) { if (c.type === 'narration-track') chapComp = c; });
+    var chapCard = !isScene && sel && sel._el && sel._el.closest && sel._el.closest('.ntrk-chapter');
+    var chapRow = chapComp
+      ? '<div class="sp-row"><button class="rv-go secondary" id="rv-pop-chap" style="flex:1;" title="' +
+        (chapCard ? 'Rename, retime, or delete this chapter card'
+          : 'Drop a chapter card at the playhead (a brief title over a dimmed frame)') + '">' +
+        (chapCard ? '⚑ Edit this chapter…' : '⚑ Add chapter here…') + '</button></div>'
+      : '';
     pop.innerHTML =
       '<div class="sp-head"><span class="sp-title" id="rv-pop-title"></span>' +
       '<button class="sp-x" id="rv-pop-x" title="Close (Esc)">✕</button></div>' +
@@ -5986,6 +6097,7 @@ export function getPreviewHtml(): string {
       '</div>' +
       bubbleRow +
       '<div class="sp-row">' + camRow + '</div>' +
+      chapRow +
       '<div class="sp-status" id="rv-pop-status"></div>';
     document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
     document.getElementById('rv-pop-go').addEventListener('click', rvPopGo);
@@ -6011,6 +6123,27 @@ export function getPreviewHtml(): string {
         b.addEventListener('click', function() { bubbleShape(sel.compId, b.getAttribute('data-shape')); });
       });
     }
+    var chapBtn = document.getElementById('rv-pop-chap');
+    if (chapBtn && chapComp) chapBtn.addEventListener('click', function() {
+      var si2 = state.currentSceneIndex;
+      var idx = -1;
+      if (chapCard) {
+        // Which chapter is the card showing? The one whose window covers the
+        // playhead; fall back to the nearest by start time.
+        var tl0 = (state.masterTime || 0) - sceneStartFor(si2);
+        var chsA = (chapComp.data && chapComp.data.chapters) || [];
+        chsA.forEach(function(c3, i3) {
+          var hold = (typeof c3.dur === 'number' && c3.dur >= 0.5) ? c3.dur : 2.2;
+          if (tl0 >= c3.at - 0.3 && tl0 <= c3.at + hold + 0.6) idx = i3;
+        });
+        if (idx < 0 && chsA.length) {
+          var bd = 1e9;
+          chsA.forEach(function(c3, i3) { var d0 = Math.abs(c3.at - tl0); if (d0 < bd) { bd = d0; idx = i3; } });
+        }
+      }
+      rvPopClose();
+      chapPopOpen(si2, chapComp.id, idx, null);
+    });
     var ta = document.getElementById('rv-pop-input');
     ta.value = keepText;
     ta.addEventListener('keydown', function(e) {
