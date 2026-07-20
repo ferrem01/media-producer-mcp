@@ -92,6 +92,14 @@ export function extractToken(req: IncomingMessage): string | null {
     // invalid URL
   }
 
+  // Browser session cookie (set by the Google login callback): lets Studio
+  // work on a bare /studio URL with no token in the address bar.
+  const cookies = req.headers.cookie;
+  if (cookies) {
+    const m = /(?:^|;\s*)mp_session=([^;]+)/.exec(cookies);
+    if (m) return decodeURIComponent(m[1]);
+  }
+
   return null;
 }
 

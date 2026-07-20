@@ -1477,3 +1477,24 @@ url of the droplet or anything."
 - Extension: removed the grandfathered manual-token path (Marc: only
   him + Jacob use this; no backwards compatibility wanted). Sign-in is
   now the only way in.
+
+## Studio: session login, tenant field gone (Marc, 2026-07-20)
+
+"If I am logged in as the right user shouldn't I be able to just use
+studio without passing in tenant and token every time... I don't even
+want to see that field at the top of studio anymore."
+
+- Google login now sets an HttpOnly SameSite=Lax session cookie
+  (mp_session, 30 days) and redirects back into Studio; extractToken
+  accepts it alongside Bearer/?token=, so the whole API works
+  cookie-authenticated. /auth/logout clears it (Sign out link in the
+  header chip). return_to is constrained to on-site paths.
+- A BARE /studio now just works: boot asks /auth/me (cookie), resolves
+  the session's tenant, loads its projects; signed out -> bounce
+  through Google and straight back. Share links with ?tenant=&token=
+  still work and win when present.
+- The Tenant field and Load button are GONE from the Studio header --
+  replaced by the project picker plus a signed-in chip (avatar, email,
+  sign out). Tenant is never typed anywhere anymore: MCP, extension,
+  and Studio all derive it from the login, with phase-1 enforcement
+  underneath.
