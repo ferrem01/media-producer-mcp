@@ -241,7 +241,16 @@ async function callAnthropic(
     .join("");
 
   if (!result) {
-    throw new Error("Anthropic returned empty response");
+    // Name the shape: on thinking-by-default models (Claude 5 family) a tight
+    // max_tokens can be consumed entirely by the thinking block, leaving no
+    // text -- the bare "empty response" error sent us chasing ghosts.
+    var blockTypes = data.content.map((b) => b.type).join(",") || "none";
+    throw new Error(
+      `Anthropic returned empty response (stop_reason: ${data.stop_reason || "?"}; blocks: ${blockTypes})` +
+      (data.stop_reason === "max_tokens"
+        ? " -- the model's thinking likely consumed the whole max_tokens budget; raise maxTokens"
+        : ""),
+    );
   }
 
   // A response cut off by the token budget is NOT a usable partial result for

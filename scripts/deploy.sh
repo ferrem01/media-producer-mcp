@@ -77,6 +77,10 @@ else
 fi
 pm2 save >/dev/null 2>&1 || true
 
+# Health watchdog (idempotent): pm2 memory ceiling + a cron /health probe
+# that restarts -- and, if restarts don't recover it, redeploys -- a wedged app.
+MP_PM2_NAME="$APP_NAME" bash scripts/setup-watchdog.sh || echo "watchdog setup skipped"
+
 # Health check: wait for the server to answer, then confirm it serves THIS
 # commit (a healthy response from a stale process is the classic silent
 # deploy failure).
