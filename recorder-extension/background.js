@@ -13,9 +13,135 @@ let session = null; // { tabId, phase, startedMs, pausedMs, pauseBegan, events, 
 
 const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: false, camera: false };
 
+// The one server this build talks to. Users never see or enter it -- the
+// whole setup is "Sign in with Google". (Override via settings.server only
+// for dev builds.)
+const SERVER = "https://159-203-115-164.nip.io";
+
 async function getSettings() {
   const s = await chrome.storage.sync.get(DEFAULTS);
   return { ...DEFAULTS, ...s };
+}
+
+// ── Sign in with Google (server-brokered OAuth code + PKCE) ─────────────────
+// The media-producer server already runs a full OAuth surface for MCP
+// clients (RFC 7591 registration, /authorize backed by Google, /token with
+// PKCE + rotating refresh tokens). The extension is just another registered
+// client. After the flow we mirror {server, tenant, token} into the SAME
+// sync settings the recording pipeline has always read -- so sign-in is the
+// only new moving part.
+
+function b64url(bytes) {
+  return btoa(String.fromCharCode(...new Uint8Array(bytes)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function ensureOAuthClient(server) {
+  const { qrOAuthClient } = await chrome.storage.local.get("qrOAuthClient");
+  const redirectUri = chrome.identity.getRedirectURL();
+  if (qrOAuthClient?.client_id && qrOAuthClient.server === server && qrOAuthClient.redirect_uri === redirectUri) {
+    return qrOAuthClient;
+  }
+  const res = await fetch(server + "/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_name: "Quotient Recorder", redirect_uris: [redirectUri] }),
+  });
+  if (!res.ok) throw new Error("client registration failed (" + res.status + ")");
+  const reg = await res.json();
+  const client = { client_id: reg.client_id, server, redirect_uri: redirectUri };
+  await chrome.storage.local.set({ qrOAuthClient: client });
+  return client;
+}
+
+async function tokenExchange(server, body) {
+  const res = await fetch(server + "/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = ""; try { detail = (await res.json()).error_description || ""; } catch (e) {}
+    throw new Error("token exchange failed (" + res.status + (detail ? ": " + detail : "") + ")");
+  }
+  return res.json();
+}
+
+async function saveAuth(server, tok) {
+  // Who am I? -> email + tenant for the signed-in display and upload routing.
+  const meRes = await fetch(server + "/auth/me", { headers: { Authorization: "Bearer " + tok.access_token } });
+  if (!meRes.ok) throw new Error("could not load profile (" + meRes.status + ")");
+  const me = await meRes.json();
+  const auth = {
+    server,
+    access_token: tok.access_token,
+    refresh_token: tok.refresh_token || null,
+    expires_at: Date.now() + (tok.expires_in || 86400) * 1000,
+    email: me.email, name: me.name, picture: me.picture, tenant_id: me.tenant_id,
+  };
+  await chrome.storage.local.set({ qrAuth: auth });
+  // Mirror into the sync settings every recording/upload path already reads.
+  await chrome.storage.sync.set({ server, tenant: me.tenant_id, token: tok.access_token });
+  return auth;
+}
+
+async function signIn() {
+  const server = (await getSettings()).server || SERVER;
+  const client = await ensureOAuthClient(server);
+  const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
+  const verifier = b64url(verifierBytes);
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
+  const authUrl = server + "/authorize?" + new URLSearchParams({
+    response_type: "code",
+    client_id: client.client_id,
+    redirect_uri: client.redirect_uri,
+    state,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+  });
+  const redirect = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
+  const got = new URL(redirect);
+  if (got.searchParams.get("state") !== state) throw new Error("OAuth state mismatch");
+  const code = got.searchParams.get("code");
+  if (!code) throw new Error(got.searchParams.get("error_description") || "sign-in was cancelled");
+  const tok = await tokenExchange(server, {
+    grant_type: "authorization_code", code,
+    redirect_uri: client.redirect_uri, code_verifier: verifier,
+  });
+  return saveAuth(server, tok);
+}
+
+/** Refresh the 24h access token when it is near expiry; silent no-op
+ *  otherwise. Called before auth-status renders and before every recording
+ *  starts, so a signed-in user never sees an expired-token failure. */
+async function refreshIfNeeded() {
+  const { qrAuth } = await chrome.storage.local.get("qrAuth");
+  if (!qrAuth?.refresh_token) return qrAuth || null;
+  if (qrAuth.expires_at - Date.now() > 10 * 60 * 1000) return qrAuth;
+  try {
+    const tok = await tokenExchange(qrAuth.server, { grant_type: "refresh_token", refresh_token: qrAuth.refresh_token });
+    return await saveAuth(qrAuth.server, tok);
+  } catch (e) {
+    // Refresh token rotated away or revoked: back to signed-out.
+    console.warn("qr: token refresh failed:", e.message);
+    await signOut();
+    return null;
+  }
+}
+
+async function signOut() {
+  await chrome.storage.local.remove("qrAuth");
+  await chrome.storage.sync.set({ token: "", tenant: "" });
+}
+
+async function authStatus() {
+  const auth = await refreshIfNeeded();
+  if (auth) return { signedIn: true, email: auth.email, name: auth.name, picture: auth.picture, tenant: auth.tenant_id };
+  // Grandfathered manual token (pre-OAuth installs): still lets you record.
+  const s = await getSettings();
+  if (s.token && s.tenant) return { signedIn: true, email: "(configured token)", name: s.tenant, picture: null, tenant: s.tenant, legacy: true };
+  return { signedIn: false };
 }
 
 async function ensureOffscreen() {
@@ -50,10 +176,20 @@ function freshEvents(tab, settings) {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
+      if (msg.type === "qr-auth-status") { sendResponse(await authStatus()); return; }
+      if (msg.type === "qr-signin") {
+        try { const a = await signIn(); sendResponse({ ok: true, email: a.email, name: a.name, picture: a.picture, tenant: a.tenant_id }); }
+        catch (e) { sendResponse({ ok: false, error: e.message }); }
+        return;
+      }
+      if (msg.type === "qr-signout") { await signOut(); sendResponse({ ok: true }); return; }
+
       if (msg.type === "qr-start") {
+        await refreshIfNeeded(); // never start a take on a stale token
         const settings = await getSettings();
-        if (!settings.server || !settings.tenant || !settings.token) {
-          sendResponse({ ok: false, error: "Configure server, tenant and token first." });
+        if (!settings.server) { await chrome.storage.sync.set({ server: SERVER }); settings.server = SERVER; }
+        if (!settings.tenant || !settings.token) {
+          sendResponse({ ok: false, error: "Sign in first." });
           return;
         }
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
