@@ -5670,10 +5670,25 @@ export function getPreviewHtml(): string {
         if (!sceneId) { var s = node.getAttribute('data-scene-id'); if (s) sceneId = s; }
         if (!compType) { var t = node.getAttribute('data-comp-type'); if (t) compType = t; }
         if (!compId) { var c = node.getAttribute('data-comp-id'); if (c) compId = c; }
+        // Assembled component wrappers carry data-cid, namespaced
+        // "sceneId__compId" in the composite -- without reading it the
+        // selection never knew WHICH component was clicked (the camera
+        // bubble's placement controls never appeared; label read "div").
+        if (!compId) { var c1 = node.getAttribute('data-cid'); if (c1) compId = c1; }
       }
       node = node.parentElement;
     }
     if (!sceneId) sceneId = studioCurrentSceneId();
+    if (compId && sceneId && compId.indexOf(sceneId + '__') === 0) compId = compId.slice(sceneId.length + 2);
+    if (compId && !compType) {
+      // The wrapper has no type attr; recover it from project data so the
+      // selection label names the component, not its inner div.
+      var p0 = state.currentProject;
+      (p0 && p0.scenes || []).forEach(function(s0) {
+        if (s0.id !== sceneId) return;
+        (s0.components || []).forEach(function(c0) { if (c0.id === compId) compType = c0.type; });
+      });
+    }
     var cls = (el.className && typeof el.className === 'string') ? el.className.split(/\\s+/).filter(Boolean) : [];
     return {
       sceneId: sceneId, compType: compType, compId: compId,
