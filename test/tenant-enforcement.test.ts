@@ -156,6 +156,18 @@ describe("/api/tenants admin listing (source guards)", () => {
   });
 });
 
+describe("playground routes (source guards)", () => {
+  it("body-carried tenant_ids are guarded; shared-library saves are admin-only", async () => {
+    const src = await fs.readFile(path.resolve(__dirname, "../src/index.ts"), "utf-8");
+    // components/save: writes into a tenant dir (guard) or the SHARED
+    // library that renders into every tenant's films (admin only).
+    expect(src).toContain("if (saveTenantId && !requireTenant(req, res, saveTenantId)) return;");
+    expect(src).toContain("Saving to the shared component library requires the admin scope");
+    // playground revise: tid pulls that tenant's brand kit into LLM context.
+    expect(src).toContain("if (tid && !requireTenant(req, res, tid)) return;");
+  });
+});
+
 describe("server.ts MCP registration (source guards)", () => {
   it("all tools register through the tenant-enforcing wrapper", async () => {
     const src = await fs.readFile(path.resolve(__dirname, "../src/server.ts"), "utf-8");
