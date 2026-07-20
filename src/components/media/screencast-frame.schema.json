@@ -37,6 +37,11 @@
       "optional": true,
       "default": 16
     },
+    "shape": {
+      "type": "string",
+      "label": "Set 'circle' (frame_style 'none' only) for a square, center-cover-cropped circular clip -- the camera-bubble look. Overrides corner_radius.",
+      "optional": true
+    },
     "max_width_pct": {
       "type": "number",
       "label": "Frame width as % of the component box. Honored in 'none' mode too: set ~88 to inset a full-bleed screencast ~20px top/bottom so it floats as a card over the scene background (aspect ratio pulls the sides in proportionally).",
