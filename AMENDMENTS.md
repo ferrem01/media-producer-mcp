@@ -1433,3 +1433,31 @@ data dir misses login-only tenants.)
 Phase 2 (next): "Sign in with Google" in the recorder extension via the
 server's existing OAuth PKCE endpoints -- zero fields in the popup, the
 session's tenant does the rest.
+
+## Multi-tenancy phase 2: extension "Sign in with Google" (Marc, 2026-07-20)
+
+The bar, verbatim: "in the extension there will be nothing the user has
+to enter besides logging in. I don't want to even show the tenant id or
+url of the droplet or anything."
+
+- Popup is now zero-field: signed-out shows one "Sign in with Google"
+  button; signed-in shows an avatar/name/email card with Sign out. The
+  record button is gated on auth (and upload terminal states cannot
+  re-enable a signed-out popup).
+- The extension registers itself as an OAuth client of the server's
+  EXISTING surface (RFC 7591 /register, /authorize backed by Google,
+  /token with PKCE + rotating refresh) -- no new server code. Flow:
+  chrome.identity.launchWebAuthFlow -> code+state to the pinned
+  chromiumapp.org redirect -> /token exchange -> /auth/me for
+  email/tenant.
+- After sign-in the account is mirrored into the SAME sync settings the
+  recording pipeline has always read ({server, tenant, token}), so
+  capture/upload/generate paths are untouched. The 24h JWT silently
+  refreshes before auth-status renders and before every take starts.
+- Server URL is baked into the build (users never see it). Manual-token
+  installs are grandfathered as a "(configured token)" signed-in state.
+- Manifest 0.9.0 (+"identity" permission); zip rebuilt (served at
+  /extension.zip). Regression: test/extension-auth.test.ts guards the
+  zero-field contract, PKCE/state/refresh wiring, and settings mirror.
+- Same-account-everywhere now holds: MCP login and extension login are
+  the same Google identity -> same tenant (enforcement from phase 1).

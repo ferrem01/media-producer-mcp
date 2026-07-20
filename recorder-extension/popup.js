@@ -1,33 +1,58 @@
-// Quotient Recorder -- popup: settings + record/stop.
+// Quotient Recorder -- popup: sign in + record/stop. The ONLY setup is
+// "Sign in with Google": server/tenant/token are resolved by the account
+// (background.js mirrors them into the settings the pipeline reads).
 const $ = (id) => document.getElementById(id);
-const FIELDS = ["server", "tenant", "token", "project"];
 
-// First-run defaults: everything but the token, so a fresh install is one
-// field away from recording. (Settings persist across reinstalls anyway --
-// the manifest "key" pins the extension ID that chrome.storage.sync keys on.)
-const DEFAULTS = {
-  server: "https://159-203-115-164.nip.io",
-  tenant: "marc-getquotient-ai",
-  token: "",
-  project: "library",
-};
+function renderAuth(st) {
+  const signedIn = !!(st && st.signedIn);
+  $("auth-out").style.display = signedIn ? "none" : "block";
+  $("auth-in").style.display = signedIn ? "flex" : "none";
+  $("record").dataset.needsAuth = signedIn ? "" : "1";
+  $("record").disabled = !signedIn;
+  if (signedIn) {
+    $("auth-name").textContent = st.name || "";
+    $("auth-email").textContent = st.email || "";
+    if (st.picture) { $("auth-pic").src = st.picture; $("auth-pic").style.display = "block"; }
+    else $("auth-pic").style.display = "none";
+  }
+}
 
 async function load() {
-  const s = await chrome.storage.sync.get({ ...DEFAULTS, mic: false, camera: false });
-  FIELDS.forEach((f) => { $(f).value = s[f] || DEFAULTS[f] || ""; });
+  const s = await chrome.storage.sync.get({ mic: false, camera: false });
   $("mic").checked = !!s.mic;
   $("camera").checked = !!s.camera;
+  renderAuth(await chrome.runtime.sendMessage({ type: "qr-auth-status" }));
   const { recording } = await chrome.runtime.sendMessage({ type: "qr-status" }) || {};
   setRecording(!!recording);
   const { qrLastStatus } = (await chrome.storage.session?.get("qrLastStatus")) || {};
   showStatus(qrLastStatus);
 }
 
+$("signin").addEventListener("click", async () => {
+  $("signin").disabled = true;
+  $("status").textContent = "Opening Google sign-in…";
+  const res = await chrome.runtime.sendMessage({ type: "qr-signin" });
+  $("signin").disabled = false;
+  if (res && res.ok) {
+    $("status").textContent = "";
+    renderAuth({ signedIn: true, ...res });
+  } else {
+    $("status").textContent = "Sign-in failed: " + ((res && res.error) || "unknown error");
+  }
+});
+
+$("signout").addEventListener("click", async (e) => {
+  e.preventDefault();
+  await chrome.runtime.sendMessage({ type: "qr-signout" });
+  renderAuth({ signedIn: false });
+});
+
 function showStatus(st) {
   if (!st) return;
   // No re-record while a take is still uploading -- the offscreen recorder
   // is busy with the blob and a second session would collide with it.
-  $("record").disabled = st.state === "uploading";
+  // (needsAuth: a terminal upload state must not re-enable a signed-out popup.)
+  $("record").disabled = st.state === "uploading" || $("record").dataset.needsAuth === "1";
   if (st.state === "uploading") {
     const p = st.progress;
     $("status").textContent = p && p.total
@@ -63,9 +88,7 @@ function setRecording(on) {
 }
 
 async function save() {
-  const s = { mic: $("mic").checked, camera: $("camera").checked };
-  FIELDS.forEach((f) => { s[f] = $(f).value.trim(); });
-  await chrome.storage.sync.set(s);
+  await chrome.storage.sync.set({ mic: $("mic").checked, camera: $("camera").checked });
 }
 
 async function ensurePermission(name, withCam) {
@@ -115,5 +138,4 @@ $("record").addEventListener("click", async () => {
   }
 });
 
-FIELDS.forEach((f) => $(f).addEventListener("change", save));
 load();

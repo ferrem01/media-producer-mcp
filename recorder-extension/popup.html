@@ -16,10 +16,23 @@
   </head>
   <body>
     <h1>Quotient Recorder</h1>
-    <label>Server</label><input id="server" placeholder="https://159-203-115-164.nip.io" />
-    <label>Tenant</label><input id="tenant" placeholder="marc-getquotient-ai" />
-    <label>Token</label><input id="token" type="password" placeholder="token" />
-    <label>Library project</label><input id="project" placeholder="library" />
+    <!-- Auth: the ONLY setup is signing in. No server, tenant or token is
+         ever shown -- the account decides everything. -->
+    <div id="auth-out" style="display:none;">
+      <button id="signin" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:#17171c;display:flex;align-items:center;justify-content:center;gap:8px;">
+        <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.7 2.4 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.2C12.4 13.5 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.2C.9 16.5 0 20.1 0 24s.9 7.5 2.6 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.6l-7.7-6c-2.1 1.4-4.8 2.3-7.5 2.3-6.3 0-11.6-4-13.5-9.6l-7.9 6.2C6.5 42.6 14.6 48 24 48z"/></svg>
+        Sign in with Google
+      </button>
+      <div style="font-size:10px;color:#9ca3af;margin-top:6px;">One click and you're set — recordings land in your own studio.</div>
+    </div>
+    <div id="auth-in" style="display:none;align-items:center;gap:8px;padding:8px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;">
+      <img id="auth-pic" width="26" height="26" style="border-radius:50%;display:none;" />
+      <div style="flex:1;min-width:0;">
+        <div id="auth-name" style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+        <div id="auth-email" style="font-size:10px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+      </div>
+      <a id="signout" href="#" style="font-size:10px;color:#9ca3af;text-decoration:none;flex:0 0 auto;">Sign out</a>
+    </div>
     <label style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer;font-size:12px;color:#17171c;">
       <input type="checkbox" id="mic" style="width:auto;margin:0;" />
       &#127897; Narrate live (record my mic while demoing)
