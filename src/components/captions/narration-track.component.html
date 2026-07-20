@@ -141,7 +141,7 @@
     for (var k = 0; k < chapters.length; k++) {
       var ch = chapters[k];
       var at = Math.max(0.2, ch.at);
-      var hold = 2.2;
+      var hold = (typeof ch.dur === 'number' && ch.dur >= 0.5) ? ch.dur : 2.2;
       // Freeze the DOM state for this moment via callbacks so ONE title/kicker
       // element serves every chapter (set text just before showing it).
       (function (title, index, atT) {

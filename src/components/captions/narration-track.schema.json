@@ -14,7 +14,12 @@
       "type": "array",
       "label": "Chapter Moments",
       "optional": true,
-      "description": "[{ title, at }] in scene-local seconds -- brief dimmed full-frame section titles."
+      "description": "[{ title, at, dur? }] in scene-local seconds -- brief dimmed full-frame section titles; dur = how long the card shows (default 2.2s)."
+    },
+    "chapters_edited": {
+      "type": "boolean",
+      "label": "Set by Studio when the user edits chapters; the auto-drafter (sentence spine) never overwrites an edited list.",
+      "optional": true
     }
   }
 }
