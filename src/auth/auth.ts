@@ -4,6 +4,12 @@
  * Reads AUTH_TOKENS env var in format: "token1:tenant1,token2:tenant2"
  * When AUTH_TOKENS is not set, all requests are allowed (dev mode).
  * Also supports JWT tokens from Google OAuth.
+ *
+ * TENANT SCOPING: a token maps to exactly one tenant, and every tenant-scoped
+ * route/tool must act only on that tenant (enforced via tenantAllowed /
+ * requireTenant below). The special tenant "*" (an AUTH_TOKENS entry like
+ * "opstoken:*") is an ADMIN scope that may act cross-tenant -- reserve it for
+ * operator tooling, never hand it to users.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -140,4 +146,40 @@ export function authMiddleware(
   // Neither worked
   res.writeHead(401, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: "Invalid token" }));
+}
+
+/**
+ * May a principal authenticated as `authedTenant` act on `tenantId`?
+ * Pure decision core of tenant enforcement -- exported for tests.
+ * - auth disabled (dev mode): everything passes.
+ * - "*" is the admin scope: cross-tenant allowed.
+ * - otherwise: exact match only.
+ */
+export function tenantAllowed(
+  authedTenant: string | undefined,
+  tenantId: string,
+  authEnabled: boolean = isAuthEnabled(),
+): boolean {
+  if (!authEnabled) return true;
+  if (!authedTenant) return false;
+  if (authedTenant === "*") return true;
+  return authedTenant === tenantId;
+}
+
+/**
+ * Route guard: 403 (and return false) unless the authenticated principal may
+ * act on `tenantId`. Call AFTER authMiddleware (which stamps req.tenantId).
+ */
+export function requireTenant(
+  req: IncomingMessage,
+  res: ServerResponse,
+  tenantId: string,
+): boolean {
+  const authed = (req as any).tenantId as string | undefined;
+  if (tenantAllowed(authed, tenantId)) return true;
+  res.writeHead(403, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({
+    error: `Forbidden: this token is scoped to tenant "${authed || "(none)"}", not "${tenantId}"`,
+  }));
+  return false;
 }

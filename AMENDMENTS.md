@@ -1395,3 +1395,41 @@ only the status code.)
   component-data path with a mocked LLM, and source guards on the
   Studio template literal (compId in payload, data-cid reading, error
   body surfacing).
+
+## Multi-tenancy phase 1: enforcement (Marc, 2026-07-20)
+
+Analysis for the multi-tenant push found the system was multi-tenant in
+storage only: authMiddleware resolved WHO you are, then every API route
+took the tenant from the URL and every MCP tool from a plain tenant_id
+param -- nothing compared them. Any logged-in user could read/write any
+tenant. (Also: Jacob's OAuth tenant HAD been created correctly --
+jacob-getquotient-ai in _system/tenants.json; it looked missing because
+tenant DIRECTORIES are created lazily on first write, so `ls` of the
+data dir misses login-only tenants.)
+
+- Single choke point in index.ts after authMiddleware: every
+  tenant-scoped /api route (tenant = first segment; revise/undo nested)
+  403s unless the token's tenant matches. "*" is the new ADMIN scope
+  (AUTH_TOKENS entry like "opstok:*") for cross-tenant operator tooling.
+  ADDING A ROUTE: register it in the alternation (or, if tenant-less,
+  in the test's allowlist) -- test/tenant-enforcement.test.ts scans the
+  source and fails on unregistered /api routes.
+- MCP tools now act on the SESSION's tenant: /mcp stamps req.auth, the
+  SDK surfaces it as extra.authInfo, and a tenant-enforcing tool()
+  wrapper overrides params.tenant_id with it (param still honored for
+  admin/stdio-dev sessions, where it is required). tenant_id is now
+  optional in every tool schema -- authenticated users stop passing it.
+- Job routes (no tenant in URL): list is forced to the caller's tenant;
+  single-job GET and wait answer 404 for a foreign tenant's job (job
+  existence itself is cross-tenant information).
+- Closed while auditing: /assets/_system/* served UNAUTHENTICATED --
+  including _system/tenants.json (user emails/names) and deploy.log;
+  now only _system/cache/ (music bed cache) is served. Tenant registry
+  path now follows config.dataDir instead of a hardcoded
+  /data/media-producer.
+- Deploy note: static tokens in AUTH_TOKENS now really scope to their
+  mapped tenant (DEPLOY.md documents preview123 -> marc-getquotient-ai).
+
+Phase 2 (next): "Sign in with Google" in the recorder extension via the
+server's existing OAuth PKCE endpoints -- zero fields in the popup, the
+session's tenant does the rest.
