@@ -3416,7 +3416,15 @@ export function getPreviewHtml(): string {
               if (Math.abs(chipSpots[cs2].pct - pctC) < 1.2 && chipSpots[cs2].lift === liftC) { liftC++; cs2 = -1; }
             }
             chipSpots.push({ pct: pctC, lift: liftC });
-            if (liftC) chip.style.top = (2 - liftC * 20) + 'px';
+            // Crowded seams stay INSIDE the lane: second chip takes the lower
+            // in-lane row, further collisions shove sideways. (Lifting up 20px
+            // per collision walked chips off the layer when several cuts
+            // landed in a row.)
+            if (liftC) {
+              chip.style.top = (liftC % 2 ? 15 : 2) + 'px';
+              var shoveC = Math.floor(liftC / 2);
+              if (shoveC) chip.style.marginLeft = (-8 + shoveC * 15) + 'px';
+            }
             chip.style.left = pctC.toFixed(2) + '%';
             chip.title = glen.toFixed(1) + 's of footage cut (src ' + c2.src_start.toFixed(1) + 's–' + c2.src_end.toFixed(1) + 's). Click to restore.';
             chip.addEventListener('click', function(ev) {
