@@ -1337,3 +1337,32 @@ pattern: narration-track's data.chapters [{title, at, dur?}].
 Auto policy unchanged for now: the spine still drafts chapters on first
 assembly. If living with editable chapters still annoys, downgrading the
 draft to a suggestion is a one-line policy change on this same UI.
+
+## Booth draft 500 + deploy resilience (Marc, 2026-07-20)
+
+Marc clicked booth's Draft Script and got a 500: "Anthropic returned
+empty response". Root cause was NOT the film analysis (runs clean on his
+project) but the LLM call budget: newer models think by default and the
+thinking spends from max_tokens, so the drafter's 1500 cap was consumed
+before any JSON text was emitted.
+
+- booth-script maxTokens 1500 -> 6000 (with a comment naming the trap).
+- llm client's empty-response error now reports stop_reason + returned
+  block types and hints "raise maxTokens" when stop_reason=max_tokens.
+- Live-verified on proj_c55cfce5: draft returns a timed cue list; the
+  timelapse span correctly gets a single bridging line.
+
+Same PR fixes the deploy wedge that took the droplet down twice:
+
+- /api/deploy's detached child was still the app's process-tree child,
+  and pm2 kills by walking ppids -- a reload mid-deploy SIGINT-killed
+  `npm ci`, leaving a half-built dist crash-looping. The deploy is now
+  double-forked (setsid + nohup) so it re-parents to init. Proven live:
+  the first post-merge auto-deploy (old code) died at its own pm2
+  reload; the second (new code) ran through reload to completion.
+- New health watchdog, installed idempotently by deploy.sh: pm2
+  max_memory_restart 1200M + an every-minute /etc/cron.d probe of
+  /health. Escalation: 3 straight misses -> pm2 restart; 2 restarts
+  without recovery -> full `deploy.sh master` under flock (the only
+  cure for a corrupted dist). Any healthy probe resets the ladder.
+  Log: /var/log/mp-watchdog.log.
