@@ -183,6 +183,15 @@ describe("Studio session login (source guards)", () => {
     const src = await fs.readFile(path.resolve(__dirname, "../src/index.ts"), "utf-8");
     expect(src).toContain('"Set-Cookie": "mp_session=; HttpOnly; Path=/; Max-Age=0"');
   });
+  it("signed-out /studio bounces to Google BEFORE the auth middleware (no raw 401 JSON)", async () => {
+    const src = await fs.readFile(path.resolve(__dirname, "../src/index.ts"), "utf-8");
+    const studioIdx = src.indexOf('urlPath.startsWith("/studio")');
+    const middlewareIdx = src.indexOf("Auth for all non-health routes");
+    expect(studioIdx).toBeGreaterThan(-1);
+    expect(studioIdx, "the /studio shell must be served before the auth middleware").toBeLessThan(middlewareIdx);
+    expect(src).toContain('Location: "/auth/google/login?return_to=" + encodeURIComponent(url)');
+  });
+
   it("Studio has NO tenant field and boots from the session", async () => {
     const src = await fs.readFile(path.resolve(__dirname, "../src/preview-app/preview-app.ts"), "utf-8");
     expect(src).not.toContain('id="tenant-input"');
