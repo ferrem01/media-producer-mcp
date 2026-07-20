@@ -746,6 +746,23 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
+      // ── Studio SPA (formerly "preview"; /preview kept as an alias) ──
+      // Handled BEFORE the auth middleware: a signed-out visit must bounce
+      // through Google and come back, not eat the API's raw 401 JSON. Only
+      // the app shell is served here -- every byte of data stays token/
+      // cookie-gated behind the middleware.
+      if (urlPath.startsWith("/studio") || urlPath.startsWith("/preview")) {
+        const t0 = extractToken(req);
+        if (isAuthEnabled() && !(t0 && validateToken(t0))) {
+          res.writeHead(302, { Location: "/auth/google/login?return_to=" + encodeURIComponent(url) });
+          res.end();
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
+        res.end(previewHtml);
+        return;
+      }
+
       // ── Auth for all non-health routes ──
       const authPassed = await new Promise<boolean>((resolve) => {
         authMiddleware(req, res, () => resolve(true));
@@ -778,12 +795,6 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
-      // ── Studio SPA (formerly "preview"; /preview kept as an alias) ──
-      if (urlPath.startsWith("/studio") || urlPath.startsWith("/preview")) {
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
-        res.end(previewHtml);
-        return;
-      }
 
       // ── Upload page: browser drag-drop uploader (public HTML shell; the
       // upload POST it fires carries the token). Bypasses the AI client's
