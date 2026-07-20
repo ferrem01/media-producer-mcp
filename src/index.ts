@@ -804,11 +804,20 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         const logDir = path.join(config.dataDir, "_system");
         await fs.mkdir(logDir, { recursive: true });
         const deployLogPath = path.join(logDir, "deploy.log");
-        const logFd = openSync(deployLogPath, "w");
-        const child = spawn("bash", [deployScript, branch], {
+        await fs.writeFile(deployLogPath, "");
+        // Double-fork: the intermediate shell exits immediately and the real
+        // deploy re-parents to init (ppid 1). detached:true alone gives a new
+        // process GROUP but keeps this process as the PARENT -- and pm2 kills
+        // by process TREE (walking ppids), so any app restart mid-deploy
+        // SIGINT-killed npm ci and left node_modules half-installed, wedging
+        // the box (2026-07-20, twice). Paths are server-controlled; branch is
+        // regex-validated above.
+        const child = spawn("bash", ["-c",
+          `setsid nohup bash '${deployScript}' '${branch}' >> '${deployLogPath}' 2>&1 < /dev/null &`,
+        ], {
           cwd: repoRoot,
-          detached: true, // own process group: survives this process's pm2 reload
-          stdio: ["ignore", logFd, logFd],
+          detached: true,
+          stdio: "ignore",
           env: { ...process.env },
         });
         child.unref();
