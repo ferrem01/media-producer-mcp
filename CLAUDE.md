@@ -6,7 +6,10 @@ the **environment gotchas** that will otherwise cost you an hour.
 
 - Deeper design docs: `SPEC-motion-architecture.md` (motion layers, one-camera
   rule + anchors, component tiers, template pass-through -- read before touching
-  choreography, camera, or component interfaces), `SPEC.md` (visual-quality
+  choreography, camera, or component interfaces), `SPEC-timelapse.md` (the
+  wait as a deliberate beat: sampled playback, elapsed clock, gap-funded film
+  time, suggest/auto policy, and the THREE mapper twins that must agree --
+  read before touching media EDL mapping), `SPEC.md` (visual-quality
   enforcement), `ARCHITECTURE.md`
   (data model — note it is partly stale: it still says `plan`/`brief`; current
   vocabulary is `storyboard`/`visual_notes`), `UNIFIED-CODEGEN-SPEC.md`,
