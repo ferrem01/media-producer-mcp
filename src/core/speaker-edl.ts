@@ -865,7 +865,12 @@ export async function autoTimelapseForStrain(
   if (!pin) return null;
   const prev = pins.filter((p: any) => p.out < pin.out - 0.05).pop();
   const spanStart = prev ? prev.src : (edit.segments && edit.segments.length ? edit.segments[0].src_start : 0);
-  const spanEnd = Math.max(spanStart + 1, pin.src - 0.5);
+  // The span runs to the pinned frame itself: the beat's final flipbook
+  // step already parks on the landing frame, so a real-speed lead-out
+  // before the pin is redundant -- and it left a visible gap between the
+  // striped block and the pin it lands (Marc: "I wish the segment would
+  // end exactly at the pin").
+  const spanEnd = Math.max(spanStart + 1, pin.src);
   if (spanEnd - spanStart < 3) return null;
   // Default beat length: enough to read, never a chore. ~1s of film per
   // 30s of waiting, clamped 3..8s.
@@ -882,9 +887,7 @@ export async function autoTimelapseForStrain(
   // or a long hold before the pin, neither of which is the film anyone
   // meant. Only a too-small window falls back to the funded default
   // (~1s of film per 30s of waiting, clamped 3..8s).
-  const windowOut = prev ? pin.out - prev.out : 0;
-  const residual1x = Math.max(0, pin.src - spanEnd);
-  const available = Math.round((windowOut - residual1x) * 10) / 10;
+  const available = prev ? Math.round((pin.out - prev.out) * 10) / 10 : 0;
   const outSeconds = available >= 3 ? available : Math.max(3, Math.min(8, Math.round(kept / 30)));
   return applyTimelapse(project, { scene_id: sceneId, key, src_start: spanStart, src_end: spanEnd, out_seconds: outSeconds }, dataDir);
 }

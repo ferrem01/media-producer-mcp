@@ -1287,3 +1287,12 @@ Also: the beat's FINAL 0.45s flipbook step now parks on the landing
 frame (src_end−0.05) in all three mappers — the beat settles on the
 exact frame playback continues from, and the preview buffers the landing
 before the boundary instead of seeking there late.
+
+## Timelapse polish (Marc, 2026-07-20): the block ends exactly at the pin
+
+Playback verdict after round 4: "pretty accurate and pretty tight" — one
+visual complaint left: the striped block ended 0.5s before the pin (the
+auto's real-speed lead-out). That lead-out is redundant since the beat's
+final flipbook step parks on the landing frame, so the auto's span now
+runs to the pinned frame itself (spanEnd = pin.src) and the beat fills
+the window exactly: block edge == pin, visually and temporally.
