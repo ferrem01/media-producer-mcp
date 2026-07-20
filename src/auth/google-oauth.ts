@@ -220,6 +220,15 @@ export async function handleGoogleCallback(req: IncomingMessage, res: ServerResp
     }
 
     const user = await findOrCreateTenant(userInfo.email, userInfo.name, userInfo.picture);
+    // A tenant exists ON DISK from its first login -- lazily-created dirs
+    // made login-only tenants invisible (`ls` of the data dir showed nothing,
+    // reading as "no tenant was created" when it had been).
+    try {
+      const { ensureTenantScaffold } = await import("../persistence/paths.js");
+      await ensureTenantScaffold(user.tenantId);
+    } catch (e: any) {
+      console.warn(`tenant scaffold failed for ${user.tenantId}: ${e?.message || e}`);
+    }
 
     // Check for MCP client flow
     const pendingFlow = state ? pendingFlows.get(state) : undefined;

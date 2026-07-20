@@ -1461,3 +1461,19 @@ url of the droplet or anything."
   zero-field contract, PKCE/state/refresh wiring, and settings mirror.
 - Same-account-everywhere now holds: MCP login and extension login are
   the same Google identity -> same tenant (enforcement from phase 1).
+
+## Tenants visible from first login + admin listing (Marc, 2026-07-20)
+
+- First OAuth login now eagerly scaffolds the tenant on disk
+  (projects/, brand-kit/assets/, components/) -- lazily-created dirs
+  made login-only tenants invisible to `ls`, which is exactly how
+  Jacob's (correctly created) tenant read as missing. Naming stays
+  slugified full email: marc@getquotient.ai -> marc-getquotient-ai,
+  jacob@getquotient.ai -> jacob-getquotient-ai.
+- GET /api/tenants (admin "*" scope or deploy token ONLY): registry
+  entries merged with on-disk state -- tenant_id, email, name,
+  created/last-login, on_disk, project count. Replaces the ls
+  heuristic.
+- Extension: removed the grandfathered manual-token path (Marc: only
+  him + Jacob use this; no backwards compatibility wanted). Sign-in is
+  now the only way in.

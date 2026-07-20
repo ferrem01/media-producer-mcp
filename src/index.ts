@@ -49,7 +49,7 @@ import { protectedResourceMetadata, authorizationServerMetadata, registerClient,
 import { readTraces, dailyDigest } from "./trace/index.js";
 import { generateImage } from "./media/image-gen.js";
 import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGetMe } from "./auth/google-oauth.js";
-import { initTenantStoreFromFile } from "./auth/tenant-store.js";
+import { initTenantStoreFromFile, listTenants } from "./auth/tenant-store.js";
 import { normalizeVideoForWeb } from "./core/video-normalize.js";
 import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/asset-intel.js";
 import { solveMediaEdits, inferIntents } from "./core/media-edl.js";
@@ -2769,6 +2769,48 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         project.updated_at = new Date().toISOString();
         await saveProject(project);
         jsonResponse(res, 200, { ok: true, scene_id: sceneId, media_edits: (scene as any).media_edits || {} });
+        return;
+      }
+
+      // ── API: Tenant listing (ADMIN) ──
+      // The operator's answer to "who is on this box": registry entries
+      // (OAuth logins) merged with on-disk state, replacing the `ls`
+      // heuristic that missed login-only tenants. Admin scope ("*") or the
+      // deploy token -- never a per-tenant token.
+      if (urlPath === "/api/tenants" && method === "GET") {
+        const isAdmin = (req as any).tenantId === "*" || !isAuthEnabled();
+        const deploySecret = process.env.MP_DEPLOY_TOKEN;
+        const providedDt = (req.headers["x-deploy-token"] as string) ||
+          new URL(url, "http://localhost").searchParams.get("deploy_token") || "";
+        if (!isAdmin && !(deploySecret && providedDt === deploySecret)) {
+          jsonResponse(res, 403, { error: "Admin scope or deploy token required" });
+          return;
+        }
+        const registered = await listTenants();
+        const byId = new Map(registered.map((t) => [t.tenantId, t]));
+        let dirs: string[] = [];
+        try {
+          dirs = (await fs.readdir(config.dataDir, { withFileTypes: true }))
+            .filter((d) => d.isDirectory() && !d.name.startsWith("_"))
+            .map((d) => d.name);
+        } catch { /* empty data dir */ }
+        const ids = [...new Set([...byId.keys(), ...dirs])].sort();
+        const tenants = await Promise.all(ids.map(async (id) => {
+          const reg = byId.get(id);
+          let projects = 0;
+          try { projects = (await fs.readdir(path.join(config.dataDir, id, "projects"))).length; }
+          catch { /* no projects dir yet */ }
+          return {
+            tenant_id: id,
+            email: reg?.email || null,
+            name: reg?.name || null,
+            created_at: reg?.createdAt || null,
+            last_login: reg?.lastLogin || null,
+            on_disk: dirs.includes(id),
+            projects,
+          };
+        }));
+        jsonResponse(res, 200, { tenants });
         return;
       }
 

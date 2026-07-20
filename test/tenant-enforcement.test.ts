@@ -78,7 +78,7 @@ describe("index.ts route coverage (source guards)", () => {
     const scoped = new Set(guard![1].split("|"));
     // Routes that legitimately carry no tenant in the URL. jobs enforce via
     // the job's own tenantId; deploy/server-log use the deploy secret.
-    const TENANTLESS_API_ROUTES = new Set(["jobs", "deploy", "server-log"]);
+    const TENANTLESS_API_ROUTES = new Set(["jobs", "deploy", "server-log", "tenants"]);
 
     const names = new Set<string>();
     for (const m of src.matchAll(/urlPath\.match\(\/\^\\\/api\\\/([a-z-]+)/g)) names.add(m[1]);
@@ -118,6 +118,41 @@ describe("index.ts route coverage (source guards)", () => {
   it("tenant store path follows config.dataDir", () => {
     expect(src).toContain('initTenantStoreFromFile(path.join(config.dataDir, "_system", "tenants.json"))');
     expect(src).not.toContain('initTenantStoreFromFile("/data/media-producer');
+  });
+});
+
+describe("first-login tenant scaffold", () => {
+  it("creates the on-disk skeleton idempotently", async () => {
+    const { config } = await import("../src/config.js");
+    const { ensureTenantScaffold, tenantDir } = await import("../src/persistence/paths.js");
+    const prev = config.dataDir;
+    config.dataDir = path.resolve(__dirname, "../test-output/tenant-scaffold");
+    try {
+      await ensureTenantScaffold("jacob-getquotient-ai");
+      await ensureTenantScaffold("jacob-getquotient-ai"); // idempotent
+      const base = tenantDir("jacob-getquotient-ai");
+      for (const d of ["projects", "brand-kit/assets", "components"]) {
+        const st = await fs.stat(path.join(base, d));
+        expect(st.isDirectory()).toBe(true);
+      }
+    } finally {
+      await fs.rm(path.resolve(__dirname, "../test-output/tenant-scaffold"), { recursive: true, force: true });
+      config.dataDir = prev;
+    }
+  });
+
+  it("the OAuth callback scaffolds the tenant on login (source guard)", async () => {
+    const src = await fs.readFile(path.resolve(__dirname, "../src/auth/google-oauth.ts"), "utf-8");
+    expect(src).toContain("ensureTenantScaffold(user.tenantId)");
+  });
+});
+
+describe("/api/tenants admin listing (source guards)", () => {
+  it("is gated on admin scope or the deploy token, never a per-tenant token", async () => {
+    const src = await fs.readFile(path.resolve(__dirname, "../src/index.ts"), "utf-8");
+    const route = src.slice(src.indexOf('urlPath === "/api/tenants"'), src.indexOf('urlPath === "/api/tenants"') + 900);
+    expect(route).toContain('(req as any).tenantId === "*"');
+    expect(route).toContain("Admin scope or deploy token required");
   });
 });
 
