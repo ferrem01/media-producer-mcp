@@ -740,6 +740,11 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         await handleTokenExchange(req, res);
         return;
       }
+      if (urlPath === "/auth/logout") {
+        res.writeHead(302, { "Set-Cookie": "mp_session=; HttpOnly; Path=/; Max-Age=0", Location: "/" });
+        res.end();
+        return;
+      }
 
       // ── Auth for all non-health routes ──
       const authPassed = await new Promise<boolean>((resolve) => {

@@ -168,6 +168,31 @@ describe("playground routes (source guards)", () => {
   });
 });
 
+describe("Studio session login (source guards)", () => {
+  it("extractToken reads the mp_session cookie (bare /studio auth)", async () => {
+    const src = await fs.readFile(path.resolve(__dirname, "../src/auth/auth.ts"), "utf-8");
+    expect(src).toContain("mp_session=([^;]+)");
+  });
+  it("Google callback sets an HttpOnly SameSite cookie and redirects into Studio", async () => {
+    const src = await fs.readFile(path.resolve(__dirname, "../src/auth/google-oauth.ts"), "utf-8");
+    expect(src).toMatch(/Set-Cookie.*mp_session=.*HttpOnly.*SameSite=Lax/);
+    // return_to must stay on-site -- an absolute URL would be an open redirect.
+    expect(src).toContain('browserFlow.returnTo.startsWith("/")');
+  });
+  it("/auth/logout clears the session cookie", async () => {
+    const src = await fs.readFile(path.resolve(__dirname, "../src/index.ts"), "utf-8");
+    expect(src).toContain('"Set-Cookie": "mp_session=; HttpOnly; Path=/; Max-Age=0"');
+  });
+  it("Studio has NO tenant field and boots from the session", async () => {
+    const src = await fs.readFile(path.resolve(__dirname, "../src/preview-app/preview-app.ts"), "utf-8");
+    expect(src).not.toContain('id="tenant-input"');
+    expect(src).not.toContain("tenant-input");
+    expect(src).toContain("fetch('/auth/me')");
+    expect(src).toContain("'/auth/google/login?return_to='");
+    expect(src).toContain('id="user-chip"');
+  });
+});
+
 describe("server.ts MCP registration (source guards)", () => {
   it("all tools register through the tenant-enforcing wrapper", async () => {
     const src = await fs.readFile(path.resolve(__dirname, "../src/server.ts"), "utf-8");

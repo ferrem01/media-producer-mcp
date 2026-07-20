@@ -60,6 +60,10 @@ interface AuthCode {
 }
 
 const pendingFlows = new Map<string, PendingFlow>();
+
+// Browser login flows (no OAuth client): state -> where to land after the
+// cookie is set. Lets a signed-out /studio bounce through Google and back.
+const browserReturns = new Map<string, { returnTo: string; createdAt: number }>();
 const authCodes = new Map<string, AuthCode>();
 
 // Clean up expired entries every 5 minutes
@@ -147,6 +151,13 @@ export async function handleGoogleLogin(req: IncomingMessage, res: ServerRespons
       codeChallengeMethod,
       createdAt: Date.now(),
     });
+  } else {
+    // Browser flow (Studio): remember where to land after the cookie is set.
+    const returnTo = query.get("return_to") || "/studio";
+    browserReturns.set(internalState, { returnTo, createdAt: Date.now() });
+    for (const [k, v] of browserReturns) {
+      if (Date.now() - v.createdAt > 10 * 60 * 1000) browserReturns.delete(k);
+    }
   }
 
   const params = new URLSearchParams({
@@ -255,24 +266,26 @@ export async function handleGoogleCallback(req: IncomingMessage, res: ServerResp
       return;
     }
 
-    // Direct browser flow: return JWT
+    // Direct browser flow: set the session cookie and land back in Studio.
+    // The cookie (not a URL token) is what lets a bookmarked bare /studio
+    // just work -- HttpOnly so page script never sees it, SameSite=Lax so
+    // cross-site POSTs don't carry it.
     const token = signToken({
       email: user.email,
       tenant_id: user.tenantId,
       name: user.name,
       picture: user.picture,
     });
-
-    jsonReply(res, 200, {
-      success: true,
-      token,
-      user: {
-        email: user.email,
-        name: user.name,
-        picture: user.picture,
-        tenant_id: user.tenantId,
-      },
+    const browserFlow = state ? browserReturns.get(state) : undefined;
+    if (state) browserReturns.delete(state);
+    const returnTo = browserFlow?.returnTo && browserFlow.returnTo.startsWith("/") ? browserFlow.returnTo : "/studio";
+    const first = (h?: string | string[]) => (Array.isArray(h) ? h[0] : h || "").split(",")[0].trim();
+    const isHttps = first(req.headers["x-forwarded-proto"]) === "https";
+    res.writeHead(302, {
+      "Set-Cookie": `mp_session=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000${isHttps ? "; Secure" : ""}`,
+      Location: returnTo,
     });
+    res.end();
   } catch (err) {
     console.error("OAuth callback error:", err);
     jsonReply(res, 500, { error: "oauth_error", message: "Internal server error" });
@@ -385,13 +398,14 @@ export async function handleTokenExchange(req: IncomingMessage, res: ServerRespo
  * GET /auth/me (requires auth)
  */
 export async function handleGetMe(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
+  // Accept every token source auth knows (Bearer, ?token=, session cookie) --
+  // the cookie path is what lets a bare /studio ask "who am I?".
+  const { extractToken } = await import("./auth.js");
+  const token = extractToken(req);
+  if (!token) {
     jsonReply(res, 401, { error: "missing_token" });
     return;
   }
-
-  const token = authHeader.slice("Bearer ".length).trim();
   const payload = verifyToken(token);
   if (!payload) {
     jsonReply(res, 401, { error: "invalid_token" });

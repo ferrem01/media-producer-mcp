@@ -760,12 +760,14 @@ export function getPreviewHtml(): string {
   <header>
     <h1>Studio</h1>
     <div class="header-controls">
-      <label>Tenant</label>
-      <input id="tenant-input" type="text" placeholder="tenant-id" style="width:120px;">
       <label>Project</label>
-      <select id="project-select" disabled><option value="">-- load tenant first --</option></select>
-      <button class="btn btn-primary" id="load-btn">Load</button>
+      <select id="project-select" disabled><option value="">Loading&#8230;</option></select>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
+      <span id="user-chip" style="display:none;align-items:center;gap:6px;margin-left:12px;font-size:11px;color:#6b7280;">
+        <img id="user-pic" width="20" height="20" style="border-radius:50%;display:none;" alt="">
+        <span id="user-email"></span>
+        <a href="/auth/logout" style="color:#9ca3af;text-decoration:none;margin-left:2px;">Sign out</a>
+      </span>
     </div>
   </header>
 
@@ -866,9 +868,7 @@ export function getPreviewHtml(): string {
 
   // DOM refs
   var els = {
-    tenantInput: document.getElementById('tenant-input'),
     projectSelect: document.getElementById('project-select'),
-    loadBtn: document.getElementById('load-btn'),
     sceneList: document.getElementById('scene-list'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
     previewWrapper: document.getElementById('preview-wrapper'),
@@ -1816,7 +1816,8 @@ export function getPreviewHtml(): string {
 
   // Load projects for tenant
   function loadProjects() {
-    state.tenantId = els.tenantInput.value.trim();
+    // tenantId comes from the session (/auth/me) or a share-link param --
+    // there is no tenant field to read.
     if (!state.tenantId) return;
 
     api('/projects/' + state.tenantId).then(function(projects) {
@@ -5256,15 +5257,6 @@ export function getPreviewHtml(): string {
   }
 
   // Events
-  els.loadBtn.addEventListener('click', function() {
-    var selected = els.projectSelect.value;
-    if (selected) {
-      loadProject(selected);
-    } else {
-      loadProjects();
-    }
-  });
-  els.tenantInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') loadProjects(); });
   els.projectSelect.addEventListener('change', function() {
     var val = els.projectSelect.value;
     if (val) loadProject(val);
@@ -5649,12 +5641,37 @@ export function getPreviewHtml(): string {
     banner.textContent = 'Error: ' + (e.message || 'Unknown') + ' (line ' + e.lineno + ')';
   });
 
-  // Init from URL params
+  // ── Boot: who am I, and whose projects load? ──
+  // Share links still carry ?tenant= (+ ?token=) and win when present.
+  // A BARE /studio resolves the tenant from the login session (/auth/me,
+  // cookie-authenticated); signed out -> bounce through Google and back.
+  function showUserChip(me) {
+    var chip = document.getElementById('user-chip');
+    if (!chip || !me) return;
+    document.getElementById('user-email').textContent = me.email || '';
+    var pic = document.getElementById('user-pic');
+    if (me.picture) { pic.src = me.picture; pic.style.display = 'inline-block'; }
+    chip.style.display = 'inline-flex';
+  }
   var params = new URLSearchParams(window.location.search);
   var tenantParam = params.get('tenant');
   if (tenantParam) {
-    els.tenantInput.value = tenantParam;
+    state.tenantId = tenantParam;
     loadProjects();
+    fetch('/auth/me').then(function(r) { return r.ok ? r.json() : null; })
+      .then(showUserChip).catch(function() {});
+  } else {
+    fetch('/auth/me').then(function(r) {
+      if (!r.ok) throw new Error('signed out');
+      return r.json();
+    }).then(function(me) {
+      state.tenantId = me.tenant_id;
+      showUserChip(me);
+      loadProjects();
+    }).catch(function() {
+      window.location.href = '/auth/google/login?return_to=' +
+        encodeURIComponent(window.location.pathname + window.location.search);
+    });
   }
 
   // ─────────────────────────────────────────────
