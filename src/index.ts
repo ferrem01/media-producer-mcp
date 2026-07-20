@@ -2520,6 +2520,35 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       // segments|null}. Same grammar as camera moves: "screencast" or a
       // video[src*="file"] selector -- several videos per scene, each with
       // its own edit.
+      // ── API: Timelapse beats (deliberate \u23E9 spans; see speaker-edl) ──
+      const timelapseMatch = urlPath.match(/^\/api\/timelapse\/([^/]+)\/([^/]+)$/);
+      if (timelapseMatch && method === "POST") {
+        const [, tenantId, projectId] = timelapseMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const project = await loadProject(tenantId, projectId);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        try {
+          const { applyTimelapse, removeTimelapse, maintainTranscriptCacheAfterGap } = await import("./core/speaker-edl.js");
+          const action = body.action === "remove" ? "remove" : "apply";
+          const result = action === "remove"
+            ? await removeTimelapse(project, { scene_id: String(body.scene_id), key: String(body.key), src_start: Number(body.src_start) })
+            : await applyTimelapse(project, {
+                scene_id: String(body.scene_id), key: String(body.key),
+                src_start: Number(body.src_start), src_end: Number(body.src_end),
+                out_seconds: Number(body.out_seconds) || 4,
+              });
+          await saveProject(project);
+          const narr = (project.audio?.tracks || []).find((t: any) => t.id === "narration");
+          if (result.gap_bake_at != null && result.added_seconds) {
+            await maintainTranscriptCacheAfterGap(tenantId, projectId, narr?.source, result.gap_bake_at, result.added_seconds);
+          }
+          jsonResponse(res, 200, { ok: true, result, project });
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
       const mediaEditsMatch = urlPath.match(/^\/api\/media-edits\/([^/]+)\/([^/]+)$/);
       if (mediaEditsMatch && method === "POST") {
         const [, tenantId, projectId] = mediaEditsMatch.map(decodeURIComponent);
@@ -2633,20 +2662,48 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             return;
           }
           const solved = solveMediaEdits(intents, srcDur);
-          const hasAny = (intents.cuts?.length || 0) + (intents.rate_regions?.length || 0) + (intents.pins?.length || 0) > 0;
+          const hasAny = (intents.cuts?.length || 0) + (intents.rate_regions?.length || 0) + (intents.pins?.length || 0) + (intents.timelapses?.length || 0) > 0;
           if (!hasAny) delete editsMap[target];
           else editsMap[target] = {
             segments: solved.segments,
             pins: intents.pins || [],
             cuts: intents.cuts || [],
             rate_regions: intents.rate_regions || [],
+            ...(intents.timelapses?.length ? { timelapses: intents.timelapses } : {}),
             pin_status: solved.pin_status,
           };
           if (Object.keys(editsMap).length) (scene as any).media_edits = editsMap;
           else delete (scene as any).media_edits;
           project.updated_at = new Date().toISOString();
+          // A pin strained past the 16x cap has no honest manual state --
+          // auto-create the timelapse beat that makes it land (visible +
+          // reversible in the effects lane; the response says so).
+          let tlNote: any = null;
+          if (hasAny) {
+            try {
+              const { autoTimelapseForStrain, maintainTranscriptCacheAfterGap } = await import("./core/speaker-edl.js");
+              const auto = await autoTimelapseForStrain(project, sceneId, target);
+              if (auto) {
+                tlNote = auto;
+                const narr = (project.audio?.tracks || []).find((t: any) => t.id === "narration");
+                if (auto.gap_bake_at != null && auto.added_seconds) {
+                  await maintainTranscriptCacheAfterGap(tenantId, projectId, narr?.source, auto.gap_bake_at, auto.added_seconds);
+                }
+              }
+            } catch (autoErr: any) {
+              console.warn("auto-timelapse skipped:", autoErr?.message || autoErr);
+            }
+          }
           await saveProject(project);
-          jsonResponse(res, 200, { ok: true, scene_id: sceneId, target, edit: editsMap[target] || null });
+          jsonResponse(res, 200, {
+            ok: true, scene_id: sceneId, target,
+            edit: ((scene as any).media_edits || {})[target] || null,
+            ...(tlNote ? {
+              timelapse_auto: tlNote,
+              note: `That wait needed more than 16x -- made it a ${tlNote.out_seconds}s timelapse (click the \u23E9 block in the effects lane to resize or remove).`,
+              project,
+            } : {}),
+          });
           return;
         }
 

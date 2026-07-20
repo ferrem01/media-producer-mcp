@@ -247,7 +247,17 @@ export interface MediaSegment {
    *  `src_end` equals `src_start` and `rate` is 0. This is a TRUE freeze (one
    *  frame parked), not slow playback. */
   hold?: number;
+  /** TIMELAPSE marker: this segment is a deliberate timelapse beat. Its rate
+   *  is EXEMPT from the 16x cap, and above ~8x renderers switch to sampled
+   *  playback (hold each sampled frame ~0.45s) plus an elapsed-clock chip
+   *  instead of continuous fast motion. */
+  tl?: 1;
 }
+
+/** A deliberate timelapse: source [src_start, src_end) plays in EXACTLY
+ *  `out_seconds` of output time, however fast that requires (cap-exempt).
+ *  Renders as sampled frames + an elapsed clock above ~8x. */
+export interface MediaTimelapse { src_start: number; src_end: number; out_seconds: number }
 
 /** A media element's edit: ordered segments (monotonic source times). When
  *  the mapped source runs out before the element stops being shown, the
@@ -272,6 +282,8 @@ export interface MediaEdit {
    *  inferred from segments on the first op-based edit. */
   cuts?: MediaCut[];
   rate_regions?: MediaRateRegion[];
+  /** Deliberate timelapse beats (exact-duration, cap-exempt spans). */
+  timelapses?: MediaTimelapse[];
   /** Derived per-pin health from the last solve. */
   pin_status?: Array<{ out: number; status: "ok" | "strained" | "broken"; detail?: string }>;
 }
@@ -501,6 +513,10 @@ export interface Project {
       edl?: {
         cuts: Array<{ src_start: number; src_end: number }>;
         segments: Array<{ src_start: number; src_end: number; rate: number }>;
+        /** Inserted silences (timelapse beats): at SOURCE moment `src_at`,
+         *  the derived narration holds `seconds` of silence -- the film owns
+         *  that time with no voice, and the screen's timelapse plays there. */
+        gaps?: Array<{ src_at: number; seconds: number }>;
       };
       /** Cache: derived audio rendering of source x edl + its cache key. */
       derived_audio?: string;
