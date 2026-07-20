@@ -1180,3 +1180,16 @@ nothing); fresh installs use nip.io + `key_type rsa4096` per the proven
 recipe; extension default server + docs point at
 https://159-203-115-164.nip.io. Do NOT overwrite the hand-written
 Caddyfile on this droplet — it carries the /hyperframes route.
+
+## TESTPLAN run findings, round 1 (Marc, 2026-07-20)
+
+- **Upload progress** (extension 0.8.0): a 5-minute take is a 100-300MB
+  upload and the popup said only "Uploading…" — reads as a hang. The
+  offscreen uploader now uses XHR (real page context, so upload.onprogress
+  works; fetch has no upload progress) with ONE combined meter across tab +
+  camera files; popup renders "Uploading… 42% · 38 / 91 MB", live and when
+  opened mid-upload (progress rides qrLastStatus in storage.session).
+- **HUD timer flash**: the PiP HUD's clock interval started when the HUD
+  opened — during the 3-2-1 countdown — while rollT was still 0, so it
+  rendered Date.now() as minutes for a beat. Shows 0:00 until the take
+  actually rolls.
