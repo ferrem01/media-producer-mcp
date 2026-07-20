@@ -95,6 +95,30 @@ describe("applyTimelapse", () => {
     expect(p.speaker.clips[0].edl.gaps[0].seconds).toBeCloseTo(6, 0);
   });
 
+  it("a new beat overlapping an existing one replaces it (partial chip-click, then the auto's whole wait)", async () => {
+    const p = jammedFilm();
+    // Manual chip-click: timelapse only the back half of the wait. The pin
+    // window still can't hold the untouched front half at 16x.
+    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 80, src_end: 148, out_seconds: 3 });
+    // The auto (or a second click) covers the WHOLE wait.
+    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 6 });
+    const sc = p.scenes[1].media_edits.screencast;
+    // One beat, not two overlapping constraints.
+    expect(sc.timelapses.length).toBe(1);
+    expect(sc.timelapses[0]).toEqual({ src_start: 8, src_end: 148, out_seconds: 6 });
+    expect(sc.segments.filter((s: any) => s.tl).length).toBe(1);
+    expect((sc.pin_status || []).filter((x: any) => x.status !== "ok")).toEqual([]);
+    // Total film time = original 60 + (6s beat - 2s original window); the
+    // gaps (merged at the same narration spot) fund exactly that.
+    expect(p.scenes[1].duration_seconds).toBeCloseTo(64, 0);
+    const gapTotal = p.speaker.clips[0].edl.gaps.reduce((a: number, g: any) => a + g.seconds, 0);
+    expect(gapTotal).toBeCloseTo(4, 0);
+    // And a remove still drains everything.
+    await removeTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8 });
+    expect((p.speaker.clips[0].edl.gaps || []).length).toBe(0);
+    expect(p.scenes[1].duration_seconds).toBeCloseTo(60, 0);
+  });
+
   it("removeTimelapse shrinks the film back and lifts the gap", async () => {
     const p = jammedFilm();
     await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 6 });

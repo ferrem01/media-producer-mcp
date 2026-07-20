@@ -635,7 +635,18 @@ export async function applyTimelapse(
     : Math.max(0.1, (nextPin ? nextPin.out : outTimeAtSource(solvedBefore.segments, args.src_end)) - beatLocal);
   const wantDelta = Math.round((outSeconds - prevOut) * 100) / 100;
   if (existingTl) existingTl.out_seconds = outSeconds;
-  else tls.push({ src_start: args.src_start, src_end: args.src_end, out_seconds: outSeconds });
+  else {
+    // A new span that overlaps existing beats REPLACES them -- overlapping
+    // fixed-duration constraints cannot coexist in the solver (the live
+    // path: a manual chip-click timelapses one fast stretch, the pin stays
+    // impossible, and the auto then fires with the whole wait). The old
+    // beat's film time is already inside the pin-to-pin window measured
+    // above, so the gap math stays balanced.
+    for (let i = tls.length - 1; i >= 0; i--) {
+      if (tls[i].src_start < args.src_end - 0.05 && tls[i].src_end > args.src_start + 0.05) tls.splice(i, 1);
+    }
+    tls.push({ src_start: args.src_start, src_end: args.src_end, out_seconds: outSeconds });
+  }
   edit.timelapses = tls;
 
   // Fund positive deltas with narration silence; refunds are bounded by the
