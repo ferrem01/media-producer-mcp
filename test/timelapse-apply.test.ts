@@ -135,8 +135,10 @@ describe("applyTimelapse", () => {
     ];
     const res = await autoTimelapseForStrain(p, "screencast", "screencast");
     expect(res).toBeTruthy();
-    // Window 12.8 minus the 0.5s 1x landing = 12.3s beat; nothing funded.
-    expect(res!.out_seconds).toBeCloseTo(12.3, 1);
+    // The beat fills the full 12.8s window and its span runs to the pinned
+    // frame itself -- the striped block ends exactly at the pin.
+    expect(res!.out_seconds).toBeCloseTo(12.8, 1);
+    expect(res!.src_end).toBeCloseTo(240, 1);
     expect(res!.added_seconds).toBe(0);
     expect((p.speaker.clips[0].edl.gaps || []).length).toBe(0);
     expect(p.scenes[1].duration_seconds).toBeCloseTo(60, 0);
