@@ -106,3 +106,9 @@ export async function getTenantById(tenantId: string): Promise<Tenant | undefine
   }
   return undefined;
 }
+
+/** All registered (OAuth) tenants. Admin listing only. */
+export async function listTenants(): Promise<Tenant[]> {
+  ensureLoaded();
+  return [...cache.values()];
+}

@@ -138,9 +138,6 @@ async function signOut() {
 async function authStatus() {
   const auth = await refreshIfNeeded();
   if (auth) return { signedIn: true, email: auth.email, name: auth.name, picture: auth.picture, tenant: auth.tenant_id };
-  // Grandfathered manual token (pre-OAuth installs): still lets you record.
-  const s = await getSettings();
-  if (s.token && s.tenant) return { signedIn: true, email: "(configured token)", name: s.tenant, picture: null, tenant: s.tenant, legacy: true };
   return { signedIn: false };
 }
 

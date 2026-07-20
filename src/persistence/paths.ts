@@ -16,6 +16,20 @@ export function tenantDir(tenantId: string): string {
   return path.join(config.dataDir, tenantId);
 }
 
+/**
+ * Eagerly create a tenant's directory skeleton (projects/, brand-kit/assets/,
+ * components/). Called on first OAuth login so a tenant is visible on disk
+ * from the moment it exists -- lazily-created dirs made login-only tenants
+ * invisible to `ls` and read as "no tenant was created". Idempotent.
+ */
+export async function ensureTenantScaffold(tenantId: string): Promise<void> {
+  const fs = await import("node:fs/promises");
+  const base = tenantDir(tenantId);
+  await fs.mkdir(path.join(base, "projects"), { recursive: true });
+  await fs.mkdir(path.join(base, "brand-kit", "assets"), { recursive: true });
+  await fs.mkdir(path.join(base, "components"), { recursive: true });
+}
+
 // ── Brand Kit ──
 
 export function brandKitDir(tenantId: string): string {
