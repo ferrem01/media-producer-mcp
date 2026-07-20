@@ -168,6 +168,9 @@
         try { chrome.runtime.sendMessage({ type: "qr-stop" }); } catch (e) {}
       });
       hudState.timer = pip.setInterval(() => {
+        // The HUD opens BEFORE the countdown finishes; until the take rolls
+        // (rollT set) the elapsed math would render Date.now() as minutes.
+        if (!hudState.rolling || !hudState.rollT) { time.textContent = "0:00"; return; }
         const now = Date.now();
         const paused = hudState.paused ? now - hudState.pauseBegan : 0;
         time.textContent = fmtHud(now - hudState.rollT - hudState.pausedTotal - paused);

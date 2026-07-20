@@ -215,7 +215,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             message: "Upload failed: " + (msg.error || "unknown error"),
           });
         }
-        chrome.storage.session?.set({ qrLastStatus: { state: msg.state, error: msg.error || null, projectUrl: msg.projectUrl || null, at: Date.now() } });
+        chrome.storage.session?.set({ qrLastStatus: { state: msg.state, error: msg.error || null, projectUrl: msg.projectUrl || null, progress: msg.progress || null, at: Date.now() } });
         return;
       }
 

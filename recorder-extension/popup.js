@@ -28,7 +28,12 @@ function showStatus(st) {
   // No re-record while a take is still uploading -- the offscreen recorder
   // is busy with the blob and a second session would collide with it.
   $("record").disabled = st.state === "uploading";
-  if (st.state === "uploading") $("status").textContent = "Uploading…";
+  if (st.state === "uploading") {
+    const p = st.progress;
+    $("status").textContent = p && p.total
+      ? `Uploading… ${p.pct}% · ${(p.done / 1048576).toFixed(0)} / ${(p.total / 1048576).toFixed(0)} MB`
+      : "Uploading…";
+  }
   else if (st.state === "done") $("status").textContent = "Uploaded ✓ — assembling now; the film appears in Studio in a few minutes.";
   else if (st.state === "error") $("status").textContent = "Upload failed: " + (st.error || "unknown error");
   else if (st.state === "ready" && st.projectUrl) {
@@ -45,7 +50,7 @@ function showStatus(st) {
 // progress, and the terminal state also lands in storage.session (covers a
 // popup opened after the fact).
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === "qr-offscreen-status") showStatus({ state: msg.state, error: msg.error });
+  if (msg?.type === "qr-offscreen-status") showStatus({ state: msg.state, error: msg.error, progress: msg.progress });
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && changes.qrLastStatus?.newValue) showStatus(changes.qrLastStatus.newValue);

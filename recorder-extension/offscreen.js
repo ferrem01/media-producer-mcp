@@ -113,18 +113,43 @@ async function stop(upload) {
     releaseStreams();
     if (!blob.size) { status("error", "empty recording"); return; }
 
-    status("uploading");
     const base = upload.server;
     const q = (extra) => `token=${encodeURIComponent(upload.token)}${extra || ""}`;
-    const uploadAsset = async (name, body) => {
-      const r = await fetch(
-        `${base}/api/upload-asset/${encodeURIComponent(upload.tenant)}/${encodeURIComponent(upload.project)}?${q(`&name=${encodeURIComponent(name)}`)}`,
-        { method: "POST", body },
-      );
-      const j = await r.json();
-      if (!r.ok || !j.ok) throw new Error(j.error || `upload HTTP ${r.status}`);
-      return j;
+
+    // Progress: one combined meter across both files (a 5-minute take is
+    // ~100-300MB; a bare "Uploading..." reads as a hang). XHR because the
+    // offscreen document is a real page and fetch has no upload progress.
+    const totalBytes = blob.size + (camBlob ? camBlob.size : 0);
+    let uploadedBase = 0;
+    let lastSent = 0;
+    const report = (loaded) => {
+      const now = Date.now();
+      if (now - lastSent < 400 && uploadedBase + loaded < totalBytes) return;
+      lastSent = now;
+      status("uploading", null, null, {
+        done: uploadedBase + loaded,
+        total: totalBytes,
+        pct: Math.min(100, Math.round(((uploadedBase + loaded) / totalBytes) * 100)),
+      });
     };
+    report(0);
+    const uploadAsset = (name, body) => new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${base}/api/upload-asset/${encodeURIComponent(upload.tenant)}/${encodeURIComponent(upload.project)}?${q(`&name=${encodeURIComponent(name)}`)}`);
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) report(e.loaded); };
+      xhr.onload = () => {
+        let j = null;
+        try { j = JSON.parse(xhr.responseText); } catch (e) { /* fall through */ }
+        if (xhr.status >= 200 && xhr.status < 300 && j && j.ok) {
+          uploadedBase += body.size;
+          report(0);
+          resolve(j);
+        } else reject(new Error((j && j.error) || `upload HTTP ${xhr.status}`));
+      };
+      xhr.onerror = () => reject(new Error("upload network error"));
+      xhr.ontimeout = () => reject(new Error("upload timed out"));
+      xhr.send(body);
+    });
 
     // 1. Tab video, then the camera take when there is one.
     const upJson = await uploadAsset(upload.name, blob);
@@ -191,6 +216,6 @@ async function pollForProject(upload, prompt) {
   }
 }
 
-function status(state, error, projectUrl) {
-  chrome.runtime.sendMessage({ type: "qr-offscreen-status", state, error: error || null, projectUrl: projectUrl || null });
+function status(state, error, projectUrl, progress) {
+  chrome.runtime.sendMessage({ type: "qr-offscreen-status", state, error: error || null, projectUrl: projectUrl || null, progress: progress || null });
 }
