@@ -1366,3 +1366,32 @@ Same PR fixes the deploy wedge that took the droplet down twice:
   without recovery -> full `deploy.sh master` under flock (the only
   cure for a corrupted dist). Any healthy probe resets the ladder.
   Log: /var/log/mp-watchdog.log.
+
+## Revise-an-element works on speaker films (Marc, 2026-07-20)
+
+Marc highlighted the PiP bubble, typed "can you make this even smaller?",
+and got "Error: API error 400". Root cause: reviseScene only knew two
+editing primitives -- patch a CODEGEN component's source, or edit an
+st- TEMPLATE's slots. Speaker films are neither: pure library-component
+compositions (screencast-frame, narration-track, gradient-background),
+so EVERY element revise on a speaker film 400'd with "no codegen
+component to revise". (The Studio also swallowed the body and showed
+only the status code.)
+
+- New third primitive: library-component DATA revise. A click that
+  resolves to a library component maps the instruction onto that
+  component's schema-constrained data (same LLM contract as template
+  slots, incl. the _note escape hatch), MERGES new over old (a dropped
+  key must never delete video_url -- that key IS the film), saves, and
+  re-assembles the preview.
+- Routing is now an exported pure function (resolveReviseTarget):
+  element hit on a library comp -> component-data; codegen comp ->
+  source patch (unchanged); st- -> slot revise (unchanged); else an
+  instructive error naming the scene's components.
+- Studio sends the resolved compId with the element payload, and api()
+  now surfaces the server's error body instead of "API error N".
+- Regression suite: test/scene-revise.test.ts -- routing matrix, LLM
+  guardrails (schema echoes, garbage JSON, dropped keys), the on-disk
+  component-data path with a mocked LLM, and source guards on the
+  Studio template literal (compId in payload, data-cid reading, error
+  body surfacing).

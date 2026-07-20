@@ -33,6 +33,88 @@ export interface ReviseElement {
   text?: string;
   outerHTMLSnippet?: string;
   compType?: string;
+  /** Component id the click resolved to (Studio reads data-cid wrappers). */
+  compId?: string;
+}
+
+/** Which revise path a request takes. Exported for regression tests. */
+export type ReviseTarget =
+  | { kind: "component-data"; comp: any }
+  | { kind: "codegen"; comp: any }
+  | { kind: "template-slots"; comp: any }
+  | { kind: "none"; error: string };
+
+/**
+ * Route a revise to the right editing primitive. Speaker films (narrated
+ * screencasts) are pure library-component compositions -- no codegen source,
+ * no st- template -- so a click that resolves to a library component revises
+ * that component's DATA. Refusing those with "no codegen component" was the
+ * Studio 400 on every speaker-film element revise.
+ */
+export function resolveReviseTarget(scene: any, element?: ReviseElement): ReviseTarget {
+  const comps = ((scene?.components || []) as any[]).filter((c) => c && typeof c.type === "string");
+  const isCodegen = (c: any) => CODEGEN_PREFIXES.some((p) => c.type.startsWith(p));
+  const isTemplate = (c: any) => c.type.startsWith("st-");
+  if (element) {
+    const byId = element.compId ? comps.find((c) => c.id === element.compId) : undefined;
+    const byType = !byId && element.compType ? comps.find((c) => c.type === element.compType) : undefined;
+    const hit = byId || byType;
+    // Codegen/template components keep their richer paths (source patch /
+    // slot revise) even when clicked directly.
+    if (hit && !isCodegen(hit) && !isTemplate(hit)) return { kind: "component-data", comp: hit };
+  }
+  const codegen = comps.find(isCodegen);
+  if (codegen) return { kind: "codegen", comp: codegen };
+  const tpl = comps.find(isTemplate);
+  if (tpl) return { kind: "template-slots", comp: tpl };
+  const names = comps.map((c) => c.type).join(", ");
+  return {
+    kind: "none",
+    error: `This scene has no editable source -- click the element you want changed so the revise targets its component (scene components: ${names || "none"}).`,
+  };
+}
+
+/**
+ * Shared guardrails for data-revise LLM responses (template slots + library
+ * component data): parse, unwrap a schema-shaped echo, extract the _note
+ * escape hatch, drop slot-DEFINITION echoes, and refuse a response that
+ * drops every existing key (it would blank the scene). Exported for tests.
+ */
+export function sanitizeDataRevise(
+  raw: string,
+  prevData: Record<string, unknown>,
+): { ok: true; data: Record<string, unknown>; note?: string } | { ok: false; error: string } {
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim());
+  } catch {
+    return { ok: false, error: "Data revise returned unparseable JSON -- scene unchanged." };
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { ok: false, error: "Data revise returned a non-object -- scene unchanged." };
+  }
+  // Unwrap a schema-shaped echo ({type, label, ..., data: {...}}).
+  const note0 = typeof (data as any)._note === "string" ? (data as any)._note : undefined;
+  if ((data as any).data && typeof (data as any).data === "object" && !Array.isArray((data as any).data)
+      && typeof (data as any).type === "string") {
+    data = (data as any).data;
+  }
+  const note = typeof (data as any)._note === "string" ? (data as any)._note : note0;
+  delete (data as any)._note;
+  // Drop slot-DEFINITION echoes ({type, label} objects) -- keep the current
+  // value for those keys instead of storing schema metadata as content.
+  for (const [k, v] of Object.entries(data)) {
+    if (v && typeof v === "object" && !Array.isArray(v)
+        && typeof (v as any).type === "string" && typeof (v as any).label === "string") {
+      if (k in prevData) data[k] = prevData[k];
+      else delete data[k];
+    }
+  }
+  const prevKeys = Object.keys(prevData);
+  if (prevKeys.length > 0 && !Object.keys(data).some((k) => prevKeys.includes(k))) {
+    return { ok: false, error: "Data revise dropped every existing key -- scene unchanged." };
+  }
+  return { ok: true, data, note };
 }
 
 export interface ReviseSceneOpts {
@@ -368,40 +450,9 @@ async function reviseTemplateSlots(
     return { ok: false, error: `Template slot revise failed: ${e?.message || e}` };
   }
 
-  let data: Record<string, unknown>;
-  try {
-    data = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim());
-  } catch {
-    return { ok: false, error: "Template slot revise returned unparseable JSON -- scene unchanged." };
-  }
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return { ok: false, error: "Template slot revise returned a non-object -- scene unchanged." };
-  }
-  // Unwrap a schema-shaped echo ({type, label, ..., data: {...}}).
-  const note0 = typeof (data as any)._note === "string" ? (data as any)._note : undefined;
-  if ((data as any).data && typeof (data as any).data === "object" && !Array.isArray((data as any).data)
-      && typeof (data as any).type === "string") {
-    data = (data as any).data;
-  }
-  const note = typeof (data as any)._note === "string" ? (data as any)._note : note0;
-  delete (data as any)._note;
-  // Drop slot-DEFINITION echoes ({type, label} objects) -- keep the current
-  // value for those slots instead of storing schema metadata as content.
-  const prevData = (tplComp.data || {}) as Record<string, unknown>;
-  for (const [k, v] of Object.entries(data)) {
-    if (v && typeof v === "object" && !Array.isArray(v)
-        && typeof (v as any).type === "string" && typeof (v as any).label === "string") {
-      if (k in prevData) data[k] = prevData[k];
-      else delete data[k];
-    }
-  }
-
-  // A garbage response that renames every slot would blank the scene (the
-  // template hides missing slots). Require overlap with the current slots.
-  const prevKeys = Object.keys(tplComp.data || {});
-  if (prevKeys.length > 0 && !Object.keys(data).some((k) => prevKeys.includes(k))) {
-    return { ok: false, error: "Template slot revise dropped every existing slot -- scene unchanged." };
-  }
+  const sanitized = sanitizeDataRevise(raw, (tplComp.data || {}) as Record<string, unknown>);
+  if (!sanitized.ok) return { ok: false, error: sanitized.error };
+  const { data, note } = sanitized;
 
   tplComp.data = data;
   await saveProject(project);
@@ -434,6 +485,86 @@ async function reviseTemplateSlots(
   };
 }
 
+/**
+ * Revise a LIBRARY component (screencast-frame, narration-track, ...) by
+ * editing its schema-constrained DATA -- the same contract as template slots.
+ * This is the only revise primitive speaker films have: their scenes are
+ * library-component compositions with no codegen source to patch.
+ */
+async function reviseLibraryComponentData(
+  opts: ReviseSceneOpts,
+  project: any,
+  scene: any,
+  comp: any,
+): Promise<ReviseSceneResult> {
+  // Find the component's schema for field context (category dir is unknown;
+  // scan like the catalog does). Optional -- the revise works without it.
+  let fieldLines = "";
+  try {
+    const entries = await fs.readdir(config.componentLibDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name === "shared") continue;
+      const p = path.join(config.componentLibDir, entry.name, `${comp.type}.schema.json`);
+      try {
+        const schema = JSON.parse(await fs.readFile(p, "utf-8"));
+        fieldLines = Object.entries((schema.data || schema.properties || {}) as Record<string, any>)
+          .map(([k, v]) => `- ${k}: ${v?.label || v?.description || v?.type || ""}${v?.optional ? " (optional)" : ""}`)
+          .join("\n");
+        break;
+      } catch { /* try next category */ }
+    }
+  } catch { /* schema is optional context */ }
+
+  const sys = `You edit the data of a "${comp.type}" component inside a video scene. The component's rendering is fixed code; you can ONLY change its data fields (sizes, positions, text, styling options the fields express). Return ONLY the updated data object as pure JSON -- the same shape as "Current data", no markdown fences, no commentary, no schema. Keep every existing key, and keep values the instruction does not affect unchanged (NEVER change file/URL fields like video_url unless explicitly asked). If the instruction asks for something the data fields cannot express, leave the data unchanged and add a "_note" string key explaining what this component's data cannot do.`;
+  const user = `Component: ${comp.type} (id: ${comp.id})\n${fieldLines ? `Data fields:\n${fieldLines}\n` : ""}\nCurrent data:\n${JSON.stringify(comp.data || {}, null, 2)}\n\nInstruction: ${opts.instruction.trim()}\n\nReturn ONLY the updated data JSON object (same shape as Current data).`;
+
+  let raw: string;
+  try {
+    raw = await callLLM(opts.llmConfig, [
+      { role: "system", content: sys },
+      { role: "user", content: user },
+    ], { maxTokens: 2000 });
+  } catch (e: any) {
+    return { ok: false, error: `Component data revise failed: ${e?.message || e}` };
+  }
+
+  const sanitized = sanitizeDataRevise(raw, (comp.data || {}) as Record<string, unknown>);
+  if (!sanitized.ok) return { ok: false, error: sanitized.error };
+
+  // MERGE new over old (unlike template slots, which replace): a dropped key
+  // here can be load-bearing (video_url IS the film) -- absence must never
+  // mean deletion for a library component.
+  comp.data = { ...(comp.data || {}), ...sanitized.data };
+  await saveProject(project);
+
+  // Re-assemble for the Studio preview (best-effort; the data is already saved).
+  let sceneHtml: string | undefined;
+  try {
+    const sources: { type: string; source: string }[] = [];
+    for (const c of scene.components as any[]) {
+      if (sources.some((s) => s.type === c.type)) continue;
+      const src = await loadSource(c.type, opts.tenantId, opts.projectId);
+      if (src != null) sources.push({ type: c.type, source: src });
+    }
+    sceneHtml = await assembleSceneAuto({
+      scene, components: sources, brandKit: project.brand_kit, canvas: project.canvas,
+      gsapDir: config.gsapDir, componentLibDir: config.componentLibDir, preview: true,
+    });
+  } catch (e: any) {
+    console.warn(`  [revise] component-data preview assembly failed: ${e?.message || e}`);
+  }
+
+  return {
+    ok: true,
+    componentType: comp.type,
+    blocksApplied: 1,
+    fullRewrite: false,
+    sceneHtml,
+    defects: [],
+    layout_warnings: sanitized.note ? [`component data: ${sanitized.note}`] : [],
+  };
+}
+
 export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneResult> {
   if (!opts.instruction?.trim()) return { ok: false, error: "instruction is required" };
 
@@ -442,14 +573,15 @@ export async function reviseScene(opts: ReviseSceneOpts): Promise<ReviseSceneRes
   const scene = project.scenes.find((s: any) => s.id === opts.sceneId);
   if (!scene) return { ok: false, error: `Scene ${opts.sceneId} not found in project ${opts.projectId}` };
 
-  const codegenComp = scene.components.find((c: any) => CODEGEN_PREFIXES.some((p) => c.type.startsWith(p)));
-  if (!codegenComp) {
+  const target = resolveReviseTarget(scene, opts.element);
+  if (target.kind === "none") return { ok: false, error: target.error };
+  if (target.kind === "component-data") return reviseLibraryComponentData(opts, project, scene, target.comp);
+  if (target.kind === "template-slots") {
     // Scene-template instantiation: revise means editing the slot data, not
     // patching source (the composition is deliberately locked).
-    const tplComp = scene.components.find((c: any) => typeof c.type === "string" && c.type.startsWith("st-"));
-    if (tplComp) return reviseTemplateSlots(opts, project, scene, tplComp);
-    return { ok: false, error: `Scene ${opts.sceneId} has no codegen component to revise` };
+    return reviseTemplateSlots(opts, project, scene, target.comp);
   }
+  const codegenComp = target.comp;
   const type = codegenComp.type;
 
   const existingSource = await loadSource(type, opts.tenantId, opts.projectId);

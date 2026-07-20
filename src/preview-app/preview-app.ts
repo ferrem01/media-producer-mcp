@@ -987,7 +987,13 @@ export function getPreviewHtml(): string {
       opts.body = JSON.stringify(body);
     }
     return fetch('/api' + withToken(path), opts).then(function(r) {
-      if (!r.ok) throw new Error('API error ' + r.status);
+      if (!r.ok) {
+        // Surface the server's error message -- "API error 400" hides the
+        // actionable reason the route body carries.
+        return r.json().catch(function() { return null; }).then(function(b) {
+          throw new Error((b && b.error) ? b.error : ('API error ' + r.status));
+        });
+      }
       return r.json();
     });
   }
@@ -6425,7 +6431,10 @@ export function getPreviewHtml(): string {
     if (!p) { studioStatus('Load a project first.', 'warn'); return; }
     var element = (studio.scope === 'element' && studio.sel) ? {
       tagName: studio.sel.tagName, classList: studio.sel.classList, text: studio.sel.text,
-      outerHTMLSnippet: studio.sel.outerHTMLSnippet, compType: studio.sel.compType
+      outerHTMLSnippet: studio.sel.outerHTMLSnippet, compType: studio.sel.compType,
+      // compId routes speaker-film revises to the clicked LIBRARY component's
+      // data (those scenes have no codegen source; without it the server 400s).
+      compId: studio.sel.compId
     } : undefined;
 
     studio.busy = true;
