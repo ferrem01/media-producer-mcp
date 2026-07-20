@@ -62,6 +62,10 @@ export function mapSourceTime(segments: MediaSegment[], outputTime: number): num
       // continuous blur. Below 8x, smooth fast motion reads fine.
       if (s.tl && s.rate > 8) {
         const step = 0.45;
+        // Final step lands ON the destination frame: the beat settles on the
+        // exact frame playback continues from (and the preview gets to buffer
+        // it before the boundary instead of seeking there late).
+        if (outputTime - acc > outDur - step) return Math.max(s.src_start, s.src_end - 0.05);
         const q = Math.floor((outputTime - acc) / step) * step;
         return Math.min(s.src_end - 0.05, s.src_start + q * s.rate);
       }
@@ -113,6 +117,7 @@ function __mpMapSourceTime(segs, t) {
     var outDur = (s.src_end - s.src_start) / rate;
     if (t < acc + outDur) {
       if (s.tl && rate > 8) {
+        if (t - acc > outDur - 0.45) return Math.max(s.src_start, s.src_end - 0.05);
         var q = Math.floor((t - acc) / 0.45) * 0.45;
         return Math.min(s.src_end - 0.05, s.src_start + q * rate);
       }

@@ -1231,10 +1231,22 @@ export function getPreviewHtml(): string {
         acc += s.hold;
         continue;
       }
-      var rate = Math.min(16, Math.max(0.1, s.rate || 1));
+      // Timelapse segments are cap-exempt (mirrors mapSourceTime in
+      // media-edl.ts EXACTLY -- clamping tl to 16x here made the preview
+      // play the beat ~15% long and land every later pin late).
+      var rate = s.tl ? Math.min(2000, Math.max(0.1, s.rate || 1)) : Math.min(16, Math.max(0.1, s.rate || 1));
       if (s.src_end <= s.src_start) continue;
       var outDur = (s.src_end - s.src_start) / rate;
-      if (t < acc + outDur) return { src: s.src_start + (t - acc) * rate, rate: rate, frozen: false };
+      if (t < acc + outDur) {
+        if (s.tl && rate > 8) {
+          // Sampled flipbook, same 0.45s quantum as the render; the final
+          // step parks on the landing frame so the boundary is seamless.
+          if (t - acc > outDur - 0.45) return { src: Math.max(s.src_start, s.src_end - 0.05), rate: rate, frozen: false };
+          var q = Math.floor((t - acc) / 0.45) * 0.45;
+          return { src: Math.min(s.src_end - 0.05, s.src_start + q * rate), rate: rate, frozen: false };
+        }
+        return { src: s.src_start + (t - acc) * rate, rate: rate, frozen: false };
+      }
       acc += outDur;
     }
     var last = segs[segs.length - 1];

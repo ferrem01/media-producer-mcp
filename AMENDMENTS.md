@@ -1271,3 +1271,19 @@ frame. Three coordinated fixes:
 - **Resize measures the window**: applyTimelapse's prevOut is always the
   pin-to-pin window, never the beat's stored out_seconds -- resizing a
   beat inside an already-wide window must not splice a bogus gap.
+
+## Timelapse round 4 (Marc, 2026-07-20): preview map didn't know tl either
+
+"Still off... the scene I pinned is happening where the playhead is" —
+~1.5s late. Root cause: the Studio preview has its OWN copy of the
+source-time mapper (edlMapClient in preview-app.ts) and it still clamped
+every rate to 16x, so it played the 18.3x beat ~15% long and everything
+after landed late. Same bug class as renderMediaLane in round 3 — there
+are now three tl-aware mapper twins that must agree: mapSourceTime (TS,
+render), MAP_SOURCE_TIME_JS (injected), edlMapClient (preview). Grep all
+three when touching mapping.
+
+Also: the beat's FINAL 0.45s flipbook step now parks on the landing
+frame (src_end−0.05) in all three mappers — the beat settles on the
+exact frame playback continues from, and the preview buffers the landing
+before the boundary instead of seeking there late.

@@ -64,6 +64,11 @@ describe("mapSourceTime sampling for fast timelapses", () => {
     expect(b).toBeCloseTo(a, 3);
     expect(c).toBeGreaterThan(b + 5);     // one step = 0.45*30 = 13.5s of source
   });
+  it("the final flipbook step lands ON the destination frame", () => {
+    // 30x over 120s -> 4s beat; the last 0.45s shows src_end-0.05 so the
+    // beat settles on the exact frame playback continues from.
+    expect(mapSourceTime(segs, 3.8)).toBeCloseTo(120 - 0.05, 2);
+  });
   it("smooth (unquantized) below 8x", () => {
     const slow = [{ src_start: 0, src_end: 24, rate: 6, tl: 1 as const }];
     expect(mapSourceTime(slow, 1)).toBeCloseTo(6, 2);
