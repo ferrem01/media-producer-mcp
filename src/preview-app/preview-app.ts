@@ -3404,6 +3404,11 @@ export function getPreviewHtml(): string {
             }
           }
           var chipSpots = [];
+          // Collision is judged in PIXELS at the current zoom (percent-of-film
+          // collided chips that sat seconds apart, dropping rows for no visual
+          // reason). setTimelineZoom re-renders this lane so leveling tracks zoom.
+          var trackElC = document.getElementById('timeline-track');
+          var trackWC = (trackElC && trackElC.offsetWidth) || 1000;
           cutList.forEach(function(c2) {
             var glen = c2.src_end - c2.src_start;
             if (glen < 0.05) return;
@@ -3411,11 +3416,12 @@ export function getPreviewHtml(): string {
             chip.className = 'ml-cut';
             chip.textContent = '✂';
             var pctC = ((sceneStart + Math.min(srcToOut(c2.src_start), dur)) / total) * 100;
+            var pxC = (pctC / 100) * trackWC;
             var liftC = 0;
             for (var cs2 = 0; cs2 < chipSpots.length; cs2++) {
-              if (Math.abs(chipSpots[cs2].pct - pctC) < 1.2 && chipSpots[cs2].lift === liftC) { liftC++; cs2 = -1; }
+              if (Math.abs(chipSpots[cs2].px - pxC) < 20 && chipSpots[cs2].lift === liftC) { liftC++; cs2 = -1; }
             }
-            chipSpots.push({ pct: pctC, lift: liftC });
+            chipSpots.push({ px: pxC, lift: liftC });
             // Crowded seams stay INSIDE the lane: second chip takes the lower
             // in-lane row, further collisions shove sideways. (Lifting up 20px
             // per collision walked chips off the layer when several cuts
@@ -3916,6 +3922,7 @@ export function getPreviewHtml(): string {
     if (!track) return;
     track.style.width = (state.tlZoom * 100) + '%';
     renderWaveStrip();
+    renderMediaLane(); // chip leveling is pixel-based; recompute at the new zoom
     followPlayhead(true);
   }
 
