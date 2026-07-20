@@ -253,12 +253,6 @@ export function getPreviewHtml(): string {
   .fx-seg.fx-open { border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0;
     -webkit-mask-image: linear-gradient(to right, #000 72%, transparent);
     mask-image: linear-gradient(to right, #000 72%, transparent); }
-  /* Timelapse: a deliberate beat (striped block) vs. a suggestion chip on
-     footage already running ugly-fast (dashed). */
-  .fx-tl { background: repeating-linear-gradient(135deg, #c7d2fe 0 6px, #a5b4fc 6px 12px);
-    color: #312e81; border-color: #6366f1; box-shadow: inset 0 0 0 1px rgba(79,70,229,0.35); }
-  .fx-tl-suggest { background: rgba(199,210,254,0.35); color: #4338ca;
-    border: 1.5px dashed #818cf8; box-shadow: none; }
   .lane-bed.fx { background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.18); border-radius: 6px; }
   /* Media lane: each video's source-map as blocks (color = rate). */
   #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 52px; pointer-events: none; }
@@ -273,6 +267,15 @@ export function getPreviewHtml(): string {
   .ml-seg.r-turbo { background: #f87171; }
   .ml-seg.r-freeze { background: repeating-linear-gradient(45deg, #d1d5db, #d1d5db 3px, #f3f4f6 3px, #f3f4f6 6px); }
   .ml-seg.r-plain { background: #eef2ff; border: 1px dashed #a5b4fc; }
+  /* Timelapse: a SEGMENT type, not an effect -- it maps 1:1 onto a span of
+     footage, exactly like every other rate block in this lane. */
+  .ml-seg.r-tl { background: repeating-linear-gradient(135deg, #6366f1 0 6px, #818cf8 6px 12px);
+    color: #fff; box-shadow: inset 0 0 0 1.5px #4338ca; }
+  /* Suggestion tag riding a fast segment: "make this stretch deliberate". */
+  .ml-tl-suggest { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px;
+    border: 1.5px dashed rgba(255,255,255,0.85); background: rgba(49,46,129,0.35);
+    color: #fff; cursor: pointer; line-height: 19px; }
+  .ml-tl-suggest:hover { background: rgba(49,46,129,0.6); }
   /* Pins: the user's sync anchors -- a diamond above the lane. Color = health. */
   /* Pin marker: a clean map-pin head floating ABOVE the lane, tip on the
      exact pinned film time, with a hairline guide dropping through the
@@ -3128,7 +3131,6 @@ export function getPreviewHtml(): string {
     var total = state.totalDuration || calcTotalDuration();
     if (!p || !p.scenes || !(total > 0)) return;
     var glyph = { zoom: '\u2922', pan: '\u2194', rotate: '\u21BB', reset: '\u21A9' };
-    var spkNames = (((p.speaker || {}).clips) || []).map(function(c0) { return (c0.source || '').split('/').pop(); }).filter(Boolean);
     function block(from, to, cls, text, title, onClick) {
       var b = document.createElement('div');
       b.className = 'fx-seg ' + cls;
@@ -3181,43 +3183,6 @@ export function getPreviewHtml(): string {
             '\u2299 callout',
             'Scene ' + (si + 1) + ': callout [' + Math.round(c.w) + '\u00D7' + Math.round(c.h) + '%] @' + Number(c.at || 0).toFixed(1) + 's for ' + Number(c.dur || 5).toFixed(1) + 's. Click to edit.',
             function(el2) { coPopOpen(si, comp.id, ci, el2); });
-        });
-      });
-      // Timelapse: tl segments are film grammar, so they render HERE as
-      // ⏩ duration blocks (resize/remove via popover); plain footage
-      // already forced to 8x+ gets a dashed "make it deliberate?" chip.
-      // Speaker-follower maps mirror the talk track and get neither.
-      var tlEdits = scene.media_edits || {};
-      Object.keys(tlEdits).forEach(function(tkey) {
-        if (spkNames.some(function(n) { return tkey.indexOf(n) !== -1; })) return;
-        var ed = tlEdits[tkey] || {};
-        var tlist = ed.timelapses || [];
-        var acc = 0;
-        (ed.segments || []).forEach(function(s) {
-          var holdS = (typeof s.hold === 'number' && s.hold > 0) ? s.hold : 0;
-          var rate = Math.max(0.1, s.rate || 1);
-          if (!s.tl) rate = Math.min(16, rate);
-          var outDur = holdS || ((s.src_end - s.src_start) / rate);
-          var from = acc, to = Math.min(dur, acc + outDur);
-          acc += outDur;
-          if (!(to > from) || holdS) return;
-          if (s.tl) {
-            var tl = null;
-            tlist.forEach(function(t2) { if (Math.abs(t2.src_start - s.src_start) < 0.6) tl = t2; });
-            if (!tl) tl = { src_start: s.src_start, src_end: s.src_end, out_seconds: Math.round(outDur * 10) / 10 };
-            block(sceneStart + from, sceneStart + to, 'fx-tl',
-              '⏩ ' + fmtRate(rate),
-              'Scene ' + (si + 1) + ': timelapse — ' + (s.src_end - s.src_start).toFixed(0) + 's of footage in ' + outDur.toFixed(1) + 's (' + fmtRate(rate) + '), sampled with an elapsed-time clock. Click to resize or remove.',
-              function(el2) { tlPopOpen(si, tkey, tl, false, el2); });
-          } else if (rate >= 8) {
-            var span2 = s.src_end - s.src_start;
-            var prop = { src_start: s.src_start, src_end: s.src_end,
-              out_seconds: Math.max(3, Math.min(8, Math.round(span2 / 30 * 10) / 10)) };
-            block(sceneStart + from, sceneStart + to, 'fx-tl-suggest',
-              '⏩?',
-              'Scene ' + (si + 1) + ': this stretch runs at ' + fmtRate(rate) + ' — continuous video reads ugly past 8×. Click to make it a deliberate timelapse (sampled frames + elapsed clock).',
-              function(el2) { tlPopOpen(si, tkey, prop, true, el2); });
-          }
         });
       });
     });
@@ -3454,6 +3419,7 @@ export function getPreviewHtml(): string {
           b.title = title;
           if (onClick) b.addEventListener('click', function(ev) { ev.stopPropagation(); onClick(b); });
           rowEl.appendChild(b);
+          return b;
         }
         var label = videoLabelFor(v);
         if (!found.edit) {
@@ -3462,20 +3428,55 @@ export function getPreviewHtml(): string {
           });
         } else {
           var segs = found.edit.segments || [];
+          var tlist = found.edit.timelapses || [];
           var acc = 0;
           segs.forEach(function(s, i2) {
             var holdS = (typeof s.hold === 'number' && s.hold > 0) ? s.hold : 0;
-            var rate = Math.min(16, Math.max(0.1, s.rate || 1));
+            // Timelapse segments are cap-exempt: sizing them at the 16x
+            // clamp drew the block too wide and shoved everything after it
+            // past the pins (the lane lied while the pins told the truth).
+            var rate = s.tl ? Math.max(0.1, Math.min(2000, s.rate || 1)) : Math.min(16, Math.max(0.1, s.rate || 1));
             var outDur = holdS || ((s.src_end - s.src_start) / rate);
             var isHold = holdS > 0;
-            var cls = isHold ? 'r-freeze' : (rate >= 6 ? 'r-turbo' : (rate > 1.2 ? 'r-fast' : 'r-normal'));
+            var cls = isHold ? 'r-freeze' : (s.tl ? 'r-tl' : (rate >= 6 ? 'r-turbo' : (rate > 1.2 ? 'r-fast' : 'r-normal')));
             var from = acc, to = Math.min(dur, acc + outDur);
             var ttl = isHold
               ? (label + ' — HOLD ' + holdS.toFixed(1) + 's on frame ' + s.src_start.toFixed(1) + 's')
+              : s.tl
+              ? (label + ' — TIMELAPSE: ' + (s.src_end - s.src_start).toFixed(0) + 's of footage in ' + outDur.toFixed(1) + 's (' + fmtRate(rate) + '), sampled with an elapsed-time clock. Click to resize or remove.')
               : (label + ' — ' + fmtRate(rate) + '  src ' + s.src_start.toFixed(1) + '-' + s.src_end.toFixed(1) + 's');
-            if (to > from) block(from, to, cls, ttl, (function(idx) {
-              return function(el2) { mediaPopOpen(si, found.key, v, found.edit, idx, el2); };
-            })(i2), isHold ? 'HOLD' : (Math.abs(rate - 1) >= 0.05 ? fmtRate(rate) : ''));
+            if (to > from) {
+              var clickFn;
+              if (s.tl) {
+                // The segment IS the timelapse -- click edits the beat, not
+                // the raw segment (its duration is a constraint, not a rate).
+                var tlm = null;
+                tlist.forEach(function(t2) { if (Math.abs(t2.src_start - s.src_start) < 0.6) tlm = t2; });
+                if (!tlm) tlm = { src_start: s.src_start, src_end: s.src_end, out_seconds: Math.round(outDur * 10) / 10 };
+                clickFn = (function(tt) { return function(el2) { tlPopOpen(si, found.key, tt, false, el2); }; })(tlm);
+              } else {
+                clickFn = (function(idx) {
+                  return function(el2) { mediaPopOpen(si, found.key, v, found.edit, idx, el2); };
+                })(i2);
+              }
+              var bEl = block(from, to, cls, ttl, clickFn,
+                isHold ? 'HOLD' : (s.tl ? '⏩ ' + fmtRate(rate) : (Math.abs(rate - 1) >= 0.05 ? fmtRate(rate) : '')));
+              // Footage already forced to 8x+ reads ugly as continuous video:
+              // ride a small ⏩? tag on the segment offering the deliberate
+              // version (sampled frames + elapsed clock).
+              if (!isHold && !s.tl && rate >= 8) {
+                var sug = document.createElement('span');
+                sug.className = 'ml-tl-suggest';
+                sug.textContent = '⏩?';
+                sug.title = 'This stretch runs at ' + fmtRate(rate) + ' — continuous video reads ugly past 8×. Click to make it a deliberate timelapse (sampled frames + elapsed clock).';
+                var prop = { src_start: s.src_start, src_end: s.src_end,
+                  out_seconds: Math.max(3, Math.min(8, Math.round((s.src_end - s.src_start) / 30 * 10) / 10)) };
+                sug.addEventListener('click', (function(pp, sEl) {
+                  return function(ev) { ev.stopPropagation(); tlPopOpen(si, found.key, pp, true, sEl); };
+                })(prop, sug));
+                bEl.appendChild(sug);
+              }
+            }
             acc += outDur;
           });
           if (acc < dur - 0.05) {
@@ -3494,7 +3495,7 @@ export function getPreviewHtml(): string {
                 a2 += g2.hold;   // a freeze occupies output time but no source range
                 continue;
               }
-              var rr = Math.min(16, Math.max(0.1, g2.rate || 1));
+              var rr = g2.tl ? Math.max(0.1, Math.min(2000, g2.rate || 1)) : Math.min(16, Math.max(0.1, g2.rate || 1));
               if (srcT <= g2.src_start) return a2;
               if (srcT <= g2.src_end) return a2 + (srcT - g2.src_start) / rr;
               a2 += (g2.src_end - g2.src_start) / rr;
@@ -3584,10 +3585,6 @@ export function getPreviewHtml(): string {
     // against the bottom edge made them read as one smudge.
     var hasFx = ((p || {}).scenes || []).some(function(s2) {
       if ((s2.camera_moves || []).length) return true;
-      var me2 = s2.media_edits || {};
-      if (Object.keys(me2).some(function(k2) {
-        return ((me2[k2] || {}).segments || []).some(function(g2) { return g2.tl || (g2.rate || 1) >= 8; });
-      })) return true;
       return (s2.components || []).some(function(c2) {
         return c2.type === 'screencast-frame' && c2.data && Array.isArray(c2.data.callouts) && c2.data.callouts.length;
       });
@@ -4300,10 +4297,10 @@ export function getPreviewHtml(): string {
       if (r.edit) scene.media_edits[target] = r.edit;
       else { delete scene.media_edits[target]; if (!Object.keys(scene.media_edits).length) delete scene.media_edits; }
       // The pin needed more than 16x, so the server made the wait a
-      // deliberate timelapse (loud, visible in the effects lane, reversible).
+      // deliberate timelapse (loud, visible as a striped screen-lane segment, reversible).
       if (r.timelapse_auto && r.project) {
         var ta = r.timelapse_auto;
-        studioStatus('⏩ ' + (r.note || 'That wait needed more than 16× — made it a timelapse (click the ⏩ block in the effects lane to resize or remove).'), 'warn');
+        studioStatus('⏩ ' + (r.note || 'That wait needed more than 16× — made it a timelapse (click the striped ⏩ segment in the screen lane to resize or remove).'), 'warn');
         afterSpeakerEdit({ project: r.project, bake_seam: ta.gap_bake_at, restored_seconds: ta.added_seconds },
           Math.max(0, (ta.film_at || 0) - 1));
         return;
@@ -4589,7 +4586,7 @@ export function getPreviewHtml(): string {
     var pop = document.getElementById('cam-pop');
     if (pop) { pop.style.display = 'none'; pop.style.width = '280px'; }
     camPop.si = camPop.mi = -1;
-    document.querySelectorAll('.cam-pill.active, .fx-seg.active').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('.cam-pill.active, .fx-seg.active, .ml-seg.active').forEach(function(el) { el.classList.remove('active'); });
   }
 
   function camPopOpen(si, mi, pill) {

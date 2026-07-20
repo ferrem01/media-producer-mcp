@@ -2677,7 +2677,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           project.updated_at = new Date().toISOString();
           // A pin strained past the 16x cap has no honest manual state --
           // auto-create the timelapse beat that makes it land (visible +
-          // reversible in the effects lane; the response says so).
+          // reversible right in the screen lane; the response says so).
           let tlNote: any = null;
           if (hasAny) {
             try {
@@ -2700,7 +2700,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             edit: ((scene as any).media_edits || {})[target] || null,
             ...(tlNote ? {
               timelapse_auto: tlNote,
-              note: `That wait needed more than 16x -- made it a ${tlNote.out_seconds}s timelapse (click the \u23E9 block in the effects lane to resize or remove).`,
+              note: `That wait needed more than 16x -- made it a ${tlNote.out_seconds}s timelapse (click the striped \u23E9 segment in the screen lane to resize or remove).`,
               project,
             } : {}),
           });

@@ -1230,3 +1230,21 @@ use: a TIMELAPSE beat that owns its own film time.
 
 Acceptance film is proj_c55cfce5: cut, pin, accept the suggestion, and
 the film should read clean.
+
+## Timelapse UI correction (Marc, 2026-07-20): it's a SEGMENT, not an effect
+
+Marc's read on the first live version: "Why did you make it an effect? I
+would have expected it to just be a segment type." He's right — a
+timelapse maps 1:1 onto a span of footage, which is exactly what the
+screen lane's rate blocks are; drawing it as a second bar in the effects
+lane put two pictures of one truth on screen. His screenshot also caught
+a real bug: renderMediaLane didn't know tl rates (clamped everything to
+16x for width), so the screen lane drew the timelapsed stretch too wide
+and shoved the map past the pins — while the effects block sat perfectly
+between them.
+
+Now: tl segments render IN the screen lane as a striped "⏩ 28.2×"
+segment (click → resize/remove popover); fast (8x+) plain segments carry
+a small ⏩? tag (click → make it deliberate); the effects lane is back to
+zooms/callouts only; screen-lane widths are tl-aware so the map lines up
+with the pins.
