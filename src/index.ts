@@ -44,7 +44,7 @@ import { assembleComposite, type CompositeComponentSource } from "./core/composi
 import path from "node:path";
 import os from "node:os";
 import { setupWebSocket } from "./ws.js";
-import { authMiddleware, extractToken, validateToken, isAuthEnabled } from "./auth/auth.js";
+import { authMiddleware, extractToken, validateToken, isAuthEnabled, requireTenant, tenantAllowed } from "./auth/auth.js";
 import { protectedResourceMetadata, authorizationServerMetadata, registerClient, wwwAuthenticateChallenge } from "./auth/mcp-oauth.js";
 import { readTraces, dailyDigest } from "./trace/index.js";
 import { generateImage } from "./media/image-gen.js";
@@ -347,8 +347,10 @@ function getSpeakerUrl(project: any): string | undefined {
 }
 
 async function main() {
-  // Initialize tenant store
-  initTenantStoreFromFile("/data/media-producer/_system/tenants.json");
+  // Initialize tenant store (under the configured data dir -- a hardcoded
+  // /data/media-producer here silently split the registry from the data
+  // whenever MP_DATA_DIR pointed elsewhere).
+  initTenantStoreFromFile(path.join(config.dataDir, "_system", "tenants.json"));
 
   // Create MCP server
   const server = createMcpServer();
@@ -432,7 +434,8 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         // metadata — Claude ignores the challenge on a 200, so it has to be 401.
         if (isAuthEnabled()) {
           const token = extractToken(req);
-          if (!token || !validateToken(token)) {
+          const authedTenant = token ? validateToken(token) : null;
+          if (!token || !authedTenant) {
             res.writeHead(401, {
               "Content-Type": "application/json",
               "WWW-Authenticate": wwwAuthenticateChallenge(publicOrigin(req)),
@@ -440,6 +443,10 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
             res.end(JSON.stringify({ error: "Authentication required" }));
             return;
           }
+          // The SDK transport forwards req.auth to tool handlers as
+          // extra.authInfo -- this is how tools learn (and enforce) WHICH
+          // tenant the session belongs to. "*" = admin ops token.
+          (req as any).auth = { token, clientId: "mcp", scopes: [], extra: { tenantId: authedTenant } };
         }
 
         if (method === "POST") {
@@ -563,13 +570,14 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
-      // Serve system-cached media (e.g. royalty-free background music under
-      // _system/cache/). Same unauthenticated rationale as project media above.
-      const systemAssetMatch = urlPath.match(/^\/assets\/_system\/(.+)$/);
+      // Serve system-cached media (royalty-free background music). ONLY the
+      // cache/ subtree: _system also holds tenants.json (user emails/names)
+      // and deploy.log, which an unbounded match served to the open internet.
+      const systemAssetMatch = urlPath.match(/^\/assets\/_system\/cache\/(.+)$/);
       if (systemAssetMatch && (method === "GET" || method === "HEAD")) {
         const sysPath = decodeURIComponent(systemAssetMatch[1]);
         if (sysPath.includes("..")) { res.writeHead(403); res.end("Forbidden"); return; }
-        const fullPath = path.join(config.dataDir, "_system", sysPath);
+        const fullPath = path.join(config.dataDir, "_system", "cache", sysPath);
         try {
           await streamFile(req, res, fullPath);
         } catch {
@@ -744,6 +752,20 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         await new Promise((r) => setTimeout(r, 10));
       }
       if (res.writableEnded) return;
+
+      // ── Tenant enforcement (single choke point) ──
+      // Every tenant-scoped /api route puts the tenant in the FIRST path
+      // segment after the route name (revise/undo is the one nested case).
+      // A token is scoped to ONE tenant ("*" = admin, cross-tenant); a URL
+      // naming any other tenant is a 403 -- without this, multi-tenancy was
+      // storage layout only and any logged-in user could read/write anyone.
+      // ADDING A ROUTE? Tenant-scoped -> add its name to this alternation;
+      // tenant-less -> add it to TENANTLESS_API_ROUTES (both are checked by
+      // test/tenant-enforcement.test.ts, which fails on unregistered routes).
+      const tenantSeg =
+        urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
+        urlPath.match(/^\/api\/(?:projects|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
+      if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
       if (urlPath === "/auth/me" && method === "GET") {
@@ -2756,7 +2778,11 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       if (jobsListMatch && method === "GET") {
         const jobParams = new URL(url, "http://localhost").searchParams;
         const typeFilter = jobParams.get("type") as "render" | "generate" | undefined;
-        const tenantFilter = jobParams.get("tenant_id") || undefined;
+        // Jobs carry no tenant in the URL: a non-admin token sees ONLY its
+        // own tenant's jobs, whatever tenant_id it asked for.
+        const authedT = (req as any).tenantId as string | undefined;
+        const tenantFilter = (isAuthEnabled() && authedT && authedT !== "*")
+          ? authedT : (jobParams.get("tenant_id") || undefined);
         const jobs = listAllJobs(tenantFilter, typeFilter || undefined);
         // Strip large result payloads from list view
         const summary = jobs.map((j: any) => ({
@@ -2774,7 +2800,9 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       if (jobMatch && method === "GET") {
         const jobId = decodeURIComponent(jobMatch[1]);
         const job = getJob(jobId);
-        if (!job) {
+        // A foreign tenant's job answers 404 (not 403): job ids are random,
+        // and existence itself is cross-tenant information.
+        if (!job || !tenantAllowed((req as any).tenantId, (job as any).tenantId || "")) {
           jsonResponse(res, 404, { error: "Job not found" });
           return;
         }
@@ -2786,6 +2814,14 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       const jobWaitMatch = urlPath.match(/^\/api\/jobs\/([^/]+)\/wait/);
       if (jobWaitMatch && method === "GET") {
         const jobId = decodeURIComponent(jobWaitMatch[1]);
+        {
+          const j0 = getJob(jobId);
+          // Same 404-not-403 rationale as the single-job route above.
+          if (j0 && !tenantAllowed((req as any).tenantId, (j0 as any).tenantId || "")) {
+            jsonResponse(res, 404, { error: "Job not found" });
+            return;
+          }
+        }
         const urlParams = new URL(url, "http://localhost").searchParams;
         const timeoutSec = Math.min(Number(urlParams.get("timeout") || "120"), 300);
         const timeoutMs = timeoutSec * 1000;

@@ -128,6 +128,30 @@ function err(msg: string) {
   return { content: [{ type: "text" as const, text: msg }], isError: true as const };
 }
 
+/**
+ * Which tenant does an MCP tool call act on? Pure decision core -- exported
+ * for the tenant-enforcement regression tests.
+ * - Authenticated session (extra.authInfo.extra.tenantId set): the SESSION's
+ *   tenant, always. The param is ignored on mismatch -- a client must never
+ *   be able to act cross-tenant by typing a different tenant_id.
+ * - Admin session ("*") or unauthenticated (stdio/dev): the param, which is
+ *   then required.
+ */
+export function effectiveTenant(
+  paramTenant: string | undefined,
+  authedTenant: string | undefined,
+): { tenantId: string } | { error: string } {
+  if (authedTenant && authedTenant !== "*") {
+    return { tenantId: authedTenant };
+  }
+  if (paramTenant) return { tenantId: paramTenant };
+  return {
+    error: authedTenant === "*"
+      ? "tenant_id is required for admin-scoped sessions"
+      : "tenant_id is required (unauthenticated session)",
+  };
+}
+
 /** Normalize a cloud-storage SHARE link into a direct-download URL the server
  *  can fetch() as raw bytes. A Drive/Dropbox "share" URL serves an HTML preview
  *  page, not the file -- fetching it would save HTML. Converts the common forms;
@@ -222,15 +246,37 @@ export function createMcpServer(): McpServer {
     version: "0.1.0",
   });
 
+  // Tenant-enforcing tool registrar. The HTTP layer stamps the session's
+  // authenticated tenant into req.auth (surfaced here as extra.authInfo);
+  // every tool acts on THAT tenant -- params.tenant_id is only honored for
+  // admin ("*") or unauthenticated (stdio/dev) sessions. Register every
+  // tool through this, never through server.tool directly.
+  const tool = (
+    name: string,
+    description: string,
+    schema: Record<string, unknown>,
+    handler: (params: any, extra?: any) => any,
+  ) =>
+    server.tool(name, description, schema as any, (async (params: any, extra: any) => {
+      const authed = extra?.authInfo?.extra?.tenantId as string | undefined;
+      const resolved = effectiveTenant(params?.tenant_id, authed);
+      if ("error" in resolved) return err(resolved.error);
+      if (params && params.tenant_id !== resolved.tenantId) {
+        if (params.tenant_id) console.warn(`  [mcp] ${name}: tenant_id "${params.tenant_id}" overridden by session tenant "${resolved.tenantId}"`);
+        params.tenant_id = resolved.tenantId;
+      }
+      return handler(params, extra);
+    }) as any);
+
   // ─────────────────────────────────────────────
   // create - Create a new project
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "create",
     "Create a new media project (video, image, presentation, one-pager, slideshow, gif, social)",
     {
-      tenant_id: z.string().describe("Tenant identifier"),
+      tenant_id: z.string().optional().describe("Tenant identifier (optional on authenticated sessions -- the session's tenant is used)"),
       name: z.string().describe("Project name"),
       format: z.enum(["video", "image", "slideshow", "presentation", "one-pager", "gif", "social", "email-header", "thumbnail"]).describe("Output format"),
       preset: z.enum(["landscape", "vertical", "square"]).optional().describe("Resolution preset (default: landscape)"),
@@ -252,11 +298,11 @@ export function createMcpServer(): McpServer {
   // get - Get project, brand kit, or component catalog
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "get",
     "Get a project's state, tenant brand kit, a single scene, or a scene's MEASURED layout. Pass project_id for project, 'brand_kit' target for brand kit, project_id + scene_id for a single scene. target='layout' (with project_id + scene_id, optional selector) renders the scene headless and returns real element boxes, container chains, video intrinsic sizes and object-fit crop math, plus plain-English warnings -- use it to diagnose WHY something looks wrong (e.g. \"video runs over the frame\") before writing a revise instruction.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string().optional(),
       scene_id: z.string().optional(),
       target: z.enum(["project", "brand_kit", "job", "jobs", "layout"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs, 'layout' for measured scene geometry."),
@@ -316,11 +362,11 @@ export function createMcpServer(): McpServer {
   // list - List projects or available components
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "list",
     "List projects for a tenant, or available component types. Pass target='components' to see the component catalog.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       target: z.enum(["projects", "components"]).optional().describe("What to list (default: projects)"),
     },
     async (params) => {
@@ -340,11 +386,11 @@ export function createMcpServer(): McpServer {
   // add - Add a scene or component
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "add",
     "Add a scene to a project, or a component to a scene. If scene_id is provided, adds a component to that scene. Otherwise adds a new scene.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string(),
       scene_id: z.string().optional().describe("If provided, adds a component to this scene"),
 
@@ -443,11 +489,11 @@ export function createMcpServer(): McpServer {
   // update - Update project, scene, or component
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "update",
     "Update a project, scene, component, or storyboard. Infers target from which IDs are provided. Use provide_asset to upload assets for a storyboard scene. Use storyboard to directly edit the storyboard.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string(),
       scene_id: z.string().optional(),
       component_id: z.string().optional(),
@@ -588,8 +634,8 @@ export function createMcpServer(): McpServer {
           if (params.storyboard.reorder_scenes?.length) {
             const order = params.storyboard.reorder_scenes;
             const reordered = order
-              .filter(i => i >= 0 && i < project.storyboard!.scenes.length)
-              .map(i => project.storyboard!.scenes[i]);
+              .filter((i: number) => i >= 0 && i < project.storyboard!.scenes.length)
+              .map((i: number) => project.storyboard!.scenes[i]);
             if (reordered.length === project.storyboard.scenes.length) {
               project.storyboard.scenes = reordered;
             }
@@ -785,11 +831,11 @@ export function createMcpServer(): McpServer {
   // delete - Remove a project, scene, component, or brand asset
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "delete",
     "Delete a project, scene, component, or brand asset. Infers the target from the IDs you provide: project_id + scene_id + component_id removes a component; project_id + scene_id removes a scene; project_id alone deletes the whole project. Set target='brand' with asset_names to remove brand assets from the tenant kit. This is the safe, explicit counterpart to add/update.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       target: z.enum(["project", "brand"]).optional().describe("Defaults to project-scoped deletion. Set 'brand' to remove brand assets by name."),
       project_id: z.string().optional(),
       scene_id: z.string().optional().describe("With project_id, removes this scene. With component_id too, removes that component."),
@@ -849,11 +895,11 @@ export function createMcpServer(): McpServer {
   // reorder - Reorder scenes
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "reorder",
     "Reorder scenes in a project by providing scene IDs in the desired order",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string(),
       scene_ids: z.array(z.string()).describe("Scene IDs in desired order"),
     },
@@ -868,11 +914,11 @@ export function createMcpServer(): McpServer {
   // edit_speaker - Cut/restore talk-track time (the re-fit referee)
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "edit_speaker",
     "Edit the TALK TRACK of a narrated recorder film. action='cut' removes a span of FILM time from the speaker: the voice loses it, the film shortens, captions ripple -- and the SCREEN keeps every frame (its map re-fits through pins; only the camera bubble mirrors the cut so lips match). action='restore' gives a previous cut's time back. action='list' shows the speaker clip and its cuts, each with the film-time seam where it sits, so you can pick what to restore. Times are FILM seconds -- what the Studio timeline shows. Use for requests like 'cut the dead air at 1:16' or 'remove where I said um'.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string(),
       action: z.enum(["list", "cut", "restore"]),
       from: z.number().optional().describe("cut: film-time start in seconds"),
@@ -931,11 +977,11 @@ export function createMcpServer(): McpServer {
   // brand - Get/set brand kit, manage brand assets
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "brand",
     "Get, set, or extract a tenant's brand kit (colors, fonts, logo, style, assets). Pass a url to extract + store the brand kit from a website. Pass no fields to get the current brand kit. Pass fields to update.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       url: z.string().optional().describe("Extract + store the brand kit from this website URL (colors, fonts, logos, theme) -- no video is generated."),
       enhance: z.boolean().optional().describe("Run LLM brand analysis during URL extraction (slower, richer guidelines)."),
       include_images: z.boolean().optional().describe("During URL extraction, also crawl the site (entry + interior product/feature pages), download product/background imagery, caption each with a vision LLM, and store them as described brand assets."),
@@ -1084,11 +1130,11 @@ export function createMcpServer(): McpServer {
   // render - Render project or scene preview
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "revise",
     "Surgically revise ONE scene from a natural-language instruction. Patches the scene's codegen source (fast SEARCH/REPLACE), versions the prior source, and re-runs the fast legibility/runtime gates. Pass `element` to scope the change to a selected element; omit it to revise the whole scene. For a full from-scratch redo of a scene use generate with target='scene'.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string(),
       scene_id: z.string().describe("The scene to revise"),
       instruction: z.string().describe("What to change, in plain language"),
@@ -1137,7 +1183,7 @@ export function createMcpServer(): McpServer {
     },
   );
 
-  server.tool(
+  tool(
     "render",
     "Render a project to its output format, or render a single scene as a preview image (pass scene_id). " +
       "ITERATE BEFORE YOU RENDER -- the cheap-to-expensive ladder: (1) paper-edit the beats and get sign-off, " +
@@ -1147,7 +1193,7 @@ export function createMcpServer(): McpServer {
       "A production render captures every scene frame-by-frame (~2min/scene cold; unchanged scenes are free via the scene cache). " +
       "NEVER edit a project while its render job runs.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string(),
       scene_id: z.string().optional().describe("If provided, renders a single scene preview image"),
       quality: z.enum(["preview", "production"]).optional().describe("Render quality (default: production)"),
@@ -1247,11 +1293,11 @@ export function createMcpServer(): McpServer {
   // upload - Upload an asset to a project
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "upload",
     "Upload an asset (image, video, audio) to a project or to the tenant brand kit. Set target='brand' to upload a brand asset.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string().optional(),
       target: z.enum(["project", "brand"]).optional().describe("Upload target (default: project)"),
       url: z.string().optional().describe("URL to download the asset from"),
@@ -1482,11 +1528,11 @@ export function createMcpServer(): McpServer {
   // audio - Manage audio tracks
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "audio",
     "Add, update, or remove audio tracks (voiceover, music, SFX) on a project. For voiceover tracks, provide 'text' instead of 'source' to auto-generate TTS. Use sync_points with scene_id to store timing markers in a scene's audio_hints.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string(),
       action: z.enum(["add", "update", "remove", "search"]).describe("Action to perform. Use 'search' to search Jamendo music library."),
       query: z.string().optional().describe("Search query for music (use with action='search')"),
@@ -1662,11 +1708,11 @@ export function createMcpServer(): McpServer {
   // generate - LLM generates a custom component
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "generate",
     "Generate media from a natural language prompt. Use mode='storyboard' to produce just the storyboard (script + per-scene breakdown + asset requirements) for review. Use mode='full' (default) to produce the scenes: if the project already has a storyboard it builds from that (honoring your edits), otherwise it creates the storyboard first, then builds. Rendering to a final video is a separate step (the render tool). Recommended flow: storyboard -> review/edit -> full -> preview/edit -> render. Recorder films (screen recordings from the Quotient Recorder extension) assemble automatically on upload and get a SPEAKER lane -- edit their talk track with the edit_speaker tool, not by regenerating.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       prompt: z.string().default("").describe("Description of what to generate. Optional when the project already has a storyboard (uses its narrative)."),
       target: z.enum(["component", "scene", "video", "image", "presentation"]).optional().default("video").describe("What to generate (default: video)"),
       id: z.string().optional().describe("ID of existing content to revise. Component: component name. Scene: scene_id (requires project_id). Video/image/presentation: project_id."),
@@ -2118,7 +2164,7 @@ export function createMcpServer(): McpServer {
   // job - Dedicated job management tool
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "job",
     "Check or wait for any async job (generate, render). action=status to poll, action=wait to block until done or timeout, action=list to list jobs for a tenant.",
     {
@@ -2171,11 +2217,11 @@ export function createMcpServer(): McpServer {
   // capture - Screenshot URLs for component creation
   // ─────────────────────────────────────────────
 
-  server.tool(
+  tool(
     "capture",
     "Capture a screenshot of a URL. Can save as a project asset or create an image-showcase component from it.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       url: z.string().describe("URL to screenshot"),
       project_id: z.string().optional().describe("Project to save asset to (optional)"),
       viewport_width: z.number().optional().default(1920).describe("Viewport width"),
@@ -2259,11 +2305,11 @@ export function createMcpServer(): McpServer {
   // ─────────────────────────────────────────────
   // website_to_video - one-shot: URL -> on-brand launch video
   // ─────────────────────────────────────────────
-  server.tool(
+  tool(
     "website_to_video",
     "One-shot: turn a website URL into an on-brand, rendered launch video. Extracts the brand kit from the URL (colors, fonts, logos, theme), generates scenes, and renders -- in a single async job. Returns a job_id; poll with get(target='job').",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       url: z.string().describe("Website URL to brand the video from (e.g. https://getquotient.ai)"),
       prompt: z.string().optional().describe("Optional creative direction. If omitted, launch-video direction is derived from the brand."),
       target_duration: z.number().optional().default(24).describe("Target video length in seconds (default 24)"),
@@ -2339,11 +2385,11 @@ export function createMcpServer(): McpServer {
   // ─────────────────────────────────────────────
   // regenerate_asset - re-run a generated asset in place (roadmap #3)
   // ─────────────────────────────────────────────
-  server.tool(
+  tool(
     "regenerate_asset",
     "Re-run a generated image asset in place using its stored generation params (prompt, model, size, quality) -- optionally with a tweak -- without rebuilding the whole video. Writes a new version, re-wires the scene that uses it, and saves. Re-render the project to see the new asset in the video.",
     {
-      tenant_id: z.string(),
+      tenant_id: z.string().optional(),
       project_id: z.string(),
       asset_id: z.string().describe("Id of the generated asset to re-run (see project.assets[])"),
       prompt: z.string().optional().describe("Override prompt. If omitted, reuses the asset's stored prompt verbatim."),
