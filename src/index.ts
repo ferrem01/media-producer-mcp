@@ -1397,6 +1397,13 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           jsonResponse(res, 400, { error: "type and source are required" });
           return;
         }
+        // Body-carried tenant_id is a caller claim like any other -- guard it.
+        if (saveTenantId && !requireTenant(req, res, saveTenantId)) return;
+        // The SHARED library renders into EVERY tenant's films: admin only.
+        if (!saveTenantId && isAuthEnabled() && (req as any).tenantId !== "*") {
+          jsonResponse(res, 403, { error: "Saving to the shared component library requires the admin scope; pass tenant_id to save into your tenant's library." });
+          return;
+        }
 
         try {
           // If tenant_id provided, save to tenant's custom components dir
@@ -1683,6 +1690,8 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           jsonResponse(res, 400, { error: "prompt and source are required" });
           return;
         }
+        // tid pulls that tenant's brand kit into the LLM context -- guard it.
+        if (tid && !requireTenant(req, res, tid)) return;
 
         try {
           let llmCfg;
