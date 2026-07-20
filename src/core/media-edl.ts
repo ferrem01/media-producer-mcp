@@ -34,7 +34,10 @@ export function normalizeSegments(segments: MediaSegment[]): MediaSegment[] {
         : {
             src_start: Math.max(0, s.src_start),
             src_end: s.src_end,
-            rate: Math.min(16, Math.max(0.1, s.rate || 1)),
+            // Timelapse segments are cap-exempt: their whole point is an
+            // exact-duration beat, however fast that requires.
+            rate: s.tl ? Math.min(2000, Math.max(0.1, s.rate || 1)) : Math.min(16, Math.max(0.1, s.rate || 1)),
+            ...(s.tl ? { tl: 1 as const } : {}),
           },
     );
 }
@@ -53,8 +56,16 @@ export function mapSourceTime(segments: MediaSegment[], outputTime: number): num
   for (const s of segs) {
     const outDur = segOutDur(s);
     if (outputTime < acc + outDur) {
-      // Hold: park on src_start for the whole window (frame frozen).
-      return isHoldSegment(s) ? s.src_start : s.src_start + (outputTime - acc) * s.rate;
+      if (isHoldSegment(s)) return s.src_start;
+      // Timelapse above ~8x: SAMPLED playback -- hold each sampled frame
+      // ~0.45s of output (a legible flipbook of progress) instead of a
+      // continuous blur. Below 8x, smooth fast motion reads fine.
+      if (s.tl && s.rate > 8) {
+        const step = 0.45;
+        const q = Math.floor((outputTime - acc) / step) * step;
+        return Math.min(s.src_end - 0.05, s.src_start + q * s.rate);
+      }
+      return s.src_start + (outputTime - acc) * s.rate;
     }
     acc += outDur;
   }
@@ -97,10 +108,16 @@ function __mpMapSourceTime(segs, t) {
       acc += s.hold;
       continue;
     }
-    var rate = Math.min(16, Math.max(0.1, s.rate || 1));
+    var rate = s.tl ? Math.min(2000, Math.max(0.1, s.rate || 1)) : Math.min(16, Math.max(0.1, s.rate || 1));
     if (s.src_end <= s.src_start) continue;
     var outDur = (s.src_end - s.src_start) / rate;
-    if (t < acc + outDur) return s.src_start + (t - acc) * rate;
+    if (t < acc + outDur) {
+      if (s.tl && rate > 8) {
+        var q = Math.floor((t - acc) / 0.45) * 0.45;
+        return Math.min(s.src_end - 0.05, s.src_start + q * rate);
+      }
+      return s.src_start + (t - acc) * rate;
+    }
     acc += outDur;
   }
   var last = segs[segs.length - 1];
@@ -136,6 +153,9 @@ export interface MediaIntents {
   cuts?: MediaCut[];
   rate_regions?: MediaRateRegion[];
   pins?: MediaPin[];
+  /** Deliberate timelapses: each span plays in EXACTLY out_seconds
+   *  (cap-exempt); the solver treats them as fixed-duration constraints. */
+  timelapses?: Array<{ src_start: number; src_end: number; out_seconds: number }>;
 }
 
 export interface SolveResult {
@@ -170,7 +190,10 @@ function prefRate(regions: MediaRateRegion[], t: number): number {
 
 /** Available (uncut) source intervals within [from, to), split at every cut
  *  and rate-region boundary so each piece has one preferred rate. */
-function piecesBetween(from: number, to: number, cuts: MediaCut[], regions: MediaRateRegion[]): Array<{ s: number; e: number; pref: number; hard: boolean }> {
+function piecesBetween(
+  from: number, to: number, cuts: MediaCut[], regions: MediaRateRegion[],
+  tls?: Array<{ src_start: number; src_end: number; rate: number }>,
+): Array<{ s: number; e: number; pref: number; hard: boolean; tl?: number }> {
   if (to <= from + 0.001) return [];
   const bounds = new Set<number>([from, to]);
   const regionBounds = new Set<number>();
@@ -180,8 +203,13 @@ function piecesBetween(from: number, to: number, cuts: MediaCut[], regions: Medi
       if (b > from && b < to) { bounds.add(b); regionBounds.add(Math.round(b * 1000)); }
     }
   }
+  for (const t of tls || []) {
+    for (const b of [t.src_start, t.src_end]) {
+      if (b > from && b < to) { bounds.add(b); regionBounds.add(Math.round(b * 1000)); }
+    }
+  }
   const bs = Array.from(bounds).sort((a, b) => a - b);
-  const pieces: Array<{ s: number; e: number; pref: number; hard: boolean }> = [];
+  const pieces: Array<{ s: number; e: number; pref: number; hard: boolean; tl?: number }> = [];
   for (let i = 0; i < bs.length - 1; i++) {
     const s = bs[i], e = bs[i + 1];
     if (e - s < 0.005) continue;
@@ -192,7 +220,12 @@ function piecesBetween(from: number, to: number, cuts: MediaCut[], regions: Medi
     // when the neighbor solves to the same rate, or the user's split
     // vanishes from the lane and block-level Cut targets the merged span
     // (measured: cutting between two pins removed the whole stretch).
-    pieces.push({ s, e, pref: prefRate(regions, mid), hard: regionBounds.has(Math.round(s * 1000)) });
+    // A piece inside a timelapse span plays at the timelapse's FIXED rate:
+    // an exact-duration constraint, exempt from the 16x cap and from the
+    // pin-window flexing in the solver.
+    const tlHit = (tls || []).find((t2) => mid >= t2.src_start && mid < t2.src_end);
+    if (tlHit) pieces.push({ s, e, pref: tlHit.rate, hard: true, tl: tlHit.rate });
+    else pieces.push({ s, e, pref: prefRate(regions, mid), hard: regionBounds.has(Math.round(s * 1000)) });
   }
   return pieces;
 }
@@ -208,6 +241,23 @@ function piecesBetween(from: number, to: number, cuts: MediaCut[], regions: Medi
 export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?: number): SolveResult {
   const cuts = mergeRanges((intents.cuts || []) as MediaCut[], srcDur);
   const regions = mergeRanges((intents.rate_regions || []) as MediaRateRegion[], srcDur, true);
+  // Timelapses: exact-duration constraints. Rate = KEPT footage within the
+  // span (cuts inside it play no part) over the chosen output duration.
+  const tls = (intents.timelapses || [])
+    .filter((t) => t.src_end > t.src_start + 0.05 && t.out_seconds > 0.2)
+    .map((t) => {
+      let kept = 0;
+      let cursor = Math.max(0, t.src_start);
+      const end = Math.min(srcDur, t.src_end);
+      for (const c of cuts) {
+        if (c.src_end <= cursor || c.src_start >= end) continue;
+        kept += Math.max(0, Math.min(c.src_start, end) - cursor);
+        cursor = Math.max(cursor, c.src_end);
+      }
+      kept += Math.max(0, end - cursor);
+      return { src_start: t.src_start, src_end: t.src_end, rate: Math.max(0.1, kept / t.out_seconds) };
+    })
+    .filter((t) => t.rate > 0);
   const pinStatus: SolveResult["pin_status"] = [];
 
   // Validate pins: inside cut footage or out of order = broken (excluded).
@@ -236,11 +286,11 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
   chain = chain.concat(anchors);
 
   const segments: MediaSegment[] = [];
-  const push = (s: number, e: number, rate: number, hard?: boolean) => {
-    rate = Math.min(16, Math.max(0.1, rate));
+  const push = (s: number, e: number, rate: number, hard?: boolean, tl?: boolean) => {
+    rate = tl ? Math.min(2000, Math.max(0.1, rate)) : Math.min(16, Math.max(0.1, rate));
     const last = segments[segments.length - 1];
-    if (!hard && last && Math.abs(last.src_end - s) < 0.005 && Math.abs(last.rate - rate) < 0.001) last.src_end = e;
-    else segments.push({ src_start: s, src_end: e, rate: Math.round(rate * 1000) / 1000 });
+    if (!hard && last && !last.tl === !tl && Math.abs(last.src_end - s) < 0.005 && Math.abs(last.rate - rate) < 0.001) last.src_end = e;
+    else segments.push({ src_start: s, src_end: e, rate: Math.round(rate * 1000) / 1000, ...(tl ? { tl: 1 as const } : {}) });
   };
   // Push a TRUE freeze: hold frame `src` for `holdSeconds` of OUTPUT time, the
   // source clock parked. Replaces the old "0.1x forward micro-sliver" that
@@ -253,7 +303,7 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
   for (let i = 0; i < chain.length - 1; i++) {
     const a = chain[i], b = chain[i + 1];
     const window = b.out - a.out;
-    const pieces = piecesBetween(a.src, b.src, cuts, regions);
+    const pieces = piecesBetween(a.src, b.src, cuts, regions, tls);
     const atPref = pieces.reduce((t, p) => t + (p.e - p.s) / p.pref, 0);
     if (!pieces.length) {
       // Nothing to show before this pin: freeze the PINNED frame for the whole
@@ -271,8 +321,9 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
       // the window exactly instead (measured: an 8x preference produced a
       // 50s hold where a ~3.6x fill was wanted).
       let first0 = true;
-      for (const p of pieces) { push(p.s, p.e, Math.min(p.pref, 1), p.hard || first0); first0 = false; }
-      const played = pieces.reduce((t, p) => t + (p.e - p.s) / Math.min(p.pref, 1), 0);
+      // Timelapse pieces keep their exact rate even in the under-full branch.
+      for (const p of pieces) { push(p.s, p.e, p.tl ? p.tl : Math.min(p.pref, 1), p.hard || first0, !!p.tl); first0 = false; }
+      const played = pieces.reduce((t, p) => t + (p.e - p.s) / (p.tl ? p.tl : Math.min(p.pref, 1)), 0);
       const hold = window - played;
       // Freeze the pinned frame (b.src) for the leftover window -- a true hold,
       // so playback resumes from the SAME frame with no rewind.
@@ -283,15 +334,20 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
     // Scale preferences so we arrive exactly on time. Pieces that hit the
     // 16x/0.1x clamp can't flex further -- iterate so the UNCLAMPED pieces
     // absorb the remainder and the pin still lands to the frame.
-    let scale = atPref / window;
+    // Fixed (timelapse) pieces occupy exactly their own time; only the free
+    // pieces flex to land the pin.
+    const fixedTime = pieces.reduce((t, p) => t + (p.tl ? (p.e - p.s) / p.tl : 0), 0);
+    const freeAtPref = pieces.reduce((t, p) => t + (p.tl ? 0 : (p.e - p.s) / p.pref), 0);
+    let scale = freeAtPref > 0 ? freeAtPref / Math.max(0.01, window - fixedTime) : 1;
     for (let iter = 0; iter < 5; iter++) {
       let clampedTime = 0, freePref = 0;
       for (const p of pieces) {
+        if (p.tl) continue;
         const r = p.pref * scale;
         if (r >= 16 || r <= 0.1) clampedTime += (p.e - p.s) / Math.min(16, Math.max(0.1, r));
         else freePref += (p.e - p.s) / p.pref;
       }
-      const remaining = window - clampedTime;
+      const remaining = window - fixedTime - clampedTime;
       if (remaining <= 0.01 || freePref <= 0) break;
       const next = freePref / remaining;
       if (Math.abs(next - scale) < 1e-6) break;
@@ -300,9 +356,9 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
     let arrival = 0;
     let first1 = true;
     for (const p of pieces) {
-      const rate = Math.min(16, Math.max(0.1, p.pref * scale));
+      const rate = p.tl ? p.tl : Math.min(16, Math.max(0.1, p.pref * scale));
       arrival += (p.e - p.s) / rate;
-      push(p.s, p.e, rate, p.hard || first1);
+      push(p.s, p.e, rate, p.hard || first1, !!p.tl);
       first1 = false;
     }
     if (Math.abs(arrival - window) > 0.15) {
@@ -316,7 +372,7 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
   const lastAnchor = chain[chain.length - 1];
   if (lastAnchor) {
     let first2 = true;
-    for (const p of piecesBetween(lastAnchor.src, srcDur, cuts, regions)) { push(p.s, p.e, p.pref, p.hard || first2); first2 = false; }
+    for (const p of piecesBetween(lastAnchor.src, srcDur, cuts, regions, tls)) { push(p.s, p.e, p.tl ? p.tl : p.pref, p.hard || first2, !!p.tl); first2 = false; }
   }
 
   return { segments: normalizeSegments(segments), pin_status: pinStatus };
@@ -326,8 +382,8 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
  *  intent world on their first op: source gaps = cuts, non-1x runs = rate
  *  preferences, stored pins pass through. */
 export function inferIntents(edit: MediaEdit, srcDur: number): MediaIntents {
-  if (edit.cuts || edit.rate_regions) {
-    return { cuts: edit.cuts || [], rate_regions: edit.rate_regions || [], pins: edit.pins || [] };
+  if (edit.cuts || edit.rate_regions || edit.timelapses) {
+    return { cuts: edit.cuts || [], rate_regions: edit.rate_regions || [], pins: edit.pins || [], timelapses: edit.timelapses || [] };
   }
   const segs = normalizeSegments(edit.segments || []);
   const cuts: MediaCut[] = [];

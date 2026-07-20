@@ -88,6 +88,71 @@ export async function detectSilence(
 
 /** Concatenate the KEPT spans of a media file's audio into a standalone AAC
  *  narration file (the Mode A narration track). Throws on ffmpeg failure. */
+/**
+ * Like cutAudioTo, but with SILENCE INSERTS: after cutting to keptSpans, the
+ * bake gains `seconds` of silence at each gap's position (gapAt on the SOURCE
+ * clock -- the silence lands where that source moment sits in the bake).
+ * Timelapse beats own film time with no voice; this is where that time is
+ * physically made.
+ */
+export async function cutAudioToWithGaps(
+  mediaPath: string,
+  keptSpans: Range[],
+  gaps: Array<{ src_at: number; seconds: number }>,
+  outPath: string,
+): Promise<void> {
+  if (!gaps.length) return cutAudioTo(mediaPath, keptSpans, outPath);
+  if (!keptSpans.length) throw new Error("no audio spans to keep");
+  // Split kept spans at every gap position so a silence source can slot in.
+  const sorted = gaps.slice().sort((a, b) => a.src_at - b.src_at);
+  type Piece = { kind: "src"; from: number; to: number } | { kind: "sil"; seconds: number };
+  const pieces: Piece[] = [];
+  for (const span of keptSpans) {
+    let cursor = span.from;
+    for (const g of sorted) {
+      if (g.src_at > cursor && g.src_at < span.to) {
+        pieces.push({ kind: "src", from: cursor, to: g.src_at });
+        pieces.push({ kind: "sil", seconds: g.seconds });
+        cursor = g.src_at;
+      } else if (Math.abs(g.src_at - span.from) < 0.01 && cursor === span.from) {
+        pieces.push({ kind: "sil", seconds: g.seconds });
+      }
+    }
+    if (span.to > cursor) pieces.push({ kind: "src", from: cursor, to: span.to });
+  }
+  // A gap sitting exactly at the END of the last kept span still applies.
+  for (const g of sorted) {
+    const lastKept = keptSpans[keptSpans.length - 1];
+    if (Math.abs(g.src_at - lastKept.to) < 0.01) pieces.push({ kind: "sil", seconds: g.seconds });
+  }
+  const parts: string[] = [];
+  const labels: string[] = [];
+  pieces.forEach((p, i) => {
+    if (p.kind === "src") {
+      parts.push(`[0:a]atrim=start=${p.from.toFixed(3)}:end=${p.to.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`);
+    } else {
+      parts.push(`anullsrc=r=48000:cl=mono,atrim=0:${p.seconds.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`);
+    }
+    labels.push(`[a${i}]`);
+  });
+  const concat = labels.join("") + `concat=n=${pieces.length}:v=0:a=1[out]`;
+  await new Promise<void>((resolve, reject) => {
+    const ff = spawn("ffmpeg", [
+      "-y", "-i", mediaPath,
+      "-filter_complex", `${parts.join(";")};${concat}`,
+      "-map", "[out]", "-c:a", "aac", "-b:a", "160k",
+      outPath,
+    ]);
+    const errs: Buffer[] = [];
+    ff.stderr.on("data", (c) => errs.push(c));
+    ff.on("error", reject);
+    ff.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`audio gap-splice failed: ${Buffer.concat(errs).toString().split("\n").slice(-4).join(" ")}`));
+    });
+  });
+}
+
 export async function cutAudioTo(
   mediaPath: string,
   keptSpans: Range[],

@@ -333,7 +333,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl && isTransparent ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.media_edits && Object.keys(scene.media_edits).length ? `<script>${mediaEdlScript(scene.media_edits, "document.body")}</script>` : "")}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
+${preview && speakerUrl && isTransparent ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(scene.media_edits && Object.keys(scene.media_edits).length ? `<script>${mediaEdlScript(scene.media_edits, "document.body")}</script><script>${timelapseClockScript(scene.media_edits, canvas, "document.body", "window.__MP_TIMELINE", scene.duration_seconds)}</script>` : "")}${(scene.camera_moves && scene.camera_moves.length ? `<script>${cameraMovesScript(scene.camera_moves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? '' : '<div class="mp-ambient"></div>'}
 ${isTransparent ? '' : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ''}
@@ -486,6 +486,92 @@ export function mediaEdlScript(
     }
     if (missing && tries++ < 300) requestAnimationFrame(tick);
     else if (missing) { try { console.warn('[edl] media-edit target(s) never matched an element:', keys.join(', ')); } catch (e2) {} }
+  })();
+})();
+`;
+}
+
+/**
+ * Elapsed-time clock for timelapse beats: while playback sits inside a tl
+ * segment past the 8x sampling threshold, a small pill ("⏱ +2:47 · ⏩14×")
+ * says how much real time is flying by -- the honest-storytelling half of
+ * the timelapse effect. Driven by a zero-ease proxy tween ON THE SCENE
+ * TIMELINE (not rAF wall-clock), so it renders identically under the
+ * capture loop's .time(t) seeks and the Studio preview's playback.
+ */
+export function timelapseClockScript(
+  mediaEdits: Record<string, import("./types.js").MediaEdit>,
+  canvas: { width: number; height: number },
+  containerExpr: string,
+  timelineExpr: string,
+  sceneDuration: number,
+): string {
+  const windows: { a: number; b: number; r: number }[] = [];
+  for (const key of Object.keys(mediaEdits || {})) {
+    const segs = (mediaEdits[key]?.segments || []) as any[];
+    let acc = 0;
+    for (const s of segs) {
+      const holdS = typeof s.hold === "number" && s.hold > 0 ? s.hold : 0;
+      let rate = Math.max(0.1, s.rate || 1);
+      if (!s.tl) rate = Math.min(16, rate);
+      const outDur = holdS || (s.src_end - s.src_start) / rate;
+      if (s.tl && !holdS && rate > 8 && outDur > 0.2 &&
+          !windows.some((w) => Math.abs(w.a - acc) < 0.2)) {
+        windows.push({
+          a: Math.round(acc * 1000) / 1000,
+          b: Math.round((acc + outDur) * 1000) / 1000,
+          r: Math.round(rate * 10) / 10,
+        });
+      }
+      acc += outDur;
+    }
+  }
+  if (!windows.length) return "";
+  const fs = Math.max(14, Math.round(canvas.height * 0.024));
+  const top = Math.round(canvas.height * 0.037);
+  const right = Math.round(canvas.width * 0.03);
+  return `
+(function() {
+  var W = ${JSON.stringify(windows)};
+  var DUR = ${sceneDuration};
+  var chip = null, lastTxt = '';
+  function ensureChip(root) {
+    if (chip && chip.parentNode) return chip;
+    chip = document.createElement('div');
+    chip.setAttribute('data-mp-tl-clock', '1');
+    chip.style.cssText = 'position:absolute;top:${top}px;right:${right}px;z-index:9500;display:none;' +
+      'background:rgba(15,23,42,0.78);color:#f8fafc;border:1px solid rgba(248,250,252,0.18);' +
+      'border-radius:999px;padding:${Math.round(fs * 0.45)}px ${Math.round(fs * 0.85)}px;' +
+      'font:600 ${fs}px/1.3 ui-monospace,"SF Mono",Menlo,Consolas,monospace;' +
+      'font-variant-numeric:tabular-nums;letter-spacing:0.02em;pointer-events:none;' +
+      '-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);';
+    root.appendChild(chip);
+    return chip;
+  }
+  var tries = 0;
+  (function tick() {
+    var root = ${containerExpr};
+    var tl = ${timelineExpr};
+    if (!root || !tl || !tl.to) {
+      if (tries++ < 300) requestAnimationFrame(tick);
+      return;
+    }
+    ensureChip(root);
+    tl.to({ t: 0 }, { t: DUR, duration: DUR, ease: 'none',
+      onUpdate: function() {
+        var t = this.progress() * DUR;
+        var w = null;
+        for (var i = 0; i < W.length; i++) { if (t >= W[i].a && t < W[i].b) { w = W[i]; break; } }
+        if (!w) { if (chip.style.display !== 'none') chip.style.display = 'none'; return; }
+        // Elapsed SOURCE time, quantized to the same 0.45s flipbook step the
+        // playback samples on -- the clock ticks exactly when the frame does.
+        var elapsed = Math.floor((t - w.a) / 0.45) * 0.45 * w.r;
+        var m = Math.floor(elapsed / 60), s = Math.floor(elapsed - m * 60);
+        var txt = '\\u23F1 +' + m + ':' + (s < 10 ? '0' : '') + s + ' \\u00B7 \\u23E9' +
+          (w.r === Math.round(w.r) ? Math.round(w.r) : w.r) + '\\u00D7';
+        if (txt !== lastTxt) { chip.textContent = txt; lastTxt = txt; }
+        if (chip.style.display === 'none') chip.style.display = 'block';
+      } }, 0);
   })();
 })();
 `;
@@ -1029,7 +1115,7 @@ if (typeof ScrambleTextPlugin !== 'undefined') gsap.registerPlugin(ScrambleTextP
 </script>
 </head>
 <body>
-${preview && speakerUrl && isTransparent ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(options.mediaEdits && Object.keys(options.mediaEdits).length ? `<script>${mediaEdlScript(options.mediaEdits, "document.body")}</script>` : "")}${(options.cameraMoves && options.cameraMoves.length ? `<script>${cameraMovesScript(options.cameraMoves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
+${preview && speakerUrl && isTransparent ? speakerUnderlayHtml(speakerUrl, options.speakerOffset || 0) : ""}${(options.mediaEdits && Object.keys(options.mediaEdits).length ? `<script>${mediaEdlScript(options.mediaEdits, "document.body")}</script><script>${timelapseClockScript(options.mediaEdits, canvas, "document.body", "window.__MP_TIMELINE", duration)}</script>` : "")}${(options.cameraMoves && options.cameraMoves.length ? `<script>${cameraMovesScript(options.cameraMoves, canvas, "document.body", "window.__MP_TIMELINE")}</script>` : "")}
 <div class="mp-camera" style="position:absolute;inset:-20px;width:calc(100% + 40px);height:calc(100% + 40px);will-change:transform;">
 ${isTransparent ? "" : '<div class="mp-ambient"></div>'}
 ${isTransparent ? "" : hasBgImage ? '<div class="mp-page-bg" style="position:absolute;inset:0;z-index:0;background:var(--mp-bg-image,none);background-size:cover;background-position:center;"></div>' : ""}

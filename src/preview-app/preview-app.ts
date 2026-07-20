@@ -253,6 +253,12 @@ export function getPreviewHtml(): string {
   .fx-seg.fx-open { border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0;
     -webkit-mask-image: linear-gradient(to right, #000 72%, transparent);
     mask-image: linear-gradient(to right, #000 72%, transparent); }
+  /* Timelapse: a deliberate beat (striped block) vs. a suggestion chip on
+     footage already running ugly-fast (dashed). */
+  .fx-tl { background: repeating-linear-gradient(135deg, #c7d2fe 0 6px, #a5b4fc 6px 12px);
+    color: #312e81; border-color: #6366f1; box-shadow: inset 0 0 0 1px rgba(79,70,229,0.35); }
+  .fx-tl-suggest { background: rgba(199,210,254,0.35); color: #4338ca;
+    border: 1.5px dashed #818cf8; box-shadow: none; }
   .lane-bed.fx { background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.18); border-radius: 6px; }
   /* Media lane: each video's source-map as blocks (color = rate). */
   #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 52px; pointer-events: none; }
@@ -3122,6 +3128,7 @@ export function getPreviewHtml(): string {
     var total = state.totalDuration || calcTotalDuration();
     if (!p || !p.scenes || !(total > 0)) return;
     var glyph = { zoom: '\u2922', pan: '\u2194', rotate: '\u21BB', reset: '\u21A9' };
+    var spkNames = (((p.speaker || {}).clips) || []).map(function(c0) { return (c0.source || '').split('/').pop(); }).filter(Boolean);
     function block(from, to, cls, text, title, onClick) {
       var b = document.createElement('div');
       b.className = 'fx-seg ' + cls;
@@ -3174,6 +3181,43 @@ export function getPreviewHtml(): string {
             '\u2299 callout',
             'Scene ' + (si + 1) + ': callout [' + Math.round(c.w) + '\u00D7' + Math.round(c.h) + '%] @' + Number(c.at || 0).toFixed(1) + 's for ' + Number(c.dur || 5).toFixed(1) + 's. Click to edit.',
             function(el2) { coPopOpen(si, comp.id, ci, el2); });
+        });
+      });
+      // Timelapse: tl segments are film grammar, so they render HERE as
+      // ⏩ duration blocks (resize/remove via popover); plain footage
+      // already forced to 8x+ gets a dashed "make it deliberate?" chip.
+      // Speaker-follower maps mirror the talk track and get neither.
+      var tlEdits = scene.media_edits || {};
+      Object.keys(tlEdits).forEach(function(tkey) {
+        if (spkNames.some(function(n) { return tkey.indexOf(n) !== -1; })) return;
+        var ed = tlEdits[tkey] || {};
+        var tlist = ed.timelapses || [];
+        var acc = 0;
+        (ed.segments || []).forEach(function(s) {
+          var holdS = (typeof s.hold === 'number' && s.hold > 0) ? s.hold : 0;
+          var rate = Math.max(0.1, s.rate || 1);
+          if (!s.tl) rate = Math.min(16, rate);
+          var outDur = holdS || ((s.src_end - s.src_start) / rate);
+          var from = acc, to = Math.min(dur, acc + outDur);
+          acc += outDur;
+          if (!(to > from) || holdS) return;
+          if (s.tl) {
+            var tl = null;
+            tlist.forEach(function(t2) { if (Math.abs(t2.src_start - s.src_start) < 0.6) tl = t2; });
+            if (!tl) tl = { src_start: s.src_start, src_end: s.src_end, out_seconds: Math.round(outDur * 10) / 10 };
+            block(sceneStart + from, sceneStart + to, 'fx-tl',
+              '⏩ ' + fmtRate(rate),
+              'Scene ' + (si + 1) + ': timelapse — ' + (s.src_end - s.src_start).toFixed(0) + 's of footage in ' + outDur.toFixed(1) + 's (' + fmtRate(rate) + '), sampled with an elapsed-time clock. Click to resize or remove.',
+              function(el2) { tlPopOpen(si, tkey, tl, false, el2); });
+          } else if (rate >= 8) {
+            var span2 = s.src_end - s.src_start;
+            var prop = { src_start: s.src_start, src_end: s.src_end,
+              out_seconds: Math.max(3, Math.min(8, Math.round(span2 / 30 * 10) / 10)) };
+            block(sceneStart + from, sceneStart + to, 'fx-tl-suggest',
+              '⏩?',
+              'Scene ' + (si + 1) + ': this stretch runs at ' + fmtRate(rate) + ' — continuous video reads ugly past 8×. Click to make it a deliberate timelapse (sampled frames + elapsed clock).',
+              function(el2) { tlPopOpen(si, tkey, prop, true, el2); });
+          }
         });
       });
     });
@@ -3236,6 +3280,68 @@ export function getPreviewHtml(): string {
       next.splice(ci, 1);
       camPopClose();
       saveCalloutsData(si, comp, next);
+    });
+  }
+
+  // ── Timelapse popover: create (from a suggestion or auto), resize, remove ──
+  // The beat OWNS its film time: apply splices a matching silent gap into
+  // the talk track, remove refunds it -- so resizing never desyncs anything.
+  function tlPopOpen(si, tkey, tl, isNew, anchorEl) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[si];
+    var pop = document.getElementById('cam-pop');
+    if (!scene || !pop) return;
+    camPopClose();
+    anchorEl.classList.add('active');
+    var span = Math.max(0.1, tl.src_end - tl.src_start);
+    pop.innerHTML =
+      '<div class="sp-head"><span class="sp-title"><b>⏩ Timelapse</b> — scene ' + (si + 1) + '</span>' +
+      '<button class="sp-x" id="tl-x" title="Close (Esc)">✕</button></div>' +
+      '<div class="sp-region" style="margin-bottom:7px;">' + span.toFixed(0) + 's of footage plays as sampled frames with an elapsed-time clock — honest fast-forward, not a smear. The beat owns its film time: the talk track gets a matching silent gap.</div>' +
+      '<div class="sp-fields"><label>plays in <input id="tl-out" type="number" min="1" max="60" step="0.5" value="' + escAttr('' + (tl.out_seconds || 5)) + '">s</label>' +
+      '<span class="sp-title" id="tl-rate" style="opacity:0.7;"></span></div>' +
+      '<div class="sp-row">' +
+      (isNew ? '' : '<button class="rv-go secondary" id="tl-del" style="flex:0 0 auto;color:#dc2626;border-color:#fca5a5;">Remove</button>') +
+      '<button class="rv-go" id="tl-save" style="flex:1;">' + (isNew ? 'Make it a timelapse' : 'Save') + '</button></div>';
+    pop.style.display = 'block';
+    var pr = anchorEl.getBoundingClientRect();
+    var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 180;
+    var px = Math.max(8, Math.min(pr.left + pr.width / 2 - pw / 2, window.innerWidth - pw - 8));
+    var py = pr.top - ph - 10;
+    if (py < 8) py = pr.bottom + 10;
+    pop.style.left = px + 'px';
+    pop.style.top = py + 'px';
+    function rateNote() {
+      var o = parseFloat(document.getElementById('tl-out').value);
+      if (!(o > 0)) o = tl.out_seconds || 5;
+      document.getElementById('tl-rate').textContent = '≈ ' + fmtRate(span / o);
+    }
+    rateNote();
+    document.getElementById('tl-out').addEventListener('input', rateNote);
+    document.getElementById('tl-x').addEventListener('click', camPopClose);
+    function post(body, msg) {
+      camPopClose();
+      studioStatus(msg, '');
+      api('POST', '/timelapse/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), body)
+        .then(function(r) {
+          if (!r || r.ok === false) { studioStatus('Timelapse failed: ' + ((r && r.error) || 'unknown'), 'err'); return; }
+          var res = r.result || {};
+          studioStatus('⏩ ' + (body.action === 'remove' ? 'Timelapse removed' : 'Timelapse set') +
+            (res.added_seconds ? ' — film ' + (res.added_seconds > 0 ? '+' : '') + Number(res.added_seconds).toFixed(1) + 's' : '') + ' ✓ reloading…', 'ok');
+          afterSpeakerEdit({ project: r.project, bake_seam: res.gap_bake_at, restored_seconds: res.added_seconds },
+            Math.max(0, (res.film_at || 0) - 1));
+        })
+        .catch(function(e) { studioStatus('Timelapse failed: ' + e.message, 'err'); });
+    }
+    document.getElementById('tl-save').addEventListener('click', function() {
+      var o = parseFloat(document.getElementById('tl-out').value);
+      if (!(o >= 1)) { studioStatus('Give the timelapse at least 1 second.', 'warn'); return; }
+      post({ action: 'apply', scene_id: scene.id, key: tkey, src_start: tl.src_start, src_end: tl.src_end, out_seconds: o },
+        'Building timelapse…');
+    });
+    var del = document.getElementById('tl-del');
+    if (del) del.addEventListener('click', function() {
+      post({ action: 'remove', scene_id: scene.id, key: tkey, src_start: tl.src_start }, 'Removing timelapse…');
     });
   }
 
@@ -3478,6 +3584,10 @@ export function getPreviewHtml(): string {
     // against the bottom edge made them read as one smudge.
     var hasFx = ((p || {}).scenes || []).some(function(s2) {
       if ((s2.camera_moves || []).length) return true;
+      var me2 = s2.media_edits || {};
+      if (Object.keys(me2).some(function(k2) {
+        return ((me2[k2] || {}).segments || []).some(function(g2) { return g2.tl || (g2.rate || 1) >= 8; });
+      })) return true;
       return (s2.components || []).some(function(c2) {
         return c2.type === 'screencast-frame' && c2.data && Array.isArray(c2.data.callouts) && c2.data.callouts.length;
       });
@@ -4189,6 +4299,15 @@ export function getPreviewHtml(): string {
       scene.media_edits = scene.media_edits || {};
       if (r.edit) scene.media_edits[target] = r.edit;
       else { delete scene.media_edits[target]; if (!Object.keys(scene.media_edits).length) delete scene.media_edits; }
+      // The pin needed more than 16x, so the server made the wait a
+      // deliberate timelapse (loud, visible in the effects lane, reversible).
+      if (r.timelapse_auto && r.project) {
+        var ta = r.timelapse_auto;
+        studioStatus('⏩ ' + (r.note || 'That wait needed more than 16× — made it a timelapse (click the ⏩ block in the effects lane to resize or remove).'), 'warn');
+        afterSpeakerEdit({ project: r.project, bake_seam: ta.gap_bake_at, restored_seconds: ta.added_seconds },
+          Math.max(0, (ta.film_at || 0) - 1));
+        return;
+      }
       var warn = '';
       (r.edit && r.edit.pin_status || []).forEach(function(ps) {
         if (ps.status !== 'ok') warn += ' ⚠ pin @' + Number(ps.out).toFixed(1) + 's: ' + (ps.detail || ps.status) + '.';

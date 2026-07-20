@@ -1193,3 +1193,40 @@ Caddyfile on this droplet — it carries the /hyperframes route.
   opened — during the 3-2-1 countdown — while rollT was still 0, so it
   rendered Date.now() as minutes for a beat. Shows 0:00 until the take
   actually rolls.
+
+## Timelapse as a deliberate effect (2026-07-20)
+
+Marc's experiment film (proj_c55cfce5, 217s cut, 142s of footage jammed
+into a 1.8s pin window) proved the failure mode: continuous fast-forward
+past ~8x reads as an ugly smear, and past 16x the pin math simply cannot
+land ("lands 8.1s off"). The answer is the film-grammar move real editors
+use: a TIMELAPSE beat that owns its own film time.
+
+- **Data**: `MediaIntents.timelapses [{src_start, src_end, out_seconds}]`
+  — exact-duration, cap-exempt constraints. Solver emits `tl: 1` segments
+  with fixed rate (kept-span/out_seconds, clamp 0.1..2000), excluded from
+  pin-window flexing. `edl.gaps [{src_at, seconds}]` on the speaker clip
+  funds the beat: applyTimelapse splices a matching silence gap into the
+  talk track (cutAudioToWithGaps), so captions/pins/booth cues ripple once
+  and nothing desyncs. removeTimelapse refunds the gap. The camera bubble
+  freezes (adjustHold) for the beat.
+- **Playback**: past 8x a tl segment plays as SAMPLED frames (0.45s
+  flipbook steps in mapSourceTime + MAP_SOURCE_TIME_JS) instead of
+  continuous blur, with an elapsed-clock chip ("⏱ +2:47 · ⏩28×") emitted
+  by timelapseClockScript — a zero-ease proxy tween on the scene timeline
+  (NOT rAF wall-clock), so capture seeks and Studio playback render it
+  identically. The clock ticks on the same 0.45s quantum as the frames.
+- **Policy**: suggest when it's ugly, auto only when it's impossible.
+  8-16x continuous segments get a dashed ⏩? chip in the effects lane
+  (click → make it deliberate); a pin strained past 16x triggers
+  autoTimelapseForStrain server-side — loud (studio toast), visible
+  (striped ⏩ block in the effects lane), reversible (resize/remove in the
+  same popover). 16x stays the continuous-video cap.
+- **Routes**: POST /api/timelapse/:tenant/:project {action: apply|remove,
+  scene_id, key, src_start, src_end?, out_seconds?}; /api/media-edits ops
+  return `{timelapse_auto, note, project}` when the auto fires. Transcript
+  cache re-keys across the gap (maintainTranscriptCacheAfterGap); the
+  Studio reuses afterSpeakerEdit's bake_seam shift client-side.
+
+Acceptance film is proj_c55cfce5: cut, pin, accept the suggestion, and
+the film should read clean.

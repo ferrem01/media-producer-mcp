@@ -34,6 +34,7 @@ import {
   BACKDROP_TYPES,
   bakeDirectLogoData,
   mediaEdlScript,
+  timelapseClockScript,
 } from "./scene-assembler.js";
 import { config } from "../config.js";
 import { resolveAutoCropData, resolveScreencastAutoCrops } from "./asset-intel.js";
@@ -225,6 +226,15 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       componentScripts.push(mediaEdlScript(
         scene.media_edits,
         `document.querySelector('.mp-scene[data-scene-id="${scene.id}"]')`,
+      ));
+      // Timelapse elapsed-time clock rides the scene timeline, so the master
+      // proxy tween drives it in preview exactly like capture seeks do.
+      componentScripts.push(timelapseClockScript(
+        scene.media_edits,
+        canvas,
+        `document.querySelector('.mp-scene[data-scene-id="${scene.id}"]')`,
+        "sceneTl",
+        scene.duration_seconds,
       ));
     }
 
