@@ -45,11 +45,14 @@ export function sanitizeCues(cues: unknown, filmDur: number): ScriptCue[] {
 /** Map a SOURCE-clock second through the scene's EDL segments to the film
  *  clock (scene-local), or null when the moment was cut. */
 function srcToSceneTime(
-  segments: Array<{ src_start: number; src_end: number; rate: number }>,
+  segments: Array<{ src_start: number; src_end: number; rate: number; hold?: number }>,
   src: number,
 ): number | null {
   let acc = 0;
   for (const s of segments) {
+    // Freeze frames occupy FILM time with no source range -- skipping them
+    // shifted every later event (and cue) earlier by the hold's length.
+    if (typeof s.hold === "number" && s.hold > 0) { acc += s.hold; continue; }
     const rate = s.rate || 1;
     const len = (s.src_end - s.src_start) / rate;
     if (src >= s.src_start && src < s.src_end) return acc + (src - s.src_start) / rate;
@@ -98,15 +101,22 @@ export function describeFilmForScript(project: Project, sidecar?: {
         if (t !== null) events.push(`    at ${fmtT(offset + t)}: CHAPTER MARK "${(ch.label || "").slice(0, 50)}"`);
       }
       let acc = 0;
-      for (const seg of segs) {
+      for (const seg of segs as Array<{ src_start: number; src_end: number; rate: number; hold?: number; tl?: number }>) {
+        const holdS = typeof seg.hold === "number" && seg.hold > 0 ? seg.hold : 0;
         const rate = seg.rate || 1;
-        const len = (seg.src_end - seg.src_start) / rate;
+        const len = holdS || (seg.src_end - seg.src_start) / rate;
         const a = offset + acc;
         const b = a + len;
-        if (rate <= 1.01) {
-          lines.push(`${fmtT(a)}-${fmtT(b)}: REAL-TIME demo footage (budget ~${Math.max(3, Math.round(len * WORDS_PER_SECOND))} words)`);
+        if (holdS) {
+          lines.push(`${fmtT(a)}-${fmtT(b)}: FREEZE-FRAME (screen holds still ${holdS.toFixed(1)}s; narration can keep talking, ~${Math.max(3, Math.round(len * WORDS_PER_SECOND))} words)`);
+        } else if (seg.tl) {
+          lines.push(`${fmtT(a)}-${fmtT(b)}: TIMELAPSE ${Math.round(rate)}x with an on-screen elapsed clock (waiting compressed; at most one short bridging line, ~${Math.max(3, Math.round(len * WORDS_PER_SECOND))} words)`);
+        } else if (rate > 3) {
+          lines.push(`${fmtT(a)}-${fmtT(b)}: FAST-FORWARD ${Math.round(rate * 10) / 10}x (details not readable; one short bridging line, ~${Math.max(3, Math.round(len * WORDS_PER_SECOND))} words)`);
         } else {
-          lines.push(`${fmtT(a)}-${fmtT(b)}: TIMELAPSE ${rate}x (waiting compressed; at most one short bridging line, ~${Math.max(3, Math.round(len * WORDS_PER_SECOND))} words)`);
+          // Mildly re-timed footage (pin fitting) still READS as real-time;
+          // calling it a timelapse made the drafter under-write it.
+          lines.push(`${fmtT(a)}-${fmtT(b)}: REAL-TIME demo footage (budget ~${Math.max(3, Math.round(len * WORDS_PER_SECOND))} words)`);
         }
         acc += len;
       }
