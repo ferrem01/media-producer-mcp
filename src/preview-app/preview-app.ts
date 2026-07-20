@@ -5696,13 +5696,32 @@ export function getPreviewHtml(): string {
       studio.pendingInside = null;
       if (studio.dragBox) studio.dragBox.style.display = 'none';
     };
+    // The camera bubble is DIRECTLY draggable -- grabbing it moves the
+    // bubble instead of drawing a zoom marquee.
+    function bubbleWrapOf(t) {
+      var el = t && t.closest ? t.closest('.mp-component') : null;
+      var cid = el && (el.getAttribute('data-cid') || '');
+      return (el && /(?:^|__)(?:camera|booth)_pip$/.test(cid)) ? el : null;
+    }
     function onDown(e) {
       if (studio.busy || e.button !== 0) return;
-      drag = { x0: e.clientX, y0: e.clientY, moved: false };
+      var bw = bubbleWrapOf(e.target);
+      drag = { x0: e.clientX, y0: e.clientY, moved: false, bub: bw,
+        bubLeft: bw ? bw.offsetLeft : 0, bubTop: bw ? bw.offsetTop : 0 };
     }
     function onDragMove(e) {
       if (!drag) return;
       var w = Math.abs(e.clientX - drag.x0), h = Math.abs(e.clientY - drag.y0);
+      if (drag.bub) {
+        if (!drag.moved && w + h < 6) return;
+        if (!drag.moved) { rvPopClose(); try { drag.bub.style.right = 'auto'; drag.bub.style.bottom = 'auto'; } catch (e2) {} }
+        drag.moved = true;
+        e.preventDefault();
+        hi.style.display = 'none';
+        drag.bub.style.left = (drag.bubLeft + (e.clientX - drag.x0)) + 'px';
+        drag.bub.style.top = (drag.bubTop + (e.clientY - drag.y0)) + 'px';
+        return;
+      }
       if (!drag.moved && w + h < 10) return;
       if (!drag.moved) rvPopClose(); // marquee takes over; don't stack popovers
       drag.moved = true;
@@ -5720,6 +5739,11 @@ export function getPreviewHtml(): string {
       var d = drag; drag = null;
       if (!d.moved) return; // plain click: onClick handles selection
       studio._justDragged = +new Date();
+      if (d.bub) {
+        bubbleCommitMove(d.bub.getAttribute('data-cid') || '',
+          d.bubLeft + (e.clientX - d.x0), d.bubTop + (e.clientY - d.y0));
+        return;
+      }
       var w = Math.abs(e.clientX - d.x0), h = Math.abs(e.clientY - d.y0);
       if (w < 24 || h < 24) { studio.dragCancel(); return; } // too small to mean a zoom
       zoomConfirmOpen(doc, { left: Math.min(d.x0, e.clientX), top: Math.min(d.y0, e.clientY), width: w, height: h });
@@ -5820,7 +5844,10 @@ export function getPreviewHtml(): string {
     var pos = comp.position || { x: '74%', y: '58%', width: '23%', height: '30%' };
     var w = parseFloat(pos.width) || 23;
     if (size) w = size === 'S' ? 15 : size === 'L' ? 30 : 22;
-    var h = w; // 16:9 box on a 16:9 canvas
+    // A circle bubble needs a square box in PIXELS: on the 16:9 canvas
+    // that's h% = w% * 16/9. Other shapes keep the 16:9-ish box (h% == w%).
+    var circ = comp.data && comp.data.shape === 'circle';
+    var h = circ ? Math.round(w * (16 / 9) * 10) / 10 : w;
     var x = parseFloat(pos.x) || 74;
     var y = parseFloat(pos.y) || 58;
     if (corner) {
@@ -5839,6 +5866,65 @@ export function getPreviewHtml(): string {
       startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
     }).catch(function(e) {
       studioStatus('Bubble placement failed: ' + e.message, 'err');
+    });
+  }
+
+  // Bubble shape: rect / rounded / circle. Writes component data through the
+  // PATCH route; circle also squares the position box (see bubblePlace).
+  function bubbleShape(compId, shape) {
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[state.currentSceneIndex];
+    if (!p || !scene) return;
+    var comp = null;
+    (scene.components || []).forEach(function(c) { if (c.id === compId) comp = c; });
+    if (!comp) return;
+    var pos = comp.position || { x: '74%', y: '58%', width: '23%', height: '30%' };
+    var w = parseFloat(pos.width) || 23;
+    var h = shape === 'circle' ? Math.round(w * (16 / 9) * 10) / 10 : w;
+    var x = Math.max(0, Math.min(100 - w, parseFloat(pos.x) || 74));
+    var y = Math.max(0, Math.min(88 - h, parseFloat(pos.y) || 58));
+    comp.position = { x: x + '%', y: y + '%', width: w + '%', height: h + '%' };
+    var data = shape === 'circle' ? { shape: 'circle' }
+      : shape === 'rect' ? { shape: null, corner_radius: 0 }
+      : { shape: null, corner_radius: 18 };
+    comp.data = Object.assign({}, comp.data || {}, data);
+    studioStatus('Reshaping bubble…', '');
+    var patchPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+    api('PATCH', patchPath, { data: data, position: comp.position }).then(function() {
+      studioStatus('Bubble reshaped ✓ reloading preview…', 'ok');
+      startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
+    }).catch(function(e) {
+      studioStatus('Bubble reshape failed: ' + e.message, 'err');
+    });
+  }
+
+  // Commit a drag-placed bubble: wrapper px (canvas coordinates) -> position
+  // percentages. No preview reload -- the wrapper is already where it landed.
+  function bubbleCommitMove(cid, leftPx, topPx) {
+    var p = state.currentProject;
+    if (!p) return;
+    var m = cid.match(/^(?:(.*)__)?((?:camera|booth)_pip)$/);
+    var sceneId = m && m[1], compId = m ? m[2] : cid;
+    var scene = null;
+    (p.scenes || []).forEach(function(s) { if (s.id === sceneId) scene = s; });
+    if (!scene) scene = p.scenes && p.scenes[state.currentSceneIndex];
+    if (!scene) return;
+    var comp = null;
+    (scene.components || []).forEach(function(c) { if (c.id === compId) comp = c; });
+    if (!comp) return;
+    var cw = parseInt(els.previewIframe.width, 10) || 1920;
+    var ch = parseInt(els.previewIframe.height, 10) || 1080;
+    var pos = comp.position || { width: '23%', height: '30%' };
+    var w = parseFloat(pos.width) || 23, h = parseFloat(pos.height) || 30;
+    var x = Math.max(0, Math.min(100 - w, (leftPx / cw) * 100));
+    var y = Math.max(0, Math.min(100 - h, (topPx / ch) * 100));
+    comp.position = { x: Math.round(x * 10) / 10 + '%', y: Math.round(y * 10) / 10 + '%', width: w + '%', height: h + '%' };
+    studioStatus('Placing bubble…', '');
+    var patchPath = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + compId;
+    api('PATCH', patchPath, { position: comp.position }).then(function() {
+      studioStatus('Bubble moved ✓', 'ok');
+    }).catch(function(e) {
+      studioStatus('Bubble move failed: ' + e.message, 'err');
     });
   }
 
@@ -5882,7 +5968,13 @@ export function getPreviewHtml(): string {
           ['S', 'M', 'L'].map(function(s) {
             return '<button class="rv-go secondary rv-bub-size" data-size="' + s + '" style="flex:1;">' + s + '</button>';
           }).join('') +
-        '</div>'
+        '</div>' +
+        '<div class="sp-row" style="gap:4px;" title="Bubble shape">' +
+          [['rect', '&#9645; Rect'], ['round', '&#9634; Round'], ['circle', '&#9711; Circle']].map(function(sh) {
+            return '<button class="rv-go secondary rv-bub-shape" data-shape="' + sh[0] + '" style="flex:1;">' + sh[1] + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div class="sp-status">Or just drag the bubble to place it anywhere.</div>'
       : '';
     pop.innerHTML =
       '<div class="sp-head"><span class="sp-title" id="rv-pop-title"></span>' +
@@ -5914,6 +6006,9 @@ export function getPreviewHtml(): string {
       });
       pop.querySelectorAll('.rv-bub-size').forEach(function(b) {
         b.addEventListener('click', function() { bubblePlace(sel.compId, null, b.getAttribute('data-size')); });
+      });
+      pop.querySelectorAll('.rv-bub-shape').forEach(function(b) {
+        b.addEventListener('click', function() { bubbleShape(sel.compId, b.getAttribute('data-shape')); });
       });
     }
     var ta = document.getElementById('rv-pop-input');

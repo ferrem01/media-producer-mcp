@@ -354,6 +354,11 @@
       var stageBox = stage.getBoundingClientRect();
       if (stageBox.width < 4 || stageBox.height < 4) return;
       var full = frameStyle === 'none';
+      // Circle: a square, cover-cropped clip ('none' mode only) -- built for
+      // the camera bubble. The box math below treats the frame as 1:1 and the
+      // media branch center-crops the footage to fill it.
+      var isCircle = full && data.shape === 'circle';
+      var arFit = isCircle ? 1 : ar;
       // full (frame_style:'none') defaults to 100% (edge-to-edge), but an
       // explicit max_width_pct is honored so a full-bleed screencast can be
       // inset with a margin. Below ~95% it becomes width-constrained and the
@@ -366,7 +371,7 @@
       var frameW = stageBox.width * (maxWPct / 100);
       var chromeH = frameStyle === 'macos-browser' ? Math.min(64, Math.max(40, frameW * 0.034)) : 0;
       var maxH = stageBox.height * padV;
-      if (frameW / ar + chromeH > maxH) frameW = Math.max(1, (maxH - chromeH) * ar);
+      if (frameW / arFit + chromeH > maxH) frameW = Math.max(1, (maxH - chromeH) * arFit);
       chromeH = frameStyle === 'macos-browser' ? Math.min(64, Math.max(40, frameW * 0.034)) : 0;
 
       // full (frame_style:'none') defaults to radius 0 (truly frameless), but an
@@ -403,6 +408,26 @@
         chrome.style.display = 'none';
       }
 
+      if (isCircle) {
+        // Square viewport clipped to a circle; footage cover-crops (center)
+        // so the circle is always full -- no letterbox wedges inside a ring.
+        viewport.style.aspectRatio = '1 / 1';
+        viewport.style.borderRadius = '50%';
+        frame.style.borderRadius = '50%';
+        if (ar >= 1) {
+          // Landscape content: fill by height, center horizontally.
+          media.style.width = (srcW / chh) * 100 + '%';
+          media.style.height = (srcH / chh) * 100 + '%';
+          media.style.left = (-(((cw - chh) / 2) + crop.left) / chh) * 100 + '%';
+          media.style.top = (-crop.top / chh) * 100 + '%';
+        } else {
+          // Portrait content: fill by width, center vertically.
+          media.style.width = (srcW / cw) * 100 + '%';
+          media.style.height = (srcH / cw) * 100 + '%';
+          media.style.left = (-crop.left / cw) * 100 + '%';
+          media.style.top = (-(((chh - cw) / 2) + crop.top) / cw) * 100 + '%';
+        }
+      } else {
       viewport.style.aspectRatio = cw + ' / ' + chh;
       media.style.width = (srcW / cw) * 100 + '%';
       // Explicit height, not auto: identical to auto when the media's
@@ -411,6 +436,7 @@
       media.style.height = (srcH / chh) * 100 + '%';
       media.style.left = (-crop.left / cw) * 100 + '%';
       media.style.top = (-crop.top / chh) * 100 + '%';
+      }
       layoutCallouts();
       if (centerFloat) centerFloat();
     }

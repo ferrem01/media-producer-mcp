@@ -1296,3 +1296,22 @@ auto's real-speed lead-out). That lead-out is redundant since the beat's
 final flipbook step parks on the landing frame, so the auto's span now
 runs to the pinned frame itself (spanEnd = pin.src) and the beat fills
 the window exactly: block edge == pin, visually and temporally.
+
+## PiP bubble controls round 2 (Marc, 2026-07-20): shape + drag
+
+Marc: "change the PIP size and location... square to rectangle to circle
+... move it around the screen." What existed: corner presets + S/M/L on
+the bubble popover (and a separate built-in pip_* config on
+screencast-frame that pipeline scenes use). Added for the camera_pip /
+booth_pip component path his films use:
+
+- screencast-frame gains data.shape:'circle' ('none' mode): square
+  cover-cropped viewport clipped to a circle (frame box fitted 1:1; the
+  media branch center-crops so no letterbox wedges inside the ring).
+  Studio squares the position box in px when switching (h% = w% * 16/9
+  on the 16:9 canvas).
+- Bubble popover: Rect / Round / Circle buttons (corner_radius 0 / 18 /
+  shape:circle) via the component PATCH route.
+- The bubble is now DIRECTLY draggable in the preview: grabbing it moves
+  the bubble (the zoom marquee still owns drags that start anywhere
+  else); release PATCHes position -- no preview reload needed.
