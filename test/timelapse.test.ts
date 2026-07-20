@@ -70,3 +70,41 @@ describe("mapSourceTime sampling for fast timelapses", () => {
     expect(mapSourceTime(slow, 1.2)).toBeCloseTo(7.2, 2);
   });
 });
+
+describe("surplus windows never crawl below 1x (Marc's 0.1x filler bug)", () => {
+  // His exact shape: pins on "right," and "wow" define a 12.8s window (talk
+  // was left between the pinned words); an 8s beat + 0.5s of residual
+  // footage left 4.3s of surplus -- the solver stretched the 0.5s sliver to
+  // 0.104x slow motion. Surplus must become a HOLD on the pinned frame.
+  it("beat smaller than the pin window -> 1x residual + hold, no sub-1x", () => {
+    const r = solveMediaEdits(
+      {
+        rate_regions: [{ src_start: 0, src_end: 297.89, rate: 1 }],
+        pins: [{ out: 30.9, src: 38.5 }, { out: 43.7, src: 264.2 }],
+        timelapses: [{ src_start: 38.5, src_end: 263.7, out_seconds: 8 }],
+      },
+      297.89,
+    );
+    const sub1 = r.segments.filter((s) => !s.tl && !(s.hold! > 0) && s.rate < 0.99);
+    expect(sub1).toEqual([]);
+    const hold = r.segments.find((s) => s.hold! > 0 && Math.abs(s.src_start - 264.2) < 0.3);
+    expect(hold).toBeTruthy();
+    expect(hold!.hold).toBeCloseTo(4.3, 0);
+    const st = r.pin_status.find((x) => Math.abs(x.out - 43.7) < 0.1);
+    expect(st!.status).toBe("ok");
+    expect(st!.detail).toMatch(/arrives early/);
+  });
+
+  it("explicit slow-mo regions keep their sub-1x preference", () => {
+    const r = solveMediaEdits(
+      {
+        rate_regions: [{ src_start: 0, src_end: 10, rate: 0.5 }],
+        pins: [{ out: 20, src: 10 }],
+      },
+      60,
+    );
+    const slow = r.segments.find((s) => s.rate < 0.9);
+    expect(slow).toBeTruthy();
+    expect(slow!.rate).toBeCloseTo(0.5, 1);
+  });
+});

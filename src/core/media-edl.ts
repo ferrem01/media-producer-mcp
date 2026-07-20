@@ -289,7 +289,12 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
   const push = (s: number, e: number, rate: number, hard?: boolean, tl?: boolean) => {
     rate = tl ? Math.min(2000, Math.max(0.1, rate)) : Math.min(16, Math.max(0.1, rate));
     const last = segments[segments.length - 1];
-    if (!hard && last && !last.tl === !tl && Math.abs(last.src_end - s) < 0.005 && Math.abs(last.rate - rate) < 0.001) last.src_end = e;
+    // Adjacent same-rate tl pieces merge even across hard boundaries: a rate
+    // region ending mid-beat splits one timelapse into identical pieces, and
+    // the mapping is unchanged by joining them -- one beat, one segment.
+    const mergeable = last && Math.abs(last.src_end - s) < 0.005 && Math.abs(last.rate - rate) < 0.001 &&
+      ((!hard && !last.tl === !tl) || (!!last.tl && !!tl));
+    if (mergeable) last!.src_end = e;
     else segments.push({ src_start: s, src_end: e, rate: Math.round(rate * 1000) / 1000, ...(tl ? { tl: 1 as const } : {}) });
   };
   // Push a TRUE freeze: hold frame `src` for `holdSeconds` of OUTPUT time, the
@@ -339,12 +344,20 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
     const fixedTime = pieces.reduce((t, p) => t + (p.tl ? (p.e - p.s) / p.tl : 0), 0);
     const freeAtPref = pieces.reduce((t, p) => t + (p.tl ? 0 : (p.e - p.s) / p.pref), 0);
     let scale = freeAtPref > 0 ? freeAtPref / Math.max(0.01, window - fixedTime) : 1;
+    // Relaxing fast preferences toward 1x to fill a surplus window is
+    // wanted; SLOWING footage below natural speed to pad it out is not --
+    // a 0.5s sliver crawling at 0.1x for 5s reads as a broken film. Each
+    // free piece's floor is min(pref, 1): explicit slow-mo regions keep
+    // their rate, everything else never dips below 1x. Whatever the floor
+    // can't fill becomes a hold on the pinned frame (the same "arrives
+    // early" semantic every other surplus window gets).
+    const floorOf = (p: { pref: number }) => Math.min(p.pref, 1);
     for (let iter = 0; iter < 5; iter++) {
       let clampedTime = 0, freePref = 0;
       for (const p of pieces) {
         if (p.tl) continue;
         const r = p.pref * scale;
-        if (r >= 16 || r <= 0.1) clampedTime += (p.e - p.s) / Math.min(16, Math.max(0.1, r));
+        if (r >= 16 || r <= floorOf(p)) clampedTime += (p.e - p.s) / Math.min(16, Math.max(floorOf(p), r));
         else freePref += (p.e - p.s) / p.pref;
       }
       const remaining = window - fixedTime - clampedTime;
@@ -356,13 +369,17 @@ export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?:
     let arrival = 0;
     let first1 = true;
     for (const p of pieces) {
-      const rate = p.tl ? p.tl : Math.min(16, Math.max(0.1, p.pref * scale));
+      const rate = p.tl ? p.tl : Math.min(16, Math.max(floorOf(p), p.pref * scale));
       arrival += (p.e - p.s) / rate;
       push(p.s, p.e, rate, p.hard || first1, !!p.tl);
       first1 = false;
     }
-    if (Math.abs(arrival - window) > 0.15) {
-      pinStatus.push({ out: b.out, status: "strained", detail: `needs ${(scale > 1 ? "faster" : "slower")} playback than the ${scale > 1 ? "16x cap" : "0.1x floor"} allows -- lands ${(arrival - window).toFixed(1)}s off` });
+    if (arrival < window - 0.15) {
+      const hold = window - arrival;
+      pushHold(b.src, hold);
+      pinStatus.push({ out: b.out, status: "ok", detail: `arrives early -- holds the pinned frame ${hold.toFixed(1)}s` });
+    } else if (arrival > window + 0.15) {
+      pinStatus.push({ out: b.out, status: "strained", detail: `needs faster playback than the 16x cap allows -- lands ${(arrival - window).toFixed(1)}s off` });
     } else {
       pinStatus.push({ out: b.out, status: "ok" });
     }

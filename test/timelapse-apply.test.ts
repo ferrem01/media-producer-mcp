@@ -14,7 +14,7 @@ vi.mock("../src/core/auto-compress.js", () => ({
   proposeChapterPins: vi.fn(),
 }));
 
-import { applyTimelapse, removeTimelapse } from "../src/core/speaker-edl.js";
+import { applyTimelapse, removeTimelapse, autoTimelapseForStrain } from "../src/core/speaker-edl.js";
 
 function jammedFilm(): any {
   // Marc's shape: a pin right after a cut seam with 142s of footage jammed
@@ -117,6 +117,36 @@ describe("applyTimelapse", () => {
     await removeTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8 });
     expect((p.speaker.clips[0].edl.gaps || []).length).toBe(0);
     expect(p.scenes[1].duration_seconds).toBeCloseTo(60, 0);
+  });
+
+  it("auto beat fills a pin window the user already funded with talk (Marc's 'ends at the wow')", async () => {
+    // His shape: talk was CUT, not gapped -- but he left ~13s of speech
+    // between the pinned words, so the pins already define a 12.8s window.
+    // The beat must fill it edge-to-edge (ending at the pinned word), with
+    // NO narration gap and NO film growth -- not default to 8s and force
+    // the solver to pad the difference.
+    const p = jammedFilm();
+    const sc = p.scenes[1].media_edits.screencast;
+    sc.pins = [{ out: 10, src: 8, word: "start" }, { out: 22.8, src: 240, word: "wow" }];
+    sc.rate_regions = [{ src_start: 0, src_end: 200, rate: 1 }];
+    sc.pin_status = [
+      { out: 10, status: "ok" },
+      { out: 22.8, status: "strained", detail: "needs faster playback than the 16x cap allows -- lands 1.7s off" },
+    ];
+    const res = await autoTimelapseForStrain(p, "screencast", "screencast");
+    expect(res).toBeTruthy();
+    // Window 12.8 minus the 0.5s 1x landing = 12.3s beat; nothing funded.
+    expect(res!.out_seconds).toBeCloseTo(12.3, 1);
+    expect(res!.added_seconds).toBe(0);
+    expect((p.speaker.clips[0].edl.gaps || []).length).toBe(0);
+    expect(p.scenes[1].duration_seconds).toBeCloseTo(60, 0);
+    const tl = sc.segments.filter((s: any) => s.tl);
+    expect(tl.length).toBe(1);
+    // No sub-1x filler, and no hold parked before "wow": the beat itself
+    // ends at the pinned word. (Other windows may legitimately hold.)
+    expect(sc.segments.filter((s: any) => !s.tl && !(s.hold > 0) && s.rate < 0.99)).toEqual([]);
+    expect(sc.segments.filter((s: any) => s.hold > 0.5 && Math.abs(s.src_start - 240) < 1)).toEqual([]);
+    expect((sc.pin_status || []).filter((x: any) => x.status !== "ok")).toEqual([]);
   });
 
   it("removeTimelapse shrinks the film back and lifts the gap", async () => {

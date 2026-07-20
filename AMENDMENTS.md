@@ -1248,3 +1248,26 @@ segment (click → resize/remove popover); fast (8x+) plain segments carry
 a small ⏩? tag (click → make it deliberate); the effects lane is back to
 zooms/callouts only; screen-lane widths are tl-aware so the map lines up
 with the pins.
+
+## Timelapse round 3 (Marc, 2026-07-20): "it should end at the wow"
+
+Marc pinned "right," and "wow" with ~13s of talk left between them, and
+the auto sized the beat with its default heuristic (8s) while the pins
+already defined a 12.8s window. The solver then stretched the 0.5s of
+leftover footage to 0.104x slow motion to fill the 4.3s surplus --
+"that's the wrong math", and playback visibly didn't end at the pinned
+frame. Three coordinated fixes:
+
+- **Solver floor**: auto-flex never slows footage below min(pref, 1) --
+  relaxing fast prefs toward 1x to fill a window stays; sub-1x crawl is
+  gone. Whatever the floor can't fill becomes a HOLD on the pinned frame
+  ("arrives early -- holds", same as every other surplus window). Also:
+  adjacent same-rate tl pieces merge across hard boundaries (a rate
+  region ending mid-beat split one beat into two lane blocks).
+- **Auto sizing fills the window**: when the pins already define a window
+  wider than the default beat, out_seconds = window - 1x-landing-residual
+  (edge-to-edge, ending at the pinned word) with NO gap and NO film
+  growth. Only a too-small window falls back to the funded 3..8s default.
+- **Resize measures the window**: applyTimelapse's prevOut is always the
+  pin-to-pin window, never the beat's stored out_seconds -- resizing a
+  beat inside an already-wide window must not splice a bogus gap.
