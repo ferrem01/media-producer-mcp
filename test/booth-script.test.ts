@@ -32,20 +32,37 @@ describe("describeFilmForScript", () => {
         id: "screencast", duration_seconds: 20, components: [],
         media_edits: { screencast: { segments: [
           { src_start: 0, src_end: 10, rate: 1 },     // 10s real
-          { src_start: 10, src_end: 90, rate: 8 },     // 10s timelapse
+          { src_start: 10, src_end: 90, rate: 8 },     // 10s fast-forward (continuous)
         ] } },
       },
       { id: "outro", duration_seconds: 5, components: [] },
     ],
   };
 
-  it("lays out bookends, real-time and timelapse spans on the film clock", () => {
+  it("lays out bookends, real-time and fast spans on the film clock", () => {
     const { brief, filmDur } = describeFilmForScript(project, null);
     expect(filmDur).toBe(31);
     expect(brief).toContain("0.0s-6.0s: branded logo intro");
     expect(brief).toContain("6.0s-16.0s: REAL-TIME");
-    expect(brief).toContain("16.0s-26.0s: TIMELAPSE 8x");
+    expect(brief).toContain("16.0s-26.0s: FAST-FORWARD 8x");
     expect(brief).toContain("26.0s-31.0s: branded outro");
+  });
+
+  it("labels tl segments as timelapse, keeps holds' film time, real-time under 3x", () => {
+    const p2: any = { scenes: [{
+      id: "s", duration_seconds: 40, components: [],
+      media_edits: { screencast: { segments: [
+        { src_start: 0, src_end: 12.5, rate: 1.25 },          // pin-fitted: still real-time
+        { src_start: 12.5, src_end: 192.5, rate: 18, tl: 1 }, // 10s deliberate beat
+        { src_start: 192.5, src_end: 192.5, rate: 0, hold: 5 }, // 5s freeze
+        { src_start: 192.5, src_end: 207.5, rate: 1 },
+      ] } },
+    }] };
+    const { brief } = describeFilmForScript(p2, null);
+    expect(brief).toContain("0.0s-10.0s: REAL-TIME");
+    expect(brief).toContain("10.0s-20.0s: TIMELAPSE 18x with an on-screen elapsed clock");
+    expect(brief).toContain("20.0s-25.0s: FREEZE-FRAME");
+    expect(brief).toContain("25.0s-40.0s: REAL-TIME");
   });
 
   it("maps sidecar events through the EDL to film time and drops cut ones", () => {
