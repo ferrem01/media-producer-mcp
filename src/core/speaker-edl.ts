@@ -630,9 +630,13 @@ export async function applyTimelapse(
   // The span's NORMATIVE footprint: up to the next pin at/after its end.
   // Unpinned ends fall back to the solved map.
   const nextPin = pinsByOut.find((p: any) => p.src >= args.src_end - 0.3 && p.out > beatLocal + 0.05);
-  const prevOut = existingTl
-    ? existingTl.out_seconds
-    : Math.max(0.1, (nextPin ? nextPin.out : outTimeAtSource(solvedBefore.segments, args.src_end)) - beatLocal);
+  // prevOut is the WINDOW the span currently occupies, pin-to-pin when the
+  // end is pinned (the film's truth) -- never the beat's own stored length:
+  // when the window is wider than the beat (talk left between the pinned
+  // words), resizing the beat to fill it must NOT add film time.
+  // (Unpinned ends fall back to the solved map, which for an existing beat
+  // measures beatLocal + its current out_seconds -- same answer as before.)
+  const prevOut = Math.max(0.1, (nextPin ? nextPin.out : outTimeAtSource(solvedBefore.segments, args.src_end)) - beatLocal);
   const wantDelta = Math.round((outSeconds - prevOut) * 100) / 100;
   if (existingTl) existingTl.out_seconds = outSeconds;
   else {
@@ -872,6 +876,15 @@ export async function autoTimelapseForStrain(
     cursor = Math.max(cursor, c.src_end);
   }
   kept += Math.max(0, spanEnd - cursor);
-  const outSeconds = Math.max(3, Math.min(8, Math.round(kept / 30)));
+  // The pins may ALREADY define a window wider than the default beat (the
+  // user left talk between the pinned words): size the beat to fill it
+  // edge-to-edge -- a beat smaller than its window forces slow-mo filler
+  // or a long hold before the pin, neither of which is the film anyone
+  // meant. Only a too-small window falls back to the funded default
+  // (~1s of film per 30s of waiting, clamped 3..8s).
+  const windowOut = prev ? pin.out - prev.out : 0;
+  const residual1x = Math.max(0, pin.src - spanEnd);
+  const available = Math.round((windowOut - residual1x) * 10) / 10;
+  const outSeconds = available >= 3 ? available : Math.max(3, Math.min(8, Math.round(kept / 30)));
   return applyTimelapse(project, { scene_id: sceneId, key, src_start: spanStart, src_end: spanEnd, out_seconds: outSeconds }, dataDir);
 }
