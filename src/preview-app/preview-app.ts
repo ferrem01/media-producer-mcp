@@ -5685,6 +5685,12 @@ export function getPreviewHtml(): string {
         '<div class="booth-row"><button class="btn btn-primary" id="booth-done">Close</button></div>'
       );
       document.getElementById('booth-done').addEventListener('click', boothClose);
+      // The pre-attach transcript fetch cached "nothing to transcribe" for
+      // this project, and the once-per-project gate would block the refetch
+      // -- the take just CREATED the transcript, so drop the gate or the
+      // word lane stays empty until a hard reload.
+      state._transcriptFor = null;
+      state._transcript = null;
       // Reload so the captions overlay, audio lanes and spine show up.
       loadProject(p.project_id);
     }
