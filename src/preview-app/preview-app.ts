@@ -4747,7 +4747,13 @@ export function getPreviewHtml(): string {
         (isBox
           ? '<label>hold <input id="cp-hold" type="number" min="0" max="10" step="0.5" value="' + escAttr('' + (m.hold != null ? m.hold : 0)) + '">s</label>' +
             '<div class="sp-region">Region ' + Math.round(m.w) + '\u00d7' + Math.round(m.h) + '% at (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%) \u2014 redraw the box to change it.</div>'
-          : (m.type === 'rotate' ? '<label>angle <input id="cp-angle" type="number" min="-45" max="45" step="1" value="' + escAttr('' + (m.angle != null ? m.angle : 8)) + '">\u00b0</label>' : '') +
+          : (m.type === 'rotate'
+              ? '<label>angle <input id="cp-angle" type="number" min="-45" max="45" step="1" value="' + escAttr('' + (m.angle != null ? m.angle : 8)) + '">\u00b0</label>' +
+                '<label title="z = flat spin; y = 3D book-page turn; x = 3D tilt toward/away">axis <select id="cp-axis">' +
+                  ['z', 'y', 'x'].map(function(ax) { return '<option value="' + ax + '"' + ((m.axis || 'z') === ax ? ' selected' : '') + '>' + (ax === 'z' ? 'z (flat)' : ax === 'y' ? 'y (3D turn)' : 'x (3D tilt)') + '</option>'; }).join('') +
+                '</select></label>' +
+                '<label title="3D axes only: signed canvas-% shift to clear space beside the tilted frame (negative = left/up)">shift <input id="cp-shift" type="number" min="-40" max="40" step="1" value="' + escAttr('' + (m.shift != null ? m.shift : 0)) + '">%</label>'
+              : '') +
             (m.type === 'aside'
               ? '<label>words <select id="cp-side"><option value="left"' + (m.side !== 'right' ? ' selected' : '') + '>on the left</option><option value="right"' + (m.side === 'right' ? ' selected' : '') + '>on the right</option></select></label>' +
                 '<label style="flex-basis:100%;">text <textarea id="cp-text" rows="2" style="width:100%;box-sizing:border-box;font:inherit;">' + escHtml(m.text || '') + '</textarea></label>'
@@ -4789,6 +4795,10 @@ export function getPreviewHtml(): string {
       if (scEl) { var sc = parseFloat(scEl.value); if (!isNaN(sc)) next.scale = sc; }
       var agEl = document.getElementById('cp-angle');
       if (agEl) { var ag = parseFloat(agEl.value); if (!isNaN(ag)) next.angle = Math.max(-45, Math.min(45, ag)); }
+      var axEl = document.getElementById('cp-axis');
+      if (axEl) next.axis = axEl.value === 'y' ? 'y' : axEl.value === 'x' ? 'x' : 'z';
+      var shEl = document.getElementById('cp-shift');
+      if (shEl) { var sh = parseFloat(shEl.value); if (!isNaN(sh)) next.shift = Math.max(-40, Math.min(40, sh)); }
       var sdEl = document.getElementById('cp-side');
       if (sdEl) next.side = sdEl.value === 'right' ? 'right' : 'left';
       var txEl = document.getElementById('cp-text');
@@ -6283,12 +6293,16 @@ export function getPreviewHtml(): string {
       camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1 1 45%;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
         (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1 1 45%;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '') +
         '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Glide the camera to this element at the playhead. Keeps the current zoom; from wide it drifts in at 1.4×.">→ Pan here</button>' +
-        '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1 1 45%;" title="Tilt the camera on this element at the playhead (angle editable on the block afterwards)">↻ Rotate</button>' +
-        (selVideo ? '<button class="rv-go secondary" id="rv-pop-aside" style="flex:1 1 45%;" title="Tilt the browser frame away in 3D, type words into the cleared space, then return to full frame. Set the words on the ◧ block afterwards.">◧ Aside + words</button>' : '');
+        '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1 1 45%;" title="Rotate the camera on this element at the playhead. The block edits angle, AXIS (flat spin / 3D book-turn / tilt) and a sideways shift to clear space.">↻ Rotate</button>' +
+        '<button class="rv-go secondary" id="rv-pop-text" style="flex:1 1 45%;" title="Drop type-on brand text at the playhead where you clicked. Click the text afterwards to revise or remove it.">T Add text here</button>';
     }
     // Speaker bubble selected: direct placement beats prose. Corners + sizes
     // write the component position through the PATCH route -- no LLM, instant.
     var isBubble = !isScene && sel && (sel.compId === 'camera_pip' || sel.compId === 'booth_pip');
+    var isText = !isScene && sel && sel.compType === 'kinetic-text';
+    var textRow = isText
+      ? '<div class="sp-row"><button class="rv-go secondary" id="rv-pop-remove" style="flex:1;color:#dc2626;border-color:#fca5a5;" title="Delete this text component">🗑 Remove this text</button></div>'
+      : '';
     var bubbleRow = isBubble
       ? '<div class="sp-row" style="gap:4px;" title="Place the camera bubble">' +
           ['tl:&#8598;', 'tr:&#8599;', 'bl:&#8601;', 'br:&#8600;'].map(function(c) {
@@ -6328,6 +6342,7 @@ export function getPreviewHtml(): string {
       '</div>' +
       bubbleRow +
       '<div class="sp-row" style="flex-wrap:wrap;">' + camRow + '</div>' +
+      textRow +
       chapRow +
       '<div class="sp-status" id="rv-pop-status"></div>';
     document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
@@ -6341,8 +6356,10 @@ export function getPreviewHtml(): string {
     if (pb) pb.addEventListener('click', panToSelection);
     var rb = document.getElementById('rv-pop-rot');
     if (rb) rb.addEventListener('click', rotateToSelection);
-    var ab = document.getElementById('rv-pop-aside');
-    if (ab) ab.addEventListener('click', asideAtPlayhead);
+    var tb = document.getElementById('rv-pop-text');
+    if (tb) tb.addEventListener('click', addTextAtPlayhead);
+    var rmb = document.getElementById('rv-pop-remove');
+    if (rmb) rmb.addEventListener('click', removeSelectedComponent);
     var db = document.getElementById('rv-pop-draw');
     if (db) db.addEventListener('click', function() {
       rvPopClose();
@@ -6470,18 +6487,64 @@ export function getPreviewHtml(): string {
     saveCameraMovesForScene(b.si, moves);
   }
 
-  // "Aside + words": the frame tilts away in perspective, words type into
-  // the cleared third, everything glides back. Words/side/timing are edited
-  // on the block afterwards -- placing it first gives instant visual feedback.
-  function asideAtPlayhead() {
-    var b = camMoveBasis();
-    if (!b) return;
-    var move = { at: b.at, type: 'aside', side: 'left', text: 'Your point here', duration: 1.0, hold: 3, 'return': true };
-    var moves = (b.scene.camera_moves || []).slice();
-    moves.push(move);
+  // "Add text here": text is a PRIMITIVE, not a camera trick -- a real
+  // kinetic-text component dropped at the playhead where the user clicked.
+  // Being a component, the existing tools take over from there: click it to
+  // revise ("make it bigger", "change the words") or remove it; compose it
+  // freely with a 3D rotate to build the aside-style beat.
+  function addTextAtPlayhead() {
+    var sel = studio.sel;
+    var si = state.currentSceneIndex;
+    var scene = currentSceneEntry();
+    var p = state.currentProject;
+    if (!scene || !p) return;
+    var cw = parseInt(els.previewIframe.width, 10) || 1920;
+    var cx = 25; var cy = 40; // default: left third, upper-middle
+    try {
+      if (sel && sel._el) {
+        var r = sel._el.getBoundingClientRect();
+        cx = Math.round(((r.left + r.width / 2) / cw) * 100);
+        cy = Math.round(((r.top + r.height / 2) / (parseInt(els.previewIframe.height, 10) || 1080)) * 100);
+      }
+    } catch (e0) {}
+    var dur = scene.duration_seconds || 5;
+    var at = Math.round(Math.max(0, Math.min(dur - 0.5, (state.masterTime || 0) - sceneStartFor(si))) * 10) / 10;
+    var comp = {
+      id: 'text_' + Date.now().toString(36),
+      type: 'kinetic-text',
+      z_index: 60,
+      position: { x: Math.max(2, Math.min(60, cx - 18)) + '%', y: Math.max(5, Math.min(70, cy - 12)) + '%', width: '36%', height: '30%' },
+      data: { text: 'Your words here', entrance: 'type-on', at: at },
+    };
     rvPopClose();
-    saveCameraMovesForScene(b.si, moves);
-    studioStatus('◧ Aside added — click its block in the effects lane to set the words and side.', 'ok');
+    api('POST', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) +
+        '/scenes/' + encodeURIComponent(scene.id) + '/components', { component: comp })
+      .then(function(r) {
+        if (!r || r.ok === false) { studioStatus('Add text failed: ' + ((r && r.error) || 'unknown'), 'err'); return; }
+        if (r.scene) { p.scenes[si] = r.scene; }
+        studioStatus('T Text added at ' + at.toFixed(1) + 's — click it to revise the words, style or timing; the popover offers Remove.', 'ok');
+        startCompositePreview(p, { time: state.masterTime, sceneIndex: si });
+      })
+      .catch(function(e) { studioStatus('Add text failed: ' + e.message, 'err'); });
+  }
+
+  // Selected text components get a direct Remove (revise handles the rest).
+  function removeSelectedComponent() {
+    var sel = studio.sel;
+    var si = state.currentSceneIndex;
+    var scene = currentSceneEntry();
+    var p = state.currentProject;
+    if (!sel || !sel.compId || !scene || !p) return;
+    api('DELETE', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) +
+        '/scenes/' + encodeURIComponent(scene.id) + '/components/' + encodeURIComponent(sel.compId), null)
+      .then(function(r) {
+        if (!r || r.ok === false) { studioStatus('Remove failed: ' + ((r && r.error) || 'unknown'), 'err'); return; }
+        scene.components = (scene.components || []).filter(function(c) { return c.id !== sel.compId; });
+        rvPopClose();
+        studioStatus('Removed ✓ reloading preview…', 'ok');
+        startCompositePreview(p, { time: state.masterTime, sceneIndex: si });
+      })
+      .catch(function(e) { studioStatus('Remove failed: ' + e.message, 'err'); });
   }
 
   // "Zoom inside": arm the draw gesture scoped to the selected video. The

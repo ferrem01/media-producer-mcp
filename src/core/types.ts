@@ -223,6 +223,14 @@ export interface CameraMove {
   text?: string;
   /** type=aside only: perspective tilt in degrees (default 26). */
   rotationY?: number;
+  /** type=rotate only: rotation axis. "z" (default) is the flat 2D spin;
+   *  "y" is the 3D book-page turn; "x" tilts toward/away vertically.
+   *  Non-z axes get perspective automatically. */
+  axis?: "x" | "y" | "z";
+  /** type=rotate only (3D axes): signed sideways shift as canvas % --
+   *  clears space beside the tilted frame (y-axis shifts horizontally,
+   *  x-axis vertically). */
+  shift?: number;
   /** Drawn-box dimensions as canvas % (x,y = box center). When present, the
    *  scale is computed at apply time so the box just fills the rig's frame --
    *  "what you outlined is what you get". */

@@ -1578,3 +1578,27 @@ then have the thing pan back and fill up the entire screen."
 - Verified headless: matrix3d mid-move (real z-rotation), 27 chars
   typed on, words gone before the return, frame back to visual
   identity after. One camera runtime serves preview and render.
+
+## Composable primitives: 3D rotate + text, aside retired (Marc, 2026-07-21)
+
+Marc, on reviewing the aside: "I would rather see if I can just simply
+make rotate more robust and then use the existing tools to add the
+text in." Right call -- the aside was a macro pretending to be a
+primitive. Now:
+
+- ROTATE is fully 3D: axis knob on the block (z = flat spin, y = 3D
+  book-page turn, x = 3D tilt), plus a signed shift (canvas %) that
+  clears space beside/above the tilted frame, plus scale. Non-z axes
+  get perspective automatically; return/reset flatten rotationX/Y too.
+- TEXT is a primitive: "T Add text here" in the revise popover drops a
+  real kinetic-text component (type-on entrance, brand-styled) at the
+  playhead where you clicked, with its own start time. Because it is a
+  component, the existing tools take over: click it to revise ("make
+  it bigger", "change the words") or Remove (new button when a
+  kinetic-text is selected). New routes: POST/DELETE
+  /api/projects/:t/:p/scenes/:sid/components (choke-point guarded).
+- Marc's scene is now a recipe, not a feature: rotate(y, -26deg,
+  shift 18%) + text at the playhead + return.
+- The ◧ Aside button is gone; its runtime + block editor stay so any
+  placed blocks keep working. Headless-verified: the 3D rotate
+  produces the identical mid-move matrix3d the aside did.
