@@ -80,6 +80,11 @@ export function getPreviewHtml(): string {
   #booth-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
   #booth-card p { color: #6b7280; line-height: 1.5; margin-bottom: 10px; }
   #booth-card .booth-row { display: flex; gap: 8px; margin-top: 10px; }
+  /* Draft-in-progress: indeterminate sweep -- honest about not knowing the
+     total, alive enough that minutes never read as a hang. */
+  .booth-draft-bar { position: relative; height: 4px; border-radius: 2px; background: #e5e7eb; overflow: hidden; margin-top: 10px; }
+  .booth-draft-fill { position: absolute; top: 0; bottom: 0; width: 34%; border-radius: 2px; background: linear-gradient(90deg, #818cf8, #6366f1); animation: booth-sweep 1.6s ease-in-out infinite; }
+  @keyframes booth-sweep { 0% { left: -34%; } 100% { left: 100%; } }
   #booth-card .booth-row .btn { flex: 1; padding: 8px 10px; }
   .booth-count { font-size: 64px; font-weight: 700; text-align: center; padding: 18px 0; color: #4f46e5; font-variant-numeric: tabular-nums; }
   .booth-live { display: flex; align-items: center; gap: 8px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -5404,13 +5409,49 @@ export function getPreviewHtml(): string {
   }
 
   function boothDraftScript() {
-    boothCard('<h3>&#128220; Drafting script&hellip;</h3><p>Reading the cut &mdash; its real-time spans, timelapses, pages and clicks &mdash; and writing narration timed to the clock. ~15s.</p>');
+    // Drafting is a real model run -- often 1-2 minutes. Show a live clock +
+    // staged status so it never reads as a hang, and survive a gateway
+    // cutting the long request: the server keeps writing and SAVES the
+    // script, so on transport error we poll for it before declaring failure.
+    booth.phase = 'drafting';
+    var t0 = Date.now();
+    boothCard(
+      '<h3>&#128220; Drafting script&hellip; <span id="booth-draft-timer" style="font-variant-numeric:tabular-nums;color:#6366f1;">0:00</span></h3>' +
+      '<p id="booth-draft-stage">Reading the cut &mdash; its real-time spans, timelapses, pages and clicks&hellip;</p>' +
+      '<div class="booth-draft-bar"><div class="booth-draft-fill"></div></div>' +
+      '<p style="font-size:10px;color:#9ca3af;margin-top:6px;">Usually 1&ndash;2 minutes &mdash; the director reads every span before writing a word.</p>'
+    );
+    var tick = setInterval(function() {
+      if (booth.phase !== 'drafting') { clearInterval(tick); return; }
+      var s = Math.floor((Date.now() - t0) / 1000);
+      var timer = document.getElementById('booth-draft-timer');
+      var stage = document.getElementById('booth-draft-stage');
+      if (!timer) { clearInterval(tick); return; }
+      timer.textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+      if (stage) stage.textContent =
+        s < 25 ? 'Reading the cut — its real-time spans, timelapses, pages and clicks…'
+        : s < 75 ? 'Writing cues timed to the film clock…'
+        : s < 160 ? 'Still writing — longer films take a couple of minutes…'
+        : 'Almost there…';
+    }, 1000);
+    function finish(cues) { clearInterval(tick); booth.script = cues || []; boothScriptCard(); }
+    function fail(msg) { clearInterval(tick); studioStatus('Script drafting failed: ' + msg, 'err'); boothIdleCard(); }
     api('POST', boothScriptPath(), {}).then(function(j) {
-      booth.script = (j.script && j.script.cues) || [];
-      boothScriptCard();
+      finish(j.script && j.script.cues);
     }).catch(function(e) {
-      studioStatus('Script drafting failed: ' + e.message, 'err');
-      boothIdleCard();
+      // Transport died (proxy/gateway timeout) but the server may still be
+      // drafting -- it saves the script when done. Poll up to 3 more minutes.
+      var polls = 0;
+      var stage = document.getElementById('booth-draft-stage');
+      if (stage) stage.textContent = 'Connection hiccup — still drafting on the server, checking for the result…';
+      var poll = setInterval(function() {
+        polls++;
+        api(boothScriptPath()).then(function(j) {
+          var cues = j.script && j.script.cues;
+          if (cues && cues.length) { clearInterval(poll); finish(cues); }
+          else if (polls >= 18) { clearInterval(poll); fail(e.message); }
+        }).catch(function() { if (polls >= 18) { clearInterval(poll); fail(e.message); } });
+      }, 10000);
     });
   }
 
