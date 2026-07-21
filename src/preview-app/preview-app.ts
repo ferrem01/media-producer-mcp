@@ -5565,15 +5565,28 @@ export function getPreviewHtml(): string {
     // The recorder is glued to the FILM clock: pausing the transport pauses
     // the take (catch your breath, then press play to resume -- both pick up
     // together), and only reaching the end of the film ends it.
+    booth._stallTicks = 0;
     booth.mon = setInterval(function() {
       if (booth.phase !== 'recording') return;
       boothMute(true); // idempotent guard: audio elements can be rebuilt under us
       if (state.masterTime >= state.totalDuration - 0.05) { boothStopTake(); return; }
+      // The take is glued to the FILM CLOCK, not just the transport: a
+      // buffering stall freezes masterTime while "playing" stays true, and
+      // a mic that keeps rolling through it makes the take LONGER than the
+      // film -- every later word then plays late (seen live: a 116s take
+      // over a 107s film, narration drifting into the outro). Pause the
+      // recorder whenever the clock stops advancing; resume when it moves.
+      var advancing = (state.masterTime - booth.lastFilmT) > 0.03;
+      if (state.playing && !advancing) booth._stallTicks++;
+      else booth._stallTicks = 0;
+      var buffering = state.playing && booth._stallTicks >= 2; // ~500ms frozen
       var paused = booth.rec.state === 'paused';
       if (!state.playing && !paused) {
         try { booth.rec.pause(); } catch (e) {}
-        boothRecCard(true);
-      } else if (state.playing && paused) {
+        boothRecCard(true); // deliberate pause: show the paused card
+      } else if (buffering && !paused) {
+        try { booth.rec.pause(); } catch (e) {} // silent: stalls are sub-second noise
+      } else if (state.playing && !buffering && paused) {
         try { booth.rec.resume(); } catch (e) {}
         boothRecCard(false);
       }
@@ -5583,7 +5596,7 @@ export function getPreviewHtml(): string {
       booth.lastFilmT = state.masterTime;
       boothPrompterTick(state.masterTime);
       var el = document.getElementById('booth-elapsed');
-      if (el) el.textContent = fmtTime(state.masterTime) + ' / ' + fmtTime(state.totalDuration);
+      if (el) el.textContent = fmtTime(state.masterTime) + ' / ' + fmtTime(state.totalDuration) + (buffering ? ' · buffering…' : '');
     }, 250);
     boothPrompterTick(0);
   }
@@ -5631,12 +5644,32 @@ export function getPreviewHtml(): string {
       '<h3>&#127908; Take recorded (' + fmtTime(state.masterTime) + ' of film covered)</h3>' +
       (booth.desynced ? '<p style="color:#b45309;">&#9888; The timeline was scrubbed mid-take, so voice and picture may be out of step &mdash; listen before using, or retake.</p>' : '') +
       (camTake
-        ? '<video controls playsinline src="' + booth.url + '" style="width:100%;border-radius:10px;margin:8px 0 2px;"></video>'
-        : '<audio controls src="' + booth.url + '"></audio>') +
+        ? '<video id="booth-take-el" controls playsinline src="' + booth.url + '" style="width:100%;border-radius:10px;margin:8px 0 2px;"></video>'
+        : '<audio id="booth-take-el" controls src="' + booth.url + '"></audio>') +
+      '<p id="booth-drift-warn" style="display:none;color:#b45309;font-size:11px;"></p>' +
       '<div class="booth-row"><button class="btn btn-primary" id="booth-use">Use this take</button>' +
       '<button class="btn btn-secondary" id="booth-retake">Retake</button>' +
       '<button class="btn btn-secondary" id="booth-discard">Discard</button></div>'
     );
+    // Measure the take against the film clock it was recorded over: a take
+    // materially LONGER than the film time covered means clock drift (e.g.
+    // buffering the recorder didn't catch) and every later word will play
+    // late. Warn before it gets attached.
+    (function() {
+      var el = document.getElementById('booth-take-el');
+      var covered = state.masterTime || 0;
+      if (!el || !(covered > 1)) return;
+      el.addEventListener('loadedmetadata', function() {
+        var drift = (isFinite(el.duration) ? el.duration : 0) - covered;
+        if (drift > 1.5) {
+          var w = document.getElementById('booth-drift-warn');
+          if (w) {
+            w.style.display = '';
+            w.textContent = '⚠ This take is ' + drift.toFixed(1) + 's longer than the film it covered — playback stalled while the mic rolled, so later words will land late. A retake is recommended.';
+          }
+        }
+      });
+    })();
     document.getElementById('booth-use').addEventListener('click', boothUpload);
     document.getElementById('booth-retake').addEventListener('click', function() { boothCountdown(3); });
     document.getElementById('booth-discard').addEventListener('click', boothClose);
