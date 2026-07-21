@@ -5195,6 +5195,18 @@ export function getPreviewHtml(): string {
   };
 
   function scrub(sliderVal) {
+    // The take is glued to the film clock and a browser recorder can only
+    // APPEND: scrubbing back mid-take replays film the mic then records a
+    // second time, so every later word plays late (live case: three
+    // scrub-backs made a 116s take over a 107s film -- the elapsed readout
+    // shows FILM time, so it even LOOKS like the recorder rewound; it
+    // cannot). Lock scrubbing during a take; the booth's own start-at-zero
+    // seek passes via _internalScrub.
+    if ((booth.phase === 'recording' || booth.phase === 'countdown') && !booth._internalScrub) {
+      studioStatus('⛔ Scrubbing is locked while recording — the take is glued to the film clock. Pause to catch your breath, or stop the take and retake.', 'warn');
+      movePlayhead();
+      return;
+    }
     var totalDur = state.totalDuration;
     if (totalDur <= 0) return;
     state._stopAt = null;
@@ -5325,6 +5337,7 @@ export function getPreviewHtml(): string {
 
   function boothClose() {
     booth.phase = 'closed';
+    if (state.currentProject) els.slider.disabled = false;
     if (booth.mon) { clearInterval(booth.mon); booth.mon = null; }
     if (booth.rec && booth.rec.state === 'recording') { try { booth.rec.stop(); } catch (e) {} }
     booth.rec = null;
@@ -5536,7 +5549,8 @@ export function getPreviewHtml(): string {
   }
 
   function boothRecord() {
-    scrub(0);
+    booth._internalScrub = true;
+    try { scrub(0); } finally { booth._internalScrub = false; }
     boothMute(true);
     var hasCam = booth.stream && booth.stream.getVideoTracks().length > 0;
     var mime = hasCam
@@ -5565,6 +5579,7 @@ export function getPreviewHtml(): string {
     // The recorder is glued to the FILM clock: pausing the transport pauses
     // the take (catch your breath, then press play to resume -- both pick up
     // together), and only reaching the end of the film ends it.
+    els.slider.disabled = true; // visual affordance for the scrub lock
     booth._stallTicks = 0;
     booth.mon = setInterval(function() {
       if (booth.phase !== 'recording') return;
@@ -5627,6 +5642,7 @@ export function getPreviewHtml(): string {
   function boothStopTake() {
     if (booth.phase !== 'recording') return;
     booth.phase = 'review';
+    els.slider.disabled = false;
     if (booth.mon) { clearInterval(booth.mon); booth.mon = null; }
     document.getElementById('prompter-bar').style.display = 'none';
     if (state.playing) togglePlay();
