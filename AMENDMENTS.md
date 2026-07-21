@@ -1701,3 +1701,15 @@ match zoom-inside? Yes to both.
 - Probe re-verified: pan inside a 2.5x hold still glides at 2.5x and
   returns to the zoom framing; a bare pan on a wide camera measures
   identity throughout (deliberate no-op).
+
+## Pan inside falls back to the scene zoom (Marc, 2026-07-21)
+
+Marc, zoomed on the composer via a SCENE zoom, clicked Pan inside and
+was told "nothing to pan inside yet" -- technically correct (the
+footage inside the frame wasn't magnified; only Zoom inside... does
+that), humanly wrong (he was looking at a zoomed picture). "Pan what
+I see" wins: when Pan inside finds no magnified footage but the scene
+camera IS zoomed, the grab falls back to a scene pan with a status
+note explaining the switch. The refusal now only fires when nothing
+is zoomed at all (and mentions scrubbing into the zoom's hold as the
+other likely miss).

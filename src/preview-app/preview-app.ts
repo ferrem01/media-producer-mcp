@@ -6155,6 +6155,21 @@ export function getPreviewHtml(): string {
         var pInside = studio.panInside || null;
         var pEl = pInside ? panInsideRig(pInside.target) : panTargetEl();
         var pXf = pEl ? readXf(pEl) : { s: 1, x: 0, y: 0 };
+        if (pInside && (!pEl || pXf.s <= 1.05)) {
+          // The footage is NOT magnified inside its frame here (no Zoom
+          // inside…, or the playhead is outside its window). But if the
+          // SCENE camera is zoomed, the zoomed picture the user is looking
+          // at IS pannable -- "pan what I see" beats a technicality, so
+          // fall back to a scene pan and say so. (Marc hit this: zoomed on
+          // the composer via a scene zoom, Pan inside said "not zoomed".)
+          var sEl = panTargetEl();
+          var sXf = sEl ? readXf(sEl) : { s: 1, x: 0, y: 0 };
+          if (sEl && sXf.s > 1.05) {
+            pInside = null; studio.panInside = null;
+            pEl = sEl; pXf = sXf;
+            studioStatus('↔ That zoom is a scene zoom (the footage isn’t magnified inside its frame) — panning the scene camera instead.', '');
+          }
+        }
         // Pan NEVER zooms: it slides the camera at its current zoom. At 1x
         // there is nowhere to pan -- say so honestly instead of faking it.
         if (!pEl || pXf.s <= 1.05) {
@@ -6162,7 +6177,7 @@ export function getPreviewHtml(): string {
           studio.panInside = null;
           try { doc.body.style.cursor = 'crosshair'; } catch (eD0) {}
           studioStatus(pInside
-            ? '⊕ Nothing to pan inside yet — Zoom inside… first, then pan during its hold.'
+            ? '⊕ Nothing is magnified here — Zoom inside… first (or scrub into its hold), then pan.'
             : '↔ The camera is wide — it already sees everything, so there is nothing to pan. Add a zoom, then drag during its hold.', 'warn');
           return;
         }

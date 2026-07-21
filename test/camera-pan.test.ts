@@ -81,6 +81,12 @@ describe("studio pan gesture + parallel lane", () => {
     expect(html).toContain("nothing to pan");
   });
 
+  it("pan-inside over a scene zoom falls back to panning the scene camera", () => {
+    // "pan what I see": a scene-zoomed picture is pannable even when the
+    // footage inside the frame isn't magnified.
+    expect(html).toContain("panning the scene camera instead");
+  });
+
   it("overlapping effect blocks split the bar height (parallel bars)", () => {
     expect(html).toContain("placeSegs");
     expect(html).toContain("fx-thin");
