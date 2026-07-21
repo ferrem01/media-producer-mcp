@@ -212,7 +212,8 @@ export interface CameraMove {
    *  drawn rect would go stale (SPEC-motion-architecture). Anchored moves
    *  ride the whole-scene camera rig; target is ignored when anchor is set. */
   anchor?: string;
-  /** Zoom factor for type=zoom (e.g. 1.8). Ignored when w/h are present. */
+  /** Zoom factor for type=zoom (e.g. 1.8); pan/rotate keep the camera's
+   *  current zoom unless this is set. Ignored when w/h are present. */
   scale?: number;
   /** Drawn-box dimensions as canvas % (x,y = box center). When present, the
    *  scale is computed at apply time so the box just fills the rig's frame --
