@@ -1618,3 +1618,21 @@ Also, did you leave the aside effect in there?"
   block editor mirrors this: switching axis to y/x autofills the
   preset into still-default fields so what you see saved is what
   plays. Marc's existing y-axis blocks upgrade automatically.
+
+## Pan is never a no-op (Marc, 2026-07-21)
+
+Marc: "I hit pan and nothing happens." Root cause: pan was defined as
+"move the focal point at the CURRENT zoom" -- and at 1x (the camera
+returns to wide after most moves) a pan is mathematically nothing: the
+whole frame is visible and the cover-clamp pins motion to zero. The
+add-a-scale heuristic only fired when the scene had no earlier moves,
+so any scene with existing camera work authored invisible pans.
+
+- Authored pans always carry their own zoom (1.4x, editable on the ↔
+  block) and the runtime guarantees the floor for any pan without one:
+  glide at the current zoom when pushed in, drift in at 1.4x when
+  wide. A pan now ALWAYS moves.
+- Chaining pans glides the camera point-to-point while zoomed --
+  Marc's "pan over to that box" model without a new gesture. A
+  draw-a-box pan target (a la Zoom inside) remains an option if
+  clicking elements isn't precise enough in practice.

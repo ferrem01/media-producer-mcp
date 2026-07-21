@@ -6306,7 +6306,7 @@ export function getPreviewHtml(): string {
     } else {
       camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1 1 45%;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
         (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1 1 45%;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '') +
-        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Glide the camera to this element at the playhead. Keeps the current zoom; from wide it drifts in at 1.4×.">→ Pan here</button>' +
+        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Drift the camera to this element at the playhead (1.4× by default — set scale on its block; chain pans to glide point-to-point while zoomed).">→ Pan here</button>' +
         '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1 1 45%;" title="Rotate the camera on this element at the playhead. The block edits angle, AXIS (flat spin / 3D book-turn / tilt) and a sideways shift to clear space.">↻ Rotate</button>' +
         '<button class="rv-go secondary" id="rv-pop-text" style="flex:1 1 45%;" title="Drop type-on brand text at the playhead where you clicked. Click the text afterwards to revise or remove it.">T Add text here</button>';
     }
@@ -6480,13 +6480,15 @@ export function getPreviewHtml(): string {
   function panToSelection() {
     var b = camMoveBasis();
     if (!b) return;
-    var move = { at: b.at, type: 'pan', x: b.x, y: b.y, duration: 0.9, hold: 1.5, 'return': true };
-    var earlier = (b.scene.camera_moves || []).some(function(mm) { return (mm.at || 0) < b.at && mm.type !== 'reset'; });
-    if (!earlier) move.scale = 1.4;
+    // Every authored pan carries its own zoom (editable on the block): the
+    // "keep current zoom" idea produced invisible pans whenever the camera
+    // happened to be wide at that moment (a 1x pan is a no-op).
+    var move = { at: b.at, type: 'pan', x: b.x, y: b.y, scale: 1.4, duration: 0.9, hold: 1.5, 'return': true };
     var moves = (b.scene.camera_moves || []).slice();
     moves.push(move);
     rvPopClose();
     saveCameraMovesForScene(b.si, moves);
+    studioStatus('→ Pan added — the camera drifts to this spot at 1.4×; tune scale/timing on its ↔ block.', 'ok');
   }
 
   // "Rotate": tilt the rig on the selected element. Angle is a taste knob --
