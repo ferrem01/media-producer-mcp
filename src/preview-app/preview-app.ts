@@ -4419,6 +4419,13 @@ export function getPreviewHtml(): string {
       scene.media_edits = scene.media_edits || {};
       if (r.edit) scene.media_edits[target] = r.edit;
       else { delete scene.media_edits[target]; if (!Object.keys(scene.media_edits).length) delete scene.media_edits; }
+      // Screen-owned films: the server contracted the scene to the edit's
+      // natural length -- the whole film gets shorter (or grows back on
+      // restore). Apply before the preview restarts so the ruler agrees.
+      if (r.duration_seconds != null) {
+        scene.duration_seconds = r.duration_seconds;
+        state.totalDuration = calcTotalDuration();
+      }
       // The pin needed more than 16x, so the server made the wait a
       // deliberate timelapse (loud, visible as a striped screen-lane segment, reversible).
       if (r.timelapse_auto && r.project) {
@@ -4474,6 +4481,10 @@ export function getPreviewHtml(): string {
       delete_targets: deleteTargets,
     }).then(function(r) {
       scene.media_edits = r.media_edits && Object.keys(r.media_edits).length ? r.media_edits : undefined;
+      if (r.duration_seconds != null) {
+        scene.duration_seconds = r.duration_seconds;
+        state.totalDuration = calcTotalDuration();
+      }
       studioStatus((doneMsg || 'Saved') + ' ✓ reloading preview…', 'ok');
       startCompositePreview(p, { time: state.masterTime, sceneIndex: state.currentSceneIndex });
     }).catch(function(e) {

@@ -52,7 +52,7 @@ import { handleGoogleLogin, handleGoogleCallback, handleTokenExchange, handleGet
 import { initTenantStoreFromFile, listTenants } from "./auth/tenant-store.js";
 import { normalizeVideoForWeb } from "./core/video-normalize.js";
 import { analyzeAndSaveIntel, isAnalyzableVideo, type AssetIntel } from "./core/asset-intel.js";
-import { solveMediaEdits, inferIntents } from "./core/media-edl.js";
+import { solveMediaEdits, inferIntents, contractSceneToEdl } from "./core/media-edl.js";
 import { sceneCompositesOverSpeaker } from "./core/speaker-mode.js";
 import { repairBrandAssetPath } from "./core/scene-assembler.js";
 import { spawn } from "node:child_process";
@@ -2593,6 +2593,12 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
                 src_start: Number(body.src_start), src_end: Number(body.src_end),
                 out_seconds: Number(body.out_seconds) || 4,
               });
+          {
+            // Screen-owned films contract to the new EDL length (a timelapse
+            // literally shortens the film when no audio anchors the clock).
+            const tlScene = project.scenes.find((s: any) => s.id === String(body.scene_id));
+            if (tlScene) contractSceneToEdl(project, tlScene, String(body.key));
+          }
           await saveProject(project);
           const narr = (project.audio?.tracks || []).find((t: any) => t.id === "narration");
           if (result.gap_bake_at != null && result.added_seconds) {
@@ -2750,9 +2756,14 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
               console.warn("auto-timelapse skipped:", autoErr?.message || autoErr);
             }
           }
+          // Screen-owned films: the footage IS the clock, so the scene
+          // contracts to the edit's natural length (and re-expands to the
+          // source length when edits are cleared). Speaker films never move.
+          const contracted = contractSceneToEdl(project, scene, target, srcDur);
           await saveProject(project);
           jsonResponse(res, 200, {
             ok: true, scene_id: sceneId, target,
+            ...(contracted != null ? { duration_seconds: contracted } : {}),
             edit: ((scene as any).media_edits || {})[target] || null,
             ...(tlNote ? {
               timelapse_auto: tlNote,
@@ -2792,8 +2803,13 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (Object.keys(edits).length) (scene as any).media_edits = edits;
         else delete (scene as any).media_edits;
         project.updated_at = new Date().toISOString();
+        const contractedLegacy = contractSceneToEdl(project, scene, target);
         await saveProject(project);
-        jsonResponse(res, 200, { ok: true, scene_id: sceneId, media_edits: (scene as any).media_edits || {} });
+        jsonResponse(res, 200, {
+          ok: true, scene_id: sceneId,
+          ...(contractedLegacy != null ? { duration_seconds: contractedLegacy } : {}),
+          media_edits: (scene as any).media_edits || {},
+        });
         return;
       }
 
