@@ -3164,7 +3164,7 @@ export function getPreviewHtml(): string {
     var p = state.currentProject;
     var total = state.totalDuration || calcTotalDuration();
     if (!p || !p.scenes || !(total > 0)) return;
-    var glyph = { zoom: '\u2922', pan: '\u2194', rotate: '\u21BB', reset: '\u21A9', aside: '\u25E7' };
+    var glyph = { zoom: '\u2922', pan: '\u2194', rotate: '\u21BB', reset: '\u21A9' };
     function block(from, to, cls, text, title, onClick) {
       var b = document.createElement('div');
       b.className = 'fx-seg ' + cls;
@@ -4690,6 +4690,17 @@ export function getPreviewHtml(): string {
     var pw = pop.offsetWidth || 280, ph = pop.offsetHeight || 120;
     pop.style.left = Math.max(8, Math.min(r.left - pw / 2, window.innerWidth - pw - 8)) + 'px';
     pop.style.top = Math.max(8, r.top - ph - 10) + 'px';
+    var axSel = document.getElementById('cp-axis');
+    if (axSel) axSel.addEventListener('change', function() {
+      var agI = document.getElementById('cp-angle');
+      var shI = document.getElementById('cp-shift');
+      var scI = document.getElementById('cp-scale');
+      if (axSel.value === 'y' || axSel.value === 'x') {
+        if (agI && (!agI.value || Math.abs(parseFloat(agI.value)) <= 8)) agI.value = '-26';
+        if (shI && (!shI.value || parseFloat(shI.value) === 0)) shI.value = '18';
+        if (scI && (!scI.value || parseFloat(scI.value) === 1 || parseFloat(scI.value) === 1.4)) scI.value = '0.86';
+      }
+    });
     document.getElementById('cp-x').addEventListener('click', camPopClose);
     document.getElementById('cp-restore').addEventListener('click', function() {
       camPopClose();
@@ -4754,10 +4765,6 @@ export function getPreviewHtml(): string {
                 '</select></label>' +
                 '<label title="3D axes only: signed canvas-% shift to clear space beside the tilted frame (negative = left/up)">shift <input id="cp-shift" type="number" min="-40" max="40" step="1" value="' + escAttr('' + (m.shift != null ? m.shift : 0)) + '">%</label>'
               : '') +
-            (m.type === 'aside'
-              ? '<label>words <select id="cp-side"><option value="left"' + (m.side !== 'right' ? ' selected' : '') + '>on the left</option><option value="right"' + (m.side === 'right' ? ' selected' : '') + '>on the right</option></select></label>' +
-                '<label style="flex-basis:100%;">text <textarea id="cp-text" rows="2" style="width:100%;box-sizing:border-box;font:inherit;">' + escHtml(m.text || '') + '</textarea></label>'
-              : '') +
             '<label>scale <input id="cp-scale" type="number" min="1" max="5" step="0.1" value="' + escAttr('' + (m.scale || (m.type === 'zoom' ? 1.8 : 1.4))) + '">\u00d7</label>' +
             '<label>hold <input id="cp-hold" type="number" min="0" max="10" step="0.5" value="' + escAttr('' + (m.hold != null ? m.hold : 0)) + '">s</label>') +
         '<label>ease <input id="cp-dur" type="number" min="0.2" max="3" step="0.1" value="' + escAttr('' + (m.duration || 0.8)) + '">s</label>' +
@@ -4777,6 +4784,17 @@ export function getPreviewHtml(): string {
     if (y < 8) y = Math.min(window.innerHeight - ph - 8, r.bottom + 10);
     pop.style.left = x + 'px';
     pop.style.top = y + 'px';
+    var axSel = document.getElementById('cp-axis');
+    if (axSel) axSel.addEventListener('change', function() {
+      var agI = document.getElementById('cp-angle');
+      var shI = document.getElementById('cp-shift');
+      var scI = document.getElementById('cp-scale');
+      if (axSel.value === 'y' || axSel.value === 'x') {
+        if (agI && (!agI.value || Math.abs(parseFloat(agI.value)) <= 8)) agI.value = '-26';
+        if (shI && (!shI.value || parseFloat(shI.value) === 0)) shI.value = '18';
+        if (scI && (!scI.value || parseFloat(scI.value) === 1 || parseFloat(scI.value) === 1.4)) scI.value = '0.86';
+      }
+    });
     document.getElementById('cp-x').addEventListener('click', camPopClose);
     document.getElementById('cp-del').addEventListener('click', function() {
       var moves = (scene.camera_moves || []).slice();
@@ -4799,10 +4817,6 @@ export function getPreviewHtml(): string {
       if (axEl) next.axis = axEl.value === 'y' ? 'y' : axEl.value === 'x' ? 'x' : 'z';
       var shEl = document.getElementById('cp-shift');
       if (shEl) { var sh = parseFloat(shEl.value); if (!isNaN(sh)) next.shift = Math.max(-40, Math.min(40, sh)); }
-      var sdEl = document.getElementById('cp-side');
-      if (sdEl) next.side = sdEl.value === 'right' ? 'right' : 'left';
-      var txEl = document.getElementById('cp-text');
-      if (txEl) next.text = String(txEl.value || '').slice(0, 200);
       var hdEl = document.getElementById('cp-hold');
       if (hdEl) { var hd = parseFloat(hdEl.value); if (!isNaN(hd)) next.hold = hd; }
       var duEl = document.getElementById('cp-dur');

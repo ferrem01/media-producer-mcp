@@ -1602,3 +1602,19 @@ primitive. Now:
 - The ◧ Aside button is gone; its runtime + block editor stay so any
   placed blocks keep working. Headless-verified: the 3D rotate
   produces the identical mid-move matrix3d the aside did.
+
+## 3D rotate gets assertive; aside fully removed (Marc, 2026-07-21)
+
+Marc on the first 3D rotate test: "the rotation is not really getting
+out of the way -- I would have expected a greater tilt, greater slide.
+Also, did you leave the aside effect in there?"
+
+- The aside is now fully gone: type, runtime, block-editor fields,
+  glyph. (No projects carried aside moves; verified before removal.)
+- 3D rotate defaults are ASSERTIVE: on axis y/x, the neutral values
+  (angle 0, shift 0, scale 1) read as "untouched" and upgrade to a
+  real turn (-26deg), a real slide (18% away from the receding edge)
+  and a step back (0.86). Any deliberately set value is honored. The
+  block editor mirrors this: switching axis to y/x autofills the
+  preset into still-default fields so what you see saved is what
+  plays. Marc's existing y-axis blocks upgrade automatically.
