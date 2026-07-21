@@ -4747,7 +4747,8 @@ export function getPreviewHtml(): string {
         (isBox
           ? '<label>hold <input id="cp-hold" type="number" min="0" max="10" step="0.5" value="' + escAttr('' + (m.hold != null ? m.hold : 0)) + '">s</label>' +
             '<div class="sp-region">Region ' + Math.round(m.w) + '\u00d7' + Math.round(m.h) + '% at (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%) \u2014 redraw the box to change it.</div>'
-          : '<label>scale <input id="cp-scale" type="number" min="1.1" max="5" step="0.1" value="' + escAttr('' + (m.scale || 1.8)) + '">\u00d7</label>' +
+          : (m.type === 'rotate' ? '<label>angle <input id="cp-angle" type="number" min="-45" max="45" step="1" value="' + escAttr('' + (m.angle != null ? m.angle : 8)) + '">\u00b0</label>' : '') +
+            '<label>scale <input id="cp-scale" type="number" min="1" max="5" step="0.1" value="' + escAttr('' + (m.scale || (m.type === 'zoom' ? 1.8 : 1.4))) + '">\u00d7</label>' +
             '<label>hold <input id="cp-hold" type="number" min="0" max="10" step="0.5" value="' + escAttr('' + (m.hold != null ? m.hold : 0)) + '">s</label>') +
         '<label>ease <input id="cp-dur" type="number" min="0.2" max="3" step="0.1" value="' + escAttr('' + (m.duration || 0.8)) + '">s</label>' +
         '<label title="Ease back to wide afterwards">return <input id="cp-return" type="checkbox"' + (m['return'] ? ' checked' : '') + '></label>' +
@@ -4782,6 +4783,8 @@ export function getPreviewHtml(): string {
       if (!isNaN(at)) next.at = Math.max(0, Math.min(dur - 0.2, Math.round(at * 10) / 10));
       var scEl = document.getElementById('cp-scale');
       if (scEl) { var sc = parseFloat(scEl.value); if (!isNaN(sc)) next.scale = sc; }
+      var agEl = document.getElementById('cp-angle');
+      if (agEl) { var ag = parseFloat(agEl.value); if (!isNaN(ag)) next.angle = Math.max(-45, Math.min(45, ag)); }
       var hdEl = document.getElementById('cp-hold');
       if (hdEl) { var hd = parseFloat(hdEl.value); if (!isNaN(hd)) next.hold = hd; }
       var duEl = document.getElementById('cp-dur');
@@ -6270,7 +6273,9 @@ export function getPreviewHtml(): string {
       camRow = '<button class="rv-go secondary" id="rv-pop-draw" style="flex:1;" title="Drag on the scene to outline the region the camera should push into">⤢ Draw zoom region…</button>';
     } else {
       camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
-        (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '');
+        (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '') +
+        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1;" title="Glide the camera to this element at the playhead. Keeps the current zoom; from wide it drifts in at 1.4×.">→ Pan here</button>' +
+        '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1;" title="Tilt the camera on this element at the playhead (angle editable on the block afterwards)">↻ Rotate</button>';
     }
     // Speaker bubble selected: direct placement beats prose. Corners + sizes
     // write the component position through the PATCH route -- no LLM, instant.
@@ -6323,6 +6328,10 @@ export function getPreviewHtml(): string {
     if (zb) zb.addEventListener('click', zoomToSelection);
     var zi = document.getElementById('rv-pop-zoom-inside');
     if (zi) zi.addEventListener('click', zoomInsideSelection);
+    var pb = document.getElementById('rv-pop-pan');
+    if (pb) pb.addEventListener('click', panToSelection);
+    var rb = document.getElementById('rv-pop-rot');
+    if (rb) rb.addEventListener('click', rotateToSelection);
     var db = document.getElementById('rv-pop-draw');
     if (db) db.addEventListener('click', function() {
       rvPopClose();
@@ -6400,6 +6409,54 @@ export function getPreviewHtml(): string {
     moves.push(move);
     rvPopClose();
     saveCameraMovesForScene(si, moves);
+  }
+
+  // Shared: the selected element's focal point + scene-local playhead time,
+  // or null (with a status message) when there is nothing to aim at.
+  function camMoveBasis() {
+    var sel = studio.sel;
+    var si = state.currentSceneIndex;
+    var scene = currentSceneEntry();
+    if (!sel || !sel._el || sel._isScene || !scene) return null;
+    var r;
+    try { r = sel._el.getBoundingClientRect(); } catch (e) { return null; }
+    if (!r || r.width < 4 || r.height < 4) { studioStatus('That element has no visible box to aim the camera at.', 'warn'); return null; }
+    var cw = parseInt(els.previewIframe.width, 10) || 1920;
+    var ch = parseInt(els.previewIframe.height, 10) || 1080;
+    var dur = scene.duration_seconds || 5;
+    return {
+      si: si, scene: scene,
+      at: Math.round(Math.max(0, Math.min(dur - 0.2, (state.masterTime || 0) - sceneStartFor(si))) * 10) / 10,
+      x: Math.round(((r.left + r.width / 2) / cw) * 100),
+      y: Math.round(((r.top + r.height / 2) / ch) * 100),
+    };
+  }
+
+  // "Pan here": glide the camera's focal point to the selected element. The
+  // runtime keeps the current zoom for pans; from a wide (1x) start that
+  // would be invisible, so the first move in a scene carries its own 1.4x.
+  function panToSelection() {
+    var b = camMoveBasis();
+    if (!b) return;
+    var move = { at: b.at, type: 'pan', x: b.x, y: b.y, duration: 0.9, hold: 1.5, 'return': true };
+    var earlier = (b.scene.camera_moves || []).some(function(mm) { return (mm.at || 0) < b.at && mm.type !== 'reset'; });
+    if (!earlier) move.scale = 1.4;
+    var moves = (b.scene.camera_moves || []).slice();
+    moves.push(move);
+    rvPopClose();
+    saveCameraMovesForScene(b.si, moves);
+  }
+
+  // "Rotate": tilt the rig on the selected element. Angle is a taste knob --
+  // 8 degrees reads as intent without seasickness; edit it on the block.
+  function rotateToSelection() {
+    var b = camMoveBasis();
+    if (!b) return;
+    var move = { at: b.at, type: 'rotate', x: b.x, y: b.y, angle: 8, duration: 0.8, hold: 1.5, 'return': true };
+    var moves = (b.scene.camera_moves || []).slice();
+    moves.push(move);
+    rvPopClose();
+    saveCameraMovesForScene(b.si, moves);
   }
 
   // "Zoom inside": arm the draw gesture scoped to the selected video. The

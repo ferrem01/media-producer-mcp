@@ -1540,3 +1540,21 @@ shorter?" Yes:
   that a plain cut solves to kept-footage length with no pad/hold.
   Route-level verified locally: add_cut 60..120 on a 205s scene ->
   duration 145; clear -> 205.
+
+## Camera parity: pan + rotate join zoom in Studio (Marc, 2026-07-21)
+
+Marc: "bring panning and rotate up to parity with zoom and callout" --
+we're not only making product walkthroughs; tempo-cut films live on
+camera language. The ENGINE always supported zoom/pan/rotate/reset (the
+generation pipeline places them); only hand-authoring was zoom-only.
+
+- Revise popover on any element now offers "→ Pan here" and "↻ Rotate"
+  next to the zooms. Pan glides the focal point to the element keeping
+  the current zoom; the first move in a scene carries its own 1.4x
+  (runtime change: pan/rotate honor an explicit m.scale -- a 1x pan is
+  invisible). Rotate tilts 8 degrees by default.
+- The effects-lane block popover gains an angle field (rotate, +/-45)
+  and shows scale for every non-box move; blocks already rendered with
+  ↔ / ↻ glyphs.
+- One camera runtime (cameraMovesScript) serves preview AND render, so
+  no twin drift.

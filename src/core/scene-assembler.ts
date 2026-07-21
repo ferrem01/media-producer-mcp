@@ -868,7 +868,10 @@ export function cameraMovesScript(
             var bw = (m.w / 100) * CW, bh = (m.h / 100) * CH;
             sc = Math.max(1.05, Math.min(5, Math.min(W / bw, H / bh)));
           } else {
-            sc = m.type === 'zoom' ? (m.scale || 2) : st.scale;
+            // Pan/rotate keep the camera's current zoom unless the move
+            // carries its own scale (a hand-authored pan from wide sets one:
+            // a 1x pan is invisible).
+            sc = m.type === 'zoom' ? (m.scale || 2) : (m.scale || st.scale);
           }
           to = {
             scale: sc,
