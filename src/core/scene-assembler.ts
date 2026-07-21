@@ -859,6 +859,57 @@ export function cameraMovesScript(
         var fy = ((m.y != null ? m.y : 50) / 100) * CH;
         var px = k ? Math.max(0, Math.min(1, (fx - b.left) / W)) : fx / CW;
         var py = k ? Math.max(0, Math.min(1, (fy - b.top) / H)) : fy / CH;
+        if (m.type === 'pan') {
+          // PEER-EFFECT pan. Pan and zoom are independent effects that may
+          // run at the same time without referencing each other, so a pan
+          // resolves at its tween's FIRST RENDER, not when the timeline is
+          // built: it adopts whatever scale the camera holds at that moment
+          // (a zoom mid-hold keeps its zoom; a wide camera gets 1.4 so the
+          // motion is never invisible), and its return restores the framing
+          // that existed just before the pan fired -- never yanking a
+          // still-holding zoom back to wide.
+          var pDur = m.duration || 1;
+          var pEase = m.ease || 'power2.inOut';
+          var pPrior = null;
+          var pTo = null;
+          var computeP = function() {
+            if (pTo) return pTo;
+            var cs = 1, cx0 = 0, cy0 = 0;
+            try {
+              cs = parseFloat(gsap.getProperty(rig.el, 'scaleX')) || 1;
+              cx0 = parseFloat(gsap.getProperty(rig.el, 'x')) || 0;
+              cy0 = parseFloat(gsap.getProperty(rig.el, 'y')) || 0;
+            } catch (eP) {}
+            pPrior = { scale: cs, x: cx0, y: cy0 };
+            var sc = m.scale || (cs > 1.05 ? cs : 1.4);
+            var tx = (0.5 - px) * W * sc, ty = (0.5 - py) * H * sc;
+            if (!k) {
+              var mxP = (sc - 1) * CW / 2, myP = (sc - 1) * CH / 2;
+              tx = Math.max(-mxP, Math.min(mxP, tx));
+              ty = Math.max(-myP, Math.min(myP, ty));
+            }
+            pTo = { scale: sc, x: tx, y: ty };
+            return pTo;
+          };
+          tl.to(rig.el, {
+            scale: function() { return computeP().scale; },
+            x: function() { return computeP().x; },
+            y: function() { return computeP().y; },
+            duration: pDur, ease: pEase,
+          }, m.at);
+          var stBefore = st;
+          st = { scale: m.scale || Math.max(st.scale, 1.4), x: 0, y: 0, rotation: st.rotation };
+          if (m['return']) {
+            tl.to(rig.el, {
+              scale: function() { return pPrior ? pPrior.scale : 1; },
+              x: function() { return pPrior ? pPrior.x : 0; },
+              y: function() { return pPrior ? pPrior.y : 0; },
+              duration: pDur, ease: pEase,
+            }, m.at + pDur + (m.hold || 0));
+            st = stBefore;
+          }
+          return;
+        }
         var to;
         if (m.type === 'reset') to = { scale: 1, x: 0, y: 0, rotation: 0, rotationX: 0, rotationY: 0 };
         else {
@@ -869,13 +920,9 @@ export function cameraMovesScript(
             sc = Math.max(1.05, Math.min(5, Math.min(W / bw, H / bh)));
           } else {
             // Zoom picks its own scale; rotate keeps the camera's current
-            // zoom. PAN always guarantees visible motion: at 1x a pan is
-            // mathematically a no-op (the cover-clamp pins it to zero), so
-            // an unset pan scale means "current zoom, but never below 1.4"
-            // -- glide when pushed in, drift in when wide.
-            sc = m.type === 'zoom' ? (m.scale || 2)
-              : m.type === 'pan' ? (m.scale || Math.max(st.scale, 1.4))
-              : (m.scale || st.scale);
+            // zoom. (Pan never reaches here -- it has its own fire-time
+            // branch above.)
+            sc = m.type === 'zoom' ? (m.scale || 2) : (m.scale || st.scale);
           }
           to = {
             scale: sc,

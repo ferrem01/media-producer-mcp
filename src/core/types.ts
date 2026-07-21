@@ -212,8 +212,12 @@ export interface CameraMove {
    *  drawn rect would go stale (SPEC-motion-architecture). Anchored moves
    *  ride the whole-scene camera rig; target is ignored when anchor is set. */
   anchor?: string;
-  /** Zoom factor for type=zoom (e.g. 1.8); pan/rotate keep the camera's
-   *  current zoom unless this is set. Ignored when w/h are present. */
+  /** Zoom factor for type=zoom (e.g. 1.8); rotate keeps the camera's
+   *  current zoom unless this is set. For type=pan, UNSET means "adopt
+   *  whatever zoom the camera holds when the pan fires, never below 1.4"
+   *  (pan and zoom are peer effects that may overlap; a pan mid-zoom-hold
+   *  glides at that zoom and its return restores the pre-pan framing).
+   *  Ignored when w/h are present. */
   scale?: number;
   /** type=rotate only: rotation axis. "z" (default) is the flat 2D spin;
    *  "y" is the 3D book-page turn; "x" tilts toward/away vertically.
