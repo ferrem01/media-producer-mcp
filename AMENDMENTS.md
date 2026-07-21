@@ -1636,3 +1636,39 @@ so any scene with existing camera work authored invisible pans.
   Marc's "pan over to that box" model without a new gesture. A
   draw-a-box pan target (a la Zoom inside) remains an option if
   clicking elements isn't precise enough in practice.
+
+## Pan is a peer effect + drag gesture + parallel lane bars (Marc, 2026-07-21)
+
+Marc's design, refined over two rounds: (1) pan's gesture is DRAGGING
+the picture to a new spot -- a box is zoom's metaphor, pan is
+movement; (2) pan and zoom are SEPARATE effects, unaware of each
+other, that may run at the same time (a pan riding a zoom's hold);
+(3) when two effects overlap in time, the effects-lane bars split the
+height and run in parallel -- peers should look like peers.
+
+- Runtime (cameraMovesScript): a pan resolves at its tween's FIRST
+  RENDER, not at build time. It adopts whatever scale the camera
+  holds at that moment (a holding zoom keeps its zoom; a wide camera
+  gets the 1.4x floor so motion is never invisible) and its return
+  restores the PRE-PAN framing -- never yanking a still-holding zoom
+  back to wide. The zoom's own return still carries the camera home
+  from wherever the pan left it (GSAP return tweens read live state).
+  Headless-verified: pan inside a 2.5x hold glides at 2.5x to the
+  focal, returns to the zoom framing, zoom return lands identity;
+  bare pan floors at 1.4x with the cover-clamp.
+- Studio gesture: the ↔ Pan button (element AND scene popovers) ARMS
+  grab-drag mode -- drag the preview footage where the camera should
+  look (maps convention: the picture follows the cursor), release
+  drops the pan block at the playhead. Live feedback rides the real
+  camera rig (scene root stands in when no rig exists yet); a wide
+  camera snaps to 1.4x on grab so the drag previews the truth. Esc
+  cancels and restores. Saved drag-pans carry NO scale -- the block
+  editor shows scale as "auto" (blank = adopt at fire time).
+- Effects lane: blocks are collected then laid out; transitively
+  overlapping blocks cluster, get greedy row assignment, and each
+  concurrent block renders at 1/n of the 26px bed (.fx-thin) --
+  parallel effects read as parallel bars. Generalizes past two but
+  two is the practical case.
+- Tests: test/camera-pan.test.ts pins the fire-time contract, the
+  no-scale drag-pan, the dual popover entry, the lane split, and
+  syntax-parses the generated Studio JS (the template-literal trap).
