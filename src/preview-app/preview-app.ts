@@ -192,8 +192,13 @@ export function getPreviewHtml(): string {
   #slider-wrap::-webkit-scrollbar { display: none; }
   #timeline-track { position: relative; height: 100%; min-width: 100%; width: 100%; }
   /* Fixed lane gutter: one icon per visible lane, stationary at the left of
-     the timeline no matter where the track is scrolled. */
-  #lane-gutter { position: relative; width: 22px; flex: none; align-self: flex-start; }
+     the timeline no matter where the track is scrolled. NO align-self
+     override: the gutter and #slider-wrap are the same height (y.total), so
+     both must use the row's centered alignment -- pinning the gutter to
+     flex-start while the wrap centered made every icon ride high whenever
+     the lane stack was shorter than the transport controls (the bare
+     screen-only timeline). */
+  #lane-gutter { position: relative; width: 22px; flex: none; }
   .lg-ic { position: absolute; left: 2px; width: 16px; height: 16px; color: #94a3b8; }
   .lg-ic svg { width: 16px; height: 16px; display: block; }
   /* Lane beds: each track paints on its own surface so the layers read as
