@@ -87,6 +87,19 @@ describe("studio pan gesture + parallel lane", () => {
     expect(html).toContain("panning the scene camera instead");
   });
 
+  it("a grab at a zoom block's start rides the zoom from the lane DATA", () => {
+    // The DOM only shows the current instant; a zoom whose window covers
+    // the playhead is pannable even before its ease-in has run. The saved
+    // pan is nudged to start once the zoom settles.
+    expect(html).toContain("zoomInForceAt");
+    expect(html).toContain("afterZoom");
+    expect(html).toContain("the pan starts once it settles");
+  });
+
+  it("the scale reader goes through gsap (matrix3d-proof)", () => {
+    expect(html).toContain("g.getProperty(el, 'scaleX')");
+  });
+
   it("overlapping effect blocks split the bar height (parallel bars)", () => {
     expect(html).toContain("placeSegs");
     expect(html).toContain("fx-thin");

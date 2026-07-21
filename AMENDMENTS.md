@@ -1713,3 +1713,27 @@ camera IS zoomed, the grab falls back to a scene pan with a status
 note explaining the switch. The refusal now only fires when nothing
 is zoomed at all (and mentions scrubbing into the zoom's hold as the
 other likely miss).
+
+## Pan reads the lane, not just the pixels (Marc, 2026-07-21)
+
+Marc, with a genuine Zoom inside... block AT the playhead, clicked
+Pan inside and was told nothing was magnified. Root cause: the grab
+checked the DOM's current instant, and at a zoom block's own start
+the rig hasn't eased in yet -- measured wide, refused, and my status
+message then misdiagnosed his zoom as scene-level (it was targeted;
+verified in proj_c55cfce5's data). The author's intent lives in the
+LANE, so the grab now resolves in priority order:
+ 1. a zoom whose window (ease ramp included, plus a 0.75s pre-window)
+    covers the playhead -> RIDE IT: preview jumps to its settled
+    framing, the drag happens in the frame the pan will play in, and
+    the saved pan's at is nudged to just after the zoom settles so
+    the two run parallel (targeted zoom -> inside pan on its target;
+    scene zoom -> scene pan);
+ 2. the rig the button asked for, magnified now;
+ 3. the other rig, magnified now ("pan what I see", with a note);
+ 4. a settled zoom window from the data (DOM read misfired);
+ 5. honest refusal, now mentioning "scrub onto a zoom block".
+Also: readXf reads scale/x/y through the iframe's gsap.getProperty
+(with matrix AND matrix3d parsing as fallback) -- computed-style
+regex parsing missed the matrix3d serialization transforms take
+during playback.
