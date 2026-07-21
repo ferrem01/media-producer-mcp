@@ -3148,7 +3148,7 @@ export function getPreviewHtml(): string {
 
   function camMoveDesc(m) {
     return (m.target === 'screencast' ? 'screencast ' : (m.target ? 'in-video ' : '')) + (m.type || 'zoom')
-      + (m.w ? ' [box ' + m.w + '\u00d7' + m.h + '%]' : (m.scale ? ' ' + m.scale + '\u00d7' : (m.type === 'pan' ? ' (adopts zoom)' : '')))
+      + (m.type === 'pan' ? ' (at current zoom)' : (m.w ? ' [box ' + m.w + '\u00d7' + m.h + '%]' : (m.scale ? ' ' + m.scale + '\u00d7' : '')))
       + ' @' + (m.at != null ? Number(m.at).toFixed(1) : '?') + 's'
       + ' \u2192 (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%)'
       + (m['return'] ? ' \u21a9' : '');
@@ -4807,7 +4807,7 @@ export function getPreviewHtml(): string {
                 '<label title="3D axes only: signed canvas-% shift to clear space beside the tilted frame (negative = left/up)">shift <input id="cp-shift" type="number" min="-40" max="40" step="1" value="' + escAttr('' + (m.shift != null ? m.shift : 0)) + '">%</label>'
               : '') +
             (m.type === 'pan'
-              ? '<label title="Blank = adopt whatever zoom the camera holds when the pan fires (never below 1.4\u00d7) \u2014 pan and zoom are independent effects that can overlap">scale <input id="cp-scale" type="number" min="1" max="5" step="0.1" placeholder="auto" value="' + escAttr(m.scale ? '' + m.scale : '') + '">\u00d7</label>'
+              ? '' // a pan has no scale: pure translation at the camera's zoom
               : '<label>scale <input id="cp-scale" type="number" min="1" max="5" step="0.1" value="' + escAttr('' + (m.scale || (m.type === 'zoom' ? 1.8 : 1.4))) + '">\u00d7</label>') +
             '<label>hold <input id="cp-hold" type="number" min="0" max="10" step="0.5" value="' + escAttr('' + (m.hold != null ? m.hold : 0)) + '">s</label>') +
         '<label>ease <input id="cp-dur" type="number" min="0.2" max="3" step="0.1" value="' + escAttr('' + (m.duration || 0.8)) + '">s</label>' +
@@ -4853,11 +4853,9 @@ export function getPreviewHtml(): string {
       var at = parseFloat(atEl && atEl.value);
       if (!isNaN(at)) next.at = Math.max(0, Math.min(dur - 0.2, Math.round(at * 10) / 10));
       var scEl = document.getElementById('cp-scale');
-      if (scEl) {
-        var sc = parseFloat(scEl.value);
-        if (!isNaN(sc)) next.scale = sc;
-        else if (m.type === 'pan') delete next.scale; // blank = auto-adopt
-      }
+      if (scEl) { var sc = parseFloat(scEl.value); if (!isNaN(sc)) next.scale = sc; }
+      if (next.type === 'pan') delete next.scale; // pan never zooms
+
       var agEl = document.getElementById('cp-angle');
       if (agEl) { var ag = parseFloat(agEl.value); if (!isNaN(ag)) next.angle = Math.max(-45, Math.min(45, ag)); }
       var axEl = document.getElementById('cp-axis');
@@ -6037,6 +6035,7 @@ export function getPreviewHtml(): string {
     try { var om = doc.getElementById('__studio_mq'); if (om) om.remove(); } catch (e) {}
     studio.dragBox = null;
     studio.panMode = false; // a fresh preview never inherits an armed pan-drag
+    studio.panInside = null;
 
     // Make it obvious the scene is clickable for revising.
     try { doc.body.style.cursor = 'crosshair'; } catch(e) {}
@@ -6094,6 +6093,7 @@ export function getPreviewHtml(): string {
       if (drag && drag.pan) { try { drag.pan.el.style.transform = drag.pan.o; } catch (eC) {} }
       if (studio.panMode || (drag && drag.pan)) {
         studio.panMode = false;
+        studio.panInside = null;
         try { doc.body.style.cursor = 'crosshair'; } catch (eC2) {}
       }
       drag = null;
@@ -6105,11 +6105,32 @@ export function getPreviewHtml(): string {
     // otherwise the scene root stands in (close enough for feedback -- the
     // save reloads the preview through the true rig either way). ──
     function panTargetEl() {
-      var rigEl = doc.querySelector('.__mp_camera_rig');
+      // The SCENE rig specifically -- an in-video content rig must not
+      // stand in for the whole-scene camera.
+      var rigEl = doc.querySelector('.__mp_camera_rig:not(.__mp_camera_rig--content)');
       if (rigEl) return rigEl;
       var sid = studioCurrentSceneId();
       var sc = sid ? doc.querySelector('.mp-scene[data-scene-id="' + sid + '"]') : null;
       return sc || doc.body;
+    }
+    // Pan-inside: the content rig wrapping the targeted video's footage.
+    // Exists only once an inside-zoom has run in this scene -- which is
+    // also the only state where panning inside means anything.
+    function panInsideRig(target) {
+      var v = null;
+      if (target && target !== 'screencast') {
+        try { v = doc.querySelector(target); } catch (eR) {}
+      }
+      if (!v) {
+        var best = 0;
+        Array.prototype.slice.call(doc.querySelectorAll('video')).forEach(function(vv) {
+          if (vv.id === '__mp_speaker_base') return;
+          var r = vv.getBoundingClientRect();
+          if (r.width * r.height > best) { best = r.width * r.height; v = vv; }
+        });
+      }
+      if (!v || !v.closest) return null;
+      return v.closest('.__mp_camera_rig--content');
     }
     function readXf(el) {
       // Current translate/scale from the computed matrix (matrix3d -- a 3D
@@ -6131,13 +6152,25 @@ export function getPreviewHtml(): string {
     function onDown(e) {
       if (studio.busy || e.button !== 0) return;
       if (studio.panMode) {
-        var pEl = panTargetEl();
-        var pXf = readXf(pEl);
-        // A wide camera snaps to the pan's 1.4x floor right away so the
-        // drag previews what the pan will actually look like.
-        var pS = pXf.s > 1.05 ? pXf.s : 1.4;
+        var pInside = studio.panInside || null;
+        var pEl = pInside ? panInsideRig(pInside.target) : panTargetEl();
+        var pXf = pEl ? readXf(pEl) : { s: 1, x: 0, y: 0 };
+        // Pan NEVER zooms: it slides the camera at its current zoom. At 1x
+        // there is nowhere to pan -- say so honestly instead of faking it.
+        if (!pEl || pXf.s <= 1.05) {
+          studio.panMode = false;
+          studio.panInside = null;
+          try { doc.body.style.cursor = 'crosshair'; } catch (eD0) {}
+          studioStatus(pInside
+            ? '⊕ Nothing to pan inside yet — Zoom inside… first, then pan during its hold.'
+            : '↔ The camera is wide — it already sees everything, so there is nothing to pan. Add a zoom, then drag during its hold.', 'warn');
+          return;
+        }
+        var pBox = null;
+        if (pInside) { try { pBox = pEl.parentElement.getBoundingClientRect(); } catch (eD1) {} }
         drag = { x0: e.clientX, y0: e.clientY, moved: false,
-          pan: { el: pEl, s: pS, x: pXf.x, y: pXf.y, cx: pXf.x, cy: pXf.y, o: pEl.style.transform || '' } };
+          pan: { el: pEl, s: pXf.s, x: pXf.x, y: pXf.y, cx: pXf.x, cy: pXf.y,
+            o: pEl.style.transform || '', inside: pInside, box: pBox } };
         e.preventDefault();
         try { doc.body.style.cursor = 'grabbing'; } catch (eD) {}
         return;
@@ -6158,10 +6191,20 @@ export function getPreviewHtml(): string {
         // pixels ARE canvas pixels (the iframe's viewport is the canvas).
         var nx = drag.pan.x + (e.clientX - drag.x0);
         var ny = drag.pan.y + (e.clientY - drag.y0);
-        // Live cover-clamp: the drag can't expose the canvas edge.
-        var mxD = (drag.pan.s - 1) * cwD / 2, myD = (drag.pan.s - 1) * chD / 2;
-        nx = Math.max(-mxD, Math.min(mxD, nx));
-        ny = Math.max(-myD, Math.min(myD, ny));
+        if (drag.pan.inside) {
+          // Inside a frame the crop masks the motion; clamp to the
+          // footage's own travel so the drag can't slide it out of view.
+          var bW = (drag.pan.box && drag.pan.box.width) || cwD;
+          var bH = (drag.pan.box && drag.pan.box.height) || chD;
+          var mxI = (drag.pan.s - 1) * bW / 2, myI = (drag.pan.s - 1) * bH / 2;
+          nx = Math.max(-mxI, Math.min(mxI, nx));
+          ny = Math.max(-myI, Math.min(myI, ny));
+        } else {
+          // Live cover-clamp: the drag can't expose the canvas edge.
+          var mxD = (drag.pan.s - 1) * cwD / 2, myD = (drag.pan.s - 1) * chD / 2;
+          nx = Math.max(-mxD, Math.min(mxD, nx));
+          ny = Math.max(-myD, Math.min(myD, ny));
+        }
         drag.pan.cx = nx; drag.pan.cy = ny;
         drag.pan.el.style.transform = 'translate(' + nx.toFixed(1) + 'px, ' + ny.toFixed(1) + 'px) scale(' + drag.pan.s + ')';
         return;
@@ -6194,11 +6237,12 @@ export function getPreviewHtml(): string {
       var d = drag; drag = null;
       if (d.pan) {
         studio.panMode = false;
+        studio.panInside = null;
         try { doc.body.style.cursor = 'crosshair'; } catch (eU) {}
         if (!d.moved) {
           // A click without a drag places nothing -- the gesture IS the drag.
           try { d.pan.el.style.transform = d.pan.o; } catch (eU2) {}
-          studioStatus('Pan needs a DRAG — click ↔ Pan again, then grab the picture and pull it.', 'warn');
+          studioStatus('Pan needs a DRAG — click Pan again, then grab the picture and pull it.', 'warn');
           return;
         }
         studio._justDragged = +new Date();
@@ -6207,18 +6251,29 @@ export function getPreviewHtml(): string {
         if (!sceneU) { try { d.pan.el.style.transform = d.pan.o; } catch (eU3) {} return; }
         var cwU = parseInt(els.previewIframe.width, 10) || 1920;
         var chU = parseInt(els.previewIframe.height, 10) || 1080;
-        // Final framing -> focal point: rig x = (0.5 - fx) * CW * s.
-        var fxU = Math.round((0.5 - (d.pan.cx || 0) / (cwU * d.pan.s)) * 100);
-        var fyU = Math.round((0.5 - (d.pan.cy || 0) / (chU * d.pan.s)) * 100);
+        // Final framing -> focal point: rig x = (0.5 - fx) * W * s, where W
+        // is the rig's own box (the canvas for scene pans, the frame's clip
+        // box for inside pans -- focal is stored as canvas % either way).
+        var fxU, fyU;
+        if (d.pan.inside && d.pan.box) {
+          var bWU = d.pan.box.width || cwU, bHU = d.pan.box.height || chU;
+          fxU = Math.round(((d.pan.box.left + (0.5 - (d.pan.cx || 0) / (bWU * d.pan.s)) * bWU) / cwU) * 100);
+          fyU = Math.round(((d.pan.box.top + (0.5 - (d.pan.cy || 0) / (bHU * d.pan.s)) * bHU) / chU) * 100);
+        } else {
+          fxU = Math.round((0.5 - (d.pan.cx || 0) / (cwU * d.pan.s)) * 100);
+          fyU = Math.round((0.5 - (d.pan.cy || 0) / (chU * d.pan.s)) * 100);
+        }
         var sdU = sceneU.duration_seconds || 5;
         var atU = Math.round(Math.max(0, Math.min(sdU - 0.2, (state.masterTime || 0) - sceneStartFor(siU))) * 10) / 10;
-        // No scale on the saved move: at runtime the pan adopts the camera's
-        // zoom at that moment (1.4x floor when wide) -- peer effects.
+        // No scale on the saved move -- a pan is pure translation at the
+        // camera's zoom when it fires; scale is never written.
         var mvU = { at: atU, type: 'pan', x: Math.max(0, Math.min(100, fxU)), y: Math.max(0, Math.min(100, fyU)), duration: 0.9, hold: 1.5, 'return': true };
+        if (d.pan.inside) mvU.target = d.pan.inside.target;
         var mvsU = (sceneU.camera_moves || []).slice();
         mvsU.push(mvU);
+        studio.panInside = null;
         saveCameraMovesForScene(siU, mvsU);
-        studioStatus('↔ Pan added at ' + atU.toFixed(1) + 's — it adopts the camera’s zoom at that moment (1.4× when wide). Click its block to retime.', 'ok');
+        studioStatus((d.pan.inside ? '⊕ Pan inside added at ' : '↔ Pan added at ') + atU.toFixed(1) + 's — it slides at the camera’s zoom at that moment. Click its block to retime.', 'ok');
         return;
       }
       if (!d.moved) return; // plain click: onClick handles selection
@@ -6281,6 +6336,7 @@ export function getPreviewHtml(): string {
 
   function studioSelect(el, doc) {
     studio.pendingInside = null; // new selection = new intent
+    studio.panInside = null;
     studio.sel = studioContextOf(el, doc);
     var isScene = !!(el.getAttribute && el.getAttribute('data-scene-id') != null);
     studio.sel._isScene = isScene;
@@ -6436,11 +6492,12 @@ export function getPreviewHtml(): string {
     var camRow;
     if (isScene) {
       camRow = '<button class="rv-go secondary" id="rv-pop-draw" style="flex:1 1 45%;" title="Drag on the scene to outline the region the camera should push into">⤢ Draw zoom region…</button>' +
-        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Grab the picture and drag it to where the camera should look — release places the pan at the playhead. Pans run alongside zooms: mid-zoom they glide at that zoom; when wide they bring 1.4×.">↔ Pan (drag)…</button>';
+        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Grab the picture and drag it to where the camera should look — release places the pan at the playhead. Pan slides at the camera’s current zoom (zoom in first; a wide camera has nowhere to pan).">↔ Pan (drag)…</button>';
     } else {
       camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1 1 45%;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
         (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1 1 45%;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '') +
-        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Grab the picture and drag it to where the camera should look — release places the pan at the playhead. Pans run alongside zooms: mid-zoom they glide at that zoom; when wide they bring 1.4×.">↔ Pan (drag)…</button>' +
+        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Grab the picture and drag it to where the camera should look — release places the pan at the playhead. Pan slides at the camera’s current zoom (zoom in first; a wide camera has nowhere to pan).">↔ Pan (drag)…</button>' +
+        (selVideo ? '<button class="rv-go secondary" id="rv-pop-pan-inside" style="flex:1 1 45%;" title="Grab ' + escAttr(videoLabelFor(selVideo)) + '’s footage and drag it within its frame — travel across a magnified recording without moving the frame. Needs a Zoom inside… first.">⊕ Pan inside…</button>' : '') +
         '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1 1 45%;" title="Rotate the camera on this element at the playhead. The block edits angle, AXIS (flat spin / 3D book-turn / tilt) and a sideways shift to clear space.">↻ Rotate</button>' +
         '<button class="rv-go secondary" id="rv-pop-text" style="flex:1 1 45%;" title="Drop type-on brand text at the playhead where you clicked. Click the text afterwards to revise or remove it.">T Add text here</button>';
     }
@@ -6502,6 +6559,8 @@ export function getPreviewHtml(): string {
     if (zi) zi.addEventListener('click', zoomInsideSelection);
     var pb = document.getElementById('rv-pop-pan');
     if (pb) pb.addEventListener('click', panDragStart);
+    var pib = document.getElementById('rv-pop-pan-inside');
+    if (pib) pib.addEventListener('click', panInsideSelection);
     var rb = document.getElementById('rv-pop-rot');
     if (rb) rb.addEventListener('click', rotateToSelection);
     var tb = document.getElementById('rv-pop-text');
@@ -6611,22 +6670,45 @@ export function getPreviewHtml(): string {
   // "Pan": grab-the-picture drag. The button ARMS pan mode; the user then
   // drags the preview footage to where the camera should look (maps
   // convention: the picture follows the cursor) and releases to drop a pan
-  // block at the playhead. The saved move carries NO scale -- pan and zoom
-  // are peer effects that may overlap, so at runtime a pan adopts whatever
-  // zoom the camera holds when it fires (never below 1.4× so the motion is
-  // always visible) and its return restores the pre-pan framing.
+  // block at the playhead. A pan NEVER zooms -- it is pure translation at
+  // whatever zoom the camera holds when it fires, so the saved move carries
+  // no scale and a wide (1x) camera has nothing to pan (the grab says so).
   function panDragStart() {
     var scene = currentSceneEntry();
     if (!scene) return;
     if (state.playing) togglePlay(); // pan is placed on a paused frame
     studio.panMode = true;
+    studio.panInside = null;
     rvPopClose();
     try {
       var docP = els.previewIframe.contentDocument;
       if (docP && docP.body) docP.body.style.cursor = 'grab';
     } catch (eP) {}
-    studioStatus('↔ Grab the picture and drag it to where the camera should look — release places the pan (Esc cancels).', '');
+    studioStatus('↔ Grab the picture and drag it to where the camera should look — release places the pan (Esc cancels). Pan slides at the camera’s current zoom.', '');
     if (els.camHint) els.camHint.textContent = 'Drag the picture; release places the pan. Esc cancels.';
+  }
+
+  // "Pan inside": zoom-inside's sibling. Same grab-drag, aimed at the
+  // FOOTAGE living inside the selected video's frame instead of the whole
+  // stage -- travel across a magnified recording without moving its frame.
+  // Meaningful only after a Zoom inside… has magnified the footage; the
+  // grab says so otherwise.
+  function panInsideSelection() {
+    var sel = studio.sel;
+    if (!sel) return;
+    var vid = videoForSelection(sel);
+    if (!vid) { studioStatus('No video under this selection to pan inside.', 'warn'); return; }
+    if (state.playing) togglePlay();
+    studio.panMode = true;
+    studio.panInside = { target: videoTargetFor(vid), label: videoLabelFor(vid) };
+    rvPopClose();
+    try {
+      var docP2 = els.previewIframe.contentDocument;
+      if (docP2 && docP2.body) docP2.body.style.cursor = 'grab';
+    } catch (eP2) {}
+    var hintP = '⊕ Grab ' + videoLabelFor(vid) + '’s footage and drag it — release places the inside-pan (Esc cancels).';
+    studioStatus(hintP, '');
+    if (els.camHint) els.camHint.textContent = hintP;
   }
 
   // "Rotate": tilt the rig on the selected element. Angle is a taste knob --

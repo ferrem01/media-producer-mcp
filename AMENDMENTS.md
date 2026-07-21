@@ -1672,3 +1672,32 @@ height and run in parallel -- peers should look like peers.
 - Tests: test/camera-pan.test.ts pins the fire-time contract, the
   no-scale drag-pan, the dual popover entry, the lane split, and
   syntax-parses the generated Studio JS (the template-literal trap).
+
+## Pan v3: pure translation + pan-inside (Marc, 2026-07-21)
+
+Marc: "when I pan, it seems to also be zooming... I don't think we
+should be doing [the 1.4x]" and: should pan get an inside variant to
+match zoom-inside? Yes to both.
+
+- Pan NEVER zooms. The 1.4x floor is deleted everywhere -- it was a
+  leftover from the click era, when invisible pans were a FEEDBACK
+  problem patched with forced zoom. The runtime tweens x/y only (a
+  scale on the move is ignored), the drag saves no scale, and the
+  block editor has no scale field for pans (and strips scale from
+  legacy pan blocks on save).
+- A wide (1x) camera has nowhere to pan: the cover-clamp pins the
+  motion to zero and that no-op is the HONEST answer. Studio says so
+  the moment you grab at wide ("add a zoom, then drag during its
+  hold") instead of faking motion.
+- ⊕ Pan inside…: zoom-inside's sibling, shown when the selection is
+  (or contains) a video. Same grab-drag, aimed at the footage inside
+  the frame -- travel across a magnified recording without moving the
+  browser frame. Requires an inside-zoom first (the grab says so);
+  the saved move carries the same video[src*=...] target zoom-inside
+  uses, feedback rides the content rig, and the frame's crop masks
+  the travel (clamped to the footage's own range).
+- Scene-pan feedback now targets the SCENE rig specifically
+  (:not(--content)) so an in-video rig can't stand in for the camera.
+- Probe re-verified: pan inside a 2.5x hold still glides at 2.5x and
+  returns to the zoom framing; a bare pan on a wide camera measures
+  identity throughout (deliberate no-op).
