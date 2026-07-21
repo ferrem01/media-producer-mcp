@@ -5571,7 +5571,7 @@ export function getPreviewHtml(): string {
       boothMute(true); // idempotent guard: audio elements can be rebuilt under us
       if (state.masterTime >= state.totalDuration - 0.05) { boothStopTake(); return; }
       // The take is glued to the FILM CLOCK, not just the transport: a
-      // buffering stall freezes masterTime while `playing` stays true, and
+      // buffering stall freezes masterTime while "playing" stays true, and
       // a mic that keeps rolling through it makes the take LONGER than the
       // film -- every later word then plays late (seen live: a 116s take
       // over a 107s film, narration drifting into the outro). Pause the
