@@ -6278,13 +6278,13 @@ export function getPreviewHtml(): string {
     var selVideo = (!isScene && sel) ? videoForSelection(sel) : null;
     var camRow;
     if (isScene) {
-      camRow = '<button class="rv-go secondary" id="rv-pop-draw" style="flex:1;" title="Drag on the scene to outline the region the camera should push into">⤢ Draw zoom region…</button>';
+      camRow = '<button class="rv-go secondary" id="rv-pop-draw" style="flex:1 1 45%;" title="Drag on the scene to outline the region the camera should push into">⤢ Draw zoom region…</button>';
     } else {
-      camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
-        (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '') +
-        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1;" title="Glide the camera to this element at the playhead. Keeps the current zoom; from wide it drifts in at 1.4×.">→ Pan here</button>' +
-        '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1;" title="Tilt the camera on this element at the playhead (angle editable on the block afterwards)">↻ Rotate</button>' +
-        (selVideo ? '<button class="rv-go secondary" id="rv-pop-aside" style="flex:1;" title="Tilt the browser frame away in 3D, type words into the cleared space, then return to full frame. Set the words on the ◧ block afterwards.">◧ Aside + words</button>' : '');
+      camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1 1 45%;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
+        (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1 1 45%;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '') +
+        '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1 1 45%;" title="Glide the camera to this element at the playhead. Keeps the current zoom; from wide it drifts in at 1.4×.">→ Pan here</button>' +
+        '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1 1 45%;" title="Tilt the camera on this element at the playhead (angle editable on the block afterwards)">↻ Rotate</button>' +
+        (selVideo ? '<button class="rv-go secondary" id="rv-pop-aside" style="flex:1 1 45%;" title="Tilt the browser frame away in 3D, type words into the cleared space, then return to full frame. Set the words on the ◧ block afterwards.">◧ Aside + words</button>' : '');
     }
     // Speaker bubble selected: direct placement beats prose. Corners + sizes
     // write the component position through the PATCH route -- no LLM, instant.
@@ -6327,7 +6327,7 @@ export function getPreviewHtml(): string {
         '<button class="rv-go" id="rv-pop-go" style="flex:1;">' + (isScene ? 'Revise scene' : 'Revise') + '</button>' +
       '</div>' +
       bubbleRow +
-      '<div class="sp-row">' + camRow + '</div>' +
+      '<div class="sp-row" style="flex-wrap:wrap;">' + camRow + '</div>' +
       chapRow +
       '<div class="sp-status" id="rv-pop-status"></div>';
     document.getElementById('rv-pop-x').addEventListener('click', rvPopClose);
