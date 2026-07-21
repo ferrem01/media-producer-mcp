@@ -868,10 +868,14 @@ export function cameraMovesScript(
             var bw = (m.w / 100) * CW, bh = (m.h / 100) * CH;
             sc = Math.max(1.05, Math.min(5, Math.min(W / bw, H / bh)));
           } else {
-            // Pan/rotate keep the camera's current zoom unless the move
-            // carries its own scale (a hand-authored pan from wide sets one:
-            // a 1x pan is invisible).
-            sc = m.type === 'zoom' ? (m.scale || 2) : (m.scale || st.scale);
+            // Zoom picks its own scale; rotate keeps the camera's current
+            // zoom. PAN always guarantees visible motion: at 1x a pan is
+            // mathematically a no-op (the cover-clamp pins it to zero), so
+            // an unset pan scale means "current zoom, but never below 1.4"
+            // -- glide when pushed in, drift in when wide.
+            sc = m.type === 'zoom' ? (m.scale || 2)
+              : m.type === 'pan' ? (m.scale || Math.max(st.scale, 1.4))
+              : (m.scale || st.scale);
           }
           to = {
             scale: sc,
