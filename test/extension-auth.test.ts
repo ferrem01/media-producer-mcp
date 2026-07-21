@@ -68,6 +68,31 @@ describe("background OAuth client", () => {
   });
 });
 
+describe("toolbar badge state machine", () => {
+  let offscreenJs = "";
+  beforeAll(async () => {
+    offscreenJs = await fs.readFile(path.join(EXT, "offscreen.js"), "utf-8");
+  });
+  it("recording shows a ticking elapsed clock, not a static REC", () => {
+    expect(backgroundJs).toContain("function badgeRecording()");
+    expect(backgroundJs).toContain("fmtElapsed(recordingElapsedMs())");
+    expect(backgroundJs).not.toContain('setBadgeText?.({ text: "REC" })');
+  });
+  it("the offscreen doc is the 1s metronome (keeps the worker awake)", () => {
+    expect(offscreenJs).toContain('chrome.runtime.sendMessage({ type: "qr-tick" })');
+    expect(backgroundJs).toContain('msg.type === "qr-tick"');
+  });
+  it("upload/assembling/ready/error states all reach the badge", () => {
+    expect(backgroundJs).toMatch(/pct \+ "%"[^\n]*BADGE_COLORS\.up/);
+    expect(backgroundJs).toContain('badge("⋯", BADGE_COLORS.gen');
+    expect(backgroundJs).toContain('badge("✓", BADGE_COLORS.ok');
+    expect(backgroundJs).toContain('badge("!", BADGE_COLORS.rec');
+  });
+  it("chapter marks flash ⚑ then restore the clock", () => {
+    expect(backgroundJs).toContain("badgeChapterFlash()");
+  });
+});
+
 describe("manifest", () => {
   it("declares the identity permission for launchWebAuthFlow", () => {
     expect(manifest.permissions).toContain("identity");
