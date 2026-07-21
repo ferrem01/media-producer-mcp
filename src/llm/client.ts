@@ -212,60 +212,74 @@ async function callAnthropic(
     systemPrompt = options.systemPrompt + (systemPrompt ? "\n\n" + systemPrompt : "");
   }
 
-  var body: Record<string, unknown> = {
-    model: config.model,
-    max_tokens: options?.maxTokens || 8192,
-    messages: apiMessages,
-  };
+  // Thinking-by-default models spend an UNPREDICTABLE share of max_tokens on
+  // thinking before any text -- a budget that comfortably fits the answer can
+  // still come back empty when the model thinks long (seen live: 6000 tokens,
+  // all thinking, zero script). Self-heal: on an all-thinking empty response,
+  // retry once with 4x the budget instead of failing the user's click.
+  var maxTokens = options?.maxTokens || 8192;
+  for (var attempt = 0; ; attempt++) {
+    var body: Record<string, unknown> = {
+      model: config.model,
+      max_tokens: maxTokens,
+      messages: apiMessages,
+    };
 
-  if (systemPrompt) {
-    // Cache the system prompt: the per-scene callers (codegen, critique)
-    // reuse the same large system prompt across every scene running in
-    // parallel and across every critique regen, so turns after the first
-    // read it from cache instead of reprocessing it.
-    body.system = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
+    if (systemPrompt) {
+      // Cache the system prompt: the per-scene callers (codegen, critique)
+      // reuse the same large system prompt across every scene running in
+      // parallel and across every critique regen, so turns after the first
+      // read it from cache instead of reprocessing it.
+      body.system = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
+    }
+
+    if (options?.temperature !== undefined && modelAcceptsTemperature(config.model)) {
+      body.temperature = options.temperature;
+    }
+
+    var data = await postAnthropic(config.apiKey, body) as {
+      content: Array<{ type: string; text?: string }>;
+      stop_reason?: string;
+    };
+
+    var result = data.content
+      .filter((block) => block.type === "text" && block.text)
+      .map((block) => block.text!)
+      .join("");
+
+    if (!result) {
+      if (data.stop_reason === "max_tokens" && attempt === 0) {
+        var grown = Math.min(32768, maxTokens * 4);
+        console.warn(`  [llm] empty response: thinking consumed the whole ${maxTokens}-token budget -- retrying once with ${grown}`);
+        maxTokens = grown;
+        continue;
+      }
+      // Name the shape: on thinking-by-default models (Claude 5 family) a tight
+      // max_tokens can be consumed entirely by the thinking block, leaving no
+      // text -- the bare "empty response" error sent us chasing ghosts.
+      var blockTypes = data.content.map((b) => b.type).join(",") || "none";
+      throw new Error(
+        `Anthropic returned empty response (stop_reason: ${data.stop_reason || "?"}; blocks: ${blockTypes})` +
+        (data.stop_reason === "max_tokens"
+          ? ` -- the model's thinking consumed the whole max_tokens budget (${maxTokens}) even after the automatic retry`
+          : ""),
+      );
+    }
+
+    // A response cut off by the token budget is NOT a usable partial result for
+    // JSON-shaped callers (a storyboard truncated mid-scene is invalid JSON,
+    // full stop) -- fail loudly and specifically here rather than let it surface
+    // hundreds of characters downstream as a mystifying "Invalid JSON" error
+    // that has to be reverse-engineered from where the text happens to stop.
+    if (data.stop_reason === "max_tokens") {
+      throw new Error(
+        `Anthropic response truncated: hit max_tokens (${maxTokens}) before finishing. ` +
+        `Raise maxTokens for this call. (${result.length} chars returned)`
+      );
+    }
+
+    return result;
   }
-
-  if (options?.temperature !== undefined && modelAcceptsTemperature(config.model)) {
-    body.temperature = options.temperature;
-  }
-
-  var data = await postAnthropic(config.apiKey, body) as {
-    content: Array<{ type: string; text?: string }>;
-    stop_reason?: string;
-  };
-
-  var result = data.content
-    .filter((block) => block.type === "text" && block.text)
-    .map((block) => block.text!)
-    .join("");
-
-  if (!result) {
-    // Name the shape: on thinking-by-default models (Claude 5 family) a tight
-    // max_tokens can be consumed entirely by the thinking block, leaving no
-    // text -- the bare "empty response" error sent us chasing ghosts.
-    var blockTypes = data.content.map((b) => b.type).join(",") || "none";
-    throw new Error(
-      `Anthropic returned empty response (stop_reason: ${data.stop_reason || "?"}; blocks: ${blockTypes})` +
-      (data.stop_reason === "max_tokens"
-        ? " -- the model's thinking likely consumed the whole max_tokens budget; raise maxTokens"
-        : ""),
-    );
-  }
-
-  // A response cut off by the token budget is NOT a usable partial result for
-  // JSON-shaped callers (a storyboard truncated mid-scene is invalid JSON,
-  // full stop) -- fail loudly and specifically here rather than let it surface
-  // hundreds of characters downstream as a mystifying "Invalid JSON" error
-  // that has to be reverse-engineered from where the text happens to stop.
-  if (data.stop_reason === "max_tokens") {
-    throw new Error(
-      `Anthropic response truncated: hit max_tokens (${body.max_tokens}) before finishing. ` +
-      `Raise maxTokens for this call. (${result.length} chars returned)`
-    );
-  }
-
-  return result;
 }
 
 async function callAnthropicAgentic(

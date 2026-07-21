@@ -168,10 +168,12 @@ export async function draftBoothScript(opts: {
         `- 1-2 sentences per cue. Leave breathing gaps; do not wall-to-wall the clock.\n\n` +
         `Reply with ONLY a JSON array: [{"at": <film seconds>, "text": "..."}] sorted by "at".`,
     }],
-    // Generous budget: Claude 5-family models think by default and the
-    // thinking spends from max_tokens -- 1500 left zero room for the JSON
-    // and surfaced as "Anthropic returned empty response".
-    { maxTokens: 6000, temperature: 0.5 },
+    // Generous budget: thinking-by-default models spend from max_tokens
+    // before any text, and how much they think is UNPREDICTABLE -- 1500 and
+    // then 6000 were both fully consumed by thinking on real films. 12000
+    // leaves real headroom, and callLLM now self-heals the residual case by
+    // retrying once at 4x when a response comes back all-thinking.
+    { maxTokens: 12000, temperature: 0.5 },
   );
   const cues = sanitizeCues(parseLlmJson(raw, "booth-script"), filmDur);
   if (!cues.length) throw new Error("script drafting returned no usable cues");
