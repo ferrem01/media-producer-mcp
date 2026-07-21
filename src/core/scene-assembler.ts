@@ -798,12 +798,82 @@ export function cameraMovesScript(
     } catch (e3) {}
     return { cx: cx, cy: cy, w: w, h: h };
   }
+  function frameHost(root) {
+    // The browser frame's OWN wrapper (chrome and all): the largest
+    // non-speaker video's component root. Aside moves tilt this element in
+    // perspective -- captions, bubble and backdrop stay level around it.
+    var media = null, best = 0;
+    Array.prototype.slice.call(root.querySelectorAll('video')).forEach(function(v) {
+      if (v.id === '__mp_speaker_base') return;
+      if (/speaker/i.test(v.currentSrc || v.src || '')) return;
+      var r = v.getBoundingClientRect();
+      if (r.width * r.height > best) { best = r.width * r.height; media = v; }
+    });
+    if (!media) return null;
+    var host = media.closest ? media.closest('[data-cid]') : null;
+    return host || media.parentElement;
+  }
+  function applyAside(root, tl, m) {
+    var el = frameHost(root);
+    if (!el) return;
+    var cleared = (m.side === 'right') ? 'right' : 'left';
+    var dir = cleared === 'left' ? 1 : -1;          // frame slides AWAY from the words
+    var rotY = (m.rotationY != null ? m.rotationY : 26) * (cleared === 'left' ? -1 : 1);
+    var dur = m.duration || 1.0;
+    var ease = m.ease || 'power3.inOut';
+    var hold = m.hold != null ? m.hold : 3;
+    tl.to(el, { x: dir * CW * 0.20, rotationY: rotY, scale: m.scale || 0.86,
+      transformPerspective: 1600, transformOrigin: '50% 50%', duration: dur, ease: ease }, m.at);
+    var textWrap = null;
+    if (m.text) {
+      // Brand-styled words typing on in the cleared third; they live OUTSIDE
+      // the camera rig so other moves never drag them.
+      textWrap = document.createElement('div');
+      textWrap.className = '__mp_aside_words';
+      textWrap.style.cssText = 'position:absolute;top:0;bottom:0;' + (cleared === 'left' ? 'left:5%;' : 'right:5%;text-align:right;') +
+        'width:30%;display:flex;flex-direction:column;justify-content:center;gap:0.25em;z-index:3;pointer-events:none;' +
+        'font-family:var(--mp-font-family,inherit);color:var(--mp-color-text,#fff);';
+      String(m.text).split(String.fromCharCode(10)).forEach(function(line) {
+        var d = document.createElement('div');
+        d.style.cssText = 'font-size:' + Math.round(CH * 0.052) + 'px;font-weight:700;line-height:1.18;letter-spacing:-0.01em;';
+        // Chars grouped per WORD (nowrap) so lines break only at spaces --
+        // bare char spans wrapped mid-word ("chan / nel").
+        line.split(' ').forEach(function(word, wi) {
+          if (wi > 0) {
+            var gap = document.createElement('span');
+            gap.textContent = ' ';
+            d.appendChild(gap);
+          }
+          var w = document.createElement('span');
+          w.style.cssText = 'display:inline-block;white-space:nowrap;';
+          for (var ci = 0; ci < word.length; ci++) {
+            var sp = document.createElement('span');
+            sp.textContent = word[ci];
+            sp.style.cssText = 'opacity:0;display:inline-block;';
+            w.appendChild(sp);
+          }
+          d.appendChild(w);
+        });
+        textWrap.appendChild(d);
+      });
+      root.appendChild(textWrap);
+      var chars = textWrap.querySelectorAll('span span');
+      if (chars.length) tl.to(chars, { opacity: 1, duration: 0.02, stagger: 0.03, ease: 'none' }, m.at + dur * 0.55);
+    }
+    if (m['return'] !== false) {
+      var backAt = m.at + dur + hold;
+      if (textWrap) tl.to(textWrap, { opacity: 0, y: -14, duration: 0.35, ease: 'power2.in' }, Math.max(m.at, backAt - 0.2));
+      tl.to(el, { x: 0, rotationY: 0, scale: 1, duration: dur, ease: ease }, backAt);
+    }
+  }
   function apply() {
     var root = ${containerExpr};
     var tl = ${timelineExpr};
     if (!root || !tl || !tl.to) return false;
     var groups = {};
     moves.forEach(function(m) {
+      // 3D asides animate the frame's own wrapper -- never a 2D rig group.
+      if (m.type === 'aside') { applyAside(root, tl, m); return; }
       // Anchored moves always ride the whole-scene camera rig.
       var k = m.anchor ? '' : (m.target || '');
       (groups[k] = groups[k] || []).push(m);

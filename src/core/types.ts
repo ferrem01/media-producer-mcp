@@ -196,7 +196,7 @@ export interface SceneQuality {
 export interface CameraMove {
   /** Scene-local start time in seconds. */
   at: number;
-  type: "zoom" | "pan" | "rotate" | "reset";
+  type: "zoom" | "pan" | "rotate" | "reset" | "aside";
   /** Focal point as percent of canvas (0-100). Defaults to center. */
   x?: number;
   y?: number;
@@ -215,6 +215,14 @@ export interface CameraMove {
   /** Zoom factor for type=zoom (e.g. 1.8); pan/rotate keep the camera's
    *  current zoom unless this is set. Ignored when w/h are present. */
   scale?: number;
+  /** type=aside only: which side of the frame is CLEARED for the words
+   *  (the frame tilts away toward the other side). Default "left". */
+  side?: "left" | "right";
+  /** type=aside only: words that type on in the cleared region while the
+   *  frame is aside; they exit before the frame returns. */
+  text?: string;
+  /** type=aside only: perspective tilt in degrees (default 26). */
+  rotationY?: number;
   /** Drawn-box dimensions as canvas % (x,y = box center). When present, the
    *  scale is computed at apply time so the box just fills the rig's frame --
    *  "what you outlined is what you get". */
