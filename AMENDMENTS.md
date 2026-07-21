@@ -1558,3 +1558,23 @@ generation pipeline places them); only hand-authoring was zoom-only.
   ↔ / ↻ glyphs.
 - One camera runtime (cameraMovesScript) serves preview AND render, so
   no twin drift.
+
+## 3D aside: frame tilts away, words type in, camera returns (Marc, 2026-07-21)
+
+Marc: "take the entire browser frame, rotate it in three dimensions off
+to the side, making room on the left where I could type in some words...
+then have the thing pan back and fill up the entire screen."
+
+- New camera move type "aside" (types.ts + cameraMovesScript): the
+  frame's own component wrapper tilts in real perspective (rotationY,
+  transformPerspective 1600, slight scale-down, slide toward the far
+  side); brand-styled words TYPE ON character-by-character in the
+  cleared third (word-grouped so lines never break mid-word); the words
+  exit and the frame glides back to full screen. Captions, bubble and
+  backdrop stay level -- asides never join the 2D rig groups.
+- Studio: "◧ Aside + words" button in the revise popover (video
+  selected) places one at the playhead; its ◧ effects-lane block edits
+  words, side (left/right), timing, hold, scale, return.
+- Verified headless: matrix3d mid-move (real z-rotation), 27 chars
+  typed on, words gone before the return, frame back to visual
+  identity after. One camera runtime serves preview and render.

@@ -3164,7 +3164,7 @@ export function getPreviewHtml(): string {
     var p = state.currentProject;
     var total = state.totalDuration || calcTotalDuration();
     if (!p || !p.scenes || !(total > 0)) return;
-    var glyph = { zoom: '\u2922', pan: '\u2194', rotate: '\u21BB', reset: '\u21A9' };
+    var glyph = { zoom: '\u2922', pan: '\u2194', rotate: '\u21BB', reset: '\u21A9', aside: '\u25E7' };
     function block(from, to, cls, text, title, onClick) {
       var b = document.createElement('div');
       b.className = 'fx-seg ' + cls;
@@ -4748,6 +4748,10 @@ export function getPreviewHtml(): string {
           ? '<label>hold <input id="cp-hold" type="number" min="0" max="10" step="0.5" value="' + escAttr('' + (m.hold != null ? m.hold : 0)) + '">s</label>' +
             '<div class="sp-region">Region ' + Math.round(m.w) + '\u00d7' + Math.round(m.h) + '% at (' + Math.round(m.x || 50) + '%, ' + Math.round(m.y || 50) + '%) \u2014 redraw the box to change it.</div>'
           : (m.type === 'rotate' ? '<label>angle <input id="cp-angle" type="number" min="-45" max="45" step="1" value="' + escAttr('' + (m.angle != null ? m.angle : 8)) + '">\u00b0</label>' : '') +
+            (m.type === 'aside'
+              ? '<label>words <select id="cp-side"><option value="left"' + (m.side !== 'right' ? ' selected' : '') + '>on the left</option><option value="right"' + (m.side === 'right' ? ' selected' : '') + '>on the right</option></select></label>' +
+                '<label style="flex-basis:100%;">text <textarea id="cp-text" rows="2" style="width:100%;box-sizing:border-box;font:inherit;">' + escHtml(m.text || '') + '</textarea></label>'
+              : '') +
             '<label>scale <input id="cp-scale" type="number" min="1" max="5" step="0.1" value="' + escAttr('' + (m.scale || (m.type === 'zoom' ? 1.8 : 1.4))) + '">\u00d7</label>' +
             '<label>hold <input id="cp-hold" type="number" min="0" max="10" step="0.5" value="' + escAttr('' + (m.hold != null ? m.hold : 0)) + '">s</label>') +
         '<label>ease <input id="cp-dur" type="number" min="0.2" max="3" step="0.1" value="' + escAttr('' + (m.duration || 0.8)) + '">s</label>' +
@@ -4785,6 +4789,10 @@ export function getPreviewHtml(): string {
       if (scEl) { var sc = parseFloat(scEl.value); if (!isNaN(sc)) next.scale = sc; }
       var agEl = document.getElementById('cp-angle');
       if (agEl) { var ag = parseFloat(agEl.value); if (!isNaN(ag)) next.angle = Math.max(-45, Math.min(45, ag)); }
+      var sdEl = document.getElementById('cp-side');
+      if (sdEl) next.side = sdEl.value === 'right' ? 'right' : 'left';
+      var txEl = document.getElementById('cp-text');
+      if (txEl) next.text = String(txEl.value || '').slice(0, 200);
       var hdEl = document.getElementById('cp-hold');
       if (hdEl) { var hd = parseFloat(hdEl.value); if (!isNaN(hd)) next.hold = hd; }
       var duEl = document.getElementById('cp-dur');
@@ -6275,7 +6283,8 @@ export function getPreviewHtml(): string {
       camRow = '<button class="rv-go secondary" id="rv-pop-zoom" style="flex:1;" title="Push the camera toward this element so it fills the frame (at the playhead)">⤢ Zoom to this</button>' +
         (selVideo ? '<button class="rv-go secondary" id="rv-pop-zoom-inside" style="flex:1;" title="Draw a box on ' + escAttr(videoLabelFor(selVideo)) + ' -- its footage magnifies inside its frame; everything around it stays put">⊕ Zoom inside…</button>' : '') +
         '<button class="rv-go secondary" id="rv-pop-pan" style="flex:1;" title="Glide the camera to this element at the playhead. Keeps the current zoom; from wide it drifts in at 1.4×.">→ Pan here</button>' +
-        '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1;" title="Tilt the camera on this element at the playhead (angle editable on the block afterwards)">↻ Rotate</button>';
+        '<button class="rv-go secondary" id="rv-pop-rot" style="flex:1;" title="Tilt the camera on this element at the playhead (angle editable on the block afterwards)">↻ Rotate</button>' +
+        (selVideo ? '<button class="rv-go secondary" id="rv-pop-aside" style="flex:1;" title="Tilt the browser frame away in 3D, type words into the cleared space, then return to full frame. Set the words on the ◧ block afterwards.">◧ Aside + words</button>' : '');
     }
     // Speaker bubble selected: direct placement beats prose. Corners + sizes
     // write the component position through the PATCH route -- no LLM, instant.
@@ -6332,6 +6341,8 @@ export function getPreviewHtml(): string {
     if (pb) pb.addEventListener('click', panToSelection);
     var rb = document.getElementById('rv-pop-rot');
     if (rb) rb.addEventListener('click', rotateToSelection);
+    var ab = document.getElementById('rv-pop-aside');
+    if (ab) ab.addEventListener('click', asideAtPlayhead);
     var db = document.getElementById('rv-pop-draw');
     if (db) db.addEventListener('click', function() {
       rvPopClose();
@@ -6457,6 +6468,20 @@ export function getPreviewHtml(): string {
     moves.push(move);
     rvPopClose();
     saveCameraMovesForScene(b.si, moves);
+  }
+
+  // "Aside + words": the frame tilts away in perspective, words type into
+  // the cleared third, everything glides back. Words/side/timing are edited
+  // on the block afterwards -- placing it first gives instant visual feedback.
+  function asideAtPlayhead() {
+    var b = camMoveBasis();
+    if (!b) return;
+    var move = { at: b.at, type: 'aside', side: 'left', text: 'Your point here', duration: 1.0, hold: 3, 'return': true };
+    var moves = (b.scene.camera_moves || []).slice();
+    moves.push(move);
+    rvPopClose();
+    saveCameraMovesForScene(b.si, moves);
+    studioStatus('◧ Aside added — click its block in the effects lane to set the words and side.', 'ok');
   }
 
   // "Zoom inside": arm the draw gesture scoped to the selected video. The
