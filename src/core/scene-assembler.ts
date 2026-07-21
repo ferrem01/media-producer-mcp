@@ -930,7 +930,7 @@ export function cameraMovesScript(
         var px = k ? Math.max(0, Math.min(1, (fx - b.left) / W)) : fx / CW;
         var py = k ? Math.max(0, Math.min(1, (fy - b.top) / H)) : fy / CH;
         var to;
-        if (m.type === 'reset') to = { scale: 1, x: 0, y: 0, rotation: 0 };
+        if (m.type === 'reset') to = { scale: 1, x: 0, y: 0, rotation: 0, rotationX: 0, rotationY: 0 };
         else {
           var sc;
           if (m.type === 'zoom' && m.w && m.h) {
@@ -949,7 +949,19 @@ export function cameraMovesScript(
             y: (0.5 - py) * H * sc,
             rotation: m.type === 'rotate' ? (m.angle || 0) : st.rotation,
           };
-          if (!k) {
+          if (m.type === 'rotate' && (m.axis === 'y' || m.axis === 'x')) {
+            // 3D rotate: a perspective turn, not a flat spin. Focal-centering
+            // and the cover-clamp don't apply (scale may drop below 1 to keep
+            // the tilted frame inside the canvas); the optional signed shift
+            // clears space beside/above the frame.
+            to = { scale: m.scale || 1, x: 0, y: 0, rotation: 0 };
+            to[m.axis === 'y' ? 'rotationY' : 'rotationX'] = (m.angle || 0);
+            to.transformPerspective = 1600;
+            if (m.shift) {
+              if (m.axis === 'y') to.x = (m.shift / 100) * CW;
+              else to.y = (m.shift / 100) * CH;
+            }
+          } else if (!k) {
             // Whole-scene rig: same cover-clamp as anchored moves.
             var mx2 = (sc - 1) * CW / 2, my2 = (sc - 1) * CH / 2;
             to.x = Math.max(-mx2, Math.min(mx2, to.x));
@@ -958,10 +970,13 @@ export function cameraMovesScript(
         }
         var dur = m.duration || 1;
         var ease = m.ease || 'power2.inOut';
-        tl.to(rig.el, { scale: to.scale, x: to.x, y: to.y, rotation: to.rotation, duration: dur, ease: ease }, m.at);
+        var tw = { scale: to.scale, x: to.x, y: to.y, rotation: to.rotation, duration: dur, ease: ease };
+        if (to.rotationY != null) { tw.rotationY = to.rotationY; tw.transformPerspective = to.transformPerspective; delete tw.rotation; }
+        if (to.rotationX != null) { tw.rotationX = to.rotationX; tw.transformPerspective = to.transformPerspective; delete tw.rotation; }
+        tl.to(rig.el, tw, m.at);
         st = to;
         if (m['return']) {
-          tl.to(rig.el, { scale: 1, x: 0, y: 0, rotation: 0, duration: dur, ease: ease }, m.at + dur + (m.hold || 0));
+          tl.to(rig.el, { scale: 1, x: 0, y: 0, rotation: 0, rotationX: 0, rotationY: 0, duration: dur, ease: ease }, m.at + dur + (m.hold || 0));
           st = { scale: 1, x: 0, y: 0, rotation: 0 };
         }
       });

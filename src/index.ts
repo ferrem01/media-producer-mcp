@@ -30,7 +30,7 @@ import { loadBrandKit } from "./persistence/brand-kit.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
-import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes, ensureStoryboardScene } from "./persistence/project.js";
+import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
@@ -2417,6 +2417,40 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       }
 
       // ── API: Component data patch (Studio callout authoring etc.) ──
+      // ── API: Add / remove a component on a scene ──
+      // The Studio "Add text here" primitive (and future add-component UIs):
+      // POST appends a component instance; DELETE removes one by id. Both
+      // tenant-guarded by the choke point like every /api/projects route.
+      const compAddMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)\/components$/);
+      if (compAddMatch && method === "POST") {
+        const [, tenantId, projectId, sceneId] = compAddMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const comp = body.component as any;
+        if (!comp || typeof comp.id !== "string" || typeof comp.type !== "string") {
+          jsonResponse(res, 400, { error: "component {id, type, data?} is required" });
+          return;
+        }
+        const projA = await loadProject(tenantId, projectId);
+        if (!projA) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const scnA = projA.scenes.find((sc0: any) => sc0.id === sceneId);
+        if (!scnA) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
+        if ((scnA.components || []).some((c0: any) => c0.id === comp.id)) {
+          jsonResponse(res, 400, { error: `component id "${comp.id}" already exists in this scene` });
+          return;
+        }
+        const updatedA = await addComponent(tenantId, projectId, sceneId, comp);
+        jsonResponse(res, 200, { ok: true, component_id: comp.id, scene: updatedA?.scenes.find((sc0: any) => sc0.id === sceneId) });
+        return;
+      }
+      const compDelMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)\/components\/([^/]+)$/);
+      if (compDelMatch && method === "DELETE") {
+        const [, tenantId, projectId, sceneId, compId] = compDelMatch.map(decodeURIComponent);
+        const updatedD = await removeComponent(tenantId, projectId, sceneId, compId);
+        if (!updatedD) { jsonResponse(res, 404, { error: "Project, scene or component not found" }); return; }
+        jsonResponse(res, 200, { ok: true, removed: compId });
+        return;
+      }
+
       // Scoped successor to the removed generic prop-editor PATCH: merges
       // the posted data object into ONE component's data and saves.
       const compPatchMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)\/components\/([^/]+)$/);
