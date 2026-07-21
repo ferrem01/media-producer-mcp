@@ -6133,14 +6133,71 @@ export function getPreviewHtml(): string {
       return v.closest('.__mp_camera_rig--content');
     }
     function readXf(el) {
-      // Current translate/scale from the computed matrix (matrix3d -- a 3D
-      // rotate in force -- reads as identity: pan feedback starts flat).
+      // Current translate/scale. GSAP's own reader first (it parses every
+      // serialization, including the matrix3d form transforms take during
+      // playback); computed-matrix parsing as the fallback.
+      try {
+        var g = doc.defaultView && doc.defaultView.gsap;
+        if (g && g.getProperty) {
+          return { s: parseFloat(g.getProperty(el, 'scaleX')) || 1,
+            x: parseFloat(g.getProperty(el, 'x')) || 0,
+            y: parseFloat(g.getProperty(el, 'y')) || 0 };
+        }
+      } catch (eG) {}
       var tr = '';
       try { tr = getComputedStyle(el).transform || ''; } catch (eX) {}
       var mm = /^matrix\(([^)]+)\)/.exec(tr);
-      if (!mm) return { s: 1, x: 0, y: 0 };
-      var v = mm[1].split(',').map(parseFloat);
-      return { s: v[0] || 1, x: v[4] || 0, y: v[5] || 0 };
+      if (mm) {
+        var v = mm[1].split(',').map(parseFloat);
+        return { s: v[0] || 1, x: v[4] || 0, y: v[5] || 0 };
+      }
+      var m3 = /^matrix3d\(([^)]+)\)/.exec(tr);
+      if (m3) {
+        var v3 = m3[1].split(',').map(parseFloat);
+        return { s: v3[0] || 1, x: v3[12] || 0, y: v3[13] || 0 };
+      }
+      return { s: 1, x: 0, y: 0 };
+    }
+    // The zoom IN FORCE at a scene-local time, read from the DATA -- the
+    // DOM only shows the current instant, and a pan grabbed right where a
+    // zoom block STARTS (Marc's case: playhead at the zoom's own at) finds
+    // a still-wide rig even though the author's intent is "pan inside that
+    // zoom". Window = ease-in ramp + hold (+ ease-out when returning, or
+    // until the next move / scene end when open-ended).
+    function zoomInForceAt(sceneD, t) {
+      var best = null;
+      var mvs = (sceneD && sceneD.camera_moves) || [];
+      mvs.forEach(function(m) {
+        if (m.type !== 'zoom') return;
+        var ez = m.duration != null ? Number(m.duration) : 1;
+        var end;
+        if (m['return']) end = (m.at || 0) + ez + (m.hold != null ? Number(m.hold) : 0) + ez;
+        else {
+          var nxt = null;
+          mvs.forEach(function(n) { if (n !== m && (n.at || 0) > (m.at || 0) + 0.01 && (!nxt || (n.at || 0) < (nxt.at || 0))) nxt = n; });
+          end = nxt ? (nxt.at || 0) : (sceneD.duration_seconds || 5);
+        }
+        // A beat of pre-window: grabbing just before the block still means
+        // "pan that zoom" (the saved pan is nudged to after it settles).
+        if (t >= (m.at || 0) - 0.75 && t < end - 0.1) {
+          if (!best || (m.at || 0) >= (best.at || 0)) best = m;
+        }
+      });
+      return best;
+    }
+    function zoomSettledScale(zm, boxW, boxH) {
+      if (zm.scale) return zm.scale;
+      if (zm.w && zm.h) {
+        var cwS = parseInt(els.previewIframe.width, 10) || 1920;
+        var chS = parseInt(els.previewIframe.height, 10) || 1080;
+        var bw = (zm.w / 100) * cwS, bh = (zm.h / 100) * chS;
+        return Math.max(1.05, Math.min(5, Math.min((boxW || cwS) / bw, (boxH || chS) / bh)));
+      }
+      return 2;
+    }
+    function insideSpecFor(rigEl) {
+      var v = rigEl && rigEl.querySelector && rigEl.querySelector('video');
+      return v ? { target: videoTargetFor(v), label: videoLabelFor(v) } : null;
     }
     // The camera bubble is DIRECTLY draggable -- grabbing it moves the
     // bubble instead of drawing a zoom marquee.
@@ -6152,40 +6209,101 @@ export function getPreviewHtml(): string {
     function onDown(e) {
       if (studio.busy || e.button !== 0) return;
       if (studio.panMode) {
-        var pInside = studio.panInside || null;
-        var pEl = pInside ? panInsideRig(pInside.target) : panTargetEl();
-        var pXf = pEl ? readXf(pEl) : { s: 1, x: 0, y: 0 };
-        if (pInside && (!pEl || pXf.s <= 1.05)) {
-          // The footage is NOT magnified inside its frame here (no Zoom
-          // inside…, or the playhead is outside its window). But if the
-          // SCENE camera is zoomed, the zoomed picture the user is looking
-          // at IS pannable -- "pan what I see" beats a technicality, so
-          // fall back to a scene pan and say so. (Marc hit this: zoomed on
-          // the composer via a scene zoom, Pan inside said "not zoomed".)
-          var sEl = panTargetEl();
-          var sXf = sEl ? readXf(sEl) : { s: 1, x: 0, y: 0 };
-          if (sEl && sXf.s > 1.05) {
-            pInside = null; studio.panInside = null;
-            pEl = sEl; pXf = sXf;
-            studioStatus('↔ That zoom is a scene zoom (the footage isn’t magnified inside its frame) — panning the scene camera instead.', '');
+        // What is pannable here? Resolved in priority order -- the lane's
+        // DATA outranks the DOM's current instant, because a grab right at
+        // a zoom block's start (Marc's case) finds a still-wide rig even
+        // though the intent is plainly "pan inside that zoom":
+        //   1. a zoom whose ease-in ramp covers the playhead -> ride it
+        //      (preview jumps to its settled framing; the saved pan starts
+        //      once the zoom settles, so the two run parallel)
+        //   2. the rig the button asked for, magnified NOW
+        //   3. the other rig, magnified now ("pan what I see")
+        //   4. a settled zoom window from the data (DOM read misfired)
+        //   5. nothing -> honest refusal.
+        var wIn = studio.panInside || null;
+        var sceneG = currentSceneEntry();
+        var tG = (state.masterTime || 0) - sceneStartFor(state.currentSceneIndex);
+        var cwG = parseInt(els.previewIframe.width, 10) || 1920;
+        var chG = parseInt(els.previewIframe.height, 10) || 1080;
+        var pick = null;
+        var zm = sceneG ? zoomInForceAt(sceneG, tG) : null;
+        var zmEase = zm ? (zm.duration != null ? Number(zm.duration) : 1) : 0;
+        var zmRamp = !!(zm && tG < (zm.at || 0) + zmEase + 0.05);
+        var rideZoom = function() {
+          var el3 = null, box3 = null, in3 = null;
+          if (zm.target) {
+            el3 = panInsideRig(zm.target);
+            if (!el3) return null;
+            in3 = { target: zm.target, label: '' };
+            try { box3 = el3.parentElement.getBoundingClientRect(); } catch (eZ0) {}
+          } else {
+            el3 = panTargetEl();
+            if (!el3) return null;
+          }
+          var s3 = zoomSettledScale(zm, box3 && box3.width, box3 && box3.height);
+          var fx3 = ((zm.x != null ? zm.x : 50) / 100) * cwG;
+          var fy3 = ((zm.y != null ? zm.y : 50) / 100) * chG;
+          var tx3, ty3;
+          if (in3 && box3) {
+            var px3 = Math.max(0, Math.min(1, (fx3 - box3.left) / (box3.width || 1)));
+            var py3 = Math.max(0, Math.min(1, (fy3 - box3.top) / (box3.height || 1)));
+            tx3 = (0.5 - px3) * box3.width * s3;
+            ty3 = (0.5 - py3) * box3.height * s3;
+          } else {
+            tx3 = (0.5 - fx3 / cwG) * cwG * s3;
+            ty3 = (0.5 - fy3 / chG) * chG * s3;
+            var mx3 = (s3 - 1) * cwG / 2, my3 = (s3 - 1) * chG / 2;
+            tx3 = Math.max(-mx3, Math.min(mx3, tx3));
+            ty3 = Math.max(-my3, Math.min(my3, ty3));
+          }
+          return { el: el3, s: s3, x: tx3, y: ty3, inside: in3, box: box3, afterZoom: zm, jump: true,
+            note: (in3 ? '⊕ Panning the footage inside the zoom at ' : '↔ Panning inside the zoom at ') + (zm.at || 0).toFixed(1) + 's — the pan starts once it settles.' };
+        };
+        if (zm && zmRamp) pick = rideZoom();
+        if (!pick) {
+          var aEl = wIn ? panInsideRig(wIn.target) : panTargetEl();
+          var aXf = aEl ? readXf(aEl) : { s: 1, x: 0, y: 0 };
+          if (aEl && aXf.s > 1.05) {
+            var aBox = null;
+            if (wIn) { try { aBox = aEl.parentElement.getBoundingClientRect(); } catch (eA0) {} }
+            pick = { el: aEl, s: aXf.s, x: aXf.x, y: aXf.y, inside: wIn, box: aBox, note: '' };
           }
         }
-        // Pan NEVER zooms: it slides the camera at its current zoom. At 1x
-        // there is nowhere to pan -- say so honestly instead of faking it.
-        if (!pEl || pXf.s <= 1.05) {
+        if (!pick) {
+          var bEl = wIn ? panTargetEl() : doc.querySelector('.__mp_camera_rig--content');
+          var bXf = bEl ? readXf(bEl) : { s: 1, x: 0, y: 0 };
+          if (bEl && bXf.s > 1.05) {
+            var bIn = wIn ? null : insideSpecFor(bEl);
+            if (wIn || bIn) {
+              var bBox = null;
+              if (bIn) { try { bBox = bEl.parentElement.getBoundingClientRect(); } catch (eB0) {} }
+              pick = { el: bEl, s: bXf.s, x: bXf.x, y: bXf.y, inside: bIn, box: bBox,
+                note: wIn ? '↔ That zoom is a scene zoom — panning the scene camera instead.'
+                  : '⊕ The scene camera is wide but the footage is magnified — panning inside the frame instead.' };
+            }
+          }
+        }
+        if (!pick && zm) pick = rideZoom();
+        // Pan NEVER zooms: it slides the camera at its current zoom. With
+        // nothing zoomed now and no zoom block here, there is nowhere to
+        // pan -- say so honestly instead of faking it.
+        if (!pick) {
           studio.panMode = false;
           studio.panInside = null;
           try { doc.body.style.cursor = 'crosshair'; } catch (eD0) {}
-          studioStatus(pInside
-            ? '⊕ Nothing is magnified here — Zoom inside… first (or scrub into its hold), then pan.'
-            : '↔ The camera is wide — it already sees everything, so there is nothing to pan. Add a zoom, then drag during its hold.', 'warn');
+          studioStatus(wIn
+            ? '⊕ Nothing is magnified here and no zoom covers the playhead — Zoom inside… first (or scrub onto a zoom block), then pan.'
+            : '↔ The camera is wide — it already sees everything, so there is nothing to pan. Add a zoom (or scrub onto a zoom block), then drag.', 'warn');
           return;
         }
-        var pBox = null;
-        if (pInside) { try { pBox = pEl.parentElement.getBoundingClientRect(); } catch (eD1) {} }
+        studio.panInside = null;
         drag = { x0: e.clientX, y0: e.clientY, moved: false,
-          pan: { el: pEl, s: pXf.s, x: pXf.x, y: pXf.y, cx: pXf.x, cy: pXf.y,
-            o: pEl.style.transform || '', inside: pInside, box: pBox } };
+          pan: { el: pick.el, s: pick.s, x: pick.x, y: pick.y, cx: pick.x, cy: pick.y,
+            o: pick.el.style.transform || '', inside: pick.inside, box: pick.box, afterZoom: pick.afterZoom || null } };
+        if (pick.jump) {
+          try { pick.el.style.transform = 'translate(' + pick.x.toFixed(1) + 'px, ' + pick.y.toFixed(1) + 'px) scale(' + pick.s + ')'; } catch (eJ) {}
+        }
+        if (pick.note) studioStatus(pick.note, '');
         e.preventDefault();
         try { doc.body.style.cursor = 'grabbing'; } catch (eD) {}
         return;
@@ -6280,6 +6398,13 @@ export function getPreviewHtml(): string {
         }
         var sdU = sceneU.duration_seconds || 5;
         var atU = Math.round(Math.max(0, Math.min(sdU - 0.2, (state.masterTime || 0) - sceneStartFor(siU))) * 10) / 10;
+        if (d.pan.afterZoom) {
+          // Riding a zoom grabbed during its ramp: start the pan once the
+          // zoom settles so the two run parallel instead of fighting.
+          var zU = d.pan.afterZoom;
+          var setU = (zU.at || 0) + (zU.duration != null ? Number(zU.duration) : 1) + 0.1;
+          atU = Math.round(Math.max(atU, Math.min(sdU - 0.2, setU)) * 10) / 10;
+        }
         // No scale on the saved move -- a pan is pure translation at the
         // camera's zoom when it fires; scale is never written.
         var mvU = { at: atU, type: 'pan', x: Math.max(0, Math.min(100, fxU)), y: Math.max(0, Math.min(100, fyU)), duration: 0.9, hold: 1.5, 'return': true };
