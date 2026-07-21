@@ -140,3 +140,31 @@ describe("contractSceneToEdl", () => {
     expect(solved.segments.every((s: any) => !s.hold)).toBe(true);
   });
 });
+
+describe("film-clock hand-off (screen -> speaker)", () => {
+  it("attaching narration transfers the clock: the contracted film stops resizing", () => {
+    // Act 1: screen-owned recording, cut down -- the film contracts.
+    const scene: any = {
+      duration_seconds: 193.7,
+      media_edits: { screencast: { segments: [
+        { src_start: 0, src_end: 60, rate: 1 },
+        { src_start: 200, src_end: 235.6, rate: 1 },
+      ] } },
+    };
+    const project: any = { scenes: [scene] };
+    expect(contractSceneToEdl(project, scene, "screencast", 293.9)).toBe(95.6);
+
+    // Act 2: a booth take attaches -- voiceover track + speaker lane appear.
+    // (attachBoothNarration never mutates duration_seconds: "picture stays
+    // locked". This test guards the OWNERSHIP flip that follows.)
+    project.audio = { tracks: [{ id: "narration", type: "voiceover", source: "/assets/vo.m4a" }] };
+    project.speaker = { clips: [{ source: "/assets/take.webm", at: 0 }] };
+
+    // Act 3: the speaker now owns the clock -- further footage edits must
+    // NOT resize the film, no matter how the EDL changes.
+    scene.media_edits.screencast.segments = [{ src_start: 0, src_end: 30, rate: 1 }];
+    expect(screenOwnsClock(project)).toBe(false);
+    expect(contractSceneToEdl(project, scene, "screencast", 293.9)).toBe(null);
+    expect(scene.duration_seconds).toBe(95.6);
+  });
+});
