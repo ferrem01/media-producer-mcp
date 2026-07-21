@@ -5646,36 +5646,103 @@ export function getPreviewHtml(): string {
     var p = state.currentProject;
     if (!p || !booth.blob) return;
     booth.phase = 'uploading';
-    boothCard('<h3>&#127908; Attaching narration&hellip;</h3><p>Uploading the take, transcribing it, and building captions + chapter cards. This takes a moment.</p>');
-    var name = 'booth-take-' + new Date().toISOString().replace(/[:.]/g, '-') + '.webm';
-    var url = withToken('/api/booth-narration/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '?name=' + encodeURIComponent(name));
-    var opts = { method: 'POST', body: booth.blob, headers: { 'Content-Type': 'application/octet-stream' } };
-    if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
-    fetch(url, opts).then(function(r) {
-      return r.json().then(function(j) {
-        if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
-        return j;
-      });
-    }).then(function(j) {
+    // Two legs with different truths: the UPLOAD has a real percentage (XHR
+    // upload progress on a known blob size); the server work (whisper
+    // transcription + captions + chapters) does not, so it gets the elapsed
+    // clock + staged messages + sweep. A dropped connection mid-server-work
+    // is survivable -- the attach completes and saves, so we poll the
+    // project for the new voiceover before calling it failed.
+    var t0 = Date.now();
+    var t0iso = new Date().toISOString();
+    var totalMB = booth.blob.size / 1048576;
+    var uploaded = false;
+    boothCard(
+      '<h3>&#127908; Attaching narration&hellip; <span id="booth-att-timer" style="font-variant-numeric:tabular-nums;color:#6366f1;">0:00</span></h3>' +
+      '<p id="booth-att-stage">Uploading the take&hellip; 0% of ' + totalMB.toFixed(1) + ' MB</p>' +
+      '<div class="booth-draft-bar"><div class="booth-draft-fill" id="booth-att-fill"></div></div>' +
+      '<p style="font-size:10px;color:#9ca3af;margin-top:6px;">Transcription runs on the server &mdash; long takes take a few minutes.</p>'
+    );
+    var tick = setInterval(function() {
+      if (booth.phase !== 'uploading') { clearInterval(tick); return; }
+      var timer = document.getElementById('booth-att-timer');
+      if (!timer) { clearInterval(tick); return; }
+      var s = Math.floor((Date.now() - t0) / 1000);
+      timer.textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+      if (uploaded) {
+        var stage = document.getElementById('booth-att-stage');
+        if (stage) stage.textContent =
+          s < 90 ? 'Transcribing the take and building captions + chapter cards…'
+          : s < 210 ? 'Still transcribing — longer takes take longer…'
+          : 'Almost there…';
+      }
+    }, 1000);
+    function attachedCard(summary) {
+      clearInterval(tick);
       booth.phase = 'done';
       boothCard(
         '<h3>&#10003; Narration attached</h3>' +
-        '<p>' + escHtml(j.summary || 'Done.') + '</p>' +
+        '<p>' + escHtml(summary || 'Done.') + '</p>' +
         '<div class="booth-row"><button class="btn btn-primary" id="booth-done">Close</button></div>'
       );
       document.getElementById('booth-done').addEventListener('click', boothClose);
       // Reload so the captions overlay, audio lanes and spine show up.
       loadProject(p.project_id);
-    }).catch(function(e) {
+    }
+    function failedCard(msg) {
+      clearInterval(tick);
       booth.phase = 'review';
       boothCard(
-        '<h3>Upload failed</h3><p>' + escHtml(e.message || String(e)) + '</p>' +
+        '<h3>Upload failed</h3><p>' + escHtml(msg) + '</p>' +
         '<div class="booth-row"><button class="btn btn-primary" id="booth-use">Retry</button>' +
         '<button class="btn btn-secondary" id="booth-discard">Discard</button></div>'
       );
       document.getElementById('booth-use').addEventListener('click', boothUpload);
       document.getElementById('booth-discard').addEventListener('click', boothClose);
-    });
+    }
+    function recover(errMsg) {
+      // The server keeps attaching after a transport cut; look for its result.
+      var stage0 = document.getElementById('booth-att-stage');
+      if (stage0) stage0.textContent = 'Connection hiccup — the server may still be attaching, checking for the result…';
+      var polls = 0;
+      var poll = setInterval(function() {
+        polls++;
+        api('/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id)).then(function(r) {
+          var proj = r.project || r;
+          var hasVo = ((proj.audio || {}).tracks || []).some(function(t) { return t.type === 'voiceover'; });
+          if (hasVo && proj.updated_at > t0iso) { clearInterval(poll); attachedCard('Narration attached (recovered after a connection drop).'); }
+          else if (polls >= 18) { clearInterval(poll); failedCard(errMsg); }
+        }).catch(function() { if (polls >= 18) { clearInterval(poll); failedCard(errMsg); } });
+      }, 10000);
+    }
+    var name = 'booth-take-' + new Date().toISOString().replace(/[:.]/g, '-') + '.webm';
+    var url = withToken('/api/booth-narration/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '?name=' + encodeURIComponent(name));
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    if (_token) xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+    xhr.upload.onprogress = function(e) {
+      if (!e.lengthComputable || uploaded) return;
+      var pct = Math.min(100, Math.round((e.loaded / e.total) * 100));
+      var stage = document.getElementById('booth-att-stage');
+      if (stage) stage.textContent = 'Uploading the take… ' + pct + '% of ' + totalMB.toFixed(1) + ' MB';
+      // Determinate bar while the percentage is real; sweep resumes after.
+      var fill = document.getElementById('booth-att-fill');
+      if (fill) { fill.style.animation = 'none'; fill.style.left = '0'; fill.style.width = pct + '%'; }
+    };
+    xhr.upload.onload = function() {
+      uploaded = true;
+      var fill = document.getElementById('booth-att-fill');
+      if (fill) { fill.style.animation = ''; fill.style.left = ''; fill.style.width = ''; }
+    };
+    xhr.onload = function() {
+      var j = null;
+      try { j = JSON.parse(xhr.responseText); } catch (e2) {}
+      if (xhr.status >= 200 && xhr.status < 300 && j && j.ok) attachedCard(j.summary);
+      else if (xhr.status >= 500 || xhr.status === 0) recover((j && j.error) || ('HTTP ' + xhr.status));
+      else failedCard((j && j.error) || ('HTTP ' + xhr.status));
+    };
+    xhr.onerror = function() { recover('network error during attach'); };
+    xhr.send(booth.blob);
   }
 
   var boothBtn = document.getElementById('booth-btn');
