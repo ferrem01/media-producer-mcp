@@ -141,6 +141,47 @@ async function authStatus() {
   return { signedIn: false };
 }
 
+// ── Toolbar badge: the take's live status at a glance ───────────────────────
+// armed "•" -> recording "M:SS" (ticking, red) -> paused "⏸" -> upload "42%"
+// -> assembling "⋯" -> ready "✓" / error "!". Chapter marks flash "⚑".
+// The tooltip always carries the long-form version of the same state.
+const BADGE_COLORS = { rec: "#dc2626", warn: "#f59e0b", up: "#3b82f6", gen: "#6366f1", ok: "#16a34a" };
+
+function badge(text, color, title) {
+  chrome.action?.setBadgeText?.({ text: text || "" });
+  if (color) chrome.action?.setBadgeBackgroundColor?.({ color });
+  chrome.action?.setBadgeTextColor?.({ color: "#ffffff" });
+  chrome.action?.setTitle?.({ title: title || "Quotient Recorder" });
+}
+
+function fmtElapsed(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s >= 600) return Math.floor(s / 60) + "m"; // "12m" -- badge fits ~4 chars
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+function recordingElapsedMs() {
+  if (!session || !session.startedMs) return 0;
+  const pausedTail = session.phase === "paused" ? Date.now() - session.pauseBegan : 0;
+  return Date.now() - session.startedMs - session.pausedMs - pausedTail;
+}
+
+function badgeRecording() {
+  const t = fmtElapsed(recordingElapsedMs());
+  badge(t, BADGE_COLORS.rec, "Recording " + t + " — ⌘/Ctrl+Shift+N marks a chapter; stop from the popup.");
+}
+
+// A chapter mark flashes ⚑ so the keystroke visibly landed.
+let chapterFlash = null;
+function badgeChapterFlash() {
+  if (chapterFlash) clearTimeout(chapterFlash);
+  badge("⚑", BADGE_COLORS.gen, "Chapter marked");
+  chapterFlash = setTimeout(() => {
+    chapterFlash = null;
+    if (session?.phase === "recording") badgeRecording();
+  }, 1200);
+}
+
 async function ensureOffscreen() {
   const has = await chrome.offscreen.hasDocument?.();
   if (has) return;
@@ -215,6 +256,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Skeleton persisted so a suspended-and-restarted worker can still
         // finish the upload on Stop (see qr-ping handler).
         await chrome.storage.session?.set({ qrSession: { tabId: tab.id, phase: "armed", startedMs: 0, pausedMs: 0, settings } });
+        badge("•", BADGE_COLORS.warn, "Armed — click the page to start recording.");
 
         // Instrument the tab. Injected (not declared) so only recorded tabs
         // ever run the capture script.
@@ -247,8 +289,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         session.events.recording.startedAt = new Date().toISOString();
         await chrome.storage.session?.set({ qrSession: { tabId: session.tabId, phase: "recording", startedMs: session.startedMs, pausedMs: 0, settings: session.settings } });
         chrome.runtime.sendMessage({ type: "qr-offscreen-begin" });
-        chrome.action?.setBadgeBackgroundColor?.({ color: "#dc2626" });
-        chrome.action?.setBadgeText?.({ text: "REC" });
+        badgeRecording();
         return;
       }
 
@@ -257,7 +298,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         session.phase = "paused";
         session.pauseBegan = Date.now();
         chrome.runtime.sendMessage({ type: "qr-offscreen-pause" });
-        chrome.action?.setBadgeText?.({ text: "⏸" });
+        badge("⏸", BADGE_COLORS.warn, "Paused — resume from the on-page controls.");
         return;
       }
 
@@ -266,7 +307,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         session.pausedMs += Date.now() - session.pauseBegan;
         session.phase = "recording";
         chrome.runtime.sendMessage({ type: "qr-offscreen-resume" });
-        chrome.action?.setBadgeText?.({ text: "REC" });
+        badgeRecording();
         return;
       }
 
@@ -275,7 +316,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const s = session;
         session = null;
         await chrome.storage.session?.remove("qrSession");
-        chrome.action?.setBadgeText?.({ text: "" });
+        badge("");
         try { await chrome.tabs.sendMessage(s.tabId, { type: "qr-content-stop" }); } catch (e) {}
         if (s.prompterWin) { try { await chrome.windows.remove(s.prompterWin); } catch (e) {} }
         if (s.phase === "armed" || !s.startedMs) {
@@ -319,13 +360,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg.kind === "click") ev.clicks.push({ t, ...msg.data });
         else if (msg.kind === "input") ev.inputs.push({ t, ...msg.data });
         else if (msg.kind === "navigation") ev.navigations.push({ t, ...msg.data });
-        else if (msg.kind === "chapter") ev.chapters.push({ t, ...msg.data });
+        else if (msg.kind === "chapter") { ev.chapters.push({ t, ...msg.data }); badgeChapterFlash(); }
         else if (msg.kind === "activity") ev._activity.push(t);
         return;
       }
 
       if (msg.type === "qr-offscreen-status") {
-        // Progress + terminal states from the offscreen uploader.
+        // Progress + terminal states from the offscreen uploader -- mirror
+        // every one onto the toolbar badge so the take's fate is readable
+        // without opening anything.
+        if (msg.state === "uploading") {
+          const pct = msg.progress?.pct;
+          badge(pct != null ? pct + "%" : "↑", BADGE_COLORS.up,
+            pct != null ? "Uploading… " + pct + "%" : "Uploading…");
+        } else if (msg.state === "done") {
+          badge("⋯", BADGE_COLORS.gen, "Uploaded — assembling your walkthrough…");
+        } else if (msg.state === "ready") {
+          badge("✓", BADGE_COLORS.ok, "Walkthrough ready — open the popup to view it.");
+        } else if (msg.state === "error") {
+          badge("!", BADGE_COLORS.rec, "Upload failed — open the popup for details.");
+        }
         if (msg.state === "ready" && msg.projectUrl) {
           chrome.notifications?.create("qr-ready", {
             type: "basic",
@@ -368,8 +422,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
 
+      if (msg.type === "qr-tick") {
+        if (session?.phase === "recording" && !chapterFlash) badgeRecording();
+        return;
+      }
+
       if (msg.type === "qr-status") {
         sendResponse({ recording: !!session });
+        // Opening the popup acknowledges a terminal ✓ / ! badge.
+        if (!session) {
+          const { qrLastStatus } = (await chrome.storage.session?.get("qrLastStatus")) || {};
+          if (qrLastStatus && (qrLastStatus.state === "ready" || qrLastStatus.state === "error")) badge("");
+        }
         return;
       }
     } catch (e) {

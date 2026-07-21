@@ -18,13 +18,26 @@ let trackDims = { width: 0, height: 0 };
 let micStream = null;
 let camStream = null;
 
+// 1s heartbeat while recording: drives the toolbar badge's elapsed clock AND
+// keeps the MV3 service worker awake (it computes the badge from session
+// state; without events it can idle out mid-take). This document is alive
+// exactly while a recording is, so it is the natural metronome.
+let tickTimer = null;
+function startTick() {
+  stopTick();
+  tickTimer = setInterval(() => { try { chrome.runtime.sendMessage({ type: "qr-tick" }); } catch (e) {} }, 1000);
+}
+function stopTick() {
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+}
+
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === "qr-offscreen-prep") prep(msg.streamId, msg.mic, msg.camera, msg.dims);
-  else if (msg.type === "qr-offscreen-begin") begin();
-  else if (msg.type === "qr-offscreen-pause") { try { recorder?.pause(); camRecorder?.pause(); } catch (e) {} }
-  else if (msg.type === "qr-offscreen-resume") { try { recorder?.resume(); camRecorder?.resume(); } catch (e) {} }
-  else if (msg.type === "qr-offscreen-abort") abort();
-  else if (msg.type === "qr-offscreen-stop") stop(msg.upload);
+  else if (msg.type === "qr-offscreen-begin") { begin(); startTick(); }
+  else if (msg.type === "qr-offscreen-pause") { stopTick(); try { recorder?.pause(); camRecorder?.pause(); } catch (e) {} }
+  else if (msg.type === "qr-offscreen-resume") { startTick(); try { recorder?.resume(); camRecorder?.resume(); } catch (e) {} }
+  else if (msg.type === "qr-offscreen-abort") { stopTick(); abort(); }
+  else if (msg.type === "qr-offscreen-stop") { stopTick(); stop(msg.upload); }
 });
 
 async function prep(streamId, mic, camera, dims) {

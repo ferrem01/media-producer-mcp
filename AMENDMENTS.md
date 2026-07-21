@@ -1498,3 +1498,21 @@ want to see that field at the top of studio anymore."
   sign out). Tenant is never typed anywhere anymore: MCP, extension,
   and Studio all derive it from the login, with phase-1 enforcement
   underneath.
+
+## Extension badge: the take's status at a glance (Marc, 2026-07-21)
+
+Marc: "the extension has a little 'rec' on the icon... what else can you
+add to that little icon?" The badge is now a full state machine:
+
+- Armed: amber "•" (click the page to start).
+- Recording: a TICKING elapsed clock (M:SS red; >=10min "12m"). The
+  offscreen document is the 1s metronome -- it is alive exactly while a
+  take is, and its ticks also keep the MV3 worker from idling out.
+- Paused: "⏸". Chapter mark (⌘⇧N): flashes "⚑" 1.2s so the keystroke
+  visibly landed, then the clock resumes.
+- Uploading: live percentage (blue). Assembling: "⋯" (indigo).
+  Ready: "✓" (green). Failed: "!" (red). Opening the popup
+  acknowledges terminal states and clears the badge.
+- The tooltip always carries the long-form state (hover the icon).
+- Extension 0.9.1; zip rebuilt; source guards added to
+  test/extension-auth.test.ts.
