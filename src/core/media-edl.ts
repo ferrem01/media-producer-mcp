@@ -243,6 +243,35 @@ function piecesBetween(
  *                the scene ending, so it only bounds nothing today -- kept
  *                for future validation.
  */
+/**
+ * Does the SCREEN own the film clock? True when nothing audio-anchored
+ * exists -- no speaker clips, no voiceover narration. In that world the
+ * footage IS the film: cutting footage shortens the film. Speaker films
+ * keep their duration (the audio must not move when footage is edited).
+ */
+export function screenOwnsClock(project: any): boolean {
+  if (project?.speaker?.clips?.length) return false;
+  const tracks = project?.audio?.tracks || [];
+  return !tracks.some((t: any) => t?.type === "voiceover");
+}
+
+/**
+ * Contract a screen-owned scene to its EDL's natural output length; with
+ * edits cleared, restore the source duration. Mutates scene.duration_seconds
+ * and returns the new value when it changed, else null. No-op for
+ * audio-anchored films and when neither segments nor srcDur are usable.
+ */
+export function contractSceneToEdl(project: any, scene: any, target: string, srcDur?: number): number | null {
+  if (!screenOwnsClock(project)) return null;
+  const segs = scene?.media_edits?.[target]?.segments as MediaSegment[] | undefined;
+  const natural = segs?.length ? edlOutputDuration(segs) : (srcDur && srcDur > 0 ? srcDur : NaN);
+  if (!(natural > 0)) return null;
+  const next = Math.max(1, Math.round(natural * 10) / 10);
+  if (Math.abs((scene.duration_seconds || 0) - next) < 0.05) return null;
+  scene.duration_seconds = next;
+  return next;
+}
+
 export function solveMediaEdits(intents: MediaIntents, srcDur: number, _outDur?: number): SolveResult {
   const cuts = mergeRanges((intents.cuts || []) as MediaCut[], srcDur);
   const regions = mergeRanges((intents.rate_regions || []) as MediaRateRegion[], srcDur, true);

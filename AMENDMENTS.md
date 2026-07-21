@@ -1516,3 +1516,27 @@ add to that little icon?" The badge is now a full state machine:
 - The tooltip always carries the long-form state (hover the icon).
 - Extension 0.9.1; zip rebuilt; source guards added to
   test/extension-auth.test.ts.
+
+## Screen-owned film clock (Marc, 2026-07-21)
+
+Live report: a screen-only recording (no speaker) stayed 3:25 after Marc
+cut it down to ~1:45 -- the scene kept its stale recorded duration and
+the tail rendered as a long dead hatch. "Shouldn't the whole video get
+shorter?" Yes:
+
+- New concept: screenOwnsClock(project) -- true when nothing
+  audio-anchored exists (no speaker clips, no voiceover; music alone
+  doesn't anchor). In that world the footage IS the film clock.
+- contractSceneToEdl: after every media-edit op, legacy segments save,
+  and timelapse apply/remove, a screen-owned scene's duration_seconds
+  becomes the EDL's natural output length (kept footage at its rates;
+  clearing all edits restores the source duration). Speaker films NEVER
+  move -- audio must not shift when footage is edited.
+- Studio applies the contracted duration from the op response
+  (scene.duration_seconds + totalDuration) before restarting the
+  preview, so the ruler, hatch, and total time agree immediately.
+- Regression: media-edl.test.ts covers the ownership predicate, the
+  contraction math (cuts, rates, restore, speaker-film immunity), and
+  that a plain cut solves to kept-footage length with no pad/hold.
+  Route-level verified locally: add_cut 60..120 on a 205s scene ->
+  duration 145; clear -> 205.

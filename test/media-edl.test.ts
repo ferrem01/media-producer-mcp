@@ -5,6 +5,9 @@ import {
   activeSegmentAt,
   normalizeSegments,
   parseEdlAttr,
+  screenOwnsClock,
+  contractSceneToEdl,
+  solveMediaEdits,
 } from "../src/core/media-edl.js";
 
 const SEGS = [
@@ -71,5 +74,69 @@ describe("media EDL mapping", () => {
     expect(parseEdlAttr('{"a":1}')).toBeNull();
     expect(parseEdlAttr("[]")).toBeNull();
     expect(parseEdlAttr(null)).toBeNull();
+  });
+});
+
+// ── Screen-owned film clock ──────────────────────────────────────────────────
+// Live report: a screen-only recording (no speaker, no music) stayed 3:25
+// after cutting it down to ~1:45 -- the stale scene duration left a long
+// dead hatch. With nothing audio-anchored, the footage IS the clock.
+
+describe("screenOwnsClock", () => {
+  it("true for a bare screen film (and with music only)", () => {
+    expect(screenOwnsClock({})).toBe(true);
+    expect(screenOwnsClock({ audio: { tracks: [{ type: "music" }] } })).toBe(true);
+  });
+  it("false once anything audio-anchored exists", () => {
+    expect(screenOwnsClock({ speaker: { clips: [{}] } })).toBe(false);
+    expect(screenOwnsClock({ audio: { tracks: [{ type: "voiceover" }] } })).toBe(false);
+  });
+});
+
+describe("contractSceneToEdl", () => {
+  const seg = (s: number, e: number, rate = 1) => ({ src_start: s, src_end: e, rate });
+
+  it("REGRESSION: cutting a screen-only recording shortens the film", () => {
+    const scene: any = {
+      duration_seconds: 205, // the stale full-recording length
+      media_edits: { screencast: { segments: [seg(0, 60), seg(120, 165)] } }, // 105s kept
+    };
+    expect(contractSceneToEdl({}, scene, "screencast", 205)).toBe(105);
+    expect(scene.duration_seconds).toBe(105);
+  });
+
+  it("rates count: sped-up footage occupies less film time", () => {
+    const scene: any = {
+      duration_seconds: 100,
+      media_edits: { screencast: { segments: [seg(0, 60, 2), seg(60, 100, 1)] } }, // 30 + 40
+    };
+    expect(contractSceneToEdl({}, scene, "screencast")).toBe(70);
+  });
+
+  it("clearing every edit restores the source duration", () => {
+    const scene: any = { duration_seconds: 105 };
+    expect(contractSceneToEdl({}, scene, "screencast", 205)).toBe(205);
+  });
+
+  it("NEVER moves a speaker film's clock", () => {
+    const scene: any = {
+      duration_seconds: 100,
+      media_edits: { screencast: { segments: [seg(0, 30)] } },
+    };
+    const project = { audio: { tracks: [{ type: "voiceover" }] } };
+    expect(contractSceneToEdl(project, scene, "screencast", 200)).toBe(null);
+    expect(scene.duration_seconds).toBe(100);
+  });
+
+  it("no-op when already at the natural length or nothing usable", () => {
+    const scene: any = { duration_seconds: 105, media_edits: { screencast: { segments: [seg(0, 105)] } } };
+    expect(contractSceneToEdl({}, scene, "screencast")).toBe(null);
+    expect(contractSceneToEdl({}, { duration_seconds: 50 }, "screencast")).toBe(null); // cleared + unknown srcDur
+  });
+
+  it("solver output on a plain cut equals kept footage at 1x (no pad, no hold)", () => {
+    const solved = solveMediaEdits({ cuts: [{ src_start: 60, src_end: 120 }] }, 205);
+    expect(Math.abs(edlOutputDuration(solved.segments) - 145)).toBeLessThan(0.1);
+    expect(solved.segments.every((s: any) => !s.hold)).toBe(true);
   });
 });
