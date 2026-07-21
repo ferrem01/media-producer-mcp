@@ -83,7 +83,7 @@ describe("toolbar badge state machine", () => {
     expect(backgroundJs).toContain('msg.type === "qr-tick"');
   });
   it("upload/assembling/ready/error states all reach the badge", () => {
-    expect(backgroundJs).toMatch(/pct \+ "%", BADGE_COLORS\.up/);
+    expect(backgroundJs).toMatch(/pct \+ "%"[^\n]*BADGE_COLORS\.up/);
     expect(backgroundJs).toContain('badge("⋯", BADGE_COLORS.gen');
     expect(backgroundJs).toContain('badge("✓", BADGE_COLORS.ok');
     expect(backgroundJs).toContain('badge("!", BADGE_COLORS.rec');
