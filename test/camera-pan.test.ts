@@ -16,21 +16,23 @@ function scriptFor(moves: any[]): string {
 describe("peer-effect pan runtime", () => {
   const pan = [{ at: 2, type: "pan", x: 20, y: 30, duration: 0.8, hold: 1, return: true }];
 
-  it("pan resolves at fire time: adopts current scale with a 1.4 floor", () => {
+  it("pan is pure translation resolved at fire time: reads the live scale, never tweens it", () => {
     const js = scriptFor(pan);
-    // fire-time read of the rig's actual scale...
+    // fire-time read of the rig's actual scale (used for math only)...
     expect(js).toContain("gsap.getProperty(rig.el, 'scaleX')");
-    // ...unset scale adopts it, never below 1.4 on a wide camera
-    expect(js).toContain("m.scale || (cs > 1.05 ? cs : 1.4)");
+    // ...and the pan tween animates x/y only -- no scale key, no floor
+    const panBranch = js.slice(js.indexOf("PEER-EFFECT pan"), js.indexOf("var to;"));
+    expect(panBranch).not.toContain("scale: function");
+    expect(panBranch).not.toContain("1.4");
   });
 
-  it("pan return restores the PRE-PAN framing, not wide", () => {
+  it("pan return restores the PRE-PAN position, not wide", () => {
     const js = scriptFor(pan);
-    expect(js).toContain("pPrior ? pPrior.scale : 1");
     expect(js).toContain("pPrior ? pPrior.x : 0");
+    expect(js).toContain("pPrior ? pPrior.y : 0");
   });
 
-  it("the old build-time pan floor is gone (pan never reaches the generic branch)", () => {
+  it("the old build-time pan floor is gone everywhere", () => {
     const js = scriptFor(pan);
     expect(js).not.toContain("Math.max(st.scale, 1.4))");
   });
@@ -60,11 +62,23 @@ describe("studio pan gesture + parallel lane", () => {
     expect(html.match(/id="rv-pop-pan"/g)?.length).toBe(2);
   });
 
-  it("a saved drag-pan carries NO scale (auto-adopt at fire time)", () => {
-    // the drag's onUp builds the move without a scale key
+  it("pan-inside exists as zoom-inside's sibling", () => {
+    expect(html).toContain("panInsideSelection");
+    expect(html).toContain('id="rv-pop-pan-inside"');
+    // the content rig is the inside target; the scene rig excludes it
+    expect(html).toContain("__mp_camera_rig--content");
+    expect(html).toContain(":not(.__mp_camera_rig--content)");
+  });
+
+  it("a saved drag-pan carries NO scale, and the editor never writes one onto a pan", () => {
     const m = /var mvU = \{ at: atU, type: 'pan',[^}]*\}/.exec(html);
     expect(m).toBeTruthy();
     expect(m![0]).not.toContain("scale");
+    expect(html).toContain("if (next.type === 'pan') delete next.scale;");
+  });
+
+  it("a wide camera refuses the grab with an honest message", () => {
+    expect(html).toContain("nothing to pan");
   });
 
   it("overlapping effect blocks split the bar height (parallel bars)", () => {

@@ -860,14 +860,16 @@ export function cameraMovesScript(
         var px = k ? Math.max(0, Math.min(1, (fx - b.left) / W)) : fx / CW;
         var py = k ? Math.max(0, Math.min(1, (fy - b.top) / H)) : fy / CH;
         if (m.type === 'pan') {
-          // PEER-EFFECT pan. Pan and zoom are independent effects that may
-          // run at the same time without referencing each other, so a pan
-          // resolves at its tween's FIRST RENDER, not when the timeline is
-          // built: it adopts whatever scale the camera holds at that moment
-          // (a zoom mid-hold keeps its zoom; a wide camera gets 1.4 so the
-          // motion is never invisible), and its return restores the framing
-          // that existed just before the pan fired -- never yanking a
-          // still-holding zoom back to wide.
+          // PEER-EFFECT pan: PURE TRANSLATION. Pan and zoom are independent
+          // effects that may run at the same time without referencing each
+          // other, so a pan resolves at its tween's FIRST RENDER, not when
+          // the timeline is built: it slides the camera at whatever zoom it
+          // holds at that moment and NEVER touches scale (a scale on the
+          // move is ignored -- "pan also zooming" read as two effects
+          // fighting). At 1x the cover-clamp pins motion to zero: a wide
+          // camera has nowhere to pan, and that no-op is the honest answer
+          // (Studio says so at drag time). The return restores the PRE-PAN
+          // position -- never yanking a still-holding zoom's framing.
           var pDur = m.duration || 1;
           var pEase = m.ease || 'power2.inOut';
           var pPrior = null;
@@ -880,28 +882,25 @@ export function cameraMovesScript(
               cx0 = parseFloat(gsap.getProperty(rig.el, 'x')) || 0;
               cy0 = parseFloat(gsap.getProperty(rig.el, 'y')) || 0;
             } catch (eP) {}
-            pPrior = { scale: cs, x: cx0, y: cy0 };
-            var sc = m.scale || (cs > 1.05 ? cs : 1.4);
-            var tx = (0.5 - px) * W * sc, ty = (0.5 - py) * H * sc;
+            pPrior = { x: cx0, y: cy0 };
+            var tx = (0.5 - px) * W * cs, ty = (0.5 - py) * H * cs;
             if (!k) {
-              var mxP = (sc - 1) * CW / 2, myP = (sc - 1) * CH / 2;
+              var mxP = (cs - 1) * CW / 2, myP = (cs - 1) * CH / 2;
               tx = Math.max(-mxP, Math.min(mxP, tx));
               ty = Math.max(-myP, Math.min(myP, ty));
             }
-            pTo = { scale: sc, x: tx, y: ty };
+            pTo = { x: tx, y: ty };
             return pTo;
           };
           tl.to(rig.el, {
-            scale: function() { return computeP().scale; },
             x: function() { return computeP().x; },
             y: function() { return computeP().y; },
             duration: pDur, ease: pEase,
           }, m.at);
           var stBefore = st;
-          st = { scale: m.scale || Math.max(st.scale, 1.4), x: 0, y: 0, rotation: st.rotation };
+          st = { scale: st.scale, x: 0, y: 0, rotation: st.rotation };
           if (m['return']) {
             tl.to(rig.el, {
-              scale: function() { return pPrior ? pPrior.scale : 1; },
               x: function() { return pPrior ? pPrior.x : 0; },
               y: function() { return pPrior ? pPrior.y : 0; },
               duration: pDur, ease: pEase,
