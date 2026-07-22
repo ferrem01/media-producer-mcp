@@ -99,15 +99,27 @@ function extractAttr(attrs: string, name: string): string | null {
  * Handles data='{ "key": "value" }' pattern.
  */
 function extractDataAttr(attrs: string): Record<string, unknown> {
-  // Try single-quoted data attribute (contains double quotes in JSON)
-  const sqMatch = attrs.match(/data\s*=\s*'([\s\S]*?)'/i);
-  if (sqMatch) {
-    try {
-      return JSON.parse(sqMatch[1]);
-    } catch {
-      console.warn(`  [component-tags] Failed to parse data attribute: ${sqMatch[1].substring(0, 100)}...`);
-      return {};
+  // Try single-quoted data attribute (contains double quotes in JSON).
+  // A raw apostrophe INSIDE a JSON string ("I'll draft...") would end a
+  // non-greedy match early and silently bind {} (empty-shell mock, July
+  // regression) -- so scan each candidate closing quote until the span
+  // parses as JSON instead of trusting the first one.
+  const sqOpen = attrs.match(/data\s*=\s*'/i);
+  if (sqOpen && sqOpen.index !== undefined) {
+    const openIdx = sqOpen.index + sqOpen[0].length;
+    let closeIdx = attrs.indexOf("'", openIdx);
+    let firstSpan: string | null = null;
+    while (closeIdx !== -1) {
+      const candidate = attrs.slice(openIdx, closeIdx);
+      if (firstSpan === null) firstSpan = candidate;
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        closeIdx = attrs.indexOf("'", closeIdx + 1);
+      }
     }
+    console.warn(`  [component-tags] Failed to parse data attribute: ${(firstSpan || "").substring(0, 100)}...`);
+    return {};
   }
 
   // Try double-quoted data attribute (contains escaped quotes or simple values)

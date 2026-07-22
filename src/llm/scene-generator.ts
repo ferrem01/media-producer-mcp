@@ -496,9 +496,12 @@ export async function buildCodegenSpec(draft: any): Promise<string> {
     // VERBATIM (layout/position is yours; the content and script are not).
     if (authoredComps.length > 0) {
       parts.push(`\n## Storyboard-Authored Component Data (embed VERBATIM)`);
-      parts.push(`The storyboard authored these components' full data payloads. Embed each with this exact data (you own position/size/staging around it; do NOT rewrite, trim, or drop the data -- especially "script" arrays, which are the on-screen performance):`);
+      parts.push(`The storyboard authored these components' full data payloads. Embed each with this exact data (you own position/size/staging around it; do NOT rewrite, trim, or drop the data -- especially "script" arrays, which are the on-screen performance). Apostrophes are pre-escaped as \\u0027 so the JSON survives the single-quoted data attribute -- keep them escaped exactly as given:`);
       for (var ac of authoredComps) {
-        parts.push(`<component type="${ac.type}" data='${JSON.stringify(ac.data)}' />`);
+        // A raw apostrophe inside data='...' ends the HTML attribute early:
+        // the component silently binds {} and renders an empty shell. '
+        // is attribute-safe and JSON.parse restores the apostrophe.
+        parts.push(`<component type="${ac.type}" data='${JSON.stringify(ac.data).replace(/'/g, "\\u0027")}' />`);
       }
     }
 

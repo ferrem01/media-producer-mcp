@@ -344,7 +344,7 @@ PERFORMABLE SURFACES (schemas marked 🎬 PERFORMABLE) must arrive MID-PERFORMAN
 
 ### How It Works
 1. Read the component schemas from the spec
-2. Embed components using \`<component type="name" data='{...}' />\` with the data fields from the schema
+2. Embed components using \`<component type="name" data='{...}' />\` with the data fields from the schema. The data attribute is single-quoted: NEVER put a raw apostrophe inside the JSON -- escape every ' in text as \\u0027 (e.g. "I\\u0027ll draft it") or the attribute ends early and the component renders EMPTY.
 3. Write custom code only for layout, transitions, backgrounds, and elements with no library match
 
 The result is HYBRID: <component> tags for known UI + custom code for everything else.

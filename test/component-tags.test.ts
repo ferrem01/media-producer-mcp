@@ -323,3 +323,25 @@ describe("backdrop exclusion from the camera rig", () => {
     expect(js).toContain("data-mp-backdrop");
   });
 });
+
+const MOCK_SRC = `<template>\n<div class="m">{{greeting}}</div>\n</template>\n<script>\nfunction buildTimeline(tl, ctx) {}\n</script>`;
+
+describe("data attribute apostrophe survival", () => {
+  it("parses single-quoted data whose JSON strings contain apostrophes", async () => {
+    const { resolveComponentTags } = await import("../src/core/component-tags.js");
+    const data = { greeting: "I'll draft it", script: [{ action: "respond", at: 1, text: "Here's the plan" }] };
+    const html = `<div><component type="mock" data='${JSON.stringify(data)}' /></div>`;
+    const result = resolveComponentTags(html, new Map([["mock", MOCK_SRC]]));
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].data).toEqual(data);
+  });
+
+  it("parses \\u0027-escaped apostrophes (the codegen-spec emission format)", async () => {
+    const { resolveComponentTags } = await import("../src/core/component-tags.js");
+    const data = { title: "Marc's campaign" };
+    const attr = JSON.stringify(data).replace(/'/g, "\\u0027");
+    const html = `<component type="mock" data='${attr}' />`;
+    const result = resolveComponentTags(html, new Map([["mock", MOCK_SRC]]));
+    expect(result.components[0].data).toEqual(data);
+  });
+});
