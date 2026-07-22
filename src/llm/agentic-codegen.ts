@@ -312,7 +312,7 @@ Design for a viewer watching a finished video, not a designer reading a spec.
 ## TEMPO-CUT SCENES (applies whenever the visual notes or creative direction name "tempo-cut")
 
 In this grammar the CUT carries the energy, so each scene stays disciplined:
-- BUILD FROM THE KIT: stage the library components via \`<component>\` tags — \`composer\` for a typed ask (never hand-roll an input box), \`kinetic-text\` with \`entrance:"type-on"\` for build-up lines, \`annotation\` for narration docked beside a window, the product mocks for surfaces. Hand-rolled versions of surfaces the kit already has are a failure.
+- BUILD FROM THE KIT: stage the library components via \`<component>\` tags — \`composer\` for a typed ask (never hand-roll an input box), \`kinetic-text\` with \`entrance:"type-on"\` for build-up lines, \`annotation\` for narration docked beside a window, the product mocks for surfaces. Hand-rolled versions of surfaces the kit already has are a failure. This holds ESPECIALLY when the notes describe things HAPPENING inside a mock (tabs switching, tasks checking off, a post publishing): those are the mock's own script actions — stage the library component with a \`data.script\` performance, never rebuild the surface to animate it by hand.
 - NO corner labels, montage labels, scene-name chips, timestamps, or "session/live" badges anywhere. The frame carries the one thought and nothing else.
 - ONE CANVAS: the scene keeps the film's canvas color (the scene background it was given). Never invert to a different world than the neighboring scenes.
 - EDGE SAFETY: nothing within 4% of any frame edge. Clipped type at the frame boundary is an automatic failure.
@@ -339,6 +339,8 @@ Minimum bar for any scene you author: \`mpAtmosphere\` for the world, \`mpCamera
 
 Your scene MUST use <component> tags for any UI element that exists in the component library.
 Do NOT rebuild from scratch what already exists. Writing custom HTML for a library component is a bug.
+
+PERFORMABLE SURFACES (schemas marked 🎬 PERFORMABLE) must arrive MID-PERFORMANCE: their data MUST include a timed \`script\` array ([{action, at, ...}] using the schema's documented actions) that plays the scene's beats on the surface — the ask types and sends, tool-calls fire and flip green one by one, progress ticks up, the post publishes. Staging one with only static end-state data (progress already complete, results already green) is a frozen screenshot and a blocking defect. When the spec carries Storyboard-Authored Component Data, embed that data VERBATIM — the script array is the scene's choreography, not a suggestion.
 
 ### How It Works
 1. Read the component schemas from the spec

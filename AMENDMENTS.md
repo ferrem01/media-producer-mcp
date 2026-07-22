@@ -1737,3 +1737,31 @@ Also: readXf reads scale/x/y through the iframe's gsap.getProperty
 (with matrix AND matrix3d parsing as fallback) -- computed-style
 regex parsing missed the matrix3d serialization transforms take
 during playback.
+## Scripted surfaces: performances survive storyboard → codegen (Marc, 2026-07-22)
+
+Regression test (regenerate the Claude-connector tempo cut from one prompt,
+proj_1031fb41) vs the hand-built original (proj_0890a34e): the new film's
+mocks arrived FROZEN — static end-state data (progress 3/3, tool calls
+already green), no typing, no firing, and the two Quotient scenes hand-rolled
++ failed gates at -46. Root causes, all structural:
+
+- The storyboard's `components` was a STRING array — the prompt said "put the
+  full interaction sequence in data.script" but the schema had nowhere to put
+  it outside `scene_template.data`, and the sanitizer flattened any object to
+  its type string.
+- `buildCodegenSpec`'s Component Schemas section listed data fields but never
+  `script_actions` — codegen literally never saw that a surface could perform.
+
+Fixed (fix 1+2 of 3; deterministic critique gate deferred):
+- `components` entries are now string | {type, data} end to end (DraftScene,
+  StoryboardScene, sanitizer keeps authored data, template-assign skips
+  scenes carrying it, pipeline helpers normalized). Storyboard prompt +
+  tempo-cut contract: performable mocks MUST be staged as objects with a
+  timed data.script (static_surface = blocking).
+- Codegen spec now carries a "Storyboard-Authored Component Data (embed
+  VERBATIM)" section + 🎬 PERFORMABLE schema blocks with the full action
+  vocabulary; system prompt: performable surfaces arrive MID-PERFORMANCE.
+- Scene-generator enforcement extended: an authored script that doesn't
+  survive into the scene HTML triggers the corrective retry (same mechanism
+  as the zero-<component>-tags check).
+- test/scripted-surfaces.test.ts covers the pass-through.

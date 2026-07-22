@@ -324,8 +324,19 @@ async function generateCodegenScene(
   // ships non-compliance silently (measured: whole projects generated with a
   // 125-entry catalog and ZERO <component> tags). One corrective retry.
   var wantedComps = (Array.isArray(draft.components) ? draft.components : [])
-    .filter((c: any) => typeof c === "string" && c !== "video");
+    .map((c: any) => (typeof c === "string" ? c : c?.type))
+    .filter((t: any) => typeof t === "string" && t.length > 0 && t !== "video");
   var missingComponents = wantedComps.length > 0 && !sceneHtml.includes("<component ");
+  // Storyboard-authored scripted performances are the scene's choreography --
+  // a performable surface that ships without its script arrives frozen at an
+  // end state (the exact failure that made mock scenes read as screenshots).
+  var authoredScriptTypes = (Array.isArray(draft.components) ? draft.components : [])
+    .filter((c: any) => c && typeof c === "object" && (c.data as any)?.script)
+    .map((c: any) => c.type as string);
+  var scriptKeyRe = /['"]script['"]\s*:/;
+  var missingScripts = authoredScriptTypes.filter(
+    (t) => !(sceneHtml.includes(`type="${t}"`) && scriptKeyRe.test(sceneHtml)),
+  );
   // REAL FOOTAGE is even less optional than library components: when the
   // spec names an /assets video, a scene that fabricates a lookalike UI
   // mock instead of embedding the recording is a structural failure
@@ -337,11 +348,12 @@ async function generateCodegenScene(
       .filter((f: string) => f.length > 0),
   ));
   var missingFootage = specVideoFiles.filter((f) => !sceneHtml.includes(f));
-  if (missingComponents || missingFootage.length > 0) {
+  if (missingComponents || missingFootage.length > 0 || missingScripts.length > 0) {
     var defectLines: string[] = [];
     if (missingComponents) defectLines.push(`the storyboard selected the vetted library components [${wantedComps.join(", ")}] but you embedded NONE of them -- you rebuilt everything as bespoke HTML, which produces flat, low-craft results. You MUST embed each via <component type="..." data='{...}' /> (schemas are in the spec).`);
     if (missingFootage.length > 0) defectLines.push(`the spec names REAL footage (${missingFootage.join(", ")}) and your scene does not reference it -- you fabricated a mock instead of embedding the actual recording. You MUST present each named file, preferably via <component type="screencast-frame" data='{"video_url":"...","frame_style":"macos-browser","crop":"auto"}' /> (or a bare markup <video src muted playsinline> for full-bleed moments), as the spec directs.`);
-    console.warn(`  Scene ${opts.sceneIndex + 1}: structural defect(s) -- ${missingComponents ? "no <component> tags" : ""}${missingComponents && missingFootage.length ? " + " : ""}${missingFootage.length ? "dropped footage " + missingFootage.join(",") : ""} -- corrective retry`);
+    if (missingScripts.length > 0) defectLines.push(`the storyboard authored a timed data.script performance for [${missingScripts.join(", ")}] and your scene dropped it -- the surface arrives frozen at an end state instead of PERFORMING. Embed each with the storyboard's data VERBATIM (including the full script array) via <component type="..." data='{...,"script":[...]}' />.`);
+    console.warn(`  Scene ${opts.sceneIndex + 1}: structural defect(s) -- ${[missingComponents ? "no <component> tags" : "", missingFootage.length ? "dropped footage " + missingFootage.join(",") : "", missingScripts.length ? "dropped script(s) " + missingScripts.join(",") : ""].filter(Boolean).join(" + ")} -- corrective retry`);
     try {
       var retryResult = await generateSceneAgentic({
         sceneSpec: effectiveSpec,
@@ -364,12 +376,13 @@ async function generateCodegenScene(
       var retryHtml = stripHtmlFences(retryResult.html);
       var retryCompsOk = !missingComponents || retryHtml.includes("<component ");
       var retryFootageOk = missingFootage.every((f) => retryHtml.includes(f));
-      if (retryCompsOk && retryFootageOk) {
+      var retryScriptsOk = missingScripts.every((t) => retryHtml.includes(`type="${t}"`) && scriptKeyRe.test(retryHtml));
+      if (retryCompsOk && retryFootageOk && retryScriptsOk) {
         sceneHtml = retryHtml;
         agenticResult = retryResult;
         console.log(`  Scene ${opts.sceneIndex + 1}: corrective retry fixed the structural defect(s) ✓`);
       } else {
-        console.warn(`  Scene ${opts.sceneIndex + 1}: retry still defective (components ok: ${retryCompsOk}, footage ok: ${retryFootageOk}) -- shipping first version`);
+        console.warn(`  Scene ${opts.sceneIndex + 1}: retry still defective (components ok: ${retryCompsOk}, footage ok: ${retryFootageOk}, scripts ok: ${retryScriptsOk}) -- shipping first version`);
       }
     } catch (e: any) {
       console.warn(`  Scene ${opts.sceneIndex + 1}: component-enforcement retry failed (${e?.message || e}) -- shipping first version`);
@@ -434,7 +447,7 @@ function buildBrandContext(brandKit: BrandKit): string {
  * notes into a spec the agentic codegen generator can use
  * with <component> tags.
  */
-async function buildCodegenSpec(draft: any): Promise<string> {
+export async function buildCodegenSpec(draft: any): Promise<string> {
   var parts: string[] = [];
 
   parts.push(`Scene: "${draft.label}"`);
@@ -470,10 +483,23 @@ async function buildCodegenSpec(draft: any): Promise<string> {
 
   // Component hints: look up schemas from catalog and include them
   if (draft.components?.length > 0) {
-    var componentTypes: string[] = draft.components;
+    var componentTypes: string[] = draft.components.map((c: any) => (typeof c === "string" ? c : c.type));
+    var authoredComps = (draft.components as any[]).filter((c: any) => c && typeof c === "object" && c.data);
     parts.push(`\nUse these library components via <component> tags:`);
     for (var compType of componentTypes) {
       parts.push(`  - <component type="${compType}" />`);
+    }
+
+    // Storyboard-authored component data: the storyboard already wrote the
+    // full data payload -- including timed data.script performances on
+    // performable surfaces. That data is the scene's choreography; embed it
+    // VERBATIM (layout/position is yours; the content and script are not).
+    if (authoredComps.length > 0) {
+      parts.push(`\n## Storyboard-Authored Component Data (embed VERBATIM)`);
+      parts.push(`The storyboard authored these components' full data payloads. Embed each with this exact data (you own position/size/staging around it; do NOT rewrite, trim, or drop the data -- especially "script" arrays, which are the on-screen performance):`);
+      for (var ac of authoredComps) {
+        parts.push(`<component type="${ac.type}" data='${JSON.stringify(ac.data)}' />`);
+      }
     }
 
     // Look up component schemas from the catalog so the LLM has them upfront
@@ -511,6 +537,18 @@ async function buildCodegenSpec(draft: any): Promise<string> {
                 var propEnum = p.enum ? ` values: ${p.enum.join(", ")}` : "";
                 schemaLines.push(`      - ${propName}: ${p.type}${propReq}${propEnum}`);
               }
+            }
+          }
+          // Performable surfaces: the script-action vocabulary is the whole
+          // point of these components. Omitting it here is why generated
+          // scenes shipped mocks frozen at their end state -- the codegen
+          // never saw that the surface could perform.
+          var sa = (catalogEntry as any).script_actions as Array<{ action: string; description: string; params?: Record<string, string> }> | undefined;
+          if (sa && sa.length > 0) {
+            schemaLines.push(`  🎬 PERFORMABLE -- this surface plays a timed script. Its data MUST include script: [{action, at, ...params}] so it performs on screen; staging it with only static end-state data (progress complete, tool calls already green) is a blocking defect. Actions:`);
+            for (var act of sa) {
+              var paramStr = act.params ? ` params: ${Object.entries(act.params).map(([k, v]) => `${k} (${v})`).join(", ")}` : "";
+              schemaLines.push(`    - ${act.action}: ${act.description}${paramStr}`);
             }
           }
           schemasFound.push(schemaLines.join("\n"));

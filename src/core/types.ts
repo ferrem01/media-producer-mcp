@@ -436,8 +436,10 @@ export interface StoryboardScene {
   assets: AssetRequirement[];
   /** Visual description for the storyboard */
   visual_notes: string;
-  /** Library component types the storyboard builder suggested embedding in this scene */
-  components?: string[];
+  /** Library components the storyboard builder suggested embedding in this
+   *  scene. Plain string = type only. Object = storyboard-authored data; for
+   *  performable surfaces data.script is the timed on-screen performance. */
+  components?: Array<string | { type: string; data?: Record<string, unknown> }>;
   /** Cinematic stock-footage search phrase; when set, b-roll plays behind the scene */
   broll_query?: string;
   /** AI-generated still image prompt; when set, a generated image is the scene background (mutually exclusive with broll_query) */
