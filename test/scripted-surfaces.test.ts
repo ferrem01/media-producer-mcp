@@ -133,3 +133,23 @@ describe("authored composition (deterministic scene path)", () => {
     expect(spec).toContain("Storyboard-Authored Component Data");
   });
 });
+
+describe("authored composition layout without the shell", () => {
+  it("splits campaign + chat left/right when quotient-app-shell is absent", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const result = await generateScene({
+      scene: {
+        label: "Quotient pair", duration_seconds: 10.8, purpose: "p", visual_notes: "v",
+        components: [
+          { type: "quotient-campaign", data: { title: "Roundtable" } },
+          { type: "quotient-chat", data: { history: [] } },
+        ],
+      } as any,
+      sceneIndex: 6, totalScenes: 13, prompt: "p",
+      llmConfig: {} as any, brandKit: {} as any, canvas: { width: 1920, height: 1080 } as any,
+    } as any);
+    const byType = Object.fromEntries((result.scene as any).components.map((c: any) => [c.type, c]));
+    expect(byType["quotient-campaign"].position.width).toBe("62%");
+    expect(byType["quotient-chat"].position.x).toBe("66.5%");
+  });
+});

@@ -289,10 +289,22 @@ function authoredLayout(types: string[]): Map<string, { position: Record<string,
     if (has("quotient-chat")) {
       out.set("quotient-chat", { position: { x: "67.6%", y: "8%", width: "30.5%", height: "87%" }, z_index: 15 });
     }
+  } else if (has("quotient-chat") && (has("quotient-campaign") || has("quotient-social"))) {
+    // No shell staged (storyboards sometimes drop it): same split, framed
+    // as two floating windows over the world instead of inside the shell.
+    for (var pairCenter of ["quotient-campaign", "quotient-social"]) {
+      if (has(pairCenter)) out.set(pairCenter, { position: { x: "2.5%", y: "6%", width: "62%", height: "88%" }, z_index: 10 });
+    }
+    out.set("quotient-chat", { position: { x: "66.5%", y: "6%", width: "31%", height: "88%" }, z_index: 15 });
+  }
+  // Any remaining pair splits left/right; a lone surface gets the classic
+  // single-window frame (the hand-built films' 84% inset).
+  var unplaced = types.filter((t) => !out.has(t));
+  if (unplaced.length === 2) {
+    out.set(unplaced[0], { position: { x: "2.5%", y: "6%", width: "62%", height: "88%" }, z_index: 10 });
+    out.set(unplaced[1], { position: { x: "66.5%", y: "6%", width: "31%", height: "88%" }, z_index: 15 });
   }
   for (var t of types) {
-    // Un-reciped surfaces share the single-window frame; the storyboard's
-    // compositions stage at most one such window per scene.
     if (!out.has(t)) out.set(t, { position: { x: "8%", y: "6.5%", width: "84%", height: "87%" }, z_index: 10 });
   }
   return out;

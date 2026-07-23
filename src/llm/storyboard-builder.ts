@@ -665,7 +665,10 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
           at: Math.max(0, Math.min(dur0 - 0.5, Number(m.at) || 0)),
           type: m.type,
           ...(m.type === "zoom" ? { anchor: String(m.anchor).trim() } : {}),
-          ...(m.scale ? { scale: Math.max(1.3, Math.min(2.6, Number(m.scale) || 1.8)) } : {}),
+          // 1.05 floor, not 1.3: a whole-window anchor with a forced 1.3+
+          // zoom crops the window's chrome for the length of the move; the
+          // subtle push (1.05-1.2) is a legitimate authored choice.
+          ...(m.scale ? { scale: Math.max(1.05, Math.min(2.6, Number(m.scale) || 1.8)) } : {}),
           duration: Math.max(0.4, Math.min(1.6, Number(m.duration) || 0.9)),
         }))
         .slice(0, 4);
