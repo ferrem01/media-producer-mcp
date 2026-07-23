@@ -1737,3 +1737,51 @@ Also: readXf reads scale/x/y through the iframe's gsap.getProperty
 (with matrix AND matrix3d parsing as fallback) -- computed-style
 regex parsing missed the matrix3d serialization transforms take
 during playback.
+## Scripted surfaces: performances survive storyboard → codegen (Marc, 2026-07-22)
+
+Regression test (regenerate the Claude-connector tempo cut from one prompt,
+proj_1031fb41) vs the hand-built original (proj_0890a34e): the new film's
+mocks arrived FROZEN — static end-state data (progress 3/3, tool calls
+already green), no typing, no firing, and the two Quotient scenes hand-rolled
++ failed gates at -46. Root causes, all structural:
+
+- The storyboard's `components` was a STRING array — the prompt said "put the
+  full interaction sequence in data.script" but the schema had nowhere to put
+  it outside `scene_template.data`, and the sanitizer flattened any object to
+  its type string.
+- `buildCodegenSpec`'s Component Schemas section listed data fields but never
+  `script_actions` — codegen literally never saw that a surface could perform.
+
+Fixed (fix 1+2 of 3; deterministic critique gate deferred):
+- `components` entries are now string | {type, data} end to end (DraftScene,
+  StoryboardScene, sanitizer keeps authored data, template-assign skips
+  scenes carrying it, pipeline helpers normalized). Storyboard prompt +
+  tempo-cut contract: performable mocks MUST be staged as objects with a
+  timed data.script (static_surface = blocking).
+- Codegen spec now carries a "Storyboard-Authored Component Data (embed
+  VERBATIM)" section + 🎬 PERFORMABLE schema blocks with the full action
+  vocabulary; system prompt: performable surfaces arrive MID-PERFORMANCE.
+- Scene-generator enforcement extended: an authored script that doesn't
+  survive into the scene HTML triggers the corrective retry (same mechanism
+  as the zero-<component>-tags check).
+- test/scripted-surfaces.test.ts covers the pass-through.
+
+## Authored compositions skip codegen (Marc, 2026-07-23)
+
+v3 rerun postmortem: with scripts flowing (see previous entry), the mock
+scenes STILL shipped broken -- codegen's only remaining job was layout and
+it sized a cowork mock 2545px wide inside a 1719px clipping card (content
+painted off both edges, rail clipped to "Outpu"/"Cont", 3 revision rounds
+burned re-inventing the framing). Marc: hand-built films work because hands
+write structured component scenes, not HTML.
+
+- New deterministic path in scene-generator: when every non-backdrop
+  component hint is an authored object (data + scripts) the scene is
+  instantiated directly -- components with the standard inset framings
+  (quotient trio recipe: shell 1.2%/2% 97.6%x96% + center 61.5% + chat
+  30.5% with show_panel:false; single window 8%/6.5% 84%x87%), webgl
+  backdrop world, ids = types so authored camera anchors resolve, marked
+  scene.authored_composition.
+- Critique loop + editorial fix pass treat authored compositions like
+  template scenes (boot gate only; regen would rebuild the same scene).
+- Instant instead of minutes per mock scene; immune to codegen drops.

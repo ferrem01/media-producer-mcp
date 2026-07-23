@@ -247,12 +247,122 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     };
   }
 
+  // ── Deterministic authored-composition path (no codegen) ──
+  // When the storyboard fully authored the scene's components (data +
+  // scripted performances), codegen would only be inventing layout -- the
+  // one job it reliably botches (measured: a cowork mock sized 2545px wide
+  // inside a 1719px clipping card, content painted off both edges, three
+  // revision rounds burned re-inventing the framing). Instantiate the
+  // structured scene directly with the standard inset framings instead --
+  // the exact shape the hand-built films use, rendered by the same runtime.
+  var allDraftComps: any[] = Array.isArray(draft.components) ? (draft.components as any[]) : [];
+  var authoredDraftComps = allDraftComps.filter((c) => c && typeof c === "object" && c.data && typeof c.type === "string");
+  var strayPlainComps = allDraftComps.filter((c) => typeof c === "string" && c !== "webgl-backdrop");
+  if (authoredDraftComps.length > 0 && strayPlainComps.length === 0 && !draft.broll_query) {
+    return buildAuthoredCompositionScene(sceneId, draft, authoredDraftComps, opts);
+  }
+
   // ── Unified Codegen Path (always active) ──
   // All scenes go through the agentic codegen generator
   // which can use <component> tags to embed library components.
   var codegenSpec = await buildCodegenSpec(draft);
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (unified codegen)`);
   return await generateCodegenScene(opts, draft, codegenSpec, sceneId);
+}
+
+// ── Authored Composition (deterministic) ──
+
+/**
+ * Standard inset framings for authored product-mock compositions -- the
+ * recipes the storyboard prompt teaches, identical to the hand-built films.
+ * The quotient trio composes (inset shell + center surface + real chat
+ * panel); anything without a recipe gets the classic single-window inset.
+ */
+function authoredLayout(types: string[]): Map<string, { position: Record<string, string | number>; z_index: number }> {
+  var out = new Map<string, { position: Record<string, string | number>; z_index: number }>();
+  var has = (t: string) => types.indexOf(t) !== -1;
+  if (has("quotient-app-shell")) {
+    out.set("quotient-app-shell", { position: { x: "1.2%", y: "2%", width: "97.6%", height: "96%" }, z_index: 5 });
+    for (var center of ["quotient-campaign", "quotient-social"]) {
+      if (has(center)) out.set(center, { position: { x: "4.7%", y: "8%", width: "61.5%", height: "89%" }, z_index: 10 });
+    }
+    if (has("quotient-chat")) {
+      out.set("quotient-chat", { position: { x: "67.6%", y: "8%", width: "30.5%", height: "87%" }, z_index: 15 });
+    }
+  } else if (has("quotient-chat") && (has("quotient-campaign") || has("quotient-social"))) {
+    // No shell staged (storyboards sometimes drop it): same split, framed
+    // as two floating windows over the world instead of inside the shell.
+    for (var pairCenter of ["quotient-campaign", "quotient-social"]) {
+      if (has(pairCenter)) out.set(pairCenter, { position: { x: "2.5%", y: "6%", width: "62%", height: "88%" }, z_index: 10 });
+    }
+    out.set("quotient-chat", { position: { x: "66.5%", y: "6%", width: "31%", height: "88%" }, z_index: 15 });
+  }
+  // Any remaining pair splits left/right; a lone surface gets the classic
+  // single-window frame (the hand-built films' 84% inset).
+  var unplaced = types.filter((t) => !out.has(t));
+  if (unplaced.length === 2) {
+    out.set(unplaced[0], { position: { x: "2.5%", y: "6%", width: "62%", height: "88%" }, z_index: 10 });
+    out.set(unplaced[1], { position: { x: "66.5%", y: "6%", width: "31%", height: "88%" }, z_index: 15 });
+  }
+  for (var t of types) {
+    if (!out.has(t)) out.set(t, { position: { x: "8%", y: "6.5%", width: "84%", height: "87%" }, z_index: 10 });
+  }
+  return out;
+}
+
+function buildAuthoredCompositionScene(
+  sceneId: string,
+  draft: DraftScene,
+  authored: Array<{ type: string; data: Record<string, unknown> }>,
+  opts: SceneGeneratorOpts,
+): GeneratedScene {
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (authored composition -- deterministic, no codegen)`);
+  var types = authored.map((c) => c.type);
+  var layout = authoredLayout(types);
+  // The dark cinematic world under every mock window, matching the film's
+  // template scenes (and the hand-built originals).
+  var components: any[] = [{
+    id: "bg",
+    type: "webgl-backdrop",
+    z_index: 1,
+    position: { x: 0, y: 0, width: "100%", height: "100%" },
+    data: { seed: 5 + opts.sceneIndex * 7 },
+  }];
+  for (var c of authored) {
+    var lay = layout.get(c.type)!;
+    var data: Record<string, unknown> = { ...c.data };
+    // The recipe's show_panel contract: the shell's own agent panel hides
+    // when the full-fidelity quotient-chat rides beside it.
+    if (c.type === "quotient-app-shell" && types.indexOf("quotient-chat") !== -1 && data.show_panel === undefined) {
+      data.show_panel = false;
+    }
+    // id = type so storyboard-authored camera anchors ("claude-cowork-session"
+    // or "claude-cowork-session.transcript") resolve without translation.
+    components.push({ id: c.type, type: c.type, data, position: lay.position, z_index: lay.z_index });
+  }
+  var acTransition: SceneTransition | undefined;
+  if (draft.transition_in && draft.transition_in.type !== "none") {
+    acTransition = {
+      type: draft.transition_in.type as SceneTransition["type"],
+      duration_seconds: draft.transition_in.duration_seconds || 0.5,
+    };
+  }
+  var scene: Scene = {
+    id: sceneId,
+    label: draft.label,
+    duration_seconds: draft.duration_seconds || 8,
+    transition_in: acTransition,
+    background: "#0c0d12",
+    beats: Array.isArray(draft.beats) && draft.beats.length >= 2 ? (draft.beats as any) : undefined,
+    camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
+    components,
+    audio_hints: draft.voiceover_text ? { voiceover_text: draft.voiceover_text } : undefined,
+  } as any;
+  // Curated instantiation: the critique loop treats it like a template scene
+  // (boot gate only -- there is no codegen source to revise, and a regen
+  // would deterministically rebuild the same scene).
+  (scene as any).authored_composition = true;
+  return { scene };
 }
 
 // ── Freeform Scene Generation ──
@@ -324,8 +434,19 @@ async function generateCodegenScene(
   // ships non-compliance silently (measured: whole projects generated with a
   // 125-entry catalog and ZERO <component> tags). One corrective retry.
   var wantedComps = (Array.isArray(draft.components) ? draft.components : [])
-    .filter((c: any) => typeof c === "string" && c !== "video");
+    .map((c: any) => (typeof c === "string" ? c : c?.type))
+    .filter((t: any) => typeof t === "string" && t.length > 0 && t !== "video");
   var missingComponents = wantedComps.length > 0 && !sceneHtml.includes("<component ");
+  // Storyboard-authored scripted performances are the scene's choreography --
+  // a performable surface that ships without its script arrives frozen at an
+  // end state (the exact failure that made mock scenes read as screenshots).
+  var authoredScriptTypes = (Array.isArray(draft.components) ? draft.components : [])
+    .filter((c: any) => c && typeof c === "object" && (c.data as any)?.script)
+    .map((c: any) => c.type as string);
+  var scriptKeyRe = /['"]script['"]\s*:/;
+  var missingScripts = authoredScriptTypes.filter(
+    (t) => !(sceneHtml.includes(`type="${t}"`) && scriptKeyRe.test(sceneHtml)),
+  );
   // REAL FOOTAGE is even less optional than library components: when the
   // spec names an /assets video, a scene that fabricates a lookalike UI
   // mock instead of embedding the recording is a structural failure
@@ -337,11 +458,12 @@ async function generateCodegenScene(
       .filter((f: string) => f.length > 0),
   ));
   var missingFootage = specVideoFiles.filter((f) => !sceneHtml.includes(f));
-  if (missingComponents || missingFootage.length > 0) {
+  if (missingComponents || missingFootage.length > 0 || missingScripts.length > 0) {
     var defectLines: string[] = [];
     if (missingComponents) defectLines.push(`the storyboard selected the vetted library components [${wantedComps.join(", ")}] but you embedded NONE of them -- you rebuilt everything as bespoke HTML, which produces flat, low-craft results. You MUST embed each via <component type="..." data='{...}' /> (schemas are in the spec).`);
     if (missingFootage.length > 0) defectLines.push(`the spec names REAL footage (${missingFootage.join(", ")}) and your scene does not reference it -- you fabricated a mock instead of embedding the actual recording. You MUST present each named file, preferably via <component type="screencast-frame" data='{"video_url":"...","frame_style":"macos-browser","crop":"auto"}' /> (or a bare markup <video src muted playsinline> for full-bleed moments), as the spec directs.`);
-    console.warn(`  Scene ${opts.sceneIndex + 1}: structural defect(s) -- ${missingComponents ? "no <component> tags" : ""}${missingComponents && missingFootage.length ? " + " : ""}${missingFootage.length ? "dropped footage " + missingFootage.join(",") : ""} -- corrective retry`);
+    if (missingScripts.length > 0) defectLines.push(`the storyboard authored a timed data.script performance for [${missingScripts.join(", ")}] and your scene dropped it -- the surface arrives frozen at an end state instead of PERFORMING. Embed each with the storyboard's data VERBATIM (including the full script array) via <component type="..." data='{...,"script":[...]}' />.`);
+    console.warn(`  Scene ${opts.sceneIndex + 1}: structural defect(s) -- ${[missingComponents ? "no <component> tags" : "", missingFootage.length ? "dropped footage " + missingFootage.join(",") : "", missingScripts.length ? "dropped script(s) " + missingScripts.join(",") : ""].filter(Boolean).join(" + ")} -- corrective retry`);
     try {
       var retryResult = await generateSceneAgentic({
         sceneSpec: effectiveSpec,
@@ -364,12 +486,13 @@ async function generateCodegenScene(
       var retryHtml = stripHtmlFences(retryResult.html);
       var retryCompsOk = !missingComponents || retryHtml.includes("<component ");
       var retryFootageOk = missingFootage.every((f) => retryHtml.includes(f));
-      if (retryCompsOk && retryFootageOk) {
+      var retryScriptsOk = missingScripts.every((t) => retryHtml.includes(`type="${t}"`) && scriptKeyRe.test(retryHtml));
+      if (retryCompsOk && retryFootageOk && retryScriptsOk) {
         sceneHtml = retryHtml;
         agenticResult = retryResult;
         console.log(`  Scene ${opts.sceneIndex + 1}: corrective retry fixed the structural defect(s) ✓`);
       } else {
-        console.warn(`  Scene ${opts.sceneIndex + 1}: retry still defective (components ok: ${retryCompsOk}, footage ok: ${retryFootageOk}) -- shipping first version`);
+        console.warn(`  Scene ${opts.sceneIndex + 1}: retry still defective (components ok: ${retryCompsOk}, footage ok: ${retryFootageOk}, scripts ok: ${retryScriptsOk}) -- shipping first version`);
       }
     } catch (e: any) {
       console.warn(`  Scene ${opts.sceneIndex + 1}: component-enforcement retry failed (${e?.message || e}) -- shipping first version`);
@@ -434,7 +557,7 @@ function buildBrandContext(brandKit: BrandKit): string {
  * notes into a spec the agentic codegen generator can use
  * with <component> tags.
  */
-async function buildCodegenSpec(draft: any): Promise<string> {
+export async function buildCodegenSpec(draft: any): Promise<string> {
   var parts: string[] = [];
 
   parts.push(`Scene: "${draft.label}"`);
@@ -470,10 +593,26 @@ async function buildCodegenSpec(draft: any): Promise<string> {
 
   // Component hints: look up schemas from catalog and include them
   if (draft.components?.length > 0) {
-    var componentTypes: string[] = draft.components;
+    var componentTypes: string[] = draft.components.map((c: any) => (typeof c === "string" ? c : c.type));
+    var authoredComps = (draft.components as any[]).filter((c: any) => c && typeof c === "object" && c.data);
     parts.push(`\nUse these library components via <component> tags:`);
     for (var compType of componentTypes) {
       parts.push(`  - <component type="${compType}" />`);
+    }
+
+    // Storyboard-authored component data: the storyboard already wrote the
+    // full data payload -- including timed data.script performances on
+    // performable surfaces. That data is the scene's choreography; embed it
+    // VERBATIM (layout/position is yours; the content and script are not).
+    if (authoredComps.length > 0) {
+      parts.push(`\n## Storyboard-Authored Component Data (embed VERBATIM)`);
+      parts.push(`The storyboard authored these components' full data payloads. Embed each with this exact data (you own position/size/staging around it; do NOT rewrite, trim, or drop the data -- especially "script" arrays, which are the on-screen performance). Apostrophes are pre-escaped as \\u0027 so the JSON survives the single-quoted data attribute -- keep them escaped exactly as given:`);
+      for (var ac of authoredComps) {
+        // A raw apostrophe inside data='...' ends the HTML attribute early:
+        // the component silently binds {} and renders an empty shell. '
+        // is attribute-safe and JSON.parse restores the apostrophe.
+        parts.push(`<component type="${ac.type}" data='${JSON.stringify(ac.data).replace(/'/g, "\\u0027")}' />`);
+      }
     }
 
     // Look up component schemas from the catalog so the LLM has them upfront
@@ -511,6 +650,18 @@ async function buildCodegenSpec(draft: any): Promise<string> {
                 var propEnum = p.enum ? ` values: ${p.enum.join(", ")}` : "";
                 schemaLines.push(`      - ${propName}: ${p.type}${propReq}${propEnum}`);
               }
+            }
+          }
+          // Performable surfaces: the script-action vocabulary is the whole
+          // point of these components. Omitting it here is why generated
+          // scenes shipped mocks frozen at their end state -- the codegen
+          // never saw that the surface could perform.
+          var sa = (catalogEntry as any).script_actions as Array<{ action: string; description: string; params?: Record<string, string> }> | undefined;
+          if (sa && sa.length > 0) {
+            schemaLines.push(`  🎬 PERFORMABLE -- this surface plays a timed script. Its data MUST include script: [{action, at, ...params}] so it performs on screen; staging it with only static end-state data (progress complete, tool calls already green) is a blocking defect. Actions:`);
+            for (var act of sa) {
+              var paramStr = act.params ? ` params: ${Object.entries(act.params).map(([k, v]) => `${k} (${v})`).join(", ")}` : "";
+              schemaLines.push(`    - ${act.action}: ${act.description}${paramStr}`);
             }
           }
           schemasFound.push(schemaLines.join("\n"));

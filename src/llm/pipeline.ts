@@ -189,7 +189,7 @@ export function isBookendScene(
   label: string | undefined,
   sceneIndex: number,
   totalScenes: number,
-  componentTypes?: string[],
+  componentHints?: Array<string | { type: string }>,
 ): boolean {
   const labelLower = (label || "").toLowerCase();
   const byLabel =
@@ -197,6 +197,7 @@ export function isBookendScene(
     (sceneIndex === 0 && (labelLower.includes("title") || labelLower.includes("opening"))) ||
     (sceneIndex === totalScenes - 1 && (labelLower.includes("closing") || labelLower.includes("cta") || labelLower.includes("end")));
   // A video-only scene (single video component) is a brand clip -> bookend.
+  const componentTypes = componentHints?.map((c) => (typeof c === "string" ? c : c.type));
   const videoOnly = componentTypes?.length === 1 && componentTypes[0] === "video";
   return byLabel || !!videoOnly;
 }
@@ -1065,10 +1066,11 @@ async function critiqueAndRetryScene(opts: {
   // codegen source to regenerate. Only template instantiation ever puts an
   // st-* component on a scene.
   if (
-    opts.scene.components.length > 0 &&
-    opts.scene.components.some((c) => typeof c.type === "string" && c.type.startsWith("st-"))
+    (opts.scene.components.length > 0 &&
+      opts.scene.components.some((c) => typeof c.type === "string" && c.type.startsWith("st-"))) ||
+    (opts.scene as any).authored_composition === true
   ) {
-    console.log(`  Critique: scene ${opts.sceneIndex} is a scene-template instantiation, skipping critique/regen`);
+    console.log(`  Critique: scene ${opts.sceneIndex} is a ${(opts.scene as any).authored_composition ? "storyboard-authored composition" : "scene-template instantiation"}, skipping critique/regen`);
     // BOOT GATE (no LLM, no regen): a template with a runtime bug otherwise
     // ships silently -- a stale reference once crashed a template mid-boot
     // and Studio played the unstyled wreck. One assemble + seek sweep; a
@@ -2632,7 +2634,8 @@ async function runUnifiedPipeline(
       // same template -- a fix_scene on one burns the editorial budget on a no-op.
       const isTemplateScene = (idx: number) => {
         const comps = project.scenes[idx]?.components || [];
-        return comps.length > 0 && comps.some((c) => typeof c.type === "string" && c.type.startsWith("st-"));
+        return (comps.length > 0 && comps.some((c) => typeof c.type === "string" && c.type.startsWith("st-")))
+          || (project.scenes[idx] as any)?.authored_composition === true;
       };
       const sceneFixes = (editorial.fixes || []).filter(f => f.type === "fix_scene" && typeof f.scene_index === "number" && f.detail && f.scene_index! >= 0 && f.scene_index! < project.scenes.length && !isTemplateScene(f.scene_index!));
       let regen = 0;
@@ -3025,11 +3028,15 @@ async function runUnifiedPipeline(
  * Safe at the draft stage: components are type names only; codegen fills
  * data against the (unified) type's schema.
  */
-function unifyCaptionStyle(scenes: Array<{ components?: string[] }>): void {
+type ComponentHint = string | { type: string; data?: Record<string, unknown> };
+const hintType = (c: ComponentHint): string => (typeof c === "string" ? c : c.type);
+
+function unifyCaptionStyle(scenes: Array<{ components?: ComponentHint[] }>): void {
   const counts = new Map<string, number>();
   for (const s of scenes) {
     for (const c of s.components || []) {
-      if (c.startsWith("caption-")) counts.set(c, (counts.get(c) || 0) + 1);
+      const t = hintType(c);
+      if (t.startsWith("caption-")) counts.set(t, (counts.get(t) || 0) + 1);
     }
   }
   if (counts.size <= 1) return;
@@ -3043,11 +3050,17 @@ function unifyCaptionStyle(scenes: Array<{ components?: string[] }>): void {
   let swaps = 0;
   for (const s of scenes) {
     if (!s.components?.length) continue;
-    const rewritten = s.components.map((c) =>
-      c.startsWith("caption-") && c !== chosen ? (swaps++, chosen) : c
-    );
+    const rewritten = s.components.map((c) => {
+      const t = hintType(c);
+      if (!t.startsWith("caption-") || t === chosen) return c;
+      swaps++;
+      // Preserve authored data when a caption hint carries it -- only the
+      // style (type) is being unified.
+      return typeof c === "string" ? chosen : { ...c, type: chosen };
+    });
     // Dedupe (a scene that listed two caption styles now lists one twice)
-    s.components = rewritten.filter((c, i) => c !== chosen || rewritten.indexOf(c) === i);
+    s.components = rewritten.filter((c, i) =>
+      hintType(c) !== chosen || rewritten.findIndex((r) => hintType(r) === chosen) === i);
   }
   console.log(`  Motif discipline: unified ${counts.size} caption styles -> "${chosen}" (${swaps} swaps)`);
 }
