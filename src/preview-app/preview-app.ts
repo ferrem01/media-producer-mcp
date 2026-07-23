@@ -218,7 +218,7 @@ export function getPreviewHtml(): string {
   .lane-bed.speaker { background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.18); border-radius: 6px; }
   .lane-bed.music { background: rgba(148,163,184,0.08); border: 1px solid rgba(148,163,184,0.16); border-radius: 5px; }
   /* The playhead: one line through every lane, driven by the master clock. */
-  #playhead-line { position: absolute; top: 18px; bottom: 0; width: 1.5px; background: #4f46e5; opacity: 0.45; z-index: 5; pointer-events: none; }
+  #playhead-line { position: absolute; top: 18px; bottom: 0; width: 1.5px; background: #4f46e5; opacity: 0.45; z-index: 40; pointer-events: none; }
   /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
   #audio-lanes { position: absolute; left: 0; right: 0; top: 86px; height: 10px; pointer-events: none; }
   .audio-lane-seg { position: absolute; height: 4px; border-radius: 2px; pointer-events: auto; }
@@ -559,40 +559,40 @@ export function getPreviewHtml(): string {
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .prop-script-row .ps-text { flex: 1; font-size: 11px; padding: 3px 5px; border: 1px solid #e5e7eb; border-radius: 5px; min-width: 0; }
 
-  /* Scene focus mode: the scene's own clock, one row per component.
-     Sits BELOW the ruler band so the film scrubber stays visible and
-     usable while focused (the focus playhead mirrors it live). */
-  #focus-lane { position: absolute; left: 0; right: 0; top: 22px; z-index: 30;
-    background: #101322; border-radius: 6px; overflow: hidden; pointer-events: auto; }
+  /* Scene focus mode: detail rows ON THE SAME timeline -- same scrubber,
+     same playhead, same zoom. Rows live in FILM coordinates, spanning the
+     scene's segment of the track; the rest of the film is dimmed. Sits
+     below the ruler so the film scrubber stays visible and in charge. */
+  #focus-lane { position: absolute; left: 0; right: 0; top: 22px; z-index: 25;
+    background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px;
+    overflow: visible; pointer-events: auto; }
   #focus-lane * { pointer-events: auto; }
-  .fm-playhead { pointer-events: none !important; }
-  .fm-name { pointer-events: none !important; }
-  .fm-head { display: flex; align-items: center; gap: 10px; height: 26px; padding: 0 8px; }
-  #fm-exit { border: 1px solid #4a4f78; background: #262b45; color: #e0e5ff; font-size: 11px; font-weight: 600;
-    padding: 3px 10px; border-radius: 999px; cursor: pointer; }
-  #fm-exit:hover { background: #343a63; border-color: #6366f1; }
-  #fm-play { border: 1px solid #3b4066; background: #1c2038; color: #a5b4fc; font-size: 11px;
-    padding: 3px 10px; border-radius: 999px; cursor: pointer; }
-  #fm-play:hover { background: #262b45; }
-  .fm-title { font-size: 10px; color: #8b93b8; letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .fm-hint { margin-left: auto; font-size: 9px; color: #5b6288; flex-shrink: 0; padding-right: 4px; }
-  .fm-playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #f43f5e;
-    box-shadow: 0 0 6px rgba(244,63,94,0.8); z-index: 6; pointer-events: none; }
-  .fm-track { position: absolute; left: 140px; right: 10px; top: 24px; bottom: 6px; }
-  .fm-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(148,163,184,0.12); }
-  .fm-grid.fm-beat { background: rgba(99,102,241,0.55); width: 1px; }
+  .fm-shade { position: absolute; top: 0; bottom: 0; background: rgba(148,163,184,0.22); pointer-events: none !important; }
+  /* The header rides the scrollport, not the track: sticky so "where am I"
+     and the way out are visible no matter where you scroll or zoom. */
+  .fm-head { position: sticky; left: 6px; top: 0; z-index: 8; display: inline-flex; width: max-content;
+    align-items: center; gap: 8px; height: 24px; padding: 0 4px; }
+  #fm-exit { border: 1px solid #a5b4fc; background: #ffffff; color: #4338ca; font-size: 11px; font-weight: 600;
+    padding: 2px 10px; border-radius: 999px; cursor: pointer; box-shadow: 0 1px 3px rgba(67,56,202,0.15); }
+  #fm-exit:hover { background: #eef2ff; border-color: #6366f1; }
+  .fm-title { font-size: 10px; color: #6470a5; letter-spacing: 0.02em; white-space: nowrap;
+    background: rgba(255,255,255,0.85); padding: 2px 8px; border-radius: 999px; }
+  .fm-track { position: absolute; left: 0; right: 0; top: 26px; bottom: 4px; }
+  .fm-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(100,116,139,0.16); pointer-events: none !important; }
+  .fm-grid.fm-beat { background: rgba(99,102,241,0.45); }
   .fm-row { position: absolute; left: 0; right: 0; height: 22px; }
-  .fm-name { position: absolute; left: -134px; width: 126px; top: 3px; font-size: 10px; color: #aab2d5;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
-  .fm-bar { position: absolute; top: 3px; height: 15px; background: linear-gradient(180deg, #5157e8, #4046c9);
-    border-radius: 4px; opacity: 0.92; }
-  .fm-bar.fm-custom { background: repeating-linear-gradient(45deg, #3a3f63, #3a3f63 6px, #303554 6px, #303554 12px); }
+  .fm-bar { position: absolute; top: 3px; height: 15px; background: linear-gradient(180deg, #6366f1, #4f46e5);
+    border-radius: 4px; opacity: 0.95; overflow: hidden; }
+  .fm-bar .fm-bar-label { font-size: 9px; color: #e0e7ff; padding: 1.5px 8px; display: block;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none !important; }
+  .fm-bar.fm-custom { background: repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 6px, #b6c2d4 6px, #b6c2d4 12px); }
+  .fm-bar.fm-custom .fm-bar-label { color: #475569; }
   .fm-edge { position: absolute; top: -2px; bottom: -2px; width: 8px; cursor: ew-resize; border-radius: 3px; }
-  .fm-edge:hover { background: rgba(255,255,255,0.35); }
+  .fm-edge:hover { background: rgba(255,255,255,0.5); }
   .fm-edge-l { left: -3px; } .fm-edge-r { right: -3px; }
-  .fm-diamond { position: absolute; top: 6px; width: 9px; height: 9px; margin-left: -4.5px; background: #fbbf24;
-    transform: rotate(45deg); cursor: grab; border-radius: 2px; box-shadow: 0 0 0 1.5px rgba(15,17,34,0.9); }
-  .fm-diamond:hover { background: #fde68a; }
+  .fm-diamond { position: absolute; top: 6px; width: 9px; height: 9px; margin-left: -4.5px; background: #f59e0b;
+    transform: rotate(45deg); cursor: grab; border-radius: 2px; box-shadow: 0 0 0 1.5px #ffffff; z-index: 3; }
+  .fm-diamond:hover { background: #fbbf24; }
 
   /* Prop Editor */
   #props-panel {
@@ -3200,8 +3200,6 @@ export function getPreviewHtml(): string {
   }
   function exitFocus() {
     focusSceneIdx = -1;
-    _fmScenePlayEnd = -1;
-    if (_fmRaf) { cancelAnimationFrame(_fmRaf); _fmRaf = null; }
     var fl = document.getElementById('focus-lane');
     if (fl) { fl.style.display = 'none'; fl.innerHTML = ''; }
   }
@@ -3226,24 +3224,31 @@ export function getPreviewHtml(): string {
     var dur = scene.duration_seconds || 5;
     var comps = scene.components || [];
     var bounds = focusBeatBounds(scene, dur);
+    // FILM coordinates throughout: the rows span only this scene's segment
+    // of the track, so the master scrubber, playhead, zoom and play button
+    // all keep working exactly as they do everywhere else.
+    var total = state.totalDuration || calcTotalDuration();
+    var start = fmSceneStart();
+    var toPct = function(filmT) { return ((filmT / total) * 100).toFixed(3) + '%'; };
     var html = '<div class="fm-head">'
-      + '<button id="fm-exit" title="Back to the film timeline (Esc)">\\u2190 Back to film</button>'
-      + '<button id="fm-play" title="Play just this scene (pauses at its end)">\\u25b6 Play scene</button>'
-      + '<span class="fm-title">' + escHtml(scene.label || scene.id) + ' \\u00b7 ' + dur.toFixed(1) + 's on the scene clock'
+      + '<button id="fm-exit" title="Back to the film timeline (Esc, or double-click the scene again)">\\u2190 Back to film</button>'
+      + '<span class="fm-title">' + escHtml(scene.label || scene.id) + ' \\u00b7 ' + dur.toFixed(1) + 's'
       + (bounds.length ? ' \\u00b7 ' + (bounds.length + 1) + ' beats (drags snap)' : '') + '</span>'
-      + '<span class="fm-hint">drag anywhere to scrub \\u00b7 Esc closes</span></div>';
+      + '</div>';
     html += '<div class="fm-track" id="fm-track">';
-    html += '<div class="fm-playhead" id="fm-playhead"></div>';
-    for (var s = 1; s < dur; s++) html += '<div class="fm-grid fm-sec" style="left:' + ((s / dur) * 100).toFixed(2) + '%"></div>';
-    bounds.forEach(function(b) { html += '<div class="fm-grid fm-beat" style="left:' + ((b / dur) * 100).toFixed(2) + '%"></div>'; });
+    // The rest of the film, dimmed -- the segment in focus stays bright.
+    html += '<div class="fm-shade" style="left:0;width:' + toPct(start) + '"></div>';
+    html += '<div class="fm-shade" style="left:' + toPct(start + dur) + ';right:0"></div>';
+    for (var s = 1; s < dur; s++) html += '<div class="fm-grid fm-sec" style="left:' + toPct(start + s) + '"></div>';
+    bounds.forEach(function(b) { html += '<div class="fm-grid fm-beat" style="left:' + toPct(start + b) + '"></div>'; });
     comps.forEach(function(c, i) {
       var isCustom = /^scene_/.test(c.type || '');
       var inAt = (c.enter && typeof c.enter.at === 'number') ? c.enter.at : 0;
       var outAt = (c.exit && typeof c.exit.at === 'number') ? c.exit.at : dur;
       html += '<div class="fm-row" style="top:' + (i * 22) + 'px" data-ci="' + i + '">'
-        + '<span class="fm-name" title="' + escAttr(c.type) + '">' + escHtml(isCustom ? 'custom scene' : c.type) + '</span>'
-        + '<div class="fm-bar' + (isCustom ? ' fm-custom' : '') + '" data-ci="' + i + '" style="left:' + ((inAt / dur) * 100).toFixed(2) + '%;width:' + (((outAt - inAt) / dur) * 100).toFixed(2) + '%"'
-        + ' title="' + escAttr(c.type + ' \\u2014 on stage ' + inAt.toFixed(1) + 's\\u2013' + outAt.toFixed(1) + 's') + '">'
+        + '<div class="fm-bar' + (isCustom ? ' fm-custom' : '') + '" data-ci="' + i + '" style="left:' + toPct(start + inAt) + ';width:' + (((outAt - inAt) / total) * 100).toFixed(3) + '%"'
+        + ' title="' + escAttr(c.type + ' \\u2014 on stage ' + inAt.toFixed(1) + 's\\u2013' + outAt.toFixed(1) + 's (scene clock)') + '">'
+        + '<span class="fm-bar-label">' + escHtml(isCustom ? 'custom scene' : c.type) + '</span>'
         + (isCustom ? '' :
             '<span class="fm-edge fm-edge-l" data-ci="' + i + '" title="Drag: entrance time"></span>'
           + '<span class="fm-edge fm-edge-r" data-ci="' + i + '" title="Drag: exit time"></span>')
@@ -3251,21 +3256,18 @@ export function getPreviewHtml(): string {
       var script = (c.data && Array.isArray(c.data.script)) ? c.data.script : [];
       script.forEach(function(a, si) {
         if (!a || typeof a.at !== 'number') return;
-        html += '<div class="fm-diamond" data-ci="' + i + '" data-si="' + si + '" style="left:' + ((Math.min(a.at, dur) / dur) * 100).toFixed(2) + '%"'
+        html += '<div class="fm-diamond" data-ci="' + i + '" data-si="' + si + '" style="left:' + toPct(start + Math.min(a.at, dur)) + '"'
           + ' title="' + escAttr((a.action || 'action') + ' @ ' + a.at.toFixed(2) + 's \\u2014 drag to retime') + '"></div>';
       });
       html += '</div>';
     });
     html += '</div>';
     fl.style.display = 'block';
-    fl.style.height = (30 + comps.length * 22 + 8) + 'px';
+    fl.style.height = (30 + comps.length * 22 + 6) + 'px';
     fl.innerHTML = html;
     var ex = document.getElementById('fm-exit');
     if (ex) ex.addEventListener('click', exitFocus);
-    var fp = document.getElementById('fm-play');
-    if (fp) fp.addEventListener('click', function() { fmPlayScene(scene, dur); });
-    wireFocusDrags(scene, dur, bounds);
-    fmStartPlayhead();
+    wireFocusDrags(scene, dur, bounds, start, total);
   }
   // ── Focus transport: playhead, scrub, scene-play, Esc ──
   function fmSceneStart() {
@@ -3273,30 +3275,6 @@ export function getPreviewHtml(): string {
       var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
       return meta && meta[focusSceneIdx] ? meta[focusSceneIdx].start : sceneOffset(focusSceneIdx);
     } catch (e) { return sceneOffset(focusSceneIdx); }
-  }
-  var _fmRaf = null;
-  var _fmScenePlayEnd = -1;
-  function fmStartPlayhead() {
-    if (_fmRaf) cancelAnimationFrame(_fmRaf);
-    (function tick() {
-      if (focusSceneIdx < 0) { _fmRaf = null; return; }
-      var ph = document.getElementById('fm-playhead');
-      var scene = state.currentProject && state.currentProject.scenes[focusSceneIdx];
-      if (ph && scene) {
-        var dur = scene.duration_seconds || 5;
-        var tl = getCompositeMasterTimeline();
-        var t = tl ? tl.time() : (state.masterTime || 0);
-        var local = Math.max(0, Math.min(dur, t - fmSceneStart()));
-        ph.style.left = ((local / dur) * 100).toFixed(2) + '%';
-        // Scene-play: stop the transport at the scene's end.
-        if (_fmScenePlayEnd >= 0 && state.playing && t >= _fmScenePlayEnd - 0.03) {
-          _fmScenePlayEnd = -1;
-          var pb = document.getElementById('play-btn');
-          if (pb) pb.click();
-        }
-      }
-      _fmRaf = requestAnimationFrame(tick);
-    })();
   }
   function fmSeekLocal(t, dur) {
     var start = fmSceneStart();
@@ -3313,16 +3291,6 @@ export function getPreviewHtml(): string {
       updateTimeDisplay(start + clamped);
     } catch (e) {}
   }
-  function fmPlayScene(scene, dur) {
-    var start = fmSceneStart();
-    var tl = getCompositeMasterTimeline();
-    if (state.playing) { _fmScenePlayEnd = -1; var pb0 = document.getElementById('play-btn'); if (pb0) pb0.click(); return; }
-    if (tl) { tl.time(start); tl.pause(); }
-    state.masterTime = start;
-    _fmScenePlayEnd = start + dur;
-    var pb = document.getElementById('play-btn');
-    if (pb) pb.click();
-  }
   document.addEventListener('keydown', function(ev) {
     if (ev.key === 'Escape' && focusSceneIdx >= 0) { exitFocus(); ev.stopPropagation(); }
   });
@@ -3333,13 +3301,16 @@ export function getPreviewHtml(): string {
     cands.forEach(function(c) { var d = Math.abs(c - t); if (d < bd) { bd = d; best = c; } });
     return Math.max(0, Math.min(dur, Math.round(best * 100) / 100));
   }
-  function wireFocusDrags(scene, dur, bounds) {
+  function wireFocusDrags(scene, dur, bounds, segStart, filmTotal) {
     var track = document.getElementById('fm-track');
     if (!track) return;
+    // px -> SCENE-LOCAL seconds (the track is film-wide; storage is local).
     function pxToT(clientX) {
       var r = track.getBoundingClientRect();
-      return fmSnap(((clientX - r.left) / Math.max(1, r.width)) * dur, dur, bounds);
+      var filmT = ((clientX - r.left) / Math.max(1, r.width)) * filmTotal;
+      return fmSnap(filmT - segStart, dur, bounds);
     }
+    var toPct = function(localT) { return (((segStart + localT) / filmTotal) * 100).toFixed(3) + '%'; };
     function patchComp(comp, body, done) {
       var p = state.currentProject;
       var path = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
@@ -3355,7 +3326,7 @@ export function getPreviewHtml(): string {
         d.setPointerCapture(ev.pointerId);
         var comp = scene.components[parseInt(d.dataset.ci, 10)];
         var si = parseInt(d.dataset.si, 10);
-        function mv(e2) { var t = pxToT(e2.clientX); d._t = t; d.style.left = ((t / dur) * 100).toFixed(2) + '%'; }
+        function mv(e2) { var t = pxToT(e2.clientX); d._t = t; d.style.left = toPct(t); }
         function up() {
           d.removeEventListener('pointermove', mv); d.removeEventListener('pointerup', up);
           if (typeof d._t === 'number' && comp && comp.data && comp.data.script && comp.data.script[si]) {
@@ -3380,8 +3351,8 @@ export function getPreviewHtml(): string {
           var inAt = (comp.enter && typeof comp.enter.at === 'number') ? comp.enter.at : 0;
           var outAt = (comp.exit && typeof comp.exit.at === 'number') ? comp.exit.at : dur;
           if (isL) inAt = Math.min(t, outAt - 0.2); else outAt = Math.max(t, inAt + 0.2);
-          bar.style.left = ((inAt / dur) * 100).toFixed(2) + '%';
-          bar.style.width = (((outAt - inAt) / dur) * 100).toFixed(2) + '%';
+          bar.style.left = toPct(inAt);
+          bar.style.width = (((outAt - inAt) / filmTotal) * 100).toFixed(3) + '%';
         }
         function up() {
           edge.removeEventListener('pointermove', mv); edge.removeEventListener('pointerup', up);
@@ -3408,15 +3379,16 @@ export function getPreviewHtml(): string {
         edge.addEventListener('pointerup', up);
       });
     });
-    // Scrub: press-and-drag anywhere that isn't a drag handle. The lane is a
-    // timeline -- grabbing it should always move the playhead.
+    // Scrub: press-and-drag anywhere that isn't a drag handle -- identical
+    // gesture to the film timeline, same clock, no snapping.
     track.addEventListener('pointerdown', function(ev) {
       if (ev.target.closest && (ev.target.closest('.fm-diamond') || ev.target.closest('.fm-edge'))) return;
       ev.preventDefault();
       try { track.setPointerCapture(ev.pointerId); } catch (e) {}
       function seekFrom(e2) {
         var r = track.getBoundingClientRect();
-        fmSeekLocal(((e2.clientX - r.left) / Math.max(1, r.width)) * dur, dur);
+        var filmT = ((e2.clientX - r.left) / Math.max(1, r.width)) * filmTotal;
+        fmSeekLocal(filmT - segStart, dur);
       }
       seekFrom(ev);
       function mv(e2) { seekFrom(e2); }
