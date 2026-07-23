@@ -563,7 +563,10 @@ export function getPreviewHtml(): string {
      Sits BELOW the ruler band so the film scrubber stays visible and
      usable while focused (the focus playhead mirrors it live). */
   #focus-lane { position: absolute; left: 0; right: 0; top: 22px; z-index: 30;
-    background: #101322; border-radius: 6px; overflow: hidden; }
+    background: #101322; border-radius: 6px; overflow: hidden; pointer-events: auto; }
+  #focus-lane * { pointer-events: auto; }
+  .fm-playhead { pointer-events: none !important; }
+  .fm-name { pointer-events: none !important; }
   .fm-head { display: flex; align-items: center; gap: 10px; height: 26px; padding: 0 8px; }
   #fm-exit { border: 1px solid #4a4f78; background: #262b45; color: #e0e5ff; font-size: 11px; font-weight: 600;
     padding: 3px 10px; border-radius: 999px; cursor: pointer; }
