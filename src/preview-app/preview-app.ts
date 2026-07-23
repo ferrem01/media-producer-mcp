@@ -276,6 +276,9 @@ export function getPreviewHtml(): string {
   /* Media lane: each video's source-map as blocks (color = rate). */
   #media-lane { position: absolute; left: 0; right: 0; top: 0; height: 52px; pointer-events: none; }
   .ml-row { position: absolute; left: 0; right: 0; height: 26px; }
+  .ml-row-tag { position: absolute; top: -1px; z-index: 3; margin-left: 3px; padding: 0 5px; height: 13px; line-height: 13px;
+    font-size: 9px; letter-spacing: 0.02em; color: rgba(255,255,255,0.85); background: rgba(15,17,26,0.72);
+    border-radius: 3px; pointer-events: none; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ml-seg { position: absolute; height: 100%; border-radius: 4px; pointer-events: auto; cursor: pointer; opacity: 0.92; box-sizing: border-box;
     border: 1px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.10);
     font-size: 12px; line-height: 24px; font-weight: 600; color: rgba(255,255,255,0.97); text-align: center; overflow: hidden; white-space: nowrap; }
@@ -3571,13 +3574,23 @@ export function getPreviewHtml(): string {
       });
       var sceneStart = sceneStartFor(si);
       var dur = scene.duration_seconds || 5;
-      // ONE row: the primary video per scene (followers/callout clones are
-      // already filtered; the effects lane owns everything overlay-shaped).
-      vids.slice(0, 1).forEach(function(v, row) {
+      // One row PER independent video (followers/callout clones are already
+      // filtered; the effects lane owns everything overlay-shaped). Multi-row
+      // scenes are the side-by-side case: each piece of footage gets its own
+      // editable timing row so the two can be aligned against each other.
+      vids.slice(0, 4).forEach(function(v, row) {
         var found = editForVideo(scene, v, vids);
         var rowEl = document.createElement('div');
         rowEl.className = 'ml-row';
-        rowEl.style.top = '2px';
+        rowEl.style.top = (2 + row * 26) + 'px';
+        if (vids.length > 1) {
+          // Filename tag so the rows are tellable-apart while aligning.
+          var tag = document.createElement('span');
+          tag.className = 'ml-row-tag';
+          tag.textContent = videoLabelFor(v);
+          tag.style.left = ((sceneStart / total) * 100).toFixed(2) + '%';
+          rowEl.appendChild(tag);
+        }
         function block(fromLocal, toLocal, cls, title, onClick, text) {
           var b = document.createElement('div');
           b.className = 'ml-seg ' + cls;
@@ -3742,6 +3755,32 @@ export function getPreviewHtml(): string {
   // playhead line dropping through every lane. Lanes a film doesn't have
   // (no speaker, no music) don't render, and the whole strip shrinks. ──
 
+  // Independent (non-speaker, non-follower) videos in the busiest scene --
+  // the screen lane renders one row per video. DOM-derived (same filter as
+  // renderMediaLane) so the count matches what actually plays; before the
+  // composite loads it stays 1 and the next layout pass corrects it.
+  function maxScreenRows() {
+    try {
+      var p = state.currentProject;
+      if (!p || !p.scenes || !state.compositeLoaded) return 1;
+      var doc = els.previewIframe.contentDocument;
+      if (!doc) return 1;
+      var spkSrcs = (((p.speaker || {}).clips) || []).map(function(c) { return (c.source || '').split('/').pop(); }).filter(Boolean);
+      var max = 1;
+      p.scenes.forEach(function(scene) {
+        var n = sceneVideos(doc, scene.id).filter(function(v) {
+          var src = v.getAttribute('src') || '';
+          if (isSpeakerVideoSrc(src)) return false;
+          if (spkSrcs.some(function(nm) { return src.indexOf(nm) !== -1; })) return false;
+          if (v.closest && v.closest('.scf-callout')) return false;
+          return true;
+        }).length;
+        if (n > max) max = n;
+      });
+      return Math.min(4, max);
+    } catch (e) { return 1; }
+  }
+
   function laneLayout() {
     var p = state.currentProject || {};
     var tracks = ((p.audio || {}).tracks) || [];
@@ -3758,7 +3797,12 @@ export function getPreviewHtml(): string {
         return c2.type === 'narration-track' && c2.data && Array.isArray(c2.data.chapters) && c2.data.chapters.length;
       });
     });
-    var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 32, screenH: 32, speakerH: 32, musicH: 16, speaker: -1, music: -1 };
+    var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 32, screenH: 32, screenRows: 1, speakerH: 32, musicH: 16, speaker: -1, music: -1 };
+    // Side-by-side scenes: the screen band grows one row per independent
+    // video (max across scenes), so every piece of footage gets a timeline
+    // row it can be sped/cut/pinned on.
+    y.screenRows = maxScreenRows();
+    y.screenH = 32 + (y.screenRows - 1) * 26;
     var top = 22;
     if (hasFx) { y.fx = top; top += y.fxH + 8; }
     y.screen = top; top += y.screenH + 8;
