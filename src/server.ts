@@ -64,6 +64,10 @@ const positionSchema = z.object({
 
 const animationSchema = z.object({
   effect: z.string(),
+  // Scene-local start time (seconds). Enter defaults to 0; exit defaults to
+  // scene end minus duration. The assembler has always honored this -- the
+  // schema just used to strip it.
+  at: z.number().optional(),
   duration: z.number().optional(),
   stagger: z.number().optional(),
   ease: z.string().optional(),

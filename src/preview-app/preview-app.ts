@@ -122,6 +122,10 @@ export function getPreviewHtml(): string {
     margin-right: 6px;
   }
   .scene-item:hover { background: #f9fafb; transform: translateX(1px); }
+  .scene-prov { display: inline-block; margin-right: 5px; font-size: 10px; line-height: 1; vertical-align: 1px; cursor: help; }
+  .scene-prov.sp-template { color: #0ea5e9; }
+  .scene-prov.sp-composition { color: #6366f1; }
+  .scene-prov.sp-custom { color: #d48c34; }
   .scene-item.active {
     background: #eef2ff;
     border-left-color: #6366f1;
@@ -527,6 +531,56 @@ export function getPreviewHtml(): string {
   .sm-status.ok { color: #34d399; }
   .sm-status.err { color: #f87171; }
 
+  /* Inspector drawer (scene structure) */
+  #inspector {
+    position: fixed; top: 48px; right: 0; bottom: 0; width: 340px; z-index: 60;
+    background: #ffffff; border-left: 1px solid #e5e7eb; box-shadow: -8px 0 24px rgba(15,23,42,0.08);
+    transform: translateX(100%); transition: transform 0.18s ease; display: flex; flex-direction: column;
+  }
+  #inspector.open { transform: translateX(0); }
+  .insp-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #f3f4f6; }
+  #insp-title { font-size: 13px; font-weight: 600; color: #111827; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .insp-prov { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: #eef2ff; cursor: help; }
+  .insp-prov.sp-template { color: #0284c7; background: #e0f2fe; }
+  .insp-prov.sp-composition { color: #4f46e5; background: #eef2ff; }
+  .insp-prov.sp-custom { color: #b45309; background: #fef3c7; }
+  #insp-close { border: none; background: none; font-size: 18px; color: #9ca3af; cursor: pointer; line-height: 1; }
+  #insp-tree { max-height: 38%; overflow-y: auto; border-bottom: 1px solid #f3f4f6; padding: 6px 8px; }
+  .insp-node { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 8px;
+    border-radius: 6px; cursor: pointer; font-size: 12px; color: #374151; }
+  .insp-node:hover { background: #f3f4f6; }
+  .insp-node.active { background: #eef2ff; color: #4338ca; }
+  .insp-node .in-type { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .insp-node .in-meta { font-size: 10px; color: #9ca3af; flex-shrink: 0; }
+  #prop-editor { flex: 1; overflow-y: auto; padding: 4px 10px 16px; }
+  .prop-script-row { display: flex; gap: 5px; align-items: center; margin-bottom: 4px; }
+  .prop-script-row .ps-at { width: 54px; font-size: 11px; padding: 3px 4px; border: 1px solid #e5e7eb; border-radius: 5px; }
+  .prop-script-row .ps-action { font-size: 10px; font-weight: 600; color: #6366f1; width: 92px; flex-shrink: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prop-script-row .ps-text { flex: 1; font-size: 11px; padding: 3px 5px; border: 1px solid #e5e7eb; border-radius: 5px; min-width: 0; }
+
+  /* Scene focus mode: the scene's own clock, one row per component */
+  #focus-lane { position: absolute; left: 0; right: 0; top: 0; z-index: 30;
+    background: #101322; border-radius: 6px; overflow: hidden; }
+  .fm-head { display: flex; align-items: center; gap: 10px; height: 24px; padding: 0 8px; }
+  #fm-exit { border: none; background: #262b45; color: #c7d2fe; font-size: 10px; padding: 2px 8px; border-radius: 999px; cursor: pointer; }
+  .fm-title { font-size: 10px; color: #8b93b8; letter-spacing: 0.03em; }
+  .fm-track { position: absolute; left: 140px; right: 10px; top: 24px; bottom: 6px; }
+  .fm-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(148,163,184,0.12); }
+  .fm-grid.fm-beat { background: rgba(99,102,241,0.55); width: 1px; }
+  .fm-row { position: absolute; left: 0; right: 0; height: 22px; }
+  .fm-name { position: absolute; left: -134px; width: 126px; top: 3px; font-size: 10px; color: #aab2d5;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+  .fm-bar { position: absolute; top: 3px; height: 15px; background: linear-gradient(180deg, #5157e8, #4046c9);
+    border-radius: 4px; opacity: 0.92; }
+  .fm-bar.fm-custom { background: repeating-linear-gradient(45deg, #3a3f63, #3a3f63 6px, #303554 6px, #303554 12px); }
+  .fm-edge { position: absolute; top: -2px; bottom: -2px; width: 8px; cursor: ew-resize; border-radius: 3px; }
+  .fm-edge:hover { background: rgba(255,255,255,0.35); }
+  .fm-edge-l { left: -3px; } .fm-edge-r { right: -3px; }
+  .fm-diamond { position: absolute; top: 6px; width: 9px; height: 9px; margin-left: -4.5px; background: #fbbf24;
+    transform: rotate(45deg); cursor: grab; border-radius: 2px; box-shadow: 0 0 0 1.5px rgba(15,17,34,0.9); }
+  .fm-diamond:hover { background: #fde68a; }
+
   /* Prop Editor */
   #props-panel {
     overflow-y: auto;
@@ -780,6 +834,7 @@ export function getPreviewHtml(): string {
       <label>Project</label>
       <select id="project-select" disabled><option value="">Loading&#8230;</option></select>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
+      <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
       <span id="user-chip" style="display:none;align-items:center;gap:6px;margin-left:12px;font-size:11px;color:#6b7280;">
         <img id="user-pic" width="20" height="20" style="border-radius:50%;display:none;" alt="">
         <span id="user-email"></span>
@@ -791,6 +846,20 @@ export function getPreviewHtml(): string {
   <div id="sidebar">
     <div class="sidebar-header">Scenes</div>
     <div id="scene-list"><div class="empty-state">Load a project</div></div>
+  </div>
+
+  <!-- Inspector drawer (SPEC-studio-structure): the current scene's cast --
+       component tree + typed data editor. Structure lives on the side;
+       time lives on the bottom. -->
+  <div id="inspector">
+    <div class="insp-head">
+      <span id="insp-title">Scene</span>
+      <span id="insp-prov" class="insp-prov"></span>
+      <button id="insp-close" title="Close">&#215;</button>
+    </div>
+    <div id="insp-tree"><div class="empty-state">Load a project</div></div>
+    <div class="panel-header">Properties</div>
+    <div id="prop-editor"><div class="empty-state">Select a component</div></div>
   </div>
 
   <div id="main">
@@ -830,6 +899,7 @@ export function getPreviewHtml(): string {
         <div id="cam-pills"></div>
         <div id="fx-lane"></div>
         <div id="media-lane"></div>
+        <div id="focus-lane" style="display:none;"></div>
         <canvas id="wave-strip"></canvas>
         <div id="word-lane"></div>
         <div id="playhead-line" style="display:none"></div>
@@ -2142,6 +2212,22 @@ export function getPreviewHtml(): string {
   }
 
   // Render scene list in sidebar
+  // ── Scene provenance (SPEC-studio-structure) ──
+  // How a scene was built determines how it edits: template and composition
+  // scenes are structured data (instant, deterministic edits); custom scenes
+  // are generated code (edits go through the AI revise pass).
+  function sceneProvenance(scene) {
+    var comps = (scene && scene.components) || [];
+    if (comps.some(function(c) { return typeof c.type === 'string' && c.type.indexOf('st-') === 0; })) return 'template';
+    if (comps.some(function(c) { return /^scene_/.test(c.type || ''); })) return 'custom';
+    return 'composition';
+  }
+  var PROVENANCE = {
+    template:    { glyph: '\\u25a6', label: 'Template',    tip: 'Template scene \\u2014 designer-built composition. Edits are instant slot-data edits.' },
+    composition: { glyph: '\\u2b12', label: 'Composition', tip: 'Composition \\u2014 structured library components with data (and scripts). Edits apply directly.' },
+    custom:      { glyph: '\\u2726', label: 'Custom',      tip: 'Custom scene \\u2014 bespoke generated code. Edits go through an AI revise pass.' },
+  };
+
   function renderSceneList() {
     var project = state.currentProject;
     if (!project || !project.scenes || !project.scenes.length) {
@@ -2165,10 +2251,11 @@ export function getPreviewHtml(): string {
           badgeHtml = '<span class="scene-quality-badge qb-warn" title="' + escAttr((q.unresolved_defects || []).join('\\n')) + '">\\u26a0 shipped with ' + n + ' unresolved</span>';
         }
       }
+      var prov = PROVENANCE[sceneProvenance(scene)];
       html += '<div class="scene-item' + (active ? ' active' : '') + '" data-index="' + i + '">'
         + '<div class="scene-thumb" data-scene-id="' + escHtml(scene.id) + '"></div>'
         + '<div class="scene-info">'
-        + '<div class="scene-label">' + (i + 1) + '. ' + escHtml(label) + '</div>'
+        + '<div class="scene-label"><span class="scene-prov sp-' + sceneProvenance(scene) + '" title="' + escAttr(prov.tip) + '">' + prov.glyph + '</span>' + (i + 1) + '. ' + escHtml(label) + '</div>'
         + '<div class="scene-meta-row">'
         + '<span class="scene-dur">' + (scene.duration_seconds || 0).toFixed(1) + 's' + (beatCount ? ' \\u00b7 ' + beatCount + ' beats' : '') + '</span>'
         + '<button class="scene-sb-btn" data-index="' + i + '" title="Storyboard, defects &amp; regenerate">&#x2261; Storyboard</button>'
@@ -2185,6 +2272,13 @@ export function getPreviewHtml(): string {
     els.sceneList.querySelectorAll('.scene-item').forEach(function(el) {
       el.addEventListener('click', function() {
         selectScene(parseInt(el.dataset.index, 10));
+      });
+      // Double-click: scene focus mode -- the timeline becomes this scene's
+      // component timeline (SPEC-studio-structure).
+      el.addEventListener('dblclick', function() {
+        var idx = parseInt(el.dataset.index, 10);
+        selectScene(idx);
+        enterFocus(idx);
       });
     });
 
@@ -2227,6 +2321,8 @@ export function getPreviewHtml(): string {
     var wasPlaying = state.playing;
     state.currentSceneIndex = index;
     state.currentComponentIndex = -1;
+    if (focusSceneIdx >= 0 && focusSceneIdx !== index) exitFocus();
+    if (inspOpen()) setTimeout(renderInspector, 0);
 
     // Stop the animation loop but preserve music state
     if (state.animFrameId) {
@@ -2801,6 +2897,22 @@ export function getPreviewHtml(): string {
             html += '<input type="text" class="prop-input" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
           }
 
+        } else if (key === 'script' && Array.isArray(val) && val.length && val.every(function(a) { return a && typeof a === 'object' && a.action; })) {
+          // Scripted performance: ordered action rows (at + action + text).
+          // The at times are the scene's choreography -- same data the focus
+          // mode diamonds drag.
+          html += '<div class="prop-script" data-key="script">';
+          val.forEach(function(a, ai) {
+            html += '<div class="prop-script-row">'
+              + '<input type="number" step="0.1" min="0" class="ps-at" data-ai="' + ai + '" value="' + (typeof a.at === 'number' ? a.at : '') + '" title="scene-local time (s)">'
+              + '<span class="ps-action" title="' + escAttr(a.action) + '">' + escHtml(a.action) + '</span>'
+              + (typeof a.text === 'string'
+                  ? '<input type="text" class="ps-text" data-ai="' + ai + '" value="' + escAttr(a.text) + '">'
+                  : '<span class="ps-text" style="border:none;color:#9ca3af;">' + escHtml(JSON.stringify(a).slice(0, 60)) + '</span>')
+              + '</div>';
+          });
+          html += '</div>';
+
         } else if (Array.isArray(val)) {
           // Array: check if it's an array of color strings
           var isColorArray = val.length > 0 && val.every(function(v) { return isColorValue(v); });
@@ -2953,6 +3065,20 @@ export function getPreviewHtml(): string {
         input.addEventListener('input', handler);
       }
     });
+
+    // Script rows: retime an action or rewrite its text
+    els.propEditor.querySelectorAll('.prop-script .ps-at').forEach(function(inp) {
+      inp.addEventListener('change', function() {
+        var a = (comp.data.script || [])[parseInt(inp.dataset.ai, 10)];
+        if (a) { a.at = parseFloat(inp.value) || 0; savePropDebounced(); }
+      });
+    });
+    els.propEditor.querySelectorAll('.prop-script input.ps-text').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        var a = (comp.data.script || [])[parseInt(inp.dataset.ai, 10)];
+        if (a) { a.text = inp.value; savePropDebounced(); }
+      });
+    });
   }
 
   function clearProps() {
@@ -2965,6 +3091,255 @@ export function getPreviewHtml(): string {
   function savePropDebounced() {
     if (_saveTimer) clearTimeout(_saveTimer);
     _saveTimer = setTimeout(savePropNow, 400);
+  }
+
+  // ── Inspector drawer (SPEC-studio-structure) ──
+  // The scene's cast: one node per component; selecting one drives the
+  // typed prop editor below. Hover outlines the element on canvas.
+  function inspOpen() {
+    var el = document.getElementById('inspector');
+    return !!(el && el.classList.contains('open'));
+  }
+  function renderInspector() {
+    var host = document.getElementById('insp-tree');
+    if (!host) return;
+    var project = state.currentProject;
+    var scene = project && project.scenes && project.scenes[state.currentSceneIndex];
+    var titleEl = document.getElementById('insp-title');
+    var provEl = document.getElementById('insp-prov');
+    if (!scene) {
+      host.innerHTML = '<div class="empty-state">No scene selected</div>';
+      if (titleEl) titleEl.textContent = 'Scene';
+      if (provEl) { provEl.textContent = ''; provEl.title = ''; }
+      clearProps();
+      return;
+    }
+    var kind = sceneProvenance(scene);
+    var prov = PROVENANCE[kind];
+    if (titleEl) titleEl.textContent = scene.label || scene.id;
+    if (provEl) { provEl.textContent = prov.glyph + ' ' + prov.label; provEl.title = prov.tip; provEl.className = 'insp-prov sp-' + kind; }
+    var html = '';
+    (scene.components || []).forEach(function(c, i) {
+      var isCustom = /^scene_/.test(c.type || '');
+      var scripts = (c.data && Array.isArray(c.data.script)) ? c.data.script.length : 0;
+      var inAt = (c.enter && typeof c.enter.at === 'number') ? c.enter.at : null;
+      var meta = [];
+      if (scripts) meta.push(scripts + ' actions');
+      if (inAt !== null) meta.push('in @' + inAt.toFixed(1) + 's');
+      html += '<div class="insp-node' + (i === state.currentComponentIndex ? ' active' : '') + '" data-ci="' + i + '">'
+        + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : c.type) + '</span>'
+        + '<span class="in-meta">' + escHtml(meta.join(' \\u00b7 ')) + '</span>'
+        + '</div>';
+    });
+    host.innerHTML = html || '<div class="empty-state">No components</div>';
+    host.querySelectorAll('.insp-node').forEach(function(node) {
+      var ci = parseInt(node.dataset.ci, 10);
+      node.addEventListener('click', function() {
+        state.currentComponentIndex = ci;
+        renderInspector();
+        renderProps();
+      });
+      node.addEventListener('mouseenter', function() { outlineComp(ci, true); });
+      node.addEventListener('mouseleave', function() { outlineComp(ci, false); });
+    });
+    renderProps();
+  }
+  function outlineComp(ci, on) {
+    try {
+      var scene = state.currentProject.scenes[state.currentSceneIndex];
+      var comp = scene.components[ci];
+      if (!comp) return;
+      var doc = els.previewIframe.contentDocument;
+      var el = doc.querySelector('[data-cid="' + scene.id + '__' + comp.id + '"]')
+        || doc.querySelector('[data-cid="' + comp.id + '"]');
+      if (el) el.style.outline = on ? '2px solid #6366f1' : '';
+    } catch (e) {}
+  }
+  (function wireInspector() {
+    var btn = document.getElementById('inspect-btn');
+    var panel = document.getElementById('inspector');
+    var close = document.getElementById('insp-close');
+    if (btn && panel) btn.addEventListener('click', function() {
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) renderInspector();
+    });
+    if (close && panel) close.addEventListener('click', function() { panel.classList.remove('open'); });
+  })();
+
+  // ── Scene focus mode: the scene's own clock ──
+  // Double-click a scene chip: the timeline area becomes THAT scene's
+  // component timeline -- bars (enter.at..exit.at), script diamonds, beat
+  // gridlines, all draggable with snap. Every drag is an ordinary PATCH.
+  var focusSceneIdx = -1;
+  function refreshCompositeQuiet() {
+    var p = state.currentProject;
+    if (!p || !state.compositeLoaded) return;
+    var saved = state.masterTime || 0;
+    fetchHtml('/preview-composite/' + state.tenantId + '/' + p.project_id).then(function(h) {
+      state._compositeHtml = h;
+      writeSceneToIframe(h);
+      setTimeout(function() {
+        var tl = getCompositeMasterTimeline();
+        if (tl) { tl.time(saved); tl.pause(); }
+      }, 600);
+    });
+  }
+  function exitFocus() {
+    focusSceneIdx = -1;
+    var fl = document.getElementById('focus-lane');
+    if (fl) { fl.style.display = 'none'; fl.innerHTML = ''; }
+  }
+  function enterFocus(idx) {
+    focusSceneIdx = idx;
+    renderFocusLane();
+  }
+  function focusBeatBounds(scene, dur) {
+    var bounds = []; var acc = 0;
+    (scene.beats || []).forEach(function(b) {
+      acc += (b.duration_seconds || 0);
+      if (acc < dur - 0.05) bounds.push(Math.round(acc * 100) / 100);
+    });
+    return bounds;
+  }
+  function renderFocusLane() {
+    var fl = document.getElementById('focus-lane');
+    if (!fl) return;
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[focusSceneIdx];
+    if (!scene) { exitFocus(); return; }
+    var dur = scene.duration_seconds || 5;
+    var comps = scene.components || [];
+    var bounds = focusBeatBounds(scene, dur);
+    var html = '<div class="fm-head"><button id="fm-exit">\\u2190 film</button>'
+      + '<span class="fm-title">' + escHtml(scene.label || scene.id) + ' \\u00b7 ' + dur.toFixed(1) + 's on the scene clock'
+      + (bounds.length ? ' \\u00b7 ' + (bounds.length + 1) + ' beats (drags snap)' : '') + '</span></div>';
+    html += '<div class="fm-track" id="fm-track">';
+    for (var s = 1; s < dur; s++) html += '<div class="fm-grid fm-sec" style="left:' + ((s / dur) * 100).toFixed(2) + '%"></div>';
+    bounds.forEach(function(b) { html += '<div class="fm-grid fm-beat" style="left:' + ((b / dur) * 100).toFixed(2) + '%"></div>'; });
+    comps.forEach(function(c, i) {
+      var isCustom = /^scene_/.test(c.type || '');
+      var inAt = (c.enter && typeof c.enter.at === 'number') ? c.enter.at : 0;
+      var outAt = (c.exit && typeof c.exit.at === 'number') ? c.exit.at : dur;
+      html += '<div class="fm-row" style="top:' + (i * 22) + 'px" data-ci="' + i + '">'
+        + '<span class="fm-name" title="' + escAttr(c.type) + '">' + escHtml(isCustom ? 'custom scene' : c.type) + '</span>'
+        + '<div class="fm-bar' + (isCustom ? ' fm-custom' : '') + '" data-ci="' + i + '" style="left:' + ((inAt / dur) * 100).toFixed(2) + '%;width:' + (((outAt - inAt) / dur) * 100).toFixed(2) + '%"'
+        + ' title="' + escAttr(c.type + ' \\u2014 on stage ' + inAt.toFixed(1) + 's\\u2013' + outAt.toFixed(1) + 's') + '">'
+        + (isCustom ? '' :
+            '<span class="fm-edge fm-edge-l" data-ci="' + i + '" title="Drag: entrance time"></span>'
+          + '<span class="fm-edge fm-edge-r" data-ci="' + i + '" title="Drag: exit time"></span>')
+        + '</div>';
+      var script = (c.data && Array.isArray(c.data.script)) ? c.data.script : [];
+      script.forEach(function(a, si) {
+        if (!a || typeof a.at !== 'number') return;
+        html += '<div class="fm-diamond" data-ci="' + i + '" data-si="' + si + '" style="left:' + ((Math.min(a.at, dur) / dur) * 100).toFixed(2) + '%"'
+          + ' title="' + escAttr((a.action || 'action') + ' @ ' + a.at.toFixed(2) + 's \\u2014 drag to retime') + '"></div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+    fl.style.display = 'block';
+    fl.style.height = (30 + comps.length * 22 + 8) + 'px';
+    fl.innerHTML = html;
+    var ex = document.getElementById('fm-exit');
+    if (ex) ex.addEventListener('click', exitFocus);
+    wireFocusDrags(scene, dur, bounds);
+  }
+  function fmSnap(t, dur, bounds) {
+    var cands = bounds.slice();
+    for (var s = 0; s <= Math.ceil(dur * 2); s++) cands.push(s / 2);
+    var best = t, bd = 0.18;
+    cands.forEach(function(c) { var d = Math.abs(c - t); if (d < bd) { bd = d; best = c; } });
+    return Math.max(0, Math.min(dur, Math.round(best * 100) / 100));
+  }
+  function wireFocusDrags(scene, dur, bounds) {
+    var track = document.getElementById('fm-track');
+    if (!track) return;
+    function pxToT(clientX) {
+      var r = track.getBoundingClientRect();
+      return fmSnap(((clientX - r.left) / Math.max(1, r.width)) * dur, dur, bounds);
+    }
+    function patchComp(comp, body, done) {
+      var p = state.currentProject;
+      var path = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+      api('PATCH', path, body).then(function() {
+        refreshCompositeQuiet();
+        if (inspOpen()) renderInspector();
+        if (done) done();
+      }).catch(function() {});
+    }
+    track.querySelectorAll('.fm-diamond').forEach(function(d) {
+      d.addEventListener('pointerdown', function(ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        d.setPointerCapture(ev.pointerId);
+        var comp = scene.components[parseInt(d.dataset.ci, 10)];
+        var si = parseInt(d.dataset.si, 10);
+        function mv(e2) { var t = pxToT(e2.clientX); d._t = t; d.style.left = ((t / dur) * 100).toFixed(2) + '%'; }
+        function up() {
+          d.removeEventListener('pointermove', mv); d.removeEventListener('pointerup', up);
+          if (typeof d._t === 'number' && comp && comp.data && comp.data.script && comp.data.script[si]) {
+            comp.data.script[si].at = d._t;
+            patchComp(comp, { data: { script: comp.data.script } });
+          }
+        }
+        d.addEventListener('pointermove', mv);
+        d.addEventListener('pointerup', up);
+      });
+    });
+    track.querySelectorAll('.fm-edge').forEach(function(edge) {
+      edge.addEventListener('pointerdown', function(ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        edge.setPointerCapture(ev.pointerId);
+        var comp = scene.components[parseInt(edge.dataset.ci, 10)];
+        var isL = edge.classList.contains('fm-edge-l');
+        var bar = edge.parentElement;
+        function mv(e2) {
+          var t = pxToT(e2.clientX);
+          edge._t = t;
+          var inAt = (comp.enter && typeof comp.enter.at === 'number') ? comp.enter.at : 0;
+          var outAt = (comp.exit && typeof comp.exit.at === 'number') ? comp.exit.at : dur;
+          if (isL) inAt = Math.min(t, outAt - 0.2); else outAt = Math.max(t, inAt + 0.2);
+          bar.style.left = ((inAt / dur) * 100).toFixed(2) + '%';
+          bar.style.width = (((outAt - inAt) / dur) * 100).toFixed(2) + '%';
+        }
+        function up() {
+          edge.removeEventListener('pointermove', mv); edge.removeEventListener('pointerup', up);
+          if (typeof edge._t !== 'number' || !comp) return;
+          if (isL) {
+            var enter = comp.enter || { effect: 'fade' };
+            enter.at = Math.min(edge._t, ((comp.exit && comp.exit.at) || dur) - 0.2);
+            comp.enter = enter;
+            patchComp(comp, { enter: enter }, renderFocusLane);
+          } else {
+            // Dragging the right edge back to the scene end clears the exit.
+            if (edge._t >= dur - 0.05) {
+              delete comp.exit;
+              patchComp(comp, { exit: null }, renderFocusLane);
+            } else {
+              var exitA = comp.exit || { effect: 'fade' };
+              exitA.at = Math.max(edge._t, ((comp.enter && comp.enter.at) || 0) + 0.2);
+              comp.exit = exitA;
+              patchComp(comp, { exit: exitA }, renderFocusLane);
+            }
+          }
+        }
+        edge.addEventListener('pointermove', mv);
+        edge.addEventListener('pointerup', up);
+      });
+    });
+    // Click the empty track: seek the preview to that scene-local moment.
+    track.addEventListener('click', function(ev) {
+      if (ev.target !== track && !ev.target.classList.contains('fm-grid') && !ev.target.classList.contains('fm-row')) return;
+      var r = track.getBoundingClientRect();
+      var t = ((ev.clientX - r.left) / Math.max(1, r.width)) * dur;
+      try {
+        var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
+        var start = meta && meta[focusSceneIdx] ? meta[focusSceneIdx].start : sceneOffset(focusSceneIdx);
+        var tl = getCompositeMasterTimeline();
+        if (tl) { tl.time(start + t); tl.pause(); }
+        state.masterTime = start + t;
+        updateTimeDisplay(start + t);
+      } catch (e) {}
+    });
   }
 
   function savePropNow() {
