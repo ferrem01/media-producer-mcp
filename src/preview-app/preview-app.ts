@@ -559,8 +559,10 @@ export function getPreviewHtml(): string {
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .prop-script-row .ps-text { flex: 1; font-size: 11px; padding: 3px 5px; border: 1px solid #e5e7eb; border-radius: 5px; min-width: 0; }
 
-  /* Scene focus mode: the scene's own clock, one row per component */
-  #focus-lane { position: absolute; left: 0; right: 0; top: 0; z-index: 30;
+  /* Scene focus mode: the scene's own clock, one row per component.
+     Sits BELOW the ruler band so the film scrubber stays visible and
+     usable while focused (the focus playhead mirrors it live). */
+  #focus-lane { position: absolute; left: 0; right: 0; top: 22px; z-index: 30;
     background: #101322; border-radius: 6px; overflow: hidden; }
   .fm-head { display: flex; align-items: center; gap: 10px; height: 26px; padding: 0 8px; }
   #fm-exit { border: 1px solid #4a4f78; background: #262b45; color: #e0e5ff; font-size: 11px; font-weight: 600;
