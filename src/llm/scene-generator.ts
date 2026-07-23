@@ -247,12 +247,110 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
     };
   }
 
+  // ── Deterministic authored-composition path (no codegen) ──
+  // When the storyboard fully authored the scene's components (data +
+  // scripted performances), codegen would only be inventing layout -- the
+  // one job it reliably botches (measured: a cowork mock sized 2545px wide
+  // inside a 1719px clipping card, content painted off both edges, three
+  // revision rounds burned re-inventing the framing). Instantiate the
+  // structured scene directly with the standard inset framings instead --
+  // the exact shape the hand-built films use, rendered by the same runtime.
+  var allDraftComps: any[] = Array.isArray(draft.components) ? (draft.components as any[]) : [];
+  var authoredDraftComps = allDraftComps.filter((c) => c && typeof c === "object" && c.data && typeof c.type === "string");
+  var strayPlainComps = allDraftComps.filter((c) => typeof c === "string" && c !== "webgl-backdrop");
+  if (authoredDraftComps.length > 0 && strayPlainComps.length === 0 && !draft.broll_query) {
+    return buildAuthoredCompositionScene(sceneId, draft, authoredDraftComps, opts);
+  }
+
   // ── Unified Codegen Path (always active) ──
   // All scenes go through the agentic codegen generator
   // which can use <component> tags to embed library components.
   var codegenSpec = await buildCodegenSpec(draft);
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (unified codegen)`);
   return await generateCodegenScene(opts, draft, codegenSpec, sceneId);
+}
+
+// ── Authored Composition (deterministic) ──
+
+/**
+ * Standard inset framings for authored product-mock compositions -- the
+ * recipes the storyboard prompt teaches, identical to the hand-built films.
+ * The quotient trio composes (inset shell + center surface + real chat
+ * panel); anything without a recipe gets the classic single-window inset.
+ */
+function authoredLayout(types: string[]): Map<string, { position: Record<string, string | number>; z_index: number }> {
+  var out = new Map<string, { position: Record<string, string | number>; z_index: number }>();
+  var has = (t: string) => types.indexOf(t) !== -1;
+  if (has("quotient-app-shell")) {
+    out.set("quotient-app-shell", { position: { x: "1.2%", y: "2%", width: "97.6%", height: "96%" }, z_index: 5 });
+    for (var center of ["quotient-campaign", "quotient-social"]) {
+      if (has(center)) out.set(center, { position: { x: "4.7%", y: "8%", width: "61.5%", height: "89%" }, z_index: 10 });
+    }
+    if (has("quotient-chat")) {
+      out.set("quotient-chat", { position: { x: "67.6%", y: "8%", width: "30.5%", height: "87%" }, z_index: 15 });
+    }
+  }
+  for (var t of types) {
+    // Un-reciped surfaces share the single-window frame; the storyboard's
+    // compositions stage at most one such window per scene.
+    if (!out.has(t)) out.set(t, { position: { x: "8%", y: "6.5%", width: "84%", height: "87%" }, z_index: 10 });
+  }
+  return out;
+}
+
+function buildAuthoredCompositionScene(
+  sceneId: string,
+  draft: DraftScene,
+  authored: Array<{ type: string; data: Record<string, unknown> }>,
+  opts: SceneGeneratorOpts,
+): GeneratedScene {
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (authored composition -- deterministic, no codegen)`);
+  var types = authored.map((c) => c.type);
+  var layout = authoredLayout(types);
+  // The dark cinematic world under every mock window, matching the film's
+  // template scenes (and the hand-built originals).
+  var components: any[] = [{
+    id: "bg",
+    type: "webgl-backdrop",
+    z_index: 1,
+    position: { x: 0, y: 0, width: "100%", height: "100%" },
+    data: { seed: 5 + opts.sceneIndex * 7 },
+  }];
+  for (var c of authored) {
+    var lay = layout.get(c.type)!;
+    var data: Record<string, unknown> = { ...c.data };
+    // The recipe's show_panel contract: the shell's own agent panel hides
+    // when the full-fidelity quotient-chat rides beside it.
+    if (c.type === "quotient-app-shell" && types.indexOf("quotient-chat") !== -1 && data.show_panel === undefined) {
+      data.show_panel = false;
+    }
+    // id = type so storyboard-authored camera anchors ("claude-cowork-session"
+    // or "claude-cowork-session.transcript") resolve without translation.
+    components.push({ id: c.type, type: c.type, data, position: lay.position, z_index: lay.z_index });
+  }
+  var acTransition: SceneTransition | undefined;
+  if (draft.transition_in && draft.transition_in.type !== "none") {
+    acTransition = {
+      type: draft.transition_in.type as SceneTransition["type"],
+      duration_seconds: draft.transition_in.duration_seconds || 0.5,
+    };
+  }
+  var scene: Scene = {
+    id: sceneId,
+    label: draft.label,
+    duration_seconds: draft.duration_seconds || 8,
+    transition_in: acTransition,
+    background: "#0c0d12",
+    beats: Array.isArray(draft.beats) && draft.beats.length >= 2 ? (draft.beats as any) : undefined,
+    camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
+    components,
+    audio_hints: draft.voiceover_text ? { voiceover_text: draft.voiceover_text } : undefined,
+  } as any;
+  // Curated instantiation: the critique loop treats it like a template scene
+  // (boot gate only -- there is no codegen source to revise, and a regen
+  // would deterministically rebuild the same scene).
+  (scene as any).authored_composition = true;
+  return { scene };
 }
 
 // ── Freeform Scene Generation ──

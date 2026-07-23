@@ -1066,10 +1066,11 @@ async function critiqueAndRetryScene(opts: {
   // codegen source to regenerate. Only template instantiation ever puts an
   // st-* component on a scene.
   if (
-    opts.scene.components.length > 0 &&
-    opts.scene.components.some((c) => typeof c.type === "string" && c.type.startsWith("st-"))
+    (opts.scene.components.length > 0 &&
+      opts.scene.components.some((c) => typeof c.type === "string" && c.type.startsWith("st-"))) ||
+    (opts.scene as any).authored_composition === true
   ) {
-    console.log(`  Critique: scene ${opts.sceneIndex} is a scene-template instantiation, skipping critique/regen`);
+    console.log(`  Critique: scene ${opts.sceneIndex} is a ${(opts.scene as any).authored_composition ? "storyboard-authored composition" : "scene-template instantiation"}, skipping critique/regen`);
     // BOOT GATE (no LLM, no regen): a template with a runtime bug otherwise
     // ships silently -- a stale reference once crashed a template mid-boot
     // and Studio played the unstyled wreck. One assemble + seek sweep; a
@@ -2633,7 +2634,8 @@ async function runUnifiedPipeline(
       // same template -- a fix_scene on one burns the editorial budget on a no-op.
       const isTemplateScene = (idx: number) => {
         const comps = project.scenes[idx]?.components || [];
-        return comps.length > 0 && comps.some((c) => typeof c.type === "string" && c.type.startsWith("st-"));
+        return (comps.length > 0 && comps.some((c) => typeof c.type === "string" && c.type.startsWith("st-")))
+          || (project.scenes[idx] as any)?.authored_composition === true;
       };
       const sceneFixes = (editorial.fixes || []).filter(f => f.type === "fix_scene" && typeof f.scene_index === "number" && f.detail && f.scene_index! >= 0 && f.scene_index! < project.scenes.length && !isTemplateScene(f.scene_index!));
       let regen = 0;

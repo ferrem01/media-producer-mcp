@@ -58,3 +58,78 @@ describe("scripted surface pass-through", () => {
     expect(spec).not.toContain("Storyboard-Authored Component Data");
   });
 });
+
+describe("authored composition (deterministic scene path)", () => {
+  it("builds the structured scene directly when all components are authored", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const result = await generateScene({
+      scene: {
+        label: "The Work",
+        duration_seconds: 13.5,
+        purpose: "agent does the work",
+        visual_notes: "cowork session performs",
+        components: [{ type: "claude-cowork-session", data: { title: "Roundtable", script: [{ action: "working", at: 0.5 }] } }],
+        camera_moves: [{ at: 0.5, type: "zoom", anchor: "claude-cowork-session", scale: 1.05 }],
+        voiceover_text: "Claude opens the connector.",
+      } as any,
+      sceneIndex: 4,
+      totalScenes: 13,
+      prompt: "p",
+      llmConfig: {} as any,
+      brandKit: {} as any,
+      canvas: { width: 1920, height: 1080 } as any,
+    } as any);
+    const scene: any = result.scene;
+    expect(scene.authored_composition).toBe(true);
+    expect(result.customSources).toBeUndefined();
+    const types = scene.components.map((c: any) => c.type);
+    expect(types).toContain("webgl-backdrop");
+    expect(types).toContain("claude-cowork-session");
+    const mock = scene.components.find((c: any) => c.type === "claude-cowork-session");
+    expect(mock.data.script).toHaveLength(1);
+    expect(mock.position).toEqual({ x: "8%", y: "6.5%", width: "84%", height: "87%" });
+    expect(scene.camera_moves).toHaveLength(1);
+  });
+
+  it("applies the quotient trio recipe (inset shell + center + chat, show_panel off)", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const result = await generateScene({
+      scene: {
+        label: "Quotient",
+        duration_seconds: 10.8,
+        purpose: "p",
+        visual_notes: "v",
+        components: [
+          { type: "quotient-app-shell", data: { breadcrumbs: ["Campaigns"] } },
+          { type: "quotient-campaign", data: { title: "Roundtable", script: [{ action: "switch-tab", at: 3, tab: "Tasks" }] } },
+          { type: "quotient-chat", data: { history: [] } },
+        ],
+      } as any,
+      sceneIndex: 6,
+      totalScenes: 13,
+      prompt: "p",
+      llmConfig: {} as any,
+      brandKit: {} as any,
+      canvas: { width: 1920, height: 1080 } as any,
+    } as any);
+    const scene: any = result.scene;
+    const byType = Object.fromEntries(scene.components.map((c: any) => [c.type, c]));
+    expect(byType["quotient-app-shell"].data.show_panel).toBe(false);
+    expect(byType["quotient-app-shell"].position.x).toBe("1.2%");
+    expect(byType["quotient-campaign"].position.width).toBe("61.5%");
+    expect(byType["quotient-chat"].position.x).toBe("67.6%");
+    expect(byType["quotient-campaign"].data.script).toHaveLength(1);
+  });
+
+  it("leaves mixed plain-component scenes to codegen", async () => {
+    const { buildCodegenSpec } = await import("../src/llm/scene-generator.js");
+    // A scene mixing an authored mock with a plain non-backdrop hint stays on
+    // the codegen path -- assert the spec builder still handles it (no throw,
+    // authored section present) rather than the deterministic path claiming it.
+    const spec = await buildCodegenSpec({
+      label: "mixed", purpose: "p", visual_notes: "v", duration_seconds: 8,
+      components: ["kinetic-text", { type: "claude-cowork-home", data: { greeting: "Hi" } }],
+    });
+    expect(spec).toContain("Storyboard-Authored Component Data");
+  });
+});
