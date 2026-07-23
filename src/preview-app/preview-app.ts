@@ -562,9 +562,17 @@ export function getPreviewHtml(): string {
   /* Scene focus mode: the scene's own clock, one row per component */
   #focus-lane { position: absolute; left: 0; right: 0; top: 0; z-index: 30;
     background: #101322; border-radius: 6px; overflow: hidden; }
-  .fm-head { display: flex; align-items: center; gap: 10px; height: 24px; padding: 0 8px; }
-  #fm-exit { border: none; background: #262b45; color: #c7d2fe; font-size: 10px; padding: 2px 8px; border-radius: 999px; cursor: pointer; }
-  .fm-title { font-size: 10px; color: #8b93b8; letter-spacing: 0.03em; }
+  .fm-head { display: flex; align-items: center; gap: 10px; height: 26px; padding: 0 8px; }
+  #fm-exit { border: 1px solid #4a4f78; background: #262b45; color: #e0e5ff; font-size: 11px; font-weight: 600;
+    padding: 3px 10px; border-radius: 999px; cursor: pointer; }
+  #fm-exit:hover { background: #343a63; border-color: #6366f1; }
+  #fm-play { border: 1px solid #3b4066; background: #1c2038; color: #a5b4fc; font-size: 11px;
+    padding: 3px 10px; border-radius: 999px; cursor: pointer; }
+  #fm-play:hover { background: #262b45; }
+  .fm-title { font-size: 10px; color: #8b93b8; letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fm-hint { margin-left: auto; font-size: 9px; color: #5b6288; flex-shrink: 0; padding-right: 4px; }
+  .fm-playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #f43f5e;
+    box-shadow: 0 0 6px rgba(244,63,94,0.8); z-index: 6; pointer-events: none; }
   .fm-track { position: absolute; left: 140px; right: 10px; top: 24px; bottom: 6px; }
   .fm-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(148,163,184,0.12); }
   .fm-grid.fm-beat { background: rgba(99,102,241,0.55); width: 1px; }
@@ -2273,10 +2281,11 @@ export function getPreviewHtml(): string {
       el.addEventListener('click', function() {
         selectScene(parseInt(el.dataset.index, 10));
       });
-      // Double-click: scene focus mode -- the timeline becomes this scene's
-      // component timeline (SPEC-studio-structure).
+      // Double-click: TOGGLE scene focus mode -- the timeline becomes this
+      // scene's component timeline (SPEC-studio-structure).
       el.addEventListener('dblclick', function() {
         var idx = parseInt(el.dataset.index, 10);
+        if (focusSceneIdx === idx) { exitFocus(); return; }
         selectScene(idx);
         enterFocus(idx);
       });
@@ -3186,6 +3195,8 @@ export function getPreviewHtml(): string {
   }
   function exitFocus() {
     focusSceneIdx = -1;
+    _fmScenePlayEnd = -1;
+    if (_fmRaf) { cancelAnimationFrame(_fmRaf); _fmRaf = null; }
     var fl = document.getElementById('focus-lane');
     if (fl) { fl.style.display = 'none'; fl.innerHTML = ''; }
   }
@@ -3210,10 +3221,14 @@ export function getPreviewHtml(): string {
     var dur = scene.duration_seconds || 5;
     var comps = scene.components || [];
     var bounds = focusBeatBounds(scene, dur);
-    var html = '<div class="fm-head"><button id="fm-exit">\\u2190 film</button>'
+    var html = '<div class="fm-head">'
+      + '<button id="fm-exit" title="Back to the film timeline (Esc)">\\u2190 Back to film</button>'
+      + '<button id="fm-play" title="Play just this scene (pauses at its end)">\\u25b6 Play scene</button>'
       + '<span class="fm-title">' + escHtml(scene.label || scene.id) + ' \\u00b7 ' + dur.toFixed(1) + 's on the scene clock'
-      + (bounds.length ? ' \\u00b7 ' + (bounds.length + 1) + ' beats (drags snap)' : '') + '</span></div>';
+      + (bounds.length ? ' \\u00b7 ' + (bounds.length + 1) + ' beats (drags snap)' : '') + '</span>'
+      + '<span class="fm-hint">drag anywhere to scrub \\u00b7 Esc closes</span></div>';
     html += '<div class="fm-track" id="fm-track">';
+    html += '<div class="fm-playhead" id="fm-playhead"></div>';
     for (var s = 1; s < dur; s++) html += '<div class="fm-grid fm-sec" style="left:' + ((s / dur) * 100).toFixed(2) + '%"></div>';
     bounds.forEach(function(b) { html += '<div class="fm-grid fm-beat" style="left:' + ((b / dur) * 100).toFixed(2) + '%"></div>'; });
     comps.forEach(function(c, i) {
@@ -3242,8 +3257,65 @@ export function getPreviewHtml(): string {
     fl.innerHTML = html;
     var ex = document.getElementById('fm-exit');
     if (ex) ex.addEventListener('click', exitFocus);
+    var fp = document.getElementById('fm-play');
+    if (fp) fp.addEventListener('click', function() { fmPlayScene(scene, dur); });
     wireFocusDrags(scene, dur, bounds);
+    fmStartPlayhead();
   }
+  // ── Focus transport: playhead, scrub, scene-play, Esc ──
+  function fmSceneStart() {
+    try {
+      var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
+      return meta && meta[focusSceneIdx] ? meta[focusSceneIdx].start : sceneOffset(focusSceneIdx);
+    } catch (e) { return sceneOffset(focusSceneIdx); }
+  }
+  var _fmRaf = null;
+  var _fmScenePlayEnd = -1;
+  function fmStartPlayhead() {
+    if (_fmRaf) cancelAnimationFrame(_fmRaf);
+    (function tick() {
+      if (focusSceneIdx < 0) { _fmRaf = null; return; }
+      var ph = document.getElementById('fm-playhead');
+      var scene = state.currentProject && state.currentProject.scenes[focusSceneIdx];
+      if (ph && scene) {
+        var dur = scene.duration_seconds || 5;
+        var tl = getCompositeMasterTimeline();
+        var t = tl ? tl.time() : (state.masterTime || 0);
+        var local = Math.max(0, Math.min(dur, t - fmSceneStart()));
+        ph.style.left = ((local / dur) * 100).toFixed(2) + '%';
+        // Scene-play: stop the transport at the scene's end.
+        if (_fmScenePlayEnd >= 0 && state.playing && t >= _fmScenePlayEnd - 0.03) {
+          _fmScenePlayEnd = -1;
+          var pb = document.getElementById('play-btn');
+          if (pb) pb.click();
+        }
+      }
+      _fmRaf = requestAnimationFrame(tick);
+    })();
+  }
+  function fmSeekLocal(t, dur) {
+    var start = fmSceneStart();
+    var clamped = Math.max(0, Math.min(dur, t));
+    try {
+      var tl = getCompositeMasterTimeline();
+      if (tl && !state.playing) { tl.time(start + clamped); tl.pause(); }
+      state.masterTime = start + clamped;
+      updateTimeDisplay(start + clamped);
+    } catch (e) {}
+  }
+  function fmPlayScene(scene, dur) {
+    var start = fmSceneStart();
+    var tl = getCompositeMasterTimeline();
+    if (state.playing) { _fmScenePlayEnd = -1; var pb0 = document.getElementById('play-btn'); if (pb0) pb0.click(); return; }
+    if (tl) { tl.time(start); tl.pause(); }
+    state.masterTime = start;
+    _fmScenePlayEnd = start + dur;
+    var pb = document.getElementById('play-btn');
+    if (pb) pb.click();
+  }
+  document.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Escape' && focusSceneIdx >= 0) { exitFocus(); ev.stopPropagation(); }
+  });
   function fmSnap(t, dur, bounds) {
     var cands = bounds.slice();
     for (var s = 0; s <= Math.ceil(dur * 2); s++) cands.push(s / 2);
@@ -3326,19 +3398,21 @@ export function getPreviewHtml(): string {
         edge.addEventListener('pointerup', up);
       });
     });
-    // Click the empty track: seek the preview to that scene-local moment.
-    track.addEventListener('click', function(ev) {
-      if (ev.target !== track && !ev.target.classList.contains('fm-grid') && !ev.target.classList.contains('fm-row')) return;
-      var r = track.getBoundingClientRect();
-      var t = ((ev.clientX - r.left) / Math.max(1, r.width)) * dur;
-      try {
-        var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
-        var start = meta && meta[focusSceneIdx] ? meta[focusSceneIdx].start : sceneOffset(focusSceneIdx);
-        var tl = getCompositeMasterTimeline();
-        if (tl) { tl.time(start + t); tl.pause(); }
-        state.masterTime = start + t;
-        updateTimeDisplay(start + t);
-      } catch (e) {}
+    // Scrub: press-and-drag anywhere that isn't a drag handle. The lane is a
+    // timeline -- grabbing it should always move the playhead.
+    track.addEventListener('pointerdown', function(ev) {
+      if (ev.target.closest && (ev.target.closest('.fm-diamond') || ev.target.closest('.fm-edge'))) return;
+      ev.preventDefault();
+      try { track.setPointerCapture(ev.pointerId); } catch (e) {}
+      function seekFrom(e2) {
+        var r = track.getBoundingClientRect();
+        fmSeekLocal(((e2.clientX - r.left) / Math.max(1, r.width)) * dur, dur);
+      }
+      seekFrom(ev);
+      function mv(e2) { seekFrom(e2); }
+      function up() { track.removeEventListener('pointermove', mv); track.removeEventListener('pointerup', up); }
+      track.addEventListener('pointermove', mv);
+      track.addEventListener('pointerup', up);
     });
   }
 
