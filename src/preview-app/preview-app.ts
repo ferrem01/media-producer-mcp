@@ -3302,6 +3302,11 @@ export function getPreviewHtml(): string {
       var tl = getCompositeMasterTimeline();
       if (tl && !state.playing) { tl.time(start + clamped); tl.pause(); }
       state.masterTime = start + clamped;
+      // Keep the film scrubber in step -- the app's sync loop treats the
+      // slider as truth, so a seek that skips it gets snapped right back.
+      if (els.slider && state.totalDuration > 0) {
+        els.slider.value = Math.round(((start + clamped) / state.totalDuration) * 1000);
+      }
       updateTimeDisplay(start + clamped);
     } catch (e) {}
   }
