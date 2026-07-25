@@ -3256,7 +3256,10 @@ export function getPreviewHtml(): string {
       r.dl.style.display = '';
       r.dl.className = 'btn btn-primary' + (rs.stale ? ' stale' : '');
       r.dl.href = rs.output_url;
-      r.dl.setAttribute('download', ((p.name || p.project_id) + '').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-') + '.mp4');
+      // NB: explicit character classes -- backslash classes (\w, \s) get
+      // eaten by the outer template literal and mangle the regex.
+      var fname = ((p.name || p.project_id) + '').replace(/[^A-Za-z0-9 _-]/g, '').replace(/ +/g, '-').replace(/^-+|-+$/g, '');
+      r.dl.setAttribute('download', (fname || p.project_id) + '.mp4');
       r.dl.title = rs.stale
         ? 'The film changed after this MP4 was rendered — re-render to pick up the latest edits'
         : 'Download the rendered film (' + fmtMB(rs.size_bytes) + ')';
