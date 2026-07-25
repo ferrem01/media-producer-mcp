@@ -56,7 +56,7 @@ import { solveMediaEdits, inferIntents, contractSceneToEdl } from "./core/media-
 import { sceneCompositesOverSpeaker } from "./core/speaker-mode.js";
 import { repairBrandAssetPath } from "./core/scene-assembler.js";
 import { spawn } from "node:child_process";
-import { openSync } from "node:fs";
+import { openSync, readFileSync } from "node:fs";
 
 /**
  * Resolve all component sources for a scene by reading .component.html files
@@ -200,6 +200,21 @@ function escHtml(s: string): string {
  * and the list of registered tools -- generated DYNAMICALLY from the live MCP
  * server (`_registeredTools`) so it can never go stale as tools are added/removed.
  */
+/** Version of the recorder extension currently served at /extension.zip --
+ *  read from the checked-out manifest so the landing page always states
+ *  which build the download link hands out. Cached: it changes per deploy. */
+let _extVersion: string | null = null;
+function extensionVersion(): string {
+  if (_extVersion !== null) return _extVersion;
+  try {
+    const manifestPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "recorder-extension", "manifest.json");
+    _extVersion = (JSON.parse(readFileSync(manifestPath, "utf-8")).version as string) || "";
+  } catch {
+    _extVersion = "";
+  }
+  return _extVersion;
+}
+
 function renderMcpLanding(server: unknown): string {
   let tools: Array<{ name: string; description: string }> = [];
   try {
@@ -277,13 +292,17 @@ function renderMcpLanding(server: unknown): string {
       <p>The <b>Quotient Recorder</b> Chrome extension captures a tab + your voice
       (and camera), and this server assembles it into a branded, captioned,
       auto-edited film — no editor required.</p>
-      <p><a class="btn" href="/extension.zip" download>⬇ Download the extension</a></p>
+      <p><a class="btn" href="/extension.zip" download>⬇ Download the extension</a>
+      ${extensionVersion() ? `<span class="muted" style="margin-left:8px;">v${escHtml(extensionVersion())}</span>` : ""}</p>
+      <p class="muted">The popup shows its version in the header — if it doesn't match
+      the one above, re-download and reload the unpacked folder.</p>
       <ol>
         <li>Unzip, open <code>chrome://extensions</code>, enable <b>Developer mode</b>,
         click <b>Load unpacked</b> and pick the unzipped folder. Pin it.</li>
-        <li>Open the popup: set <b>Server</b> to this server's URL, plus your
-        tenant + token. Tick <b>Narrate</b> (and <b>Camera</b> if you want your face
-        in a bubble).</li>
+        <li>Open the popup and <b>Sign in with Google</b> — that's the whole setup.
+        Tick <b>Narrate</b> (and <b>Camera</b> if you want your face in a bubble),
+        and pick where to save: a new project, or an existing one to add the
+        recording to as a new scene.</li>
         <li>Open the page you're demoing, hit <b>Record</b>, click anywhere to roll
         after the 3-2-1, and talk while you drive. Pause/stop from the floating HUD.</li>
         <li>When you stop, everything uploads and the film builds itself —

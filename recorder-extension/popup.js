@@ -18,6 +18,7 @@ function renderAuth(st) {
 }
 
 async function load() {
+  try { $("ver").textContent = "v" + chrome.runtime.getManifest().version; } catch (e) {}
   const s = await chrome.storage.sync.get({ mic: false, camera: false, destProject: "" });
   $("mic").checked = !!s.mic;
   $("camera").checked = !!s.camera;
@@ -36,9 +37,11 @@ async function loadDestinations(savedId) {
   const sel = $("dest");
   const res = await chrome.runtime.sendMessage({ type: "qr-projects" });
   if (!res || !res.ok) return; // keep the "New project" default silently
+  // ALL non-failed projects, newest first -- you never know which one the
+  // user wants to drop a take into (undated ones sink to the bottom).
   const projects = (res.projects || [])
-    .filter((p) => (p.scene_count || 0) > 0 && p.status !== "failed")
-    .slice(0, 15);
+    .filter((p) => p.status !== "failed")
+    .sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
   for (const p of projects) {
     const opt = document.createElement("option");
     opt.value = p.project_id;
