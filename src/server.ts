@@ -240,6 +240,35 @@ function outputUrl(tenantId: string, projectId: string, filename: string): strin
   return `${config.publicUrl}/output/${encodeURIComponent(tenantId)}/projects/${encodeURIComponent(projectId)}/${encodeURIComponent(filename)}`;
 }
 
+/** Latest-render facts for a project: does output.mp4 exist, when was it
+ *  written, and is it behind the current edit state. output.mp4 is always
+ *  the MOST RECENT completed render (each render overwrites it), so this is
+ *  the durable answer to "give me the download link for project X" -- long
+ *  after the render job's own response has scrolled away. Same stat logic
+ *  as the HTTP /api/render-status route (Studio's Download button). */
+export async function renderStatusFields(project: {
+  tenant_id: string;
+  project_id: string;
+  updated_at?: string;
+}): Promise<Record<string, unknown>> {
+  try {
+    const outPath = path.join(projectOutputDir(project.tenant_id, project.project_id), "output.mp4");
+    const st = await fs.stat(outPath).catch(() => null);
+    if (!st) return { rendered: false };
+    const stale = !!(project.updated_at && new Date(project.updated_at).getTime() > st.mtime.getTime() + 2000);
+    return {
+      rendered: true,
+      download_url: outputUrl(project.tenant_id, project.project_id, "output.mp4"),
+      rendered_at: st.mtime.toISOString(),
+      render_size_bytes: st.size,
+      render_stale: stale,
+      ...(stale ? { render_hint: "This MP4 predates the project's latest edits -- render again to refresh it, or share it as-is if the difference doesn't matter." } : {}),
+    };
+  } catch {
+    return { rendered: false };
+  }
+}
+
 /** Enrich a job object with preview_url when tenant and project are known.
  *  Completed render jobs additionally get a public download_url and LOSE the
  *  server-local outputPath: a filesystem path is what led agents to tell
@@ -373,7 +402,7 @@ export function createMcpServer(): McpServer {
         return ok(scene);
       }
 
-      return ok(withStudio(project));
+      return ok({ ...withStudio(project), ...(await renderStatusFields(project)) });
     },
   );
 
@@ -397,7 +426,13 @@ export function createMcpServer(): McpServer {
       }
 
       const projects = await listProjects(params.tenant_id);
-      return ok(projects);
+      // Per-project latest-render facts, so "which of these can I download?"
+      // needs no follow-up call per project.
+      const enriched = await Promise.all(projects.map(async (p) => ({
+        ...p,
+        ...(await renderStatusFields({ tenant_id: params.tenant_id!, project_id: p.project_id, updated_at: (p as any).updated_at })),
+      })));
+      return ok(enriched);
     },
   );
 
