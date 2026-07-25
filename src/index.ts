@@ -786,7 +786,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -1750,13 +1750,54 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           jsonResponse(res, 404, { error: "Project not found" });
           return;
         }
-        const job = queueRender(tenantId, projectId);
+        const rBody = await parseBody(req).catch(() => ({} as any));
+        const rQuality = rBody?.quality === "preview" ? "preview" : rBody?.quality === "production" ? "production" : undefined;
+        const job = queueRender(tenantId, projectId, rQuality ? ({ quality: rQuality } as any) : undefined);
         jsonResponse(res, 200, {
           status: "queued",
           job_id: job.id,
           project_id: projectId,
           tenant_id: tenantId,
+          quality: rQuality || "production",
         });
+        return;
+      }
+
+      // ── API: Job status (Studio render button polls this) ──
+      // GET /api/job/{tenant}/{job_id} -- same shape the MCP job tool returns.
+      const jobOneMatch = urlPath.match(/^\/api\/job\/([^/]+)\/([^/]+)$/);
+      if (jobOneMatch && method === "GET") {
+        const [, jmTenant, jmId] = jobOneMatch.map(decodeURIComponent);
+        const jmJob = getJobStatus(jmId);
+        if (!jmJob || ((jmJob as any).tenantId && (jmJob as any).tenantId !== jmTenant)) {
+          jsonResponse(res, 404, { error: "Job not found" });
+          return;
+        }
+        jsonResponse(res, 200, jmJob);
+        return;
+      }
+
+      // ── API: Render status (does a downloadable film exist, and how fresh) ──
+      // GET /api/render-status/{tenant}/{project}
+      const rsMatch = urlPath.match(/^\/api\/render-status\/([^/]+)\/([^/]+)$/);
+      if (rsMatch && method === "GET") {
+        const [, rsTenant, rsProject] = rsMatch.map(decodeURIComponent);
+        try {
+          const outPath = path.join(config.dataDir, rsTenant, "projects", rsProject, "output", "output.mp4");
+          const st = await fs.stat(outPath).catch(() => null);
+          const rsProj = await loadProject(rsTenant, rsProject);
+          jsonResponse(res, 200, {
+            rendered: !!st,
+            completed_at: st ? st.mtime.toISOString() : null,
+            size_bytes: st ? st.size : 0,
+            project_updated_at: rsProj?.updated_at || null,
+            // Edited since the file was written -> the download is stale.
+            stale: !!(st && rsProj?.updated_at && new Date(rsProj.updated_at).getTime() > st.mtime.getTime() + 2000),
+            output_url: st ? `/output/${encodeURIComponent(rsTenant)}/projects/${encodeURIComponent(rsProject)}/output.mp4` : null,
+          });
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
         return;
       }
 
@@ -1916,6 +1957,72 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           const body = await parseBody(req);
           const videoUrl = body?.video_url as string;
           if (!videoUrl) { jsonResponse(res, 400, { error: "video_url required" }); return; }
+
+          // ── Destination: append to an EXISTING project ──
+          // The extension's Save-to picker sends dest_project_id. The take
+          // becomes a new walkthrough scene (auto-compressed EDL, camera PiP
+          // when present) inserted before the brand outro; existing scenes,
+          // narration and edits are untouched. A vanished destination falls
+          // back to today's new-project path (the extension toasts it).
+          const destId = (body?.dest_project_id as string) || "";
+          if (destId) {
+            const destProj = await loadProject(rgTenant, destId);
+            if (destProj) {
+              try {
+                const { proposeSceneCompression, probeMediaDuration } = await import("./core/auto-compress.js");
+                const recDur = await probeMediaDuration(videoUrl, config.dataDir).catch(() => 0);
+                const sceneId = `rec_${Date.now().toString(36)}`;
+                const comps: any[] = [{
+                  id: sceneId + "_v",
+                  type: "screencast-frame",
+                  z_index: 10,
+                  position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+                  data: { video_url: videoUrl, frame_style: "none", corner_radius: 0, crop: "auto" },
+                }];
+                if (body?.camera_url) {
+                  comps.push({
+                    id: sceneId + "_cam",
+                    type: "screencast-frame",
+                    z_index: 40,
+                    position: { x: "82%", y: "61.3%", width: "15%", height: "26.7%" },
+                    data: { video_url: body.camera_url as string, frame_style: "none", corner_radius: 0, shape: "circle" },
+                  });
+                }
+                const newScene: any = {
+                  id: sceneId,
+                  label: `Recorded ${new Date().toLocaleString()}`,
+                  duration_seconds: Math.max(3, recDur || 30),
+                  components: comps,
+                };
+                // Before the brand outro when the project ends with one.
+                const outroIdx = destProj.scenes.findIndex((s: any) =>
+                  (s.components || []).some((c: any) => typeof c?.data?.video_url === "string" && c.data.video_url.includes("/brand-kit/outro/")));
+                if (outroIdx >= 0) destProj.scenes.splice(outroIdx, 0, newScene);
+                else destProj.scenes.push(newScene);
+                try {
+                  const cRes = await proposeSceneCompression(newScene, { dataDir: config.dataDir });
+                  if (cRes.applied.length) console.log(`  recorder-append: auto-compress ${sceneId}: ${cRes.applied.map((a: any) => `${a.source_duration}s->${a.output_duration}s`).join(", ")}`);
+                } catch (ce: any) {
+                  console.warn(`  recorder-append: auto-compress skipped (${ce?.message || ce})`);
+                }
+                // Mode A narration is NOT attached in append mode (the target
+                // project owns its narration); the raw audio stays in the clip.
+                destProj.updated_at = new Date().toISOString();
+                const { saveProject: saveDest } = await import("./persistence/project.js");
+                await saveDest(destProj);
+                console.log(`  recorder-append: ${destId} += scene ${sceneId} (${(recDur || 0).toFixed(1)}s take${body?.camera_url ? " + camera" : ""})`);
+                jsonResponse(res, 200, { ok: true, appended_scene: sceneId, project_id: destId });
+                return;
+              } catch (ae: any) {
+                console.error(`  recorder-append: FAILED (${ae?.message || ae}) -- falling back to new project`);
+              }
+            } else {
+              console.warn(`  recorder-append: destination ${destId} not found -- falling back to new project`);
+            }
+            // Fall through to the new-project path; tell the extension so it
+            // can toast the fallback.
+            (body as any).__fellBack = true;
+          }
           const { runGeneratePipeline } = await import("./llm/pipeline.js");
           const { llmConfigFromEnv } = await import("./llm/client.js");
           const { loadBrandKit } = await import("./persistence/brand-kit.js");
@@ -1951,7 +2058,7 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
               else console.error(`  recorder-generate: FAILED (${r?.error || r?.status || "unknown"}) ("${prompt}")`);
             })
             .catch((e: any) => console.error(`  recorder-generate: FAILED (${e?.message || e})`));
-          jsonResponse(res, 202, { ok: true, started: true, note: "Assembling; the project will appear in Studio when done." });
+          jsonResponse(res, 202, { ok: true, started: true, fallback: (body as any).__fellBack ? "new_project" : undefined, note: "Assembling; the project will appear in Studio when done." });
         } catch (e: any) {
           jsonResponse(res, 500, { error: e?.message || String(e) });
         }

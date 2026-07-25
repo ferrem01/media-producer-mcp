@@ -11,7 +11,7 @@
 // clock (the film has no paused footage, so events must not either).
 let session = null; // { tabId, phase, startedMs, pausedMs, pauseBegan, events, settings, prompterWin }
 
-const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: false, camera: false };
+const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: false, camera: false, destProject: "" };
 
 // The one server this build talks to. Users never see or enter it -- the
 // whole setup is "Sign in with Google". (Override via settings.server only
@@ -222,6 +222,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       if (msg.type === "qr-signout") { await signOut(); sendResponse({ ok: true }); return; }
 
+      if (msg.type === "qr-projects") {
+        // Popup's Save-to picker: the tenant's projects, newest first. The
+        // popup keeps its "New project" default silently on any failure.
+        await refreshIfNeeded();
+        const settings = await getSettings();
+        const server = (settings.server || SERVER).replace(/\/+$/, "");
+        if (!settings.tenant || !settings.token) { sendResponse({ ok: false, error: "signed out" }); return; }
+        try {
+          const res = await fetch(`${server}/api/projects/${encodeURIComponent(settings.tenant)}?token=${encodeURIComponent(settings.token)}`);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const list = await res.json();
+          sendResponse({ ok: true, projects: Array.isArray(list) ? list : [] });
+        } catch (e) {
+          sendResponse({ ok: false, error: String(e && e.message || e) });
+        }
+        return;
+      }
+
       if (msg.type === "qr-start") {
         await refreshIfNeeded(); // never start a take on a stale token
         const settings = await getSettings();
@@ -344,6 +362,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             events: s.events,
             mic: !!s.settings.mic,
             camera: !!s.settings.camera,
+            // Save-to picker: append the take to this project as a new scene
+            // instead of assembling a fresh walkthrough project.
+            destProjectId: s.settings.destProject || "",
           },
         });
         sendResponse({ ok: true });
@@ -402,7 +423,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             message: "Upload failed: " + (msg.error || "unknown error"),
           });
         }
-        chrome.storage.session?.set({ qrLastStatus: { state: msg.state, error: msg.error || null, projectUrl: msg.projectUrl || null, progress: msg.progress || null, at: Date.now() } });
+        chrome.storage.session?.set({ qrLastStatus: { state: msg.state, error: msg.error || null, projectUrl: msg.projectUrl || null, progress: msg.progress || null, note: msg.note || null, at: Date.now() } });
         return;
       }
 

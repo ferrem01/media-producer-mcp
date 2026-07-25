@@ -68,6 +68,24 @@ export function getPreviewHtml(): string {
     cursor: pointer; transition: all 0.15s ease;
   }
   .btn-primary { background: #4f46e5; color: #fff; }
+  /* Render button states + edit lock while a render runs (edits made
+     mid-render get clobbered by the job's write-back -- lock is load-bearing) */
+  #render-btn.rendering { background: #6366f1; cursor: default; opacity: 0.9; }
+  #render-btn.failed { background: #dc2626; }
+  #download-btn.stale::after { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #f59e0b; margin-left: 6px; vertical-align: 1px; }
+  #render-menu { position: fixed; z-index: 200; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(15,23,42,0.14); padding: 4px; display: none; }
+  #render-menu button { display: block; width: 100%; text-align: left; border: none; background: none;
+    font-size: 12px; padding: 7px 12px; border-radius: 6px; cursor: pointer; color: #111827; }
+  #render-menu button:hover { background: #f3f4f6; }
+  #rendering-banner { display: none; position: fixed; top: 48px; left: 0; right: 0; z-index: 90;
+    background: #eef2ff; border-bottom: 1px solid #c7d2fe; color: #4338ca; font-size: 12px; font-weight: 500;
+    text-align: center; padding: 5px 0; }
+  body.mp-rendering #rendering-banner { display: block; }
+  body.mp-rendering #slider-wrap, body.mp-rendering #lane-gutter, body.mp-rendering #inspector,
+  body.mp-rendering .scene-sb-btn, body.mp-rendering #booth-btn, body.mp-rendering #inspect-btn {
+    pointer-events: none; opacity: 0.55; }
   .btn-primary:hover { background: #4338ca; box-shadow: 0 1px 3px rgba(79,70,229,0.3); }
   .btn-secondary { background: #f3f4f6; color: #111827; border: 1px solid #e5e7eb; }
   .btn-secondary:hover { background: #e5e7eb; }
@@ -848,6 +866,12 @@ export function getPreviewHtml(): string {
       <select id="project-select" disabled><option value="">Loading&#8230;</option></select>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
+      <span id="render-wrap" style="display:none;align-items:center;gap:4px;">
+        <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
+        <button class="btn btn-secondary" id="render-menu-btn" style="padding:5px 8px;" title="Render options">&#9662;</button>
+        <a class="btn btn-primary" id="download-btn" style="display:none;text-decoration:none;" download>&#8681; Download MP4</a>
+        <button class="btn btn-secondary" id="rerender-btn" style="display:none;" title="Render again with the latest edits">&#8635; Re-render</button>
+      </span>
       <span id="user-chip" style="display:none;align-items:center;gap:6px;margin-left:12px;font-size:11px;color:#6b7280;">
         <img id="user-pic" width="20" height="20" style="border-radius:50%;display:none;" alt="">
         <span id="user-email"></span>
@@ -927,6 +951,11 @@ export function getPreviewHtml(): string {
 <div id="prompter-bar"><div id="prompter-cur"></div><div id="prompter-next"></div></div>
 
 <div id="studio-toast"></div>
+<div id="rendering-banner">&#9881; Rendering&#8230; editing is paused until the render finishes &#8212; edits made now would not appear in the MP4 anyway.</div>
+<div id="render-menu">
+  <button data-quality="production">&#127916; Production render <span style="color:#9ca3af;">&#8212; full quality</span></button>
+  <button data-quality="preview">&#9193; Preview render <span style="color:#9ca3af;">&#8212; faster, lower res</span></button>
+</div>
 <div id="studio-ctx"></div>
 <div id="rv-pop" class="studio-pop"></div>
 <div id="cam-pop" class="studio-pop" style="width:280px;"></div>
@@ -2133,6 +2162,15 @@ export function getPreviewHtml(): string {
       // Initialize audio tracks once for the project
       initAudio();
 
+      // Render button: reflect this project's downloadable-film state. A
+      // render left running on a previously open project keeps going
+      // server-side; we just stop following it here.
+      if (render.timer) { clearTimeout(render.timer); render.timer = null; }
+      render.job = null; render.status = null; render.lastFailed = false;
+      renderLock(false);
+      updateRenderUI();
+      renderStatusRefresh();
+
       // Narration booth: offered whenever the film has screencast footage to
       // narrate over (the attach endpoint needs a screencast scene).
       var boothBtnEl = document.getElementById('booth-btn');
@@ -3178,6 +3216,135 @@ export function getPreviewHtml(): string {
       if (panel.classList.contains('open')) renderInspector();
     });
     if (close && panel) close.addEventListener('click', function() { panel.classList.remove('open'); });
+  })();
+
+  // ── Render & download (the film must be reachable from Studio -- no SSH) ──
+  // States: idle -> rendering (poll /job every 5s, editing locked) -> done
+  // (Download MP4 with a stale dot if the project changed since) / failed.
+  var render = { job: null, timer: null, status: null };
+  function renderEls() {
+    return {
+      wrap: document.getElementById('render-wrap'),
+      btn: document.getElementById('render-btn'),
+      menuBtn: document.getElementById('render-menu-btn'),
+      menu: document.getElementById('render-menu'),
+      dl: document.getElementById('download-btn'),
+      rr: document.getElementById('rerender-btn')
+    };
+  }
+  function renderLock(on) { document.body.classList.toggle('mp-rendering', !!on); }
+  function updateRenderUI() {
+    var r = renderEls();
+    if (!r.wrap) return;
+    var p = state.currentProject;
+    r.wrap.style.display = p ? 'inline-flex' : 'none';
+    if (!p) return;
+    if (render.job) {
+      var pct = render.job.percent;
+      r.btn.style.display = '';
+      r.btn.className = 'btn btn-primary rendering';
+      r.btn.textContent = '⏳ Rendering…' + (pct > 0 ? ' ' + Math.round(pct) + '%' : '');
+      r.menuBtn.style.display = 'none';
+      r.dl.style.display = 'none';
+      r.rr.style.display = 'none';
+      return;
+    }
+    var rs = render.status;
+    if (rs && rs.rendered) {
+      r.btn.style.display = 'none';
+      r.menuBtn.style.display = 'none';
+      r.dl.style.display = '';
+      r.dl.className = 'btn btn-primary' + (rs.stale ? ' stale' : '');
+      r.dl.href = rs.output_url;
+      r.dl.setAttribute('download', ((p.name || p.project_id) + '').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-') + '.mp4');
+      r.dl.title = rs.stale
+        ? 'The film changed after this MP4 was rendered — re-render to pick up the latest edits'
+        : 'Download the rendered film (' + fmtMB(rs.size_bytes) + ')';
+      r.rr.style.display = '';
+    } else {
+      r.btn.style.display = '';
+      r.btn.className = 'btn btn-primary' + (render.lastFailed ? ' failed' : '');
+      r.btn.textContent = render.lastFailed ? '↻ Retry render' : '⬇ Render';
+      r.menuBtn.style.display = '';
+      r.dl.style.display = 'none';
+      r.rr.style.display = 'none';
+    }
+  }
+  function fmtMB(bytes) {
+    if (!bytes) return '';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+  function renderStatusRefresh() {
+    var p = state.currentProject;
+    if (!p || !state.tenantId) return;
+    api('/render-status/' + state.tenantId + '/' + p.project_id).then(function(rs) {
+      render.status = rs;
+      updateRenderUI();
+    }).catch(function() { updateRenderUI(); });
+  }
+  function startRender(quality) {
+    var p = state.currentProject;
+    if (!p || render.job) return;
+    render.lastFailed = false;
+    api('POST', '/render/' + state.tenantId + '/' + p.project_id, { quality: quality || 'production' })
+      .then(function(resp) {
+        render.job = { id: resp.job_id, percent: 0 };
+        renderLock(true);
+        updateRenderUI();
+        studioStatus('Render started (' + (resp.quality || 'production') + ') — the Download button appears here when it finishes.', 'ok');
+        render.timer = setTimeout(pollRenderJob, 4000);
+      })
+      .catch(function(e) {
+        studioStatus('Could not start the render: ' + e.message, 'err');
+      });
+  }
+  function pollRenderJob() {
+    if (!render.job) return;
+    api('/job/' + state.tenantId + '/' + render.job.id).then(function(job) {
+      if (!render.job) return;
+      if (job.status === 'completed') { finishRender(true); return; }
+      if (job.status === 'failed') { finishRender(false, job.error); return; }
+      render.job.percent = (job.progress && job.progress.percent) || 0;
+      updateRenderUI();
+      render.timer = setTimeout(pollRenderJob, 5000);
+    }).catch(function() {
+      // Transient poll failure (server restart, network blip): keep trying.
+      render.timer = setTimeout(pollRenderJob, 8000);
+    });
+  }
+  function finishRender(ok, err) {
+    if (render.timer) { clearTimeout(render.timer); render.timer = null; }
+    render.job = null;
+    renderLock(false);
+    render.lastFailed = !ok;
+    if (ok) studioStatus('✓ Render complete — Download MP4 is ready.', 'ok');
+    else studioStatus('Render failed: ' + (err || 'unknown error'), 'err');
+    renderStatusRefresh();
+  }
+  (function wireRender() {
+    var r = renderEls();
+    if (!r.btn) return;
+    r.btn.addEventListener('click', function() {
+      if (render.job) return; // already rendering
+      startRender('production');
+    });
+    r.rr.addEventListener('click', function() { startRender('production'); });
+    r.menuBtn.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      var open = r.menu.style.display === 'block';
+      if (open) { r.menu.style.display = 'none'; return; }
+      var rect = r.menuBtn.getBoundingClientRect();
+      r.menu.style.top = (rect.bottom + 4) + 'px';
+      r.menu.style.left = Math.max(8, rect.right - 220) + 'px';
+      r.menu.style.display = 'block';
+    });
+    r.menu.querySelectorAll('button').forEach(function(b) {
+      b.addEventListener('click', function() {
+        r.menu.style.display = 'none';
+        startRender(b.getAttribute('data-quality') || 'production');
+      });
+    });
+    document.addEventListener('click', function() { r.menu.style.display = 'none'; });
   })();
 
   // ── Scene focus mode: the scene's own clock ──
