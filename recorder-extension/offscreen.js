@@ -194,13 +194,28 @@ async function stop(upload) {
           prompt,
           narration_embedded: !!upload.mic && !camJson,
           camera_url: camJson ? camJson.url : undefined,
+          // Save-to picker: append to this existing project instead of
+          // assembling a fresh walkthrough project.
+          dest_project_id: upload.destProjectId || undefined,
         }),
       },
     );
     const genJson = await genRes.json();
     if (!genRes.ok || !genJson.ok) throw new Error(genJson.error || `generate HTTP ${genRes.status}`);
 
-    status("done");
+    // Append mode resolves synchronously: the scene is already in the
+    // destination project -- link straight to it, no assembly to wait for.
+    if (genJson.appended_scene && genJson.project_id) {
+      status("ready", null, studioUrl(upload, genJson.project_id));
+      return;
+    }
+    // The chosen destination vanished server-side: the take still became a
+    // fresh walkthrough (today's behavior) -- say so, then poll as usual.
+    if (genJson.fallback === "new_project") {
+      status("done", null, null, null, "That project no longer exists — assembling a new walkthrough instead; it appears in Studio in a few minutes.");
+    } else {
+      status("done");
+    }
     // 4. Close the loop: poll until the project exists, then hand the user
     // its Studio link (assembly is minutes; whisper on first Mode A run more).
     pollForProject(upload, prompt);
@@ -209,10 +224,12 @@ async function stop(upload) {
   }
 }
 
+function studioUrl(upload, id) {
+  return `${upload.server}/studio?tenant=${encodeURIComponent(upload.tenant)}&project=${encodeURIComponent(id)}&token=${encodeURIComponent(upload.token)}`;
+}
+
 async function pollForProject(upload, prompt) {
   const base = upload.server;
-  const studioUrl = (id) =>
-    `${base}/studio?tenant=${encodeURIComponent(upload.tenant)}&project=${encodeURIComponent(id)}&token=${encodeURIComponent(upload.token)}`;
   for (let i = 0; i < 80; i++) {
     await new Promise((r) => setTimeout(r, 15_000));
     try {
@@ -224,11 +241,11 @@ async function pollForProject(upload, prompt) {
       // fire once scenes exist (assembly finished).
       const hit = Array.isArray(list) && list.find((p) =>
         p.name === prompt.slice(0, 60) && (p.scene_count || 0) > 0 && p.status !== "draft" && p.status !== "failed");
-      if (hit) { status("ready", null, studioUrl(hit.project_id)); return; }
+      if (hit) { status("ready", null, studioUrl(upload, hit.project_id)); return; }
     } catch (e) { /* transient; keep polling */ }
   }
 }
 
-function status(state, error, projectUrl, progress) {
-  chrome.runtime.sendMessage({ type: "qr-offscreen-status", state, error: error || null, projectUrl: projectUrl || null, progress: progress || null });
+function status(state, error, projectUrl, progress, note) {
+  chrome.runtime.sendMessage({ type: "qr-offscreen-status", state, error: error || null, projectUrl: projectUrl || null, progress: progress || null, note: note || null });
 }

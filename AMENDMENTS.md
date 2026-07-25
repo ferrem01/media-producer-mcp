@@ -1785,3 +1785,26 @@ write structured component scenes, not HTML.
 - Critique loop + editorial fix pass treat authored compositions like
   template scenes (boot gate only; regen would rebuild the same scene).
 - Instant instead of minutes per mock scene; immune to codegen drops.
+
+## Studio structure: badges + inspector + scene focus mode (Marc, 2026-07-23)
+
+Marc: should Studio expose what scenes are made of? Yes -- the data IS the
+film now. SPEC-studio-structure.md; rule: structure on the side, time on
+the bottom, film-wide lanes only for film-wide things.
+
+- Scene chips: provenance glyph (▦ template / ⬒ composition / ✦ custom)
+  -- tells the user how the scene edits before they touch it.
+- Inspector drawer (header ⬒ Inspect): scene cast as a tree + the
+  resurrected typed prop editor (it was fully built and disabled --
+  els.propEditor just had no DOM home). script arrays render as ordered
+  at+action+text rows. Saves ride the existing component PATCH.
+- Scene focus mode (dblclick a chip): timeline becomes the scene's own
+  clock -- row per component, bars enter.at..exit.at with draggable
+  edges, script diamonds draggable, beat gridlines with snap. Custom
+  scenes render one opaque bar. Every drag is an ordinary PATCH, so
+  Studio and MCP edits stay one system.
+- animationSchema accepts `at` (assembler honored it since the motion
+  architecture; the zod schema silently stripped it).
+- Live-verified on proj_fa58e846: 8▦+5⬒ badges, inspector tree +
+  7 script rows on the cowork scene, focus lane with 7 diamonds and
+  3 beat gridlines on the 13.5s scene clock.

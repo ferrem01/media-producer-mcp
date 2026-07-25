@@ -7,6 +7,7 @@
       h1 { font-size: 14px; margin: 0 0 10px; }
       label { display: block; font-size: 11px; color: #6b7280; margin: 8px 0 2px; }
       input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; }
+      select { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; background: #fff; color: #17171c; }
       #record { width: 100%; margin-top: 14px; padding: 10px; border: 0; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: #393bf5; color: #fff; }
       #record.recording { background: #dc2626; }
       #record:disabled { opacity: 0.45; cursor: default; }
@@ -43,6 +44,13 @@
       &#128247; Camera bubble (face + voice over the demo)
     </label>
     <div style="font-size:10px;color:#9ca3af;margin:2px 0 0 20px;">Records your camera and mic alongside the tab; the film shows you as a picture-in-picture bubble.</div>
+    <!-- Destination: new project (assembled walkthrough, today's behavior) or
+         append the take as a scene into an existing project. -->
+    <label for="dest">Save to</label>
+    <select id="dest">
+      <option value="">&#10133; New project</option>
+    </select>
+    <div id="dest-hint" style="font-size:10px;color:#9ca3af;margin:2px 0 0 0;">New project assembles a full walkthrough. Picking an existing project adds this take to it as a new scene.</div>
     <button id="record">● Record this tab</button>
     <div id="status"></div>
     <div class="hint">While recording: ⌘/Ctrl+Shift+N marks a chapter. Stop from this popup; the film assembles automatically and appears in Studio.</div>

@@ -18,15 +18,42 @@ function renderAuth(st) {
 }
 
 async function load() {
-  const s = await chrome.storage.sync.get({ mic: false, camera: false });
+  const s = await chrome.storage.sync.get({ mic: false, camera: false, destProject: "" });
   $("mic").checked = !!s.mic;
   $("camera").checked = !!s.camera;
-  renderAuth(await chrome.runtime.sendMessage({ type: "qr-auth-status" }));
+  const auth = await chrome.runtime.sendMessage({ type: "qr-auth-status" });
+  renderAuth(auth);
+  if (auth && auth.signedIn) loadDestinations(s.destProject);
   const { recording } = await chrome.runtime.sendMessage({ type: "qr-status" }) || {};
   setRecording(!!recording);
   const { qrLastStatus } = (await chrome.storage.session?.get("qrLastStatus")) || {};
   showStatus(qrLastStatus);
 }
+
+// "Save to" picker: default is a fresh assembled walkthrough; picking an
+// existing project appends the take to it as a new scene instead.
+async function loadDestinations(savedId) {
+  const sel = $("dest");
+  const res = await chrome.runtime.sendMessage({ type: "qr-projects" });
+  if (!res || !res.ok) return; // keep the "New project" default silently
+  const projects = (res.projects || [])
+    .filter((p) => (p.scene_count || 0) > 0 && p.status !== "failed")
+    .slice(0, 15);
+  for (const p of projects) {
+    const opt = document.createElement("option");
+    opt.value = p.project_id;
+    opt.textContent = (p.name || p.project_id).slice(0, 48);
+    sel.appendChild(opt);
+  }
+  // Restore the remembered destination -- but never point at a project that
+  // no longer exists (the value silently stays "New project" then).
+  if (savedId) sel.value = savedId;
+  if (sel.value !== savedId) sel.value = "";
+}
+
+$("dest").addEventListener("change", () => {
+  chrome.storage.sync.set({ destProject: $("dest").value });
+});
 
 $("signin").addEventListener("click", async () => {
   $("signin").disabled = true;
@@ -36,6 +63,8 @@ $("signin").addEventListener("click", async () => {
   if (res && res.ok) {
     $("status").textContent = "";
     renderAuth({ signedIn: true, ...res });
+    const { destProject } = await chrome.storage.sync.get({ destProject: "" });
+    loadDestinations(destProject);
   } else {
     $("status").textContent = "Sign-in failed: " + ((res && res.error) || "unknown error");
   }
@@ -59,7 +88,7 @@ function showStatus(st) {
       ? `Uploading… ${p.pct}% · ${(p.done / 1048576).toFixed(0)} / ${(p.total / 1048576).toFixed(0)} MB`
       : "Uploading…";
   }
-  else if (st.state === "done") $("status").textContent = "Uploaded ✓ — assembling now; the film appears in Studio in a few minutes.";
+  else if (st.state === "done") $("status").textContent = st.note || "Uploaded ✓ — assembling now; the film appears in Studio in a few minutes.";
   else if (st.state === "error") $("status").textContent = "Upload failed: " + (st.error || "unknown error");
   else if (st.state === "ready" && st.projectUrl) {
     $("status").innerHTML = "";
@@ -75,7 +104,7 @@ function showStatus(st) {
 // progress, and the terminal state also lands in storage.session (covers a
 // popup opened after the fact).
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === "qr-offscreen-status") showStatus({ state: msg.state, error: msg.error, progress: msg.progress });
+  if (msg?.type === "qr-offscreen-status") showStatus({ state: msg.state, error: msg.error, progress: msg.progress, note: msg.note });
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && changes.qrLastStatus?.newValue) showStatus(changes.qrLastStatus.newValue);

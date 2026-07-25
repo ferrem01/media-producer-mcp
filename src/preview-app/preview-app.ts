@@ -68,6 +68,24 @@ export function getPreviewHtml(): string {
     cursor: pointer; transition: all 0.15s ease;
   }
   .btn-primary { background: #4f46e5; color: #fff; }
+  /* Render button states + edit lock while a render runs (edits made
+     mid-render get clobbered by the job's write-back -- lock is load-bearing) */
+  #render-btn.rendering { background: #6366f1; cursor: default; opacity: 0.9; }
+  #render-btn.failed { background: #dc2626; }
+  #download-btn.stale::after { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #f59e0b; margin-left: 6px; vertical-align: 1px; }
+  #render-menu { position: fixed; z-index: 200; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(15,23,42,0.14); padding: 4px; display: none; }
+  #render-menu button { display: block; width: 100%; text-align: left; border: none; background: none;
+    font-size: 12px; padding: 7px 12px; border-radius: 6px; cursor: pointer; color: #111827; }
+  #render-menu button:hover { background: #f3f4f6; }
+  #rendering-banner { display: none; position: fixed; top: 48px; left: 0; right: 0; z-index: 90;
+    background: #eef2ff; border-bottom: 1px solid #c7d2fe; color: #4338ca; font-size: 12px; font-weight: 500;
+    text-align: center; padding: 5px 0; }
+  body.mp-rendering #rendering-banner { display: block; }
+  body.mp-rendering #slider-wrap, body.mp-rendering #lane-gutter, body.mp-rendering #inspector,
+  body.mp-rendering .scene-sb-btn, body.mp-rendering #booth-btn, body.mp-rendering #inspect-btn {
+    pointer-events: none; opacity: 0.55; }
   .btn-primary:hover { background: #4338ca; box-shadow: 0 1px 3px rgba(79,70,229,0.3); }
   .btn-secondary { background: #f3f4f6; color: #111827; border: 1px solid #e5e7eb; }
   .btn-secondary:hover { background: #e5e7eb; }
@@ -122,6 +140,10 @@ export function getPreviewHtml(): string {
     margin-right: 6px;
   }
   .scene-item:hover { background: #f9fafb; transform: translateX(1px); }
+  .scene-prov { display: inline-block; margin-right: 5px; font-size: 10px; line-height: 1; vertical-align: 1px; cursor: help; }
+  .scene-prov.sp-template { color: #0ea5e9; }
+  .scene-prov.sp-composition { color: #6366f1; }
+  .scene-prov.sp-custom { color: #d48c34; }
   .scene-item.active {
     background: #eef2ff;
     border-left-color: #6366f1;
@@ -214,7 +236,7 @@ export function getPreviewHtml(): string {
   .lane-bed.speaker { background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.18); border-radius: 6px; }
   .lane-bed.music { background: rgba(148,163,184,0.08); border: 1px solid rgba(148,163,184,0.16); border-radius: 5px; }
   /* The playhead: one line through every lane, driven by the master clock. */
-  #playhead-line { position: absolute; top: 18px; bottom: 0; width: 1.5px; background: #4f46e5; opacity: 0.45; z-index: 5; pointer-events: none; }
+  #playhead-line { position: absolute; top: 18px; bottom: 0; width: 1.5px; background: #4f46e5; opacity: 0.45; z-index: 40; pointer-events: none; }
   /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
   #audio-lanes { position: absolute; left: 0; right: 0; top: 86px; height: 10px; pointer-events: none; }
   .audio-lane-seg { position: absolute; height: 4px; border-radius: 2px; pointer-events: auto; }
@@ -527,6 +549,69 @@ export function getPreviewHtml(): string {
   .sm-status.ok { color: #34d399; }
   .sm-status.err { color: #f87171; }
 
+  /* Inspector drawer (scene structure) */
+  #inspector {
+    position: fixed; top: 48px; right: 0; bottom: 0; width: 340px; z-index: 60;
+    background: #ffffff; border-left: 1px solid #e5e7eb; box-shadow: -8px 0 24px rgba(15,23,42,0.08);
+    transform: translateX(100%); transition: transform 0.18s ease; display: flex; flex-direction: column;
+  }
+  #inspector.open { transform: translateX(0); }
+  .insp-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #f3f4f6; }
+  #insp-title { font-size: 13px; font-weight: 600; color: #111827; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .insp-prov { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: #eef2ff; cursor: help; }
+  .insp-prov.sp-template { color: #0284c7; background: #e0f2fe; }
+  .insp-prov.sp-composition { color: #4f46e5; background: #eef2ff; }
+  .insp-prov.sp-custom { color: #b45309; background: #fef3c7; }
+  #insp-close { border: none; background: none; font-size: 18px; color: #9ca3af; cursor: pointer; line-height: 1; }
+  #insp-tree { max-height: 38%; overflow-y: auto; border-bottom: 1px solid #f3f4f6; padding: 6px 8px; }
+  .insp-node { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 8px;
+    border-radius: 6px; cursor: pointer; font-size: 12px; color: #374151; }
+  .insp-node:hover { background: #f3f4f6; }
+  .insp-node.active { background: #eef2ff; color: #4338ca; }
+  .insp-node .in-type { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .insp-node .in-meta { font-size: 10px; color: #9ca3af; flex-shrink: 0; }
+  #prop-editor { flex: 1; overflow-y: auto; padding: 4px 10px 16px; }
+  .prop-script-row { display: flex; gap: 5px; align-items: center; margin-bottom: 4px; }
+  .prop-script-row .ps-at { width: 54px; font-size: 11px; padding: 3px 4px; border: 1px solid #e5e7eb; border-radius: 5px; }
+  .prop-script-row .ps-action { font-size: 10px; font-weight: 600; color: #6366f1; width: 92px; flex-shrink: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prop-script-row .ps-text { flex: 1; font-size: 11px; padding: 3px 5px; border: 1px solid #e5e7eb; border-radius: 5px; min-width: 0; }
+
+  /* Scene focus mode: detail rows ON THE SAME timeline -- same scrubber,
+     same playhead, same zoom. Rows live in FILM coordinates, spanning the
+     scene's segment of the track; the rest of the film is dimmed. Sits
+     below the ruler so the film scrubber stays visible and in charge. */
+  #focus-lane { position: absolute; left: 0; right: 0; top: 22px; z-index: 25;
+    background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px;
+    overflow: visible; pointer-events: auto; }
+  #focus-lane * { pointer-events: auto; }
+  .fm-shade { position: absolute; top: 0; bottom: 0; background: rgba(148,163,184,0.22); pointer-events: none !important; }
+  /* The header rides the scrollport, not the track: sticky so "where am I"
+     and the way out are visible no matter where you scroll or zoom. */
+  .fm-head { position: sticky; left: 6px; top: 0; z-index: 8; display: inline-flex; width: max-content;
+    align-items: center; gap: 8px; height: 24px; padding: 0 4px; }
+  #fm-exit { border: 1px solid #a5b4fc; background: #ffffff; color: #4338ca; font-size: 11px; font-weight: 600;
+    padding: 2px 10px; border-radius: 999px; cursor: pointer; box-shadow: 0 1px 3px rgba(67,56,202,0.15); }
+  #fm-exit:hover { background: #eef2ff; border-color: #6366f1; }
+  .fm-title { font-size: 10px; color: #6470a5; letter-spacing: 0.02em; white-space: nowrap;
+    background: rgba(255,255,255,0.85); padding: 2px 8px; border-radius: 999px; }
+  .fm-track { position: absolute; left: 0; right: 0; top: 26px; bottom: 4px; }
+  .fm-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(100,116,139,0.16); pointer-events: none !important; }
+  .fm-grid.fm-beat { background: rgba(99,102,241,0.45); }
+  .fm-row { position: absolute; left: 0; right: 0; height: 22px; }
+  .fm-bar { position: absolute; top: 3px; height: 15px; background: linear-gradient(180deg, #6366f1, #4f46e5);
+    border-radius: 4px; opacity: 0.95; overflow: hidden; }
+  .fm-bar .fm-bar-label { font-size: 9px; color: #e0e7ff; padding: 1.5px 8px; display: block;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none !important; }
+  .fm-bar.fm-custom { background: repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 6px, #b6c2d4 6px, #b6c2d4 12px); }
+  .fm-bar.fm-custom .fm-bar-label { color: #475569; }
+  .fm-edge { position: absolute; top: -2px; bottom: -2px; width: 8px; cursor: ew-resize; border-radius: 3px; }
+  .fm-edge:hover { background: rgba(255,255,255,0.5); }
+  .fm-edge-l { left: -3px; } .fm-edge-r { right: -3px; }
+  .fm-diamond { position: absolute; top: 6px; width: 9px; height: 9px; margin-left: -4.5px; background: #f59e0b;
+    transform: rotate(45deg); cursor: grab; border-radius: 2px; box-shadow: 0 0 0 1.5px #ffffff; z-index: 3; }
+  .fm-diamond:hover { background: #fbbf24; }
+
   /* Prop Editor */
   #props-panel {
     overflow-y: auto;
@@ -780,6 +865,13 @@ export function getPreviewHtml(): string {
       <label>Project</label>
       <select id="project-select" disabled><option value="">Loading&#8230;</option></select>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
+      <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
+      <span id="render-wrap" style="display:none;align-items:center;gap:4px;">
+        <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
+        <button class="btn btn-secondary" id="render-menu-btn" style="padding:5px 8px;" title="Render options">&#9662;</button>
+        <a class="btn btn-primary" id="download-btn" style="display:none;text-decoration:none;" download>&#8681; Download MP4</a>
+        <button class="btn btn-secondary" id="rerender-btn" style="display:none;" title="Render again with the latest edits">&#8635; Re-render</button>
+      </span>
       <span id="user-chip" style="display:none;align-items:center;gap:6px;margin-left:12px;font-size:11px;color:#6b7280;">
         <img id="user-pic" width="20" height="20" style="border-radius:50%;display:none;" alt="">
         <span id="user-email"></span>
@@ -791,6 +883,20 @@ export function getPreviewHtml(): string {
   <div id="sidebar">
     <div class="sidebar-header">Scenes</div>
     <div id="scene-list"><div class="empty-state">Load a project</div></div>
+  </div>
+
+  <!-- Inspector drawer (SPEC-studio-structure): the current scene's cast --
+       component tree + typed data editor. Structure lives on the side;
+       time lives on the bottom. -->
+  <div id="inspector">
+    <div class="insp-head">
+      <span id="insp-title">Scene</span>
+      <span id="insp-prov" class="insp-prov"></span>
+      <button id="insp-close" title="Close">&#215;</button>
+    </div>
+    <div id="insp-tree"><div class="empty-state">Load a project</div></div>
+    <div class="panel-header">Properties</div>
+    <div id="prop-editor"><div class="empty-state">Select a component</div></div>
   </div>
 
   <div id="main">
@@ -830,6 +936,7 @@ export function getPreviewHtml(): string {
         <div id="cam-pills"></div>
         <div id="fx-lane"></div>
         <div id="media-lane"></div>
+        <div id="focus-lane" style="display:none;"></div>
         <canvas id="wave-strip"></canvas>
         <div id="word-lane"></div>
         <div id="playhead-line" style="display:none"></div>
@@ -844,6 +951,11 @@ export function getPreviewHtml(): string {
 <div id="prompter-bar"><div id="prompter-cur"></div><div id="prompter-next"></div></div>
 
 <div id="studio-toast"></div>
+<div id="rendering-banner">&#9881; Rendering&#8230; editing is paused until the render finishes &#8212; edits made now would not appear in the MP4 anyway.</div>
+<div id="render-menu">
+  <button data-quality="production">&#127916; Production render <span style="color:#9ca3af;">&#8212; full quality</span></button>
+  <button data-quality="preview">&#9193; Preview render <span style="color:#9ca3af;">&#8212; faster, lower res</span></button>
+</div>
 <div id="studio-ctx"></div>
 <div id="rv-pop" class="studio-pop"></div>
 <div id="cam-pop" class="studio-pop" style="width:280px;"></div>
@@ -2050,6 +2162,15 @@ export function getPreviewHtml(): string {
       // Initialize audio tracks once for the project
       initAudio();
 
+      // Render button: reflect this project's downloadable-film state. A
+      // render left running on a previously open project keeps going
+      // server-side; we just stop following it here.
+      if (render.timer) { clearTimeout(render.timer); render.timer = null; }
+      render.job = null; render.status = null; render.lastFailed = false;
+      renderLock(false);
+      updateRenderUI();
+      renderStatusRefresh();
+
       // Narration booth: offered whenever the film has screencast footage to
       // narrate over (the attach endpoint needs a screencast scene).
       var boothBtnEl = document.getElementById('booth-btn');
@@ -2142,6 +2263,22 @@ export function getPreviewHtml(): string {
   }
 
   // Render scene list in sidebar
+  // ── Scene provenance (SPEC-studio-structure) ──
+  // How a scene was built determines how it edits: template and composition
+  // scenes are structured data (instant, deterministic edits); custom scenes
+  // are generated code (edits go through the AI revise pass).
+  function sceneProvenance(scene) {
+    var comps = (scene && scene.components) || [];
+    if (comps.some(function(c) { return typeof c.type === 'string' && c.type.indexOf('st-') === 0; })) return 'template';
+    if (comps.some(function(c) { return /^scene_/.test(c.type || ''); })) return 'custom';
+    return 'composition';
+  }
+  var PROVENANCE = {
+    template:    { glyph: '\\u25a6', label: 'Template',    tip: 'Template scene \\u2014 designer-built composition. Edits are instant slot-data edits.' },
+    composition: { glyph: '\\u2b12', label: 'Composition', tip: 'Composition \\u2014 structured library components with data (and scripts). Edits apply directly.' },
+    custom:      { glyph: '\\u2726', label: 'Custom',      tip: 'Custom scene \\u2014 bespoke generated code. Edits go through an AI revise pass.' },
+  };
+
   function renderSceneList() {
     var project = state.currentProject;
     if (!project || !project.scenes || !project.scenes.length) {
@@ -2165,10 +2302,11 @@ export function getPreviewHtml(): string {
           badgeHtml = '<span class="scene-quality-badge qb-warn" title="' + escAttr((q.unresolved_defects || []).join('\\n')) + '">\\u26a0 shipped with ' + n + ' unresolved</span>';
         }
       }
+      var prov = PROVENANCE[sceneProvenance(scene)];
       html += '<div class="scene-item' + (active ? ' active' : '') + '" data-index="' + i + '">'
         + '<div class="scene-thumb" data-scene-id="' + escHtml(scene.id) + '"></div>'
         + '<div class="scene-info">'
-        + '<div class="scene-label">' + (i + 1) + '. ' + escHtml(label) + '</div>'
+        + '<div class="scene-label"><span class="scene-prov sp-' + sceneProvenance(scene) + '" title="' + escAttr(prov.tip) + '">' + prov.glyph + '</span>' + (i + 1) + '. ' + escHtml(label) + '</div>'
         + '<div class="scene-meta-row">'
         + '<span class="scene-dur">' + (scene.duration_seconds || 0).toFixed(1) + 's' + (beatCount ? ' \\u00b7 ' + beatCount + ' beats' : '') + '</span>'
         + '<button class="scene-sb-btn" data-index="' + i + '" title="Storyboard, defects &amp; regenerate">&#x2261; Storyboard</button>'
@@ -2185,6 +2323,14 @@ export function getPreviewHtml(): string {
     els.sceneList.querySelectorAll('.scene-item').forEach(function(el) {
       el.addEventListener('click', function() {
         selectScene(parseInt(el.dataset.index, 10));
+      });
+      // Double-click: TOGGLE scene focus mode -- the timeline becomes this
+      // scene's component timeline (SPEC-studio-structure).
+      el.addEventListener('dblclick', function() {
+        var idx = parseInt(el.dataset.index, 10);
+        if (focusSceneIdx === idx) { exitFocus(); return; }
+        selectScene(idx);
+        enterFocus(idx);
       });
     });
 
@@ -2227,6 +2373,8 @@ export function getPreviewHtml(): string {
     var wasPlaying = state.playing;
     state.currentSceneIndex = index;
     state.currentComponentIndex = -1;
+    if (focusSceneIdx >= 0 && focusSceneIdx !== index) exitFocus();
+    if (inspOpen()) setTimeout(renderInspector, 0);
 
     // Stop the animation loop but preserve music state
     if (state.animFrameId) {
@@ -2801,6 +2949,22 @@ export function getPreviewHtml(): string {
             html += '<input type="text" class="prop-input" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
           }
 
+        } else if (key === 'script' && Array.isArray(val) && val.length && val.every(function(a) { return a && typeof a === 'object' && a.action; })) {
+          // Scripted performance: ordered action rows (at + action + text).
+          // The at times are the scene's choreography -- same data the focus
+          // mode diamonds drag.
+          html += '<div class="prop-script" data-key="script">';
+          val.forEach(function(a, ai) {
+            html += '<div class="prop-script-row">'
+              + '<input type="number" step="0.1" min="0" class="ps-at" data-ai="' + ai + '" value="' + (typeof a.at === 'number' ? a.at : '') + '" title="scene-local time (s)">'
+              + '<span class="ps-action" title="' + escAttr(a.action) + '">' + escHtml(a.action) + '</span>'
+              + (typeof a.text === 'string'
+                  ? '<input type="text" class="ps-text" data-ai="' + ai + '" value="' + escAttr(a.text) + '">'
+                  : '<span class="ps-text" style="border:none;color:#9ca3af;">' + escHtml(JSON.stringify(a).slice(0, 60)) + '</span>')
+              + '</div>';
+          });
+          html += '</div>';
+
         } else if (Array.isArray(val)) {
           // Array: check if it's an array of color strings
           var isColorArray = val.length > 0 && val.every(function(v) { return isColorValue(v); });
@@ -2953,6 +3117,20 @@ export function getPreviewHtml(): string {
         input.addEventListener('input', handler);
       }
     });
+
+    // Script rows: retime an action or rewrite its text
+    els.propEditor.querySelectorAll('.prop-script .ps-at').forEach(function(inp) {
+      inp.addEventListener('change', function() {
+        var a = (comp.data.script || [])[parseInt(inp.dataset.ai, 10)];
+        if (a) { a.at = parseFloat(inp.value) || 0; savePropDebounced(); }
+      });
+    });
+    els.propEditor.querySelectorAll('.prop-script input.ps-text').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        var a = (comp.data.script || [])[parseInt(inp.dataset.ai, 10)];
+        if (a) { a.text = inp.value; savePropDebounced(); }
+      });
+    });
   }
 
   function clearProps() {
@@ -2965,6 +3143,429 @@ export function getPreviewHtml(): string {
   function savePropDebounced() {
     if (_saveTimer) clearTimeout(_saveTimer);
     _saveTimer = setTimeout(savePropNow, 400);
+  }
+
+  // ── Inspector drawer (SPEC-studio-structure) ──
+  // The scene's cast: one node per component; selecting one drives the
+  // typed prop editor below. Hover outlines the element on canvas.
+  function inspOpen() {
+    var el = document.getElementById('inspector');
+    return !!(el && el.classList.contains('open'));
+  }
+  function renderInspector() {
+    var host = document.getElementById('insp-tree');
+    if (!host) return;
+    var project = state.currentProject;
+    var scene = project && project.scenes && project.scenes[state.currentSceneIndex];
+    var titleEl = document.getElementById('insp-title');
+    var provEl = document.getElementById('insp-prov');
+    if (!scene) {
+      host.innerHTML = '<div class="empty-state">No scene selected</div>';
+      if (titleEl) titleEl.textContent = 'Scene';
+      if (provEl) { provEl.textContent = ''; provEl.title = ''; }
+      clearProps();
+      return;
+    }
+    var kind = sceneProvenance(scene);
+    var prov = PROVENANCE[kind];
+    if (titleEl) titleEl.textContent = scene.label || scene.id;
+    if (provEl) { provEl.textContent = prov.glyph + ' ' + prov.label; provEl.title = prov.tip; provEl.className = 'insp-prov sp-' + kind; }
+    var html = '';
+    (scene.components || []).forEach(function(c, i) {
+      var isCustom = /^scene_/.test(c.type || '');
+      var scripts = (c.data && Array.isArray(c.data.script)) ? c.data.script.length : 0;
+      var inAt = (c.enter && typeof c.enter.at === 'number') ? c.enter.at : null;
+      var meta = [];
+      if (scripts) meta.push(scripts + ' actions');
+      if (inAt !== null) meta.push('in @' + inAt.toFixed(1) + 's');
+      html += '<div class="insp-node' + (i === state.currentComponentIndex ? ' active' : '') + '" data-ci="' + i + '">'
+        + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : c.type) + '</span>'
+        + '<span class="in-meta">' + escHtml(meta.join(' \\u00b7 ')) + '</span>'
+        + '</div>';
+    });
+    host.innerHTML = html || '<div class="empty-state">No components</div>';
+    host.querySelectorAll('.insp-node').forEach(function(node) {
+      var ci = parseInt(node.dataset.ci, 10);
+      node.addEventListener('click', function() {
+        state.currentComponentIndex = ci;
+        renderInspector();
+        renderProps();
+      });
+      node.addEventListener('mouseenter', function() { outlineComp(ci, true); });
+      node.addEventListener('mouseleave', function() { outlineComp(ci, false); });
+    });
+    renderProps();
+  }
+  function outlineComp(ci, on) {
+    try {
+      var scene = state.currentProject.scenes[state.currentSceneIndex];
+      var comp = scene.components[ci];
+      if (!comp) return;
+      var doc = els.previewIframe.contentDocument;
+      var el = doc.querySelector('[data-cid="' + scene.id + '__' + comp.id + '"]')
+        || doc.querySelector('[data-cid="' + comp.id + '"]');
+      if (el) el.style.outline = on ? '2px solid #6366f1' : '';
+    } catch (e) {}
+  }
+  (function wireInspector() {
+    var btn = document.getElementById('inspect-btn');
+    var panel = document.getElementById('inspector');
+    var close = document.getElementById('insp-close');
+    if (btn && panel) btn.addEventListener('click', function() {
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) renderInspector();
+    });
+    if (close && panel) close.addEventListener('click', function() { panel.classList.remove('open'); });
+  })();
+
+  // ── Render & download (the film must be reachable from Studio -- no SSH) ──
+  // States: idle -> rendering (poll /job every 5s, editing locked) -> done
+  // (Download MP4 with a stale dot if the project changed since) / failed.
+  var render = { job: null, timer: null, status: null };
+  function renderEls() {
+    return {
+      wrap: document.getElementById('render-wrap'),
+      btn: document.getElementById('render-btn'),
+      menuBtn: document.getElementById('render-menu-btn'),
+      menu: document.getElementById('render-menu'),
+      dl: document.getElementById('download-btn'),
+      rr: document.getElementById('rerender-btn')
+    };
+  }
+  function renderLock(on) { document.body.classList.toggle('mp-rendering', !!on); }
+  function updateRenderUI() {
+    var r = renderEls();
+    if (!r.wrap) return;
+    var p = state.currentProject;
+    r.wrap.style.display = p ? 'inline-flex' : 'none';
+    if (!p) return;
+    if (render.job) {
+      var pct = render.job.percent;
+      r.btn.style.display = '';
+      r.btn.className = 'btn btn-primary rendering';
+      r.btn.textContent = '⏳ Rendering…' + (pct > 0 ? ' ' + Math.round(pct) + '%' : '');
+      r.menuBtn.style.display = 'none';
+      r.dl.style.display = 'none';
+      r.rr.style.display = 'none';
+      return;
+    }
+    var rs = render.status;
+    if (rs && rs.rendered) {
+      r.btn.style.display = 'none';
+      r.menuBtn.style.display = 'none';
+      r.dl.style.display = '';
+      r.dl.className = 'btn btn-primary' + (rs.stale ? ' stale' : '');
+      r.dl.href = rs.output_url;
+      // NB: explicit character classes -- backslash classes (\w, \s) get
+      // eaten by the outer template literal and mangle the regex.
+      var fname = ((p.name || p.project_id) + '').replace(/[^A-Za-z0-9 _-]/g, '').replace(/ +/g, '-').replace(/^-+|-+$/g, '');
+      r.dl.setAttribute('download', (fname || p.project_id) + '.mp4');
+      r.dl.title = rs.stale
+        ? 'The film changed after this MP4 was rendered — re-render to pick up the latest edits'
+        : 'Download the rendered film (' + fmtMB(rs.size_bytes) + ')';
+      r.rr.style.display = '';
+    } else {
+      r.btn.style.display = '';
+      r.btn.className = 'btn btn-primary' + (render.lastFailed ? ' failed' : '');
+      r.btn.textContent = render.lastFailed ? '↻ Retry render' : '⬇ Render';
+      r.menuBtn.style.display = '';
+      r.dl.style.display = 'none';
+      r.rr.style.display = 'none';
+    }
+  }
+  function fmtMB(bytes) {
+    if (!bytes) return '';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+  function renderStatusRefresh() {
+    var p = state.currentProject;
+    if (!p || !state.tenantId) return;
+    api('/render-status/' + state.tenantId + '/' + p.project_id).then(function(rs) {
+      render.status = rs;
+      updateRenderUI();
+    }).catch(function() { updateRenderUI(); });
+  }
+  function startRender(quality) {
+    var p = state.currentProject;
+    if (!p || render.job) return;
+    render.lastFailed = false;
+    api('POST', '/render/' + state.tenantId + '/' + p.project_id, { quality: quality || 'production' })
+      .then(function(resp) {
+        render.job = { id: resp.job_id, percent: 0 };
+        renderLock(true);
+        updateRenderUI();
+        studioStatus('Render started (' + (resp.quality || 'production') + ') — the Download button appears here when it finishes.', 'ok');
+        render.timer = setTimeout(pollRenderJob, 4000);
+      })
+      .catch(function(e) {
+        studioStatus('Could not start the render: ' + e.message, 'err');
+      });
+  }
+  function pollRenderJob() {
+    if (!render.job) return;
+    api('/job/' + state.tenantId + '/' + render.job.id).then(function(job) {
+      if (!render.job) return;
+      if (job.status === 'completed') { finishRender(true); return; }
+      if (job.status === 'failed') { finishRender(false, job.error); return; }
+      render.job.percent = (job.progress && job.progress.percent) || 0;
+      updateRenderUI();
+      render.timer = setTimeout(pollRenderJob, 5000);
+    }).catch(function() {
+      // Transient poll failure (server restart, network blip): keep trying.
+      render.timer = setTimeout(pollRenderJob, 8000);
+    });
+  }
+  function finishRender(ok, err) {
+    if (render.timer) { clearTimeout(render.timer); render.timer = null; }
+    render.job = null;
+    renderLock(false);
+    render.lastFailed = !ok;
+    if (ok) studioStatus('✓ Render complete — Download MP4 is ready.', 'ok');
+    else studioStatus('Render failed: ' + (err || 'unknown error'), 'err');
+    renderStatusRefresh();
+  }
+  (function wireRender() {
+    var r = renderEls();
+    if (!r.btn) return;
+    r.btn.addEventListener('click', function() {
+      if (render.job) return; // already rendering
+      startRender('production');
+    });
+    r.rr.addEventListener('click', function() { startRender('production'); });
+    r.menuBtn.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      var open = r.menu.style.display === 'block';
+      if (open) { r.menu.style.display = 'none'; return; }
+      var rect = r.menuBtn.getBoundingClientRect();
+      r.menu.style.top = (rect.bottom + 4) + 'px';
+      r.menu.style.left = Math.max(8, rect.right - 220) + 'px';
+      r.menu.style.display = 'block';
+    });
+    r.menu.querySelectorAll('button').forEach(function(b) {
+      b.addEventListener('click', function() {
+        r.menu.style.display = 'none';
+        startRender(b.getAttribute('data-quality') || 'production');
+      });
+    });
+    document.addEventListener('click', function() { r.menu.style.display = 'none'; });
+  })();
+
+  // ── Scene focus mode: the scene's own clock ──
+  // Double-click a scene chip: the timeline area becomes THAT scene's
+  // component timeline -- bars (enter.at..exit.at), script diamonds, beat
+  // gridlines, all draggable with snap. Every drag is an ordinary PATCH.
+  var focusSceneIdx = -1;
+  function refreshCompositeQuiet() {
+    var p = state.currentProject;
+    if (!p || !state.compositeLoaded) return;
+    var saved = state.masterTime || 0;
+    fetchHtml('/preview-composite/' + state.tenantId + '/' + p.project_id).then(function(h) {
+      state._compositeHtml = h;
+      writeSceneToIframe(h);
+      setTimeout(function() {
+        var tl = getCompositeMasterTimeline();
+        if (tl) { tl.time(saved); tl.pause(); }
+      }, 600);
+    });
+  }
+  function exitFocus() {
+    focusSceneIdx = -1;
+    var fl = document.getElementById('focus-lane');
+    if (fl) { fl.style.display = 'none'; fl.innerHTML = ''; }
+  }
+  function enterFocus(idx) {
+    focusSceneIdx = idx;
+    renderFocusLane();
+  }
+  function focusBeatBounds(scene, dur) {
+    var bounds = []; var acc = 0;
+    (scene.beats || []).forEach(function(b) {
+      acc += (b.duration_seconds || 0);
+      if (acc < dur - 0.05) bounds.push(Math.round(acc * 100) / 100);
+    });
+    return bounds;
+  }
+  function renderFocusLane() {
+    var fl = document.getElementById('focus-lane');
+    if (!fl) return;
+    var p = state.currentProject;
+    var scene = p && p.scenes && p.scenes[focusSceneIdx];
+    if (!scene) { exitFocus(); return; }
+    var dur = scene.duration_seconds || 5;
+    var comps = scene.components || [];
+    var bounds = focusBeatBounds(scene, dur);
+    // FILM coordinates throughout: the rows span only this scene's segment
+    // of the track, so the master scrubber, playhead, zoom and play button
+    // all keep working exactly as they do everywhere else.
+    var total = state.totalDuration || calcTotalDuration();
+    var start = fmSceneStart();
+    var toPct = function(filmT) { return ((filmT / total) * 100).toFixed(3) + '%'; };
+    var html = '<div class="fm-head">'
+      + '<button id="fm-exit" title="Back to the film timeline (Esc, or double-click the scene again)">\\u2190 Back to film</button>'
+      + '<span class="fm-title">' + escHtml(scene.label || scene.id) + ' \\u00b7 ' + dur.toFixed(1) + 's'
+      + (bounds.length ? ' \\u00b7 ' + (bounds.length + 1) + ' beats (drags snap)' : '') + '</span>'
+      + '</div>';
+    html += '<div class="fm-track" id="fm-track">';
+    // The rest of the film, dimmed -- the segment in focus stays bright.
+    html += '<div class="fm-shade" style="left:0;width:' + toPct(start) + '"></div>';
+    html += '<div class="fm-shade" style="left:' + toPct(start + dur) + ';right:0"></div>';
+    for (var s = 1; s < dur; s++) html += '<div class="fm-grid fm-sec" style="left:' + toPct(start + s) + '"></div>';
+    bounds.forEach(function(b) { html += '<div class="fm-grid fm-beat" style="left:' + toPct(start + b) + '"></div>'; });
+    comps.forEach(function(c, i) {
+      var isCustom = /^scene_/.test(c.type || '');
+      var inAt = (c.enter && typeof c.enter.at === 'number') ? c.enter.at : 0;
+      var outAt = (c.exit && typeof c.exit.at === 'number') ? c.exit.at : dur;
+      html += '<div class="fm-row" style="top:' + (i * 22) + 'px" data-ci="' + i + '">'
+        + '<div class="fm-bar' + (isCustom ? ' fm-custom' : '') + '" data-ci="' + i + '" style="left:' + toPct(start + inAt) + ';width:' + (((outAt - inAt) / total) * 100).toFixed(3) + '%"'
+        + ' title="' + escAttr(c.type + ' \\u2014 on stage ' + inAt.toFixed(1) + 's\\u2013' + outAt.toFixed(1) + 's (scene clock)') + '">'
+        + '<span class="fm-bar-label">' + escHtml(isCustom ? 'custom scene' : c.type) + '</span>'
+        + (isCustom ? '' :
+            '<span class="fm-edge fm-edge-l" data-ci="' + i + '" title="Drag: entrance time"></span>'
+          + '<span class="fm-edge fm-edge-r" data-ci="' + i + '" title="Drag: exit time"></span>')
+        + '</div>';
+      var script = (c.data && Array.isArray(c.data.script)) ? c.data.script : [];
+      script.forEach(function(a, si) {
+        if (!a || typeof a.at !== 'number') return;
+        html += '<div class="fm-diamond" data-ci="' + i + '" data-si="' + si + '" style="left:' + toPct(start + Math.min(a.at, dur)) + '"'
+          + ' title="' + escAttr((a.action || 'action') + ' @ ' + a.at.toFixed(2) + 's \\u2014 drag to retime') + '"></div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+    fl.style.display = 'block';
+    fl.style.height = (30 + comps.length * 22 + 6) + 'px';
+    fl.innerHTML = html;
+    var ex = document.getElementById('fm-exit');
+    if (ex) ex.addEventListener('click', exitFocus);
+    wireFocusDrags(scene, dur, bounds, start, total);
+  }
+  // ── Focus transport: playhead, scrub, scene-play, Esc ──
+  function fmSceneStart() {
+    try {
+      var meta = els.previewIframe.contentWindow.__MP_SCENE_META;
+      return meta && meta[focusSceneIdx] ? meta[focusSceneIdx].start : sceneOffset(focusSceneIdx);
+    } catch (e) { return sceneOffset(focusSceneIdx); }
+  }
+  function fmSeekLocal(t, dur) {
+    var start = fmSceneStart();
+    var clamped = Math.max(0, Math.min(dur, t));
+    try {
+      var tl = getCompositeMasterTimeline();
+      if (tl && !state.playing) { tl.time(start + clamped); tl.pause(); }
+      state.masterTime = start + clamped;
+      // Keep the film scrubber in step -- the app's sync loop treats the
+      // slider as truth, so a seek that skips it gets snapped right back.
+      if (els.slider && state.totalDuration > 0) {
+        els.slider.value = Math.round(((start + clamped) / state.totalDuration) * 1000);
+      }
+      updateTimeDisplay(start + clamped);
+    } catch (e) {}
+  }
+  document.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Escape' && focusSceneIdx >= 0) { exitFocus(); ev.stopPropagation(); }
+  });
+  function fmSnap(t, dur, bounds) {
+    var cands = bounds.slice();
+    for (var s = 0; s <= Math.ceil(dur * 2); s++) cands.push(s / 2);
+    var best = t, bd = 0.18;
+    cands.forEach(function(c) { var d = Math.abs(c - t); if (d < bd) { bd = d; best = c; } });
+    return Math.max(0, Math.min(dur, Math.round(best * 100) / 100));
+  }
+  function wireFocusDrags(scene, dur, bounds, segStart, filmTotal) {
+    var track = document.getElementById('fm-track');
+    if (!track) return;
+    // px -> SCENE-LOCAL seconds (the track is film-wide; storage is local).
+    function pxToT(clientX) {
+      var r = track.getBoundingClientRect();
+      var filmT = ((clientX - r.left) / Math.max(1, r.width)) * filmTotal;
+      return fmSnap(filmT - segStart, dur, bounds);
+    }
+    var toPct = function(localT) { return (((segStart + localT) / filmTotal) * 100).toFixed(3) + '%'; };
+    function patchComp(comp, body, done) {
+      var p = state.currentProject;
+      var path = '/projects/' + state.tenantId + '/' + p.project_id + '/scenes/' + scene.id + '/components/' + comp.id;
+      api('PATCH', path, body).then(function() {
+        refreshCompositeQuiet();
+        if (inspOpen()) renderInspector();
+        if (done) done();
+      }).catch(function() {});
+    }
+    track.querySelectorAll('.fm-diamond').forEach(function(d) {
+      d.addEventListener('pointerdown', function(ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        d.setPointerCapture(ev.pointerId);
+        var comp = scene.components[parseInt(d.dataset.ci, 10)];
+        var si = parseInt(d.dataset.si, 10);
+        function mv(e2) { var t = pxToT(e2.clientX); d._t = t; d.style.left = toPct(t); }
+        function up() {
+          d.removeEventListener('pointermove', mv); d.removeEventListener('pointerup', up);
+          if (typeof d._t === 'number' && comp && comp.data && comp.data.script && comp.data.script[si]) {
+            comp.data.script[si].at = d._t;
+            patchComp(comp, { data: { script: comp.data.script } });
+          }
+        }
+        d.addEventListener('pointermove', mv);
+        d.addEventListener('pointerup', up);
+      });
+    });
+    track.querySelectorAll('.fm-edge').forEach(function(edge) {
+      edge.addEventListener('pointerdown', function(ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        edge.setPointerCapture(ev.pointerId);
+        var comp = scene.components[parseInt(edge.dataset.ci, 10)];
+        var isL = edge.classList.contains('fm-edge-l');
+        var bar = edge.parentElement;
+        function mv(e2) {
+          var t = pxToT(e2.clientX);
+          edge._t = t;
+          var inAt = (comp.enter && typeof comp.enter.at === 'number') ? comp.enter.at : 0;
+          var outAt = (comp.exit && typeof comp.exit.at === 'number') ? comp.exit.at : dur;
+          if (isL) inAt = Math.min(t, outAt - 0.2); else outAt = Math.max(t, inAt + 0.2);
+          bar.style.left = toPct(inAt);
+          bar.style.width = (((outAt - inAt) / filmTotal) * 100).toFixed(3) + '%';
+        }
+        function up() {
+          edge.removeEventListener('pointermove', mv); edge.removeEventListener('pointerup', up);
+          if (typeof edge._t !== 'number' || !comp) return;
+          if (isL) {
+            var enter = comp.enter || { effect: 'fade' };
+            enter.at = Math.min(edge._t, ((comp.exit && comp.exit.at) || dur) - 0.2);
+            comp.enter = enter;
+            patchComp(comp, { enter: enter }, renderFocusLane);
+          } else {
+            // Dragging the right edge back to the scene end clears the exit.
+            if (edge._t >= dur - 0.05) {
+              delete comp.exit;
+              patchComp(comp, { exit: null }, renderFocusLane);
+            } else {
+              var exitA = comp.exit || { effect: 'fade' };
+              exitA.at = Math.max(edge._t, ((comp.enter && comp.enter.at) || 0) + 0.2);
+              comp.exit = exitA;
+              patchComp(comp, { exit: exitA }, renderFocusLane);
+            }
+          }
+        }
+        edge.addEventListener('pointermove', mv);
+        edge.addEventListener('pointerup', up);
+      });
+    });
+    // Scrub: press-and-drag anywhere that isn't a drag handle -- identical
+    // gesture to the film timeline, same clock, no snapping.
+    track.addEventListener('pointerdown', function(ev) {
+      if (ev.target.closest && (ev.target.closest('.fm-diamond') || ev.target.closest('.fm-edge'))) return;
+      ev.preventDefault();
+      try { track.setPointerCapture(ev.pointerId); } catch (e) {}
+      function seekFrom(e2) {
+        var r = track.getBoundingClientRect();
+        var filmT = ((e2.clientX - r.left) / Math.max(1, r.width)) * filmTotal;
+        fmSeekLocal(filmT - segStart, dur);
+      }
+      seekFrom(ev);
+      function mv(e2) { seekFrom(e2); }
+      function up() { track.removeEventListener('pointermove', mv); track.removeEventListener('pointerup', up); }
+      track.addEventListener('pointermove', mv);
+      track.addEventListener('pointerup', up);
+    });
   }
 
   function savePropNow() {

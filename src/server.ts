@@ -64,6 +64,10 @@ const positionSchema = z.object({
 
 const animationSchema = z.object({
   effect: z.string(),
+  // Scene-local start time (seconds). Enter defaults to 0; exit defaults to
+  // scene end minus duration. The assembler has always honored this -- the
+  // schema just used to strip it.
+  at: z.number().optional(),
   duration: z.number().optional(),
   stagger: z.number().optional(),
   ease: z.string().optional(),
@@ -230,14 +234,29 @@ function withStudio<T extends { tenant_id: string; project_id: string }>(project
   };
 }
 
-/** Enrich a job object with preview_url when tenant and project are known. */
-function jobWithPreview(job: Record<string, unknown>): Record<string, unknown> {
+/** Public HTTP URL for a file in a project's output dir (the /output route
+ *  serves these unauthenticated -- it's how Studio's Download button works). */
+function outputUrl(tenantId: string, projectId: string, filename: string): string {
+  return `${config.publicUrl}/output/${encodeURIComponent(tenantId)}/projects/${encodeURIComponent(projectId)}/${encodeURIComponent(filename)}`;
+}
+
+/** Enrich a job object with preview_url when tenant and project are known.
+ *  Completed render jobs additionally get a public download_url and LOSE the
+ *  server-local outputPath: a filesystem path is what led agents to tell
+ *  users to "SSH into the server" for their film. Hand back a link instead,
+ *  and say out loud that the link is the thing to share. */
+export function jobWithPreview(job: Record<string, unknown>): Record<string, unknown> {
   const tenantId = job.tenantId as string | undefined;
   const projectId = job.projectId as string | undefined;
-  if (tenantId && projectId) {
-    return { ...job, preview_url: previewUrl(tenantId, projectId) };
+  if (!tenantId || !projectId) return job;
+  const out: Record<string, unknown> = { ...job, preview_url: previewUrl(tenantId, projectId) };
+  if (job.type === "render" && job.status === "completed" && job.outputPath) {
+    out.download_url = outputUrl(tenantId, projectId, path.basename(String(job.outputPath)));
+    out.message =
+      "Film is ready. Give the user download_url (a direct MP4 link) -- or preview_url, where Studio's Download MP4 button serves the same file. The file is NOT fetched over SSH.";
+    delete out.outputPath;
   }
-  return job;
+  return out;
 }
 
 export function createMcpServer(): McpServer {
@@ -1259,7 +1278,11 @@ export function createMcpServer(): McpServer {
             atTime: scene.duration_seconds / 3,
           });
 
-          return ok({ status: "rendered", scene_id: scene.id, output_path: outputPath });
+          return ok({
+            status: "rendered",
+            scene_id: scene.id,
+            image_url: outputUrl(params.tenant_id!, params.project_id, path.basename(outputPath)),
+          });
         } catch (e: any) {
           return err(`Scene render failed: ${e.message}`);
         }
@@ -1284,7 +1307,7 @@ export function createMcpServer(): McpServer {
         status: "queued",
         job_id: job.id,
         project_id: project.project_id,
-        message: "Render queued. Use get(target='job', job_id='" + job.id + "') to check status.",
+        message: "Render queued. Use get(target='job', job_id='" + job.id + "') to check status; the completed job includes download_url -- a direct MP4 link to give the user (no server access needed).",
       });
     },
   );
@@ -2178,7 +2201,7 @@ export function createMcpServer(): McpServer {
       if (params.action === "list") {
         if (!params.tenant_id) return err("tenant_id required for list");
         const jobs = listAllJobs(params.tenant_id, params.job_type);
-        return ok(jobs);
+        return ok(jobs.map((j) => jobWithPreview(j as unknown as Record<string, unknown>)));
       }
 
       if (params.action === "status") {
@@ -2364,7 +2387,9 @@ export function createMcpServer(): McpServer {
             return {
               status: "completed",
               project_id: projectId,
-              output_path: rs.outputPath,
+              download_url: rs.outputPath
+                ? outputUrl(params.tenant_id!, projectId, path.basename(rs.outputPath))
+                : undefined,
               preview_url: previewUrl(params.tenant_id, projectId),
               brand: { theme: summary.colors, fonts: summary.typography, logos: summary.logos?.length || 0 },
             };
