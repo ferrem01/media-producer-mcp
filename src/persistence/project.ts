@@ -143,11 +143,11 @@ export function ensureStoryboardScene(project: Project, sceneIndex: number): Sto
   return sb.scenes[sceneIndex];
 }
 
-export async function listProjects(tenantId: string): Promise<Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number }>> {
+export async function listProjects(tenantId: string): Promise<Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number; updated_at?: string }>> {
   const dir = projectsDir(tenantId);
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true });
-    const results: Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number }> = [];
+    const results: Array<{ project_id: string; name: string; format: OutputFormat; status: string; scene_count: number; updated_at?: string }> = [];
 
     for (const entry of entries) {
       if (!entry.isDirectory() || !entry.name.startsWith("proj_")) continue;
@@ -159,6 +159,7 @@ export async function listProjects(tenantId: string): Promise<Array<{ project_id
           format: project.format,
           status: project.status,
           scene_count: project.scenes?.length ?? 0,
+          updated_at: project.updated_at,
         });
       }
     }
