@@ -14,7 +14,7 @@
  */
 
 import { normalizeHtmlUrls } from "./normalize-urls.js";
-import { resolveComponentTags, buildComponentTimelineScript, buildLogoDevUrl } from "./component-tags.js";
+import { resolveComponentTags, transformComponentTagData, buildComponentTimelineScript, buildLogoDevUrl } from "./component-tags.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
 import type { Scene, SceneBeat, SceneComponent, BrandKit, Canvas } from "./types.js";
 import { beatTimeline } from "./beats.js";
@@ -194,7 +194,8 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     // or a client that skipped the update-tool guardrail) -- so preview dedups
     // and render sync-binds it. Keyed on speakerUrl (the resolved speaker clip).
     const preData = speakerUrl ? normalizeSpeakerPipRefs(preData0, speakerUrl).data : preData0;
-    const resolvedData = resolveAssetUrls(preData, preview, speakerUrl);
+    const preData1 = comp.type === "lottie-accent" ? await inlineLottieAnimation(preData) : preData;
+    const resolvedData = resolveAssetUrls(preData1, preview, speakerUrl);
     let boundHtml = bindTemplate(parsed.template, resolvedData);
 
     // Codegen scenes without <component> tags route through here -- resolve
@@ -237,6 +238,10 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
   // it (references the global THREE).
   const usesThree = componentScripts.some((s) => s.includes("THREE"));
   const threeSource = usesThree ? await loadThreeSource(options.threeDir || config.threeDir) : "";
+
+  // lottie-web (~240KB) likewise: only when a component drives the player.
+  const usesLottie = componentScripts.some((s) => s.includes("lottie.loadAnimation"));
+  const lottieSource = usesLottie ? await loadLottieSource(config.lottieDir) : "";
 
   // Read shared script utilities
   const sharedSource = await loadSharedUtilities();
@@ -314,7 +319,7 @@ img, video {
 /* ── Component Styles ── */
 ${componentStyles.join("\n\n")}
 </style>
-${threeSource ? `<!-- three.js (bundled: three + addons, global THREE). MUST be its own\n     <script>: the bundle opens with "use strict", and concatenating it with the\n     GSAP block below would make that block strict too -- a GSAP plugin's UMD\n     shim assigns the getter-only window.window (a silent no-op in sloppy mode),\n     which throws in strict mode and would abort gsap + the whole scene. -->\n<script>\n${threeSource}\n</script>\n` : ""}<script>
+${threeSource ? `<!-- three.js (bundled: three + addons, global THREE). MUST be its own\n     <script>: the bundle opens with "use strict", and concatenating it with the\n     GSAP block below would make that block strict too -- a GSAP plugin's UMD\n     shim assigns the getter-only window.window (a silent no-op in sloppy mode),\n     which throws in strict mode and would abort gsap + the whole scene. -->\n<script>\n${threeSource}\n</script>\n` : ""}${lottieSource ? `<!-- lottie-web svg player (global lottie). Own <script> block for the same\n     strict-mode isolation reason as three.js above. -->\n<script>\n${lottieSource}\n</script>\n` : ""}<script>
 ${gsapSource}
 
 ${sharedSource}
@@ -1078,6 +1083,10 @@ export async function assembleCodegenScene(options: {
   // concrete per-edge trims, not a sentinel.
   sceneParsed.template = await resolveScreencastAutoCrops(sceneParsed.template);
 
+  // Inline lottie-accent animation JSON at assembly (asset name -> embedded
+  // data) -- the tag resolver's data callback is sync, so this is a pre-pass.
+  sceneParsed.template = await transformComponentTagData(sceneParsed.template, "lottie-accent", inlineLottieAnimation);
+
   // 2. Build component source map for tag resolution
   const rawSourceMap = new Map<string, string>();
   for (const cs of componentSources) {
@@ -1124,6 +1133,10 @@ export async function assembleCodegenScene(options: {
   // Inline three.js only when the codegen scene or a used component references it.
   const usesThree = sceneSource.includes("THREE") || componentSources.some((c) => c.source.includes("THREE"));
   const threeSource = usesThree ? await loadThreeSource(config.threeDir) : "";
+
+  // lottie-web likewise (the lottie-accent component drives the player).
+  const usesLottie = sceneSource.includes("lottie.loadAnimation") || componentSources.some((c) => c.source.includes("lottie.loadAnimation"));
+  const lottieSource = usesLottie ? await loadLottieSource(config.lottieDir) : "";
 
   const isTransparent = transparentBackground === true;
 
@@ -1172,7 +1185,7 @@ img, video {
 /* ── Scene + Component Styles ── */
 ${allStyles.join("\n\n")}
 </style>
-${threeSource ? `<!-- three.js (bundled: three + addons, global THREE). MUST be its own\n     <script>: the bundle opens with "use strict", and concatenating it with the\n     GSAP block below would make that block strict too -- a GSAP plugin's UMD\n     shim assigns the getter-only window.window (a silent no-op in sloppy mode),\n     which throws in strict mode and would abort gsap + the whole scene. -->\n<script>\n${threeSource}\n</script>\n` : ""}<script>
+${threeSource ? `<!-- three.js (bundled: three + addons, global THREE). MUST be its own\n     <script>: the bundle opens with "use strict", and concatenating it with the\n     GSAP block below would make that block strict too -- a GSAP plugin's UMD\n     shim assigns the getter-only window.window (a silent no-op in sloppy mode),\n     which throws in strict mode and would abort gsap + the whole scene. -->\n<script>\n${threeSource}\n</script>\n` : ""}${lottieSource ? `<!-- lottie-web svg player (global lottie). Own <script> block for the same\n     strict-mode isolation reason as three.js above. -->\n<script>\n${lottieSource}\n</script>\n` : ""}<script>
 ${gsapSource}
 
 ${sharedSource}
@@ -1866,6 +1879,42 @@ export function buildComponentScript(
  * ShaderPass, RoundedBoxGeometry). Returns "" if the bundle is absent, so
  * scenes without WebGL components are unaffected.
  */
+export async function loadLottieSource(lottieDir: string): Promise<string> {
+  const filePath = path.join(lottieDir, "lottie_svg.min.js");
+  try {
+    return await fs.readFile(filePath, "utf-8");
+  } catch {
+    console.warn(`lottie player bundle not found: ${filePath}`);
+    return "";
+  }
+}
+
+/** Inline a lottie-accent's animation JSON into its data at assembly time.
+ *  data.asset names a curated file in components/shared/lottie/; data.src is
+ *  an /assets/ path to an uploaded .json. Embedding the JSON (instead of the
+ *  component fetching it) keeps file:// frame capture deterministic and
+ *  network-free. No-op if neither resolves -- the component warns at runtime. */
+export async function inlineLottieAnimation(data: Record<string, any>): Promise<Record<string, any>> {
+  if (data.animation) return data;
+  try {
+    let jsonPath: string | null = null;
+    if (typeof data.asset === "string" && data.asset) {
+      const safe = data.asset.replace(/[^a-z0-9-]/gi, "");
+      const thisDir = path.dirname(fileURLToPath(import.meta.url));
+      jsonPath = path.join(thisDir, "..", "components", "shared", "lottie", `${safe}.json`);
+    } else if (typeof data.src === "string" && data.src.startsWith("/assets/")) {
+      const m = data.src.match(/^\/assets\/([^/]+)\/(.+)$/);
+      if (m) jsonPath = path.join(config.dataDir, m[1], m[2].startsWith("projects/") ? m[2] : path.join("brand-kit", "assets", m[2].replace(/^brand-kit\//, "")));
+    }
+    if (!jsonPath) return data;
+    const parsed = JSON.parse(await fs.readFile(jsonPath, "utf-8"));
+    if (parsed && typeof parsed.fr === "number") return { ...data, animation: parsed };
+  } catch (e: any) {
+    console.warn(`lottie-accent: could not inline animation (asset=${data.asset || data.src}): ${e?.message || e}`);
+  }
+  return data;
+}
+
 export async function loadThreeSource(threeDir: string): Promise<string> {
   const filePath = path.join(threeDir, "three.min.js");
   try {
