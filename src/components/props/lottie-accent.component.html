@@ -1,0 +1,70 @@
+<template>
+  <div class="ltac"></div>
+</template>
+
+<style scoped>
+  /* ── lottie-accent: a professionally-animated vector accent (confetti,
+     checkmark, rocket...) from the curated Lottie set. Like sticker-prop,
+     it's seasoning that sits ON content -- never the subject. ── */
+  .ltac { position: absolute; inset: 0; pointer-events: none; }
+  .ltac svg { width: 100%; height: 100%; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.ltac');
+    // data.animation is the Lottie JSON, inlined server-side at assembly
+    // (resolved from data.asset / data.src) -- no fetch, so file:// capture
+    // stays deterministic.
+    if (!data.animation || typeof lottie === 'undefined') {
+      console.warn('lottie-accent: no animation data or player');
+      return tl;
+    }
+    var anim = lottie.loadAnimation({
+      container: host,
+      renderer: 'svg',
+      loop: false,
+      autoplay: false,       // NEVER autoplay: frames are driven off the scene clock
+      animationData: data.animation,
+    });
+
+    var fr = data.animation.fr || 30;
+    var totalFrames = Math.max(1, (data.animation.op || 1) - (data.animation.ip || 0));
+    var intrinsic = totalFrames / fr;  // the asset's natural duration, seconds
+
+    var at = Math.max(0, Number(data.at) || 0);
+    var hold = Number(data.hold) || 0;              // 0 = plays/loops to scene end
+    var visible = hold > 0 ? hold : Math.max(0.1, (ctx && ctx.duration ? ctx.duration : intrinsic) - at);
+    var loop = data.loop !== false;                  // loop by default while visible
+    var speed = Number(data.speed) || 1;
+
+    // Entrance: quick pop unless the asset IS the entrance (entrance:'none').
+    if (data.entrance !== 'none') {
+      gsap.set(host, { autoAlpha: 0, scale: 0.85, transformOrigin: '50% 50%' });
+      tl.to(host, { autoAlpha: 1, scale: 1, duration: 0.35, ease: 'back.out(1.6)' }, at);
+    }
+
+    // Frame driver: a linear tween whose onUpdate seeks the player. Seeking
+    // the gsap timeline (preview scrub, frame capture) re-fires onUpdate, so
+    // the Lottie frame is a pure function of the scene clock.
+    var proxy = { t: 0 };
+    tl.to(proxy, {
+      t: visible,
+      duration: visible,
+      ease: 'none',
+      onUpdate: function() {
+        var played = proxy.t * speed;
+        var frame = played * fr;
+        if (loop) frame = frame % totalFrames;
+        else frame = Math.min(frame, totalFrames - 0.001);
+        anim.goToAndStop(frame, true);
+      },
+    }, at);
+
+    if (hold > 0) {
+      tl.to(host, { autoAlpha: 0, scale: 0.92, duration: 0.3, ease: 'power2.in' }, at + hold);
+    }
+    return tl;
+  }
+</script>

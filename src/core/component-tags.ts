@@ -136,6 +136,62 @@ function extractDataAttr(attrs: string): Record<string, unknown> {
   return {};
 }
 
+/** Locate the data='...' / data="..." attribute's exact span within an
+ *  attrs string (apostrophe-tolerant, same scan as extractDataAttr).
+ *  Returns null when there is no parseable data attribute. */
+function findDataAttrSpan(attrs: string): { start: number; end: number } | null {
+  const sqOpen = attrs.match(/data\s*=\s*'/i);
+  if (sqOpen && sqOpen.index !== undefined) {
+    const openIdx = sqOpen.index + sqOpen[0].length;
+    let closeIdx = attrs.indexOf("'", openIdx);
+    while (closeIdx !== -1) {
+      try {
+        JSON.parse(attrs.slice(openIdx, closeIdx));
+        return { start: sqOpen.index, end: closeIdx + 1 };
+      } catch {
+        closeIdx = attrs.indexOf("'", closeIdx + 1);
+      }
+    }
+    return null;
+  }
+  const dqMatch = attrs.match(/data\s*=\s*"[\s\S]*?"/i);
+  if (dqMatch && dqMatch.index !== undefined) {
+    return { start: dqMatch.index, end: dqMatch.index + dqMatch[0].length };
+  }
+  return null;
+}
+
+/**
+ * Rewrite the data attribute of every <component> tag of one type through an
+ * async transform -- the assembly-time hook for data that must be resolved
+ * server-side (e.g. lottie-accent inlining its animation JSON so file://
+ * capture never fetches). Tags without data get the transform of {}.
+ */
+export async function transformComponentTagData(
+  html: string,
+  type: string,
+  transform: (data: Record<string, unknown>) => Promise<Record<string, unknown>>,
+): Promise<string> {
+  const matches = [...html.matchAll(COMPONENT_TAG_REGEX)];
+  let out = html;
+  // Replace back-to-front so earlier match indices stay valid.
+  for (const m of matches.reverse()) {
+    const attrs = m[1];
+    if ((extractAttr(attrs, "type") || "") !== type) continue;
+    const data = extractDataAttr(attrs);
+    const next = await transform(data);
+    if (next === data) continue;
+    const json = JSON.stringify(next).replace(/'/g, "\\u0027");
+    const span = findDataAttrSpan(attrs);
+    const keptAttrs = span
+      ? (attrs.slice(0, span.start) + attrs.slice(span.end)).trim()
+      : attrs.trim();
+    const newTag = `<component ${keptAttrs}${keptAttrs ? " " : ""}data='${json}' />`;
+    out = out.slice(0, m.index!) + newTag + out.slice(m.index! + m[0].length);
+  }
+  return out;
+}
+
 /**
  * Resolve all <component> tags in HTML.
  *

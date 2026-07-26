@@ -1,0 +1,15 @@
+{
+  "type": "lottie-accent",
+  "label": "Lottie Accent",
+  "category": "props",
+  "description": "A professionally-animated vector accent from the curated Lottie set -- drop-in motion polish for a beat. Curated assets (use as data.asset): confetti, party-popper, check-mark, sparkles, fire, rocket, light-bulb, hundred, thumbs-up, heart, star, eyes, wave, clap, party-face, trophy, target, chart-up, bell, mind-blown. Position it small (10-25% of frame) over or beside the content it punctuates -- confetti on the success beat, check-mark as an item lands, rocket on launch copy. Like sticker-prop: seasoning, never the subject; 1-2 per scene max.",
+  "data": {
+    "asset": { "type": "string", "label": "Curated asset name (see description). Preferred." },
+    "src": { "type": "string", "label": "Alternative: /assets/ path to an uploaded Lottie .json", "optional": true },
+    "at": { "type": "number", "label": "Entrance time in scene seconds (default 0)", "optional": true },
+    "hold": { "type": "number", "label": "Seconds visible before it exits (0/omit = stays to scene end)", "optional": true },
+    "loop": { "type": "boolean", "label": "Loop while visible (default true; false = play once and freeze)", "optional": true },
+    "speed": { "type": "number", "label": "Playback speed multiplier (default 1)", "optional": true },
+    "entrance": { "type": "string", "label": "'pop' (default) or 'none' when the asset animates its own entrance", "optional": true }
+  }
+}
