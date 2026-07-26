@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { jobWithPreview, renderStatusFields } from "../src/server.js";
+import { jobWithPreview, renderStatusFields, OPERATOR_PLAYBOOK } from "../src/server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -44,6 +44,37 @@ describe("jobWithPreview (MCP job responses)", () => {
     const out = jobWithPreview({ id: "job_y", type: "render", status: "completed" });
     expect(out.preview_url).toBeUndefined();
     expect(out.download_url).toBeUndefined();
+  });
+});
+
+// The operator playbook rides the MCP initialize handshake: every client
+// agent receives it before its first tool call. It must stay compact and
+// keep carrying the load-bearing lessons (links not SSH, iterate ladder,
+// brand kit first, async jobs).
+describe("OPERATOR_PLAYBOOK (handshake instructions)", () => {
+  it("is wired into the McpServer construction", async () => {
+    const src = await fs.readFile(path.resolve(__dirname, "../src/server.ts"), "utf-8");
+    expect(src).toMatch(/instructions: OPERATOR_PLAYBOOK/);
+  });
+
+  it("carries the load-bearing operator knowledge", () => {
+    for (const phrase of [
+      "download_url",     // delivery is a link...
+      "SSH",              // ...never server access
+      "studio_url",       // humans review/edit in Studio
+      "storyboard",       // iterate ladder starts cheap
+      "quality:'preview'",
+      "brand kit",        // generate needs a kit
+      "job_id",           // async job contract
+      "revise",           // surgical edit before regeneration
+      "NEVER edit a project while its render job runs",
+    ]) {
+      expect(OPERATOR_PLAYBOOK, `playbook lost: ${phrase}`).toContain(phrase);
+    }
+  });
+
+  it("stays a tight page (clients hold it in context all session)", () => {
+    expect(OPERATOR_PLAYBOOK.length).toBeLessThan(4000);
   });
 });
 

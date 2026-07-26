@@ -288,10 +288,45 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
   return out;
 }
 
+/**
+ * Operator playbook, delivered to EVERY client in the MCP initialize
+ * handshake. This is the calling agent's "how to be a good client" -- the
+ * knowledge that otherwise gets learned one failure at a time (agents
+ * telling users to SSH in for their film, production renders before the
+ * storyboard was ever reviewed, generates against an empty brand kit).
+ * Keep it a tight page: clients carry it in context all session.
+ */
+export const OPERATOR_PLAYBOOK = `Media Producer turns prompts into branded films (video/image/deck): scenes are code-authored motion graphics, rendered deterministically. You (the agent) drive it; the creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
+
+BEFORE GENERATING
+- Ask the human what they're making before calling generate: audience, goal/CTA, target length, and video type (product launch / explainer / recorded walkthrough / social tempo-cut).
+- Brand comes from the tenant's brand kit. If none exists yet, run extract_brand_from_website (their site URL) or upload brand assets first -- generate without a kit produces an unbranded film.
+- A recorded screen demo? Don't generate from a prompt -- the Chrome recorder extension captures the tab + voice and assembles the film automatically (download at /extension.zip on this server).
+
+ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
+1. generate mode='storyboard' -> review the beats with the human, adjust, THEN build scenes.
+2. Proof a single scene as a still: render{scene_id}.
+3. Review motion live in Studio (studio_url on every project response) -- it plays scenes in-browser with no render. This is also where the HUMAN edits: send them there for review rather than describing frames in text.
+4. First full watch: render{quality:'preview'} (fast). Production render only to ship.
+
+EDITING
+- revise = surgical, natural-language change to an existing scene ("make the headline white"). Use it before regenerating anything.
+- add/update/reorder/delete = structural edits to scenes and components. regenerate_asset = re-run one generated image.
+- NEVER edit a project while its render job runs.
+
+JOBS AND DELIVERY
+- generate and render are async: they return a job_id; poll job{action:'status'} (or wait). Progress includes step + percent -- relay it.
+- When a render completes, the job carries download_url (direct MP4 link) and preview_url (Studio). GIVE THE HUMAN THOSE LINKS. Every output is served over HTTPS -- there is never a reason for SSH or server filesystem access.
+- Any time later, get(project_id) / list return rendered, download_url and render_stale (true = the MP4 predates the latest edits; offer a re-render).
+
+If something looks wrong in a scene, get{target:'layout'} measures the real geometry (element boxes, crop math, warnings) -- diagnose before writing a revise instruction.`;
+
 export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "media-producer-mcp",
     version: "0.1.0",
+  }, {
+    instructions: OPERATOR_PLAYBOOK,
   });
 
   // Tenant-enforcing tool registrar. The HTTP layer stamps the session's
