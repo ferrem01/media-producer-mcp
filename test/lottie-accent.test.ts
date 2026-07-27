@@ -111,6 +111,34 @@ describe("lottie-accent", () => {
     expect(byType["lottie-accent"].data.asset).toBe("confetti");
   });
 
+  it("Studio composite inlines the player + animation (the render/preview parity trap)", async () => {
+    // The composite (all scenes, one doc -- what Studio plays) is a separate
+    // assembler; three.js was once missing there and WebGL rendered black in
+    // Studio only. Same trap for lottie: pin that the composite carries it.
+    const { assembleComposite } = await import("../src/core/composite-assembler.js");
+    const compSrc = await fs.readFile(
+      path.resolve(__dirname, "../src/components/props/lottie-accent.component.html"), "utf-8",
+    );
+    const html = await assembleComposite({
+      scenes: [{
+        scene: {
+          id: "s1", label: "t", duration_seconds: 5,
+          components: [{
+            id: "c1", type: "lottie-accent",
+            position: { x: "70%", y: "8%", width: "20%", height: "34%" },
+            data: { asset: "confetti" },
+          }],
+        } as any,
+        components: [{ type: "lottie-accent", source: compSrc }],
+      }],
+      brandKit: { fonts: [] } as any,
+      canvas: { width: 1280, height: 720 } as any,
+      gsapDir: path.resolve(__dirname, "../vendor/gsap"),
+    } as any);
+    expect(html).toContain("lottie-web svg player");
+    expect(html).toContain('"fr"');
+  });
+
   it("vendored player bundle exists", async () => {
     const src = await loadLottieSource(config.lottieDir);
     expect(src.length).toBeGreaterThan(100_000);
