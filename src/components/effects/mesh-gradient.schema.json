@@ -2,11 +2,13 @@
   "type": "mesh-gradient",
   "label": "Mesh Gradient",
   "category": "effects",
-  "description": "Animated mesh gradient background with multiple color blobs. Use as z_index 0 background layer for organic, flowing backgrounds.",
+  "description": "Animated mesh gradient background with seeded color blobs. Use as z_index 0 background layer for organic, flowing backgrounds. Serves as the film's LIGHT WORLD backdrop (SPEC-world.md): pass theme:'light' for the airy editorial base, seed for a film-stable layout, and time_offset (scene film-start seconds) so the drift continues across scene cuts.",
   "data": {
     "colors": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "label": "Gradient Colors",
       "required": true,
       "placeholder": "[\"var(--mp-color-background)\", \"var(--mp-color-primary)\"]"
@@ -16,6 +18,21 @@
       "label": "Animation Speed Multiplier",
       "optional": true,
       "placeholder": "1"
+    },
+    "seed": {
+      "type": "number",
+      "label": "Seeded blob layout (film-stable)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "'light' = airy near-white world; default dark",
+      "optional": true
+    },
+    "time_offset": {
+      "type": "number",
+      "label": "Film-time offset (s) so drift continues across cuts",
+      "optional": true
     }
   }
 }

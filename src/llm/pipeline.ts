@@ -31,6 +31,7 @@ import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
 import { loadProject, saveProject, createProject } from "../persistence/project.js";
 import { runGrammarPrep, pickMusicMood } from "./grammar-prep.js";
+import { deriveWorld, worldPromptBlock, type WorldSpec } from "./world.js";
 import { assembleNarratedScreencast } from "./narrated-screencast.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
@@ -490,6 +491,7 @@ async function runSceneRevisionPipeline(
   if (opts.critique !== false) {
     opts.onProgress?.({ step: "critiquing", percent: 70, detail: "Reviewing & polishing" });
     const critiqueResult = await critiqueAndRetryScene({
+      world: (project as any).world,
       scene: generated.scene,
       draft,
       sceneIndex,
@@ -629,6 +631,7 @@ async function runVideoRevisionPipeline(
     let finalVidScene = generated.scene;
     if (opts.critique !== false) {
       const critiqueResult = await critiqueAndRetryScene({
+        world: (project as any).world,
         scene: generated.scene,
         draft,
         sceneIndex: i,
@@ -1016,6 +1019,7 @@ async function findComponentSourceForCritique(
 }
 
 async function critiqueAndRetryScene(opts: {
+  world?: WorldSpec;
   scene: Scene;
   draft: any;
   sceneIndex: number;
@@ -1344,7 +1348,8 @@ async function critiqueAndRetryScene(opts: {
       let specForCon = currentDraft?.visual_notes || currentDraft?.purpose || currentDraft?.label || opts.prompt;
       if (sceneBeats) specForCon += `\n\n${formatBeatSheet(sceneBeats)}`;
       const requiresLogo = /\blogo\b/i.test(specForCon) && (opts.brandKit?.logos?.length ?? 0) > 0;
-      const brandTheme: "light" | "dark" = brandBackgroundIsLight(opts.brandKit) ? "light" : "dark";
+      const brandTheme: "light" | "dark" = (opts as any).world?.theme
+        || (brandBackgroundIsLight(opts.brandKit) ? "light" : "dark");
       // Footage / hero-image background: light text over a scrim is correct then,
       // so the theme rule must not false-flag it as off_brand_theme.
       const mediaBackground = /<video[\s>]|class="[^"]*\bmp-(broll|hero-img)\b|class="[^"]*broll/i.test(assembledHtml);
@@ -2129,6 +2134,17 @@ async function runUnifiedPipeline(
   var beatMap: import("../audio/beat-map.js").BeatMap | undefined = prep.beatMap;
   trace?.endEvent({ mandate: prep.mandate, bpm: beatMap?.bpm });
 
+  // ── The WORLD (SPEC-world.md): one continuous visual container per film ──
+  // Derived in code from brand + treatment (deterministic across regens of
+  // the same film), stored on the project, and honored by the storyboard,
+  // every scene path, and the theme gate.
+  const world = deriveWorld({
+    brandKit,
+    treatment,
+    seedSource: `${opts.tenant_id}:${(treatment?.concept || richPrompt).slice(0, 80)}`,
+  });
+  console.log(`  World: ${world.theme} / ${world.backdrop.component} seed=${world.backdrop.seed} palette=[${world.backdrop.palette.join(",")}]`);
+
   var storyboard = await buildStoryboard({
     prompt: richPrompt,
     format,
@@ -2144,6 +2160,7 @@ async function runUnifiedPipeline(
     treatment,
     beatGrid: beatMap ? { bpm: beatMap.bpm, barSec: beatMap.barSec } : undefined,
     filmGrammar,
+    world,
   });
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
@@ -2162,6 +2179,17 @@ async function runUnifiedPipeline(
     quantizeScenesToBars(storyboard.scenes, beatMap.barSec);
   }
 
+  // Film-time starts (post-quantization): the continuous world backdrop
+  // renders at film_start + local t, so its slow drift survives every cut.
+  {
+    let filmAcc = 0;
+    for (const d of storyboard.scenes as any[]) {
+      filmAcc += d.transition_in?.duration_seconds || 0;
+      d.film_start = Math.round(filmAcc * 100) / 100;
+      filmAcc += Number(d.duration_seconds) || 5;
+    }
+  }
+
     // Create project shell (reuse tempProjectId from reference image processing if available)
   var projectId = tempProjectId || `proj_${uuid().replace(/-/g, "").slice(0, 8)}`;
   var project: Project = {
@@ -2172,6 +2200,7 @@ async function runUnifiedPipeline(
     status: "draft",
     canvas,
     brand_kit: brandKit,
+    world,
     scenes: [],
     treatment: treatment,
     film_grade: format === "video" || format === "slideshow" ? "cinematic" : undefined,
@@ -2424,6 +2453,7 @@ async function runUnifiedPipeline(
             treatment,
             brollVideoUrl: brollUrlMap.get(i),
             hasSpeakerTrack: !!opts.speaker_source,
+            world,
           });
         } catch (e: any) {
           console.error(`  Scene ${i + 1} "${draft.label}" generation failed (${e.message}) -- retrying with beats stripped (smaller codegen output).`);
@@ -2465,6 +2495,7 @@ async function runUnifiedPipeline(
         let finalCustomSources = generated.customSources;
         if (opts.critique !== false) {
           const critiqueResult = await critiqueAndRetryScene({
+            world,
             scene: generated.scene,
             draft,
             sceneIndex: i,
@@ -2695,6 +2726,7 @@ async function runUnifiedPipeline(
             // worker timing out -- which kills the whole render. correctnessOnly
             // keeps it cheap (render + gates, no aesthetic re-judging).
             const gated = await critiqueAndRetryScene({
+              world: (project as any).world,
               scene: re.scene, draft, sceneIndex: idx, totalScenes: project.scenes.length,
               prompt: richPrompt, format, llmConfig: opts.llmConfig, brandKit, canvas,
               tenantId: opts.tenant_id, projectId, compDir, maxRetries: 1,

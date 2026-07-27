@@ -18,6 +18,10 @@
     overflow: hidden;
     background: var(--mp-color-background, #09090b);
   }
+  .mesh-gradient.mesh-light {
+    /* The light world (SPEC-world.md): airy editorial base, not brand-dark. */
+    background: #fafaf8;
+  }
 
   .noise-overlay {
     position: absolute;
@@ -41,6 +45,8 @@
     var tl = gsap.timeline();
     var container = el.querySelector('.mesh-gradient');
     var speed = data.speed || 1;
+    var light = data.theme === 'light';
+    if (light) container.classList.add('mesh-light');
 
     var colors = data.colors || [
       'var(--mp-color-primary, #6366f1)',
@@ -49,60 +55,59 @@
       '#f472b6'
     ];
 
-    // Create 4 large, heavily blurred blobs for organic mesh feel
-    var blobConfigs = [
-      { x: '5%',  y: '5%',  size: '70%', blur: 100 },
-      { x: '45%', y: '50%', size: '65%', blur: 110 },
-      { x: '50%', y: '-5%', size: '60%', blur: 90  },
-      { x: '10%', y: '55%', size: '58%', blur: 120 }
-    ];
+    // Seeded layout: the WORLD's seed decides where the blobs live, so the
+    // same film always lands in the same world (and different films differ).
+    var seed = Number(data.seed) || 7;
+    function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
 
-    blobConfigs.forEach(function(cfg, i) {
-      if (i >= colors.length) return;
+    var blobCount = 4;
+    var blobs = [];
+    for (var i = 0; i < blobCount; i++) {
       var blob = document.createElement('div');
       blob.className = 'mesh-blob';
-      blob.style.background = 'radial-gradient(circle, ' + colors[i % colors.length] + ' 0%, transparent 70%)';
-      blob.style.width = cfg.size;
-      blob.style.height = cfg.size;
-      blob.style.left = cfg.x;
-      blob.style.top = cfg.y;
-      blob.style.opacity = '0.45';
-      blob.style.filter = 'blur(' + cfg.blur + 'px)';
+      var col = colors[i % colors.length];
+      blob.style.background = 'radial-gradient(circle, ' + col + ' 0%, transparent 70%)';
+      var size = 52 + rnd() * 26; // % of frame
+      blob.style.width = size + '%';
+      blob.style.height = size + '%';
+      var bx = -10 + rnd() * 70;
+      var by = -12 + rnd() * 72;
+      blob.style.left = bx + '%';
+      blob.style.top = by + '%';
+      // Light world: soft pastel wash (low opacity over near-white).
+      // Dark world: the richer glow the brand-dark films always had.
+      blob.style.opacity = light ? String(0.16 + rnd() * 0.1) : String(0.38 + rnd() * 0.14);
+      blob.style.filter = 'blur(' + Math.round(90 + rnd() * 40) + 'px)';
       container.appendChild(blob);
-    });
+      blobs.push({
+        el: blob,
+        baseOpacity: parseFloat(blob.style.opacity),
+        // Per-blob drift parameters (seeded, film-stable)
+        ax: 40 + rnd() * 60, ay: 30 + rnd() * 45,
+        fx: 0.05 + rnd() * 0.05, fy: 0.04 + rnd() * 0.05,
+        px: rnd() * Math.PI * 2, py: rnd() * Math.PI * 2,
+        fs: 0.03 + rnd() * 0.03, ps: rnd() * Math.PI * 2,
+      });
+    }
 
-    var blobs = container.querySelectorAll('.mesh-blob');
-
-    var blobEase = 'sine.inOut';
-
-    // Animate blobs with slow organic drift
-    blobs.forEach(function(blob, i) {
-      var xShift = (i % 2 === 0 ? 1 : -1) * (60 + i * 20);
-      var yShift = (i % 2 === 0 ? -1 : 1) * (40 + i * 15);
-      var cycleDur = (8 + i * 1.5) / speed;
-
-      // Clamp to scene duration if needed
-      var dur = Math.min(cycleDur, ctx.duration * 0.9);
-
-      tl.to(blob, {
-        x: xShift,
-        y: yShift,
-        scale: 1.06 + i * 0.04,
-        duration: dur,
-        ease: blobEase,
-        yoyo: true,
-        repeat: -1
-      }, i * 0.5);
-
-      // Cross-fade opacity for more organic feel
-      tl.to(blob, {
-        opacity: 0.3 + (i % 2) * 0.2,
-        duration: dur * 0.7,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: -1
-      }, i * 0.3);
-    });
+    // CONTINUOUS drift: blob state is a pure function of FILM time
+    // (data.time_offset + local t), so the world's motion survives scene
+    // cuts -- and frame capture / preview seeks land on identical frames.
+    var offset = Number(data.time_offset) || 0;
+    var st = { t: 0 };
+    function applyState(t) {
+      var ft = offset + t * (ctx.duration || 10);
+      for (var i = 0; i < blobs.length; i++) {
+        var b = blobs[i];
+        var x = Math.sin(ft * b.fx * speed * Math.PI * 2 + b.px) * b.ax;
+        var y = Math.cos(ft * b.fy * speed * Math.PI * 2 + b.py) * b.ay;
+        var s = 1 + Math.sin(ft * b.fs * speed * Math.PI * 2 + b.ps) * 0.06;
+        b.el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(' + s.toFixed(3) + ')';
+        b.el.style.opacity = String(b.baseOpacity * (0.85 + 0.15 * Math.sin(ft * 0.11 + i * 1.7)));
+      }
+    }
+    tl.to(st, { t: 1, duration: ctx.duration || 10, ease: 'none', onUpdate: function () { applyState(st.t); } }, 0);
+    applyState(0);
 
     return tl;
   }

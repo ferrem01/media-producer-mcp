@@ -77,8 +77,11 @@
     // so captured frames track timeline SEEKS exactly (same pattern as
     // glass-slab). No requestAnimationFrame.
     var st = { t: 0 };
+    // World continuity (SPEC-world.md): drift runs on FILM time so the
+    // backdrop's slow motion continues across scene cuts.
+    var worldOffset = Number(data.time_offset) || 0;
     function applyState(t) {
-      var d = t * (ctx.duration || 10);
+      var d = worldOffset + t * (ctx.duration || 10);
       for (var i = 0; i < ribbons.length; i++) {
         var r = ribbons[i];
         r.rotation.x += 0; // base pose set above; drift below is absolute
