@@ -26,7 +26,8 @@ import { reviseScene, undoScene } from "./llm/scene-revise.js";
 import { normalizeBeats } from "./core/beats.js";
 import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
-import { loadBrandKit } from "./persistence/brand-kit.js";
+import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-kit.js";
+import { queueBuildFromStoryboard } from "./server.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
@@ -805,7 +806,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -1814,6 +1815,103 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             stale: !!(st && rsProj?.updated_at && new Date(rsProj.updated_at).getTime() > st.mtime.getTime() + 2000),
             output_url: st ? `/output/${encodeURIComponent(rsTenant)}/projects/${encodeURIComponent(rsProject)}/output.mp4` : null,
           });
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
+      // ── API: Build scenes from a storyboard draft (Studio's Build button) ──
+      // POST /api/generate-scenes/{tenant}/{project} -- same path as the MCP
+      // generate tool building from an approved storyboard.
+      const genScenesMatch = urlPath.match(/^\/api\/generate-scenes\/([^/]+)\/([^/]+)$/);
+      if (genScenesMatch && method === "POST") {
+        const [, gsTenant, gsProject] = genScenesMatch.map(decodeURIComponent);
+        const gsBody = await parseBody(req).catch(() => ({} as any));
+        const gsRes = await queueBuildFromStoryboard(gsTenant, gsProject, {
+          film_grammar: gsBody?.film_grammar,
+          max_revisions: gsBody?.max_revisions,
+        });
+        if (!gsRes) { jsonResponse(res, 400, { error: "Project has no storyboard to build from (or is mid-render)." }); return; }
+        if ("error" in gsRes) { jsonResponse(res, 500, { error: gsRes.error }); return; }
+        jsonResponse(res, 202, { ok: true, job_id: gsRes.job.id, project_id: gsProject });
+        return;
+      }
+
+      // ── API: Brand kit read/update (Studio's brand panel) ──
+      // GET returns the kit; PATCH shallow-merges top-level fields (colors
+      // merge per-key; fonts/logos/assets/guidelines/voice/style replace).
+      const bkMatch = urlPath.match(/^\/api\/brand-kit\/([^/]+)$/);
+      if (bkMatch && method === "GET") {
+        const bkTenant = decodeURIComponent(bkMatch[1]);
+        jsonResponse(res, 200, (await loadBrandKit(bkTenant).catch(() => null)) || {});
+        return;
+      }
+      if (bkMatch && (method === "PATCH" || method === "PUT")) {
+        const bkTenant = decodeURIComponent(bkMatch[1]);
+        try {
+          const patch = await parseBody(req);
+          const kit: any = (await loadBrandKit(bkTenant).catch(() => null)) || { colors: {}, fonts: [] };
+          if (patch && typeof patch === "object") {
+            if (patch.colors && typeof patch.colors === "object") kit.colors = { ...kit.colors, ...patch.colors };
+            for (const key of ["fonts", "logos", "assets", "guidelines", "voice", "style"]) {
+              if (patch[key] !== undefined) (kit as any)[key] = patch[key];
+            }
+          }
+          await saveBrandKit(bkTenant, kit);
+          jsonResponse(res, 200, kit);
+        } catch (e: any) {
+          jsonResponse(res, 500, { error: e?.message || String(e) });
+        }
+        return;
+      }
+
+      // ── API: Brand asset binary upload (Studio drag-drop) ──
+      // POST /api/brand-asset/{tenant}?name=logo.png&type=logo&variant=full&theme=dark
+      // Raw file bytes as body. type 'logo' registers in kit.logos; anything
+      // else registers in kit.assets with that BrandAssetType.
+      const baMatch = urlPath.match(/^\/api\/brand-asset\/([^/]+)$/);
+      if (baMatch && method === "POST") {
+        const baTenant = decodeURIComponent(baMatch[1]);
+        const baQuery = new URL(req.url || "/", "http://localhost").searchParams;
+        const baName = path.basename(baQuery.get("name") || `asset_${Date.now()}.bin`).replace(/[^a-zA-Z0-9._-]/g, "_");
+        const baType = (baQuery.get("type") || "other") as any;
+        try {
+          const MAX_BRAND_UPLOAD = 256 * 1024 * 1024;
+          const chunks: Buffer[] = [];
+          let received = 0;
+          await new Promise<void>((resolve, reject) => {
+            req.on("data", (c: Buffer) => {
+              received += c.length;
+              if (received > MAX_BRAND_UPLOAD) { reject(new Error("file exceeds 256MB limit")); req.destroy(); return; }
+              chunks.push(c);
+            });
+            req.on("end", () => resolve());
+            req.on("error", reject);
+          });
+          const buf = Buffer.concat(chunks);
+          if (!buf.length) { jsonResponse(res, 400, { error: "empty body" }); return; }
+          const filePath = brandAssetPath(baTenant, baName);
+          await fs.mkdir(path.dirname(filePath), { recursive: true });
+          await fs.writeFile(filePath, buf);
+          const servedUrl = `/assets/${encodeURIComponent(baTenant)}/brand-kit/${encodeURIComponent(baName)}`;
+          const kit: any = (await loadBrandKit(baTenant).catch(() => null)) || { colors: {}, fonts: [] };
+          const stem = baName.replace(/\.[a-z0-9]+$/i, "");
+          if (baType === "logo") {
+            kit.logos = (kit.logos || []).filter((l: any) => l.name !== stem);
+            kit.logos.push({
+              name: stem,
+              url: servedUrl,
+              variant: (baQuery.get("variant") || "full") as any,
+              theme: (baQuery.get("theme") || "any") as any,
+            });
+          } else {
+            kit.assets = (kit.assets || []).filter((a: any) => a.name !== stem);
+            kit.assets.push({ name: stem, url: servedUrl, type: baType });
+          }
+          await saveBrandKit(baTenant, kit);
+          console.log(`  brand-asset: ${baTenant} += ${baName} (${baType}, ${(buf.length / 1024).toFixed(0)}KB)`);
+          jsonResponse(res, 200, { ok: true, url: servedUrl, name: stem, type: baType, kit });
         } catch (e: any) {
           jsonResponse(res, 500, { error: e?.message || String(e) });
         }

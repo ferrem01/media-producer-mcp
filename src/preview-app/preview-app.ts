@@ -855,6 +855,64 @@ export function getPreviewHtml(): string {
   }
   .scene-sb-btn:hover { border-color: #6366f1; color: #4f46e5; }
   .scene-quality-badge { cursor: pointer; }
+
+  /* ── Storyboard draft view: the script, before any scene exists ── */
+  #draft-view { position: absolute; inset: 0; overflow: auto; background: #f8fafc; display: none;
+    padding: 20px 26px 48px; z-index: 5; }
+  .dv-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    max-width: 920px; margin-bottom: 18px; }
+  .dv-title { font-size: 19px; font-weight: 700; color: #111827; }
+  .dv-sub { font-size: 12px; color: #6b7280; margin-top: 3px; }
+  .dv-narr { font-size: 13px; color: #374151; margin-top: 8px; max-width: 640px; }
+  .dv-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px;
+    margin-bottom: 12px; max-width: 920px; }
+  .dv-card-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .dv-num { font-size: 11px; font-weight: 700; color: #9ca3af; }
+  .dv-label { font-size: 14px; font-weight: 600; color: #111827; flex: 1; }
+  .dv-dur { font-size: 11px; color: #6b7280; }
+  .dv-purpose { font-size: 12px; color: #4f46e5; margin-bottom: 4px; }
+  .dv-notes { font-size: 12.5px; color: #374151; line-height: 1.5; margin-bottom: 8px; }
+  .dv-beats { font-size: 11.5px; color: #6b7280; margin-bottom: 8px; }
+  .dv-beat { margin: 2px 0; }
+  .dv-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .dv-chip { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+    background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+  .dv-chip.authored { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+  .dv-vo { font-size: 11.5px; color: #6b7280; font-style: italic; margin-top: 8px; }
+
+  /* ── Brand kit panel ── */
+  #brand-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 300; display: none; }
+  #brand-panel { position: absolute; right: 0; top: 0; bottom: 0; width: 540px; max-width: 92vw;
+    background: #fff; overflow: auto; padding: 18px 22px 40px; box-shadow: -12px 0 40px rgba(15,23,42,0.25); }
+  .bk-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .bk-title { font-size: 16px; font-weight: 700; color: #111827; }
+  .bk-section { margin-bottom: 18px; }
+  .bk-section h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #6b7280; margin: 0 0 8px; }
+  .bk-color-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .bk-color-row label { font-size: 12px; color: #374151; width: 92px; }
+  .bk-color-row input[type=color] { width: 34px; height: 26px; border: 1px solid #e5e7eb; border-radius: 6px;
+    padding: 1px; background: #fff; cursor: pointer; }
+  .bk-color-row input[type=text] { width: 90px; font: 12px ui-monospace, monospace; padding: 4px 7px;
+    border: 1px solid #e5e7eb; border-radius: 6px; }
+  .bk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+  .bk-tile { border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px; text-align: center; position: relative; }
+  .bk-tile img, .bk-tile video { max-width: 100%; height: 54px; object-fit: contain; display: block; margin: 0 auto 4px;
+    background: repeating-conic-gradient(#f3f4f6 0% 25%, #fff 0% 50%) 0 0/14px 14px; border-radius: 4px; }
+  .bk-tile .bk-name { font-size: 10px; color: #374151; word-break: break-all; }
+  .bk-tile .bk-type { font-size: 9px; color: #9ca3af; text-transform: uppercase; }
+  .bk-tile .bk-del { position: absolute; top: 2px; right: 4px; border: none; background: none; color: #9ca3af;
+    cursor: pointer; font-size: 12px; display: none; }
+  .bk-tile:hover .bk-del { display: block; }
+  #bk-drop { border: 2px dashed #c7d2fe; border-radius: 10px; padding: 18px; text-align: center;
+    font-size: 12px; color: #6b7280; cursor: pointer; transition: all 0.15s; }
+  #bk-drop.over { border-color: #6366f1; background: #eef2ff; color: #4338ca; }
+  .bk-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .bk-row label { font-size: 12px; color: #374151; width: 92px; }
+  .bk-row select, .bk-row input[type=text] { font-size: 12px; padding: 5px 8px; border: 1px solid #e5e7eb; border-radius: 6px; }
+  #bk-guidelines { width: 100%; min-height: 74px; font: 12px Inter, sans-serif; padding: 8px 10px;
+    border: 1px solid #e5e7eb; border-radius: 8px; box-sizing: border-box; }
+  .bk-fonts { font-size: 12px; color: #374151; }
 </style>
 </head>
 <body>
@@ -866,6 +924,7 @@ export function getPreviewHtml(): string {
       <select id="project-select" disabled><option value="">Loading&#8230;</option></select>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
+      <button class="btn btn-secondary" id="brand-btn" style="display:none;" title="View and edit this tenant's brand kit: colors, voice, logos, assets">&#127912; Brand</button>
       <span id="render-wrap" style="display:none;align-items:center;gap:4px;">
         <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
         <button class="btn btn-secondary" id="render-menu-btn" style="padding:5px 8px;" title="Render options">&#9662;</button>
@@ -963,6 +1022,8 @@ export function getPreviewHtml(): string {
 <div id="studio-modal" class="studio-modal-backdrop" style="display:none;">
   <div class="studio-modal-card" id="studio-modal-card"></div>
 </div>
+
+<div id="brand-overlay"><div id="brand-panel"></div></div>
 
 <script>
 (function() {
@@ -2171,6 +2232,19 @@ export function getPreviewHtml(): string {
       updateRenderUI();
       renderStatusRefresh();
 
+      var brandBtnEl = document.getElementById('brand-btn');
+      if (brandBtnEl) brandBtnEl.style.display = '';
+
+      // Storyboard-state project: show the SCRIPT (draft view), not an empty
+      // timeline. Everything below assumes built scenes.
+      hideDraftView();
+      var dvScenes = project.scenes && project.scenes.length;
+      var dvSb = project.storyboard && project.storyboard.scenes && project.storyboard.scenes.length;
+      if (!dvScenes && dvSb) {
+        renderDraftView(project);
+        return;
+      }
+
       // Narration booth: offered whenever the film has screencast footage to
       // narrate over (the attach endpoint needs a screencast scene).
       var boothBtnEl = document.getElementById('booth-btn');
@@ -3348,6 +3422,302 @@ export function getPreviewHtml(): string {
       });
     });
     document.addEventListener('click', function() { r.menu.style.display = 'none'; });
+  })();
+
+  // ── Storyboard draft view: a project that is script, not scenes yet ──
+  // Storyboard-state projects used to open into an empty timeline ("No
+  // scenes / Failed to load composite") -- the review step of the
+  // storyboard -> review -> build ladder deserves a real surface.
+  var draftBuild = { job: null, timer: null };
+  function hideDraftView() {
+    var dv = document.getElementById('draft-view');
+    if (dv) dv.style.display = 'none';
+    if (draftBuild.timer) { clearTimeout(draftBuild.timer); draftBuild.timer = null; }
+    draftBuild.job = null;
+  }
+  function draftChip(c) {
+    if (typeof c === 'string') return '<span class="dv-chip">' + escHtml(c) + '</span>';
+    if (!c || !c.type) return '';
+    var extra = '';
+    var d = c.data || {};
+    if (d.asset) extra = ' · ' + d.asset;
+    else if (d.script && d.script.length) extra = ' · ' + d.script.length + ' actions';
+    else if (Object.keys(d).length) extra = ' · data';
+    return '<span class="dv-chip authored" title="Storyboard-authored data">' + escHtml(c.type + extra) + '</span>';
+  }
+  function renderDraftView(project) {
+    var pc = document.getElementById('preview-container');
+    var dv = document.getElementById('draft-view');
+    if (!dv) { dv = document.createElement('div'); dv.id = 'draft-view'; pc.appendChild(dv); }
+    els.previewPlaceholder.style.display = 'none';
+    var pw = document.getElementById('preview-wrapper');
+    if (pw) pw.style.display = 'none';
+    var sb = project.storyboard || {};
+    var scenes = sb.scenes || [];
+    var total = 0;
+    scenes.forEach(function(s) { total += Number(s.duration_seconds) || 0; });
+    var h = '<div class="dv-head"><div>' +
+      '<div class="dv-title">' + escHtml(project.name || project.project_id) + '</div>' +
+      '<div class="dv-sub">Storyboard draft — ' + scenes.length + ' scenes · ~' + Math.round(total) + 's · nothing built yet</div>' +
+      (sb.narrative ? '<div class="dv-narr">' + escHtml(sb.narrative) + '</div>' : '') +
+      '</div><button class="btn btn-primary" id="dv-build" title="Generate the scenes from this storyboard (a few minutes)">▶ Build scenes</button></div>';
+    scenes.forEach(function(s, i) {
+      h += '<div class="dv-card">' +
+        '<div class="dv-card-head"><span class="dv-num">' + (i + 1) + '</span>' +
+        '<span class="dv-label">' + escHtml(s.label || ('Scene ' + (i + 1))) + '</span>' +
+        '<span class="dv-dur">' + (Number(s.duration_seconds) || 0) + 's</span></div>' +
+        (s.purpose ? '<div class="dv-purpose">' + escHtml(s.purpose) + '</div>' : '') +
+        (s.visual_notes ? '<div class="dv-notes">' + escHtml(s.visual_notes) + '</div>' : '');
+      var beats = s.beats || [];
+      if (beats.length) {
+        h += '<div class="dv-beats">';
+        beats.forEach(function(b) {
+          h += '<div class="dv-beat">• <b>' + escHtml(b.label || '') + '</b> (' + (Number(b.duration_seconds) || 0) + 's)' +
+            (b.action ? ' — ' + escHtml(b.action) : '') + '</div>';
+        });
+        h += '</div>';
+      }
+      var comps = s.components || [];
+      if (comps.length || s.template || s.scene_template) {
+        h += '<div class="dv-chips">';
+        var tpl = s.scene_template || s.template;
+        if (tpl) h += '<span class="dv-chip">' + escHtml('template: ' + tpl) + '</span>';
+        comps.forEach(function(c) { h += draftChip(c); });
+        h += '</div>';
+      }
+      if (s.voiceover_text) h += '<div class="dv-vo">“' + escHtml(s.voiceover_text) + '”</div>';
+      h += '</div>';
+    });
+    dv.innerHTML = h;
+    dv.style.display = 'block';
+    // Sidebar mirrors the script so the left rail isn't a dead "No scenes"
+    els.sceneList.innerHTML = scenes.map(function(s, i) {
+      return '<div class="empty-state" style="text-align:left;padding:8px 12px;">' + (i + 1) + '. ' +
+        escHtml(s.label || 'Scene') + '</div>';
+    }).join('') || '<div class="empty-state">Empty storyboard</div>';
+    var btn = document.getElementById('dv-build');
+    if (btn) btn.addEventListener('click', function() { startDraftBuild(project.project_id, btn); });
+  }
+  function startDraftBuild(projectId, btn) {
+    if (draftBuild.job) return;
+    btn.disabled = true;
+    btn.textContent = '⏳ Building…';
+    api('POST', '/generate-scenes/' + state.tenantId + '/' + projectId, {})
+      .then(function(resp) {
+        draftBuild.job = resp.job_id;
+        studioStatus('Building scenes from the storyboard — this takes a few minutes; the film loads here when done.', 'ok');
+        pollDraftBuild(projectId, btn);
+      })
+      .catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = '▶ Build scenes';
+        studioStatus('Could not start the build: ' + e.message, 'err');
+      });
+  }
+  function pollDraftBuild(projectId, btn) {
+    if (!draftBuild.job) return;
+    api('/job/' + state.tenantId + '/' + draftBuild.job).then(function(job) {
+      if (!draftBuild.job) return;
+      if (job.status === 'completed') {
+        draftBuild.job = null;
+        studioStatus('✓ Scenes built — loading the film.', 'ok');
+        loadProject(projectId);
+        return;
+      }
+      if (job.status === 'failed') {
+        draftBuild.job = null;
+        btn.disabled = false;
+        btn.textContent = '↻ Retry build';
+        studioStatus('Build failed: ' + (job.error || 'unknown error'), 'err');
+        return;
+      }
+      var pct = (job.progress && job.progress.percent) || 0;
+      var detail = (job.progress && job.progress.detail) || (job.progress && job.progress.step) || '';
+      btn.textContent = '⏳ Building… ' + pct + '%' + (detail ? ' · ' + detail : '');
+      draftBuild.timer = setTimeout(function() { pollDraftBuild(projectId, btn); }, 5000);
+    }).catch(function() {
+      draftBuild.timer = setTimeout(function() { pollDraftBuild(projectId, btn); }, 8000);
+    });
+  }
+
+  // ── Brand kit panel: see and edit the tenant's brand ──
+  var brand = { kit: null };
+  function brandOpen() {
+    document.getElementById('brand-overlay').style.display = 'block';
+    api('/brand-kit/' + state.tenantId).then(function(kit) {
+      brand.kit = kit || {};
+      renderBrandPanel();
+    }).catch(function(e) {
+      document.getElementById('brand-panel').innerHTML = '<div class="empty-state">Failed to load brand kit: ' + escHtml(e.message) + '</div>';
+    });
+  }
+  function brandClose() { document.getElementById('brand-overlay').style.display = 'none'; }
+  var BK_COLOR_KEYS = ['primary', 'secondary', 'accent', 'background', 'surface', 'text', 'text_muted'];
+  function bkAssetTile(a, kind) {
+    // NB: backslashes doubled -- this file is one big template literal and
+    // single \\. or \\? would emit as bare . / ? (invalid regex, kills Studio).
+    var isImg = /\\.(png|jpe?g|gif|webp|svg)(\\?|$)/i.test(a.url || '');
+    var isVid = /\\.(mp4|webm|mov)(\\?|$)/i.test(a.url || '');
+    var media = isImg ? '<img src="' + escAttr(a.url) + '" loading="lazy">'
+      : isVid ? '<video src="' + escAttr(a.url) + '" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>'
+      : '<div style="height:54px;display:flex;align-items:center;justify-content:center;font-size:22px;">🎵</div>';
+    var sub = kind === 'logo' ? ((a.variant || 'full') + ' · ' + (a.theme || 'any')) : (a.type || '');
+    return '<div class="bk-tile" data-kind="' + kind + '" data-name="' + escAttr(a.name) + '">' + media +
+      '<div class="bk-name">' + escHtml(a.name || '') + '</div>' +
+      '<div class="bk-type">' + escHtml(sub) + '</div>' +
+      '<button class="bk-del" title="Remove from the kit (file stays on disk)">×</button></div>';
+  }
+  function renderBrandPanel() {
+    var kit = brand.kit || {};
+    var colors = kit.colors || {};
+    var style = kit.style || {};
+    var h = '<div class="bk-head"><span class="bk-title">🎨 Brand kit</span>' +
+      '<span style="display:flex;gap:6px;"><button class="btn btn-primary" id="bk-save">Save changes</button>' +
+      '<button class="btn btn-secondary" id="bk-close">×</button></span></div>';
+    h += '<div class="bk-section"><h4>Colors</h4>';
+    BK_COLOR_KEYS.forEach(function(k) {
+      var v = colors[k] || '#000000';
+      var safe = /^#[0-9a-fA-F]{6}$/.test(v) ? v : '#000000';
+      h += '<div class="bk-color-row"><label>' + k + '</label>' +
+        '<input type="color" data-ck="' + k + '" value="' + escAttr(safe) + '">' +
+        '<input type="text" data-ckt="' + k + '" value="' + escAttr(v) + '"></div>';
+    });
+    h += '</div>';
+    h += '<div class="bk-section"><h4>Style &amp; voice</h4>' +
+      '<div class="bk-row"><label>motion</label><select id="bk-motion">' +
+      ['', 'minimal', 'punchy', 'cinematic'].map(function(m) {
+        return '<option value="' + m + '"' + ((style.motion || '') === m ? ' selected' : '') + '>' + (m || '(unset)') + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="bk-row"><label>border radius</label><input type="text" id="bk-radius" value="' + escAttr(style.border_radius || '') + '" placeholder="e.g. 12px"></div>' +
+      '<div class="bk-row"><label>TTS voice</label><select id="bk-voice">' +
+      ['', 'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map(function(v) {
+        return '<option value="' + v + '"' + ((kit.voice || '') === v ? ' selected' : '') + '>' + (v || '(unset)') + '</option>';
+      }).join('') + '</select></div></div>';
+    h += '<div class="bk-section"><h4>Guidelines</h4>' +
+      '<textarea id="bk-guidelines" placeholder="Free-form brand rules the storyboard and generator follow…">' + escHtml(kit.guidelines || '') + '</textarea></div>';
+    var fonts = kit.fonts || [];
+    h += '<div class="bk-section"><h4>Fonts</h4><div class="bk-fonts">' +
+      (fonts.length ? fonts.map(function(f) {
+        return escHtml(f.family + ' (' + f.source + (f.weights && f.weights.length ? ' · ' + f.weights.join('/') : '') + ')');
+      }).join('<br>') : '<span style="color:#9ca3af;">none</span>') + '</div></div>';
+    var logos = kit.logos || [];
+    h += '<div class="bk-section"><h4>Logos (' + logos.length + ')</h4><div class="bk-grid">' +
+      logos.map(function(l) { return bkAssetTile(l, 'logo'); }).join('') + '</div></div>';
+    var assets = kit.assets || [];
+    h += '<div class="bk-section"><h4>Assets (' + assets.length + ')</h4><div class="bk-grid">' +
+      assets.map(function(a) { return bkAssetTile(a, 'asset'); }).join('') + '</div></div>';
+    h += '<div class="bk-section"><h4>Add files</h4>' +
+      '<div class="bk-row"><label>upload as</label><select id="bk-up-type">' +
+      ['logo', 'background', 'image', 'product', 'screenshot', 'intro', 'outro', 'watermark', 'music'].map(function(t) {
+        return '<option value="' + t + '">' + t + '</option>';
+      }).join('') + '</select>' +
+      '<span id="bk-logo-opts" style="display:flex;gap:6px;">' +
+      '<select id="bk-up-variant"><option>full</option><option>icon</option><option>wordmark</option></select>' +
+      '<select id="bk-up-theme"><option>any</option><option>dark</option><option>light</option></select></span></div>' +
+      '<div id="bk-drop">Drop images / videos / audio here, or click to choose files</div>' +
+      '<input type="file" id="bk-file" multiple style="display:none;">' +
+      '<div id="bk-up-status" style="font-size:11px;color:#6b7280;margin-top:6px;"></div></div>';
+    var panel = document.getElementById('brand-panel');
+    panel.innerHTML = h;
+    wireBrandPanel();
+  }
+  function wireBrandPanel() {
+    var panel = document.getElementById('brand-panel');
+    document.getElementById('bk-close').addEventListener('click', brandClose);
+    // Color pickers and hex fields mirror each other
+    BK_COLOR_KEYS.forEach(function(k) {
+      var pick = panel.querySelector('[data-ck="' + k + '"]');
+      var text = panel.querySelector('[data-ckt="' + k + '"]');
+      pick.addEventListener('input', function() { text.value = pick.value; });
+      text.addEventListener('input', function() {
+        if (/^#[0-9a-fA-F]{6}$/.test(text.value)) pick.value = text.value;
+      });
+    });
+    var typeSel = document.getElementById('bk-up-type');
+    var logoOpts = document.getElementById('bk-logo-opts');
+    var syncLogoOpts = function() { logoOpts.style.display = typeSel.value === 'logo' ? 'flex' : 'none'; };
+    typeSel.addEventListener('change', syncLogoOpts);
+    syncLogoOpts();
+    document.getElementById('bk-save').addEventListener('click', function() {
+      var colors = {};
+      BK_COLOR_KEYS.forEach(function(k) { colors[k] = panel.querySelector('[data-ckt="' + k + '"]').value.trim(); });
+      var patch = {
+        colors: colors,
+        guidelines: document.getElementById('bk-guidelines').value,
+        style: {
+          motion: document.getElementById('bk-motion').value || undefined,
+          border_radius: document.getElementById('bk-radius').value.trim() || undefined,
+        },
+      };
+      var voice = document.getElementById('bk-voice').value;
+      if (voice) patch.voice = voice;
+      api('PATCH', '/brand-kit/' + state.tenantId, patch).then(function(kit) {
+        brand.kit = kit;
+        studioStatus('✓ Brand kit saved — new generations pick it up immediately.', 'ok');
+        renderBrandPanel();
+      }).catch(function(e) { studioStatus('Save failed: ' + e.message, 'err'); });
+    });
+    // Delete (unregister) a logo/asset from the kit
+    panel.querySelectorAll('.bk-del').forEach(function(del) {
+      del.addEventListener('click', function() {
+        var tile = del.closest('.bk-tile');
+        var kind = tile.getAttribute('data-kind');
+        var nm = tile.getAttribute('data-name');
+        var patch = {};
+        if (kind === 'logo') patch.logos = (brand.kit.logos || []).filter(function(l) { return l.name !== nm; });
+        else patch.assets = (brand.kit.assets || []).filter(function(a) { return a.name !== nm; });
+        api('PATCH', '/brand-kit/' + state.tenantId, patch).then(function(kit) {
+          brand.kit = kit;
+          renderBrandPanel();
+        }).catch(function(e) { studioStatus('Remove failed: ' + e.message, 'err'); });
+      });
+    });
+    // Drag-drop + click-to-choose uploads
+    var drop = document.getElementById('bk-drop');
+    var file = document.getElementById('bk-file');
+    drop.addEventListener('click', function() { file.click(); });
+    drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', function() { drop.classList.remove('over'); });
+    drop.addEventListener('drop', function(e) {
+      e.preventDefault();
+      drop.classList.remove('over');
+      bkUpload(Array.prototype.slice.call(e.dataTransfer.files || []));
+    });
+    file.addEventListener('change', function() { bkUpload(Array.prototype.slice.call(file.files || [])); });
+  }
+  function bkUpload(files) {
+    if (!files.length) return;
+    var type = document.getElementById('bk-up-type').value;
+    var extra = '';
+    if (type === 'logo') {
+      extra = '&variant=' + encodeURIComponent(document.getElementById('bk-up-variant').value) +
+        '&theme=' + encodeURIComponent(document.getElementById('bk-up-theme').value);
+    }
+    var status = document.getElementById('bk-up-status');
+    var remaining = files.length;
+    files.forEach(function(f) {
+      status.textContent = 'Uploading ' + f.name + '…';
+      var url = '/api' + withToken('/brand-asset/' + state.tenantId + '?name=' + encodeURIComponent(f.name) + '&type=' + encodeURIComponent(type) + extra);
+      var opts = { method: 'POST', body: f, headers: {} };
+      if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
+      fetch(url, opts).then(function(r) { return r.json(); }).then(function(j) {
+        remaining--;
+        if (!j.ok) { status.textContent = 'Upload failed: ' + (j.error || 'unknown'); return; }
+        brand.kit = j.kit;
+        if (remaining === 0) {
+          status.textContent = '';
+          studioStatus('✓ Added to the brand kit.', 'ok');
+          renderBrandPanel();
+        }
+      }).catch(function(e) { remaining--; status.textContent = 'Upload failed: ' + e.message; });
+    });
+  }
+  (function wireBrand() {
+    var btn = document.getElementById('brand-btn');
+    if (btn) btn.addEventListener('click', brandOpen);
+    document.getElementById('brand-overlay').addEventListener('click', function(e) {
+      if (e.target === document.getElementById('brand-overlay')) brandClose();
+    });
   })();
 
   // ── Scene focus mode: the scene's own clock ──

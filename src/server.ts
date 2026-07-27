@@ -321,6 +321,132 @@ JOBS AND DELIVERY
 
 If something looks wrong in a scene, get{target:'layout'} measures the real geometry (element boxes, crop math, warnings) -- diagnose before writing a revise instruction.`;
 
+/**
+ * Queue a build-scenes-from-storyboard job (generate mode='full' on a
+ * storyboarded project). Shared by the MCP generate tool and Studio's
+ * "Build scenes" button (POST /api/generate-scenes). Returns null when the
+ * project has no usable storyboard (caller decides what that means),
+ * {error} when generation cannot start, else {job}.
+ */
+export async function queueBuildFromStoryboard(
+  tenantId: string,
+  projectId: string,
+  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "speaker-screencast"; max_revisions?: number } = {},
+): Promise<{ job: { id: string } } | { error: string } | null> {
+  const project = await loadProject(tenantId, projectId);
+  // Any project that HAS a storyboard rebuilds from it. Only 'rendering' is
+  // excluded (don't swap scenes mid-render).
+  if (!project || !project.storyboard || project.status === "rendering") return null;
+
+  const storyboardPrompt = buildPromptFromStoryboard(project.storyboard);
+
+  let llmConfig;
+  try {
+    llmConfig = llmConfigFromEnv();
+  } catch (e: any) {
+    return { error: `LLM not configured: ${e.message}` };
+  }
+
+  const brandKit = await loadBrandKit(tenantId);
+  // A project with a speaker track already HAS its narration (a real
+  // recording). Auto-TTS on top of it double-voices the film, and
+  // auto-music fights the recording.
+  const hasNarration = !!(project.speaker_track && project.speaker_track.clips && project.speaker_track.clips.length);
+  const job = queueJob("generate", tenantId, async (j) => {
+    const trace = new TraceBuilder("generate", tenantId, "", storyboardPrompt);
+    try {
+      j.progress = { step: "generating_from_storyboard", percent: 10 };
+      const pipelineResult = await runGeneratePipeline({
+        prompt: storyboardPrompt,
+        target: "video",
+        tenant_id: tenantId,
+        llmConfig,
+        onProgress: genProgress(j, 10, 95),
+        brandKit: brandKit || project.brand_kit,
+        canvas: project.canvas,
+        creativity: opts.creativity,
+        film_grammar: opts.film_grammar,
+        maxRevisions: opts.max_revisions,
+        project_id: project.project_id,
+        voiceover: !hasNarration,
+        backgroundMusic: !hasNarration,
+        voice: project.storyboard!.audio.voice as any,
+        sceneCount: project.storyboard!.scenes.length,
+      });
+
+      // Copy generated scenes, audio, and assets from the new project back to the original storyboarded project
+      // Use the in-memory project object from pipelineResult instead of re-loading from disk
+      // to avoid race conditions where disk write hasn't completed yet
+      const generatedProject = (pipelineResult as any)?.project;
+      const newProjectId = generatedProject?.project_id || (pipelineResult as any)?.projectId || (pipelineResult as any)?.project_id;
+      if (newProjectId && newProjectId !== projectId) {
+        const origProject = await loadProject(tenantId, projectId);
+        if (generatedProject && origProject) {
+          origProject.scenes = generatedProject.scenes;
+          origProject.audio = generatedProject.audio;
+          origProject.assets = generatedProject.assets;
+          origProject.canvas = generatedProject.canvas;
+          // Never WIPE a speaker track the user already attached: the
+          // pipeline only produces one in speaker-source mode, so an
+          // undefined here used to clobber a narration set via `add`.
+          if (generatedProject.speaker_track) origProject.speaker_track = generatedProject.speaker_track;
+          origProject.status = "generated";
+          origProject.updated_at = new Date().toISOString();
+          await saveProject(origProject);
+
+          // Copy component HTML, voiceover audio, and downloaded assets
+          // from the working-copy project to the original. Recursive
+          // (component dirs can nest) and LOUD on failure -- a silent
+          // skip here leaves the original with scenes that reference
+          // components it doesn't have (an empty preview).
+          const srcDir = projectDir(tenantId, newProjectId);
+          const dstDir = projectDir(tenantId, projectId);
+          for (const subdir of ["components", "voiceover", "assets"]) {
+            const srcSub = path.join(srcDir, subdir);
+            const dstSub = path.join(dstDir, subdir);
+            try {
+              await fs.access(srcSub);
+            } catch {
+              continue; // nothing generated for this subdir
+            }
+            try {
+              await fs.cp(srcSub, dstSub, { recursive: true, force: true });
+              console.log(`  Build-from-storyboard: copied ${subdir}/ from ${newProjectId}`);
+            } catch (copyErr: any) {
+              console.error(`  Build-from-storyboard: FAILED to copy ${subdir}/ from ${newProjectId}: ${copyErr?.message || copyErr}`);
+            }
+          }
+
+          console.log(`  Build-from-storyboard: copied ${generatedProject.scenes.length} scenes from ${newProjectId} to ${projectId}`);
+        }
+      } else {
+        // Pipeline wrote to the same project
+        const updated = await loadProject(tenantId, projectId);
+        if (updated) {
+          updated.status = "generated";
+          updated.updated_at = new Date().toISOString();
+          await saveProject(updated);
+        }
+      }
+
+      if (pipelineResult && typeof pipelineResult === "object" && "project_id" in (pipelineResult as any)) {
+        j.projectId = (pipelineResult as any).project_id;
+      }
+
+      j.progress = { step: "complete", percent: 100 };
+      trace.setOutcome("success");
+      return pipelineResult;
+    } catch (pipelineErr: any) {
+      trace.setOutcome("failed", pipelineErr.message);
+      throw pipelineErr;
+    } finally {
+      trace.finish();
+    }
+  });
+  job.projectId = projectId;
+  return { job };
+}
+
 export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "media-producer-mcp",
@@ -2001,131 +2127,20 @@ export function createMcpServer(): McpServer {
         // one. Anything else (no project, a draft project, or a revision via `id`)
         // falls through to the fresh storyboard+scenes run below.
         if (params.project_id && !params.id) {
-          const project = await loadProject(params.tenant_id, params.project_id);
-          // Any project that HAS a storyboard rebuilds from it -- not just the
-          // never-built "storyboard" state. Passing project_id + mode=full on
-          // an already-generated project used to fall through to the fresh-
-          // storyboard path below: it invented a brand-new video from a near-
-          // empty prompt in a scratch project and left the named project
-          // untouched -- the opposite of what the caller asked for. Only
-          // 'rendering' is excluded (don't swap scenes mid-render).
-          if (project && project.storyboard && project.status !== "rendering") {
-
-          // Use the storyboard's script as the prompt for the unified pipeline
-          // Build a rich prompt from the storyboard's narrative + scene details
-          const storyboardPrompt = buildPromptFromStoryboard(project.storyboard);
-
-          let llmConfig;
-          try {
-            llmConfig = llmConfigFromEnv();
-          } catch (e: any) {
-            return err(`LLM not configured: ${e.message}`);
-          }
-
-          const brandKit = await loadBrandKit(params.tenant_id);
-          // A project with a speaker track already HAS its narration (a real
-          // recording). Auto-TTS on top of it double-voices the film, and
-          // auto-music fights the recording -- both were hardcoded true.
-          const hasNarration = !!(project.speaker_track && project.speaker_track.clips && project.speaker_track.clips.length);
-          const job = queueJob("generate", params.tenant_id, async (j) => {
-            const trace = new TraceBuilder("generate", params.tenant_id, "", storyboardPrompt);
-            try {
-              j.progress = { step: "generating_from_storyboard", percent: 10 };
-              const pipelineResult = await runGeneratePipeline({
-                prompt: storyboardPrompt,
-                target: "video",
-                tenant_id: params.tenant_id,
-                llmConfig,
-                onProgress: genProgress(j, 10, 95),
-                brandKit: brandKit || project.brand_kit,
-                canvas: project.canvas,
-                creativity: params.creativity,
-              film_grammar: params.film_grammar,
-              maxRevisions: params.max_revisions,
-                project_id: project.project_id,
-                voiceover: !hasNarration,
-                backgroundMusic: !hasNarration,
-                voice: project.storyboard!.audio.voice as any,
-                sceneCount: project.storyboard!.scenes.length,
-              });
-
-              // Copy generated scenes, audio, and assets from the new project back to the original storyboarded project
-              // Use the in-memory project object from pipelineResult instead of re-loading from disk
-              // to avoid race conditions where disk write hasn't completed yet
-              const generatedProject = (pipelineResult as any)?.project;
-              const newProjectId = generatedProject?.project_id || (pipelineResult as any)?.projectId || (pipelineResult as any)?.project_id;
-              if (newProjectId && newProjectId !== params.project_id) {
-                const origProject = await loadProject(params.tenant_id, params.project_id!);
-                if (generatedProject && origProject) {
-                  origProject.scenes = generatedProject.scenes;
-                  origProject.audio = generatedProject.audio;
-                  origProject.assets = generatedProject.assets;
-                  origProject.canvas = generatedProject.canvas;
-                  // Never WIPE a speaker track the user already attached: the
-                  // pipeline only produces one in speaker-source mode, so an
-                  // undefined here used to clobber a narration set via `add`.
-                  if (generatedProject.speaker_track) origProject.speaker_track = generatedProject.speaker_track;
-                  origProject.status = "generated";
-                  origProject.updated_at = new Date().toISOString();
-                  await saveProject(origProject);
-
-                  // Copy component HTML, voiceover audio, and downloaded assets
-                  // from the working-copy project to the original. Recursive
-                  // (component dirs can nest) and LOUD on failure -- a silent
-                  // skip here leaves the original with scenes that reference
-                  // components it doesn't have (an empty preview).
-                  const srcDir = projectDir(params.tenant_id, newProjectId);
-                  const dstDir = projectDir(params.tenant_id, params.project_id!);
-                  for (const subdir of ["components", "voiceover", "assets"]) {
-                    const srcSub = path.join(srcDir, subdir);
-                    const dstSub = path.join(dstDir, subdir);
-                    try {
-                      await fs.access(srcSub);
-                    } catch {
-                      continue; // nothing generated for this subdir
-                    }
-                    try {
-                      await fs.cp(srcSub, dstSub, { recursive: true, force: true });
-                      console.log(`  Build-from-storyboard: copied ${subdir}/ from ${newProjectId}`);
-                    } catch (copyErr: any) {
-                      console.error(`  Build-from-storyboard: FAILED to copy ${subdir}/ from ${newProjectId}: ${copyErr?.message || copyErr}`);
-                    }
-                  }
-
-                  console.log(`  Build-from-storyboard: copied ${generatedProject.scenes.length} scenes from ${newProjectId} to ${params.project_id}`);
-                }
-              } else {
-                // Pipeline wrote to the same project
-                const updated = await loadProject(params.tenant_id, params.project_id!);
-                if (updated) {
-                  updated.status = "generated";
-                  updated.updated_at = new Date().toISOString();
-                  await saveProject(updated);
-                }
-              }
-
-              if (pipelineResult && typeof pipelineResult === "object" && "project_id" in (pipelineResult as any)) {
-                j.projectId = (pipelineResult as any).project_id;
-              }
-
-              j.progress = { step: "complete", percent: 100 };
-              trace.setOutcome("success");
-              return pipelineResult;
-            } catch (pipelineErr: any) {
-              trace.setOutcome("failed", pipelineErr.message);
-              throw pipelineErr;
-            } finally {
-              trace.finish();
-            }
+          const sbBuild = await queueBuildFromStoryboard(params.tenant_id, params.project_id, {
+            creativity: params.creativity,
+            film_grammar: params.film_grammar,
+            max_revisions: params.max_revisions,
           });
-
-          return ok({
-            status: "queued",
-            job_id: job.id,
-            project_id: project.project_id,
-            preview_url: previewUrl(params.tenant_id, project.project_id),
-            message: "Generating scenes from storyboard. Use get(target='job', job_id='" + job.id + "') to check status.",
-          });
+          if (sbBuild) {
+            if ("error" in sbBuild) return err(sbBuild.error);
+            return ok({
+              status: "queued",
+              job_id: sbBuild.job.id,
+              project_id: params.project_id,
+              preview_url: previewUrl(params.tenant_id, params.project_id),
+              message: "Generating scenes from storyboard. Use get(target='job', job_id='" + sbBuild.job.id + "') to check status.",
+            });
           }
           // No approved storyboard on this project -> fall through to a fresh run.
         }
