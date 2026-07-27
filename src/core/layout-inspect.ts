@@ -72,8 +72,9 @@ export interface LayoutInspection {
   warnings: string[];
 }
 
-/** Read a component source, searching project -> tenant -> library dirs. */
-async function loadSource(type: string, tenantId: string, projectId: string): Promise<string | null> {
+/** Read a component source, searching project -> tenant -> library dirs.
+ *  (Shared with motion-inspect.) */
+export async function loadSource(type: string, tenantId: string, projectId: string): Promise<string | null> {
   const dirs = [
     path.join(config.dataDir, tenantId, "projects", projectId, "components"),
     path.join(config.dataDir, tenantId, "components"),

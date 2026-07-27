@@ -514,14 +514,27 @@ export function createMcpServer(): McpServer {
       tenant_id: z.string().optional(),
       project_id: z.string().optional(),
       scene_id: z.string().optional(),
-      target: z.enum(["project", "brand_kit", "job", "jobs", "layout"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs, 'layout' for measured scene geometry."),
+      target: z.enum(["project", "brand_kit", "job", "jobs", "layout", "motion"]).optional().describe("What to get (default: project). Use 'job' with job_id for single job status, 'jobs' for all tenant jobs, 'layout' for measured scene geometry, 'motion' (with project_id + scene_id) for sampled per-component motion across scene time -- verify 'did the zoom/entrance actually fire' without rendering."),
       job_id: z.string().optional().describe("Job ID to check status (use with target='job')"),
       job_type: z.enum(["render", "generate"]).optional().describe("Filter jobs by type (use with target='jobs')"),
       selector: z.string().optional().describe("CSS selector to also measure specific element(s) (use with target='layout')"),
       at_time: z.number().optional().describe("Timeline second to measure at (use with target='layout'; default mid-scene)"),
+      samples: z.number().optional().describe("Evenly spaced sample count across the scene (use with target='motion'; default 13, max 40)"),
     },
     async (params) => {
       const target = params.target || "project";
+
+      if (target === "motion") {
+        if (!params.project_id || !params.scene_id) return err("project_id and scene_id are required for target='motion'");
+        const { inspectSceneMotion } = await import("./core/motion-inspect.js");
+        const motion = await inspectSceneMotion({
+          tenantId: params.tenant_id,
+          projectId: params.project_id,
+          sceneId: params.scene_id,
+          samples: params.samples,
+        });
+        return motion.ok ? ok(motion) : err(motion.error || "Motion inspection failed");
+      }
 
       if (target === "brand_kit") {
         const kit = await loadBrandKit(params.tenant_id);
