@@ -15,7 +15,7 @@
 import { normalizeHtmlUrls } from "./normalize-urls.js";
 import { sceneCompositesOverSpeaker } from "./speaker-mode.js";
 import { parseComponent, bindTemplate, scopeCSS, type ParsedComponent } from "./component-parser.js";
-import { resolveComponentTags } from "./component-tags.js";
+import { resolveComponentTags, transformComponentTagData } from "./component-tags.js";
 import {
   generateFontLinks,
   resolveAssetUrls,
@@ -25,6 +25,8 @@ import {
   buildComponentScript,
   loadGsapSource,
   loadThreeSource,
+  loadLottieSource,
+  inlineLottieAnimation,
   loadSharedUtilities,
   loadLibraryComponentSources,
   resolveSpeakerVideoTags,
@@ -80,6 +82,14 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
   // backdrop played as a permanently black canvas.
   const usesThree = options.scenes.some((s) => s.components.some((c) => c.source.includes("THREE")));
   const threeSource = usesThree ? await loadThreeSource(config.threeDir) : "";
+
+  // lottie-web likewise: without the player the lottie-accent component
+  // silently bails on its `typeof lottie === 'undefined'` guard -- confetti
+  // that renders in the film would be invisible in Studio.
+  const usesLottie = options.scenes.some((s) =>
+    s.components.some((c) => c.source.includes("lottie.loadAnimation")) ||
+    (s.scene.components || []).some((c) => c.type === "lottie-accent"));
+  const lottieSource = usesLottie ? await loadLottieSource(config.lottieDir) : "";
 
   // Codegen scenes embed library components via <component> tags (video,
   // browser frames, charts...). Load the library once if any scene needs it,
@@ -141,7 +151,10 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       const parsed = sourceMap.get(comp.type);
       if (!parsed) continue;
 
-      const preData = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData(comp);
+      const preData0 = comp.type === "screencast-frame" ? await resolveAutoCropData(comp.data) : bakeDirectLogoData(comp);
+      // Same assembly-time hook as the render path: the accent's animation
+      // JSON is inlined into its data (no fetch at play time).
+      const preData = comp.type === "lottie-accent" ? await inlineLottieAnimation(preData0) : preData0;
       const resolvedData = resolveAssetUrls(preData, true, speakerUrl);
       let boundHtml = bindTemplate(parsed.template, resolvedData);
       // Resolve raw <video src="speaker"> PiP tags (same contract as the
@@ -163,6 +176,7 @@ export async function assembleComposite(options: CompositeOptions): Promise<stri
       // by loadVideoForCapture) actually exist in the preview DOM.
       if (boundHtml.includes("<component ") && librarySourceMap.size > 0) {
         boundHtml = await resolveScreencastAutoCrops(boundHtml);
+        boundHtml = await transformComponentTagData(boundHtml, "lottie-accent", inlineLottieAnimation);
         const tagResult = resolveComponentTags(
           boundHtml,
           librarySourceMap,
@@ -353,6 +367,11 @@ ${threeSource ? `<!-- three.js (bundled: three + addons, global THREE). MUST be 
      GSAP block below would make that block strict too. -->
 <script>
 ${threeSource}
+</script>
+` : ""}${lottieSource ? `<!-- lottie-web svg player (global lottie). Own <script> block for the same
+     strict-mode isolation reason as three.js. -->
+<script>
+${lottieSource}
 </script>
 ` : ""}<script>
 ${gsapSource}
