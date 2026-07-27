@@ -6927,10 +6927,15 @@ export function getPreviewHtml(): string {
     if (me.picture) { pic.src = me.picture; pic.style.display = 'inline-block'; }
     chip.style.display = 'inline-flex';
   }
+  function showBrandBtn() {
+    var b = document.getElementById('brand-btn');
+    if (b) b.style.display = '';
+  }
   var params = new URLSearchParams(window.location.search);
   var tenantParam = params.get('tenant');
   if (tenantParam) {
     state.tenantId = tenantParam;
+    showBrandBtn();
     loadProjects();
     fetch('/auth/me').then(function(r) { return r.ok ? r.json() : null; })
       .then(showUserChip).catch(function() {});
@@ -6941,6 +6946,7 @@ export function getPreviewHtml(): string {
     }).then(function(me) {
       state.tenantId = me.tenant_id;
       showUserChip(me);
+      showBrandBtn();
       loadProjects();
     }).catch(function() {
       window.location.href = '/auth/google/login?return_to=' +
