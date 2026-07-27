@@ -86,6 +86,31 @@ describe("lottie-accent", () => {
     expect(html).not.toContain("lottie-web svg player");
   });
 
+  it("rides the authored-composition path as a corner overlay, not a window", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const result = await generateScene({
+      scene: {
+        label: "ship it", duration_seconds: 8, purpose: "p", visual_notes: "v",
+        components: [
+          { type: "claude-cowork-session", data: { title: "Launch" } },
+          { type: "lottie-accent", data: { asset: "confetti", at: 2 } },
+        ],
+      } as any,
+      sceneIndex: 2, totalScenes: 5, prompt: "p",
+      llmConfig: {} as any, brandKit: {} as any, canvas: { width: 1920, height: 1080 } as any,
+    } as any);
+    const scene: any = result.scene;
+    expect(scene.authored_composition).toBe(true);   // deterministic -- NOT codegen
+    const byType = Object.fromEntries(scene.components.map((c: any) => [c.type, c]));
+    // The mock keeps the classic single-window inset -- the accent must not
+    // have demoted it into a pair split.
+    expect(byType["claude-cowork-session"].position.width).toBe("84%");
+    // The accent is a small high-z corner overlay, never an 84% window.
+    expect(byType["lottie-accent"].position.width).toBe("21%");
+    expect(byType["lottie-accent"].z_index).toBeGreaterThanOrEqual(40);
+    expect(byType["lottie-accent"].data.asset).toBe("confetti");
+  });
+
   it("vendored player bundle exists", async () => {
     const src = await loadLottieSource(config.lottieDir);
     expect(src.length).toBeGreaterThan(100_000);
