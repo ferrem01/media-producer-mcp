@@ -173,9 +173,35 @@ export async function inspectSceneMotion(opts: {
         document.querySelectorAll(".mp-component[data-cid]").forEach((el) => {
           const cs = getComputedStyle(el as HTMLElement);
           const r = (el as HTMLElement).getBoundingClientRect();
+          // Entrances usually animate elements INSIDE the wrapper (the
+          // wrapper itself stays opacity 1) -- so "is content visible" walks
+          // the subtree carrying the cumulative opacity product and takes
+          // the max over content-bearing nodes (text/svg/img/video/canvas).
+          let effOpacity = 0;
+          let contentSeen = false;
+          const walk = (node: Element, product: number, depth: number) => {
+            if (depth > 6 || effOpacity >= 0.999) return;
+            const ncs = getComputedStyle(node as HTMLElement);
+            if (ncs.display === "none" || ncs.visibility === "hidden") return;
+            const p = product * (parseFloat(ncs.opacity) || 0);
+            if (p <= 0.001) return;
+            const tag = node.tagName;
+            const hasText = !!(node.childNodes && Array.from(node.childNodes).some((n) => n.nodeType === 3 && (n.textContent || "").trim()));
+            if (hasText || tag === "svg" || tag === "IMG" || tag === "VIDEO" || tag === "CANVAS" || tag === "PATH") {
+              contentSeen = true;
+              if (p > effOpacity) effOpacity = p;
+            }
+            let kids = 0;
+            for (const child of Array.from(node.children)) {
+              if (++kids > 24) break;
+              walk(child, p, depth + 1);
+            }
+          };
+          walk(el, 1, 0);
+          if (!contentSeen) effOpacity = parseFloat(cs.opacity) || 0; // no content nodes: fall back to the wrapper
           comps[(el as HTMLElement).getAttribute("data-cid") || ""] = {
-            opacity: parseFloat(cs.opacity),
-            visible: cs.visibility !== "hidden" && cs.display !== "none" && r.width > 0 && r.height > 0,
+            opacity: Math.round(effOpacity * 100) / 100,
+            visible: cs.visibility !== "hidden" && cs.display !== "none" && r.width > 0 && r.height > 0 && effOpacity > 0.02,
             rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
             transform: cs.transform,
           };
