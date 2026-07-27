@@ -278,8 +278,24 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
  * The quotient trio composes (inset shell + center surface + real chat
  * panel); anything without a recipe gets the classic single-window inset.
  */
-function authoredLayout(types: string[]): Map<string, { position: Record<string, string | number>; z_index: number }> {
+/** Overlay accents (celebration/delight seasoning): never windows -- they sit
+ *  ON the composition in a corner, small, above everything. */
+var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
+var ACCENT_SPOTS: Array<Record<string, string | number>> = [
+  { x: "71%", y: "7%", width: "21%", height: "36%" },   // top-right
+  { x: "7%", y: "56%", width: "19%", height: "34%" },   // bottom-left
+];
+
+function authoredLayout(allTypes: string[]): Map<string, { position: Record<string, string | number>; z_index: number }> {
   var out = new Map<string, { position: Record<string, string | number>; z_index: number }>();
+  // Accents are placed as corner overlays AFTER the windows, and excluded
+  // from the window recipes -- a confetti burst must never become a 84%
+  // full-frame "window".
+  var accents = allTypes.filter((t) => ACCENT_TYPES.indexOf(t) !== -1);
+  var types = allTypes.filter((t) => ACCENT_TYPES.indexOf(t) === -1);
+  accents.forEach((t, i) => {
+    out.set(t, { position: ACCENT_SPOTS[Math.min(i, ACCENT_SPOTS.length - 1)], z_index: 40 + i });
+  });
   var has = (t: string) => types.indexOf(t) !== -1;
   if (has("quotient-app-shell")) {
     out.set("quotient-app-shell", { position: { x: "1.2%", y: "2%", width: "97.6%", height: "96%" }, z_index: 5 });

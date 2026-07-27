@@ -345,6 +345,7 @@ Match scene INTENT to a component category (the catalog has blocks for all of th
 - Location, coverage, routes, "where" -> maps/* (route-map, pin-drop, world-map, bubble-map, ...)
 - Product UI / app flows -> the mockups/* (slack-workspace, dashboard-kpi, chat-simulator, ...) and layouts/* (browser-frame, device-mockup, ...)
 - CTA / closing -> cta-card, pricing-card
+- Celebration / success / delight punctuation -> lottie-accent (curated professional micro-animations: confetti, party-popper, check-mark, rocket, trophy, sparkles, chart-up, ...). ALWAYS author it as an object with data -- {"type": "lottie-accent", "data": {"asset": "confetti", "at": 2.5, "hold": 3}} -- never a plain string. It is seasoning ON another beat's content (a corner overlay), never the subject; at most one per scene, on 1-2 KEY beats in the film.
 - Film-look finishing -> the renderer already applies a film-level color grade (S-curve + saturation + fine grain) to the WHOLE video, so scenes do not need their own grain/grade. On 1-2 KEY scenes only, you may still add ONE subtle effects/* overlay (vignette, light-leak, shimmer-sweep) for emphasis. Do NOT add a film-FX overlay to every scene -- it gets heavy. Most scenes need none.
 
 For scenes with existing UI elements (chat panels, dashboards, code editors), ALWAYS list the matching library component types.
