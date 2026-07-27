@@ -38,6 +38,8 @@ export interface SceneGeneratorOpts {
   treatment?: Treatment;
   /** URL of a b-roll stock clip for the agent to place as this scene's background. */
   brollVideoUrl?: string;
+  /** The film's world (SPEC-world.md): continuous backdrop + theme contract. */
+  world?: import("./world.js").WorldSpec;
 }
 
 export interface GeneratedScene {
@@ -265,7 +267,7 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   // ── Unified Codegen Path (always active) ──
   // All scenes go through the agentic codegen generator
   // which can use <component> tags to embed library components.
-  var codegenSpec = await buildCodegenSpec(draft);
+  var codegenSpec = await buildCodegenSpec(draft, opts.world);
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (unified codegen)`);
   return await generateCodegenScene(opts, draft, codegenSpec, sceneId);
 }
@@ -337,7 +339,23 @@ function buildAuthoredCompositionScene(
   var layout = authoredLayout(types);
   // The dark cinematic world under every mock window, matching the film's
   // template scenes (and the hand-built originals).
-  var components: any[] = [{
+  // The film's ONE world under every scene (SPEC-world.md). The per-scene
+  // seed (5 + sceneIndex * 7) was the deck-of-posters bug: a fresh world at
+  // every cut. With a world: same component, same seed, clock offset to
+  // film time so the drift continues across the cut.
+  var w = opts.world;
+  var components: any[] = [w ? {
+    id: "bg",
+    type: w.backdrop.component,
+    z_index: 1,
+    position: { x: 0, y: 0, width: "100%", height: "100%" },
+    data: {
+      seed: w.backdrop.seed,
+      colors: w.backdrop.palette,
+      theme: w.theme,
+      time_offset: (draft as any).film_start || 0,
+    },
+  } : {
     id: "bg",
     type: "webgl-backdrop",
     z_index: 1,
@@ -368,7 +386,7 @@ function buildAuthoredCompositionScene(
     label: draft.label,
     duration_seconds: draft.duration_seconds || 8,
     transition_in: acTransition,
-    background: "#0c0d12",
+    background: w ? (w.theme === "light" ? "#fafaf8" : "#0c0d12") : "#0c0d12",
     beats: Array.isArray(draft.beats) && draft.beats.length >= 2 ? (draft.beats as any) : undefined,
     camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
     components,
@@ -573,7 +591,7 @@ function buildBrandContext(brandKit: BrandKit): string {
  * notes into a spec the agentic codegen generator can use
  * with <component> tags.
  */
-export async function buildCodegenSpec(draft: any): Promise<string> {
+export async function buildCodegenSpec(draft: any, world?: import("./world.js").WorldSpec): Promise<string> {
   var parts: string[] = [];
 
   parts.push(`Scene: "${draft.label}"`);
@@ -696,6 +714,14 @@ export async function buildCodegenSpec(draft: any): Promise<string> {
   if (draft.voiceover_text) {
     parts.push(`\nVoiceover: "${draft.voiceover_text}"`);
     parts.push(`Time the visual reveals to match the narration pacing.`);
+  }
+
+  // The film's WORLD (SPEC-world.md): codegen scenes author their own page,
+  // so they receive the contract as constraints -- theme is not a choice.
+  if (world) {
+    const { worldPromptBlock } = await import("./world.js");
+    parts.push(`\n${worldPromptBlock(world)}`);
+    parts.push(`Your page background MUST be the world's ${world.theme} base (${world.theme === "light" ? "#fafaf8 or the brand background" : "the dark brand base"}); build atmosphere with the world palette, never by inverting the theme.`);
   }
 
   return parts.join("\n");

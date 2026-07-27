@@ -557,6 +557,14 @@ export interface Project {
   };
   /** The original prompt that kicked off generation (the ask). */
   prompt?: string;
+  /** The film's WORLD (SPEC-world.md): one continuous backdrop/theme
+   *  contract authored at the creative-director stage and honored by every
+   *  scene. Duck-typed here to avoid a core->llm import. */
+  world?: {
+    backdrop: { component: string; seed: number; palette: string[] };
+    theme: "light" | "dark";
+    chapter_slots: number;
+  };
   /** The storyboard (script + scene breakdown + asset manifest) */
   storyboard?: Storyboard;
   created_at?: string;

@@ -9,6 +9,7 @@
 
 import { callLLM, callLLMAgentic, type LLMConfig, type LLMContentPart, type LLMMessage, type LLMTool } from "./client.js";
 import { formatCatalogForPrompt, type ComponentCatalogEntry } from "./catalog.js";
+import { worldPromptBlock } from "./world.js";
 import type { Treatment } from "./creative-director.js";
 import { SCENE_STORYBOARD_DESIGN_RULES } from "./design-rules.js";
 import { COMPOSITION_PLAYBOOK, PACING_PLAYBOOK } from "./cinematography.js";
@@ -159,6 +160,8 @@ export interface StoryboardBuilderOpts {
   /** L4 film grammar the treatment committed to. Activates the matching
    *  contract section below as MANDATORY rather than conditional prose. */
   filmGrammar?: import("./creative-director.js").FilmGrammar;
+  /** The film's world (SPEC-world.md): given, continuous, enforced. */
+  world?: import("./world.js").WorldSpec;
 }
 
 export interface StoryboardComponent {
@@ -176,6 +179,9 @@ export interface StoryboardComponent {
 }
 
 export interface DraftScene {
+  /** Film-time start (s), stamped post-quantization -- the continuous world
+   *  backdrop renders at film_start + local t so drift survives cuts. */
+  film_start?: number;
   label: string;
   duration_seconds: number;
   purpose: string;         // what this scene communicates -- its job in the story
@@ -350,7 +356,7 @@ Match scene INTENT to a component category (the catalog has blocks for all of th
 
 For scenes with existing UI elements (chat panels, dashboards, code editors), ALWAYS list the matching library component types.
 
-### Background Strategy -- decide this FIRST, per scene, by INTENT
+${opts.world ? worldPromptBlock(opts.world) + "\n\n" : ""}### Background Strategy -- decide this FIRST, per scene, by INTENT
 Before writing any background, decide which of FOUR strategies the moment wants. Do this BEFORE reaching for b-roll -- b-roll is ONE option, not the default for every atmospheric beat:
 1. **B-roll video (broll_query)** -- real-world energy, atmosphere, a place, a human moment that should feel ALIVE and MOVING. Opener "set the world", emotional/aspirational/lifestyle beats WITH motion. Must visibly move (see B-Roll below).
 2. **Generated image (hero_image)** -- a calm, composed, contemplative, or singular striking visual; a beat that should feel STILL and intentional. A photograph never reads as "broken" the way a frozen video does, so this -- NOT a slowed/static video -- is the correct tool for quiet/still/atmospheric moments. Use hero_image when you want the cinematic b-roll *feeling* (real, emotional, beautiful) but the scene should HOLD STILL.
