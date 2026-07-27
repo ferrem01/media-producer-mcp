@@ -61,6 +61,41 @@ model + seed + references** so it's **re-runnable / tweakable in place** —
 
 ---
 
+## Backlog — captured July 27 session (post-Lottie / HeyGen teardown)
+
+Raised during the session and parked, roughly in priority order:
+
+1. **Accent placement intelligence** — the lottie/sticker corner-overlay spots are
+   static; bias toward the *emptiest* region of the composition so a confetti
+   burst never sits on a panel header. Optionally tighten the storyboard prompt
+   line to "emotional beats only" (the behavioral batch showed check-marks
+   landing on informational beats — defensible, but a taste call).
+2. **Long-form skill file** — the deep twin of the MCP handshake operator
+   playbook (which shipped): a `skills/` layout in a public repo for
+   `npx skills add`, plus a download next to the extension on the landing page.
+   Do it once we've seen how the handshake version performs with real agents.
+3. **Motion diagnostics** — `get(target:'motion')`: sample per-component
+   transforms across scene time headlessly so agents can verify "did the zoom
+   fire" without watching the MP4 (we build these probes ad hoc every time);
+   plus golden-frame snapshot tests for the component library. (HyperFrames'
+   `keyframes` / `snapshot` analog.)
+4. **Generation-side behavioral regression suite** (#97) — the 6-storyboard
+   accent-casting batch (celebratory/somber/explicit/instructional matrix) was
+   the seed; script it into a repeatable suite with graded assertions.
+5. **Draft-view polish** — hide the transport bar under the storyboard draft
+   view; allow editing storyboard fields from the draft cards (today they're
+   read-only until scenes are built).
+6. **Light-brand codegen weakness** (older, still open) — the generator's first
+   instinct on light brands is dark/purple inversion + borderline contrast; the
+   gates catch it but burn the revision budget. Fix the generator, not the gates.
+7. **Figma brand import** — alongside website extraction.
+8. **`npx megamedia` CLI** — dev-channel client (init/preview/render against the
+   server) for the HyperFrames-style developer crowd.
+9. **Housekeeping** — clean up the July 27 test projects (6 storyboard drafts +
+   test films); TESTPLAN.md rewrite; orphan `quotient` tenant cleanup.
+10. **Side-by-side follow-ups** (older) — an "add video" gesture in Studio;
+    speaker-cut re-fit for independent videos.
+
 ## Flagship UX — Studio + click-to-revise  *(big project, not yet specced)*
 Rename **`preview` → `Studio`** and rework it for the codegen video model (the old
 preview's component-property/data editing is obsolete — scenes are codegen now, there
