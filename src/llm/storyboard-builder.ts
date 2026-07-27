@@ -854,6 +854,15 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
           toolResult = "Cannot add a beat yet -- call add_scene first to start a scene.";
         } else {
           var targetScene = scenes[currentSceneIdx];
+          // A REJECTED finish_storyboard (scene-count mismatch) has already
+          // finalized this scene -- _rawBeats is gone. A beat arriving after
+          // that must REOPEN the scene seeded with its finalized beats (the
+          // next finalize re-normalizes the lot), not crash the storyboard
+          // on undefined.push.
+          if (!targetScene._rawBeats) {
+            targetScene._rawBeats = Array.isArray(targetScene.beats) ? targetScene.beats.slice() : [];
+            delete targetScene.beats;
+          }
           targetScene._rawBeats.push({ ...toolCall.input });
           toolResult = `beat ${targetScene._rawBeats.length} added to scene ${currentSceneIdx + 1} ("${targetScene.label}")`;
         }
