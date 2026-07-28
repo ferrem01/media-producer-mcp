@@ -15,11 +15,15 @@
      lives BEHIND the wall (DOM under the canvas); the canvas is slightly
      translucent so the type ghosts through the glass and reads clean in the
      seams. The HyperFrames "glass mosaic" beat. ── */
-  .gsw { position: absolute; inset: 0; overflow: hidden; background: #14100e; }
+  .gsw { position: absolute; inset: 0; overflow: hidden; background: #0e1013; }
   .gsw-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; opacity: 0.88; }
   .gsw-text { position: absolute; inset: 0; z-index: 1; pointer-events: none;
     font-family: 'IBM Plex Mono', 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
     filter: blur(0.3px); }
+  /* text_front (default): type rides ABOVE the glass, crisp and legible;
+     text_front:false keeps the original behind-the-glass ghost. */
+  .gsw.gsw-front .gsw-text { z-index: 3; filter: none; }
+  .gsw.gsw-front .gsw-canvas { opacity: 1; }
   .gsw-kicker { position: absolute; top: 9%; left: 0; right: 0; text-align: center;
     font-size: 24px; font-weight: 500; letter-spacing: 0.42em; text-indent: 0.42em;
     color: #7fd8cf; }
@@ -64,10 +68,12 @@
         statsEl.appendChild(d);
       });
     }
+    var front = data.text_front !== false;
+    if (front) el.querySelector('.gsw').classList.add('gsw-front');
     // Visible from frame 1, then a quiet lift over the first 15% of the shot.
     var fadeDur = Math.max(0.2, dur * 0.15);
-    if (kickerEl) { gsap.set(kickerEl, { opacity: 0.42 }); tl.to(kickerEl, { opacity: 0.75, duration: fadeDur, ease: 'power2.out' }, 0); }
-    if (statsEl) { gsap.set(statsEl, { opacity: 0.5 }); tl.to(statsEl, { opacity: 0.95, duration: fadeDur, ease: 'power2.out' }, 0); }
+    if (kickerEl) { gsap.set(kickerEl, { opacity: front ? 0.6 : 0.42 }); tl.to(kickerEl, { opacity: front ? 0.92 : 0.75, duration: fadeDur, ease: 'power2.out' }, 0); }
+    if (statsEl) { gsap.set(statsEl, { opacity: front ? 0.7 : 0.5 }); tl.to(statsEl, { opacity: front ? 1 : 0.95, duration: fadeDur, ease: 'power2.out' }, 0); }
 
     // ── The wall (three.js) ──
     var canvas = el.querySelector('.gsw-canvas');
@@ -112,9 +118,9 @@
       camera.position.set(0, 0, 8.2);
 
       // ── Tile materials: a small shared pool of dark warm-graphite glass ──
-      var tileColor = new THREE.Color(data.tile_color || '#3a3230');
-      var darker = tileColor.clone().lerp(new THREE.Color('#191412'), 0.45);
-      var warmer = tileColor.clone().lerp(new THREE.Color('#5a4a40'), 0.35);
+      var tileColor = new THREE.Color(data.tile_color || '#363c44');
+      var darker = tileColor.clone().lerp(new THREE.Color('#14171c'), 0.45);
+      var warmer = tileColor.clone().lerp(new THREE.Color('#4c5866'), 0.35);
       var mats = [];
       for (var mi = 0; mi < 5; mi++) {
         var mix = mi / 4;
@@ -200,16 +206,16 @@
       wall.rotation.y = 0.12;
       scene.add(wall);
 
-      // ── Lights: warm low-left + cool top-right so tile rims pick up
+      // ── Lights: silver key low-left + cool top-right so tile rims pick up
       // opposing speculars; ambient floor so "dark glass" never goes void. ──
-      scene.add(new THREE.AmbientLight('#2c2622', 2.1));
-      var warm = new THREE.PointLight('#ffb46e', 108, 0, 1.7);
-      warm.position.set(-7, -4.5, 5);
-      scene.add(warm);
-      var cool = new THREE.DirectionalLight('#cfe3ff', 1.5);
+      scene.add(new THREE.AmbientLight('#262b31', 2.1));
+      var key = new THREE.PointLight('#e8f0ff', 96, 0, 1.7);
+      key.position.set(-7, -4.5, 5);
+      scene.add(key);
+      var cool = new THREE.DirectionalLight('#cfe3ff', 1.8);
       cool.position.set(5.5, 6, 6.5);
       scene.add(cool);
-      var rim = new THREE.PointLight('#9fd9ff', 34, 0, 1.6);
+      var rim = new THREE.PointLight('#9fd9ff', 40, 0, 1.6);
       rim.position.set(6, 3.5, 3);
       scene.add(rim);
 
@@ -235,8 +241,8 @@
           m.position.z = m.userData.baseZ + 0.1 + 0.07 * breath;
         }
         // specular drift keeps the rims alive
-        warm.position.x = -7 + Math.sin(d * 0.45) * 2.2;
-        warm.position.y = -4.5 + Math.cos(d * 0.33) * 1.4;
+        key.position.x = -7 + Math.sin(d * 0.45) * 2.2;
+        key.position.y = -4.5 + Math.cos(d * 0.33) * 1.4;
         rim.position.x = 6 - 1.6 * ease;
         camera.position.x = 0.12 * Math.sin(d * 0.2);
         camera.lookAt(0, 0, 0);

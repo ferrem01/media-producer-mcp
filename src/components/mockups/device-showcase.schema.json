@@ -8,7 +8,11 @@
       "type": "string",
       "label": "Device",
       "optional": true,
-      "enum": ["iphone", "macbook", "duo"],
+      "enum": [
+        "iphone",
+        "macbook",
+        "duo"
+      ],
       "default": "iphone"
     },
     "screenshot_url": {
@@ -26,7 +30,11 @@
       "type": "string",
       "label": "Designed app-screen preset for the iPhone (used when no screenshot; app-hero = lime onboarding, app-stats = dark activity dashboard, app-chart = white stat + area chart)",
       "optional": true,
-      "enum": ["app-hero", "app-stats", "app-chart"]
+      "enum": [
+        "app-hero",
+        "app-stats",
+        "app-chart"
+      ]
     },
     "screen_title": {
       "type": "string",
@@ -42,7 +50,10 @@
       "type": "string",
       "label": "Theme",
       "optional": true,
-      "enum": ["light", "dark"],
+      "enum": [
+        "light",
+        "dark"
+      ],
       "default": "dark"
     },
     "float": {
@@ -55,6 +66,12 @@
       "type": "number",
       "label": "Entrance start (s, default 0.3)",
       "optional": true
+    },
+    "rotate": {
+      "type": "number",
+      "label": "Rotate (deg)",
+      "optional": true,
+      "description": "Tilt of the whole device stage in degrees. Use \u00b110-16 on the outer phones of a trio to fan them like a hand of cards."
     }
   }
 }
