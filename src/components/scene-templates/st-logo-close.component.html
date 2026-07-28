@@ -16,6 +16,12 @@
      itself out. */
   .stlc { position: absolute; inset: 0; overflow: hidden; color: #f4f4f8;
     font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  /* Light-world variant (SPEC-world.md): same sting on the airy ground --
+     dark type, soft brand wash, no atmosphere pass. */
+  .stlc.light { color: #17171c; }
+  .stlc.light .stlc-url { color: rgba(23, 23, 28, 0.5); }
+  .stlc.light::before { content: ''; position: absolute; inset: 0;
+    background: radial-gradient(60% 55% at 50% 46%, color-mix(in srgb, var(--mp-color-primary, #4f46e5) 10%, transparent) 0%, transparent 75%); }
   .stlc-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     display: flex; flex-direction: column; align-items: center; gap: 3.4vh; text-align: center; }
   .stlc-logo { height: 72px; width: auto; }
@@ -49,14 +55,21 @@
       .to(url, { autoAlpha: 1, y: 0, duration: 0.6 }, 2.0);
 
     var brandPrimary = getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5';
-    if (window.mpAtmosphere) mpAtmosphere(root, { dark: true, noBase: !!data.backdrop_active });
-    // Light-theme wordmarks (dark text) go invisible on this dark ground --
-    // mpLogoOnDark measures and flips lightness when needed, then glows.
-    if (logo && data.logo_url) {
-      if (window.mpLogoOnDark) mpLogoOnDark(logo, brandPrimary);
-      else if (window.mpGlow) mpGlow(logo, brandPrimary, 0.8);
+    var isLight = data.theme === 'light';
+    if (isLight) {
+      // Light world: no dark atmosphere, no lightness-flip on the logo --
+      // the wordmark's own colors read on the airy ground.
+      root.classList.add('light');
+    } else {
+      if (window.mpAtmosphere) mpAtmosphere(root, { dark: true, noBase: !!data.backdrop_active });
+      // Light-theme wordmarks (dark text) go invisible on this dark ground --
+      // mpLogoOnDark measures and flips lightness when needed, then glows.
+      if (logo && data.logo_url) {
+        if (window.mpLogoOnDark) mpLogoOnDark(logo, brandPrimary);
+        else if (window.mpGlow) mpGlow(logo, brandPrimary, 0.8);
+      }
     }
-    if (window.mpGlow && cta) mpGlow(cta, brandPrimary, 0.5);
+    if (window.mpGlow && cta && !isLight) mpGlow(cta, brandPrimary, 0.5);
     if (window.mpShimmer && logo) mpShimmer(tl, q('.stlc-center'), 2.6);
     if (window.mpCameraPush) mpCameraPush(tl, root, ctx.duration, 1.05);
     // Breathe: the CTA pulses gently for the remainder.

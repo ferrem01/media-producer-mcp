@@ -65,6 +65,11 @@ model + seed + references** so it's **re-runnable / tweakable in place** —
 
 Raised during the session and parked, roughly in priority order:
 
+0. **Light variants for the dark st-\* template family** -- the world passes
+   theme:'light' but only st-logo-close implements it so far; st-quote,
+   st-manifesto, st-swarm, st-compare, st-flow, st-convergence still render
+   dark-only and break light-world films that cast them. Same pattern as
+   st-logo-close (skip atmosphere/logo-flip, .light CSS variant).
 1. **Accent placement intelligence** — the lottie/sticker corner-overlay spots are
    static; bias toward the *emptiest* region of the composition so a confetti
    burst never sits on a panel header. Optionally tighten the storyboard prompt
