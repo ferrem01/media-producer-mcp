@@ -3120,8 +3120,13 @@ function quantizeScenesToBars(
   barSec: number,
 ): void {
   if (!(barSec > 0)) return;
-  const toBars = (seconds: number) =>
-    Math.round(Math.max(1, Math.round(seconds / barSec)) * barSec * 10000) / 10000;
+  const toBars = (seconds: number) => {
+    // Micro-beats (SPEC-world.md P3): a deliberately tiny scene (a word, a
+    // stamp, one click) quantizes to HALF a bar instead of being inflated
+    // to a full one -- the cut still lands on the grid.
+    if (seconds <= barSec * 0.75) return Math.round((barSec / 2) * 10000) / 10000;
+    return Math.round(Math.max(1, Math.round(seconds / barSec)) * barSec * 10000) / 10000;
+  };
 
   let changes = 0;
   for (let i = 0; i < scenes.length; i++) {
@@ -3130,7 +3135,7 @@ function quantizeScenesToBars(
     const target = s.duration_seconds + trans;
     const quantized = toBars(target);
     // A scene must keep enough room to breathe after the transition share
-    const newDur = Math.max(1.5, Math.round((quantized - trans) * 100) / 100);
+    const newDur = Math.max(target <= barSec * 0.75 ? 0.8 : 1.5, Math.round((quantized - trans) * 100) / 100);
     if (Math.abs(newDur - s.duration_seconds) > 0.05) {
       console.log(`  Beat grid: scene ${i} "${s.label || ""}" ${s.duration_seconds}s -> ${newDur}s (segment=${quantized}s = ${Math.round(quantized / barSec)} bars)`);
       s.duration_seconds = newDur;
