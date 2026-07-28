@@ -119,3 +119,12 @@ describe("editorial vocabulary enforcement", () => {
     expect(sb).toContain("THE TEMPLATE VOCABULARY IS CLOSED");
   });
 });
+
+describe("hand-edit API transition vocabulary", () => {
+  it("the add/update transition enum carries the engine's full set (source guard)", async () => {
+    const s = await read("../src/server.ts");
+    for (const t of ["shader-gravitational-lens", "shader-flash-white", "whip-pan", "cinematic-zoom"]) {
+      expect(s).toContain(`"${t}"`);
+    }
+  });
+});
