@@ -65,6 +65,10 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
     console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (scene template ${st.type})`);
     var stData = (st.data && typeof st.data === "object") ? st.data : {};
+    // The WORLD's theme is the template's theme unless the storyboard set one
+    // explicitly (SPEC-world.md): a light film must not close on a template
+    // that defaults dark -- that temperature jump is the deck-of-posters bug.
+    if (opts.world && !(stData as any).theme) (stData as any).theme = opts.world.theme;
     // Default the wordmark slot from the brand kit when the template wants
     // one and the storyboard didn't fill it.
     if (!(stData as any).logo_url && opts.brandKit?.logos?.length) {
@@ -103,7 +107,10 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
         id: "tpl_bg",
         type: "webgl-backdrop",
         z_index: 0,
-        data: { seed: 3 + opts.sceneIndex * 4 },
+        // In a world: the film's one backdrop, clock-offset to film time.
+        data: opts.world
+          ? { seed: opts.world.backdrop.seed, colors: opts.world.backdrop.palette, time_offset: (draft as any).film_start || 0 }
+          : { seed: 3 + opts.sceneIndex * 4 },
       });
     }
     // st-artifact is a SHELL: the artifact (a ui-mock or media component

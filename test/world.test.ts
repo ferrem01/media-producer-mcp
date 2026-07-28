@@ -79,6 +79,25 @@ describe("authored composition in a world", () => {
     expect(bg.data.seed).toBe(5 + 2 * 7);
   });
 
+  it("template scenes inherit the world theme (no dark close on a light film)", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const world = deriveWorld({ brandKit: LIGHT_KIT, seedSource: "tenant:film" });
+    const result = await generateScene({
+      scene: {
+        label: "Close", duration_seconds: 3, purpose: "p", visual_notes: "v",
+        scene_template: { type: "st-logo-close", data: {} },
+        components: [],
+      } as any,
+      sceneIndex: 6, totalScenes: 7, prompt: "p",
+      llmConfig: {} as any, brandKit: LIGHT_KIT, canvas: { width: 1920, height: 1080 } as any,
+      world,
+    } as any);
+    const comps: any[] = (result.scene as any).components;
+    const tpl = comps.find((c) => c.id === "tpl_0");
+    expect(tpl.data.theme).toBe("light");                 // world theme inherited
+    expect(comps.find((c) => c.id === "tpl_bg")).toBeUndefined(); // no dark webgl bg
+  });
+
   it("codegen spec carries the world contract", async () => {
     const { buildCodegenSpec } = await import("../src/llm/scene-generator.js");
     const world = deriveWorld({ brandKit: LIGHT_KIT, seedSource: "t:f" });
