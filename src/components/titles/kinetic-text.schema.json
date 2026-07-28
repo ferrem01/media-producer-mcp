@@ -48,6 +48,21 @@
       "type": "string",
       "label": "Override size (CSS, e.g. '16vw' for a hero numeral; default 60px)",
       "optional": true
+    },
+    "font": {
+      "type": "string",
+      "label": "Font-family override (e.g. \"ui-monospace, 'JetBrains Mono', monospace\")",
+      "optional": true
+    },
+    "letter_spacing": {
+      "type": "string",
+      "label": "Tracking override (e.g. '0.18em' for labels)",
+      "optional": true
+    },
+    "font_weight": {
+      "type": "string",
+      "label": "Weight override (e.g. 800)",
+      "optional": true
     }
   }
 }

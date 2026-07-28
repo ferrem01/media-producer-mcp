@@ -85,6 +85,8 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var card = el.querySelector('.x-card');
+    // Display scale: the card is fixed-size by design; hero shots blow it up.
+    if (data.scale) { card.style.transform = 'scale(' + Number(data.scale) + ')'; card.style.transformOrigin = '50% 50%'; }
     var avatar = el.querySelector('.x-avatar');
     var nameEl = el.querySelector('.x-name');
     var handleEl = el.querySelector('.x-handle');

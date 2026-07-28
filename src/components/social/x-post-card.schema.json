@@ -57,6 +57,11 @@
       "label": "Avatar Color/Gradient",
       "optional": true,
       "placeholder": "#1d9bf0"
+    },
+    "scale": {
+      "type": "number",
+      "label": "Blow the fixed-size card up for hero shots (e.g. 1.5)",
+      "optional": true
     }
   }
 }

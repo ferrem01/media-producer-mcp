@@ -27,6 +27,11 @@
       "label": "Album Art Color/Gradient",
       "optional": true,
       "placeholder": "#1db954"
+    },
+    "scale": {
+      "type": "number",
+      "label": "Blow the fixed-size card up for hero shots (e.g. 1.6)",
+      "optional": true
     }
   }
 }

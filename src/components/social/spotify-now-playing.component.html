@@ -70,6 +70,8 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var card = el.querySelector('.sp-card');
+    // Display scale: the card is fixed-size by design; hero shots blow it up.
+    if (data.scale) { card.style.transform = 'scale(' + Number(data.scale) + ')'; card.style.transformOrigin = '50% 50%'; }
     var art = el.querySelector('.sp-art');
     var track = el.querySelector('.sp-track');
     var artist = el.querySelector('.sp-artist');
