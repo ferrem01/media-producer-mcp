@@ -16,6 +16,7 @@ import { formatBeatSheet } from "../core/beats.js";
 import type { Treatment } from "./creative-director.js";
 import { loadAssetIntel } from "../core/asset-intel.js";
 import { recoverAssetUrl, resolveVideoPath } from "../core/video-path.js";
+import { hexIsLight } from "./world.js";
 
 // ── Types ──
 
@@ -511,6 +512,22 @@ function buildAuthoredCompositionScene(
       return;
     }
     var data: Record<string, unknown> = { ...c.data };
+    // WORLD INK CLAMP: editorial copy must contrast the world it sits on.
+    // Storyboards habitually author dark-era caption colors (#f5f6fa) that
+    // vanish on the light world -- and authored comps skip the codegen
+    // contrast gates, so nothing downstream catches it. Deterministic fix:
+    // in a world, a caption/hero whose ink matches the world's lightness
+    // (or that has no ink at all on a LIGHT world, where component defaults
+    // are dark-era white) gets the world's ink instead.
+    if (w && (isCaptionRole(c.type) || HERO_ROLE_TYPES.indexOf(c.type) !== -1)) {
+      var worldIsLight = w.theme === "light";
+      var ink = typeof data.color === "string" ? (data.color as string) : undefined;
+      var inkClash = ink !== undefined && hexIsLight(ink) === worldIsLight;
+      if (inkClash || (ink === undefined && worldIsLight)) {
+        data.color = worldIsLight ? (opts.brandKit?.colors?.text || "#17171c") : "#f5f6fa";
+        console.log(`    ${c.type}: ink ${ink || "(default)"} would vanish on the ${w.theme} world -- clamped to ${data.color}`);
+      }
+    }
     // The recipe's show_panel contract: the shell's own agent panel hides
     // when the full-fidelity quotient-chat rides beside it.
     if (c.type === "quotient-app-shell" && types.indexOf("quotient-chat") !== -1 && data.show_panel === undefined) {
