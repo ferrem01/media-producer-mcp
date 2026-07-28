@@ -41,6 +41,16 @@ describe("deriveWorld", () => {
   });
 });
 
+describe("tempo-cut is music-first (source guards)", () => {
+  it("the pipeline defaults the music bed ON for tempo-cut and warns on a silent run", async () => {
+    const fsm = await import("node:fs/promises");
+    const src = await fsm.readFile(new URL("../src/llm/pipeline.ts", import.meta.url), "utf-8");
+    expect(src).toContain('filmGrammar === "tempo-cut"');
+    expect(src).toContain("TEMPO-CUT WITHOUT A MUSIC BED");
+    expect(src).toContain("produced NO beat grid");
+  });
+});
+
 describe("authored composition in a world", () => {
   it("backdrop is the WORLD's (one seed, film-time offset), not per-scene", async () => {
     const { generateScene } = await import("../src/llm/scene-generator.js");
