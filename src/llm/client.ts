@@ -175,30 +175,64 @@ function modelAcceptsTemperature(model: string): boolean {
   return !/^claude-(sonnet|opus|haiku|fable|mythos)-5/.test(model);
 }
 
-/** POST to the Anthropic messages API. If the model rejects `temperature` as
- *  deprecated (Claude 5 family and beyond), retry once without it -- so a new
- *  model id set via MP_LLM_MODEL can never brick the pipeline on this param. */
+/** Per-request wall clock. A fetch with no signal waits FOREVER on a
+ *  black-holed connection -- measured live as generate jobs frozen at
+ *  "Designing the creative direction" with no error. Long enough for a big
+ *  storyboard completion, short enough that a dead socket surfaces as a
+ *  retryable failure instead of a stuck job. */
+const LLM_REQUEST_TIMEOUT_MS = Number(process.env.MP_LLM_TIMEOUT_MS) || 240_000;
+
+/** POST to the Anthropic messages API.
+ *  - If the model rejects `temperature` as deprecated (Claude 5 family and
+ *    beyond), retry once without it -- so a new model id set via MP_LLM_MODEL
+ *    can never brick the pipeline on this param.
+ *  - Transient failures (timeout, network error, 429/5xx/overloaded) retry
+ *    with backoff instead of hanging or failing the whole generate job on
+ *    one bad socket. */
 async function postAnthropic(apiKey: string, body: Record<string, unknown>): Promise<unknown> {
-  for (var attempt = 0; attempt < 2; attempt++) {
-    var response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify(body),
-    });
+  var TRANSIENT_BACKOFF_MS = [2000, 8000, 20000];
+  var transientAttempt = 0;
+  var temperatureRetried = false;
+  for (;;) {
+    var response: Response;
+    try {
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(LLM_REQUEST_TIMEOUT_MS),
+      });
+    } catch (netErr: any) {
+      // Timeout or network-level failure: retry with backoff, then surface.
+      if (transientAttempt < TRANSIENT_BACKOFF_MS.length) {
+        var waitMs = TRANSIENT_BACKOFF_MS[transientAttempt++];
+        console.warn(`  [llm] request ${netErr?.name === "TimeoutError" ? `timed out after ${LLM_REQUEST_TIMEOUT_MS / 1000}s` : `failed (${netErr?.message || netErr})`} -- retry ${transientAttempt}/${TRANSIENT_BACKOFF_MS.length} in ${waitMs / 1000}s`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      throw new Error(`Anthropic API unreachable after ${TRANSIENT_BACKOFF_MS.length + 1} attempts: ${netErr?.message || netErr}`);
+    }
     if (response.ok) return response.json();
     var errorText = await response.text();
-    if (attempt === 0 && response.status === 400 && body.temperature !== undefined
+    if (!temperatureRetried && response.status === 400 && body.temperature !== undefined
         && /temperature.*deprecated/i.test(errorText)) {
+      temperatureRetried = true;
       delete body.temperature;
+      continue;
+    }
+    var transientStatus = response.status === 429 || response.status >= 500 || /overloaded/i.test(errorText);
+    if (transientStatus && transientAttempt < TRANSIENT_BACKOFF_MS.length) {
+      var backoffMs = TRANSIENT_BACKOFF_MS[transientAttempt++];
+      console.warn(`  [llm] API ${response.status} (transient) -- retry ${transientAttempt}/${TRANSIENT_BACKOFF_MS.length} in ${backoffMs / 1000}s`);
+      await new Promise((r) => setTimeout(r, backoffMs));
       continue;
     }
     throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
   }
-  throw new Error("Anthropic API error: retry loop exhausted");
 }
 
 async function callAnthropic(
@@ -399,6 +433,9 @@ async function callOpenAI(
       "Authorization": `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
+    // Same stuck-socket guard as the Anthropic path: no signal = a dead
+    // connection stalls the generate job forever with no error.
+    signal: AbortSignal.timeout(LLM_REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {
