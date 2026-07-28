@@ -2197,6 +2197,31 @@ async function runUnifiedPipeline(
   // draft to the majority caption style.
   unifyCaptionStyle(storyboard.scenes);
 
+  // ── Editorial vocabulary enforcement (deterministic) ──
+  // The editorial contract closes the template vocabulary: statement beats
+  // are st-statement ONLY. Measured live (proj_deae06b8): the storyboard LLM
+  // still reaches for its familiar launch-film statement templates
+  // (st-manifesto/st-quote/st-swarm) -- convert them in code, carrying the
+  // text/kicker/theme across, so the serif editorial voice survives.
+  if (filmGrammar === "editorial") {
+    const CONVERT = new Set(["st-manifesto", "st-quote", "st-swarm"]);
+    for (const d of storyboard.scenes as any[]) {
+      const st = d.scene_template;
+      if (!st || !CONVERT.has(st.type)) continue;
+      const sd = (st.data && typeof st.data === "object") ? st.data : {};
+      const text = sd.text || sd.quote || sd.title || sd.headline || d.label || "";
+      console.log(`  Editorial vocabulary: converting ${st.type} -> st-statement ("${String(text).slice(0, 40)}")`);
+      d.scene_template = {
+        type: "st-statement",
+        data: {
+          text: String(text),
+          ...(sd.kicker ? { kicker: sd.kicker } : {}),
+          ...(sd.theme === "dark" ? { theme: "dark" } : {}),
+        },
+      };
+    }
+  }
+
   // ── Beat quantization: every cut lands on a downbeat ──
   // Each segment (incoming transition + scene) is snapped to a whole number of
   // bars, so cumulative cut points fall exactly on the track's bar grid.
