@@ -1908,3 +1908,29 @@ not block count (our caption family is already 1:1 with theirs).
   hyperframes-blocks2.test.ts (6). Full suite 568 passed (same 4
   pre-existing env failures). st-statement proof frames captured
   headlessly: cream + gradient emphasis + dark variant all correct.
+
+## Shot-per-shot recreation round 2: fidelity fixes (Marc, 2026-07-28)
+
+Marc: "I don't think what we built looks like the reference video shot per
+shot at all." He was right -- the first pass sampled 12 stills of a
+~28-shot sub-second montage and called it shot-per-shot. Round 2 rebuilt
+against the definitive 3fps shot list (28 shots incl. X-post card, phone
+trio, 52-counter pair, Spotify card, npx line, 01-04 step sequence,
+build-up checklist, 5 category cards, github URL) and forced out real
+product fixes:
+
+- MICRO-SHOT ENTRANCE COMPRESSION (scene-assembler): component entrances
+  are authored for 4-8s scenes; sub-1.4s cuts sampled EMPTY. Scenes
+  <=1.4s now play each component timeline at 2.2/duration speed.
+  + scene-cache CACHE_VERSION bump (assembler changes now bust the cache;
+  a stale 273ms "re-render" proved they didn't).
+- glass-shard-wall (threed): three.js beveled glass mosaic with teal
+  text ghosting through -- the reference's one build-from-scratch visual.
+- vignette-spot (effects): radial ellipse wash (category-card backdrop).
+- code-block style:"bare" (+font_size/color): naked mono lines on the
+  scene canvas -- terminal-line beats and checklists were invisible
+  dark-on-dark inside the window chrome.
+- kinetic-text font_size: hero numerals ("52" at 16vw) vs the 60px
+  caption default.
+- flowchart FIT TO THE SHOT: the 5s draw choreography now scales to
+  complete by ~55% of the scene -- micro-shots show the whole tree.

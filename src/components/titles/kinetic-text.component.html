@@ -42,6 +42,9 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var container = el.querySelector('.text-container');
+    // Display-scale override: hero numerals/headlines size to the shot
+    // ("52" at 16vw), not the 60px caption default.
+    if (data.font_size) container.style.fontSize = data.font_size;
     var text = String(data.text || '');
 
     if (data.color) container.style.color = data.color;

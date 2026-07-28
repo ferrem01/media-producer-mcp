@@ -19,7 +19,24 @@
       "type": "array",
       "label": "Highlighted Lines",
       "optional": true,
-      "items": { "type": "number" }
+      "items": {
+        "type": "number"
+      }
+    },
+    "style": {
+      "type": "string",
+      "label": "window (default) | bare -- no chrome, naked mono text on the scene canvas (terminal-line beats, checklists)",
+      "optional": true
+    },
+    "font_size": {
+      "type": "string",
+      "label": "Bare-mode text size (CSS, default 2.1vw)",
+      "optional": true
+    },
+    "color": {
+      "type": "string",
+      "label": "Bare-mode text color (e.g. #34d399 for checklists)",
+      "optional": true
     }
   }
 }

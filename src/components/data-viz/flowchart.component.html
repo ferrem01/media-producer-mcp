@@ -268,9 +268,16 @@
       path.style.strokeDashoffset = len;
     });
 
-    // Sequence: node pops, then connectors out of it draw on, then next node
+    // Sequence: node pops, then connectors out of it draw on, then next node.
+    // FIT TO THE SHOT: the build must COMPLETE by ~55% of the scene -- a
+    // micro-shot (sub-second editorial cut) shows the whole tree, scaled
+    // down from the leisurely 5s choreography rather than truncated mid-draw.
     var step = Math.max(0.32, (speed * 0.55));
-    var t = 0.3;
+    var buildSpan = 0.3 + step * orderedNodes.length + speed * 0.5;
+    var fit = Math.min(1, ((ctx.duration || 8) * 0.55) / buildSpan);
+    speed *= fit;
+    step *= fit;
+    var t = 0.3 * fit;
 
     orderedNodes.forEach(function(nd, i) {
       tl.to(nodeEls[nd.id], {

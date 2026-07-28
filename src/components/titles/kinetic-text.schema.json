@@ -43,6 +43,11 @@
       "type": "string",
       "label": "LEGACY (ignored)",
       "optional": true
+    },
+    "font_size": {
+      "type": "string",
+      "label": "Override size (CSS, e.g. '16vw' for a hero numeral; default 60px)",
+      "optional": true
     }
   }
 }
