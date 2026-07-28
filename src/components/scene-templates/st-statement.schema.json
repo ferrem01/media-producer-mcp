@@ -4,13 +4,42 @@
   "category": "scene-template",
   "description": "WHOLE-SCENE template: the EDITORIAL statement beat. Huge display-SERIF type owns the frame -- one thought (or a rolling sequence of thoughts) on a warm cream canvas, with ONE word emphasized in gradient italic. This is the editorial-grammar workhorse: statement beats alternate with evidence beats to tell a story in type ('The registry is the *product*.'). Use for narration lines, chapter theses, and the open/close of editorial films. Distinct from st-manifesto (kinetic sans slam): st-statement is calm, serif, and literary. Themes: cream (default -- the editorial signature), light (the film's own light canvas), dark (the chapter-flip temperature).",
   "data": {
-    "text": { "type": "string", "label": "The statement. Wrap the ONE key word/phrase in *stars* for the gradient-italic emphasis. Use \\n to force line breaks." },
-    "lines": { "type": "array", "items": { "type": "string" }, "label": "Rolling sequence: 2-3 statements that each hold, then roll up and out as the next rolls in (use INSTEAD of text for multi-thought beats)", "optional": true },
-    "kicker": { "type": "string", "label": "Small caps label above (e.g. CHAPTER TWO)", "optional": true },
-    "theme": { "type": "string", "label": "cream (default; 'light' aliases to cream) | dark (the chapter-flip temperature)", "optional": true }
+    "text": {
+      "type": "string",
+      "label": "The statement. Wrap the ONE key word/phrase in *stars* for the gradient-italic emphasis. Use \\n to force line breaks."
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "label": "Rolling sequence: 2-3 statements that each hold, then roll up and out as the next rolls in (use INSTEAD of text for multi-thought beats)",
+      "optional": true
+    },
+    "kicker": {
+      "type": "string",
+      "label": "Small caps label above (e.g. CHAPTER TWO)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "cream (default; 'light' aliases to cream) | dark (the chapter-flip temperature)",
+      "optional": true
+    },
+    "chapter_number": {
+      "type": "string",
+      "label": "Chapter-card mode: a numeral ('02') rendered big in brand color beside the headline, which sets in SANS",
+      "optional": true
+    }
   },
   "match": {
-    "entry": { "x": 0.5, "y": 0.5 },
-    "exit": { "x": 0.5, "y": 0.5 }
+    "entry": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "exit": {
+      "x": 0.5,
+      "y": 0.5
+    }
   }
 }
