@@ -309,7 +309,13 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
 export const OPERATOR_PLAYBOOK = `Media Producer turns prompts into branded films (video/image/deck): scenes are code-authored motion graphics, rendered deterministically. You (the agent) drive it; the creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
 
 BEFORE GENERATING
-- Ask the human what they're making before calling generate: audience, goal/CTA, target length, and video type (product launch / explainer / recorded walkthrough / social tempo-cut).
+- Ask the human what they're making before calling generate: audience, goal/CTA, target length, and which film grammar fits.
+- FILM GRAMMARS (the film's dialect; pass film_grammar to pin one, omit to let the server's creative director choose from the brief):
+  * launch-film -- few long cinematic scenes, one continuous world. For brand moments and feature reveals that should feel expansive.
+  * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover, told through real product surfaces. For product explainers and launch clips that should feel fast and confident.
+  * editorial -- typography-first manifesto: huge serif statements on cream/dark canvases alternating with full-bleed evidence beats; the words are the product. For thought-leadership, "why we built this", catalog showcases.
+  * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never choose it without one.
+  Rule of thumb: product demos the product (tempo-cut) vs. words carry the argument (editorial) vs. one cinematic world (launch-film) vs. human on camera (speaker-screencast). If the human's answer doesn't clearly pick one, relay the choice to them in these terms.
 - Brand comes from the tenant's brand kit. If none exists yet, run extract_brand_from_website (their site URL) or upload brand assets first -- generate without a kit produces an unbranded film.
 - A recorded screen demo? Don't generate from a prompt -- the Chrome recorder extension captures the tab + voice and assembles the film automatically (download at /extension.zip on this server).
 
