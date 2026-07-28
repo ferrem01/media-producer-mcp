@@ -84,3 +84,14 @@ describe("hyperframes blocks", () => {
     }
   });
 });
+
+describe("vignette-spot", () => {
+  it("parses, is seek-safe, and paints a radial ellipse", async () => {
+    const fs2 = await import("node:fs/promises");
+    const src = await fs2.readFile(new URL("../src/components/effects/vignette-spot.component.html", import.meta.url), "utf-8");
+    const { parseComponent } = await import("../src/core/component-parser.js");
+    expect(parseComponent(src).script).toContain("createTimeline");
+    expect(src).not.toMatch(/requestAnimationFrame|setInterval|setTimeout|performance\.now|Date\.now|Math\.random/);
+    expect(src).toContain("radial-gradient");
+  });
+});
