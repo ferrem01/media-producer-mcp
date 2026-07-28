@@ -235,6 +235,23 @@ export function getPreviewHtml(): string {
   .lane-bed.screen { background: rgba(148,163,184,0.07); border: 1px solid rgba(148,163,184,0.20); border-radius: 6px; }
   .lane-bed.speaker { background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.18); border-radius: 6px; }
   .lane-bed.music { background: rgba(148,163,184,0.08); border: 1px solid rgba(148,163,184,0.16); border-radius: 5px; }
+  .lane-bed.comps { background: rgba(99,102,241,0.04); border: 1px solid rgba(99,102,241,0.14); border-radius: 6px; }
+  /* Components band: every scene's cast as lane-packed micro-bars, always
+     visible (no click-into-scene needed). Rows cap at 4; a "+N" chip covers
+     the overflow and opens focus mode. */
+  #comp-lane { position: absolute; left: 0; right: 0; pointer-events: none; }
+  .comp-bar { position: absolute; height: 9px; border-radius: 4px; pointer-events: auto; cursor: pointer;
+    box-sizing: border-box; overflow: hidden; opacity: 0.82; }
+  .comp-bar:hover { opacity: 1; box-shadow: 0 0 0 1.5px rgba(30,41,59,0.35); z-index: 3; }
+  .comp-bar.comp-active { opacity: 1; box-shadow: 0 0 0 1.5px #4338ca; z-index: 3; }
+  .comp-bar.comp-custom { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.35) 0 3px, transparent 3px 6px); }
+  .comp-bar-label { display: block; font-size: 8px; line-height: 9px; font-weight: 600; color: #ffffff;
+    padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: clip; letter-spacing: 0.02em;
+    text-shadow: 0 0 2px rgba(0,0,0,0.25); pointer-events: none; }
+  .comp-more { position: absolute; height: 9px; border-radius: 4px; pointer-events: auto; cursor: pointer;
+    background: #e2e8f0; border: 1px solid #cbd5e1; color: #475569; font-size: 8px; line-height: 8px;
+    font-weight: 700; text-align: center; box-sizing: border-box; }
+  .comp-more:hover { background: #cbd5e1; }
   /* The playhead: one line through every lane, driven by the master clock. */
   #playhead-line { position: absolute; top: 18px; bottom: 0; width: 1.5px; background: #4f46e5; opacity: 0.45; z-index: 40; pointer-events: none; }
   /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
@@ -995,6 +1012,7 @@ export function getPreviewHtml(): string {
         <div id="cam-pills"></div>
         <div id="fx-lane"></div>
         <div id="media-lane"></div>
+        <div id="comp-lane"></div>
         <div id="focus-lane" style="display:none;"></div>
         <canvas id="wave-strip"></canvas>
         <div id="word-lane"></div>
@@ -3742,10 +3760,12 @@ export function getPreviewHtml(): string {
     focusSceneIdx = -1;
     var fl = document.getElementById('focus-lane');
     if (fl) { fl.style.display = 'none'; fl.innerHTML = ''; }
+    if (typeof renderCompLane === 'function') renderCompLane();
   }
   function enterFocus(idx) {
     focusSceneIdx = idx;
     renderFocusLane();
+    if (typeof renderCompLane === 'function') renderCompLane(); // focus owns the track; the band steps aside
   }
   function focusBeatBounds(scene, dur) {
     var bounds = []; var acc = 0;
@@ -4768,7 +4788,18 @@ export function getPreviewHtml(): string {
         return c2.type === 'narration-track' && c2.data && Array.isArray(c2.data.chapters) && c2.data.chapters.length;
       });
     });
-    var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 32, screenH: 32, screenRows: 1, speakerH: 32, musicH: 16, speaker: -1, music: -1 };
+    var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 32, screenH: 32, screenRows: 1, speakerH: 32, musicH: 16, speaker: -1, music: -1, comps: -1, compsH: 0, compRows: 0 };
+    // Components band: every scene's cast, always visible. Rows = the
+    // busiest scene's component count, capped at 4 (a "+N" chip covers the
+    // rest). On pure motion-graphics films (no media clips) it REPLACES the
+    // empty screen bed instead of stacking above it.
+    var maxComps = 0;
+    ((p || {}).scenes || []).forEach(function(s3) {
+      maxComps = Math.max(maxComps, (s3.components || []).length);
+    });
+    var hasMedia = !!((state.mediaClips || []).length);
+    y.compRows = Math.min(4, maxComps);
+    y.compsH = y.compRows > 0 ? y.compRows * 12 + 4 : 0;
     // Side-by-side scenes: the screen band grows one row per independent
     // video (max across scenes), so every piece of footage gets a timeline
     // row it can be sped/cut/pinned on.
@@ -4776,7 +4807,14 @@ export function getPreviewHtml(): string {
     y.screenH = 32 + (y.screenRows - 1) * 26;
     var top = 22;
     if (hasFx) { y.fx = top; top += y.fxH + 8; }
-    y.screen = top; top += y.screenH + 8;
+    if (y.compRows > 0 && !hasMedia) {
+      // Comps band stands in for the screen band.
+      y.comps = top; top += y.compsH + 8;
+      y.screen = -1;
+    } else {
+      if (y.compRows > 0) { y.comps = top; top += y.compsH + 8; }
+      y.screen = top; top += y.screenH + 8;
+    }
     if (hasSpk) { y.speaker = top; top += y.speakerH + 8; }
     if (hasMusic) { y.music = top; top += y.musicH + 6; }
     y.total = Math.max(top + 2, 84);
@@ -4788,6 +4826,7 @@ export function getPreviewHtml(): string {
     screen: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1.7" y="3" width="12.6" height="8.2" rx="1.4"/><path d="M5.6 14h4.8"/></svg>',
     speaker: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="5.2" r="2.6"/><path d="M2.8 14c0.8-3 2.8-4.4 5.2-4.4S12.4 11 13.2 14"/></svg>',
     music: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="12.2" r="1.9"/><path d="M6.9 12.2V3.6l6-1.4v8.4"/><circle cx="11" cy="10.6" r="1.9"/></svg>',
+    comps: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="1.8" y="1.8" width="5.4" height="5.4" rx="1"/><rect x="8.8" y="1.8" width="5.4" height="5.4" rx="1"/><rect x="1.8" y="8.8" width="5.4" height="5.4" rx="1"/><rect x="8.8" y="8.8" width="5.4" height="5.4" rx="1"/></svg>',
   };
 
   function applyLaneLayout(y) {
@@ -4811,7 +4850,10 @@ export function getPreviewHtml(): string {
     // their own lane above the screen.
     setTop('cam-pills', 0, false);
     setTop('fx-lane', y.fx, y.fx >= 0);
-    setTop('media-lane', y.screen);
+    setTop('media-lane', Math.max(0, y.screen), y.screen >= 0);
+    setTop('comp-lane', y.comps + 2, y.comps >= 0);
+    var clEl = document.getElementById('comp-lane');
+    if (clEl) clEl.style.height = y.compsH + 'px';
     var mlEl = document.getElementById('media-lane');
     if (mlEl) mlEl.style.height = y.screenH + 'px';
     setTop('wave-strip', y.speaker + 3, y.speaker >= 0);
@@ -4828,7 +4870,8 @@ export function getPreviewHtml(): string {
     }
     bed('ruler', y.ruler, y.rulerH);
     if (y.fx >= 0) bed('fx', y.fx - 2, y.fxH + 4);
-    bed('screen', y.screen - 2, y.screenH + 4);
+    if (y.comps >= 0) bed('comps', y.comps - 2, y.compsH + 4);
+    if (y.screen >= 0) bed('screen', y.screen - 2, y.screenH + 4);
     if (y.speaker >= 0) bed('speaker', y.speaker - 2, y.speakerH + 4);
     if (y.music >= 0) bed('music', y.music, y.musicH);
     // Fixed gutter icons: stationary no matter the scroll/zoom, each
@@ -4836,7 +4879,8 @@ export function getPreviewHtml(): string {
     if (gut) {
       var html = '';
       if (y.fx >= 0) html += '<span class="lg-ic" style="top:' + (y.fx + y.fxH / 2 - 7) + 'px" title="EFFECTS \u2014 zooms, pans, rotates and callouts. Click a block to edit it.">' + LG_ICONS.fx + '</span>';
-      html += '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="SCREEN \u2014 your recording. Click a block to split, speed up or remove footage.">' + LG_ICONS.screen + '</span>';
+      if (y.comps >= 0) html += '<span class="lg-ic" style="top:' + (y.comps + y.compsH / 2 - 8) + 'px" title="COMPONENTS \u2014 every scene\\'s cast. Click a bar to inspect it; double-click to edit its timing.">' + LG_ICONS.comps + '</span>';
+      if (y.screen >= 0) html += '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="SCREEN \u2014 your recording. Click a block to split, speed up or remove footage.">' + LG_ICONS.screen + '</span>';
       if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="SPEAKER \u2014 your voice (and camera). Click a piece to play, split or remove talk.">' + LG_ICONS.speaker + '</span>';
       if (y.music >= 0) html += '<span class="lg-ic" style="top:' + (y.music + y.musicH / 2 - 8) + 'px" title="MUSIC \u2014 the bed under the film, ducked while you speak.">' + LG_ICONS.music + '</span>';
       gut.innerHTML = html;
@@ -4856,6 +4900,103 @@ export function getPreviewHtml(): string {
   // Words lane companion: the speaker clip block, its cut seams, and the
   // linked badge (ROADMAP #8 stage 3); layout applied here since this runs
   // on every project/lane change.
+  // ── Components band: every scene's cast as always-visible micro-bars ──
+  // (Marc, 2026-07-28: "make the components visible the whole time in the
+  // time scrubber, not something you click into.") Rows cap at 4; a "+N"
+  // chip covers the overflow and opens focus mode, which remains the
+  // drag-to-retime surface.
+  var COMP_FAMILIES = [
+    { re: /^(kinetic|headline|title|text|code|lower-third|st-)/, color: '#6366f1' },   // type & statements
+    { re: /^(x-post|spotify|social|testimonial|quote)/, color: '#0ea5e9' },            // social proof
+    { re: /^(chart|flowchart|data|counter|stat|graph|metric|timeline|table)/, color: '#10b981' }, // data viz
+    { re: /^(device|mockup|browser|phone|laptop|screenshot|app-)/, color: '#f59e0b' }, // product surfaces
+    { re: /^(glass|particle|shader|three|vignette|effect|backdrop|world|mesh|gradient)/, color: '#8b5cf6' }, // worlds & fx
+    { re: /^(lottie|icon|logo|badge)/, color: '#ec4899' },                             // accents
+    { re: /^(media|video|screencast|image)/, color: '#94a3b8' },                       // footage
+  ];
+  function compColor(type) {
+    var t = String(type || '').toLowerCase();
+    for (var f = 0; f < COMP_FAMILIES.length; f++) if (COMP_FAMILIES[f].re.test(t)) return COMP_FAMILIES[f].color;
+    var h = 0;
+    for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % 360;
+    return 'hsl(' + h + ', 45%, 55%)';
+  }
+  function renderCompLane() {
+    var wrap = document.getElementById('comp-lane');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    var p = state.currentProject;
+    var total = state.totalDuration || calcTotalDuration();
+    if (!p || !p.scenes || !(total > 0)) return;
+    if (focusSceneIdx >= 0) return; // focus mode owns the track
+    var trackEl = document.getElementById('timeline-track');
+    var pxTotal = trackEl ? trackEl.clientWidth : 1000;
+    var CAP = 4;
+    var offset = 0;
+    p.scenes.forEach(function(scene, si) {
+      var dur = scene.duration_seconds || 5;
+      var comps = scene.components || [];
+      var showAll = comps.length <= CAP;
+      var visible = showAll ? comps.length : CAP - 1;
+      for (var ci = 0; ci < visible; ci++) {
+        (function(c, ci2) {
+          var inAt = (c.enter && typeof c.enter.at === 'number') ? c.enter.at : 0;
+          var outAt = (c.exit && typeof c.exit.at === 'number') ? c.exit.at : dur;
+          var leftT = offset + Math.max(0, Math.min(inAt, dur));
+          var wT = Math.max(0.05, Math.min(outAt, dur) - inAt);
+          var isCustom = /^scene_/.test(c.type || '');
+          var bar = document.createElement('div');
+          bar.className = 'comp-bar' + (isCustom ? ' comp-custom' : '')
+            + (si === state.currentSceneIndex && ci2 === state.currentComponentIndex ? ' comp-active' : '');
+          bar.style.top = (ci2 * 12) + 'px';
+          bar.style.left = ((leftT / total) * 100).toFixed(3) + '%';
+          bar.style.width = 'max(3px, ' + ((wT / total) * 100).toFixed(3) + '%)';
+          bar.style.background = compColor(c.type);
+          bar.title = (isCustom ? 'custom scene' : c.type) + ' (' + (c.id || '') + ') — ' + (scene.label || scene.id)
+            + '. Click: inspect. Double-click: edit timing.';
+          var pxW = (wT / total) * pxTotal;
+          if (pxW > 56) {
+            var lab = document.createElement('span');
+            lab.className = 'comp-bar-label';
+            lab.textContent = isCustom ? 'custom' : c.type;
+            bar.appendChild(lab);
+          }
+          bar.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            selectScene(si);
+            state.currentComponentIndex = ci2;
+            var insp = document.getElementById('inspector');
+            if (insp && !insp.classList.contains('open')) insp.classList.add('open');
+            renderInspector();
+            renderCompLane();
+          });
+          bar.addEventListener('dblclick', function(ev) {
+            ev.stopPropagation();
+            selectScene(si);
+            enterFocus(si);
+          });
+          wrap.appendChild(bar);
+        })(comps[ci], ci);
+      }
+      if (!showAll) {
+        var more = document.createElement('div');
+        more.className = 'comp-more';
+        more.style.top = ((CAP - 1) * 12) + 'px';
+        more.style.left = ((offset / total) * 100).toFixed(3) + '%';
+        more.style.width = 'max(14px, ' + ((dur / total) * 100).toFixed(3) + '%)';
+        more.textContent = '+' + (comps.length - (CAP - 1));
+        more.title = (comps.length - (CAP - 1)) + ' more components in ' + (scene.label || scene.id) + ' — click to open the scene timeline.';
+        more.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          selectScene(si);
+          enterFocus(si);
+        });
+        wrap.appendChild(more);
+      }
+      offset += dur;
+    });
+  }
+
   function renderLaneLabels() {
     var track = document.getElementById('timeline-track');
     if (!track) return;
@@ -4865,6 +5006,7 @@ export function getPreviewHtml(): string {
     var total = state.totalDuration || calcTotalDuration();
     var y = laneLayout();
     applyLaneLayout(y);
+    renderCompLane();
     var hasSpeaker = !!(p.speaker && p.speaker.clips && p.speaker.clips.length);
     if (hasSpeaker && p.speaker.clips.length === 1 && total > 0) {
       var clip = p.speaker.clips[0];
