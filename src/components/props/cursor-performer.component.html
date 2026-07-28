@@ -1,0 +1,52 @@
+<template>
+  <div class="curp"></div>
+</template>
+
+<style scoped>
+  /* ── cursor-performer: the film's protagonist hand. A cursor that travels
+     the scene clicking the things that cause the next beat -- UI exhibits
+     become a story. Thread it ACROSS scenes by matching each scene's first
+     path point to the previous scene's last (the storyboard's handoff
+     contract), so the hand appears continuous through hard cuts. ── */
+  .curp { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.curp');
+    var path = Array.isArray(data.path) && data.path.length ? data.path : [{ at: 0.3, x: '50%', y: '55%' }];
+
+    var cursor = (typeof createCursor === 'function')
+      ? createCursor(host, { size: Number(data.size) || 30 })
+      : null;
+    if (!cursor) { console.warn('cursor-performer: shared cursor util missing'); return tl; }
+    cursor.style.zIndex = '95';
+
+    // Place at the first point immediately (the handoff position from the
+    // previous scene); move point-to-point with eased glides; pulse on click.
+    var p0 = path[0];
+    gsap.set(cursor, { left: p0.x || '50%', top: p0.y || '50%' });
+    if (data.enter === 'fade' || path[0].at > 0.15) {
+      gsap.set(cursor, { autoAlpha: 0 });
+      tl.to(cursor, { autoAlpha: 1, duration: 0.25 }, Math.max(0, (Number(p0.at) || 0.3) - 0.25));
+    }
+    for (var i = 1; i < path.length; i++) {
+      var prev = path[i - 1];
+      var pt = path[i];
+      var t0 = Math.max(0, Number(prev.at) || 0);
+      var t1 = Math.max(t0 + 0.15, Number(pt.at) || (t0 + 0.6));
+      tl.to(cursor, { left: pt.x, top: pt.y, duration: t1 - t0, ease: 'power2.inOut' }, t0);
+    }
+    path.forEach(function(pt) {
+      if (pt.click && typeof clickCursor === 'function') {
+        clickCursor(tl, cursor, Math.max(0, Number(pt.at) || 0));
+      }
+    });
+    if (data.exit === 'fade') {
+      var last = path[path.length - 1];
+      tl.to(cursor, { autoAlpha: 0, duration: 0.25 }, Math.max(0, (Number(last.at) || 0) + 0.4));
+    }
+    return tl;
+  }
+</script>

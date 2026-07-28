@@ -290,6 +290,8 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
 /** Overlay accents (celebration/delight seasoning): never windows -- they sit
  *  ON the composition in a corner, small, above everything. */
 var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
+/** Full-stage overlays: performers that cover the whole composition. */
+var STAGE_OVERLAY_TYPES = ["cursor-performer"];
 var ACCENT_SPOTS: Array<Record<string, string | number>> = [
   { x: "71%", y: "7%", width: "21%", height: "36%" },   // top-right
   { x: "7%", y: "56%", width: "19%", height: "34%" },   // bottom-left
@@ -301,7 +303,11 @@ function authoredLayout(allTypes: string[]): Map<string, { position: Record<stri
   // from the window recipes -- a confetti burst must never become a 84%
   // full-frame "window".
   var accents = allTypes.filter((t) => ACCENT_TYPES.indexOf(t) !== -1);
-  var types = allTypes.filter((t) => ACCENT_TYPES.indexOf(t) === -1);
+  var overlays = allTypes.filter((t) => STAGE_OVERLAY_TYPES.indexOf(t) !== -1);
+  var types = allTypes.filter((t) => ACCENT_TYPES.indexOf(t) === -1 && STAGE_OVERLAY_TYPES.indexOf(t) === -1);
+  overlays.forEach(function(t) {
+    out.set(t, { position: { x: 0, y: 0, width: "100%", height: "100%" }, z_index: 45 });
+  });
   accents.forEach((t, i) => {
     out.set(t, { position: ACCENT_SPOTS[Math.min(i, ACCENT_SPOTS.length - 1)], z_index: 40 + i });
   });

@@ -1,0 +1,16 @@
+{
+  "type": "cursor-performer",
+  "label": "Cursor Performer",
+  "category": "props",
+  "description": "The film's protagonist hand: a cursor that travels the scene and CLICKS the thing that causes the next beat -- UI exhibits become a story someone is doing. Position its box over the whole stage at a high z_index. CONTINUITY CONTRACT: when threading the cursor across consecutive scenes, make each scene's FIRST path point equal the previous scene's LAST point (same x/y), so the hand reads as continuous through hard cuts. Use on 2-4 consecutive UI scenes max; it should always be traveling toward or clicking something meaningful.",
+  "data": {
+    "path": {
+      "type": "array",
+      "label": "[{at, x:'62%', y:'48%', click?:true}] -- scene-local seconds, stage-relative coords",
+      "required": true
+    },
+    "size": { "type": "number", "label": "Cursor size px (default 30)", "optional": true },
+    "enter": { "type": "string", "label": "'fade' to fade in at the first point (default: present from start)", "optional": true },
+    "exit": { "type": "string", "label": "'fade' to fade out after the last point", "optional": true }
+  }
+}
