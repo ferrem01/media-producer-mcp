@@ -1838,3 +1838,9 @@ in 7/8 scenes with broken handoffs). "Implement them both."
   first consecutive chain (max 4 scenes), the rest removed, handoffs
   repaired so scene N's first path point = scene N-1's last.
 - test/continuity.test.ts (12 tests) pins all of it.
+- Post-ship addendum (same day): WORLD INK CLAMP -- the verification
+  film exposed storyboards authoring dark-era caption ink (#f5f6fa) on
+  the light world (invisible headline). Authored comps skip codegen
+  contrast gates, so buildAuthoredCompositionScene now deterministically
+  clamps caption/hero ink that matches the world's lightness (or is
+  absent on a light world) to the world's ink (brand text / #f5f6fa).

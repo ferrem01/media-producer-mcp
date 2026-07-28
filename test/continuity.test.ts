@@ -173,3 +173,62 @@ describe("enforceFilmContinuity: the one hand", () => {
     expect(scenes[0].components.some((c: any) => c.type === "cursor-performer")).toBe(false);
   });
 });
+
+describe("world ink clamp (editorial copy must contrast the world)", () => {
+  it("light world: a white caption ink is clamped to the brand's dark text", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const world = deriveWorld({ brandKit: LIGHT_KIT, seedSource: "t:f" });
+    const result = await generateScene({
+      scene: {
+        label: "s", duration_seconds: 5, purpose: "p", visual_notes: "v",
+        components: [
+          { type: "composer", data: { text: "brief" } },
+          { type: "kinetic-text", data: { text: "MEET THE TEAM", color: "#f5f6fa" } },
+        ],
+      } as any,
+      sceneIndex: 0, totalScenes: 6, prompt: "p",
+      llmConfig: {} as any, brandKit: { colors: { text: "#17171c" } } as any,
+      canvas: { width: 1920, height: 1080 } as any, world,
+    } as any);
+    const kt = (result.scene as any).components.find((c: any) => c.type === "kinetic-text");
+    expect(kt.data.color).toBe("#17171c");
+  });
+
+  it("light world: a caption with NO ink gets the world ink (dark-era defaults are white)", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const world = deriveWorld({ brandKit: LIGHT_KIT, seedSource: "t:f" });
+    const result = await generateScene({
+      scene: {
+        label: "s", duration_seconds: 5, purpose: "p", visual_notes: "v",
+        components: [{ type: "kinetic-text", data: { text: "HELLO" } }],
+      } as any,
+      sceneIndex: 0, totalScenes: 6, prompt: "p",
+      llmConfig: {} as any, brandKit: {} as any, canvas: { width: 1920, height: 1080 } as any, world,
+    } as any);
+    const kt = (result.scene as any).components.find((c: any) => c.type === "kinetic-text");
+    expect(kt.data.color).toBe("#17171c");
+  });
+
+  it("keeps a contrasting ink untouched; no world -> no clamp", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const world = deriveWorld({ brandKit: LIGHT_KIT, seedSource: "t:f" });
+    const withWorld = await generateScene({
+      scene: {
+        label: "s", duration_seconds: 5, purpose: "p", visual_notes: "v",
+        components: [{ type: "kinetic-text", data: { text: "OK", color: "#393bf5" } }],
+      } as any,
+      sceneIndex: 0, totalScenes: 6, prompt: "p",
+      llmConfig: {} as any, brandKit: {} as any, canvas: { width: 1920, height: 1080 } as any, world,
+    } as any);
+    expect((withWorld.scene as any).components.find((c: any) => c.type === "kinetic-text").data.color).toBe("#393bf5");
+    const noWorld = await generateScene({
+      scene: {
+        label: "s", duration_seconds: 5, purpose: "p", visual_notes: "v",
+        components: [{ type: "kinetic-text", data: { text: "OK", color: "#f5f6fa" } }],
+      } as any,
+      sceneIndex: 0, totalScenes: 6, prompt: "p",
+      llmConfig: {} as any, brandKit: {} as any, canvas: { width: 1920, height: 1080 } as any,
+    } as any);
+    expect((noWorld.scene as any).components.find((c: any) => c.type === "kinetic-text").data.color).toBe("#f5f6fa");
+  });
+});
