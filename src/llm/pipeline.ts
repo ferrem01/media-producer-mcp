@@ -32,6 +32,7 @@ import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
 import { loadProject, saveProject, createProject } from "../persistence/project.js";
 import { runGrammarPrep, pickMusicMood } from "./grammar-prep.js";
 import { deriveWorld, worldPromptBlock, type WorldSpec } from "./world.js";
+import { enforceFilmContinuity } from "./continuity.js";
 import { assembleNarratedScreencast } from "./narrated-screencast.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
@@ -2578,6 +2579,12 @@ async function runUnifiedPipeline(
     project.scenes.push(scene);
   }
 
+  // Film continuity pass (deterministic): match-cut pinning across
+  // consecutive authored scenes + the one-hand cursor contract (cap the
+  // chain, repair handoffs). Runs on the assembled scene list -- the first
+  // moment the film exists as a sequence rather than parallel scene jobs.
+  const continuityLog = enforceFilmContinuity(project.scenes);
+  for (const line of continuityLog) console.log(`  Continuity: ${line}`);
 
   // Apply speaker track scene-level settings after all scenes are generated
   if (project.speaker_track) {

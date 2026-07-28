@@ -1808,3 +1808,33 @@ the bottom, film-wide lanes only for film-wide things.
 - Live-verified on proj_fa58e846: 8▦+5⬒ badges, inspector tree +
   7 script rows on the cowork scene, focus lane with 7 diamonds and
   3 beat gridlines on the 13.5s scene clock.
+
+## Authored-layout intelligence + film continuity pass (Marc, 2026-07-28)
+
+Marc on the e2e world film: "generally looks kinda like crap... things
+are not lined up correctly... looks like a bunch of separate scenes."
+Root causes: the authored-layout fallback stacked every recipe-less
+component into the SAME 84% inset (scene 6: stat-card + kinetic-text
+center-collided), and nothing enforced cross-cut continuity (cursor cast
+in 7/8 scenes with broken handoffs). "Implement them both."
+
+- authoredLayout is now per-INSTANCE and role-aware (scene-generator.ts):
+  captions (kinetic-text/annotation/typewriter/caption-*) and heroes
+  (stat-card/number-counter-row/headline-carousel/hero-reveal/quote-block)
+  never become windows. One surface + copy -> window docks left 58%, copy
+  stacks in a real right column; recipes/pairs + copy -> lower-third band;
+  no surfaces -> heroes center stage, captions lower third; 3+ recipe-less
+  surfaces -> even row, never a stack. ghost-type full-stage z4 (behind
+  windows), floating-pills full-stage z38, storyboard-authored backdrops
+  DROPPED in world films (one world, one backdrop). Same-type instances
+  get unique ids (type, type_2...) and distinct frames. All prior recipes
+  (trio/pair/84% inset/accent corners/cursor overlay) pinned unchanged.
+- New deterministic continuity pass (src/llm/continuity.ts,
+  enforceFilmContinuity) runs in pipeline.ts the moment the scene list
+  exists: (1) MATCH-CUT PINNING -- consecutive authored scenes sharing a
+  surface type get the later instance pinned to the earlier frame +
+  data.match_cut stamped, skipped when the inherited frame would bury a
+  sibling column; (2) THE ONE HAND -- cursor-performer capped to the
+  first consecutive chain (max 4 scenes), the rest removed, handoffs
+  repaired so scene N's first path point = scene N-1's last.
+- test/continuity.test.ts (12 tests) pins all of it.
