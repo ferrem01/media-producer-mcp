@@ -1,0 +1,44 @@
+{
+  "type": "device-showcase",
+  "label": "Device Showcase",
+  "category": "mockups",
+  "description": "Apple device-glamour mockup: a CSS-3D iPhone (titanium edge, Dynamic Island), MacBook (tilted lid + keyboard deck), or an overlapping duo rises in, settles over a soft grounding shadow, and floats with a gentle 3D sway. Cast it for app/product hero beats, 'available on desktop and mobile' moments, or launch shots -- e.g. { \"device\": \"duo\", \"screenshot_url\": \"https://example.com/dashboard.png\", \"screenshot_url_2\": \"https://example.com/mobile.png\" }. Without screenshots the screens render a tasteful brand-tinted UI skeleton, so it works even before assets exist.",
+  "data": {
+    "device": {
+      "type": "string",
+      "label": "Device",
+      "optional": true,
+      "enum": ["iphone", "macbook", "duo"],
+      "default": "iphone"
+    },
+    "screenshot_url": {
+      "type": "string",
+      "label": "Screen image URL (lead device; placeholder skeleton when absent)",
+      "optional": true,
+      "placeholder": "https://example.com/screen.png"
+    },
+    "screenshot_url_2": {
+      "type": "string",
+      "label": "Second screen image URL (duo's iPhone)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "enum": ["light", "dark"],
+      "default": "dark"
+    },
+    "float": {
+      "type": "boolean",
+      "label": "Continuous floating sway (default true)",
+      "optional": true,
+      "default": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Entrance start (s, default 0.3)",
+      "optional": true
+    }
+  }
+}

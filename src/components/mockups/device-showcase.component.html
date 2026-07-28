@@ -1,0 +1,412 @@
+<template>
+  <div class="dsc">
+    <div class="dsc-glow"></div>
+    <div class="dsc-stage">
+      <div class="dsc-unit dsc-unit-macbook">
+        <div class="dsc-shadow"></div>
+        <div class="dsc-device dsc-macbook">
+          <div class="dsc-lid">
+            <div class="dsc-screen">
+              <div class="dsc-ph">
+                <div class="dsc-ph-nav"><i></i><i></i><i></i></div>
+                <div class="dsc-ph-hero"></div>
+                <div class="dsc-ph-row"></div>
+                <div class="dsc-ph-row dsc-ph-row-short"></div>
+                <div class="dsc-ph-cards"><i></i><i></i><i></i></div>
+              </div>
+              <img class="dsc-shot" alt="" />
+              <div class="dsc-spec"></div>
+            </div>
+          </div>
+          <div class="dsc-deck"></div>
+        </div>
+      </div>
+      <div class="dsc-unit dsc-unit-iphone">
+        <div class="dsc-shadow"></div>
+        <div class="dsc-device dsc-iphone">
+          <div class="dsc-screen">
+            <div class="dsc-ph">
+              <div class="dsc-ph-nav"><i></i><i></i><i></i></div>
+              <div class="dsc-ph-hero"></div>
+              <div class="dsc-ph-row"></div>
+              <div class="dsc-ph-row dsc-ph-row-short"></div>
+              <div class="dsc-ph-cards"><i></i><i></i><i></i></div>
+            </div>
+            <img class="dsc-shot" alt="" />
+            <div class="dsc-island"></div>
+            <div class="dsc-spec"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── device-showcase: Apple device-glamour mockup. CSS-3D iPhone / MacBook
+     shells with screenshot slots, rising in and floating with a gentle
+     timeline-driven sway. Place over the stage region the hero device owns. ── */
+  .dsc {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    font-family: var(--mp-font-family, 'Inter', system-ui, sans-serif);
+    perspective: 1600px;
+    pointer-events: none;
+  }
+
+  .dsc-glow {
+    position: absolute;
+    width: 900px;
+    height: 900px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(120, 120, 200, 0.14) 0%,
+      rgba(120, 120, 200, 0.05) 45%,
+      transparent 70%);
+    z-index: 0;
+  }
+  .dsc.dsc-light .dsc-glow {
+    background: radial-gradient(circle,
+      rgba(15, 23, 42, 0.08) 0%,
+      rgba(15, 23, 42, 0.03) 45%,
+      transparent 70%);
+  }
+
+  .dsc-stage {
+    position: relative;
+    transform-style: preserve-3d;
+    z-index: 1;
+  }
+
+  .dsc-unit {
+    position: relative;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .dsc-device {
+    position: relative;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .dsc-shadow {
+    position: absolute;
+    left: 50%;
+    bottom: -54px;
+    width: 78%;
+    height: 44px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center,
+      rgba(0, 0, 0, 0.55) 0%,
+      rgba(0, 0, 0, 0.25) 45%,
+      transparent 72%);
+    filter: blur(10px);
+    will-change: transform, opacity;
+  }
+  .dsc.dsc-light .dsc-shadow {
+    background: radial-gradient(ellipse at center,
+      rgba(15, 23, 42, 0.35) 0%,
+      rgba(15, 23, 42, 0.15) 45%,
+      transparent 72%);
+  }
+
+  /* ── iPhone: titanium rounded slab, ~9:19.5, Dynamic Island. ── */
+  .dsc-iphone {
+    width: 300px;
+    height: 650px;
+    border-radius: 48px;
+    padding: 11px;
+    box-sizing: border-box;
+    background: linear-gradient(160deg, #4a4a52 0%, #26262c 40%, #101014 100%);
+    border: 2px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+      0 60px 120px rgba(0, 0, 0, 0.55),
+      0 24px 48px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.55);
+  }
+  .dsc-iphone .dsc-screen { border-radius: 38px; }
+  .dsc-island {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 96px;
+    height: 28px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 4;
+  }
+
+  /* ── MacBook: tilted lid + bottom deck. ── */
+  .dsc-macbook { width: 780px; }
+  .dsc-lid {
+    position: relative;
+    height: 486px;
+    border-radius: 18px 18px 4px 4px;
+    padding: 14px 14px 20px 14px;
+    box-sizing: border-box;
+    background: linear-gradient(160deg, #3c3c44 0%, #202026 45%, #111116 100%);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 60px 120px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.5);
+    transform-origin: 50% 100%;
+    transform: rotateX(-8deg);
+  }
+  .dsc-lid .dsc-screen { border-radius: 8px; }
+  .dsc-deck {
+    position: relative;
+    height: 30px;
+    margin: 0 -34px;
+    border-radius: 4px 4px 14px 14px;
+    background:
+      linear-gradient(180deg,
+        rgba(255, 255, 255, 0.20) 0%,
+        rgba(255, 255, 255, 0.05) 8%,
+        transparent 30%),
+      repeating-linear-gradient(90deg,
+        rgba(255, 255, 255, 0.030) 0 22px,
+        rgba(255, 255, 255, 0.005) 22px 24px),
+      linear-gradient(180deg, #34343c 0%, #1c1c22 60%, #0d0d11 100%);
+    box-shadow:
+      0 30px 60px rgba(0, 0, 0, 0.5),
+      inset 0 -2px 3px rgba(0, 0, 0, 0.6);
+  }
+  .dsc-deck::after {
+    /* thumb notch */
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 130px;
+    height: 9px;
+    border-radius: 0 0 10px 10px;
+    background: rgba(0, 0, 0, 0.45);
+    box-shadow: inset 0 -1px 1px rgba(255, 255, 255, 0.08);
+  }
+
+  /* ── Screen: screenshot slot over a tasteful placeholder. ── */
+  .dsc-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: linear-gradient(160deg, #15151c 0%, #08080c 100%);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+  }
+  .dsc-shot {
+    display: none;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    z-index: 1;
+  }
+
+  /* Placeholder: brand-tinted gradient with a subtle UI skeleton,
+     screens read a touch brighter than the ambient shell. */
+  .dsc-ph {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 9% 8%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 5.5%;
+    background:
+      radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.10) 0%, transparent 55%),
+      linear-gradient(160deg,
+        var(--mp-color-primary, #6366f1) -60%,
+        var(--mp-color-surface, #1b1b26) 55%,
+        #0b0b12 100%);
+  }
+  .dsc-ph-nav { display: flex; gap: 4%; height: 5%; }
+  .dsc-ph-nav i {
+    flex: 1;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+  .dsc-ph-nav i:first-child { flex: 0 0 22%; background: var(--mp-color-primary, #6366f1); opacity: 0.65; }
+  .dsc-ph-hero {
+    height: 34%;
+    border-radius: 12px;
+    background:
+      linear-gradient(140deg,
+        color-mix(in srgb, var(--mp-color-primary, #6366f1) 45%, transparent) 0%,
+        rgba(255, 255, 255, 0.06) 70%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+  .dsc-ph-row { height: 4.5%; width: 76%; border-radius: 999px; background: rgba(255, 255, 255, 0.16); }
+  .dsc-ph-row-short { width: 48%; opacity: 0.7; }
+  .dsc-ph-cards { display: flex; gap: 5%; flex: 1; min-height: 0; }
+  .dsc-ph-cards i {
+    flex: 1;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  .dsc.dsc-light .dsc-ph {
+    background:
+      radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.85) 0%, transparent 60%),
+      linear-gradient(160deg,
+        color-mix(in srgb, var(--mp-color-primary, #6366f1) 22%, #ffffff) 0%,
+        #eef0f6 60%,
+        #dfe3ec 100%);
+  }
+  .dsc.dsc-light .dsc-ph-nav i,
+  .dsc.dsc-light .dsc-ph-row { background: rgba(15, 23, 42, 0.14); }
+  .dsc.dsc-light .dsc-ph-cards i { background: rgba(15, 23, 42, 0.07); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+
+  /* Specular edge highlight sweeping the glass. */
+  .dsc-spec {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    background: linear-gradient(115deg,
+      transparent 32%,
+      rgba(255, 255, 255, 0.18) 47%,
+      rgba(255, 255, 255, 0.04) 53%,
+      transparent 68%);
+    mix-blend-mode: screen;
+    will-change: transform;
+  }
+
+  /* ── Duo layout: MacBook center-left, iPhone overlapping front-right. ── */
+  .dsc.dsc-duo .dsc-unit-macbook { transform: translateX(-90px); }
+  .dsc.dsc-duo .dsc-unit-iphone {
+    position: absolute;
+    right: -40px;
+    bottom: -60px;
+    transform: scale(0.62) translateZ(120px);
+    transform-origin: 100% 100%;
+    z-index: 2;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+
+    var root = el.querySelector('.dsc');
+    var glow = el.querySelector('.dsc-glow');
+    var unitMac = el.querySelector('.dsc-unit-macbook');
+    var unitPhone = el.querySelector('.dsc-unit-iphone');
+    if (!root || !unitMac || !unitPhone) return tl;
+
+    var mode = data.device === 'macbook' ? 'macbook'
+      : data.device === 'duo' ? 'duo' : 'iphone';
+    var theme = data.theme === 'light' ? 'light' : 'dark';
+    if (theme === 'light') root.classList.add('dsc-light');
+    if (mode === 'duo') root.classList.add('dsc-duo');
+    if (mode === 'iphone') unitMac.style.display = 'none';
+    if (mode === 'macbook') unitPhone.style.display = 'none';
+
+    function setShot(unit, url) {
+      if (!url) return;
+      var shot = unit.querySelector('.dsc-shot');
+      var ph = unit.querySelector('.dsc-ph');
+      if (!shot) return;
+      shot.src = String(url);
+      shot.style.display = 'block';
+      if (ph) ph.style.display = 'none';
+    }
+    // screenshot_url dresses the mode's lead device (MacBook in duo);
+    // screenshot_url_2 dresses the duo's iPhone.
+    var lead = mode === 'iphone' ? unitPhone : unitMac;
+    setShot(lead, data.screenshot_url);
+    if (mode === 'duo') setShot(unitPhone, data.screenshot_url_2);
+
+    var units = mode === 'duo' ? [unitMac, unitPhone]
+      : mode === 'macbook' ? [unitMac] : [unitPhone];
+    var at = Math.max(0, Number(data.at) || 0.3);
+    var dur = ctx && ctx.duration ? ctx.duration : 8;
+
+    if (glow) {
+      gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
+      tl.to(glow, { autoAlpha: 1, scale: 1, duration: 1.0, ease: 'power2.out' }, at);
+    }
+
+    units.forEach(function (unit, i) {
+      var device = unit.querySelector('.dsc-device');
+      var shadow = unit.querySelector('.dsc-shadow');
+      var spec = unit.querySelector('.dsc-spec');
+      var start = at + i * 0.18;
+      var baseY = mode === 'duo' && unit === unitPhone ? -6 : -10;
+      var baseX = 4;
+
+      // Entrance: rise + settle, the grounding shadow blooming underneath.
+      gsap.set(unit, { autoAlpha: 0, y: 110 });
+      gsap.set(device, { rotateY: baseY - 14, rotateX: baseX + 8, z: -160, transformPerspective: 1600 });
+      if (shadow) gsap.set(shadow, { autoAlpha: 0, scaleX: 0.55, scaleY: 0.7 });
+      if (spec) gsap.set(spec, { xPercent: -55 });
+
+      tl.to(unit, { autoAlpha: 1, y: 0, duration: 1.15, ease: 'power3.out' }, start);
+      tl.to(device, { rotateY: baseY, rotateX: baseX, z: 0, duration: 1.3, ease: 'power3.out' }, start);
+      if (shadow) tl.to(shadow, { autoAlpha: 1, scaleX: 1, scaleY: 1, duration: 1.15, ease: 'power3.out' }, start);
+      if (spec) tl.to(spec, { xPercent: 55, duration: 1.4, ease: 'power2.inOut' }, start + 0.15);
+
+      // Float: gentle timeline-driven sway (yoyo sine repeats span the scene;
+      // never wall-clock, so every seeked frame is deterministic).
+      if (data.float !== false) {
+        var settleAt = start + 1.3;
+        var phase = i * 0.7; // duo devices drift out of phase
+        tl.to(device, {
+          rotateY: baseY + 7,
+          rotateX: baseX - 3,
+          duration: 2.8 + phase,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: -1
+        }, settleAt);
+        tl.to(unit, {
+          y: -12,
+          duration: 2.3 + phase,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: -1
+        }, settleAt);
+        if (shadow) tl.to(shadow, {
+          scaleX: 0.92,
+          opacity: 0.8,
+          duration: 2.3 + phase,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: -1
+        }, settleAt);
+        if (spec) tl.to(spec, {
+          xPercent: 20,
+          duration: 2.8 + phase,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: -1
+        }, settleAt);
+      }
+    });
+
+    // Exit: drop back into depth before the cut.
+    if (dur > 3) {
+      var exitAt = dur - 0.6;
+      units.forEach(function (unit) {
+        var device = unit.querySelector('.dsc-device');
+        tl.to(unit, { autoAlpha: 0, y: 40, duration: 0.45, ease: 'power2.in' }, exitAt);
+        tl.to(device, { z: -140, duration: 0.45, ease: 'power2.in' }, exitAt);
+      });
+      if (glow) tl.to(glow, { autoAlpha: 0, duration: 0.45, ease: 'power2.in' }, exitAt);
+    }
+
+    return tl;
+  }
+</script>

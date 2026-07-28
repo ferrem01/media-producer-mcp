@@ -1,0 +1,140 @@
+<template>
+  <div class="stst">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap">
+    <div class="stst-vignette"></div>
+    <div class="stst-kicker-row"><span class="stst-rule"></span><span class="stst-kicker">{{kicker}}</span></div>
+    <div class="stst-stage"></div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-statement: the EDITORIAL statement beat. Huge display-serif type
+     owns the frame -- one thought, one emphasized word in gradient italic,
+     warm cream (or near-black) canvas, nothing else. The rolling-text
+     storytelling style: statement beats alternate with evidence beats. */
+  .stst { position: absolute; inset: 0; overflow: hidden; background: #f4efe1;
+    font-family: 'Instrument Serif', Georgia, 'Times New Roman', 'DejaVu Serif', serif; }
+  .stst.is-dark { background: #14131b; }
+  .stst-vignette { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 70% 55% at 50% 46%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
+  .stst.is-dark .stst-vignette {
+    background: radial-gradient(ellipse 70% 55% at 50% 46%, rgba(255,255,255,0.06), rgba(255,255,255,0) 70%); }
+  .stst-kicker-row { position: absolute; left: 50%; top: 15vh; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stst-rule { width: 34px; height: 2px; background: var(--mp-color-primary, #4f46e5); transform-origin: left center; }
+  .stst-kicker { font-size: 14px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--mp-color-primary, #4f46e5); }
+  .stst-stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 78vw; }
+  .stst-line-group { position: absolute; left: 0; top: 0; width: 100%;
+    display: flex; flex-direction: column; align-items: center; row-gap: 0.6vh;
+    transform: translateY(-50%); }
+  .stst-linemask { overflow: hidden; padding: 0.35vh 0.2em; }
+  .stst-line { display: block; text-align: center; color: #1c1a16; white-space: nowrap;
+    font-size: 6.4vw; line-height: 1.06; letter-spacing: -0.01em; font-weight: 400; }
+  .stst.is-dark .stst-line { color: #f2efe6; }
+  .stst-line.is-secondary { font-size: 4.2vw; opacity: 0.85; }
+  .stst-em { font-style: italic; background: linear-gradient(96deg,
+      var(--mp-color-primary, #7c5cff) 10%, #c4489f 55%, #ff6a4d 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    padding-right: 0.06em; }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var root = q('.stst');
+    var dur = ctx.duration || 5;
+
+    // Theme: 'cream' is the editorial signature and the light default
+    // ('light' aliases to cream -- a light world stays WARM here, that
+    // warmth is the style); 'dark' is the chapter-flip temperature.
+    if (data.theme === 'dark') root.classList.add('is-dark');
+
+    var kickerRow = q('.stst-kicker-row');
+    if (!data.kicker) kickerRow.style.display = 'none';
+
+    // Statements: data.text (one) or data.lines (a rolling sequence -- each
+    // entry holds its share of the scene, then rolls up and out as the next
+    // rolls in). '*word*' marks the gradient-italic emphasis.
+    var raw = Array.isArray(data.lines) && data.lines.length ? data.lines : [data.text || ''];
+    var statements = raw.map(function(s) { return String(s || ''); }).filter(Boolean);
+    if (!statements.length) statements = [''];
+
+    var stage = q('.stst-stage');
+
+    // Build each statement as its own centered group of masked lines.
+    // A statement wraps onto multiple visual lines by explicit '\n' or every
+    // ~4 words (nowrap lines keep the serif's set tight and huge).
+    function buildStatement(text, secondary) {
+      var group = document.createElement('div');
+      group.className = 'stst-line-group';
+      var lines = text.indexOf('\n') !== -1 ? text.split('\n') : (function(t) {
+        var words = t.split(/\s+/).filter(Boolean);
+        if (words.length <= 4) return [t];
+        var out = [], per = Math.ceil(words.length / Math.ceil(words.length / 4));
+        for (var i = 0; i < words.length; i += per) out.push(words.slice(i, i + per).join(' '));
+        return out;
+      })(text);
+      var lineEls = [];
+      lines.forEach(function(lineText) {
+        var mask = document.createElement('div');
+        mask.className = 'stst-linemask';
+        var line = document.createElement('span');
+        line.className = 'stst-line' + (secondary ? ' is-secondary' : '');
+        // *emphasis* -> gradient italic span
+        var re = /\*([^*]+)\*|([^*]+)/g, m;
+        while ((m = re.exec(lineText)) !== null) {
+          if (m[1] !== undefined) {
+            var em = document.createElement('em');
+            em.className = 'stst-em';
+            em.textContent = m[1];
+            line.appendChild(em);
+          } else {
+            line.appendChild(document.createTextNode(m[2]));
+          }
+        }
+        mask.appendChild(line);
+        group.appendChild(mask);
+        lineEls.push(line);
+      });
+      stage.appendChild(group);
+      return { group: group, lines: lineEls };
+    }
+
+    var built = statements.map(function(s, i) { return buildStatement(s, false); });
+
+    // Timing: intro beat, then each statement owns an equal slice; the last
+    // one holds to the end (no exit -- the cut is the exit, editorial style).
+    var intro = 0.35;
+    var slice = (dur - intro) / statements.length;
+    var riseD = Math.min(0.85, slice * 0.35);
+
+    built.forEach(function(b, i) {
+      var t0 = intro + i * slice;
+      // Lines rise out of their masks, staggered -- the serif line-rise.
+      gsap.set(b.lines, { yPercent: 118 });
+      gsap.set(b.group, { autoAlpha: 1 });
+      tl.to(b.lines, { yPercent: 0, duration: riseD, ease: 'power4.out', stagger: 0.09 }, t0);
+      // Roll up and out before the next statement (except the last).
+      if (i < built.length - 1) {
+        tl.to(b.lines, { yPercent: -118, duration: riseD * 0.8, ease: 'power3.in', stagger: 0.05 }, t0 + slice - riseD * 0.7);
+      }
+      // A whisper of drift while it holds (life, not distraction).
+      tl.fromTo(b.group, { scale: 1 }, { scale: 1.012, duration: Math.max(0.6, slice - riseD), ease: 'none' }, t0 + riseD * 0.5);
+    });
+
+    gsap.set(q('.stst-rule'), { scaleX: 0 });
+    gsap.set(q('.stst-kicker'), { autoAlpha: 0, y: -8 });
+    tl.to(q('.stst-rule'), { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 0.15)
+      .to(q('.stst-kicker'), { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.25);
+
+    return tl;
+  }
+</script>

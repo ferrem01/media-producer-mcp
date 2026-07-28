@@ -152,7 +152,11 @@ export interface SceneBeat {
 }
 
 export interface SceneTransition {
-  type: "crossfade" | "blur-crossfade" | "slide-reveal" | "zoom-through" | "glitch-cut" | "morph-wipe" | "scale-rotate" | "curtain" | "wipe-left" | "wipe-right" | "slide-up" | "slide-down" | "iris" | "glass-turn" | "match-cut" | "none";
+  type: "crossfade" | "blur-crossfade" | "slide-reveal" | "zoom-through" | "glitch-cut" | "morph-wipe" | "scale-rotate" | "curtain" | "wipe-left" | "wipe-right" | "slide-up" | "slide-down" | "iris" | "glass-turn" | "match-cut" | "whip-pan" | "cinematic-zoom" | "push"
+    // WebGL shader transitions (gl-transitions engine in transitions.ts)
+    | "shader-crosswarp" | "shader-ripple" | "shader-radial" | "shader-directional-warp" | "shader-burn" | "shader-chromatic" | "shader-lens-distortion" | "shader-swirl" | "shader-pixelize"
+    | "shader-flash-white" | "shader-light-leak" | "shader-gravitational-lens" | "shader-thermal" | "shader-domain-warp" | "shader-ridged-burn"
+    | "none";
   duration_seconds: number;
 }
 

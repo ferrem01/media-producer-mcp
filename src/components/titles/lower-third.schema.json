@@ -1,0 +1,14 @@
+{
+  "type": "lower-third",
+  "label": "Broadcast Lower Third",
+  "category": "titles",
+  "description": "Broadcast-quality lower third for identifying a person on screen -- a speaker, customer, host, expert, or quoted source. Anchors to the bottom-left (bottom-right with side:'right') with safe margins, enters at `at` seconds, holds, and exits gracefully on scenes of 5s or longer. ONE component, EIGHT presets via data.style: 'clean-bar' (white card + thin accent rule, slide-in with overshoot -- the safe default), 'accent-underline' (transparent, big name, accent underline draws left-to-right), 'bold-block' (solid accent name block + offset dark title block, staggered slide), 'color-block' (stacked accent/near-black blocks wipe in via scaleX, text reveals after), 'dark-card' (dark glass card with blur + subtle border, rises with fade), 'kicker-name' (tiny uppercase accent kicker above a big rising name -- the title becomes the kicker line), 'mask-reveal' (name/title rise through a baseline clip mask while a thin rule expands), 'soft-pill' (rounded white pill, back.out pop). Place over interview, testimonial, speaker, or demo scenes at a HIGH z_index. Example: {\"name\":\"Sarah Chen\",\"title\":\"VP Marketing, Acme\",\"style\":\"dark-card\",\"at\":0.6,\"side\":\"left\"}.",
+  "data": {
+    "name": { "type": "string", "label": "Person or entity name, e.g. \"Sarah Chen\"", "required": true },
+    "title": { "type": "string", "label": "Role/affiliation line, e.g. \"VP Marketing, Acme\"", "optional": true },
+    "style": { "type": "string", "label": "Visual preset", "optional": true, "default": "clean-bar", "enum": ["clean-bar", "accent-underline", "bold-block", "color-block", "dark-card", "kicker-name", "mask-reveal", "soft-pill"] },
+    "accent": { "type": "string", "label": "Accent color (default brand primary)", "optional": true },
+    "at": { "type": "number", "label": "Entrance start (s, default 0.4)", "optional": true },
+    "side": { "type": "string", "label": "Anchor side", "optional": true, "default": "left", "enum": ["left", "right"] }
+  }
+}

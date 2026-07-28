@@ -1,0 +1,51 @@
+{
+  "type": "map-route",
+  "label": "Map Route",
+  "category": "data-viz",
+  "description": "Stylized dot-matrix flight map (world or US): a coarse land silhouette fades in as a radial dot stagger, then curved accent arcs draw between labeled endpoint markers with pulsing dots and uppercase label chips. Cast it for global reach, expansion, logistics, remote teams, or 'from X to Y' beats -- e.g. routes: [{\"from\":{\"x\":18,\"y\":34,\"label\":\"San Francisco\"},\"to\":{\"x\":48,\"y\":22,\"label\":\"London\"}}]. Coordinates are 0-100 percentages of the map box; 1-4 routes read best. Place over the whole stage or a large map region.",
+  "data": {
+    "region": {
+      "type": "string",
+      "label": "Map region",
+      "optional": true,
+      "enum": ["world", "us"],
+      "default": "world"
+    },
+    "routes": {
+      "type": "array",
+      "label": "Routes",
+      "required": true,
+      "items": {
+        "from": { "type": "object", "label": "Origin: {x, y (0-100 % of map box), label}" },
+        "to": { "type": "object", "label": "Destination: {x, y (0-100 % of map box), label}" }
+      }
+    },
+    "dot_color": {
+      "type": "string",
+      "label": "Land dot color (default muted per theme)",
+      "optional": true
+    },
+    "accent": {
+      "type": "string",
+      "label": "Arc + marker color (default brand primary)",
+      "optional": true
+    },
+    "theme": {
+      "type": "string",
+      "label": "Theme",
+      "optional": true,
+      "enum": ["light", "dark"],
+      "default": "dark"
+    },
+    "seed": {
+      "type": "number",
+      "label": "Dot-shimmer seed (film-stable)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "Entrance start (s, default 0.3)",
+      "optional": true
+    }
+  }
+}
