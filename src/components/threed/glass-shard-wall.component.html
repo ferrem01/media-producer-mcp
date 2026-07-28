@@ -1,0 +1,253 @@
+<template>
+  <div class="gsw">
+    <div class="gsw-text">
+      <div class="gsw-kicker"></div>
+      <div class="gsw-stats"></div>
+    </div>
+    <canvas class="gsw-canvas"></canvas>
+  </div>
+</template>
+
+<style scoped>
+  /* ── glass-shard-wall: a full-frame 3D mosaic of dark beveled glass tiles
+     (jittered hex cells) seen at a slight angle, thin specular rims catching
+     light, a few tiles parted so dark seams open up. Teal monospace text
+     lives BEHIND the wall (DOM under the canvas); the canvas is slightly
+     translucent so the type ghosts through the glass and reads clean in the
+     seams. The HyperFrames "glass mosaic" beat. ── */
+  .gsw { position: absolute; inset: 0; overflow: hidden; background: #14100e; }
+  .gsw-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; opacity: 0.88; }
+  .gsw-text { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    font-family: 'IBM Plex Mono', 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
+    filter: blur(0.3px); }
+  .gsw-kicker { position: absolute; top: 9%; left: 0; right: 0; text-align: center;
+    font-size: 24px; font-weight: 500; letter-spacing: 0.42em; text-indent: 0.42em;
+    color: #7fd8cf; }
+  .gsw-stats { position: absolute; bottom: 14%; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 9%; }
+  .gsw-stat { text-align: center; color: #7fd8cf; }
+  .gsw-stat-value { font-size: 44px; font-weight: 700; letter-spacing: 0.08em; }
+  .gsw-stat-label { margin-top: 8px; font-size: 13px; font-weight: 500;
+    letter-spacing: 0.34em; text-indent: 0.34em; opacity: 0.8; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    data = data || {};
+    ctx = ctx || {};
+    var dur = ctx.duration || 6;
+
+    // ── Text behind the glass (DOM, under the canvas) ──
+    var accent = data.accent || '#7fd8cf';
+    var kickerEl = el.querySelector('.gsw-kicker');
+    var statsEl = el.querySelector('.gsw-stats');
+    var kicker = (data.kicker !== undefined && data.kicker !== null) ? String(data.kicker) : 'WRITE HTML → RENDER VIDEO';
+    var stats = Array.isArray(data.stats) && data.stats.length ? data.stats : [
+      { value: '47x', label: 'FASTER THAN AE' },
+      { value: '2.4K', label: 'CREATORS' },
+      { value: '24M', label: 'VIDEOS RENDERED' }
+    ];
+    if (kickerEl) { kickerEl.textContent = kicker; kickerEl.style.color = accent; }
+    if (statsEl) {
+      stats.forEach(function (s) {
+        var d = document.createElement('div');
+        d.className = 'gsw-stat';
+        d.style.color = accent;
+        var v = document.createElement('div');
+        v.className = 'gsw-stat-value';
+        v.textContent = String((s && s.value) || '');
+        var l = document.createElement('div');
+        l.className = 'gsw-stat-label';
+        l.textContent = String((s && s.label) || '');
+        d.appendChild(v); d.appendChild(l);
+        statsEl.appendChild(d);
+      });
+    }
+    // Visible from frame 1, then a quiet lift over the first 15% of the shot.
+    var fadeDur = Math.max(0.2, dur * 0.15);
+    if (kickerEl) { gsap.set(kickerEl, { opacity: 0.42 }); tl.to(kickerEl, { opacity: 0.75, duration: fadeDur, ease: 'power2.out' }, 0); }
+    if (statsEl) { gsap.set(statsEl, { opacity: 0.5 }); tl.to(statsEl, { opacity: 0.95, duration: fadeDur, ease: 'power2.out' }, 0); }
+
+    // ── The wall (three.js) ──
+    var canvas = el.querySelector('.gsw-canvas');
+    if (typeof THREE === 'undefined' || !canvas) {
+      if (typeof console !== 'undefined') console.warn('[glass-shard-wall] THREE not available');
+      return tl;
+    }
+
+    var seed = Number(data.seed) || 7;
+    function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+    // Position-keyed hash: hex lattice vertices are SHARED between neighboring
+    // cells, so their jitter must be a pure function of position (not draw
+    // order) or the seams tear. Seed-mixed, deterministic, seek-safe.
+    var seedMix = (Number(data.seed) || 7) * 0.6180339887;
+    function vhash(x, y, k) {
+      var s = Math.sin(x * 127.1 + y * 311.7 + k * 74.7 + seedMix * 43.13) * 43758.5453;
+      return s - Math.floor(s);
+    }
+
+    try {
+      var W = (ctx.canvas && ctx.canvas.width) || canvas.clientWidth || 1920;
+      var H = (ctx.canvas && ctx.canvas.height) || canvas.clientHeight || 1080;
+      // SwiftShader (software WebGL): render at a capped internal resolution
+      // and let CSS upscale (same trade as glass-slab).
+      var RES_MAX = 1280;
+      var rscale = Math.min(1, RES_MAX / Math.max(W, H));
+      var RW = Math.max(2, Math.round(W * rscale));
+      var RH = Math.max(2, Math.round(H * rscale));
+
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setSize(RW, RH, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.12;
+      // Transparent clear: the seams between tiles open straight onto the DOM
+      // text layer below -- that's what sells "text behind the glass".
+      renderer.setClearColor(0x000000, 0);
+
+      var scene = new THREE.Scene();
+      var camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
+      camera.position.set(0, 0, 8.2);
+
+      // ── Tile materials: a small shared pool of dark warm-graphite glass ──
+      var tileColor = new THREE.Color(data.tile_color || '#3a3230');
+      var darker = tileColor.clone().lerp(new THREE.Color('#191412'), 0.45);
+      var warmer = tileColor.clone().lerp(new THREE.Color('#5a4a40'), 0.35);
+      var mats = [];
+      for (var mi = 0; mi < 5; mi++) {
+        var mix = mi / 4;
+        mats.push(new THREE.MeshPhysicalMaterial({
+          color: darker.clone().lerp(warmer, mix),
+          roughness: 0.2 + mi * 0.035,
+          metalness: 0.6,
+          clearcoat: 0.75,
+          clearcoatRoughness: 0.12,
+          reflectivity: 0.55
+        }));
+      }
+
+      // ── Jittered hex lattice -> beveled extruded shards ──
+      // Flat-top hexagons; every lattice vertex is jittered via the position
+      // hash so shared edges stay shared and the mosaic reads Voronoi-ish.
+      var R = 0.95;                       // cell radius
+      var DEPTH = 0.15;
+      var wall = new THREE.Group();
+      var SQ3 = Math.sqrt(3);
+      var tiles = [];
+      var MAX_TILES = 70;
+      for (var q = -5; q <= 5 && tiles.length < MAX_TILES; q++) {
+        var cx = 1.5 * R * q;
+        for (var r = -6; r <= 6 && tiles.length < MAX_TILES; r++) {
+          var cy = SQ3 * R * (r + q / 2);
+          if (cy < -4.4 || cy > 4.4) continue;
+          // Six lattice vertices, each jittered by its own position hash.
+          var pts = [];
+          var gx, gy, jx, jy, a;
+          for (var k = 0; k < 6; k++) {
+            a = (Math.PI / 3) * k;
+            gx = cx + R * Math.cos(a);
+            gy = cy + R * Math.sin(a);
+            jx = (vhash(Math.round(gx * 100), Math.round(gy * 100), 1) - 0.5) * 0.55 * R;
+            jy = (vhash(Math.round(gx * 100), Math.round(gy * 100), 2) - 0.5) * 0.55 * R;
+            pts.push({ x: gx + jx, y: gy + jy });
+          }
+          // Inset toward the centroid -> the dark seam between neighbors.
+          var mx = 0, my = 0, p;
+          for (var c = 0; c < 6; c++) { mx += pts[c].x; my += pts[c].y; }
+          mx /= 6; my /= 6;
+          var inset = 0.9 + rnd() * 0.025;
+          var shape = new THREE.Shape();
+          for (var v = 0; v < 6; v++) {
+            p = pts[v];
+            var sx = mx + (p.x - mx) * inset - mx; // local coords around centroid
+            var sy = my + (p.y - my) * inset - my;
+            if (v === 0) shape.moveTo(sx, sy); else shape.lineTo(sx, sy);
+          }
+          shape.closePath();
+          var geo = new THREE.ExtrudeGeometry(shape, {
+            depth: DEPTH, curveSegments: 1,
+            bevelEnabled: true, bevelThickness: 0.045, bevelSize: 0.045, bevelOffset: 0, bevelSegments: 1
+          });
+          var mesh = new THREE.Mesh(geo, mats[Math.floor(rnd() * mats.length)]);
+          mesh.position.set(mx, my, (rnd() - 0.5) * 0.09);
+          mesh.userData = {
+            baseZ: mesh.position.z,
+            baseRX: (rnd() - 0.5) * 0.02,
+            baseRY: (rnd() - 0.5) * 0.02,
+            parted: false
+          };
+          mesh.rotation.set(mesh.userData.baseRX, mesh.userData.baseRY, 0);
+          wall.add(mesh);
+          tiles.push(mesh);
+        }
+      }
+      // 3 "parted" tiles near the middle band: tilted open, breathing, with a
+      // dark gap behind them (text peeks through).
+      var mid = tiles.filter(function (t) { return Math.abs(t.position.x) < 5 && Math.abs(t.position.y) < 3.4; });
+      var partedCount = Math.min(3, mid.length);
+      for (var pi = 0; pi < partedCount; pi++) {
+        var pick = mid[Math.floor(rnd() * mid.length)];
+        if (pick.userData.parted) { pi--; continue; }
+        pick.userData.parted = true;
+        pick.userData.phase = rnd() * Math.PI * 2;
+        pick.userData.ampX = 0.06 + rnd() * 0.07;
+        pick.userData.ampY = (rnd() - 0.5) * 0.12;
+      }
+      // The whole wall, slightly tilted so rims rake the light.
+      wall.rotation.x = -0.15;
+      wall.rotation.y = 0.12;
+      scene.add(wall);
+
+      // ── Lights: warm low-left + cool top-right so tile rims pick up
+      // opposing speculars; ambient floor so "dark glass" never goes void. ──
+      scene.add(new THREE.AmbientLight('#2c2622', 2.1));
+      var warm = new THREE.PointLight('#ffb46e', 108, 0, 1.7);
+      warm.position.set(-7, -4.5, 5);
+      scene.add(warm);
+      var cool = new THREE.DirectionalLight('#cfe3ff', 1.5);
+      cool.position.set(5.5, 6, 6.5);
+      scene.add(cool);
+      var rim = new THREE.PointLight('#9fd9ff', 34, 0, 1.6);
+      rim.position.set(6, 3.5, 3);
+      scene.add(rim);
+
+      // ── Motion: one proxy tween drives every transform + render, so frames
+      // track timeline SEEKS exactly (webgl-backdrop pattern, no wall clocks).
+      // Everything scales with ctx.duration; the composed frame exists at t=0.
+      var st = { t: 0 };
+      function applyState(t) {
+        var d = t * dur;
+        // slow parallax drift of the whole wall
+        var ease = t * t * (3 - 2 * t); // smoothstep over the shot
+        wall.rotation.y = 0.10 + 0.05 * ease + 0.012 * Math.sin(d * 0.4);
+        wall.rotation.x = -0.15 + 0.018 * Math.sin(d * 0.31);
+        wall.position.x = -0.18 + 0.36 * ease;
+        wall.position.y = 0.08 - 0.16 * ease;
+        // parted tiles breathe open
+        for (var i = 0; i < tiles.length; i++) {
+          var m = tiles[i];
+          if (!m.userData.parted) continue;
+          var breath = 0.5 + 0.5 * Math.sin(d * 0.9 + m.userData.phase);
+          m.rotation.x = m.userData.baseRX + m.userData.ampX * (0.55 + 0.45 * breath);
+          m.rotation.y = m.userData.baseRY + m.userData.ampY * (0.55 + 0.45 * breath);
+          m.position.z = m.userData.baseZ + 0.1 + 0.07 * breath;
+        }
+        // specular drift keeps the rims alive
+        warm.position.x = -7 + Math.sin(d * 0.45) * 2.2;
+        warm.position.y = -4.5 + Math.cos(d * 0.33) * 1.4;
+        rim.position.x = 6 - 1.6 * ease;
+        camera.position.x = 0.12 * Math.sin(d * 0.2);
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+      }
+      tl.to(st, { t: 1, duration: dur, ease: 'none', onUpdate: function () { applyState(st.t); } }, 0);
+      applyState(0);
+    } catch (e) {
+      if (typeof console !== 'undefined') console.warn('[glass-shard-wall] WebGL failed:', e && e.message);
+    }
+
+    return tl;
+  }
+</script>

@@ -48,4 +48,22 @@ describe("hyperframes blocks 2", () => {
     expect(schema.description.length).toBeGreaterThan(40);
     expect(schema.data.device.enum).toEqual(["iphone", "macbook", "duo"]);
   });
+
+  it("glass-shard-wall: parses, seek-safe, schema advertises seed+kicker+stats", async () => {
+    const file = comp("threed", "glass-shard-wall");
+    const src = await fs.readFile(file, "utf-8");
+    const parsed = parseComponent(src);
+    expect(parsed.template.length).toBeGreaterThan(10);
+    expect(parsed.script).toContain("createTimeline");
+    expect(src).not.toMatch(SEEK_UNSAFE);
+    const schema = JSON.parse(
+      await fs.readFile(file.replace(".component.html", ".schema.json"), "utf-8"),
+    );
+    expect(schema.type).toBe("glass-shard-wall");
+    expect(schema.category).toBe("threed");
+    expect(schema.description.length).toBeGreaterThan(40);
+    expect(schema.data.seed.type).toBe("number");
+    expect(schema.data.kicker.type).toBe("string");
+    expect(schema.data.stats.type).toBe("array");
+  });
 });

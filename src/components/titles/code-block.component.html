@@ -163,6 +163,21 @@
       lineEls.push(span);
     });
 
+    // BARE style: no window chrome -- a naked mono line/stanza on the scene's
+    // own canvas (the "$ npx ..." terminal-line beat, checklists on dark).
+    if (data.style === 'bare') {
+      var bar = el.querySelector('.window-bar');
+      if (bar) bar.style.display = 'none';
+      if (lineNumbersEl) lineNumbersEl.style.display = 'none';
+      codeWindow.style.background = 'transparent';
+      codeWindow.style.border = 'none';
+      codeWindow.style.boxShadow = 'none';
+      codeWindow.style.width = 'auto';
+      codeContent.style.fontSize = data.font_size || '2.1vw';
+      codeContent.style.lineHeight = '1.9';
+      if (data.color) codeContent.style.color = data.color;
+    }
+
     var speed = ctx.motion === 'minimal' ? 0.35 : ctx.motion === 'punchy' ? 0.45 : 0.55;
     var stagger = ctx.motion === 'minimal' ? 0.04 : ctx.motion === 'punchy' ? 0.06 : 0.08;
 
