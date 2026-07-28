@@ -32,6 +32,70 @@
               <div class="dsc-ph-row dsc-ph-row-short"></div>
               <div class="dsc-ph-cards"><i></i><i></i><i></i></div>
             </div>
+            <div class="dsc-app">
+              <div class="dsc-app-hero">
+                <div class="dsc-fig">
+                  <i class="dsc-fig-head"></i>
+                  <i class="dsc-fig-body"></i>
+                  <i class="dsc-fig-arm-a"></i>
+                  <i class="dsc-fig-arm-b"></i>
+                  <i class="dsc-fig-leg-a"></i>
+                  <i class="dsc-fig-leg-b"></i>
+                  <i class="dsc-fig-ground"></i>
+                </div>
+                <div class="dsc-hero-title">Unleash Full Potential</div>
+                <div class="dsc-hero-sub">Train smarter every single day</div>
+                <div class="dsc-hero-cta">Start Now</div>
+              </div>
+              <div class="dsc-app-stats">
+                <div class="dsc-user">
+                  <i class="dsc-user-avatar"></i>
+                  <div class="dsc-user-lines">
+                    <b>Alex Morgan</b>
+                    <span>Today's activity</span>
+                  </div>
+                  <i class="dsc-user-dot"></i>
+                </div>
+                <div class="dsc-ring-wrap">
+                  <div class="dsc-ring"></div>
+                  <div class="dsc-ring-center">
+                    <b class="dsc-ring-value">2</b>
+                    <span>workouts</span>
+                  </div>
+                </div>
+                <div class="dsc-prog">
+                  <div class="dsc-prog-title">Your Progress</div>
+                  <div class="dsc-prog-row"><span>Running</span><i class="dsc-bar"><b style="width:82%"></b></i><em>5.2 km</em></div>
+                  <div class="dsc-prog-row"><span>Cycling</span><i class="dsc-bar"><b style="width:58%"></b></i><em>12 km</em></div>
+                  <div class="dsc-prog-row"><span>Strength</span><i class="dsc-bar"><b style="width:36%"></b></i><em>40 min</em></div>
+                </div>
+                <div class="dsc-tabbar"><i class="dsc-tab-on"></i><i></i><i></i><i></i></div>
+              </div>
+              <div class="dsc-app-chart">
+                <div class="dsc-chart-top">
+                  <div>
+                    <div class="dsc-chart-label">Calories burned</div>
+                    <div class="dsc-chart-value"><b class="dsc-chart-num">740</b><span>kcal</span></div>
+                  </div>
+                  <div class="dsc-chart-pill">This week</div>
+                </div>
+                <div class="dsc-chart-chips">
+                  <div class="dsc-chip"><span>Steps</span><b>8,432</b></div>
+                  <div class="dsc-chip"><span>Active</span><b>54 min</b></div>
+                </div>
+                <div class="dsc-chart-plot">
+                  <div class="dsc-chart-svg">
+                    <svg viewBox="0 0 100 60" preserveAspectRatio="none">
+                      <path class="dsc-chart-grid" d="M0,15 H100 M0,30 H100 M0,45 H100"/>
+                      <path d="M0,46 C10,42 16,30 26,32 C36,34 42,18 52,21 C62,24 70,10 80,13 C88,15.5 94,10 100,7 L100,60 L0,60 Z" fill="#c4dd7f" fill-opacity="0.32"/>
+                      <path d="M0,46 C10,42 16,30 26,32 C36,34 42,18 52,21 C62,24 70,10 80,13 C88,15.5 94,10 100,7" fill="none" stroke="#8fb544" stroke-width="1.6" stroke-linecap="round"/>
+                      <circle cx="80" cy="13" r="2.4" fill="#334016"/>
+                    </svg>
+                  </div>
+                  <div class="dsc-chart-days"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+                </div>
+              </div>
+            </div>
             <img class="dsc-shot" alt="" />
             <div class="dsc-island"></div>
             <div class="dsc-spec"></div>
@@ -283,6 +347,266 @@
     will-change: transform;
   }
 
+  /* Light scenes: the default 120px-blur black shadow smears the whole
+     (overflow-hidden) placement box into a grey column on light backgrounds.
+     Tighter, softer shadows keep the phone grounded without the smear. */
+  .dsc.dsc-light .dsc-iphone,
+  .dsc.dsc-scr-hero .dsc-iphone,
+  .dsc.dsc-scr-chart .dsc-iphone {
+    box-shadow:
+      0 20px 40px rgba(30, 38, 20, 0.26),
+      0 8px 18px rgba(30, 38, 20, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.18);
+  }
+  .dsc.dsc-scr-stats .dsc-iphone {
+    box-shadow:
+      0 20px 40px rgba(0, 0, 0, 0.3),
+      0 8px 18px rgba(0, 0, 0, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  /* The specular sweep's mix-blend-mode: screen breaks inside the 3D subtree
+     on some renderers: it composites flattened against the page, painting a
+     ghost un-rotated rectangle behind the phone. Preset screens use plain
+     alpha blending instead. */
+  .dsc.dsc-scr-hero .dsc-spec,
+  .dsc.dsc-scr-stats .dsc-spec,
+  .dsc.dsc-scr-chart .dsc-spec {
+    mix-blend-mode: normal;
+    background: linear-gradient(115deg,
+      transparent 32%,
+      rgba(255, 255, 255, 0.13) 47%,
+      rgba(255, 255, 255, 0.03) 53%,
+      transparent 68%);
+  }
+  /* Flatten the 3D context for preset screens: preserve-3d + the colored
+     screen surfaces makes Chromium composite a faint un-rotated ghost copy of
+     the screen behind the phone. The tilt itself still renders -- GSAP applies
+     perspective per-transform (transformPerspective). */
+  .dsc.dsc-scr-hero .dsc-stage, .dsc.dsc-scr-hero .dsc-unit, .dsc.dsc-scr-hero .dsc-device,
+  .dsc.dsc-scr-stats .dsc-stage, .dsc.dsc-scr-stats .dsc-unit, .dsc.dsc-scr-stats .dsc-device,
+  .dsc.dsc-scr-chart .dsc-stage, .dsc.dsc-scr-chart .dsc-unit, .dsc.dsc-scr-chart .dsc-device {
+    transform-style: flat;
+  }
+
+  /* ── Fitness app presets (data.screen): real-looking screens instead of the
+     generic skeleton. One preset per instance; the phone BODY re-tints to
+     match its screen so a trio doesn't read as three pale slabs. ── */
+  .dsc-app { display: none; position: absolute; inset: 0; z-index: 1; }
+  .dsc-app > div { display: none; position: absolute; inset: 0; box-sizing: border-box; }
+
+  /* hero: lime screen, sage body */
+  .dsc.dsc-scr-hero .dsc-iphone {
+    background: linear-gradient(160deg, #f0f5da 0%, #c6d3a0 45%, #8d9c6c 100%);
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+  .dsc.dsc-scr-hero .dsc-iphone .dsc-screen {
+    background:
+      radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.5) 0%, transparent 55%),
+      #d7e8a9;
+  }
+  .dsc-app-hero {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 58px 26px 30px;
+    text-align: center;
+  }
+  .dsc-fig {
+    position: relative;
+    width: 128px;
+    height: 128px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.55);
+    box-shadow: inset 0 0 0 3px rgba(30, 39, 18, 0.12);
+  }
+  .dsc-fig i { position: absolute; background: #243015; border-radius: 999px; }
+  .dsc-fig-head { width: 21px; height: 21px; left: 57px; top: 25px; border-radius: 50%; }
+  .dsc-fig-body { width: 7px; height: 36px; left: 62px; top: 47px; transform: rotate(12deg); }
+  .dsc-fig-arm-a { width: 6px; height: 28px; left: 60px; top: 51px; transform: rotate(52deg); transform-origin: 50% 0; }
+  .dsc-fig-arm-b { width: 6px; height: 28px; left: 70px; top: 51px; transform: rotate(-46deg); transform-origin: 50% 0; }
+  .dsc-fig-leg-a { width: 6px; height: 32px; left: 58px; top: 80px; transform: rotate(32deg); transform-origin: 50% 0; }
+  .dsc-fig-leg-b { width: 6px; height: 32px; left: 68px; top: 80px; transform: rotate(-22deg); transform-origin: 50% 0; }
+  .dsc-fig-ground { width: 52px; height: 5px; left: 38px; bottom: 16px; opacity: 0.3; }
+  .dsc-hero-title {
+    font-size: 30px;
+    line-height: 1.12;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #1d2612;
+    max-width: 230px;
+  }
+  .dsc-hero-sub { font-size: 13px; font-weight: 500; color: rgba(29, 38, 18, 0.6); margin-top: -6px; }
+  .dsc-hero-cta {
+    margin-top: 10px;
+    background: #1b2113;
+    color: #d7e8a9;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 15px 44px;
+    border-radius: 999px;
+    box-shadow: 0 10px 24px rgba(27, 33, 19, 0.35);
+  }
+
+  /* stats: dark screen, near-black body */
+  .dsc.dsc-scr-stats .dsc-iphone {
+    background: linear-gradient(160deg, #2c2c32 0%, #131317 45%, #050507 100%);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+  .dsc.dsc-scr-stats .dsc-iphone .dsc-screen { background: #101014; }
+  .dsc-app-stats {
+    flex-direction: column;
+    gap: 18px;
+    padding: 60px 22px 26px;
+    color: #f2f3ef;
+  }
+  .dsc-user { display: flex; align-items: center; gap: 12px; }
+  .dsc-user-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #eaf7b6 0%, #a7c45c 70%, #7f9a3e 100%);
+  }
+  .dsc-user-lines b { display: block; font-size: 15px; font-weight: 700; }
+  .dsc-user-lines span { display: block; font-size: 11.5px; color: rgba(255, 255, 255, 0.55); margin-top: 2px; }
+  .dsc-user-dot {
+    margin-left: auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+  }
+  .dsc-ring-wrap { position: relative; width: 168px; height: 168px; margin: 4px auto; }
+  .dsc-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(from -90deg, #c9ec6b 0deg 252deg, rgba(255, 255, 255, 0.10) 252deg 360deg);
+    -webkit-mask: radial-gradient(closest-side, transparent 73%, #000 74%);
+    mask: radial-gradient(closest-side, transparent 73%, #000 74%);
+  }
+  .dsc-ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .dsc-ring-center b { font-size: 54px; font-weight: 800; line-height: 1; color: #fff; }
+  .dsc-ring-center span {
+    margin-top: 5px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .dsc-prog { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
+  .dsc-prog-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .dsc-prog-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .dsc-prog-row span { width: 56px; font-weight: 600; color: rgba(255, 255, 255, 0.82); }
+  .dsc-bar {
+    flex: 1;
+    display: block;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+  }
+  .dsc-bar b { display: block; height: 100%; border-radius: 999px; background: #c9ec6b; }
+  .dsc-prog-row em { width: 44px; font-style: normal; font-size: 11px; text-align: right; color: rgba(255, 255, 255, 0.55); }
+  .dsc-tabbar {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 14px 12px 2px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .dsc-tabbar i { width: 22px; height: 22px; border-radius: 7px; background: rgba(255, 255, 255, 0.14); }
+  .dsc-tabbar .dsc-tab-on { background: #c9ec6b; }
+
+  /* chart: white screen, silver body */
+  .dsc.dsc-scr-chart .dsc-iphone {
+    background: linear-gradient(160deg, #fafbf6 0%, #d9dcd1 45%, #a9ad9f 100%);
+    border-color: rgba(255, 255, 255, 0.7);
+  }
+  .dsc.dsc-scr-chart .dsc-iphone .dsc-screen { background: #ffffff; }
+  .dsc-app-chart {
+    flex-direction: column;
+    padding: 68px 26px 34px;
+    color: #181c10;
+  }
+  .dsc-chart-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .dsc-chart-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(24, 28, 16, 0.5);
+  }
+  .dsc-chart-value { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+  .dsc-chart-value b { font-size: 58px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+  .dsc-chart-value span { font-size: 16px; font-weight: 600; color: rgba(24, 28, 16, 0.45); }
+  .dsc-chart-pill {
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #41501f;
+    background: #eef4d8;
+    border-radius: 999px;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+  .dsc-chart-chips { display: flex; gap: 10px; margin-top: 20px; }
+  .dsc-chip { flex: 1; background: #f3f5ea; border-radius: 14px; padding: 12px 14px; }
+  .dsc-chip span {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: rgba(24, 28, 16, 0.45);
+  }
+  .dsc-chip b { display: block; font-size: 17px; font-weight: 700; margin-top: 3px; }
+  .dsc-chart-plot { margin-top: auto; }
+  .dsc-chart-svg { position: relative; }
+  .dsc-chart-svg svg { display: block; width: 100%; height: 230px; }
+  .dsc-chart-svg::after {
+    /* soft fade of the area fill toward the baseline (gradient look, no defs) */
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 42%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 92%);
+    pointer-events: none;
+  }
+  .dsc-chart-grid { stroke: rgba(24, 28, 16, 0.08); stroke-width: 0.5; fill: none; }
+  .dsc-chart-days {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding: 0 2px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: rgba(24, 28, 16, 0.4);
+  }
+
   /* ── Duo layout: MacBook center-left, iPhone overlapping front-right. ── */
   .dsc.dsc-duo .dsc-unit-macbook { transform: translateX(-90px); }
   .dsc.dsc-duo .dsc-unit-iphone {
@@ -318,16 +642,58 @@
       if (!url) return;
       var shot = unit.querySelector('.dsc-shot');
       var ph = unit.querySelector('.dsc-ph');
+      var app = unit.querySelector('.dsc-app');
       if (!shot) return;
       shot.src = String(url);
       shot.style.display = 'block';
       if (ph) ph.style.display = 'none';
+      if (app) app.style.display = 'none';
     }
     // screenshot_url dresses the mode's lead device (MacBook in duo);
     // screenshot_url_2 dresses the duo's iPhone.
     var lead = mode === 'iphone' ? unitPhone : unitMac;
     setShot(lead, data.screenshot_url);
     if (mode === 'duo') setShot(unitPhone, data.screenshot_url_2);
+
+    // data.screen picks a designed fitness-app preset for the iPhone screen
+    // (real content, not the generic skeleton). A screenshot always wins.
+    var screenKey = data.screen === 'app-hero' ? 'hero'
+      : data.screen === 'app-stats' ? 'stats'
+      : data.screen === 'app-chart' ? 'chart' : null;
+    var phoneShot = mode === 'iphone' ? data.screenshot_url
+      : mode === 'duo' ? data.screenshot_url_2 : null;
+    if (screenKey && mode !== 'macbook' && !phoneShot) {
+      root.classList.add('dsc-scr-' + screenKey);
+      var app = unitPhone.querySelector('.dsc-app');
+      var panel = unitPhone.querySelector('.dsc-app-' + screenKey);
+      var phoneGeneric = unitPhone.querySelector('.dsc-ph');
+      if (app && panel) {
+        app.style.display = 'block';
+        panel.style.display = 'flex';
+        if (phoneGeneric) phoneGeneric.style.display = 'none';
+        if (data.screen_title != null && data.screen_title !== '') {
+          var titleEl = panel.querySelector('.dsc-hero-title');
+          if (titleEl) titleEl.textContent = String(data.screen_title);
+        }
+        if (data.screen_value != null && data.screen_value !== '') {
+          var valEl = panel.querySelector('.dsc-ring-value') || panel.querySelector('.dsc-chart-num');
+          if (valEl) valEl.textContent = String(data.screen_value);
+        }
+        // Preset screens are placement-aware: fit the phone to its box so a
+        // side-by-side trio can size each phone by its box (middle taller).
+        // Measured once at build time from layout -- no wall clocks.
+        var stage = el.querySelector('.dsc-stage');
+        if (stage && root.clientWidth > 0 && root.clientHeight > 0) {
+          var fit = Math.min(root.clientWidth / 380, root.clientHeight / 800);
+          fit = Math.max(0.5, Math.min(1.6, fit));
+          gsap.set(stage, { scale: fit });
+        }
+        // The ambient glow tints the whole (overflow-hidden) placement box and
+        // shows its clipped edges on light scene backgrounds -- the designed
+        // screens carry the color themselves, so drop it.
+        if (glow) glow.style.display = 'none';
+      }
+    }
 
     var units = mode === 'duo' ? [unitMac, unitPhone]
       : mode === 'macbook' ? [unitMac] : [unitPhone];

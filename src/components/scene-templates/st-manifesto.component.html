@@ -73,7 +73,7 @@
       w.className = 'stmf-word';
       w.textContent = clean;
       if (tok.star || accents.indexOf(bare) !== -1) w.classList.add('is-accent');
-      else if (SMALL[bare]) w.classList.add('is-small');
+      else if (SMALL[bare] && !data.uniform) w.classList.add('is-small');
       flow.appendChild(w);
     });
 

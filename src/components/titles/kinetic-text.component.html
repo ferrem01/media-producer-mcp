@@ -45,6 +45,10 @@
     // Display-scale override: hero numerals/headlines size to the shot
     // ("52" at 16vw), not the 60px caption default.
     if (data.font_size) container.style.fontSize = data.font_size;
+    // Typeface/tracking overrides: mono terminal lines, letterspaced labels.
+    if (data.font) container.style.fontFamily = data.font;
+    if (data.letter_spacing) container.style.letterSpacing = data.letter_spacing;
+    if (data.font_weight) container.style.fontWeight = String(data.font_weight);
     var text = String(data.text || '');
 
     if (data.color) container.style.color = data.color;
