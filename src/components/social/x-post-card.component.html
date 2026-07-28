@@ -86,7 +86,10 @@
     var tl = gsap.timeline();
     var card = el.querySelector('.x-card');
     // Display scale: the card is fixed-size by design; hero shots blow it up.
-    if (data.scale) { card.style.transform = 'scale(' + Number(data.scale) + ')'; card.style.transformOrigin = '50% 50%'; }
+    // Folded into every GSAP scale value -- an inline transform would be
+    // overwritten by the first tween that touches scale.
+    var S = Number(data.scale) || 1;
+    card.style.transformOrigin = '50% 50%';
     var avatar = el.querySelector('.x-avatar');
     var nameEl = el.querySelector('.x-name');
     var handleEl = el.querySelector('.x-handle');
@@ -119,11 +122,11 @@
 
     var speed = ctx.motion === 'minimal' ? 0.55 : ctx.motion === 'punchy' ? 0.7 : 0.85;
 
-    gsap.set(card, { autoAlpha: 0, y: 50, scale: 1.04, filter: 'blur(4px)' });
+    gsap.set(card, { autoAlpha: 0, y: 50, scale: 1.04 * S, filter: 'blur(4px)' });
     gsap.set([avatar, nameEl, handleEl, verified, textEl], { autoAlpha: 0, y: 16 });
     gsap.set(stats, { autoAlpha: 0, y: 12 });
 
-    tl.to(card, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.25);
+    tl.to(card, { autoAlpha: 1, y: 0, scale: S, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.25);
     tl.to([avatar, nameEl, handleEl, verified, textEl], {
       autoAlpha: 1, y: 0, duration: speed * 0.8, stagger: 0.06, ease: 'power2.out'
     }, 0.4);
@@ -149,7 +152,7 @@
 
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.6;
-      tl.to(card, { autoAlpha: 0, y: -25, scale: 0.98, duration: 0.45, ease: 'power2.in' }, exitAt);
+      tl.to(card, { autoAlpha: 0, y: -25, scale: 0.98 * S, duration: 0.45, ease: 'power2.in' }, exitAt);
     }
 
     return tl;

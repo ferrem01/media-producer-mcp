@@ -2,6 +2,7 @@
   <div class="sp-wrap">
     <div class="sp-card">
       <div class="sp-art">
+        <svg class="sp-note" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
         <div class="sp-eq">
           <span class="sp-bar"></span>
           <span class="sp-bar"></span>
@@ -51,6 +52,7 @@
     display: flex; align-items: flex-end; justify-content: center;
     padding-bottom: 16px; box-sizing: border-box;
   }
+  .sp-note { display: none; }
   .sp-eq { display: flex; align-items: flex-end; gap: 5px; height: 40px; }
   .sp-bar {
     width: 7px; height: 30%; background: rgba(255,255,255,0.92); border-radius: 3px;
@@ -64,6 +66,23 @@
   .sp-artist { font-size: 17px; color: #b3b3b3; margin: 4px 0 14px; }
   .sp-progress { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.18); overflow: hidden; }
   .sp-progress-fill { height: 100%; width: 0%; background: #1db954; border-radius: 3px; }
+
+  /* ── PORTRAIT layout (data.layout: 'card'): the big album-art card from
+     editorial hero shots -- square art on top, type below, Spotify badge
+     at the bottom. The compact horizontal bar stays the default. */
+  .sp-card.sp-portrait { flex-direction: column; align-items: stretch; gap: 18px;
+    width: 380px; max-width: none; padding: 20px 20px 24px; }
+  .sp-portrait .sp-art { width: 100%; height: 340px; border-radius: 14px;
+    align-items: center; justify-content: center; padding-bottom: 0; position: relative; }
+  .sp-portrait .sp-note { display: block; width: 132px; height: 132px; fill: none;
+    stroke: rgba(255,255,255,0.85); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .sp-portrait .sp-eq { position: absolute; right: 18px; bottom: 16px; height: 30px; }
+  .sp-portrait .sp-bar { width: 5px; }
+  .sp-portrait .sp-track { font-size: 30px; }
+  .sp-portrait .sp-artist { font-size: 18px; margin: 4px 0 16px; }
+  .sp-portrait .sp-info { display: flex; flex-direction: column; }
+  .sp-portrait .sp-now { order: 3; margin: 16px 0 0; }
+  .sp-portrait .sp-now-label { text-transform: none; letter-spacing: 0.01em; font-size: 15px; color: #ffffff; }
 </style>
 
 <script>
@@ -71,7 +90,14 @@
     var tl = gsap.timeline();
     var card = el.querySelector('.sp-card');
     // Display scale: the card is fixed-size by design; hero shots blow it up.
-    if (data.scale) { card.style.transform = 'scale(' + Number(data.scale) + ')'; card.style.transformOrigin = '50% 50%'; }
+    // Folded into every GSAP scale value -- an inline transform would be
+    // overwritten by the first tween that touches scale.
+    var S = Number(data.scale) || 1;
+    card.style.transformOrigin = '50% 50%';
+    if (data.layout === 'card') {
+      card.classList.add('sp-portrait');
+      el.querySelector('.sp-now-label').textContent = 'Spotify';
+    }
     var art = el.querySelector('.sp-art');
     var track = el.querySelector('.sp-track');
     var artist = el.querySelector('.sp-artist');
@@ -85,11 +111,11 @@
 
     var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.65 : 0.8;
 
-    gsap.set(card, { autoAlpha: 0, y: 44, scale: 1.03, filter: 'blur(4px)' });
+    gsap.set(card, { autoAlpha: 0, y: 44, scale: 1.03 * S, filter: 'blur(4px)' });
     gsap.set(art, { autoAlpha: 0, scale: 0.8 });
     gsap.set([el.querySelector('.sp-now'), track, artist, el.querySelector('.sp-progress')], { autoAlpha: 0, x: -14 });
 
-    tl.to(card, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.25);
+    tl.to(card, { autoAlpha: 1, y: 0, scale: S, filter: 'blur(0px)', duration: speed, ease: 'power3.out' }, 0.25);
     tl.to(art, { autoAlpha: 1, scale: 1, duration: speed * 0.8, ease: 'back.out(1.5)', transformOrigin: '50% 50%' }, 0.35);
     tl.to([el.querySelector('.sp-now'), track, artist, el.querySelector('.sp-progress')], {
       autoAlpha: 1, x: 0, duration: speed * 0.7, stagger: 0.07, ease: 'power2.out'
@@ -119,7 +145,7 @@
 
     if (ctx.duration > 2) {
       var exitAt = ctx.duration - 0.6;
-      tl.to(card, { autoAlpha: 0, y: -24, scale: 0.98, duration: 0.45, ease: 'power2.in' }, exitAt);
+      tl.to(card, { autoAlpha: 0, y: -24, scale: 0.98 * S, duration: 0.45, ease: 'power2.in' }, exitAt);
     }
 
     return tl;

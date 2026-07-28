@@ -11,8 +11,16 @@
       "items": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "label": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "description": "Optional flat chip color (hex): sticky-note chip with auto dark/light text -- the whiteboard look on light backdrops."
+          }
         }
       }
     },
@@ -23,8 +31,12 @@
       "items": {
         "type": "object",
         "properties": {
-          "from": { "type": "string" },
-          "to": { "type": "string" }
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
         }
       }
     },
@@ -32,8 +44,17 @@
       "type": "string",
       "label": "Direction",
       "optional": true,
-      "enum": ["horizontal", "vertical"],
+      "enum": [
+        "horizontal",
+        "vertical"
+      ],
       "default": "horizontal"
+    },
+    "edge_color": {
+      "type": "string",
+      "label": "Edge Color",
+      "optional": true,
+      "description": "Optional connector/arrow color (defaults to brand accent). Use a dark neutral on light whiteboard-style backdrops."
     }
   }
 }

@@ -49,6 +49,13 @@
     if (data.font) container.style.fontFamily = data.font;
     if (data.letter_spacing) container.style.letterSpacing = data.letter_spacing;
     if (data.font_weight) container.style.fontWeight = String(data.font_weight);
+    // align: 'left'/'right' turns the centered caption into a flush block
+    // (terminal checklists, editorial column type).
+    if (data.align === 'left' || data.align === 'right') {
+      container.style.textAlign = data.align;
+      el.querySelector('.kinetic-text').style.justifyContent = data.align === 'left' ? 'flex-start' : 'flex-end';
+      container.style.maxWidth = '100%';
+    }
     var text = String(data.text || '');
 
     if (data.color) container.style.color = data.color;
@@ -100,6 +107,12 @@
         gsap.set(container, { autoAlpha: 0, y: 10 });
         tl.to(container, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 0.25);
       }
+    }
+
+    // Accent override: *starred* words take this color instead of the brand
+    // primary (e.g. the indigo package token in a mono terminal line).
+    if (data.accent_color) {
+      el.querySelectorAll('.kt-accent').forEach(function (s) { s.style.color = data.accent_color; });
     }
 
     // Exit: fade only. Nothing floats away.
