@@ -228,6 +228,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     // Collect scripts for master timeline assembly
     componentScripts.push(buildComponentScript({ ...comp, data: resolvedData }, parsed.script, scene.duration_seconds, canvas, {
       motion: brandKit.style?.motion || "cinematic",
+      settled: (scene as { entrance?: string }).entrance === "settled",
     }));
   }
 
@@ -1817,8 +1818,19 @@ export function buildComponentScript(
   scriptSource: string,
   duration: number,
   canvas: Canvas,
-  options?: { motion?: string },
+  options?: { motion?: string; settled?: boolean },
 ): string {
+  // SETTLED entrances: pre-roll the component's clock so entrances (and
+  // count-ups etc.) are already resolved when the cut lands -- the master
+  // plays only the [PRE, PRE + duration] window of the component timeline.
+  // ctx.duration is NOT extended: components author exactly as for a normal
+  // short scene, and the `ctx.duration > 2` exit guards keep exits out of
+  // the window. That guard is also why the flag only applies to scenes
+  // <= 2s -- on longer scenes an authored exit (at duration - x) would land
+  // inside or before the pre-roll and the cut would open on faded content.
+  const SETTLE_PRE = 2.2;
+  const settled = !!options?.settled && duration <= 2;
+  const ctxDuration = duration;
   // Normalize component scripts: strip ES module syntax (illegal outside <script type="module">)
   const normalizedScript = scriptSource
     .replace(/export\s+default\s+function\s+/g, "function ")
@@ -1833,7 +1845,7 @@ export function buildComponentScript(
     var el = document.querySelector('[data-cid="${comp.id}"]');
     var data = ${JSON.stringify(comp.data)};
     var ctx = {
-      duration: ${duration},
+      duration: ${ctxDuration},
       fps: ${canvas.fps},
       canvas: { width: ${canvas.width}, height: ${canvas.height} },
       motion: "${options?.motion || "cinematic"}",
@@ -1863,7 +1875,14 @@ export function buildComponentScript(
         try { console.error('[scene] createTimeline crashed for ${safeId}:', eCT_${safeId} && eCT_${safeId}.message); } catch (e2_${safeId}) {}
       }
       if (tl_${safeId}) {
-        // MICRO-SHOT compression: component entrances are authored for 4-8s
+${settled ? `        // SETTLED: play only the [${SETTLE_PRE}, ${SETTLE_PRE + duration}] window of the
+        // component's clock -- entrances already resolved, cut lands on
+        // standing content. tweenFromTo scrubs the child deterministically
+        // under the seek-driven master (loops inside keep advancing).
+        try {
+          master.add(tl_${safeId}.tweenFromTo(${SETTLE_PRE}, ${SETTLE_PRE + duration}, { ease: 'none' }), 0);
+        } catch (eSW_${safeId}) { master.add(tl_${safeId}, 0); }`
+    : `        // MICRO-SHOT compression: component entrances are authored for 4-8s
         // scenes; a sub-1.4s editorial hard cut would spend its whole life
         // mid-entrance (measured: sub-second shots sampled as empty frames).
         // Speed the component's timeline so content lands in the first ~40%
@@ -1872,7 +1891,7 @@ export function buildComponentScript(
         if (__dur_${safeId} > 0 && __dur_${safeId} <= 1.4) {
           try { tl_${safeId}.timeScale(Math.max(1, 2.2 / __dur_${safeId})); } catch (eTS_${safeId}) {}
         }
-        master.add(tl_${safeId}, 0);
+        master.add(tl_${safeId}, 0);`}
       }
     }
   })();`;

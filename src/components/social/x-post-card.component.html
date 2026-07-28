@@ -136,7 +136,10 @@
     stats.forEach(function (s, i) {
       var c = s.querySelector('.x-count');
       if (!c) return;
-      var target = parseFloat(c.getAttribute('data-val')) || 0;
+      var raw = String(c.getAttribute('data-val') || '');
+      var target = parseFloat(raw) || 0;
+      if (/k\s*$/i.test(raw)) target *= 1000;
+      else if (/m\s*$/i.test(raw)) target *= 1000000;
       var obj = { val: 0 };
       tl.to(obj, {
         val: target, duration: speed * 1.6, ease: 'power2.out',
