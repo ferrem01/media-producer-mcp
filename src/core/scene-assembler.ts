@@ -1863,6 +1863,15 @@ export function buildComponentScript(
         try { console.error('[scene] createTimeline crashed for ${safeId}:', eCT_${safeId} && eCT_${safeId}.message); } catch (e2_${safeId}) {}
       }
       if (tl_${safeId}) {
+        // MICRO-SHOT compression: component entrances are authored for 4-8s
+        // scenes; a sub-1.4s editorial hard cut would spend its whole life
+        // mid-entrance (measured: sub-second shots sampled as empty frames).
+        // Speed the component's timeline so content lands in the first ~40%
+        // of the shot -- the fast-cut grammar's rule is visible-from-frame-1.
+        var __dur_${safeId} = (typeof ctx !== 'undefined' && ctx && ctx.duration) || 0;
+        if (__dur_${safeId} > 0 && __dur_${safeId} <= 1.4) {
+          try { tl_${safeId}.timeScale(Math.max(1, 2.2 / __dur_${safeId})); } catch (eTS_${safeId}) {}
+        }
         master.add(tl_${safeId}, 0);
       }
     }
