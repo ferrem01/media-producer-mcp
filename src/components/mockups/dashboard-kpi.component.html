@@ -108,6 +108,13 @@
     gap: 20px;
   }
 
+  /* fidelity:'focus' -- skeleton everything except the numbers that matter
+     (SPEC-world.md P2): the mock directs the eye instead of competing. */
+  .dk-focus .dashboard-topbar { filter: blur(2.5px); opacity: 0.45; }
+  .dk-focus .kpi-label-row { opacity: 0.35; }
+  .dk-focus .kpi-card > *:not(.kpi-label-row):not(.kpi-value-row) { filter: blur(2px); opacity: 0.35; }
+  .dk-focus .kpi-value { filter: none; opacity: 1; }
+
   .kpi-card {
     background: var(--mp-color-surface, #1e293b);
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -214,6 +221,10 @@
 
 <script>
   function createTimeline(el, data, ctx) {
+    if (data.fidelity === 'focus') {
+      var dkRoot = el.querySelector('.dashboard-kpi');
+      if (dkRoot) dkRoot.classList.add('dk-focus');
+    }
     var tl = gsap.timeline();
     var frame = el.querySelector('.dashboard-frame');
     var topbar = el.querySelector('.dashboard-topbar');

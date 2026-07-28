@@ -1,0 +1,55 @@
+<template>
+  <div class="rstm"><div class="rstm-inner"></div></div>
+</template>
+
+<style scoped>
+  /* ── reasoning-stream: the AI's thinking as monospace rails -- section
+     headers + lines that type on dim and settle bright, older sections
+     receding. The "streaming reasoning text wall" move; deeply on-brand
+     for films about agents doing work. ── */
+  .rstm { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden;
+    font-family: var(--mp-font-mono, 'JetBrains Mono', ui-monospace, monospace); }
+  .rstm-inner { width: 100%; padding: 4% 6%; }
+  .rstm-head { font-size: 20px; font-weight: 700; letter-spacing: 0.14em; margin: 26px 0 10px;
+    color: var(--mp-color-text, #17171c); opacity: 0; }
+  .rstm-line { font-size: 19px; line-height: 1.75; color: var(--mp-color-text, #17171c); opacity: 0; }
+  .rstm-line::before { content: '\2014\00a0'; opacity: 0.45; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var inner = el.querySelector('.rstm-inner');
+    var sections = Array.isArray(data.sections) && data.sections.length ? data.sections : [
+      { title: 'ANALYZE', lines: ['Reading the request.', 'Scoping the work.'] },
+    ];
+    var rows = [];
+    sections.forEach(function(sec) {
+      var h = document.createElement('div');
+      h.className = 'rstm-head';
+      h.textContent = String(sec.title || '').toUpperCase();
+      inner.appendChild(h);
+      rows.push({ el: h, head: true });
+      (sec.lines || []).forEach(function(ln) {
+        var l = document.createElement('div');
+        l.className = 'rstm-line';
+        l.textContent = String(ln);
+        inner.appendChild(l);
+        rows.push({ el: l, head: false });
+      });
+    });
+
+    var start = Math.max(0, Number(data.at) || 0.3);
+    var step = Math.max(0.15, Number(data.line_interval) || 0.45);
+    rows.forEach(function(r, i) {
+      var t0 = start + i * step;
+      // Type on dim, settle bright; earlier rows recede as later ones land.
+      tl.fromTo(r.el, { opacity: 0, y: 6 }, { opacity: 0.9, y: 0, duration: 0.3, ease: 'power2.out' }, t0);
+      if (i >= 2) {
+        var older = rows[i - 2].el;
+        tl.to(older, { opacity: r.head ? 0.5 : 0.38, duration: 0.4 }, t0);
+      }
+    });
+    return tl;
+  }
+</script>

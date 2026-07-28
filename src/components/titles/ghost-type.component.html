@@ -1,0 +1,43 @@
+<template>
+  <div class="ghtp"><span class="ghtp-word"></span></div>
+</template>
+
+<style scoped>
+  /* ── ghost-type: an oversized watermark word BEHIND the foreground content.
+     The typographic layering move from the single-file motion demos: the
+     headline reads, the ghost fills the frame with quiet scale. Position
+     this component's box over the whole stage (or a region) at a LOW
+     z_index; foreground components ride above it. ── */
+  .ghtp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; pointer-events: none; }
+  .ghtp-word { font-family: var(--mp-font-family, 'Inter', sans-serif); font-weight: 800;
+    letter-spacing: -0.03em; line-height: 0.85; white-space: nowrap; user-select: none;
+    color: var(--mp-color-text, #17171c); }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.ghtp');
+    var word = el.querySelector('.ghtp-word');
+    word.textContent = String(data.text || 'GHOST').toUpperCase();
+    word.style.fontSize = data.size || '26vw';
+    word.style.opacity = String(data.opacity != null ? data.opacity : 0.07);
+    if (data.color) word.style.color = data.color;
+    if (data.align === 'left') host.style.justifyContent = 'flex-start';
+    if (data.align === 'right') host.style.justifyContent = 'flex-end';
+
+    var at = Math.max(0, Number(data.at) || 0);
+    gsap.set(word, { autoAlpha: 0, scale: 1.04 });
+    tl.to(word, { autoAlpha: data.opacity != null ? data.opacity : 0.07, scale: 1, duration: 0.9, ease: 'power2.out' }, at);
+    // Slow parametric parallax drift (seek-safe): pure function of scene time.
+    var proxy = { t: 0 };
+    var dur = ctx && ctx.duration ? ctx.duration : 8;
+    var driftX = Number(data.drift) || 30;
+    tl.to(proxy, {
+      t: 1, duration: dur, ease: 'none',
+      onUpdate: function() { gsap.set(word, { x: -driftX / 2 + proxy.t * driftX }); },
+    }, 0);
+    return tl;
+  }
+</script>
