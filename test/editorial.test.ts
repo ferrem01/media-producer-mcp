@@ -100,3 +100,12 @@ describe("shader transition ports (HyperFrames parity)", () => {
     }
   });
 });
+
+describe("LLM client resilience (the frozen-generate fix)", () => {
+  it("every LLM POST carries a timeout signal and transient retries (source guards)", async () => {
+    const c = await read("../src/llm/client.ts");
+    expect(c).toContain("AbortSignal.timeout(LLM_REQUEST_TIMEOUT_MS)");
+    expect(c).toContain("TRANSIENT_BACKOFF_MS");
+    expect((c.match(/AbortSignal\.timeout/g) || []).length).toBeGreaterThanOrEqual(2); // anthropic + openai paths
+  });
+});
