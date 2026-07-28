@@ -109,3 +109,13 @@ describe("LLM client resilience (the frozen-generate fix)", () => {
     expect((c.match(/AbortSignal\.timeout/g) || []).length).toBeGreaterThanOrEqual(2); // anthropic + openai paths
   });
 });
+
+describe("editorial vocabulary enforcement", () => {
+  it("pipeline converts launch-film statement templates to st-statement in code (source guards)", async () => {
+    const p = await read("../src/llm/pipeline.ts");
+    expect(p).toContain("Editorial vocabulary enforcement");
+    expect(p).toContain('"st-statement"');
+    const sb = await read("../src/llm/storyboard-builder.ts");
+    expect(sb).toContain("THE TEMPLATE VOCABULARY IS CLOSED");
+  });
+});
