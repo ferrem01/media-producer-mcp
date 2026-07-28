@@ -1867,3 +1867,44 @@ fixes shrink codegen's blast radius:
   OBJECTS, NOT STRINGS (one plain-string hint silently dropped a whole
   scene to the codegen path this grammar forbids).
 - test/layout-gates.test.ts: 4 live-browser gate tests + 2 source guards.
+
+## Editorial grammar + HyperFrames block parity (Marc, 2026-07-28)
+
+Marc on the HyperFrames catalog film (miguel07code's X post): our tempo-cuts
+lack that polish; the reference tells its story in huge rolling serif type
+alternating with motion-graphic evidence. "Yes build it" + port the missing
+blocks. Frame-by-frame analysis showed the polish is typography + grammar,
+not block count (our caption family is already 1:1 with theirs).
+
+- NEW FILM GRAMMAR "editorial": typography-first manifesto dialect --
+  st-statement beats (huge display-serif thought, ONE *starred* word in
+  gradient italic, cream/near-black canvas) ALTERNATING with full-bleed
+  evidence beats. Registered end-to-end: creative-director FilmGrammar +
+  prompt, storyboard contract (THE ALTERNATION / TEMPERATURE IS RHYTHM /
+  ONE EMPHASIS PER STATEMENT / EVIDENCE PERFORMS / KICKERS AS CHAPTERS),
+  server zod enum, pipeline policy (component-first creativity clamp 0.15,
+  music bed default ON -> bar quantization via the shared music-first prep).
+- st-statement scene template: Instrument Serif (Google font, system-serif
+  fallback), *emphasis* -> gradient-italic span, data.lines rolling
+  sequences (each thought rises from a line mask, holds, rolls up and out),
+  themes cream (default, 'light' aliases) / dark (the chapter flip), no
+  webgl backdrop ever injected (it paints its own canvas).
+- SHADER TRANSITIONS: engine already had 9 gl-transitions + ~20 GSAP types
+  (Marc was right to be surprised) -- they just weren't in the scene
+  contract. Added 6 new GLSL shaders for HyperFrames parity
+  (shader-flash-white, shader-light-leak, shader-gravitational-lens,
+  shader-thermal, shader-domain-warp, shader-ridged-burn) and exposed the
+  FULL shader family + whip-pan/cinematic-zoom/push in the SceneTransition
+  union + storyboard vocabulary.
+- NEW BLOCKS (agent-built, conventions-checked): lower-third (8 broadcast
+  presets: clean-bar, accent-underline, bold-block, color-block, dark-card,
+  kicker-name, mask-reveal, soft-pill), terminal-run theme presets (8
+  macOS-Terminal-inspired: pro, ocean, red-sands, homebrew, novel,
+  silver-aerogel, grass, clear-dark via CSS-var retune), map-route
+  (stylized dot-matrix world/US map with bezier route arcs + pulsing
+  markers), device-showcase (CSS-3D iPhone/MacBook/duo glamour shells with
+  screenshot slots + float).
+- Tests: editorial.test.ts (9), hyperframes-blocks.test.ts (4),
+  hyperframes-blocks2.test.ts (6). Full suite 568 passed (same 4
+  pre-existing env failures). st-statement proof frames captured
+  headlessly: cream + gradient emphasis + dark variant all correct.

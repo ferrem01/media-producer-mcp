@@ -331,7 +331,7 @@ If something looks wrong in a scene, get{target:'layout'} measures the real geom
 export async function queueBuildFromStoryboard(
   tenantId: string,
   projectId: string,
-  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "speaker-screencast"; max_revisions?: number } = {},
+  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "speaker-screencast" | "editorial"; max_revisions?: number } = {},
 ): Promise<{ job: { id: string } } | { error: string } | null> {
   const project = await loadProject(tenantId, projectId);
   // Any project that HAS a storyboard rebuilds from it. Only 'rendering' is
@@ -1952,7 +1952,7 @@ export function createMcpServer(): McpServer {
       canvas_width: z.number().optional().describe("Explicit canvas width. For images, auto-inferred from prompt if omitted."),
       canvas_height: z.number().optional().describe("Explicit canvas height. For images, auto-inferred from prompt if omitted."),
       creativity: z.number().min(0).max(1).optional().describe("Creativity level 0-1. Low (0) prefers library components. High (0.7-1.0) creates one self-contained custom component per scene. Default: 0.5."),
-      film_grammar: z.enum(["launch-film", "tempo-cut", "speaker-screencast"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. speaker-screencast: a speaker video owns the clock. Omit to let the creative director choose."),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "speaker-screencast", "editorial"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. Omit to let the creative director choose."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
       voiceover: z.boolean().optional().describe("Generate TTS voiceover narration for each scene (default: false)"),

@@ -1,0 +1,217 @@
+<template>
+  <div class="lt3">
+    <div class="lt3-anchor"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── lower-third: broadcast identification family. One component, eight
+     presets selected by data.style. Fills its assigned box and anchors the
+     card to the bottom-left (bottom-right with side:"right") with safe
+     margins. All motion lives on the gsap timeline (seek-safe). ── */
+  .lt3 { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+    font-family: var(--mp-font-family, 'Inter', sans-serif);
+    --lt3-accent: var(--mp-color-primary, #4f6df5); }
+  .lt3-anchor { position: absolute; left: 6%; bottom: 8%; max-width: 64%; will-change: transform; }
+  .lt3-right .lt3-anchor { left: auto; right: 6%; text-align: right; }
+
+  .lt3-name { font-size: 2.2vw; font-weight: 800; letter-spacing: -0.01em; line-height: 1.14; color: #fff; }
+  .lt3-title { font-size: 1.2vw; font-weight: 500; line-height: 1.35; color: rgba(255,255,255,0.75); }
+  .lt3-mask { overflow: hidden; }
+  .lt3-row { display: block; }
+
+  /* clean-bar: white card, thin accent left rule */
+  .lt3-cleanbar { display: inline-flex; align-items: stretch; gap: 1.1vw; background: #fff;
+    border-radius: 0.5vw; padding: 0.95vw 1.6vw 0.95vw 1.1vw; text-align: left;
+    box-shadow: 0 1vw 3vw rgba(10, 14, 22, 0.28); will-change: transform; }
+  .lt3-right .lt3-cleanbar { flex-direction: row-reverse; padding: 0.95vw 1.1vw 0.95vw 1.6vw; text-align: right; }
+  .lt3-cleanbar .lt3-rule { width: 0.3vw; border-radius: 0.15vw; background: var(--lt3-accent); flex: none; }
+  .lt3-cleanbar .lt3-name { color: #10131a; }
+  .lt3-cleanbar .lt3-title { color: #5c6577; }
+
+  /* accent-underline: transparent, big name, drawn underline */
+  .lt3-au .lt3-name { font-size: 2.6vw; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35); }
+  .lt3-au .lt3-title { text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35); }
+  .lt3-au-rule { height: 0.28vw; background: var(--lt3-accent); border-radius: 0.14vw; margin: 0.5vw 0 0.55vw; will-change: transform; }
+
+  /* bold-block: solid accent block name + offset dark title block */
+  .lt3-bb-name { display: inline-block; background: var(--lt3-accent); color: #fff;
+    padding: 0.55vw 1.1vw; border-radius: 0.25vw; box-shadow: 0 0.6vw 2vw rgba(10, 14, 22, 0.3); will-change: transform; }
+  .lt3-bb-title { display: inline-block; background: #14161d; color: rgba(255, 255, 255, 0.88);
+    padding: 0.42vw 0.95vw; margin-top: 0.35vw; margin-left: 1.2vw; border-radius: 0.25vw; will-change: transform; }
+  .lt3-right .lt3-bb-title { margin-left: 0; margin-right: 1.2vw; }
+
+  /* color-block: stacked accent + near-black blocks, scaleX wipe */
+  .lt3-cb { display: inline-block; padding: 0.55vw 1.2vw; will-change: transform; }
+  .lt3-cb-a { background: var(--lt3-accent); border-radius: 0.2vw 0.2vw 0 0; }
+  .lt3-cb-b { background: #0d0f15; margin-top: 0.12vw; border-radius: 0 0 0.2vw 0.2vw; }
+  .lt3-cb-a .lt3-name { color: #fff; }
+  .lt3-cb-b .lt3-title { color: rgba(255, 255, 255, 0.85); }
+
+  /* dark-card: dark glass card */
+  .lt3-darkcard { display: inline-block; background: rgba(12, 13, 18, 0.85);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 0.6vw;
+    padding: 1vw 1.6vw; box-shadow: 0 1.2vw 3.2vw rgba(0, 0, 0, 0.4); will-change: transform; }
+  .lt3-darkcard .lt3-title { margin-top: 0.2vw; }
+
+  /* kicker-name: tiny uppercase accent kicker over a big rising name */
+  .lt3-kicker { display: inline-block; font-size: 0.9vw; font-weight: 700; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--lt3-accent); margin-bottom: 0.4vw;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3); }
+  .lt3-kn .lt3-name { font-size: 2.7vw; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35); will-change: transform; }
+
+  /* mask-reveal: baseline-clipped rise + expanding rule */
+  .lt3-mr .lt3-name { font-size: 2.4vw; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35); will-change: transform; }
+  .lt3-mr .lt3-title { will-change: transform; }
+  .lt3-mr-rule { height: 2px; background: var(--lt3-accent); margin: 0.5vw 0; will-change: transform; }
+
+  /* soft-pill: rounded pill, soft shadow */
+  .lt3-pill { display: inline-block; background: #fff; border-radius: 99vw;
+    padding: 0.9vw 1.9vw; box-shadow: 0 1.4vw 3.4vw rgba(15, 23, 42, 0.24); will-change: transform; }
+  .lt3-pill .lt3-name { color: #10131a; font-size: 1.9vw; }
+  .lt3-pill .lt3-title { color: #5c6577; margin-top: 0.1vw; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.lt3');
+    var anchor = el.querySelector('.lt3-anchor');
+    if (!root || !anchor) return tl;
+
+    var name = (data && data.name) || 'Speaker Name';
+    var title = (data && data.title) || '';
+    var style = (data && data.style) || 'clean-bar';
+    var side = (data && data.side) === 'right' ? 'right' : 'left';
+    var at = (data && data.at != null) ? Math.max(0, Number(data.at) || 0) : 0.4;
+    var dur = (ctx && ctx.duration) || 6;
+    if (data && data.accent) root.style.setProperty('--lt3-accent', data.accent);
+    if (side === 'right') root.classList.add('lt3-right');
+
+    // Entrance travel direction: enter from the anchored side.
+    var dir = side === 'right' ? 1 : -1;
+    var origin = side === 'right' ? 'right center' : 'left center';
+
+    function div(cls, text, parent) {
+      var d = document.createElement('div');
+      d.className = cls;
+      if (text) d.textContent = text;
+      (parent || anchor).appendChild(d);
+      return d;
+    }
+
+    var build = {
+      'clean-bar': function () {
+        var card = div('lt3-cleanbar');
+        div('lt3-rule', null, card);
+        var col = div('lt3-col', null, card);
+        div('lt3-name', name, col);
+        if (title) div('lt3-title', title, col);
+        gsap.set(card, { x: dir * 70, autoAlpha: 0 });
+        tl.to(card, { x: 0, autoAlpha: 1, duration: 0.7, ease: 'back.out(1.4)' }, at);
+      },
+
+      'accent-underline': function () {
+        var wrap = div('lt3-au');
+        var nm = div('lt3-name', name, wrap);
+        var rule = div('lt3-au-rule', null, wrap);
+        var tt = title ? div('lt3-title', title, wrap) : null;
+        gsap.set(nm, { autoAlpha: 0, y: 16 });
+        gsap.set(rule, { scaleX: 0, transformOrigin: origin });
+        tl.to(nm, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power3.out' }, at);
+        tl.to(rule, { scaleX: 1, duration: 0.55, ease: 'power3.inOut' }, at + 0.25);
+        if (tt) {
+          gsap.set(tt, { autoAlpha: 0, y: 10 });
+          tl.to(tt, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power2.out' }, at + 0.55);
+        }
+      },
+
+      'bold-block': function () {
+        var b1 = div('lt3-bb-name lt3-name', name, div('lt3-row'));
+        var blocks = [b1];
+        if (title) blocks.push(div('lt3-bb-title lt3-title', title, div('lt3-row')));
+        blocks.forEach(function (b, i) {
+          gsap.set(b, { x: dir * 90, autoAlpha: 0 });
+          tl.to(b, { x: 0, autoAlpha: 1, duration: 0.6, ease: 'power4.out' }, at + i * 0.14);
+        });
+      },
+
+      'color-block': function () {
+        var blk1 = div('lt3-cb lt3-cb-a', null, div('lt3-row'));
+        var tx1 = div('lt3-name', name, blk1);
+        var texts = [tx1];
+        var blocks = [blk1];
+        if (title) {
+          var blk2 = div('lt3-cb lt3-cb-b', null, div('lt3-row'));
+          texts.push(div('lt3-title', title, blk2));
+          blocks.push(blk2);
+        }
+        blocks.forEach(function (b, i) {
+          gsap.set(b, { scaleX: 0, transformOrigin: origin });
+          tl.to(b, { scaleX: 1, duration: 0.5, ease: 'power4.inOut' }, at + i * 0.12);
+        });
+        gsap.set(texts, { autoAlpha: 0 });
+        tl.to(texts, { autoAlpha: 1, duration: 0.4, ease: 'power2.out', stagger: 0.08 }, at + 0.5);
+      },
+
+      'dark-card': function () {
+        var card = div('lt3-darkcard');
+        div('lt3-name', name, card);
+        if (title) div('lt3-title', title, card);
+        gsap.set(card, { y: 28, autoAlpha: 0 });
+        tl.to(card, { y: 0, autoAlpha: 1, duration: 0.65, ease: 'power3.out' }, at);
+      },
+
+      'kicker-name': function () {
+        var wrap = div('lt3-kn');
+        if (title) {
+          // Kicker line = the title, typed in via a clip-path width mask.
+          var kick = div('lt3-kicker', title, div('lt3-row', null, wrap));
+          gsap.set(kick, {
+            clipPath: side === 'right' ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)',
+          });
+          tl.to(kick, { clipPath: 'inset(0 0% 0 0%)', duration: 0.5, ease: 'power2.inOut' }, at);
+        }
+        var nm = div('lt3-name', name, div('lt3-mask', null, wrap));
+        gsap.set(nm, { yPercent: 112 });
+        tl.to(nm, { yPercent: 0, duration: 0.65, ease: 'power4.out' }, at + 0.2);
+      },
+
+      'mask-reveal': function () {
+        var wrap = div('lt3-mr');
+        var nm = div('lt3-name', name, div('lt3-mask', null, wrap));
+        var rule = div('lt3-mr-rule', null, wrap);
+        var tt = title ? div('lt3-title', title, div('lt3-mask', null, wrap)) : null;
+        gsap.set(nm, { yPercent: 115 });
+        gsap.set(rule, { scaleX: 0, transformOrigin: origin });
+        tl.to(nm, { yPercent: 0, duration: 0.65, ease: 'power4.out' }, at);
+        tl.to(rule, { scaleX: 1, duration: 0.5, ease: 'power3.inOut' }, at + 0.18);
+        if (tt) {
+          gsap.set(tt, { yPercent: 115 });
+          tl.to(tt, { yPercent: 0, duration: 0.55, ease: 'power4.out' }, at + 0.3);
+        }
+      },
+
+      'soft-pill': function () {
+        var pill = div('lt3-pill');
+        div('lt3-name', name, pill);
+        if (title) div('lt3-title', title, pill);
+        gsap.set(pill, {
+          scale: 0.55, autoAlpha: 0,
+          transformOrigin: side === 'right' ? '90% 100%' : '10% 100%',
+        });
+        tl.to(pill, { scale: 1, autoAlpha: 1, duration: 0.65, ease: 'back.out(1.7)' }, at);
+      },
+    };
+
+    (build[style] || build['clean-bar'])();
+
+    // Graceful exit in the final 0.8s -- long beats only; short beats hold.
+    if (dur >= 5) {
+      tl.to(anchor, { autoAlpha: 0, y: 26, duration: 0.55, ease: 'power2.in' }, dur - 0.8);
+    }
+
+    return tl;
+  }
+</script>

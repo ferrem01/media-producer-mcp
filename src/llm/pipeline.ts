@@ -2118,6 +2118,14 @@ async function runUnifiedPipeline(
     creativity = 0.15;
     console.log("  Tempo-cut grammar: creativity clamped to 0.15 (component-first assembly)");
   }
+  // Editorial is equally component-first: statement beats are st-statement
+  // templates, evidence beats are library exhibits -- codegen freeform is
+  // where the typography discipline dies.
+  if (filmGrammar === "editorial" && opts.creativity === undefined) {
+    opts.creativity = 0.15;
+    creativity = 0.15;
+    console.log("  Editorial grammar: creativity clamped to 0.15 (template/component-first assembly)");
+  }
 
   // ── Per-grammar PREP: "generate" mandate (music-first spine) ──
   // The generalized prep: for any grammar with background music on, pick the
@@ -2132,7 +2140,7 @@ async function runUnifiedPipeline(
   // defaults ON for tempo-cut; an explicit false still wins.
   const wantsMusic = opts.backgroundMusic !== undefined
     ? opts.backgroundMusic
-    : filmGrammar === "tempo-cut";
+    : filmGrammar === "tempo-cut" || filmGrammar === "editorial";
   if (filmGrammar === "tempo-cut" && !wantsMusic) {
     console.warn("  TEMPO-CUT WITHOUT A MUSIC BED (background_music=false): cuts cannot land on downbeats -- the film will read as a slideshow.");
   }

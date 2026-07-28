@@ -32,9 +32,9 @@ import {
  *  cross-cutting -- who narrates, what earns a cut, the music's role, the
  *  camera policy, and how scenes are assembled. Components (L1), scene
  *  templates (L2) and scenes/beats (L3) all live INSIDE one of these. */
-export type FilmGrammar = "launch-film" | "tempo-cut" | "speaker-screencast";
+export type FilmGrammar = "launch-film" | "tempo-cut" | "speaker-screencast" | "editorial";
 
-export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "speaker-screencast"];
+export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "speaker-screencast", "editorial"];
 
 export interface ConceptDirectorOpts {
   prompt: string;
@@ -112,11 +112,12 @@ Your treatment feeds a system that already speaks a launch-film dialect. Direct 
 - The camera never fully stops (slow push is always on); dark scenes live in a lit 3D ribbon world; on-brand photo backdrops with Ken Burns drift are available.
 ## FILM GRAMMAR (the first commitment you make -- output it as "filmGrammar")
 
-Every film commits to exactly ONE grammar. It is not a mood -- it is the contract that decides who narrates, what earns a cut, the music's role, and how scenes are assembled. The three:
+Every film commits to exactly ONE grammar. It is not a mood -- it is the contract that decides who narrates, what earns a cut, the music's role, and how scenes are assembled. The four:
 
 - "launch-film" (the default): few long WORLDS with 3-6 beats inside each, dark-forward cinematic look, density arcs, throws/stamps, crossfades earned at world changes. For brand films, launches, and emotional arcs that need breath.
 - "tempo-cut": the HeyGen-explainer dialect. A driving music bed picked FIRST, 6-9 hard cuts in 30-45s each quantized to the track's bars, ONE thought per cut, on-screen type IS the voiceover (no narrator, no statement slides mid-film), evidence appears as DETAIL CUTS (one cropped element huge -- an isolated composer typing the ask -- not a whole miniaturized app), captions at display scale BESIDE windows, one brand accent, at most one gag (a prop-strike card). Scenes are assembled from the component kit, not custom codegen. For product explainers, connector demos, and launch clips that should feel fast, confident, music-driven. The story must be told through the REAL product surfaces (the library's product mocks), never through invented abstractions.
 - "speaker-screencast": a human on camera owns the film. The speaker video is the base layer and THE CLOCK -- cuts and content entrances follow the speaker's sentences, overlays dock in a content region beside the speaker or take over with the speaker in PiP, the human voice narrates (no text-as-VO), music absent or ducked far under the voice. Only choose it when a speaker recording exists.
+- "editorial": the typography-first manifesto dialect. The story is told in huge display-SERIF statements on a warm cream (or near-black) canvas -- one thought per beat, ONE word per statement emphasized in gradient italic -- ALTERNATING with full-bleed evidence beats (a motion demo, a product surface, a chart) that prove the statement just made. Statement / evidence / statement / evidence. Deliberate canvas-temperature flips (cream <-> dark) at chapter turns are part of the rhythm. Music: a restrained bed. For thought-leadership clips, launch manifestos, "why we built this" films, and library/catalog showcases -- anywhere the WORDS are the product.
 
 Echo the grammar in visualStyle.motionPersonality (e.g. "tempo-cut: ..."), and let every other choice serve it.
 
@@ -172,7 +173,7 @@ thought (2-5 bars), because in that grammar the cut itself is the rhythm instrum
   ],
   "selected": 0,
   "selectionReason": "Why this concept is strongest",
-  "filmGrammar": "launch-film | tempo-cut | speaker-screencast",
+  "filmGrammar": "launch-film | tempo-cut | speaker-screencast | editorial",
   "sceneCount": 3,
   "directorNote": "3-5 sentence creative direction summary that the storyboard should follow"
 }

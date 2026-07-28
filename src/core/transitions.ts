@@ -43,7 +43,13 @@ export type TransitionType =
   | "shader-chromatic"
   | "shader-lens-distortion"
   | "shader-swirl"
-  | "shader-pixelize";
+  | "shader-pixelize"
+  | "shader-flash-white"
+  | "shader-light-leak"
+  | "shader-gravitational-lens"
+  | "shader-thermal"
+  | "shader-domain-warp"
+  | "shader-ridged-burn";
 
 /** Check if a transition type uses WebGL shaders */
 function isShaderTransition(type: string): boolean {
@@ -621,6 +627,120 @@ const SHADER_LIBRARY: Record<string, { glsl: string; uniforms?: Record<string, s
         vec2 squareSize = 2.0 * dist / squaresMin;
         vec2 p = dist > 0.0 ? (floor(uv / squareSize) + 0.5) * squareSize : uv;
         return mix(getFromColor(p), getToColor(p), progress);
+      }`,
+  },
+  "shader-flash-white": {
+    glsl: `
+      // Flash through white: exposure ramps to a white pop at the cut point,
+      // with a slight punch-zoom for energy (the HyperFrames flash-through-white).
+      vec4 transition(vec2 uv) {
+        float f = 1.0 - abs(progress * 2.0 - 1.0);
+        float flash = smoothstep(0.35, 1.0, f);
+        vec2 z = (uv - 0.5) * (1.0 - 0.08 * flash) + 0.5;
+        vec4 c = progress < 0.5 ? getFromColor(z) : getToColor(z);
+        return mix(c, vec4(1.0), flash);
+      }`,
+  },
+  "shader-light-leak": {
+    glsl: `
+      // Light leak: warm film-burn streaks sweep across the cut and wash the
+      // frame at the midpoint, then clear on the incoming scene.
+      vec4 transition(vec2 uv) {
+        float f = 1.0 - abs(progress * 2.0 - 1.0);
+        float leak = smoothstep(0.15, 0.9, f);
+        float band  = max(sin((uv.x + uv.y) * 9.4 + progress * 8.0), 0.0);
+        float band2 = max(sin((uv.x - uv.y * 0.6) * 5.0 - progress * 5.0), 0.0);
+        vec3 warm = vec3(1.0, 0.55, 0.25) * band + vec3(1.0, 0.8, 0.4) * band2 * 0.7;
+        vec4 c = mix(getFromColor(uv), getToColor(uv), smoothstep(0.35, 0.65, progress));
+        return c + vec4(warm * leak * 0.85, 0.0);
+      }`,
+  },
+  "shader-gravitational-lens": {
+    glsl: `
+      // Gravitational lens: content warps toward a central gravity well with
+      // chromatic aberration and event-horizon darkening at the peak.
+      vec4 transition(vec2 uv) {
+        vec2 center = vec2(0.5);
+        float f = 1.0 - abs(progress * 2.0 - 1.0);
+        vec2 d = uv - center;
+        float r = length(d);
+        float warp = 1.0 - (f * 0.65) * exp(-r * 3.0);
+        vec2 wuv = center + d * warp;
+        float ab = 0.02 * f * (r + 0.2);
+        float m = smoothstep(0.4, 0.6, progress);
+        vec4 a = vec4(getFromColor(clamp(wuv + d * ab, 0.0, 1.0)).r, getFromColor(wuv).g, getFromColor(clamp(wuv - d * ab, 0.0, 1.0)).b, 1.0);
+        vec4 b = vec4(getToColor(clamp(wuv + d * ab, 0.0, 1.0)).r, getToColor(wuv).g, getToColor(clamp(wuv - d * ab, 0.0, 1.0)).b, 1.0);
+        vec4 col = mix(a, b, m);
+        col.rgb *= 1.0 - f * exp(-r * 5.0) * 0.9;
+        return col;
+      }`,
+  },
+  "shader-thermal": {
+    glsl: `
+      // Thermal distortion: heat-haze noise warp with a warm shift at the peak.
+      float th_hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float th_noise(vec2 p) {
+        vec2 i = floor(p); vec2 fp = fract(p);
+        vec2 u = fp * fp * (3.0 - 2.0 * fp);
+        return mix(mix(th_hash(i), th_hash(i + vec2(1.0, 0.0)), u.x),
+                   mix(th_hash(i + vec2(0.0, 1.0)), th_hash(i + vec2(1.0, 1.0)), u.x), u.y);
+      }
+      vec4 transition(vec2 uv) {
+        float f = 1.0 - abs(progress * 2.0 - 1.0);
+        vec2 warp = vec2(
+          th_noise(uv * 8.0 + vec2(0.0, progress * 6.0)) - 0.5,
+          th_noise(uv * 8.0 + vec2(5.2, progress * 6.0)) - 0.5
+        ) * 0.05 * f;
+        vec4 c = mix(getFromColor(clamp(uv + warp, 0.0, 1.0)), getToColor(clamp(uv + warp, 0.0, 1.0)), smoothstep(0.35, 0.65, progress));
+        c.r += 0.08 * f; c.b -= 0.05 * f;
+        return c;
+      }`,
+  },
+  "shader-domain-warp": {
+    glsl: `
+      // Domain-warp dissolve: fbm-warped space carries scene A into scene B
+      // along an organic noise front.
+      float dw_hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float dw_noise(vec2 p) {
+        vec2 i = floor(p); vec2 fp = fract(p);
+        vec2 u = fp * fp * (3.0 - 2.0 * fp);
+        return mix(mix(dw_hash(i), dw_hash(i + vec2(1.0, 0.0)), u.x),
+                   mix(dw_hash(i + vec2(0.0, 1.0)), dw_hash(i + vec2(1.0, 1.0)), u.x), u.y);
+      }
+      float dw_fbm(vec2 p) {
+        float v = 0.0; float a = 0.5;
+        for (int k = 0; k < 3; k++) { v += a * dw_noise(p); p *= 2.1; a *= 0.5; }
+        return v;
+      }
+      vec4 transition(vec2 uv) {
+        float t = progress;
+        vec2 q = vec2(dw_fbm(uv * 3.0), dw_fbm(uv * 3.0 + vec2(5.2, 1.3)));
+        vec2 warped = clamp(uv + (q - 0.5) * t * (1.0 - t), 0.0, 1.0);
+        float n = dw_fbm(uv * 4.0 + q * 2.0);
+        float edge = smoothstep(t * 1.3 - 0.15, t * 1.3 + 0.15, n);
+        return mix(getToColor(warped), getFromColor(warped), edge);
+      }`,
+  },
+  "shader-ridged-burn": {
+    glsl: `
+      // Ridged burn: a noise-ridged burn front eats scene A with an ember edge.
+      float rb_hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float rb_noise(vec2 p) {
+        vec2 i = floor(p); vec2 fp = fract(p);
+        vec2 u = fp * fp * (3.0 - 2.0 * fp);
+        return mix(mix(rb_hash(i), rb_hash(i + vec2(1.0, 0.0)), u.x),
+                   mix(rb_hash(i + vec2(0.0, 1.0)), rb_hash(i + vec2(1.0, 1.0)), u.x), u.y);
+      }
+      vec4 transition(vec2 uv) {
+        float n = 1.0 - abs(2.0 * rb_noise(uv * 5.0) - 1.0);
+        n = n * 0.6 + rb_noise(uv * 13.0) * 0.4;
+        float t = progress * 1.25;
+        float d = n - t;
+        float stillFrom = smoothstep(0.0, 0.04, d);
+        float glow = smoothstep(0.10, 0.0, abs(d));
+        vec3 col = mix(getToColor(uv).rgb, getFromColor(uv).rgb, stillFrom);
+        col += vec3(1.0, 0.45, 0.1) * glow * 1.1;
+        return vec4(col, 1.0);
       }`,
   },
 };

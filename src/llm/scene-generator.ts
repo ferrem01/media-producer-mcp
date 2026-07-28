@@ -100,7 +100,9 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
       || st.type === "st-speaker-lowerthird" || st.type === "st-speaker-split";
     // An explicit backdrop_image is its own world -- it replaces the WebGL
     // ribbons (two competing backdrops read as noise).
-    var stWantsWebgl = stIsDark && !(stData as any).backdrop_image && !stSpeakerTemplate;
+    // st-statement paints its own full-bleed editorial canvas (cream/near-black)
+    // -- a webgl backdrop underneath is invisible paint, never inject one.
+    var stWantsWebgl = stIsDark && !(stData as any).backdrop_image && !stSpeakerTemplate && st.type !== "st-statement";
     if (stWantsWebgl) (stData as any).backdrop_active = true;
     var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
     if (stWantsWebgl) {

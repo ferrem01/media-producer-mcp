@@ -51,7 +51,58 @@
     --tr-cmd: #1f2328;
     --tr-out: #57606a;
     --tr-title: #6e7781;
+    --tr-glow: rgba(0,0,0,0);
     box-shadow: 0 30px 80px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  /* ── macOS Terminal-inspired theme presets (data.theme). Each preset only
+     retunes the chrome/background/text/accent variables -- one stylesheet,
+     class-switched. Default 'dark' keeps the original look above. ── */
+  .tr-frame.tr-theme-pro {
+    --tr-bg: #1e1e1e; --tr-chrome-a: #3a3a3e; --tr-chrome-b: #2e2e32;
+    --tr-prompt: #c8c8c8; --tr-cmd: #f4f4f4; --tr-out: #b8b8b8; --tr-title: #9a9a9d;
+    --tr-glow: rgba(0,0,0,0); --tr-accent: #6ac0ff;
+  }
+  .tr-frame.tr-theme-ocean {
+    --tr-bg: #224fbc; --tr-chrome-a: #3f66c9; --tr-chrome-b: #2f56be;
+    --tr-prompt: #ffffff; --tr-cmd: #ffffff; --tr-out: rgba(255,255,255,0.82); --tr-title: #cdd9f5;
+    --tr-glow: rgba(255,255,255,0.2); --tr-accent: #9fe8ff;
+  }
+  .tr-frame.tr-theme-red-sands {
+    --tr-bg: #7a251e; --tr-chrome-a: #8e3a32; --tr-chrome-b: #7d2b24;
+    --tr-prompt: #d7c9a7; --tr-cmd: #d7c9a7; --tr-out: rgba(215,201,167,0.8); --tr-title: #cbb590;
+    --tr-glow: rgba(215,201,167,0.25); --tr-accent: #ffd98c;
+  }
+  .tr-frame.tr-theme-homebrew {
+    --tr-bg: #000000; --tr-chrome-a: #2f2f31; --tr-chrome-b: #242426;
+    --tr-prompt: #28fe14; --tr-cmd: #28fe14; --tr-out: rgba(40,254,20,0.75); --tr-title: #6b9a66;
+    --tr-glow: rgba(40,254,20,0.35); --tr-accent: #aaff9e;
+  }
+  .tr-frame.tr-theme-novel {
+    --tr-bg: #dfdbc3; --tr-chrome-a: #ece8d3; --tr-chrome-b: #ddd8c0;
+    --tr-prompt: #7a2d26; --tr-cmd: #3b2322; --tr-out: rgba(59,35,34,0.75); --tr-title: #8a7f6a;
+    --tr-glow: rgba(0,0,0,0); --tr-accent: #7a2d26;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.55);
+  }
+  .tr-frame.tr-theme-silver-aerogel {
+    --tr-bg: rgba(214,214,214,0.88); --tr-chrome-a: #ececec; --tr-chrome-b: #d9d9d9;
+    --tr-prompt: #33613a; --tr-cmd: #161616; --tr-out: rgba(22,22,22,0.72); --tr-title: #6d6d6d;
+    --tr-glow: rgba(0,0,0,0); --tr-accent: #2f5fd0;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.7);
+  }
+  .tr-frame.tr-theme-grass {
+    --tr-bg: #13773d; --tr-chrome-a: #2c8a52; --tr-chrome-b: #1c7c44;
+    --tr-prompt: #fff9b1; --tr-cmd: #ffffff; --tr-out: rgba(255,255,255,0.82); --tr-title: #bfe3cb;
+    --tr-glow: rgba(255,249,177,0.28); --tr-accent: #fff9b1;
+  }
+  .tr-frame.tr-theme-clear-dark {
+    --tr-bg: rgba(15,15,20,0.82); --tr-chrome-a: rgba(70,70,78,0.85); --tr-chrome-b: rgba(52,52,60,0.85);
+    --tr-prompt: #e6e6ea; --tr-cmd: #ffffff; --tr-out: rgba(255,255,255,0.75); --tr-title: #a9a9b0;
+    --tr-glow: rgba(255,255,255,0.18); --tr-accent: #A78BFA;
+  }
+  .tr-frame.tr-theme-silver-aerogel .tr-body, .tr-frame.tr-theme-clear-dark .tr-body {
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
   }
 
   .tr-chrome {
@@ -88,10 +139,10 @@
     white-space: pre-wrap;
     word-break: break-word;
   }
-  .tr-prompt { color: var(--tr-prompt); text-shadow: 0 0 12px rgba(126,231,135,0.25); }
+  .tr-prompt { color: var(--tr-prompt); text-shadow: 0 0 12px var(--tr-glow, rgba(126,231,135,0.25)); }
   .tr-cmd { color: var(--tr-cmd); }
   .tr-out { color: var(--tr-out); }
-  .tr-out.tr-accent { color: var(--mp-color-accent, #A78BFA); }
+  .tr-out.tr-accent { color: var(--tr-accent, var(--mp-color-accent, #A78BFA)); }
 
   .tr-cursor {
     display: inline-block;
@@ -101,7 +152,7 @@
     vertical-align: text-bottom;
     margin-left: 2px;
     border-radius: 1px;
-    box-shadow: 0 0 12px rgba(126,231,135,0.4);
+    box-shadow: 0 0 12px var(--tr-glow, rgba(126,231,135,0.4));
   }
 </style>
 
@@ -114,7 +165,9 @@
     if (!frame || !body) return tl;
 
     var theme = (data && data.theme) || 'dark';
+    var THEMES = ['pro', 'ocean', 'red-sands', 'homebrew', 'novel', 'silver-aerogel', 'grass', 'clear-dark'];
     if (theme === 'light') frame.classList.add('tr-light');
+    else if (THEMES.indexOf(theme) !== -1) frame.classList.add('tr-theme-' + theme);
     if (data && data.title) titleEl.textContent = data.title;
 
     var prompt = (data && data.prompt) || '$';

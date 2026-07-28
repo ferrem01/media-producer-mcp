@@ -2,7 +2,7 @@
   "type": "terminal-run",
   "label": "Terminal Run",
   "category": "code",
-  "description": "A terminal that types a single command character-by-character then streams output lines in one after another.",
+  "description": "A terminal that types a single command character-by-character then streams output lines in one after another. Supports macOS-Terminal-inspired theme presets via data.theme: 'dark' (default), 'light', 'pro' (near-black, white text), 'ocean' (deep blue, white text), 'red-sands' (dark red-brown, amber text), 'homebrew' (black, green phosphor text), 'novel' (cream, dark brown text), 'silver-aerogel' (light glassy gray, near-black text), 'grass' (green felt, white text), 'clear-dark' (translucent dark glass, white text). Pick a theme that matches the scene's mood, e.g. {\"command\":\"npm run deploy\",\"theme\":\"homebrew\"} for a retro hacker beat.",
   "data": {
     "command": {
       "type": "string",
@@ -32,7 +32,7 @@
       "label": "Theme",
       "optional": true,
       "default": "dark",
-      "enum": ["dark", "light"]
+      "enum": ["dark", "light", "pro", "ocean", "red-sands", "homebrew", "novel", "silver-aerogel", "grass", "clear-dark"]
     }
   }
 }
