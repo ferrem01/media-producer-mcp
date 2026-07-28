@@ -128,3 +128,11 @@ describe("hand-edit API transition vocabulary", () => {
     }
   });
 });
+
+describe("micro-shot entrance compression", () => {
+  it("the assembler speeds component timelines on sub-1.4s shots (source guard)", async () => {
+    const a = await read("../src/core/scene-assembler.ts");
+    expect(a).toContain("MICRO-SHOT compression");
+    expect(a).toContain("timeScale(Math.max(1, 2.2 /");
+  });
+});
