@@ -70,6 +70,14 @@ Raised during the session and parked, roughly in priority order:
    st-manifesto, st-swarm, st-compare, st-flow, st-convergence still render
    dark-only and break light-world films that cast them. Same pattern as
    st-logo-close (skip atmosphere/logo-flip, .light CSS variant).
+0b. **Authored-layout intelligence** (from the first full end-to-end world film,
+   `proj_e9366848`) -- the authored path's fallback drops every non-window
+   component into the SAME centered 84% inset: two text-bearing components
+   collide (stat-card + kinetic-text overlapped on the payoff beat), and a
+   storyboard-cast backdrop duplicates the world. Needed: dock text
+   components (kinetic-text/annotation) to thirds instead of center-stacking,
+   drop redundant backdrop casts, and cap the cursor thread at the contract's
+   2-4 scenes (it threaded 7/8; handoffs held for the first chain then broke).
 1. **Accent placement intelligence** — the lottie/sticker corner-overlay spots are
    static; bias toward the *emptiest* region of the composition so a confetti
    burst never sits on a panel header. Optionally tighten the storyboard prompt
