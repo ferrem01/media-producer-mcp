@@ -20,12 +20,17 @@ export function getPreviewHtml(): string {
   html, body {
     width: 100%; height: 100%;
     font-family: 'Inter', -apple-system, sans-serif;
-    background: #fafafa;
+    background: #f6f7fa;
     color: #111827;
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  /* Thin, quiet scrollbars everywhere chrome allows them. */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #d3d8e2; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #b9c1cf; }
+  ::-webkit-scrollbar-track { background: transparent; }
 
   /* Layout */
   #app {
@@ -42,12 +47,18 @@ export function getPreviewHtml(): string {
     align-items: center;
     gap: 16px;
     padding: 0 16px;
-    background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e6e8ef;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04);
     z-index: 10;
   }
-  header h1 { font-size: 14px; font-weight: 600; color: #111827; white-space: nowrap; letter-spacing: -0.01em; }
+  header h1 { font-size: 14px; font-weight: 700; color: #111827; white-space: nowrap; letter-spacing: -0.02em;
+    display: flex; align-items: center; gap: 8px; }
+  /* Wordmark tile: the one saturated thing in the chrome. */
+  header h1::before { content: ''; width: 18px; height: 18px; border-radius: 5px; flex: none;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 60%, #a78bfa 100%);
+    box-shadow: 0 1px 3px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.35); }
   .header-controls {
     display: flex; align-items: center; gap: 8px; margin-left: auto;
   }
@@ -63,11 +74,12 @@ export function getPreviewHtml(): string {
   }
   .header-controls select { min-width: 180px; cursor: pointer; }
   .btn {
-    padding: 5px 14px; border: none; border-radius: 6px;
-    font-size: 12px; font-weight: 500; font-family: inherit;
+    padding: 6px 14px; border: none; border-radius: 8px;
+    font-size: 12px; font-weight: 600; font-family: inherit;
     cursor: pointer; transition: all 0.15s ease;
   }
-  .btn-primary { background: #4f46e5; color: #fff; }
+  .btn-primary { background: linear-gradient(180deg, #5b54ec, #4f46e5); color: #fff;
+    box-shadow: 0 1px 2px rgba(79,70,229,0.35), inset 0 1px 0 rgba(255,255,255,0.14); }
   /* Render button states + edit lock while a render runs (edits made
      mid-render get clobbered by the job's write-back -- lock is load-bearing) */
   #render-btn.rendering { background: #6366f1; cursor: default; opacity: 0.9; }
@@ -86,9 +98,9 @@ export function getPreviewHtml(): string {
   body.mp-rendering #slider-wrap, body.mp-rendering #lane-gutter, body.mp-rendering #inspector,
   body.mp-rendering .scene-sb-btn, body.mp-rendering #booth-btn, body.mp-rendering #inspect-btn {
     pointer-events: none; opacity: 0.55; }
-  .btn-primary:hover { background: #4338ca; box-shadow: 0 1px 3px rgba(79,70,229,0.3); }
-  .btn-secondary { background: #f3f4f6; color: #111827; border: 1px solid #e5e7eb; }
-  .btn-secondary:hover { background: #e5e7eb; }
+  .btn-primary:hover { background: linear-gradient(180deg, #524bea, #4338ca); box-shadow: 0 2px 6px rgba(79,70,229,0.4); }
+  .btn-secondary { background: #ffffff; color: #1f2937; border: 1px solid #dfe3ea; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+  .btn-secondary:hover { background: #f6f7fa; border-color: #c9cfdb; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* Narration booth (Mode B): bottom-right card so the film stays watchable
@@ -119,43 +131,45 @@ export function getPreviewHtml(): string {
   /* Sidebar - spans rows 2 and 3 */
   #sidebar {
     grid-row: 2 / 4;
-    background: #ffffff;
-    border-right: 1px solid #e5e7eb;
+    background: #fbfbfd;
+    border-right: 1px solid #e6e8ef;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
   }
   .sidebar-header {
-    font-size: 10px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.05em; color: #9ca3af;
-    padding: 14px 12px 8px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.09em; color: #8b93a3;
+    padding: 14px 14px 8px;
   }
   .scene-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 12px; cursor: pointer; font-size: 12px;
-    border-left: 3px solid transparent;
-    transition: all 0.15s ease;
-    background: #ffffff;
-    border-radius: 0 8px 8px 0;
-    margin-right: 6px;
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 9px; cursor: pointer; font-size: 12px;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+    background: transparent;
+    border-radius: 10px;
+    margin: 1px 8px;
+    border-left: none;
   }
-  .scene-item:hover { background: #f9fafb; transform: translateX(1px); }
+  .scene-item:hover { background: #f1f3f8; }
   .scene-prov { display: inline-block; margin-right: 5px; font-size: 10px; line-height: 1; vertical-align: 1px; cursor: help; }
   .scene-prov.sp-template { color: #0ea5e9; }
   .scene-prov.sp-composition { color: #6366f1; }
   .scene-prov.sp-custom { color: #d48c34; }
   .scene-item.active {
     background: #eef2ff;
-    border-left-color: #6366f1;
     color: #111827;
+    box-shadow: inset 0 0 0 1px rgba(99,102,241,0.28);
   }
+  .scene-item.active .scene-thumb { box-shadow: 0 0 0 2px #6366f1; border-color: transparent; }
   .scene-thumb {
     width: 64px; height: 36px;
-    border-radius: 6px; background: #f3f4f6;
-    border: 1px solid #e5e7eb;
+    border-radius: 7px; background: #eef0f5;
+    border: 1px solid #e2e5ec;
     flex-shrink: 0; overflow: hidden;
     position: relative;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+    transition: box-shadow 0.15s ease;
   }
   .scene-thumb iframe {
     width: 1920px; height: 1080px;
@@ -182,7 +196,8 @@ export function getPreviewHtml(): string {
 
   /* Main */
   #main {
-    display: flex; flex-direction: column; overflow: hidden; background: #f3f4f6;
+    display: flex; flex-direction: column; overflow: hidden;
+    background: radial-gradient(120% 90% at 50% 0%, #f2f3f8 0%, #e9ebf2 100%);
   }
   #preview-container {
     flex: 1; display: flex; align-items: center; justify-content: center;
@@ -192,11 +207,11 @@ export function getPreviewHtml(): string {
   #preview-iframe {
     background: #000; border: none;
     transition: opacity 0.15s ease;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.10), 0 12px 32px rgba(15,23,42,0.14), 0 0 0 1px rgba(15,23,42,0.06);
+    border-radius: 10px;
     transform-origin: top left;
   }
-  .preview-wrapper { overflow: hidden; border-radius: 8px; }
+  .preview-wrapper { overflow: hidden; border-radius: 10px; }
   .no-scene { color: #9ca3af; font-size: 13px; text-align: center; }
 
   /* Playback controls */
@@ -204,15 +219,18 @@ export function getPreviewHtml(): string {
     display: flex; align-items: center; gap: 12px;
     padding: 8px 16px;
     background: #ffffff;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid #e6e8ef;
+    box-shadow: 0 -1px 2px rgba(15,23,42,0.03);
   }
   .play-btn {
-    width: 30px; height: 30px; background: #4f46e5;
+    width: 32px; height: 32px;
+    background: linear-gradient(180deg, #5b54ec, #4f46e5);
     border: none; border-radius: 50%; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(79,70,229,0.4), inset 0 1px 0 rgba(255,255,255,0.16);
   }
-  .play-btn:hover { background: #4338ca; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
+  .play-btn:hover { background: linear-gradient(180deg, #524bea, #4338ca); box-shadow: 0 3px 10px rgba(79,70,229,0.45); }
   .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .play-btn svg { fill: #fff; }
   #slider-wrap { position: relative; flex: 1; height: 122px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
