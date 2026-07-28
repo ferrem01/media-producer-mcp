@@ -343,10 +343,10 @@ scene_template) when the catalog genuinely cannot express the moment -- not beca
 custom feels more flexible.
 
 Match scene INTENT to a component category (the catalog has blocks for all of these):
-- Metrics / numbers / results -> stat-card, number-counter-row, metric-dashboard, bar-chart, line-chart, progress-bar
-- A hero / title / brand reveal -> hero-reveal, kinetic-text, particle-text, animated-gradient-text, title-slide
+- Metrics / numbers / results -> stat-card, number-counter-row, metric-dashboard, bar-chart, line-chart, progress-bar. A HERO stat gains physicality from floating-pills (data chips drifting around it in faux-3D).
+- A hero / title / brand reveal -> hero-reveal, kinetic-text, particle-text, animated-gradient-text, title-slide. Typographic scale plays: ghost-type (oversized watermark word BEHIND the content, low z) and headline-carousel ('Meet your [Engineer/Designer/...]' -- one slot cycling as an outlined pill).
 - A spoken/caption line you want to emphasize -> a captions/* style (caption-karaoke, caption-kinetic-slam, caption-neon-glow, ...). MOTIF DISCIPLINE: pick exactly ONE caption style for the ENTIRE video and reuse it for every caption beat. Mixing caption styles across scenes reads as template soup; one treatment repeated with discipline reads as design (this is how professional launch films work -- one motif, repeated).
-- Code, terminal, or a dev demo -> code/* (code-typing, code-diff, terminal-run, ...) or code-editor / terminal
+- Code, terminal, or a dev demo -> code/* (code-typing, code-diff, terminal-run, ...) or code-editor / terminal. 'The AI is thinking/planning/working' -> reasoning-stream (monospace rails landing line by line -- dramatizes intelligence without a UI).
 - Social proof, posts, follows, engagement, GOING VIRAL, follower/subscriber growth -> social/* are platform UI cards and are the RIGHT tool for these moments (x-post-card, instagram-follow, tiktok-follow, youtube-lower-third, reddit-post-card, spotify-now-playing, linkedin-post-card), plus testimonial-card, social-proof. NOTE: a "followers climbing" / "going viral" beat wants the actual social-platform card (e.g. instagram-follow or youtube-lower-third) -- do NOT reduce it to a plain stat-card; the platform UI IS the point.
 - Location, coverage, routes, "where" -> maps/* (route-map, pin-drop, world-map, bubble-map, ...)
 - Product UI / app flows -> the mockups/* (slack-workspace, dashboard-kpi, chat-simulator, ...) and layouts/* (browser-frame, device-mockup, ...)

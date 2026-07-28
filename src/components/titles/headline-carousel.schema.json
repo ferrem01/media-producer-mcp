@@ -1,0 +1,15 @@
+{
+  "type": "headline-carousel",
+  "label": "Headline Carousel",
+  "category": "titles",
+  "description": "A headline with one slot cycling through alternatives in a clipped vertical carousel -- 'Meet your [Engineer/Designer/Analyst]' with the bracket as a rotating outlined pill. The inline pill-carousel move. 3-5 short items; pairs beautifully with ghost-type behind it.",
+  "data": {
+    "prefix": { "type": "string", "label": "Text before the slot, e.g. 'Meet your'", "required": true },
+    "items": { "type": "array", "items": { "type": "string" }, "label": "Cycling items (3-5, short)", "required": true },
+    "suffix": { "type": "string", "label": "Text after the slot", "optional": true },
+    "interval": { "type": "number", "label": "Seconds per item (default 1.1)", "optional": true },
+    "pill": { "type": "boolean", "label": "Outlined pill styling on the slot (default true)", "optional": true },
+    "size": { "type": "string", "label": "Font size (default 64px)", "optional": true },
+    "at": { "type": "number", "label": "Entrance time (s)", "optional": true }
+  }
+}

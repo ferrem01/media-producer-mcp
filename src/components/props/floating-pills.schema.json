@@ -1,0 +1,13 @@
+{
+  "type": "floating-pills",
+  "label": "Floating Data Pills",
+  "category": "props",
+  "description": "Data made physical: small labeled chips drifting in faux-3D around a hero stat or headline (the '+340 h' orbit move). Place its box over the region containing the hero (e.g. the full stage over a number-counter scene) at a HIGH z_index; pills scatter in a ring around the center, entrance-staggered, drifting continuously. 4-7 items max.",
+  "data": {
+    "items": { "type": "array", "items": { "type": "string" }, "label": "Chip labels, e.g. [\"+340 h\", \"+128 h\"]", "required": true },
+    "color": { "type": "string", "label": "Chip background (default brand secondary)", "optional": true },
+    "font_size": { "type": "string", "label": "Chip text size (default 24px)", "optional": true },
+    "seed": { "type": "number", "label": "Scatter seed (film-stable)", "optional": true },
+    "at": { "type": "number", "label": "Entrance start (s, default 0.3)", "optional": true }
+  }
+}

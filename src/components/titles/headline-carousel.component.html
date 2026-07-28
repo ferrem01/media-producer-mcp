@@ -1,0 +1,76 @@
+<template>
+  <div class="hlc">
+    <span class="hlc-prefix"></span>
+    <span class="hlc-slot"><span class="hlc-items"></span></span>
+    <span class="hlc-suffix"></span>
+  </div>
+</template>
+
+<style scoped>
+  /* ── headline-carousel: "Meet your [Engineer]" with the bracket cycling
+     through roles in a clipped slot -- the inline pill-carousel move. ── */
+  .hlc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    gap: 0.35em; font-family: var(--mp-font-family, 'Inter', sans-serif); font-weight: 700;
+    font-size: 64px; color: var(--mp-color-text, #17171c); white-space: nowrap; }
+  .hlc-slot { display: inline-block; overflow: hidden; vertical-align: baseline; position: relative; }
+  .hlc-items { display: flex; flex-direction: column; will-change: transform; }
+  .hlc-item { display: flex; align-items: center; justify-content: center; }
+  .hlc-item.pill { border: 2.5px solid var(--mp-color-primary, #4f46e5); color: var(--mp-color-primary, #4f46e5);
+    border-radius: 999px; padding: 0.06em 0.5em; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.hlc');
+    var slot = el.querySelector('.hlc-slot');
+    var itemsWrap = el.querySelector('.hlc-items');
+    el.querySelector('.hlc-prefix').textContent = data.prefix || 'Meet your';
+    el.querySelector('.hlc-suffix').textContent = data.suffix || '';
+    if (data.size) host.style.fontSize = data.size;
+
+    var items = Array.isArray(data.items) && data.items.length ? data.items : ['Engineer', 'Designer', 'Analyst'];
+    var pill = data.pill !== false;
+    items.forEach(function(txt) {
+      var it = document.createElement('span');
+      it.className = 'hlc-item' + (pill ? ' pill' : '');
+      it.textContent = String(txt);
+      itemsWrap.appendChild(it);
+    });
+    // Clone the first item at the end so the wrap-around slides forward
+    // (last -> first) instead of jumping back through the whole stack.
+    var clone = itemsWrap.children[0].cloneNode(true);
+    itemsWrap.appendChild(clone);
+
+    var interval = Math.max(0.4, Number(data.interval) || 1.1);
+    var at = Math.max(0, Number(data.at) || 0);
+    gsap.set(host, { autoAlpha: 0, y: 16 });
+    tl.to(host, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, at);
+
+    // Parametric vertical carousel: index is a pure function of scene time,
+    // with a quick eased slide at each boundary (seek-safe: recomputed on
+    // every update, no accumulated state).
+    var proxy = { t: 0 };
+    var dur = ctx && ctx.duration ? ctx.duration : 8;
+    tl.to(proxy, {
+      t: 1, duration: dur, ease: 'none',
+      onUpdate: function() {
+        var itemH = itemsWrap.children[0] ? itemsWrap.children[0].offsetHeight : 0;
+        if (!itemH) return;
+        slot.style.height = itemH + 'px';
+        var t = proxy.t * dur - at;
+        if (t < 0) { gsap.set(itemsWrap, { y: 0 }); return; }
+        var idx = Math.floor(t / interval);
+        var frac = (t - idx * interval) / interval;
+        // Slide happens in the last 25% of each interval.
+        var slide = frac > 0.75 ? (frac - 0.75) / 0.25 : 0;
+        var eased = slide * slide * (3 - 2 * slide);
+        // Position runs 0..items.length (the clone slot); wrap AFTER adding
+        // the eased fraction so last -> first slides forward.
+        var pos = (idx % items.length) + eased;
+        gsap.set(itemsWrap, { y: -(pos * itemH) });
+      },
+    }, 0);
+    return tl;
+  }
+</script>

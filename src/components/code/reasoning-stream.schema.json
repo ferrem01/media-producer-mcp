@@ -1,0 +1,15 @@
+{
+  "type": "reasoning-stream",
+  "label": "Reasoning Stream",
+  "category": "code",
+  "description": "The AI's thinking rendered as monospace rails: section headers (ANALYZE / RESEARCH / BUILD ORDER) with lines that land one by one, older rows receding. THE component for 'the agent is working/planning' beats -- dramatizes intelligence without showing a UI. Theme-aware; works full-bleed or in a panel.",
+  "data": {
+    "sections": {
+      "type": "array",
+      "label": "[{title, lines: [..]}] -- 2-3 sections, 2-4 short lines each, REAL content",
+      "required": true
+    },
+    "at": { "type": "number", "label": "Start time (s, default 0.3)", "optional": true },
+    "line_interval": { "type": "number", "label": "Seconds between rows (default 0.45)", "optional": true }
+  }
+}

@@ -1,0 +1,67 @@
+<template>
+  <div class="flpl"></div>
+</template>
+
+<style scoped>
+  /* ── floating-pills: data made physical -- small chips drifting in faux-3D
+     around a hero stat (the "+340 h" orbit move). Place the box OVER the
+     whole stage region containing the hero; pills scatter inside it. ── */
+  .flpl { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .flpl-pill { position: absolute; font-family: var(--mp-font-family, 'Inter', sans-serif);
+    font-weight: 700; font-size: 24px; color: #fff; background: var(--mp-color-secondary, #d48c34);
+    border-radius: 14px; padding: 10px 20px; box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+    will-change: transform; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var host = el.querySelector('.flpl');
+    var items = Array.isArray(data.items) && data.items.length ? data.items : ['+1', '+2', '+3'];
+    var seed = Number(data.seed) || 42;
+    function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+    // Seeded scatter that avoids the center (the hero lives there): pills
+    // land in a ring band around the middle.
+    var pills = items.map(function(txt, i) {
+      var p = document.createElement('div');
+      p.className = 'flpl-pill';
+      p.textContent = String(txt);
+      if (data.color) p.style.background = data.color;
+      if (data.font_size) p.style.fontSize = data.font_size;
+      var angle = (i / items.length) * Math.PI * 2 + rnd() * 0.9;
+      var radius = 0.30 + rnd() * 0.16; // fraction of the half-diagonal
+      var cx = 50 + Math.cos(angle) * radius * 90;
+      var cy = 50 + Math.sin(angle) * radius * 78;
+      p.style.left = Math.max(2, Math.min(88, cx)) + '%';
+      p.style.top = Math.max(4, Math.min(88, cy)) + '%';
+      var depth = 0.7 + rnd() * 0.6; // faux-3D: nearer pills bigger + faster
+      p.style.transform = 'scale(' + depth.toFixed(2) + ')';
+      host.appendChild(p);
+      return { el: p, phase: rnd() * Math.PI * 2, depth: depth, amp: 10 + rnd() * 14 };
+    });
+
+    var at = Math.max(0, Number(data.at) || 0.3);
+    pills.forEach(function(p, i) {
+      gsap.set(p.el, { autoAlpha: 0, scale: p.depth * 0.7 });
+      tl.to(p.el, { autoAlpha: 1, scale: p.depth, duration: 0.45, ease: 'back.out(1.7)' }, at + i * 0.12);
+    });
+
+    // Parametric drift: pure function of scene time (seek-safe).
+    var proxy = { t: 0 };
+    var dur = ctx && ctx.duration ? ctx.duration : 8;
+    tl.to(proxy, {
+      t: 1, duration: dur, ease: 'none',
+      onUpdate: function() {
+        var d = proxy.t * dur;
+        pills.forEach(function(p) {
+          gsap.set(p.el, {
+            x: Math.sin(d * 0.45 * p.depth + p.phase) * p.amp,
+            y: Math.cos(d * 0.38 * p.depth + p.phase * 1.3) * p.amp * 0.8,
+          });
+        });
+      },
+    }, 0);
+    return tl;
+  }
+</script>

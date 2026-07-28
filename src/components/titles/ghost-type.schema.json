@@ -1,0 +1,15 @@
+{
+  "type": "ghost-type",
+  "label": "Ghost Type",
+  "category": "titles",
+  "description": "An oversized watermark word behind the foreground content -- typographic scale without shouting (the ghost 'AI TEAM' behind a headline move). Place its box over the stage at a LOW z_index; the real headline and content ride above it. Works on light and dark worlds (uses the theme text color at low opacity).",
+  "data": {
+    "text": { "type": "string", "label": "The ghost word/phrase (uppercased)", "required": true },
+    "size": { "type": "string", "label": "Font size (default 26vw)", "optional": true },
+    "opacity": { "type": "number", "label": "0-1 (default 0.07 -- keep it quiet)", "optional": true },
+    "color": { "type": "string", "label": "Override color (default theme text)", "optional": true },
+    "align": { "type": "string", "label": "left | center | right", "optional": true },
+    "at": { "type": "number", "label": "Entrance time (s)", "optional": true },
+    "drift": { "type": "number", "label": "Horizontal parallax drift px over the scene (default 30)", "optional": true }
+  }
+}

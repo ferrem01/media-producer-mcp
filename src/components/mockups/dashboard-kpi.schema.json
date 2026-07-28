@@ -54,6 +54,11 @@
           }
         }
       }
+    },
+    "fidelity": {
+      "type": "string",
+      "label": "'focus' = skeleton/blur everything except the KPI values (directs the eye)",
+      "optional": true
     }
   },
   "script_actions": [
