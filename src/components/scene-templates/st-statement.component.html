@@ -42,6 +42,14 @@
       var(--mp-color-primary, #7c5cff) 10%, #c4489f 55%, #ff6a4d 95%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
     padding-right: 0.06em; }
+  /* Chapter mode: numbered chapter card -- big brand-color numeral beside a
+     clean SANS headline (the "02 / Agent scaffolds & builds" card). */
+  .stst.is-chapter .stst-line { font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif;
+    font-size: 3.6vw; font-weight: 600; letter-spacing: -0.015em; }
+  .stst-chapnum { display: inline-block; margin-right: 1.4vw;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif;
+    font-size: 4.6vw; font-weight: 700; letter-spacing: 0.02em;
+    color: var(--mp-color-primary, #6366f1); }
   .st-overlay { position: absolute; inset: 0; pointer-events: none; }
 </style>
 
@@ -56,6 +64,9 @@
     // ('light' aliases to cream -- a light world stays WARM here, that
     // warmth is the style); 'dark' is the chapter-flip temperature.
     if (data.theme === 'dark') root.classList.add('is-dark');
+    // Chapter mode: data.chapter_number ("02") renders as a big brand-color
+    // numeral beside the headline, and the headline sets in SANS.
+    if (data.chapter_number) root.classList.add('is-chapter');
 
     var kickerRow = q('.stst-kicker-row');
     if (!data.kicker) kickerRow.style.display = 'none';
@@ -83,11 +94,17 @@
         return out;
       })(text);
       var lineEls = [];
-      lines.forEach(function(lineText) {
+      lines.forEach(function(lineText, li) {
         var mask = document.createElement('div');
         mask.className = 'stst-linemask';
         var line = document.createElement('span');
         line.className = 'stst-line' + (secondary ? ' is-secondary' : '');
+        if (data.chapter_number && li === 0) {
+          var num = document.createElement('span');
+          num.className = 'stst-chapnum';
+          num.textContent = String(data.chapter_number);
+          line.appendChild(num);
+        }
         // *emphasis* -> gradient italic span
         var re = /\*([^*]+)\*|([^*]+)/g, m;
         while ((m = re.exec(lineText)) !== null) {
