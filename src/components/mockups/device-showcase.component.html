@@ -695,6 +695,14 @@
       }
     }
 
+    // Fan tilt: rotate the whole stage (deg) so a trio can splay like a hand
+    // of cards. GSAP-set so it composes with the fit scale above and nothing
+    // else tweens the stage.
+    if (data.rotate) {
+      var stageRot = el.querySelector('.dsc-stage');
+      if (stageRot) gsap.set(stageRot, { rotation: Number(data.rotate) });
+    }
+
     var units = mode === 'duo' ? [unitMac, unitPhone]
       : mode === 'macbook' ? [unitMac] : [unitPhone];
     var at = Math.max(0, Number(data.at) || 0.3);

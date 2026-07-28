@@ -4,10 +4,39 @@
   "category": "threed",
   "description": "Premium 3D stats/mosaic beat for editorial and tempo-cut films: a full-frame wall of dark beveled glass shards (irregular hex mosaic, real three.js) seen at a slight angle, thin specular rims catching warm/cool light, a few tiles parted so dark seams open. Teal monospace text -- a kicker line up top and a stat row in the lower third -- ghosts through from BEHIND the glass. Fills the whole frame (position 0,0 100%x100%); content is composed from frame 1 with slow parallax drift, breathing tiles, and drifting speculars. Deterministic (seeded) -- seeks exactly under render capture.",
   "data": {
-    "seed": { "type": "number", "label": "Mosaic layout seed (film-stable; vary per scene)", "optional": true },
-    "kicker": { "type": "string", "label": "Top kicker line behind the glass (default 'WRITE HTML → RENDER VIDEO')", "optional": true },
-    "stats": { "type": "array", "items": { "type": "object" }, "label": "Stat row [{value,label}], e.g. [{\"value\":\"47x\",\"label\":\"FASTER THAN AE\"}] (default 3 demo stats)", "optional": true },
-    "tile_color": { "type": "string", "label": "Glass tile base color (default #3a3230 warm graphite)", "optional": true },
-    "accent": { "type": "string", "label": "Text color behind the glass (default #7fd8cf teal)", "optional": true }
+    "seed": {
+      "type": "number",
+      "label": "Mosaic layout seed (film-stable; vary per scene)",
+      "optional": true
+    },
+    "kicker": {
+      "type": "string",
+      "label": "Top kicker line behind the glass (default 'WRITE HTML \u2192 RENDER VIDEO')",
+      "optional": true
+    },
+    "stats": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "label": "Stat row [{value,label}], e.g. [{\"value\":\"47x\",\"label\":\"FASTER THAN AE\"}] (default 3 demo stats)",
+      "optional": true
+    },
+    "tile_color": {
+      "type": "string",
+      "label": "Glass tile base color (default #3a3230 warm graphite)",
+      "optional": true
+    },
+    "accent": {
+      "type": "string",
+      "label": "Text color behind the glass (default #7fd8cf teal)",
+      "optional": true
+    },
+    "text_front": {
+      "type": "boolean",
+      "label": "Text In Front",
+      "optional": true,
+      "description": "Default true: type rides above the glass, crisp. false = the original behind-the-glass ghost."
+    }
   }
 }
