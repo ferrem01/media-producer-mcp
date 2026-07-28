@@ -1,0 +1,26 @@
+<template>
+  <div class="vgs"></div>
+</template>
+
+<style scoped>
+  /* ── vignette-spot: a soft radial ellipse wash -- the "dark hole" that
+     editorial category cards sit inside (colored headline in a dark
+     ellipse on a cream canvas), or a light halo behind a hero on dark.
+     Pure backdrop dressing; pair it with a text component on top. */
+  .vgs { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.vgs');
+    var color = data.color || 'rgba(20,22,30,0.92)';
+    var reach = data.reach !== undefined ? Number(data.reach) : 62;
+    root.style.background = 'radial-gradient(ellipse ' + reach + '% ' + reach + '% at 50% 50%, ' +
+      color + ' 0%, ' + color + ' ' + Math.max(0, reach - 38) + '%, transparent 72%)';
+    gsap.set(root, { autoAlpha: 0 });
+    tl.to(root, { autoAlpha: data.opacity !== undefined ? Number(data.opacity) : 1,
+      duration: 0.45, ease: 'power2.out' }, Number(data.at) || 0);
+    return tl;
+  }
+</script>

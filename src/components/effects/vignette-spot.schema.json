@@ -1,0 +1,12 @@
+{
+  "type": "vignette-spot",
+  "label": "Vignette Spot",
+  "category": "effects",
+  "description": "A soft radial ELLIPSE wash centered in its box -- the editorial 'category card' backdrop: a dark ellipse hole on a cream canvas with a colored headline sitting inside it (pair with kinetic-text on top), or a light halo behind a hero on a dark canvas. Backdrop dressing only, never text. Example: { color: 'rgba(20,22,30,0.92)', reach: 62 } under a bold colored headline.",
+  "data": {
+    "color": { "type": "string", "label": "Ellipse color (default rgba(20,22,30,0.92) -- a dark hole)", "optional": true },
+    "reach": { "type": "number", "label": "Ellipse radius as % of the box (default 62)", "optional": true },
+    "opacity": { "type": "number", "label": "Final opacity 0-1 (default 1)", "optional": true },
+    "at": { "type": "number", "label": "Fade-in start (s, default 0)", "optional": true }
+  }
+}
