@@ -292,53 +292,181 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
 var ACCENT_TYPES = ["lottie-accent", "sticker-prop"];
 /** Full-stage overlays: performers that cover the whole composition. */
 var STAGE_OVERLAY_TYPES = ["cursor-performer"];
+/** Ambient full-stage text overlays that ride ABOVE the windows (their own
+ *  markup scatters; the box is the whole stage). */
+var HIGH_OVERLAY_TYPES = ["floating-pills"];
+/** Ambient full-stage type BEHIND the windows, above the backdrop. */
+var GHOST_TYPES = ["ghost-type"];
+/** Backdrop-cast components: in a WORLD film these are redundant -- the
+ *  world's one backdrop is already injected, and a second per-scene backdrop
+ *  is exactly the deck-of-posters bug. Dropped when a world exists. */
+var BACKDROP_CAST_TYPES = ["mesh-gradient", "webgl-backdrop", "gradient-background", "liquid-background"];
+/** Editorial text roles: captions/annotations must never be stretched into
+ *  84% "windows" stacked on a surface (the scene-6 collision bug). They dock
+ *  beside or below the surfaces instead. */
+var CAPTION_ROLE_TYPES = ["kinetic-text", "annotation", "typewriter", "animated-gradient-text", "section-header"];
+/** Typographic heroes: centerpieces (big number, stat), not windows. */
+var HERO_ROLE_TYPES = ["stat-card", "number-counter-row", "headline-carousel", "hero-reveal", "quote-block"];
 var ACCENT_SPOTS: Array<Record<string, string | number>> = [
   { x: "71%", y: "7%", width: "21%", height: "36%" },   // top-right
   { x: "7%", y: "56%", width: "19%", height: "34%" },   // bottom-left
 ];
+var FULL_STAGE: Record<string, string | number> = { x: 0, y: 0, width: "100%", height: "100%" };
 
-function authoredLayout(allTypes: string[]): Map<string, { position: Record<string, string | number>; z_index: number }> {
-  var out = new Map<string, { position: Record<string, string | number>; z_index: number }>();
-  // Accents are placed as corner overlays AFTER the windows, and excluded
-  // from the window recipes -- a confetti burst must never become a 84%
-  // full-frame "window".
-  var accents = allTypes.filter((t) => ACCENT_TYPES.indexOf(t) !== -1);
-  var overlays = allTypes.filter((t) => STAGE_OVERLAY_TYPES.indexOf(t) !== -1);
-  var types = allTypes.filter((t) => ACCENT_TYPES.indexOf(t) === -1 && STAGE_OVERLAY_TYPES.indexOf(t) === -1);
-  overlays.forEach(function(t) {
-    out.set(t, { position: { x: 0, y: 0, width: "100%", height: "100%" }, z_index: 45 });
+function isCaptionRole(t: string): boolean {
+  return CAPTION_ROLE_TYPES.indexOf(t) !== -1 || t.indexOf("caption-") === 0;
+}
+
+type LayoutSlot = { position: Record<string, string | number>; z_index: number } | null;
+
+function pct(x: number, y: number, w: number, h: number): Record<string, string> {
+  var r = (n: number) => `${Math.round(n * 10) / 10}%`;
+  return { x: r(x), y: r(y), width: r(w), height: r(h) };
+}
+
+/** Stack n slots vertically inside a band; returns [y, h] rows. */
+function stackRows(n: number, bandY: number, bandH: number, gap: number): Array<[number, number]> {
+  var h = (bandH - gap * (n - 1)) / n;
+  var rows: Array<[number, number]> = [];
+  for (var i = 0; i < n; i++) rows.push([bandY + i * (h + gap), h]);
+  return rows;
+}
+
+/**
+ * Per-INSTANCE layout for authored compositions. Returns an array aligned
+ * with `authored` (null = drop the instance, e.g. a redundant backdrop in a
+ * world film). Role-aware: surfaces get the window recipes; captions and
+ * heroes get editorial placements (docked column / lower third / center
+ * stage) instead of stacking into the same 84% inset -- the collision that
+ * made films read as sloppy.
+ */
+function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean): LayoutSlot[] {
+  var slots: LayoutSlot[] = authored.map(() => null);
+  var accentCount = 0;
+  var surfaceIdx: number[] = [];
+  var captionIdx: number[] = [];
+  var heroIdx: number[] = [];
+  authored.forEach((c, i) => {
+    var t = c.type;
+    if (STAGE_OVERLAY_TYPES.indexOf(t) !== -1) {
+      slots[i] = { position: { ...FULL_STAGE }, z_index: 45 };
+    } else if (ACCENT_TYPES.indexOf(t) !== -1) {
+      slots[i] = { position: ACCENT_SPOTS[Math.min(accentCount, ACCENT_SPOTS.length - 1)], z_index: 40 + accentCount };
+      accentCount++;
+    } else if (HIGH_OVERLAY_TYPES.indexOf(t) !== -1) {
+      slots[i] = { position: { ...FULL_STAGE }, z_index: 38 };
+    } else if (GHOST_TYPES.indexOf(t) !== -1) {
+      slots[i] = { position: { ...FULL_STAGE }, z_index: 4 };
+    } else if (BACKDROP_CAST_TYPES.indexOf(t) !== -1) {
+      // With a world: drop (the film's one backdrop is already injected).
+      // Without: honor it as the scene's backdrop wash over the legacy bg.
+      slots[i] = hasWorld ? null : { position: { ...FULL_STAGE }, z_index: 2 };
+    } else if (isCaptionRole(t)) {
+      captionIdx.push(i);
+    } else if (HERO_ROLE_TYPES.indexOf(t) !== -1) {
+      heroIdx.push(i);
+    } else {
+      surfaceIdx.push(i);
+    }
   });
-  accents.forEach((t, i) => {
-    out.set(t, { position: ACCENT_SPOTS[Math.min(i, ACCENT_SPOTS.length - 1)], z_index: 40 + i });
-  });
-  var has = (t: string) => types.indexOf(t) !== -1;
-  if (has("quotient-app-shell")) {
-    out.set("quotient-app-shell", { position: { x: "1.2%", y: "2%", width: "97.6%", height: "96%" }, z_index: 5 });
+
+  // ── Surfaces: the window recipes (identical to the hand-built films) ──
+  var firstOfType = (t: string) => surfaceIdx.find((i) => authored[i].type === t && !slots[i]);
+  var hasSurface = (t: string) => surfaceIdx.some((i) => authored[i].type === t);
+  if (hasSurface("quotient-app-shell")) {
+    var shellI = firstOfType("quotient-app-shell");
+    if (shellI !== undefined) slots[shellI] = { position: { x: "1.2%", y: "2%", width: "97.6%", height: "96%" }, z_index: 5 };
     for (var center of ["quotient-campaign", "quotient-social"]) {
-      if (has(center)) out.set(center, { position: { x: "4.7%", y: "8%", width: "61.5%", height: "89%" }, z_index: 10 });
+      var ci = firstOfType(center);
+      if (ci !== undefined) slots[ci] = { position: { x: "4.7%", y: "8%", width: "61.5%", height: "89%" }, z_index: 10 };
     }
-    if (has("quotient-chat")) {
-      out.set("quotient-chat", { position: { x: "67.6%", y: "8%", width: "30.5%", height: "87%" }, z_index: 15 });
-    }
-  } else if (has("quotient-chat") && (has("quotient-campaign") || has("quotient-social"))) {
+    var chatI = firstOfType("quotient-chat");
+    if (chatI !== undefined) slots[chatI] = { position: { x: "67.6%", y: "8%", width: "30.5%", height: "87%" }, z_index: 15 };
+  } else if (hasSurface("quotient-chat") && (hasSurface("quotient-campaign") || hasSurface("quotient-social"))) {
     // No shell staged (storyboards sometimes drop it): same split, framed
     // as two floating windows over the world instead of inside the shell.
     for (var pairCenter of ["quotient-campaign", "quotient-social"]) {
-      if (has(pairCenter)) out.set(pairCenter, { position: { x: "2.5%", y: "6%", width: "62%", height: "88%" }, z_index: 10 });
+      var pi = firstOfType(pairCenter);
+      if (pi !== undefined) slots[pi] = { position: { x: "2.5%", y: "6%", width: "62%", height: "88%" }, z_index: 10 };
     }
-    out.set("quotient-chat", { position: { x: "66.5%", y: "6%", width: "31%", height: "88%" }, z_index: 15 });
+    var pchatI = firstOfType("quotient-chat");
+    if (pchatI !== undefined) slots[pchatI] = { position: { x: "66.5%", y: "6%", width: "31%", height: "88%" }, z_index: 15 };
   }
-  // Any remaining pair splits left/right; a lone surface gets the classic
-  // single-window frame (the hand-built films' 84% inset).
-  var unplaced = types.filter((t) => !out.has(t));
-  if (unplaced.length === 2) {
-    out.set(unplaced[0], { position: { x: "2.5%", y: "6%", width: "62%", height: "88%" }, z_index: 10 });
-    out.set(unplaced[1], { position: { x: "66.5%", y: "6%", width: "31%", height: "88%" }, z_index: 15 });
+  var unplacedSurfaces = surfaceIdx.filter((i) => !slots[i]);
+  var placedSurfaceCount = surfaceIdx.length - unplacedSurfaces.length;
+  var hasEditorial = captionIdx.length + heroIdx.length > 0;
+  if (unplacedSurfaces.length === 2 && placedSurfaceCount === 0) {
+    slots[unplacedSurfaces[0]] = { position: { x: "2.5%", y: "6%", width: "62%", height: "88%" }, z_index: 10 };
+    slots[unplacedSurfaces[1]] = { position: { x: "66.5%", y: "6%", width: "31%", height: "88%" }, z_index: 15 };
+  } else if (unplacedSurfaces.length === 1 && placedSurfaceCount === 0) {
+    // A lone surface: classic 84% single-window inset -- unless editorial
+    // copy rides with it, in which case the window docks left and the copy
+    // gets a real right column instead of stacking on top of the window.
+    slots[unplacedSurfaces[0]] = hasEditorial
+      ? { position: { x: "3%", y: "8%", width: "58%", height: "84%" }, z_index: 10 }
+      : { position: { x: "8%", y: "6.5%", width: "84%", height: "87%" }, z_index: 10 };
+  } else if (unplacedSurfaces.length > 0) {
+    // 3+ recipe-less surfaces (or extra same-type instances beyond a recipe):
+    // an even row, never the old same-slot stack.
+    var n = unplacedSurfaces.length;
+    var w = (94 - (n - 1) * 2) / n;
+    unplacedSurfaces.forEach((idx, k) => {
+      slots[idx] = { position: pct(3 + k * (w + 2), 12, w, 76), z_index: 10 + k };
+    });
   }
-  for (var t of types) {
-    if (!out.has(t)) out.set(t, { position: { x: "8%", y: "6.5%", width: "84%", height: "87%" }, z_index: 10 });
+
+  // ── Editorial copy: docked column / lower third / center stage ──
+  var editorialIdx = heroIdx.concat(captionIdx); // heroes first (top of column)
+  if (editorialIdx.length > 0) {
+    if (surfaceIdx.length === 1 && unplacedSurfaces.length === 1) {
+      // One docked window -> right column, stacked.
+      var rows = stackRows(editorialIdx.length, 12, 76, 4);
+      editorialIdx.forEach((idx, k) => {
+        slots[idx] = { position: pct(64, rows[k][0], 33, rows[k][1]), z_index: 20 + k };
+      });
+    } else if (surfaceIdx.length > 0) {
+      // Recipe/pair/row compositions own the frame -> copy in a lower-third
+      // band above the windows.
+      var lowRows = stackRows(editorialIdx.length, 70, 24, 2);
+      editorialIdx.forEach((idx, k) => {
+        slots[idx] = { position: pct(15, lowRows[k][0], 70, lowRows[k][1]), z_index: 30 + k };
+      });
+    } else {
+      // No surfaces: pure editorial scene. Heroes hold center stage;
+      // captions take the lower third under them.
+      if (heroIdx.length > 0) {
+        var hw = (76 - (heroIdx.length - 1) * 4) / heroIdx.length;
+        heroIdx.forEach((idx, k) => {
+          slots[idx] = {
+            position: captionIdx.length > 0
+              ? pct(12 + k * (hw + 4), 14, hw, 48)
+              : pct(12 + k * (hw + 4), 20, hw, 60),
+            z_index: 10 + k,
+          };
+        });
+        if (captionIdx.length > 0) {
+          var capRows = stackRows(captionIdx.length, 68, 24, 2);
+          captionIdx.forEach((idx, k) => {
+            slots[idx] = { position: pct(15, capRows[k][0], 70, capRows[k][1]), z_index: 20 + k };
+          });
+        }
+      } else {
+        // Captions only: centered stack.
+        var soloRows = stackRows(captionIdx.length, 18, 64, 4);
+        captionIdx.forEach((idx, k) => {
+          slots[idx] = { position: pct(10, soloRows[k][0], 80, soloRows[k][1]), z_index: 10 + k };
+        });
+      }
+    }
   }
-  return out;
+
+  // Safety net: anything still unslotted (shouldn't happen) gets the inset.
+  authored.forEach((_, i) => {
+    if (!slots[i] && BACKDROP_CAST_TYPES.indexOf(authored[i].type) === -1) {
+      slots[i] = { position: { x: "8%", y: "6.5%", width: "84%", height: "87%" }, z_index: 10 };
+    }
+  });
+  return slots;
 }
 
 function buildAuthoredCompositionScene(
@@ -349,7 +477,7 @@ function buildAuthoredCompositionScene(
 ): GeneratedScene {
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (authored composition -- deterministic, no codegen)`);
   var types = authored.map((c) => c.type);
-  var layout = authoredLayout(types);
+  var slots = authoredLayout(authored, !!opts.world);
   // The dark cinematic world under every mock window, matching the film's
   // template scenes (and the hand-built originals).
   // The film's ONE world under every scene (SPEC-world.md). The per-scene
@@ -375,18 +503,26 @@ function buildAuthoredCompositionScene(
     position: { x: 0, y: 0, width: "100%", height: "100%" },
     data: { seed: 5 + opts.sceneIndex * 7 },
   }];
-  for (var c of authored) {
-    var lay = layout.get(c.type)!;
+  var seenType: Record<string, number> = {};
+  authored.forEach(function(c, ci) {
+    var lay = slots[ci];
+    if (!lay) {
+      console.log(`    dropped redundant ${c.type} (the world's backdrop already runs under this scene)`);
+      return;
+    }
     var data: Record<string, unknown> = { ...c.data };
     // The recipe's show_panel contract: the shell's own agent panel hides
     // when the full-fidelity quotient-chat rides beside it.
     if (c.type === "quotient-app-shell" && types.indexOf("quotient-chat") !== -1 && data.show_panel === undefined) {
       data.show_panel = false;
     }
-    // id = type so storyboard-authored camera anchors ("claude-cowork-session"
-    // or "claude-cowork-session.transcript") resolve without translation.
-    components.push({ id: c.type, type: c.type, data, position: lay.position, z_index: lay.z_index });
-  }
+    // First instance keeps id = type so storyboard-authored camera anchors
+    // ("claude-cowork-session" or ".transcript") resolve without translation;
+    // repeats get _2, _3... (duplicate DOM ids silently broke seeks).
+    var nth = (seenType[c.type] = (seenType[c.type] || 0) + 1);
+    var id = nth === 1 ? c.type : `${c.type}_${nth}`;
+    components.push({ id, type: c.type, data, position: lay.position, z_index: lay.z_index });
+  });
   var acTransition: SceneTransition | undefined;
   if (draft.transition_in && draft.transition_in.type !== "none") {
     acTransition = {
