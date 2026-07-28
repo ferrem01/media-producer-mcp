@@ -1471,6 +1471,8 @@ async function critiqueAndRetryScene(opts: {
               d.type === "invisible_surface" ? "A panel/card has near-zero separation from the background (ghost panel)"
               : d.type === "edge_bleed" ? "A decorative/photo element bleeds across a frame border (positioned partially off-canvas)"
               : d.type === "clipped_text" ? "Text is cut off by its container and reads as nonsense"
+              : d.type === "off_canvas_content" ? "Real content (button/card/media) hangs past the canvas edge -- cut off below the fold"
+              : d.type === "text_collision" ? "Two unrelated text elements overlap -- text landing on text"
               : "Large empty/flat region -- the frame reads as sparse/dead");
           }
           if (layoutDefects.length > 0) {

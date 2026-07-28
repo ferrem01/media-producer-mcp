@@ -615,6 +615,12 @@ export interface LayoutProbeResult {
   /** Text elements whose glyphs are cut off by an overflow-clipping ancestor or
    *  the canvas edge ("One brief" rendering as "One br"). */
   clippedTexts: Array<{ text: string; el: string; container: string; overflowX: number; overflowY: number }>;
+  /** Content elements (buttons/media/text/panels) hanging meaningfully past a
+   *  canvas edge -- or parked fully outside but near it (a CTA below the fold). */
+  offCanvasContent: Array<{ label: string; edge: string; offFrac: number; px: number }>;
+  /** Pairs of unrelated text elements whose boxes overlap -- two captions or a
+   *  chip landing on a breadcrumb row (neither contains the other in the DOM). */
+  textCollisions: Array<{ a: string; b: string; overlapFrac: number }>;
 }
 
 export async function captureSingleFrame(options: {
@@ -953,12 +959,48 @@ export async function captureSingleFrame(options: {
         const surfaces: any[] = [];
         const contentBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
         const clippedTexts: Array<{ text: string; el: string; container: string; overflowX: number; overflowY: number }> = [];
+        const offCanvasContent: Array<{ label: string; edge: string; offFrac: number; px: number }> = [];
+        const textEls: Array<{ el: Element; x: number; y: number; w: number; h: number; label: string }> = [];
+
+        const labelOf = (el: Element, txt: string) =>
+          (el.tagName.toLowerCase() +
+            (el.className && typeof el.className === "string" ? "." + el.className.split(/\s+/)[0] : "") +
+            (txt ? ` "${txt.slice(0, 30)}"` : "")).slice(0, 60);
+        const contentKind = (el: Element, cs: CSSStyleDeclaration, txt: string): string | null => {
+          const tag = el.tagName.toLowerCase();
+          if (tag === "button" || el.getAttribute("role") === "button") return "button";
+          if (tag === "img" || tag === "svg" || tag === "video" || tag === "canvas") return "media";
+          if (txt.length >= 2 && (parseFloat(cs.fontSize) || 0) >= 14) return "text";
+          const r0 = el.getBoundingClientRect();
+          if ((alphaOf(cs.backgroundColor) >= 0.5 || richFill(cs)) && r0.width >= 120 && r0.height >= 60) return "panel";
+          return null;
+        };
 
         for (const el of els) {
           const cs = getComputedStyle(el);
           if (!visible(cs)) continue;
           const r = el.getBoundingClientRect();
-          if (!onCanvas(r)) continue;
+          if (!onCanvas(r)) {
+            // Content parked fully OUTSIDE but near the canvas (a CTA card
+            // below the fold): invisible to every on-canvas check, and the
+            // scene's whole point may be in it. Only near-misses count --
+            // elements far away are entrance/exit parking, not layout bugs.
+            const near = r.left < vw * 1.4 && r.top < vh * 1.4 && r.right > -vw * 0.4 && r.bottom > -vh * 0.4;
+            const bigEnough = r.width >= 24 && r.height >= 16;
+            if (near && bigEnough) {
+              const dt = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent || "").join("").trim();
+              const kind = contentKind(el, cs, dt);
+              // Panels/plain text park off-canvas legitimately mid-animation;
+              // a BUTTON or MEDIA element fully outside is the CTA-under-the-
+              // fold class. (Persistence across probes filters the rest.)
+              if (kind === "button" || kind === "media") {
+                const edge = r.top >= vh ? "bottom" : r.bottom <= 0 ? "top" : r.left >= vw ? "right" : "left";
+                const px = Math.round(edge === "bottom" ? r.bottom - vh : edge === "top" ? -r.top : edge === "right" ? r.right - vw : -r.left);
+                offCanvasContent.push({ label: `${kind} ${labelOf(el, dt)}`, edge, offFrac: 1, px });
+              }
+            }
+            continue;
+          }
           const aFrac = (r.width * r.height) / area;
           const box = {
             x: Math.max(0, Math.round(r.x)), y: Math.max(0, Math.round(r.y)),
@@ -982,6 +1024,27 @@ export async function captureSingleFrame(options: {
           const fontSize = parseFloat(cs.fontSize) || 0;
           if ((directText.length >= 2 && fontSize >= 14) || isMedia || isButton) {
             contentBoxes.push(box);
+          }
+          if (directText.length >= 3 && fontSize >= 14) {
+            textEls.push({ el, x: r.x, y: r.y, w: r.width, h: r.height, label: labelOf(el, directText) });
+          }
+
+          // Partial overhang: a content element (or filled panel) hanging a
+          // meaningful fraction of itself past a canvas edge -- the "Start
+          // free card under the bottom of the canvas" class. Full-bleed-ish
+          // layers are exempt (backdrops oversize on purpose).
+          const kindHere = contentKind(el, cs, directText);
+          const fullBleedIsh = r.width >= vw * 0.9 || r.height >= vh * 0.9;
+          if (kindHere && !fullBleedIsh && r.width * r.height >= 1500) {
+            const visW = Math.min(r.right, vw) - Math.max(r.left, 0);
+            const visH = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+            const offFrac = 1 - (Math.max(0, visW) * Math.max(0, visH)) / (r.width * r.height);
+            if (offFrac >= 0.25) {
+              const overB = r.bottom - vh, overT = -r.top, overR = r.right - vw, overL = -r.left;
+              const worstPx = Math.max(overB, overT, overR, overL);
+              const edge = worstPx === overB ? "bottom" : worstPx === overT ? "top" : worstPx === overR ? "right" : "left";
+              offCanvasContent.push({ label: `${kindHere} ${labelOf(el, directText)}`, edge, offFrac: Math.round(offFrac * 100) / 100, px: Math.round(worstPx) });
+            }
           }
 
           // Clipped text: significant text whose glyphs are cut off -- by its
@@ -1060,7 +1123,26 @@ export async function captureSingleFrame(options: {
             });
           }
         }
-        return { vw, vh, pageBg, surfaces, contentBoxes, hasRichFullBleedBg, clippedTexts };
+        // Text-on-text collisions: two text elements overlapping heavily where
+        // NEITHER contains the other in the DOM -- sibling copy landing on
+        // sibling copy (a chip on a breadcrumb row, two stacked captions).
+        // Ancestor/descendant overlap is normal document flow, never flagged.
+        const textCollisions: Array<{ a: string; b: string; overlapFrac: number }> = [];
+        const tn = Math.min(textEls.length, 60);
+        for (let i = 0; i < tn && textCollisions.length < 4; i++) {
+          for (let j = i + 1; j < tn && textCollisions.length < 4; j++) {
+            const A = textEls[i], B = textEls[j];
+            if (A.el.contains(B.el) || B.el.contains(A.el)) continue;
+            const ix = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x);
+            const iy = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y);
+            if (ix <= 0 || iy <= 0) continue;
+            const overlapFrac = (ix * iy) / Math.min(A.w * A.h, B.w * B.h);
+            if (overlapFrac >= 0.4) {
+              textCollisions.push({ a: A.label, b: B.label, overlapFrac: Math.round(overlapFrac * 100) / 100 });
+            }
+          }
+        }
+        return { vw, vh, pageBg, surfaces, contentBoxes, hasRichFullBleedBg, clippedTexts, offCanvasContent, textCollisions };
       }, { vw: width, vh: height });
     }
 
