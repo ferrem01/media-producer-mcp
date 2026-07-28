@@ -1934,3 +1934,39 @@ product fixes:
   caption default.
 - flowchart FIT TO THE SHOT: the 5s draw choreography now scales to
   complete by ~55% of the scene -- micro-shots show the whole tree.
+
+## Recreation closed: 28-for-28 + settled entrances (Marc, 2026-07-28)
+
+The HyperFrames catalog recreation (proj_3acdc1c8) reached visual-twin
+state and Marc closed the arc. Final rounds (PRs #535-#539):
+
+- Typography/scale controls: kinetic-text font/letter_spacing/font_weight/
+  accent_color/align; st-manifesto data.uniform (no small-word shrink);
+  x-post-card + spotify data.scale. GOTCHA FOUND: an inline CSS transform
+  scale was silently overwritten by the first GSAP tween touching scale --
+  display scale must be folded into the tween values themselves.
+- spotify-now-playing layout:"card" (portrait hero: big square art +
+  note glyph + Spotify badge); x-post-card count-ups parse K/M suffixes
+  ("2.3K" ticked to 2 before); flowchart per-node color chips (sticky-note
+  style, auto text contrast) + edge_color; device-showcase screen presets
+  (app-hero/app-stats/app-chart) + data.rotate for fanned trios;
+  glass-shard-wall cool silver-blue palette + text_front.
+- PACING: Marc "seems much faster than the original" -- two real causes:
+  15fps preview choppiness (production 30fps fixed most of it) and four
+  scene durations diverging from the reference cut rhythm (matched; film
+  now 24.2s vs ref 24.1s, cut-for-cut).
+- SETTLED ENTRANCES (scene.entrance:"settled", PR #538): assembler plays
+  each component timeline's [2.2s, 2.2s+dur] window via tweenFromTo --
+  hard cuts land on STANDING content (entrances/count-ups resolved,
+  ambient still running). ctx.duration deliberately NOT extended: the
+  components' `duration > 2` exit guards keep exits out of the window,
+  which also limits the flag to scenes <= 2s. CACHE_VERSION 4. Applied to
+  the 25 hold shots; the glass wall drift + checklist build stay animated.
+- Operator playbook now carries the four-grammar cheat sheet (product
+  demos the product = tempo-cut; words carry the argument = editorial;
+  one cinematic world = launch-film; human on camera = speaker-screencast)
+  so driving agents ask the right question and pin film_grammar.
+
+Next up (Marc's backlog): Studio scrubber component bars always visible
+(design the density problem), narration/script-from-video test+fix pass,
+Studio aesthetic polish.
