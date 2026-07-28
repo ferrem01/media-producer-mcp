@@ -32,6 +32,16 @@
       "type": "number",
       "label": "Blow the fixed-size card up for hero shots (e.g. 1.6)",
       "optional": true
+    },
+    "layout": {
+      "type": "string",
+      "label": "Layout",
+      "optional": true,
+      "enum": [
+        "bar",
+        "card"
+      ],
+      "description": "card = portrait hero layout: big square album art on top, track/artist below, Spotify badge at the bottom. Default is the compact horizontal now-playing bar."
     }
   }
 }

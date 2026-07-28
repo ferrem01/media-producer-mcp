@@ -63,6 +63,23 @@
       "type": "string",
       "label": "Weight override (e.g. 800)",
       "optional": true
+    },
+    "accent_color": {
+      "type": "string",
+      "label": "Accent Color",
+      "optional": true,
+      "description": "Color for *starred* accent words, overriding the brand primary (e.g. an indigo package token in a mono terminal line)."
+    },
+    "align": {
+      "type": "string",
+      "label": "Align",
+      "optional": true,
+      "enum": [
+        "left",
+        "center",
+        "right"
+      ],
+      "description": "Horizontal alignment. left/right turn the centered caption into a flush block (terminal checklists, editorial columns)."
     }
   }
 }
