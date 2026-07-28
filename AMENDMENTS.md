@@ -1844,3 +1844,26 @@ in 7/8 scenes with broken handoffs). "Implement them both."
   contrast gates, so buildAuthoredCompositionScene now deterministically
   clamps caption/hero ink that matches the world's lightness (or is
   absent on a light world) to the world's ink (brand text / #f5f6fa).
+
+## Off-canvas + text-collision gates; deterministic payoff/close (Marc, 2026-07-28)
+
+Marc on the verified film: scenes 6-7 (the codegen tail) had "some overlap
+and some misplacement... the start free trial thing sort of under the
+bottom of the canvas." The deterministic path is now the quality path; two
+fixes shrink codegen's blast radius:
+
+- Layout probe (capture.ts) now reports offCanvasContent (buttons/media/
+  panels/text hanging >=25% past a canvas edge, or buttons/media parked
+  fully outside but near -- the CTA-below-the-fold class was invisible to
+  every gate because onCanvas() skipped such elements before any check)
+  and textCollisions (two text elements overlapping >=40% where neither
+  contains the other -- sibling copy on sibling copy). measureLayout
+  aggregates both with >=2-probe persistence (entrance/exit transients
+  don't count) and emits blocking off_canvas_content / text_collision
+  defects; pipeline maps them into the critique loop.
+- Tempo-cut storyboard contract: THE PAYOFF BEAT is deterministic
+  (stat-card / number-counter-row object -- the layout engine now gives
+  heroes center stage), THE CLOSE is a template (st-logo-close), and
+  OBJECTS, NOT STRINGS (one plain-string hint silently dropped a whole
+  scene to the codegen path this grammar forbids).
+- test/layout-gates.test.ts: 4 live-browser gate tests + 2 source guards.

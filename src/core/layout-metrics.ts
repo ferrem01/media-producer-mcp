@@ -33,7 +33,7 @@ import { captureSingleFrame, type LayoutProbeResult, type SurfaceMetric } from "
 const execFileAsync = promisify(execFile);
 
 export interface LayoutDefect {
-  type: "invisible_surface" | "dead_frame" | "edge_bleed" | "clipped_text";
+  type: "invisible_surface" | "dead_frame" | "edge_bleed" | "clipped_text" | "off_canvas_content" | "text_collision";
   detail: string;
 }
 
@@ -267,6 +267,11 @@ export async function measureLayout(opts: {
   let edgeBleed: LayoutDefect | null = null;
   // text snippet -> { frames seen clipped, worst sample }
   const clipSeen = new Map<string, { count: number; sample: { text: string; el: string; container: string; overflowX: number; overflowY: number } }>();
+  // element label -> { frames seen off-canvas, worst sample }. Persistence
+  // (>= 2 probed moments) filters elements merely mid-entrance/exit.
+  const offSeen = new Map<string, { count: number; sample: { label: string; edge: string; offFrac: number; px: number } }>();
+  // "labelA|labelB" -> { frames seen colliding, worst sample }
+  const collideSeen = new Map<string, { count: number; sample: { a: string; b: string; overlapFrac: number } }>();
 
   const tmpDir = path.join(os.tmpdir(), `layout_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true }).catch(() => {});
@@ -313,6 +318,29 @@ export async function measureLayout(opts: {
       edgeBleed = await edgeBleedDefect(probePath, opts.width, opts.height);
     }
 
+    // Off-canvas content + text collisions: tally per element/pair; both need
+    // >= 2 probed moments (an element sliding in is off-canvas for an instant
+    // by design -- an element that LIVES off-canvas is the defect).
+    for (const o of layout.offCanvasContent || []) {
+      const prev = offSeen.get(o.label);
+      if (prev) {
+        prev.count++;
+        if (o.offFrac > prev.sample.offFrac) prev.sample = o;
+      } else {
+        offSeen.set(o.label, { count: 1, sample: o });
+      }
+    }
+    for (const c of layout.textCollisions || []) {
+      const key = `${c.a}|${c.b}`;
+      const prev = collideSeen.get(key);
+      if (prev) {
+        prev.count++;
+        if (c.overlapFrac > prev.sample.overlapFrac) prev.sample = c;
+      } else {
+        collideSeen.set(key, { count: 1, sample: c });
+      }
+    }
+
     // Clipped text: tally per text snippet. Requiring >= 2 probed moments
     // filters an element that is merely mid-entrance at one instant.
     for (const c of layout.clippedTexts || []) {
@@ -343,6 +371,29 @@ export async function measureLayout(opts: {
         `Make the full text visible: smaller font-size, wrapping, or a wider container.`,
     });
     clipEmitted++;
+  }
+  let offEmitted = 0;
+  for (const { count, sample } of offSeen.values()) {
+    if (count < 2 || offEmitted >= 2) continue;
+    defects.push({
+      type: "off_canvas_content",
+      detail: `${sample.label} sits ${sample.offFrac >= 1 ? "ENTIRELY" : `${Math.round(sample.offFrac * 100)}%`} ` +
+        `outside the canvas past the ${sample.edge} edge (${sample.px}px beyond) for most of the scene. ` +
+        `Real content must live fully inside the 100vw x 100vh frame -- move it up/in, shrink the layout, ` +
+        `or remove it. Nothing the viewer is meant to see may hang below the fold.`,
+    });
+    offEmitted++;
+  }
+  let collideEmitted = 0;
+  for (const { count, sample } of collideSeen.values()) {
+    if (count < 2 || collideEmitted >= 2) continue;
+    defects.push({
+      type: "text_collision",
+      detail: `Two unrelated text elements overlap by ${Math.round(sample.overlapFrac * 100)}% of the smaller one: ` +
+        `${sample.a} collides with ${sample.b}. Separate them -- distinct regions of the frame, or stagger ` +
+        `their timelines so one exits before the other enters. Text landing on text reads as a broken frame.`,
+    });
+    collideEmitted++;
   }
   return defects;
   } finally {
