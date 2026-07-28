@@ -2209,7 +2209,8 @@ async function runUnifiedPipeline(
       const st = d.scene_template;
       if (!st || !CONVERT.has(st.type)) continue;
       const sd = (st.data && typeof st.data === "object") ? st.data : {};
-      const text = sd.text || sd.quote || sd.title || sd.headline || d.label || "";
+      // st-manifesto/swarm use '|' as a line separator; st-statement uses \n.
+      const text = String(sd.text || sd.quote || sd.title || sd.headline || d.label || "").replace(/\s*\|\s*/g, "\n");
       console.log(`  Editorial vocabulary: converting ${st.type} -> st-statement ("${String(text).slice(0, 40)}")`);
       d.scene_template = {
         type: "st-statement",
