@@ -2122,14 +2122,28 @@ async function runUnifiedPipeline(
   // authors durations in bars and the quantize pass below snaps cuts to
   // downbeats. (The "assemble" mandate already returned earlier.)
   trace?.beginEvent("grammar_prep");
+  // Tempo-cut IS music-first: the beat grid is the grammar's entire timing
+  // spine -- without it there are no bars, no quantization, no downbeats,
+  // and the "tempo cut" is hard cuts against silence (measured live:
+  // proj_e9366848 shipped with audio:null and flat 4s scenes). The bed
+  // defaults ON for tempo-cut; an explicit false still wins.
+  const wantsMusic = opts.backgroundMusic !== undefined
+    ? opts.backgroundMusic
+    : filmGrammar === "tempo-cut";
+  if (filmGrammar === "tempo-cut" && !wantsMusic) {
+    console.warn("  TEMPO-CUT WITHOUT A MUSIC BED (background_music=false): cuts cannot land on downbeats -- the film will read as a slideshow.");
+  }
   const prep = await runGrammarPrep(filmGrammar, {
     prompt: richPrompt,
     brandKit,
     tenantId: opts.tenant_id,
     format,
-    backgroundMusic: opts.backgroundMusic,
+    backgroundMusic: wantsMusic,
     sceneCount,
   });
+  if (filmGrammar === "tempo-cut" && wantsMusic && !prep.beatMap) {
+    console.warn("  TEMPO-CUT: music selection produced NO beat grid (JAMENDO_CLIENT_ID unset or selection failed) -- cuts will not be bar-quantized.");
+  }
   var musicTrack: import("../audio/music.js").MusicTrack | null = prep.music || null;
   var beatMap: import("../audio/beat-map.js").BeatMap | undefined = prep.beatMap;
   trace?.endEvent({ mandate: prep.mandate, bpm: beatMap?.bpm });
