@@ -29,7 +29,7 @@ import path from "path";
 import { projectDir } from "../persistence/paths.js";
 import type { Project } from "./types.js";
 
-const CACHE_VERSION = 3; // 3: micro-shot entrance compression in scene-assembler (2: camera rig z-index fix)
+const CACHE_VERSION = 4; // 4: settled-entrance pre-roll in scene-assembler (3: micro-shot compression)
 
 export function sceneCacheEnabled(): boolean {
   return process.env.MP_SCENE_CACHE !== "0";

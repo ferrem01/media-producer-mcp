@@ -331,6 +331,12 @@ export interface Scene {
   content_region?: ContentRegion;
   /** When true, the scene background is rendered transparently (used with full-behind overlays). */
   transparent_background?: boolean;
+  /** "settled": component timelines are pre-rolled so entrances are already
+   *  resolved at frame 0 -- the hard cut lands on standing content with only
+   *  ambient motion running (the editorial fast-cut grammar). Default
+   *  ("animated") plays entrances normally, with micro-shot compression on
+   *  sub-1.4s scenes. */
+  entrance?: "settled" | "animated";
 }
 
 // ── Audio ──
