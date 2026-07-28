@@ -74,7 +74,17 @@ const animationSchema = z.object({
 }).optional();
 
 const transitionSchema = z.object({
-  type: z.enum(["crossfade", "blur-crossfade", "wipe-left", "wipe-right", "slide-up", "slide-down", "iris", "glass-turn", "match-cut", "none"]),
+  // Keep in sync with SceneTransition (core/types.ts) -- the render engine's
+  // full vocabulary. The hand-edit API rejecting engine-supported transitions
+  // was measured live (shader-gravitational-lens bounced off the add tool
+  // while the generate pipeline used it happily).
+  type: z.enum([
+    "crossfade", "blur-crossfade", "slide-reveal", "zoom-through", "glitch-cut", "morph-wipe", "scale-rotate", "curtain",
+    "wipe-left", "wipe-right", "slide-up", "slide-down", "iris", "glass-turn", "match-cut", "whip-pan", "cinematic-zoom", "push",
+    "shader-crosswarp", "shader-ripple", "shader-radial", "shader-directional-warp", "shader-burn", "shader-chromatic",
+    "shader-lens-distortion", "shader-swirl", "shader-pixelize", "shader-flash-white", "shader-light-leak",
+    "shader-gravitational-lens", "shader-thermal", "shader-domain-warp", "shader-ridged-burn", "none",
+  ]),
   duration_seconds: z.number(),
 }).optional();
 
