@@ -222,8 +222,8 @@ export function getPreviewHtml(): string {
 
   /* Playback controls */
   #playback-bar {
-    display: flex; align-items: center; gap: 12px;
-    padding: 8px 16px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
     background: #ffffff;
     border-top: 1px solid #e6e8ef;
     box-shadow: 0 -1px 2px rgba(15,23,42,0.03);
@@ -239,7 +239,8 @@ export function getPreviewHtml(): string {
   .play-btn:hover { background: linear-gradient(180deg, #524bea, #4338ca); box-shadow: 0 3px 10px rgba(79,70,229,0.45); }
   .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .play-btn svg { fill: #fff; }
-  #slider-wrap { position: relative; flex: 1; height: 122px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  #slider-wrap { position: relative; flex: 1; height: 122px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+    background: #fbfcfe; border: 1px solid #dfe4ef; border-radius: 10px; box-shadow: inset 0 1px 2px rgba(15,23,42,0.03); }
   #slider-wrap::-webkit-scrollbar { display: none; }
   #timeline-track { position: relative; height: 100%; min-width: 100%; width: 100%; }
   /* Fixed lane gutter: one icon per visible lane, stationary at the left of
@@ -255,29 +256,29 @@ export function getPreviewHtml(): string {
   /* Lane beds: each track paints on its own surface so the layers read as
      layers; the ruler band on top is visually a different kind of thing. */
   .lane-bed { position: absolute; left: 0; right: 0; pointer-events: none; box-sizing: border-box; }
-  .lane-bed.ruler { background: #eef1f6; border-bottom: 1px solid #cbd5e1; }
+  .lane-bed.ruler { background: linear-gradient(180deg, #e8ebf3, #dee3ee); border-bottom: 1px solid #c6cdde; }
   .lane-bed.screen { background: rgba(148,163,184,0.07); border: 1px solid rgba(148,163,184,0.20); border-radius: 6px; }
   .lane-bed.speaker { background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.18); border-radius: 6px; }
   .lane-bed.music { background: rgba(148,163,184,0.08); border: 1px solid rgba(148,163,184,0.16); border-radius: 5px; }
-  .lane-bed.comps { background: rgba(99,102,241,0.04); border: 1px solid rgba(99,102,241,0.14); border-radius: 6px; }
+  .lane-bed.comps { background: transparent; border: none; }
   /* Components band: every scene's cast as lane-packed micro-bars, always
      visible (no click-into-scene needed). Rows cap at 4; a "+N" chip covers
      the overflow and opens focus mode. */
   #comp-lane { position: absolute; left: 0; right: 0; pointer-events: none; }
-  .comp-bar { position: absolute; height: 9px; border-radius: 4px; pointer-events: auto; cursor: pointer;
-    box-sizing: border-box; overflow: hidden; opacity: 0.82; }
+  .comp-bar { position: absolute; height: 12px; border-radius: 5px; pointer-events: auto; cursor: pointer;
+    box-sizing: border-box; overflow: hidden; opacity: 0.85; }
   .comp-bar:hover { opacity: 1; box-shadow: 0 0 0 1.5px rgba(30,41,59,0.35); z-index: 3; }
   .comp-bar.comp-active { opacity: 1; box-shadow: 0 0 0 1.5px #4338ca; z-index: 3; }
   .comp-bar.comp-custom { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.35) 0 3px, transparent 3px 6px); }
-  .comp-bar-label { display: block; font-size: 8px; line-height: 9px; font-weight: 600; color: #ffffff;
+  .comp-bar-label { display: block; font-size: 9px; line-height: 12px; font-weight: 600; color: #ffffff;
     padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: clip; letter-spacing: 0.02em;
     text-shadow: 0 0 2px rgba(0,0,0,0.25); pointer-events: none; }
-  .comp-more { position: absolute; height: 9px; border-radius: 4px; pointer-events: auto; cursor: pointer;
-    background: #e2e8f0; border: 1px solid #cbd5e1; color: #475569; font-size: 8px; line-height: 8px;
+  .comp-more { position: absolute; height: 12px; border-radius: 5px; pointer-events: auto; cursor: pointer;
+    background: #e2e8f0; border: 1px solid #cbd5e1; color: #475569; font-size: 9px; line-height: 10px;
     font-weight: 700; text-align: center; box-sizing: border-box; }
   .comp-more:hover { background: #cbd5e1; }
   /* The playhead: one line through every lane, driven by the master clock. */
-  #playhead-line { position: absolute; top: 18px; bottom: 0; width: 1.5px; background: #4f46e5; opacity: 0.45; z-index: 40; pointer-events: none; }
+  #playhead-line { position: absolute; top: 22px; bottom: 0; width: 1.5px; background: #4f46e5; opacity: 0.45; z-index: 40; pointer-events: none; }
   /* Audio lanes under the scrubber: music coverage + voiceover clip windows. */
   #audio-lanes { position: absolute; left: 0; right: 0; top: 86px; height: 10px; pointer-events: none; }
   .audio-lane-seg { position: absolute; height: 4px; border-radius: 2px; pointer-events: auto; }
@@ -286,15 +287,15 @@ export function getPreviewHtml(): string {
   .audio-lane-seg.sfx { top: 5px; background: #10b981; opacity: 0.6; }
   #timeline-slider {
     position: absolute; left: 0; top: 66px; width: 100%; -webkit-appearance: none; appearance: none;
-    height: 18px; background: transparent;
+    height: 22px; background: transparent;
     outline: none; cursor: pointer; margin: 0; z-index: 4;
   }
-  #timeline-slider::-webkit-slider-runnable-track { height: 3px; background: #c7cdd8; border-radius: 3px; margin-top: 7px; }
+  #timeline-slider::-webkit-slider-runnable-track { height: 3px; background: #bfc7d6; border-radius: 3px; margin-top: 9px; }
   #timeline-slider::-moz-range-track { height: 3px; background: #c7cdd8; border-radius: 3px; }
   /* Beat/scene markers over the timeline: scene cuts are strong ticks, beats are soft ticks. */
   #beat-ticks { position: absolute; left: 0; right: 0; top: 66px; height: 5px; pointer-events: none; }
-  .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #a5b4fc; opacity: 0.75; border-radius: 1px; }
-  .beat-tick.scene-cut { width: 2px; height: 13px; background: #6366f1; opacity: 0.9; }
+  .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #b3bdf7; opacity: 0.8; border-radius: 1px; }
+  .beat-tick.scene-cut { width: 2px; height: 15px; background: #4f46e5; opacity: 1; }
   /* Camera-move pills on the scrubber: one clickable pill per zoom/pan/rotate. */
   #cam-pills { position: absolute; left: 0; right: 0; top: 52px; height: 16px; pointer-events: none; }
   .cam-pill {
@@ -435,9 +436,10 @@ export function getPreviewHtml(): string {
      narrow width (vs an inline time readout) hands ~160px back to the
      scrubber, and the ticking clock still never reflows the timeline. */
   #transport-left {
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
-    flex-shrink: 0; width: 60px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    flex-shrink: 0; width: 78px; align-self: stretch;
   }
+  .tl-top-row { display: flex; align-items: center; gap: 5px; }
   .tl-zoom-seg { display: flex; border: 1px solid #dfe3ea; border-radius: 8px; overflow: hidden;
     background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
   .tl-zoom-seg button { border: none; background: none; width: 22px; height: 19px; font-size: 12px;
@@ -467,8 +469,8 @@ export function getPreviewHtml(): string {
     position: relative; display: flex; align-items: center; gap: 4px;
     flex-shrink: 0; border-radius: 999px;
   }
-  .vol-control .vol-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-    font-size: 13px; color: #6b7280; cursor: pointer; user-select: none;
+  .vol-control .vol-icon { width: 21px; height: 21px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: #6b7280; cursor: pointer; user-select: none;
     border: 1px solid #dfe3ea; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(15,23,42,0.04); transition: all 0.15s ease; }
   .vol-control:hover .vol-icon { color: #4f46e5; border-color: #c7cdf5; background: #f6f7ff; }
@@ -1020,9 +1022,16 @@ export function getPreviewHtml(): string {
 
     <div id="playback-bar">
       <span id="transport-left">
-        <span class="tl-zoom-seg">
-          <button id="tl-zoom-out" title="Zoom timeline out">&minus;</button>
-          <button id="tl-zoom-in" title="Zoom timeline in">+</button>
+        <span class="tl-top-row">
+          <span class="tl-zoom-seg">
+            <button id="tl-zoom-out" title="Zoom timeline out">&minus;</button>
+            <button id="tl-zoom-in" title="Zoom timeline in">+</button>
+          </span>
+          <span class="vol-control" id="vol-control">
+            <span class="vol-icon" id="vol-icon" title="Mute / unmute" tabindex="0">&#9834;</span>
+            <span class="audio-indicator" id="audio-indicator"></span>
+            <span class="vol-flyout"><input type="range" id="vol-slider" min="0" max="100" value="100" step="1"></span>
+          </span>
         </span>
         <button class="play-btn" id="play-btn" disabled>
           <svg id="play-icon" width="14" height="14" viewBox="0 0 14 14">
@@ -1030,11 +1039,6 @@ export function getPreviewHtml(): string {
           </svg>
         </button>
         <span id="time-stack"><span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock"></span><span class="time-display" id="time-display"><span id="time-cur">0.0s</span><span id="time-total">0.0s</span></span></span>
-        <span class="vol-control" id="vol-control">
-          <span class="vol-icon" id="vol-icon" title="Mute / unmute" tabindex="0">&#9834;</span>
-          <span class="audio-indicator" id="audio-indicator"></span>
-          <span class="vol-flyout"><input type="range" id="vol-slider" min="0" max="100" value="100" step="1"></span>
-        </span>
       </span>
       <span id="lane-gutter"></span>
       <span id="slider-wrap">
@@ -4822,7 +4826,7 @@ export function getPreviewHtml(): string {
         return c2.type === 'narration-track' && c2.data && Array.isArray(c2.data.chapters) && c2.data.chapters.length;
       });
     });
-    var y = { ruler: 0, rulerH: 18, fx: -1, fxH: 32, screenH: 32, screenRows: 1, speakerH: 32, musicH: 16, speaker: -1, music: -1, comps: -1, compsH: 0, compRows: 0 };
+    var y = { ruler: 0, rulerH: 22, fx: -1, fxH: 32, screenH: 32, screenRows: 1, speakerH: 32, musicH: 16, speaker: -1, music: -1, comps: -1, compsH: 0, compRows: 0 };
     // Components band: every scene's cast, always visible. Rows = the
     // busiest scene's component count, capped at 4 (a "+N" chip covers the
     // rest). On pure motion-graphics films (no media clips) it REPLACES the
@@ -4833,13 +4837,13 @@ export function getPreviewHtml(): string {
     });
     var hasMedia = !!((state.mediaClips || []).length);
     y.compRows = Math.min(4, maxComps);
-    y.compsH = y.compRows > 0 ? y.compRows * 12 + 4 : 0;
+    y.compsH = y.compRows > 0 ? y.compRows * 16 + 6 : 0;
     // Side-by-side scenes: the screen band grows one row per independent
     // video (max across scenes), so every piece of footage gets a timeline
     // row it can be sped/cut/pinned on.
     y.screenRows = maxScreenRows();
     y.screenH = 32 + (y.screenRows - 1) * 26;
-    var top = 22;
+    var top = 26;
     if (hasFx) { y.fx = top; top += y.fxH + 8; }
     if (y.compRows > 0 && !hasMedia) {
       // Comps band stands in for the screen band.
@@ -4851,7 +4855,7 @@ export function getPreviewHtml(): string {
     }
     if (hasSpk) { y.speaker = top; top += y.speakerH + 8; }
     if (hasMusic) { y.music = top; top += y.musicH + 6; }
-    y.total = Math.max(top + 2, 84);
+    y.total = Math.max(top + 2, 96);
     return y;
   }
 
@@ -4879,7 +4883,7 @@ export function getPreviewHtml(): string {
     // Ruler band on top: scrubber + beat ticks live in it; the camera-move
     // pills sit at the seam between ruler and the screen lane.
     setTop('timeline-slider', 0); // 18px-tall input covers the whole ruler band
-    setTop('beat-ticks', 7);
+    setTop('beat-ticks', 10);
     // Camera pills are retired -- effects render as duration blocks in
     // their own lane above the screen.
     setTop('cam-pills', 0, false);
@@ -4982,7 +4986,7 @@ export function getPreviewHtml(): string {
           var bar = document.createElement('div');
           bar.className = 'comp-bar' + (isCustom ? ' comp-custom' : '')
             + (si === state.currentSceneIndex && ci2 === state.currentComponentIndex ? ' comp-active' : '');
-          bar.style.top = (ci2 * 12) + 'px';
+          bar.style.top = (ci2 * 16) + 'px';
           bar.style.left = ((leftT / total) * 100).toFixed(3) + '%';
           bar.style.width = 'max(3px, ' + ((wT / total) * 100).toFixed(3) + '%)';
           bar.style.background = compColor(c.type);
@@ -5015,7 +5019,7 @@ export function getPreviewHtml(): string {
       if (!showAll) {
         var more = document.createElement('div');
         more.className = 'comp-more';
-        more.style.top = ((CAP - 1) * 12) + 'px';
+        more.style.top = ((CAP - 1) * 16) + 'px';
         more.style.left = ((offset / total) * 100).toFixed(3) + '%';
         more.style.width = 'max(14px, ' + ((dur / total) * 100).toFixed(3) + '%)';
         more.textContent = '+' + (comps.length - (CAP - 1));
