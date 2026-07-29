@@ -265,7 +265,19 @@ export function getPreviewHtml(): string {
      visible (no click-into-scene needed). Rows cap at 4; a "+N" chip covers
      the overflow and opens focus mode. */
   #comp-lane { position: absolute; left: 0; right: 0; pointer-events: none; }
-  .lane-cut { position: absolute; top: 22px; bottom: 0; width: 1px; background: rgba(99,102,241,0.10); pointer-events: none; }
+  /* Filmstrip lane: each scene's poster frame stretched across its segment. */
+  #film-lane { position: absolute; left: 0; right: 0; pointer-events: none; }
+  .film-cell { position: absolute; top: 0; height: 100%; overflow: hidden; border-radius: 5px;
+    background: #e8eaf2; border: 1px solid rgba(15,23,42,0.10); pointer-events: auto; cursor: pointer;
+    box-sizing: border-box; }
+  .film-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .film-cell:hover { box-shadow: 0 0 0 1.5px rgba(99,102,241,0.55); z-index: 2; }
+  .film-cell.active { box-shadow: 0 0 0 2px #6366f1; z-index: 2; }
+  /* Scene blocks: zebra containers grouping each scene's component bars. */
+  .scene-blk { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: pointer;
+    border-right: 1px solid rgba(15,23,42,0.06); }
+  .scene-blk.odd { background: rgba(99,102,241,0.045); }
+  .scene-blk:hover { background: rgba(99,102,241,0.08); }
   .comp-bar { position: absolute; height: 12px; border-radius: 5px; pointer-events: auto; cursor: pointer;
     box-sizing: border-box; overflow: hidden; opacity: 0.85; }
   .comp-bar:hover { opacity: 1; box-shadow: 0 0 0 1.5px rgba(30,41,59,0.35); z-index: 3; }
@@ -1047,6 +1059,7 @@ export function getPreviewHtml(): string {
         <div id="cam-pills"></div>
         <div id="fx-lane"></div>
         <div id="media-lane"></div>
+        <div id="film-lane"></div>
         <div id="comp-lane"></div>
         <div id="focus-lane" style="display:none;"></div>
         <canvas id="wave-strip"></canvas>
@@ -4824,7 +4837,7 @@ export function getPreviewHtml(): string {
         return c2.type === 'narration-track' && c2.data && Array.isArray(c2.data.chapters) && c2.data.chapters.length;
       });
     });
-    var y = { ruler: 0, rulerH: 22, fx: -1, fxH: 32, screenH: 32, screenRows: 1, speakerH: 32, musicH: 16, speaker: -1, music: -1, comps: -1, compsH: 0, compRows: 0 };
+    var y = { ruler: 0, rulerH: 22, fx: -1, fxH: 32, screenH: 32, screenRows: 1, speakerH: 32, musicH: 16, speaker: -1, music: -1, comps: -1, compsH: 0, compRows: 0, film: -1, filmH: 30 };
     // Components band: every scene's cast, always visible. Rows = the
     // busiest scene's component count, capped at 4 (a "+N" chip covers the
     // rest). On pure motion-graphics films (no media clips) it REPLACES the
@@ -4844,7 +4857,9 @@ export function getPreviewHtml(): string {
     var top = 26;
     if (hasFx) { y.fx = top; top += y.fxH + 8; }
     if (y.compRows > 0 && !hasMedia) {
-      // Comps band stands in for the screen band.
+      // Generated films: filmstrip (scene posters) + comps band stand in
+      // for the screen band.
+      y.film = top; top += y.filmH + 6;
       y.comps = top; top += y.compsH + 8;
       y.screen = -1;
     } else {
@@ -4863,6 +4878,7 @@ export function getPreviewHtml(): string {
     speaker: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="5.2" r="2.6"/><path d="M2.8 14c0.8-3 2.8-4.4 5.2-4.4S12.4 11 13.2 14"/></svg>',
     music: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="12.2" r="1.9"/><path d="M6.9 12.2V3.6l6-1.4v8.4"/><circle cx="11" cy="10.6" r="1.9"/></svg>',
     comps: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="1.8" y="1.8" width="5.4" height="5.4" rx="1"/><rect x="8.8" y="1.8" width="5.4" height="5.4" rx="1"/><rect x="1.8" y="8.8" width="5.4" height="5.4" rx="1"/><rect x="8.8" y="8.8" width="5.4" height="5.4" rx="1"/></svg>',
+    film: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="1.6" y="2.6" width="12.8" height="10.8" rx="1.6"/><path d="M4.6 2.6v10.8M11.4 2.6v10.8M1.6 5.5h3M1.6 8h3M1.6 10.5h3M11.4 5.5h3M11.4 8h3M11.4 10.5h3"/></svg>',
   };
 
   function applyLaneLayout(y) {
@@ -4887,6 +4903,9 @@ export function getPreviewHtml(): string {
     setTop('cam-pills', 0, false);
     setTop('fx-lane', y.fx, y.fx >= 0);
     setTop('media-lane', Math.max(0, y.screen), y.screen >= 0);
+    setTop('film-lane', y.film, y.film >= 0);
+    var flEl2 = document.getElementById('film-lane');
+    if (flEl2) flEl2.style.height = y.filmH + 'px';
     setTop('comp-lane', y.comps + 2, y.comps >= 0);
     var clEl = document.getElementById('comp-lane');
     if (clEl) clEl.style.height = y.compsH + 'px';
@@ -4915,6 +4934,7 @@ export function getPreviewHtml(): string {
     if (gut) {
       var html = '';
       if (y.fx >= 0) html += '<span class="lg-ic" style="top:' + (y.fx + y.fxH / 2 - 7) + 'px" title="EFFECTS \u2014 zooms, pans, rotates and callouts. Click a block to edit it.">' + LG_ICONS.fx + '</span>';
+      if (y.film >= 0) html += '<span class="lg-ic" style="top:' + (y.film + y.filmH / 2 - 8) + 'px" title="FILM \u2014 every scene\\'s poster frame. Click to jump to the scene.">' + LG_ICONS.film + '</span>';
       if (y.comps >= 0) html += '<span class="lg-ic" style="top:' + (y.comps + y.compsH / 2 - 8) + 'px" title="COMPONENTS \u2014 every scene\\'s cast. Click a bar to inspect it; double-click to edit its timing.">' + LG_ICONS.comps + '</span>';
       if (y.screen >= 0) html += '<span class="lg-ic" style="top:' + (y.screen + y.screenH / 2 - 8) + 'px" title="SCREEN \u2014 your recording. Click a block to split, speed up or remove footage.">' + LG_ICONS.screen + '</span>';
       if (y.speaker >= 0) html += '<span class="lg-ic" style="top:' + (y.speaker + y.speakerH / 2 - 8) + 'px" title="SPEAKER \u2014 your voice (and camera). Click a piece to play, split or remove talk.">' + LG_ICONS.speaker + '</span>';
@@ -4968,23 +4988,48 @@ export function getPreviewHtml(): string {
     var trackEl = document.getElementById('timeline-track');
     var pxTotal = trackEl ? trackEl.clientWidth : 1000;
     var CAP = 4;
-    // Scene separators: faint full-height cut lines through the lanes area,
-    // so bars visibly group into their scene (the ruler's ticks alone don't
-    // carry down into the card).
-    var trackForCuts = document.getElementById('timeline-track');
-    if (trackForCuts) {
-      trackForCuts.querySelectorAll('.lane-cut').forEach(function(n) { n.remove(); });
-      var co = 0;
-      p.scenes.forEach(function(sc, ci3) {
-        if (ci3 > 0) {
-          var cut = document.createElement('div');
-          cut.className = 'lane-cut';
-          cut.style.left = ((co / total) * 100).toFixed(3) + '%';
-          trackForCuts.appendChild(cut);
-        }
-        co += (sc.duration_seconds || 5);
-      });
-    }
+    // Filmstrip: each scene's poster frame stretched across its segment,
+    // and a zebra scene block behind the bars so the cast groups by scene.
+    var filmWrap = document.getElementById('film-lane');
+    if (filmWrap) filmWrap.innerHTML = '';
+    var pid2 = p.project_id;
+    var fo = 0;
+    p.scenes.forEach(function(sc, fi) {
+      var fdur = sc.duration_seconds || 5;
+      if (filmWrap) {
+        (function(fi2) {
+          var cell = document.createElement('div');
+          cell.className = 'film-cell' + (fi2 === state.currentSceneIndex ? ' active' : '');
+          cell.style.left = ((fo / total) * 100).toFixed(3) + '%';
+          cell.style.width = 'max(6px, calc(' + ((fdur / total) * 100).toFixed(3) + '% - 2px))';
+          cell.title = (fi2 + 1) + '. ' + (sc.label || sc.id) + ' \u00b7 ' + fdur.toFixed(1) + 's';
+          var img = document.createElement('img');
+          img.setAttribute('loading', 'lazy');
+          img.alt = '';
+          img.addEventListener('error', function() { img.remove(); });
+          img.src = '/api' + withToken('/scene-thumb/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(pid2) + '/' + encodeURIComponent(sc.id));
+          cell.appendChild(img);
+          cell.addEventListener('click', function(ev) { ev.stopPropagation(); selectScene(fi2); renderCompLane(); });
+          cell.addEventListener('dblclick', function(ev) { ev.stopPropagation(); selectScene(fi2); enterFocus(fi2); });
+          filmWrap.appendChild(cell);
+        })(fi);
+      }
+      fo += fdur;
+    });
+    var bo = 0;
+    p.scenes.forEach(function(sc, bi) {
+      (function(bi2) {
+        var blk = document.createElement('div');
+        blk.className = 'scene-blk' + (bi2 % 2 ? ' odd' : '');
+        blk.style.left = ((bo / total) * 100).toFixed(3) + '%';
+        blk.style.width = (((sc.duration_seconds || 5) / total) * 100).toFixed(3) + '%';
+        blk.style.top = '-2px';
+        blk.style.height = 'calc(100% + 2px)';
+        blk.addEventListener('click', function(ev) { ev.stopPropagation(); selectScene(bi2); renderCompLane(); });
+        wrap.appendChild(blk);
+      })(bi);
+      bo += (sc.duration_seconds || 5);
+    });
     var offset = 0;
     p.scenes.forEach(function(scene, si) {
       var dur = scene.duration_seconds || 5;
