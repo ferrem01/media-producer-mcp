@@ -712,6 +712,10 @@ export function getPreviewHtml(): string {
     outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .prop-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+  /* Media prop preview: the asset itself, with the path demoted below it. */
+  .prop-media { border: 1px solid #e2e6ef; border-radius: 8px; overflow: hidden; background: #0f1117; margin-bottom: 6px; }
+  .prop-media-el { display: block; width: 100%; max-height: 160px; object-fit: contain; }
+  .prop-media-path { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; color: #8b93a3; }
   textarea.prop-input {
     resize: vertical; min-height: 40px;
     font-family: 'JetBrains Mono', 'SF Mono', monospace;
@@ -3135,6 +3139,19 @@ export function getPreviewHtml(): string {
             html += '<input type="color" class="prop-color-picker" data-key="' + escAttr(key) + '" value="' + escAttr(hexVal) + '">';
             html += '<input type="text" class="prop-color-text" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
             html += '</div>';
+          } else if ((/\\.(png|jpe?g|webp|gif|svg|avif|mp4|webm|mov|m4v)(\\?|$)/i.test(val) || /^\\/assets\\//.test(val)) && (val.charAt(0) === '/' || /^https?:/.test(val))) {
+            // Media prop: show the ACTUAL image/video -- a server path means
+            // nothing to a user. The path stays editable below the preview.
+            var isVid = /\\.(mp4|webm|mov|m4v)(\\?|$)/i.test(val);
+            var mediaSrc = val.charAt(0) === '/' && _token
+              ? val + (val.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(_token)
+              : val;
+            html += '<div class="prop-media">';
+            html += isVid
+              ? '<video class="prop-media-el" src="' + escAttr(mediaSrc) + '" controls muted preload="metadata"></video>'
+              : '<img class="prop-media-el" src="' + escAttr(mediaSrc) + '" alt="" onerror="this.parentNode.style.display=&quot;none&quot;">';
+            html += '</div>';
+            html += '<input type="text" class="prop-input prop-url-input prop-media-path" data-key="' + escAttr(key) + '" value="' + escAttr(val) + '">';
           } else if (isUrlValue(val)) {
             // URL link + text input
             html += '<div class="prop-url-row">';
