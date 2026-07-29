@@ -22,15 +22,43 @@ export function resolveVideoPath(
   if (p.startsWith("file://")) p = p.slice(7);
   p = p.replace(/^https?:\/\/localhost:\d+/, "");
 
-  let m: RegExpMatchArray | null;
-  if ((m = p.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/)))
-    return path.join(dataDir, m[1], "projects", m[2], "assets", m[3]);
-  if ((m = p.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/)))
-    return path.join(dataDir, m[1], "brand-kit", "assets", m[2]);
-  if ((m = p.match(/^\/assets\/([^/]+)\/assets\/(.+)$/)))
-    return path.join(dataDir, m[1], "assets", m[2]);
+  // The src usually comes from the DOM (video.src), where the browser has
+  // percent-ENCODED the URL -- a file on disk named "Connect Claude + Use
+  // Case.mp4" reads back as ".../Connect%20Claude%20+%20Use%20Case.mp4".
+  // That form reaches us BOTH as /assets/... routes and as file:// URLs to
+  // absolute paths (the preview assembler pre-resolves assets), so decoding
+  // must apply to every branch: ffmpeg on the %20 path silently extracted
+  // nothing and the render shipped a black video window.
+  // decodeURIComponent leaves a literal "+" alone (correct for paths). If --
+  // pathologically -- a file is literally named with "%20" on disk, the
+  // decoded path won't exist and the raw form wins the existence race.
+  const mapped = (q: string): string | null => {
+    let m: RegExpMatchArray | null;
+    if ((m = q.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/)))
+      return path.join(dataDir, m[1], "projects", m[2], "assets", m[3]);
+    if ((m = q.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/)))
+      return path.join(dataDir, m[1], "brand-kit", "assets", m[2]);
+    if ((m = q.match(/^\/assets\/([^/]+)\/assets\/(.+)$/)))
+      return path.join(dataDir, m[1], "assets", m[2]);
+    return null;
+  };
+  let decoded = p;
+  if (p.includes("%")) {
+    try { decoded = decodeURIComponent(p); } catch { decoded = p; }
+  }
+  // Decoded first (files live under their original names), raw as fallback.
+  const candidates = decoded !== p ? [decoded, p] : [p];
+  let first: string | null = null;
+  for (const c of candidates) {
+    const fsPath = mapped(c) ?? (c.startsWith("/") ? c : null);
+    if (fsPath) {
+      if (first === null) first = fsPath;
+      if (fs.existsSync(fsPath)) return fsPath;
+    }
+  }
+  if (first !== null) return first;
 
-  // Absolute filesystem path or external URL -- use as-is.
+  // External URL -- use as-is.
   return p;
 }
 
