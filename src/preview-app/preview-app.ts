@@ -505,7 +505,10 @@ export function getPreviewHtml(): string {
   .audio-indicator.has-audio { color: #4f46e5; background: #eef2ff; }
   /* In the left transport column: clear the floating rate badge, and open
      the flyout to the RIGHT (right:0 would push it off the screen edge). */
-  #transport-left .vol-control { margin-top: 0; }
+  /* Reserve the rate badge's floating slot below the clock: it renders at
+     time-stack bottom +3..+16px, so the volume button keeps clear of it
+     whether or not a rate is showing (no reflow either way). */
+  #transport-left .vol-control { margin-top: 11px; }
   .vol-flyout {
     position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 20;
     display: flex; align-items: center; padding: 8px 10px;
