@@ -3242,6 +3242,7 @@ export function getPreviewHtml(): string {
           var v = parseFloat(rangeInput.value) || 0;
           comp.data[key] = v;
           numInput.value = v;
+          savePropDebounced();
         });
       }
     });
@@ -3269,6 +3270,7 @@ export function getPreviewHtml(): string {
           if (isColorValue(textInput.value)) {
             picker.value = colorToHex(textInput.value);
           }
+          savePropDebounced();
         });
       }
     });
