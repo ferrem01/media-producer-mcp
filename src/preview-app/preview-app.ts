@@ -2521,6 +2521,16 @@ export function getPreviewHtml(): string {
     });
   }
 
+  // Select a scene for INSPECTION only: no seek, no pause -- the playhead
+  // and playback state stay exactly where they are. Used by timeline
+  // component bars and scene blocks (the filmstrip and rail still JUMP).
+  function selectSceneQuiet(index) {
+    state.currentSceneIndex = index;
+    if (focusSceneIdx >= 0 && focusSceneIdx !== index) exitFocus();
+    if (inspOpen()) setTimeout(renderInspector, 0);
+    updateActiveScene(index);
+  }
+
   function selectScene(index) {
     var wasPlaying = state.playing;
     state.currentSceneIndex = index;
@@ -5111,7 +5121,7 @@ export function getPreviewHtml(): string {
         blk.style.width = (((sc.duration_seconds || 5) / total) * 100).toFixed(3) + '%';
         blk.style.top = '-2px';
         blk.style.height = 'calc(100% + 2px)';
-        blk.addEventListener('click', function(ev) { ev.stopPropagation(); selectScene(bi2); renderCompLane(); });
+        blk.addEventListener('click', function(ev) { ev.stopPropagation(); selectSceneQuiet(bi2); renderCompLane(); });
         wrap.appendChild(blk);
       })(bi);
       bo += (sc.duration_seconds || 5);
@@ -5147,7 +5157,7 @@ export function getPreviewHtml(): string {
           }
           bar.addEventListener('click', function(ev) {
             ev.stopPropagation();
-            selectScene(si);
+            selectSceneQuiet(si);
             state.currentComponentIndex = ci2;
             var insp = document.getElementById('inspector');
             if (insp && !insp.classList.contains('open')) insp.classList.add('open');
@@ -5156,7 +5166,7 @@ export function getPreviewHtml(): string {
           });
           bar.addEventListener('dblclick', function(ev) {
             ev.stopPropagation();
-            selectScene(si);
+            selectSceneQuiet(si);
             enterFocus(si);
           });
           wrap.appendChild(bar);
@@ -5172,7 +5182,7 @@ export function getPreviewHtml(): string {
         more.title = (comps.length - (CAP - 1)) + ' more components in ' + (scene.label || scene.id) + ' — click to open the scene timeline.';
         more.addEventListener('click', function(ev) {
           ev.stopPropagation();
-          selectScene(si);
+          selectSceneQuiet(si);
           enterFocus(si);
         });
         wrap.appendChild(more);
