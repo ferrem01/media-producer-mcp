@@ -495,10 +495,10 @@ export function getPreviewHtml(): string {
     overflow-y: auto;
   }
   #storyboard-panel .panel-header {
-    font-size: 10px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.05em; color: #9ca3af;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.09em; color: #8b93a3;
     padding: 10px 12px 8px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid #f0f2f7;
   }
   #storyboard-body { padding: 8px 12px; }
   .sb-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
@@ -509,9 +509,9 @@ export function getPreviewHtml(): string {
   .sb-input {
     width: 100%; box-sizing: border-box; resize: vertical;
     padding: 6px 8px; font-size: 12px; font-family: inherit; line-height: 1.35;
-    border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; color: #111827;
+    border: 1px solid #dfe3ea; border-radius: 8px; background: #fff; color: #111827;
   }
-  .sb-input:focus { outline: none; border-color: #6366f1; }
+  .sb-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
   .sb-actions { display: flex; gap: 6px; margin-top: 4px; }
   .sb-hint { font-size: 10px; color: #64748b; margin-top: 4px; }
   /* Compact read-only storyboard preview (full editing happens in the dialog). */
@@ -587,7 +587,7 @@ export function getPreviewHtml(): string {
   /* Inspector drawer (scene structure) */
   #inspector {
     position: fixed; top: 48px; right: 0; bottom: 0; width: 340px; z-index: 60;
-    background: #ffffff; border-left: 1px solid #e5e7eb; box-shadow: -8px 0 24px rgba(15,23,42,0.08);
+    background: #ffffff; border-left: 1px solid #e6e8ef; box-shadow: -2px 0 4px rgba(15,23,42,0.04), -16px 0 44px rgba(15,23,42,0.12);
     transform: translateX(100%); transition: transform 0.18s ease; display: flex; flex-direction: column;
   }
   #inspector.open { transform: translateX(0); }
@@ -600,17 +600,17 @@ export function getPreviewHtml(): string {
   #insp-close { border: none; background: none; font-size: 18px; color: #9ca3af; cursor: pointer; line-height: 1; }
   #insp-tree { max-height: 38%; overflow-y: auto; border-bottom: 1px solid #f3f4f6; padding: 6px 8px; }
   .insp-node { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 8px;
-    border-radius: 6px; cursor: pointer; font-size: 12px; color: #374151; }
+    border-radius: 8px; cursor: pointer; font-size: 12px; color: #374151; }
   .insp-node:hover { background: #f3f4f6; }
   .insp-node.active { background: #eef2ff; color: #4338ca; }
   .insp-node .in-type { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .insp-node .in-meta { font-size: 10px; color: #9ca3af; flex-shrink: 0; }
   #prop-editor { flex: 1; overflow-y: auto; padding: 4px 10px 16px; }
   .prop-script-row { display: flex; gap: 5px; align-items: center; margin-bottom: 4px; }
-  .prop-script-row .ps-at { width: 54px; font-size: 11px; padding: 3px 4px; border: 1px solid #e5e7eb; border-radius: 5px; }
+  .prop-script-row .ps-at { width: 54px; font-size: 11px; padding: 3px 4px; border: 1px solid #dfe3ea; border-radius: 6px; }
   .prop-script-row .ps-action { font-size: 10px; font-weight: 600; color: #6366f1; width: 92px; flex-shrink: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .prop-script-row .ps-text { flex: 1; font-size: 11px; padding: 3px 5px; border: 1px solid #e5e7eb; border-radius: 5px; min-width: 0; }
+  .prop-script-row .ps-text { flex: 1; font-size: 11px; padding: 3px 5px; border: 1px solid #dfe3ea; border-radius: 6px; min-width: 0; }
 
   /* Scene focus mode: detail rows ON THE SAME timeline -- same scrubber,
      same playhead, same zoom. Rows live in FILM coordinates, spanning the
@@ -652,10 +652,10 @@ export function getPreviewHtml(): string {
     overflow-y: auto;
   }
   #props-panel .panel-header {
-    font-size: 10px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.05em; color: #9ca3af;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.09em; color: #8b93a3;
     padding: 10px 12px 8px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid #f0f2f7;
   }
   .props-content { padding: 8px 12px; }
   .prop-component-type {
@@ -673,7 +673,7 @@ export function getPreviewHtml(): string {
     width: 100%; padding: 6px 10px;
     font-size: 12px; font-family: inherit;
     background: #ffffff; color: #111827;
-    border: 1px solid #d1d5db; border-radius: 6px;
+    border: 1px solid #dfe3ea; border-radius: 8px;
     outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .prop-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
@@ -885,21 +885,23 @@ export function getPreviewHtml(): string {
   #studio-toast.err { background: rgba(153,27,27,0.94); color: #fee2e2; }
   /* Storyboard button on each scene row */
   .scene-sb-btn {
-    flex: 0 0 auto; border: 1px solid #e5e7eb; background: #fff; color: #6b7280;
-    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 6px; cursor: pointer;
+    flex: 0 0 auto; border: 1px solid #dfe3ea; background: #fff; color: #6b7280;
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 7px; cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.03);
   }
   .scene-sb-btn:hover { border-color: #6366f1; color: #4f46e5; }
   .scene-quality-badge { cursor: pointer; }
 
   /* ── Storyboard draft view: the script, before any scene exists ── */
-  #draft-view { position: absolute; inset: 0; overflow: auto; background: #f8fafc; display: none;
+  #draft-view { position: absolute; inset: 0; overflow: auto; background: #f6f7fa; display: none;
     padding: 20px 26px 48px; z-index: 5; }
   .dv-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
     max-width: 920px; margin-bottom: 18px; }
   .dv-title { font-size: 19px; font-weight: 700; color: #111827; }
   .dv-sub { font-size: 12px; color: #6b7280; margin-top: 3px; }
   .dv-narr { font-size: 13px; color: #374151; margin-top: 8px; max-width: 640px; }
-  .dv-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px;
+  .dv-card { background: #fff; border: 1px solid #e6e8ef; border-radius: 12px; padding: 14px 16px;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04);
     margin-bottom: 12px; max-width: 920px; }
   .dv-card-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
   .dv-num { font-size: 11px; font-weight: 700; color: #9ca3af; }
@@ -918,7 +920,8 @@ export function getPreviewHtml(): string {
   /* ── Brand kit panel ── */
   #brand-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 300; display: none; }
   #brand-panel { position: absolute; right: 0; top: 0; bottom: 0; width: 540px; max-width: 92vw;
-    background: #fff; overflow: auto; padding: 18px 22px 40px; box-shadow: -12px 0 40px rgba(15,23,42,0.25); }
+    background: #fff; overflow: auto; padding: 18px 22px 40px; border-left: 1px solid #e6e8ef;
+    box-shadow: -2px 0 4px rgba(15,23,42,0.05), -20px 0 56px rgba(15,23,42,0.22); }
   .bk-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .bk-title { font-size: 16px; font-weight: 700; color: #111827; }
   .bk-section { margin-bottom: 18px; }
@@ -926,12 +929,13 @@ export function getPreviewHtml(): string {
     color: #6b7280; margin: 0 0 8px; }
   .bk-color-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
   .bk-color-row label { font-size: 12px; color: #374151; width: 92px; }
-  .bk-color-row input[type=color] { width: 34px; height: 26px; border: 1px solid #e5e7eb; border-radius: 6px;
+  .bk-color-row input[type=color] { width: 34px; height: 26px; border: 1px solid #dfe3ea; border-radius: 7px;
     padding: 1px; background: #fff; cursor: pointer; }
   .bk-color-row input[type=text] { width: 90px; font: 12px ui-monospace, monospace; padding: 4px 7px;
-    border: 1px solid #e5e7eb; border-radius: 6px; }
+    border: 1px solid #dfe3ea; border-radius: 7px; }
   .bk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-  .bk-tile { border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px; text-align: center; position: relative; }
+  .bk-tile { border: 1px solid #e2e5ec; border-radius: 10px; padding: 6px; text-align: center; position: relative;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
   .bk-tile img, .bk-tile video { max-width: 100%; height: 54px; object-fit: contain; display: block; margin: 0 auto 4px;
     background: repeating-conic-gradient(#f3f4f6 0% 25%, #fff 0% 50%) 0 0/14px 14px; border-radius: 4px; }
   .bk-tile .bk-name { font-size: 10px; color: #374151; word-break: break-all; }
