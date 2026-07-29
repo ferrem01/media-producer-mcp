@@ -9,6 +9,9 @@
  */
 
 import path from "node:path";
+import os from "node:os";
+import fs from "node:fs/promises";
+import { spawn } from "node:child_process";
 import { callLLM, type LLMConfig } from "./client.js";
 import { parseLlmJson } from "./json-repair.js";
 import { resolveVideoPath } from "../core/video-path.js";
@@ -146,27 +149,77 @@ export async function draftBoothScript(opts: {
   } catch { /* heuristic timeline still works */ }
 
   const { brief, filmDur } = describeFilmForScript(project, sidecar);
+  // Product context: the prompt only. Brand-kit guidelines are VISUAL design
+  // guidance ("192px section gaps", "clean white canvas") -- feeding them as
+  // "voice hints" made the drafter narrate the design system instead of the
+  // demo (observed verbatim in drafted scripts).
   const productContext = [
+    project.name && `Product/film name: ${project.name}`,
     project.prompt && `The film is about: ${project.prompt}`,
-    project.brand_kit?.guidelines && `Brand voice hints: ${project.brand_kit.guidelines.slice(0, 400)}`,
   ].filter(Boolean).join("\n");
 
+  // Ground the drafter in the ACTUAL footage: extract up to 8 stills at the
+  // midpoints of real-time spans and attach them (film-clock labeled) so the
+  // script narrates what is on screen, not what it imagines.
+  type Part = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+  const frameParts: Part[] = [];
+  try {
+    let sceneOffset = 0;
+    for (const sc of project.scenes || []) {
+      const edit = (sc as any).media_edits?.screencast;
+      const comp: any = (sc.components || []).find((c: any) => c.type === "screencast-frame" && c.data?.video_url);
+      if (edit?.segments?.length && comp) {
+        const videoPath = resolveVideoPath(comp.data.video_url, opts.dataDir);
+        const segs = (edit.segments as Array<{ src_start: number; src_end: number; rate: number; hold?: number }>)
+          .filter((g) => !(typeof g.hold === "number" && g.hold > 0) && (g.rate || 1) <= 3);
+        const step = Math.max(1, Math.ceil(segs.length / 8));
+        const picks = segs.filter((_, i) => i % step === 0).slice(0, 8);
+        const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "booth-frames-"));
+        for (const g of picks) {
+          const srcMid = (g.src_start + g.src_end) / 2;
+          const filmT = srcToSceneTime(edit.segments, srcMid);
+          if (filmT === null) continue;
+          const out = path.join(tmp, `f${frameParts.length}.jpg`);
+          const ok = await new Promise<boolean>((resolve) => {
+            const ff = spawn("ffmpeg", ["-y", "-ss", String(srcMid), "-i", videoPath, "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "7", out], { stdio: "ignore" });
+            ff.on("close", (code) => resolve(code === 0));
+            ff.on("error", () => resolve(false));
+          });
+          if (!ok) continue;
+          try {
+            const buf = await fs.readFile(out);
+            frameParts.push({ type: "text", text: `Frame from the footage at ${fmtT(sceneOffset + filmT)} (film clock):` });
+            frameParts.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${buf.toString("base64")}` } });
+          } catch { /* skip unreadable frame */ }
+        }
+        await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+      }
+      sceneOffset += sc.duration_seconds || 0;
+    }
+  } catch { /* text-only drafting still works */ }
+
+  const promptText =
+    `Write a voiceover script for a ${filmDur}s product-walkthrough film. A human will READ this aloud ` +
+    `while the film plays (teleprompter), so it must fit the clock: people speak ~${WORDS_PER_SECOND} words/second. ` +
+    `Respect every span's word budget -- an overlong line is worse than a short one.\n\n` +
+    `Film timeline (film-clock seconds):\n${brief}\n\n${productContext}\n\n` +
+    `Rules:\n` +
+    `- Conversational first person ("Here I'm...", "Now watch..."), present tense, no marketing fluff.\n` +
+    `- Narrate what the user is DOING in the footage and why it matters. The attached frames show the actual ` +
+    `screen at labeled film times -- describe what is happening in THEM; use the page/click events as anchors.\n` +
+    `- NEVER describe visual design: no spacing, fonts, colors, pixel measurements, "clean canvas", "whitespace", ` +
+    `or layout commentary. Viewers can see the screen; tell them what it means.\n` +
+    `- Timelapse spans get at most ONE short bridging line ("While the agents work...").\n` +
+    `- The intro/outro bookends: one short opening hook over the intro, one closing line over the outro.\n` +
+    `- 1-2 sentences per cue. Leave breathing gaps; do not wall-to-wall the clock.\n\n` +
+    `Reply with ONLY a JSON array: [{"at": <film seconds>, "text": "..."}] sorted by "at".`;
   const raw = await callLLM(
     opts.llmConfig,
     [{
       role: "user",
-      content:
-        `Write a voiceover script for a ${filmDur}s product-walkthrough film. A human will READ this aloud ` +
-        `while the film plays (teleprompter), so it must fit the clock: people speak ~${WORDS_PER_SECOND} words/second. ` +
-        `Respect every span's word budget -- an overlong line is worse than a short one.\n\n` +
-        `Film timeline (film-clock seconds):\n${brief}\n\n${productContext}\n\n` +
-        `Rules:\n` +
-        `- Conversational first person ("Here I'm...", "Now watch..."), present tense, no marketing fluff.\n` +
-        `- Describe what is ON SCREEN when it's on screen; use the page/click events as anchors.\n` +
-        `- Timelapse spans get at most ONE short bridging line ("While the agents work...").\n` +
-        `- The intro/outro bookends: one short opening hook over the intro, one closing line over the outro.\n` +
-        `- 1-2 sentences per cue. Leave breathing gaps; do not wall-to-wall the clock.\n\n` +
-        `Reply with ONLY a JSON array: [{"at": <film seconds>, "text": "..."}] sorted by "at".`,
+      content: frameParts.length
+        ? ([{ type: "text", text: promptText }, ...frameParts] as any)
+        : promptText,
     }],
     // Generous budget: thinking-by-default models spend from max_tokens
     // before any text, and how much they think is UNPREDICTABLE -- 1500 and
