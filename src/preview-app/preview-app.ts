@@ -222,12 +222,18 @@ export function getPreviewHtml(): string {
 
   /* Playback controls */
   #playback-bar {
+    position: relative;
     display: flex; align-items: center; gap: 10px;
     padding: 10px 14px;
     background: #ffffff;
     border-top: 1px solid #e6e8ef;
     box-shadow: 0 -1px 2px rgba(15,23,42,0.03);
   }
+  /* Timeline resizer: grab the seam above the strip; the player re-fits. */
+  #tl-resizer { position: absolute; top: -4px; left: 0; right: 0; height: 9px; cursor: ns-resize; z-index: 55; }
+  #tl-resizer::after { content: ''; position: absolute; left: 50%; top: 3px; width: 44px; height: 4px;
+    transform: translateX(-50%); border-radius: 2px; background: #d3d8e4; opacity: 0; transition: opacity 0.12s ease; }
+  #tl-resizer:hover::after, #tl-resizer.dragging::after { opacity: 1; background: #a5b0f5; }
   .play-btn {
     width: 32px; height: 32px;
     background: linear-gradient(180deg, #5b54ec, #4f46e5);
@@ -1033,6 +1039,7 @@ export function getPreviewHtml(): string {
     </div>
 
     <div id="playback-bar">
+      <div id="tl-resizer" title="Drag to resize the timeline (the player re-fits)"></div>
       <span id="transport-left">
         <span class="tl-zoom-seg">
           <button id="tl-zoom-out" title="Zoom timeline out">&minus;</button>
@@ -2732,6 +2739,44 @@ export function getPreviewHtml(): string {
     wrapper.style.height = (nH * scale) + 'px';
   }
   window.addEventListener('resize', updatePreviewScale);
+
+  // ── Timeline height drag: resize the strip; lanes fit with priority
+  // collapse (filmstrip first, then component rows) and the player re-fits
+  // to whatever height is left. Persisted per browser. ──
+  (function wireTlResizer() {
+    var rz = document.getElementById('tl-resizer');
+    if (!rz) return;
+    rz.addEventListener('pointerdown', function(ev) {
+      ev.preventDefault();
+      rz.setPointerCapture(ev.pointerId);
+      rz.classList.add('dragging');
+      var sw = document.getElementById('slider-wrap');
+      var startH = sw ? sw.getBoundingClientRect().height : 128;
+      var startY = ev.clientY;
+      function mv(e2) {
+        var h = Math.round(Math.min(480, Math.max(64, startH + (startY - e2.clientY))));
+        state.tlHeight = h;
+        renderMediaLane();
+        renderLaneLabels();
+        updatePreviewScale();
+      }
+      function up() {
+        rz.classList.remove('dragging');
+        rz.removeEventListener('pointermove', mv);
+        rz.removeEventListener('pointerup', up);
+        try { localStorage.setItem('mp_tl_height', String(state.tlHeight || 0)); } catch (e3) {}
+      }
+      rz.addEventListener('pointermove', mv);
+      rz.addEventListener('pointerup', up);
+    });
+    rz.addEventListener('dblclick', function() {
+      state.tlHeight = 0;
+      try { localStorage.removeItem('mp_tl_height'); } catch (e4) {}
+      renderMediaLane();
+      renderLaneLabels();
+      updatePreviewScale();
+    });
+  })();
 
   function clearPreview() {
     els.previewWrapper.style.display = 'none';
@@ -4837,6 +4882,11 @@ export function getPreviewHtml(): string {
         return c2.type === 'narration-track' && c2.data && Array.isArray(c2.data.chapters) && c2.data.chapters.length;
       });
     });
+    // User-set strip height (drag handle). 0 = auto (content-sized).
+    if (state.tlHeight === undefined) {
+      var savedH = parseInt(localStorage.getItem('mp_tl_height') || '0', 10);
+      state.tlHeight = (savedH >= 64 && savedH <= 480) ? savedH : 0;
+    }
     var y = { ruler: 0, rulerH: 22, fx: -1, fxH: 32, screenH: 32, screenRows: 1, speakerH: 32, musicH: 16, speaker: -1, music: -1, comps: -1, compsH: 0, compRows: 0, film: -1, filmH: 30 };
     // Components band: every scene's cast, always visible. Rows = the
     // busiest scene's component count, capped at 4 (a "+N" chip covers the
@@ -4856,19 +4906,48 @@ export function getPreviewHtml(): string {
     y.screenH = 32 + (y.screenRows - 1) * 26;
     var top = 26;
     if (hasFx) { y.fx = top; top += y.fxH + 8; }
-    if (y.compRows > 0 && !hasMedia) {
-      // Generated films: filmstrip (scene posters) + comps band stand in
-      // for the screen band.
-      y.film = top; top += y.filmH + 6;
-      y.comps = top; top += y.compsH + 8;
-      y.screen = -1;
-    } else {
-      if (y.compRows > 0) { y.comps = top; top += y.compsH + 8; }
-      y.screen = top; top += y.screenH + 8;
+    // Fit lanes to the user's strip height with PRIORITY COLLAPSE: the
+    // filmstrip folds first, then component rows reduce 4->1 (the '+N'
+    // chip absorbs the difference). Core lanes (ruler/screen/speaker/
+    // music) never collapse.
+    var hasScenes = (((p || {}).scenes) || []).length > 0;
+    var desiredRows = y.compRows;
+    function attempt(filmH, rows) {
+      var a = { film: -1, filmH: filmH, comps: -1, compsH: rows > 0 ? rows * 16 + 6 : 0, compRows: rows, fx: -1, screen: -1, speaker: -1, music: -1 };
+      var t = 26;
+      if (hasFx) { a.fx = t; t += y.fxH + 8; }
+      if (filmH > 0 && hasScenes) { a.film = t; t += filmH + 6; }
+      if (rows > 0 && !hasMedia) {
+        a.comps = t; t += a.compsH + 8;
+      } else {
+        if (rows > 0) { a.comps = t; t += a.compsH + 8; }
+        a.screen = t; t += y.screenH + 8;
+      }
+      if (hasSpk) { a.speaker = t; t += y.speakerH + 8; }
+      if (hasMusic) { a.music = t; t += y.musicH + 6; }
+      a.total = t + 2;
+      return a;
     }
-    if (hasSpk) { y.speaker = top; top += y.speakerH + 8; }
-    if (hasMusic) { y.music = top; top += y.musicH + 6; }
-    y.total = Math.max(top + 2, 128);
+    var H = state.tlHeight || 0;
+    var configs = [[30, desiredRows]];
+    if (H > 0) {
+      configs.push([0, desiredRows]);
+      for (var rr = desiredRows - 1; rr >= 1; rr--) configs.push([0, rr]);
+    }
+    var fit = null;
+    for (var ci = 0; ci < configs.length; ci++) {
+      fit = attempt(configs[ci][0], configs[ci][1]);
+      if (H === 0 || fit.total <= H) break;
+    }
+    // Spare room grows the filmstrip (posters get more legible), then pads.
+    if (H > 0 && fit.film >= 0 && fit.total < H) {
+      var extra = Math.min(18, H - fit.total);
+      fit = attempt(30 + extra, fit.compRows);
+    }
+    y.film = fit.film; y.filmH = fit.filmH; y.comps = fit.comps; y.compsH = fit.compsH;
+    y.compRows = fit.compRows; y.fx = fit.fx; y.screen = fit.screen;
+    y.speaker = fit.speaker; y.music = fit.music;
+    y.total = H > 0 ? Math.max(fit.total, H) : Math.max(fit.total, 128);
     return y;
   }
 
@@ -4882,6 +4961,7 @@ export function getPreviewHtml(): string {
   };
 
   function applyLaneLayout(y) {
+    state._laneY = y;
     var sw = document.getElementById('slider-wrap');
     var track = document.getElementById('timeline-track');
     var gut = document.getElementById('lane-gutter');
@@ -4987,7 +5067,8 @@ export function getPreviewHtml(): string {
     if (focusSceneIdx >= 0) return; // focus mode owns the track
     var trackEl = document.getElementById('timeline-track');
     var pxTotal = trackEl ? trackEl.clientWidth : 1000;
-    var CAP = 4;
+    var CAP = (state._laneY && state._laneY.compRows) || 4;
+    var filmOn = !!(state._laneY && state._laneY.film >= 0);
     // Filmstrip: each scene's poster frame stretched across its segment,
     // and a zebra scene block behind the bars so the cast groups by scene.
     var filmWrap = document.getElementById('film-lane');
@@ -4996,7 +5077,7 @@ export function getPreviewHtml(): string {
     var fo = 0;
     p.scenes.forEach(function(sc, fi) {
       var fdur = sc.duration_seconds || 5;
-      if (filmWrap) {
+      if (filmWrap && filmOn) {
         (function(fi2) {
           var cell = document.createElement('div');
           cell.className = 'film-cell' + (fi2 === state.currentSceneIndex ? ' active' : '');
