@@ -64,6 +64,22 @@ function srcToSceneTime(
   return null;
 }
 
+/** A scene's screencast EDL, whatever key it's stored under: 'screencast'
+ *  (recorder projects) or a video[src*=...] selector (hand-edited films).
+ *  Prefer the entry whose selector matches the given video_url. */
+export function sceneEdl(scene: Scene, videoUrl?: string): { segments: Array<{ src_start: number; src_end: number; rate: number; hold?: number; tl?: number }> } | null {
+  const me = (scene as any).media_edits as Record<string, any> | undefined;
+  if (!me) return null;
+  const entries = Object.entries(me).filter(([, v]) => Array.isArray(v?.segments) && v.segments.length);
+  if (!entries.length) return null;
+  if (videoUrl) {
+    const base = path.basename(videoUrl);
+    const hit = entries.find(([k]) => k === "screencast" || k.includes(base));
+    if (hit) return hit[1];
+  }
+  return entries[0][1];
+}
+
 function fmtT(t: number): string {
   return `${t.toFixed(1)}s`;
 }
@@ -81,7 +97,8 @@ export function describeFilmForScript(project: Project, sidecar?: {
   for (const s of scenes) {
     const dur = s.duration_seconds || 0;
     filmDur += dur;
-    const edit = (s as any).media_edits?.screencast;
+    const comp0: any = (s.components || []).find((c: any) => c.type === "screencast-frame" && c.data?.video_url);
+    const edit = sceneEdl(s, comp0?.data?.video_url);
     if (!edit?.segments?.length) {
       const kind = /intro/i.test(s.id) ? "branded logo intro (no product on screen)"
         : /outro/i.test(s.id) ? "branded outro card"
@@ -166,18 +183,25 @@ export async function draftBoothScript(opts: {
   try {
     let sceneOffset = 0;
     for (const sc of project.scenes || []) {
-      const edit = (sc as any).media_edits?.screencast;
       const comp: any = (sc.components || []).find((c: any) => c.type === "screencast-frame" && c.data?.video_url);
-      if (edit?.segments?.length && comp) {
+      const edit = comp ? sceneEdl(sc, comp.data.video_url) : null;
+      if (comp) {
         const videoPath = resolveVideoPath(comp.data.video_url, opts.dataDir);
-        const segs = (edit.segments as Array<{ src_start: number; src_end: number; rate: number; hold?: number }>)
+        // No EDL: the clip plays ~1:1 -- synthesize even spans across the
+        // scene so frames still ground the drafter.
+        const dur = sc.duration_seconds || 0;
+        const rawSegs = edit?.segments?.length
+          ? edit.segments
+          : ((n) => Array.from({ length: n }, (_, i) => ({
+              src_start: (dur * i) / n, src_end: (dur * (i + 1)) / n, rate: 1 })))(Math.min(8, Math.max(1, Math.floor(dur / 6))));
+        const segs = (rawSegs as Array<{ src_start: number; src_end: number; rate: number; hold?: number }>)
           .filter((g) => !(typeof g.hold === "number" && g.hold > 0) && (g.rate || 1) <= 3);
         const step = Math.max(1, Math.ceil(segs.length / 8));
         const picks = segs.filter((_, i) => i % step === 0).slice(0, 8);
         const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "booth-frames-"));
         for (const g of picks) {
           const srcMid = (g.src_start + g.src_end) / 2;
-          const filmT = srcToSceneTime(edit.segments, srcMid);
+          const filmT = edit?.segments?.length ? srcToSceneTime(edit.segments, srcMid) : srcMid;
           if (filmT === null) continue;
           const out = path.join(tmp, `f${frameParts.length}.jpg`);
           const ok = await new Promise<boolean>((resolve) => {
