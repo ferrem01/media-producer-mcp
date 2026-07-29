@@ -265,6 +265,7 @@ export function getPreviewHtml(): string {
      visible (no click-into-scene needed). Rows cap at 4; a "+N" chip covers
      the overflow and opens focus mode. */
   #comp-lane { position: absolute; left: 0; right: 0; pointer-events: none; }
+  .lane-cut { position: absolute; top: 22px; bottom: 0; width: 1px; background: rgba(99,102,241,0.10); pointer-events: none; }
   .comp-bar { position: absolute; height: 12px; border-radius: 5px; pointer-events: auto; cursor: pointer;
     box-sizing: border-box; overflow: hidden; opacity: 0.85; }
   .comp-bar:hover { opacity: 1; box-shadow: 0 0 0 1.5px rgba(30,41,59,0.35); z-index: 3; }
@@ -436,10 +437,9 @@ export function getPreviewHtml(): string {
      narrow width (vs an inline time readout) hands ~160px back to the
      scrubber, and the ticking clock still never reflows the timeline. */
   #transport-left {
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-    flex-shrink: 0; width: 78px; align-self: stretch;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px;
+    flex-shrink: 0; width: 64px; align-self: stretch;
   }
-  .tl-top-row { display: flex; align-items: center; gap: 5px; }
   .tl-zoom-seg { display: flex; border: 1px solid #dfe3ea; border-radius: 8px; overflow: hidden;
     background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
   .tl-zoom-seg button { border: none; background: none; width: 22px; height: 19px; font-size: 12px;
@@ -1022,16 +1022,9 @@ export function getPreviewHtml(): string {
 
     <div id="playback-bar">
       <span id="transport-left">
-        <span class="tl-top-row">
-          <span class="tl-zoom-seg">
-            <button id="tl-zoom-out" title="Zoom timeline out">&minus;</button>
-            <button id="tl-zoom-in" title="Zoom timeline in">+</button>
-          </span>
-          <span class="vol-control" id="vol-control">
-            <span class="vol-icon" id="vol-icon" title="Mute / unmute" tabindex="0">&#9834;</span>
-            <span class="audio-indicator" id="audio-indicator"></span>
-            <span class="vol-flyout"><input type="range" id="vol-slider" min="0" max="100" value="100" step="1"></span>
-          </span>
+        <span class="tl-zoom-seg">
+          <button id="tl-zoom-out" title="Zoom timeline out">&minus;</button>
+          <button id="tl-zoom-in" title="Zoom timeline in">+</button>
         </span>
         <button class="play-btn" id="play-btn" disabled>
           <svg id="play-icon" width="14" height="14" viewBox="0 0 14 14">
@@ -1039,6 +1032,11 @@ export function getPreviewHtml(): string {
           </svg>
         </button>
         <span id="time-stack"><span id="rate-badge" title="Live media rate: the active segment's mapped speed, and the measured actual advance of the video's clock"></span><span class="time-display" id="time-display"><span id="time-cur">0.0s</span><span id="time-total">0.0s</span></span></span>
+        <span class="vol-control" id="vol-control">
+          <span class="vol-icon" id="vol-icon" title="Mute / unmute" tabindex="0">&#9834;</span>
+          <span class="audio-indicator" id="audio-indicator"></span>
+          <span class="vol-flyout"><input type="range" id="vol-slider" min="0" max="100" value="100" step="1"></span>
+        </span>
       </span>
       <span id="lane-gutter"></span>
       <span id="slider-wrap">
@@ -4855,7 +4853,7 @@ export function getPreviewHtml(): string {
     }
     if (hasSpk) { y.speaker = top; top += y.speakerH + 8; }
     if (hasMusic) { y.music = top; top += y.musicH + 6; }
-    y.total = Math.max(top + 2, 96);
+    y.total = Math.max(top + 2, 128);
     return y;
   }
 
@@ -4970,6 +4968,23 @@ export function getPreviewHtml(): string {
     var trackEl = document.getElementById('timeline-track');
     var pxTotal = trackEl ? trackEl.clientWidth : 1000;
     var CAP = 4;
+    // Scene separators: faint full-height cut lines through the lanes area,
+    // so bars visibly group into their scene (the ruler's ticks alone don't
+    // carry down into the card).
+    var trackForCuts = document.getElementById('timeline-track');
+    if (trackForCuts) {
+      trackForCuts.querySelectorAll('.lane-cut').forEach(function(n) { n.remove(); });
+      var co = 0;
+      p.scenes.forEach(function(sc, ci3) {
+        if (ci3 > 0) {
+          var cut = document.createElement('div');
+          cut.className = 'lane-cut';
+          cut.style.left = ((co / total) * 100).toFixed(3) + '%';
+          trackForCuts.appendChild(cut);
+        }
+        co += (sc.duration_seconds || 5);
+      });
+    }
     var offset = 0;
     p.scenes.forEach(function(scene, si) {
       var dur = scene.duration_seconds || 5;
