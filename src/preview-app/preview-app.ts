@@ -64,9 +64,10 @@ export function getPreviewHtml(): string {
   }
   .header-controls label { font-size: 11px; font-weight: 500; color: #6b7280; }
   .header-controls input, .header-controls select {
-    background: #ffffff; border: 1px solid #d1d5db; color: #111827;
-    padding: 5px 10px; border-radius: 6px; font-size: 12px; font-family: inherit;
+    background: #ffffff; border: 1px solid #dfe3ea; color: #111827;
+    padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; font-family: inherit;
     outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04);
   }
   .header-controls input:focus, .header-controls select:focus {
     border-color: #6366f1;
@@ -101,6 +102,11 @@ export function getPreviewHtml(): string {
   .btn-primary:hover { background: linear-gradient(180deg, #524bea, #4338ca); box-shadow: 0 2px 6px rgba(79,70,229,0.4); }
   .btn-secondary { background: #ffffff; color: #1f2937; border: 1px solid #dfe3ea; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
   .btn-secondary:hover { background: #f6f7fa; border-color: #c9cfdb; }
+  /* Render is a split button: main action + options caret share one pill. */
+  #render-btn { border-radius: 8px 0 0 8px; }
+  #render-menu-btn { border-radius: 0 8px 8px 0; padding: 6px 8px; margin-left: -7px;
+    box-shadow: 0 1px 2px rgba(79,70,229,0.35), inset 1px 1px 0 rgba(255,255,255,0.10);
+    border-left: 1px solid rgba(255,255,255,0.28); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* Narration booth (Mode B): bottom-right card so the film stays watchable
@@ -429,9 +435,15 @@ export function getPreviewHtml(): string {
      narrow width (vs an inline time readout) hands ~160px back to the
      scrubber, and the ticking clock still never reflows the timeline. */
   #transport-left {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    flex-shrink: 0; width: 56px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    flex-shrink: 0; width: 60px;
   }
+  .tl-zoom-seg { display: flex; border: 1px solid #dfe3ea; border-radius: 8px; overflow: hidden;
+    background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+  .tl-zoom-seg button { border: none; background: none; width: 22px; height: 19px; font-size: 12px;
+    line-height: 1; color: #6b7280; cursor: pointer; padding: 0; }
+  .tl-zoom-seg button + button { border-left: 1px solid #eef0f5; }
+  .tl-zoom-seg button:hover { background: #f1f3f8; color: #4f46e5; }
   .time-display {
     display: flex; flex-direction: column; align-items: center;
     font-family: 'JetBrains Mono', 'SF Mono', monospace;
@@ -453,10 +465,13 @@ export function getPreviewHtml(): string {
      the volume slider lives in a hover/focus flyout so it costs no bar width. */
   .vol-control {
     position: relative; display: flex; align-items: center; gap: 4px;
-    flex-shrink: 0; padding: 4px 6px; border-radius: 8px;
+    flex-shrink: 0; border-radius: 999px;
   }
-  .vol-control:hover { background: #f3f4f6; }
-  .vol-control .vol-icon { font-size: 14px; color: #6b7280; cursor: pointer; user-select: none; }
+  .vol-control .vol-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: #6b7280; cursor: pointer; user-select: none;
+    border: 1px solid #dfe3ea; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04); transition: all 0.15s ease; }
+  .vol-control:hover .vol-icon { color: #4f46e5; border-color: #c7cdf5; background: #f6f7ff; }
   .vol-control .vol-icon.muted { color: #cbd5e1; }
   .audio-indicator {
     font-size: 10px; font-weight: 600; color: #9ca3af; white-space: nowrap;
@@ -466,7 +481,7 @@ export function getPreviewHtml(): string {
   .audio-indicator.has-audio { color: #4f46e5; background: #eef2ff; }
   /* In the left transport column: clear the floating rate badge, and open
      the flyout to the RIGHT (right:0 would push it off the screen edge). */
-  #transport-left .vol-control { margin-top: 8px; }
+  #transport-left .vol-control { margin-top: 0; }
   .vol-flyout {
     position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 20;
     display: flex; align-items: center; padding: 8px 10px;
@@ -494,7 +509,7 @@ export function getPreviewHtml(): string {
     border-right: 1px solid #e5e7eb;
     overflow-y: auto;
   }
-  #storyboard-panel .panel-header {
+  .panel-header {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.09em; color: #8b93a3;
     padding: 10px 12px 8px;
@@ -591,19 +606,21 @@ export function getPreviewHtml(): string {
     transform: translateX(100%); transition: transform 0.18s ease; display: flex; flex-direction: column;
   }
   #inspector.open { transform: translateX(0); }
-  .insp-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #f3f4f6; }
+  .insp-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid #f0f2f7; background: #fbfbfd; }
   #insp-title { font-size: 13px; font-weight: 600; color: #111827; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .insp-prov { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: #eef2ff; cursor: help; }
   .insp-prov.sp-template { color: #0284c7; background: #e0f2fe; }
   .insp-prov.sp-composition { color: #4f46e5; background: #eef2ff; }
   .insp-prov.sp-custom { color: #b45309; background: #fef3c7; }
   #insp-close { border: none; background: none; font-size: 18px; color: #9ca3af; cursor: pointer; line-height: 1; }
-  #insp-tree { max-height: 38%; overflow-y: auto; border-bottom: 1px solid #f3f4f6; padding: 6px 8px; }
-  .insp-node { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 8px;
+  #insp-tree { max-height: 38%; overflow-y: auto; border-bottom: 1px solid #f0f2f7; padding: 6px 8px; }
+  .insp-node { display: flex; align-items: center; gap: 8px; padding: 6px 8px;
     border-radius: 8px; cursor: pointer; font-size: 12px; color: #374151; }
   .insp-node:hover { background: #f3f4f6; }
   .insp-node.active { background: #eef2ff; color: #4338ca; }
-  .insp-node .in-type { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .insp-node .in-type { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .insp-node .in-dot { width: 8px; height: 8px; border-radius: 3px; flex: none; align-self: center;
+    box-shadow: inset 0 0 0 1px rgba(15,23,42,0.08); }
   .insp-node .in-meta { font-size: 10px; color: #9ca3af; flex-shrink: 0; }
   #prop-editor { flex: 1; overflow-y: auto; padding: 4px 10px 16px; }
   .prop-script-row { display: flex; gap: 5px; align-items: center; margin-bottom: 4px; }
@@ -650,12 +667,6 @@ export function getPreviewHtml(): string {
   /* Prop Editor */
   #props-panel {
     overflow-y: auto;
-  }
-  #props-panel .panel-header {
-    font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.09em; color: #8b93a3;
-    padding: 10px 12px 8px;
-    border-bottom: 1px solid #f0f2f7;
   }
   .props-content { padding: 8px 12px; }
   .prop-component-type {
@@ -885,11 +896,10 @@ export function getPreviewHtml(): string {
   #studio-toast.err { background: rgba(153,27,27,0.94); color: #fee2e2; }
   /* Storyboard button on each scene row */
   .scene-sb-btn {
-    flex: 0 0 auto; border: 1px solid #dfe3ea; background: #fff; color: #6b7280;
-    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 7px; cursor: pointer;
-    box-shadow: 0 1px 2px rgba(15,23,42,0.03);
+    flex: 0 0 auto; border: none; background: #eef0f6; color: #8b93a3;
+    font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; cursor: pointer;
   }
-  .scene-sb-btn:hover { border-color: #6366f1; color: #4f46e5; }
+  .scene-sb-btn:hover { background: #e3e7f5; color: #4f46e5; }
   .scene-quality-badge { cursor: pointer; }
 
   /* ── Storyboard draft view: the script, before any scene exists ── */
@@ -964,9 +974,9 @@ export function getPreviewHtml(): string {
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
       <button class="btn btn-secondary" id="brand-btn" style="display:none;" title="View and edit this tenant's brand kit: colors, voice, logos, assets">&#127912; Brand</button>
-      <span id="render-wrap" style="display:none;align-items:center;gap:4px;">
+      <span id="render-wrap" style="display:none;align-items:center;gap:8px;">
         <button class="btn btn-primary" id="render-btn" title="Render the film to MP4 (production quality)">&#8681; Render</button>
-        <button class="btn btn-secondary" id="render-menu-btn" style="padding:5px 8px;" title="Render options">&#9662;</button>
+        <button class="btn btn-primary" id="render-menu-btn" title="Render options">&#9662;</button>
         <a class="btn btn-primary" id="download-btn" style="display:none;text-decoration:none;" download>&#8681; Download MP4</a>
         <button class="btn btn-secondary" id="rerender-btn" style="display:none;" title="Render again with the latest edits">&#8635; Re-render</button>
       </span>
@@ -992,6 +1002,7 @@ export function getPreviewHtml(): string {
       <span id="insp-prov" class="insp-prov"></span>
       <button id="insp-close" title="Close">&#215;</button>
     </div>
+    <div class="panel-header">Cast</div>
     <div id="insp-tree"><div class="empty-state">Load a project</div></div>
     <div class="panel-header">Properties</div>
     <div id="prop-editor"><div class="empty-state">Select a component</div></div>
@@ -1009,9 +1020,9 @@ export function getPreviewHtml(): string {
 
     <div id="playback-bar">
       <span id="transport-left">
-        <span style="display:flex;gap:3px;">
-          <button id="tl-zoom-in" class="scene-sb-btn" title="Zoom timeline in">+</button>
-          <button id="tl-zoom-out" class="scene-sb-btn" title="Zoom timeline out">&minus;</button>
+        <span class="tl-zoom-seg">
+          <button id="tl-zoom-out" title="Zoom timeline out">&minus;</button>
+          <button id="tl-zoom-in" title="Zoom timeline in">+</button>
         </span>
         <button class="play-btn" id="play-btn" disabled>
           <svg id="play-icon" width="14" height="14" viewBox="0 0 14 14">
@@ -3293,6 +3304,7 @@ export function getPreviewHtml(): string {
       if (scripts) meta.push(scripts + ' actions');
       if (inAt !== null) meta.push('in @' + inAt.toFixed(1) + 's');
       html += '<div class="insp-node' + (i === state.currentComponentIndex ? ' active' : '') + '" data-ci="' + i + '">'
+        + '<span class="in-dot" style="background:' + (isCustom ? '#94a3b8' : compColor(c.type)) + '"></span>'
         + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : c.type) + '</span>'
         + '<span class="in-meta">' + escHtml(meta.join(' \\u00b7 ')) + '</span>'
         + '</div>';
@@ -4930,7 +4942,7 @@ export function getPreviewHtml(): string {
   var COMP_FAMILIES = [
     { re: /^(kinetic|headline|title|text|code|lower-third|st-)/, color: '#6366f1' },   // type & statements
     { re: /^(x-post|spotify|social|testimonial|quote)/, color: '#0ea5e9' },            // social proof
-    { re: /^(chart|flowchart|data|counter|stat|graph|metric|timeline|table)/, color: '#10b981' }, // data viz
+    { re: /^(chart|flowchart|data|counter|stat|graph|metric|timeline|table|bar-|pie-|line-)/, color: '#10b981' }, // data viz
     { re: /^(device|mockup|browser|phone|laptop|screenshot|app-)/, color: '#f59e0b' }, // product surfaces
     { re: /^(glass|particle|shader|three|vignette|effect|backdrop|world|mesh|gradient)/, color: '#8b5cf6' }, // worlds & fx
     { re: /^(lottie|icon|logo|badge)/, color: '#ec4899' },                             // accents
