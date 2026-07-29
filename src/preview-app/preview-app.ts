@@ -104,6 +104,9 @@ export function getPreviewHtml(): string {
   .btn-secondary:hover { background: #f6f7fa; border-color: #c9cfdb; }
   /* Render is a split button: main action + options caret share one pill. */
   #render-btn { border-radius: 8px 0 0 8px; }
+  /* The caret hides while a render runs (and on failure) -- the primary is
+     alone then and gets its full pill back, not a squared 'cut off' edge. */
+  #render-btn.rendering, #render-btn.failed { border-radius: 8px; }
   #render-menu-btn { border-radius: 0 8px 8px 0; padding: 6px 8px; margin-left: -7px;
     box-shadow: 0 1px 2px rgba(79,70,229,0.35), inset 1px 1px 0 rgba(255,255,255,0.10);
     border-left: 1px solid rgba(255,255,255,0.28); }
