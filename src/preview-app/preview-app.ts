@@ -309,7 +309,7 @@ export function getPreviewHtml(): string {
     height: 22px; background: transparent;
     outline: none; cursor: pointer; margin: 0; z-index: 4;
   }
-  #timeline-slider::-webkit-slider-runnable-track { height: 3px; background: #bfc7d6; border-radius: 3px; margin-top: 9px; }
+  #timeline-slider::-webkit-slider-runnable-track { height: 3px; background: #bfc7d6; border-radius: 3px; margin-top: 9.5px; }
   #timeline-slider::-moz-range-track { height: 3px; background: #c7cdd8; border-radius: 3px; }
   /* Beat/scene markers over the timeline: scene cuts are strong ticks, beats are soft ticks. */
   #beat-ticks { position: absolute; left: 0; right: 0; top: 66px; height: 5px; pointer-events: none; }
@@ -446,7 +446,7 @@ export function getPreviewHtml(): string {
     width: 20px; height: 18px; opacity: 0; cursor: pointer; border: none;
   }
   #playhead-line::before {
-    content: ''; position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
+    content: ''; position: absolute; top: -18.5px; left: 50%; transform: translateX(-50%);
     width: 15px; height: 15px; border-radius: 50%;
     background: #3730a3; border: 2px solid #fff;
     box-shadow: 0 1px 4px rgba(55,48,163,0.5);
