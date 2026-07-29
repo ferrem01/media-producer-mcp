@@ -29,7 +29,7 @@ import path from "path";
 import { projectDir } from "../persistence/paths.js";
 import type { Project } from "./types.js";
 
-const CACHE_VERSION = 4; // 4: settled-entrance pre-roll in scene-assembler (3: micro-shot compression)
+const CACHE_VERSION = 5; // 5: video-path URL-decode fix -- cached scenes may carry black video windows (4: settled-entrance pre-roll)
 
 export function sceneCacheEnabled(): boolean {
   return process.env.MP_SCENE_CACHE !== "0";
