@@ -309,9 +309,13 @@ export function getPreviewHtml(): string {
     height: 22px; background: transparent;
     outline: none; cursor: pointer; margin: 0; z-index: 4;
   }
-  #timeline-slider::-webkit-slider-runnable-track { height: 3px; background: #bfc7d6; border-radius: 3px; margin-top: 9.5px; }
-  #timeline-slider::-moz-range-track { height: 3px; background: #c7cdd8; border-radius: 3px; }
+  #timeline-slider::-webkit-slider-runnable-track { height: 22px; background: transparent; }
+  #timeline-slider::-moz-range-track { height: 22px; background: transparent; }
   /* Beat/scene markers over the timeline: scene cuts are strong ticks, beats are soft ticks. */
+  /* Our own scrubber line: a plain div at the ruler's exact center --
+     the native slider track's vertical placement is browser lottery. */
+  #ruler-line { position: absolute; left: 0; right: 0; top: 10px; height: 2px; border-radius: 1px;
+    background: #bfc7d6; z-index: 3; pointer-events: none; }
   #beat-ticks { position: absolute; left: 0; right: 0; top: 66px; height: 5px; pointer-events: none; }
   .beat-tick { position: absolute; top: 50%; width: 1px; height: 9px; transform: translateY(-50%); background: #b3bdf7; opacity: 0.8; border-radius: 1px; }
   .beat-tick.scene-cut { width: 2px; height: 15px; background: #4f46e5; opacity: 1; }
@@ -1061,6 +1065,7 @@ export function getPreviewHtml(): string {
       <span id="slider-wrap">
         <div id="timeline-track">
         <input type="range" id="timeline-slider" min="0" max="1000" value="0" step="any" disabled>
+        <div id="ruler-line"></div>
         <div id="beat-ticks"></div>
         <div id="audio-lanes"></div>
         <div id="cam-pills"></div>
