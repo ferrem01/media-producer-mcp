@@ -27,8 +27,11 @@ export interface MusicSelectOptions {
   brandKit?: BrandKit | null;
   tenantId?: string;
   minDuration?: number;  // minimum track duration in seconds
-  /** Instrumental tracks only (Jamendo filter): a bed under narration must
-   *  not carry lyrics that fight the speaker. */
+  /** Instrumental tracks only. DEFAULT TRUE: these films carry their story
+   *  in on-screen type or narration, and lyrics fight both -- vocals never
+   *  belong under a marketing film unless someone deliberately asks. Pass
+   *  `false` explicitly to allow vocal tracks. (Tenant brand-kit uploads
+   *  are exempt: an uploaded track is a deliberate choice.) */
   instrumental?: boolean;
 }
 
@@ -42,6 +45,10 @@ interface StockManifest {
     artist: string;
     duration: number;
     moods: string[];
+    /** Track carries vocals/lyrics. Absent = assumed instrumental (the
+     *  bundled corporate beds are); true = skipped under the default
+     *  instrumental-only selection. */
+    vocals?: boolean;
   }>;
 }
 
@@ -55,6 +62,7 @@ const STOCK_MUSIC_DIR = path.join(config.dataDir, "_system", "stock-music");
  */
 export async function selectMusic(opts: MusicSelectOptions): Promise<MusicTrack | null> {
   const mood = opts.mood.toLowerCase();
+  const instrumental = opts.instrumental !== false; // default: no vocals, ever
 
   // 1. Brand kit music assets
   if (opts.brandKit?.assets) {
@@ -93,13 +101,13 @@ export async function selectMusic(opts: MusicSelectOptions): Promise<MusicTrack 
   }
 
   // 2. Stock music library
-  const stockTrack = await selectStockMusic(mood, opts.minDuration);
+  const stockTrack = await selectStockMusic(mood, opts.minDuration, instrumental);
   if (stockTrack) {
     return stockTrack;
   }
 
   // 3. Jamendo (if configured)
-  const jamendoTrack = await searchJamendo(mood, opts.minDuration, opts.instrumental);
+  const jamendoTrack = await searchJamendo(mood, opts.minDuration, instrumental);
   if (jamendoTrack) {
     return jamendoTrack;
   }
@@ -110,20 +118,23 @@ export async function selectMusic(opts: MusicSelectOptions): Promise<MusicTrack 
 /**
  * Select from the bundled stock music library.
  */
-async function selectStockMusic(mood: string, minDuration?: number): Promise<MusicTrack | null> {
+async function selectStockMusic(mood: string, minDuration?: number, instrumental?: boolean): Promise<MusicTrack | null> {
   try {
     const manifestPath = path.join(STOCK_MUSIC_DIR, "manifest.json");
     const raw = await fs.readFile(manifestPath, "utf-8");
     const manifest: StockManifest = JSON.parse(raw);
 
+    // No vocals under the film unless the caller opted out of instrumental.
+    const pool = instrumental ? manifest.tracks.filter(t => t.vocals !== true) : manifest.tracks;
+
     // Find tracks matching the mood
-    let candidates = manifest.tracks.filter(t =>
+    let candidates = pool.filter(t =>
       t.moods.some(m => m.toLowerCase() === mood)
     );
 
     // If no mood match, pick a default corporate track
     if (candidates.length === 0) {
-      candidates = manifest.tracks.filter(t =>
+      candidates = pool.filter(t =>
         t.moods.includes("corporate")
       );
     }
@@ -138,8 +149,8 @@ async function selectStockMusic(mood: string, minDuration?: number): Promise<Mus
     }
 
     if (candidates.length === 0) {
-      // Last resort: any track
-      candidates = manifest.tracks;
+      // Last resort: any track (still excluding vocals under the default)
+      candidates = pool;
     }
 
     if (candidates.length === 0) {
