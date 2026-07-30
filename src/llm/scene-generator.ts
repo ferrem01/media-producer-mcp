@@ -343,7 +343,7 @@ function stackRows(n: number, bandY: number, bandH: number, gap: number): Array<
  * stage) instead of stacking into the same 84% inset -- the collision that
  * made films read as sloppy.
  */
-function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean): LayoutSlot[] {
+function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false): LayoutSlot[] {
   var slots: LayoutSlot[] = authored.map(() => null);
   var accentCount = 0;
   var surfaceIdx: number[] = [];
@@ -372,6 +372,40 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean): L
       surfaceIdx.push(i);
     }
   });
+
+  // ── VERTICAL (9:16) LAYOUT: the landscape recipes below have no width to
+  // live in. The social-reel contract's closed vocabulary, deterministic:
+  // TYPE CARD (captions only, middle band), STACK (caption band on top, ONE
+  // surface below, full width), or stacked surfaces -- side-by-side never.
+  // Desktop-style surfaces render full-width; measured on the maiden flight,
+  // anything narrower is an illegible sliver.
+  if (vertical) {
+    var vTop = 14, vBottom = 88; // middle band: clear of platform UI
+    var capBand = captionIdx.length + heroIdx.length > 0;
+    var surfTop = capBand ? 34 : vTop + 4;
+    var freeSurf = surfaceIdx.filter((i) => !slots[i]);
+    if (freeSurf.length > 0) {
+      var sh = (vBottom - surfTop - (freeSurf.length - 1) * 3) / freeSurf.length;
+      freeSurf.forEach((idx, k) => {
+        slots[idx] = { position: pct(0, surfTop + k * (sh + 3), 100, sh), z_index: 10 + k };
+      });
+    }
+    var vEd = heroIdx.concat(captionIdx);
+    if (vEd.length > 0) {
+      if (freeSurf.length > 0) {
+        var capRows = stackRows(vEd.length, vTop + 2, surfTop - vTop - 5, 2);
+        vEd.forEach((idx, k) => {
+          slots[idx] = { position: pct(6, capRows[k][0], 88, capRows[k][1]), z_index: 30 + k };
+        });
+      } else {
+        var cardRows = stackRows(vEd.length, 30, 42, 4);
+        vEd.forEach((idx, k) => {
+          slots[idx] = { position: pct(6, cardRows[k][0], 88, cardRows[k][1]), z_index: 30 + k };
+        });
+      }
+    }
+    return slots; // residual nulls = deliberately dropped (backdrop casts under a world)
+  }
 
   // ── Surfaces: the window recipes (identical to the hand-built films) ──
   var firstOfType = (t: string) => surfaceIdx.find((i) => authored[i].type === t && !slots[i]);
@@ -480,7 +514,7 @@ function buildAuthoredCompositionScene(
 ): GeneratedScene {
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (authored composition -- deterministic, no codegen)`);
   var types = authored.map((c) => c.type);
-  var slots = authoredLayout(authored, !!opts.world);
+  var slots = authoredLayout(authored, !!opts.world, opts.canvas.height > opts.canvas.width);
   // The dark cinematic world under every mock window, matching the film's
   // template scenes (and the hand-built originals).
   // The film's ONE world under every scene (SPEC-world.md). The per-scene
