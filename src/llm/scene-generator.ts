@@ -547,7 +547,9 @@ function buildAuthoredCompositionScene(
   // close and orphaned while the film shipped a flat gradient. The clip or
   // still replaces the world backdrop for THIS scene; authored content
   // stacks above it and caption scrims keep the type legible.
+  var mediaBackdrop = false;
   if (opts.brollVideoUrl || opts.imageUrl) {
+    mediaBackdrop = true;
     components[0] = opts.brollVideoUrl ? {
       id: "bg",
       type: "video",
@@ -580,13 +582,18 @@ function buildAuthoredCompositionScene(
     // in a world, a caption/hero whose ink matches the world's lightness
     // (or that has no ink at all on a LIGHT world, where component defaults
     // are dark-era white) gets the world's ink instead.
-    if (w && (isCaptionRole(c.type) || HERO_ROLE_TYPES.indexOf(c.type) !== -1)) {
-      var worldIsLight = w.theme === "light";
+    // A media backdrop reads as DARK regardless of world theme: b-roll gets
+    // composed under a darkening treatment and hero stills carry the 0.35
+    // dark scrim -- dark ink over either lands near-invisible (measured
+    // live: proj_cd8a6fb6 scene 7, near-black caption on a scrimmed
+    // golden-hour still at 1.39:1).
+    if ((w || mediaBackdrop) && (isCaptionRole(c.type) || HERO_ROLE_TYPES.indexOf(c.type) !== -1)) {
+      var worldIsLight = mediaBackdrop ? false : w!.theme === "light";
       var ink = typeof data.color === "string" ? (data.color as string) : undefined;
       var inkClash = ink !== undefined && hexIsLight(ink) === worldIsLight;
-      if (inkClash || (ink === undefined && worldIsLight)) {
+      if (inkClash || (ink === undefined && worldIsLight) || (ink === undefined && mediaBackdrop)) {
         data.color = worldIsLight ? (opts.brandKit?.colors?.text || "#17171c") : "#f5f6fa";
-        console.log(`    ${c.type}: ink ${ink || "(default)"} would vanish on the ${w.theme} world -- clamped to ${data.color}`);
+        console.log(`    ${c.type}: ink ${ink || "(default)"} would vanish on the ${mediaBackdrop ? "media backdrop" : w!.theme + " world"} -- clamped to ${data.color}`);
       }
     }
     // The recipe's show_panel contract: the shell's own agent panel hides

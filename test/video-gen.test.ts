@@ -123,4 +123,18 @@ describe("gen_video wiring (source guards)", () => {
     expect(sg).toMatch(/opts\.brollVideoUrl \|\| opts\.imageUrl/);
     expect(sg).toMatch(/overlay_opacity: 0\.35/); // legibility scrim over hero stills
   });
+
+  it("captions over a media backdrop get light ink (the scrim is dark)", async () => {
+    // proj_cd8a6fb6 scene 7: near-black caption on a dark-scrimmed still, 1.39:1.
+    const sg = await read("../src/llm/scene-generator.ts");
+    expect(sg).toMatch(/\(w \|\| mediaBackdrop\) && \(isCaptionRole/);
+    expect(sg).toMatch(/mediaBackdrop \? false : w!\.theme === "light"/);
+  });
+
+  it("an explicitly briefed generated shot makes gen_video mandatory", async () => {
+    // proj_cd8a6fb6: the brief said "generate this shot" and the storyboard
+    // shipped the centerpiece as an empty gradient instead.
+    const sb = await read("../src/llm/storyboard-builder.ts");
+    expect(sb).toMatch(/MANDATORY WHEN BRIEFED/);
+  });
 });
