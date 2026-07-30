@@ -1657,7 +1657,8 @@ export function createMcpServer(): McpServer {
             scripted_line: t.line,
             heard_by_whisper: t.transcript ?? "(transcription unavailable)",
           })),
-          note: "Pass asset_url to generate as speaker_source for a speaker-led film (her voice becomes the soundtrack; scenes cut on her sentences). Compare scripted_line vs heard_by_whisper per take -- Veo occasionally paraphrases; regenerate a single take with generate_clip + reference_image if one drifted. Voice consistency across takes is best-effort; listen before shipping.",
+          seam_seconds: result.seams,
+          note: "Pass asset_url to generate as speaker_source for a speaker-led film (her voice becomes the soundtrack; scenes cut on her sentences). Compare scripted_line vs heard_by_whisper per take -- Veo occasionally paraphrases; regenerate a single take with generate_clip + reference_image if one drifted. Voice consistency across takes is best-effort; listen before shipping. seam_seconds marks each take boundary in the stitched clip: the cuts are trimmed and pose-matched, but the surest hide is an editor's -- brief the film to cut away to the product surface at those moments.",
         };
       });
       return ok({
