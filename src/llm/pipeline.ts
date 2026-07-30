@@ -2179,6 +2179,47 @@ async function runUnifiedPipeline(
     trace?.endEvent({ mandate: prep.mandate });
   }
 
+  // ── Narration-first: a provided speaker recording IS the script ──
+  // The storyboard-mode path already transcribes an attached speaker track;
+  // full generation with a fresh speaker_source never did (measured live:
+  // proj_11bcf413 -- nothing transcribed, the storyboard INVENTED dialogue
+  // and budgeted 17s of film for an 8s take). Transcribe up front and pin
+  // the treatment + storyboard to the real words and the real clock.
+  if (opts.speaker_source && format !== "image") {
+    try {
+      const { whisperAvailable, getTranscript } = await import("../core/transcribe.js");
+      if (await whisperAvailable()) {
+        const { resolveVideoPath } = await import("../core/video-path.js");
+        const audioPath = resolveVideoPath(opts.speaker_source);
+        const nCacheDir = path.join(os.tmpdir(), "mp-narration-cache");
+        await fs.mkdir(nCacheDir, { recursive: true }).catch(() => {});
+        const { segments } = await getTranscript(audioPath, nCacheDir);
+        if (segments.length) {
+          const total = segments[segments.length - 1].end;
+          const nLines: string[] = [];
+          let nBuf: string[] = [];
+          let nT0 = -1;
+          for (const s of segments) {
+            const wd = s.text.trim();
+            if (nT0 < 0) nT0 = s.start;
+            nBuf.push(wd);
+            if (/[.?!]$/.test(wd)) { nLines.push(`[${nT0.toFixed(1)}s] ${nBuf.join(" ")}`); nBuf = []; nT0 = -1; }
+          }
+          if (nBuf.length) nLines.push(`[${nT0.toFixed(1)}s] ${nBuf.join(" ")}`);
+          opts.prompt += `\n\n## RECORDED NARRATION (the speaker recording -- this IS the soundtrack and the clock)\n` +
+            `Total narration length: ${total.toFixed(1)}s. Scene durations MUST sum to this, and scene cuts MUST land on the sentence boundaries below. ` +
+            `Do NOT write new dialogue or voiceover scripts (no TTS is layered on the recording); each scene's voiceover_text must QUOTE its span of the narration verbatim, and every overlay entrance should be timed to the bracketed sentence starts.\n` +
+            nLines.join("\n");
+          console.log(`  Narration-first: injected speaker transcript (${segments.length} words, ${total.toFixed(1)}s)`);
+        }
+      } else {
+        console.warn("  Narration-first: whisper unavailable -- storyboard will not know the speaker's real words");
+      }
+    } catch (e: any) {
+      console.warn(`  Narration-first: transcript skipped: ${e?.message || e}`);
+    }
+  }
+
   // Creative Director: reads the raw prompt, fills the gaps as the expert,
   // commits to ONE concept + look, and decides the scene count.
   var treatment: Treatment | undefined;
