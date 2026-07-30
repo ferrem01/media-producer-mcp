@@ -16,7 +16,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { v4 as uuid } from "uuid";
-import type { LLMConfig } from "./client.js";
+import { llmRetryScope, type LLMConfig } from "./client.js";
 import { generateComponentLLM } from "./component-gen.js";
 import { buildComponentCatalog, type ComponentCatalogEntry } from "./catalog.js";
 import { buildStoryboard } from "./storyboard-builder.js";
@@ -206,8 +206,35 @@ export function isBookendScene(
 
 /**
  * Run the full generation pipeline.
+ *
+ * This wrapper surfaces transient LLM retries into job progress: without it,
+ * a retrying model call reads as a silent multi-minute stall (measured live
+ * at the concept step). It tracks the last progress event so the retry note
+ * lands on the right step/percent; llmRetryScope (AsyncLocalStorage) keeps
+ * concurrent jobs from seeing each other's retries.
  */
 export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineResult> {
+  var lastP = { step: "starting", percent: 0 };
+  var userProgress = opts.onProgress;
+  var wrapped: PipelineOpts = {
+    ...opts,
+    onProgress: (p) => {
+      lastP = { step: p.step, percent: p.percent };
+      userProgress?.(p);
+    },
+  };
+  return llmRetryScope.run(
+    (r) =>
+      userProgress?.({
+        step: lastP.step,
+        percent: lastP.percent,
+        detail: `Model call interrupted (${r.reason}) -- retry ${r.attempt}/${r.maxAttempts - 1}`,
+      }),
+    () => runGeneratePipelineInner(wrapped),
+  );
+}
+
+async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineResult> {
   // Deterministic narration rule: a real speaker recording IS the narration.
   // speaker_source carries its own audio, and a project being (re)built may
   // already have a narration track attached -- in either case auto-TTS would
@@ -419,6 +446,7 @@ async function runSceneRevisionPipeline(
     trace?.beginEvent("scene_revision");
     const storyboard = await buildStoryboard({
       prompt: revisionPrompt,
+      rawPrompt: opts.prompt,
       format: project.format || "video",
       llmConfig: opts.llmConfig,
       brandKit,
@@ -560,6 +588,7 @@ async function runVideoRevisionPipeline(
   trace?.beginEvent("video_revision");
   const storyboard = await buildStoryboard({
     prompt: revisionPrompt,
+    rawPrompt: opts.prompt,
     format: project.format || "video",
     llmConfig: opts.llmConfig,
     brandKit: project.brand_kit || brandKit,
@@ -2135,6 +2164,13 @@ async function runUnifiedPipeline(
     console.log("  Social-reel grammar: creativity clamped to 0.15 (component-first assembly)");
   }
 
+  // Progress honesty: everything from here to the first media emission used
+  // to run SILENT under the concept step's percent -- treatment + music prep
+  // + the multi-minute storyboard loop all displayed as "concept 17%"
+  // (measured live: a 6.5-min job showed concept for ~6 min then jumped to
+  // 78%). Each long stage now announces itself.
+  opts.onProgress?.({ step: "soundtrack", percent: 10, detail: "Picking the music & beat grid" });
+
   // ── Per-grammar PREP: "generate" mandate (music-first spine) ──
   // The generalized prep: for any grammar with background music on, pick the
   // track and beat-map it BEFORE the storyboard so the shared storyboard
@@ -2178,8 +2214,11 @@ async function runUnifiedPipeline(
   });
   console.log(`  World: ${world.theme} / ${world.backdrop.component} seed=${world.backdrop.seed} palette=[${world.backdrop.palette.join(",")}]`);
 
+  opts.onProgress?.({ step: "storyboarding", percent: 12, detail: "Storyboarding the film" });
+
   var storyboard = await buildStoryboard({
     prompt: richPrompt,
+    rawPrompt: opts.prompt,
     format,
     llmConfig: opts.llmConfig,
     brandKit,

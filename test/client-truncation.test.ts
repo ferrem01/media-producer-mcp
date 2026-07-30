@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { callLLM, callLLMAgentic, type LLMConfig, type LLMTool } from "../src/llm/client.js";
+import { sseResponseFromMessage } from "./helpers/sse.js";
 
 const CONFIG: LLMConfig = { provider: "anthropic", apiKey: "test-key", model: "claude-sonnet-5" };
 
 function mockFetchOnce(body: unknown, ok = true) {
-  const fetchMock = vi.fn().mockResolvedValue({
-    ok,
-    status: ok ? 200 : 400,
-    json: async () => body,
-    text: async () => JSON.stringify(body),
-  });
+  const fetchMock = vi.fn().mockImplementation(async () =>
+    ok
+      ? sseResponseFromMessage(body as { content: any[]; stop_reason?: string })
+      : new Response(JSON.stringify(body), { status: 400 }),
+  );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }

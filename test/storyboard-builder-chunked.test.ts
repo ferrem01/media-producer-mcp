@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { buildStoryboard } from "../src/llm/storyboard-builder.js";
+import { sseResponseFromMessage } from "./helpers/sse.js";
 
 const BRAND_KIT = {
   name: "Test",
@@ -34,7 +35,7 @@ function mockTurns(turns: Array<{ content: any[]; stop_reason: string }>) {
   const fetchMock = vi.fn().mockImplementation(async () => {
     const turn = turns[Math.min(i, turns.length - 1)];
     i++;
-    return { ok: true, status: 200, json: async () => turn, text: async () => JSON.stringify(turn) };
+    return sseResponseFromMessage(turn);
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
