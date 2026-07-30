@@ -76,6 +76,29 @@ describe("generateVideoClip (Veo)", () => {
     expect(result).toBeNull();
   });
 
+  it("conditions on a reference image for character consistency", async () => {
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+    mockVeo();
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "veo-ref-"));
+    const refPath = path.join(dir, "presenter.jpg");
+    await fs.writeFile(refPath, Buffer.from("fake-jpeg-bytes"));
+    try {
+      const result = await generateVideoClip({
+        prompt: "the same presenter, next take",
+        aspectRatio: "16:9",
+        outputDir: dir,
+        filename: "take2.mp4",
+        referenceImagePath: refPath,
+      });
+      expect(result).not.toBeNull();
+      const submitBody = JSON.parse((vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string);
+      expect(submitBody.instances[0].image.mimeType).toBe("image/jpeg");
+      expect(submitBody.instances[0].image.bytesBase64Encoded).toBe(Buffer.from("fake-jpeg-bytes").toString("base64"));
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }, 60000);
+
   it("returns null when the safety filter eats the clip", async () => {
     process.env.GEMINI_API_KEY = "test-gemini-key";
     mockVeo({ filtered: true });

@@ -1555,6 +1555,7 @@ export function createMcpServer(): McpServer {
       prompt: z.string().describe("The shot as a cinematography direction: subject, action, camera move, light. For speech, include the line in quotes: \"a friendly woman looks into the camera and says: 'One conversation becomes a campaign.'\""),
       aspect_ratio: z.enum(["16:9", "9:16"]).optional().describe("Clip aspect (default 16:9; use 9:16 for reels)"),
       name: z.string().optional().describe("Filename stem for the saved clip (default: clip_<jobid>)"),
+      reference_image: z.string().optional().describe("CHARACTER CONSISTENCY: an /assets/... URL or server path to an image the clip animates FROM (first-frame conditioning). Use a frame of a prior take (or a character still) to keep the same presenter across clips."),
     },
     async (params) => {
       if (!process.env.GEMINI_API_KEY) {
@@ -1562,12 +1563,30 @@ export function createMcpServer(): McpServer {
       }
       const tenantId = params.tenant_id!;
       const aspect = params.aspect_ratio || "16:9";
+      // Resolve a reference image (/assets URL or raw server path) to disk.
+      let referenceImagePath: string | undefined;
+      if (params.reference_image) {
+        const ref = params.reference_image;
+        const brandMatch = ref.match(/^\/assets\/([^/]+)\/brand-kit\/(.+)$/);
+        const projMatch = ref.match(/^\/assets\/([^/]+)\/projects\/([^/]+)\/assets\/(.+)$/);
+        const resolvedRef: string = brandMatch
+          ? path.resolve(config.dataDir, brandMatch[1], "brand-kit", "assets", decodeURIComponent(brandMatch[2]))
+          : projMatch
+            ? path.resolve(config.dataDir, projMatch[1], "projects", projMatch[2], "assets", decodeURIComponent(projMatch[3]))
+            : ref;
+        try {
+          await fs.access(resolvedRef);
+        } catch {
+          return err(`reference_image not found on the server: ${ref}`);
+        }
+        referenceImagePath = resolvedRef;
+      }
       const job = queueJob("generate", tenantId, async (j) => {
         j.progress = { step: "veo", percent: 10, detail: "Generating the clip (Veo -- typically 1-3 minutes)" };
         const stem = (params.name || `clip_${j.id.replace(/^job_/, "")}`).replace(/[^a-zA-Z0-9_-]/g, "_");
         const filename = `${stem}.mp4`;
         const outputDir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "video");
-        const clip = await generateVideoClip({ prompt: params.prompt, aspectRatio: aspect, outputDir, filename });
+        const clip = await generateVideoClip({ prompt: params.prompt, aspectRatio: aspect, outputDir, filename, referenceImagePath });
         if (!clip) {
           throw new Error(`Veo returned no clip: ${lastVideoGenError() || "unknown failure (see server logs)"}`);
         }

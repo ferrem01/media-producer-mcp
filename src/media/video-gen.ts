@@ -81,6 +81,11 @@ export interface VideoGenOptions {
   filename: string;
   apiKey?: string;
   model?: string;
+  /** First-frame conditioning for CHARACTER CONSISTENCY: the clip animates
+   *  from this image, so the same reference (a presenter frame from a prior
+   *  take, a character sheet) keeps the same person/look across clips.
+   *  Local file path -- read and base64d into the request. */
+  referenceImagePath?: string;
 }
 
 export interface VideoGenResult {
@@ -108,6 +113,16 @@ export async function generateVideoClip(opts: VideoGenOptions): Promise<VideoGen
   try {
     console.log(`  Video gen: "${opts.prompt.substring(0, 70)}..." model=${model} aspect=${opts.aspectRatio}`);
 
+    // First-frame image conditioning (character consistency across takes).
+    let imagePart: { bytesBase64Encoded: string; mimeType: string } | undefined;
+    if (opts.referenceImagePath) {
+      const bytes = await fs.readFile(opts.referenceImagePath);
+      const ext = path.extname(opts.referenceImagePath).toLowerCase();
+      const mimeType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+      imagePart = { bytesBase64Encoded: bytes.toString("base64"), mimeType };
+      console.log(`  Video gen: conditioning on reference image ${path.basename(opts.referenceImagePath)} (${(bytes.length / 1024).toFixed(0)}KB)`);
+    }
+
     // 1. Submit the long-running generation. A model-id 404 triggers ONE
     //    discovery pass (Google rotates Veo ids: -preview vs -001, 3.0 vs
     //    3.1) and a retry with what the key actually serves.
@@ -116,7 +131,7 @@ export async function generateVideoClip(opts: VideoGenOptions): Promise<VideoGen
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
-          instances: [{ prompt: opts.prompt }],
+          instances: [{ prompt: opts.prompt, ...(imagePart ? { image: imagePart } : {}) }],
           parameters: { aspectRatio: opts.aspectRatio },
         }),
         signal: AbortSignal.timeout(60_000),
