@@ -29,7 +29,8 @@ describe("data-story grammar registration", () => {
     expect(src).toMatch(/REAL FIGURES ONLY/);
     expect(src).toMatch(/HONEST AXES/);
     expect(src).toMatch(/metric-dashboard is earned ONLY as the finale/);
-    expect(src).toMatch(/OBJECTS, NOT STRINGS[\s\S]{0,600}DATA-STORY|DATA-STORY[\s\S]{0,2400}OBJECTS, NOT STRINGS/);
+    const section = src.split("### DATA-STORY FILMS")[1]?.split("### SPEAKER-SCREENCAST")[0] || "";
+    expect(section).toContain("OBJECTS, NOT STRINGS"); // component-first inside the data-story contract itself
   });
 
   it("gets the component-first policy and the music-first spine", async () => {

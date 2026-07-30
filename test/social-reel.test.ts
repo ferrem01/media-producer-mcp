@@ -37,6 +37,19 @@ describe("social-reel grammar registration", () => {
     expect(src).toMatch(/filmGrammar === "tempo-cut" \|\| filmGrammar === "editorial" \|\| filmGrammar === "social-reel"/);
   });
 
+  it("enforces the format's length in code, not just in the contract", async () => {
+    const src = await read("../src/llm/pipeline.ts");
+    expect(src).toContain("Social-reel length discipline");
+    expect(src).toMatch(/SCENE_CAP = 6, TOTAL_CAP = 28/);
+    expect(src).toMatch(/rescaleBeats\(s\.beats, SCENE_CAP\)/); // beats follow the squeeze
+  });
+
+  it("bans whole desktop workspaces as surfaces", async () => {
+    const src = await read("../src/llm/storyboard-builder.ts");
+    expect(src).toMatch(/WHOLE DESKTOP WORKSPACES ARE BANNED/);
+    expect(src).toMatch(/quotient-app-shell/);
+  });
+
   it("is exposed on the generate tool and defaults the canvas vertical", async () => {
     const src = await read("../src/server.ts");
     expect(src).toMatch(/"launch-film", "tempo-cut", "speaker-screencast", "editorial", "social-reel"/);
