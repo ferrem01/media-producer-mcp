@@ -2316,10 +2316,17 @@ async function runUnifiedPipeline(
   // Both contracts say voiceover_text stays empty, but the storyboard still
   // populates it (measured live: proj_a7b3ffbd shipped narration lines that
   // re-read the captions). Strip in code -- unless the caller explicitly
-  // asked for TTS, which overrides the grammar's default.
-  if ((filmGrammar === "social-reel" || filmGrammar === "data-story") && !opts.voiceover) {
+  // asked for TTS, which overrides the grammar's default. Beats carry their
+  // own voiceover lines (and audio_hints get rebuilt from the draft at scene
+  // build), so the strip covers all three or the copy re-enters (measured
+  // live: proj_48475b3d's audio_hints carried scene labels re-filled by the
+  // voiceover enforcement below -- which this flag now also disables).
+  const textIsVoiceover = (filmGrammar === "social-reel" || filmGrammar === "data-story") && !opts.voiceover;
+  if (textIsVoiceover) {
     for (const d of storyboard.scenes as any[]) {
       if (d.voiceover_text) d.voiceover_text = undefined;
+      if (d.audio_hints?.voiceover_text) d.audio_hints.voiceover_text = undefined;
+      if (Array.isArray(d.beats)) for (const b of d.beats) if (b?.voiceover_text) b.voiceover_text = undefined;
     }
   }
 
@@ -2509,8 +2516,11 @@ async function runUnifiedPipeline(
       bookendScenes.add(si);
     }
 
-    // Enforce voiceover on non-bookend scenes
-    if (!isBookend && !draft.voiceover_text && draft.duration_seconds >= 3) {
+    // Enforce voiceover on non-bookend scenes -- except in text-as-voiceover
+    // grammars, where this fallback would re-fill exactly what the strip
+    // above emptied (the label would ride into audio_hints and be one TTS
+    // flag away from double-voicing the captions).
+    if (!textIsVoiceover && !isBookend && !draft.voiceover_text && draft.duration_seconds >= 3) {
       // Generate voiceover text from the scene's purpose
       var fallbackVoiceover = draft.purpose || draft.label || "";
       if (draft.visual_notes) {
