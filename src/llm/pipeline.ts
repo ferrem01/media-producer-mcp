@@ -38,6 +38,7 @@ import { loadBrandKit } from "../persistence/brand-kit.js";
 import { tenantComponentsDir, projectDir } from "../persistence/paths.js";
 import { config } from "../config.js";
 import { fetchStockFootage } from "../media/stock-footage.js";
+import { generateVideoClip } from "../media/video-gen.js";
 import { generateSceneVoiceovers } from "../audio/scene-voiceover.js";
 import type { BrandKit, Canvas, OutputFormat, StoryboardScene, Project, Storyboard, ReferenceImage, Scene, SceneBeat, SceneTransition } from "../core/types.js";
 import { beatMidpoints, formatBeatSheet, rescaleBeats } from "../core/beats.js";
@@ -2528,6 +2529,45 @@ async function runUnifiedPipeline(
     }
     console.log(`  Stock footage: ${brollUrlMap.size} clip(s) fetched`);
     trace?.endEvent({ clips: brollUrlMap.size });
+  }
+
+  // 3b1b. DIFFUSION-generated footage (Veo via the Gemini API). The storyboard
+  // tags a scene with gen_video only for moving shots stock can't plausibly
+  // contain; the generated clip lands in the same assets dir and rides the
+  // same brollVideoUrl channel as real footage -- downstream (EDL, frame-swap
+  // capture, darkened-background composition) treats video as video. Capped
+  // hard: this is the expensive fetcher (priced per generated second).
+  if (process.env.GEMINI_API_KEY) {
+    const genVideoScenes = storyboard.scenes
+      .map((d: any, si: number) => ({ d, si }))
+      .filter(({ d, si }: any) => d.gen_video && !enrichResult.imageUrls.has(si) && !brollUrlMap.has(si));
+    if (genVideoScenes.length > 0) {
+      trace?.beginEvent("gen_video");
+      opts.onProgress?.({ step: "media", percent: 18, detail: "Generating footage (Veo)" });
+      const assetsDir = path.join(projectDir(opts.tenant_id, projectId), "assets");
+      await fs.mkdir(assetsDir, { recursive: true });
+      const MAX_GEN_VIDEO = Number(process.env.MP_MAX_GEN_VIDEO) || 2;
+      const aspectRatio: "16:9" | "9:16" = canvas.height > canvas.width ? "9:16" : "16:9";
+      let generated = 0;
+      for (const { d, si } of genVideoScenes) {
+        if (generated >= MAX_GEN_VIDEO) {
+          console.log(`  Video gen: cap of ${MAX_GEN_VIDEO} reached, skipping "${d.label}"`);
+          continue;
+        }
+        const filename = `genvid_scene_${si}.mp4`;
+        const clip = await generateVideoClip({
+          prompt: d.gen_video, aspectRatio, outputDir: assetsDir, filename,
+        });
+        if (clip) {
+          brollUrlMap.set(si, `/assets/${opts.tenant_id}/projects/${projectId}/assets/${filename}`);
+          generated++;
+          console.log(`  Gen-video scene ${si} "${d.label}": clip attached`);
+        }
+      }
+      trace?.endEvent({ clips: generated });
+    }
+  } else if (storyboard.scenes.some((d: any) => d.gen_video)) {
+    console.log("  Video gen: storyboard requested gen_video but GEMINI_API_KEY is not set -- scenes fall back to their motion-graphics background");
   }
 
   // 3b2. REAL uploaded footage named in the prompt. A build-from-storyboard

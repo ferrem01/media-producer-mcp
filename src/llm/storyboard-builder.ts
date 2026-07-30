@@ -96,8 +96,9 @@ const SCENE_TOOL_SCHEMA = {
       description: "How this scene transitions in from the previous one",
     },
     voiceover_text: { type: "string", description: "Scene narration (concatenation of beat narration when the scene has beats)" },
-    broll_query: { type: "string", description: "Cinematic stock-footage search phrase (mutually exclusive with hero_image)" },
-    hero_image: { type: "string", description: "AI-generated still image prompt (mutually exclusive with broll_query)" },
+    broll_query: { type: "string", description: "Cinematic stock-footage search phrase (mutually exclusive with hero_image/gen_video)" },
+    hero_image: { type: "string", description: "AI-generated still image prompt (mutually exclusive with broll_query/gen_video)" },
+    gen_video: { type: "string", description: "AI-generated video clip prompt -- ONLY for moving shots stock footage cannot plausibly contain (mutually exclusive with broll_query/hero_image)" },
     camera_moves: {
       type: "array",
       description: "Stage-camera moves on this scene (the ONE camera). ONLY anchored moves are allowed here: {at, type:'zoom', anchor:'componentId.anchorName', scale?, duration?} or {at, type:'reset', duration?}. Anchors come from performable components' CAMERA ANCHORS (e.g. slack-workspace publishes composer, messages, thread-panel -- 'tpl_artifact.composer'). Zoom in while the surface performs, reset before the next thought. Max 4 per scene.",
@@ -210,6 +211,7 @@ export interface DraftScene {
   hero_image?: string;
   voiceover_text?: string;  // Narration script for this scene (TTS)
   broll_query?: string;     // when set, fetch cinematic stock footage as this scene's background
+  gen_video?: string;       // when set, DIFFUSION-generate this scene's background clip (Veo) -- shots stock can't contain
   /** The scene's internal beat timeline: one persistent world, several thoughts.
    *  Normalized (bars -> seconds, rescaled to fill the scene) after parsing. */
   beats?: SceneBeat[];
@@ -407,12 +409,13 @@ Match scene INTENT to a component category (the catalog has blocks for all of th
 For scenes with existing UI elements (chat panels, dashboards, code editors), ALWAYS list the matching library component types.
 
 ${opts.world ? worldPromptBlock(opts.world) + "\n\n" : ""}### Background Strategy -- decide this FIRST, per scene, by INTENT
-Before writing any background, decide which of FOUR strategies the moment wants. Do this BEFORE reaching for b-roll -- b-roll is ONE option, not the default for every atmospheric beat:
+Before writing any background, decide which of FIVE strategies the moment wants. Do this BEFORE reaching for b-roll -- b-roll is ONE option, not the default for every atmospheric beat:
 1. **B-roll video (broll_query)** -- real-world energy, atmosphere, a place, a human moment that should feel ALIVE and MOVING. Opener "set the world", emotional/aspirational/lifestyle beats WITH motion. Must visibly move (see B-Roll below).
 2. **Generated image (hero_image)** -- a calm, composed, contemplative, or singular striking visual; a beat that should feel STILL and intentional. A photograph never reads as "broken" the way a frozen video does, so this -- NOT a slowed/static video -- is the correct tool for quiet/still/atmospheric moments. Use hero_image when you want the cinematic b-roll *feeling* (real, emotional, beautiful) but the scene should HOLD STILL.
-3. **Motion graphics / mesh (animated background, the default)** -- product, UI, data, abstract, branded scenes. HTML/CSS/GSAP gradients, glow orbs, particles.
-4. **Plain gradient** -- when nothing else is earned.
-**DECISION GATE:** Is this beat moving or still? MOVING/kinetic/alive -> b-roll. STILL/calm/contemplative/composed -> hero_image. If you catch yourself wanting a "slow", "still", "perfectly calm", "stationary camera", "resting", or "barely moving" video, STOP -- that is a hero_image, not a broll_query. A meditative/dawn/quiet/serene opener is almost always a hero_image, NOT slow b-roll.
+3. **Generated video (gen_video)** -- a MOVING shot that stock search cannot plausibly contain: a specific staged scenario, a branded/surreal moment, an impossible camera path ("a wall of glowing sticky notes collapsing into a single clean card, slow push-in"). Write it as a cinematography direction: subject, action, camera move, light. It is the EXPENSIVE tool -- 0-1 per film, only when neither stock nor a still can deliver the shot. If a generic search phrase would find the shot on a stock site, use broll_query instead.
+4. **Motion graphics / mesh (animated background, the default)** -- product, UI, data, abstract, branded scenes. HTML/CSS/GSAP gradients, glow orbs, particles.
+5. **Plain gradient** -- when nothing else is earned.
+**DECISION GATE:** Is this beat moving or still? MOVING/kinetic/alive -> b-roll (or gen_video ONLY if stock can't contain the shot). STILL/calm/contemplative/composed -> hero_image. If you catch yourself wanting a "slow", "still", "perfectly calm", "stationary camera", "resting", or "barely moving" video, STOP -- that is a hero_image, not a broll_query. A meditative/dawn/quiet/serene opener is almost always a hero_image, NOT slow b-roll.
 
 ### B-Roll (atmospheric stock footage) -- when the beat MOVES
 Once the gate above says this beat is MOVING, add a "broll_query": a SPECIFIC, cinematic stock-footage search phrase that matches the scene's mood and the brand. The clip plays as a darkened background BEHIND your content (it does not replace the foreground).
