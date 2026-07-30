@@ -143,6 +143,11 @@ const TOOLS: LLMTool[] = [
 
 export interface StoryboardBuilderOpts {
   prompt: string;
+  /** The user's ORIGINAL prompt, before treatment/context enrichment.
+   *  Used for fallback naming only -- `prompt` may start with injected
+   *  scaffolding ("## Creative Direction ..."), and slicing THAT into the
+   *  project name ships prompt internals to the user. */
+  rawPrompt?: string;
   format: OutputFormat;
   llmConfig: LLMConfig;
   brandKit: BrandKit;
@@ -784,6 +789,7 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
   var currentSceneIdx = -1;
   var name: string | undefined;
   var finished = false;
+  var countRejections = 0;
 
   // Generous headroom: scenes now arrive as add_scene + one add_beat call
   // per beat, so the turn budget must scale with total beats, not just
@@ -906,12 +912,26 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
         }
       } else if (toolCall.name === "finish_storyboard") {
         var finishNotes: string[] = currentSceneIdx >= 0 ? finalizeBeats(scenes[currentSceneIdx]) : [];
+        // Bank the model's title even from a rejected finish: if the board
+        // later ends unfinished, the fallback name must be the model's title,
+        // never a slice of the (scaffolding-prefixed) prompt.
+        if (!name && toolCall.input.name) name = String(toolCall.input.name);
         if (scenes.length === 0) {
           toolResult = "Cannot finish yet -- no scenes added. Call add_scene at least once first.";
-        } else if (opts.sceneCount && scenes.length !== opts.sceneCount) {
-          toolResult = `Cannot finish yet -- exactly ${opts.sceneCount} scenes required, but ${scenes.length} added so far. Add or remove scenes to match.`;
+        } else if (opts.sceneCount && scenes.length !== opts.sceneCount && countRejections < 1) {
+          // ONE chance to reconcile with the director's count. If the model
+          // comes back still insisting on its own structure, its structure
+          // wins -- a grammar contract (hook + escalations + payoff) can
+          // legitimately contradict the director's number, and rejecting
+          // forever deadlocks the board into the max-iterations bailout
+          // (observed live: sceneCount 3 vs 8 built scenes, prompt-slice name).
+          countRejections++;
+          toolResult = `Cannot finish yet -- exactly ${opts.sceneCount} scenes required, but ${scenes.length} added so far. Add or remove scenes to match, or call finish_storyboard again if your structure is deliberate.`;
         } else {
-          name = String(toolCall.input.name || opts.prompt.slice(0, 60));
+          if (opts.sceneCount && scenes.length !== opts.sceneCount) {
+            console.warn(`  Storyboard builder: accepting ${scenes.length} scenes over the director's ${opts.sceneCount} -- the model held its structure after one rejection.`);
+          }
+          name = String(toolCall.input.name || (opts.rawPrompt || opts.prompt).slice(0, 60));
           finished = true;
           toolResult = "accepted" + (finishNotes.length ? ` -- ${finishNotes.join("; ")}` : "");
         }
@@ -930,7 +950,7 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
   if (currentSceneIdx >= 0) finalizeBeats(scenes[currentSceneIdx]);
   if (!finished) {
     console.warn(`  Storyboard builder: max iterations (${maxIterations}) reached with ${scenes.length} scene(s) and no finish_storyboard call -- using what was added.`);
-    name = name || opts.prompt.slice(0, 60);
+    name = name || (opts.rawPrompt || opts.prompt).slice(0, 60);
   }
 
   var componentHints = 0;

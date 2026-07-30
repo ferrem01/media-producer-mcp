@@ -4,6 +4,7 @@
  * Thin wrapper for calling LLMs. Supports Anthropic (Claude) as primary
  * and OpenAI as secondary provider. Uses native fetch -- no SDK dependency.
  */
+import { AsyncLocalStorage } from "node:async_hooks";
 
 export interface LLMConfig {
   provider: "anthropic" | "openai";
@@ -175,63 +176,199 @@ function modelAcceptsTemperature(model: string): boolean {
   return !/^claude-(sonnet|opus|haiku|fable|mythos)-5/.test(model);
 }
 
-/** Per-request wall clock. A fetch with no signal waits FOREVER on a
- *  black-holed connection -- measured live as generate jobs frozen at
- *  "Designing the creative direction" with no error. Long enough for a big
- *  storyboard completion, short enough that a dead socket surfaces as a
- *  retryable failure instead of a stuck job. */
-const LLM_REQUEST_TIMEOUT_MS = Number(process.env.MP_LLM_TIMEOUT_MS) || 240_000;
+/** Timeouts. The original guard here was a single 240s wall clock on a
+ *  NON-streaming fetch -- added because a black-holed connection otherwise
+ *  froze generate jobs forever. But a wall clock can't tell a dead socket
+ *  from a legitimately slow generation: a thinking-heavy model writing a
+ *  16k-budget treatment can honestly run past 240s, and then the timeout
+ *  aborts *working* requests over and over (measured live as generate jobs
+ *  stuck ~13 min at "Designing the creative direction" -- 3 aborted good
+ *  attempts + backoffs before one squeaked under the wire).
+ *
+ *  Now the request STREAMS, and the guard is an IDLE timeout: abort only
+ *  when no bytes arrive for a while. A live generation emits deltas
+ *  continuously, so slow-but-healthy calls finish on attempt one; a dead
+ *  socket goes quiet and still surfaces fast. The wall clock survives only
+ *  as a generous absolute backstop. */
+const LLM_STREAM_IDLE_TIMEOUT_MS = Number(process.env.MP_LLM_IDLE_TIMEOUT_MS) || 90_000;
+const LLM_REQUEST_TIMEOUT_MS = Number(process.env.MP_LLM_TIMEOUT_MS) || 900_000;
 
-/** POST to the Anthropic messages API.
+/** Scoped LLM-retry notifications: a pipeline run can wrap itself in
+ *  `llmRetryScope.run(cb, ...)` and every transient retry inside that async
+ *  scope reports to cb -- letting job progress say "retrying the model call
+ *  (2/4)" instead of sitting silent. AsyncLocalStorage keeps concurrent jobs
+ *  from seeing each other's retries. */
+export interface LlmRetryInfo {
+  reason: string;
+  attempt: number;
+  maxAttempts: number;
+  waitMs: number;
+}
+export const llmRetryScope = new AsyncLocalStorage<(info: LlmRetryInfo) => void>();
+
+interface AnthropicMessageShape {
+  content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }>;
+  stop_reason?: string;
+}
+
+type StreamOutcome =
+  | { ok: true; message: AnthropicMessageShape }
+  | { ok: false; status: number; errorText: string };
+
+/** One streaming POST to the messages API, reassembled into the classic
+ *  non-streaming response shape so callers stay unchanged. Throws on
+ *  network failure, idle timeout, or mid-stream error events; returns
+ *  {ok:false} for HTTP error statuses (which arrive as plain JSON). */
+async function streamAnthropicOnce(apiKey: string, body: Record<string, unknown>): Promise<StreamOutcome> {
+  var controller = new AbortController();
+  var wallTimer = setTimeout(
+    () => controller.abort(Object.assign(new Error(`request exceeded the ${LLM_REQUEST_TIMEOUT_MS / 1000}s absolute cap`), { name: "TimeoutError" })),
+    LLM_REQUEST_TIMEOUT_MS,
+  );
+  var idleTimer: NodeJS.Timeout | undefined;
+  var armIdle = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(
+      () => controller.abort(Object.assign(new Error(`stream went silent for ${LLM_STREAM_IDLE_TIMEOUT_MS / 1000}s (dead connection)`), { name: "TimeoutError" })),
+      LLM_STREAM_IDLE_TIMEOUT_MS,
+    );
+  };
+
+  try {
+    armIdle();
+    var response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({ ...body, stream: true }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return { ok: false, status: response.status, errorText: await response.text() };
+    }
+    if (!response.body) throw new Error("Anthropic response had no body stream");
+
+    // Parse the SSE event stream back into content blocks + stop_reason.
+    var content: Array<Record<string, unknown>> = [];
+    var toolJson: Record<number, string> = {};
+    var stopReason: string | undefined;
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buf = "";
+
+    for (;;) {
+      armIdle();
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buf += decoder.decode(chunk.value, { stream: true });
+
+      var sep;
+      while ((sep = buf.indexOf("\n\n")) !== -1) {
+        var rawEvent = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        var data = rawEvent
+          .split("\n")
+          .filter((l) => l.startsWith("data:"))
+          .map((l) => l.slice(5).trim())
+          .join("");
+        if (!data) continue;
+        var evt = JSON.parse(data) as Record<string, any>;
+        switch (evt.type) {
+          case "content_block_start": {
+            var block = { ...evt.content_block } as Record<string, unknown>;
+            content[evt.index] = block;
+            if (block.type === "tool_use") toolJson[evt.index] = "";
+            break;
+          }
+          case "content_block_delta": {
+            var target = content[evt.index];
+            if (!target) break;
+            if (evt.delta.type === "text_delta") {
+              target.text = ((target.text as string) || "") + evt.delta.text;
+            } else if (evt.delta.type === "input_json_delta") {
+              toolJson[evt.index] = (toolJson[evt.index] || "") + evt.delta.partial_json;
+            } else if (evt.delta.type === "thinking_delta") {
+              target.thinking = ((target.thinking as string) || "") + evt.delta.thinking;
+            } else if (evt.delta.type === "signature_delta") {
+              target.signature = ((target.signature as string) || "") + evt.delta.signature;
+            }
+            break;
+          }
+          case "content_block_stop": {
+            if (toolJson[evt.index] !== undefined && content[evt.index]) {
+              content[evt.index].input = toolJson[evt.index] ? JSON.parse(toolJson[evt.index]) : {};
+              delete toolJson[evt.index];
+            }
+            break;
+          }
+          case "message_delta": {
+            if (evt.delta?.stop_reason) stopReason = evt.delta.stop_reason;
+            break;
+          }
+          case "error":
+            throw new Error(`Anthropic stream error: ${evt.error?.message || JSON.stringify(evt.error)}`);
+        }
+      }
+    }
+
+    return { ok: true, message: { content: content.filter(Boolean) as AnthropicMessageShape["content"], stop_reason: stopReason } };
+  } finally {
+    clearTimeout(wallTimer);
+    if (idleTimer) clearTimeout(idleTimer);
+  }
+}
+
+/** POST to the Anthropic messages API (streamed under the hood).
  *  - If the model rejects `temperature` as deprecated (Claude 5 family and
  *    beyond), retry once without it -- so a new model id set via MP_LLM_MODEL
  *    can never brick the pipeline on this param.
- *  - Transient failures (timeout, network error, 429/5xx/overloaded) retry
- *    with backoff instead of hanging or failing the whole generate job on
- *    one bad socket. */
+ *  - Transient failures (idle timeout, network error, mid-stream drop,
+ *    429/5xx/overloaded) retry with backoff instead of hanging or failing
+ *    the whole generate job on one bad socket. Each retry is reported to
+ *    the ambient llmRetryScope so job progress can show it. */
 async function postAnthropic(apiKey: string, body: Record<string, unknown>): Promise<unknown> {
   var TRANSIENT_BACKOFF_MS = [2000, 8000, 20000];
   var transientAttempt = 0;
   var temperatureRetried = false;
   for (;;) {
-    var response: Response;
+    var outcome: StreamOutcome;
     try {
-      response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(LLM_REQUEST_TIMEOUT_MS),
-      });
+      outcome = await streamAnthropicOnce(apiKey, body);
     } catch (netErr: any) {
-      // Timeout or network-level failure: retry with backoff, then surface.
+      // Idle timeout, connection failure, or mid-stream drop: retry with
+      // backoff, then surface. (An aborted read rejects with the abort
+      // reason we passed, so the message names which guard fired.)
+      var reason = netErr?.message || String(netErr);
       if (transientAttempt < TRANSIENT_BACKOFF_MS.length) {
         var waitMs = TRANSIENT_BACKOFF_MS[transientAttempt++];
-        console.warn(`  [llm] request ${netErr?.name === "TimeoutError" ? `timed out after ${LLM_REQUEST_TIMEOUT_MS / 1000}s` : `failed (${netErr?.message || netErr})`} -- retry ${transientAttempt}/${TRANSIENT_BACKOFF_MS.length} in ${waitMs / 1000}s`);
+        console.warn(`  [llm] request failed (${reason}) -- retry ${transientAttempt}/${TRANSIENT_BACKOFF_MS.length} in ${waitMs / 1000}s`);
+        llmRetryScope.getStore()?.({ reason, attempt: transientAttempt, maxAttempts: TRANSIENT_BACKOFF_MS.length + 1, waitMs });
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
-      throw new Error(`Anthropic API unreachable after ${TRANSIENT_BACKOFF_MS.length + 1} attempts: ${netErr?.message || netErr}`);
+      throw new Error(`Anthropic API unreachable after ${TRANSIENT_BACKOFF_MS.length + 1} attempts: ${reason}`);
     }
-    if (response.ok) return response.json();
-    var errorText = await response.text();
-    if (!temperatureRetried && response.status === 400 && body.temperature !== undefined
+    if (outcome.ok) return outcome.message;
+    var errorText = outcome.errorText;
+    if (!temperatureRetried && outcome.status === 400 && body.temperature !== undefined
         && /temperature.*deprecated/i.test(errorText)) {
       temperatureRetried = true;
       delete body.temperature;
       continue;
     }
-    var transientStatus = response.status === 429 || response.status >= 500 || /overloaded/i.test(errorText);
+    var transientStatus = outcome.status === 429 || outcome.status >= 500 || /overloaded/i.test(errorText);
     if (transientStatus && transientAttempt < TRANSIENT_BACKOFF_MS.length) {
       var backoffMs = TRANSIENT_BACKOFF_MS[transientAttempt++];
-      console.warn(`  [llm] API ${response.status} (transient) -- retry ${transientAttempt}/${TRANSIENT_BACKOFF_MS.length} in ${backoffMs / 1000}s`);
+      console.warn(`  [llm] API ${outcome.status} (transient) -- retry ${transientAttempt}/${TRANSIENT_BACKOFF_MS.length} in ${backoffMs / 1000}s`);
+      llmRetryScope.getStore()?.({ reason: `API ${outcome.status}`, attempt: transientAttempt, maxAttempts: TRANSIENT_BACKOFF_MS.length + 1, waitMs: backoffMs });
       await new Promise((r) => setTimeout(r, backoffMs));
       continue;
     }
-    throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
+    throw new Error(`Anthropic API error ${outcome.status}: ${errorText}`);
   }
 }
 
