@@ -105,4 +105,22 @@ describe("gen_video wiring (source guards)", () => {
     expect(p).toMatch(/genvid_scene_/);
     expect(p).toMatch(/gen_video but GEMINI_API_KEY is not set/); // loud fallback log
   });
+
+  it("footage survives the critique loop: threaded regens + dropped-footage gate", async () => {
+    // proj_b84a8e84: 4/5 fetched clips dropped, every drop at attempts:2 --
+    // regens rebuilt scenes without the footage and nothing noticed.
+    const p = await read("../src/llm/pipeline.ts");
+    expect(p.match(/brollVideoUrl: opts\.brollVideoUrl/g)?.length).toBeGreaterThanOrEqual(2); // regen + template swap
+    expect(p).toMatch(/brollVideoUrl: brollUrlMap\.get\(i\)/);
+    expect(p).toMatch(/type: "dropped_footage"/);
+  });
+
+  it("authored compositions place fetched media as their backdrop", async () => {
+    // proj_b84a8e84 scene 7: hero still generated and orphaned -- the
+    // deterministic path had no media channel at all.
+    const sg = await read("../src/llm/scene-generator.ts");
+    expect(sg).toMatch(/MEDIA BACKDROP/);
+    expect(sg).toMatch(/opts\.brollVideoUrl \|\| opts\.imageUrl/);
+    expect(sg).toMatch(/overlay_opacity: 0\.35/); // legibility scrim over hero stills
+  });
 });
