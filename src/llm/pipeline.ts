@@ -2126,6 +2126,14 @@ async function runUnifiedPipeline(
     creativity = 0.15;
     console.log("  Editorial grammar: creativity clamped to 0.15 (template/component-first assembly)");
   }
+  // Social-reel is the same discipline at feed speed: caption/template beats
+  // from the kit, composed for 9:16 -- freeform codegen is where safe zones
+  // and caption scale die.
+  if (filmGrammar === "social-reel" && opts.creativity === undefined) {
+    opts.creativity = 0.15;
+    creativity = 0.15;
+    console.log("  Social-reel grammar: creativity clamped to 0.15 (component-first assembly)");
+  }
 
   // ── Per-grammar PREP: "generate" mandate (music-first spine) ──
   // The generalized prep: for any grammar with background music on, pick the
@@ -2140,7 +2148,7 @@ async function runUnifiedPipeline(
   // defaults ON for tempo-cut; an explicit false still wins.
   const wantsMusic = opts.backgroundMusic !== undefined
     ? opts.backgroundMusic
-    : filmGrammar === "tempo-cut" || filmGrammar === "editorial";
+    : filmGrammar === "tempo-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel";
   if (filmGrammar === "tempo-cut" && !wantsMusic) {
     console.warn("  TEMPO-CUT WITHOUT A MUSIC BED (background_music=false): cuts cannot land on downbeats -- the film will read as a slideshow.");
   }

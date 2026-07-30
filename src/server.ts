@@ -314,8 +314,9 @@ BEFORE GENERATING
   * launch-film -- few long cinematic scenes, one continuous world. For brand moments and feature reveals that should feel expansive.
   * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover, told through real product surfaces. For product explainers and launch clips that should feel fast and confident.
   * editorial -- typography-first manifesto: huge serif statements on cream/dark canvases alternating with full-bleed evidence beats; the words are the product. For thought-leadership, "why we built this", catalog showcases.
+  * social-reel -- vertical 9:16 feed film, 15-30s: a hook in the first 2 seconds, caption-scale type as the voiceover, escalation beats, a loop seam. Canvas defaults to vertical. For Reels/Shorts/TikTok product moments and social announcements.
   * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never choose it without one.
-  Rule of thumb: product demos the product (tempo-cut) vs. words carry the argument (editorial) vs. one cinematic world (launch-film) vs. human on camera (speaker-screencast). If the human's answer doesn't clearly pick one, relay the choice to them in these terms.
+  Rule of thumb: product demos the product (tempo-cut) vs. words carry the argument (editorial) vs. one cinematic world (launch-film) vs. human on camera (speaker-screencast) vs. the feed format carries it (social-reel). If the human's answer doesn't clearly pick one, relay the choice to them in these terms.
 - Brand comes from the tenant's brand kit. If none exists yet, run extract_brand_from_website (their site URL) or upload brand assets first -- generate without a kit produces an unbranded film.
 - A recorded screen demo? Don't generate from a prompt -- the Chrome recorder extension captures the tab + voice and assembles the film automatically (download at /extension.zip on this server).
 
@@ -347,7 +348,7 @@ If something looks wrong in a scene, get{target:'layout'} measures the real geom
 export async function queueBuildFromStoryboard(
   tenantId: string,
   projectId: string,
-  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "speaker-screencast" | "editorial"; max_revisions?: number } = {},
+  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "speaker-screencast" | "editorial" | "social-reel"; max_revisions?: number } = {},
 ): Promise<{ job: { id: string } } | { error: string } | null> {
   const project = await loadProject(tenantId, projectId);
   // Any project that HAS a storyboard rebuilds from it. Only 'rendering' is
@@ -1971,7 +1972,7 @@ export function createMcpServer(): McpServer {
       canvas_width: z.number().optional().describe("Explicit canvas width. For images, auto-inferred from prompt if omitted."),
       canvas_height: z.number().optional().describe("Explicit canvas height. For images, auto-inferred from prompt if omitted."),
       creativity: z.number().min(0).max(1).optional().describe("Creativity level 0-1. Low (0) prefers library components. High (0.7-1.0) creates one self-contained custom component per scene. Default: 0.5."),
-      film_grammar: z.enum(["launch-film", "tempo-cut", "speaker-screencast", "editorial"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. Omit to let the creative director choose."),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "speaker-screencast", "editorial", "social-reel"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. social-reel: vertical 9:16 feed film, 15-30s, hook-first with caption-scale type and a loop seam (canvas defaults to vertical). Omit to let the creative director choose."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
       voiceover: z.boolean().optional().describe("Generate TTS voiceover narration for each scene (default: false)"),
@@ -2112,7 +2113,13 @@ export function createMcpServer(): McpServer {
                 fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
                 style: { border_radius: "12px", motion: "cinematic" as const },
               },
-              canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+              // Social-reel ships to a feed: default the canvas vertical unless
+              // the caller sized it explicitly.
+              canvas: (params.canvas_width && params.canvas_height)
+                ? { width: params.canvas_width, height: params.canvas_height, preset: (params.canvas_height > params.canvas_width ? ("vertical" as const) : ("landscape" as const)), fps: 30, background: "#0f172a" }
+                : params.film_grammar === "social-reel"
+                  ? { width: 1080, height: 1920, preset: "vertical" as const, fps: 30, background: "#0f172a" }
+                  : { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
               creativity: params.creativity,
               film_grammar: params.film_grammar,
               maxRevisions: params.max_revisions,
@@ -2252,7 +2259,13 @@ export function createMcpServer(): McpServer {
                 fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
                 style: { border_radius: "12px", motion: "cinematic" as const },
               },
-              canvas: { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+              // Social-reel ships to a feed: default the canvas vertical unless
+              // the caller sized it explicitly.
+              canvas: (params.canvas_width && params.canvas_height)
+                ? { width: params.canvas_width, height: params.canvas_height, preset: (params.canvas_height > params.canvas_width ? ("vertical" as const) : ("landscape" as const)), fps: 30, background: "#0f172a" }
+                : params.film_grammar === "social-reel"
+                  ? { width: 1080, height: 1920, preset: "vertical" as const, fps: 30, background: "#0f172a" }
+                  : { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
               canvasWidth: params.canvas_width,
               canvasHeight: params.canvas_height,
               creativity: params.creativity,
