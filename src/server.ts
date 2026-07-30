@@ -52,6 +52,7 @@ import { getTranscript, whisperAvailable } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
 import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
 import { generateImage } from "./media/image-gen.js";
+import { generateVideoClip } from "./media/video-gen.js";
 
 // ── Shared Zod schemas ──
 
@@ -1545,6 +1546,48 @@ export function createMcpServer(): McpServer {
   // ─────────────────────────────────────────────
   // upload - Upload an asset to a project
   // ─────────────────────────────────────────────
+
+  tool(
+    "generate_clip",
+    "Generate a standalone AI video clip with Veo (diffusion video) from a text prompt -- a talking-head take (Veo generates the VOICE too: put the spoken line in quotes inside the prompt), a branded shot no stock library has, or b-roll to attach to a project later. Async: returns a job_id to poll with get(target='job'); the completed job carries download_url, and the clip is saved as a tenant brand video asset so it can be referenced in briefs/uploads. Clips are ~8 seconds. Requires GEMINI_API_KEY on the server.",
+    {
+      tenant_id: z.string().optional(),
+      prompt: z.string().describe("The shot as a cinematography direction: subject, action, camera move, light. For speech, include the line in quotes: \"a friendly woman looks into the camera and says: 'One conversation becomes a campaign.'\""),
+      aspect_ratio: z.enum(["16:9", "9:16"]).optional().describe("Clip aspect (default 16:9; use 9:16 for reels)"),
+      name: z.string().optional().describe("Filename stem for the saved clip (default: clip_<jobid>)"),
+    },
+    async (params) => {
+      if (!process.env.GEMINI_API_KEY) {
+        return err("GEMINI_API_KEY is not configured on this server -- diffusion video is unavailable.");
+      }
+      const tenantId = params.tenant_id!;
+      const aspect = params.aspect_ratio || "16:9";
+      const job = queueJob("generate", tenantId, async (j) => {
+        j.progress = { step: "veo", percent: 10, detail: "Generating the clip (Veo -- typically 1-3 minutes)" };
+        const stem = (params.name || `clip_${j.id.replace(/^job_/, "")}`).replace(/[^a-zA-Z0-9_-]/g, "_");
+        const filename = `${stem}.mp4`;
+        const outputDir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "video");
+        const clip = await generateVideoClip({ prompt: params.prompt, aspectRatio: aspect, outputDir, filename });
+        if (!clip) {
+          throw new Error("Veo returned no clip -- the request failed, timed out, or was safety-filtered (see server logs; softening the prompt often fixes filtering).");
+        }
+        j.progress = { step: "done", percent: 100, detail: "Clip ready" };
+        const servedUrl = `/assets/${tenantId}/brand-kit/video/${filename}`;
+        return {
+          asset_url: servedUrl,
+          download_url: `${config.publicUrl}${servedUrl}`,
+          model: clip.model,
+          aspect_ratio: aspect,
+          note: "Attach to a film by referencing this /assets URL in a generate/revise brief, or place it on a scene as a video component src.",
+        };
+      });
+      return ok({
+        job_id: job.id,
+        status: job.status,
+        message: `Veo clip queued. Poll with get(target='job', job_id='${job.id}') -- the completed job includes download_url.`,
+      });
+    },
+  );
 
   tool(
     "upload",
