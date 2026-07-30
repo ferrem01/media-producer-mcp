@@ -69,7 +69,7 @@ import { resolveContactTimestamps, stitchFramesToSheet } from "../core/contact-s
 import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler.js";
 import { captureSingleFrame, captureFrameSequence, validateSceneRuntime } from "../core/capture.js";
 import { measureTextContrast } from "../core/text-contrast.js";
-import { measureLayout } from "../core/layout-metrics.js";
+import { measureLayout, measureEmptyMoments } from "../core/layout-metrics.js";
 import os from "node:os";
 
 // Keep old imports for backwards compat (deprecated functions still exist in their files)
@@ -1127,12 +1127,70 @@ async function critiqueAndRetryScene(opts: {
         htmlPath: bootPath, width: opts.canvas.width, height: opts.canvas.height,
         duration: opts.scene.duration_seconds || 8, steps: 6,
       });
-      await fs.rm(bootDir, { recursive: true, force: true }).catch(() => {});
+      const gateFindings: string[] = [];
       if (!runtime.ok) {
         console.error(`  [TEMPLATE BOOT CRASH] scene ${opts.sceneIndex} (${opts.scene.components.map((c) => c.type).join("+")}): ${runtime.error}`);
+        gateFindings.push(`[runtime] template boot crash: ${runtime.error}`);
+      } else {
+        // MEASUREMENT GATES for assembled scenes: until now these ran only on
+        // the codegen path, so component-first films (tempo-cut, editorial,
+        // social-reel, data-story) shipped exactly the defects the gates
+        // exist to catch -- measured live: dark-on-dark compose text, a fully
+        // empty mid-film frame, 1-3s dead entrance gaps (proj_48475b3d,
+        // proj_56358b25). No regen exists for a curated composition, so
+        // findings are stamped on the scene's quality record -- loud in logs,
+        // loud in Studio -- instead of triggering a codegen rewrite.
+        const dur = opts.scene.duration_seconds || 8;
+        try {
+          const contrastDefects = await measureTextContrast({
+            htmlPath: bootPath, width: opts.canvas.width, height: opts.canvas.height,
+            atTimes: [dur * 0.35, dur * 0.6, dur * 0.85],
+          });
+          for (const d of contrastDefects) {
+            gateFindings.push(
+              d.reason === "clipped"
+                ? `[off_canvas] text "${d.text}" is ${Math.round((d.clippedFraction ?? 0) * 100)}% cut off by the canvas/container edge`
+                : `[illegible] text "${d.text}" -- measured contrast ${d.contrast}:1 (needs >= ${d.threshold}:1)`);
+          }
+        } catch (e: any) {
+          console.warn(`  Assembled-scene legibility gate skipped: ${e?.message || e}`);
+        }
+        try {
+          const layoutDefects = await measureLayout({
+            htmlPath: bootPath, width: opts.canvas.width, height: opts.canvas.height,
+            atTimes: [dur * 0.45, dur * 0.7, dur * 0.9],
+          });
+          for (const d of layoutDefects) gateFindings.push(`[${d.type}] ${d.detail}`);
+        } catch (e: any) {
+          console.warn(`  Assembled-scene layout gate skipped: ${e?.message || e}`);
+        }
+        try {
+          // Deterministic scenes have no excuse for an empty canvas: probe an
+          // early moment (the entrance-gap window) and two later ones.
+          const earlyT = Math.min(Math.max(0.8, dur * 0.15), dur * 0.4);
+          const emptyMoments = await measureEmptyMoments({
+            htmlPath: bootPath, width: opts.canvas.width, height: opts.canvas.height,
+            atTimes: [earlyT, dur * 0.5, dur * 0.85],
+          });
+          for (const m of emptyMoments) {
+            gateFindings.push(
+              m.atTime === earlyT
+                ? `[dead_entrance] canvas is essentially empty ${m.atTime.toFixed(1)}s into the scene (${(m.coverage * 100).toFixed(0)}% content coverage) -- the entrance animation leaves a visible gap after the cut`
+                : `[empty_moment] canvas is essentially empty at ${m.atTime.toFixed(1)}s (${(m.coverage * 100).toFixed(0)}% content coverage) -- the viewer stares at backdrop mid-scene`);
+          }
+        } catch (e: any) {
+          console.warn(`  Assembled-scene empty-moment gate skipped: ${e?.message || e}`);
+        }
+      }
+      await fs.rm(bootDir, { recursive: true, force: true }).catch(() => {});
+      if (gateFindings.length > 0) {
+        console.warn(`  [ASSEMBLED-SCENE GATES] scene ${opts.sceneIndex} (${opts.scene.components.map((c) => c.type).join("+")}): ${gateFindings.length} finding(s)\n    - ${gateFindings.join("\n    - ")}`);
+        const prevQ = (opts.scene as any).quality;
         (opts.scene as any).quality = {
-          score: -100, passed: false, attempts: 0,
-          unresolved_defects: [`[runtime] template boot crash: ${runtime.error}`],
+          score: runtime.ok ? (prevQ?.score ?? 0) : -100,
+          passed: false,
+          attempts: prevQ?.attempts ?? 0,
+          unresolved_defects: [...(prevQ?.unresolved_defects || []), ...gateFindings],
         };
       }
     } catch (e: any) {
