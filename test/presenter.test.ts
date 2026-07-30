@@ -49,14 +49,22 @@ describe("chunkScript", () => {
 });
 
 describe("generate_presenter wiring (source guards)", () => {
-  it("orchestrator: reference-anchored takes, whisper verification, concat with re-encode fallback", async () => {
+  it("orchestrator: chained references, speech-trimmed stitch, whisper verification", async () => {
+    // First live run (quotient_pitch): every take anchored to take 1's frame
+    // and raw takes stitched whole -- each cut jerked back to the take-1 pose
+    // after a beat of dead air. The stitch now chains take N's FINAL frame
+    // into take N+1's reference and trims each take to its spoken window.
     const vg = await read("../src/media/video-gen.ts");
     expect(vg).toMatch(/const MAX_TAKES = 8/);
     expect(vg).toMatch(/referenceImagePath: i === 0 \? undefined : referenceFramePath/);
-    expect(vg).toMatch(/-sseof/);                          // settle frame from take 1
+    expect(vg).toMatch(/CHAINED reference/);
+    expect(vg).toMatch(/_ref_\$\{i \+ 1\}/);               // per-take chained frame
+    expect(vg).toMatch(/"-sseof", "-0\.1"/);               // the take's true final frame
+    expect(vg).toMatch(/speechStart = segments\[0\]\.start/);
+    expect(vg).toMatch(/t\.speechStart - LEAD_IN/);        // trim to the spoken window
     expect(vg).toMatch(/whisperAvailable/);
     expect(vg).toMatch(/"-c", "copy"/);
-    expect(vg).toMatch(/"libx264"/);                       // concat fallback
+    expect(vg).toMatch(/"libx264"/);                       // uniform re-encode path
   });
 
   it("tool + playbook expose the flow", async () => {

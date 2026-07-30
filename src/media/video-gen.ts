@@ -309,16 +309,17 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
   const { promisify } = await import("node:util");
   const run = promisify(execFile);
 
-  const takes: PresenterVideoResult["takes"] = [];
+  const takes: Array<PresenterVideoResult["takes"][number] & { speechStart?: number; speechEnd?: number }> = [];
   let model = "";
   let referenceFramePath = "";
+  let firstReferencePath = "";
 
   for (let i = 0; i < lines.length; i++) {
     opts.onProgress?.(`Take ${i + 1}/${lines.length} (Veo)`, (i / (lines.length + 1)));
     const filename = `${opts.nameStem}_take_${i + 1}.mp4`;
     const prompt = i === 0
       ? `${presenter}. They look directly into the camera and say, warmly and naturally: '${lines[i]}' Static camera with a very slight slow push-in, shallow depth of field.`
-      : `The exact same presenter as the reference image -- identical appearance, clothing, voice, tone, framing and lighting. They continue speaking directly to camera and say: '${lines[i]}' Static camera, shallow depth of field.`;
+      : `The exact same presenter as the reference image -- identical appearance, clothing, voice, tone, framing and lighting, continuing the same take from exactly this pose. They keep speaking directly to camera and say: '${lines[i]}' Static camera, shallow depth of field.`;
     const clip = await generateVideoClip({
       prompt,
       aspectRatio: opts.aspectRatio,
@@ -333,15 +334,19 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
     model = clip.model;
     takes.push({ path: clip.localPath, filename, line: lines[i] });
 
-    // A settle frame near the end of take 1 anchors every later take.
-    if (i === 0) {
-      referenceFramePath = path.join(opts.outputDir, `${opts.nameStem}_reference.jpg`);
-      await run(FFMPEG(), ["-y", "-sseof", "-0.4", "-i", clip.localPath, "-frames:v", "1", "-q:v", "3", referenceFramePath]);
-    }
+    // CHAINED reference: take N+1 anchors to take N's FINAL frame, so each
+    // cut continues from the pose the previous take actually ended in.
+    // (Measured on the first live run: anchoring every take to take 1's
+    // settle frame made each cut visibly jerk back to that pose.)
+    referenceFramePath = path.join(opts.outputDir, `${opts.nameStem}_ref_${i + 1}.jpg`);
+    await run(FFMPEG(), ["-y", "-sseof", "-0.1", "-i", clip.localPath, "-frames:v", "1", "-q:v", "3", referenceFramePath]);
+    if (i === 0) firstReferencePath = referenceFramePath;
   }
 
-  // Whisper-verify each take (best-effort -- the transcript rides back so
-  // callers can spot a paraphrased line without listening).
+  // Whisper each take: the transcript rides back for script verification,
+  // and the segment timings mark the SPOKEN window so the stitch can trim
+  // the dead air (lead-in silence, post-line settle) that read as a
+  // pause-then-jerk at every cut on the first live run.
   try {
     const { whisperAvailable, getTranscript } = await import("../core/transcribe.js");
     if (await whisperAvailable()) {
@@ -350,24 +355,58 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
         try {
           const { segments } = await getTranscript(t.path, cacheDir);
           t.transcript = segments.map((s) => s.text.trim()).join(" ").trim();
+          if (segments.length) {
+            t.speechStart = segments[0].start;
+            t.speechEnd = segments[segments.length - 1].end;
+          }
         } catch { /* per-take best effort */ }
       }
     }
   } catch { /* transcription optional */ }
 
-  // Concatenate the takes into one speaker_source-ready clip. Veo outputs
-  // share encoder settings, so stream-copy first; re-encode as the fallback.
+  // Stitch. When speech timings exist, trim each take to its spoken window
+  // (small lead-in/out so words never clip) and re-encode the trimmed
+  // pieces with uniform settings; the concat of our own uniform encodes is
+  // then a clean stream-copy. Without timings, concat the raw takes.
   opts.onProgress?.("Stitching takes", lines.length / (lines.length + 1));
   const concatPath = path.join(opts.outputDir, `${opts.nameStem}.mp4`);
   const listPath = path.join(opts.outputDir, `${opts.nameStem}_concat.txt`);
-  await fs.writeFile(listPath, takes.map((t) => `file '${t.path.replace(/'/g, "'\\''")}'`).join("\n"));
+  const LEAD_IN = 0.2, LEAD_OUT = 0.25;
+  const pieces: string[] = [];
+  for (let i = 0; i < takes.length; i++) {
+    const t = takes[i];
+    if (t.speechStart === undefined || t.speechEnd === undefined || t.speechEnd <= t.speechStart) {
+      pieces.push(t.path);
+      continue;
+    }
+    const ss = Math.max(0, t.speechStart - LEAD_IN);
+    const to = t.speechEnd + LEAD_OUT; // past EOF is fine -- ffmpeg stops at the end
+    const trimmed = path.join(opts.outputDir, `${opts.nameStem}_trim_${i + 1}.mp4`);
+    try {
+      await run(FFMPEG(), [
+        "-y", "-ss", ss.toFixed(2), "-to", to.toFixed(2), "-i", t.path,
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
+        trimmed,
+      ]);
+      pieces.push(trimmed);
+    } catch {
+      console.warn(`  Presenter: trim failed on take ${i + 1} -- using the raw take`);
+      pieces.push(t.path);
+    }
+  }
+  await fs.writeFile(listPath, pieces.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"));
+  const uniformTrims = pieces.every((p) => p.includes("_trim_"));
   try {
+    if (!uniformTrims) throw new Error("mixed sources -- re-encode the concat");
     await run(FFMPEG(), ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", concatPath]);
   } catch {
-    console.warn("  Presenter: stream-copy concat failed -- re-encoding");
-    await run(FFMPEG(), ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k", concatPath]);
+    await run(FFMPEG(), ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-ar", "48000", concatPath]);
   }
   await fs.unlink(listPath).catch(() => {});
+  for (const p of pieces) {
+    if (p.includes("_trim_")) await fs.unlink(p).catch(() => {});
+  }
 
-  return { concatPath, takes, model, referenceFramePath };
+  return { concatPath, takes, model, referenceFramePath: firstReferencePath };
 }
