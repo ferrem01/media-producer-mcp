@@ -338,6 +338,19 @@ The vertical feed dialect: 9:16, built to stop a thumb. Obey this contract exact
 - EVIDENCE AT PHONE SCALE: product mocks (quotient-*, claude-*, device-showcase, cards) are staged LARGE -- one surface filling the middle band, never two side by side. A device-showcase phone in a 9:16 film is a phone-in-phone: prefer the app surface itself, full-bleed.
 - NO VOICEOVER: voiceover_text stays empty; the captions are the script.
 
+### DATA-STORY FILMS (${opts.filmGrammar === "data-story" ? "ACTIVE for this film" : 'when the director\'s treatment names "data-story"'})
+The numbers-as-protagonist dialect: every beat stages a figure, and the figures argue the case. Obey this contract exactly:
+- THE SHAPE: 5-8 scenes in 25-45s. Each scene is CLAIM -> PROOF: a short line of type states the claim (2-8 words), then ONE data component proves it at hero scale. The claim may live in the same scene as a leading beat (type lands, then the chart draws) or as its own 2-3s setup scene before a bigger proof.
+- ONE NUMBER PER BEAT: each data beat has exactly ONE protagonist figure -- staged HUGE (the number at display scale, labels small). Two competing numbers in one scene is two scenes. A wall of metrics mid-film is a blocking defect; metric-dashboard is earned ONLY as the finale recap.
+- NUMBERS BUILD, NEVER APPEAR: every counter counts up live (number-counter-row, stat-card), every bar chart RACES its bars in, every line chart DRAWS its climb, every progress bar FILLS. A pre-drawn chart or a number that is simply present is a static_surface defect -- the motion of the figure arriving IS the story.
+- ESCALATION ORDER: sequence the beats so the figures build toward the biggest -- the money number lands LAST and LARGEST as the payoff beat. Do not spend the best figure early.
+- REAL FIGURES ONLY: every number comes from the brief. NEVER invent a statistic. If the brief has no figure for a beat, that beat stages the MECHANISM instead (a progress-bar filling, a flowchart routing, a before/after) -- an invented "+347%" is worse than no number.
+- HONEST AXES: bar/line scales start at zero unless the delta IS the story (say so in visual_notes); axis labels and units legible at canvas scale; the same metric keeps the same color across scenes.
+- THE DATA KIT: number-counter-row (counting rows), stat-card (one hero figure + label), bar-chart, line-chart, progress-bar, metric-dashboard (finale only), flowchart (mechanism beats). Charts carry data.values with the REAL figures; visual_notes name the draw choreography (which bar lands first, where the line pauses before the spike).
+- THE EDIT: claims are SHORT (2-3s); proofs breathe (3-6s -- long enough for the count/draw to land and hold). Hard cuts; music is a restrained driving bed and counters/draws should land near downbeats.
+- TEXT IS THE VOICEOVER: no narrator. The claim lines are kinetic-text/annotation at display scale; voiceover_text stays empty.
+- OBJECTS, NOT STRINGS: every entry in components[] is an OBJECT with type + data -- same rule as tempo-cut, same reason. The CLOSE is st-logo-close.
+
 ### SPEAKER-SCREENCAST FILMS (${opts.filmGrammar === "speaker-screencast" ? "ACTIVE for this film" : "when a speaker recording drives the film"})
 The human on camera owns the film; everything else supports them. The contract:
 - THE VOICE IS THE CLOCK: the speaker's sentences decide when scenes cut and when content enters. Author scene/beat durations against what is being SAID, never against an abstract rhythm -- a cut mid-sentence is a failure.

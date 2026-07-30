@@ -2163,6 +2163,14 @@ async function runUnifiedPipeline(
     creativity = 0.15;
     console.log("  Social-reel grammar: creativity clamped to 0.15 (component-first assembly)");
   }
+  // Data-story lives or dies on the data kit performing real figures --
+  // freeform codegen is where invented statistics and pre-drawn charts
+  // sneak in.
+  if (filmGrammar === "data-story" && opts.creativity === undefined) {
+    opts.creativity = 0.15;
+    creativity = 0.15;
+    console.log("  Data-story grammar: creativity clamped to 0.15 (component-first assembly)");
+  }
 
   // Progress honesty: everything from here to the first media emission used
   // to run SILENT under the concept step's percent -- treatment + music prep
@@ -2184,7 +2192,7 @@ async function runUnifiedPipeline(
   // defaults ON for tempo-cut; an explicit false still wins.
   const wantsMusic = opts.backgroundMusic !== undefined
     ? opts.backgroundMusic
-    : filmGrammar === "tempo-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel";
+    : filmGrammar === "tempo-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story";
   if (filmGrammar === "tempo-cut" && !wantsMusic) {
     console.warn("  TEMPO-CUT WITHOUT A MUSIC BED (background_music=false): cuts cannot land on downbeats -- the film will read as a slideshow.");
   }
