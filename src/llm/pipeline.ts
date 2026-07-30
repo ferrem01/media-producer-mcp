@@ -1065,6 +1065,11 @@ async function critiqueAndRetryScene(opts: {
   compDir: string;
   maxRetries: number;
   imageUrl?: string;
+  /** Provided real footage (b-roll / gen-video / uploaded). Threaded into
+   *  every regen: without it, the FIRST critique-driven regen silently
+   *  regenerated the scene footage-less (measured live: proj_b84a8e84 --
+   *  4 of 5 fetched Pexels clips dropped, every drop at attempts:2). */
+  brollVideoUrl?: string;
   trace?: TraceBuilder;
   customSources?: Map<string, string>;
   catalog: ComponentCatalogEntry[];
@@ -1497,6 +1502,22 @@ async function critiqueAndRetryScene(opts: {
         console.log(`  Detectors: ${detectors.defects.length} defect(s) [${detectors.defects.map((d) => d.type).join(", ")}]`);
       }
 
+      // Dropped-footage gate (deterministic): when real footage was provided
+      // for this scene, its URL must be IN the assembled HTML. The one-shot
+      // corrective inside generateScene only guards the FIRST generation --
+      // a critique regen used to rebuild the scene footage-less and nothing
+      // downstream noticed (measured live: proj_b84a8e84, 4/5 Pexels clips
+      // dropped, all at attempts:2, CSS recreations shipped instead).
+      if (!isVideoOnly && opts.brollVideoUrl && !assembledHtml.includes(opts.brollVideoUrl)) {
+        correctness.defects.push({
+          type: "dropped_footage",
+          detail: `The provided REAL footage (${opts.brollVideoUrl}) is not in the scene. Place it as the scene's full-bleed background: <video class="mp-broll" src="${opts.brollVideoUrl}" muted playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"> darkened under the type. A CSS/vector recreation of the shot is NOT a substitute for the real clip.`,
+        });
+        critiqueResult.issues.push("Provided footage missing from the scene (CSS recreation is not a substitute)");
+        correctness.pass = false;
+        console.log("  Dropped-footage gate: provided clip missing from assembled HTML -- forcing revision");
+      }
+
       // Programmatic legibility gate: measure each text element's REAL contrast
       // against the pixels rendered behind it. Catches illegible text the vision
       // model misses (dark caption over b-roll, light-on-light, faded copy) --
@@ -1819,6 +1840,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         brandKit: opts.brandKit,
         canvas: opts.canvas,
         imageUrl: opts.imageUrl,
+        brollVideoUrl: opts.brollVideoUrl,
         tenantId: opts.tenantId,
         projectId: opts.projectId,
         treatment: opts.treatment,
@@ -1882,6 +1904,7 @@ Output valid JSON only. No markdown fences, no commentary.`;
         brandKit: opts.brandKit,
         canvas: opts.canvas,
         imageUrl: opts.imageUrl,
+        brollVideoUrl: opts.brollVideoUrl,
         tenantId: opts.tenantId,
         projectId: opts.projectId,
         treatment: opts.treatment,
@@ -2769,6 +2792,7 @@ async function runUnifiedPipeline(
             compDir,
             maxRetries: opts.maxRevisions ?? MAX_SCENE_REVISIONS,
             imageUrl,
+            brollVideoUrl: brollUrlMap.get(i),
             trace,
             customSources: generated.customSources,
             codegenSession: generated.codegenSession,

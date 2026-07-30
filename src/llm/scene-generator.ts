@@ -540,6 +540,31 @@ function buildAuthoredCompositionScene(
     position: { x: 0, y: 0, width: "100%", height: "100%" },
     data: { seed: 5 + opts.sceneIndex * 7 },
   }];
+  // MEDIA BACKDROP: fetched footage/stills must reach the screen in authored
+  // compositions too. The codegen path composes provided media itself, but
+  // this path is deterministic and previously had NO channel -- measured
+  // live (proj_b84a8e84): a golden-hour hero still was generated for the
+  // close and orphaned while the film shipped a flat gradient. The clip or
+  // still replaces the world backdrop for THIS scene; authored content
+  // stacks above it and caption scrims keep the type legible.
+  if (opts.brollVideoUrl || opts.imageUrl) {
+    components[0] = opts.brollVideoUrl ? {
+      id: "bg",
+      type: "video",
+      z_index: 1,
+      position: { x: 0, y: 0, width: "100%", height: "100%" },
+      data: { src: opts.brollVideoUrl, object_fit: "cover" },
+    } : {
+      id: "bg",
+      type: "image",
+      z_index: 1,
+      position: { x: 0, y: 0, width: "100%", height: "100%" },
+      // Ken Burns drift is built into the component; the overlay keeps
+      // caption-scale type readable over an unpredictable photograph.
+      data: { src: opts.imageUrl, overlay_opacity: 0.35, overlay_color: "#0c0d12" },
+    };
+    console.log(`    media backdrop: ${opts.brollVideoUrl ? "b-roll clip" : "hero still"} replaces the world backdrop for this scene`);
+  }
   var seenType: Record<string, number> = {};
   authored.forEach(function(c, ci) {
     var lay = slots[ci];
