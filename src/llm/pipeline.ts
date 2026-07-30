@@ -2278,6 +2278,34 @@ async function runUnifiedPipeline(
     }
   }
 
+  // ── Social-reel length discipline (deterministic) ──
+  // The contract says 15-28s of scene time with 1.5-4s scenes, but the
+  // storyboard still ships the occasional 9s beat (measured live:
+  // proj_56358b25 -- 32s of scene time, one 9.67s scene; with transitions
+  // the file ran 34s against the format's hard <30s ceiling). Enforce in
+  // code before bar quantization: cap any scene, then squeeze
+  // proportionally until the total fits. Beats rescale with their scene.
+  if (filmGrammar === "social-reel") {
+    const SCENE_CAP = 6, TOTAL_CAP = 28, MIN_SCENE = 1.5;
+    const srScenes = storyboard.scenes as Array<{ label?: string; duration_seconds: number; beats?: SceneBeat[] }>;
+    for (const s of srScenes) {
+      if ((Number(s.duration_seconds) || 0) > SCENE_CAP) {
+        console.log(`  Social-reel length: scene "${s.label || ""}" ${s.duration_seconds}s -> ${SCENE_CAP}s (per-scene cap)`);
+        s.duration_seconds = SCENE_CAP;
+        if (Array.isArray(s.beats) && s.beats.length >= 2) rescaleBeats(s.beats, SCENE_CAP);
+      }
+    }
+    const srTotal = srScenes.reduce((sum, s) => sum + (Number(s.duration_seconds) || 0), 0);
+    if (srTotal > TOTAL_CAP) {
+      const k = TOTAL_CAP / srTotal;
+      console.log(`  Social-reel length: ${srTotal.toFixed(1)}s of scene time -> squeezing x${k.toFixed(2)} to fit ${TOTAL_CAP}s`);
+      for (const s of srScenes) {
+        s.duration_seconds = Math.max(MIN_SCENE, Math.round((Number(s.duration_seconds) || MIN_SCENE) * k * 100) / 100);
+        if (Array.isArray(s.beats) && s.beats.length >= 2) rescaleBeats(s.beats, s.duration_seconds);
+      }
+    }
+  }
+
   // ── Beat quantization: every cut lands on a downbeat ──
   // Each segment (incoming transition + scene) is snapped to a whole number of
   // bars, so cumulative cut points fall exactly on the track's bar grid.
