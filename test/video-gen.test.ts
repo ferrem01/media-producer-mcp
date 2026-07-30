@@ -138,6 +138,14 @@ describe("gen_video wiring (source guards)", () => {
     expect(p).toMatch(/type: "dropped_footage"/);
   });
 
+  it("the operator playbook teaches calling agents to steer media", async () => {
+    const s = await read("../src/server.ts");
+    expect(s).toMatch(/REAL MEDIA \(the server plans and fetches this AUTONOMOUSLY/);
+    expect(s).toMatch(/STEER WITH LANGUAGE, not tool calls/);
+    expect(s).toMatch(/generate this shot\." An explicitly briefed generated shot is contractually mandatory/);
+    expect(s).toMatch(/TALKING HEADS are explicit by design/);
+  });
+
   it("authored compositions place fetched media as their backdrop", async () => {
     // proj_b84a8e84 scene 7: hero still generated and orphaned -- the
     // deterministic path had no media channel at all.
