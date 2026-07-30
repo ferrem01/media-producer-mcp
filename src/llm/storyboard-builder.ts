@@ -317,6 +317,16 @@ The typography-first manifesto dialect: the story is told IN TYPE, punctuated by
 - KICKERS AS CHAPTERS: number the chapters with st-statement kicker ("01 - THE PROBLEM"). 2-3 chapters max.
 - NO VOICEOVER: the type is the voice. voiceover_text stays empty on statement beats.
 
+### SOCIAL-REEL FILMS (${opts.filmGrammar === "social-reel" ? "ACTIVE for this film" : 'when the director\'s treatment names "social-reel"'})
+The vertical feed dialect: 9:16, built to stop a thumb. Obey this contract exactly:
+- THE SHAPE: 15-30s TOTAL, 5-8 scenes. Scene 1 is the HOOK (<=2s): one bold claim or question in giant type that earns the next second -- no logos, no setup, no "welcome". Then 3-5 ESCALATION beats that each pay the hook off a little more, ONE payoff beat (the money shot: the product doing the thing, a number landing), and a CLOSE that composes into the hook frame so the loop replays cleanly (same canvas color, type landing where the hook's type began).
+- VERTICAL COMPOSITION: every scene composes for a phone held in one hand. Content lives in the MIDDLE BAND: keep the top ~12% and bottom ~18% of the canvas clear (platform UI covers them). Stack, don't spread: one thought per screen-height, components at y 20-75%. A landscape-composed scene letterboxed into 9:16 is a blocking defect.
+- CAPTIONS ARE THE VOICEOVER: no narrator. Type at display scale (7-12vw) carries the story -- kinetic-text with entrance:"type-on" for build-ups, st-statement for declarations. Max ~8 words on screen at once; the viewer is reading at feed speed with the sound possibly off. Music still drives the cut rhythm for the sound-on viewer.
+- THE EDIT: hard cuts on downbeats, 1.5-4s per scene. One shader transition maximum, spent on the payoff beat. One brand accent color; the film keeps ONE canvas world end to end.
+- OBJECTS, NOT STRINGS: every scene's components[] entries are OBJECTS with type + data (+ script where performable) -- same rule as tempo-cut, same reason.
+- EVIDENCE AT PHONE SCALE: product mocks (quotient-*, claude-*, device-showcase, cards) are staged LARGE -- one surface filling the middle band, never two side by side. A device-showcase phone in a 9:16 film is a phone-in-phone: prefer the app surface itself, full-bleed.
+- NO VOICEOVER: voiceover_text stays empty; the captions are the script.
+
 ### SPEAKER-SCREENCAST FILMS (${opts.filmGrammar === "speaker-screencast" ? "ACTIVE for this film" : "when a speaker recording drives the film"})
 The human on camera owns the film; everything else supports them. The contract:
 - THE VOICE IS THE CLOCK: the speaker's sentences decide when scenes cut and when content enters. Author scene/beat durations against what is being SAID, never against an abstract rhythm -- a cut mid-sentence is a failure.
