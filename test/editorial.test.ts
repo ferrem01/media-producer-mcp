@@ -102,11 +102,17 @@ describe("shader transition ports (HyperFrames parity)", () => {
 });
 
 describe("LLM client resilience (the frozen-generate fix)", () => {
-  it("every LLM POST carries a timeout signal and transient retries (source guards)", async () => {
+  it("every LLM POST is guarded against dead sockets and retries transients (source guards)", async () => {
     const c = await read("../src/llm/client.ts");
-    expect(c).toContain("AbortSignal.timeout(LLM_REQUEST_TIMEOUT_MS)");
+    // Anthropic path streams with an IDLE timeout (a wall clock aborted
+    // legitimately slow generations -- the measured concept-step stall).
+    expect(c).toContain("LLM_STREAM_IDLE_TIMEOUT_MS");
+    expect(c).toContain('stream: true');
     expect(c).toContain("TRANSIENT_BACKOFF_MS");
-    expect((c.match(/AbortSignal\.timeout/g) || []).length).toBeGreaterThanOrEqual(2); // anthropic + openai paths
+    // The absolute-cap wall clock survives as a backstop, and the OpenAI
+    // path still carries its own timeout signal.
+    expect(c).toContain("LLM_REQUEST_TIMEOUT_MS");
+    expect(c).toContain("AbortSignal.timeout(LLM_REQUEST_TIMEOUT_MS)"); // openai path
   });
 });
 
