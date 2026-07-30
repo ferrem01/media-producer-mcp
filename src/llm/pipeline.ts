@@ -2164,6 +2164,13 @@ async function runUnifiedPipeline(
     console.log("  Social-reel grammar: creativity clamped to 0.15 (component-first assembly)");
   }
 
+  // Progress honesty: everything from here to the first media emission used
+  // to run SILENT under the concept step's percent -- treatment + music prep
+  // + the multi-minute storyboard loop all displayed as "concept 17%"
+  // (measured live: a 6.5-min job showed concept for ~6 min then jumped to
+  // 78%). Each long stage now announces itself.
+  opts.onProgress?.({ step: "soundtrack", percent: 10, detail: "Picking the music & beat grid" });
+
   // ── Per-grammar PREP: "generate" mandate (music-first spine) ──
   // The generalized prep: for any grammar with background music on, pick the
   // track and beat-map it BEFORE the storyboard so the shared storyboard
@@ -2206,6 +2213,8 @@ async function runUnifiedPipeline(
     seedSource: `${opts.tenant_id}:${(treatment?.concept || richPrompt).slice(0, 80)}`,
   });
   console.log(`  World: ${world.theme} / ${world.backdrop.component} seed=${world.backdrop.seed} palette=[${world.backdrop.palette.join(",")}]`);
+
+  opts.onProgress?.({ step: "storyboarding", percent: 12, detail: "Storyboarding the film" });
 
   var storyboard = await buildStoryboard({
     prompt: richPrompt,
