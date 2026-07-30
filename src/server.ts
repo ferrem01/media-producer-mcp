@@ -52,7 +52,7 @@ import { getTranscript, whisperAvailable } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
 import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
 import { generateImage } from "./media/image-gen.js";
-import { generateVideoClip, lastVideoGenError } from "./media/video-gen.js";
+import { generateVideoClip, generatePresenterVideo, lastVideoGenError } from "./media/video-gen.js";
 
 // ── Shared Zod schemas ──
 
@@ -327,6 +327,7 @@ REAL MEDIA (the server plans and fetches this AUTONOMOUSLY -- you steer it with 
 - STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk", "photographic and cinematic -- real imagery carries this film", "close on a golden-hour still" all reliably produce fetched/generated media. Mood-only briefs get motion graphics on UI/data beats and real media on emotional/place beats -- that default is usually right.
 - To FORCE a generated shot, describe it and say so: "the signature shot, which no stock library has: <cinematography direction> -- generate this shot." An explicitly briefed generated shot is contractually mandatory for the storyboard to honor.
 - TALKING HEADS are explicit by design (casting a synthetic presenter is the human's call): generate_clip makes a standalone Veo clip -- put the spoken line in quotes in the prompt and Veo generates the VOICE too. Feed the resulting asset_url back to generate as speaker_source and the film becomes speaker-led: her voice is the soundtrack, whisper transcribes it, scenes cut on her sentences, content docks beside her. Pass reference_image (a frame from a prior take) to keep the SAME presenter across clips.
+- FULL SPEECHES: generate_presenter takes a whole script (up to ~60s), splits it into consistent multi-take deliveries, verifies each take against the script, and returns ONE stitched clip ready to be speaker_source. The result lists scripted_line vs heard_by_whisper per take -- relay any drift to the human before building the film.
 - Relay costs honestly when the human asks for generated video: Veo clips are ~8s, priced per generated second, and take 1-3 minutes each.
 
 ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
@@ -1611,6 +1612,58 @@ export function createMcpServer(): McpServer {
         job_id: job.id,
         status: job.status,
         message: `Veo clip queued. Poll with get(target='job', job_id='${job.id}') -- the completed job includes download_url.`,
+      });
+    },
+  );
+
+  tool(
+    "generate_presenter",
+    "Generate a consistent AI presenter delivering a FULL SCRIPT (script-to-presenter). Splits the speech into ~8s Veo takes at sentence boundaries, anchors every take to a reference frame from take 1 (same face/framing/light; voice consistency is best-effort), whisper-verifies each take, and stitches them into ONE clip saved as a tenant brand video asset -- ready to pass to generate as speaker_source for a speaker-led film. Async job; caps at 8 takes (~60s of speech). Requires GEMINI_API_KEY.",
+    {
+      tenant_id: z.string().optional(),
+      script: z.string().describe("The full speech, verbatim. Written sentences -- each take covers ~22 words, split at sentence boundaries."),
+      presenter: z.string().optional().describe("Presenter description: appearance, setting, light. Default: a friendly professional presenter at a bright modern desk."),
+      aspect_ratio: z.enum(["16:9", "9:16"]).optional().describe("Clip aspect (default 16:9)"),
+      name: z.string().optional().describe("Filename stem (default presenter_<jobid>)"),
+    },
+    async (params) => {
+      if (!process.env.GEMINI_API_KEY) {
+        return err("GEMINI_API_KEY is not configured on this server -- diffusion video is unavailable.");
+      }
+      const tenantId = params.tenant_id!;
+      const aspect = params.aspect_ratio || "16:9";
+      const job = queueJob("generate", tenantId, async (j) => {
+        const stem = (params.name || `presenter_${j.id.replace(/^job_/, "")}`).replace(/[^a-zA-Z0-9_-]/g, "_");
+        const outputDir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "video");
+        const result = await generatePresenterVideo({
+          script: params.script,
+          presenter: params.presenter,
+          aspectRatio: aspect,
+          outputDir,
+          nameStem: stem,
+          onProgress: (detail, fraction) => {
+            j.progress = { step: "presenter", percent: Math.round(5 + fraction * 90), detail };
+          },
+        });
+        j.progress = { step: "done", percent: 100, detail: "Presenter clip ready" };
+        const servedUrl = `/assets/${tenantId}/brand-kit/video/${stem}.mp4`;
+        return {
+          asset_url: servedUrl,
+          download_url: `${config.publicUrl}${servedUrl}`,
+          model: result.model,
+          takes: result.takes.map((t, i) => ({
+            take: i + 1,
+            asset_url: `/assets/${tenantId}/brand-kit/video/${t.filename}`,
+            scripted_line: t.line,
+            heard_by_whisper: t.transcript ?? "(transcription unavailable)",
+          })),
+          note: "Pass asset_url to generate as speaker_source for a speaker-led film (her voice becomes the soundtrack; scenes cut on her sentences). Compare scripted_line vs heard_by_whisper per take -- Veo occasionally paraphrases; regenerate a single take with generate_clip + reference_image if one drifted. Voice consistency across takes is best-effort; listen before shipping.",
+        };
+      });
+      return ok({
+        job_id: job.id,
+        status: job.status,
+        message: `Presenter generation queued (one Veo take per ~22 words -- expect 1-3 min per take). Poll with get(target='job', job_id='${job.id}').`,
       });
     },
   );
