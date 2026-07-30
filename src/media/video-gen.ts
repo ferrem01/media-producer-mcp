@@ -19,11 +19,58 @@ import path from "node:path";
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 /** Fast tier by default: background b-roll doesn't need the flagship model,
- *  and it's several times cheaper per second. Override with MP_VEO_MODEL. */
+ *  and it's several times cheaper per second. Override with MP_VEO_MODEL.
+ *  If this id 404s (Google rotates Veo model ids), the available Veo models
+ *  are DISCOVERED from ListModels and the best fast one is used instead. */
 const DEFAULT_MODEL = "veo-3.0-fast-generate-001";
 
 const POLL_INTERVAL_MS = 10_000;
 const MAX_WAIT_MS = 6 * 60_000;
+
+/** The last failure reason, for callers that surface errors to users (the
+ *  job path) -- the function itself degrades to null by design. */
+let lastError: string | undefined;
+export function lastVideoGenError(): string | undefined {
+  return lastError;
+}
+
+/** Discovered-and-cached Veo model id (survives for the process). */
+let discoveredModel: string | undefined;
+
+/** List the API's models and pick the best Veo video model: prefer "fast"
+ *  variants (cheaper, fine for backgrounds), then the highest version. */
+async function discoverVeoModel(apiKey: string): Promise<string | undefined> {
+  if (discoveredModel) return discoveredModel;
+  try {
+    const res = await fetch(`${GEMINI_BASE}/models?pageSize=1000`, {
+      headers: { "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+      console.warn(`  Video gen: ListModels failed ${res.status} while discovering a Veo model`);
+      return undefined;
+    }
+    const data = (await res.json()) as { models?: Array<{ name?: string; supportedGenerationMethods?: string[] }> };
+    const veo = (data.models || [])
+      .map((m) => (m.name || "").replace(/^models\//, ""))
+      .filter((n) => /veo/i.test(n));
+    if (veo.length === 0) {
+      console.warn("  Video gen: the API lists no Veo models for this key");
+      return undefined;
+    }
+    const score = (n: string) => {
+      const ver = parseFloat((n.match(/veo-(\d+(?:\.\d+)?)/) || [])[1] || "0");
+      return ver * 10 + (/fast/i.test(n) ? 1 : 0);
+    };
+    veo.sort((a, b) => score(b) - score(a));
+    discoveredModel = veo[0];
+    console.log(`  Video gen: discovered Veo models [${veo.join(", ")}] -- using ${discoveredModel}`);
+    return discoveredModel;
+  } catch (e: any) {
+    console.warn(`  Video gen: model discovery failed: ${e?.message || e}`);
+    return undefined;
+  }
+}
 
 export interface VideoGenOptions {
   /** The shot description -- written like a cinematography direction. */
@@ -55,28 +102,44 @@ export async function generateVideoClip(opts: VideoGenOptions): Promise<VideoGen
     console.log("  Video gen: GEMINI_API_KEY not set, skipping");
     return null;
   }
-  const model = opts.model || process.env.MP_VEO_MODEL || DEFAULT_MODEL;
+  let model = opts.model || process.env.MP_VEO_MODEL || discoveredModel || DEFAULT_MODEL;
+  lastError = undefined;
 
   try {
     console.log(`  Video gen: "${opts.prompt.substring(0, 70)}..." model=${model} aspect=${opts.aspectRatio}`);
 
-    // 1. Submit the long-running generation.
-    const submit = await fetch(`${GEMINI_BASE}/models/${model}:predictLongRunning`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        instances: [{ prompt: opts.prompt }],
-        parameters: { aspectRatio: opts.aspectRatio },
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
+    // 1. Submit the long-running generation. A model-id 404 triggers ONE
+    //    discovery pass (Google rotates Veo ids: -preview vs -001, 3.0 vs
+    //    3.1) and a retry with what the key actually serves.
+    const submitOnce = (m: string) =>
+      fetch(`${GEMINI_BASE}/models/${m}:predictLongRunning`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          instances: [{ prompt: opts.prompt }],
+          parameters: { aspectRatio: opts.aspectRatio },
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+    let submit = await submitOnce(model);
+    if (submit.status === 404 && !opts.model && !process.env.MP_VEO_MODEL) {
+      console.warn(`  Video gen: model "${model}" not found -- discovering available Veo models`);
+      const found = await discoverVeoModel(apiKey);
+      if (found && found !== model) {
+        model = found;
+        submit = await submitOnce(model);
+      }
+    }
     if (!submit.ok) {
-      console.warn(`  Video gen: Veo submit failed ${submit.status}: ${(await submit.text()).slice(0, 300)}`);
+      const body = (await submit.text()).slice(0, 500);
+      lastError = `Veo submit failed ${submit.status} (model ${model}): ${body}`;
+      console.warn(`  Video gen: ${lastError}`);
       return null;
     }
     const op = (await submit.json()) as { name?: string };
     if (!op.name) {
-      console.warn("  Video gen: Veo submit returned no operation name");
+      lastError = "Veo submit returned no operation name";
+      console.warn(`  Video gen: ${lastError}`);
       return null;
     }
 
@@ -85,7 +148,8 @@ export async function generateVideoClip(opts: VideoGenOptions): Promise<VideoGen
     let videoUri: string | undefined;
     for (;;) {
       if (Date.now() > deadline) {
-        console.warn(`  Video gen: Veo operation timed out after ${MAX_WAIT_MS / 60000} min`);
+        lastError = `Veo operation timed out after ${MAX_WAIT_MS / 60000} min`;
+        console.warn(`  Video gen: ${lastError}`);
         return null;
       }
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
@@ -94,7 +158,8 @@ export async function generateVideoClip(opts: VideoGenOptions): Promise<VideoGen
         signal: AbortSignal.timeout(30_000),
       });
       if (!poll.ok) {
-        console.warn(`  Video gen: Veo poll failed ${poll.status}`);
+        lastError = `Veo operation poll failed ${poll.status}`;
+        console.warn(`  Video gen: ${lastError}`);
         return null;
       }
       const status = (await poll.json()) as {
@@ -109,14 +174,16 @@ export async function generateVideoClip(opts: VideoGenOptions): Promise<VideoGen
       };
       if (!status.done) continue;
       if (status.error) {
-        console.warn(`  Video gen: Veo operation error: ${status.error.message || "unknown"}`);
+        lastError = `Veo operation error: ${status.error.message || "unknown"}`;
+        console.warn(`  Video gen: ${lastError}`);
         return null;
       }
       const gvr = status.response?.generateVideoResponse;
       videoUri = gvr?.generatedSamples?.[0]?.video?.uri;
       if (!videoUri) {
         const filtered = gvr?.raiMediaFilteredCount;
-        console.warn(`  Video gen: Veo finished with no video${filtered ? ` (${filtered} filtered by safety policy -- soften the prompt)` : ""}`);
+        lastError = `Veo finished with no video${filtered ? ` (${filtered} filtered by safety policy -- soften the prompt)` : ""}`;
+        console.warn(`  Video gen: ${lastError}`);
         return null;
       }
       break;
@@ -128,7 +195,8 @@ export async function generateVideoClip(opts: VideoGenOptions): Promise<VideoGen
       signal: AbortSignal.timeout(120_000),
     });
     if (!dl.ok) {
-      console.warn(`  Video gen: Veo download failed ${dl.status}`);
+      lastError = `Veo clip download failed ${dl.status}`;
+      console.warn(`  Video gen: ${lastError}`);
       return null;
     }
     await fs.mkdir(opts.outputDir, { recursive: true });
@@ -136,14 +204,16 @@ export async function generateVideoClip(opts: VideoGenOptions): Promise<VideoGen
     await fs.writeFile(localPath, Buffer.from(await dl.arrayBuffer()));
     const size = (await fs.stat(localPath)).size;
     if (size < 10_000) {
-      console.warn(`  Video gen: downloaded clip suspiciously small (${size} bytes) -- discarding`);
+      lastError = `downloaded clip suspiciously small (${size} bytes) -- discarded`;
+      console.warn(`  Video gen: ${lastError}`);
       await fs.unlink(localPath).catch(() => {});
       return null;
     }
     console.log(`  Video gen: clip saved (${(size / 1024 / 1024).toFixed(1)}MB) -> ${opts.filename}`);
     return { localPath, model };
   } catch (e: any) {
-    console.warn(`  Video gen: ${e?.message || e}`);
+    lastError = String(e?.message || e);
+    console.warn(`  Video gen: ${lastError}`);
     return null;
   }
 }
