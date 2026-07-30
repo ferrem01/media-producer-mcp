@@ -248,6 +248,50 @@ function deadFrameDefect(coverage: number, colorSpread: number | null): LayoutDe
 }
 
 /**
+ * Empty-moment probe for DETERMINISTIC (component-assembled / template)
+ * scenes: content coverage at specific moments. Codegen scenes get the softer
+ * dead-frame rule above (sparse-over-flat only, and only when EVERY probe is
+ * dead) -- there, a breath beat over a rich gradient is a choice. An
+ * assembled scene is different: its content is known and deterministic, so a
+ * probed moment where essentially NOTHING is on canvas (below minCoverage,
+ * rich backdrop or not) is a real gap the viewer stares at -- measured live
+ * as a fully empty mid-film frame (proj_48475b3d at 25.0s) and ~1-3s dead
+ * entrance gaps at scene opens in both grammar maiden flights.
+ */
+export async function measureEmptyMoments(opts: {
+  htmlPath: string;
+  width: number;
+  height: number;
+  atTimes: number[];
+  /** Coverage below this fraction counts as an empty canvas (default 0.02). */
+  minCoverage?: number;
+}): Promise<Array<{ atTime: number; coverage: number }>> {
+  const minCov = opts.minCoverage ?? 0.02;
+  const empty: Array<{ atTime: number; coverage: number }> = [];
+  const tmpDir = path.join(os.tmpdir(), `emptyprobe_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`);
+  await fs.mkdir(tmpDir, { recursive: true }).catch(() => {});
+  try {
+    for (const t of opts.atTimes) {
+      let layout: LayoutProbeResult | undefined;
+      try {
+        ({ layout } = await captureSingleFrame({
+          htmlPath: opts.htmlPath, outputPath: path.join(tmpDir, "probe.png"),
+          width: opts.width, height: opts.height, atTime: t, layoutProbe: true,
+        }));
+      } catch {
+        continue;
+      }
+      if (!layout) continue;
+      const coverage = contentCoverage(layout);
+      if (coverage < minCov) empty.push({ atTime: t, coverage });
+    }
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+  return empty;
+}
+
+/**
  * Measure surface separation + content coverage across several moments and return
  * the blocking layout defects found. Probes multiple times (elements animate in)
  * and keeps the WORST finding per type so a transient full-frame moment doesn't
