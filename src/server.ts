@@ -52,7 +52,7 @@ import { getTranscript, whisperAvailable } from "./core/transcribe.js";
 import { resolveVideoPath } from "./core/video-path.js";
 import { registerBrandExtractTool, extractAndStoreBrand } from "./tools/brand-extract-tool.js";
 import { generateImage } from "./media/image-gen.js";
-import { generateVideoClip } from "./media/video-gen.js";
+import { generateVideoClip, lastVideoGenError } from "./media/video-gen.js";
 
 // ── Shared Zod schemas ──
 
@@ -1569,7 +1569,7 @@ export function createMcpServer(): McpServer {
         const outputDir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "video");
         const clip = await generateVideoClip({ prompt: params.prompt, aspectRatio: aspect, outputDir, filename });
         if (!clip) {
-          throw new Error("Veo returned no clip -- the request failed, timed out, or was safety-filtered (see server logs; softening the prompt often fixes filtering).");
+          throw new Error(`Veo returned no clip: ${lastVideoGenError() || "unknown failure (see server logs)"}`);
         }
         j.progress = { step: "done", percent: 100, detail: "Clip ready" };
         const servedUrl = `/assets/${tenantId}/brand-kit/video/${filename}`;
