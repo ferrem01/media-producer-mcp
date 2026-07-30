@@ -343,7 +343,7 @@ function stackRows(n: number, bandY: number, bandH: number, gap: number): Array<
  * stage) instead of stacking into the same 84% inset -- the collision that
  * made films read as sloppy.
  */
-function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false): LayoutSlot[] {
+function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false, speaker = false): LayoutSlot[] {
   var slots: LayoutSlot[] = authored.map(() => null);
   var accentCount = 0;
   var surfaceIdx: number[] = [];
@@ -372,6 +372,34 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
       surfaceIdx.push(i);
     }
   });
+
+  // ── SPEAKER-VISIBLE LAYOUT: the camera recording is the base layer and
+  // the speaker is the star -- content DOCKS beside her instead of filling
+  // the frame (measured live: proj_11bcf413 placed the campaign board at
+  // 84% width over an opaque backdrop, and the film's own speaker never
+  // appeared in it). Surfaces stack in a right-third dock; captions sit in
+  // the lower-left third at chin level; backdrop casts are dropped -- the
+  // camera feed IS the backdrop.
+  if (speaker) {
+    authored.forEach((c, i) => {
+      if (BACKDROP_CAST_TYPES.indexOf(c.type) !== -1) slots[i] = null;
+    });
+    var dockSurf = surfaceIdx.filter((i) => !slots[i]);
+    if (dockSurf.length > 0) {
+      var dockRows = stackRows(dockSurf.length, 12, 72, 3);
+      dockSurf.forEach((idx, k) => {
+        slots[idx] = { position: pct(62, dockRows[k][0], 35, dockRows[k][1]), z_index: 10 + k };
+      });
+    }
+    var spEd = heroIdx.concat(captionIdx);
+    if (spEd.length > 0) {
+      var spRows = stackRows(spEd.length, 72, 16, 2);
+      spEd.forEach((idx, k) => {
+        slots[idx] = { position: pct(4, spRows[k][0], 54, spRows[k][1]), z_index: 30 + k };
+      });
+    }
+    return slots; // residual nulls = deliberately dropped (the camera is the base)
+  }
 
   // ── VERTICAL (9:16) LAYOUT: the landscape recipes below have no width to
   // live in. The social-reel contract's closed vocabulary, deterministic:
@@ -514,7 +542,12 @@ function buildAuthoredCompositionScene(
 ): GeneratedScene {
   console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (authored composition -- deterministic, no codegen)`);
   var types = authored.map((c) => c.type);
-  var slots = authoredLayout(authored, !!opts.world, opts.canvas.height > opts.canvas.width);
+  // A speaker film's camera recording is the base layer: no world backdrop
+  // (an opaque full-bleed component paints over the render's transparent
+  // page and buries the speaker -- measured live: proj_11bcf413), and the
+  // dock layout keeps content beside her.
+  var speakerBase = !!opts.hasSpeakerTrack;
+  var slots = authoredLayout(authored, !!opts.world, opts.canvas.height > opts.canvas.width, speakerBase);
   // The dark cinematic world under every mock window, matching the film's
   // template scenes (and the hand-built originals).
   // The film's ONE world under every scene (SPEC-world.md). The per-scene
@@ -522,7 +555,7 @@ function buildAuthoredCompositionScene(
   // every cut. With a world: same component, same seed, clock offset to
   // film time so the drift continues across the cut.
   var w = opts.world;
-  var components: any[] = [w ? {
+  var components: any[] = speakerBase ? [] : [w ? {
     id: "bg",
     type: w.backdrop.component,
     z_index: 1,
@@ -548,7 +581,7 @@ function buildAuthoredCompositionScene(
   // still replaces the world backdrop for THIS scene; authored content
   // stacks above it and caption scrims keep the type legible.
   var mediaBackdrop = false;
-  if (opts.brollVideoUrl || opts.imageUrl) {
+  if (!speakerBase && (opts.brollVideoUrl || opts.imageUrl)) {
     mediaBackdrop = true;
     components[0] = opts.brollVideoUrl ? {
       id: "bg",
@@ -587,13 +620,14 @@ function buildAuthoredCompositionScene(
     // dark scrim -- dark ink over either lands near-invisible (measured
     // live: proj_cd8a6fb6 scene 7, near-black caption on a scrimmed
     // golden-hour still at 1.39:1).
-    if ((w || mediaBackdrop) && (isCaptionRole(c.type) || HERO_ROLE_TYPES.indexOf(c.type) !== -1)) {
-      var worldIsLight = mediaBackdrop ? false : w!.theme === "light";
+    var overLiveBase = mediaBackdrop || speakerBase; // unpredictable pixels behind the type -> light ink
+    if ((w || overLiveBase) && (isCaptionRole(c.type) || HERO_ROLE_TYPES.indexOf(c.type) !== -1)) {
+      var worldIsLight = overLiveBase ? false : w!.theme === "light";
       var ink = typeof data.color === "string" ? (data.color as string) : undefined;
       var inkClash = ink !== undefined && hexIsLight(ink) === worldIsLight;
-      if (inkClash || (ink === undefined && worldIsLight) || (ink === undefined && mediaBackdrop)) {
+      if (inkClash || (ink === undefined && worldIsLight) || (ink === undefined && overLiveBase)) {
         data.color = worldIsLight ? (opts.brandKit?.colors?.text || "#17171c") : "#f5f6fa";
-        console.log(`    ${c.type}: ink ${ink || "(default)"} would vanish on the ${mediaBackdrop ? "media backdrop" : w!.theme + " world"} -- clamped to ${data.color}`);
+        console.log(`    ${c.type}: ink ${ink || "(default)"} would vanish on the ${overLiveBase ? (speakerBase ? "camera base layer" : "media backdrop") : w!.theme + " world"} -- clamped to ${data.color}`);
       }
     }
     // The recipe's show_panel contract: the shell's own agent panel hides
