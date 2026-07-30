@@ -322,6 +322,13 @@ BEFORE GENERATING
 - Brand comes from the tenant's brand kit. If none exists yet, run extract_brand_from_website (their site URL) or upload brand assets first -- generate without a kit produces an unbranded film.
 - A recorded screen demo? Don't generate from a prompt -- the Chrome recorder extension captures the tab + voice and assembles the film automatically (download at /extension.zip on this server).
 
+REAL MEDIA (the server plans and fetches this AUTONOMOUSLY -- you steer it with the brief)
+- Every film gets a media plan: the creative director decides per beat whether it opens on real footage, holds on a generated still, or stays motion graphics. Three sources, all automatic: stock b-roll (Pexels, free, moving atmospheric shots), AI-generated stills (for composed/held moments), and AI-generated video (Veo -- ONLY for moving shots no stock library could contain; 0-1 per film, it is the expensive source).
+- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk", "photographic and cinematic -- real imagery carries this film", "close on a golden-hour still" all reliably produce fetched/generated media. Mood-only briefs get motion graphics on UI/data beats and real media on emotional/place beats -- that default is usually right.
+- To FORCE a generated shot, describe it and say so: "the signature shot, which no stock library has: <cinematography direction> -- generate this shot." An explicitly briefed generated shot is contractually mandatory for the storyboard to honor.
+- TALKING HEADS are explicit by design (casting a synthetic presenter is the human's call): generate_clip makes a standalone Veo clip -- put the spoken line in quotes in the prompt and Veo generates the VOICE too. Feed the resulting asset_url back to generate as speaker_source and the film becomes speaker-led: her voice is the soundtrack, whisper transcribes it, scenes cut on her sentences, content docks beside her. Pass reference_image (a frame from a prior take) to keep the SAME presenter across clips.
+- Relay costs honestly when the human asks for generated video: Veo clips are ~8s, priced per generated second, and take 1-3 minutes each.
+
 ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
 1. generate mode='storyboard' -> review the beats with the human, adjust, THEN build scenes.
 2. Proof a single scene as a still: render{scene_id}.
