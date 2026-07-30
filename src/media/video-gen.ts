@@ -262,6 +262,24 @@ export function chunkScript(script: string, maxWords = 22): string[] {
 const MAX_TAKES = 8;
 const FFMPEG = () => process.env.MP_FFMPEG || "ffmpeg";
 
+/** Media duration in seconds, parsed from ffmpeg's own banner (ffprobe is
+ *  not guaranteed on the box; ffmpeg is -- the renderer already relies on it). */
+async function probeDuration(
+  run: (cmd: string, args: string[]) => Promise<{ stdout: string; stderr: string }>,
+  file: string,
+): Promise<number> {
+  const parse = (s: string): number => {
+    const m = s.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/);
+    return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0;
+  };
+  try {
+    const { stderr } = await run(FFMPEG(), ["-i", file, "-f", "null", "-"]);
+    return parse(String(stderr || ""));
+  } catch (e: any) {
+    return parse(String(e?.stderr || ""));
+  }
+}
+
 export interface PresenterVideoOptions {
   /** The full speech, verbatim. */
   script: string;
@@ -280,6 +298,11 @@ export interface PresenterVideoResult {
   takes: Array<{ path: string; filename: string; line: string; transcript?: string }>;
   model: string;
   referenceFramePath: string;
+  /** Seconds into the stitched clip where each take boundary lands. A film
+   *  can hide these seams the way an editor does -- cut away to the product
+   *  surface exactly here -- instead of holding on the presenter through the
+   *  join. Empty for a single-take speech. */
+  seams: number[];
 }
 
 const DEFAULT_PRESENTER =
@@ -317,9 +340,19 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
   for (let i = 0; i < lines.length; i++) {
     opts.onProgress?.(`Take ${i + 1}/${lines.length} (Veo)`, (i / (lines.length + 1)));
     const filename = `${opts.nameStem}_take_${i + 1}.mp4`;
+    // CAMERA LOCK on multi-take speeches: take 1 used to be the only take
+    // with a push-in, so it ended slightly tighter than take 2 began -- a
+    // scale pop at the FIRST seam only (measured live on quotient_pitch_v2:
+    // seam 1 blipped, seam 2-3 was invisible, and both later takes were
+    // already static). A single-take clip keeps the push-in; it has no seam
+    // to betray.
+    const multiTake = lines.length > 1;
+    const cameraNote = multiTake
+      ? "Locked-off static camera: no zoom, no push-in, no camera movement, constant framing and shot size."
+      : "Static camera with a very slight slow push-in.";
     const prompt = i === 0
-      ? `${presenter}. They look directly into the camera and say, warmly and naturally: '${lines[i]}' Static camera with a very slight slow push-in, shallow depth of field.`
-      : `The exact same presenter as the reference image -- identical appearance, clothing, voice, tone, framing and lighting, continuing the same take from exactly this pose. They keep speaking directly to camera and say: '${lines[i]}' Static camera, shallow depth of field.`;
+      ? `${presenter}. They look directly into the camera and say, warmly and naturally: '${lines[i]}' ${cameraNote} Shallow depth of field.`
+      : `The exact same presenter as the reference image -- identical appearance, clothing, voice, tone, framing, shot size and lighting, continuing the same take from exactly this pose. They keep speaking directly to camera and say: '${lines[i]}' ${cameraNote} Shallow depth of field.`;
     const clip = await generateVideoClip({
       prompt,
       aspectRatio: opts.aspectRatio,
@@ -373,10 +406,12 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
   const listPath = path.join(opts.outputDir, `${opts.nameStem}_concat.txt`);
   const LEAD_IN = 0.2, LEAD_OUT = 0.25;
   const pieces: string[] = [];
+  const pieceDurations: number[] = [];
   for (let i = 0; i < takes.length; i++) {
     const t = takes[i];
     if (t.speechStart === undefined || t.speechEnd === undefined || t.speechEnd <= t.speechStart) {
       pieces.push(t.path);
+      pieceDurations.push(await probeDuration(run, t.path));
       continue;
     }
     const ss = Math.max(0, t.speechStart - LEAD_IN);
@@ -390,10 +425,19 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
         trimmed,
       ]);
       pieces.push(trimmed);
+      pieceDurations.push(await probeDuration(run, trimmed));
     } catch {
       console.warn(`  Presenter: trim failed on take ${i + 1} -- using the raw take`);
       pieces.push(t.path);
+      pieceDurations.push(await probeDuration(run, t.path));
     }
+  }
+  // Seam positions in the stitched clip: where a film should cut away.
+  const seams: number[] = [];
+  let acc = 0;
+  for (let i = 0; i < pieceDurations.length - 1; i++) {
+    acc += pieceDurations[i];
+    seams.push(Math.round(acc * 100) / 100);
   }
   await fs.writeFile(listPath, pieces.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"));
   const uniformTrims = pieces.every((p) => p.includes("_trim_"));
@@ -408,5 +452,5 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
     if (p.includes("_trim_")) await fs.unlink(p).catch(() => {});
   }
 
-  return { concatPath, takes, model, referenceFramePath: firstReferencePath };
+  return { concatPath, takes, model, referenceFramePath: firstReferencePath, seams };
 }

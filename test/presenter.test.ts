@@ -67,6 +67,20 @@ describe("generate_presenter wiring (source guards)", () => {
     expect(vg).toMatch(/"libx264"/);                       // uniform re-encode path
   });
 
+  it("locks the camera on multi-take speeches and reports seam positions", async () => {
+    // Marc on v2: seam 1 blipped, seams 2-3 were invisible. Only take 1
+    // carried "push-in" -- it ended tighter than take 2 began. Multi-take
+    // now locks the shot size; a single take keeps the push-in (no seam).
+    const vg = await read("../src/media/video-gen.ts");
+    expect(vg).toMatch(/CAMERA LOCK on multi-take/);
+    expect(vg).toMatch(/const multiTake = lines\.length > 1/);
+    expect(vg).toMatch(/Locked-off static camera: no zoom, no push-in/);
+    expect(vg).toMatch(/very slight slow push-in/);        // still there for single takes
+    expect(vg).toMatch(/seams\.push/);
+    const s = await read("../src/server.ts");
+    expect(s).toMatch(/seam_seconds: result\.seams/);
+  });
+
   it("tool + playbook expose the flow", async () => {
     const s = await read("../src/server.ts");
     expect(s).toMatch(/"generate_presenter"/);
