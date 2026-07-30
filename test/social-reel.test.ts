@@ -39,9 +39,9 @@ describe("social-reel grammar registration", () => {
 
   it("enforces the format's length in code, not just in the contract", async () => {
     const src = await read("../src/llm/pipeline.ts");
-    expect(src).toContain("Social-reel length discipline");
-    expect(src).toMatch(/SCENE_CAP = 6, TOTAL_CAP = 28/);
-    expect(src).toMatch(/rescaleBeats\(s\.beats, SCENE_CAP\)/); // beats follow the squeeze
+    expect(src).toContain("Grammar length discipline");
+    expect(src).toMatch(/"social-reel": \{ sceneCap: 6, totalCap: 28/);
+    expect(src).toMatch(/rescaleBeats\(s\.beats, rule\.sceneCap\)/); // beats follow the squeeze
   });
 
   it("bans whole desktop workspaces as surfaces", async () => {

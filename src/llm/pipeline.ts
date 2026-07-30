@@ -2278,31 +2278,48 @@ async function runUnifiedPipeline(
     }
   }
 
-  // ── Social-reel length discipline (deterministic) ──
-  // The contract says 15-28s of scene time with 1.5-4s scenes, but the
-  // storyboard still ships the occasional 9s beat (measured live:
-  // proj_56358b25 -- 32s of scene time, one 9.67s scene; with transitions
-  // the file ran 34s against the format's hard <30s ceiling). Enforce in
-  // code before bar quantization: cap any scene, then squeeze
-  // proportionally until the total fits. Beats rescale with their scene.
-  if (filmGrammar === "social-reel") {
-    const SCENE_CAP = 6, TOTAL_CAP = 28, MIN_SCENE = 1.5;
-    const srScenes = storyboard.scenes as Array<{ label?: string; duration_seconds: number; beats?: SceneBeat[] }>;
-    for (const s of srScenes) {
-      if ((Number(s.duration_seconds) || 0) > SCENE_CAP) {
-        console.log(`  Social-reel length: scene "${s.label || ""}" ${s.duration_seconds}s -> ${SCENE_CAP}s (per-scene cap)`);
-        s.duration_seconds = SCENE_CAP;
-        if (Array.isArray(s.beats) && s.beats.length >= 2) rescaleBeats(s.beats, SCENE_CAP);
+  // ── Grammar length discipline (deterministic) ──
+  // Formats with hard length contracts get them enforced in code: the
+  // storyboard still ships over-long beats (measured live: social-reel
+  // proj_56358b25 -- 32s of scene time vs the <30s ceiling; data-story
+  // proj_a7b3ffbd -- 50.4s vs the 45s cap). Cap any scene, then squeeze
+  // proportionally until the total fits, BEFORE bar quantization. Beats
+  // rescale with their scene.
+  {
+    const LENGTH_DISCIPLINE: Record<string, { sceneCap: number; totalCap: number; minScene: number }> = {
+      "social-reel": { sceneCap: 6, totalCap: 28, minScene: 1.5 },
+      "data-story": { sceneCap: 7, totalCap: 42, minScene: 2 },
+    };
+    const rule = LENGTH_DISCIPLINE[filmGrammar];
+    if (rule) {
+      const ldScenes = storyboard.scenes as Array<{ label?: string; duration_seconds: number; beats?: SceneBeat[] }>;
+      for (const s of ldScenes) {
+        if ((Number(s.duration_seconds) || 0) > rule.sceneCap) {
+          console.log(`  ${filmGrammar} length: scene "${s.label || ""}" ${s.duration_seconds}s -> ${rule.sceneCap}s (per-scene cap)`);
+          s.duration_seconds = rule.sceneCap;
+          if (Array.isArray(s.beats) && s.beats.length >= 2) rescaleBeats(s.beats, rule.sceneCap);
+        }
+      }
+      const ldTotal = ldScenes.reduce((sum, s) => sum + (Number(s.duration_seconds) || 0), 0);
+      if (ldTotal > rule.totalCap) {
+        const k = rule.totalCap / ldTotal;
+        console.log(`  ${filmGrammar} length: ${ldTotal.toFixed(1)}s of scene time -> squeezing x${k.toFixed(2)} to fit ${rule.totalCap}s`);
+        for (const s of ldScenes) {
+          s.duration_seconds = Math.max(rule.minScene, Math.round((Number(s.duration_seconds) || rule.minScene) * k * 100) / 100);
+          if (Array.isArray(s.beats) && s.beats.length >= 2) rescaleBeats(s.beats, s.duration_seconds);
+        }
       }
     }
-    const srTotal = srScenes.reduce((sum, s) => sum + (Number(s.duration_seconds) || 0), 0);
-    if (srTotal > TOTAL_CAP) {
-      const k = TOTAL_CAP / srTotal;
-      console.log(`  Social-reel length: ${srTotal.toFixed(1)}s of scene time -> squeezing x${k.toFixed(2)} to fit ${TOTAL_CAP}s`);
-      for (const s of srScenes) {
-        s.duration_seconds = Math.max(MIN_SCENE, Math.round((Number(s.duration_seconds) || MIN_SCENE) * k * 100) / 100);
-        if (Array.isArray(s.beats) && s.beats.length >= 2) rescaleBeats(s.beats, s.duration_seconds);
-      }
+  }
+
+  // ── Text-as-voiceover grammars: the type IS the script ──
+  // Both contracts say voiceover_text stays empty, but the storyboard still
+  // populates it (measured live: proj_a7b3ffbd shipped narration lines that
+  // re-read the captions). Strip in code -- unless the caller explicitly
+  // asked for TTS, which overrides the grammar's default.
+  if ((filmGrammar === "social-reel" || filmGrammar === "data-story") && !opts.voiceover) {
+    for (const d of storyboard.scenes as any[]) {
+      if (d.voiceover_text) d.voiceover_text = undefined;
     }
   }
 

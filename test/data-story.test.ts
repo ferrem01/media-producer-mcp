@@ -39,6 +39,19 @@ describe("data-story grammar registration", () => {
     expect(src).toMatch(/filmGrammar === "social-reel" \|\| filmGrammar === "data-story"/);
   });
 
+  it("enforces length + no-voiceover in code, not just in the contract", async () => {
+    const src = await read("../src/llm/pipeline.ts");
+    expect(src).toMatch(/"data-story": \{ sceneCap: 7, totalCap: 42/);
+    expect(src).toMatch(/\(filmGrammar === "social-reel" \|\| filmGrammar === "data-story"\) && !opts\.voiceover/);
+  });
+
+  it("contract bans invented decompositions and rainbow charts, demands hero scale", async () => {
+    const src = await read("../src/llm/storyboard-builder.ts");
+    expect(src).toMatch(/DECOMPOSING a real total into invented parts is inventing/);
+    expect(src).toMatch(/CHARTS WEAR THE BRAND/);
+    expect(src).toMatch(/>=20% of the frame height/);
+  });
+
   it("is exposed on the generate tool and the operator playbook", async () => {
     const src = await read("../src/server.ts");
     expect(src).toMatch(/"launch-film", "tempo-cut", "speaker-screencast", "editorial", "social-reel", "data-story"/);
