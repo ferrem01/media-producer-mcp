@@ -24,7 +24,9 @@ describe("social-reel grammar registration", () => {
     const src = await read("../src/llm/storyboard-builder.ts");
     expect(src).toContain("SOCIAL-REEL FILMS");
     expect(src).toMatch(/top ~12% and bottom ~18%/);       // safe zones
-    expect(src).toMatch(/15-30s TOTAL/);                   // feed length
+    expect(src).toMatch(/15-28s of SCENE TIME/);           // feed length incl. transitions
+    expect(src).toMatch(/SIDE-BY-SIDE IS BANNED/);         // closed layout vocabulary
+    expect(src).toMatch(/LANDSCAPE SURFACES GET CROPPED, NOT SHRUNK/);
     expect(src).toMatch(/CAPTIONS ARE THE VOICEOVER/);     // no narrator
     expect(src).toMatch(/OBJECTS, NOT STRINGS/);           // component-first
   });
