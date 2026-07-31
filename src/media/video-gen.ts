@@ -452,5 +452,12 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
     if (p.includes("_trim_")) await fs.unlink(p).catch(() => {});
   }
 
+  // Seam sidecar: a film built on this clip reads it (concatPath minus the
+  // extension + .seams.json) and briefs a product takeover over every join,
+  // so the multi-take stitch is hidden by the edit rather than by luck.
+  if (seams.length) {
+    await fs.writeFile(concatPath.replace(/\.[^.]+$/, "") + ".seams.json", JSON.stringify(seams)).catch(() => {});
+  }
+
   return { concatPath, takes, model, referenceFramePath: firstReferencePath, seams };
 }
