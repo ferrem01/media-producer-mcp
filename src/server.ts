@@ -310,35 +310,32 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
 export const OPERATOR_PLAYBOOK = `Media Producer turns prompts into branded films (video/image/deck): scenes are code-authored motion graphics, rendered deterministically. You (the agent) drive it; the creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
 
 BEFORE GENERATING
-- Ask the human what they're making before calling generate: audience, goal/CTA, target length, and which film grammar fits.
-- FILM GRAMMARS (the film's dialect; pass film_grammar to pin one, omit to let the server's creative director choose from the brief):
-  * launch-film -- few long cinematic scenes, one continuous world. For brand moments and feature reveals that should feel expansive.
-  * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover, told through real product surfaces. For product explainers and launch clips that should feel fast and confident.
-  * editorial -- typography-first manifesto: huge serif statements on cream/dark canvases alternating with full-bleed evidence beats; the words are the product. For thought-leadership, "why we built this", catalog showcases.
-  * social-reel -- vertical 9:16 feed film, 15-30s: a hook in the first 2 seconds, caption-scale type as the voiceover, escalation beats, a loop seam. Canvas defaults to vertical. For Reels/Shorts/TikTok product moments and social announcements.
-  * data-story -- numbers-as-protagonist: claim -> proof beats where ONE figure per scene counts up or draws in live, escalating to the money number. Figures must come from the brief (never invented). For metrics announcements, quarterly recaps, benchmark results, growth/ROI stories.
+- Ask the human first: audience, goal/CTA, target length, and which film grammar fits.
+- FILM GRAMMARS (the film's dialect; pass film_grammar to pin one, omit to let the creative director choose):
+  * launch-film -- few long cinematic scenes, one continuous world. Expansive brand moments.
+  * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover. Fast, confident explainers.
+  * editorial -- typography-first manifesto: huge serif statements alternating with full-bleed evidence. The words are the product.
+  * social-reel -- vertical 9:16, 15-30s: hook in the first 2 seconds, caption-scale type, escalation beats, a loop seam.
+  * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene up to the money number. Figures come from the brief, never invented.
   * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never choose it without one.
-  Rule of thumb: product demos the product (tempo-cut) vs. words carry the argument (editorial) vs. numbers carry the argument (data-story) vs. one cinematic world (launch-film) vs. human on camera (speaker-screencast) vs. the feed format carries it (social-reel). If the human's answer doesn't clearly pick one, relay the choice to them in these terms.
-- Brand comes from the tenant's brand kit. If none exists yet, run extract_brand_from_website (their site URL) or upload brand assets first -- generate without a kit produces an unbranded film.
-- A recorded screen demo? Don't generate from a prompt -- the Chrome recorder extension captures the tab + voice and assembles the film automatically (download at /extension.zip on this server).
+  Rule of thumb: the product argues (tempo-cut) vs. the words (editorial) vs. the numbers (data-story) vs. one cinematic world (launch-film) vs. a person on camera (speaker-screencast) vs. the feed format (social-reel). If their answer doesn't pick one, relay the choice in these terms.
+- Brand comes from the tenant's brand kit. No kit yet? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
+- A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and assembles the film automatically.
 
-REAL MEDIA (the server plans and fetches this AUTONOMOUSLY -- you steer it with the brief)
-- Every film gets a media plan: the creative director decides per beat whether it opens on real footage, holds on a generated still, or stays motion graphics. Three sources, all automatic: stock b-roll (Pexels, free, moving atmospheric shots), AI-generated stills (for composed/held moments), and AI-generated video (Veo -- ONLY for moving shots no stock library could contain; 0-1 per film, it is the expensive source).
-- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk", "photographic and cinematic -- real imagery carries this film", "close on a golden-hour still" all reliably produce fetched/generated media. Mood-only briefs get motion graphics on UI/data beats and real media on emotional/place beats -- that default is usually right.
-- To FORCE a generated shot, describe it and say so: "the signature shot, which no stock library has: <cinematography direction> -- generate this shot." An explicitly briefed generated shot is contractually mandatory for the storyboard to honor.
-- TALKING HEADS are explicit by design (casting a synthetic presenter is the human's call): generate_clip makes a standalone Veo clip -- put the spoken line in quotes in the prompt and Veo generates the VOICE too. Feed the resulting asset_url back to generate as speaker_source and the film becomes speaker-led: her voice is the soundtrack, whisper transcribes it, scenes cut on her sentences, content docks beside her. Pass reference_image (a frame from a prior take) to keep the SAME presenter across clips.
-- FULL SPEECHES: generate_presenter takes a whole script (up to ~60s), splits it into consistent multi-take deliveries, verifies each take against the script, and returns ONE stitched clip ready to be speaker_source. The result lists scripted_line vs heard_by_whisper per take -- relay any drift to the human before building the film.
-- Relay costs honestly when the human asks for generated video: Veo clips are ~8s, priced per generated second, and take 1-3 minutes each.
+REAL MEDIA (planned and fetched AUTONOMOUSLY -- you steer it with the brief)
+- Per beat the director picks real footage, a generated still, or motion graphics, from Pexels stock, AI stills, or Veo video (only for moving shots no stock library could contain; 0-1 per film, the expensive one, ~8s and 1-3 min each -- say so when asked).
+- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk", "photographic and cinematic". To FORCE a generated shot, describe it and say "generate this shot" -- that makes it mandatory. Mood-only briefs get motion graphics on UI/data beats and real media on emotional ones; that default is usually right.
+- TALKING HEADS are explicit by design (casting a synthetic presenter is the human's call). generate_clip = one Veo clip; quote the spoken line and Veo voices it. generate_presenter = a whole script (~60s) split into consistent multi-take deliveries, returned as ONE stitched clip, reporting scripted vs heard-by-whisper per take (relay any drift). Feed either asset_url back as speaker_source and the film becomes speaker-led: her voice is the soundtrack, scenes cut on her sentences, content docks beside her. reference_image keeps the same presenter across clips.
 
 ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
 1. generate mode='storyboard' -> review the beats with the human, adjust, THEN build scenes.
 2. Proof a single scene as a still: render{scene_id}.
-3. Review motion live in Studio (studio_url on every project response) -- it plays scenes in-browser with no render. This is also where the HUMAN edits: send them there for review rather than describing frames in text.
+3. Watch motion live in Studio (studio_url on every project response) -- in-browser, no render. Send the HUMAN there to review and edit rather than describing frames in text.
 4. First full watch: render{quality:'preview'} (fast). Production render only to ship.
 
 EDITING
-- revise = surgical, natural-language change to an existing scene ("make the headline white"). Use it before regenerating anything.
-- add/update/reorder/delete = structural edits to scenes and components. regenerate_asset = re-run one generated image.
+- revise = surgical, natural-language change to a scene ("make the headline white"). Use it before regenerating anything.
+- add/update/reorder/delete = structural edits. regenerate_asset = re-run one generated image.
 - NEVER edit a project while its render job runs.
 
 JOBS AND DELIVERY
