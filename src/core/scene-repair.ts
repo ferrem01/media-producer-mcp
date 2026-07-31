@@ -20,6 +20,13 @@
  *     patch cannot make a scene mean something different; these stay reports.
  *   - contrast INSIDE a component (a mock's own tab labels at 3.5:1): the fix
  *     belongs in the component library, not in scene data.
+ *   - invisible_surface: same reason, and it was tried -- see the note at the
+ *     bottom of repairScene for what a no-op patch looks like in production.
+ *
+ * THE RULE THIS MODULE LEARNED: never add a patch without first verifying the
+ * component actually reads the field. A patch that writes data nothing
+ * consumes reports a repair that never happened -- strictly worse than the
+ * badge it replaced. COLOR_CAPABLE exists for exactly this reason.
  */
 import type { Scene, SceneComponent } from "./types.js";
 
@@ -109,6 +116,23 @@ export function repairScene(scene: Scene, defects: SceneDefect[]): RepairResult 
   const notes: string[] = [];
   const comps: SceneComponent[] = Array.isArray(scene.components) ? scene.components : [];
   const has = (t: string) => defects.some((d) => d.type === t);
+  // ONE patch per component per pass, then re-measure. Without this, a single
+  // run of overflowing copy reports as several clipped_text defects (the gate
+  // samples the truncation at different widths) and each one shrinks the SAME
+  // component again: measured on proj_de47d492, a kinetic-text went 32px ->
+  // 16.38px and 15% -> 60% tall in one pass, and was still clipped, because
+  // the real defect was position, not size.
+  const patched = new Set<string>();
+  const claim = (c: SceneComponent): boolean => {
+    const key = c.id || c.type;
+    if (patched.has(key)) return false;
+    patched.add(key);
+    return true;
+  };
+  /** Text also reported as hanging off the canvas is a POSITION problem --
+   *  shrinking the type cannot bring it back on frame. */
+  const alsoOffCanvas = (text: string) =>
+    defects.some((d) => (d.type === "off_canvas_content" || d.type === "edge_bleed") && d.text && d.text.includes(text.slice(0, 20)));
 
   // ── 1. Clipped / truncated text: shrink the type and give it room ──
   // The hook line on a social post rendered 26% cut off top and bottom; the
@@ -117,6 +141,8 @@ export function repairScene(scene: Scene, defects: SceneDefect[]): RepairResult 
     if (d.type !== "clipped_text" && d.type !== "off_canvas" && d.type !== "illegible_clipped") continue;
     const target = d.text ? comps.find((c) => componentCarriesText(c, d.text!)) : undefined;
     if (!target) continue;
+    if (d.text && alsoOffCanvas(d.text)) continue;
+    if (!claim(target)) continue;
     const shrunk = scaleFontSize((target.data || {}).font_size, 0.8);
     if (shrunk !== null) {
       (target.data as Record<string, unknown>).font_size = shrunk;
@@ -144,7 +170,7 @@ export function repairScene(scene: Scene, defects: SceneDefect[]): RepairResult 
     if (d.type !== "illegible" || !d.text) continue;
     if (typeof d.backdropLuminance !== "number") continue; // over-video case: needs a scrim, not an ink
     const target = comps.find((c) => COLOR_CAPABLE.has(c.type) && componentCarriesText(c, d.text!));
-    if (!target) continue;
+    if (!target || !claim(target)) continue;
     // WCAG luminance midpoint: below it the backdrop is dark and wants light
     // type; above it the reverse. Near-black rather than pure black keeps the
     // frame from looking like a printout.
@@ -212,20 +238,14 @@ export function repairScene(scene: Scene, defects: SceneDefect[]): RepairResult 
     }
   }
 
-  // ── 5. Ghost panel: a surface that vanishes into the background ──
-  // The component owns its fill, but scene data can ask for a visible edge.
-  if (has("invisible_surface")) {
-    for (const c of comps) {
-      const d = c.data as Record<string, unknown>;
-      if (BACKDROP_RE.test(c.type) || BACKDROP_RE.test(c.id || "")) continue;
-      if (d && d.border === undefined && !TEXT_ROLE.test(c.type)) {
-        d.border = true;
-        d.shadow = d.shadow === undefined ? true : d.shadow;
-        notes.push(`${c.id}: border + shadow requested (panel was ghosting)`);
-        break; // one surface per pass -- re-measure decides if more is needed
-      }
-    }
-  }
+  // ── invisible_surface: NO PATCH, deliberately ──
+  // There was one. It set data.border/data.shadow and logged "border + shadow
+  // requested". Measured on proj_de47d492: it fired on five of seven scenes,
+  // the defect survived every time, and the reason is simple -- NOT ONE
+  // component in the library reads data.border (grep it). The patch changed
+  // nothing on screen while reporting that it had, which is worse than
+  // shipping the badge. A ghosting panel's fill lives inside the component;
+  // the fix belongs there, so this stays a report.
 
   return { changed: notes.length > 0, notes };
 }

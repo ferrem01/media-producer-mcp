@@ -1970,3 +1970,98 @@ state and Marc closed the arc. Final rounds (PRs #535-#539):
 Next up (Marc's backlog): Studio scrubber component bars always visible
 (design the density problem), narration/script-from-video test+fix pass,
 Studio aesthetic polish.
+
+## Auto-fix loop: gate defects become data repairs (2026-07-31)
+
+Component-assembled scenes (speaker films, takeovers, most of tempo-cut,
+data-story and social-reel) have no codegen source, so every gate finding
+shipped as `quality: {passed:false, attempts:0}` -- an honest measurement
+nobody could act on. `src/core/scene-repair.ts` (PRs #584, #585) turns the
+findings into deterministic DATA patches, applied inside a
+measure -> repair -> re-measure loop in the authored branch of
+`pipeline.ts`, bounded by `maxRetries`. The stamp is now honest in both
+directions: `passed` can be true, `attempts` counts repair passes, and a
+`repairs` log says what was changed.
+
+The table (each family derived from a repair performed BY HAND earlier in
+the session, then re-derived from the first live run):
+- clipped_text / off_canvas -> font_size x0.8 + container height x1.5
+- off_canvas_content -> clamp the box back inside (full-bleed exempt)
+- illegible -> repaint `data.color` from the backdrop luminance the gate
+  measured: < 0.18 -> #ffffff, else #101014
+- dead_entrance -> entrance = "settled"
+- dead_frame / empty_moment -> enlarge the primary surface x1.3 (94%/80% caps)
+
+Deliberately NOT patched: intent_mismatch, empty_skeleton, stray_ui
+(judgment -- a data patch cannot make a scene mean something different),
+and contrast INSIDE a component's own chrome (quotient-social's "Likes"
+label at 2.59:1) -- no scene-data color exists there, so claiming a fix
+would be a lie. Those stay reports.
+
+FIRST LIVE RUN (proj_0a31e568, social-reel, 7.7 min): scene 5 came back
+`attempts:2` with four repairs -- the loop works -- and the report was a
+to-do list. `illegible` was 8 of 13 unresolved findings and had NO patch
+(added, above; `measureTextContrast` now reports `backdropLuminance`).
+Two real bugs: the loop asked `bg` for a border (a backdrop is SUPPOSED
+to melt into the page) and grew a `sticker-prop` 36% -> 60% to fill a dead
+frame while the subject stayed small. Backdrops and props are now excluded
+from both patches. `COLOR_CAPABLE` is a verified list, not a guess --
+grep `data.color` in src/components.
+
+### Per-stage wall clock (#39 prerequisite)
+
+`createStageTimer` in `pipeline.ts` times every stage off the single
+onProgress callback (injectable clock, only closes on an actual CHANGE of
+step) and attaches `stage_timings` to PipelineResult, which the generate
+job returns verbatim. 20-minute generates were previously unauditable:
+percentages, never durations.
+
+### Open, needs a decision (not a patch)
+
+`assembled-scene-gates` -> st-statement measures 13% content coverage
+against the layout gate's 16% floor and takes a `dead_frame` badge. Fails
+identically on master, and only surfaces where a real browser exists --
+i.e. it is live on the droplet. The editorial grammar's deliberate
+negative space and the gate's coverage floor genuinely disagree.
+
+
+### Round 3: the loop's own two bugs (proj_de47d492)
+
+The second live run fired repairs on 5 of 7 scenes -- and both new
+behaviours were wrong.
+
+1. **invisible_surface was a NO-OP.** It set `data.border`/`data.shadow`
+   and logged "border + shadow requested". It fired on five scenes, the
+   defect survived every time, and the reason is flat: **not one component
+   in the library reads `data.border`** (grep it). A patch that writes data
+   nothing consumes reports a repair that never happened -- strictly worse
+   than the badge it replaced. The patch is DELETED; a ghosting panel's
+   fill lives inside the component.
+2. **A clipped run got shrunk four times in one pass.** One overflowing
+   line reports as several clipped_text defects (the gate samples the
+   truncation at different widths) and each patched the SAME component:
+   32px -> 16.38px, 15% -> 60% tall, still clipped. Now ONE patch per
+   component per pass, then re-measure. And text also reported
+   `off_canvas_content` is skipped entirely -- it sat 51% past the LEFT
+   edge, which no font size can fix.
+
+THE RULE, recorded at the top of scene-repair.ts: never add a patch
+without first verifying the component actually reads the field.
+COLOR_CAPABLE exists for exactly this reason.
+
+### The real remaining defect is the component library, not the scenes
+
+Across both runs the surviving findings are overwhelmingly the Quotient
+mock components' own chrome: quotient-chat's "Type a message..." at
+2.59:1, its checklist rows at 1.32-1.40:1, quotient-campaign's tab labels
+("Brief"/"Tasks"/"Deliverables") at 3.5:1, quotient-social's "Likes" at
+2.59:1, and `div.qch`/`div.qch-composer` panels at 1.1-4.5% lightness
+separation (needs 8%). No scene-data patch can reach any of it. This is
+the next real piece of work.
+
+### #39 answered by the first stage_timings
+
+proj_de47d492, 515s total: storyboarding 225.3s (44%), scenes 140.7s
+(27%), concept 62.5s, media 49.9s, editorial 36.3s (7%). The editorial
+pass -- the thing #39 assumed was worth cutting -- is the SMALLEST LLM
+stage. The storyboard builder is the target.

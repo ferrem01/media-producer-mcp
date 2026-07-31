@@ -64,6 +64,13 @@ node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 320
     (`text-contrast.ts`) for legibility; `measureLayout` (`layout-metrics.ts`) for ghost
     panels (surface-vs-background lightness) + dead frames (content coverage + backdrop
     color-spread). Wired into `pipeline.ts` right after the critique.
+  - **Auto-fix loop** (`core/scene-repair.ts`): component-assembled scenes have no
+    codegen to regenerate, so gate defects drive deterministic DATA patches instead —
+    measure → repair → re-measure, bounded by `maxRetries`, in the authored branch of
+    `pipeline.ts`. `quality.repairs` logs what changed; `attempts` counts the passes.
+    Judgment defects (`intent_mismatch`, `empty_skeleton`, `stray_ui`) and contrast
+    inside a component's own chrome are deliberately left as reports — see
+    `AMENDMENTS.md` for why, and for the live run that shaped the table.
 - **One scene vocabulary:** `purpose` + `visual_notes` everywhere (matches
   `StoryboardScene`). The word "brief" is retired at the scene level; the assembled
   codegen bundle is "the spec". A loud guard in `storyboard-builder.ts` ensures visual
@@ -102,13 +109,13 @@ node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 320
   long `job(action:"wait")`). Seed a tenant brand kit first (`saveBrandKit(tenant, kit)`)
   — `generate` loads the tenant kit from disk.
 
-## Branch / PR state (as of this session)
+## Branch / PR state
 
-- **PR #85** "Video visual quality: codegen rules + measurement-based critique gates +
-  one scene vocabulary" — **MERGED** to `master` (squash `3df01d5`).
-- **`claude/render-chromium-path`** (`ae0ac1e`) — follow-up, **unmerged**:
-  `MP_CHROMIUM_PATH` in `scene-worker.ts` + `capture-url.ts` (the two launch sites the PR
-  missed; needed for renders in constrained envs).
+Everything through PR #585 is merged to `master` and auto-deploys to the droplet
+(`https://159-203-115-164.nip.io/health` reports the serving commit — check it before
+trusting a live verification). Recent arcs: Veo diffusion video + `generate_presenter`
+(#570–#582), the speaker-film takeover recipe (#580–#583), the auto-fix loop
+(#584–#585). Running change log with the reasoning: `AMENDMENTS.md`.
 
 ## Open issues / follow-ups
 
