@@ -29,6 +29,9 @@ export interface SceneDefect {
   detail: string;
   /** The offending text run, when the gate identified one. */
   text?: string;
+  /** For `illegible`: mean relative luminance (0-1) measured behind the text.
+   *  Picks the ink -- dark backdrop wants light type and vice versa. */
+  backdropLuminance?: number;
 }
 
 export interface RepairResult {
@@ -39,6 +42,30 @@ export interface RepairResult {
 
 /** Types that carry editorial copy -- the ones whose type size we may shrink. */
 const TEXT_ROLE = /^(kinetic-text|caption-|annotation|lower-third|st-|headline|title|quote|hero-reveal|number-counter|stat-card)/;
+
+/**
+ * Components that read `data.color` for their own type and therefore CAN have
+ * their ink repaired from scene data. Verified against the component library
+ * (grep `data.color` in src/components) -- guessing here would make the loop
+ * report a repair that changed nothing on screen.
+ */
+const COLOR_CAPABLE = new Set([
+  "kinetic-text", "morph-text", "ghost-type", "texture-mask-text",
+  "sticker-prop", "floating-pills", "code-block", "progress-bar", "line-chart",
+]);
+
+/**
+ * Backdrop / atmosphere layers. They are SUPPOSED to melt into the page, and
+ * they are not the frame's subject -- so `invisible_surface` must never ask
+ * one for a border (proj_0a31e568 put a border request on `bg`), and the
+ * dead-frame patch must never "fix" an empty frame by inflating one.
+ */
+const BACKDROP_RE = /^(bg$|backdrop|mesh-gradient|webgl-backdrop|liquid-background|particle-field|light-leak|vignette|spotlight|grain|noise|gradient)/;
+
+/** Decoration, not subject. Enlarging a sticker does not fill a dead frame --
+ *  measured on proj_0a31e568, where the loop grew a sticker-prop 36% -> 60%
+ *  while the actual subject stayed small. */
+const PROP_RE = /^(sticker-prop|floating-pills|shimmer-sweep|magnetic|portal|confetti|accent-)/;
 
 function pctNum(v: unknown): number | null {
   if (typeof v === "number") return v;
@@ -106,6 +133,29 @@ export function repairScene(scene: Scene, defects: SceneDefect[]): RepairResult 
     }
   }
 
+  // ── 1b. Illegible text: repaint the ink against the measured backdrop ──
+  // The most common defect by far on assembled scenes (8 of 13 unresolved on
+  // proj_0a31e568) and the one with the cleanest data fix: the gate reports
+  // the luminance it actually sampled behind the run, so the correct ink is
+  // arithmetic, not taste. Only components that READ data.color qualify --
+  // text baked into a component's own chrome (a mock's "Likes" label) is the
+  // component library's problem and is left as a report.
+  for (const d of defects) {
+    if (d.type !== "illegible" || !d.text) continue;
+    if (typeof d.backdropLuminance !== "number") continue; // over-video case: needs a scrim, not an ink
+    const target = comps.find((c) => COLOR_CAPABLE.has(c.type) && componentCarriesText(c, d.text!));
+    if (!target) continue;
+    // WCAG luminance midpoint: below it the backdrop is dark and wants light
+    // type; above it the reverse. Near-black rather than pure black keeps the
+    // frame from looking like a printout.
+    const ink = d.backdropLuminance < 0.18 ? "#ffffff" : "#101014";
+    const data = (target.data || {}) as Record<string, unknown>;
+    if (data.color === ink) continue; // already tried; re-measure said no
+    data.color = ink;
+    target.data = data as SceneComponent["data"];
+    notes.push(`${target.id}: color -> ${ink} (backdrop luminance ${d.backdropLuminance})`);
+  }
+
   // ── 2. Content hanging off the canvas: clamp the box back inside ──
   for (const d of defects) {
     if (d.type !== "off_canvas_content" && d.type !== "edge_bleed") continue;
@@ -135,11 +185,15 @@ export function repairScene(scene: Scene, defects: SceneDefect[]): RepairResult 
 
   // ── 4. Dead/empty frame: give the primary surface the room it needs ──
   // A surface occupying a fraction of the canvas over a flat backdrop reads
-  // as empty; enlarging it is the fix the gate is actually asking for.
+  // as empty; enlarging it is the fix the gate is actually asking for. It has
+  // to be the SUBJECT though -- backdrops and props are not what the viewer
+  // is failing to see.
   if (has("dead_frame") || has("empty_moment")) {
     let biggest: SceneComponent | undefined;
     let biggestArea = 0;
     for (const c of comps) {
+      if (BACKDROP_RE.test(c.type) || BACKDROP_RE.test(c.id || "")) continue;
+      if (PROP_RE.test(c.type)) continue;
       const w = pctNum(c.position?.width), h = pctNum(c.position?.height);
       if (w === null || h === null) continue;
       if (w >= 99 && h >= 99) continue; // already full-bleed
@@ -163,6 +217,7 @@ export function repairScene(scene: Scene, defects: SceneDefect[]): RepairResult 
   if (has("invisible_surface")) {
     for (const c of comps) {
       const d = c.data as Record<string, unknown>;
+      if (BACKDROP_RE.test(c.type) || BACKDROP_RE.test(c.id || "")) continue;
       if (d && d.border === undefined && !TEXT_ROLE.test(c.type)) {
         d.border = true;
         d.shadow = d.shadow === undefined ? true : d.shadow;

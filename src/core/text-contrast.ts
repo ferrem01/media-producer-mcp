@@ -34,6 +34,10 @@ export interface ContrastDefect {
   reason: "low-contrast" | "no-backing" | "clipped";
   /** For reason "clipped": fraction (0-1) of the text area that is cut off. */
   clippedFraction?: number;
+  /** Mean relative luminance (0-1) of the backdrop actually sampled behind the
+   *  text. A repair needs this to pick an ink: dark backdrop -> light text,
+   *  light backdrop -> dark text. Only set for reason "low-contrast". */
+  backdropLuminance?: number;
 }
 
 /** Text cut off by more than this fraction of its area is a defect. Small
@@ -195,6 +199,10 @@ export async function measureTextContrast(opts: {
           const defect: ContrastDefect = {
             text: t.text, fontSize: Math.round(t.fontSize),
             contrast: Math.round(worst * 100) / 100, threshold, reason: "low-contrast",
+            backdropLuminance:
+              Math.round(
+                (cells.reduce((a, c) => a + relLuminance(c.r, c.g, c.b), 0) / cells.length) * 1000,
+              ) / 1000,
           };
           const prev = byText.get(t.text);
           if (!prev || prev.reason === "low-contrast" && defect.contrast < prev.contrast) byText.set(t.text, defect);

@@ -72,6 +72,70 @@ describe("repairScene", () => {
     expect(s.components[0].position.height).toBe("80%");      // capped
   });
 
+  // ── The live run (proj_0a31e568) -- the first film to report repairs, and
+  // the one that showed what the table still got wrong. ──
+
+  it("repaints illegible text against the measured backdrop", () => {
+    const s = scene([{
+      id: "kinetic-text", type: "kinetic-text",
+      data: { text: "Try Quotient", color: "#8f8f9f" },
+      position: { x: "6%", y: "40%", width: "88%", height: "20%" },
+    }]);
+    // Scene 7 shipped "Try Quotient" at 1.53:1 over the brand's white page.
+    const r = repairScene(s, [{
+      type: "illegible", text: "Try Quotient",
+      detail: 'text "Try Quotient" -- measured contrast 1.53:1 (needs >= 4.5:1)',
+      backdropLuminance: 0.94,
+    }]);
+    expect(r.changed).toBe(true);
+    expect(s.components[0].data.color).toBe("#101014");   // light page -> dark ink
+  });
+
+  it("goes light over a dark backdrop", () => {
+    const s = scene([{
+      id: "kinetic-text", type: "kinetic-text",
+      data: { text: "plan", color: "#17171c" },
+      position: { x: "6%", y: "40%", width: "88%", height: "20%" },
+    }]);
+    repairScene(s, [{ type: "illegible", text: "plan", detail: "2.42:1", backdropLuminance: 0.04 }]);
+    expect(s.components[0].data.color).toBe("#ffffff");
+  });
+
+  it("leaves text baked into a component's own chrome to the component library", () => {
+    // "Likes"/"Comments" at 2.59:1 are quotient-social's internal labels; no
+    // scene-data color exists to change, so a patch here would be a lie.
+    const s = scene([{
+      id: "quotient-social", type: "quotient-social",
+      data: { post: { body: "Likes" } },
+      position: { x: "10%", y: "10%", width: "70%", height: "60%" },
+    }]);
+    const r = repairScene(s, [{ type: "illegible", text: "Likes", detail: "2.59:1", backdropLuminance: 0.9 }]);
+    expect(r.changed).toBe(false);
+  });
+
+  it("does not ask a backdrop for a border", () => {
+    // The loop put "border + shadow requested" on `bg` -- a backdrop is
+    // SUPPOSED to melt into the page.
+    const s = scene([
+      { id: "bg", type: "mesh-gradient", data: {}, position: { x: "0%", y: "0%", width: "100%", height: "100%" } },
+      { id: "card", type: "quotient-social", data: {}, position: { x: "10%", y: "10%", width: "70%", height: "60%" } },
+    ]);
+    repairScene(s, [{ type: "invisible_surface", detail: "panel vanishes into the backdrop" }]);
+    expect((s.components[0].data as any).border).toBeUndefined();
+    expect((s.components[1].data as any).border).toBe(true);
+  });
+
+  it("does not fill a dead frame by inflating a sticker", () => {
+    // The loop grew sticker-prop 36% -> 54% -> 60% while the subject stayed small.
+    const s = scene([
+      { id: "sticker-prop", type: "sticker-prop", data: {}, position: { x: "70%", y: "10%", width: "20%", height: "36%" } },
+      { id: "board", type: "quotient-campaign", data: {}, position: { x: "8%", y: "20%", width: "50%", height: "40%" } },
+    ]);
+    repairScene(s, [{ type: "dead_frame", detail: "Content covers only 11% of the frame" }]);
+    expect(s.components[0].position.height).toBe("36%");   // untouched
+    expect(s.components[1].position.width).toBe("65%");    // 50 * 1.3 -- the subject grew
+  });
+
   it("does NOT invent fixes for judgment defects", () => {
     const s = scene([{ id: "c", type: "kinetic-text", data: { text: "hi", font_size: "10vw" }, position: { x: "6%", y: "16%", width: "88%", height: "15%" } }]);
     const before = JSON.stringify(s);

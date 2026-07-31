@@ -56,6 +56,6 @@ describe("data-story grammar registration", () => {
     const src = await read("../src/server.ts");
     expect(src).toMatch(/"launch-film", "tempo-cut", "speaker-screencast", "editorial", "social-reel", "data-story"/);
     expect(src).toContain("data-story -- numbers-as-protagonist"); // operator playbook
-    expect(src).toMatch(/numbers carry the argument \(data-story\)/); // rule of thumb
+    expect(src).toMatch(/the numbers \(data-story\)/); // rule of thumb
   });
 });

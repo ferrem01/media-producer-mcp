@@ -1225,7 +1225,7 @@ async function critiqueAndRetryScene(opts: {
               ? `text "${d.text}" is ${Math.round((d.clippedFraction ?? 0) * 100)}% cut off by the canvas/container edge`
               : `text "${d.text}" -- measured contrast ${d.contrast}:1 (needs >= ${d.threshold}:1)`;
             gateFindings.push(`[${type}] ${detail}`);
-            structured.push({ type, detail, text: d.text });
+            structured.push({ type, detail, text: d.text, backdropLuminance: d.backdropLuminance });
           }
         } catch (e: any) {
           console.warn(`  Assembled-scene legibility gate skipped: ${e?.message || e}`);
