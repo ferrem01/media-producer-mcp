@@ -262,6 +262,44 @@ export function chunkScript(script: string, maxWords = 22): string[] {
 const MAX_TAKES = 8;
 const FFMPEG = () => process.env.MP_FFMPEG || "ffmpeg";
 
+/** Loudness target for stitched presenter takes (mean dBFS over the spoken
+ *  window) and the true-peak ceiling the limiter holds. Veo's takes vary
+ *  take-to-take -- measured on quotient_pitch_v3: take 1 -26.0 dB mean, take
+ *  2 -19.5 dB mean peaking at -0.2 dBFS (essentially clipping, which is what
+ *  made the middle segment sound loud and tinny), take 3 -23.4 dB. */
+const TARGET_MEAN_DB = -23;
+const PEAK_CEILING = 0.85; // ~-1.4 dBFS
+
+/** dB gain that moves `meanDb` to the target, clamped so a mis-measure can
+ *  never blow up or mute a take. Exported for tests. */
+export function normalizationGainDb(meanDb: number | null, target = TARGET_MEAN_DB): number {
+  if (meanDb === null || !Number.isFinite(meanDb)) return 0;
+  return Math.max(-12, Math.min(12, Math.round((target - meanDb) * 100) / 100));
+}
+
+/** Mean volume (dBFS) of a file's audio, optionally over a window. */
+async function probeMeanVolume(
+  run: (cmd: string, args: string[]) => Promise<{ stdout: string; stderr: string }>,
+  file: string,
+  ss?: number,
+  to?: number,
+): Promise<number | null> {
+  const args: string[] = [];
+  if (ss !== undefined) args.push("-ss", ss.toFixed(2));
+  if (to !== undefined) args.push("-to", to.toFixed(2));
+  args.push("-i", file, "-af", "volumedetect", "-f", "null", "-");
+  const parse = (s: string): number | null => {
+    const m = s.match(/mean_volume:\s*(-?\d+(?:\.\d+)?) dB/);
+    return m ? Number(m[1]) : null;
+  };
+  try {
+    const { stderr } = await run(FFMPEG(), args);
+    return parse(String(stderr || ""));
+  } catch (e: any) {
+    return parse(String(e?.stderr || ""));
+  }
+}
+
 /** Media duration in seconds, parsed from ffmpeg's own banner (ffprobe is
  *  not guaranteed on the box; ffmpeg is -- the renderer already relies on it). */
 async function probeDuration(
@@ -417,10 +455,19 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
     const ss = Math.max(0, t.speechStart - LEAD_IN);
     const to = t.speechEnd + LEAD_OUT; // past EOF is fine -- ffmpeg stops at the end
     const trimmed = path.join(opts.outputDir, `${opts.nameStem}_trim_${i + 1}.mp4`);
+    // Match this take's loudness to the others and keep peaks off the
+    // ceiling: Veo hands back takes that differ by ~6dB, and a take that
+    // peaks at -0.2 dBFS reads as loud and tinny next to its neighbours.
+    const meanDb = await probeMeanVolume(run, t.path, ss, to);
+    const gainDb = normalizationGainDb(meanDb);
+    if (meanDb !== null) {
+      console.log(`  Presenter: take ${i + 1} mean ${meanDb.toFixed(1)}dB -> ${gainDb >= 0 ? "+" : ""}${gainDb}dB (target ${TARGET_MEAN_DB}dB)`);
+    }
     try {
       await run(FFMPEG(), [
         "-y", "-ss", ss.toFixed(2), "-to", to.toFixed(2), "-i", t.path,
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
+        "-af", `volume=${gainDb}dB,alimiter=limit=${PEAK_CEILING}`,
         "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
         trimmed,
       ]);

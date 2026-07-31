@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chunkScript } from "../src/media/video-gen.js";
+import { chunkScript, normalizationGainDb } from "../src/media/video-gen.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
@@ -45,6 +45,29 @@ describe("chunkScript", () => {
   it("handles missing terminal punctuation", () => {
     const takes = chunkScript("An unfinished thought without a period");
     expect(takes).toEqual(["An unfinished thought without a period"]);
+  });
+});
+
+describe("take loudness matching", () => {
+  // Marc on quotient_pitch_v3: "the middle segment, the volume changed --
+  // a little tinny." Measured: Veo handed back take 1 at -26.0 dB mean,
+  // take 2 at -19.5 dB peaking at -0.2 dBFS (clipping), take 3 at -23.4 dB.
+  // The stitch had preserved that faithfully.
+  it("moves each take to the common target", () => {
+    expect(normalizationGainDb(-26.0)).toBe(3);      // take 1 up
+    expect(normalizationGainDb(-19.5)).toBe(-3.5);   // take 2 down (the loud one)
+    expect(normalizationGainDb(-23.4)).toBe(0.4);    // take 3 barely moves
+  });
+
+  it("clamps absurd corrections and no-ops on a failed measure", () => {
+    expect(normalizationGainDb(-90)).toBe(12);       // silence -> capped, not +67dB
+    expect(normalizationGainDb(-1)).toBe(-12);
+    expect(normalizationGainDb(null)).toBe(0);
+    expect(normalizationGainDb(Number.NaN)).toBe(0);
+  });
+
+  it("honors an explicit target", () => {
+    expect(normalizationGainDb(-20, -20)).toBe(0);
   });
 });
 
