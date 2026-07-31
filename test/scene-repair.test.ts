@@ -91,6 +91,35 @@ describe("repairScene", () => {
     expect(s.components[0].data.color).toBe("#101014");   // light page -> dark ink
   });
 
+  it("repaints a starred accent word too, and matches text the gate split", () => {
+    // proj_0b762363: "Every *word*, written." reports as TWO runs -- the base
+    // "Every , written." at 1.01:1 and the accent "word" at 2.53:1. Neither is
+    // a substring of the authored line, and the accent takes the brand
+    // primary rather than data.color.
+    const s = scene([{
+      id: "kinetic-text", type: "kinetic-text",
+      data: { text: "Every *word*, written." },
+      position: { x: "6%", y: "35%", width: "88%", height: "20%" },
+    }]);
+    const r = repairScene(s, [{
+      type: "illegible", text: "Every , written.",
+      detail: "1.01:1", backdropLuminance: 0.99,
+    }]);
+    expect(r.changed).toBe(true);
+    expect(s.components[0].data.color).toBe("#101014");
+    expect(s.components[0].data.accent_color).toBe("#101014");
+  });
+
+  it("does not word-match on a single short word", () => {
+    const s = scene([{
+      id: "kinetic-text", type: "kinetic-text",
+      data: { text: "Ship it on Tuesday." },
+      position: { x: "6%", y: "35%", width: "88%", height: "20%" },
+    }]);
+    const r = repairScene(s, [{ type: "illegible", text: "on", detail: "2:1", backdropLuminance: 0.9 }]);
+    expect(r.changed).toBe(false);
+  });
+
   it("goes light over a dark backdrop", () => {
     const s = scene([{
       id: "kinetic-text", type: "kinetic-text",
