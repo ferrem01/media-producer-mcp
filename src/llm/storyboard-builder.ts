@@ -96,6 +96,7 @@ const SCENE_TOOL_SCHEMA = {
       description: "How this scene transitions in from the previous one",
     },
     voiceover_text: { type: "string", description: "Scene narration (concatenation of beat narration when the scene has beats)" },
+    transparent_background: { type: "boolean", description: "SPEAKER FILMS ONLY. false = this scene is a TAKEOVER: it covers the camera and the product surface owns the whole frame. Omit (or true) = the speaker stays visible and content docks beside her." },
     broll_query: { type: "string", description: "Cinematic stock-footage search phrase (mutually exclusive with hero_image/gen_video)" },
     hero_image: { type: "string", description: "AI-generated still image prompt (mutually exclusive with broll_query/gen_video)" },
     gen_video: { type: "string", description: "AI-generated video clip prompt -- ONLY for moving shots stock footage cannot plausibly contain (mutually exclusive with broll_query/hero_image)" },
