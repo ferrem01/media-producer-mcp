@@ -103,7 +103,21 @@ function componentCarriesText(c: SceneComponent, text: string): boolean {
   if (Array.isArray(d.lines)) for (const l of d.lines) if (typeof l === "string") hay.push(l);
   if (typeof d.title === "string") hay.push(d.title);
   if (typeof d.headline === "string") hay.push(d.headline);
-  return hay.some((h) => h.toLowerCase().includes(needle) || needle.includes(h.toLowerCase().slice(0, 40)));
+  const straight = (s: string) => s.toLowerCase().replace(/\*/g, "");
+  // A one- or two-character run ("on", "to") appears inside almost any line by
+  // coincidence -- that is not identification, and repainting a whole headline
+  // off the back of it would be a guess.
+  if (needle.length >= 3 && hay.some((h) => straight(h).includes(needle) || needle.includes(straight(h).slice(0, 40)))) return true;
+  // `*stars*` mark accent words, and the gate reads the accent span as its
+  // own text node -- so "Every *word*, written." reports as two runs,
+  // "Every , written." and "word", neither of which is a substring of the
+  // authored line (measured on proj_0b762363). Fall back to word overlap.
+  const words = needle.split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+  if (!words.length || !words.some((w) => w.length >= 4)) return false;
+  return hay.some((h) => {
+    const hw = new Set(straight(h).split(/[^a-z0-9]+/).filter(Boolean));
+    return words.every((w) => hw.has(w));
+  });
 }
 
 /**
@@ -176,10 +190,23 @@ export function repairScene(scene: Scene, defects: SceneDefect[]): RepairResult 
     // frame from looking like a printout.
     const ink = d.backdropLuminance < 0.18 ? "#ffffff" : "#101014";
     const data = (target.data || {}) as Record<string, unknown>;
-    if (data.color === ink) continue; // already tried; re-measure said no
-    data.color = ink;
+    // A `*starred*` accent word takes the brand PRIMARY, not data.color, and
+    // on a near-white page that is its own low-contrast defect -- measured on
+    // proj_0b762363: "word" at 2.53:1 inside a line whose base text had just
+    // been repainted. Legibility over mood is codegen non-negotiable #1, so
+    // the accent takes the same ink.
+    const starred = typeof data.text === "string" && data.text.includes("*");
+    const accentNeedsInk = starred && data.accent_color !== ink;
+    if (data.color === ink && !accentNeedsInk) continue; // already tried; re-measure said no
+    if (data.color !== ink) {
+      data.color = ink;
+      notes.push(`${target.id}: color -> ${ink} (backdrop luminance ${d.backdropLuminance})`);
+    }
+    if (accentNeedsInk) {
+      data.accent_color = ink;
+      notes.push(`${target.id}: accent_color -> ${ink} (starred word was taking the brand primary)`);
+    }
     target.data = data as SceneComponent["data"];
-    notes.push(`${target.id}: color -> ${ink} (backdrop luminance ${d.backdropLuminance})`);
   }
 
   // ── 2. Content hanging off the canvas: clamp the box back inside ──

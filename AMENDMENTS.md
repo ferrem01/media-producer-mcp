@@ -2065,3 +2065,22 @@ proj_de47d492, 515s total: storyboarding 225.3s (44%), scenes 140.7s
 (27%), concept 62.5s, media 49.9s, editorial 36.3s (7%). The editorial
 pass -- the thing #39 assumed was worth cutting -- is the SMALLEST LLM
 stage. The storyboard builder is the target.
+
+### Round 4: the accent word (proj_0b762363)
+
+Verification 3 confirmed round 3 -- zero border no-ops, the shrink ran ONCE,
+and the contrast patch fired for real on a live film:
+`kinetic-text: color -> #101014 (backdrop luminance 0.996)`. It also showed
+one more gap.
+
+`Every *word*, written.` reports as TWO runs: the base "Every , written."
+at 1.01:1 and the accent "word" at 2.53:1. Neither is a substring of the
+authored line (the stars, and the accent span being its own text node), so
+componentCarriesText matched neither -- and `*starred*` words take the brand
+PRIMARY rather than `data.color`, which on a near-white page is its own
+defect. Fixed: text matching falls back to word overlap (all needle words
+present, at least one >= 4 chars) and strips the star markers, and a repaint
+sets `accent_color` too. Legibility over mood is codegen non-negotiable #1.
+Substring matching now requires >= 3 characters -- "on"/"to" appear inside
+almost any line by coincidence, and repainting a headline off the back of
+that would be a guess.
