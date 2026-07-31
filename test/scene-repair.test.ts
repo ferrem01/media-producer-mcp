@@ -113,16 +113,53 @@ describe("repairScene", () => {
     expect(r.changed).toBe(false);
   });
 
-  it("does not ask a backdrop for a border", () => {
-    // The loop put "border + shadow requested" on `bg` -- a backdrop is
-    // SUPPOSED to melt into the page.
+  it("does not pretend to fix a ghosting panel", () => {
+    // There WAS a patch here: it set data.border/data.shadow. It fired on
+    // five of seven scenes of proj_de47d492, the defect survived every time,
+    // and not one component in the library reads data.border. A patch that
+    // writes data nothing consumes is worse than the badge it replaced.
     const s = scene([
       { id: "bg", type: "mesh-gradient", data: {}, position: { x: "0%", y: "0%", width: "100%", height: "100%" } },
       { id: "card", type: "quotient-social", data: {}, position: { x: "10%", y: "10%", width: "70%", height: "60%" } },
     ]);
-    repairScene(s, [{ type: "invisible_surface", detail: "panel vanishes into the backdrop" }]);
-    expect((s.components[0].data as any).border).toBeUndefined();
-    expect((s.components[1].data as any).border).toBe(true);
+    const r = repairScene(s, [{ type: "invisible_surface", detail: "panel vanishes into the backdrop" }]);
+    expect(r.changed).toBe(false);
+    expect((s.components[1].data as any).border).toBeUndefined();
+  });
+
+  it("shrinks a clipped run ONCE per pass, however many times the gate saw it", () => {
+    // proj_de47d492: one overflowing line reported as four clipped_text
+    // defects (the gate samples the truncation at several widths) shrank the
+    // same component 32px -> 16.38px in a single pass.
+    const s = scene([{
+      id: "kinetic-text", type: "kinetic-text",
+      data: { text: "Launch our Free Trial campaign — plan, copy, calendar", font_size: "32px" },
+      position: { x: "6%", y: "16%", width: "88%", height: "15%" },
+    }]);
+    const r = repairScene(s, [
+      { type: "clipped_text", text: "Launch our Free Trial camp", detail: "68% cut off" },
+      { type: "clipped_text", text: "Launch our Free Trial campaign — plan, copy, cale", detail: "37% cut off" },
+      { type: "clipped_text", text: "Launch our Free Trial campaign — plan, copy, calendar", detail: "27% cut off" },
+    ]);
+    expect(r.changed).toBe(true);
+    expect(s.components[0].data.font_size).toBe("25.6px");  // 32 * 0.8, once
+    expect(s.components[0].position.height).toBe("23%");    // round(15 * 1.5), once
+  });
+
+  it("does not shrink type to fix what is really a position problem", () => {
+    // Same run: the text sat 51% past the LEFT canvas edge. No font size
+    // brings it back on frame.
+    const s = scene([{
+      id: "kinetic-text", type: "kinetic-text",
+      data: { text: "Launch our Free Trial campaign", font_size: "32px" },
+      position: { x: "6%", y: "16%", width: "88%", height: "15%" },
+    }]);
+    const r = repairScene(s, [
+      { type: "clipped_text", text: "Launch our Free Trial campaign", detail: "37% cut off" },
+      { type: "off_canvas_content", text: "Launch our Free Trial campaign", detail: "sits 51% outside the canvas past the left edge" },
+    ]);
+    expect(s.components[0].data.font_size).toBe("32px");    // untouched
+    expect(r.notes.join()).not.toMatch(/font_size/);
   });
 
   it("does not fill a dead frame by inflating a sticker", () => {
