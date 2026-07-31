@@ -2206,10 +2206,24 @@ async function runUnifiedPipeline(
             if (/[.?!]$/.test(wd)) { nLines.push(`[${nT0.toFixed(1)}s] ${nBuf.join(" ")}`); nBuf = []; nT0 = -1; }
           }
           if (nBuf.length) nLines.push(`[${nT0.toFixed(1)}s] ${nBuf.join(" ")}`);
+          // A generated presenter clip is stitched from several Veo takes;
+          // its seam sidecar tells the storyboard where the joins are so a
+          // takeover can be scheduled OVER them (the editor's hide).
+          let seamNote = "";
+          try {
+            const sidecar = audioPath.replace(/\.[^.]+$/, "") + ".seams.json";
+            const raw = await fs.readFile(sidecar, "utf-8");
+            const seams: number[] = JSON.parse(raw);
+            if (Array.isArray(seams) && seams.length) {
+              seamNote = `\n\nSEAMS IN THIS RECORDING (it was assembled from multiple takes): ${seams.map((s) => `${s.toFixed(2)}s`).join(", ")}. ` +
+                `At EACH seam the picture jumps. Schedule a full-frame product TAKEOVER that STARTS ~0.2s BEFORE the seam and runs at least 2.5s, so the join happens while the viewer is looking at the product. Between takeovers the speaker is full-frame and unobstructed.`;
+              console.log(`  Narration-first: presenter seams at [${seams.join(", ")}] -- briefing takeovers over them`);
+            }
+          } catch { /* no sidecar: a single-take or human recording */ }
           opts.prompt += `\n\n## RECORDED NARRATION (the speaker recording -- this IS the soundtrack and the clock)\n` +
             `Total narration length: ${total.toFixed(1)}s. Scene durations MUST sum to this, and scene cuts MUST land on the sentence boundaries below. ` +
             `Do NOT write new dialogue or voiceover scripts (no TTS is layered on the recording); each scene's voiceover_text must QUOTE its span of the narration verbatim, and every overlay entrance should be timed to the bracketed sentence starts.\n` +
-            nLines.join("\n");
+            nLines.join("\n") + seamNote;
           console.log(`  Narration-first: injected speaker transcript (${segments.length} words, ${total.toFixed(1)}s)`);
         }
       } else {
@@ -2450,6 +2464,63 @@ async function runUnifiedPipeline(
       if (d.voiceover_text) d.voiceover_text = undefined;
       if (d.audio_hints?.voiceover_text) d.audio_hints.voiceover_text = undefined;
       if (Array.isArray(d.beats)) for (const b of d.beats) if (b?.voiceover_text) b.voiceover_text = undefined;
+    }
+  }
+
+  // ── Speaker-film TAKEOVERS: enforce the recipe deterministically ──
+  // A scene that stages a product surface INSTEAD of the speaker is a
+  // takeover, and the storyboard authors it wrong in ways the viewer sees:
+  // measured live on proj_4b4c366c, both takeovers came out as transparent
+  // 35%-wide side panels (camera showing straight through), both ran 1.3s
+  // (too fast to read a product screen), and both carried shader
+  // transitions that blended the presenter back in mid-cut. Three rounds of
+  // hand repair fixed what code can simply guarantee.
+  if (filmGrammar === "speaker-screencast") {
+    const TAKEOVER_MIN = 2.5;
+    const SURFACE_RE = /^(quotient-|claude-|slack-|linkedin-|x-post|screencast-frame|product-screenshot|browser-|app-|ui-|device-showcase|metric-dashboard)/;
+    for (const d of storyboard.scenes as any[]) {
+      const comps: any[] = Array.isArray(d.components) ? d.components : [];
+      const objects = comps.filter((c) => c && typeof c === "object" && typeof c.type === "string");
+      // A takeover = the scene's content is a product surface and the
+      // storyboard already meant to cover the camera (explicit opaque), OR
+      // the scene is surface-only with no caption/speaker furniture.
+      const surfaces = objects.filter((c) => SURFACE_RE.test(c.type));
+      const isTakeover = surfaces.length > 0
+        && (d.transparent_background === false || objects.length === surfaces.length);
+      if (!isTakeover) continue;
+
+      const notes: string[] = [];
+      if (d.transparent_background !== false) { d.transparent_background = false; notes.push("opaque"); }
+      for (const s of surfaces) {
+        const p = s.position || {};
+        const full = p.x === "0%" && p.y === "0%" && p.width === "100%" && p.height === "100%";
+        if (!full) { s.position = { x: "0%", y: "0%", width: "100%", height: "100%" }; notes.push(`${s.type} full-frame`); }
+      }
+      if ((Number(d.duration_seconds) || 0) < TAKEOVER_MIN) {
+        notes.push(`hold ${d.duration_seconds}s -> ${TAKEOVER_MIN}s`);
+        d.duration_seconds = TAKEOVER_MIN;
+        if (Array.isArray(d.beats) && d.beats.length >= 2) rescaleBeats(d.beats, TAKEOVER_MIN);
+      }
+      // A blended transition shows the presenter again for a few frames in
+      // the middle of the cut -- exactly what the takeover is hiding.
+      if (!d.transition_in || d.transition_in.type !== "none") {
+        d.transition_in = { type: "none", duration_seconds: 0 };
+        notes.push("hard cut");
+      }
+      if (notes.length) console.log(`  Takeover recipe: scene "${d.label || "?"}" -- ${notes.join(", ")}`);
+    }
+    // The speaker's scenes keep the camera as their background: an opaque
+    // full-bleed backdrop component paints over her (proj_4b4c366c had one
+    // on BOTH presenter scenes).
+    const BACKDROP_RE = /^(mesh-gradient|webgl-backdrop|gradient-background|particle-|aurora|light-mesh)/;
+    for (const d of storyboard.scenes as any[]) {
+      if (d.transparent_background === false) continue; // takeovers may own their frame
+      const comps: any[] = Array.isArray(d.components) ? d.components : [];
+      const before = comps.length;
+      d.components = comps.filter((c) => !(c && typeof c === "object" && typeof c.type === "string" && BACKDROP_RE.test(c.type)));
+      if (d.components.length !== before) {
+        console.log(`  Takeover recipe: scene "${d.label || "?"}" -- dropped a full-bleed backdrop (the camera is the background)`);
+      }
     }
   }
 

@@ -359,6 +359,13 @@ The human on camera owns the film; everything else supports them. The contract:
 - THE HUMAN NARRATES: no text-as-voiceover, no statement slides, no annotation lines that duplicate what the speaker is saying out loud. On-screen text is limited to labels/callouts that ADD to the speech (a metric, a name, a step number).
 - LAYOUT: use the two speaker scene modes (speaker-visible content region vs takeover-with-PiP -- mechanics below). Content overlays enter with the house line-rise ON the sentence that introduces them, and leave when the speaker moves on.
 - EVIDENCE: screencasts/product mocks appear when the speaker refers to them, framed in the content region; camera zooms follow what the speaker is pointing AT (anchored zoom, reset before the next thought).
+- THE TAKEOVER RECIPE (a cutaway that REPLACES her, not a panel beside her). When the film cuts away to a product surface, the scene MUST be built this way -- measured live on proj_4b4c366c, where every one of these was wrong and needed hand repair:
+  * OPAQUE AND FULL-FRAME: set transparent_background:false and position the surface at x:0%, y:0%, width:100%, height:100% (a 35%-wide panel over a transparent scene is NOT a takeover -- the camera shows straight through it and the cutaway does nothing).
+  * HOLD LONG ENOUGH TO READ: >=2.5s. A product screen flashed for a beat reads as a glitch, not as proof. The speaker's SENTENCE sets the span -- a takeover covers a whole thought, never a fragment.
+  * FRAME THE PERFORMING REGION: a full app shell at full frame is small text surrounded by acres of empty white. Give the scene a camera_moves zoom anchored on the region that is actually changing (e.g. 'quotient-campaign.board'), or stage the specific panel instead of the whole shell. The viewer must be able to READ the thing the speaker just claimed.
+  * HARD CUT IN: transition_in {"type":"none"}. A shader/flash transition blends the presenter back in for a few frames mid-cut and reads as a stutter.
+  * NEVER cover her with a codegen backdrop: the speaker scenes on either side stay transparent_background:true with NO full-bleed background component -- the camera IS their background.
+- HIDING A MULTI-TAKE SEAM: when the speaker recording was assembled from several generated takes, the brief carries the seam timestamps. A takeover must START ~0.2s BEFORE the seam it hides and run past it -- a cutaway that begins ON the seam exposes the jump it exists to cover.
 - MUSIC: absent, or a bed ducked far under the voice. The voice is always the loudest thing.
 
 ### Writing Great Visual Notes
