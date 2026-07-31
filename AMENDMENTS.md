@@ -1970,3 +1970,57 @@ state and Marc closed the arc. Final rounds (PRs #535-#539):
 Next up (Marc's backlog): Studio scrubber component bars always visible
 (design the density problem), narration/script-from-video test+fix pass,
 Studio aesthetic polish.
+
+## Auto-fix loop: gate defects become data repairs (2026-07-31)
+
+Component-assembled scenes (speaker films, takeovers, most of tempo-cut,
+data-story and social-reel) have no codegen source, so every gate finding
+shipped as `quality: {passed:false, attempts:0}` -- an honest measurement
+nobody could act on. `src/core/scene-repair.ts` (PRs #584, #585) turns the
+findings into deterministic DATA patches, applied inside a
+measure -> repair -> re-measure loop in the authored branch of
+`pipeline.ts`, bounded by `maxRetries`. The stamp is now honest in both
+directions: `passed` can be true, `attempts` counts repair passes, and a
+`repairs` log says what was changed.
+
+The table (each family derived from a repair performed BY HAND earlier in
+the session, then re-derived from the first live run):
+- clipped_text / off_canvas -> font_size x0.8 + container height x1.5
+- off_canvas_content -> clamp the box back inside (full-bleed exempt)
+- illegible -> repaint `data.color` from the backdrop luminance the gate
+  measured: < 0.18 -> #ffffff, else #101014
+- dead_entrance -> entrance = "settled"
+- dead_frame / empty_moment -> enlarge the primary surface x1.3 (94%/80% caps)
+- invisible_surface -> request border + shadow
+
+Deliberately NOT patched: intent_mismatch, empty_skeleton, stray_ui
+(judgment -- a data patch cannot make a scene mean something different),
+and contrast INSIDE a component's own chrome (quotient-social's "Likes"
+label at 2.59:1) -- no scene-data color exists there, so claiming a fix
+would be a lie. Those stay reports.
+
+FIRST LIVE RUN (proj_0a31e568, social-reel, 7.7 min): scene 5 came back
+`attempts:2` with four repairs -- the loop works -- and the report was a
+to-do list. `illegible` was 8 of 13 unresolved findings and had NO patch
+(added, above; `measureTextContrast` now reports `backdropLuminance`).
+Two real bugs: the loop asked `bg` for a border (a backdrop is SUPPOSED
+to melt into the page) and grew a `sticker-prop` 36% -> 60% to fill a dead
+frame while the subject stayed small. Backdrops and props are now excluded
+from both patches. `COLOR_CAPABLE` is a verified list, not a guess --
+grep `data.color` in src/components.
+
+### Per-stage wall clock (#39 prerequisite)
+
+`createStageTimer` in `pipeline.ts` times every stage off the single
+onProgress callback (injectable clock, only closes on an actual CHANGE of
+step) and attaches `stage_timings` to PipelineResult, which the generate
+job returns verbatim. 20-minute generates were previously unauditable:
+percentages, never durations.
+
+### Open, needs a decision (not a patch)
+
+`assembled-scene-gates` -> st-statement measures 13% content coverage
+against the layout gate's 16% floor and takes a `dead_frame` badge. Fails
+identically on master, and only surfaces where a real browser exists --
+i.e. it is live on the droplet. The editorial grammar's deliberate
+negative space and the gate's coverage floor genuinely disagree.
