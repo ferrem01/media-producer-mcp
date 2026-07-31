@@ -1170,7 +1170,17 @@ async function critiqueAndRetryScene(opts: {
         } catch (e: any) {
           console.warn(`  Assembled-scene layout gate skipped: ${e?.message || e}`);
         }
+        // A transparent speaker scene has the CAMERA as its background, and
+        // the boot page renders without it -- so "empty canvas" is exactly
+        // what a correct scene looks like here. Measured on proj_61516d44:
+        // every presenter scene shipped dead_entrance/empty_moment at 0-1%
+        // coverage, burning the revision budget on unfixable phantoms.
+        const cameraIsBackground = sceneCompositesOverSpeaker(opts.scene, !!opts.speakerUrl);
+        if (cameraIsBackground) {
+          console.log(`  Assembled-scene empty-moment gate skipped: scene ${opts.sceneIndex} composites over the camera`);
+        }
         try {
+          if (cameraIsBackground) throw new Error("skip");
           // Deterministic scenes have no excuse for an empty canvas: probe an
           // early moment (the entrance-gap window) and two later ones.
           const earlyT = Math.min(Math.max(0.8, dur * 0.15), dur * 0.4);
@@ -1185,7 +1195,7 @@ async function critiqueAndRetryScene(opts: {
                 : `[empty_moment] canvas is essentially empty at ${m.atTime.toFixed(1)}s (${(m.coverage * 100).toFixed(0)}% content coverage) -- the viewer stares at backdrop mid-scene`);
           }
         } catch (e: any) {
-          console.warn(`  Assembled-scene empty-moment gate skipped: ${e?.message || e}`);
+          if (e?.message !== "skip") console.warn(`  Assembled-scene empty-moment gate skipped: ${e?.message || e}`);
         }
       }
       await fs.rm(bootDir, { recursive: true, force: true }).catch(() => {});
@@ -2485,8 +2495,17 @@ async function runUnifiedPipeline(
       // storyboard already meant to cover the camera (explicit opaque), OR
       // the scene is surface-only with no caption/speaker furniture.
       const surfaces = objects.filter((c) => SURFACE_RE.test(c.type));
+      // Speaker FURNITURE (a lower-third naming her, a caption at her chin)
+      // only exists when she is on screen -- its presence means this is not
+      // a takeover. Props and callouts (cursor-performer, annotation) are
+      // fine ON a takeover, so they must NOT disqualify one: the previous
+      // count-equality heuristic let a single cursor-performer companion
+      // silently demote both takeovers back to 35% docks (measured on
+      // proj_61516d44 -- both seams shipped exposed).
+      const FURNITURE_RE = /^(st-speaker-lowerthird|lower-third|speaker-)/;
+      const hasFurniture = objects.some((c) => FURNITURE_RE.test(c.type));
       const isTakeover = surfaces.length > 0
-        && (d.transparent_background === false || objects.length === surfaces.length);
+        && (d.transparent_background === false || !hasFurniture);
       if (!isTakeover) continue;
 
       const notes: string[] = [];

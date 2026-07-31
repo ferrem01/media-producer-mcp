@@ -72,6 +72,39 @@ describe("takeover as BUILT (behavioral)", () => {
   });
 });
 
+describe("the takeover flag must be AUTHORABLE and DETECTABLE", () => {
+  // proj_61516d44: the recipe never fired. Two reasons, both invisible to
+  // the tests above -- which hand-built a draft with transparent_background
+  // already set, a state the real pipeline could not produce.
+  it("the scene tool schema accepts transparent_background", async () => {
+    const sb = await read("../src/llm/storyboard-builder.ts");
+    const schema = sb.split("SCENE_TOOL_SCHEMA")[1]?.split("name: \"add_beat\"")[0] || sb;
+    expect(schema).toMatch(/transparent_background: \{ type: "boolean"/);
+    expect(schema).toMatch(/TAKEOVER/);
+  });
+
+  it("a companion prop does not demote a takeover", async () => {
+    // The storyboard staged quotient-campaign + cursor-performer; the old
+    // objects.length === surfaces.length test failed and both takeovers
+    // silently became 35% docks.
+    const p = await read("../src/llm/pipeline.ts");
+    const block = p.split("Speaker-film TAKEOVERS")[1]?.split("Beat quantization")[0] || "";
+    expect(block).not.toMatch(/objects\.length === surfaces\.length/);
+    expect(block).toMatch(/FURNITURE_RE/);
+    expect(block).toMatch(/!hasFurniture/);
+  });
+
+  it("the empty-canvas gate is skipped when the camera is the background", async () => {
+    const p = await read("../src/llm/pipeline.ts");
+    expect(p).toMatch(/cameraIsBackground = sceneCompositesOverSpeaker/);
+  });
+
+  it("the limiter cannot re-normalize the peak back to 0 dBFS", async () => {
+    const vg = await read("../src/media/video-gen.ts");
+    expect(vg).toMatch(/level=disabled/);
+  });
+});
+
 describe("takeover contract (storyboard)", () => {
   it("defines the recipe: opaque, full-frame, >=2.5s, framed on the performing region, hard cut", async () => {
     const sb = await read("../src/llm/storyboard-builder.ts");

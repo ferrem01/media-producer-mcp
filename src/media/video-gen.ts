@@ -467,7 +467,11 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
       await run(FFMPEG(), [
         "-y", "-ss", ss.toFixed(2), "-to", to.toFixed(2), "-i", t.path,
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
-        "-af", `volume=${gainDb}dB,alimiter=limit=${PEAK_CEILING}`,
+        // level=disabled is REQUIRED: alimiter's auto-level re-normalizes the
+        // output by 1/limit (+1.41dB at 0.85), which hands the peak straight
+        // back to 0 dBFS -- measured on quotient_pitch_v4, whose take 2 still
+        // shipped at -0.0 dBFS with the limiter "on".
+        "-af", `volume=${gainDb}dB,alimiter=limit=${PEAK_CEILING}:level=disabled`,
         "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
         trimmed,
       ]);
