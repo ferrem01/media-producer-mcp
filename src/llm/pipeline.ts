@@ -71,6 +71,7 @@ import { assembleSceneAuto, type ComponentSource } from "../core/scene-assembler
 import { captureSingleFrame, captureFrameSequence, validateSceneRuntime } from "../core/capture.js";
 import { measureTextContrast } from "../core/text-contrast.js";
 import { measureLayout, measureEmptyMoments } from "../core/layout-metrics.js";
+import { repairScene, type SceneDefect } from "../core/scene-repair.js";
 import os from "node:os";
 
 // Keep old imports for backwards compat (deprecated functions still exist in their files)
@@ -1115,6 +1116,19 @@ async function critiqueAndRetryScene(opts: {
     // ships silently -- a stale reference once crashed a template mid-boot
     // and Studio played the unstyled wreck. One assemble + seek sweep; a
     // crash is stamped on the scene's quality so Studio surfaces it loudly.
+    // AUTO-FIX LOOP: the gates below produce precise defects, and until now
+    // an authored scene could do nothing with them -- every film shipped
+    // `passed:false, attempts:0`. Now each pass measures, applies the
+    // deterministic data repairs (scene-repair.ts), and re-measures; only
+    // what survives is stamped. Judgment defects (intent_mismatch) have no
+    // data fix and remain reports.
+    let repairPasses = 0;
+    let gateFindings: string[] = [];
+    let structured: SceneDefect[] = [];
+    const repairLog: string[] = [];
+    const maxRepairs = Math.max(0, opts.maxRetries ?? 0);
+    let runtimeOk = true;
+    for (let pass = 0; ; pass++) {
     try {
       const bootDirs = [opts.compDir, tenantComponentsDir(opts.tenantId)];
       const bootSources: ComponentSource[] = [];
@@ -1133,7 +1147,9 @@ async function critiqueAndRetryScene(opts: {
         htmlPath: bootPath, width: opts.canvas.width, height: opts.canvas.height,
         duration: opts.scene.duration_seconds || 8, steps: 6,
       });
-      const gateFindings: string[] = [];
+      gateFindings = [];
+      structured = [];
+      runtimeOk = runtime.ok;
       if (!runtime.ok) {
         console.error(`  [TEMPLATE BOOT CRASH] scene ${opts.sceneIndex} (${opts.scene.components.map((c) => c.type).join("+")}): ${runtime.error}`);
         gateFindings.push(`[runtime] template boot crash: ${runtime.error}`);
@@ -1153,10 +1169,12 @@ async function critiqueAndRetryScene(opts: {
             atTimes: [dur * 0.35, dur * 0.6, dur * 0.85],
           });
           for (const d of contrastDefects) {
-            gateFindings.push(
-              d.reason === "clipped"
-                ? `[off_canvas] text "${d.text}" is ${Math.round((d.clippedFraction ?? 0) * 100)}% cut off by the canvas/container edge`
-                : `[illegible] text "${d.text}" -- measured contrast ${d.contrast}:1 (needs >= ${d.threshold}:1)`);
+            const type = d.reason === "clipped" ? "clipped_text" : "illegible";
+            const detail = d.reason === "clipped"
+              ? `text "${d.text}" is ${Math.round((d.clippedFraction ?? 0) * 100)}% cut off by the canvas/container edge`
+              : `text "${d.text}" -- measured contrast ${d.contrast}:1 (needs >= ${d.threshold}:1)`;
+            gateFindings.push(`[${type}] ${detail}`);
+            structured.push({ type, detail, text: d.text });
           }
         } catch (e: any) {
           console.warn(`  Assembled-scene legibility gate skipped: ${e?.message || e}`);
@@ -1166,7 +1184,11 @@ async function critiqueAndRetryScene(opts: {
             htmlPath: bootPath, width: opts.canvas.width, height: opts.canvas.height,
             atTimes: [dur * 0.45, dur * 0.7, dur * 0.9],
           });
-          for (const d of layoutDefects) gateFindings.push(`[${d.type}] ${d.detail}`);
+          for (const d of layoutDefects) {
+            gateFindings.push(`[${d.type}] ${d.detail}`);
+            const quoted = d.detail.match(/"([^"]{2,60})"/);
+            structured.push({ type: d.type, detail: d.detail, text: quoted?.[1] });
+          }
         } catch (e: any) {
           console.warn(`  Assembled-scene layout gate skipped: ${e?.message || e}`);
         }
@@ -1189,28 +1211,46 @@ async function critiqueAndRetryScene(opts: {
             atTimes: [earlyT, dur * 0.5, dur * 0.85],
           });
           for (const m of emptyMoments) {
-            gateFindings.push(
-              m.atTime === earlyT
-                ? `[dead_entrance] canvas is essentially empty ${m.atTime.toFixed(1)}s into the scene (${(m.coverage * 100).toFixed(0)}% content coverage) -- the entrance animation leaves a visible gap after the cut`
-                : `[empty_moment] canvas is essentially empty at ${m.atTime.toFixed(1)}s (${(m.coverage * 100).toFixed(0)}% content coverage) -- the viewer stares at backdrop mid-scene`);
+            const type = m.atTime === earlyT ? "dead_entrance" : "empty_moment";
+            const detail = type === "dead_entrance"
+              ? `canvas is essentially empty ${m.atTime.toFixed(1)}s into the scene (${(m.coverage * 100).toFixed(0)}% content coverage) -- the entrance animation leaves a visible gap after the cut`
+              : `canvas is essentially empty at ${m.atTime.toFixed(1)}s (${(m.coverage * 100).toFixed(0)}% content coverage) -- the viewer stares at backdrop mid-scene`;
+            gateFindings.push(`[${type}] ${detail}`);
+            structured.push({ type, detail });
           }
         } catch (e: any) {
           if (e?.message !== "skip") console.warn(`  Assembled-scene empty-moment gate skipped: ${e?.message || e}`);
         }
       }
       await fs.rm(bootDir, { recursive: true, force: true }).catch(() => {});
-      if (gateFindings.length > 0) {
-        console.warn(`  [ASSEMBLED-SCENE GATES] scene ${opts.sceneIndex} (${opts.scene.components.map((c) => c.type).join("+")}): ${gateFindings.length} finding(s)\n    - ${gateFindings.join("\n    - ")}`);
-        const prevQ = (opts.scene as any).quality;
-        (opts.scene as any).quality = {
-          score: runtime.ok ? (prevQ?.score ?? 0) : -100,
-          passed: false,
-          attempts: prevQ?.attempts ?? 0,
-          unresolved_defects: [...(prevQ?.unresolved_defects || []), ...gateFindings],
-        };
-      }
     } catch (e: any) {
       console.warn(`  Template boot gate skipped (non-fatal): ${e?.message || e}`);
+      break;
+    }
+
+    // Nothing left to fix, or the budget is spent -> stop measuring.
+    if (gateFindings.length === 0 || pass >= maxRepairs) break;
+    const repair = repairScene(opts.scene, structured);
+    if (!repair.changed) break; // only judgment defects remain
+    repairPasses = pass + 1;
+    repairLog.push(...repair.notes);
+    console.log(`  [AUTO-FIX] scene ${opts.sceneIndex} pass ${repairPasses}: ${repair.notes.join("; ")}`);
+    }
+
+    if (gateFindings.length > 0 || repairLog.length > 0) {
+      if (gateFindings.length > 0) {
+        console.warn(`  [ASSEMBLED-SCENE GATES] scene ${opts.sceneIndex} (${opts.scene.components.map((c) => c.type).join("+")}): ${gateFindings.length} unresolved after ${repairPasses} repair pass(es)\n    - ${gateFindings.join("\n    - ")}`);
+      } else {
+        console.log(`  [AUTO-FIX] scene ${opts.sceneIndex}: all gate defects resolved in ${repairPasses} pass(es)`);
+      }
+      const prevQ = (opts.scene as any).quality;
+      (opts.scene as any).quality = {
+        score: runtimeOk ? (prevQ?.score ?? 0) : -100,
+        passed: gateFindings.length === 0 && runtimeOk,
+        attempts: (prevQ?.attempts ?? 0) + repairPasses,
+        unresolved_defects: [...(prevQ?.unresolved_defects || []), ...gateFindings],
+        ...(repairLog.length ? { repairs: repairLog } : {}),
+      };
     }
     return { scene: opts.scene, customSources: opts.customSources };
   }
