@@ -13,6 +13,65 @@ const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
 // cuts landed AFTER their seams, and shader transitions stuttered the cut.
 // Marc's craft note on the result: 1.3s is too fast to read a product screen.
 
+// BEHAVIORAL tests first. The source-regex guards below did NOT catch that
+// the recipe was thrown away at scene build (proj_cec231eb: the pipeline set
+// 0/0/100/100 + opaque, then authoredLayout's speaker dock re-slotted the
+// surface to 35% width and buildAuthoredCompositionScene dropped
+// transparent_background entirely). Assert on the BUILT SCENE.
+
+describe("takeover as BUILT (behavioral)", () => {
+  const speakerDraft = (transparent: boolean | undefined) => ({
+    label: "Takeover",
+    duration_seconds: 3,
+    purpose: "p",
+    visual_notes: "v",
+    ...(transparent === undefined ? {} : { transparent_background: transparent }),
+    components: [{ type: "quotient-campaign", data: { title: "Free Trial Launch" } }],
+  });
+  const buildOpts = (draft: any) => ({
+    scene: draft,
+    sceneIndex: 1,
+    totalScenes: 4,
+    prompt: "p",
+    llmConfig: {} as any,
+    brandKit: {} as any,
+    canvas: { width: 1920, height: 1080 } as any,
+    hasSpeakerTrack: true,
+  });
+
+  it("a takeover surface fills the frame and the scene is opaque", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const { scene } = await generateScene(buildOpts(speakerDraft(false)) as any);
+    const surface = (scene as any).components.find((c: any) => c.type === "quotient-campaign");
+    expect(surface).toBeTruthy();
+    // Full-frame (the engine's FULL_STAGE uses numeric 0 origins).
+    expect(String(surface.position.x).replace("%", "")).toBe("0");
+    expect(String(surface.position.y).replace("%", "")).toBe("0");
+    expect(surface.position.width).toBe("100%");
+    expect(surface.position.height).toBe("100%");
+    // Must reach the SCENE -- the renderer reads this, not the draft.
+    expect((scene as any).transparent_background).toBe(false);
+  });
+
+  it("a non-takeover speaker scene still docks beside her and stays transparent", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    const { scene } = await generateScene(buildOpts(speakerDraft(undefined)) as any);
+    const surface = (scene as any).components.find((c: any) => c.type === "quotient-campaign");
+    expect(surface.position.width).toBe("35%");        // the dock, not the frame
+    expect(surface.position.x).toBe("62%");
+    expect((scene as any).transparent_background).toBeUndefined(); // defaults transparent
+  });
+
+  it("no full-bleed backdrop is injected into any speaker scene", async () => {
+    const { generateScene } = await import("../src/llm/scene-generator.js");
+    for (const t of [false, undefined]) {
+      const { scene } = await generateScene(buildOpts(speakerDraft(t as any)) as any);
+      const bg = (scene as any).components.find((c: any) => /mesh-gradient|webgl-backdrop/.test(c.type));
+      expect(bg).toBeUndefined();
+    }
+  });
+});
+
 describe("takeover contract (storyboard)", () => {
   it("defines the recipe: opaque, full-frame, >=2.5s, framed on the performing region, hard cut", async () => {
     const sb = await read("../src/llm/storyboard-builder.ts");
