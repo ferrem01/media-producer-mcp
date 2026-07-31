@@ -140,7 +140,53 @@ export interface PipelineResult {
   };
   critique?: any;
   customComponents?: Array<{ type: string; source: string }>;
+  /** Wall-clock seconds per pipeline stage, in the order they ran. */
+  stage_timings?: StageTiming[];
   error?: string;
+}
+
+/** One pipeline stage and how long it actually took. */
+export interface StageTiming {
+  step: string;
+  seconds: number;
+}
+
+/**
+ * Wall-clock timer for pipeline stages. Every stage transition already flows
+ * through the single onProgress callback, so timing them costs nothing and
+ * finally answers "where do the 20 minutes go?" with numbers instead of a
+ * guess. The clock is injectable so this is testable without sleeping.
+ */
+export function createStageTimer(now: () => number = Date.now) {
+  const timings: StageTiming[] = [];
+  let step = "starting";
+  let start = now();
+  const close = () => {
+    timings.push({ step, seconds: Math.round((now() - start) / 100) / 10 });
+    start = now();
+  };
+  return {
+    /** Called on every progress tick; only a CHANGE of step closes a stage. */
+    mark(next: string) {
+      if (next === step) return;
+      close();
+      step = next;
+    },
+    /** Close the final stage and return the whole timeline, in order. */
+    finish(): StageTiming[] {
+      close();
+      return timings;
+    },
+    /** Slowest-first one-liner for the log. */
+    summary(): string {
+      const total = timings.reduce((a, s) => a + s.seconds, 0);
+      const parts = timings
+        .filter((s) => s.seconds >= 0.5)
+        .sort((a, b) => b.seconds - a.seconds)
+        .map((s) => `${s.step} ${s.seconds}s`);
+      return `${total.toFixed(1)}s total: ${parts.join(", ")}`;
+    },
+  };
 }
 
 const DEFAULT_BRAND_KIT: BrandKit = {
@@ -218,14 +264,16 @@ export function isBookendScene(
 export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineResult> {
   var lastP = { step: "starting", percent: 0 };
   var userProgress = opts.onProgress;
+  const stages = createStageTimer();
   var wrapped: PipelineOpts = {
     ...opts,
     onProgress: (p) => {
+      stages.mark(p.step);
       lastP = { step: p.step, percent: p.percent };
       userProgress?.(p);
     },
   };
-  return llmRetryScope.run(
+  const result = await llmRetryScope.run(
     (r) =>
       userProgress?.({
         step: lastP.step,
@@ -234,6 +282,9 @@ export async function runGeneratePipeline(opts: PipelineOpts): Promise<PipelineR
       }),
     () => runGeneratePipelineInner(wrapped),
   );
+  result.stage_timings = stages.finish();
+  console.log(`  Stage timings -- ${stages.summary()}`);
+  return result;
 }
 
 async function runGeneratePipelineInner(opts: PipelineOpts): Promise<PipelineResult> {
@@ -1174,7 +1225,7 @@ async function critiqueAndRetryScene(opts: {
               ? `text "${d.text}" is ${Math.round((d.clippedFraction ?? 0) * 100)}% cut off by the canvas/container edge`
               : `text "${d.text}" -- measured contrast ${d.contrast}:1 (needs >= ${d.threshold}:1)`;
             gateFindings.push(`[${type}] ${detail}`);
-            structured.push({ type, detail, text: d.text });
+            structured.push({ type, detail, text: d.text, backdropLuminance: d.backdropLuminance });
           }
         } catch (e: any) {
           console.warn(`  Assembled-scene legibility gate skipped: ${e?.message || e}`);

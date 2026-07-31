@@ -74,7 +74,12 @@ describe("OPERATOR_PLAYBOOK (handshake instructions)", () => {
   });
 
   it("stays a tight page (clients hold it in context all session)", () => {
-    expect(OPERATOR_PLAYBOOK.length).toBeLessThan(4000);
+    // Budget raised 4000 -> 5000 when the playbook grew from four grammars to
+    // six and gained the REAL MEDIA section (three media sources + the two
+    // presenter tools). The prose was tightened 6232 -> ~4600 first; the rest
+    // is surface the operator genuinely has to know. Cut content before you
+    // raise this again.
+    expect(OPERATOR_PLAYBOOK.length).toBeLessThan(5000);
   });
 });
 
