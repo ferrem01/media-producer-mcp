@@ -343,7 +343,7 @@ function stackRows(n: number, bandY: number, bandH: number, gap: number): Array<
  * stage) instead of stacking into the same 84% inset -- the collision that
  * made films read as sloppy.
  */
-function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false, speaker = false): LayoutSlot[] {
+function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false, speaker = false, takeover = false): LayoutSlot[] {
   var slots: LayoutSlot[] = authored.map(() => null);
   var accentCount = 0;
   var surfaceIdx: number[] = [];
@@ -386,10 +386,22 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     });
     var dockSurf = surfaceIdx.filter((i) => !slots[i]);
     if (dockSurf.length > 0) {
-      var dockRows = stackRows(dockSurf.length, 12, 72, 3);
-      dockSurf.forEach((idx, k) => {
-        slots[idx] = { position: pct(62, dockRows[k][0], 35, dockRows[k][1]), z_index: 10 + k };
-      });
+      // A TAKEOVER replaces her: its surface owns the whole frame. The dock
+      // recipe below is for scenes where she stays on screen -- applying it
+      // to a takeover silently un-does the takeover (measured live on
+      // proj_cec231eb: the pipeline set 0/0/100/100 and this re-slotted it
+      // to a 35% panel, so the cutaway covered nothing and both seams
+      // stayed exposed).
+      if (takeover) {
+        dockSurf.forEach((idx, k) => {
+          slots[idx] = { position: { ...FULL_STAGE }, z_index: 10 + k };
+        });
+      } else {
+        var dockRows = stackRows(dockSurf.length, 12, 72, 3);
+        dockSurf.forEach((idx, k) => {
+          slots[idx] = { position: pct(62, dockRows[k][0], 35, dockRows[k][1]), z_index: 10 + k };
+        });
+      }
     }
     var spEd = heroIdx.concat(captionIdx);
     if (spEd.length > 0) {
@@ -547,7 +559,10 @@ function buildAuthoredCompositionScene(
   // page and buries the speaker -- measured live: proj_11bcf413), and the
   // dock layout keeps content beside her.
   var speakerBase = !!opts.hasSpeakerTrack;
-  var slots = authoredLayout(authored, !!opts.world, opts.canvas.height > opts.canvas.width, speakerBase);
+  // A takeover scene is one the storyboard/pipeline marked opaque: it
+  // REPLACES the speaker rather than sitting beside her.
+  var isTakeover = speakerBase && (draft as any).transparent_background === false;
+  var slots = authoredLayout(authored, !!opts.world, opts.canvas.height > opts.canvas.width, speakerBase, isTakeover);
   // The dark cinematic world under every mock window, matching the film's
   // template scenes (and the hand-built originals).
   // The film's ONE world under every scene (SPEC-world.md). The per-scene
@@ -660,6 +675,14 @@ function buildAuthoredCompositionScene(
     components,
     audio_hints: draft.voiceover_text ? { voiceover_text: draft.voiceover_text } : undefined,
   } as any;
+  // Speaker films: carry the draft's compositing intent onto the SCENE.
+  // Without this the field died at the draft and every structured speaker
+  // scene composited over the camera -- a "takeover" the viewer could see
+  // straight through (proj_cec231eb). Only the st-speaker-screencast
+  // template ever emitted it before.
+  if (typeof (draft as any).transparent_background === "boolean") {
+    (scene as any).transparent_background = (draft as any).transparent_background;
+  }
   // Curated instantiation: the critique loop treats it like a template scene
   // (boot gate only -- there is no codegen source to revise, and a regen
   // would deterministically rebuild the same scene).
