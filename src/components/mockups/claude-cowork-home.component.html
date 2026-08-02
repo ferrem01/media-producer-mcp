@@ -359,25 +359,28 @@
     }
     if (data.mode) setMode(data.mode);
 
-    // Working ✳ under the composer (after send)
-    var workingEl = null;
-    function showWorking(opts) {
-      opts = opts || {};
-      removeWorking();
+    // Working ✳ under the composer (after send). Elements are created at
+    // BUILD (hidden) and shown/hidden by timeline set()s -- state as a
+    // function of playhead position, so the scrubber can never strand the
+    // line under the composer mid-type (it could when this was a call()).
+    var lastWorking = null;
+    function makeWorking(text) {
       var d = document.createElement('div');
       d.className = 'cwh-working';
       d.innerHTML = '<span class="star">✳</span>' +
-        (opts.text ? '<span class="cwh-working-verb">' + opts.text + '</span>' : '');
+        (text ? '<span class="cwh-working-verb">' + text + '</span>' : '');
       composer.parentNode.insertBefore(d, composer.nextSibling);
-      workingEl = d;
-      gsap.from(d, { autoAlpha: 0, y: 6, duration: 0.3 });
+      gsap.set(d, { display: 'none', autoAlpha: 0 });
       gsap.to(d.querySelector('.star'), { rotation: 360, duration: 2.6, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
+      return d;
     }
-    function removeWorking() {
-      if (!workingEl) return;
-      gsap.killTweensOf(workingEl.querySelector('.star'));
-      if (workingEl.parentNode) workingEl.parentNode.removeChild(workingEl);
-      workingEl = null;
+    function scheduleWorking(tlRef, text, at) {
+      var prev = lastWorking;
+      var d = makeWorking(text);
+      lastWorking = d;
+      if (prev) tlRef.set(prev, { display: 'none', autoAlpha: 0 }, at);
+      tlRef.set(d, { display: 'flex', autoAlpha: 1 }, at);
+      return d;
     }
 
     // Entrance: greeting, composer, ideas stagger in
@@ -436,15 +439,18 @@
           tl.fromTo(sendBtn, { scale: 0.82 },
             { scale: 1, duration: 0.32, ease: 'back.out(3)', immediateRender: false }, at);
           tl.set(sendBtn, { autoAlpha: 0 }, at + 0.22);
-          tl.call(function () {
-            inputEl.textContent = '';
-            showWorking({ text: action.working_text || '' });
-          }, null, at + 0.22);
+          tl.call(function () { inputEl.textContent = ''; }, null, at + 0.22);
+          // The working line only appears when a scene ASKS for it -- no
+          // implicit blurb on every send.
+          if (action.working_text) scheduleWorking(tl, action.working_text, at + 0.22);
         },
         'working': function (tl, ctr, action, at) {
-          tl.call(function () { showWorking(action); }, null, at);
+          scheduleWorking(tl, action.text || '', at);
         },
-        'stop-working': function (tl, ctr, action, at) { tl.call(removeWorking, null, at); },
+        'stop-working': function (tl, ctr, action, at) {
+          var target = lastWorking;
+          if (target) tl.set(target, { display: 'none', autoAlpha: 0 }, at);
+        },
         'switch-mode': function (tl, ctr, action, at) {
           tl.call(function () { setMode(action.mode); }, null, at);
         },
