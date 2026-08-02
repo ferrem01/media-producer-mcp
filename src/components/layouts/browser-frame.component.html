@@ -116,6 +116,10 @@
     /* The viewport paints the theme background, so pin the matching theme ink:
        inherited default-black content text measured 1.13:1 on the dark ground. */
     color: var(--mp-color-text, #ffffff);
+    /* And because it paints the PAGE color, it ghosts straight into the page
+       (measured 0.0% separation on proj_36750f52) -- a bezel ring keeps the
+       browser reading as a window on any ground. */
+    box-shadow: inset 0 0 0 1px rgba(128, 128, 140, 0.28);
     overflow: hidden;
   }
 
