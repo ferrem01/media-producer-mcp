@@ -2246,3 +2246,30 @@ Remaining, known, template-side: st- template claim/tagline text has no
 data.color channel, so a light-theme template over a dark mesh patch stays
 a report (scene_001's claim at 1.09:1). Template typography theming is its
 own arc.
+
+## #45: ground-measured ink -- the theme flag loses to the actual page (2026-08-02)
+
+The task was filed as "template typography theming", but the evidence
+reshaped it. proj_b75ca862's 1.09:1 claim was NOT an st- template: it was
+the ANNOTATION component, which carries no plate of its own -- theme:"dark"
+only flips its ink light for use on dark grounds -- authored with
+theme:"dark" AND color:"#17171c" on a LIGHT film. The component obeyed the
+flag (near-white ink on a near-white mesh) and ignored the color field
+entirely, which would have been perfect. (The tagline case that motivated
+option (b) turned out to be the transient-fade class, already fixed in the
+gate.)
+
+The fix is (b) in spirit, without pixel reads: the scene page's background
+IS the brand ground and it is measurable. atmosphere.js gains
+mpGroundLum() (page luminance; null on transparent speaker pages),
+mpParseColor(), mpInkContrast(). Annotation now derives dark/light from the
+MEASURED ground (WCAG midpoint 0.18, matching the ink-repair loop); the
+authored theme flag only decides when the page is transparent. An authored
+data.color is honored when it clears 4.5:1 on the measured ground and
+ignored when it cannot be read.
+
+Behavioral proof (test/ground-ink.test.ts, real assembler + real gate): the
+exact authored data from proj_b75ca862 now measures clean on a white page;
+the mirrored case (dark ink authored on a dark film) measures clean too;
+a passing authored ink is honored. The helpers are global -- any ink-only
+component can adopt the same two lines.

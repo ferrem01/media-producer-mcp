@@ -401,4 +401,49 @@
     for (var i = 0; i < n; i++) out.push({ start: (d * i) / n, end: (d * (i + 1)) / n });
     return out;
   };
+
+  // ── Ground truth for ink (legibility over mood, non-negotiable #1) ──
+  // The scene page's background IS the brand ground, and a component that
+  // paints only TYPE (no plate of its own) can MEASURE it instead of
+  // trusting a theme label. proj_b75ca862: annotation theme:"dark" on a
+  // light film lit near-white ink over a near-white mesh at 1.09:1 -- the
+  // flag described a ground that did not exist. Returns the ground's
+  // relative luminance (0-1), or null when the page is transparent (speaker
+  // scenes: the camera is the ground and cannot be measured here).
+  window.mpGroundLum = function () {
+    function lum(str) {
+      var c = window.mpParseColor ? mpParseColor(str) : null;
+      if (!c || c.a < 0.5) return null;
+      function ch(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+      return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+    }
+    var l = lum(getComputedStyle(document.body).backgroundColor);
+    if (l === null) l = lum(getComputedStyle(document.documentElement).backgroundColor);
+    return l;
+  };
+
+  // Parse #rgb / #rrggbb / rgb() / rgba() into {r,g,b,a} (null when unparseable).
+  window.mpParseColor = function (str) {
+    str = String(str || '').trim();
+    var m = str.match(/^#([0-9a-f]{3})$/i);
+    if (m) return { r: parseInt(m[1][0] + m[1][0], 16), g: parseInt(m[1][1] + m[1][1], 16), b: parseInt(m[1][2] + m[1][2], 16), a: 1 };
+    m = str.match(/^#([0-9a-f]{6})$/i);
+    if (m) return { r: parseInt(m[1].slice(0, 2), 16), g: parseInt(m[1].slice(2, 4), 16), b: parseInt(m[1].slice(4, 6), 16), a: 1 };
+    m = str.match(/^rgba?\(([^)]+)\)$/i);
+    if (m) {
+      var p = m[1].split(',').map(parseFloat);
+      return { r: p[0], g: p[1], b: p[2], a: p.length >= 4 ? p[3] : 1 };
+    }
+    return null;
+  };
+
+  // WCAG contrast of an ink color against a ground luminance.
+  window.mpInkContrast = function (color, groundLum) {
+    var c = mpParseColor(color);
+    if (!c || typeof groundLum !== 'number') return null;
+    function ch(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    var l = 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+    var hi = Math.max(l, groundLum), lo = Math.min(l, groundLum);
+    return (hi + 0.05) / (lo + 0.05);
+  };
 })();
