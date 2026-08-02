@@ -58,8 +58,22 @@
     var tl = gsap.timeline();
     var root = el.querySelector('.anno');
     root.classList.add('align-' + (data.align || 'left'));
-    if (data.theme === 'dark') root.classList.add('is-dark');
+    // The theme flag DESCRIBES the ground; the ground is measurable. When
+    // they disagree, the ground wins -- theme:"dark" on a light film lit
+    // near-white ink over a near-white mesh at 1.09:1 (proj_b75ca862). The
+    // authored flag only decides on transparent pages (speaker scenes),
+    // where the camera is the ground and cannot be measured here. 0.18 is
+    // the WCAG midpoint the ink-repair loop already uses.
+    var groundL = window.mpGroundLum ? mpGroundLum() : null;
+    var wantDark = groundL !== null ? groundL < 0.18 : data.theme === 'dark';
+    if (wantDark) root.classList.add('is-dark');
     if (data.size === 'label') root.classList.add('size-label');
+    // An authored ink is honored only when it can be READ on the measured
+    // ground; a failing one keeps the theme preset (which just passed above).
+    if (data.color && groundL !== null && window.mpInkContrast) {
+      var r = mpInkContrast(data.color, groundL);
+      if (r !== null && r >= 4.5) root.style.setProperty('--anno-ink', data.color);
+    }
 
     function accentify(target, text) {
       var re = /\*([^*]+)\*|([^*]+)/g, m;
