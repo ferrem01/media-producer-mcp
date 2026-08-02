@@ -2141,3 +2141,26 @@ scenes, defect survived every pass). Fix belongs in the gates
 (camera-neutral probe times, or skip clipped/off-canvas checks when the
 stage root carries a scale transform at probe time). Precedent:
 cameraIsBackground already skips the empty-canvas gate on speaker scenes.
+
+## #44: camera-aware gates -- a zoom is a shot, not a bug (2026-08-02)
+
+Marc: "we will be zooming in the future or panning so this cant happen."
+
+captureSingleFrame now measures the camera rig's transform AT THE PROBED
+INSTANT (after the timeline seek): any .__mp_camera_rig / .__mp_camera_clip /
+.mp-camera holding scale outside [0.95, 1.05] or |translate| > 14px marks the
+frame cameraActive. Thresholds sit above the ambient Ken Burns (1.03 +
+<=10px drift inside its 20px overscan), so only real camera_moves trip it.
+
+On a cameraActive frame the gates skip GEOMETRY findings only -- clipped
+text, off-canvas content, edge bleed, text collisions in measureLayout, and
+the "clipped" reason in measureTextContrast. Scale-invariant checks still
+run: contrast ratios, ghost-panel fill separation, dead-frame coverage.
+Detection is live-DOM rather than camera_moves window math on purpose: it
+needs no timing model, and it covers every zoom mechanism (camera_moves,
+Studio zoom-inside rigs, future pans) identically.
+
+Behavioral test (test/camera-aware-gates.test.ts): a held 1.6x zoom that
+pushes half the layout off-frame produces zero geometry findings, while the
+SAME content genuinely off-canvas without a camera still flags -- the
+control that proves the skip informed the gate rather than neutering it.

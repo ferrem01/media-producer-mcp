@@ -124,8 +124,9 @@ export async function measureTextContrast(opts: {
     for (let i = 0; i < opts.atTimes.length; i++) {
       const backdropPath = path.join(tmpDir, `backdrop_${i}.png`);
       let textElements;
+      let cameraActive: boolean | undefined;
       try {
-        ({ textElements } = await captureSingleFrame({
+        ({ textElements, cameraActive } = await captureSingleFrame({
           htmlPath: opts.htmlPath,
           outputPath: backdropPath,
           width: opts.width,
@@ -150,7 +151,10 @@ export async function measureTextContrast(opts: {
         // deliberate design device), and only PARTIAL clips: text that is
         // essentially fully hidden (>= 98%, e.g. off-stage carousel items in an
         // overflow-hidden container) is not a visible artifact.
-        const clipped = t.clippedFraction ?? 0;
+        // Mid-zoom/pan the camera transform is what carries text past the
+        // frame edge -- that is the shot, not truncation. Contrast ratios are
+        // scale-invariant and still measured; only the clip check skips.
+        const clipped = cameraActive ? 0 : (t.clippedFraction ?? 0);
         if (clipped >= CLIP_FRACTION && clipped < 0.98 && (t.opacity ?? 1) >= 0.85) {
           const prev = byText.get(t.text);
           if (!prev || (prev.reason === "clipped" && clipped > (prev.clippedFraction ?? 0))) {
