@@ -84,10 +84,15 @@
                 <span class="cwh-mode-opt is-active" data-target="mode-cowork">Cowork</span>
               </div>
               <span class="cwh-crow-sp"></span>
-              <span class="cwh-model" data-target="model-label">Opus 4.8</span>
+              <span class="cwh-model" data-target="model-label">Opus 5</span>
               <span class="cwh-effort" data-target="effort-label">High</span>
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0010 0M8 12.5V15"/></svg>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0010 0M8 12.5V15"/></svg>
+              <!-- The terracotta send button: hidden until typing starts, pressed
+                   on send-prompt (the real app shows it only once there's text). -->
+              <span class="cwh-send" data-target="send-btn">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3.5M3.8 7.7L8 3.5l4.2 4.2"/></svg>
+              </span>
             </div>
             <div class="cwh-comp-sub">
               <span class="cwh-sub-item">
@@ -197,9 +202,10 @@
     font-size: 12px; font-weight: 600; color: #57544c; }
   .cwh-center { flex: 1; display: flex; flex-direction: column; justify-content: center;
     align-items: center; padding: 0 7%; }
-  .cwh-greeting { display: flex; align-items: center; gap: 16px; margin-bottom: 28px;
+  /* Greeting sized to the real app: big, light serif, the mark to its left. */
+  .cwh-greeting { display: flex; align-items: center; gap: 18px; margin-bottom: 32px;
     font-family: 'Tiempos Headline', Georgia, 'Times New Roman', serif;
-    font-size: 44px; font-weight: 500; color: #2a2925; letter-spacing: -0.01em; }
+    font-size: 54px; font-weight: 400; color: #2a2925; letter-spacing: -0.015em; }
   .cwh-greeting .starburst { display: inline-block; }
   /* Real Claude mark via logo.dev; the hand-drawn starburst stays underneath
      as the fallback. The logo box paints the page color itself so multiply
@@ -217,13 +223,21 @@
      the later-in-DOM ideas paint over the open menu. */
   /* 2px border: the white composer measured 0.0% separation on white pages;
      a 1px border computes below the 1.5px visible-edge floor. */
-  .cwh-composer { width: 100%; max-width: 760px; background: #fff; border: 2px solid #e2e0d8;
-    border-radius: 16px; box-shadow: 0 4px 16px rgba(31,30,29,0.06);
+  .cwh-composer { width: 100%; max-width: 780px; background: #fff; border: 2px solid #e2e0d8;
+    border-radius: 22px; box-shadow: 0 4px 16px rgba(31,30,29,0.06);
     position: relative; z-index: 5; }
-  .cwh-comp-input { padding: 18px 20px 6px; font-size: 15px; color: #1f1e1d; min-height: 24px;
+  .cwh-comp-input { padding: 20px 24px 8px; font-size: 16px; color: #1f1e1d; min-height: 26px;
     line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
   .cwh-comp-input:empty::before { content: attr(data-placeholder); color: #a5a39a; }
-  .cwh-comp-row { display: flex; align-items: center; gap: 11px; padding: 8px 16px 12px; position: relative; }
+  .cwh-comp-row { display: flex; align-items: center; gap: 11px; padding: 8px 14px 12px 18px; position: relative; }
+  /* The terracotta send button (real app: appears only once there's text).
+     Hidden state keeps layout space so its pop-in never reflows the row. */
+  /* No CSS transitions here -- GSAP owns the pop-in and the press, and a
+     transition on transform would fight its per-frame updates. */
+  .cwh-send { width: 36px; height: 36px; border-radius: 11px; background: #c65f3f;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    opacity: 0; transform: scale(0.6); }
+  .cwh-send.is-visible { opacity: 1; transform: scale(1); }
   .cwh-crow-ico { color: #57544c; font-size: 17px; }
   .cwh-plusmenu { position: absolute; z-index: 50;
     width: 250px; background: #fff; border: 1px solid #e8e6e0; border-radius: 13px;
@@ -236,8 +250,8 @@
   .cwh-pm-chev { color: #a5a39a; font-size: 14px; }
   .cwh-pm-warn { font-size: 11.5px; color: #c07f1f; margin-right: 2px; }
   .cwh-pm-sep { height: 1px; background: #efeee8; margin: 4px 8px; }
-  .cwh-mode { display: flex; gap: 2px; background: #efeee8; border-radius: 9px; padding: 2px; }
-  .cwh-mode-opt { font-size: 12.5px; font-weight: 600; color: #57544c; padding: 4px 12px; border-radius: 7px; }
+  .cwh-mode { display: flex; gap: 2px; background: #efeee8; border-radius: 999px; padding: 3px; }
+  .cwh-mode-opt { font-size: 13px; font-weight: 600; color: #8a887f; padding: 5px 14px; border-radius: 999px; }
   .cwh-mode-opt.is-active { background: #fff; color: #1f1e1d; border: 1px solid #e2e0d8;
     box-shadow: 0 1px 3px rgba(31,30,29,0.07); }
   .cwh-crow-sp { flex: 1; }
@@ -267,10 +281,11 @@
     var win = q('.cwh-win');
     var inputEl = q('[data-target="input"]');
     var composer = q('[data-target="composer"]');
+    var sendBtn = q('[data-target="send-btn"]');
     var dur = ctx.duration || 10;
 
     q('[data-target="greeting-text"]').textContent = data.greeting || 'Afternoon, Marc';
-    q('[data-target="model-label"]').textContent = data.model_label || 'Opus 4.8';
+    q('[data-target="model-label"]').textContent = data.model_label || 'Opus 5';
     q('[data-target="effort-label"]').textContent = data.effort_label || 'High';
     q('[data-target="usage-text"]').textContent = data.usage_label || '2× more usage until August 5';
     if (data.account_name) q('[data-target="account-name"]').textContent = data.account_name;
@@ -393,13 +408,28 @@
     if (data.script && data.script.length > 0) {
       runScript(tl, el, data.script, cursorTargets, ctx, {
         'type-prompt': function (tl, ctr, action, at) {
+          // The send button pops in with the first keystroke, like the app.
+          // Guarded so scrub re-fires don't restack the pop tween.
+          tl.call(function () {
+            if (sendBtn.classList.contains('is-visible')) return;
+            sendBtn.classList.add('is-visible');
+            gsap.fromTo(sendBtn, { scale: 0.6, autoAlpha: 0 },
+              { scale: 1, autoAlpha: 1, duration: 0.3, ease: 'back.out(2.5)' });
+          }, null, at);
           typeText(tl, inputEl, action.text || '', at, action.speed || 30);
         },
         'send-prompt': function (tl, ctr, action, at) {
+          // The press: a quick push-down/spring-back on the button, THEN the
+          // composer clears -- the click reads before its consequence.
+          tl.call(function () {
+            gsap.fromTo(sendBtn, { scale: 0.82 }, { scale: 1, duration: 0.32, ease: 'back.out(3)' });
+          }, null, at);
           tl.call(function () {
             inputEl.textContent = '';
+            sendBtn.classList.remove('is-visible');
+            gsap.set(sendBtn, { clearProps: 'transform,opacity,visibility' });
             showWorking({ text: action.working_text || '' });
-          }, null, at);
+          }, null, at + 0.22);
         },
         'working': function (tl, ctr, action, at) {
           tl.call(function () { showWorking(action); }, null, at);
