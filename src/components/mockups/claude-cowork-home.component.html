@@ -233,12 +233,13 @@
   .cwh-comp-row { display: flex; align-items: center; gap: 13px; padding: 10px 16px 14px 22px; position: relative; }
   /* The terracotta send button (real app: appears only once there's text).
      Hidden state keeps layout space so its pop-in never reflows the row. */
-  /* No CSS transitions here -- GSAP owns the pop-in and the press, and a
-     transition on transform would fight its per-frame updates. */
+  /* No CSS transitions or state classes here -- the send button's visibility
+     lives entirely on the GSAP timeline (fromTo/set tweens), which is what
+     makes it scrub-correct in both directions. CSS only sets the resting
+     hidden state for scenes that never type. */
   .cwh-send { width: 40px; height: 40px; border-radius: 12px; background: #c65f3f;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     opacity: 0; transform: scale(0.6); }
-  .cwh-send.is-visible { opacity: 1; transform: scale(1); }
   .cwh-crow-ico { color: #57544c; font-size: 20px; }
   .cwh-plusmenu { position: absolute; z-index: 50;
     width: 250px; background: #fff; border: 1px solid #e8e6e0; border-radius: 13px;
@@ -420,25 +421,23 @@
       runScript(tl, el, data.script, cursorTargets, ctx, {
         'type-prompt': function (tl, ctr, action, at) {
           // The send button pops in with the first keystroke, like the app.
-          // Guarded so scrub re-fires don't restack the pop tween.
-          tl.call(function () {
-            if (sendBtn.classList.contains('is-visible')) return;
-            sendBtn.classList.add('is-visible');
-            gsap.fromTo(sendBtn, { scale: 0.6, autoAlpha: 0 },
-              { scale: 1, autoAlpha: 1, duration: 0.3, ease: 'back.out(2.5)' });
-          }, null, at);
+          // TIMELINE tweens (not call() callbacks): the scrubber renders the
+          // correct state at any playhead position in either direction --
+          // edge-triggered callbacks left the button hidden when arriving
+          // into the typed region from the right.
+          tl.fromTo(sendBtn, { autoAlpha: 0, scale: 0.6 },
+            { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2.5)' }, at);
           typeText(tl, inputEl, action.text || '', at, action.speed || 30);
         },
         'send-prompt': function (tl, ctr, action, at) {
-          // The press: a quick push-down/spring-back on the button, THEN the
-          // composer clears -- the click reads before its consequence.
-          tl.call(function () {
-            gsap.fromTo(sendBtn, { scale: 0.82 }, { scale: 1, duration: 0.32, ease: 'back.out(3)' });
-          }, null, at);
+          // The press: push-down/spring-back, THEN (0.22s later) the button
+          // hides and the composer clears -- the click reads before its
+          // consequence. All state on the timeline, scrub-safe.
+          tl.fromTo(sendBtn, { scale: 0.82 },
+            { scale: 1, duration: 0.32, ease: 'back.out(3)', immediateRender: false }, at);
+          tl.set(sendBtn, { autoAlpha: 0 }, at + 0.22);
           tl.call(function () {
             inputEl.textContent = '';
-            sendBtn.classList.remove('is-visible');
-            gsap.set(sendBtn, { clearProps: 'transform,opacity,visibility' });
             showWorking({ text: action.working_text || '' });
           }, null, at + 0.22);
         },
