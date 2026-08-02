@@ -1,7 +1,8 @@
 <template>
   <div class="cws">
     <div class="cws-win" data-target="window">
-      <!-- Sidebar (Home tab) -->
+      <!-- Sidebar: IDENTICAL chrome to claude-cowork-home, so the home->session
+           match-cut is literal (the real app keeps the sidebar). -->
       <div class="cws-side" data-target="sidebar" data-anchor="sidebar">
         <div class="cws-lights">
           <span class="cws-dot cws-dot--r"></span><span class="cws-dot cws-dot--y"></span><span class="cws-dot cws-dot--g"></span>
@@ -45,88 +46,94 @@
         <div class="cws-recents-head"><span>Pinned</span></div>
         <div class="cws-pin-list" data-target="pin-list"></div>
         <div class="cws-recents-head"><span>Recents</span>
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><path d="M3 5h10M5 8h6M7 11h2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><path d="M4 3v10M4 13l-1.6-1.6M4 13l1.6-1.6M11 13V3M11 3L9.4 4.6M11 3l1.6 1.6"/></svg>
         </div>
         <div class="cws-session-list" data-target="recent-list"></div>
         <div class="cws-side-foot">
-          <div class="cws-update">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#57544c" stroke-width="1.3"><path d="M10 17c4-2 6-5 6-9V4l-6-2-6 2v4c0 4 2 7 6 9z" transform="scale(0.9) translate(1,1)"/></svg>
-            <div class="cws-update-txt"><b>Relaunch to update</b><span>v1.20186.1</span></div>
-            <span class="cws-update-arrow">→</span>
+          <div class="cws-design-row">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.2"/></svg>
+            Design <span class="cws-labs-pill">Labs</span>
           </div>
           <div class="cws-account">
             <span class="cws-ava" data-target="account-avatar">M</span>
             <span class="cws-account-name" data-target="account-name">Marc</span>
+            <span class="cws-account-mode">Max</span>
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
           </div>
         </div>
       </div>
 
-      <!-- Main -->
+      <!-- Main pane -->
       <div class="cws-main">
-        <div class="cws-head">
-          <svg width="17" height="14" viewBox="0 0 20 16" fill="none" stroke="#57544c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13h9a3.5 3.5 0 100-7 5 5 0 00-9.6-1.4A4 4 0 006 13z"/></svg>
-          <span class="cws-title" data-target="title"></span>
+        <div class="cws-header">
+          <svg width="17" height="17" viewBox="0 0 20 16" fill="none" stroke="#57544c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13h9a3.5 3.5 0 100-7 5 5 0 00-9.6-1.4A4 4 0 006 13z"/></svg>
+          <span class="cws-title" data-target="title">Work flow test</span>
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#57544c" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
-          <span class="cws-head-sp"></span>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M10 2.5v11"/></svg>
+          <span class="cws-header-sp"></span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3"><rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M10 2.5v11"/></svg>
         </div>
-        <div class="cws-transcript" data-target="transcript" data-anchor="transcript"></div>
-        <div class="cws-inputwrap" data-anchor="input">
-          <div class="cws-inputbox" data-target="input-box">
-            <div class="cws-input" data-target="input"></div>
+        <div class="cws-viewport" data-target="viewport" data-anchor="transcript">
+          <div class="cws-track" data-target="track"></div>
+          <div class="cws-fadetop"></div>
+        </div>
+        <div class="cws-composerwrap">
+          <div class="cws-inputbox" data-target="inputbox" data-anchor="input">
+            <div class="cws-input" data-target="input" data-placeholder="Write a message..."></div>
             <div class="cws-inputrow">
-              <span class="cws-inrow-ico">+</span>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="4" width="12" height="9" rx="2"/><path d="M6 4V3h4v1M8 7v4M6 9h4"/></svg>
-              <span class="cws-manual">
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M8 2v3M8 11v3M2 8h3M11 8h3"/></svg>
-                Manual
+              <span class="cws-inrow-plus">+</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1.5 1.5 0 011.5-1.5h2.6l1.4 1.6h4.9A1.5 1.5 0 0114 6.6V11a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11V5z"/><path d="M8 7.2v3M6.5 8.7h3"/></svg>
+              <span class="cws-automode">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5l4.5 4.5-4.5 4.5M8.5 3.5L13 8l-4.5 4.5"/></svg>
+                Auto
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
               </span>
               <span class="cws-inrow-sp"></span>
-              <span class="cws-model" data-target="model-label">Opus 4.8</span>
+              <span class="cws-model" data-target="model-label">Opus 5</span>
               <span class="cws-effort" data-target="effort-label">High</span>
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0010 0M8 12.5V15"/></svg>
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0010 0M8 12.5V15"/></svg>
+              <span class="cws-send" data-target="send-btn">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3.5M3.8 7.7L8 3.5l4.2 4.2"/></svg>
+              </span>
+              <span class="cws-stop" data-target="stop-btn">
+                <span class="cws-stop-square"></span>
+              </span>
             </div>
           </div>
-          <div class="cws-disclaimer">Claude is AI and can make mistakes. Please double-check responses. <u>Give us feedback</u></div>
+          <div class="cws-disclaimer">Claude is AI and can make mistakes. Please double-check responses. <span class="cws-disc-link">Give us feedback</span></div>
         </div>
       </div>
 
-      <!-- Right rail -->
-      <div class="cws-rail" data-target="rail">
-        <!-- The camera anchor hugs the CARDS, not the full-height rail: a
-             center-zoom on the rail would frame mostly empty space below. -->
-        <div class="cws-cards" data-anchor="panel">
-        <div class="cws-card" data-target="progress-card">
-          <div class="cws-card-head">
-            <span class="cws-card-title">Progress</span>
-            <span class="cws-progress-count" data-target="progress-count"></span>
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg>
+      <!-- Right rail: three floating cards like the app -->
+      <div class="cws-rail" data-anchor="panel">
+        <div class="cws-card">
+          <div class="cws-card-head">Progress <span class="cws-card-count" data-target="progress-count"></span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#57544c" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg>
           </div>
-          <div class="cws-progress-steps" data-target="progress-steps"></div>
         </div>
-        <div class="cws-card" data-target="outputs-card">
-          <div class="cws-card-head">
-            <span class="cws-card-title">Outputs</span>
-            <span class="cws-card-sp"></span>
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg>
+        <div class="cws-card">
+          <div class="cws-card-head">Outputs
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#57544c" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg>
           </div>
           <div class="cws-outputs" data-target="outputs"></div>
         </div>
         <div class="cws-card">
-          <div class="cws-card-head">
-            <span class="cws-card-title">Context</span>
+          <div class="cws-card-head">Context
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#57544c" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
             <span class="cws-card-sp"></span>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><rect x="3" y="6" width="10" height="6" rx="1.5"/><path d="M5 6V3h6v3M5.5 14h5"/></svg>
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1.5 1.5 0 011.5-1.5h2.6l1.4 1.6h4.9A1.5 1.5 0 0114 6.6V11a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11V5z"/><path d="M8 7.2v3M6.5 8.7h3"/></svg>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="3.5" width="12" height="8" rx="1.5"/><path d="M5 14h6"/></svg>
           </div>
-          <div class="cws-ctx-label">Connectors</div>
+          <div class="cws-ctx-placeholder" data-target="ctx-placeholder">
+            <div class="cws-ctx-illus">
+              <span class="cws-ctx-sheet cws-ctx-sheet--a"></span>
+              <span class="cws-ctx-sheet cws-ctx-sheet--b"></span>
+              <span class="cws-ctx-sheet cws-ctx-sheet--c">+</span>
+            </div>
+            <div class="cws-ctx-caption">Track tools and referenced files used in this task.</div>
+          </div>
+          <div class="cws-ctx-connlabel" data-target="conn-label" style="display:none">Connectors</div>
           <div class="cws-connectors" data-target="connectors"></div>
-          <div class="cws-ctx-label cws-skills-label" data-target="skills-label" style="display:none">Skills</div>
-          <div class="cws-connectors" data-target="skills"></div>
-        </div>
         </div>
       </div>
     </div>
@@ -134,172 +141,167 @@
 </template>
 
 <style scoped>
-  /* ── claude-cowork-session: a RUNNING Cowork task (from Marc's
-     screenshot). Serif Claude prose in the main pane, and the right rail:
-     Progress (N of M), Outputs, Context with connector chips. Tier:
-     performable-surface. The marketing-agent-at-work beat. ── */
+  /* ── claude-cowork-session: a RUNNING Cowork task, rebuilt frame-by-frame
+     against a screen recording of the real app. The transcript is a
+     bottom-following column whose scroll position is a GSAP tween ON THE
+     TIMELINE (precomputed offsets), so streaming/scrolling is smooth AND
+     scrub-correct in both directions. Sidebar chrome is identical to
+     claude-cowork-home for literal match-cuts. Tier: performable-surface. ── */
   .cws { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; color: #1f1e1d; }
-  .cws-win { width: 100%; height: 100%; background: #f7f6f2; border-radius: 12px;
-    border: 1px solid rgba(31, 30, 29, 0.1); overflow: hidden; display: flex;
+  .cws-win { width: 100%; height: 100%; background: #f4f3ee; border-radius: 12px;
+    border: 1px solid rgba(31, 30, 29, 0.1); overflow: hidden; display: flex; position: relative;
     box-shadow: 0 30px 90px rgba(31, 30, 29, 0.25), 0 6px 24px rgba(31, 30, 29, 0.12); }
 
-  /* Sidebar (matches claude-cowork-home) */
-  /* 2px divider (color on all edges, width only right): #fbfaf7 is ~3.5%
-     from a white page and needs a computed >= 1.5px edge. */
-  .cws-side { width: 248px; min-width: 248px; background: #fbfaf7;
+  /* Sidebar (mirror of cowork-home) */
+  .cws-side { width: 21%; min-width: 250px; max-width: 320px; background: #fbfaf7;
     border: solid #e8e6e0; border-width: 0 2px 0 0;
-    display: flex; flex-direction: column; padding: 12px 12px 10px; }
-  .cws-lights { display: flex; align-items: center; gap: 7px; padding: 2px 4px 12px; }
-  .cws-dot { width: 11px; height: 11px; border-radius: 50%; }
+    display: flex; flex-direction: column; padding: 14px 14px 12px; }
+  .cws-lights { display: flex; align-items: center; gap: 8px; padding: 2px 4px 14px; }
+  .cws-dot { width: 12px; height: 12px; border-radius: 50%; }
   .cws-dot--r { background: #ff5f57; } .cws-dot--y { background: #febc2e; } .cws-dot--g { background: #28c840; }
   .cws-lights-sp { flex: 1; }
-  .cws-tabs { display: flex; gap: 4px; background: #efeee8; border-radius: 9px; padding: 3px; margin-bottom: 12px; }
-  .cws-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 6px 0; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: #57544c; }
+  .cws-tabs { display: flex; gap: 4px; background: #efeee8; border-radius: 10px; padding: 3px; margin-bottom: 14px; }
+  .cws-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 8px 0; border-radius: 8px; font-size: 14px; font-weight: 600; color: #57544c; }
   .cws-tab.is-active { background: #fff; color: #1f1e1d; box-shadow: 0 1px 3px rgba(31,30,29,0.08);
     border: 1px solid #e8e6e0; }
-  .cws-nav { display: flex; flex-direction: column; gap: 1px; margin-bottom: 8px; }
-  .cws-nav-row { display: flex; align-items: center; gap: 9px; padding: 5.5px 8px; border-radius: 8px;
-    font-size: 13px; color: #1f1e1d; }
-  .cws-nav-plus { width: 14px; text-align: center; font-size: 15px; color: #57544c; }
-  .cws-beta-pill { font-size: 10px; font-weight: 600; color: #57544c; background: #ecebe4;
-    border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+  .cws-nav { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+  .cws-nav-row { display: flex; align-items: center; gap: 11px; padding: 7px 10px; border-radius: 9px;
+    font-size: 14.5px; color: #1f1e1d; }
+  .cws-nav-plus { width: 15px; text-align: center; font-size: 16px; color: #57544c; }
+  .cws-beta-pill, .cws-labs-pill { font-size: 11px; font-weight: 600; color: #57544c;
+    background: #ecebe4; border-radius: 6px; padding: 1.5px 7px; margin-left: 5px; }
   .cws-recents-head { display: flex; align-items: center; justify-content: space-between;
-    padding: 5px 8px 4px; font-size: 11.5px; font-weight: 600; color: #8a887f; }
-  .cws-pin-list, .cws-session-list { display: flex; flex-direction: column; gap: 1px; }
+    padding: 7px 10px 5px; font-size: 12.5px; color: #8a887f; }
+  .cws-pin-list, .cws-session-list { display: flex; flex-direction: column; gap: 2px; }
   .cws-session-list { flex: 1; overflow: hidden; }
-  .cws-session { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; }
-  .cws-session.is-active { background: #ecebe4; }
-  .cws-sess-ico { flex-shrink: 0; display: flex; color: #8a887f; }
-  .cws-sess-title { flex: 1; font-size: 12.5px; color: #1f1e1d;
+  .cws-sessrow { display: flex; align-items: center; gap: 10px; padding: 6.5px 10px; border-radius: 9px; }
+  .cws-sessrow.is-active { background: #ecebe4; }
+  .cws-sessrow-ico { display: flex; color: #57544c; flex-shrink: 0; }
+  .cws-sessrow-title { flex: 1; font-size: 14px; color: #1f1e1d;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cws-side-foot { margin-top: 8px; }
-  .cws-update { display: flex; align-items: center; gap: 9px; padding: 8px 10px;
-    border: 1px solid #e8e6e0; border-radius: 11px; background: #fff; margin-bottom: 7px; }
-  .cws-update-txt { flex: 1; display: flex; flex-direction: column; line-height: 1.3; }
-  .cws-update-txt b { font-size: 12px; color: #1f1e1d; font-weight: 600; }
-  .cws-update-txt span { font-size: 10.5px; color: #8a887f; }
-  .cws-update-arrow { color: #57544c; font-size: 13px; }
-  .cws-account { display: flex; align-items: center; gap: 8px; padding: 4px 6px; }
-  .cws-ava { width: 22px; height: 22px; border-radius: 50%; background: #1f1e1d; color: #fff;
-    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
-  .cws-account-name { flex: 1; font-size: 13px; font-weight: 600; color: #1f1e1d; }
+  .cws-side-foot { margin-top: 10px; border-top: 1px solid #efeee8; padding-top: 9px; }
+  .cws-design-row { display: flex; align-items: center; gap: 11px; padding: 7px 10px;
+    font-size: 14.5px; color: #1f1e1d; }
+  .cws-account { display: flex; align-items: center; gap: 9px; padding: 6px 8px; }
+  .cws-ava { width: 25px; height: 25px; border-radius: 50%; background: #1f1e1d; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+  .cws-account-name { font-size: 14.5px; font-weight: 600; color: #1f1e1d; }
+  .cws-account-mode { flex: 1; font-size: 13.5px; color: #6b6861; }
 
-  /* Main */
-  .cws-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .cws-head { display: flex; align-items: center; gap: 8px; padding: 14px 22px 10px; flex-shrink: 0; }
-  .cws-title { font-size: 15px; font-weight: 700; color: #1f1e1d;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cws-head-sp { flex: 1; }
-  .cws-transcript { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 34px 10px 26px;
-    display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+  /* Main pane */
+  .cws-main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+  .cws-header { display: flex; align-items: center; gap: 9px; padding: 16px 22px 10px; flex-shrink: 0; }
+  .cws-title { font-size: 16px; font-weight: 600; color: #1f1e1d; }
+  .cws-header-sp { flex: 1; }
 
-  /* Serif Claude prose (Tiempos look) */
+  /* The transcript: overflow-hidden viewport + a track we translate on the
+     timeline. Offsets are PRECOMPUTED at build (every block is measured),
+     so scroll is a pure function of the playhead. */
+  .cws-viewport { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+  .cws-track { position: relative; width: min(720px, 88%); margin: 0 auto;
+    padding: 10px 0 26px; will-change: transform; }
+  .cws-fadetop { position: absolute; top: 0; left: 0; right: 0; height: 34px; pointer-events: none;
+    background: linear-gradient(180deg, #f4f3ee 8%, rgba(244,243,238,0)); }
+
+  /* Blocks */
+  .cws-block { margin: 0 0 18px; }
+  .cws-user-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+  .cws-user { max-width: 82%; font-size: 16.5px; line-height: 1.5; color: #1f1e1d;
+    background: #ecebe4; border-radius: 18px; padding: 13px 20px;
+    white-space: pre-wrap; word-break: break-word; }
+  .cws-user-copy { display: flex; color: #8a887f; padding-right: 4px; }
   .cws-text { font-family: 'Tiempos Text', Georgia, 'Times New Roman', serif;
-    font-size: 15.5px; line-height: 1.62; color: #1f1e1d;
+    font-size: 19px; line-height: 1.6; color: #1f1e1d;
     white-space: pre-wrap; word-break: break-word; }
   .cws-text strong { font-weight: 700; }
-  .cws-text code { font-family: 'SF Mono', Menlo, monospace; font-size: 13px; color: #b3542e;
+  .cws-text u { text-underline-offset: 3px; }
+  .cws-text code { font-family: 'SF Mono', Menlo, monospace; font-size: 15px; color: #b3542e;
     background: #efeee8; border-radius: 5px; padding: 0 5px; }
-  .cws-htext { font-family: 'Tiempos Headline', Georgia, serif; font-size: 18px; font-weight: 700;
+  .cws-htext { font-family: 'Tiempos Headline', Georgia, serif; font-size: 21px; font-weight: 700;
     color: #1f1e1d; line-height: 1.4; }
-  .cws-user { align-self: flex-end; max-width: 78%; font-size: 13.5px; line-height: 1.55; color: #1f1e1d;
-    background: #ecebe4; border-radius: 14px; padding: 9px 14px; white-space: pre-wrap; word-break: break-word;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; }
-  /* "✳ Working on it…" -- sized like the real session (big star, calm gray). */
-  .cws-working { display: flex; align-items: center; gap: 11px; margin-top: 4px; }
-  .cws-working .star { color: #D97757; font-size: 22px; display: inline-block; }
-  .cws-working-verb { font-size: 15px; color: #6b6861; }
 
-  /* Tool group (the REAL Cowork treatment, from screenshots): muted header
-     with the humanized tool name, a vertical timeline inside (clock-icon
-     thinking text with code chips, the tool row with a Result pill, the
-     orange dotted "Using Quotient…" spinner, ✓ Done) -- then the whole
-     group COLLAPSES to a one-liner with a chevron. */
-  .cws-tgroup { max-width: 94%; overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; }
-  .cws-tg-title { font-size: 13.5px; color: #8a887f; margin-bottom: 10px; }
-  .cws-tg-body { position: relative; padding-left: 30px; display: flex; flex-direction: column; gap: 13px; }
-  .cws-tg-body::before { content: ''; position: absolute; left: 9px; top: 8px; bottom: 8px;
-    width: 1.5px; background: #e5e3db; }
-  .cws-tg-row { position: relative; }
-  .cws-tg-glyph { position: absolute; left: -30px; top: 0; width: 20px; height: 20px;
-    display: flex; align-items: center; justify-content: center; background: #f7f6f2; }
-  .cws-tg-think { font-size: 13.5px; color: #57544c; line-height: 1.55;
-    white-space: pre-wrap; word-break: break-word; }
-  .cws-tg-think code { font-family: 'SF Mono', Menlo, monospace; font-size: 12px; color: #a33e2f;
-    background: #f3ede9; border: 1px solid #e8ddd6; border-radius: 5px; padding: 0 5px; }
-  .cws-tg-toolname { font-size: 13.5px; color: #8a887f; display: flex; align-items: center; min-height: 20px; }
-  .cws-tg-ico { width: 20px; height: 20px; border-radius: 6px; position: relative; overflow: hidden;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 700; color: #fff; }
-  .cws-tg-result { display: none; margin-top: 8px; }
-  .cws-tgroup.is-done .cws-tg-result { display: inline-block; }
-  .cws-tg-result span { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; color: #8a887f;
-    background: #efeee8; border-radius: 6px; padding: 3px 10px; }
-  .cws-tg-using { display: flex; align-items: center; gap: 11px; font-size: 14px; color: #57544c; }
-  .cws-tg-spin { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
-    border: 2.2px dotted #D97757; }
-  .cws-tgroup.is-done .cws-tg-usingrow { display: none; }
-  .cws-tg-done { display: none; font-size: 13.5px; color: #57544c; align-items: center; min-height: 20px; }
-  .cws-tgroup.is-done .cws-tg-done { display: flex; }
-  .cws-tg-collapsed { display: none; align-items: center; gap: 6px;
-    font-size: 14px; color: #57544c; }
-  .cws-tg-collapsed .chev { color: #a5a39a; font-size: 15px; }
-  .cws-tgroup.is-collapsed .cws-tg-title, .cws-tgroup.is-collapsed .cws-tg-body { display: none; }
-  .cws-tgroup.is-collapsed .cws-tg-collapsed { display: flex; }
+  /* Response action row + resting star */
+  .cws-actions { display: flex; align-items: center; gap: 14px; color: #8a887f; margin-top: -6px; }
+  .cws-idlestar { color: #D97757; font-size: 30px; line-height: 1; }
+
+  /* Status line: ✳ + verb + ticking counter */
+  .cws-status { display: flex; align-items: center; gap: 12px; }
+  .cws-status .star { color: #D97757; font-size: 24px; display: inline-block; line-height: 1; }
+  .cws-status-verb { font-size: 17px; color: #6b6861; }
+  .cws-status-secs { font-size: 15px; color: #8a887f; }
+
+  /* Tool use: gray summary line + indented detail + optional results panel.
+     Matches the app: no boxes around the summary, a hairline timeline stem. */
+  .cws-tsum { font-size: 17px; color: #6b6861; }
+  .cws-tdetail { margin-top: 12px; }
+  .cws-trow { display: flex; align-items: center; gap: 11px; font-size: 15.5px; color: #57544c;
+    min-height: 26px; }
+  .cws-trow-ico { display: flex; color: #6b6861; flex-shrink: 0; width: 18px; justify-content: center; }
+  .cws-tstem { width: 1.5px; height: 14px; background: #dedcd4; margin: 2px 0 2px 8.5px; }
+  .cws-trow-count { margin-left: auto; font-size: 14px; color: #6b6861; }
+  .cws-tresults { margin: 10px 0 0 29px; border: 1.5px solid #e2e0d8; border-radius: 12px;
+    background: #fbfaf7; padding: 4px 0; overflow: hidden; }
+  .cws-tres-row { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 14.5px; }
+  .cws-tres-fav { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
+    color: #fff; background: #a5a39a; }
+  .cws-tres-title { flex: 1; color: #1f1e1d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cws-tres-domain { font-size: 13px; color: #6b6861; flex-shrink: 0; }
 
   /* Composer */
-  .cws-inputwrap { flex-shrink: 0; padding: 4px 22px 8px; }
-  /* 2px border: the white composer measured 0.0% separation on white pages. */
-  .cws-inputbox { background: #fff; border: 2px solid #e2e0d8; border-radius: 15px;
-    padding: 13px 16px 10px; box-shadow: 0 2px 8px rgba(31,30,29,0.05); }
-  .cws-inputbox.is-active { border-color: rgba(217, 119, 87, 0.6); }
-  .cws-input { font-size: 14px; color: #1f1e1d; line-height: 1.5; min-height: 21px;
+  .cws-composerwrap { flex-shrink: 0; padding: 6px 0 10px; display: flex; flex-direction: column; align-items: center; }
+  .cws-inputbox { width: min(760px, 92%); background: #fff; border: 2px solid #e2e0d8;
+    border-radius: 22px; box-shadow: 0 4px 16px rgba(31,30,29,0.06); padding: 16px 18px 12px 22px; }
+  .cws-inputbox.is-active { border-color: rgba(217, 119, 87, 0.55); }
+  .cws-input { font-size: 17px; color: #1f1e1d; line-height: 1.5; min-height: 24px;
     white-space: pre-wrap; word-break: break-word; }
   .cws-input:empty::before { content: attr(data-placeholder); color: #a5a39a; }
-  .cws-inputrow { display: flex; align-items: center; gap: 11px; padding-top: 9px; }
-  .cws-inrow-ico { color: #57544c; font-size: 16px; }
-  .cws-manual { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #57544c; }
+  .cws-inputrow { display: flex; align-items: center; gap: 13px; padding-top: 12px; }
+  .cws-inrow-plus { color: #57544c; font-size: 19px; }
+  .cws-automode { display: flex; align-items: center; gap: 7px; font-size: 14px; color: #57544c; }
   .cws-inrow-sp { flex: 1; }
-  .cws-model { font-size: 12.5px; font-weight: 600; color: #1f1e1d; }
-  .cws-effort { font-size: 12.5px; color: #8a887f; }
-  .cws-disclaimer { text-align: center; font-size: 11px; color: #a5a39a; padding-top: 7px; }
+  .cws-model { font-size: 14.5px; font-weight: 600; color: #1f1e1d; }
+  .cws-effort { font-size: 14.5px; color: #6b6861; }
+  .cws-send { width: 36px; height: 36px; border-radius: 11px; background: #c65f3f;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    opacity: 0; transform: scale(0.6); }
+  .cws-stop { width: 36px; height: 36px; border-radius: 11px; background: #fff;
+    border: 1.5px solid #cfcdc5; display: none; align-items: center; justify-content: center; flex-shrink: 0; }
+  .cws-stop-square { width: 12px; height: 12px; border-radius: 2.5px; background: #1f1e1d; }
+  .cws-disclaimer { margin-top: 9px; font-size: 12.5px; color: #8a887f; }
+  .cws-disc-link { text-decoration: underline; }
 
-  /* Right rail */
-  .cws-rail { width: 268px; min-width: 268px; padding: 14px 14px 0 0;
-    display: flex; flex-direction: column; }
-  .cws-cards { display: flex; flex-direction: column; gap: 10px; }
-  /* 2px: white rail cards are panel-sized and 0.0% from a white page. */
-  .cws-card { background: #fff; border: 2px solid #e8e6e0; border-radius: 13px; padding: 12px 14px; }
-  .cws-card-head { display: flex; align-items: center; gap: 8px; }
-  .cws-card-title { font-size: 13.5px; font-weight: 700; color: #1f1e1d; flex: 0 0 auto; }
+  /* Right rail: three floating cards */
+  .cws-rail { width: 21%; min-width: 235px; max-width: 300px; padding: 14px 14px 0 0;
+    display: flex; flex-direction: column; gap: 10px; }
+  .cws-card { background: #fff; border: 2px solid #e8e6e0; border-radius: 14px; padding: 13px 15px;
+    box-shadow: 0 2px 8px rgba(31,30,29,0.04); }
+  .cws-card-head { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #1f1e1d; }
+  .cws-card-count { font-size: 13.5px; font-weight: 400; color: #6b6861; }
   .cws-card-sp { flex: 1; }
-  .cws-progress-count { flex: 1; text-align: right; font-size: 12.5px; color: #8a887f; }
-  .cws-progress-steps { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
-  .cws-progress-steps:empty { margin-top: 0; }
-  .cws-step { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: #57544c; line-height: 1.4; }
-  .cws-step-dot { width: 13px; height: 13px; border-radius: 50%; border: 1.4px solid #c9c7bf;
-    flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; }
-  .cws-step.done .cws-step-dot { background: #3fa860; border-color: #3fa860; }
-  .cws-step.done .cws-step-dot::after { content: '✓'; color: #fff; font-size: 8px; }
-  .cws-step.active .cws-step-dot { border-color: #D97757; }
-  .cws-step.done { color: #8a887f; }
-  .cws-outputs { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
-  .cws-outputs:empty { margin-top: 0; }
-  .cws-output { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #1f1e1d;
+  .cws-outputs { display: flex; flex-direction: column; gap: 6px; }
+  .cws-outputs:not(:empty) { margin-top: 10px; }
+  .cws-output { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #1f1e1d;
     border: 1px solid #efeee8; background: #fbfaf7; border-radius: 9px; padding: 7px 10px; }
-  .cws-output-ico { display: flex; color: #57544c; flex-shrink: 0; }
-  .cws-ctx-label { font-size: 11.5px; color: #8a887f; margin: 10px 0 7px; }
+  .cws-ctx-placeholder { padding: 14px 4px 6px; text-align: center; }
+  .cws-ctx-illus { position: relative; height: 62px; margin-bottom: 10px; }
+  .cws-ctx-sheet { position: absolute; border: 1.5px solid #dedcd4; background: #fdfdfb; border-radius: 7px; }
+  .cws-ctx-sheet--a { width: 34px; height: 40px; left: calc(50% - 48px); top: 14px; }
+  .cws-ctx-sheet--b { width: 34px; height: 40px; left: calc(50% - 6px); top: 10px; }
+  .cws-ctx-sheet--c { width: 40px; height: 48px; left: calc(50% + 8px); top: 2px;
+    border-style: dashed; display: flex; align-items: center; justify-content: center;
+    color: #8a887f; font-size: 15px; }
+  .cws-ctx-caption { font-size: 12.5px; color: #8a887f; line-height: 1.45; }
+  .cws-ctx-connlabel { font-size: 12.5px; color: #8a887f; margin: 12px 0 7px; }
   .cws-connectors { display: flex; flex-wrap: wrap; gap: 6px; }
-  .cws-conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #1f1e1d;
-    border: 1px solid #efeee8; background: #fbfaf7; border-radius: 9px; padding: 4px 9px 4px 5px; }
+  .cws-conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #1f1e1d;
+    border: 1px solid #e8e6e0; background: #fbfaf7; border-radius: 999px; padding: 4px 11px 4px 6px; }
   .cws-conn.is-live { border-color: rgba(217, 119, 87, 0.55); background: #fdf3ee; }
-  .cws-conn-ico { width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; position: relative;
-    display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
-    color: #fff; overflow: hidden; }
-  .cws-conn-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cws-conn-ico { width: 17px; height: 17px; border-radius: 5px; flex-shrink: 0; position: relative;
+    display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; }
+  .cws-conn-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 5px; }
 </style>
 
 <script>
@@ -307,88 +309,82 @@
     var tl = gsap.timeline();
     var q = function (s) { return el.querySelector(s); };
     var win = q('.cws-win');
-    var transcript = q('[data-target="transcript"]');
+    var track = q('[data-target="track"]');
+    var viewport = q('[data-target="viewport"]');
+    var inputBox = q('[data-target="inputbox"]');
     var inputEl = q('[data-target="input"]');
-    var inputBox = q('[data-target="input-box"]');
-    var dur = ctx.duration || 10;
+    var sendBtn = q('[data-target="send-btn"]');
+    var stopBtn = q('[data-target="stop-btn"]');
+    var dur = ctx.duration || 8;
 
-    q('[data-target="title"]').textContent = data.title || 'Launch campaign plan';
-    q('[data-target="model-label"]').textContent = data.model_label || 'Opus 4.8';
+    q('[data-target="title"]').textContent = data.title || 'Work flow test';
+    q('[data-target="model-label"]').textContent = data.model_label || 'Opus 5';
     q('[data-target="effort-label"]').textContent = data.effort_label || 'High';
     if (data.account_name) q('[data-target="account-name"]').textContent = data.account_name;
     if (data.account_name) q('[data-target="account-avatar"]').textContent = String(data.account_name).charAt(0).toUpperCase();
-    inputEl.setAttribute('data-placeholder', data.placeholder || 'Write a message…');
 
-    // Sidebar lists (task rows get the checklist glyph, chats the bubble)
-    var TASK_ICO = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M3 4.5l1 1 2-2M3 8.5l1 1 2-2M3 12.5l1 1 2-2M9 4.5h5M9 8.5h5M9 12.5h5" transform="scale(0.95)"/></svg>';
-    var CHAT_ICO = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/></svg>';
-    var pinned = Array.isArray(data.pinned) ? data.pinned : ['Canva Design Hub'];
-    var recents = Array.isArray(data.recents) && data.recents.length ? data.recents : [
-      { title: 'Email access question', kind: 'task' },
-      { title: 'Seniority Healthcare partnership requirements', kind: 'task' },
-      { title: 'Getquotient MCP integration', kind: 'task' },
-      { title: 'Quotient customer information sources', kind: 'task' },
-      { title: 'Integrating Quotient with Boomerang', kind: 'chat' },
-      { title: 'Head of growth role and responsibilities', kind: 'chat' },
-      { title: 'Canva launch image', kind: 'task' },
+    // ── Sidebar lists (same defaults as cowork-home) ──
+    var ARTIFACT_ICO = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2.5"/><path d="M5.5 8.6l1.8 1.8 3.4-3.8"/></svg>';
+    var TASK_ICO = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M3 4.5h2M7 4.5h6M3 8h2M7 8h6M3 11.5h2M7 11.5h6"/></svg>';
+    var pinned = Array.isArray(data.pinned) && data.pinned.length ? data.pinned : [
+      'Quotient Weekly Burn', 'Steve Goldberg Tracker', 'Quotient Usecase Picker',
+      'Quotient Time Savings Calculator', 'Quotient Process', 'Gtm Credits Onepager',
     ];
-    var activeIdx = Number(data.active_recent) || 1;
+    var recents = Array.isArray(data.recents) && data.recents.length ? data.recents : [
+      { title: data.title || 'Work flow test' }, { title: 'Canva launch image' },
+    ];
+    var activeRecent = data.active_recent != null ? Number(data.active_recent) : 0;
     var pinList = q('[data-target="pin-list"]');
     var recentList = q('[data-target="recent-list"]');
-    function rowEl(item, active) {
-      var it = typeof item === 'string' ? { title: item } : item;
+    function sideRow(item, ico, active) {
+      var title = item && item.title ? item.title : String(item);
       var d = document.createElement('div');
-      d.className = 'cws-session' + (active ? ' is-active' : '');
-      d.innerHTML = '<span class="cws-sess-ico">' + (it.kind === 'chat' ? CHAT_ICO : TASK_ICO) + '</span>' +
-        '<span class="cws-sess-title">' + (it.title || '') + '</span>';
+      d.className = 'cws-sessrow' + (active ? ' is-active' : '');
+      d.innerHTML = '<span class="cws-sessrow-ico">' + ico + '</span>' +
+        '<span class="cws-sessrow-title">' + title + '</span>';
       return d;
     }
-    pinned.forEach(function (t) { pinList.appendChild(rowEl(t, false)); });
-    recents.forEach(function (t, i) { recentList.appendChild(rowEl(t, i === activeIdx)); });
+    pinned.forEach(function (t) { pinList.appendChild(sideRow(t, ARTIFACT_ICO, false)); });
+    recents.forEach(function (t, i) { recentList.appendChild(sideRow(t, TASK_ICO, i === activeRecent)); });
 
-    // ── Right rail ──
+    // ── Rail: progress / outputs / connectors ──
+    var progress = data.progress || null;
     var progressCount = q('[data-target="progress-count"]');
-    var progressSteps = q('[data-target="progress-steps"]');
-    var progress = data.progress || { current: 0, total: 3 };
-    var steps = Array.isArray(data.progress_steps) ? data.progress_steps.slice() : [];
     function renderProgress() {
-      progressCount.textContent = progress.total ? (progress.current + ' of ' + progress.total) : '';
-      progressSteps.innerHTML = '';
-      steps.forEach(function (s, i) {
-        var d = document.createElement('div');
-        var done = i < progress.current;
-        var active = i === progress.current && progress.current < (progress.total || steps.length);
-        d.className = 'cws-step' + (done ? ' done' : '') + (active ? ' active' : '');
-        d.innerHTML = '<span class="cws-step-dot"></span><span>' + (s.text || s) + '</span>';
-        progressSteps.appendChild(d);
-      });
+      progressCount.textContent = progress && progress.total ? (progress.current || 0) + ' of ' + progress.total : '';
     }
     renderProgress();
-
     var outputsEl = q('[data-target="outputs"]');
-    var DOC_ICO = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z"/><path d="M9.5 1.5V5H13"/></svg>';
+    var DOC_ICO = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z"/><path d="M5.5 8h5M5.5 10.5h5"/></svg>';
     function addOutput(o, animate) {
       var d = document.createElement('div');
       d.className = 'cws-output';
-      d.innerHTML = '<span class="cws-output-ico">' + DOC_ICO + '</span>' +
-        '<span>' + (o.name || String(o)) + '</span>';
+      d.innerHTML = '<span>' + DOC_ICO + '</span><span>' + (o.name || String(o)) + '</span>';
       outputsEl.appendChild(d);
       if (animate !== false) gsap.from(d, { autoAlpha: 0, x: 14, duration: 0.35, ease: 'power2.out' });
       return d;
     }
     (Array.isArray(data.outputs) ? data.outputs : []).forEach(function (o) { addOutput(o, false); });
 
+    // Connectors: chips join the Context card when first used (like the app),
+    // unless connectors[].present === true (already in the rail at open).
     var LOGO_DEV = function (domain) {
       return 'https://img.logo.dev/' + domain + '?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=64&fallback=monogram';
     };
-    var GLOBE_ICO = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.7 3.7 2.7 6S9.8 12.3 8 14c-1.8-1.7-2.7-3.7-2.7-6S6.2 3.7 8 2z"/></svg>';
+    var GLOBE_ICO = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.7 3.7 2.7 6S9.8 12.3 8 14c-1.8-1.7-2.7-3.7-2.7-6S6.2 3.7 8 2z"/></svg>';
     var connectorsEl = q('[data-target="connectors"]');
-    var connectors = Array.isArray(data.connectors) && data.connectors.length ? data.connectors : [
-      { name: 'Quotient', icon_url: LOGO_DEV('getquotient.ai') },
-      { name: 'Web Search', globe: true },
-    ];
+    var connLabel = q('[data-target="conn-label"]');
+    var ctxPlaceholder = q('[data-target="ctx-placeholder"]');
+    var connectors = Array.isArray(data.connectors) ? data.connectors : [];
     var connEls = {};
-    connectors.forEach(function (c) {
+    function connDef(name) {
+      var key = String(name || '').toLowerCase();
+      for (var i = 0; i < connectors.length; i++) {
+        if (String(connectors[i].name || '').toLowerCase() === key) return connectors[i];
+      }
+      return null;
+    }
+    function connChipEl(c) {
       var d = document.createElement('div');
       d.className = 'cws-conn';
       var ico;
@@ -397,154 +393,366 @@
         String(c.name || '?').charAt(0) + '<img class="cws-conn-img" src="' + c.icon_url + '" onerror="this.remove()"/></span>';
       else ico = '<span class="cws-conn-ico" style="background:' + (c.color || '#57544c') + '">' + String(c.name || '?').charAt(0) + '</span>';
       d.innerHTML = ico + '<span>' + (c.name || '') + '</span>';
-      connectorsEl.appendChild(d);
-      connEls[String(c.name || '').toLowerCase()] = d;
-    });
-    var skillsEl = q('[data-target="skills"]');
-    var skillsLabel = q('[data-target="skills-label"]');
-    (Array.isArray(data.skills) ? data.skills : []).forEach(function (s) {
-      skillsLabel.style.display = '';
-      var d = document.createElement('div');
-      d.className = 'cws-conn';
-      d.innerHTML = '<span class="cws-conn-ico" style="background:#57544c">' + String(s).charAt(0).toUpperCase() + '</span><span>' + s + '</span>';
-      skillsEl.appendChild(d);
-    });
-
-    // ── Transcript blocks ──
-    function scrollDown() { transcript.scrollTop = transcript.scrollHeight; }
-    function addBlock(node, animate) {
-      transcript.appendChild(node);
-      if (animate !== false) {
-        gsap.set(node, { autoAlpha: 0, y: 8 });
-        gsap.to(node, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' });
-      }
-      scrollDown();
-      return node;
-    }
-    function md(text) {
-      var h = String(text || '');
-      h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
-      h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      return h;
-    }
-    function textEl(text, heading) {
-      var d = document.createElement('div');
-      d.className = heading ? 'cws-htext' : 'cws-text';
-      d.innerHTML = md(text);
       return d;
     }
-    function userEl(text) {
-      var d = document.createElement('div'); d.className = 'cws-user'; d.textContent = String(text || ''); return d;
-    }
-    // Tool-call rows: pop in running (spinner + the matching rail chip
-    // lights up), flip to done (green check + result) after `duration`.
-    function connIconHtml(name, size) {
+    function ensureChip(name) {
       var key = String(name || '').toLowerCase();
-      var c = null;
-      connectors.forEach(function (cc) { if (String(cc.name || '').toLowerCase() === key) c = cc; });
-      if (c && c.globe) return '<span class="cws-tcall-ico" style="background:transparent">' + GLOBE_ICO + '</span>';
-      if (c && c.icon_url) return '<span class="cws-tcall-ico" style="background:' + (c.color || '#393bf5') + '">' +
-        String(c.name).charAt(0) + '<img class="cws-conn-img" src="' + c.icon_url + '" onerror="this.remove()"/></span>';
-      return '<span class="cws-tcall-ico" style="background:#57544c">' + String(name || '?').charAt(0).toUpperCase() + '</span>';
-    }
-    function humanize(tool) {
-      return String(tool || 'Tool').split(/[-_]/).map(function (w) {
-        return w.charAt(0).toUpperCase() + w.slice(1);
-      }).join(' ');
-    }
-    var CLOCK_ICO = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.2 1.4"/></svg>';
-    var DONECHK_ICO = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M5.5 8l1.8 1.8L10.8 6.3"/></svg>';
-    function toolGroupEl(a) {
-      var d = document.createElement('div');
-      d.className = 'cws-tgroup';
-      var title = a.title || humanize(a.tool);
-      var thinkHtml = '';
-      if (a.thinking) {
-        thinkHtml = '<div class="cws-tg-row"><span class="cws-tg-glyph">' + CLOCK_ICO + '</span>' +
-          '<div class="cws-tg-think">' + String(a.thinking).replace(/`([^`]+)`/g, '<code>$1</code>') + '</div></div>';
-      }
-      d.innerHTML = '<div class="cws-tg-title">' + title + '</div>' +
-        '<div class="cws-tg-body">' + thinkHtml +
-          '<div class="cws-tg-row"><span class="cws-tg-glyph">' + connIconHtml(a.connector).replace('cws-tcall-ico', 'cws-tg-ico') + '</span>' +
-            '<div class="cws-tg-toolname">' + title + '</div>' +
-            '<div class="cws-tg-result"><span>Result</span></div></div>' +
-          '<div class="cws-tg-row cws-tg-usingrow"><div class="cws-tg-using"><span class="cws-tg-spin"></span>Using ' + (a.connector || 'tools') + '…</div></div>' +
-          '<div class="cws-tg-row"><span class="cws-tg-glyph">' + DONECHK_ICO + '</span>' +
-            '<div class="cws-tg-done">' + (a.done_label || 'Done') + '</div></div>' +
-        '</div>' +
-        '<div class="cws-tg-collapsed">' + title + ' <span class="chev">›</span></div>';
+      if (connEls[key]) return connEls[key];
+      var c = connDef(name) || { name: name };
+      var d = connChipEl(c);
+      gsap.set(d, { display: 'none' });
+      connectorsEl.appendChild(d);
+      connEls[key] = d;
       return d;
+    }
+    // Chips scheduled at build, shown by timeline sets (scrub-safe).
+    var railRevealed = false;
+    function scheduleChipJoin(tlRef, name, at) {
+      var d = ensureChip(name);
+      if (!railRevealed) {
+        railRevealed = true;
+        tlRef.set(ctxPlaceholder, { display: 'none' }, at);
+        tlRef.set(connLabel, { display: 'block' }, at);
+      }
+      tlRef.set(d, { display: 'inline-flex' }, at);
+      tlRef.fromTo(d, { scale: 0.7, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.35, ease: 'back.out(2)', immediateRender: false }, at);
     }
     function setConnLive(name, live) {
       var d = connEls[String(name || '').toLowerCase()];
       if (!d) return;
-      if (live) { d.classList.add('is-live'); gsap.from(d, { scale: 1.12, duration: 0.35, ease: 'back.out(2)' }); }
-      else d.classList.remove('is-live');
+      d.classList.toggle('is-live', !!live);
+    }
+    // present:true chips are in the rail from frame one.
+    connectors.forEach(function (c) {
+      if (c.present) {
+        var d = ensureChip(c.name);
+        gsap.set(d, { display: 'inline-flex' });
+        gsap.set(ctxPlaceholder, { display: 'none' });
+        gsap.set(connLabel, { display: 'block' });
+        railRevealed = true;
+      }
+    });
+
+    // ── Markdown-lite for prose ──
+    function md(text) {
+      var h = String(text || '');
+      h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+      h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      h = h.replace(/__([^_]+)__/g, '<u>$1</u>');
+      // Mid-stream a pair can be split across the slice point -- strip any
+      // unmatched leftover markers so "**" never renders literally.
+      h = h.replace(/\*\*/g, '').replace(/__/g, '').replace(/`/g, '');
+      return h;
     }
 
-    // Working ✳ in the transcript ("✳ Working on it…" after a user message,
-    // like the real app). Elements are created at BUILD (hidden) and
-    // shown/hidden by timeline set()s -- state as a function of playhead
-    // position, so the scrubber can never strand or duplicate the line.
-    var lastWorking = null;
-    function makeWorking(text) {
+    // ── Block builders (each returns a .cws-block element) ──
+    function blockWrap(inner) {
       var d = document.createElement('div');
-      d.className = 'cws-working';
+      d.className = 'cws-block';
+      if (inner) d.appendChild(inner);
+      return d;
+    }
+    function userBlock(text) {
+      var w = document.createElement('div');
+      w.className = 'cws-block cws-user-wrap';
+      w.innerHTML = '<div class="cws-user"></div>' +
+        '<span class="cws-user-copy"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="5" y="5" width="8" height="8" rx="1.5"/><path d="M3 10.5V4a1 1 0 011-1h6.5"/></svg></span>';
+      w.querySelector('.cws-user').textContent = String(text || '');
+      return w;
+    }
+    function textBlock(text, heading) {
+      var d = document.createElement('div');
+      d.className = 'cws-block ' + (heading ? 'cws-htext' : 'cws-text');
+      d.innerHTML = md(text);
+      return d;
+    }
+    function actionsBlock() {
+      var d = document.createElement('div');
+      d.className = 'cws-block cws-actions';
+      d.innerHTML =
+        '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="5" y="5" width="8" height="8" rx="1.5"/><path d="M3 10.5V4a1 1 0 011-1h6.5"/></svg>' +
+        '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6v4h2.5L9 13V3L5.5 6H3z"/><path d="M11 6a3 3 0 010 4"/></svg>' +
+        '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7.5v6M2 8.5v4a1 1 0 001 1h7.6a1.4 1.4 0 001.4-1.2l.8-4a1.4 1.4 0 00-1.4-1.6H8.6l.6-3a1.5 1.5 0 00-2.7-1.1L4.5 7.5H2z"/></svg>' +
+        '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" transform="rotate(180)"><path d="M4.5 7.5v6M2 8.5v4a1 1 0 001 1h7.6a1.4 1.4 0 001.4-1.2l.8-4a1.4 1.4 0 00-1.4-1.6H8.6l.6-3a1.5 1.5 0 00-2.7-1.1L4.5 7.5H2z"/></svg>';
+      return d;
+    }
+    function idleStarBlock() {
+      var d = document.createElement('div');
+      d.className = 'cws-block cws-idlestar';
+      d.textContent = '✳';
+      return d;
+    }
+    function statusBlock(text) {
+      var d = document.createElement('div');
+      d.className = 'cws-block cws-status';
       d.innerHTML = '<span class="star">✳</span>' +
-        '<span class="cws-working-verb">' + (text || 'Working on it…') + '</span>';
-      transcript.appendChild(d);
-      gsap.set(d, { display: 'none', autoAlpha: 0 });
-      gsap.to(d.querySelector('.star'), { rotation: 360, duration: 2.6, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
+        '<span class="cws-status-verb"></span><span class="cws-status-secs"></span>';
+      d.querySelector('.cws-status-verb').textContent = String(text || 'Working on it…');
+      gsap.to(d.querySelector('.star'), { rotation: 360, duration: 3.2, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
       return d;
     }
-    function scheduleWorking(tlRef, text, at) {
-      var prev = lastWorking;
-      var d = makeWorking(text);
-      lastWorking = d;
-      if (prev) tlRef.set(prev, { display: 'none', autoAlpha: 0 }, at);
-      tlRef.set(d, { display: 'flex', autoAlpha: 1 }, at);
-      tlRef.call(scrollDown, null, at);
-      return d;
+    var FOUND_ICO = '<svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5l3 3"/></svg>';
+    function toolConnIco(name) {
+      var c = connDef(name);
+      if (c && c.globe) return GLOBE_ICO;
+      if (c && c.icon_url) return '<span class="cws-conn-ico" style="background:' + (c.color || '#393bf5') + ';width:16px;height:16px">' +
+        String(c.name || '?').charAt(0) + '<img class="cws-conn-img" src="' + c.icon_url + '" onerror="this.remove()"/></span>';
+      return GLOBE_ICO;
     }
-    function scheduleStopWorking(tlRef, at) {
-      var target = lastWorking;
-      if (target) tlRef.set(target, { display: 'none', autoAlpha: 0 }, at);
-    }
-    function streamText(tlRef, text, at, secs, heading) {
-      var d = textEl('', heading);
-      var words = String(text || '').split(/(\s+)/);
-      var full = md(text);
-      scheduleStopWorking(tlRef, at);
-      tlRef.call(function () { if (!d.isConnected) addBlock(d); }, null, at);
-      var proxy = { n: 0 };
-      tlRef.to(proxy, {
-        n: words.length, duration: Math.max(0.6, secs || Math.min(3.2, words.length * 0.05)), ease: 'none',
-        onUpdate: function () { d.innerHTML = md(words.slice(0, Math.ceil(proxy.n)).join('')); scrollDown(); },
-        onComplete: function () { d.innerHTML = full; scrollDown(); },
-      }, at + 0.05);
+    // Tool-use block: summary line stays; the detail (found tools -> query row
+    // -> optional results panel) collapses away when done, like the app.
+    function toolBlock(a) {
+      var d = document.createElement('div');
+      d.className = 'cws-block';
+      var summary = document.createElement('div');
+      summary.className = 'cws-tsum';
+      summary.textContent = a.summary || ('Loaded tools, used ' + (a.connector || 'tools'));
+      d.appendChild(summary);
+      var detail = document.createElement('div');
+      detail.className = 'cws-tdetail';
+      var html = '<div class="cws-trow"><span class="cws-trow-ico">' + FOUND_ICO + '</span>Found tools</div>';
+      if (a.detail) html += '<div class="cws-trow" style="margin-left:29px;color:#6b6861;font-size:14.5px">' + a.detail + '</div>';
+      html += '<div class="cws-tstem"></div>';
+      if (a.query) {
+        html += '<div class="cws-trow"><span class="cws-trow-ico">' + toolConnIco(a.connector) + '</span>' +
+          '<span>' + a.query + '</span>' +
+          (a.results_count ? '<span class="cws-trow-count">' + a.results_count + '</span>' : '') + '</div>';
+      }
+      if (Array.isArray(a.results) && a.results.length) {
+        html += '<div class="cws-tresults">' + a.results.map(function (r) {
+          var fav = (r.domain || '?').charAt(0).toUpperCase();
+          return '<div class="cws-tres-row"><span class="cws-tres-fav">' + fav + '</span>' +
+            '<span class="cws-tres-title">' + (r.title || '') + '</span>' +
+            '<span class="cws-tres-domain">' + (r.domain || '') + '</span></div>';
+        }).join('') + '</div>';
+      }
+      detail.innerHTML = html;
+      d.appendChild(detail);
+      return { el: d, detail: detail };
     }
 
-    // ── Initial history ──
-    (Array.isArray(data.history) ? data.history : []).forEach(function (h) {
-      if (h.type === 'user') addBlock(userEl(h.text), false);
-      else if (h.type === 'heading') addBlock(textEl(h.text, true), false);
-      else addBlock(textEl(h.text), false);
+    // ── History: final-state blocks, visible from frame one ──
+    var history = Array.isArray(data.history) ? data.history : [];
+    history.forEach(function (h) {
+      var t = h.type || 'text';
+      if (t === 'user') track.appendChild(userBlock(h.text));
+      else if (t === 'heading') track.appendChild(textBlock(h.text, true));
+      else if (t === 'tool-summary') {
+        var s = document.createElement('div');
+        s.className = 'cws-block cws-tsum';
+        s.textContent = h.text || 'Loaded tools';
+        track.appendChild(s);
+      }
+      else if (t === 'actions') track.appendChild(actionsBlock());
+      else if (t === 'idle-star') track.appendChild(idleStarBlock());
+      else track.appendChild(textBlock(h.text, false));
     });
 
-    // ── Entrance ──
-    gsap.set(win, { autoAlpha: 0, y: 24 });
-    tl.to(win, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.15);
-    var cards = Array.prototype.slice.call(el.querySelectorAll('.cws-card'));
-    gsap.set(cards, { autoAlpha: 0, x: 18 });
-    cards.forEach(function (c, i) {
-      tl.to(c, { autoAlpha: 1, x: 0, duration: 0.45, ease: 'power3.out' }, 0.5 + i * 0.14);
+    // ── Script compiler: build every scripted node NOW, measure, then drive
+    //    reveals + the scroll entirely with timeline sets/tweens. ──
+    var script = Array.isArray(data.script) ? data.script.slice() : [];
+    script.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+
+    var events = [];   // {t, node, kind:'show'|'stream'|'collapse'|'hide', extra}
+    var pending = [];  // nodes to hide (display:none) after measuring
+    var activeStatus = null; // {node, t} awaiting replacement
+    function addNode(node) { track.appendChild(node); pending.push(node); return node; }
+    function closeStatus(t) {
+      if (!activeStatus) return null;
+      var s = activeStatus; activeStatus = null;
+      events.push({ t: t, node: s.node, kind: 'hide' });
+      return s;
+    }
+
+    var workOn = [];   // [start, end] windows -> stop button visible
+    var typingAt = null;
+
+    script.forEach(function (a) {
+      var at = a.at || 0;
+      var act = a.action;
+      if (act === 'type-message') {
+        typingAt = at;
+        events.push({ t: at, kind: 'send-show' });
+        tl.call(function () { inputBox.classList.add('is-active'); }, null, at);
+        typeText(tl, inputEl, a.text || '', at, a.speed || 30);
+      } else if (act === 'send-message') {
+        var bubble = addNode(userBlock(a.text || inputEl.textContent || ''));
+        // The bubble's text is known at build only if passed; fall back to the
+        // typed text captured at fire time.
+        if (!a.text) {
+          var bEl = bubble.querySelector('.cws-user');
+          tl.call(function () { if (inputEl.textContent) bEl.textContent = inputEl.textContent; inputEl.textContent = ''; inputBox.classList.remove('is-active'); }, null, at);
+        } else {
+          tl.call(function () { inputEl.textContent = ''; inputBox.classList.remove('is-active'); }, null, at);
+        }
+        events.push({ t: at, node: bubble, kind: 'show' });
+        events.push({ t: at, kind: 'send-hide' });
+      } else if (act === 'working' || act === 'status') {
+        closeStatus(at);
+        var s = addNode(statusBlock(a.text));
+        activeStatus = { node: s, t: at };
+        events.push({ t: at, node: s, kind: 'show' });
+        if (a.counter !== false) {
+          var secsEl = s.querySelector('.cws-status-secs');
+          var proxy = { n: 0 };
+          var cdur = a.duration || Math.max(1, dur - at - 0.3);
+          tl.to(proxy, { n: cdur, duration: cdur, ease: 'none',
+            onUpdate: function () { var v = Math.floor(proxy.n); secsEl.textContent = v >= 1 ? v + 's' : ''; } }, at);
+        }
+        workOn.push([at, null]);
+      } else if (act === 'stop-working') {
+        closeStatus(at);
+        events.push({ t: at, kind: 'work-end' });
+      } else if (act === 'respond' || act === 'claude-text') {
+        closeStatus(at);
+        var sdur = act === 'respond' ? (a.duration || Math.min(3.2, String(a.text || '').split(/\s+/).length * 0.05)) : 0;
+        var nodes = [];
+        if (a.heading) nodes.push(addNode(textBlock(a.heading === true ? a.text : a.heading, true)));
+        var body = (a.heading === true) ? null : addNode(textBlock(a.text, false));
+        if (body) nodes.push(body);
+        nodes.forEach(function (n) { events.push({ t: at, node: n, kind: 'show' }); });
+        if (act === 'respond' && body) {
+          // Stream words into a block whose FINAL height is reserved, while the
+          // scroll creeps linearly -- measured once, scrub-correct.
+          var words = String(a.text || '').split(/(\s+)/);
+          var full = md(a.text);
+          var proxy2 = { n: 0 };
+          tl.to(proxy2, { n: words.length, duration: Math.max(0.6, sdur), ease: 'none',
+            onUpdate: function () { body.innerHTML = md(words.slice(0, Math.ceil(proxy2.n)).join('')); },
+            onComplete: function () { body.innerHTML = full; } }, at + 0.03);
+          events.push({ t: at, kind: 'stream', node: body, dur: Math.max(0.6, sdur) });
+          workOn.push([at, at + Math.max(0.6, sdur)]);
+        }
+        if (a.then_actions !== false && act === 'respond') {
+          var ar = addNode(actionsBlock());
+          events.push({ t: at + Math.max(0.6, sdur) + 0.25, node: ar, kind: 'show' });
+        }
+      } else if (act === 'tool-use' || act === 'tool-call') {
+        closeStatus(at);
+        var ta = act === 'tool-call' ? {
+          summary: a.label ? ('Loaded tools, ' + a.label.charAt(0).toLowerCase() + a.label.slice(1)) : ('Loaded tools, used ' + (a.connector || 'tools')),
+          connector: a.connector, query: a.result || a.tool, detail: a.detail,
+        } : a;
+        var tb = toolBlock(ta);
+        addNode(tb.el);
+        events.push({ t: at, node: tb.el, kind: 'show' });
+        var tdur = a.duration || 1.6;
+        var collapseAt = a.collapse === false ? null : (at + tdur + (a.collapse_delay || 0.9));
+        if (collapseAt != null && collapseAt < dur - 0.2) {
+          events.push({ t: collapseAt, node: tb.detail, kind: 'collapse', parent: tb.el });
+        }
+        if (a.connector) {
+          scheduleChipJoin(tl, a.connector, at);
+          tl.call(function () { setConnLive(a.connector, true); }, null, at);
+          tl.call(function () { setConnLive(a.connector, false); }, null, at + tdur);
+        }
+        workOn.push([at, at + tdur]);
+      } else if (act === 'idle-star') {
+        var st = addNode(idleStarBlock());
+        events.push({ t: at, node: st, kind: 'show' });
+        events.push({ t: at, kind: 'work-end' });
+      } else if (act === 'actions-row') {
+        var arr = addNode(actionsBlock());
+        events.push({ t: at, node: arr, kind: 'show' });
+      } else if (act === 'join-connector') {
+        scheduleChipJoin(tl, a.name, at);
+      } else if (act === 'set-progress') {
+        tl.call(function () {
+          if (!progress) progress = {};
+          if (a.total != null) progress.total = Number(a.total);
+          if (a.current != null) progress.current = Number(a.current);
+          renderProgress();
+          gsap.from(progressCount, { scale: 1.35, duration: 0.35, ease: 'back.out(2)', transformOrigin: '100% 50%' });
+        }, null, at);
+      } else if (act === 'add-output') {
+        var node = null;
+        tl.call(function () {
+          if (node && node.isConnected) return;
+          if (node) { outputsEl.appendChild(node); return; }
+          node = addOutput(a);
+        }, null, at);
+      } else if (act === 'use-connector') {
+        scheduleChipJoin(tl, a.name, at);
+        tl.call(function () { setConnLive(a.name, true); }, null, at);
+        if (a.duration !== 0) tl.call(function () { setConnLive(a.name, false); }, null, at + (a.duration || 2.2));
+      }
     });
-    var initBlocks = Array.prototype.slice.call(transcript.children);
-    if (initBlocks.length) {
-      gsap.set(initBlocks, { autoAlpha: 0, y: 8 });
-      initBlocks.forEach(function (b, i) {
-        tl.to(b, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, 0.45 + i * 0.1);
-      });
+    // A status still open at the end of the script keeps running to the cut.
+
+    // ── Measure everything, then hide the future ──
+    // All nodes are in the DOM (visible) right now; measure block heights
+    // including their margins, then display:none the scripted ones.
+    var BLOCK_GAP = 0; // margins are part of offsetHeight? No -- measure via rects.
+    function outerH(n) {
+      var r = n.getBoundingClientRect();
+      var cs = getComputedStyle(n);
+      return r.height + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+    }
+    var viewH = viewport.getBoundingClientRect().height || 400;
+    var PAD = 16;
+    var heights = new Map();
+    var collapseDelta = new Map();
+    events.forEach(function (e) {
+      if (e.kind === 'show' && e.node && !heights.has(e.node)) heights.set(e.node, outerH(e.node));
+      if (e.kind === 'collapse' && e.node && !collapseDelta.has(e.node)) collapseDelta.set(e.node, outerH(e.node));
+    });
+    var historyH = 0;
+    Array.prototype.slice.call(track.children).forEach(function (c) {
+      if (pending.indexOf(c) === -1) historyH += outerH(c);
+    });
+    var trackPad = 36; // track's own top+bottom padding
+    pending.forEach(function (n) { gsap.set(n, { display: 'none' }); });
+
+    function scrollFor(contentH) {
+      return Math.max(0, contentH + trackPad - viewH + PAD);
+    }
+    var contentH = historyH;
+    // Open pre-scrolled to the bottom of history (continuity between scenes).
+    if (data.start_scrolled !== false) gsap.set(track, { y: -scrollFor(contentH) });
+
+    // Chronological scroll + reveal choreography.
+    events.sort(function (a, b) { return a.t - b.t; });
+    events.forEach(function (e) {
+      if (e.kind === 'show') {
+        contentH += heights.get(e.node) || 0;
+        tl.set(e.node, { display: 'block' }, e.t);
+        tl.fromTo(e.node, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power2.out', immediateRender: false }, e.t);
+        tl.to(track, { y: -scrollFor(contentH), duration: 0.55, ease: 'power2.out' }, e.t);
+      } else if (e.kind === 'hide') {
+        contentH -= heights.get(e.node) || 0;
+        tl.set(e.node, { display: 'none' }, e.t);
+        tl.to(track, { y: -scrollFor(contentH), duration: 0.4, ease: 'power2.out' }, e.t);
+      } else if (e.kind === 'collapse') {
+        var dh = collapseDelta.get(e.node) || 0;
+        contentH -= dh;
+        tl.to(e.node, { height: 0, autoAlpha: 0, marginTop: 0, duration: 0.45, ease: 'power2.inOut' }, e.t);
+        tl.to(track, { y: -scrollFor(contentH), duration: 0.45, ease: 'power2.inOut' }, e.t);
+      } else if (e.kind === 'stream') {
+        // The block was revealed at full (reserved) height; creep the scroll
+        // linearly across the stream so the text writes at the reading line.
+        tl.to(track, { y: -scrollFor(contentH), duration: e.dur, ease: 'none' }, e.t);
+      } else if (e.kind === 'send-show') {
+        tl.fromTo(sendBtn, { autoAlpha: 0, scale: 0.6 },
+          { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2.5)' }, e.t);
+      } else if (e.kind === 'send-hide') {
+        tl.set(sendBtn, { autoAlpha: 0 }, e.t);
+      }
+    });
+
+    // Stop button: visible across the union of work windows.
+    if (workOn.length) {
+      var wStart = workOn[0][0];
+      var wEnd = 0;
+      workOn.forEach(function (w) { wEnd = Math.max(wEnd, w[1] == null ? dur : w[1]); });
+      tl.set(stopBtn, { display: 'flex' }, wStart);
+      if (wEnd < dur - 0.15) tl.set(stopBtn, { display: 'none' }, wEnd);
+    }
+
+    // ── Entrance: settled by default for match-cut continuity; pass
+    //    data.entrance='rise' for the classic window rise. ──
+    if (data.entrance === 'rise') {
+      gsap.set(win, { autoAlpha: 0, y: 24 });
+      tl.to(win, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.1);
     }
 
     var cursorTargets = data.cursor_targets || {
@@ -555,103 +763,8 @@
                  y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
       },
     };
-
-    // ── Script ──
     if (data.script && data.script.length > 0) {
-      runScript(tl, el, data.script, cursorTargets, ctx, {
-        'type-message': function (tl, ctr, action, at) {
-          tl.call(function () { inputBox.classList.add('is-active'); }, null, at);
-          typeText(tl, inputEl, action.text || '', at, action.speed || 30);
-        },
-        // Scrub-safety rule for every block-adding handler below: the node is
-        // created ONCE (at build, or memoized on first fire) and the call only
-        // attaches it if it isn't already in the DOM. GSAP re-fires call()s
-        // whenever the playhead crosses them -- Studio's scrubber was minting
-        // a fresh tool-call card per pass and stacking duplicates.
-        'send-message': function (tl, ctr, action, at) {
-          var bubble = null;
-          tl.call(function () {
-            if (!bubble) {
-              var txt = inputEl.textContent;
-              if (!txt) return;
-              bubble = userEl(txt);
-            }
-            if (!bubble.isConnected) addBlock(bubble);
-            inputEl.textContent = '';
-            inputBox.classList.remove('is-active');
-          }, null, at);
-        },
-        'working': function (tl, ctr, action, at) {
-          scheduleWorking(tl, action.text, at);
-        },
-        'stop-working': function (tl, ctr, action, at) { scheduleStopWorking(tl, at); },
-        'respond': function (tl, ctr, action, at) {
-          streamText(tl, action.text || '', at, action.duration, action.heading);
-        },
-        'claude-text': function (tl, ctr, action, at) {
-          var node = textEl(action.text || '', action.heading);
-          scheduleStopWorking(tl, at);
-          tl.call(function () { if (!node.isConnected) addBlock(node); }, null, at);
-        },
-        'tool-call': function (tl, ctr, action, at) {
-          var block = toolGroupEl(action);
-          scheduleStopWorking(tl, at);
-          tl.call(function () {
-            if (!block.isConnected) addBlock(block);
-            gsap.killTweensOf(block.querySelector('.cws-tg-spin'));
-            gsap.to(block.querySelector('.cws-tg-spin'),
-              { rotation: 360, duration: 1.4, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
-            if (action.connector) setConnLive(action.connector, true);
-          }, null, at);
-          var doneAt = at + (action.duration || 1.8);
-          tl.call(function () {
-            gsap.killTweensOf(block.querySelector('.cws-tg-spin'));
-            block.classList.add('is-done');
-            gsap.from(block.querySelector('.cws-tg-done'), { autoAlpha: 0, y: 4, duration: 0.3, ease: 'power2.out' });
-            if (action.connector && action.keep_live !== true) setConnLive(action.connector, false);
-            scrollDown();
-          }, null, doneAt);
-          if (action.then_working) scheduleWorking(tl, null, doneAt + 0.05);
-          // The real UI tucks finished tool work behind a one-liner with a
-          // chevron ("List Social Posts ›") -- auto-collapse unless told not to.
-          if (action.collapse !== false) {
-            tl.call(function () {
-              if (block.classList.contains('is-collapsed')) return;
-              var h = block.offsetHeight;
-              block.style.height = h + 'px';
-              block.classList.add('is-collapsed');
-              var target = block.querySelector('.cws-tg-collapsed');
-              gsap.set(block, { height: h });
-              gsap.to(block, { height: target.offsetHeight, duration: 0.45, ease: 'power2.inOut',
-                onComplete: function () { block.style.height = ''; scrollDown(); } });
-              gsap.from(target, { autoAlpha: 0, duration: 0.3, delay: 0.15 });
-            }, null, doneAt + (action.collapse_delay || 1.0));
-          }
-        },
-        'set-progress': function (tl, ctr, action, at) {
-          tl.call(function () {
-            if (action.total != null) progress.total = Number(action.total);
-            if (action.current != null) progress.current = Number(action.current);
-            if (Array.isArray(action.steps)) steps = action.steps.slice();
-            renderProgress();
-            gsap.from(progressCount, { scale: 1.35, duration: 0.35, ease: 'back.out(2)', transformOrigin: '100% 50%' });
-          }, null, at);
-        },
-        'add-output': function (tl, ctr, action, at) {
-          var node = null;
-          tl.call(function () {
-            if (node && node.isConnected) return;
-            if (node) { outputsEl.appendChild(node); return; }
-            node = addOutput(action);
-          }, null, at);
-        },
-        'use-connector': function (tl, ctr, action, at) {
-          tl.call(function () { setConnLive(action.name, true); }, null, at);
-          if (action.duration !== 0) {
-            tl.call(function () { setConnLive(action.name, false); }, null, at + (action.duration || 2.2));
-          }
-        },
-      });
+      runScript(tl, el, [], cursorTargets, ctx);
     }
 
     return tl;
