@@ -356,6 +356,19 @@ export async function measureLayout(opts: {
     const dead = deadFrameDefect(coverage, colorSpread);
     if (dead) lastDead = dead; else deadEveryFrame = false;
 
+    // Mid-zoom/pan frames: the camera transform is what pushed content past
+    // the edges -- that is the SHOT, not a layout bug. Skip every geometry
+    // finding for this instant (clipped text, off-canvas, edge bleed,
+    // collisions); the scale-invariant checks above (panel fill separation,
+    // content coverage) already ran. Measured on proj_65e702e3: a campaign
+    // board staged at x:0 width:100% reported its title 67% off-frame because
+    // the probe landed inside a camera_moves zoom, and the auto-fix loop then
+    // shrank fonts that were never too big.
+    if (layout.cameraActive) {
+      if (process.env.MP_LAYOUT_DEBUG) console.log(`  [layout-dbg] t=${t} camera active -- geometry checks skipped this frame`);
+      continue;
+    }
+
     // Edge bleed: a static positioning bug (element straddling the canvas
     // border), so ONE hit across the probed moments is enough -- keep the first.
     if (!edgeBleed) {

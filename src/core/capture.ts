@@ -621,6 +621,11 @@ export interface LayoutProbeResult {
   /** Pairs of unrelated text elements whose boxes overlap -- two captions or a
    *  chip landing on a breadcrumb row (neither contains the other in the DOM). */
   textCollisions: Array<{ a: string; b: string; overlapFrac: number }>;
+  /** True when a camera rig held a non-identity transform at this instant --
+   *  the frame is mid-zoom/pan and geometry (clipped/off-canvas) reflects the
+   *  CAMERA, not the layout. Scale-invariant checks stay valid. Stamped by
+   *  captureSingleFrame after the probe (measured outside the page evaluate). */
+  cameraActive?: boolean;
 }
 
 export async function captureSingleFrame(options: {
@@ -641,7 +646,7 @@ export async function captureSingleFrame(options: {
   /** Layout probe: collect surfaces + content bounding boxes so the caller can
    *  measure surface separation (ghost panels) and content coverage (dead zones). */
   layoutProbe?: boolean;
-}): Promise<{ textElements?: TextElementMetric[]; layout?: LayoutProbeResult }> {
+}): Promise<{ textElements?: TextElementMetric[]; layout?: LayoutProbeResult; cameraActive?: boolean }> {
   const {
     htmlPath,
     outputPath,
@@ -656,6 +661,7 @@ export async function captureSingleFrame(options: {
   } = options;
   let textElements: TextElementMetric[] | undefined;
   let layout: LayoutProbeResult | undefined;
+  let cameraActive: boolean | undefined;
 
   let ownBrowser: Browser | undefined;
   let page: Page | undefined;
@@ -685,6 +691,30 @@ export async function captureSingleFrame(options: {
       await page.evaluate((t: number) => {
         try { (window as any).__MP_TIMELINE.time(t); } catch { /* component callback threw; capture current state */ }
       }, atTime);
+    }
+
+    // Camera state AT THIS INSTANT (after the seek). camera_moves zooms/pans
+    // transform the rig; mid-move, content legitimately leaves the frame --
+    // that is what a zoom IS -- and any geometry finding (clipped text,
+    // off-canvas content, edge bleed) would blame the layout for the
+    // cinematography. Scale-invariant checks (contrast ratio, panel fill
+    // separation) stay valid on these frames. The ambient Ken Burns
+    // (.mp-camera, scale 1.03 + <=10px drift inside a 20px overscan) never
+    // exposes edges, so the thresholds sit above it.
+    if (contrastProbe || layoutProbe) {
+      cameraActive = await page.evaluate(() => {
+        for (const rig of Array.from(document.querySelectorAll(".__mp_camera_rig, .__mp_camera_clip, .mp-camera"))) {
+          const t = getComputedStyle(rig as Element).transform;
+          if (!t || t === "none") continue;
+          const m = t.match(/matrix\(([^)]+)\)/);
+          if (!m) return true; // matrix3d or other: assume the camera is moving
+          const p = m[1].split(",").map((s) => parseFloat(s));
+          const scale = Math.max(Math.abs(p[0]), Math.abs(p[3]));
+          const tx = Math.abs(p[4]), ty = Math.abs(p[5]);
+          if (scale > 1.05 || scale < 0.95 || tx > 14 || ty > 14) return true;
+        }
+        return false;
+      });
     }
 
     // Handle video elements: extract single frames with ffmpeg, replace with <img>
@@ -954,6 +984,7 @@ export async function captureSingleFrame(options: {
           if (alphaOf(htmlBg) >= 0.5) pageBg = htmlBg;
         }
 
+
         const els = Array.from(document.querySelectorAll("body *"));
         let hasRichFullBleedBg = false;
         const surfaces: any[] = [];
@@ -1144,6 +1175,7 @@ export async function captureSingleFrame(options: {
         }
         return { vw, vh, pageBg, surfaces, contentBoxes, hasRichFullBleedBg, clippedTexts, offCanvasContent, textCollisions };
       }, { vw: width, vh: height });
+      if (layout) (layout as LayoutProbeResult).cameraActive = cameraActive === true;
     }
 
     // Wait (bounded) for ALL images -- remote avatars/logos (logo.dev,
@@ -1185,5 +1217,5 @@ export async function captureSingleFrame(options: {
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   }
-  return { textElements, layout };
+  return { textElements, layout, cameraActive };
 }
