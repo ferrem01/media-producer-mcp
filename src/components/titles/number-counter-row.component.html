@@ -82,8 +82,13 @@
     // invisible as a money number. data.font_size overrides directly
     // ("24vh", "18vw"); data.hero sizes the row so ONE stat fills ~1/4 of
     // the frame height and a multi-stat row shares it proportionally.
+    // The flag counts wherever the author put it: the storyboard writes
+    // "hero": true INSIDE the stat object as naturally as at the data root
+    // (measured on proj_b75ca862 -- every counter carried it at stat level
+    // and the scale never applied).
+    var hero = !!data.hero || stats.some(function (s) { return s && s.hero; });
     var heroSize = data.font_size ? String(data.font_size)
-      : data.hero ? (stats.length <= 1 ? '26vh' : stats.length === 2 ? '18vh' : '13vh')
+      : hero ? (stats.length <= 1 ? '26vh' : stats.length === 2 ? '18vh' : '13vh')
       : null;
 
     // Build stat items with dividers
@@ -110,6 +115,11 @@
       var labelEl = document.createElement('div');
       labelEl.className = 'stat-label';
       labelEl.textContent = stats[i].label || '';
+      // The fixed slate (#64748b) measures ~3.4:1 on BOTH light and dark
+      // grounds. The label rides the ink at reduced presence instead: the
+      // composited color clears 4.5:1 wherever the value itself does.
+      labelEl.style.color = data.color ? String(data.color) : 'var(--mp-color-text, #ffffff)';
+      labelEl.style.opacity = '0.72';
       item.appendChild(labelEl);
 
       container.appendChild(item);
