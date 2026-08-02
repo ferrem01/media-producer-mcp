@@ -60,9 +60,13 @@
     position: absolute; top: 0; left: 0;
     display: flex; flex-direction: column;
     background: #fff;
-    border: 1px solid #ececea;
+    /* Real elevation: the ghost-panel gate (layout-metrics) only credits a
+       border >= 1.5px and a shadow with alpha >= 0.12 -- a 1px hairline and a
+       5%-alpha wash read as nothing at video scale, and this window floats
+       over an arbitrary brand page. */
+    border: 1.5px solid #dedcd6;
     border-radius: 14px;
-    box-shadow: 0 2px 14px rgba(0,0,0,0.05);
+    box-shadow: 0 10px 32px rgba(23,23,28,0.16);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color: #1a1a1a;
     overflow: hidden;
@@ -86,9 +90,9 @@
     position: relative; top: 1px;
   }
   .qch-tab.active { border-bottom-color: #1a1a1a; }
-  .qch-tab:not(.active) { color: #9c9a94; font-weight: 500; }
+  .qch-tab:not(.active) { color: #6b6963; font-weight: 500; }
   .qch-tab-label { overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
-  .qch-tab-x { color: #9c9a94; font-size: 15px; font-weight: 400; }
+  .qch-tab-x { color: #6b6963; font-size: 15px; font-weight: 400; }
   .qch-tab-spin {
     width: 14px; height: 14px; flex-shrink: 0;
     color: #b9b7b1;
@@ -115,7 +119,7 @@
   .qch-verb { margin: 14px 0 6px; }
   .qch-verb-row {
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-    font-size: 13.5px; color: #9c9a94;
+    font-size: 13.5px; color: #6b6963;
   }
   .qch-verb-row .qch-vtitle { color: #1f1e1b; font-weight: 600; }
   .qch-verb-title { font-size: 14.5px; font-weight: 600; margin-top: 5px; color: #1a1a1a; }
@@ -131,7 +135,7 @@
 
   /* Content card: streaming Created/Updated box */
   .qch-cc {
-    border: 1px solid #eceae7; border-radius: 12px;
+    border: 1.5px solid #dedcd6; border-radius: 12px;
     background: #fcfbfa;
     margin: 12px 0;
     overflow: hidden;
@@ -141,9 +145,9 @@
     padding: 11px 13px 9px;
     cursor: pointer;
   }
-  .qch-cc-verb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9c9a94; }
+  .qch-cc-verb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b6963; }
   .qch-cc-title { font-size: 14.5px; font-weight: 600; margin-top: 4px; color: #1a1a1a; }
-  .qch-cc-chev { color: #8b8983; margin-top: 3px; transition: transform 0.2s; }
+  .qch-cc-chev { color: #63615c; margin-top: 3px; transition: transform 0.2s; }
   .qch-cc-chev svg { width: 15px; height: 15px; }
   .qch-cc:not(.open) .qch-cc-chev { transform: rotate(180deg); }
   .qch-cc-bodywrap { padding: 0 10px 10px; }
@@ -170,7 +174,7 @@
   .qch-task { margin: 14px 0; }
   .qch-task-row {
     display: flex; align-items: center; gap: 6px;
-    font-size: 13.5px; color: #9c9a94;
+    font-size: 13.5px; color: #6b6963;
   }
   .qch-task-status { display: inline-flex; align-items: center; gap: 5px; color: #1f1e1b; font-weight: 600; }
   .qch-task-half {
@@ -236,7 +240,7 @@
   }
   .qch-typing i {
     width: 6px; height: 6px; border-radius: 50%;
-    background: #a3a19a; display: block;
+    background: #6b6963; display: block;
     animation: qchBlink 1.2s infinite;
   }
   .qch-typing i:nth-child(2) { animation-delay: 0.2s; }
@@ -260,14 +264,14 @@
   /* ── Composer ── */
   .qch-composer {
     margin: 0 12px 12px;
-    border: 1px solid #e6e4df; border-radius: 16px;
+    border: 1.5px solid #d9d7d1; border-radius: 16px;
     background: #fff;
     padding: 13px 14px 11px;
     flex-shrink: 0;
-    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+    box-shadow: 0 2px 10px rgba(23,23,28,0.12);
   }
   .qch-input { position: relative; font-size: 14px; color: #1a1a1a; min-height: 21px; }
-  .qch-placeholder { color: #a3a19a; position: absolute; left: 0; top: 0; }
+  .qch-placeholder { color: #6b6963; position: absolute; left: 0; top: 0; }
   .qch-input.filled .qch-placeholder { display: none; }
   .qch-caret {
     display: none; width: 1.5px; height: 15px; background: #1a1a1a;
@@ -284,7 +288,7 @@
   .qch-mic { width: 16px; height: 16px; }
   .qch-send {
     width: 34px; height: 34px; border-radius: 50%;
-    background: #8b8983; color: #fff;
+    background: #63615c; color: #fff;
     display: flex; align-items: center; justify-content: center;
   }
   .qch-send svg { width: 15px; height: 15px; }
@@ -301,14 +305,14 @@
     min-width: 260px; max-width: 88%;
     z-index: 20;
   }
-  .qch-refs-title { font-size: 13px; color: #9c9a94; margin-bottom: 7px; }
+  .qch-refs-title { font-size: 13px; color: #6b6963; margin-bottom: 7px; }
   .qch-ref-row {
     display: flex; align-items: center; gap: 8px;
     padding: 7px 2px;
     font-size: 13.5px; font-weight: 600; color: #1a1a1a;
   }
   .qch-ref-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .qch-ref-kind { font-size: 12.5px; font-weight: 400; color: #9c9a94; flex-shrink: 0; }
+  .qch-ref-kind { font-size: 12.5px; font-weight: 400; color: #6b6963; flex-shrink: 0; }
 </style>
 
 <script>
@@ -334,7 +338,7 @@
       if (e === 'campaign') return '<span class="qch-ent plain" style="color:#4b7bf5"><svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg></span>';
       if (e === 'blog') return '<span class="qch-ent plain" style="color:#55534e"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V3H6.5A2.5 2.5 0 004 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 006.5 22H20v-5"/></svg></span>';
       if (e === 'memory') return '<span class="qch-ent plain" style="color:#55534e"><svg viewBox="0 0 24 24"><path d="M9.5 3a3 3 0 00-3 3 3.2 3.2 0 00-2.7 3.2 3.2 3.2 0 00.9 2.25A3.4 3.4 0 004 14a3.3 3.3 0 002.6 3.2A3 3 0 009.6 21c1.2 0 2.4-.8 2.4-2V5.2C12 3.9 10.8 3 9.5 3z"/><path d="M14.5 3a3 3 0 013 3 3.2 3.2 0 012.7 3.2 3.2 3.2 0 01-.9 2.25A3.4 3.4 0 0120 14a3.3 3.3 0 01-2.6 3.2A3 3 0 0114.4 21c-1.2 0-2.4-.8-2.4-2V5.2C12 3.9 13.2 3 14.5 3z"/></svg></span>';
-      return '<span class="qch-ent plain" style="color:#9c9a94"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></span>';
+      return '<span class="qch-ent plain" style="color:#6b6963"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></span>';
     }
     function entNoun(entity) {
       var e = String(entity || '').toLowerCase();

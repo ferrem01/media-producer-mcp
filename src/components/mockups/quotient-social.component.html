@@ -187,6 +187,11 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow: hidden;
     color: #1a1a1a;
+    /* The shell had NO edge at all -- it ghosted straight into any light
+       brand page. Same elevation recipe as .qch/.qcp-card. */
+    border: 1.5px solid #dedcd6;
+    border-radius: 14px;
+    box-shadow: 0 10px 32px rgba(23,23,28,0.16);
   }
 
   /* ── App chrome bar ── */
@@ -283,9 +288,9 @@
     width: 100%; max-width: 760px;
     flex: 1; min-height: 0;
     background: #fff;
-    border: 1px solid #e6e5e2;
+    border: 1.5px solid #dedcd6;
     border-radius: 14px;
-    box-shadow: 0 2px 18px rgba(0,0,0,0.07);
+    box-shadow: 0 6px 22px rgba(23,23,28,0.13);
     overflow: hidden;
   }
 
@@ -315,7 +320,7 @@
     width: 50px; height: 50px; border-radius: 50%;
     background: #dfe7f5;
     display: flex; align-items: center; justify-content: center;
-    font-size: 17px; font-weight: 700; color: #5b7bb5;
+    font-size: 17px; font-weight: 700; color: #3d5c94;
     overflow: hidden; position: relative;
   }
   .qsp-ava img.qsp-ava-img {
@@ -429,7 +434,7 @@
     padding: 13px 13px 13px 17px;
     box-shadow: 0 1px 6px rgba(0,0,0,0.04);
   }
-  .qsp-comment-ph { font-size: 14.5px; color: #a3a19a; }
+  .qsp-comment-ph { font-size: 14.5px; color: #6b6963; }
   .qsp-comment-send {
     width: 30px; height: 30px; border-radius: 50%;
     background: #f0efec;
@@ -437,7 +442,7 @@
   }
   .qsp-comment-send svg {
     width: 14px; height: 14px;
-    fill: none; stroke: #8b8983; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    fill: none; stroke: #63615c; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
   }
 
   /* ── Engagement row ── */
@@ -448,11 +453,11 @@
   }
   .qsp-eng-item {
     display: flex; align-items: center; gap: 9px;
-    font-size: 14.5px; font-weight: 500; color: #a3a19a;
+    font-size: 14.5px; font-weight: 500; color: #6b6963;
   }
   .qsp-eng-item svg {
     width: 18px; height: 18px;
-    fill: none; stroke: #a3a19a; stroke-width: 1.6;
+    fill: none; stroke: #6b6963; stroke-width: 1.6;
     stroke-linecap: round; stroke-linejoin: round;
   }
 
@@ -467,7 +472,7 @@
     width: 44px; height: 44px; border-radius: 50%;
     background: #dfe7f5; overflow: hidden; position: relative;
     display: flex; align-items: center; justify-content: center;
-    font-size: 15px; font-weight: 700; color: #5b7bb5;
+    font-size: 15px; font-weight: 700; color: #3d5c94;
   }
   .qsp-fa-ava img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .qsp-fa-badge {
@@ -600,13 +605,19 @@
     }
 
     // ── Author ──
+    // Initials go in a SPAN that hides once the photo covers it. Leaving the
+    // text node live under an opaque img made the contrast gate measure "MF"
+    // against the photo's pixels (1:1) -- text nobody can see, defect every run.
     var ava = el.querySelector('.qsp-ava');
-    ava.textContent = authorInitials;
+    var avaTxt = document.createElement('span');
+    avaTxt.textContent = authorInitials;
+    ava.appendChild(avaTxt);
     if (authorAvatarUrl) {
       var img = document.createElement('img');
       img.className = 'qsp-ava-img';
       img.src = authorAvatarUrl;
-      img.onerror = function() { this.remove(); };
+      img.onload = function() { avaTxt.style.visibility = 'hidden'; };
+      img.onerror = function() { this.remove(); avaTxt.style.visibility = 'visible'; };
       ava.appendChild(img);
     }
     var avaBadge = el.querySelector('.qsp-ava-badge');
@@ -712,11 +723,14 @@
     if (authorComment) {
       footAuthor.style.display = 'flex';
       var faAva = el.querySelector('.qsp-fa-ava');
-      faAva.textContent = authorInitials;
+      var faTxt = document.createElement('span');
+      faTxt.textContent = authorInitials;
+      faAva.appendChild(faTxt);
       if (authorAvatarUrl) {
         var faImg = document.createElement('img');
         faImg.src = authorAvatarUrl;
-        faImg.onerror = function() { this.remove(); };
+        faImg.onload = function() { faTxt.style.visibility = 'hidden'; };
+        faImg.onerror = function() { this.remove(); faTxt.style.visibility = 'visible'; };
         faAva.appendChild(faImg);
       }
       var faBadge = el.querySelector('.qsp-fa-badge');

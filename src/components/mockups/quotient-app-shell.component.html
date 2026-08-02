@@ -138,8 +138,8 @@
     color: #1a1a1a;
     overflow: hidden;
     border-radius: 16px;
-    border: 1px solid #e9e8e4;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.09);
+    border: 1.5px solid #dedcd6;
+    box-shadow: 0 10px 40px rgba(23,23,28,0.16);
   }
   .qas svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -199,11 +199,11 @@
     display: flex; align-items: center; gap: 8px;
     border: 1px solid #e6e4df; border-radius: 10px;
     background: #fff;
-    padding: 8px 12px; font-size: 13.5px; color: #8b8983;
+    padding: 8px 12px; font-size: 13.5px; color: #63615c;
     min-width: 210px;
   }
-  .qas-search svg { width: 14px; height: 14px; color: #8b8983; }
-  .qas-kbd { margin-left: auto; font-size: 11.5px; color: #9c9a94; }
+  .qas-search svg { width: 14px; height: 14px; color: #63615c; }
+  .qas-kbd { margin-left: auto; font-size: 11.5px; color: #6b6963; }
   .qas-hist-btn { color: #55534e; display: flex; padding: 4px; }
   .qas-hist-btn svg { width: 17px; height: 17px; }
   .qas-newchat {
@@ -242,7 +242,7 @@
     max-width: 70%;
   }
   .qas-tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .qas-tab-x { color: #9c9a94; font-size: 15px; }
+  .qas-tab-x { color: #6b6963; font-size: 15px; }
   .qas-panel-icons { display: flex; align-items: center; gap: 10px; color: #55534e; }
   .qas-pi { position: relative; display: flex; align-items: center; cursor: pointer; }
   .qas-pi svg { width: 16px; height: 16px; }
@@ -262,7 +262,7 @@
   .qas-reviewed { margin: 0 0 6px; }
   .qas-reviewed-verb {
     display: flex; align-items: center; gap: 6px;
-    font-size: 13.5px; color: #8b8983;
+    font-size: 13.5px; color: #63615c;
   }
   .qas-reviewed-title { font-size: 15px; font-weight: 600; margin-top: 5px; color: #1a1a1a; }
   .qas-plat-ico { display: inline-flex; width: 15px; height: 15px; border-radius: 3px; overflow: hidden; vertical-align: -2px; }
@@ -281,10 +281,10 @@
   }
   .qas-toolcard-verb {
     display: flex; align-items: center; gap: 6px;
-    font-size: 13px; color: #8b8983;
+    font-size: 13px; color: #63615c;
   }
   .qas-toolcard-title { font-size: 14.5px; font-weight: 600; margin-top: 4px; color: #1a1a1a; }
-  .qas-toolcard-chev { color: #8b8983; transition: transform 0.2s; margin-top: 3px; }
+  .qas-toolcard-chev { color: #63615c; transition: transform 0.2s; margin-top: 3px; }
   .qas-toolcard-chev svg { width: 15px; height: 15px; }
   .qas-toolcard.open .qas-toolcard-chev { transform: rotate(180deg); }
   .qas-toolcard-body {
@@ -325,7 +325,7 @@
   }
   .qas-typing i {
     width: 6px; height: 6px; border-radius: 50%;
-    background: #a3a19a; display: block;
+    background: #6b6963; display: block;
     animation: qasBlink 1.2s infinite;
   }
   .qas-typing i:nth-child(2) { animation-delay: 0.2s; }
@@ -341,7 +341,7 @@
     flex-shrink: 0;
   }
   .qas-input { position: relative; font-size: 14px; color: #1a1a1a; min-height: 21px; }
-  .qas-placeholder { color: #a3a19a; position: absolute; left: 0; top: 0; }
+  .qas-placeholder { color: #6b6963; position: absolute; left: 0; top: 0; }
   .qas-input.filled .qas-placeholder { display: none; }
   .qas-caret {
     display: none; width: 1.5px; height: 15px; background: #1a1a1a;
