@@ -28,6 +28,8 @@ const BY_NAME: Array<[RegExp, unknown]> = [
   [/^(url|href|link)$/i, "https://getquotient.ai"],
   [/^(src|image|image_url|logo|logo_url|avatar|poster|thumbnail)/i, ""],
   [/^(value|count|number|stat)$/i, 42],
+  [/^(prefix)$/i, "$"],
+  [/^(suffix|unit)$/i, "%"],
   [/^(percent|progress)$/i, 64],
   [/^(duration|seconds|at|delay|hold)$/i, 0.4],
   [/^(scene_index|index)$/i, "02 / 05"],

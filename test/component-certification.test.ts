@@ -54,6 +54,9 @@ interface Finding { component: string; category: string; theme: string; type: st
 describe.skipIf(!process.env.MP_CERT_SWEEP)("component library certification", () => {
   it("every component's own chrome passes the gates on both grounds", async () => {
     const findings: Finding[] = [];
+    // MP_CERT_ONLY=comma,separated,types re-runs just those components --
+    // the fix loop shouldn't pay for the whole library per iteration.
+    const only = process.env.MP_CERT_ONLY ? new Set(process.env.MP_CERT_ONLY.split(",")) : null;
     const cats = (await fs.readdir(LIB, { withFileTypes: true }))
       .filter((d) => d.isDirectory() && d.name !== "shared" && !SKIP_CATEGORIES.has(d.name))
       .map((d) => d.name);
@@ -63,6 +66,7 @@ describe.skipIf(!process.env.MP_CERT_SWEEP)("component library certification", (
       for (const f of files) {
         const type = f.replace(".component.html", "");
         if (SKIP_TYPES.has(type)) continue;
+        if (only && !only.has(type)) continue;
         const source = await fs.readFile(path.join(LIB, cat, f), "utf-8");
         let schemaData: Record<string, never> = {};
         try {
@@ -91,7 +95,11 @@ describe.skipIf(!process.env.MP_CERT_SWEEP)("component library certification", (
           const htmlPath = path.join(dir, "scene.html");
           await fs.writeFile(htmlPath, html);
           try {
-            const contrast = await measureTextContrast({ htmlPath, width: W, height: H, atTimes: [DUR * 0.65] });
+            // Two probe times: the transient-entrance filter needs a moment
+            // where the text has fully arrived, or a masked entrance reads as
+            // clipped forever (first sweep flagged half the caption family at
+            // "0:1" mid-roll).
+            const contrast = await measureTextContrast({ htmlPath, width: W, height: H, atTimes: [DUR * 0.5, DUR * 0.85] });
             for (const d of contrast) {
               findings.push({ component: type, category: cat, theme: g.theme, type: `contrast:${d.reason}`, detail: `"${d.text}" ${d.contrast}:1 (needs ${d.threshold}:1)` });
             }
