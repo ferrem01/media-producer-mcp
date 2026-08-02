@@ -2523,12 +2523,14 @@ async function runUnifiedPipeline(
   // proj_a7b3ffbd -- 50.4s vs the 45s cap). Cap any scene, then squeeze
   // proportionally until the total fits, BEFORE bar quantization. Beats
   // rescale with their scene.
+  let grammarSceneCap: number | undefined;
   {
     const LENGTH_DISCIPLINE: Record<string, { sceneCap: number; totalCap: number; minScene: number }> = {
       "social-reel": { sceneCap: 6, totalCap: 28, minScene: 1.5 },
       "data-story": { sceneCap: 7, totalCap: 42, minScene: 2 },
     };
     const rule = LENGTH_DISCIPLINE[filmGrammar];
+    grammarSceneCap = rule?.sceneCap;
     if (rule) {
       const ldScenes = storyboard.scenes as Array<{ label?: string; duration_seconds: number; beats?: SceneBeat[] }>;
       for (const s of ldScenes) {
@@ -2638,7 +2640,7 @@ async function runUnifiedPipeline(
   // Each segment (incoming transition + scene) is snapped to a whole number of
   // bars, so cumulative cut points fall exactly on the track's bar grid.
   if (beatMap) {
-    quantizeScenesToBars(storyboard.scenes, beatMap.barSec);
+    quantizeScenesToBars(storyboard.scenes, beatMap.barSec, grammarSceneCap);
   }
 
   // Film-time starts (post-quantization): the continuous world backdrop
@@ -3626,9 +3628,10 @@ function segmentTransitionSeconds(
   return scene.transition_in?.duration_seconds || 0.5;
 }
 
-function quantizeScenesToBars(
+export function quantizeScenesToBars(
   scenes: Array<{ label?: string; duration_seconds: number; beats?: SceneBeat[]; transition_in?: { type?: string; duration_seconds?: number } }>,
   barSec: number,
+  sceneCap?: number,
 ): void {
   if (!(barSec > 0)) return;
   const toBars = (seconds: number) => {
@@ -3636,7 +3639,13 @@ function quantizeScenesToBars(
     // stamp, one click) quantizes to HALF a bar instead of being inflated
     // to a full one -- the cut still lands on the grid.
     if (seconds <= barSec * 0.75) return Math.round((barSec / 2) * 10000) / 10000;
-    return Math.round(Math.max(1, Math.round(seconds / barSec)) * barSec * 10000) / 10000;
+    let bars = Math.max(1, Math.round(seconds / barSec));
+    // Grammar length discipline runs BEFORE this pass, so rounding UP can
+    // re-inflate a just-clamped scene past its cap (a 6s-capped social-reel
+    // scene on a 3.4s bar rounded to 6.8s). Snap DOWN instead -- the cut
+    // stays on the grid AND the film keeps its promised length.
+    if (sceneCap && bars * barSec > sceneCap + 0.05 && bars > 1) bars -= 1;
+    return Math.round(bars * barSec * 10000) / 10000;
   };
 
   let changes = 0;

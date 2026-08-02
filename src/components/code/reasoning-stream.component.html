@@ -47,7 +47,11 @@
       tl.fromTo(r.el, { opacity: 0, y: 6 }, { opacity: 0.9, y: 0, duration: 0.3, ease: 'power2.out' }, t0);
       if (i >= 2) {
         var older = rows[i - 2].el;
-        tl.to(older, { opacity: r.head ? 0.5 : 0.38, duration: 0.4 }, t0);
+        // Receded rows land BELOW 0.5 opacity: the legibility gate treats
+        // sub-0.5 text as deliberately decorative, while 0.5 composites dark
+        // ink to a mid-gray that measures ~3.2:1 on a light wash (flagged
+        // live on proj_b8eb5c3b). 0.45 reads identically as "history".
+        tl.to(older, { opacity: r.head ? 0.45 : 0.35, duration: 0.25 }, t0);
       }
     });
     return tl;

@@ -1057,7 +1057,27 @@ export async function captureSingleFrame(options: {
             contentBoxes.push(box);
           }
           if (directText.length >= 3 && fontSize >= 14) {
-            textEls.push({ el, x: r.x, y: r.y, w: r.width, h: r.height, label: labelOf(el, directText) });
+            // Glyph extent, not container extent. An animated text container
+            // spans its whole component while its lines occupy a fraction --
+            // comparing container boxes flagged a pill sitting in a
+            // container's EMPTY corner as a 100% collision (proj_b8eb5c3b).
+            // Union the element's own text-node line rects; zero-size rects
+            // (type-on words not yet revealed) are ignored.
+            let gx = 0, gy = 0, gr = 0, gb = 0, got = false;
+            try {
+              for (const n of Array.from(el.childNodes)) {
+                if (n.nodeType !== 3 || !(n.textContent || "").trim()) continue;
+                const range = document.createRange();
+                range.selectNodeContents(n);
+                for (const cr of Array.from(range.getClientRects())) {
+                  if (cr.width < 1 || cr.height < 1) continue;
+                  if (!got) { gx = cr.x; gy = cr.y; gr = cr.right; gb = cr.bottom; got = true; }
+                  else { gx = Math.min(gx, cr.x); gy = Math.min(gy, cr.y); gr = Math.max(gr, cr.right); gb = Math.max(gb, cr.bottom); }
+                }
+              }
+            } catch { /* Range unsupported on this node: fall back to the element box */ }
+            if (got) textEls.push({ el, x: gx, y: gy, w: gr - gx, h: gb - gy, label: labelOf(el, directText) });
+            else textEls.push({ el, x: r.x, y: r.y, w: r.width, h: r.height, label: labelOf(el, directText) });
           }
 
           // Partial overhang: a content element (or filled panel) hanging a

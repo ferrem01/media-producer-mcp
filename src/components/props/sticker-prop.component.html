@@ -32,6 +32,22 @@
     var rot = data.rotation === undefined ? (kind === 'stamp' ? -8 : 0) : Number(data.rotation) || 0;
     host.appendChild(prop);
 
+    // FIT: a prop must never spill past its own box. The fixed pill font +
+    // nowrap let a long line overflow the component (measured: "1 AGENT / 12
+    // POSTS / 5 CHANNELS" ran ~84px past its pill and the overflow read
+    // white-on-white at 1.18:1). Shrink to fit, floor at 11px, wrap as the
+    // last resort.
+    if (kind !== 'ring') {
+      var hostW = host.clientWidth;
+      var propW = prop.scrollWidth || prop.offsetWidth;
+      if (hostW > 40 && propW > hostW) {
+        var base = parseFloat(getComputedStyle(prop).fontSize) || 17;
+        var fit = Math.max(11, Math.floor((base * hostW * 0.94) / propW));
+        prop.style.fontSize = fit + 'px';
+        if ((prop.scrollWidth || prop.offsetWidth) > hostW) prop.style.whiteSpace = 'normal';
+      }
+    }
+
     var at = Math.max(0, Number(data.at) || 0.4);
     var hold = Number(data.hold) || 0; // 0 = stays for the scene
     if (kind === 'stamp' && window.mpStampIn) {

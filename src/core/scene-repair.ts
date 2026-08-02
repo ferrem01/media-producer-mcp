@@ -59,6 +59,7 @@ const TEXT_ROLE = /^(kinetic-text|caption-|annotation|lower-third|st-|headline|t
 const COLOR_CAPABLE = new Set([
   "kinetic-text", "morph-text", "ghost-type", "texture-mask-text",
   "sticker-prop", "floating-pills", "code-block", "progress-bar", "line-chart",
+  "number-counter-row", // reads data.color + data.font_size since the hero-scale pass (#36)
 ]);
 
 /**

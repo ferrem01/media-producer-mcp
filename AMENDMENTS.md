@@ -2189,3 +2189,42 @@ What remains is the long tail, each noted with its cause:
   next component polish pass.
 - Template/theme text contrast on 2 headlines (2.86-3.17:1) with no
   data.color channel -- template typography, #36.
+
+## #36: hero-number scale + the long tail, closed (2026-08-02)
+
+The last open backlog item, plus everything verification 5 traced to
+component interiors:
+
+- **Bar-quantize re-inflation (the original #36 bug)**: LENGTH_DISCIPLINE
+  clamps run BEFORE quantizeScenesToBars, and toBars rounded to the NEAREST
+  bar -- a 6s-capped social-reel scene on a 3.4s bar re-inflated to 6.8s.
+  The quantizer now takes the grammar's sceneCap and snaps DOWN when
+  rounding up would breach it: the cut stays on the grid AND the film keeps
+  its promised length.
+- **Hero-number scale**: number-counter-row's fixed 72px (6.7% of a 1080p
+  frame) now yields to data: data.font_size directly, or data.hero (one
+  stat ~26vh, rows share proportionally); data.color repaints. The
+  data-story contract carries "HERO TYPE IS DATA, NOT HOPE" and the
+  component joined COLOR_CAPABLE -- only after it actually read the field.
+- **Chromium border rounding (the qch-cc mystery solved)**: Chromium
+  computes a 1.5px border as 1px at DPR 1 (measured with a live probe) --
+  under the gate's MIN_VISIBLE_BORDER floor AND visually a hairline. Every
+  1.5px panel border from the #588 pass is now 2px, .qcp-ev calendar chips
+  included. The mock-legibility test now SCRIPTS a content card into
+  existence, closing the blind spot that let the empty-shell test pass
+  while the live film flagged.
+- **sticker-prop fits its own box**: long pill text shrinks to fit (floor
+  11px, wrap as last resort) instead of spilling ~84px past the pill and
+  reading white-on-white.
+- **Transient entrance dimness**: a low-contrast finding measured ONLY
+  mid-fade (opacity 0.5-0.85), for text that reaches full opacity and
+  PASSES at another probe, is the entrance animation -- dropped in
+  measureTextContrast's finalize. Persistently dim text keeps its finding.
+  reasoning-stream's receded rows also land at 0.45/0.35 opacity now
+  (below the gate's decorative threshold; 0.5 composited dark ink to a
+  ~3.2:1 mid-gray on light washes).
+- **Glyph-box collisions**: the collision probe unions each element's own
+  text-node line rects instead of the container box -- a pill in a
+  container's EMPTY corner no longer reads as a 100% collision. Type-on
+  words not yet revealed (zero-size rects) are ignored.
+- **quotient-chat placeholder** (already merged in #591) completed the set.
