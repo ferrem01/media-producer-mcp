@@ -503,7 +503,7 @@
       var d = textEl('', heading);
       var words = String(text || '').split(/(\s+)/);
       var full = md(text);
-      tlRef.call(function () { removeWorking(); addBlock(d); }, null, at);
+      tlRef.call(function () { removeWorking(); if (!d.isConnected) addBlock(d); }, null, at);
       var proxy = { n: 0 };
       tlRef.to(proxy, {
         n: words.length, duration: Math.max(0.6, secs || Math.min(3.2, words.length * 0.05)), ease: 'none',
@@ -551,11 +551,20 @@
           tl.call(function () { inputBox.classList.add('is-active'); }, null, at);
           typeText(tl, inputEl, action.text || '', at, action.speed || 30);
         },
+        // Scrub-safety rule for every block-adding handler below: the node is
+        // created ONCE (at build, or memoized on first fire) and the call only
+        // attaches it if it isn't already in the DOM. GSAP re-fires call()s
+        // whenever the playhead crosses them -- Studio's scrubber was minting
+        // a fresh tool-call card per pass and stacking duplicates.
         'send-message': function (tl, ctr, action, at) {
+          var bubble = null;
           tl.call(function () {
-            var txt = inputEl.textContent;
-            if (!txt) return;
-            addBlock(userEl(txt));
+            if (!bubble) {
+              var txt = inputEl.textContent;
+              if (!txt) return;
+              bubble = userEl(txt);
+            }
+            if (!bubble.isConnected) addBlock(bubble);
             inputEl.textContent = '';
             inputBox.classList.remove('is-active');
           }, null, at);
@@ -568,21 +577,21 @@
           streamText(tl, action.text || '', at, action.duration, action.heading);
         },
         'claude-text': function (tl, ctr, action, at) {
-          tl.call(function () { removeWorking(); addBlock(textEl(action.text || '', action.heading)); }, null, at);
+          var node = textEl(action.text || '', action.heading);
+          tl.call(function () { removeWorking(); if (!node.isConnected) addBlock(node); }, null, at);
         },
         'tool-call': function (tl, ctr, action, at) {
-          var block = null;
+          var block = toolGroupEl(action);
           tl.call(function () {
             removeWorking();
-            block = toolGroupEl(action);
-            addBlock(block);
+            if (!block.isConnected) addBlock(block);
+            gsap.killTweensOf(block.querySelector('.cws-tg-spin'));
             gsap.to(block.querySelector('.cws-tg-spin'),
               { rotation: 360, duration: 1.4, repeat: -1, ease: 'none', transformOrigin: '50% 50%' });
             if (action.connector) setConnLive(action.connector, true);
           }, null, at);
           var doneAt = at + (action.duration || 1.8);
           tl.call(function () {
-            if (!block) return;
             gsap.killTweensOf(block.querySelector('.cws-tg-spin'));
             block.classList.add('is-done');
             gsap.from(block.querySelector('.cws-tg-done'), { autoAlpha: 0, y: 4, duration: 0.3, ease: 'power2.out' });
@@ -594,7 +603,7 @@
           // chevron ("List Social Posts ›") -- auto-collapse unless told not to.
           if (action.collapse !== false) {
             tl.call(function () {
-              if (!block) return;
+              if (block.classList.contains('is-collapsed')) return;
               var h = block.offsetHeight;
               block.style.height = h + 'px';
               block.classList.add('is-collapsed');
@@ -616,7 +625,12 @@
           }, null, at);
         },
         'add-output': function (tl, ctr, action, at) {
-          tl.call(function () { addOutput(action); }, null, at);
+          var node = null;
+          tl.call(function () {
+            if (node && node.isConnected) return;
+            if (node) { outputsEl.appendChild(node); return; }
+            node = addOutput(action);
+          }, null, at);
         },
         'use-connector': function (tl, ctr, action, at) {
           tl.call(function () { setConnLive(action.name, true); }, null, at);
