@@ -265,9 +265,11 @@ export async function captureScene(options: CaptureOptions): Promise<CaptureResu
     omitBackground,
   }));
 
-  // Spawn worker as child process
+  // Spawn worker as child process. MP_WORKER_DIR points TS runners (vitest,
+  // tsx) at the BUILT workers -- import.meta.url resolves into src/ there,
+  // where no .js exists. Same contract as render.ts's scene-worker forks.
   const workerPath = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname),
+    process.env.MP_WORKER_DIR || path.dirname(new URL(import.meta.url).pathname),
     "capture-worker.js"
   );
 

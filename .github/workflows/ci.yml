@@ -1,0 +1,55 @@
+name: CI
+
+# Typecheck + the full vitest suite on every pull request and on master.
+#
+# The suite includes browser-backed behavioral tests (the measurement gates
+# run against real components in a real Chromium) and real-render tests
+# (scene workers + ffmpeg), so the runner installs both. MP_WORKER_DIR points
+# the TS-run code at the BUILT workers in dist/core -- under vitest,
+# import.meta.url resolves into src/ where no worker .js exists.
+#
+# Known-failing tests are marked it.fails IN the suite (codegen-e2e's
+# pure-custom scaffolding drift; the st-statement negative-space vs
+# coverage-floor design decision) so this stays green without hiding them:
+# the day either behavior changes, .fails flips red and forces the call.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build (tests fork the compiled scene/capture workers)
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Test
+        run: npx vitest run
+        env:
+          MP_WORKER_DIR: ${{ github.workspace }}/dist/core
