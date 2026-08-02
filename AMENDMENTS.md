@@ -2296,3 +2296,19 @@ made the suite honestly green rather than green-by-exclusion:
   the call.
 
 Full suite: 81/81 files. First fully-green run of the project.
+
+### CI's first day: three catches before it was even merged
+
+Run 1 (PR #596): three speaker suites used "/nonexistent" as a data dir to
+mean "never touches disk" -- ensureSpeakerDerived mkdirs its assets dir, and
+only the root sandbox could create /nonexistent. Fixed with real mkdtemp
+scratch dirs.
+
+Run 2: three MORE suites (live-narration-cuts, reference-images,
+scene-cache) leaned on the /data/media-producer default -- also
+root-only. Fixed systemically: vitest.config.ts mkdtemps a scratch dir and
+sets MP_DATA_DIR for every run, killing the class.
+
+Run 3: GREEN. The lesson, recorded: this sandbox runs as ROOT, so any test
+that writes an absolute path silently passes here and fails on every normal
+machine. CI is the only guard that sees it.
