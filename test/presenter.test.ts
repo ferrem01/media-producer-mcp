@@ -108,6 +108,6 @@ describe("generate_presenter wiring (source guards)", () => {
     const s = await read("../src/server.ts");
     expect(s).toMatch(/"generate_presenter"/);
     expect(s).toMatch(/heard_by_whisper/);
-    expect(s).toMatch(/FULL SPEECHES: generate_presenter/);
+    expect(s).toMatch(/generate_presenter = a whole script/);
   });
 });
