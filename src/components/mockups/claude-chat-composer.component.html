@@ -99,7 +99,9 @@
   .composer-wrapper { padding: 8px 24px 16px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
   .composer-box {
     display: flex; flex-direction: column; width: 100%; max-width: 680px; min-height: 148px;
-    background: #fff; border: 1.5px solid #dddad3; border-radius: 20px;
+    /* 2px border: white-on-white pages need a computed >= 1.5px edge, and
+       Chromium rounds an authored 1.5px down to 1px. */
+    background: #fff; border: 2px solid #dddad3; border-radius: 20px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04); position: relative; overflow: hidden;
   }
   .composer-input {
@@ -119,7 +121,9 @@
   .plus-btn.active, .plus-btn.hovered { background: #f0efe9; }
   .model-selector { font-size: 14px; color: #9B9490; white-space: nowrap; padding: 4px 6px; cursor: default; }
   .model-selector .model-name { color: #3D3A37; font-weight: 500; }
-  .model-selector .model-quality { color: #9B9490; font-weight: 400; }
+  /* #6E6963: the quality suffix sits on the white composer and #9B9490
+     measured 2.95:1 -- this keeps the muted read at ~5.4:1. */
+  .model-selector .model-quality { color: #6E6963; font-weight: 400; }
   .model-selector .model-chevron { font-size: 10px; color: #9B9490; margin-left: 2px; }
   .mic-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent; color: #1a1a1a; cursor: default; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .send-btn { width: 38px; height: 38px; border-radius: 10px; border: none; cursor: default; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #D97706; color: #fff; }

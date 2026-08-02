@@ -309,6 +309,11 @@
   .canvas-content .design-partner-logo {
     width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center;
     justify-content: center; font-size: 14px; font-weight: 700;
+    /* The canvas paints its own dark surface (#0f172a default), so the logo
+       pins its ink instead of inheriting the page default (measured 1.18:1
+       black-on-canvas when data omits/garbles textColor). Valid data colors
+       still win via the inline styles set in the script. */
+    color: #fff; background: rgba(255, 255, 255, 0.12);
   }
   .canvas-content .design-plus { color: rgba(255,255,255,0.5); font-size: 24px; font-weight: 300; }
   /* ── Canvas text overlay ── */

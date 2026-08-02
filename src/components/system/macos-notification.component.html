@@ -52,7 +52,10 @@
     gap: 22px;
     padding: 26px 28px;
     border-radius: 28px;
-    background: rgba(255, 255, 255, 0.13);
+    /* Dark frosted glass (macOS dark-mode notification): the 13%-white wash
+       over the accent blob left white body/action text at ~2.5-3.4:1; a dark
+       wash keeps every white run >= 6:1 whatever the blob hue. */
+    background: rgba(38, 35, 60, 0.72);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow:
@@ -82,7 +85,11 @@
     justify-content: center;
     font-size: 34px;
     color: #fff;
-    background: linear-gradient(150deg, var(--mp-color-primary, #6366f1), var(--mp-color-accent, #a78bfa));
+    /* Brand hues mixed toward dark: a glyph on the raw accent end measured
+       2.53:1; the mix keeps hue and clears 3:1 (~5.6:1). */
+    background: linear-gradient(150deg,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 70%, #1a1433),
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 60%, #1a1433));
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   }
 
@@ -137,7 +144,12 @@
     var blob1 = el.querySelector('.mac-blob-1');
     var blob2 = el.querySelector('.mac-blob-2');
 
-    if (iconEl) iconEl.textContent = data.icon || '📅';
+    if (iconEl) {
+      // Emoji slot handed a word: render a monogram, not wrapped body copy.
+      var iconStr = String(data.icon == null ? '' : data.icon).trim();
+      var iconGlyphs = Array.from(iconStr);
+      iconEl.textContent = !iconStr ? '📅' : (iconGlyphs.length > 2 ? iconGlyphs[0].toUpperCase() : iconStr);
+    }
     if (titleEl) titleEl.textContent = data.title || 'Calendar';
     if (subEl) subEl.textContent = data.subtitle || 'Design Review in 10 minutes';
     if (actionEl) {

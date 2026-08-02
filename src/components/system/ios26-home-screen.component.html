@@ -5,14 +5,20 @@
       <div class="ios-blob ios-blob-2"></div>
       <div class="ios-blob ios-blob-3"></div>
     </div>
-    <div class="ios-phone">
-      <div class="ios-statusbar">
-        <span class="ios-time"></span>
-        <span class="ios-status-icons">📶 􀙇 100%</span>
+    <!-- .ios-fit scales the fixed 480x1000 phone down to whatever box the
+         scene gives the component -- without it, a 40%-tall band clipped the
+         entire status bar / widgets / dock off-view (measured 1:1 chrome
+         against the bare page in certification). -->
+    <div class="ios-fit">
+      <div class="ios-phone">
+        <div class="ios-statusbar">
+          <span class="ios-time"></span>
+          <span class="ios-status-icons">📶 􀙇 100%</span>
+        </div>
+        <div class="ios-widgets"></div>
+        <div class="ios-grid"></div>
+        <div class="ios-dock"></div>
       </div>
-      <div class="ios-widgets"></div>
-      <div class="ios-grid"></div>
-      <div class="ios-dock"></div>
     </div>
   </div>
 </template>
@@ -28,6 +34,14 @@
     justify-content: center;
     font-family: var(--mp-font-family, 'Inter', -apple-system, 'SF Pro Display', system-ui, sans-serif);
     background: #07060e;
+    /* Edge ring: #07060e measured 0.7% lightness separation from a #0f172a
+       page -- the stage needs its own visible boundary on dark grounds. */
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+  }
+
+  .ios-fit {
+    flex-shrink: 0;
+    transform-origin: center center;
   }
 
   .ios-phone {
@@ -56,10 +70,14 @@
     content: '';
     position: absolute;
     inset: 0;
+    /* Brand hues mixed toward a dark anchor: white chrome (status bar, icon
+       labels) rides this wallpaper directly, and a full-strength lavender
+       radial measured 2.7-3.7:1 behind it. The mix caps hotspot lightness so
+       white ink clears 4.5:1 (~6:1 at the accent hotspot) while keeping hue. */
     background:
-      radial-gradient(circle at 25% 20%, var(--mp-color-primary, #6366f1) 0%, transparent 45%),
-      radial-gradient(circle at 80% 30%, var(--mp-color-accent, #a78bfa) 0%, transparent 45%),
-      radial-gradient(circle at 50% 90%, #f0abfc 0%, transparent 50%),
+      radial-gradient(circle at 25% 20%, color-mix(in srgb, var(--mp-color-primary, #6366f1) 60%, #16112e) 0%, transparent 45%),
+      radial-gradient(circle at 80% 30%, color-mix(in srgb, var(--mp-color-accent, #a78bfa) 55%, #16112e) 0%, transparent 45%),
+      radial-gradient(circle at 50% 90%, color-mix(in srgb, #f0abfc 45%, #16112e) 0%, transparent 50%),
       linear-gradient(160deg, #2a2350, #120f24);
     z-index: 0;
   }
@@ -97,11 +115,18 @@
   }
   .ios-widget {
     flex: 1;
+    /* min-width 0: without it, a nowrap headline sets the flex item's
+       min-content width and the widget grows past the phone edge (measured
+       24% clipped) instead of letting the fitter shrink/ellipsize the line. */
+    min-width: 0;
     height: 160px;
     border-radius: 30px;
     padding: 20px;
     color: #fff;
-    background: rgba(255, 255, 255, 0.14);
+    /* Dark glass: white widget text over a light 14%-white wash sat at
+       ~4.5:1 worst-case on wallpaper hotspots; a dark wash keeps the frosted
+       look and lifts white ink to ~10:1. */
+    background: rgba(24, 20, 46, 0.5);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), inset 0 0 0 1px rgba(255,255,255,0.08), 0 12px 30px rgba(0,0,0,0.3);
@@ -184,6 +209,47 @@
     var gridEl = el.querySelector('.ios-grid');
     var dockEl = el.querySelector('.ios-dock');
 
+    // Fit-to-box: the phone is authored at 480x1000; boxes shorter than that
+    // used to clip every piece of chrome off-view (certified 1:1 against the
+    // bare page). Scale the wrapper, leave GSAP's transforms on .ios-phone.
+    var stageEl = el.querySelector('.ios-stage');
+    var fitEl = el.querySelector('.ios-fit');
+    if (stageEl && fitEl) {
+      var sr = stageEl.getBoundingClientRect();
+      if (sr.width > 4 && sr.height > 4) {
+        var fitScale = Math.min(1, sr.width / 500, sr.height / 1010);
+        if (fitScale < 1) fitEl.style.transform = 'scale(' + fitScale + ')';
+      }
+    }
+
+    // Emoji slot handed a word: render an OS-style monogram instead of 45px
+    // of clipped text (measured in certification).
+    function iconGlyph(s, fallback) {
+      var str = String(s == null ? '' : s).trim();
+      if (!str) return fallback;
+      var glyphs = Array.from(str);
+      return glyphs.length > 2 ? glyphs[0].toUpperCase() : str;
+    }
+
+    // Fit a one-line widget headline the way iOS does: shrink a few steps,
+    // then ellipsize -- a full sentence in a 160px widget otherwise overflows
+    // onto the app grid.
+    function fitWidgetLine(node, minPx) {
+      if (!node) return;
+      node.style.whiteSpace = 'nowrap';
+      node.style.overflow = 'hidden';
+      var fs = parseFloat(getComputedStyle(node).fontSize) || 24;
+      while (node.scrollWidth > node.clientWidth && fs > minPx) {
+        fs -= 1;
+        node.style.fontSize = fs + 'px';
+      }
+      var txt = node.textContent;
+      while (node.scrollWidth > node.clientWidth && txt.length > 2) {
+        txt = txt.slice(0, -2);
+        node.textContent = txt + '…';
+      }
+    }
+
     if (timeEl) timeEl.textContent = data.time || '9:41';
 
     var apps = (data.apps && data.apps.length) ? data.apps : [
@@ -217,6 +283,7 @@
         ((data.upNext && data.upNext.time) || '2:00 PM') + '</div>';
       widgetsEl.appendChild(w2);
       widgetEls.push(w2);
+      fitWidgetLine(w2.querySelector('.ios-widget-big'), 20);
     }
 
     // App grid
@@ -227,7 +294,7 @@
         wrap.className = 'ios-icon-wrap';
         var ic = document.createElement('div');
         ic.className = 'ios-icon';
-        ic.textContent = apps[i].icon || '📱';
+        ic.textContent = iconGlyph(apps[i].icon, '📱');
         wrap.appendChild(ic);
         var lb = document.createElement('div');
         lb.className = 'ios-icon-label';
@@ -244,7 +311,7 @@
       for (var d = 0; d < dockApps.length; d++) {
         var di = document.createElement('div');
         di.className = 'ios-icon';
-        di.textContent = dockApps[d].icon || '📱';
+        di.textContent = iconGlyph(dockApps[d].icon, '📱');
         dockEl.appendChild(di);
         dockEls.push(di);
       }
