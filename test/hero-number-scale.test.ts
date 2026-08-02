@@ -38,6 +38,12 @@ describe("hero-number scale (data-story)", () => {
   it("number-counter-row reads data.hero / data.font_size / data.color", async () => {
     const src = await read("../src/components/titles/number-counter-row.component.html");
     expect(src).toMatch(/data\.hero/);
+    // The storyboard writes "hero": true INSIDE the stat object as naturally
+    // as at the data root (proj_b75ca862: every counter, stat level, scale
+    // never applied). Both spellings must count.
+    expect(src).toMatch(/stats\.some\(function \(s\) \{ return s && s\.hero; \}\)/);
+    // Labels ride the ink, not a fixed slate that fails on every ground.
+    expect(src).toMatch(/labelEl\.style\.opacity = '0\.72'/);
     expect(src).toMatch(/data\.font_size/);
     expect(src).toMatch(/valueEl\.style\.fontSize = heroSize/);
     expect(src).toMatch(/valueEl\.style\.color = data\.color/);
@@ -72,6 +78,17 @@ describe("transient entrance dimness is not a contrast defect", () => {
     expect(tc).toMatch(/failedFull/);
     expect(tc).toMatch(/passedFull/);
     expect(tc).toMatch(/d\.reason !== "low-contrast" \|\| failedFull\.has\(d\.text\) \|\| !passedFull\.has\(d\.text\)/);
+  });
+});
+
+describe("a hardcoded-dark mock pins its own ink", () => {
+  it("email-compose does not paint the brand text token on its dark card", async () => {
+    // proj_b75ca862: every address line at 1.03:1 -- the card is #1a1a22 and
+    // .email-value rode var(--mp-color-text), which is dark ink on light brands.
+    const src = await read("../src/components/mockups/email-compose.component.html");
+    const emailValue = src.split(".email-value {")[1]?.split("}")[0] || "";
+    expect(emailValue).not.toMatch(/--mp-color-text/);
+    expect(emailValue).toMatch(/#f4f4f6/);
   });
 });
 

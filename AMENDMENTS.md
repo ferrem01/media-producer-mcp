@@ -2228,3 +2228,21 @@ component interiors:
   container's EMPTY corner no longer reads as a 100% collision. Type-on
   words not yet revealed (zero-size rects) are ignored.
 - **quotient-chat placeholder** (already merged in #591) completed the set.
+
+### Data-story verification (proj_b75ca862): the caps held; the flag needed a second spelling
+
+33.0s total (cap 42), max scene EXACTLY 7s (cap 7) -- the quantize snap-down
+worked on a live film, and the storyboard adopted "hero": true on every
+counter. But it wrote the flag INSIDE the stat object, not at data root, so
+the scale never applied ("1 AGENT" measured 1% coverage). The component now
+accepts both spellings. Two more theme leaks fixed the same way as the
+quotient mocks: number-counter-row's fixed slate label (#64748b, 3.43:1 on
+every ground) now rides the value's ink at 0.72 presence, and email-compose
+-- a HARDCODED-dark card -- was painting var(--mp-color-text) (dark ink on
+light brands) on #1a1a22: 1.03:1 on every address line. A fixed-dark mock
+pins its own light ink.
+
+Remaining, known, template-side: st- template claim/tagline text has no
+data.color channel, so a light-theme template over a dark mesh patch stays
+a report (scene_001's claim at 1.09:1). Template typography theming is its
+own arc.

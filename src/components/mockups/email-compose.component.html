@@ -115,14 +115,17 @@
   .email-label {
     font-size: 12px;
     font-weight: 500;
-    color: #475569;
+    color: #8b93a3;
     width: 60px;
     flex-shrink: 0;
   }
 
   .email-value {
     font-size: 14px;
-    color: var(--mp-color-text, #ffffff);
+    /* The card is HARDCODED dark (#1a1a22), so its ink must be too: riding
+       the brand text token painted #17171c on #1a1a22 for light brands --
+       1.03:1, measured on proj_b75ca862's every address line. */
+    color: #f4f4f6;
     flex: 1;
     overflow: hidden;
   }
@@ -156,8 +159,10 @@
   .email-footer {
     display: flex;
     padding: 12px 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
-    background: rgba(0, 0, 0, 0.1);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    /* Solid fill: a 10%-alpha wash reads as NO fill to the ghost-panel gate
+       (and to the eye) once the card floats over a light page. */
+    background: #15151c;
   }
 
   .send-button {
