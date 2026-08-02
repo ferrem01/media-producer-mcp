@@ -442,9 +442,12 @@ async function renderSingleSceneWorker(
 
   await fs.writeFile(argsPath, JSON.stringify(workerArgs));
 
-  // Spawn the worker
+  // Spawn the worker. The worker rides beside this file when compiled
+  // (dist/core), but under a TS runner (vitest, tsx) import.meta.url points
+  // into src/ where no .js exists -- MP_WORKER_DIR lets tests point at the
+  // built worker (CI builds first, then sets it to <repo>/dist/core).
   const workerPath = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname),
+    process.env.MP_WORKER_DIR || path.dirname(new URL(import.meta.url).pathname),
     "scene-worker.js"
   );
 
@@ -882,7 +885,7 @@ async function renderSceneTransparentFrames(
   await fs.writeFile(argsPath, JSON.stringify(workerArgs));
 
   const workerPath = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname),
+    process.env.MP_WORKER_DIR || path.dirname(new URL(import.meta.url).pathname),
     "scene-worker.js"
   );
 

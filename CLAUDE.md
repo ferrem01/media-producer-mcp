@@ -28,7 +28,7 @@ Repo: `ferrem01/media-producer-mcp`.
 ```
 npm run build       # tsc + copy assets to dist/  (run before any dist-based test)
 npm run typecheck   # tsc --noEmit
-npm test            # vitest run
+npm test            # vitest run  (see MP_WORKER_DIR below for the render suites)
 npm run dev         # tsx watch src/index.ts  (NOTE: page.evaluate breaks under tsx —
                     #   esbuild injects __name; run the built dist for browser probes)
 node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 3200)
@@ -84,6 +84,11 @@ node dist/index.js  # start the MCP server (stdio + HTTP on MP_PORT, default 320
   **`MP_CHROMIUM_PATH`** — set `MP_CHROMIUM_PATH=/opt/pw-browsers/chromium`.
   Launch sites: `capture.ts`, `capture-worker.ts`, `scene-worker.ts`, `capture-url.ts`,
   `tools/brand-extractor.ts`. (In a normal deploy the browser is present and this is a no-op.)
+- **Render/capture tests fork compiled workers.** Under vitest, `import.meta.url`
+  resolves into `src/` where no worker `.js` exists -- `npm run build`, then set
+  **`MP_WORKER_DIR=<repo>/dist/core`** and the render/showcase suites pass. CI
+  (`.github/workflows/ci.yml`) does exactly this; run the full suite locally as:
+  `PATH=/tmp/binshim:$PATH MP_CHROMIUM_PATH=/opt/pw-browsers/chromium MP_WORKER_DIR=$PWD/dist/core npx vitest run`
 - **ffmpeg not on PATH**, and the Playwright-bundled ffmpeg can't decode PNG. Get a full
   static build: `pip install imageio-ffmpeg`, then symlink it to `/tmp/binshim/ffmpeg`
   and prepend `/tmp/binshim` to PATH.
