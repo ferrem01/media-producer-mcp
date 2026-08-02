@@ -739,12 +739,18 @@
       }
     });
 
-    // Stop button: visible across the union of work windows.
+    // Stop button: visible across the union of work windows. Continuity rule:
+    // when the scene's work begins almost immediately (a mid-session cut with
+    // the agent still going), the stop button is on from frame one -- the
+    // previous scene ended with it showing, and a 0.15s flicker at the cut
+    // reads as a glitch.
     if (workOn.length) {
       var wStart = workOn[0][0];
+      if (wStart <= 0.6) wStart = 0;
       var wEnd = 0;
       workOn.forEach(function (w) { wEnd = Math.max(wEnd, w[1] == null ? dur : w[1]); });
-      tl.set(stopBtn, { display: 'flex' }, wStart);
+      if (wStart === 0) gsap.set(stopBtn, { display: 'flex' });
+      else tl.set(stopBtn, { display: 'flex' }, wStart);
       if (wEnd < dur - 0.15) tl.set(stopBtn, { display: 'none' }, wEnd);
     }
 
