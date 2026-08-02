@@ -21,17 +21,25 @@ function typeText(tl, element, text, at, speed) {
   var cps = speed || 30;
   var charDuration = 1 / cps;
   var isInput = _isInputElement(element);
+  // Base = whatever the element holds when the timeline is BUILT. Each
+  // keystroke callback sets base + an absolute prefix (never appends):
+  // GSAP re-fires call()s when the playhead scrubs across them in either
+  // direction, and appending turned a backwards scrub into mirrored
+  // gibberish (".gnitekram otni ti nrut" in the Studio scrubber).
+  // Absolute prefixes make every callback idempotent -- scrubbing back
+  // now UN-types the text, and re-crossing forward retypes it.
+  var base = isInput ? (element.value || '') : (element.textContent || '');
 
   for (var i = 0; i < text.length; i++) {
-    (function(ch, offset) {
+    (function(prefix, offset) {
       tl.call(function() {
         if (isInput) {
-          element.value += ch;
+          element.value = base + prefix;
         } else {
-          element.textContent += ch;
+          element.textContent = base + prefix;
         }
       }, null, at + offset);
-    })(text[i], i * charDuration);
+    })(text.substring(0, i + 1), i * charDuration);
   }
 }
 
