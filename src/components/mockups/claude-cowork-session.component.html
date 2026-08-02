@@ -583,6 +583,7 @@
     }
 
     var workOn = [];   // [start, end] windows -> stop button visible
+    var passthrough = []; // cursor/camera actions handed to the script runner
     var typingAt = null;
 
     script.forEach(function (a) {
@@ -693,6 +694,11 @@
         scheduleChipJoin(tl, a.name, at);
         tl.call(function () { setConnLive(a.name, true); }, null, at);
         if (a.duration !== 0) tl.call(function () { setConnLive(a.name, false); }, null, at + (a.duration || 2.2));
+      } else {
+        // Cursor/camera verbs (click, move-cursor, hover, ...) fall through
+        // to the shared script runner -- e.g. clicking the post link Claude
+        // just offered, motivating the cut into the next surface.
+        passthrough.push(a);
       }
     });
     // A status still open at the end of the script keeps running to the cut.
@@ -787,16 +793,24 @@
       tl.to(win, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.1);
     }
 
-    var cursorTargets = data.cursor_targets || {
-      'input': function () {
-        var b = inputBox.getBoundingClientRect();
-        var p = el.getBoundingClientRect();
-        return { x: ((b.left + b.width / 2 - p.left) / p.width * 100) + '%',
-                 y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
-      },
+    var cursorTargets = data.cursor_targets || {};
+    if (!cursorTargets['input']) cursorTargets['input'] = function () {
+      var b = inputBox.getBoundingClientRect();
+      var p = el.getBoundingClientRect();
+      return { x: ((b.left + b.width / 2 - p.left) / p.width * 100) + '%',
+               y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
     };
-    if (data.script && data.script.length > 0) {
-      runScript(tl, el, [], cursorTargets, ctx);
+    // The LAST underlined run in Claude's prose -- the "here's the post" link.
+    if (!cursorTargets['post-link']) cursorTargets['post-link'] = function () {
+      var us = el.querySelectorAll('.cws-text u');
+      if (!us.length) return { x: '50%', y: '55%' };
+      var b = us[us.length - 1].getBoundingClientRect();
+      var p = el.getBoundingClientRect();
+      return { x: ((b.left + b.width / 2 - p.left) / p.width * 100) + '%',
+               y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
+    };
+    if (passthrough.length > 0) {
+      runScript(tl, el, passthrough, cursorTargets, ctx);
     }
 
     return tl;
