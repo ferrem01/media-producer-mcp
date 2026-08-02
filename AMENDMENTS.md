@@ -2339,3 +2339,37 @@ components:
   (~2:1). Dark theme now lifts the primary toward light (color-mix 35%
   primary / 65% #f4f4f8): hue kept, legibility earned. Same token-leak
   class as email-compose.
+
+## The certification sweep: the whole library goes clean (2026-08-02)
+
+Films sample 4-6 components per generation from a library of ~140, so
+chasing component chrome one film at a time was a slot machine.
+test/component-certification.test.ts boots EVERY component with synthesized
+schema data (test/helpers/sample-data.ts) on a light AND a dark ground and
+measures it with the production gates. Gated behind MP_CERT_SWEEP=1 (heavy;
+hundreds of browser boots), MP_CERT_ONLY=list for fast fix loops,
+MP_CERT_REPORT for parallel runs.
+
+First audit: 111 raw findings -> rig fixes (honest dual probes, sane sample
+data) -> TRUE BASELINE: 127 findings across 54 components. Four parallel
+agents fixed every one -- none claimed as rig artifacts:
+- The dominant class: chrome riding PAGE tokens on surfaces the component
+  painted itself (the email-compose token-leak doctrine, now library-wide).
+- The "0:1 clipped at rest" mysteries were INPUT VALIDATION bugs: scale:42
+  and split:42 blowing layouts to 4200% -- clamped in-component.
+- ios26-home-screen's "1:1 storm": the fixed 480x1000 phone never fit its
+  box; all chrome sat off-view. It now scale-fits its stage.
+- A dozen composer/sidebar ghost panels took 2px borders / >=0.12-alpha
+  hairlines in their own divider colors.
+- stat-card's count-up printed raw tween floats mid-count; precision now
+  derives from the target.
+- Dark-world template kickers lift the brand primary toward light, resolved
+  to rgb() at boot.
+
+FINAL: full-library integration sweep = 0 findings.
+
+CORE FOLLOW-UP (found independently by three agents): parseRgb in
+text-contrast.ts cannot parse the `color(srgb r g b)` serialization Chromium
+emits for computed color-mix() values -- it reads the 0-1 floats as 0-255
+and scores the ink near-black. Components work around it by resolving mixes
+to rgb() in JS. The gate should learn the color() syntax.
