@@ -129,6 +129,20 @@
     var dividers = container.querySelectorAll('.stat-divider');
     var values = container.querySelectorAll('.stat-value');
 
+    // FIT: hero type never overflows the component's OWN box. A 26vh value
+    // in a storyboard box sized for the old 72px row clipped its digits and
+    // pushed the label past the frame (proj_a0bc86f4 scene_002). Measure the
+    // built row against the box and scale the type down proportionally.
+    if (heroSize && el.clientHeight > 60) {
+      var over = container.scrollHeight / el.clientHeight;
+      if (over > 1.02) {
+        values.forEach(function (v) {
+          var cur = parseFloat(getComputedStyle(v).fontSize) || 72;
+          v.style.fontSize = Math.floor((cur / over) * 0.95) + 'px';
+        });
+      }
+    }
+
     gsap.set(items, { autoAlpha: 0, y: 30, scale: 0.95 });
     gsap.set(dividers, { autoAlpha: 0, scaleY: 0 });
 

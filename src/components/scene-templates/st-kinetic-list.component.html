@@ -37,6 +37,10 @@
   .stkl-item { position: absolute; left: 0; top: 0; transform: translateY(-50%); width: 100%; }
   .stkl-item-n { font-size: 1.5vw; font-weight: 600; letter-spacing: 0.16em;
     color: var(--mp-color-primary, #4f46e5); margin-bottom: 2.2vh; font-variant-numeric: tabular-nums; }
+  /* Dark world: the raw brand primary is tuned for the LIGHT page and lands
+     ~2:1 over the WebGL backdrop (proj_a0bc86f4's "01 / 05" chips). Keep the
+     hue, lift the lightness. */
+  .stkl.is-dark .stkl-item-n { color: color-mix(in srgb, var(--mp-color-primary, #4f46e5) 35%, #f4f4f8); }
   .stkl-item-t { font-size: 7.2vw; font-weight: 500; line-height: 1.02; letter-spacing: -0.025em;
     text-wrap: balance; word-break: keep-all; }
   .stkl-item-m { margin-top: 2.6vh; font-family: 'Inter', sans-serif; font-size: 1.35vw;
@@ -72,8 +76,9 @@
     var dark = data.theme === 'dark';
     var root = q('.stkl');
     if (dark) {
+      root.classList.add('is-dark');
       root.style.color = '#f4f4f8';
-      var ix0 = q('.stkl-index'); if (ix0) ix0.style.color = 'rgba(244,244,248,0.4)';
+      var ix0 = q('.stkl-index'); if (ix0) ix0.style.color = 'rgba(244,244,248,0.55)';
     }
 
     var items = Array.isArray(data.items) ? data.items.slice(0, 8) : [];
