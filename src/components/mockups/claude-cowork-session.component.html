@@ -716,14 +716,33 @@
     var PAD = 16;
     var heights = new Map();
     var collapseDelta = new Map();
+    var sumPendingH = 0;
     events.forEach(function (e) {
-      if (e.kind === 'show' && e.node && !heights.has(e.node)) heights.set(e.node, outerH(e.node));
+      if (e.kind === 'show' && e.node && !heights.has(e.node)) {
+        var hh = outerH(e.node);
+        heights.set(e.node, hh);
+        sumPendingH += hh;
+      }
       if (e.kind === 'collapse' && e.node && !collapseDelta.has(e.node)) collapseDelta.set(e.node, outerH(e.node));
     });
     var historyH = 0;
     Array.prototype.slice.call(track.children).forEach(function (c) {
       if (pending.indexOf(c) === -1) historyH += outerH(c);
     });
+    // Probe the post link's geometry WHILE everything is visible: the cursor
+    // runner resolves click targets at build, when scripted blocks are
+    // already display:none (rect = zeros). Record it now; the final scroll
+    // offset is subtracted below once the event walk knows it.
+    var linkProbe = null;
+    (function () {
+      var us = track.querySelectorAll('.cws-text u');
+      if (!us.length) return;
+      var lb = us[us.length - 1].getBoundingClientRect();
+      var eb = el.getBoundingClientRect();
+      if (!eb.width || !eb.height) return;
+      linkProbe = { cx: lb.left + lb.width / 2 - eb.left, cy: lb.top + lb.height / 2 - eb.top,
+                    ew: eb.width, eh: eb.height };
+    })();
     var trackPad = 36; // track's own top+bottom padding
     // Record each block's NATURAL display before hiding: user bubbles, status
     // lines and action rows are flexboxes (align-items is what right-aligns
@@ -800,15 +819,19 @@
       return { x: ((b.left + b.width / 2 - p.left) / p.width * 100) + '%',
                y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
     };
-    // The LAST underlined run in Claude's prose -- the "here's the post" link.
-    if (!cursorTargets['post-link']) cursorTargets['post-link'] = function () {
-      var us = el.querySelectorAll('.cws-text u');
-      if (!us.length) return { x: '50%', y: '55%' };
-      var b = us[us.length - 1].getBoundingClientRect();
-      var p = el.getBoundingClientRect();
-      return { x: ((b.left + b.width / 2 - p.left) / p.width * 100) + '%',
-               y: ((b.top + b.height / 2 - p.top) / p.height * 100) + '%' };
-    };
+    // The LAST underlined run in Claude's prose -- the "here's the post"
+    // link. The probe measured the FULL stack (statuses visible, tool
+    // details expanded); by click time those above the link are hidden or
+    // collapsed, pulling it up by (fullStack - finalContent). Subtract that
+    // delta plus the end-state scroll.
+    if (!cursorTargets['post-link'] && linkProbe) {
+      var removedAbove = Math.max(0, (historyH + sumPendingH) - contentH);
+      var finalScroll = scrollFor(contentH);
+      cursorTargets['post-link'] = {
+        x: (linkProbe.cx / linkProbe.ew * 100) + '%',
+        y: ((linkProbe.cy - removedAbove - finalScroll) / linkProbe.eh * 100) + '%',
+      };
+    }
     if (passthrough.length > 0) {
       runScript(tl, el, passthrough, cursorTargets, ctx);
     }
