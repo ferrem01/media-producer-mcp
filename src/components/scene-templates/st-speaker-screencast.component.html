@@ -36,7 +36,10 @@
       radial-gradient(120% 120% at 15% 10%, color-mix(in srgb, var(--mp-color-primary, #393bf5) 12%, transparent), transparent 55%),
       linear-gradient(160deg, #eef0fb 0%, #dfe3f7 55%, #cdd4f2 100%); }
 
-  .stss-kicker-row { position: absolute; z-index: 3; top: 3.4vh; left: 50%; transform: translateX(-50%);
+  /* 5.8vh, not 3.4vh: at 3.4vh the kicker glyphs sat inside the outer 3.5%
+     (38px @1080p) frame strip and read as edge-bleed texture (measured 31x
+     noise spike at the top border). Chrome rests fully inboard of the strip. */
+  .stss-kicker-row { position: absolute; z-index: 3; top: 5.8vh; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 14px; white-space: nowrap; }
   .stss-rule { display: inline-block; width: 30px; height: 2px;
     background: color-mix(in srgb, #fff 82%, transparent); transform-origin: left center; }
@@ -46,7 +49,9 @@
   .stss.is-light .stss-rule { background: var(--mp-color-primary, #393bf5); }
   .stss.is-light .stss-kicker { color: var(--mp-color-primary, #393bf5); text-shadow: none; }
 
-  .stss-caps { position: absolute; z-index: 3; left: 50%; bottom: 3.2vh; transform: translateX(-50%); height: 0; }
+  /* Same edge-strip margin as the kicker: caption glyphs at 3.2vh straddled
+     the bottom 3.5% strip. */
+  .stss-caps { position: absolute; z-index: 3; left: 50%; bottom: 5.6vh; transform: translateX(-50%); height: 0; }
   .stss-cap { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); white-space: nowrap;
     display: flex; align-items: center; gap: 12px;
     font-size: 16px; font-weight: 600; letter-spacing: 0.02em; color: #fff;

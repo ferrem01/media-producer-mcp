@@ -43,8 +43,14 @@
   .stcp-clean-line { display: flex; align-items: baseline; gap: 1vw; padding: 1.9vh 0;
     border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
   .stcp-clean-line:last-child { border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
-  .stcp-clean-n { font-size: 1vw; font-weight: 700; color: var(--mp-color-primary, #4f46e5);
+  /* 19px chrome needs 4.5:1; raw primary measured 1.56-2.69:1 against the
+     template's own dark world. The script re-inks it per world (brand hue
+     kept, lightness moved to the world's opposite pole) -- as a resolved
+     rgb(), because a color-mix() ink computes to color(srgb ...) which the
+     contrast gate cannot parse. These statics are the no-JS fallback. */
+  .stcp-clean-n { font-size: 1vw; font-weight: 700; color: #babbf1;
     min-width: 2vw; font-variant-numeric: tabular-nums; }
+  .is-light .stcp-clean-n { color: #393395; }
   .stcp-clean-t { font-size: 1.75vw; font-weight: 500; letter-spacing: -0.01em; }
   .stcp-headline { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     margin: 0; z-index: 6; font-weight: 500; font-size: 4.6vw; line-height: 1.05;
@@ -67,6 +73,17 @@
     var seed = Number(data.seed) || 7;
     function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
 
+    // Brand-hued chrome ink, resolved to rgb(): pct of the brand primary
+    // mixed toward the world's ink pole (same math as CSS color-mix in srgb,
+    // which the contrast gate cannot parse from computed styles).
+    function inkMix(pct, poleHex) {
+      var raw = getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5';
+      var c = window.mpParseColor && mpParseColor(raw), p = window.mpParseColor && mpParseColor(poleHex);
+      if (!c || !p) return poleHex;
+      var m = function(a, b) { return Math.round(a * pct + b * (1 - pct)); };
+      return 'rgb(' + m(c.r, p.r) + ',' + m(c.g, p.g) + ',' + m(c.b, p.b) + ')';
+    }
+
     var wm = q('.stcp-wordmark');
     if (wm) { if (data.logo_url) { wm.src = data.logo_url; if (!light && window.mpLogoOnDark) mpLogoOnDark(wm); } else wm.style.display = 'none'; }
 
@@ -88,9 +105,12 @@
     // Right: the calm column.
     var cleanEl = q('.stcp-clean');
     var rightLines = (Array.isArray(data.right_lines) ? data.right_lines : []).slice(0, 5);
+    // 19px numerals need 4.5:1 (raw primary measured 1.56-2.69:1 on dark).
+    var nInk = light ? inkMix(0.6, '#17171c') : inkMix(0.35, '#f4f4f8');
     var cleans = rightLines.map(function(txt, i) {
       var row = document.createElement('div'); row.className = 'stcp-clean-line';
       var n = document.createElement('div'); n.className = 'stcp-clean-n'; n.textContent = '0' + (i + 1);
+      n.style.color = nInk;
       var t = document.createElement('div'); t.className = 'stcp-clean-t'; t.textContent = String(txt);
       row.appendChild(n); row.appendChild(t); cleanEl.appendChild(row);
       return row;
@@ -116,9 +136,14 @@
     });
 
     // Clean rows land measured, each a beat -- calm against the jitter.
+    // Compress the stagger on short scenes so the LAST row is fully arrived
+    // (opaque, at rest) by ~72% of the runtime: a 3s scene put row 3 mid-fade
+    // at every legibility probe, and mid-fade composited primary measured
+    // 1.56-2.47:1.
+    var rowStep = Math.min(0.55, Math.max(0.3, (dur * 0.72 - 1.4) / Math.max(1, cleans.length - 1)));
     cleans.forEach(function(row, i) {
-      if (window.mpThrow) mpThrow(tl, row, 1.4 + i * 0.55, { fromY: 70, duration: 0.55 });
-      else { gsap.set(row, { autoAlpha: 0, y: 22 }); tl.to(row, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 1.4 + i * 0.55); }
+      if (window.mpThrow) mpThrow(tl, row, 1.4 + i * rowStep, { fromY: 70, duration: 0.55 });
+      else { gsap.set(row, { autoAlpha: 0, y: 22 }); tl.to(row, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 1.4 + i * rowStep); }
     });
 
     // THE FLIP: the old world collapses; the winner takes the whole frame.

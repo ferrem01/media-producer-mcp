@@ -32,7 +32,12 @@
     position: absolute; inset: 0; overflow: hidden;
     background: var(--mp-color-background, #fbfbfd);
     font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif;
-    color: var(--mp-color-text, #17171c);
+    /* Pinned ink, not var(--mp-color-text): without data.theme this template
+       paints a LIGHT atmosphere world even on a dark page, where the page
+       token is #ffffff -- white-on-white measured 1.06:1. The template paints
+       its own world, so its ink is pinned to that world; the dark branch
+       below re-inks everything for the dark world. */
+    color: #17171c;
   }
   .sths-ghost {
     position: absolute; right: -5vw; top: -28vh; height: 160vh;
@@ -46,7 +51,11 @@
   .sths-kicker {
     font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
     letter-spacing: 0.19em; text-transform: uppercase;
-    color: var(--mp-color-primary, #4f46e5);
+    /* 15px kicker needs 4.5:1; raw primary measured 4.11:1 on the light
+       wash -- the script deepens it toward ink (hue kept) as a resolved
+       rgb(), because color-mix() computes to color(srgb ...) which the
+       contrast gate cannot parse. This static is the no-JS fallback. */
+    color: #3e38a9;
   }
   .sths-headline {
     margin: 0 0 3vh 0; font-weight: 500; font-size: 4.6vw; line-height: 1.06;
@@ -56,7 +65,10 @@
   .sths-headline .sths-line > span { display: block; }
   .sths-supporting {
     margin: 0; font-family: 'Inter', sans-serif; font-size: 1.15vw; line-height: 1.55;
-    color: var(--mp-color-text-muted, #6b7280); max-width: 42ch;
+    /* Pinned muted ink for the light world (the page muted token is tuned
+       for the PAGE's ground, which may be dark): #4b5563 measures ~7:1 on
+       the wash. Dark branch re-inks. */
+    color: #4b5563; max-width: 42ch;
   }
   .sths-stat { position: absolute; right: 10vw; top: 20vh; text-align: right; }
   .sths-num {
@@ -69,7 +81,7 @@
   .sths-statlabel {
     font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
     letter-spacing: 0.17em; text-transform: uppercase;
-    color: var(--mp-color-text-muted, #6b7280);
+    color: #4b5563; /* pinned to the light world; dark branch re-inks */
   }
   .sths-items { position: absolute; left: 8vw; right: 10vw; bottom: 14vh; display: flex; gap: 1.1vw; }
   .sths-item {
@@ -178,6 +190,18 @@
 
     // ── Atmosphere: washes + grain + slow push + shimmer + lit tags ──
     var dark = data.theme === 'dark';
+    // Kicker ink per world: 15px needs 4.5:1 and raw primary measured 4.11:1
+    // on the light wash / ~2.2:1 on the dark world. Brand hue kept, mixed
+    // toward the world's ink pole, resolved to rgb() (color-mix() computes
+    // to color(srgb ...) which the contrast gate cannot parse).
+    if (window.mpParseColor) {
+      var pr = mpParseColor(getComputedStyle(el.querySelector('.sths')).getPropertyValue('--mp-color-primary').trim() || '#4f46e5');
+      var pole = dark ? { r: 244, g: 244, b: 248 } : { r: 23, g: 23, b: 28 };
+      var pct = dark ? 0.35 : 0.7;
+      var kck = q('.sths-kicker');
+      if (pr && kck) kck.style.color = 'rgb(' + Math.round(pr.r * pct + pole.r * (1 - pct)) + ',' +
+        Math.round(pr.g * pct + pole.g * (1 - pct)) + ',' + Math.round(pr.b * pct + pole.b * (1 - pct)) + ')';
+    }
     if (dark) {
       el.querySelector('.sths').style.color = '#f4f4f8';
       var sup = q('.sths-supporting'); if (sup) sup.style.color = 'rgba(244,244,248,0.62)';

@@ -20,8 +20,12 @@
     display: flex; align-items: center; gap: 14px; }
   .stmf-rule { width: 34px; height: 2px; background: var(--mp-color-primary, #4f46e5);
     transform-origin: left center; }
+  /* 14px kicker needs 4.5:1; raw primary measured 2.79:1 on the dark world --
+     the script lifts it (hue kept) as a resolved rgb(); this static is the
+     no-JS fallback. Light keeps raw primary (measures clean). */
   .stmf-kicker { font-size: 14px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
-    color: var(--mp-color-primary, #4f46e5); }
+    color: #babbf1; }
+  .is-light .stmf-kicker { color: var(--mp-color-primary, #4f46e5); }
   .stmf-flow { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: 80vw; display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;
     column-gap: 1.6vw; row-gap: 1.2vh; text-align: center; }
@@ -48,6 +52,14 @@
     if (wm) { if (data.logo_url) { wm.src = data.logo_url; if (!light && window.mpLogoOnDark) mpLogoOnDark(wm); } else wm.style.display = 'none'; }
     var kickerRow = q('.stmf-kicker-row');
     if (!data.kicker) kickerRow.style.display = 'none';
+    // 14px kicker needs 4.5:1; raw primary measured 2.79:1 on the dark world.
+    // Resolved rgb() mix (35% primary toward #f4f4f8): color-mix() computes
+    // to color(srgb ...) which the contrast gate cannot parse.
+    if (!light && window.mpParseColor) {
+      var pr = mpParseColor(getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5');
+      if (pr) q('.stmf-kicker').style.color = 'rgb(' + Math.round(pr.r * 0.35 + 244 * 0.65) + ',' +
+        Math.round(pr.g * 0.35 + 244 * 0.65) + ',' + Math.round(pr.b * 0.35 + 248 * 0.65) + ')';
+    }
 
     // Words: '*word*' marks accents (brand color + slam); small connective
     // words ('a', 'the', 'of'...) automatically set smaller for scale rhythm.
