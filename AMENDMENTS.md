@@ -2312,3 +2312,14 @@ sets MP_DATA_DIR for every run, killing the class.
 Run 3: GREEN. The lesson, recorded: this sandbox runs as ROOT, so any test
 that writes an absolute path silently passes here and fails on every normal
 machine. CI is the only guard that sees it.
+
+## The st-statement decision: declaration over exemption (2026-08-02)
+
+DECIDED: deliberate negative space is a property the template DECLARES and
+the gate honors. st-statement's root carries [data-mp-deliberate-space];
+the layout probe reports it only from a VISIBLE, near-full-bleed declarer;
+deadFrameDefect halves its floor (16% -> 8%) when set. st-statement's 13%
+passes as the design it is, a genuinely blank frame (~0-2%: the statement
+never rendered) still flags, and the gate stays sharp for every component
+that doesn't earn the flag. The known-failing test flipped back to a real
+assertion. Only type-on-empty templates may declare it.

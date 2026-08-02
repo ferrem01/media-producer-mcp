@@ -234,14 +234,21 @@ function contentCoverage(layout: LayoutProbeResult): number {
  * is FLAT (measured from pixels, not geometry -- a vibrant gradient is fine, a
  * flat dark/white field is not).
  */
-function deadFrameDefect(coverage: number, colorSpread: number | null): LayoutDefect | null {
-  if (coverage >= MIN_CONTENT_COVERAGE) return null;
+function deadFrameDefect(coverage: number, colorSpread: number | null, deliberateSpace?: boolean): LayoutDefect | null {
+  // A template that declares [data-mp-deliberate-space] (st-statement: one
+  // serif thought on an empty canvas) is JUDGED at half the floor -- the
+  // negative space is the design, but a genuinely blank frame (the statement
+  // never rendered, ~0-2% coverage) still flags. Decision recorded in
+  // AMENDMENTS: declaration over exemption, so the gate stays sharp for
+  // everything that doesn't earn the flag.
+  const floor = deliberateSpace ? MIN_CONTENT_COVERAGE / 2 : MIN_CONTENT_COVERAGE;
+  if (coverage >= floor) return null;
   // Can't measure flatness -> don't risk a false positive.
   if (colorSpread === null) return null;
   if (colorSpread >= FLAT_COLOR_SPREAD) return null; // rich backdrop fills the space
   return {
     type: "dead_frame",
-    detail: `Content covers only ${(coverage * 100).toFixed(0)}% of the frame (needs >= ${(MIN_CONTENT_COVERAGE * 100).toFixed(0)}%) ` +
+    detail: `Content covers only ${(coverage * 100).toFixed(0)}% of the frame (needs >= ${(floor * 100).toFixed(0)}%) ` +
       `over a flat backdrop (color spread ${colorSpread.toFixed(1)}, flat < ${FLAT_COLOR_SPREAD}) -- the scene reads as a little text on empty space. ` +
       `Either distribute supporting elements across the canvas OR give the background real depth (a vibrant brand gradient / layered backdrop), not a flat fill.`,
   };
@@ -353,7 +360,7 @@ export async function measureLayout(opts: {
     const coverage = contentCoverage(layout);
     const colorSpread = coverage < MIN_CONTENT_COVERAGE ? await backdropColorSpread(probePath, opts.width, opts.height) : null;
     if (process.env.MP_LAYOUT_DEBUG) console.log(`  [layout-dbg] t=${t} coverage=${(coverage*100).toFixed(1)}% colorSpread=${colorSpread?.toFixed(2)} surfaces=${layout.surfaces.length} contentBoxes=${layout.contentBoxes.length} pageBg=${layout.pageBg}`);
-    const dead = deadFrameDefect(coverage, colorSpread);
+    const dead = deadFrameDefect(coverage, colorSpread, layout.deliberateSpace);
     if (dead) lastDead = dead; else deadEveryFrame = false;
 
     // Mid-zoom/pan frames: the camera transform is what pushed content past

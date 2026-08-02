@@ -628,6 +628,11 @@ export interface LayoutProbeResult {
    *  CAMERA, not the layout. Scale-invariant checks stay valid. Stamped by
    *  captureSingleFrame after the probe (measured outside the page evaluate). */
   cameraActive?: boolean;
+  /** True when a visible near-full-bleed element declares
+   *  [data-mp-deliberate-space]: the composition IS negative space (an
+   *  editorial statement on an empty canvas). The dead-frame gate halves its
+   *  coverage floor rather than demanding filler. */
+  deliberateSpace?: boolean;
 }
 
 export async function captureSingleFrame(options: {
@@ -1195,7 +1200,16 @@ export async function captureSingleFrame(options: {
             }
           }
         }
-        return { vw, vh, pageBg, surfaces, contentBoxes, hasRichFullBleedBg, clippedTexts, offCanvasContent, textCollisions };
+        // Deliberate negative space: a template whose design IS type-on-empty
+        // declares it on a near-full-bleed root; a hidden or tiny declarer
+        // does not count.
+        let deliberateSpace = false;
+        for (const d of Array.from(document.querySelectorAll("[data-mp-deliberate-space]"))) {
+          const r = d.getBoundingClientRect();
+          const cs = getComputedStyle(d);
+          if (visible(cs) && r.width >= vw * 0.8 && r.height >= vh * 0.8) { deliberateSpace = true; break; }
+        }
+        return { vw, vh, pageBg, surfaces, contentBoxes, hasRichFullBleedBg, clippedTexts, offCanvasContent, textCollisions, deliberateSpace };
       }, { vw: width, vh: height });
       if (layout) (layout as LayoutProbeResult).cameraActive = cameraActive === true;
     }
