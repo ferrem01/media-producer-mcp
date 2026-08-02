@@ -42,20 +42,19 @@
             Customize
           </div>
         </div>
+        <div class="cwh-recents-head"><span>Scheduled</span></div>
+        <div class="cwh-pin-list" data-target="sched-list"></div>
         <div class="cwh-recents-head"><span>Pinned</span></div>
-        <div class="cwh-pin-list" data-target="pin-list"></div>
-        <div class="cwh-recents-head"><span>Recents</span>
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"><path d="M3 5h10M5 8h6M7 11h2"/></svg>
-        </div>
-        <div class="cwh-session-list" data-target="recent-list"></div>
+        <div class="cwh-session-list" data-target="pin-list"></div>
         <div class="cwh-side-foot">
           <div class="cwh-design-row">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.2"/></svg>
-            Design <span class="cwh-new-pill">New</span>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.2"/></svg>
+            Design <span class="cwh-new-pill">Labs</span>
           </div>
           <div class="cwh-account">
             <span class="cwh-ava" data-target="account-avatar">M</span>
             <span class="cwh-account-name" data-target="account-name">Marc</span>
+            <span class="cwh-account-mode">Max</span>
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
           </div>
         </div>
@@ -101,8 +100,8 @@
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
               </span>
               <span class="cwh-sub-item">
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round"><path d="M8 2v3M8 11v3M2 8h3M11 8h3"/></svg>
-                Manual
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5l4.5 4.5-4.5 4.5M8.5 3.5L13 8l-4.5 4.5"/></svg>
+                <span data-target="run-mode">Auto</span>
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#8a887f" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>
               </span>
               <span class="cwh-sub-sp"></span>
@@ -159,42 +158,44 @@
   /* 2px divider (border-color on all edges so the computed color is the
      divider, widths only on the right): #fbfaf7 sits ~3.5% from a white page
      and needs a >= 1.5px computed edge. */
-  .cwh-side { width: 252px; min-width: 252px; background: #fbfaf7;
+  /* Sidebar sized to the real app's ratio (~23% of the window) with its
+     larger, airier type scale. */
+  .cwh-side { width: 23%; min-width: 270px; max-width: 340px; background: #fbfaf7;
     border: solid #e8e6e0; border-width: 0 2px 0 0;
-    display: flex; flex-direction: column; padding: 12px 12px 10px; }
-  .cwh-lights { display: flex; align-items: center; gap: 7px; padding: 2px 4px 12px; }
-  .cwh-dot { width: 11px; height: 11px; border-radius: 50%; }
+    display: flex; flex-direction: column; padding: 14px 14px 12px; }
+  .cwh-lights { display: flex; align-items: center; gap: 8px; padding: 2px 4px 14px; }
+  .cwh-dot { width: 12px; height: 12px; border-radius: 50%; }
   .cwh-dot--r { background: #ff5f57; } .cwh-dot--y { background: #febc2e; } .cwh-dot--g { background: #28c840; }
   .cwh-lights-sp { flex: 1; }
-  .cwh-tabs { display: flex; gap: 4px; background: #efeee8; border-radius: 9px; padding: 3px; margin-bottom: 12px; }
-  .cwh-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 6px 0; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: #57544c; }
+  .cwh-tabs { display: flex; gap: 4px; background: #efeee8; border-radius: 10px; padding: 3px; margin-bottom: 14px; }
+  .cwh-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 8px 0; border-radius: 8px; font-size: 14px; font-weight: 600; color: #57544c; }
   .cwh-tab.is-active { background: #fff; color: #1f1e1d; box-shadow: 0 1px 3px rgba(31,30,29,0.08);
     border: 1px solid #e8e6e0; }
-  .cwh-nav { display: flex; flex-direction: column; gap: 1px; margin-bottom: 10px; }
-  .cwh-nav-row { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px;
-    font-size: 13px; color: #1f1e1d; }
-  .cwh-nav-plus { width: 14px; text-align: center; font-size: 15px; color: #57544c; }
-  .cwh-beta-pill, .cwh-new-pill { font-size: 10px; font-weight: 600; color: #57544c;
-    background: #ecebe4; border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
-  .cwh-new-pill { background: #dbeafe; color: #2563eb; }
+  .cwh-nav { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+  .cwh-nav-row { display: flex; align-items: center; gap: 11px; padding: 8px 10px; border-radius: 9px;
+    font-size: 15px; color: #1f1e1d; }
+  .cwh-nav-row:first-child { background: #efeee8; }
+  .cwh-nav-plus { width: 15px; text-align: center; font-size: 17px; color: #57544c; }
+  .cwh-beta-pill, .cwh-new-pill { font-size: 11px; font-weight: 600; color: #57544c;
+    background: #ecebe4; border-radius: 6px; padding: 1.5px 7px; margin-left: 5px; }
   .cwh-recents-head { display: flex; align-items: center; justify-content: space-between;
-    padding: 6px 8px 5px; font-size: 11.5px; font-weight: 600; color: #8a887f; }
-  .cwh-pin-list, .cwh-session-list { display: flex; flex-direction: column; gap: 1px; }
+    padding: 8px 10px 6px; font-size: 13px; color: #8a887f; }
+  .cwh-pin-list, .cwh-session-list { display: flex; flex-direction: column; gap: 2px; }
   .cwh-session-list { flex: 1; overflow: hidden; }
-  .cwh-session { display: flex; align-items: center; gap: 8px; padding: 5.5px 8px; border-radius: 8px; }
-  .cwh-sess-num { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #dedcd4;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; color: #8a887f; flex-shrink: 0; }
-  .cwh-sess-title { flex: 1; font-size: 13px; color: #1f1e1d;
+  .cwh-session { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; }
+  .cwh-sess-ico { display: flex; color: #57544c; flex-shrink: 0; }
+  .cwh-sess-title { flex: 1; font-size: 14.5px; color: #1f1e1d;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cwh-side-foot { margin-top: 8px; border-top: 1px solid #efeee8; padding-top: 7px; }
-  .cwh-design-row { display: flex; align-items: center; gap: 9px; padding: 6px 8px;
-    font-size: 13px; color: #1f1e1d; }
-  .cwh-account { display: flex; align-items: center; gap: 8px; padding: 5px 6px; }
-  .cwh-ava { width: 22px; height: 22px; border-radius: 50%; background: #1f1e1d; color: #fff;
-    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
-  .cwh-account-name { flex: 1; font-size: 13px; font-weight: 600; color: #1f1e1d; }
+  .cwh-sess-tag { font-size: 13px; color: #8a887f; flex-shrink: 0; }
+  .cwh-side-foot { margin-top: 10px; border-top: 1px solid #efeee8; padding-top: 9px; }
+  .cwh-design-row { display: flex; align-items: center; gap: 11px; padding: 8px 10px;
+    font-size: 15px; color: #1f1e1d; }
+  .cwh-account { display: flex; align-items: center; gap: 9px; padding: 6px 8px; }
+  .cwh-ava { width: 25px; height: 25px; border-radius: 50%; background: #1f1e1d; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+  .cwh-account-name { font-size: 15px; font-weight: 600; color: #1f1e1d; }
+  .cwh-account-mode { flex: 1; font-size: 14px; color: #6b6861; }
 
   /* Main */
   .cwh-main { flex: 1; position: relative; display: flex; flex-direction: column; min-width: 0; }
@@ -226,19 +227,19 @@
   .cwh-composer { width: 100%; max-width: 780px; background: #fff; border: 2px solid #e2e0d8;
     border-radius: 22px; box-shadow: 0 4px 16px rgba(31,30,29,0.06);
     position: relative; z-index: 5; }
-  .cwh-comp-input { padding: 20px 24px 8px; font-size: 16px; color: #1f1e1d; min-height: 26px;
+  .cwh-comp-input { padding: 24px 28px 10px; font-size: 20px; color: #1f1e1d; min-height: 30px;
     line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
   .cwh-comp-input:empty::before { content: attr(data-placeholder); color: #a5a39a; }
-  .cwh-comp-row { display: flex; align-items: center; gap: 11px; padding: 8px 14px 12px 18px; position: relative; }
+  .cwh-comp-row { display: flex; align-items: center; gap: 13px; padding: 10px 16px 14px 22px; position: relative; }
   /* The terracotta send button (real app: appears only once there's text).
      Hidden state keeps layout space so its pop-in never reflows the row. */
   /* No CSS transitions here -- GSAP owns the pop-in and the press, and a
      transition on transform would fight its per-frame updates. */
-  .cwh-send { width: 36px; height: 36px; border-radius: 11px; background: #c65f3f;
+  .cwh-send { width: 40px; height: 40px; border-radius: 12px; background: #c65f3f;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     opacity: 0; transform: scale(0.6); }
   .cwh-send.is-visible { opacity: 1; transform: scale(1); }
-  .cwh-crow-ico { color: #57544c; font-size: 17px; }
+  .cwh-crow-ico { color: #57544c; font-size: 20px; }
   .cwh-plusmenu { position: absolute; z-index: 50;
     width: 250px; background: #fff; border: 1px solid #e8e6e0; border-radius: 13px;
     box-shadow: 0 10px 34px rgba(31,30,29,0.14); padding: 6px; display: none; }
@@ -251,17 +252,17 @@
   .cwh-pm-warn { font-size: 11.5px; color: #c07f1f; margin-right: 2px; }
   .cwh-pm-sep { height: 1px; background: #efeee8; margin: 4px 8px; }
   .cwh-mode { display: flex; gap: 2px; background: #efeee8; border-radius: 999px; padding: 3px; }
-  .cwh-mode-opt { font-size: 13px; font-weight: 600; color: #8a887f; padding: 5px 14px; border-radius: 999px; }
+  .cwh-mode-opt { font-size: 15px; font-weight: 600; color: #6b6861; padding: 6px 17px; border-radius: 999px; }
   .cwh-mode-opt.is-active { background: #fff; color: #1f1e1d; border: 1px solid #e2e0d8;
     box-shadow: 0 1px 3px rgba(31,30,29,0.07); }
   .cwh-crow-sp { flex: 1; }
-  .cwh-model { font-size: 13px; font-weight: 600; color: #1f1e1d; }
-  .cwh-effort { font-size: 13px; color: #8a887f; }
-  .cwh-comp-sub { display: flex; align-items: center; gap: 14px; padding: 9px 16px;
-    background: #fbfaf7; border-top: 1px solid #efeee8; border-radius: 0 0 15px 15px; }
-  .cwh-sub-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #57544c; }
+  .cwh-model { font-size: 15px; font-weight: 600; color: #1f1e1d; }
+  .cwh-effort { font-size: 15px; color: #6b6861; }
+  .cwh-comp-sub { display: flex; align-items: center; gap: 18px; padding: 11px 20px;
+    background: #fbfaf7; border-top: 1px solid #efeee8; border-radius: 0 0 21px 21px; }
+  .cwh-sub-item { display: flex; align-items: center; gap: 7px; font-size: 14px; color: #57544c; }
   .cwh-sub-sp { flex: 1; }
-  .cwh-usage { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #57544c; }
+  .cwh-usage { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: #57544c; }
   .cwh-ideas { width: 100%; max-width: 760px; margin-top: 30px; }
   .cwh-ideas-head { font-size: 12.5px; color: #8a887f; margin-bottom: 10px; padding-left: 4px; }
   .cwh-idea { display: flex; align-items: center; gap: 13px; padding: 9px 6px; border-radius: 10px; }
@@ -292,25 +293,32 @@
     if (data.account_name) q('[data-target="account-avatar"]').textContent = String(data.account_name).charAt(0).toUpperCase();
     inputEl.setAttribute('data-placeholder', data.placeholder || 'How can I help you today?');
 
-    // Sidebar lists
-    var pinned = Array.isArray(data.pinned) ? data.pinned : ['Canva Design Hub'];
-    var recents = Array.isArray(data.recents) && data.recents.length ? data.recents : [
-      'Email access question', 'Seniority Healthcare partnership', 'Getquotient MCP integration',
-      'Quotient customer information sources', 'Head of growth role and responsibilities',
-      'Canva launch image', 'Creative projects',
+    // Sidebar lists -- Scheduled + Pinned sections with the real app's
+    // artifact glyph per row (the numbered chips were a mock-ism).
+    var ARTIFACT_ICO = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2.5"/><path d="M5.5 8.6l1.8 1.8 3.4-3.8"/></svg>';
+    var CLOCKROW_ICO = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="8" r="5.6"/><path d="M8 5v3.2l2 1.2"/></svg>';
+    var scheduled = Array.isArray(data.scheduled) ? data.scheduled : [
+      { title: 'Quotient weekly burn report', tag: 'Weekly' },
     ];
+    var pinned = Array.isArray(data.pinned) && data.pinned.length ? data.pinned : [
+      'Quotient Weekly Burn', 'Steve Goldberg Tracker', 'Quotient Usecase Picker',
+      'Quotient Time Savings Calculator', 'Quotient Process', 'Gtm Credits Onepager',
+      'Quotient Stack Consolidation Case Study', 'Quotient Positioning Onepager',
+    ];
+    var schedList = q('[data-target="sched-list"]');
     var pinList = q('[data-target="pin-list"]');
-    var recentList = q('[data-target="recent-list"]');
-    var num = 1;
-    function rowEl(title) {
+    function rowEl(item, ico) {
+      var title = item && item.title ? item.title : String(item);
+      var tag = item && item.tag ? item.tag : '';
       var d = document.createElement('div');
       d.className = 'cwh-session';
-      d.innerHTML = '<span class="cwh-sess-num">' + (num++) + '</span>' +
-        '<span class="cwh-sess-title">' + title + '</span>';
+      d.innerHTML = '<span class="cwh-sess-ico">' + ico + '</span>' +
+        '<span class="cwh-sess-title">' + title + '</span>' +
+        (tag ? '<span class="cwh-sess-tag">' + tag + '</span>' : '');
       return d;
     }
-    pinned.forEach(function (t) { pinList.appendChild(rowEl(t)); });
-    recents.forEach(function (t) { recentList.appendChild(rowEl(t)); });
+    scheduled.forEach(function (t) { schedList.appendChild(rowEl(t, CLOCKROW_ICO)); });
+    pinned.forEach(function (t) { pinList.appendChild(rowEl(t, ARTIFACT_ICO)); });
 
     // Ideas -- line-icon tiles like the real app (icon names map to built-in
     // pictograms; any other string renders as-is, e.g. an emoji).
@@ -319,11 +327,14 @@
       inbox: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5.5a2 2 0 012-2h4a2 2 0 012 2v2a2 2 0 01-2 2H6l-2 1.5v-1.5a2 2 0 01-1.5-2v-2z"/><path d="M12 6.5h.5a2 2 0 011.5 2v2a1.7 1.7 0 01-1.3 1.8V14l-2-1.5H8.5"/></svg>',
       doc: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#57544c" stroke-width="1.2" stroke-linecap="round"><path d="M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z"/><path d="M5.5 8h5M5.5 10.5h5M9 13l1.5-1.5"/></svg>',
     };
-    var ideas = Array.isArray(data.ideas) && data.ideas.length ? data.ideas : [
-      { icon: 'sunrise', label: 'Send me a daily briefing' },
-      { icon: 'inbox', label: 'Organize my inbox' },
-      { icon: 'doc', label: 'Customize Cowork for me' },
-    ];
+    // Ideas only render when a scene passes them explicitly -- the real home
+    // (Cowork mode) doesn't show the "Ideas for you" block by default.
+    var ideas = Array.isArray(data.ideas) ? data.ideas : [];
+    var ideaSection = q('.cwh-ideas');
+    if (!ideas.length && ideaSection && ideaSection.parentNode) {
+      ideaSection.parentNode.removeChild(ideaSection);
+      ideaSection = null;
+    }
     var ideaList = q('[data-target="idea-list"]');
     var ideaEls = [];
     ideas.forEach(function (it, i) {
@@ -371,7 +382,7 @@
     // Entrance: greeting, composer, ideas stagger in
     gsap.set(win, { autoAlpha: 0, y: 24 });
     tl.to(win, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.15);
-    var reveal = [q('[data-target="greeting"]'), composer, q('.cwh-ideas')];
+    var reveal = [q('[data-target="greeting"]'), composer, q('.cwh-ideas')].filter(Boolean);
     gsap.set(reveal, { autoAlpha: 0, y: 14 });
     reveal.forEach(function (r, i) {
       tl.to(r, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.4 + i * 0.18);
