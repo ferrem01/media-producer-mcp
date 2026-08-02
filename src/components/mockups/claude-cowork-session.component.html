@@ -235,6 +235,9 @@
   /* Tool use: gray summary line + indented detail + optional results panel.
      Matches the app: no boxes around the summary, a hairline timeline stem. */
   .cws-tsum { font-size: 17px; color: #6b6861; }
+  /* Trailing caret on a COLLAPSED tool line -- the "you could open this back
+     up" affordance from the app. Hidden while the detail is expanded. */
+  .cws-tsum-caret { color: #8a887f; margin-left: 7px; display: none; }
   .cws-tdetail { margin-top: 12px; }
   .cws-trow { display: flex; align-items: center; gap: 11px; font-size: 15.5px; color: #57544c;
     min-height: 26px; }
@@ -507,6 +510,10 @@
       var summary = document.createElement('div');
       summary.className = 'cws-tsum';
       summary.textContent = a.summary || ('Loaded tools, used ' + (a.connector || 'tools'));
+      var caret = document.createElement('span');
+      caret.className = 'cws-tsum-caret';
+      caret.textContent = '›';
+      summary.appendChild(caret);
       d.appendChild(summary);
       var detail = document.createElement('div');
       detail.className = 'cws-tdetail';
@@ -528,7 +535,7 @@
       }
       detail.innerHTML = html;
       d.appendChild(detail);
-      return { el: d, detail: detail };
+      return { el: d, detail: detail, caret: caret };
     }
 
     // ── History: final-state blocks, visible from frame one ──
@@ -541,6 +548,11 @@
         var s = document.createElement('div');
         s.className = 'cws-block cws-tsum';
         s.textContent = h.text || 'Loaded tools';
+        var hc = document.createElement('span');
+        hc.className = 'cws-tsum-caret';
+        hc.textContent = '›';
+        hc.style.display = 'inline';
+        s.appendChild(hc);
         track.appendChild(s);
       }
       else if (t === 'actions') track.appendChild(actionsBlock());
@@ -639,7 +651,7 @@
         var tdur = a.duration || 1.6;
         var collapseAt = a.collapse === false ? null : (at + tdur + (a.collapse_delay || 0.9));
         if (collapseAt != null && collapseAt < dur - 0.2) {
-          events.push({ t: collapseAt, node: tb.detail, kind: 'collapse', parent: tb.el });
+          events.push({ t: collapseAt, node: tb.detail, kind: 'collapse', parent: tb.el, caret: tb.caret });
         }
         if (a.connector) {
           scheduleChipJoin(tl, a.connector, at);
@@ -727,6 +739,8 @@
         contentH -= dh;
         tl.to(e.node, { height: 0, autoAlpha: 0, marginTop: 0, duration: 0.45, ease: 'power2.inOut' }, e.t);
         tl.to(track, { y: -scrollFor(contentH), duration: 0.45, ease: 'power2.inOut' }, e.t);
+        // The collapsed line grows its "you could reopen this" caret.
+        if (e.caret) tl.set(e.caret, { display: 'inline' }, e.t + 0.3);
       } else if (e.kind === 'stream') {
         // The block was revealed at full (reserved) height; creep the scroll
         // linearly across the stream so the text writes at the reading line.
