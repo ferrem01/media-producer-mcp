@@ -38,7 +38,19 @@
       "type": "string",
       "label": "Highlight quote",
       "optional": true,
-      "description": "Exact substring of the body to sweep with the marker highlight. Ignored if the body already carries *asterisk* marks or the substring is not found."
+      "description": "Exact substring of the body to sweep with the highlight. Ignored if the body already carries *asterisk* marks or the substring is not found."
+    },
+    "highlight_style": {
+      "type": "string",
+      "label": "Highlight style",
+      "optional": true,
+      "description": "'marker' (default): full-height yellow wash. 'underline': a 3px rule drawing along the baseline -- use for a film-through-line treatment in a brand color."
+    },
+    "highlight_color": {
+      "type": "string",
+      "label": "Highlight color",
+      "optional": true,
+      "description": "CSS color for the sweep (default: marker #ffe9a8, underline #393bf5). Marker colors must stay LIGHT -- the ink over them is dark."
     }
   },
   "script_actions": [

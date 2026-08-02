@@ -402,8 +402,11 @@
 
   .gmr-body p { margin: 0 0 15px; }
 
-  /* The money quote: a marker sweep painted by background-size (0% -> 100%)
-     so the highlight draws left-to-right; ink stays the dark body ink. */
+  /* The money quote: a sweep painted by background-size (0% -> 100%) so the
+     treatment draws left-to-right; ink stays the dark body ink. Two styles:
+     marker (default, full-height yellow wash) and underline (a 3px rule along
+     the baseline -- the film-through-line variant, brand-colorable because it
+     never sits BEHIND the ink). */
   .gmr-hl {
     background-image: linear-gradient(#ffe9a8, #ffe9a8);
     background-repeat: no-repeat;
@@ -415,6 +418,15 @@
     margin: -1px -2px;
     color: #1f2126;
     font-weight: 500;
+  }
+
+  .gmr-hl.is-underline {
+    background-position: 0 100%;
+    background-size: 0% 3px;
+    border-radius: 0;
+    padding: 1px 0 2px;
+    margin: -1px 0 -2px;
+    font-weight: 600;
   }
 
   .gmr-actions {
@@ -461,6 +473,11 @@
     var bodyText = data.body ||
       'Just wanted to say: the launch went perfectly.\n\nThis is the first product launch that actually felt like magic instead of chaos.\n\nThank you!';
     var hq = typeof data.highlight_quote === 'string' ? data.highlight_quote.trim() : '';
+    // Style variants: 'marker' (default) or 'underline'. A custom color is
+    // honored only when it parses as a color (the cert sampler feeds prose).
+    var underline = data.highlight_style === 'underline';
+    var hlColor = typeof data.highlight_color === 'string' && /^(#[0-9a-fA-F]{3,8}|rgb)/.test(data.highlight_color.trim())
+      ? data.highlight_color.trim() : (underline ? '#393bf5' : '');
     var hlSpans = [];
     bodyText.split(/\n+/).filter(Boolean).forEach(function(paraText) {
       var p = document.createElement('p');
@@ -472,7 +489,8 @@
       while ((m = re.exec(marked)) !== null) {
         if (m[1] !== undefined) {
           var hl = document.createElement('span');
-          hl.className = 'gmr-hl';
+          hl.className = 'gmr-hl' + (underline ? ' is-underline' : '');
+          if (hlColor) hl.style.backgroundImage = 'linear-gradient(' + hlColor + ', ' + hlColor + ')';
           hl.textContent = m[1];
           p.appendChild(hl);
           hlSpans.push(hl);
@@ -509,7 +527,7 @@
     if (hlSpans.length > 0) {
       var sweepAt = Math.min(0.25 + speed + 0.9, ctx.duration * 0.45);
       tl.to(hlSpans, {
-        backgroundSize: '100% 100%',
+        backgroundSize: underline ? '100% 3px' : '100% 100%',
         duration: 0.9, stagger: 0.15, ease: 'power2.inOut'
       }, sweepAt);
     }
