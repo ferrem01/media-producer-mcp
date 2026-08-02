@@ -1,7 +1,7 @@
 <template>
   <div class="cap-emoji">
     <div class="cap-emoji-row">
-      <span class="cap-emoji-glyph"></span>
+      <span class="cap-emoji-glyph" aria-hidden="true"></span>
       <span class="cap-emoji-text"></span>
     </div>
   </div>
@@ -38,7 +38,17 @@
     z-index: 2;
   }
 
-  .cap-emoji-glyph:empty {
+  /* The emoji is decorative ARTWORK, not text: it renders as a color glyph
+     that ignores `color`, so it's drawn via ::before (no text node) rather
+     than textContent. As a text node its inherited near-black `color` was
+     measured against the dark page at 1.18:1 (cert) -- a ratio no real pixel
+     ever shows. */
+  .cap-emoji-glyph::before {
+    content: attr(data-emoji);
+  }
+
+  .cap-emoji-glyph:not([data-emoji]),
+  .cap-emoji-glyph[data-emoji=''] {
     display: none;
   }
 
@@ -63,7 +73,7 @@
     var text = (data && data.text) || 'Let’s go!';
     var emoji = (data && data.emoji) || '🎉';
     textEl.textContent = text;
-    glyph.textContent = emoji;
+    glyph.setAttribute('data-emoji', emoji); // rendered by ::before -- see CSS note
 
     if (text.length > 18) {
       var fs = Math.max(42, Math.round(72 * (18 / text.length) + 12));

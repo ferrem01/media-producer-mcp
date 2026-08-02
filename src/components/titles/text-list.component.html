@@ -110,6 +110,29 @@
       itemEls.push(li);
     });
 
+    // List copy sits on the PAGE: hardcoded #cbd5e1 measured 1.46:1 on a
+    // white ground (cert). Pick muted ink from the measured ground; numbered
+    // markers ride the accent token, so verify those too.
+    var groundLum = window.mpGroundLum ? mpGroundLum() : null;
+    if (typeof groundLum === 'number') {
+      var itemInk = groundLum < 0.18 ? '#e6e9f2' : '#4d5461';
+      itemEls.forEach(function (li) { li.style.color = itemInk; });
+      var markers = container.querySelectorAll('.list-marker');
+      if (markers.length && window.mpInkContrast && window.mpParseColor) {
+        var mInk = getComputedStyle(markers[0]).color;
+        var mRatio = mpInkContrast(mInk, groundLum);
+        var mp = mpParseColor(mInk);
+        if (mRatio !== null && mRatio < 4.5 && mp) {
+          // Mix numerically and emit rgb(): a color-mix() computed style
+          // serializes as color(srgb ...) which downstream tooling misreads.
+          var mg = mpParseColor(groundLum < 0.18 ? '#f4f4f8' : '#17171c');
+          var fixedMarker = 'rgb(' + Math.round(mp.r * 0.5 + mg.r * 0.5) + ',' +
+            Math.round(mp.g * 0.5 + mg.g * 0.5) + ',' + Math.round(mp.b * 0.5 + mg.b * 0.5) + ')';
+          Array.prototype.forEach.call(markers, function (m) { m.style.color = fixedMarker; });
+        }
+      }
+    }
+
     var speed = ctx.motion === 'minimal' ? 0.3 : ctx.motion === 'punchy' ? 0.45 : 0.55;
     var stagger = ctx.motion === 'minimal' ? 0.08 : ctx.motion === 'punchy' ? 0.1 : 0.15;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';

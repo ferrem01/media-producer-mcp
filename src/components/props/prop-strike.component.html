@@ -23,12 +23,17 @@
   .pstk-card {
     position: relative;
     background: #ffffff; border-radius: 14px;
-    box-shadow: 0 3px 9px rgba(23, 23, 28, 0.07), 0 16px 44px rgba(23, 23, 28, 0.11);
+    /* Shadow alpha >= 0.12: on a white page the white card has 0% fill
+       separation, so the shadow IS the card's edge (cert: ghost panel at
+       0.11 alpha). */
+    box-shadow: 0 3px 9px rgba(23, 23, 28, 0.14), 0 16px 44px rgba(23, 23, 28, 0.18);
     padding: 26px 52px;
   }
   .pstk-text {
     font-size: 44px; font-weight: 700; letter-spacing: -0.01em;
-    color: #a9adb6; white-space: nowrap;
+    /* Card is always white, so the logotype grey pins to it: #a9adb6 sat at
+       2.1:1; #696d76 clears 4.5:1 even if fit-shrink drops below 24px. */
+    color: #696d76; white-space: nowrap;
   }
   .pstk-card img { display: block; max-height: 64px; }
   .pstk-x { position: absolute; inset: -12% -6%; width: 112%; height: 124%; overflow: visible; }
@@ -55,7 +60,26 @@
     }
     if (data.ink) card.style.setProperty('--pstk-ink', data.ink);
 
+    // Fit-to-box: the nowrap logotype must rest fully inside the host.
+    // Shrink the font proportionally (floor 18px) when the card overflows.
+    if (!data.image && textEl && el.clientWidth) {
+      var avail = el.clientWidth * 0.92;
+      if (card.offsetWidth > avail) {
+        var base = parseFloat(getComputedStyle(textEl).fontSize) || 44;
+        textEl.style.fontSize = Math.max(18, Math.floor(base * avail / card.offsetWidth)) + 'px';
+      }
+    }
+
+    // Tilt is a garnish, and its budget shrinks with card width: the text's
+    // axis-aligned box overhangs the card by ~(w/2)*sin(tilt) at each end,
+    // and once that clears the 26px vertical padding the box samples the
+    // PAGE behind the card (cert: a 42-degree feed hid the text entirely;
+    // clamped to 12 the ~950px card still measured 1.24:1 on the dark
+    // ground from page-colored corners). Keep the overhang under ~21px.
     var rot = data.rotation === undefined ? -3 : Number(data.rotation) || 0;
+    var halfW = Math.max(40, card.offsetWidth / 2);
+    var maxTilt = Math.min(12, Math.asin(Math.min(21, halfW) / halfW) * 180 / Math.PI);
+    rot = Math.max(-maxTilt, Math.min(maxTilt, rot));
     gsap.set(card, { rotation: rot });
 
     // Card enters with the house line-rise.

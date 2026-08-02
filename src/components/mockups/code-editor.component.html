@@ -91,6 +91,9 @@
     width: 200px;
     background: #1a1b26;
     border-right: 1px solid rgba(255, 255, 255, 0.04);
+    /* Visible edge on dark pages: #1a1b26 measured 0.3% separation from a
+       #0f172a page; the hairline needs >= 0.12 alpha to read as an edge. */
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.14);
     flex-shrink: 0;
     overflow: hidden;
   }
@@ -134,6 +137,8 @@
     display: flex;
     flex-direction: column;
     background: #1a1b26;
+    /* Same dark-page edge cue as .editor-sidebar (~0.3% separation). */
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13);
     min-width: 0;
   }
 

@@ -223,7 +223,9 @@
   .qas-panel {
     width: 33%; min-width: 300px;
     display: flex; flex-direction: column;
-    border-left: 1px solid #eeedea;
+    /* 2px divider (color on all edges, width only left): #fbfaf8 is ~3.6%
+       from a white page and needs a computed >= 1.5px edge. */
+    border: solid #e6e4df; border-width: 0 0 0 2px;
     background: #fbfaf8;
     flex-shrink: 0;
   }
@@ -269,7 +271,8 @@
   .qas-plat-ico svg { width: 100%; height: 100%; }
 
   .qas-toolcard {
-    border: 1px solid #e8e6e1; border-radius: 12px;
+    /* 2px: white card on near-white panel, 0.0% from a white page. */
+    border: 2px solid #e8e6e1; border-radius: 12px;
     background: #fff;
     margin: 14px 0;
     overflow: hidden;
@@ -295,7 +298,7 @@
   .qas-toolcard.open .qas-toolcard-body { max-height: none; padding: 0 14px 12px; }
   .qas-toolcard-preview {
     font-size: 13.5px; line-height: 1.55; color: #4b4a46;
-    border: 1px solid #efede8;
+    border: 2px solid #e8e6e1; /* 2px: #fdfcfb preview is ~1.4% from white */
     border-radius: 9px;
     padding: 12px 13px;
     background: #fdfcfb;
@@ -335,7 +338,9 @@
   /* ── Composer ── */
   .qas-composer {
     margin: 0 14px 14px;
-    border: 1px solid #e6e4df; border-radius: 16px;
+    /* 2px: white composer measured 0.0% separation on white pages (house
+       precedent: quotient mocks use 2px borders for their light panels). */
+    border: 2px solid #e6e4df; border-radius: 16px;
     background: #fff;
     padding: 13px 14px 11px;
     flex-shrink: 0;

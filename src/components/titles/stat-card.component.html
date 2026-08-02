@@ -130,8 +130,51 @@
     if (data.suffix) suffixEl.textContent = data.suffix;
     if (data.label) labelEl.textContent = data.label;
 
-    var targetValue = data.value || 0;
-    var decimals = data.decimals !== undefined ? data.decimals : 0;
+    var targetValue = Number(data.value) || 0;
+    // The TARGET decides the printed precision: an integer target must show
+    // integers on every count-up frame. A wild decimals value (cert fed 42)
+    // printed the raw tween float ("40.4444...') mid-count -- clamp the
+    // override to 0-3 and otherwise infer from the target itself.
+    var targetStr = String(targetValue);
+    var dotAt = targetStr.indexOf('.');
+    var decimals = dotAt < 0 ? 0 : Math.min(targetStr.length - dotAt - 1, 3);
+    var reqDecimals = Number(data.decimals);
+    if (isFinite(reqDecimals) && reqDecimals >= 0 && reqDecimals <= 3) {
+      decimals = Math.round(reqDecimals);
+    }
+
+    // Ground-aware inks: the gate reads the element `color` (the fill is a
+    // clipped gradient), and the hardcoded slate label measured 2.22:1 on a
+    // white ground (cert). Pin stops that stay on the ink side of the
+    // measured ground, and a truthful `color` to match.
+    var groundLum = window.mpGroundLum ? mpGroundLum() : null;
+    if (typeof groundLum === 'number') {
+      var darkGround = groundLum < 0.18;
+      var ink = darkGround ? '#ffffff' : '#17171c';
+      numberEl.style.color = ink;
+      prefixEl.style.color = ink;
+      suffixEl.style.color = ink;
+      labelEl.style.color = darkGround ? '#e6e9f2' : '#4d5461';
+      if (darkGround) {
+        // Keep the brand hue but force LIGHT stops (a dark accent token
+        // would sink the ramp into the ground).
+        numberEl.style.backgroundImage = 'linear-gradient(135deg, #ffffff 0%, ' +
+          'color-mix(in srgb, var(--mp-color-accent, #A78BFA) 55%, #f4f4f8) 50%, ' +
+          'color-mix(in srgb, var(--mp-color-accent, #A78BFA) 40%, #f4f4f8) 100%)';
+        prefixEl.style.backgroundImage = suffixEl.style.backgroundImage =
+          'linear-gradient(135deg, color-mix(in srgb, var(--mp-color-accent, #A78BFA) 55%, #f4f4f8) 0%, ' +
+          'color-mix(in srgb, var(--mp-color-accent, #A78BFA) 40%, #f4f4f8) 100%)';
+      } else {
+        // Light ground: the stock white->pastel ramp washes out on white --
+        // run it ink-first with a deepened accent.
+        numberEl.style.backgroundImage = 'linear-gradient(135deg, #17171c 0%, ' +
+          'color-mix(in srgb, var(--mp-color-accent, #7c5ce0) 70%, #17171c) 60%, ' +
+          'color-mix(in srgb, var(--mp-color-accent, #7c5ce0) 85%, #17171c) 100%)';
+        prefixEl.style.backgroundImage = suffixEl.style.backgroundImage =
+          'linear-gradient(135deg, color-mix(in srgb, var(--mp-color-accent, #7c5ce0) 70%, #17171c) 0%, ' +
+          'color-mix(in srgb, var(--mp-color-accent, #7c5ce0) 85%, #17171c) 100%)';
+      }
+    }
 
     // Initial states
     gsap.set([wrap, labelEl], { autoAlpha: 0 });

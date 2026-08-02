@@ -151,7 +151,11 @@
     box-shadow: 0 30px 90px rgba(31, 30, 29, 0.25), 0 6px 24px rgba(31, 30, 29, 0.12); }
 
   /* Sidebar */
-  .cwh-side { width: 252px; min-width: 252px; background: #fbfaf7; border-right: 1px solid #e8e6e0;
+  /* 2px divider (border-color on all edges so the computed color is the
+     divider, widths only on the right): #fbfaf7 sits ~3.5% from a white page
+     and needs a >= 1.5px computed edge. */
+  .cwh-side { width: 252px; min-width: 252px; background: #fbfaf7;
+    border: solid #e8e6e0; border-width: 0 2px 0 0;
     display: flex; flex-direction: column; padding: 12px 12px 10px; }
   .cwh-lights { display: flex; align-items: center; gap: 7px; padding: 2px 4px 12px; }
   .cwh-dot { width: 11px; height: 11px; border-radius: 50%; }
@@ -211,7 +215,9 @@
      Explicit z-index: the entrance tweens leave transforms on the composer
      AND the ideas section, isolating both stacking contexts -- without it
      the later-in-DOM ideas paint over the open menu. */
-  .cwh-composer { width: 100%; max-width: 760px; background: #fff; border: 1px solid #e2e0d8;
+  /* 2px border: the white composer measured 0.0% separation on white pages;
+     a 1px border computes below the 1.5px visible-edge floor. */
+  .cwh-composer { width: 100%; max-width: 760px; background: #fff; border: 2px solid #e2e0d8;
     border-radius: 16px; box-shadow: 0 4px 16px rgba(31,30,29,0.06);
     position: relative; z-index: 5; }
   .cwh-comp-input { padding: 18px 20px 6px; font-size: 15px; color: #1f1e1d; min-height: 24px;

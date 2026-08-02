@@ -69,6 +69,27 @@
       line.style.fontSize = fs + 'px';
     }
 
+    // Accent words ride the raw accent token; on a white ground the amber
+    // fallback measured 2.15:1 (cert, needs 3:1 at this size). Verify against
+    // the measured ground and pull failing accents toward the ground's ink.
+    var lum = window.mpGroundLum ? mpGroundLum() : null;
+    if (typeof lum === 'number' && window.mpInkContrast && window.mpParseColor) {
+      var accEls = line.querySelectorAll('.sw.accent');
+      if (accEls.length) {
+        var acc = getComputedStyle(accEls[0]).color;
+        var ratio = mpInkContrast(acc, lum);
+        var ac = mpParseColor(acc);
+        if (ratio !== null && ratio < 3 && ac) {
+          // Mix numerically and emit rgb(): a color-mix() computed style
+          // serializes as color(srgb ...) which downstream tooling misreads.
+          var mc = mpParseColor(lum < 0.18 ? '#f4f4f8' : '#17171c');
+          var fixedInk = 'rgb(' + Math.round(ac.r * 0.5 + mc.r * 0.5) + ',' +
+            Math.round(ac.g * 0.5 + mc.g * 0.5) + ',' + Math.round(ac.b * 0.5 + mc.b * 0.5) + ')';
+          for (var a = 0; a < accEls.length; a++) accEls[a].style.color = fixedInk;
+        }
+      }
+    }
+
     var speed = ctx.motion === 'minimal' ? 0.32 : ctx.motion === 'punchy' ? 0.26 : 0.3;
     var step = ctx.motion === 'minimal' ? 0.16 : ctx.motion === 'punchy' ? 0.24 : 0.2;
 

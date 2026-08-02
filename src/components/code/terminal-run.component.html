@@ -34,6 +34,9 @@
     --tr-cmd: #e6edf3;
     --tr-out: #9aa4b2;
     --tr-title: #8b8b8e;
+    /* Inner edge for the body panel: #0d1117 measured 0.3% lightness
+       separation from a #0f172a page (light body: 6.4% from white). */
+    --tr-edge: rgba(255, 255, 255, 0.14);
     display: flex;
     flex-direction: column;
     width: 80%;
@@ -47,7 +50,10 @@
     --tr-bg: #f6f8fa;
     --tr-chrome-a: #e7e7ea;
     --tr-chrome-b: #dadadd;
-    --tr-prompt: #1a7f37;
+    --tr-edge: rgba(31, 35, 40, 0.16);
+    /* #156b2e: #1a7f37 measured 4.47:1 on the light body -- one notch darker
+       keeps the green and clears 4.5:1 with margin (~6:1). */
+    --tr-prompt: #156b2e;
     --tr-cmd: #1f2328;
     --tr-out: #57606a;
     --tr-title: #6e7781;
@@ -129,6 +135,7 @@
   .tr-body {
     flex: 1;
     background: var(--tr-bg);
+    box-shadow: inset 0 0 0 1px var(--tr-edge);
     padding: 26px 28px;
     overflow: hidden;
   }

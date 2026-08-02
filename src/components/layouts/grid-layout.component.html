@@ -49,14 +49,24 @@
   }
 
   .card-icon-wrap {
-    width: 52px;
+    /* Cert sweep: callers pass TEXT here, not just an emoji -- a fixed 52px
+       box clipped "Quotient launch" by ~26px. Size to content (min 52px). */
+    align-self: flex-start;
+    min-width: 52px;
+    max-width: 100%;
     height: 52px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    white-space: nowrap;
     border-radius: 14px;
     background: linear-gradient(135deg, rgba(167, 139, 250, 0.18) 0%, rgba(139, 92, 246, 0.08) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
+    /* The wrap's tint follows the card surface, so pin the theme ink:
+       inherited default-black measured 1.23:1 on the dark card. */
+    color: var(--mp-color-text, #ffffff);
     box-shadow: 0 4px 12px rgba(167, 139, 250, 0.1);
   }
 

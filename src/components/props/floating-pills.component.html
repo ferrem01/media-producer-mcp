@@ -29,6 +29,19 @@
       p.textContent = String(txt);
       if (data.color) p.style.background = data.color;
       if (data.font_size) p.style.fontSize = data.font_size;
+      // The pill paints its OWN surface, so it pins its own ink: hardcoded
+      // white on the token fill measured 1.97:1 light / 2.76:1 dark (cert).
+      // Pick ink from the fill's luminance; either ink clears 3:1 in the
+      // 0.15-0.30 band, so the 0.175 cut always yields a legible pair.
+      host.appendChild(p);
+      try {
+        var fill = window.mpParseColor ? mpParseColor(getComputedStyle(p).backgroundColor) : null;
+        if (fill) {
+          var ch = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+          var fillLum = 0.2126 * ch(fill.r) + 0.7152 * ch(fill.g) + 0.0722 * ch(fill.b);
+          p.style.color = fillLum >= 0.175 ? '#17171c' : '#ffffff';
+        }
+      } catch (e) { /* unparseable fill: keep the default white ink */ }
       var angle = (i / items.length) * Math.PI * 2 + rnd() * 0.9;
       var radius = 0.30 + rnd() * 0.16; // fraction of the half-diagonal
       var cx = 50 + Math.cos(angle) * radius * 90;

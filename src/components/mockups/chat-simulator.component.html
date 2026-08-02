@@ -50,6 +50,9 @@
     width: 220px;
     background: #1a1d21;
     border-right: 1px solid rgba(255, 255, 255, 0.06);
+    /* Visible edge on dark pages: #1a1d21 measured 0.3% lightness separation
+       from a #0f172a page -- the hairline needs >= 0.12 alpha to count. */
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.14);
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -74,7 +77,9 @@
   .workspace-name {
     font-size: 15px;
     font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
+    /* Pinned: the sidebar paints its own #1a1d21 -- the page text token is
+       tuned for the page and measured 1.06:1 here on light pages. */
+    color: #ffffff;
     letter-spacing: -0.01em;
   }
 
@@ -96,7 +101,7 @@
   }
 
   .channel-item.active {
-    color: var(--mp-color-text, #ffffff);
+    color: #ffffff; /* pinned ink -- hardcoded dark sidebar (see .workspace-name) */
     background: rgba(255, 255, 255, 0.06);
   }
 
@@ -108,6 +113,8 @@
   .chat-main {
     flex: 1;
     background: #1e1e24;
+    /* Same dark-page edge cue as .chat-sidebar (0.45% separation measured). */
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13);
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -131,7 +138,7 @@
   .chat-header-name {
     font-size: 15px;
     font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
+    color: #ffffff; /* pinned ink -- hardcoded dark main column */
     letter-spacing: -0.01em;
   }
 
@@ -159,7 +166,7 @@
     justify-content: center;
     font-size: 14px;
     font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
+    color: #ffffff; /* pinned ink -- avatars carry their own colored fills */
     flex-shrink: 0;
   }
 
@@ -179,7 +186,7 @@
   .message-user {
     font-size: 14px;
     font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
+    color: #ffffff; /* pinned ink -- measured 1.15:1 with the light page token */
   }
 
   .message-time {

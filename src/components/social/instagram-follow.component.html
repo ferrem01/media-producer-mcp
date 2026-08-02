@@ -52,6 +52,8 @@
   }
   .ig-meta { flex: 1 1 auto; min-width: 0; }
   .ig-username { font-weight: 700; font-size: 22px; color: var(--mp-color-text, #ffffff); }
+  /* Base ink only: strengthened at boot (createTimeline) -- theme muted
+     alone measured 4.39:1 on the light chip (needs 4.5:1 at 15px). */
   .ig-sub { font-size: 15px; color: var(--mp-color-text-muted, #a8a8a8); margin-top: 2px; }
   .ig-btn {
     position: relative;
@@ -91,6 +93,22 @@
     if (data.username) username.textContent = (data.username.charAt(0) === '@' ? data.username.slice(1) : data.username);
     if (data.subtitle && sub) sub.textContent = data.subtitle;
     if (data.avatar_color && avatar) avatar.style.background = data.avatar_color;
+
+    // Muted ink, strengthened: 55% muted + 45% text clears 4.5:1 on both
+    // grounds (muted alone measured 4.39:1 on light). Blended in JS to a
+    // plain rgb() -- CSS color-mix() computes to color(srgb ...), which the
+    // contrast gate cannot parse.
+    if (sub) {
+      var cs = getComputedStyle(el);
+      var px = function (v) {
+        var s = document.createElement('span'); s.style.color = v; el.appendChild(s);
+        var c = getComputedStyle(s).color; el.removeChild(s);
+        var m = c.match(/-?[\d.]+/g); return m ? [+m[0], +m[1], +m[2]] : null;
+      };
+      var mu = px(cs.getPropertyValue('--mp-color-text-muted') || '#a8a8a8') || [168, 168, 168];
+      var tx = px(cs.getPropertyValue('--mp-color-text') || '#ffffff') || [255, 255, 255];
+      sub.style.color = 'rgb(' + Math.round(mu[0] * 0.55 + tx[0] * 0.45) + ',' + Math.round(mu[1] * 0.55 + tx[1] * 0.45) + ',' + Math.round(mu[2] * 0.55 + tx[2] * 0.45) + ')';
+    }
 
     var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.65 : 0.8;
 

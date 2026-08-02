@@ -40,7 +40,29 @@
     // Clone the first item at the end so the wrap-around slides forward
     // (last -> first) instead of jumping back through the whole stack.
     var clone = itemsWrap.children[0].cloneNode(true);
+    clone.setAttribute('aria-hidden', 'true');
     itemsWrap.appendChild(clone);
+
+    // Pill ink rides the primary token; on the dark ground it measured
+    // 2.52:1 (cert, needs 3:1). Verify against the measured ground and pull
+    // a failing primary toward the ground's ink (text + border together).
+    var lum = window.mpGroundLum ? mpGroundLum() : null;
+    if (pill && typeof lum === 'number' && window.mpInkContrast && window.mpParseColor) {
+      var pillInk = getComputedStyle(itemsWrap.children[0]).color;
+      var ratio = mpInkContrast(pillInk, lum);
+      var pc = mpParseColor(pillInk);
+      if (ratio !== null && ratio < 3 && pc) {
+        // Mix numerically and emit rgb(): a color-mix() computed style
+        // serializes as color(srgb ...) which downstream tooling misreads.
+        var mc = mpParseColor(lum < 0.18 ? '#f4f4f8' : '#17171c');
+        var fixedInk = 'rgb(' + Math.round(pc.r * 0.4 + mc.r * 0.6) + ',' +
+          Math.round(pc.g * 0.4 + mc.g * 0.6) + ',' + Math.round(pc.b * 0.4 + mc.b * 0.6) + ')';
+        for (var ci = 0; ci < itemsWrap.children.length; ci++) {
+          itemsWrap.children[ci].style.color = fixedInk;
+          itemsWrap.children[ci].style.borderColor = fixedInk;
+        }
+      }
+    }
 
     var interval = Math.max(0.4, Number(data.interval) || 1.1);
     var at = Math.max(0, Number(data.at) || 0);
@@ -59,16 +81,26 @@
         if (!itemH) return;
         slot.style.height = itemH + 'px';
         var t = proxy.t * dur - at;
-        if (t < 0) { gsap.set(itemsWrap, { y: 0 }); return; }
-        var idx = Math.floor(t / interval);
-        var frac = (t - idx * interval) / interval;
-        // Slide happens in the last 25% of each interval.
-        var slide = frac > 0.75 ? (frac - 0.75) / 0.25 : 0;
-        var eased = slide * slide * (3 - 2 * slide);
-        // Position runs 0..items.length (the clone slot); wrap AFTER adding
-        // the eased fraction so last -> first slides forward.
-        var pos = (idx % items.length) + eased;
+        var pos = 0;
+        if (t >= 0) {
+          var idx = Math.floor(t / interval);
+          var frac = (t - idx * interval) / interval;
+          // Slide happens in the last 25% of each interval.
+          var slide = frac > 0.75 ? (frac - 0.75) / 0.25 : 0;
+          var eased = slide * slide * (3 - 2 * slide);
+          // Position runs 0..items.length (the clone slot); wrap AFTER adding
+          // the eased fraction so last -> first slides forward.
+          pos = (idx % items.length) + eased;
+        }
         gsap.set(itemsWrap, { y: -(pos * itemH) });
+        // Items not in the slot are HIDDEN, not peeking: the roll must rest
+        // with exactly the current item (plus, mid-slide, its successor)
+        // visible, or off-slot copy reads as clipped text at every probe
+        // (cert: item clipped ~262px past the slot).
+        var lo = Math.floor(pos), hi = Math.ceil(pos);
+        for (var i = 0; i < itemsWrap.children.length; i++) {
+          itemsWrap.children[i].style.visibility = (i === lo || i === hi) ? 'visible' : 'hidden';
+        }
       },
     }, 0);
     return tl;

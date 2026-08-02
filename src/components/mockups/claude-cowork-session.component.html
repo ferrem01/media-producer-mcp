@@ -145,7 +145,10 @@
     box-shadow: 0 30px 90px rgba(31, 30, 29, 0.25), 0 6px 24px rgba(31, 30, 29, 0.12); }
 
   /* Sidebar (matches claude-cowork-home) */
-  .cws-side { width: 248px; min-width: 248px; background: #fbfaf7; border-right: 1px solid #e8e6e0;
+  /* 2px divider (color on all edges, width only right): #fbfaf7 is ~3.5%
+     from a white page and needs a computed >= 1.5px edge. */
+  .cws-side { width: 248px; min-width: 248px; background: #fbfaf7;
+    border: solid #e8e6e0; border-width: 0 2px 0 0;
     display: flex; flex-direction: column; padding: 12px 12px 10px; }
   .cws-lights { display: flex; align-items: center; gap: 7px; padding: 2px 4px 12px; }
   .cws-dot { width: 11px; height: 11px; border-radius: 50%; }
@@ -248,7 +251,8 @@
 
   /* Composer */
   .cws-inputwrap { flex-shrink: 0; padding: 4px 22px 8px; }
-  .cws-inputbox { background: #fff; border: 1px solid #e2e0d8; border-radius: 15px;
+  /* 2px border: the white composer measured 0.0% separation on white pages. */
+  .cws-inputbox { background: #fff; border: 2px solid #e2e0d8; border-radius: 15px;
     padding: 13px 16px 10px; box-shadow: 0 2px 8px rgba(31,30,29,0.05); }
   .cws-inputbox.is-active { border-color: rgba(217, 119, 87, 0.6); }
   .cws-input { font-size: 14px; color: #1f1e1d; line-height: 1.5; min-height: 21px;
@@ -266,7 +270,8 @@
   .cws-rail { width: 268px; min-width: 268px; padding: 14px 14px 0 0;
     display: flex; flex-direction: column; }
   .cws-cards { display: flex; flex-direction: column; gap: 10px; }
-  .cws-card { background: #fff; border: 1px solid #e8e6e0; border-radius: 13px; padding: 12px 14px; }
+  /* 2px: white rail cards are panel-sized and 0.0% from a white page. */
+  .cws-card { background: #fff; border: 2px solid #e8e6e0; border-radius: 13px; padding: 12px 14px; }
   .cws-card-head { display: flex; align-items: center; gap: 8px; }
   .cws-card-title { font-size: 13.5px; font-weight: 700; color: #1f1e1d; flex: 0 0 auto; }
   .cws-card-sp { flex: 1; }

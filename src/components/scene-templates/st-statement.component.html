@@ -32,6 +32,12 @@
   .stst-rule { width: 34px; height: 2px; background: var(--mp-color-primary, #4f46e5); transform-origin: left center; }
   .stst-kicker { font-size: 14px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase;
     color: var(--mp-color-primary, #4f46e5); }
+  /* Dark world re-inks: raw primary measured 2.67:1 (14px kicker, needs
+     4.5:1) and 2.39:1 (chapnum, needs 3:1) on the near-black canvas -- the
+     script lifts both (brand hue kept) as resolved rgb() inks; these statics
+     are the no-JS fallback. */
+  .stst.is-dark .stst-kicker { color: #babbf1; }
+  .stst.is-dark .stst-chapnum { color: #a5a7f5; }
   .stst-stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: 78vw; }
   .stst-line-group { position: absolute; left: 0; top: 0; width: 100%;
@@ -131,6 +137,20 @@
 
     var built = statements.map(function(s, i) { return buildStatement(s, false); });
 
+    // Dark-world chrome inks: raw primary measured 2.67:1 on the 14px kicker
+    // (needs 4.5:1) and 2.39:1 on the chapnum (needs 3:1). Brand hue kept,
+    // lightness lifted toward #f4f4f8, resolved to rgb() -- color-mix()
+    // computes to color(srgb ...) which the contrast gate cannot parse.
+    if (data.theme === 'dark' && window.mpParseColor) {
+      var pr = mpParseColor(getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5');
+      if (pr) {
+        var lift = function(pct) { return 'rgb(' + Math.round(pr.r * pct + 244 * (1 - pct)) + ',' +
+          Math.round(pr.g * pct + 244 * (1 - pct)) + ',' + Math.round(pr.b * pct + 248 * (1 - pct)) + ')'; };
+        var kEl = q('.stst-kicker'); if (kEl) kEl.style.color = lift(0.35);
+        el.querySelectorAll('.stst-chapnum').forEach(function(n) { n.style.color = lift(0.55); });
+      }
+    }
+
     // Timing: intro beat, then each statement owns an equal slice; the last
     // one holds to the end (no exit -- the cut is the exit, editorial style).
     var intro = 0.35;
@@ -141,11 +161,19 @@
       var t0 = intro + i * slice;
       // Lines rise out of their masks, staggered -- the serif line-rise.
       gsap.set(b.lines, { yPercent: 118 });
-      gsap.set(b.group, { autoAlpha: 1 });
+      // A statement is VISIBLE only for its own beat. Waiting (yPercent 118)
+      // and departed (-118) lines overhang their overflow mask by ~110px at
+      // full opacity -- invisible to the eye but a resting clipped-text
+      // defect to the geometry gate. Hidden groups are skipped instead.
+      gsap.set(b.group, { autoAlpha: 0 });
+      tl.set(b.group, { autoAlpha: 1 }, t0);
       tl.to(b.lines, { yPercent: 0, duration: riseD, ease: 'power4.out', stagger: 0.09 }, t0);
-      // Roll up and out before the next statement (except the last).
+      // Roll up and out before the next statement (except the last), then
+      // hide the group the moment the last line has left its mask.
       if (i < built.length - 1) {
-        tl.to(b.lines, { yPercent: -118, duration: riseD * 0.8, ease: 'power3.in', stagger: 0.05 }, t0 + slice - riseD * 0.7);
+        var outAt = t0 + slice - riseD * 0.7;
+        tl.to(b.lines, { yPercent: -118, duration: riseD * 0.8, ease: 'power3.in', stagger: 0.05 }, outAt);
+        tl.set(b.group, { autoAlpha: 0 }, outAt + riseD * 0.8 + 0.05 * Math.max(0, b.lines.length - 1) + 0.02);
       }
       // A whisper of drift while it holds (life, not distraction).
       tl.fromTo(b.group, { scale: 1 }, { scale: 1.012, duration: Math.max(0.6, slice - riseD), ease: 'none' }, t0 + riseD * 0.5);

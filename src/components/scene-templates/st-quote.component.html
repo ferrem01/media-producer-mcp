@@ -40,7 +40,17 @@
     var light = data.theme === 'light';
     if (light) {
       root.style.color = 'var(--mp-color-text, #17171c)';
-      var a = q('.stq-attr'); if (a) a.style.color = 'var(--mp-color-text-muted, #6b7280)';
+      // 15px attribution needs 4.5:1; the raw muted token measured 3.96:1 on
+      // the light wash -- deepen toward ink (muted hue kept), resolved to
+      // rgb() because color-mix() computes to color(srgb ...) which the
+      // contrast gate cannot parse.
+      var a = q('.stq-attr');
+      if (a) {
+        var mut = window.mpParseColor && mpParseColor(getComputedStyle(root).getPropertyValue('--mp-color-text-muted').trim() || '#6b7280');
+        a.style.color = mut
+          ? 'rgb(' + Math.round(mut.r * 0.55 + 23 * 0.45) + ',' + Math.round(mut.g * 0.55 + 23 * 0.45) + ',' + Math.round(mut.b * 0.55 + 28 * 0.45) + ')'
+          : '#494c55';
+      }
       var ix = q('.stq-index'); if (ix) ix.style.color = 'var(--mp-color-text-muted, #9ca3af)';
       var wm0 = q('.stq-wordmark'); if (wm0) wm0.style.filter = 'none';
     }

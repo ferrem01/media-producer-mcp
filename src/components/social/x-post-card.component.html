@@ -64,16 +64,18 @@
   .x-nameline { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
   .x-name { font-weight: 700; font-size: 22px; color: #e7e9ea; }
   .x-verified { width: 20px; height: 20px; fill: #1d9bf0; }
-  .x-handle, .x-dot, .x-time { color: #71767b; font-size: 19px; }
+  /* #71767b measured 4.3:1 on the #000 card (needs 4.5:1) -- lift the muted
+     chrome gray for margin. */
+  .x-handle, .x-dot, .x-time { color: #8f959b; font-size: 19px; }
   .x-logo { width: 24px; height: 24px; fill: #e7e9ea; flex: 0 0 auto; }
   .x-text {
     font-size: 24px; line-height: 1.4; margin: 18px 0 22px; color: #e7e9ea;
     word-wrap: break-word;
   }
   .x-stats { display: flex; gap: 56px; }
-  .x-stat { display: flex; align-items: center; gap: 9px; color: #71767b; }
-  .x-stat svg { width: 22px; height: 22px; fill: #71767b; }
-  .x-replies svg { fill: none; stroke: #71767b; stroke-width: 2; }
+  .x-stat { display: flex; align-items: center; gap: 9px; color: #8f959b; }
+  .x-stat svg { width: 22px; height: 22px; fill: #8f959b; }
+  .x-replies svg { fill: none; stroke: #8f959b; stroke-width: 2; }
   .x-likes svg { fill: none; stroke: #f91880; stroke-width: 2; }
   .x-likes .x-count { color: #f91880; }
   .x-reposts svg { fill: #00ba7c; }
@@ -88,7 +90,10 @@
     // Display scale: the card is fixed-size by design; hero shots blow it up.
     // Folded into every GSAP scale value -- an inline transform would be
     // overwritten by the first tween that touches scale.
+    // Hero scale is ~1-2.5 by design; an unclamped value (measured live: 42)
+    // blew the card past the frame -- post text measured 0:1 clipped at rest.
     var S = Number(data.scale) || 1;
+    S = Math.min(2.5, Math.max(0.5, S));
     card.style.transformOrigin = '50% 50%';
     var avatar = el.querySelector('.x-avatar');
     var nameEl = el.querySelector('.x-name');
@@ -153,9 +158,11 @@
       tl.to(heart, { scale: 1.18, duration: 1.1, ease: 'sine.inOut', yoyo: true, repeat: -1, transformOrigin: '50% 50%' }, 1.6);
     }
 
+    // Exit. Late+quick: a half-faded card over a light page composites the
+    // muted grays below 4.5:1 at the late probe -- hold at rest, then leave.
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
-      tl.to(card, { autoAlpha: 0, y: -25, scale: 0.98 * S, duration: 0.45, ease: 'power2.in' }, exitAt);
+      var exitAt = ctx.duration - 0.45;
+      tl.to(card, { autoAlpha: 0, y: -25, scale: 0.98 * S, duration: 0.35, ease: 'power2.in' }, exitAt);
     }
 
     return tl;

@@ -97,6 +97,8 @@
   .face-description {
     font-size: 17px;
     font-weight: 400;
+    /* Base ink only: strengthened at boot (createTimeline) -- theme muted
+       alone measured 3.57:1 on the light card (needs 4.5:1 at 17px). */
     color: var(--mp-color-text-muted, #94a3b8);
     margin-top: 16px;
     line-height: 1.45;
@@ -121,6 +123,24 @@
     if (data.front_description) frontDesc.textContent = data.front_description;
     if (data.back_title) backTitle.textContent = data.back_title;
     if (data.back_description) backDesc.textContent = data.back_description;
+
+    // Muted ink, strengthened: 55% muted + 45% text clears 4.5:1 on both
+    // grounds (muted alone measured 3.57:1 on light). Blended in JS to a
+    // plain rgb() -- CSS color-mix() computes to color(srgb ...), which the
+    // contrast gate cannot parse.
+    (function () {
+      var cs = getComputedStyle(el);
+      function px(v) {
+        var s = document.createElement('span'); s.style.color = v; el.appendChild(s);
+        var c = getComputedStyle(s).color; el.removeChild(s);
+        var m = c.match(/-?[\d.]+/g); return m ? [+m[0], +m[1], +m[2]] : null;
+      }
+      var mu = px(cs.getPropertyValue('--mp-color-text-muted') || '#94a3b8') || [148, 163, 184];
+      var tx = px(cs.getPropertyValue('--mp-color-text') || '#ffffff') || [255, 255, 255];
+      var ink = 'rgb(' + Math.round(mu[0] * 0.55 + tx[0] * 0.45) + ',' + Math.round(mu[1] * 0.55 + tx[1] * 0.45) + ',' + Math.round(mu[2] * 0.55 + tx[2] * 0.45) + ')';
+      frontDesc.style.color = ink;
+      backDesc.style.color = ink;
+    })();
 
     var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
 

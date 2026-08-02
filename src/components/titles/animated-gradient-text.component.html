@@ -46,12 +46,34 @@
 
     textEl.textContent = data.text || '';
 
-    // Set up gradient colors
-    var colors = data.colors || ['#A78BFA', '#F472B6', '#60A5FA', '#34D399', '#A78BFA'];
-    if (colors.length < 2) colors.push('#A78BFA');
+    // Set up gradient colors. Validate every stop: one junk string voids the
+    // whole gradient declaration and the clipped text renders as NOTHING
+    // (cert booted with non-color strings; measured ink fell back to the
+    // inherited near-black at 1.16:1 on the dark ground).
+    var isColor = function (c) {
+      if (typeof c !== 'string') return false;
+      try { if (window.CSS && CSS.supports) return CSS.supports('color', c); } catch (e) {}
+      return !!(window.mpParseColor && mpParseColor(c));
+    };
+    var colors = (Array.isArray(data.colors) ? data.colors.filter(isColor) : []);
+    if (colors.length < 2) colors = ['#A78BFA', '#F472B6', '#60A5FA', '#34D399'];
     // Ensure seamless loop by repeating first color at end
     if (colors[colors.length - 1] !== colors[0]) {
-      colors.push(colors[0]);
+      colors = colors.concat([colors[0]]);
+    }
+
+    // Ground-aware stops + a truthful `color` for the legibility gate: stops
+    // that fail 3:1 against the measured ground are pulled toward its ink
+    // (dark ground -> lighten toward #f4f4f8, light -> deepen toward #17171c).
+    var lum = window.mpGroundLum ? mpGroundLum() : null;
+    if (typeof lum === 'number') {
+      var groundInk = lum < 0.18 ? '#f4f4f8' : '#17171c';
+      colors = colors.map(function (c) {
+        var ratio = window.mpInkContrast ? mpInkContrast(c, lum) : null;
+        if (ratio !== null && ratio >= 3) return c;
+        return 'color-mix(in srgb, ' + c + ' 55%, ' + groundInk + ')';
+      });
+      textEl.style.color = lum < 0.18 ? '#ffffff' : '#17171c';
     }
 
     var gradientStr = 'linear-gradient(90deg, ' + colors.join(', ') + ')';

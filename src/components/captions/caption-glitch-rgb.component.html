@@ -1,9 +1,11 @@
 <template>
   <div class="cap-glitch">
+    <!-- The r/b layers are aria-hidden decorative COPIES of the same text and
+         live INSIDE the main span: ancestor/descendant overlap is normal flow
+         to the collision gate, whereas as siblings the 99%-overlapping copies
+         read as two unrelated texts colliding (cert). -->
     <div class="cap-glitch-stack">
-      <span class="cap-g cap-g-r"></span>
-      <span class="cap-g cap-g-b"></span>
-      <span class="cap-g cap-g-main"></span>
+      <span class="cap-g cap-g-main"><span class="cap-g-r" aria-hidden="true"></span><span class="cap-g-b" aria-hidden="true"></span></span>
     </div>
   </div>
 </template>
@@ -49,6 +51,7 @@
     width: 100%;
     mix-blend-mode: screen;
     pointer-events: none;
+    text-shadow: none;
   }
 
   .cap-g-r {
@@ -70,15 +73,15 @@
     if (!stack || !main || !red || !blue) return tl;
 
     var text = (data && data.text) || 'SYSTEM ONLINE';
-    main.textContent = text;
+    // main's text is appended as a node (textContent would wipe the r/b child
+    // layers); r/b inherit main's font metrics so they overlay exactly.
     red.textContent = text;
     blue.textContent = text;
+    main.appendChild(document.createTextNode(text));
 
     if (text.length > 22) {
       var fs = Math.max(44, Math.round(80 * (22 / text.length) + 12));
       main.style.fontSize = fs + 'px';
-      red.style.fontSize = fs + 'px';
-      blue.style.fontSize = fs + 'px';
     }
 
     var amp = ctx.motion === 'minimal' ? 8 : ctx.motion === 'punchy' ? 22 : 16;
@@ -110,11 +113,13 @@
     tl.to(red, { x: 0, autoAlpha: 0, duration: 0.3, ease: 'power3.out' }, t);
     tl.to(blue, { x: 0, autoAlpha: 0, duration: 0.3, ease: 'power3.out' }, t);
 
-    // Occasional micro re-glitch to keep it alive
+    // Occasional micro re-glitch to keep it alive. Peaks at 0.45: the layers
+    // are decorative echoes and must REST below 0.5 opacity so the gates read
+    // them as decoration, not as a second text run (cert).
     var resolved = t + 0.3;
     if (ctx.duration > resolved + 1.2) {
-      tl.set(red, { x: -amp * 0.5, autoAlpha: 0.7 }, resolved + 1.0);
-      tl.set(blue, { x: amp * 0.5, autoAlpha: 0.7 }, resolved + 1.0);
+      tl.set(red, { x: -amp * 0.5, autoAlpha: 0.45 }, resolved + 1.0);
+      tl.set(blue, { x: amp * 0.5, autoAlpha: 0.45 }, resolved + 1.0);
       tl.to([red, blue], { x: 0, autoAlpha: 0, duration: 0.18, ease: 'power2.out' }, resolved + 1.06);
     }
 

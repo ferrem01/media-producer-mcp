@@ -58,6 +58,13 @@
     textEl.textContent = data.text || '';
     if (data.subtitle) subtitleEl.textContent = data.subtitle;
 
+    // Subtitle sits on the PAGE: hardcoded #94a3b8 measured 2.16:1 on a
+    // white ground (cert). Pick muted ink from the measured ground.
+    var groundLum = window.mpGroundLum ? mpGroundLum() : null;
+    if (typeof groundLum === 'number') {
+      subtitleEl.style.color = groundLum < 0.18 ? '#e6e9f2' : '#4d5461';
+    }
+
     var speed = ctx.motion === 'minimal' ? 0.6 : ctx.motion === 'punchy' ? 0.9 : 1.4;
 
     // Initial: massive scale with heavy blur
