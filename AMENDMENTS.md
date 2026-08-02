@@ -2084,3 +2084,32 @@ sets `accent_color` too. Legibility over mood is codegen non-negotiable #1.
 Substring matching now requires >= 3 characters -- "on"/"to" appear inside
 almost any line by coincidence, and repainting a headline off the back of
 that would be a guess.
+
+## #43 + #39: the two fixes the auto-fix arc pointed at (2026-08-02)
+
+### Quotient mocks: legible chrome, real elevation, no phantom initials (#43)
+
+The surviving gate findings on every assembled film were the mocks' own
+chrome. Three mechanisms, fixed at the source (see the commit for the
+numbers): the shared warm grays (#9c9a94/#a3a19a/#8b8983 at 2.3-3.5:1)
+darkened to #6b6963/#63615c (4.8-6.0:1, hierarchy preserved); shells and
+flagged panels bumped to 1.5px #dedcd6 borders + >= 0.12-alpha shadows (what
+the ghost-panel gate credits as a visible edge -- .qsp had NO edge at all);
+avatar initials moved into a span that hides when the photo loads (they were
+being measured against the photo's pixels at 1:1) with the fallback ink
+darkened to #3d5c94 because in a sandboxed render the photo never loads and
+the fallback IS the frame. test/quotient-mock-legibility.test.ts boots the
+real components on a light page and runs the real gates; the stills confirm
+the mocks still read as the Quotient app.
+
+### Storyboard batching (#39, first cut)
+
+The bottleneck was a prompt fossil: "HARD CHUNKING RULE: at most ONE
+add_scene call per response" -- 15+ sequential round-trips per film, each
+re-reading the whole growing conversation. The rule predated the
+truncation-recovery machinery that makes batching safe (discard the turn,
+retry smaller, strikes). The prompt now targets 2-4 add_scene calls per
+turn; the recovery path still forces one-scene turns after a truncation.
+The loop mechanics needed no change (it always processed every tool call in
+a response). Expected effect: storyboarding drops from ~15 turns to ~3-5.
+Verify against stage_timings on the next live runs before claiming a number.
