@@ -92,7 +92,10 @@
     // Display scale: the card is fixed-size by design; hero shots blow it up.
     // Folded into every GSAP scale value -- an inline transform would be
     // overwritten by the first tween that touches scale.
+    // Hero scale is ~1-2.5 by design; an unclamped value (measured live: 42)
+    // blew the card past the frame -- artist line clipped ~10180px off-canvas.
     var S = Number(data.scale) || 1;
+    S = Math.min(2.5, Math.max(0.5, S));
     card.style.transformOrigin = '50% 50%';
     if (data.layout === 'card') {
       card.classList.add('sp-portrait');

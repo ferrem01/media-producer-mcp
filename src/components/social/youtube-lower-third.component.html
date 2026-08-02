@@ -49,7 +49,9 @@
   .yt-subs { font-size: 15px; color: #aaaaaa; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .yt-actions { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
   .yt-sub-btn {
-    background: #ff0000; color: #ffffff;
+    /* White on #ff0000 measured 4:1 (needs 4.5:1 at 16px) -- YouTube's darker
+       red #c00 lifts the pinned white ink to ~5.9:1. */
+    background: #cc0000; color: #ffffff;
     font-weight: 700; font-size: 16px; letter-spacing: 0.02em;
     height: 42px; line-height: 42px; padding: 0 22px; border-radius: 21px;
     box-shadow: 0 4px 14px rgba(255,0,0,0.35);

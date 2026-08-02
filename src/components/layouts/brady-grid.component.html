@@ -39,6 +39,11 @@
     width: 85%;
     max-width: 960px;
     aspect-ratio: 1;
+    /* Cert sweep: aspect-ratio makes the transferred 960px height this item's
+       automatic min-height, so the column overflowed and centered overflow
+       pushed the title off-canvas (title measured 0:1 clipped). Let it shrink. */
+    min-height: 0;
+    flex: 0 1 auto;
     z-index: 1;
   }
 

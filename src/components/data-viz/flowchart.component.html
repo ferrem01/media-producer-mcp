@@ -77,11 +77,15 @@
   }
 
   .fc-node.fc-node-last {
+    /* This node paints its own accent fill, so it pins its own ink: raw accent
+       (#a78bfa-class) gave white text only 2.7:1 -- deepen both gradient stops
+       so the pinned white ink clears 4.5:1 across the whole run. */
     background: linear-gradient(
       155deg,
-      var(--mp-color-accent, #a78bfa) 0%,
-      var(--mp-color-primary, #6366f1) 100%
+      color-mix(in srgb, var(--mp-color-accent, #a78bfa) 45%, #241a3e) 0%,
+      color-mix(in srgb, var(--mp-color-primary, #6366f1) 78%, #10122e) 100%
     );
+    color: #ffffff;
     border-color: rgba(167, 139, 250, 0.6);
     box-shadow:
       0 18px 44px rgba(167, 139, 250, 0.3),
@@ -176,9 +180,13 @@
     function chipText(hex) {
       var m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
       if (!m) return null;
+      // WCAG relative luminance (gamma-corrected) with the 0.18 midpoint --
+      // the old 0-255 weighted sum picked white ink on mid chips ("Blog"
+      // measured 2.99:1). lum < 0.18 -> light ink, else near-black.
       var v = parseInt(m[1], 16);
-      var lum = 0.2126 * (v >> 16 & 255) + 0.7152 * (v >> 8 & 255) + 0.0722 * (v & 255);
-      return lum > 140 ? '#22222c' : '#ffffff';
+      function lin(c) { var s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); }
+      var lum = 0.2126 * lin(v >> 16 & 255) + 0.7152 * lin(v >> 8 & 255) + 0.0722 * lin(v & 255);
+      return lum < 0.18 ? '#ffffff' : '#111318';
     }
     var nodeEls = {};
     nodes.forEach(function(nd, i) {
@@ -191,13 +199,18 @@
       box.style.left = p.x + 'px';
       box.style.top = p.y + 'px';
       if (nd.color) {
+        // Only restyle as a flat chip when the color actually parses -- a bad
+        // value used to strip the glass border/shadow but keep the class fill,
+        // leaving the theme ink on an accent gradient (measured ~3:1).
         var txt = chipText(nd.color);
-        box.style.background = nd.color;
-        box.style.border = '1px solid rgba(0,0,0,0.08)';
-        box.style.boxShadow = '0 8px 22px rgba(0,0,0,0.12)';
-        box.style.backdropFilter = 'none';
-        box.style.webkitBackdropFilter = 'none';
-        if (txt) box.style.color = txt;
+        if (txt) {
+          box.style.background = nd.color;
+          box.style.border = '1px solid rgba(0,0,0,0.08)';
+          box.style.boxShadow = '0 8px 22px rgba(0,0,0,0.12)';
+          box.style.backdropFilter = 'none';
+          box.style.webkitBackdropFilter = 'none';
+          box.style.color = txt;
+        }
       }
       nodesLayer.appendChild(box);
       nodeEls[nd.id] = box;

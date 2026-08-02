@@ -55,6 +55,8 @@
   .logo-label {
     font-size: 18px;
     font-weight: 400;
+    /* Base ink only: strengthened at boot (createTimeline) -- theme muted
+       alone measured 4.19:1 on the light ground (needs 4.5:1 at 18px). */
     color: var(--mp-color-text-muted, #cbd5e1);
     text-align: center;
     letter-spacing: 0.005em;
@@ -73,6 +75,22 @@
     var wrap = el.querySelector('.logo-img-wrap');
     var label = el.querySelector('.logo-label');
     if (!wrap) return tl;
+
+    // Muted ink, strengthened: 55% muted + 45% text clears 4.5:1 on both
+    // grounds (muted alone measured 4.19:1 on light). Blended in JS to a
+    // plain rgb() -- CSS color-mix() computes to color(srgb ...), which the
+    // contrast gate cannot parse.
+    if (label) {
+      var cs = getComputedStyle(el);
+      var px = function (v) {
+        var s = document.createElement('span'); s.style.color = v; el.appendChild(s);
+        var c = getComputedStyle(s).color; el.removeChild(s);
+        var m = c.match(/-?[\d.]+/g); return m ? [+m[0], +m[1], +m[2]] : null;
+      };
+      var mu = px(cs.getPropertyValue('--mp-color-text-muted') || '#cbd5e1') || [203, 213, 225];
+      var tx = px(cs.getPropertyValue('--mp-color-text') || '#ffffff') || [255, 255, 255];
+      label.style.color = 'rgb(' + Math.round(mu[0] * 0.55 + tx[0] * 0.45) + ',' + Math.round(mu[1] * 0.55 + tx[1] * 0.45) + ',' + Math.round(mu[2] * 0.55 + tx[2] * 0.45) + ')';
+    }
 
     var prominent = !!(data.prominent === true || data.prominent === 'true');
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.7;

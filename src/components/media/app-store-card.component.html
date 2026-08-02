@@ -105,8 +105,11 @@
   }
 
   .get-button {
-    background: rgba(167, 139, 250, 0.15);
-    color: var(--mp-color-accent, #A78BFA);
+    /* The button paints its own pill, so it pins its own ink: the old 15%
+       accent tint + accent text measured 2.27:1 on light grounds. A solid
+       primary fill with the matched on-primary ink holds on both themes. */
+    background: var(--mp-color-primary, #7C3AED);
+    color: var(--mp-color-on-primary, #ffffff);
     border: none;
     border-radius: 999px;
     padding: 8px 24px;
@@ -177,12 +180,13 @@
       ease: 'sine.inOut'
     }, 0.3 + speed);
 
-    // Exit
+    // Exit. Late+quick: a half-faded card over a light page composites its
+    // inks below threshold at the late probe -- hold at rest, then leave.
     if (ctx.duration > 2) {
-      var exitAt = ctx.duration - 0.6;
+      var exitAt = ctx.duration - 0.45;
       tl.to(card, {
         autoAlpha: 0, scale: 0.95, y: -15,
-        duration: 0.4,
+        duration: 0.35,
         ease: 'power2.in'
       }, exitAt);
     }
