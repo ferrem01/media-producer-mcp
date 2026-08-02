@@ -91,6 +91,10 @@
     position: relative;
     width: 140px;
     height: 140px;
+    /* Explicit page ink: the icon slot's translucent fill shows the page
+       through it, and an inherited near-black measured 1.2:1 on the dark
+       ground (cert). */
+    color: var(--mp-color-text, #ffffff);
     border-radius: 50%;
     background: linear-gradient(
       135deg,
@@ -123,6 +127,21 @@
     if (data.description) descEl.textContent = data.description;
     if (data.icon) iconEl.textContent = data.icon;
     if (data.visual) iconEl.textContent = data.visual;
+
+    // The description sits on the PAGE: hardcoded #94a3b8 measured 2.24:1 on
+    // a white ground (cert, needs 4.5:1 at 20px). Pick muted ink from the
+    // measured ground instead.
+    var lum = window.mpGroundLum ? mpGroundLum() : null;
+    if (typeof lum === 'number') {
+      descEl.style.color = lum < 0.18 ? '#e6e9f2' : '#4d5461';
+    }
+
+    // The icon slot expects a glyph; if longer copy lands in it, shrink to
+    // fit the 140px circle instead of overflowing the frame.
+    if (iconEl.textContent && iconEl.scrollWidth > iconEl.clientWidth) {
+      var ifs = parseFloat(getComputedStyle(iconEl).fontSize) || 56;
+      iconEl.style.fontSize = Math.max(16, Math.floor(ifs * iconEl.clientWidth / iconEl.scrollWidth)) + 'px';
+    }
 
     var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 1.0;
 

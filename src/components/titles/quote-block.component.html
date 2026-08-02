@@ -145,6 +145,15 @@
     var speed = ctx.motion === 'minimal' ? 0.4 : ctx.motion === 'punchy' ? 0.55 : 0.75;
     var ease = ctx.motion === 'punchy' ? 'back.out(1.2)' : 'power3.out';
 
+    // The card's 3% wash is effectively the page, so the role line sits on
+    // the PAGE ground: hardcoded #cbd5e1 measured 1.38:1 on white (cert,
+    // 16px needs 4.5:1). Pick muted ink from the measured ground.
+    var roleEl = el.querySelector('.role');
+    var groundLum = window.mpGroundLum ? mpGroundLum() : null;
+    if (roleEl && typeof groundLum === 'number') {
+      roleEl.style.color = groundLum < 0.18 ? '#e6e9f2' : '#4d5461';
+    }
+
     // Initial states
     gsap.set(card, { autoAlpha: 0, y: 40, scale: 1.05, filter: 'blur(5px)' });
     gsap.set(accentLine, { scaleX: 0 });

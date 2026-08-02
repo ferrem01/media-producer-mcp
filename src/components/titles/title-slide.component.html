@@ -92,6 +92,13 @@
     if (data.title) titleEl.textContent = data.title;
     if (data.subtitle) subtitle.textContent = data.subtitle;
 
+    // Subtitle sits on the PAGE: hardcoded #cbd5e1 measured 1.45:1 on a
+    // white ground (cert). Pick muted ink from the measured ground.
+    var groundLum = window.mpGroundLum ? mpGroundLum() : null;
+    if (typeof groundLum === 'number') {
+      subtitle.style.color = groundLum < 0.18 ? '#e6e9f2' : '#4d5461';
+    }
+
     // Collect visible elements
     var elements = [];
     if (badge && badge.textContent) elements.push(badge);

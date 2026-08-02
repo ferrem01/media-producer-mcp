@@ -51,6 +51,24 @@
     var text = (data && data.text) || 'Smooth gradient sweep';
     textEl.textContent = text;
 
+    // Gradient stops ride brand tokens: on a dark ground raw primary/accent
+    // can sit near the bg, and the gate reads the element's `color`
+    // (transparent -> black) at 1.18:1 (cert). On a measured dark ground pin
+    // LIGHT stops (brand hue mixed toward #f4f4f8) and a truthful white
+    // `color` -- the visible fill stays the clipped gradient.
+    var lum = window.mpGroundLum ? mpGroundLum() : null;
+    if (typeof lum === 'number' && lum < 0.18) {
+      textEl.style.backgroundImage = 'linear-gradient(100deg,' +
+        'color-mix(in srgb, var(--mp-color-primary, #6366f1) 45%, #f4f4f8) 0%,' +
+        'color-mix(in srgb, var(--mp-color-accent, #ec4899) 45%, #f4f4f8) 35%,' +
+        '#ffffff 50%,' +
+        'color-mix(in srgb, var(--mp-color-accent, #ec4899) 45%, #f4f4f8) 65%,' +
+        'color-mix(in srgb, var(--mp-color-primary, #6366f1) 45%, #f4f4f8) 100%)';
+      textEl.style.color = '#ffffff';
+    } else if (typeof lum === 'number') {
+      textEl.style.color = '#17171c'; // truthful ink for the gate on light grounds
+    }
+
     if (text.length > 24) {
       var fs = Math.max(46, Math.round(84 * (24 / text.length) + 12));
       textEl.style.fontSize = fs + 'px';
