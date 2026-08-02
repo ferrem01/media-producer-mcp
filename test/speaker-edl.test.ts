@@ -4,6 +4,9 @@
  * no-EDL passthrough, bake-on-change, and the assembly paths actually
  * recording the lane.
  */
+import fsSync from "node:fs";
+import os from "node:os";
+import nodePath from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../src/core/idle-silence.js", async (importOriginal) => {
@@ -15,6 +18,12 @@ vi.mock("../src/core/auto-compress.js", () => ({
   proposeSceneCompression: vi.fn(),
   proposeChapterPins: vi.fn(),
 }));
+
+// A REAL scratch dir. The old DATA_DIR sentinel claimed these tests
+// never touch disk -- but ensureSpeakerDerived mkdirs its assets dir, and
+// only the root sandbox could create /nonexistent. CI (non-root) caught it
+// on the first run: EACCES.
+const DATA_DIR = fsSync.mkdtempSync(nodePath.join(os.tmpdir(), "spk-test-"));
 
 import { ensureSpeakerDerived, speakerDeriveKey } from "../src/core/speaker-edl.js";
 import { cutAudioTo } from "../src/core/idle-silence.js";
@@ -36,7 +45,7 @@ describe("speaker EDL derivation", () => {
 
   it("no EDL -> the original IS the rendering; no bake runs", async () => {
     const p = proj([{ at: 0, source: "/assets/t/take.webm" }]);
-    const url = await ensureSpeakerDerived(p, "/nonexistent");
+    const url = await ensureSpeakerDerived(p, DATA_DIR);
     expect(url).toBe("/assets/t/take.webm");
     expect(cutAudioTo).not.toHaveBeenCalled();
     expect(p.audio.tracks[0].source).toBe("/assets/t/take.webm");
@@ -44,7 +53,7 @@ describe("speaker EDL derivation", () => {
 
   it("cuts -> bakes the kept spans and repoints the narration track", async () => {
     const p = proj([{ at: 6.1, source: "/assets/t/projects/p/assets/cam.webm", edl: { cuts: [{ src_start: 20, src_end: 30 }], segments: [] } }]);
-    const url = await ensureSpeakerDerived(p, "/nonexistent");
+    const url = await ensureSpeakerDerived(p, DATA_DIR);
     expect(url).toMatch(/speaker-derived-[0-9a-f]{16}\.m4a$/);
     expect(cutAudioTo).toHaveBeenCalledTimes(1);
     // Kept spans = complement of the cut over the probed 91.2s duration.
@@ -57,11 +66,11 @@ describe("speaker EDL derivation", () => {
   it("unchanged EDL with a live cache file is a no-op", async () => {
     const clip: any = { at: 0, source: "/assets/t/projects/p/assets/cam.webm", edl: { cuts: [{ src_start: 1, src_end: 5 }], segments: [] } };
     const p = proj([clip]);
-    await ensureSpeakerDerived(p, "/nonexistent").catch(() => {});
+    await ensureSpeakerDerived(p, DATA_DIR).catch(() => {});
     const bakes = (cutAudioTo as any).mock.calls.length;
     // Second run with same key but missing cache file -> rebakes (cache-loss
     // recovery); with an existing file it would skip. Either way the key holds.
-    await ensureSpeakerDerived(p, "/nonexistent").catch(() => {});
+    await ensureSpeakerDerived(p, DATA_DIR).catch(() => {});
     expect(clip.derived_key).toBe(speakerDeriveKey(clip));
     expect((cutAudioTo as any).mock.calls.length).toBeGreaterThanOrEqual(bakes);
   });

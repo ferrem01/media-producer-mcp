@@ -2,6 +2,9 @@
  * applyTimelapse: the beat owns film time funded by a narration gap; the
  * camera freezes; pins after the beat shift; removeTimelapse reverses.
  */
+import fsSync from "node:fs";
+import os from "node:os";
+import nodePath from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../src/core/idle-silence.js", async (importOriginal) => {
@@ -13,6 +16,11 @@ vi.mock("../src/core/auto-compress.js", () => ({
   proposeSceneCompression: vi.fn(),
   proposeChapterPins: vi.fn(),
 }));
+
+// Real scratch dir: without an explicit dataDir, applyTimelapse falls back
+// to /data/media-producer, which only a root sandbox can create. CI caught
+// it on the first run: EACCES.
+const DATA_DIR = fsSync.mkdtempSync(nodePath.join(os.tmpdir(), "tlp-test-"));
 
 import { applyTimelapse, removeTimelapse, autoTimelapseForStrain } from "../src/core/speaker-edl.js";
 
@@ -56,7 +64,7 @@ describe("applyTimelapse", () => {
     const res = await applyTimelapse(p, {
       scene_id: "screencast", key: "screencast",
       src_start: 8, src_end: 148, out_seconds: 4,
-    });
+    }, DATA_DIR);
     // The 140s span had ~2s (out 10->12); 4s beat adds ~2s of film.
     expect(res.added_seconds).toBeCloseTo(2, 0);
     expect(p.scenes[1].duration_seconds).toBeCloseTo(62, 0);
@@ -88,9 +96,9 @@ describe("applyTimelapse", () => {
 
   it("resizing an existing beat adjusts by the difference", async () => {
     const p = jammedFilm();
-    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 4 });
+    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 4 }, DATA_DIR);
     const durAfter4 = p.scenes[1].duration_seconds;
-    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 8 });
+    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 8 }, DATA_DIR);
     expect(p.scenes[1].duration_seconds).toBeCloseTo(durAfter4 + 4, 0);
     expect(p.speaker.clips[0].edl.gaps[0].seconds).toBeCloseTo(6, 0);
   });
@@ -99,9 +107,9 @@ describe("applyTimelapse", () => {
     const p = jammedFilm();
     // Manual chip-click: timelapse only the back half of the wait. The pin
     // window still can't hold the untouched front half at 16x.
-    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 80, src_end: 148, out_seconds: 3 });
+    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 80, src_end: 148, out_seconds: 3 }, DATA_DIR);
     // The auto (or a second click) covers the WHOLE wait.
-    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 6 });
+    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 6 }, DATA_DIR);
     const sc = p.scenes[1].media_edits.screencast;
     // One beat, not two overlapping constraints.
     expect(sc.timelapses.length).toBe(1);
@@ -153,7 +161,7 @@ describe("applyTimelapse", () => {
 
   it("removeTimelapse shrinks the film back and lifts the gap", async () => {
     const p = jammedFilm();
-    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 6 });
+    await applyTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8, src_end: 148, out_seconds: 6 }, DATA_DIR);
     await removeTimelapse(p, { scene_id: "screencast", key: "screencast", src_start: 8 });
     expect(p.scenes[1].duration_seconds).toBeCloseTo(60, 0);
     expect((p.speaker.clips[0].edl.gaps || []).length).toBe(0);

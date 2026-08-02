@@ -5,6 +5,9 @@
  * fit); the camera FOLLOWER mirrors the cut so lips match the voice; and
  * applySpeakerRestore reverses all of it.
  */
+import fsSync from "node:fs";
+import os from "node:os";
+import nodePath from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../src/core/idle-silence.js", async (importOriginal) => {
@@ -16,6 +19,12 @@ vi.mock("../src/core/auto-compress.js", () => ({
   proposeSceneCompression: vi.fn(),
   proposeChapterPins: vi.fn(),
 }));
+
+// A REAL scratch dir. The old DATA_DIR sentinel claimed these tests
+// never touch disk -- but ensureSpeakerDerived mkdirs its assets dir, and
+// only the root sandbox could create /nonexistent. CI (non-root) caught it
+// on the first run: EACCES.
+const DATA_DIR = fsSync.mkdtempSync(nodePath.join(os.tmpdir(), "spk-test-"));
 
 import { applySpeakerCut, applySpeakerRestore, bakeToSourceTime, mergeCut } from "../src/core/speaker-edl.js";
 import { cutAudioTo } from "../src/core/idle-silence.js";
@@ -103,7 +112,7 @@ describe("applySpeakerCut (re-fit)", () => {
   it("removes time from voice + follower; the screen keeps every frame and re-fits", async () => {
     const p = film();
     // Cut film 26.1..32.1 = bake/scene-local 20..26 = source 20..26.
-    const res = await applySpeakerCut(p, 26.1, 32.1, "/nonexistent");
+    const res = await applySpeakerCut(p, 26.1, 32.1, DATA_DIR);
 
     expect(res.removed_seconds).toBeCloseTo(6, 2);
     expect(p.speaker.clips[0].edl.cuts).toEqual([{ src_start: 20, src_end: 26 }]);
@@ -153,7 +162,7 @@ describe("applySpeakerCut (re-fit)", () => {
     p.scenes[1].duration_seconds = 25;
     // Film 18.1..20.1 = scene-local 12..14 -> inside the 8x window; the
     // seam is at source 26.
-    await applySpeakerCut(p, 18.1, 20.1, "/nonexistent");
+    await applySpeakerCut(p, 18.1, 20.1, DATA_DIR);
     const sc = p.scenes[1].media_edits.screencast;
     expect(sc.cuts).toEqual([]);
     expect(sc.pins.find((x: any) => x.auto === "refit-12.00").src).toBeCloseTo(26, 1);
@@ -164,7 +173,7 @@ describe("applySpeakerCut (re-fit)", () => {
   it("maps through EXISTING speaker cuts (second cut lands after the first)", async () => {
     const p = film();
     p.speaker.clips[0].edl.cuts = [{ src_start: 10, src_end: 20 }];
-    await applySpeakerCut(p, 26.1, 29.1, "/nonexistent"); // bake 20..23 -> source 30..33
+    await applySpeakerCut(p, 26.1, 29.1, DATA_DIR); // bake 20..23 -> source 30..33
     expect(p.speaker.clips[0].edl.cuts).toEqual([
       { src_start: 10, src_end: 20 },
       { src_start: 30, src_end: 33 },
@@ -173,7 +182,7 @@ describe("applySpeakerCut (re-fit)", () => {
 
   it("rejects spans outside the narrated scene", async () => {
     const p = film();
-    await expect(applySpeakerCut(p, 2, 8, "/nonexistent")).rejects.toThrow(/single narrated scene/);
+    await expect(applySpeakerCut(p, 2, 8, DATA_DIR)).rejects.toThrow(/single narrated scene/);
   });
 });
 
@@ -182,8 +191,8 @@ describe("applySpeakerRestore (reverse referee)", () => {
 
   it("round-trip: cut then restore returns duration, follower, anchors and caption times", async () => {
     const p = film();
-    await applySpeakerCut(p, 26.1, 32.1, "/nonexistent");
-    const res = await applySpeakerRestore(p, 20, 26, "/nonexistent");
+    await applySpeakerCut(p, 26.1, 32.1, DATA_DIR);
+    const res = await applySpeakerRestore(p, 20, 26, DATA_DIR);
 
     expect(res.restored_seconds).toBeCloseTo(6, 2);
     expect(p.speaker.clips[0].edl.cuts).toEqual([]);
@@ -216,7 +225,7 @@ describe("applySpeakerRestore (reverse referee)", () => {
 
   it("throws when no matching cut exists", async () => {
     const p = film();
-    await expect(applySpeakerRestore(p, 1, 2, "/nonexistent")).rejects.toThrow(/no matching/);
+    await expect(applySpeakerRestore(p, 1, 2, DATA_DIR)).rejects.toThrow(/no matching/);
   });
 });
 
@@ -239,7 +248,7 @@ describe("applySpeakerCut on a film with NO media-edits entries (seeding)", () =
 
   it("seeds screen + follower entries so the cut re-fits instead of truncating", async () => {
     const p = bareFilm();
-    const res = await applySpeakerCut(p, 26.1, 32.1, "/nonexistent"); // scene-local 20..26
+    const res = await applySpeakerCut(p, 26.1, 32.1, DATA_DIR); // scene-local 20..26
     expect(res.removed_seconds).toBeCloseTo(6, 2);
     expect(p.scenes[1].duration_seconds).toBeCloseTo(54, 1);
 
@@ -262,7 +271,7 @@ describe("applySpeakerCut on a film with NO media-edits entries (seeding)", () =
   it("follower seed carries EXISTING speaker cuts, then mirrors the new one", async () => {
     const p = bareFilm();
     p.speaker.clips[0].edl.cuts = [{ src_start: 10, src_end: 20 }];
-    await applySpeakerCut(p, 26.1, 29.1, "/nonexistent"); // bake 20..23 -> source 30..33
+    await applySpeakerCut(p, 26.1, 29.1, DATA_DIR); // bake 20..23 -> source 30..33
     const cam = p.scenes[1].media_edits['video[src*="cam.webm"]'];
     expect(cam.cuts).toEqual([
       { src_start: 10, src_end: 20 },
@@ -272,8 +281,8 @@ describe("applySpeakerCut on a film with NO media-edits entries (seeding)", () =
 
   it("round-trips: restore after a seeded cut returns the full scene", async () => {
     const p = bareFilm();
-    await applySpeakerCut(p, 26.1, 32.1, "/nonexistent");
-    const res = await applySpeakerRestore(p, 20, 26, "/nonexistent");
+    await applySpeakerCut(p, 26.1, 32.1, DATA_DIR);
+    const res = await applySpeakerRestore(p, 20, 26, DATA_DIR);
     expect(res.restored_seconds).toBeCloseTo(6, 2);
     expect(p.scenes[1].duration_seconds).toBeCloseTo(60, 1);
     const sc = p.scenes[1].media_edits.screencast;
