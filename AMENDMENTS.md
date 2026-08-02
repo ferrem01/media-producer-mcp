@@ -2113,3 +2113,31 @@ turn; the recovery path still forces one-scene turns after a truncation.
 The loop mechanics needed no change (it always processed every tool call in
 a response). Expected effect: storyboarding drops from ~15 turns to ~3-5.
 Verify against stage_timings on the next live runs before claiming a number.
+
+### Verification 4 (proj_65e702e3): #43 verified, #39 measured, one new class
+
+Same brief, fourth run, on the build with the mock fixes + storyboard
+batching.
+
+**#43 verified.** The old defect class is GONE from a live film: zero
+muted-chrome contrast findings ("Type a message", tab labels, "Likes"),
+zero div.qch/div.qsp ghost panels, zero phantom initials. One straggler
+found and fixed: composer's .cmpz-card needed the same shell recipe.
+
+**#39 measured honestly.** storyboarding 188.9s vs 221.4/225.3 baseline --
+~15% faster raw, ~25% per-scene (this board drew 8 scenes, baselines 7).
+Real, not the hoped-for collapse; the model appears to batch only
+partially. Next lever if more is needed: count turns via the trace, and
+consider merging concept (72s, also sequential) into the storyboard call.
+
+**New class exposed (task #44): the gates fight the camera.** The campaign
+board was staged at x:0 width:100% -- fully on-canvas -- yet reported
+"Tasks" 67% past the left edge and buttons entirely off the right. The
+cursor-performer's mid-scene ZOOMS scale the stage; the gates probe at
+45/70/90% of scene time -- mid-zoom -- and flag content the zoom
+legitimately pushed off-frame. The auto-fix loop then burned its budget
+shrinking kinetic-text that was never too big (twice per scene, four
+scenes, defect survived every pass). Fix belongs in the gates
+(camera-neutral probe times, or skip clipped/off-canvas checks when the
+stage root carries a scale transform at probe time). Precedent:
+cameraIsBackground already skips the empty-canvas gate on speaker scenes.
