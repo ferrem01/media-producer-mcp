@@ -2323,3 +2323,19 @@ passes as the design it is, a genuinely blank frame (~0-2%: the statement
 never rendered) still flags, and the gate stays sharp for every component
 that doesn't earn the flag. The known-failing test flipped back to a real
 assertion. Only type-on-empty templates may declare it.
+
+### End-to-end run 1 on the final build (proj_a0bc86f4): 3/5 clean, finale perfect
+
+Same data-story brief as proj_b75ca862. Unresolved defects 5 (was 15).
+Scenes 1, 4 and 5 -- INCLUDING the money-number finale, "1 AGENT" at 26vh
+with stat-level hero + authored 26vh font -- passed every gate. Caps held
+again (33.0s / max 7s). Two blemishes, both fixed as self-defending
+components:
+- The hero "12" (26vh) overflowed a box sized for the old 72px row (8% digit
+  clip, label 23px past the frame). number-counter-row now measures its
+  built row against its own box and scales the type down proportionally.
+- st-kinetic-list's "01 / 05" item numbers rode the raw brand PRIMARY --
+  tuned for the light page -- over the template's own dark WebGL world
+  (~2:1). Dark theme now lifts the primary toward light (color-mix 35%
+  primary / 65% #f4f4f8): hue kept, legibility earned. Same token-leak
+  class as email-compose.

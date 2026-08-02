@@ -63,6 +63,25 @@ describe("hero-number scale (data-story)", () => {
   });
 });
 
+describe("hero type fits its own box", () => {
+  it("number-counter-row scales down when the built row overflows the component", async () => {
+    // proj_a0bc86f4 scene_002: a 26vh hero "12" in a box sized for the old
+    // 72px row clipped its digits 8% and pushed DELIVERABLES 23px past the
+    // frame. The component measures itself and fits.
+    const src = await read("../src/components/titles/number-counter-row.component.html");
+    expect(src).toMatch(/container\.scrollHeight \/ el\.clientHeight/);
+    expect(src).toMatch(/\(cur \/ over\) \* 0\.95/);
+  });
+
+  it("st-kinetic-list's dark world lifts the brand primary for its item numbers", async () => {
+    // "01 / 05" chips measured ~2:1: the raw light-page primary over the
+    // WebGL backdrop. Hue kept, lightness lifted, only in the dark theme.
+    const src = await read("../src/components/scene-templates/st-kinetic-list.component.html");
+    expect(src).toMatch(/\.stkl\.is-dark \.stkl-item-n \{ color: color-mix/);
+    expect(src).toMatch(/root\.classList\.add\('is-dark'\)/);
+  });
+});
+
 describe("sticker-prop fits its own box", () => {
   it("shrinks long text instead of spilling past the pill", async () => {
     const src = await read("../src/components/props/sticker-prop.component.html");
