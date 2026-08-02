@@ -77,6 +77,15 @@
 
     if (stats.length > 6) stats = stats.slice(0, 6);
 
+    // HERO SCALE (data-story: the number is the protagonist). The fixed 72px
+    // default is 6.7% of a 1080p frame -- fine for a supporting stat row,
+    // invisible as a money number. data.font_size overrides directly
+    // ("24vh", "18vw"); data.hero sizes the row so ONE stat fills ~1/4 of
+    // the frame height and a multi-stat row shares it proportionally.
+    var heroSize = data.font_size ? String(data.font_size)
+      : data.hero ? (stats.length <= 1 ? '26vh' : stats.length === 2 ? '18vh' : '13vh')
+      : null;
+
     // Build stat items with dividers
     for (var i = 0; i < stats.length; i++) {
       if (i > 0) {
@@ -94,6 +103,8 @@
       valueEl.setAttribute('data-target', stats[i].value || 0);
       valueEl.setAttribute('data-prefix', stats[i].prefix || '');
       valueEl.setAttribute('data-suffix', stats[i].suffix || '');
+      if (heroSize) valueEl.style.fontSize = heroSize;
+      if (data.color) valueEl.style.color = data.color;
       item.appendChild(valueEl);
 
       var labelEl = document.createElement('div');

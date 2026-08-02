@@ -117,9 +117,16 @@ export async function measureTextContrast(opts: {
 
   // A caption only needs to be illegible at ONE moment it's on-screen to be a
   // defect, so probe multiple times and keep the worst (lowest-contrast) finding
-  // per text run. The probe itself only collects fully-visible text (opacity
-  // >= 0.85), so a caption mid-fade at one time is simply caught at another.
+  // per text run. Dim text (opacity 0.5-0.85) is judged on its COMPOSITED
+  // color -- but only when it stays dim: a run that reaches full opacity and
+  // passes at another probe was merely caught mid-entrance (an autoAlpha
+  // fade-in crossing 0.5 measures ~3:1 for a frame -- flagged live on
+  // proj_b8eb5c3b's tagline), and transient entrance dimness is not a defect.
   const byText = new Map<string, ContrastDefect>();
+  /** Texts that FAILED while at full opacity (>= 0.85) at some probe. */
+  const failedFull = new Set<string>();
+  /** Texts that PASSED while at full opacity at some probe. */
+  const passedFull = new Set<string>();
   try {
     for (let i = 0; i < opts.atTimes.length; i++) {
       const backdropPath = path.join(tmpDir, `backdrop_${i}.png`);
@@ -210,13 +217,26 @@ export async function measureTextContrast(opts: {
           };
           const prev = byText.get(t.text);
           if (!prev || prev.reason === "low-contrast" && defect.contrast < prev.contrast) byText.set(t.text, defect);
+          if (op >= 0.85) failedFull.add(t.text);
+        } else if (op >= 0.85) {
+          passedFull.add(t.text);
         }
       }
     }
-    return [...byText.values()];
+    return finalize();
   } catch {
-    return [...byText.values()];
+    return finalize();
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+
+  // Transient-entrance filter: a low-contrast finding measured ONLY while the
+  // text was dim (mid-fade), for a run that reached full opacity and PASSED
+  // at another probe, is the entrance animation -- not a legibility defect.
+  // Text that never reaches full opacity (persistently dim) keeps its finding.
+  function finalize(): ContrastDefect[] {
+    return [...byText.values()].filter(
+      (d) => d.reason !== "low-contrast" || failedFull.has(d.text) || !passedFull.has(d.text),
+    );
   }
 }

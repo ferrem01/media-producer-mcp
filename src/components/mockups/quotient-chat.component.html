@@ -63,8 +63,10 @@
     /* Real elevation: the ghost-panel gate (layout-metrics) only credits a
        border >= 1.5px and a shadow with alpha >= 0.12 -- a 1px hairline and a
        5%-alpha wash read as nothing at video scale, and this window floats
-       over an arbitrary brand page. */
-    border: 1.5px solid #dedcd6;
+       over an arbitrary brand page. Borders here are 2px because Chromium
+       ROUNDS 1.5px down to a computed 1px at DPR 1 (measured), which both
+       thins the edge and forfeits the gate credit. */
+    border: 2px solid #dedcd6;
     border-radius: 14px;
     box-shadow: 0 10px 32px rgba(23,23,28,0.16);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -135,7 +137,7 @@
 
   /* Content card: streaming Created/Updated box */
   .qch-cc {
-    border: 1.5px solid #dedcd6; border-radius: 12px;
+    border: 2px solid #dedcd6; border-radius: 12px;
     background: #fcfbfa;
     margin: 12px 0;
     overflow: hidden;
@@ -264,7 +266,7 @@
   /* ── Composer ── */
   .qch-composer {
     margin: 0 12px 12px;
-    border: 1.5px solid #d9d7d1; border-radius: 16px;
+    border: 2px solid #d9d7d1; border-radius: 16px;
     background: #fff;
     padding: 13px 14px 11px;
     flex-shrink: 0;

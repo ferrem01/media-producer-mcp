@@ -61,7 +61,17 @@ async function gateRun(html: string) {
 
 describe("quotient mocks pass their own gates on a light page", () => {
   it("quotient-chat: no illegible chrome, no ghost shell", async () => {
-    const { contrast, layout } = await gateRun(await assembleMock("quotient-chat", {}));
+    // Script a content card into existence: .qch-cc only exists at runtime,
+    // and testing the empty shell left it unmeasured -- proj_b8eb5c3b then
+    // caught it live at 1.1% separation because Chromium rounds a 1.5px
+    // border down to a computed 1px, under the gate's floor.
+    const { contrast, layout } = await gateRun(await assembleMock("quotient-chat", {
+      script: [
+        { action: "type-message", at: 0.2, text: "Launch the Free Trial campaign" },
+        { action: "send-message", at: 1.2 },
+        { action: "content-card", at: 1.6, verb: "Created", title: "Free Trial Launch Plan" },
+      ],
+    }));
     // The exact strings that shipped as defects, run after run.
     const flagged = contrast.filter((d) =>
       /Type a message|entities|references/i.test(d.text));
