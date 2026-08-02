@@ -2373,3 +2373,20 @@ text-contrast.ts cannot parse the `color(srgb r g b)` serialization Chromium
 emits for computed color-mix() values -- it reads the 0-1 floats as 0-255
 and scores the ink near-black. Components work around it by resolving mixes
 to rgb() in JS. The gate should learn the color() syntax.
+
+### The all-clean attempt on the certified library (proj_36750f52)
+
+FIRST passed:true STAMP IN PROJECT HISTORY: scene_001 reported
+passed:true, attempts:1, with two live repairs (ink repainted white against
+a measured 0.063-luminance backdrop; the starred accent followed). Four of
+six scenes fully clean; 4 unresolved findings total (series: 15 -> 5 -> 8 ->
+4). The two failing scenes, honestly:
+- scene_002 stacked FIVE panels (stat-card + chat + browser + email over a
+  mesh); the chat's own certified text measured 3.2-3.5:1 against sampled
+  backdrops that mix overlapping panel edges -- a scene COMPOSITION class
+  (overlap sampling), not component chrome. browser-frame's viewport also
+  ghosted at 0.0% (it paints the page color) -- fixed: inset bezel ring.
+- scene_006's tagline measured 1.08:1 live (the signature of #f4f4f8 on
+  white -- the light class seemingly never applied), but the EXACT scene
+  data + code measures CLEAN in local repro. Unreproduced; left open rather
+  than guessed at. Watch the next close scene.
