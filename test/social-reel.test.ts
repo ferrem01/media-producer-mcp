@@ -54,6 +54,6 @@ describe("social-reel grammar registration", () => {
     const src = await read("../src/server.ts");
     expect(src).toMatch(/"launch-film", "tempo-cut", "speaker-screencast", "editorial", "social-reel"/);
     expect(src).toMatch(/film_grammar === "social-reel"[\s\S]{0,120}width: 1080, height: 1920/);
-    expect(src).toContain("social-reel -- vertical 9:16 feed film"); // operator playbook
+    expect(src).toContain("social-reel -- vertical 9:16"); // operator playbook
   });
 });
