@@ -273,6 +273,12 @@
   .qch-input { position: relative; font-size: 14px; color: #1a1a1a; min-height: 21px; }
   .qch-placeholder { color: #6b6963; position: absolute; left: 0; top: 0; }
   .qch-input.filled .qch-placeholder { display: none; }
+  /* Structural, not timeline-driven: whenever typed text EXISTS the
+     placeholder is gone. The `filled` class rides a gsap .call() that does
+     not fire on a deterministic seek, so probes (and seeked renders) caught
+     "Type a message..." underneath the typed line -- a 100% text-on-text
+     collision on proj_b8eb5c3b. */
+  .qch-input-text:not(:empty) ~ .qch-placeholder { display: none; }
   .qch-caret {
     display: none; width: 1.5px; height: 15px; background: #1a1a1a;
     vertical-align: -2px; margin-left: 1px;

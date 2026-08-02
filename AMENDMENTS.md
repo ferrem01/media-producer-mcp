@@ -2164,3 +2164,28 @@ Behavioral test (test/camera-aware-gates.test.ts): a held 1.6x zoom that
 pushes half the layout off-frame produces zero geometry findings, while the
 SAME content genuinely off-canvas without a camera still flags -- the
 control that proves the skip informed the gate rather than neutering it.
+
+### Verification 5 (proj_b8eb5c3b): the series' fastest and cleanest run
+
+379.7s total (series: 463 / 515 / 443 / 485). storyboarding 168.1s (was
+221-225 pre-batching, -25%), scenes 95.2s, editorial 21.5s. Unresolved
+defects 12 (was 22 on run 4); the camera false-positive class -- titles and
+buttons "off-frame" mid-zoom -- is fully gone.
+
+What remains is the long tail, each noted with its cause:
+- quotient-chat's placeholder stayed visible UNDER the typed message (100%
+  text-on-text collision): the `filled` class rides a gsap .call() that does
+  not fire on a deterministic seek. Fixed structurally in CSS:
+  `.qch-input-text:not(:empty) ~ .qch-placeholder { display:none }`.
+- sticker-prop pill text overflowing its fixed-size pill ("1 AGENT / 12
+  POSTS / 5 CHANNELS", ~84px past, then measured white-on-white at 1.18:1
+  outside the pill). The container-growth repair cannot fix a fixed-CSS
+  pill font; the component needs wrap/auto-shrink. (#36 territory.)
+- text_collision comparing kinetic-text's full CONTAINER box against a pill
+  placed inside its empty corner -- glyph-level boxes would be the honest
+  comparison. Refinement, not a blocker.
+- Two inner-chip ghost panels (div.qch-cc live at 1.1% despite the 1.5px
+  border locally passing; div.qcp-ev calendar chips) -- inner-chip styling,
+  next component polish pass.
+- Template/theme text contrast on 2 headlines (2.86-3.17:1) with no
+  data.color channel -- template typography, #36.
