@@ -39,13 +39,13 @@ async function assembleStatement(): Promise<string> {
 }
 
 describe("assembled-scene gates: no false positives on a real template", () => {
-  // KNOWN FAILING -- an OPEN DESIGN DECISION, not a bug: st-statement's
-  // deliberate negative space measures 13% content coverage against the
-  // dead-frame gate's 16% floor. Either editorial templates get a coverage
-  // exemption or the template fills more frame; whoever decides removes
-  // .fails. Fails identically on master since the gate landed; live on the
-  // droplet.
-  it.fails("st-statement (deliberate negative space) passes the empty-moment and layout gates", async () => {
+  // DECIDED (2026-08-02): deliberate negative space is a property the
+  // template DECLARES ([data-mp-deliberate-space] on a near-full-bleed
+  // root) and the gate honors -- the floor halves to 8%, so st-statement's
+  // 13% passes while a genuinely blank frame (~0-2%: the statement never
+  // rendered) still flags. Declaration over exemption keeps the gate sharp
+  // for everything that doesn't earn the flag.
+  it("st-statement (deliberate negative space) passes the empty-moment and layout gates", async () => {
     const html = await assembleStatement();
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "asg-"));
     const htmlPath = path.join(dir, "scene.html");
