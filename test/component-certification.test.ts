@@ -121,7 +121,7 @@ describe.skipIf(!process.env.MP_CERT_SWEEP)("component library certification", (
 
     const outDir = path.resolve(__dirname, "../test-output");
     await fs.mkdir(outDir, { recursive: true });
-    await fs.writeFile(path.join(outDir, "certification-report.json"), JSON.stringify(findings, null, 2));
+    await fs.writeFile(path.join(outDir, process.env.MP_CERT_REPORT || "certification-report.json"), JSON.stringify(findings, null, 2));
     const byComponent = new Map<string, number>();
     for (const f of findings) byComponent.set(`${f.category}/${f.component}`, (byComponent.get(`${f.category}/${f.component}`) || 0) + 1);
     console.log(`\n[cert] ${findings.length} finding(s) across ${byComponent.size} component(s):`);
