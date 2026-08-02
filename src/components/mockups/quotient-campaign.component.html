@@ -131,9 +131,11 @@
   .qcp-card {
     width: 100%; height: 100%;
     background: #fff;
-    border: 1px solid #e9e8e4;
+    /* >= 1.5px border + >= 0.12-alpha shadow: what the ghost-panel gate
+       counts as a visible edge at video scale. */
+    border: 1.5px solid #dedcd6;
     border-radius: 14px;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.05);
+    box-shadow: 0 10px 32px rgba(23,23,28,0.16);
     display: flex; flex-direction: column;
     overflow: hidden;
   }
@@ -148,7 +150,7 @@
   .qcp-tab {
     display: flex; align-items: center; gap: 8px;
     padding: 0 14px; height: 100%;
-    font-size: 14.5px; font-weight: 500; color: #8b8983;
+    font-size: 14.5px; font-weight: 500; color: #63615c;
     border-bottom: 2px solid transparent;
     cursor: pointer; position: relative; top: 1px;
   }
@@ -170,22 +172,22 @@
 
   /* ── Brief ── */
   .qcp-brief-inner { max-width: 760px; margin: 0 auto; padding: 30px 28px 40px; }
-  .qcp-updated { font-size: 13.5px; color: #9c9a94; margin-bottom: 16px; }
+  .qcp-updated { font-size: 13.5px; color: #6b6963; margin-bottom: 16px; }
   .qcp-title { font-size: 32px; font-weight: 700; margin: 0 0 22px; letter-spacing: -0.5px; }
   .qcp-meta { display: flex; flex-direction: column; gap: 12px; margin-bottom: 34px; }
   .qcp-meta-row { display: flex; align-items: center; gap: 12px; font-size: 14.5px; }
-  .qcp-meta-label { display: flex; align-items: center; gap: 9px; color: #8b8983; min-width: 130px; }
+  .qcp-meta-label { display: flex; align-items: center; gap: 9px; color: #63615c; min-width: 130px; }
   .qcp-meta-label svg { width: 16px; height: 16px; }
   .qcp-date-chip { display: flex; align-items: center; gap: 7px; font-weight: 600; }
   .qcp-date-chip svg { width: 15px; height: 15px; color: #55534e; }
-  .qcp-meta-to { color: #8b8983; }
+  .qcp-meta-to { color: #63615c; }
   .qcp-owner { display: flex; align-items: center; gap: 9px; font-weight: 600; }
   .qcp-owner-ava {
     width: 24px; height: 24px; border-radius: 50%;
     background: #d5e2f5; overflow: hidden; position: relative; display: inline-block;
   }
   .qcp-owner-ava img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .qcp-owner-chev { width: 15px; height: 15px; color: #8b8983; margin-left: 130px; }
+  .qcp-owner-chev { width: 15px; height: 15px; color: #63615c; margin-left: 130px; }
   .qcp-section-h { font-size: 20px; font-weight: 700; margin: 26px 0 12px; }
   .qcp-section-p { font-size: 15px; line-height: 1.65; color: #33322f; margin: 0 0 12px; }
   .qcp-section-p a, .qcp-section-p .qcp-link { color: #33322f; }
@@ -206,7 +208,7 @@
   }
   .qcp-view-title { font-size: 21px; font-weight: 700; display: flex; align-items: center; gap: 14px; }
   .qcp-completed-chip { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 500; color: #55534e; }
-  .qcp-completed-count { color: #9c9a94; }
+  .qcp-completed-count { color: #6b6963; }
   .qcp-ring {
     width: 15px; height: 15px; border-radius: 50%;
     border: 1.6px solid #c6c4be; display: inline-block; flex-shrink: 0;
@@ -242,12 +244,12 @@
   }
   .qcp-group-row > svg { width: 14px; height: 14px; color: #55534e; }
   .qcp-group-row .qcp-ring { border-style: dashed; }
-  .qcp-group-count { color: #9c9a94; font-weight: 500; }
+  .qcp-group-count { color: #6b6963; font-weight: 500; }
   .qcp-table { margin: 0 24px 24px; border: 1px solid #eceae6; border-radius: 12px; overflow: hidden; }
   .qcp-thead {
     display: grid; align-items: center;
     padding: 10px 16px;
-    font-size: 12.5px; font-weight: 500; color: #9c9a94;
+    font-size: 12.5px; font-weight: 500; color: #6b6963;
     border-bottom: 1px solid #f0efeb;
     gap: 10px;
   }
@@ -271,7 +273,7 @@
   .qcp-pri i:nth-child(3) { height: 11px; }
   .qcp-pri.medium i { background: #e0a13d; }
   .qcp-pri.medium i:nth-child(3) { opacity: 0.25; }
-  .qcp-pri.low i { background: #9c9a94; }
+  .qcp-pri.low i { background: #6b6963; }
   .qcp-pri.low i:nth-child(2), .qcp-pri.low i:nth-child(3) { opacity: 0.25; }
   .qcp-mini-ava {
     width: 21px; height: 21px; border-radius: 50%;
@@ -300,7 +302,7 @@
   .qcp-status { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; }
   .qcp-status svg { width: 15px; height: 15px; }
   .qcp-status.published, .qcp-status.launched { color: #47934f; }
-  .qcp-status.draft { color: #8b8983; }
+  .qcp-status.draft { color: #63615c; }
   .qcp-status.scheduled { color: #5b8fc2; }
 
   /* ── Activation calendar ── */
@@ -313,7 +315,7 @@
   }
   .qcp-cal-hour {
     position: absolute; right: 10px;
-    font-size: 12px; color: #9c9a94;
+    font-size: 12px; color: #6b6963;
     transform: translateY(-50%);
   }
   .qcp-cal-days { flex: 1; display: flex; position: relative; }
@@ -329,9 +331,9 @@
     z-index: 2;
   }
   .qcp-ev-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
-  .qcp-ev-kind { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #8b8983; font-weight: 500; }
+  .qcp-ev-kind { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #63615c; font-weight: 500; }
   .qcp-ev-title { font-size: 13px; font-weight: 600; line-height: 1.35; margin-bottom: 3px; }
-  .qcp-ev-time { font-size: 11.5px; color: #9c9a94; margin-bottom: 8px; }
+  .qcp-ev-time { font-size: 11.5px; color: #6b6963; margin-bottom: 8px; }
   .qcp-ev-foot { display: flex; align-items: center; justify-content: space-between; }
   .qcp-ev .qcp-mini-ava { width: 19px; height: 19px; }
   .qcp-rocket { color: #47934f; }
