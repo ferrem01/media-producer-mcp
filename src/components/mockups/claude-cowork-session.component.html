@@ -713,6 +713,12 @@
       if (pending.indexOf(c) === -1) historyH += outerH(c);
     });
     var trackPad = 36; // track's own top+bottom padding
+    // Record each block's NATURAL display before hiding: user bubbles, status
+    // lines and action rows are flexboxes (align-items is what right-aligns
+    // the bubble) -- revealing with display:'block' flattened the flex and
+    // parked the bubble on the LEFT until something re-rendered it.
+    var naturalDisplay = new Map();
+    pending.forEach(function (n) { naturalDisplay.set(n, getComputedStyle(n).display || 'block'); });
     pending.forEach(function (n) { gsap.set(n, { display: 'none' }); });
 
     function scrollFor(contentH) {
@@ -727,7 +733,7 @@
     events.forEach(function (e) {
       if (e.kind === 'show') {
         contentH += heights.get(e.node) || 0;
-        tl.set(e.node, { display: 'block' }, e.t);
+        tl.set(e.node, { display: naturalDisplay.get(e.node) || 'block' }, e.t);
         tl.fromTo(e.node, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power2.out', immediateRender: false }, e.t);
         tl.to(track, { y: -scrollFor(contentH), duration: 0.55, ease: 'power2.out' }, e.t);
       } else if (e.kind === 'hide') {
