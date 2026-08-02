@@ -1,0 +1,55 @@
+{
+  "type": "email-reader",
+  "label": "Email Reader",
+  "category": "mockups",
+  "description": "An open email in a light Gmail-style client: sender row, subject, body, and a marker-sweep highlight over the money quote. The reading verb (email-compose is the writing verb) -- use it when a message ARRIVES and something inside it matters.",
+  "data": {
+    "subject": {
+      "type": "string",
+      "label": "Subject",
+      "optional": true,
+      "placeholder": "You have to hear this"
+    },
+    "sender_name": {
+      "type": "string",
+      "label": "Sender name",
+      "optional": true,
+      "placeholder": "Sarah Chen"
+    },
+    "sender_email": {
+      "type": "string",
+      "label": "Sender email",
+      "optional": true,
+      "placeholder": "sarah@brightloop.io"
+    },
+    "timestamp": {
+      "type": "string",
+      "label": "Timestamp",
+      "optional": true,
+      "placeholder": "9:42 AM"
+    },
+    "body": {
+      "type": "string",
+      "label": "Body",
+      "optional": true,
+      "description": "Email body; paragraphs split on newlines. Mark the money quote with *asterisks* (or use highlight_quote)."
+    },
+    "highlight_quote": {
+      "type": "string",
+      "label": "Highlight quote",
+      "optional": true,
+      "description": "Exact substring of the body to sweep with the marker highlight. Ignored if the body already carries *asterisk* marks or the substring is not found."
+    }
+  },
+  "script_actions": [
+    {
+      "action": "click",
+      "description": "Click a toolbar action or a point in the message"
+    }
+  ],
+  "default_cursor_targets": {
+    "subject": { "x": "50%", "y": "24%" },
+    "quote": { "x": "50%", "y": "62%" },
+    "archive-button": { "x": "38%", "y": "10%" }
+  }
+}

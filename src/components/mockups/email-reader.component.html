@@ -1,0 +1,303 @@
+<template>
+  <div class="emrd-wrap">
+    <div class="emrd-card">
+      <div class="emrd-toolbar">
+        <svg class="emrd-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+        </svg>
+        <span class="emrd-tb-gap"></span>
+        <svg class="emrd-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>
+        </svg>
+        <svg class="emrd-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        <svg class="emrd-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+        </svg>
+        <span class="emrd-tb-spacer"></span>
+        <svg class="emrd-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>
+        </svg>
+      </div>
+      <div class="emrd-main">
+        <div class="emrd-subject-row">
+          <span class="emrd-subject"></span>
+          <span class="emrd-chip">Inbox</span>
+        </div>
+        <div class="emrd-sender-row">
+          <!-- Initials live in an inner span so the contrast probe's sample box
+               is the tight glyph rect over the violet disc -- the div itself is
+               a SQUARE whose corners poke past the 50%-radius circle and sample
+               the white card (measured 1.13:1 on the first cert run). -->
+          <div class="emrd-avatar"><span class="emrd-avatar-txt"></span></div>
+          <div class="emrd-sender-meta">
+            <div class="emrd-sender-line">
+              <span class="emrd-sender-name"></span>
+              <span class="emrd-sender-email"></span>
+            </div>
+            <div class="emrd-to-line">to me
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+            </div>
+          </div>
+          <span class="emrd-time"></span>
+        </div>
+        <div class="emrd-body"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── email-reader: an OPEN message in a light Gmail-style client -- the
+     "signal arrives in the inbox" beat. Counterpart to email-compose (which
+     is the writing verb); this one is the reading verb, with a marker-sweep
+     highlight over the money quote. The card is HARDCODED light like Gmail
+     itself, so every ink is hardcoded to the card, never to brand tokens
+     (the email-compose lesson: a themed ink on a fixed surface is a
+     measured 1.03:1 waiting to happen). */
+  .emrd-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 40px;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+  }
+
+  .emrd-card {
+    width: 840px;
+    max-width: 92%;
+    max-height: 100%;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #ffffff;
+    /* 2px (Chromium floors 1.5px borders to 1px at DPR 1) + mid-value color:
+       the visible edge the ghost-panel gate credits on a white page. */
+    border: 2px solid #d3d8e2;
+    box-shadow:
+      0 30px 80px rgba(15, 18, 34, 0.35),
+      0 4px 18px rgba(15, 18, 34, 0.18);
+  }
+
+  /* Toolbar stays under 70px tall -- below the surface-probe size floor, so
+     its near-white fill is never measured as a ghost panel in its own right. */
+  .emrd-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    height: 56px;
+    padding: 0 26px;
+    background: #f6f8fc;
+    border-bottom: 1px solid #e6e9f0;
+  }
+
+  .emrd-icon { color: #444746; flex-shrink: 0; }
+  .emrd-tb-gap { width: 8px; }
+  .emrd-tb-spacer { flex: 1; }
+
+  .emrd-main { padding: 30px 36px 36px; }
+
+  .emrd-subject-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .emrd-subject {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #1f2126;
+    line-height: 1.25;
+  }
+
+  .emrd-chip {
+    font-size: 12px;
+    font-weight: 600;
+    color: #3c4043;
+    background: #e8eaed;
+    border-radius: 6px;
+    padding: 3px 10px;
+    flex-shrink: 0;
+  }
+
+  .emrd-sender-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 26px;
+  }
+
+  .emrd-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: #4c3fd1;
+    color: #ffffff;
+    font-size: 17px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .emrd-sender-line {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .emrd-sender-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1f2126;
+  }
+
+  .emrd-sender-email {
+    font-size: 13px;
+    color: #5f6368;
+  }
+
+  .emrd-to-line {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    color: #5f6368;
+    margin-top: 2px;
+  }
+
+  .emrd-sender-meta { flex: 1; min-width: 0; }
+
+  .emrd-time {
+    font-size: 13px;
+    color: #5f6368;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+
+  .emrd-body {
+    font-size: 19px;
+    color: #3c4043;
+    line-height: 1.65;
+  }
+
+  .emrd-body p { margin: 0 0 16px; }
+  .emrd-body p:last-child { margin-bottom: 0; }
+
+  /* The money quote: a marker sweep painted by background-size (0% -> 100%),
+     so the highlight draws left-to-right under the words. Ink stays the dark
+     body ink -- legible before, during and after the sweep. */
+  .emrd-hl {
+    background-image: linear-gradient(#ffe9a8, #ffe9a8);
+    background-repeat: no-repeat;
+    background-size: 0% 100%;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    border-radius: 3px;
+    padding: 1px 2px;
+    margin: -1px -2px;
+    color: #1f2126;
+    font-weight: 500;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.emrd-card');
+    var subjectEl = el.querySelector('.emrd-subject');
+    var nameEl = el.querySelector('.emrd-sender-name');
+    var emailEl = el.querySelector('.emrd-sender-email');
+    var timeEl = el.querySelector('.emrd-time');
+    var avatarEl = el.querySelector('.emrd-avatar-txt');
+    var bodyEl = el.querySelector('.emrd-body');
+
+    var senderName = data.sender_name || 'Sarah Chen';
+    subjectEl.textContent = data.subject || 'You have to hear this';
+    nameEl.textContent = senderName;
+    emailEl.textContent = data.sender_email ? '<' + data.sender_email + '>' : '';
+    timeEl.textContent = data.timestamp || '9:42 AM';
+    avatarEl.textContent = senderName.split(/\s+/).slice(0, 2)
+      .map(function(w) { return (w[0] || '').toUpperCase(); }).join('') || 'S';
+
+    // Body: paragraphs split on newlines. The money quote is either marked
+    // inline with *asterisks* or named via data.highlight_quote (matched as a
+    // substring); if neither matches, the mail simply renders un-highlighted.
+    var bodyText = data.body ||
+      'Just wanted to say: the launch went perfectly.\n\nThis is the first product launch that actually felt like magic instead of chaos.\n\nThank you!';
+    var hq = typeof data.highlight_quote === 'string' ? data.highlight_quote.trim() : '';
+    var hlSpans = [];
+    bodyText.split(/\n+/).filter(Boolean).forEach(function(paraText) {
+      var p = document.createElement('p');
+      var marked = paraText;
+      if (paraText.indexOf('*') === -1 && hq && paraText.indexOf(hq) !== -1) {
+        marked = paraText.split(hq).join('*' + hq + '*');
+      }
+      var re = /\*([^*]+)\*|([^*]+)/g, m;
+      while ((m = re.exec(marked)) !== null) {
+        if (m[1] !== undefined) {
+          var hl = document.createElement('span');
+          hl.className = 'emrd-hl';
+          hl.textContent = m[1];
+          p.appendChild(hl);
+          hlSpans.push(hl);
+        } else {
+          p.appendChild(document.createTextNode(m[2]));
+        }
+      }
+      bodyEl.appendChild(p);
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 0.9;
+
+    // Card entrance (the family gesture: rise + sharpen).
+    gsap.set(card, { autoAlpha: 0, scale: 0.93, y: 34, filter: 'blur(4px)' });
+    tl.to(card, {
+      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+      duration: speed, ease: 'power3.out'
+    }, 0.3);
+
+    // Inner content settles in a beat behind the card.
+    var inner = [
+      el.querySelector('.emrd-subject-row'),
+      el.querySelector('.emrd-sender-row')
+    ].concat(Array.prototype.slice.call(bodyEl.children));
+    gsap.set(inner, { autoAlpha: 0, y: 12 });
+    tl.to(inner, {
+      autoAlpha: 1, y: 0, duration: 0.45, stagger: 0.09, ease: 'power2.out'
+    }, 0.3 + speed * 0.45);
+
+    // The marker sweep: the quote gets found. Left-to-right, one beat after
+    // the mail has settled.
+    if (hlSpans.length > 0) {
+      var sweepAt = Math.min(0.3 + speed + 0.9, ctx.duration * 0.45);
+      tl.to(hlSpans, {
+        backgroundSize: '100% 100%',
+        duration: 0.9, stagger: 0.15, ease: 'power2.inOut'
+      }, sweepAt);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(card, {
+        autoAlpha: 0, scale: 0.96, y: -15,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt);
+    }
+
+    // Run interactive script if provided
+    if (data.script && data.script.length > 0) {
+      runScript(tl, el, data.script, data.cursor_targets || {}, ctx);
+    }
+
+    return tl;
+  }
+</script>

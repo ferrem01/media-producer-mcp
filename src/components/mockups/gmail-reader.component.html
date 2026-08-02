@@ -1,0 +1,533 @@
+<template>
+  <div class="gmr-wrap">
+    <div class="gmr-card">
+      <div class="gmr-header">
+        <div class="gmr-brand">
+          <svg class="gmr-logo" width="30" height="24" viewBox="0 0 48 36">
+            <path fill="#4285f4" d="M3.3 36h7.9V16.8L0 8.4v24.3C0 34.5 1.5 36 3.3 36z"/>
+            <path fill="#34a853" d="M36.8 36h7.9c1.8 0 3.3-1.5 3.3-3.3V8.4l-11.2 8.4z"/>
+            <path fill="#fbbc04" d="M36.8 2.2v14.6L48 8.4V3.9c0-4-4.6-6.3-7.9-3.9z"/>
+            <path fill="#ea4335" d="M11.2 16.8V2.2L24 11.8 36.8 2.2v14.6L24 26.4z"/>
+            <path fill="#c5221f" d="M0 3.9v4.5l11.2 8.4V2.2L7.9 0C4.6-2.4 0-.1 0 3.9z"/>
+          </svg>
+          <span class="gmr-brand-name">Gmail</span>
+        </div>
+        <div class="gmr-search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <span class="gmr-search-text">Search mail</span>
+        </div>
+        <div class="gmr-header-right">
+          <svg class="gmr-hicon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="1.6"/><circle cx="12" cy="5" r="1.6"/><circle cx="19" cy="5" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="19" r="1.6"/><circle cx="12" cy="19" r="1.6"/><circle cx="19" cy="19" r="1.6"/></svg>
+          <div class="gmr-account"><span class="gmr-account-txt">M</span></div>
+        </div>
+      </div>
+      <div class="gmr-cols">
+        <div class="gmr-sidebar">
+          <div class="gmr-compose">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+            </svg>
+            Compose
+          </div>
+          <div class="gmr-nav-item is-active">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            <span class="gmr-nav-label">Inbox</span>
+            <span class="gmr-nav-count"></span>
+          </div>
+          <div class="gmr-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <span class="gmr-nav-label">Starred</span>
+          </div>
+          <div class="gmr-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+            <span class="gmr-nav-label">Snoozed</span>
+          </div>
+          <div class="gmr-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <span class="gmr-nav-label">Sent</span>
+          </div>
+          <div class="gmr-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="gmr-nav-label">Drafts</span>
+            <span class="gmr-nav-count is-muted">90</span>
+          </div>
+          <div class="gmr-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            <span class="gmr-nav-label">More</span>
+          </div>
+        </div>
+        <div class="gmr-main">
+          <div class="gmr-toolbar">
+            <svg class="gmr-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            <span class="gmr-tb-gap"></span>
+            <svg class="gmr-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            <svg class="gmr-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <svg class="gmr-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <svg class="gmr-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            <svg class="gmr-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+            <span class="gmr-tb-spacer"></span>
+            <span class="gmr-pager"></span>
+            <svg class="gmr-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            <svg class="gmr-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div class="gmr-message">
+            <div class="gmr-subject-row">
+              <span class="gmr-subject"></span>
+              <span class="gmr-chip gmr-chip-external">External</span>
+              <span class="gmr-chip">Inbox ×</span>
+            </div>
+            <div class="gmr-sender-row">
+              <!-- Initials in an inner span: the probe samples the tight glyph
+                   rect over the colored disc, not the square div whose corners
+                   poke past the circle (the email-reader 1.13:1 lesson). -->
+              <div class="gmr-avatar"><span class="gmr-avatar-txt"></span></div>
+              <div class="gmr-sender-meta">
+                <div class="gmr-sender-line">
+                  <span class="gmr-sender-name"></span>
+                  <span class="gmr-sender-email"></span>
+                </div>
+                <div class="gmr-to-line">to me
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+                </div>
+              </div>
+              <span class="gmr-time"></span>
+              <svg class="gmr-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg class="gmr-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+            </div>
+            <div class="gmr-body"></div>
+            <div class="gmr-actions">
+              <span class="gmr-action-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                Reply
+              </span>
+              <span class="gmr-action-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>
+                Reply all
+              </span>
+              <span class="gmr-action-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+                Forward
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── gmail-reader: the UNMISTAKABLY-Gmail open message -- logo + search,
+     sidebar with the Compose pill and Inbox count, message toolbar, chips,
+     reply pills. email-reader is the generic sibling; this one is for beats
+     where the film should say "this is your real inbox". Chrome is HARDCODED
+     light (Gmail has no dark theming here), so every ink is hardcoded to its
+     own surface, never to brand tokens. */
+  .gmr-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 30px;
+    font-family: 'Google Sans', Roboto, var(--mp-font-family, 'Inter'), Arial, sans-serif;
+  }
+
+  .gmr-card {
+    width: 1360px;
+    max-width: 98%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #ffffff;
+    /* 2px border (Chromium floors 1.5px to 1px) + real-alpha shadow: the
+       visible edges the ghost-panel gate credits on a white page. */
+    border: 2px solid #d3d8e2;
+    box-shadow:
+      0 30px 80px rgba(15, 18, 34, 0.35),
+      0 4px 18px rgba(15, 18, 34, 0.18);
+  }
+
+  /* Chrome strips stay under the 70px surface-probe floor so their near-white
+     fills are never measured as ghost panels in their own right. */
+  .gmr-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 62px;
+    padding: 0 22px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #e6e9f0;
+  }
+
+  .gmr-brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 208px;
+    flex-shrink: 0;
+  }
+
+  .gmr-brand-name {
+    font-size: 21px;
+    color: #5f6368;
+  }
+
+  .gmr-search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #eaf1fb;
+    border-radius: 24px;
+    height: 44px;
+    padding: 0 20px;
+    flex: 1;
+    max-width: 620px;
+    color: #445062;
+  }
+
+  .gmr-search-text {
+    font-size: 15px;
+    color: #445062;
+  }
+
+  .gmr-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+  }
+
+  .gmr-hicon { color: #5f6368; }
+
+  .gmr-account {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #7c3aed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .gmr-account-txt {
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .gmr-cols {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .gmr-sidebar {
+    width: 216px;
+    flex-shrink: 0;
+    padding: 16px 12px 0;
+  }
+
+  .gmr-compose {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #c2e7ff;
+    color: #001d35;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 14px;
+    height: 52px;
+    padding: 0 20px;
+    width: fit-content;
+    margin-bottom: 16px;
+  }
+
+  .gmr-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 17px;
+    color: #444746;
+    margin-bottom: 2px;
+  }
+
+  .gmr-nav-item.is-active {
+    background: #d3e3fd;
+    color: #001d35;
+  }
+
+  .gmr-nav-label { font-size: 14px; }
+  .gmr-nav-item.is-active .gmr-nav-label { font-weight: 700; }
+
+  .gmr-nav-count {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 700;
+    color: #001d35;
+  }
+
+  .gmr-nav-count.is-muted { font-weight: 400; color: #444746; }
+
+  .gmr-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #e6e9f0;
+  }
+
+  .gmr-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 52px;
+    padding: 0 24px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #eceff4;
+  }
+
+  .gmr-icon { color: #444746; flex-shrink: 0; }
+  .gmr-tb-gap { width: 4px; }
+  .gmr-tb-spacer { flex: 1; }
+
+  .gmr-pager {
+    font-size: 13px;
+    color: #444746;
+  }
+
+  .gmr-message { padding: 24px 30px 28px; overflow: hidden; }
+
+  .gmr-subject-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  .gmr-subject {
+    font-size: 25px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: #1f2126;
+    line-height: 1.25;
+  }
+
+  .gmr-chip {
+    font-size: 12px;
+    font-weight: 500;
+    color: #3c4043;
+    background: #e8eaed;
+    border-radius: 5px;
+    padding: 3px 9px;
+    flex-shrink: 0;
+  }
+
+  .gmr-chip-external {
+    background: #fce8b3;
+    color: #7a4f01;
+  }
+
+  .gmr-sender-row {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    margin-bottom: 22px;
+  }
+
+  .gmr-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #b3379a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .gmr-avatar-txt {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .gmr-sender-meta { flex: 1; min-width: 0; }
+
+  .gmr-sender-line {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+
+  .gmr-sender-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1f2126;
+  }
+
+  .gmr-sender-email {
+    font-size: 13px;
+    color: #5f6368;
+  }
+
+  .gmr-to-line {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    color: #5f6368;
+    margin-top: 2px;
+  }
+
+  .gmr-time {
+    font-size: 13px;
+    color: #5f6368;
+    flex-shrink: 0;
+  }
+
+  .gmr-body {
+    font-size: 17px;
+    color: #3c4043;
+    line-height: 1.65;
+    max-width: 860px;
+  }
+
+  .gmr-body p { margin: 0 0 15px; }
+
+  /* The money quote: a marker sweep painted by background-size (0% -> 100%)
+     so the highlight draws left-to-right; ink stays the dark body ink. */
+  .gmr-hl {
+    background-image: linear-gradient(#ffe9a8, #ffe9a8);
+    background-repeat: no-repeat;
+    background-size: 0% 100%;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    border-radius: 3px;
+    padding: 1px 2px;
+    margin: -1px -2px;
+    color: #1f2126;
+    font-weight: 500;
+  }
+
+  .gmr-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 26px;
+  }
+
+  .gmr-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border: 1.5px solid #747775;
+    border-radius: 20px;
+    height: 40px;
+    padding: 0 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #444746;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.gmr-card');
+
+    var senderName = data.sender_name || 'Sarah Chen';
+    el.querySelector('.gmr-subject').textContent = data.subject || 'You have to hear this';
+    el.querySelector('.gmr-sender-name').textContent = senderName;
+    el.querySelector('.gmr-sender-email').textContent = data.sender_email ? '<' + data.sender_email + '>' : '';
+    el.querySelector('.gmr-time').textContent = data.timestamp || '9:42 AM (16 minutes ago)';
+    el.querySelector('.gmr-avatar-txt').textContent = senderName.split(/\s+/).slice(0, 2)
+      .map(function(w) { return (w[0] || '').toUpperCase(); }).join('') || 'S';
+    var count = typeof data.inbox_count === 'number' ? data.inbox_count : 2008;
+    el.querySelector('.gmr-nav-count').textContent = count.toLocaleString('en-US');
+    el.querySelector('.gmr-pager').textContent = data.pager || '5 of 4,946';
+    if (data.external === false) el.querySelector('.gmr-chip-external').style.display = 'none';
+
+    // Body: paragraphs split on newlines; the money quote is marked with
+    // *asterisks* or named via data.highlight_quote (substring match). If
+    // neither matches, the mail renders un-highlighted.
+    var bodyEl = el.querySelector('.gmr-body');
+    var bodyText = data.body ||
+      'Just wanted to say: the launch went perfectly.\n\nThis is the first product launch that actually felt like magic instead of chaos.\n\nThank you!';
+    var hq = typeof data.highlight_quote === 'string' ? data.highlight_quote.trim() : '';
+    var hlSpans = [];
+    bodyText.split(/\n+/).filter(Boolean).forEach(function(paraText) {
+      var p = document.createElement('p');
+      var marked = paraText;
+      if (paraText.indexOf('*') === -1 && hq && paraText.indexOf(hq) !== -1) {
+        marked = paraText.split(hq).join('*' + hq + '*');
+      }
+      var re = /\*([^*]+)\*|([^*]+)/g, m;
+      while ((m = re.exec(marked)) !== null) {
+        if (m[1] !== undefined) {
+          var hl = document.createElement('span');
+          hl.className = 'gmr-hl';
+          hl.textContent = m[1];
+          p.appendChild(hl);
+          hlSpans.push(hl);
+        } else {
+          p.appendChild(document.createTextNode(m[2]));
+        }
+      }
+      bodyEl.appendChild(p);
+    });
+
+    var speed = ctx.motion === 'minimal' ? 0.5 : ctx.motion === 'punchy' ? 0.7 : 0.9;
+
+    // Card entrance (the family gesture: rise + sharpen).
+    gsap.set(card, { autoAlpha: 0, scale: 0.94, y: 30, filter: 'blur(4px)' });
+    tl.to(card, {
+      autoAlpha: 1, scale: 1, y: 0, filter: 'blur(0px)',
+      duration: speed, ease: 'power3.out'
+    }, 0.25);
+
+    // Regions settle in a short stagger; everything is fully opaque well
+    // before mid-scene (the certification probe reads at duration * 0.5).
+    var regions = [
+      el.querySelector('.gmr-header'),
+      el.querySelector('.gmr-sidebar'),
+      el.querySelector('.gmr-toolbar'),
+      el.querySelector('.gmr-message')
+    ];
+    gsap.set(regions, { autoAlpha: 0, y: 10 });
+    tl.to(regions, {
+      autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.08, ease: 'power2.out'
+    }, 0.25 + speed * 0.4);
+
+    // The marker sweep: the quote gets found.
+    if (hlSpans.length > 0) {
+      var sweepAt = Math.min(0.25 + speed + 0.9, ctx.duration * 0.45);
+      tl.to(hlSpans, {
+        backgroundSize: '100% 100%',
+        duration: 0.9, stagger: 0.15, ease: 'power2.inOut'
+      }, sweepAt);
+    }
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.6;
+      tl.to(card, {
+        autoAlpha: 0, scale: 0.96, y: -15,
+        duration: 0.4, ease: 'power2.in'
+      }, exitAt);
+    }
+
+    // Run interactive script if provided
+    if (data.script && data.script.length > 0) {
+      runScript(tl, el, data.script, data.cursor_targets || {}, ctx);
+    }
+
+    return tl;
+  }
+</script>
