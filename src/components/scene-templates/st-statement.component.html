@@ -57,17 +57,15 @@
     font-size: 6.4vw; line-height: 1.06; letter-spacing: -0.01em; font-weight: 400; }
   .stst.is-dark .stst-line { color: #f2efe6; }
   .stst-line.is-secondary { font-size: 4.2vw; opacity: 0.85; }
-  /* background-clip:text paints glyphs only where the element's background
-     box covers them, and some engines size an inline's paint box from the
-     font's nominal metrics -- the italic g/y swashes that poke past descent
-     rendered with their tails CUT (transparent) on those engines while other
-     rasterizers painted them fine. Vertical padding on an inline changes NO
-     layout; it only extends the paint box. padding-right was already this
-     guard for the italic's rightward overhang. */
-  .stst-em { font-style: italic; background: linear-gradient(96deg,
-      var(--mp-color-primary, #7c5cff) 10%, #c4489f 55%, #ff6a4d 95%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    padding: 0.15em 0.06em 0.35em 0.02em; }
+  /* The emphasis colors PER GLYPH along the brand ramp (script builds the
+     spans) instead of background-clip:text. WebKit clips that technique's
+     paint region to the line box built from nominal font metrics, cutting
+     the italic swash tips -- and neither padding nor inline-block moves it
+     (proven with an in-browser diagnostic on the affected engine). Solid
+     per-glyph color is plain glyph painting and cannot clip anywhere. The
+     solid color here is the no-JS fallback. */
+  .stst-em { font-style: italic; padding-right: 0.06em;
+    color: var(--mp-color-primary, #7c5cff); }
   /* Chapter mode: numbered chapter card -- big brand-color numeral beside a
      clean SANS headline (the "02 / Agent scaffolds & builds" card). */
   .stst.is-chapter .stst-line { font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif;
@@ -124,6 +122,46 @@
 
     var stage = q('.stst-stage');
 
+    // Emphasis ramp: stops mirror the retired linear-gradient(96deg,
+    // primary 10%, #c4489f 55%, #ff6a4d 95%), sampled per glyph.
+    function parseColor(c) {
+      c = String(c || '').trim();
+      var m3 = c.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
+      if (m3) return [parseInt(m3[1] + m3[1], 16), parseInt(m3[2] + m3[2], 16), parseInt(m3[3] + m3[3], 16)];
+      var m6 = c.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+      if (m6) return [parseInt(m6[1], 16), parseInt(m6[2], 16), parseInt(m6[3], 16)];
+      var mr = c.match(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/);
+      if (mr) return [+mr[1], +mr[2], +mr[3]];
+      return [124, 92, 255];
+    }
+    var emPrimary = parseColor(getComputedStyle(root).getPropertyValue('--mp-color-primary') || '#7c5cff');
+    var emStops = [
+      { at: 0.10, c: emPrimary },
+      { at: 0.55, c: [196, 72, 159] },
+      { at: 0.95, c: [255, 106, 77] },
+    ];
+    function emRamp(t) {
+      var p = 0.10 + t * 0.85;
+      var a = emStops[0], b = emStops[emStops.length - 1];
+      for (var i = 0; i < emStops.length - 1; i++) {
+        if (p >= emStops[i].at && p <= emStops[i + 1].at) { a = emStops[i]; b = emStops[i + 1]; break; }
+      }
+      var f = b.at === a.at ? 0 : (p - a.at) / (b.at - a.at);
+      var c = a.c.map(function(v, i2) { return Math.round(v + (b.c[i2] - v) * f); });
+      return 'rgb(' + c.join(',') + ')';
+    }
+    function buildEmGlyphs(em, text) {
+      var chars = Array.from(String(text));
+      var n = Math.max(1, chars.length - 1);
+      chars.forEach(function(ch, i) {
+        if (ch === ' ') { em.appendChild(document.createTextNode(' ')); return; }
+        var g = document.createElement('span');
+        g.style.color = emRamp(i / n);
+        g.textContent = ch;
+        em.appendChild(g);
+      });
+    }
+
     // Build each statement as its own centered group of masked lines.
     // A statement wraps onto multiple visual lines by explicit '\n' or every
     // ~4 words (nowrap lines keep the serif's set tight and huge).
@@ -149,13 +187,14 @@
           num.textContent = String(data.chapter_number);
           line.appendChild(num);
         }
-        // *emphasis* -> gradient italic span
+        // *emphasis* -> italic span, one solid color per glyph along the
+        // brand ramp (see the .stst-em comment for why not background-clip)
         var re = /\*([^*]+)\*|([^*]+)/g, m;
         while ((m = re.exec(lineText)) !== null) {
           if (m[1] !== undefined) {
             var em = document.createElement('em');
             em.className = 'stst-em';
-            em.textContent = m[1];
+            buildEmGlyphs(em, m[1]);
             line.appendChild(em);
           } else {
             line.appendChild(document.createTextNode(m[2]));
