@@ -89,7 +89,21 @@
       flow.appendChild(w);
     });
 
-    if (window.mpLineRise) mpLineRise(tl, flow, 0.35);
+    if (data.entrance === 'type-on') {
+      // Word-by-word build-up (the sanctioned type-on entrance, same contract
+      // as kinetic-text): every word is in the DOM up front but takes no
+      // space until its beat, so the centered flow re-centers as it grows.
+      // Words APPEAR -- no fade, no travel; pure tl.set, scrub-safe.
+      var at0 = data.at !== undefined ? Number(data.at) : 0.3;
+      var step = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.14;
+      var wordEls = flow.querySelectorAll('.stmf-word');
+      for (var wi = 0; wi < wordEls.length; wi++) {
+        gsap.set(wordEls[wi], { display: 'none' });
+        var when = Array.isArray(data.word_times) && data.word_times[wi] !== undefined
+          ? Number(data.word_times[wi]) : at0 + wi * step;
+        tl.set(wordEls[wi], { display: 'inline-block' }, when);
+      }
+    } else if (window.mpLineRise) mpLineRise(tl, flow, 0.35);
     else {
       gsap.set(flow, { autoAlpha: 0, y: 10 });
       tl.to(flow, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 0.35);
