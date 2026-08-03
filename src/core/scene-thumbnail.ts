@@ -86,9 +86,10 @@ async function buildSceneThumbnail(
     .createHash("sha1")
     .update(
       JSON.stringify({
-        // v2: captures rewrite /assets/ srcs to file:// so video geometry is
-        // real -- bumped to regenerate every thumb cached with collapsed video.
-        v: 2,
+        // v3: captures now also rewrite /assets/ refs inside component DATA
+        // (runtime img.src) -- bumped to regenerate thumbs cached with the
+        // component's broken-image fallback.
+        v: 3,
         scene,
         at: atTime,
         speakerUrl: speakerUrl || "",
