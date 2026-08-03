@@ -1264,6 +1264,12 @@ export function getPreviewHtml(): string {
       opts.headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(body);
     }
+    // Live-sync: our OWN mutations bump updated_at too. Mark them so the
+    // external-change watcher adopts the new version instead of reloading
+    // the preview out from under the edit that caused it.
+    if (method !== 'GET' && state.currentProject && path.indexOf(state.currentProject.project_id) !== -1) {
+      liveSync.suppressUntil = Date.now() + 8000;
+    }
     return fetch('/api' + withToken(path), opts).then(function(r) {
       if (!r.ok) {
         // Surface the server's error message -- "API error 400" hides the
@@ -2293,11 +2299,62 @@ export function getPreviewHtml(): string {
   }
 
 
+  // ── Live sync: external edits (MCP tools, API scripts) appear without a
+  // manual reload. A cheap version probe every few seconds; on a change we
+  // didn't cause, re-fetch the project and hot-reload the preview at the
+  // same playhead. Skipped while playing (don't yank the film mid-watch)
+  // and while a render job is followed (editing is locked anyway).
+  var liveSync = { known: null, suppressUntil: 0, inflight: false, timer: null };
+  function liveSyncTick() {
+    var p = state.currentProject;
+    if (!p || !p.project_id || document.hidden || liveSync.inflight) return;
+    if (state.playing || state.playAll) return;
+    if (render.job) return;
+    liveSync.inflight = true;
+    api('/project-version/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id)).then(function(v) {
+      liveSync.inflight = false;
+      if (!v || !v.updated_at) return;
+      // Still on the same project? (User may have switched mid-request.)
+      if (!state.currentProject || state.currentProject.project_id !== p.project_id) return;
+      if (liveSync.known === null) { liveSync.known = v.updated_at; return; }
+      if (v.updated_at === liveSync.known) return;
+      liveSync.known = v.updated_at;
+      // Our own edit bumped the version -- adopt it, no reload.
+      if (Date.now() < liveSync.suppressUntil) return;
+      liveSyncReload();
+    }).catch(function() { liveSync.inflight = false; });
+  }
+  function liveSyncReload() {
+    var p = state.currentProject;
+    if (!p) return;
+    api('/projects/' + state.tenantId + '/' + p.project_id).then(function(project) {
+      if (!state.currentProject || state.currentProject.project_id !== project.project_id) return;
+      // Draft/storyboard-state projects have their own view -- full reload path.
+      var hasScenes = project.scenes && project.scenes.length;
+      if (!hasScenes) { loadProject(project.project_id); return; }
+      state.currentProject = project;
+      state.totalDuration = calcTotalDuration();
+      if (state.masterTime > state.totalDuration) state.masterTime = Math.max(0, state.totalDuration - 0.1);
+      initAudio();
+      renderSceneList();
+      studioStatus('↻ Updated outside Studio — preview refreshed', 'ok');
+      // Mobile boots the composite on demand; don't force it here.
+      if (IS_MOBILE && !state._compositeHtml) return;
+      startCompositePreview(project, {
+        time: state.masterTime,
+        sceneIndex: Math.max(0, Math.min(state.currentSceneIndex, project.scenes.length - 1)),
+      });
+    }).catch(function() {});
+  }
+  liveSync.timer = setInterval(liveSyncTick, 4000);
+
   // Load a specific project
   function loadProject(projectId) {
     if (!projectId || !state.tenantId) return;
     api('/projects/' + state.tenantId + '/' + projectId).then(function(project) {
       state.currentProject = project;
+      liveSync.known = project.updated_at || null;
+      liveSync.suppressUntil = 0;
       state.currentSceneIndex = -1;
       state.currentComponentIndex = -1;
       state.totalDuration = calcTotalDuration();

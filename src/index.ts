@@ -806,7 +806,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -1085,6 +1085,24 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           return;
         }
         jsonResponse(res, 200, updated);
+        return;
+      }
+
+      // ── API: Project version probe (Studio live-sync) ──
+      // GET /api/project-version/{tenant}/{project} -> {updated_at, status,
+      // scenes}. Cheap enough to poll: Studio watches it to hot-reload the
+      // preview when the project is edited externally (MCP tools, API).
+      const projVerMatch = urlPath.match(/^\/api\/project-version\/([^/]+)\/([^/]+)$/);
+      if (projVerMatch && method === "GET") {
+        const [, pvTenant, pvProject] = projVerMatch.map(decodeURIComponent);
+        const pvProj = await loadProject(pvTenant, pvProject);
+        if (!pvProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        res.setHeader("Cache-Control", "no-store");
+        jsonResponse(res, 200, {
+          updated_at: pvProj.updated_at || null,
+          status: pvProj.status,
+          scenes: (pvProj.scenes || []).length,
+        });
         return;
       }
 
