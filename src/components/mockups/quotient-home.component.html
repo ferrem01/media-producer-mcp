@@ -2,7 +2,8 @@
   <div class="qhome">
     <div class="qhome-center">
       <div class="qhome-orb">
-        <svg viewBox="0 0 48 48" aria-hidden="true">
+        <img class="qhome-orb-img" alt="" />
+        <svg class="qhome-orb-fallback" viewBox="0 0 48 48" aria-hidden="true" style="display:none">
           <defs>
             <linearGradient id="qhome-og" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0" stop-color="#7a5cff"/>
@@ -10,8 +11,9 @@
             </linearGradient>
           </defs>
           <circle cx="24" cy="24" r="24" fill="url(#qhome-og)"/>
-          <path d="M21 13 a11 11 0 0 0 0 22 z" fill="#fff" opacity="0.92"/>
-          <circle cx="30" cy="27" r="3.8" fill="#fff"/>
+          <path d="M22 12 a12 12 0 0 0 0 24 z" fill="#fff"/>
+          <circle cx="15.5" cy="24" r="4.2" fill="url(#qhome-og)"/>
+          <circle cx="30.5" cy="24" r="4.6" fill="#fff"/>
         </svg>
       </div>
       <h1 class="qhome-h1"></h1>
@@ -51,6 +53,10 @@
   .qhome-center { width: 66%; max-width: 1240px; display: flex; flex-direction: column; align-items: center; }
   .qhome-orb { width: 96px; height: 96px; margin-bottom: 36px; }
   .qhome-orb svg { width: 100%; height: 100%; display: block; }
+  /* Real app icon via logo.dev (rounded-square tile) cropped to the home
+     screen's circular orb; the inline SVG mark is the offline fallback. */
+  .qhome-orb-img { width: 100%; height: 100%; display: block; border-radius: 50%;
+    object-fit: cover; }
   .qhome-h1 { font-size: 64px; font-weight: 600; letter-spacing: -0.025em; margin: 0 0 52px;
     text-align: center; }
   .qhome-card { width: 100%; background: #fff; border: 2px solid #e6e4ee; border-radius: 26px;
@@ -82,6 +88,14 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var q = function (s) { return el.querySelector(s); };
+
+    var orbImg = q('.qhome-orb-img');
+    orbImg.src = data.logo_url ||
+      'https://img.logo.dev/getquotient.ai?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=256';
+    orbImg.onerror = function () {
+      orbImg.style.display = 'none';
+      q('.qhome-orb-fallback').style.display = 'block';
+    };
 
     q('.qhome-h1').textContent = data.heading || 'What should we create today?';
     q('.qhome-ph').textContent = data.placeholder || 'Type a message...';
