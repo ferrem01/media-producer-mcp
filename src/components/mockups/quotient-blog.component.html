@@ -1,25 +1,7 @@
 <template>
   <div class="qbl">
     <div class="qbl-window">
-      <div class="qbl-nav">
-        <div class="qbl-brand"><span class="qbl-brand-mark"><span></span></span>Quotient <span class="qbl-brand-chev">⌄</span></div>
-        <div class="qbl-navlist"></div>
-        <div class="qbl-me">
-          <div class="qbl-me-ava"><img alt=""><span class="qbl-me-init"></span></div>
-          <div class="qbl-me-col"><div class="qbl-me-name"></div><div class="qbl-me-mail"></div></div>
-        </div>
-      </div>
       <div class="qbl-main">
-        <div class="qbl-topbar">
-          <div class="qbl-crumbs"></div>
-          <div class="qbl-top-right">
-            <div class="qbl-search">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg>
-              Search <span class="qbl-kbd">⌘+K</span>
-            </div>
-            <div class="qbl-newchat">⊕ New Chat</div>
-          </div>
-        </div>
         <div class="qbl-docbar">
           <span class="qbl-updated"></span>
           <span class="qbl-docbar-sp"></span>
@@ -56,54 +38,20 @@
 </template>
 
 <style scoped>
-  /* ── quotient-blog: the Quotient blog document view, matched to the real
-     app -- left nav, breadcrumb top bar, doc header (campaign chip, Threads,
-     status pill), hero image, title/dek, authors/slug/tags meta, word count,
-     body prose. publish-blog flips the header pill Draft -> Published as a
-     reversible timeline crossfade (scrub-safe). */
+  /* ── quotient-blog: the Quotient blog DOCUMENT surface (chromeless, like
+     quotient-social/quotient-campaign): doc header row (campaign chip,
+     Threads, status pill), hero image, title/dek, authors/slug/tags meta,
+     word count, body prose. App chrome (nav, breadcrumb bar, agent panel)
+     comes from quotient-app-shell -- stage this in its content region.
+     publish-blog flips the pill Draft -> Published as a reversible timeline
+     crossfade (scrub-safe). */
   .qbl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
   .qbl-window { width: 97%; height: 96%; background: #fbfafc; border-radius: 12px;
     box-shadow: 0 20px 60px rgba(23,23,28,0.18); overflow: hidden; display: flex;
     font-family: 'Inter', -apple-system, sans-serif; }
-  .qbl-nav { width: 208px; flex-shrink: 0; background: #f7f6fa; border-right: 2px solid #e3e1ea;
-    display: flex; flex-direction: column; padding: 14px 10px 12px; }
-  .qbl-brand { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 700;
-    color: #17171c; padding: 4px 8px 14px; }
-  .qbl-brand-mark { width: 22px; height: 22px; border-radius: 7px; background: #5b4ee8;
-    display: inline-flex; align-items: center; justify-content: center; }
-  .qbl-brand-mark span { width: 10px; height: 10px; border-radius: 50%; border: 2.6px solid #fff;
-    border-right-color: transparent; transform: rotate(45deg); display: block; }
-  .qbl-brand-chev { color: #9a97a4; font-weight: 500; }
-  .qbl-navlist { flex: 1; min-height: 0; overflow: hidden; }
-  .qbl-navitem { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 500;
-    color: #45434e; padding: 7px 9px; border-radius: 9px; white-space: nowrap; }
-  .qbl-navitem svg { flex-shrink: 0; opacity: 0.7; }
-  .qbl-navitem.is-active { background: #fff; border: 1px solid #e9e7ef; color: #17171c;
-    font-weight: 600; box-shadow: 0 1px 3px rgba(23,23,28,0.05); }
-  .qbl-navitem .qbl-navchev { margin-left: auto; color: #b4b1bd; }
-  .qbl-me { display: flex; align-items: center; gap: 9px; padding: 10px 6px 2px;
-    border-top: 1px solid #eceaf1; }
-  .qbl-me-ava { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; position: relative;
-    background: #dfe7f5; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-  .qbl-me-ava img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .qbl-me-init { font-size: 11px; font-weight: 700; color: #3d5c94; }
-  .qbl-me-name { font-size: 12.5px; font-weight: 600; color: #17171c; line-height: 1.3; }
-  .qbl-me-mail { font-size: 11px; color: #8a8794; }
   .qbl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fdfdfe; }
-  .qbl-topbar { height: 52px; flex-shrink: 0; display: flex; align-items: center; padding: 0 18px;
-    gap: 12px; }
-  .qbl-crumbs { flex: 1; min-width: 0; font-size: 13.5px; color: #8a8794; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis; }
-  .qbl-crumbs b { color: #3c3a44; font-weight: 600; }
-  .qbl-crumbs .qbl-crumb-link { color: #6a67d8; }
-  .qbl-top-right { display: flex; align-items: center; gap: 10px; }
-  .qbl-search { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #8a8794;
-    border: 1px solid #e9e7ef; border-radius: 9px; padding: 6px 12px; background: #fff; }
-  .qbl-kbd { font-size: 11px; color: #b4b1bd; }
-  .qbl-newchat { font-size: 12.5px; font-weight: 600; color: #fff; background: #17171c;
-    border-radius: 9px; padding: 7px 13px; white-space: nowrap; }
   .qbl-docbar { height: 46px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;
-    padding: 0 18px; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3; }
+    padding: 0 18px; border-bottom: 1px solid #f0eff3; }
   .qbl-updated { font-size: 12.5px; color: #8a8794; flex-shrink: 1; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .qbl-docbar-sp { flex: 1 1 0; min-width: 8px; }
@@ -154,41 +102,9 @@
     var q = function(s) { return el.querySelector(s); };
     var win = q('.qbl-window');
 
-    // ── Left nav (matched item list; Blog active by default) ──
-    var NAV = ['Home', 'Chat History', 'Campaigns', 'Social', 'Blog', 'Email', 'Assets', 'Documents',
-      'Flows', 'Events', 'Audience', 'Analytics', 'Jobs', 'Memory'];
-    var EXPAND = { 'Campaigns': 1, 'Email': 1, 'Audience': 1, 'Analytics': 1 };
-    var ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>';
-    var navList = q('.qbl-navlist');
-    var activeNav = data.active_nav || 'Blog';
-    NAV.forEach(function(label) {
-      var it = document.createElement('div');
-      it.className = 'qbl-navitem' + (label === activeNav ? ' is-active' : '');
-      it.innerHTML = ICON;
-      it.appendChild(document.createTextNode(label));
-      if (EXPAND[label]) {
-        var ch = document.createElement('span');
-        ch.className = 'qbl-navchev';
-        ch.textContent = '›';
-        it.appendChild(ch);
-      }
-      navList.appendChild(it);
-    });
-    var me = data.user || { name: 'Marc Ferrentino', email: 'marc@getquotient.ai' };
-    q('.qbl-me-name').textContent = me.name;
-    q('.qbl-me-mail').textContent = me.email;
-    var meImg = q('.qbl-me-ava img');
-    if (me.avatar_url) { meImg.src = me.avatar_url; meImg.onerror = function() { this.remove(); }; }
-    else meImg.remove();
-    q('.qbl-me-init').textContent = (me.name || '?').split(/\s+/).map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
-
     // ── Doc chrome ──
     var title = data.title || 'The Hidden Cost of Manual Marketing Execution';
     var campaign = data.campaign || 'Weekly Blog Post';
-    var crumbs = q('.qbl-crumbs');
-    crumbs.innerHTML = '<span class="qbl-crumb-link">Campaigns</span> › <span class="qbl-crumb-link"></span> › <b></b>';
-    crumbs.querySelectorAll('.qbl-crumb-link')[1].textContent = campaign;
-    crumbs.querySelector('b').textContent = title.length > 34 ? title.slice(0, 33) + '…' : title;
     q('.qbl-updated').textContent = 'Last updated: ' + (data.last_updated || 'just now');
     q('.qbl-camp-name').textContent = campaign;
     q('.qbl-threads').textContent = data.threads_count != null ? data.threads_count : 2;
