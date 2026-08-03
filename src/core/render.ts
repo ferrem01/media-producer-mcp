@@ -105,6 +105,8 @@ export interface RenderOptions {
 
   /** When true, skip scene rendering and only re-apply audio mix to existing output */
   audioOnly?: boolean;
+  /** Live progress for job UIs: percent 0-100 plus a short stage detail. */
+  onProgress?: (percent: number, detail?: string) => void;
 }
 
 export interface RenderResult {
@@ -145,7 +147,7 @@ export async function renderProject(options: RenderOptions): Promise<RenderResul
 
     case "video":
     case "slideshow":
-      return renderVideo(project, componentSources, workDir, gsapDir, outputPath, startTime, undefined, options.extraComponentDirs);
+      return renderVideo(project, componentSources, workDir, gsapDir, outputPath, startTime, undefined, options.extraComponentDirs, options.onProgress);
 
     case "presentation":
     case "presentation":
@@ -504,9 +506,11 @@ async function renderScenesParallel(
   workDir: string,
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
+  onSceneDone?: (done: number, total: number) => void,
 ): Promise<Array<{ mp4Path: string; frameCount: number }>> {
   const concurrency = config.renderConcurrency;
   const results = new Array<{ mp4Path: string; frameCount: number }>(project.scenes.length);
+  let doneCount = 0;
 
   console.log(`  Rendering ${project.scenes.length} scenes (concurrency: ${concurrency})`);
 
@@ -523,7 +527,13 @@ async function renderScenesParallel(
     const promises: Promise<{ mp4Path: string; frameCount: number }>[] = [];
 
     for (let idx = batch; idx < batchEnd; idx++) {
-      promises.push(renderSingleSceneWorker(project, idx, workDir, critiqueOpts, extraComponentDirs, workers));
+      promises.push(
+        renderSingleSceneWorker(project, idx, workDir, critiqueOpts, extraComponentDirs, workers).then((r) => {
+          doneCount++;
+          onSceneDone?.(doneCount, project.scenes.length);
+          return r;
+        }),
+      );
     }
 
     let batchResults;
@@ -1022,6 +1032,7 @@ async function renderVideo(
   startTime: number,
   critiqueOpts?: { critique?: boolean; maxRevisions?: number; llmConfig?: LLMConfig; originalPrompt?: string },
   extraComponentDirs?: string[],
+  onProgress?: (percent: number, detail?: string) => void,
 ): Promise<RenderResult> {
   // ── Speaker Track pipeline branch ──
   // When project.speaker_track is set, use the new continuous base layer architecture.
@@ -1031,7 +1042,10 @@ async function renderVideo(
   }
 
   // Render all scenes (in parallel batches, each as a child process)
-  const sceneResults = await renderScenesParallel(project, workDir, critiqueOpts, extraComponentDirs);
+  // Scene renders dominate wall time: they own 0-80% of the bar.
+  const sceneResults = await renderScenesParallel(project, workDir, critiqueOpts, extraComponentDirs,
+    (done, total) => onProgress?.(Math.round((done / total) * 80), `scene ${done}/${total}`));
+  onProgress?.(82, "stitching");
 
   const sceneMp4s = sceneResults.map((r) => r.mp4Path);
   const totalFrames = sceneResults.reduce((sum, r) => sum + r.frameCount, 0);
@@ -1150,6 +1164,7 @@ async function renderVideo(
 
     // Simple concat of all segments (no xfade needed, transitions are their own segments)
     await concatSegments(segments, outputPath);
+    onProgress?.(90, "stitched");
   } else if (sceneMp4s.length === 1) {
     await fs.copyFile(sceneMp4s[0], outputPath);
   }
@@ -1157,6 +1172,7 @@ async function renderVideo(
   // ── Film grade: one consistent color pass over the whole film ──
   // Runs on the silent concat (before audio mux, which stream-copies video).
   if (project.film_grade && project.film_grade !== "none") {
+    onProgress?.(92, "film grade");
     console.log(`\n  Film grade: applying "${project.film_grade}" pass...`);
     const gradedPath = outputPath.replace(/\.mp4$/, "-graded.mp4");
     try {
@@ -1178,6 +1194,7 @@ async function renderVideo(
   const totalDuration = project.scenes.reduce((sum, s) => sum + s.duration_seconds, 0) + totalInserted;
 
   if (project.audio && project.audio.tracks.length > 0) {
+    onProgress?.(96, "mixing audio");
     console.log(`\n  Mixing ${project.audio.tracks.length} audio track(s)...`);
     if (totalInserted > 0) {
       console.log(`  Transitions inserted ${totalInserted.toFixed(2)}s of video; shifting timed audio tracks to match.`);
