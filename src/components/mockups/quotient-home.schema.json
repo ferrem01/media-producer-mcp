@@ -1,0 +1,39 @@
+{
+  "type": "quotient-home",
+  "label": "Quotient Home (new session)",
+  "category": "mockup",
+  "description": "Quotient's new-session home screen: the logo orb, the 'What should we create today?' hero line, the big composer card (attach clip, model pill, mic, send orb) and the category chip rows (Campaigns, Events, Content & SEO...). Use for 'the ask' beats: the user arrives in Quotient and types what they want. Chromeless -- pair with quotient-app-shell when nav chrome is wanted. Script it: type-message types the ask character by character (placeholder hides, send orb goes active), send-message presses the orb -- cut on the click.",
+  "data": {
+    "heading": {
+      "type": "string",
+      "label": "Hero line (default 'What should we create today?')",
+      "optional": true
+    },
+    "placeholder": {
+      "type": "string",
+      "label": "Input placeholder (default 'Type a message...')",
+      "optional": true
+    },
+    "model": {
+      "type": "string",
+      "label": "Model pill label (default 'Opus 4.7')",
+      "optional": true
+    },
+    "chips": {
+      "type": "array",
+      "items": { "type": "object" },
+      "label": "Category chips: {label, icon: megaphone|calendar|pen|share|search|trend|rocket}. Defaults to Quotient's seven.",
+      "optional": true
+    },
+    "script": {
+      "type": "array",
+      "items": { "type": "object" },
+      "label": "Timed actions: type-message {text, at, speed}, send-message {at}, highlight-chip {label, at}.",
+      "optional": true
+    }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.5 },
+    "exit": { "x": 0.5, "y": 0.62 }
+  }
+}
