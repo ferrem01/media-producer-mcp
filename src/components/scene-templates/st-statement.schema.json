@@ -21,6 +21,11 @@
       "label": "Small caps label above (e.g. CHAPTER TWO)",
       "optional": true
     },
+    "font": {
+      "type": "string",
+      "label": "Google Fonts family for the statement serif. Default 'Instrument Serif' (narrow, high-contrast editorial display). Alternatives when a wider set is wanted: 'Source Serif 4' (calm, matches product-mock serifs), 'Playfair Display' (wide editorial display)",
+      "optional": true
+    },
     "theme": {
       "type": "string",
       "label": "cream (default; 'light' aliases to cream) | dark (the chapter-flip temperature)",

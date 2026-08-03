@@ -701,6 +701,14 @@ export async function captureSingleFrame(options: {
       { timeout: 60000 }
     );
     await waitForVideoMetadata(page);
+    // Webfonts load async and components may inject font links at build time
+    // (st-statement's data.font); bounded so a dead font CDN can't stall a thumb.
+    await page
+      .evaluate(() => Promise.race([
+        (document as any).fonts?.ready,
+        new Promise((r) => setTimeout(r, 3000)),
+      ]))
+      .catch(() => {});
 
     // If a specific time is requested, advance the timeline. Swallow a throwing
     // component callback so one fragile scene doesn't abort the capture.

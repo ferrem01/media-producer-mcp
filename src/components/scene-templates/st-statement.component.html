@@ -78,6 +78,24 @@
     // numeral beside the headline, and the headline sets in SANS.
     if (data.chapter_number) root.classList.add('is-chapter');
 
+    // Statement face: data.font swaps the display serif for another Google
+    // Fonts family ('Source Serif 4', 'Playfair Display', ...). The template
+    // <link> already preloads the Instrument Serif default. Two stylesheet
+    // requests: the ital-axis one carries the *emphasis* italics, the plain
+    // one is insurance for families the ital query 400s on.
+    if (data.font && String(data.font).trim() &&
+        String(data.font).trim().toLowerCase() !== 'instrument serif') {
+      var fontFam = String(data.font).trim();
+      var famQ = fontFam.replace(/ /g, '+');
+      [famQ + ':ital@0;1', famQ].forEach(function(spec) {
+        var fl = document.createElement('link');
+        fl.rel = 'stylesheet';
+        fl.href = 'https://fonts.googleapis.com/css2?family=' + spec + '&display=swap';
+        root.appendChild(fl);
+      });
+      root.style.fontFamily = "'" + fontFam + "', 'Instrument Serif', Georgia, 'Times New Roman', 'DejaVu Serif', serif";
+    }
+
     var kickerRow = q('.stst-kicker-row');
     if (!data.kicker) kickerRow.style.display = 'none';
 
