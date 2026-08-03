@@ -75,10 +75,12 @@
   .vcall-bot-dot { width: 7px; height: 7px; border-radius: 50%; background: #e0473d; }
   .vcall-capzone { position: absolute; left: 0; right: 0; bottom: 76px; display: flex; justify-content: center;
     pointer-events: none; }
-  .vcall-cap { position: absolute; bottom: 0; max-width: 72%; background: rgba(8,8,12,0.82);
-    color: #f4f4f8; font-size: 15.5px; line-height: 1.45; padding: 9px 16px; border-radius: 8px;
+  /* Film-scale CC: this renders on a 1920-wide canvas, so caption type
+     sits closer to broadcast-subtitle size than app-UI size. */
+  .vcall-cap { position: absolute; bottom: 0; max-width: 78%; background: rgba(8,8,12,0.85);
+    color: #f4f4f8; font-size: 26px; line-height: 1.4; padding: 13px 26px; border-radius: 12px;
     text-align: center; }
-  .vcall-cap b { color: #8ab4f8; font-weight: 700; margin-right: 6px; }
+  .vcall-cap b { color: #8ab4f8; font-weight: 700; margin-right: 9px; }
   .vcall-bar { height: 64px; flex-shrink: 0; background: #17171d; display: flex; align-items: center;
     justify-content: space-between; padding: 0 14px; }
   .vcall-tools-left, .vcall-tools-mid, .vcall-tools-right { display: flex; align-items: center; gap: 4px; }
