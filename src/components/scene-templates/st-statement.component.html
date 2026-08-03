@@ -47,9 +47,13 @@
      italic descenders reach ~15px past the 1.06 line box, and the old 0.35vh
      (~4px) allowance clipped them ("glowing" lost its g tails). 1vw scales
      with the vw-sized type; the negative margin gives the room back so the
-     visual leading stays where it was. Roll offsets must clear this bleed --
-     see the yPercent 130 note in the script. */
-  .stst-linemask { overflow: hidden; padding: 0.35vh 0.2em 1vw; margin-bottom: -0.8vw; }
+     visual leading stays where it was. 1.6vw (not 1vw): baseline position
+     inside the line box depends on which font-metrics table the engine uses
+     (macOS hhea vs OS/2) -- on engines that seat the baseline lower, the
+     swash reaches ~10-15px deeper below the line box than it does here, and
+     1vw still shaved the tip. Roll offsets must clear this bleed -- see the
+     yPercent 145 note in the script. */
+  .stst-linemask { overflow: hidden; padding: 0.35vh 0.2em 1.6vw; margin-bottom: -1.4vw; }
   .stst-line { display: block; text-align: center; color: #1c1a16; white-space: nowrap;
     font-size: 6.4vw; line-height: 1.06; letter-spacing: -0.01em; font-weight: 400; }
   .stst.is-dark .stst-line { color: #f2efe6; }
@@ -191,12 +195,12 @@
     built.forEach(function(b, i) {
       var t0 = intro + i * slice;
       // Lines rise out of their masks, staggered -- the serif line-rise.
-      // 130 (not 118): the offset must exceed 100% PLUS the mask's descender
-      // bleed (1vw bottom padding ~= 30% of a 3.6vw chapter line's height),
+      // 145 (not 118): the offset must exceed 100% PLUS the mask's descender
+      // bleed (1.6vw bottom padding ~= 42% of a 3.6vw chapter line's height),
       // or the incoming line's cap tops peek through the bleed zone mid-roll.
-      gsap.set(b.lines, { yPercent: 130 });
-      // A statement is VISIBLE only for its own beat. Waiting (yPercent 130)
-      // and departed (-130) lines overhang their overflow mask by ~110px at
+      gsap.set(b.lines, { yPercent: 145 });
+      // A statement is VISIBLE only for its own beat. Waiting (yPercent 145)
+      // and departed (-145) lines overhang their overflow mask by ~110px at
       // full opacity -- invisible to the eye but a resting clipped-text
       // defect to the geometry gate. Hidden groups are skipped instead.
       gsap.set(b.group, { autoAlpha: 0 });
@@ -206,7 +210,7 @@
       // hide the group the moment the last line has left its mask.
       if (i < built.length - 1) {
         var outAt = t0 + slice - riseD * 0.7;
-        tl.to(b.lines, { yPercent: -130, duration: riseD * 0.8, ease: 'power3.in', stagger: 0.05 }, outAt);
+        tl.to(b.lines, { yPercent: -145, duration: riseD * 0.8, ease: 'power3.in', stagger: 0.05 }, outAt);
         tl.set(b.group, { autoAlpha: 0 }, outAt + riseD * 0.8 + 0.05 * Math.max(0, b.lines.length - 1) + 0.02);
       }
       // A whisper of drift while it holds (life, not distraction).
