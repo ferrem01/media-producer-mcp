@@ -6,11 +6,13 @@
   "data": {
     "title": {
       "type": "string",
-      "label": "Meeting title shown in the top bar (e.g. 'Demo — BrightLoop x Quotient')"
+      "label": "Meeting title shown in the top bar (e.g. 'Demo \u2014 BrightLoop x Quotient')"
     },
     "participants": {
       "type": "array",
-      "items": { "type": "object" },
+      "items": {
+        "type": "object"
+      },
       "label": "Two participants: {name, avatar_url?, initials?}. Without avatar_url a premium initials tile renders.",
       "optional": true
     },
@@ -31,13 +33,21 @@
     },
     "script": {
       "type": "array",
-      "items": { "type": "object" },
-      "label": "Timed actions: set-speaker {index, at}, show-caption {text, speaker, at, duration}, pulse-recorder {at}. Plus shared cursor actions.",
+      "items": {
+        "type": "object"
+      },
+      "label": "Timed actions: set-speaker {index, at}, show-caption {text, speaker?, label?, at, duration} (label overrides the bold CC attribution, e.g. 'Customer'), pulse-recorder {at}. Plus shared cursor actions.",
       "optional": true
     }
   },
   "match": {
-    "entry": { "x": 0.5, "y": 0.5 },
-    "exit": { "x": 0.84, "y": 0.76 }
+    "entry": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "exit": {
+      "x": 0.84,
+      "y": 0.76
+    }
   }
 }
