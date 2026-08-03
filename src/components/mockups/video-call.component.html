@@ -219,9 +219,14 @@
           // timeline construction, not playback) and revealed by tweens.
           var cap = document.createElement('div');
           cap.className = 'vcall-cap';
-          if (action.speaker != null && participants[action.speaker]) {
+          // Prefix: explicit role label ('Customer') beats the speaker's
+          // first name; either renders as the bold CC attribution.
+          var capLabel = action.label ||
+            (action.speaker != null && participants[action.speaker]
+              ? (participants[action.speaker].name || '').split(/\s+/)[0] : '');
+          if (capLabel) {
             var bb = document.createElement('b');
-            bb.textContent = (participants[action.speaker].name || '').split(/\s+/)[0] + ':';
+            bb.textContent = capLabel + ':';
             cap.appendChild(bb);
           }
           cap.appendChild(document.createTextNode(action.text || ''));
