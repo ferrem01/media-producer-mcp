@@ -356,7 +356,7 @@ If something looks wrong in a scene, get{target:'layout'} measures the real geom
 export async function queueBuildFromStoryboard(
   tenantId: string,
   projectId: string,
-  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "hype-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story"; max_revisions?: number } = {},
+  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "hype-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story"; max_revisions?: number; voiceover?: boolean; background_music?: boolean; voice?: string } = {},
 ): Promise<{ job: { id: string } } | { error: string } | null> {
   const project = await loadProject(tenantId, projectId);
   // Any project that HAS a storyboard rebuilds from it. Only 'rendering' is
@@ -377,6 +377,15 @@ export async function queueBuildFromStoryboard(
   // recording). Auto-TTS on top of it double-voices the film, and
   // auto-music fights the recording.
   const hasNarration = !!(project.speaker_track && project.speaker_track.clips && project.speaker_track.clips.length);
+  // TTS is opt-in, not a storyboard-build default: forcing `!hasNarration`
+  // here put phantom voiceover (and its ducking music double-add) on
+  // text-as-voiceover grammars like hype-cut/tempo-cut whose storyboards
+  // carry no VO lines at all. Default = "the storyboard actually wrote
+  // voiceover text"; an explicit opts.voiceover always wins.
+  const hasVoText = (project.storyboard.scenes || []).some(
+    (s: any) => typeof s.voiceover_text === "string" && s.voiceover_text.trim().length > 0);
+  const wantVoiceover = opts.voiceover ?? (hasVoText && !hasNarration);
+  const wantMusic = opts.background_music ?? !hasNarration;
   const job = queueJob("generate", tenantId, async (j) => {
     const trace = new TraceBuilder("generate", tenantId, "", storyboardPrompt);
     try {
@@ -393,9 +402,9 @@ export async function queueBuildFromStoryboard(
         film_grammar: opts.film_grammar,
         maxRevisions: opts.max_revisions,
         project_id: project.project_id,
-        voiceover: !hasNarration,
-        backgroundMusic: !hasNarration,
-        voice: project.storyboard!.audio.voice as any,
+        voiceover: wantVoiceover,
+        backgroundMusic: wantMusic,
+        voice: (opts.voice as any) || (project.storyboard!.audio.voice as any),
         sceneCount: project.storyboard!.scenes.length,
       });
 
@@ -409,6 +418,14 @@ export async function queueBuildFromStoryboard(
         if (generatedProject && origProject) {
           origProject.scenes = generatedProject.scenes;
           origProject.audio = generatedProject.audio;
+          // The working copy's audio tracks reference ITS project dir; the
+          // files are copied below, so retarget the sources or the original
+          // project plays (and later prunes) another project's files.
+          for (const tr of origProject.audio?.tracks || []) {
+            if (typeof (tr as any).source === "string") {
+              (tr as any).source = (tr as any).source.split(`/projects/${newProjectId}/`).join(`/projects/${projectId}/`);
+            }
+          }
           origProject.assets = generatedProject.assets;
           origProject.canvas = generatedProject.canvas;
           // Never WIPE a speaker track the user already attached: the
@@ -2292,6 +2309,9 @@ export function createMcpServer(): McpServer {
             creativity: params.creativity,
             film_grammar: params.film_grammar,
             max_revisions: params.max_revisions,
+            voiceover: params.voiceover,
+            background_music: params.background_music,
+            voice: params.voice,
           });
           if (sbBuild) {
             if ("error" in sbBuild) return err(sbBuild.error);

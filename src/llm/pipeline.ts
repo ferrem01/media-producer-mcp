@@ -3493,7 +3493,17 @@ async function runUnifiedPipeline(
             });
           }
 
+          // The music-first pass may already have attached the bed as
+          // "music_bed"; pushing a second "bgm" copy of the same song here
+          // stacked two music tracks (0.18 + 0.12 -- audibly "way too
+          // loud"). One music bed per film: reuse the existing track and
+          // only point ducking at it.
+          const existingMusic = project.audio.tracks.find((t: any) => t.type === "music");
+          if (track && existingMusic) {
+            console.log(`  Background music: bed already attached as "${existingMusic.id}" -- skipping duplicate, ducking against it`);
+          }
           if (track) {
+            if (!existingMusic) {
             console.log(`  Background music: "${track.title}" by ${track.artist} [${track.source}] (${track.duration}s)`);
 
             project.audio.tracks.push({
@@ -3509,8 +3519,9 @@ async function runUnifiedPipeline(
               fade_in: 2,
               fade_out: 3,
             });
+            }
 
-            if (beatMap) {
+            if (beatMap && !project.audio.beat_map) {
               project.audio.beat_map = {
                 bpm: beatMap.bpm,
                 beat_sec: beatMap.beatSec,
@@ -3532,7 +3543,7 @@ async function runUnifiedPipeline(
             // recovery between clips.
             project.audio.ducking = {
               enabled: true,
-              duck_track: "bgm",
+              duck_track: existingMusic ? (existingMusic as any).id : "bgm",
               trigger_track: "voiceover",
               ducked_volume: 0.35,
               attack: 0.3,
