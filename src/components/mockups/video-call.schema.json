@@ -1,0 +1,43 @@
+{
+  "type": "video-call",
+  "label": "Video Call (Zoom-style meeting)",
+  "category": "mockup",
+  "description": "A Zoom-style meeting in progress: two participant tiles with alternating active-speaker glow and animated speaking waveforms, meeting chrome (Recording pill, toolbar, timer), an optional caption line, and an AI notetaker bot tile (Fathom-style) with a pulsing REC badge docked in the grid. Use for 'the story starts on a call' beats: sales calls, demos, customer conversations that a recorder is capturing. Script it so the call is alive: speakers alternate, a caption or two lands, the recorder pulses when the story points at it.",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "Meeting title shown in the top bar (e.g. 'Demo — BrightLoop x Quotient')"
+    },
+    "participants": {
+      "type": "array",
+      "items": { "type": "object" },
+      "label": "Two participants: {name, avatar_url?, initials?}. Without avatar_url a premium initials tile renders.",
+      "optional": true
+    },
+    "recorder": {
+      "type": "object",
+      "label": "Notetaker bot tile: {name ('Fathom Notetaker'), icon_url?, status ('Recording')}. Defaults to Fathom.",
+      "optional": true
+    },
+    "timer": {
+      "type": "string",
+      "label": "Meeting elapsed time shown in the toolbar (e.g. '31:42')",
+      "optional": true
+    },
+    "first_speaker": {
+      "type": "number",
+      "label": "Index (0/1) of the participant speaking at scene start",
+      "optional": true
+    },
+    "script": {
+      "type": "array",
+      "items": { "type": "object" },
+      "label": "Timed actions: set-speaker {index, at}, show-caption {text, speaker, at, duration}, pulse-recorder {at}. Plus shared cursor actions.",
+      "optional": true
+    }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.5 },
+    "exit": { "x": 0.84, "y": 0.76 }
+  }
+}

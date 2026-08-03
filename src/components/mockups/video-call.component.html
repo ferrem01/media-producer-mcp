@@ -1,0 +1,243 @@
+<template>
+  <div class="vcall">
+    <div class="vcall-window">
+      <div class="vcall-top">
+        <span class="vcall-rec"><span class="vcall-rec-dot"></span>Recording</span>
+        <span class="vcall-title"></span>
+        <span class="vcall-view">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          View
+        </span>
+      </div>
+      <div class="vcall-grid"></div>
+      <div class="vcall-capzone"></div>
+      <div class="vcall-bar">
+        <div class="vcall-tools-left">
+          <div class="vcall-tool"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg><span>Mute</span></div>
+          <div class="vcall-tool"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg><span>Stop Video</span></div>
+        </div>
+        <div class="vcall-tools-mid">
+          <div class="vcall-tool"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Security</span></div>
+          <div class="vcall-tool"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Participants</span></div>
+          <div class="vcall-tool"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Chat</span></div>
+          <div class="vcall-tool vcall-share"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M12 13V7m-3 3 3-3 3 3M8 21h8"/></svg><span>Share Screen</span></div>
+          <div class="vcall-tool"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/></svg><span>Record</span></div>
+        </div>
+        <div class="vcall-tools-right">
+          <span class="vcall-timer"></span>
+          <div class="vcall-end">End</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── video-call: a Zoom-style meeting in progress. Two people talking
+     (active-speaker glow alternates) plus the story prop: an AI notetaker
+     bot tile with a pulsing REC badge. Dark meeting chrome, toolbar,
+     caption line. All script state lives ON the timeline (scrub-safe). */
+  .vcall { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .vcall-window { width: 96%; height: 96%; background: #0d0d12; border-radius: 12px;
+    box-shadow: 0 24px 70px rgba(0,0,0,0.5); overflow: hidden; display: flex; flex-direction: column;
+    font-family: 'Inter', -apple-system, sans-serif; position: relative; }
+  .vcall-top { height: 42px; flex-shrink: 0; display: flex; align-items: center; padding: 0 16px;
+    color: #d5d5dc; font-size: 12.5px; background: #17171d; }
+  .vcall-rec { display: flex; align-items: center; gap: 7px; color: #f0f0f4;
+    background: rgba(255,255,255,0.07); border-radius: 6px; padding: 5px 10px; font-weight: 600; }
+  .vcall-rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #e0473d; }
+  .vcall-title { flex: 1; text-align: center; color: #b9b9c2; font-weight: 500; }
+  .vcall-view { display: flex; align-items: center; gap: 6px; color: #b9b9c2;
+    background: rgba(255,255,255,0.05); border-radius: 6px; padding: 5px 10px; }
+  .vcall-grid { flex: 1; min-height: 0; display: flex; gap: 10px; padding: 12px; position: relative; }
+  .vcall-tile { flex: 1; border-radius: 10px; position: relative; overflow: hidden; background: #1c1c24;
+    border: 2px solid #4a4a58; }
+  .vcall-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .vcall-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .vcall-fallback .vcall-ava { width: 26%; aspect-ratio: 1; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 3.2vw; font-weight: 700; color: rgba(255,255,255,0.92); }
+  .vcall-glow { position: absolute; inset: 0; border: 3px solid #34a853; border-radius: 10px;
+    box-shadow: inset 0 0 34px rgba(52,168,83,0.25); pointer-events: none; }
+  .vcall-nametag { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 7px;
+    background: rgba(10,10,14,0.72); border-radius: 6px; padding: 5px 10px;
+    color: #f2f2f6; font-size: 13px; font-weight: 600; }
+  .vcall-nametag svg { flex-shrink: 0; }
+  .vcall-wave { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
+  .vcall-wave span { width: 3px; background: #34a853; border-radius: 2px; height: 4px; }
+  /* Recorder bot tile: compact, docked bottom-right of the grid */
+  .vcall-bot { position: absolute; right: 22px; bottom: 22px; width: 220px; border-radius: 10px;
+    background: #f7f7fb; padding: 12px 14px; display: flex; align-items: center; gap: 11px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45); }
+  .vcall-bot img { width: 34px; height: 34px; border-radius: 8px; object-fit: contain; background: #fff; }
+  .vcall-bot-name { font-size: 12.5px; font-weight: 700; color: #17171c; line-height: 1.25; }
+  .vcall-bot-sub { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #c2372e; }
+  .vcall-bot-dot { width: 7px; height: 7px; border-radius: 50%; background: #e0473d; }
+  .vcall-capzone { position: absolute; left: 0; right: 0; bottom: 76px; display: flex; justify-content: center;
+    pointer-events: none; }
+  .vcall-cap { position: absolute; bottom: 0; max-width: 72%; background: rgba(8,8,12,0.82);
+    color: #f4f4f8; font-size: 15.5px; line-height: 1.45; padding: 9px 16px; border-radius: 8px;
+    text-align: center; }
+  .vcall-cap b { color: #8ab4f8; font-weight: 700; margin-right: 6px; }
+  .vcall-bar { height: 64px; flex-shrink: 0; background: #17171d; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 14px; }
+  .vcall-tools-left, .vcall-tools-mid, .vcall-tools-right { display: flex; align-items: center; gap: 4px; }
+  .vcall-tool { display: flex; flex-direction: column; align-items: center; gap: 3px; color: #c9c9d2;
+    padding: 6px 11px; border-radius: 8px; }
+  .vcall-tool span { font-size: 9.5px; }
+  .vcall-share { color: #23d366; }
+  .vcall-timer { color: #9a9aa4; font-size: 12.5px; margin-right: 12px; font-variant-numeric: tabular-nums; }
+  .vcall-end { background: #e0473d; color: #fff; font-size: 12.5px; font-weight: 600;
+    border-radius: 8px; padding: 8px 18px; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var win = q('.vcall-window');
+    var grid = q('.vcall-grid');
+    var dur = ctx.duration || 5;
+
+    q('.vcall-title').textContent = data.title || 'Weekly demo call';
+    q('.vcall-timer').textContent = data.timer || '31:42';
+
+    var AVA_GRADS = [
+      'linear-gradient(135deg, #4c5aa8, #7a4ca8)',
+      'linear-gradient(135deg, #a8632f, #a83f57)',
+    ];
+    var participants = (data.participants && data.participants.length ? data.participants : [
+      { name: 'Sarah Chen', initials: 'SC' },
+      { name: 'Marcus Webb', initials: 'MW' },
+    ]).slice(0, 2);
+
+    // Build tiles ONCE at build; every later state change is a timeline tween.
+    var tiles = participants.map(function(p, i) {
+      var tile = document.createElement('div');
+      tile.className = 'vcall-tile';
+      if (p.avatar_url) {
+        var img = document.createElement('img');
+        img.src = p.avatar_url;
+        img.onerror = function() { this.remove(); };
+        tile.appendChild(img);
+      } else {
+        var fb = document.createElement('div');
+        fb.className = 'vcall-fallback';
+        fb.style.background = 'radial-gradient(ellipse at 50% 30%, #262630, #14141a)';
+        var ava = document.createElement('div');
+        ava.className = 'vcall-ava';
+        ava.style.background = AVA_GRADS[i % AVA_GRADS.length];
+        ava.textContent = p.initials || (p.name || '?').split(/\s+/).map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+        fb.appendChild(ava);
+        tile.appendChild(fb);
+      }
+      var glow = document.createElement('div');
+      glow.className = 'vcall-glow';
+      tile.appendChild(glow);
+      var tag = document.createElement('div');
+      tag.className = 'vcall-nametag';
+      var wave = document.createElement('span');
+      wave.className = 'vcall-wave';
+      for (var b = 0; b < 4; b++) wave.appendChild(document.createElement('span'));
+      tag.appendChild(wave);
+      var nm = document.createElement('span');
+      nm.textContent = p.name || 'Guest';
+      tag.appendChild(nm);
+      tile.appendChild(tag);
+      grid.appendChild(tile);
+      return { tile: tile, glow: glow, wave: wave };
+    });
+
+    // Recorder bot tile
+    var rec = data.recorder || {};
+    var bot = document.createElement('div');
+    bot.className = 'vcall-bot';
+    var bimg = document.createElement('img');
+    bimg.src = rec.icon_url || 'https://img.logo.dev/fathom.video?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=64&fallback=monogram';
+    bimg.onerror = function() { this.remove(); };
+    bot.appendChild(bimg);
+    var bcol = document.createElement('div');
+    var bname = document.createElement('div');
+    bname.className = 'vcall-bot-name';
+    bname.textContent = rec.name || 'Fathom Notetaker';
+    var bsub = document.createElement('div');
+    bsub.className = 'vcall-bot-sub';
+    var bdot = document.createElement('span');
+    bdot.className = 'vcall-bot-dot';
+    bsub.appendChild(bdot);
+    bsub.appendChild(document.createTextNode(rec.status || 'Recording'));
+    bcol.appendChild(bname);
+    bcol.appendChild(bsub);
+    bot.appendChild(bcol);
+    grid.appendChild(bot);
+
+    // ── Ambient life, all on the master timeline (deterministic per frame) ──
+    // REC dots blink; speaking waveform bars bounce; avatar breathing.
+    var period = 1.1;
+    var reps = Math.max(1, Math.ceil(dur / period));
+    [q('.vcall-rec-dot'), bdot].forEach(function(d) {
+      tl.fromTo(d, { opacity: 1 }, { opacity: 0.25, duration: period / 2, yoyo: true, repeat: reps * 2, ease: 'sine.inOut' }, 0);
+    });
+    tiles.forEach(function(t, i) {
+      var bars = t.wave.children;
+      for (var b2 = 0; b2 < bars.length; b2++) {
+        tl.fromTo(bars[b2], { height: 3 + (b2 % 2) * 2 }, {
+          height: 9 + ((b2 + i) % 3) * 3, duration: 0.28 + (b2 % 3) * 0.07,
+          yoyo: true, repeat: Math.ceil(dur / 0.3), ease: 'sine.inOut',
+        }, 0);
+      }
+      var face = t.tile.querySelector('img') || t.tile.querySelector('.vcall-fallback');
+      if (face) tl.fromTo(face, { scale: 1.015 }, { scale: 1.05, duration: dur, ease: 'sine.inOut' }, 0);
+    });
+
+    // Active speaker: glow overlays crossfade on the timeline.
+    var first = (data.first_speaker != null ? data.first_speaker : 0);
+    tiles.forEach(function(t, i) { gsap.set(t.glow, { autoAlpha: i === first ? 1 : 0 }); });
+
+    // ── Entrance ──
+    gsap.set(win, { autoAlpha: 0, scale: 0.985 });
+    tl.to(win, { autoAlpha: 1, scale: 1, duration: 0.35, ease: 'power2.out' }, 0.05);
+    gsap.set(bot, { autoAlpha: 0, y: 10 });
+    tl.to(bot, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' }, 0.5);
+
+    // ── Script actions ──
+    var capzone = q('.vcall-capzone');
+    if (Array.isArray(data.script) && data.script.length) {
+      var cursorTargets = data.cursor_targets || {
+        'recorder': { x: '84%', y: '76%' },
+        'end': { x: '94%', y: '95%' },
+      };
+      runScript(tl, el, data.script, cursorTargets, ctx, {
+        'set-speaker': function(tl2, ctr, action, at) {
+          var idx = action.index || 0;
+          tiles.forEach(function(t, i) {
+            tl2.to(t.glow, { autoAlpha: i === idx ? 1 : 0, duration: 0.25, ease: 'power2.out' }, at);
+          });
+        },
+        'show-caption': function(tl2, ctr, action, at) {
+          // Caption nodes are created at BUILD (this handler runs during
+          // timeline construction, not playback) and revealed by tweens.
+          var cap = document.createElement('div');
+          cap.className = 'vcall-cap';
+          if (action.speaker != null && participants[action.speaker]) {
+            var bb = document.createElement('b');
+            bb.textContent = (participants[action.speaker].name || '').split(/\s+/)[0] + ':';
+            cap.appendChild(bb);
+          }
+          cap.appendChild(document.createTextNode(action.text || ''));
+          capzone.appendChild(cap);
+          gsap.set(cap, { autoAlpha: 0, y: 8 });
+          var hold = action.duration || 2.2;
+          tl2.to(cap, { autoAlpha: 1, y: 0, duration: 0.25, ease: 'power2.out' }, at);
+          tl2.to(cap, { autoAlpha: 0, duration: 0.2, ease: 'power2.in' }, at + hold);
+        },
+        'pulse-recorder': function(tl2, ctr, action, at) {
+          tl2.fromTo(bot, { scale: 1 }, { scale: 1.06, duration: 0.28, ease: 'power2.out' }, at);
+          tl2.to(bot, { scale: 1, duration: 0.3, ease: 'back.out(2)' }, at + 0.3);
+        },
+      });
+    }
+
+    return tl;
+  }
+</script>

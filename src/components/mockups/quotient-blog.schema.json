@@ -1,0 +1,26 @@
+{
+  "type": "quotient-blog",
+  "label": "Quotient Blog (document view)",
+  "category": "mockup",
+  "description": "The Quotient blog document view, matched to the real app: left nav (Blog active), breadcrumb top bar with search + New Chat, doc header row (Last updated, campaign chip, Threads, Draft/Published status pill), hero image, title + dek, Authors/Slug/Tags/Publish Date meta rows, word count, and body prose. The 'publish-blog' script action flips the header pill from Draft to the green rocket Published state -- the blog's money beat. Also scroll-doc and highlight-hero. Use for 'the blog ships' payoffs and any beat set on a Quotient blog post.",
+  "data": {
+    "title": { "type": "string", "label": "Blog title (H1 + breadcrumb)" },
+    "dek": { "type": "string", "label": "Standfirst paragraph under the title", "optional": true },
+    "hero_url": { "type": "string", "label": "Hero image URL (16:9 crop)", "optional": true },
+    "campaign": { "type": "string", "label": "Campaign chip + breadcrumb segment (e.g. 'Weekly Blog Post')", "optional": true },
+    "status": { "type": "string", "label": "'draft' (default) or 'published' at scene start", "optional": true },
+    "published_when": { "type": "string", "label": "Text after 'Published' on the pill (e.g. 'just now')", "optional": true },
+    "authors": { "type": "array", "items": { "type": "object" }, "label": "[{name, avatar_url?}]", "optional": true },
+    "slug": { "type": "string", "label": "URL slug (defaults from title)", "optional": true },
+    "tags": { "type": "array", "items": { "type": "string" }, "label": "Tag chips", "optional": true },
+    "publish_date": { "type": "string", "label": "Publish date meta value", "optional": true },
+    "word_count": { "type": "number", "label": "Word count shown above the body", "optional": true },
+    "body": { "type": "array", "items": { "type": "object" }, "label": "Body blocks: [{type: 'p'|'h2', text}]", "optional": true },
+    "last_updated": { "type": "string", "label": "'Last updated:' text (default 'just now')", "optional": true },
+    "threads_count": { "type": "number", "label": "Threads chip count (default 2)", "optional": true },
+    "user": { "type": "object", "label": "Sidebar footer user: {name, email, avatar_url?}", "optional": true },
+    "active_nav": { "type": "string", "label": "Active nav item (default 'Blog')", "optional": true },
+    "script": { "type": "array", "items": { "type": "object" }, "label": "Timed actions: publish-blog {at, published_when?}, highlight-hero {at}, scroll-doc {at, amount, duration}. Cursor targets: 'status', 'hero'.", "optional": true }
+  },
+  "match": { "entry": { "x": 0.5, "y": 0.5 }, "exit": { "x": 0.93, "y": 0.12 } }
+}
