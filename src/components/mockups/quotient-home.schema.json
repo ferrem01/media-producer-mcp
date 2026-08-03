@@ -21,19 +21,34 @@
     },
     "chips": {
       "type": "array",
-      "items": { "type": "object" },
+      "items": {
+        "type": "object"
+      },
       "label": "Category chips: {label, icon: megaphone|calendar|pen|share|search|trend|rocket}. Defaults to Quotient's seven.",
       "optional": true
     },
     "script": {
       "type": "array",
-      "items": { "type": "object" },
+      "items": {
+        "type": "object"
+      },
       "label": "Timed actions: type-message {text, at, speed}, send-message {at}, highlight-chip {label, at}.",
+      "optional": true
+    },
+    "logo_url": {
+      "type": "string",
+      "label": "Logo image URL for the orb. Defaults to the real Quotient app icon (logo.dev).",
       "optional": true
     }
   },
   "match": {
-    "entry": { "x": 0.5, "y": 0.5 },
-    "exit": { "x": 0.5, "y": 0.62 }
+    "entry": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "exit": {
+      "x": 0.5,
+      "y": 0.62
+    }
   }
 }
