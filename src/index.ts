@@ -1261,6 +1261,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "no-store",
         });
         res.end(html);
         return;
@@ -1299,6 +1300,9 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Access-Control-Allow-Origin": "*",
+          // Freshly assembled every request; a cached copy silently pins old
+          // component code after a deploy (the "Studio still shows the bug" trap).
+          "Cache-Control": "no-store",
         });
         res.end(html);
         return;
