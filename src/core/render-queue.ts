@@ -172,6 +172,9 @@ async function runRender(
       extraComponentDirs: [path.join(projectDir(job.tenantId, projectId), "components")],
       outputPath,
       audioOnly: options?.audioOnly,
+      onProgress: (percent, detail) => {
+        job.progress = { step: detail || "rendering", percent };
+      },
     };
 
     const result = await renderProjectCore(renderOpts);
