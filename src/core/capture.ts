@@ -150,6 +150,16 @@ async function prepareCaptureHtml(
     .replace(/url\((["']?)(\/assets\/[^"')]+)\1\)/gi, (m, q, url) => {
       const p = resolveExisting(url);
       return p ? `url(${q}file://${p}${q})` : m;
+    })
+    // Component DATA refs ("image_url":"/assets/...") are assigned to img.src
+    // at RUNTIME, so the attribute rewrites above never see them and the img
+    // 404s under file:// (thumbnails showed the component's error fallback).
+    // Same match + lookbehind as convertAssetUrlsInHtml: the excluded chars
+    // keep the inner ".../assets/" segment of an already-rewritten file://
+    // path from matching again.
+    .replace(/(?<![A-Za-z0-9_\-./%:])\/assets\/[A-Za-z0-9_\-./%]+/g, (m) => {
+      const p = resolveExisting(m);
+      return p ? `file://${p}` : m;
     });
   if (rewritten === raw) return passthrough;
 
