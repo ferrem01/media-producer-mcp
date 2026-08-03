@@ -1835,6 +1835,9 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         const gsRes = await queueBuildFromStoryboard(gsTenant, gsProject, {
           film_grammar: gsBody?.film_grammar,
           max_revisions: gsBody?.max_revisions,
+          voiceover: typeof gsBody?.voiceover === "boolean" ? gsBody.voiceover : undefined,
+          background_music: typeof gsBody?.background_music === "boolean" ? gsBody.background_music : undefined,
+          voice: gsBody?.voice,
         });
         if (!gsRes) { jsonResponse(res, 400, { error: "Project has no storyboard to build from (or is mid-render)." }); return; }
         if ("error" in gsRes) { jsonResponse(res, 500, { error: gsRes.error }); return; }
