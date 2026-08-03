@@ -2390,3 +2390,29 @@ six scenes fully clean; 4 unresolved findings total (series: 15 -> 5 -> 8 ->
   white -- the light class seemingly never applied), but the EXACT scene
   data + code measures CLEAN in local repro. Unreproduced; left open rather
   than guessed at. Watch the next close scene.
+
+## hype-cut: the seventh grammar (distilled from the Cowork x Quotient film)
+
+The "Word for Word" film (proj_bf247f37) started as a tempo-cut and was
+directed, note by note, into something tempo-cut forbids: seven one-bar
+st-statement interstitials woven BETWEEN product beats (tempo-cut law:
+"never a statement slide mid-film"), a premise-first type cold open, all
+Cowork beats carrying one continuous session transcript, a typed follow-up
+ask escalating the story into a second act, and a cursor click inside the
+session driving the cut into the payoff app. That is editorial's
+statement/evidence alternation at tempo-cut's bar-quantized pace -- a
+distinct dialect, not a tuning: "the words hype what the product proves."
+Registered as film_grammar "hype-cut" (director row + storyboard contract +
+component-first creativity clamp + music-first default + generate-tool
+enum). Reference cut: proj_bf247f37, 15 scenes / 49.7s.
+
+Two of the film's lessons were NOT new-grammar material and landed as
+defaults instead:
+- tempo-cut gains CONTINUITY OF STATE (consecutive scenes on the same
+  surface resume state via history/start_scrolled, never reset) -- the
+  "looks like separate scenes, not one continuous video" complaint predates
+  this film and was a contract gap, not a dialect difference.
+- The text-as-voiceover strip now covers tempo-cut/hype-cut/editorial too
+  (backlog #49): proj_bf247f37 shipped EIGHT baked voiceover tracks reading
+  its scene LABELS out loud because the strip only covered
+  social-reel/data-story.

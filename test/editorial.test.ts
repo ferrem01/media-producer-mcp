@@ -68,7 +68,7 @@ describe("editorial film grammar", () => {
   it("pipeline: editorial is component-first and music-first by default (source guards)", async () => {
     const p = await read("../src/llm/pipeline.ts");
     expect(p).toContain('filmGrammar === "editorial"');
-    expect(p).toContain('filmGrammar === "tempo-cut" || filmGrammar === "editorial"');
+    expect(p).toContain('filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial"');
   });
 
   it("generate tool accepts the grammar", async () => {

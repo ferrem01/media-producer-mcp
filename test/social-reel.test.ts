@@ -34,7 +34,7 @@ describe("social-reel grammar registration", () => {
   it("gets the component-first policy and the music-first spine", async () => {
     const src = await read("../src/llm/pipeline.ts");
     expect(src).toMatch(/filmGrammar === "social-reel" && opts\.creativity === undefined/);
-    expect(src).toMatch(/filmGrammar === "tempo-cut" \|\| filmGrammar === "editorial" \|\| filmGrammar === "social-reel"/);
+    expect(src).toMatch(/filmGrammar === "tempo-cut" \|\| filmGrammar === "hype-cut" \|\| filmGrammar === "editorial" \|\| filmGrammar === "social-reel"/);
   });
 
   it("enforces the format's length in code, not just in the contract", async () => {
@@ -52,7 +52,7 @@ describe("social-reel grammar registration", () => {
 
   it("is exposed on the generate tool and defaults the canvas vertical", async () => {
     const src = await read("../src/server.ts");
-    expect(src).toMatch(/"launch-film", "tempo-cut", "speaker-screencast", "editorial", "social-reel"/);
+    expect(src).toMatch(/"launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel"/);
     expect(src).toMatch(/film_grammar === "social-reel"[\s\S]{0,120}width: 1080, height: 1920/);
     expect(src).toContain("social-reel -- vertical 9:16"); // operator playbook
   });

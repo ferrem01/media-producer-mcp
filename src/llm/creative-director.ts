@@ -32,9 +32,9 @@ import {
  *  cross-cutting -- who narrates, what earns a cut, the music's role, the
  *  camera policy, and how scenes are assembled. Components (L1), scene
  *  templates (L2) and scenes/beats (L3) all live INSIDE one of these. */
-export type FilmGrammar = "launch-film" | "tempo-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story";
+export type FilmGrammar = "launch-film" | "tempo-cut" | "hype-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story";
 
-export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "speaker-screencast", "editorial", "social-reel", "data-story"];
+export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story"];
 
 export interface ConceptDirectorOpts {
   prompt: string;
@@ -116,6 +116,7 @@ Every film commits to exactly ONE grammar. It is not a mood -- it is the contrac
 
 - "launch-film" (the default): few long WORLDS with 3-6 beats inside each, dark-forward cinematic look, density arcs, throws/stamps, crossfades earned at world changes. For brand films, launches, and emotional arcs that need breath.
 - "tempo-cut": the HeyGen-explainer dialect. A driving music bed picked FIRST, 6-9 hard cuts in 30-45s each quantized to the track's bars, ONE thought per cut, on-screen type IS the voiceover (no narrator, no statement slides mid-film), evidence appears as DETAIL CUTS (one cropped element huge -- an isolated composer typing the ask -- not a whole miniaturized app), captions at display scale BESIDE windows, one brand accent, at most one gag (a prop-strike card). Scenes are assembled from the component kit, not custom codegen. For product explainers, connector demos, and launch clips that should feel fast, confident, music-driven. The story must be told through the REAL product surfaces (the library's product mocks), never through invented abstractions.
+- "hype-cut": the story-first hype dialect -- tempo-cut's edit driving editorial's alternation: the words HYPE, the product PROVES. A driving bed picked FIRST; ONE-BAR kinetic type interstitials (st-statement at hype pace -- premise lines, reactions, turns) alternate with LONGER product beats (2-6 bars) where the library's named product mocks PERFORM a single use-case story. The film opens PREMISE-FIRST (1-2 type beats set the stakes before any product pixel); the product beats form ONE CONTINUOUS story-world (the same session carries its transcript and state across every cut back to it -- never reset); the story escalates in TWO ACTS (first payoff, then the user asks for more in-product, then the bigger payoff); and the cut into the payoff surface is CAUSED on screen (the cursor clicks the link that becomes the next scene). For product-story hype films, MCP/integration demos, and launch clips where a use-case narrative -- not a feature run -- is the argument. Reference cut: the "Word for Word" Cowork x Quotient film (proj_bf247f37).
 - "speaker-screencast": a human on camera owns the film. The speaker video is the base layer and THE CLOCK -- cuts and content entrances follow the speaker's sentences, overlays dock in a content region beside the speaker or take over with the speaker in PiP, the human voice narrates (no text-as-VO), music absent or ducked far under the voice. Only choose it when a speaker recording exists.
 - "editorial": the typography-first manifesto dialect. The story is told in huge display-SERIF statements on a warm cream (or near-black) canvas -- one thought per beat, ONE word per statement emphasized in gradient italic -- ALTERNATING with full-bleed evidence beats (a motion demo, a product surface, a chart) that prove the statement just made. Statement / evidence / statement / evidence. Deliberate canvas-temperature flips (cream <-> dark) at chapter turns are part of the rhythm. Music: a restrained bed. For thought-leadership clips, launch manifestos, "why we built this" films, and library/catalog showcases -- anywhere the WORDS are the product.
 - "social-reel": the vertical feed dialect (9:16, 15-30s TOTAL). The FORMAT carries the film: a HOOK beat in the first 2 seconds (a bold claim or question in giant type -- the thumb-stopper), 3-5 escalation beats that each pay off the hook a little more, one payoff beat, and a LOOP SEAM (the closing frame composes into the opening frame so the loop replays cleanly). Captions ARE the voiceover at display scale; every beat composes for a vertical phone held in one hand -- content stacked in the middle band, top ~12% and bottom ~18% left clear for platform UI. One brand accent, driving music, hard cuts. For Reels/Shorts/TikTok product moments, feature drops, and social announcements -- anywhere the film ships to a feed. sceneCount for this dialect counts BEATS: hook + each escalation + payoff are separate scenes, so commit to 6-9 -- a sceneCount of 3 contradicts the shape and deadlocks the storyboard.
@@ -147,7 +148,9 @@ per scene. Scene counts: 1-2 for short-form (12-20s), 3-4 for standard (30-60s),
 a deep dive (60-120s). Each scene carries 3-6 beats; a 30-45s film is typically an
 opening world, one or two long living middles (12-18s each), and a closing world.
 EXCEPTION: a TEMPO-CUT film inverts this -- set sceneCount to 6-9, each scene one short
-thought (2-5 bars), because in that grammar the cut itself is the rhythm instrument.
+thought (2-5 bars), because in that grammar the cut itself is the rhythm instrument. A
+HYPE-CUT film inverts it further: 10-16 scenes, alternating one-bar type interstitials
+with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
 
 ## Output Format (valid JSON, no markdown fences)
 

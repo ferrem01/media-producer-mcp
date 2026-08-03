@@ -314,11 +314,12 @@ BEFORE GENERATING
 - FILM GRAMMARS (the film's dialect; pass film_grammar to pin one, omit to let the creative director choose):
   * launch-film -- few long cinematic scenes, one continuous world. Expansive brand moments.
   * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover. Fast, confident explainers.
+  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats that form ONE continuous scripted session; premise-first open, two-act escalation, a click inside the product drives the cut into the payoff app. For use-case narratives (MCP/integration demos).
   * editorial -- typography-first manifesto: huge serif statements alternating with full-bleed evidence. The words are the product.
   * social-reel -- vertical 9:16, 15-30s: hook in the first 2 seconds, caption-scale type, escalation beats, a loop seam.
   * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene up to the money number. Figures come from the brief, never invented.
   * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never choose it without one.
-  Rule of thumb: the product argues (tempo-cut) vs. the words (editorial) vs. the numbers (data-story) vs. one cinematic world (launch-film) vs. a person on camera (speaker-screencast) vs. the feed format (social-reel). If their answer doesn't pick one, relay the choice in these terms.
+  Rule of thumb: the product argues (tempo-cut) vs. the words hype what the product proves (hype-cut) vs. the words (editorial) vs. the numbers (data-story) vs. one cinematic world (launch-film) vs. a person on camera (speaker-screencast) vs. the feed format (social-reel). If their answer doesn't pick one, relay the choice in these terms.
 - Brand comes from the tenant's brand kit. No kit yet? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
 - A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and assembles the film automatically.
 
@@ -355,7 +356,7 @@ If something looks wrong in a scene, get{target:'layout'} measures the real geom
 export async function queueBuildFromStoryboard(
   tenantId: string,
   projectId: string,
-  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story"; max_revisions?: number } = {},
+  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "hype-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story"; max_revisions?: number } = {},
 ): Promise<{ job: { id: string } } | { error: string } | null> {
   const project = await loadProject(tenantId, projectId);
   // Any project that HAS a storyboard rebuilds from it. Only 'rendering' is
@@ -2093,7 +2094,7 @@ export function createMcpServer(): McpServer {
       canvas_width: z.number().optional().describe("Explicit canvas width. For images, auto-inferred from prompt if omitted."),
       canvas_height: z.number().optional().describe("Explicit canvas height. For images, auto-inferred from prompt if omitted."),
       creativity: z.number().min(0).max(1).optional().describe("Creativity level 0-1. Low (0) prefers library components. High (0.7-1.0) creates one self-contained custom component per scene. Default: 0.5."),
-      film_grammar: z.enum(["launch-film", "tempo-cut", "speaker-screencast", "editorial", "social-reel", "data-story"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. social-reel: vertical 9:16 feed film, 15-30s, hook-first with caption-scale type and a loop seam (canvas defaults to vertical). data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. Omit to let the creative director choose."),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. social-reel: vertical 9:16 feed film, 15-30s, hook-first with caption-scale type and a loop seam (canvas defaults to vertical). data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. Omit to let the creative director choose."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
       voiceover: z.boolean().optional().describe("Generate TTS voiceover narration for each scene (default: false)"),
