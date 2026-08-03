@@ -1,0 +1,274 @@
+<template>
+  <div class="qcn">
+    <div class="qcn-window">
+      <div class="qcn-side">
+        <div class="qcn-back">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5m7-7-7 7 7 7"/></svg>
+          Back to app
+        </div>
+        <div class="qcn-navsec">Workspace</div>
+        <div class="qcn-nav" data-nav="General"></div>
+        <div class="qcn-nav" data-nav="Brand"></div>
+        <div class="qcn-nav" data-nav="Users"></div>
+        <div class="qcn-nav" data-nav="Integrations"></div>
+        <div class="qcn-nav" data-nav="MCP Servers"></div>
+        <div class="qcn-nav" data-nav="Social Accounts"></div>
+        <div class="qcn-nav" data-nav="Email Settings"></div>
+        <div class="qcn-nav" data-nav="Custom Properties"></div>
+        <div class="qcn-nav" data-nav="Background Jobs"></div>
+        <div class="qcn-nav" data-nav="Developers"></div>
+        <div class="qcn-navsec">Billing &amp; Usage</div>
+        <div class="qcn-nav" data-nav="Plan"></div>
+        <div class="qcn-nav" data-nav="Usage"></div>
+        <div class="qcn-navsec">Personal</div>
+        <div class="qcn-nav" data-nav="Profile"></div>
+        <div class="qcn-nav" data-nav="Notifications"></div>
+      </div>
+      <div class="qcn-main">
+        <div class="qcn-scroll">
+          <h1 class="qcn-h1">MCP Servers</h1>
+          <p class="qcn-sub">Connect external tools and services for Quotient to use on your behalf.</p>
+          <div class="qcn-seclbl qcn-connected-lbl">Connected</div>
+          <div class="qcn-list qcn-connected"></div>
+          <div class="qcn-seclbl">Marketplace</div>
+          <div class="qcn-list qcn-marketplace"></div>
+        </div>
+      </div>
+      <div class="qcn-shade"></div>
+      <div class="qcn-modal">
+        <img class="qcn-modal-logo" alt="">
+        <div class="qcn-modal-title"></div>
+        <div class="qcn-modal-text"></div>
+        <div class="qcn-modal-btns">
+          <div class="qcn-btn qcn-btn-ghost">Cancel</div>
+          <div class="qcn-btn qcn-btn-dark" data-anchor="allow">Authorize</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── quotient-connect: Quotient's MCP Servers settings screen, matched to
+     the real app (settings sidebar, Connected rows with status pills,
+     Marketplace rows with chevrons, OAuth authorize modal). The connect
+     flow is fully scripted and scrub-safe: modal visibility and the
+     Connected pill flip live ON the timeline. */
+  .qcn { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .qcn-window { width: 97%; height: 96%; background: #fdfdfd; border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(23,23,28,0.18); overflow: hidden; display: flex; position: relative;
+    font-family: 'Inter', -apple-system, sans-serif; }
+  .qcn-side { width: 218px; flex-shrink: 0; background: #fbfafd; border-right: 2px solid #e3e1ea;
+    padding: 16px 12px; overflow: hidden; }
+  .qcn-back { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600;
+    color: #35333c; padding: 6px 8px; margin-bottom: 14px; }
+  .qcn-navsec { font-size: 11px; font-weight: 600; color: #a09db0; padding: 10px 8px 4px;
+    letter-spacing: 0.02em; }
+  .qcn-nav { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 500;
+    color: #4b4954; padding: 6.5px 8px; border-radius: 8px; white-space: nowrap; }
+  .qcn-nav svg { flex-shrink: 0; opacity: 0.75; }
+  .qcn-nav.is-active { background: #ecebf8; color: #17171c; font-weight: 600; }
+  .qcn-main { flex: 1; min-width: 0; display: flex; justify-content: center; overflow: hidden; }
+  .qcn-scroll { width: min(720px, 88%); padding: 34px 0 30px; overflow: hidden; }
+  .qcn-h1 { font-size: 25px; font-weight: 700; color: #17171c; margin: 0 0 6px; }
+  .qcn-sub { font-size: 14.5px; color: #6f6c7a; margin: 0 0 22px; }
+  .qcn-seclbl { font-size: 14.5px; font-weight: 500; color: #6b6875; margin: 14px 0 4px; }
+  .qcn-row { display: flex; align-items: center; gap: 14px; padding: 14px 6px;
+    border-bottom: 1px solid #f0eff3; position: relative; border-radius: 8px; }
+  .qcn-logo { width: 38px; height: 38px; border-radius: 9px; object-fit: contain; background: #fff;
+    border: 1px solid #f0eff3; flex-shrink: 0; }
+  .qcn-info { flex: 1; min-width: 0; }
+  .qcn-name { font-size: 15.5px; font-weight: 600; color: #17171c; line-height: 1.35; }
+  .qcn-desc { font-size: 13.5px; color: #77747f; line-height: 1.4; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .qcn-chev { color: #b4b1bd; font-size: 18px; flex-shrink: 0; }
+  .qcn-pill { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600;
+    border: 1px solid #e6e4ea; border-radius: 999px; padding: 5px 12px; flex-shrink: 0; }
+  .qcn-pill-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .qcn-pill.is-ok { color: #2f3b31; } .qcn-pill.is-ok .qcn-pill-dot { background: #34a853; }
+  .qcn-pill.is-fail { color: #4a3230; } .qcn-pill.is-fail .qcn-pill-dot { background: #dd4b39; }
+  .qcn-pill.is-pend { color: #4a4030; } .qcn-pill.is-pend .qcn-pill-dot { background: #e8a03c; }
+  .qcn-kebab { color: #9a97a4; font-weight: 700; padding: 0 4px; flex-shrink: 0; }
+  /* OAuth modal (prebuilt, revealed on the timeline) */
+  .qcn-shade { position: absolute; inset: 0; background: rgba(20,19,27,0.35); visibility: hidden; opacity: 0; }
+  .qcn-modal { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%);
+    width: 380px; background: #fff; border-radius: 14px; box-shadow: 0 30px 80px rgba(23,23,28,0.3);
+    padding: 26px 26px 22px; text-align: center; visibility: hidden; opacity: 0; }
+  .qcn-modal-logo { width: 52px; height: 52px; border-radius: 12px; object-fit: contain;
+    border: 1px solid #f0eff3; margin: 0 auto 12px; display: block; }
+  .qcn-modal-title { font-size: 17px; font-weight: 700; color: #17171c; margin-bottom: 7px; }
+  .qcn-modal-text { font-size: 13.5px; color: #6f6c7a; line-height: 1.5; margin-bottom: 18px; }
+  .qcn-modal-btns { display: flex; gap: 10px; justify-content: center; }
+  .qcn-btn { font-size: 13.5px; font-weight: 600; border-radius: 9px; padding: 9px 20px; }
+  .qcn-btn-ghost { color: #4b4954; border: 1px solid #e6e4ea; }
+  .qcn-btn-dark { color: #fff; background: #17171c; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function(s) { return el.querySelector(s); };
+    var win = q('.qcn-window');
+
+    var LOGO_TOKEN = 'pk_B_cdrQLyTkSFPzSMm52goQ';
+    function logoUrl(svc) {
+      if (svc.icon_url) return svc.icon_url;
+      return 'https://img.logo.dev/' + (svc.domain || (String(svc.name || '').toLowerCase().replace(/\s+/g, '') + '.com')) +
+        '?token=' + LOGO_TOKEN + '&format=png&size=64&fallback=monogram';
+    }
+
+    // Sidebar icons (tiny generic glyphs, matched to the real screen's weight)
+    var NAV_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>';
+    var active = data.active_nav || 'MCP Servers';
+    Array.prototype.forEach.call(el.querySelectorAll('.qcn-nav'), function(n) {
+      var label = n.getAttribute('data-nav');
+      n.innerHTML = NAV_ICON;
+      n.appendChild(document.createTextNode(label));
+      if (label === active) n.classList.add('is-active');
+    });
+
+    var DEFAULT_CONNECTED = [
+      { name: 'GitHub', domain: 'github.com', desc: 'Pull development activity for changelogs and release notes', status: 'connected' },
+      { name: 'Linear', domain: 'linear.app', desc: 'Access issues, projects, and comments from Linear', status: 'connected' },
+      { name: 'Canva', domain: 'canva.com', desc: 'Create and manage designs, templates, and assets', status: 'connected' },
+      { name: 'Attio', domain: 'attio.com', desc: 'Search, create, and manage CRM records, notes, and tasks', status: 'connected' },
+    ];
+    var DEFAULT_MARKET = [
+      { name: 'Fathom', domain: 'fathom.video', desc: 'Access AI meeting recordings, transcripts, and summaries' },
+      { name: 'Zapier', domain: 'zapier.com', desc: 'Automate workflows across 8,000+ apps' },
+      { name: 'Notion', domain: 'notion.so', desc: 'Access pages, databases, and comments from Notion' },
+      { name: 'Stripe', domain: 'stripe.com', desc: 'Access payment data, customers, and subscriptions' },
+      { name: 'Granola', domain: 'granola.ai', desc: 'Search meeting notes and transcripts from Granola' },
+    ];
+    var connected = data.connected || DEFAULT_CONNECTED;
+    var market = data.marketplace || DEFAULT_MARKET;
+
+    var PILL_LABEL = { connected: 'Connected', failed: 'Failed', pending: 'Pending' };
+    var PILL_CLASS = { connected: 'is-ok', failed: 'is-fail', pending: 'is-pend' };
+
+    function buildRow(svc, section) {
+      var row = document.createElement('div');
+      row.className = 'qcn-row';
+      var img = document.createElement('img');
+      img.className = 'qcn-logo';
+      img.src = logoUrl(svc);
+      img.onerror = function() { this.style.visibility = 'hidden'; };
+      row.appendChild(img);
+      var info = document.createElement('div');
+      info.className = 'qcn-info';
+      var nm = document.createElement('div');
+      nm.className = 'qcn-name';
+      nm.textContent = svc.name;
+      var ds = document.createElement('div');
+      ds.className = 'qcn-desc';
+      ds.textContent = svc.desc || '';
+      info.appendChild(nm);
+      info.appendChild(ds);
+      row.appendChild(info);
+      if (section === 'connected') {
+        var pill = document.createElement('span');
+        pill.className = 'qcn-pill ' + (PILL_CLASS[svc.status] || 'is-ok');
+        pill.innerHTML = '<span class="qcn-pill-dot"></span>' + (PILL_LABEL[svc.status] || 'Connected');
+        row.appendChild(pill);
+        var kb = document.createElement('span');
+        kb.className = 'qcn-kebab';
+        kb.textContent = '⋮';
+        row.appendChild(kb);
+      } else {
+        // Marketplace rows carry BOTH end states prebuilt: the chevron
+        // (default) and a hidden Connected pill the connect action reveals --
+        // the flip is a reversible timeline crossfade, never a DOM mutation.
+        var pill2 = document.createElement('span');
+        pill2.className = 'qcn-pill is-ok';
+        pill2.innerHTML = '<span class="qcn-pill-dot"></span>Connected';
+        pill2.style.visibility = 'hidden';
+        pill2.style.opacity = '0';
+        row.appendChild(pill2);
+        var ch = document.createElement('span');
+        ch.className = 'qcn-chev';
+        ch.textContent = '›';
+        row.appendChild(ch);
+        row._pill = pill2;
+        row._chev = ch;
+      }
+      return row;
+    }
+
+    var connectedList = q('.qcn-connected');
+    var marketList = q('.qcn-marketplace');
+    if (!connected.length) q('.qcn-connected-lbl').style.display = 'none';
+    connected.forEach(function(svc) { connectedList.appendChild(buildRow(svc, 'connected')); });
+    var marketRows = {};
+    market.forEach(function(svc) {
+      var row = buildRow(svc, 'market');
+      marketList.appendChild(row);
+      marketRows[String(svc.name).toLowerCase()] = { row: row, svc: svc };
+    });
+
+    // ── Entrance ──
+    gsap.set(win, { autoAlpha: 0, y: 14 });
+    tl.to(win, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'power2.out' }, 0.05);
+    var rows = el.querySelectorAll('.qcn-row');
+    gsap.set(rows, { autoAlpha: 0, y: 8 });
+    tl.to(rows, { autoAlpha: 1, y: 0, duration: 0.3, stagger: 0.035, ease: 'power2.out' }, 0.2);
+
+    // ── Cursor targets (measured at build; modal is laid out but invisible) ──
+    var shade = q('.qcn-shade');
+    var modal = q('.qcn-modal');
+    var allowBtn = q('.qcn-btn-dark');
+    function pctTarget(node) {
+      var r = node.getBoundingClientRect();
+      var w = el.getBoundingClientRect();
+      if (!r.width || !w.width) return null;
+      return { x: ((r.left + r.width / 2 - w.left) / w.width * 100) + '%',
+               y: ((r.top + r.height / 2 - w.top) / w.height * 100) + '%' };
+    }
+    var cursorTargets = data.cursor_targets || {};
+    Object.keys(marketRows).forEach(function(k) {
+      if (!cursorTargets[k]) {
+        var t = pctTarget(marketRows[k].row);
+        if (t) cursorTargets[k] = t;
+      }
+    });
+    if (!cursorTargets['allow']) {
+      var ta = pctTarget(allowBtn);
+      if (ta) cursorTargets['allow'] = ta;
+    }
+
+    // ── Script ──
+    if (Array.isArray(data.script) && data.script.length) {
+      runScript(tl, el, data.script, cursorTargets, ctx, {
+        'connect': function(tl2, ctr, action, at) {
+          var key = String(action.service || 'fathom').toLowerCase();
+          var entry = marketRows[key];
+          if (!entry) return;
+          var svc = entry.svc;
+          q('.qcn-modal-logo').src = logoUrl(svc);
+          q('.qcn-modal-title').textContent = 'Connect ' + svc.name;
+          q('.qcn-modal-text').textContent = 'Quotient will be able to ' +
+            ((svc.desc || 'use this service').charAt(0).toLowerCase() + (svc.desc || 'use this service').slice(1)) + '.';
+          // row press flash
+          tl2.fromTo(entry.row, { backgroundColor: 'rgba(236,235,248,0)' },
+            { backgroundColor: '#ecebf8', duration: 0.14, yoyo: true, repeat: 1, immediateRender: false }, at);
+          // OAuth modal in
+          tl2.to(shade, { autoAlpha: 1, duration: 0.2 }, at + 0.3);
+          tl2.fromTo(modal, { autoAlpha: 0, y: 8, scale: 0.98 },
+            { autoAlpha: 1, y: 0, scale: 1, duration: 0.28, ease: 'power2.out', immediateRender: false }, at + 0.32);
+          // authorize press + modal out
+          var t2 = at + (action.authorize_after != null ? action.authorize_after : 1.3);
+          tl2.fromTo(allowBtn, { scale: 1 }, { scale: 0.95, duration: 0.1, yoyo: true, repeat: 1 }, t2);
+          tl2.to(modal, { autoAlpha: 0, y: -6, duration: 0.2, ease: 'power2.in' }, t2 + 0.25);
+          tl2.to(shade, { autoAlpha: 0, duration: 0.2 }, t2 + 0.28);
+          // chevron -> Connected pill (reversible crossfade)
+          tl2.to(entry.row._chev, { autoAlpha: 0, duration: 0.15 }, t2 + 0.45);
+          tl2.fromTo(entry.row._pill, { autoAlpha: 0, scale: 0.85 },
+            { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: false }, t2 + 0.5);
+          tl2.fromTo(entry.row, { backgroundColor: 'rgba(52,168,83,0)' },
+            { backgroundColor: 'rgba(52,168,83,0.07)', duration: 0.3, yoyo: true, repeat: 1, immediateRender: false }, t2 + 0.5);
+        },
+      });
+    }
+
+    return tl;
+  }
+</script>

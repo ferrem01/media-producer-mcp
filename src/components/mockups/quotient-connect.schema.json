@@ -1,0 +1,32 @@
+{
+  "type": "quotient-connect",
+  "label": "Quotient MCP Servers (connect an integration)",
+  "category": "mockup",
+  "description": "Quotient's MCP Servers settings screen, matched to the real app: settings sidebar (MCP Servers active), a Connected section with green/red/orange status pills, and a Marketplace section with logo rows and chevrons. The 'connect' script action performs the real flow: cursor clicks a marketplace row (e.g. Fathom), an OAuth authorize modal appears, cursor clicks Authorize, and the row's chevron flips to a green Connected pill. Use for 'hook up the integration' beats -- showing Quotient gaining access to a recorder, CRM, or tool.",
+  "data": {
+    "connected": {
+      "type": "array",
+      "items": { "type": "object" },
+      "label": "Already-connected rows: {name, domain?, icon_url?, desc, status: 'connected'|'failed'|'pending'}. Defaults to GitHub/Linear/Canva/Attio.",
+      "optional": true
+    },
+    "marketplace": {
+      "type": "array",
+      "items": { "type": "object" },
+      "label": "Marketplace rows: {name, domain?, icon_url?, desc}. Defaults include Fathom (meeting recordings/transcripts).",
+      "optional": true
+    },
+    "active_nav": {
+      "type": "string",
+      "label": "Active sidebar item (default 'MCP Servers')",
+      "optional": true
+    },
+    "script": {
+      "type": "array",
+      "items": { "type": "object" },
+      "label": "Timed actions: connect {service: 'Fathom', at, authorize_after?}. Cursor targets exist per marketplace service (lowercased name) and 'allow'.",
+      "optional": true
+    }
+  },
+  "match": { "entry": { "x": 0.5, "y": 0.5 }, "exit": { "x": 0.6, "y": 0.45 } }
+}
