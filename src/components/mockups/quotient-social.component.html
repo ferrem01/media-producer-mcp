@@ -744,23 +744,50 @@
     }
 
     // ── Schedule menu helpers ──
+    // SCRUB SAFETY: menu visibility lives ON the timeline (fromTo/to), never
+    // inside tl.call() -- GSAP re-fires calls on playhead crossings but cannot
+    // undo their mutations, so scrubbing backwards left the menu/published
+    // state stuck (the cowork-session class of bug). The menu stays
+    // display:block and toggles via autoAlpha; positioning is an idempotent
+    // helper run at build and re-run (harmlessly) before each open.
+    function positionMenu() {
+      var rootRect = root.getBoundingClientRect();
+      var btnRect = schedBtn.getBoundingClientRect();
+      if (!rootRect.width || !btnRect.width) return;
+      var leftPct = ((btnRect.right - rootRect.left) / rootRect.width) * 100;
+      var topPct = ((btnRect.bottom - rootRect.top) / rootRect.height) * 100;
+      schedMenu.style.right = (100 - leftPct) + '%';
+      schedMenu.style.left = 'auto';
+      schedMenu.style.top = 'calc(' + topPct + '% + 6px)';
+    }
+    positionMenu();
+    schedMenu.style.display = 'block';
+    gsap.set(schedMenu, { autoAlpha: 0 });
     function openMenu(tlRef, at) {
-      tlRef.call(function() {
-        var rootRect = root.getBoundingClientRect();
-        var btnRect = schedBtn.getBoundingClientRect();
-        var leftPct = ((btnRect.right - rootRect.left) / rootRect.width) * 100;
-        var topPct = ((btnRect.bottom - rootRect.top) / rootRect.height) * 100;
-        schedMenu.style.right = (100 - leftPct) + '%';
-        schedMenu.style.left = 'auto';
-        schedMenu.style.top = 'calc(' + topPct + '% + 6px)';
-        schedMenu.style.display = 'block';
-        gsap.fromTo(schedMenu, { autoAlpha: 0, y: -6 }, { autoAlpha: 1, y: 0, duration: 0.22, ease: 'power2.out' });
-      }, null, at);
+      tlRef.call(positionMenu, null, Math.max(0, at - 0.01));
+      tlRef.fromTo(schedMenu, { autoAlpha: 0, y: -6 },
+        { autoAlpha: 1, y: 0, duration: 0.22, ease: 'power2.out', immediateRender: false }, at);
     }
     function closeMenu(tlRef, at) {
-      tlRef.call(function() {
-        gsap.to(schedMenu, { autoAlpha: 0, y: -6, duration: 0.16, ease: 'power2.in', onComplete: function() { schedMenu.style.display = 'none'; } });
-      }, null, at);
+      tlRef.to(schedMenu, { autoAlpha: 0, y: -6, duration: 0.16, ease: 'power2.in' }, at);
+    }
+    // Pre-built header content for script-driven status flips: the target
+    // state is created at BUILD and revealed by reversible crossfade -- no
+    // innerHTML/className mutations on the timeline.
+    var statusLeft = el.querySelector('.qsp-status-left');
+    function buildStatusLayer(st, dateStr) {
+      var layer = document.createElement('div');
+      layer.className = 'qsp-status-left';
+      layer.style.cssText = 'position:absolute; left:20px; top:0; bottom:0;';
+      var ic = document.createElement('span'); ic.className = 'qsp-status-icon';
+      ic.innerHTML = CHECK_SVG;
+      var tx = document.createElement('span'); tx.className = 'qsp-status-text';
+      tx.textContent = (st === 'scheduled' ? 'Scheduled for ' : 'Post published on ') + dateStr;
+      layer.appendChild(ic); layer.appendChild(tx);
+      statusBar.style.position = 'relative';
+      statusBar.appendChild(layer);
+      gsap.set(layer, { autoAlpha: 0 });
+      return layer;
     }
 
     // ── Entrance ──
@@ -840,30 +867,32 @@
         },
         'publish-post': function(tl, ctr, action, at) {
           var dateStr = (action && action.published_date) || publishedDate;
-          var menuVisible = true;
-          tl.call(function() {
-            var row = schedMenu.querySelector('[data-menu="publish"]');
-            if (schedMenu.style.display === 'none') { menuVisible = false; return; }
-            gsap.fromTo(row, { backgroundColor: 'rgba(0,0,0,0)' },
-              { backgroundColor: '#eeede9', duration: 0.15, yoyo: true, repeat: 1 });
-          }, null, at);
+          var row = schedMenu.querySelector('[data-menu="publish"]');
+          tl.fromTo(row, { backgroundColor: 'rgba(0,0,0,0)' },
+            { backgroundColor: '#eeede9', duration: 0.15, yoyo: true, repeat: 1, immediateRender: false }, at);
           closeMenu(tl, at + 0.45);
-          tl.call(function() {
-            applyStatus('published', dateStr);
-            applyBottomStrip('published');
-            schedBtn.style.display = 'none';
-            viewBtn.style.display = 'flex';
-          }, null, at + 0.7);
-          tl.fromTo(statusBar, { scale: 1 }, { scale: 1.02, duration: 0.3, ease: 'power2.out' }, at + 0.7);
-          tl.to(statusBar, { scale: 1, duration: 0.25, ease: 'back.out(2)' }, at + 1.0);
+          var layer = buildStatusLayer('published', dateStr);
+          var t = at + 0.7;
+          tl.to(statusBar, { backgroundColor: '#47934f', color: '#ffffff',
+            borderBottomColor: 'rgba(232,231,228,0)', duration: 0.2, ease: 'power2.out' }, t);
+          tl.to(statusLeft, { autoAlpha: 0, duration: 0.12 }, t);
+          tl.to(layer, { autoAlpha: 1, duration: 0.18 }, t + 0.04);
+          tl.set(actions, { display: 'none' }, t);
+          if (data.show_engagement !== false) tl.set(engage, { display: 'flex' }, t);
+          tl.set(schedBtn, { display: 'none' }, t);
+          tl.set(viewBtn, { display: 'flex' }, t);
+          tl.fromTo(statusBar, { scale: 1 }, { scale: 1.02, duration: 0.3, ease: 'power2.out' }, t);
+          tl.to(statusBar, { scale: 1, duration: 0.25, ease: 'back.out(2)' }, t + 0.3);
         },
         'schedule-post': function(tl, ctr, action, at) {
           var scheduledDate = (action && action.scheduled_date) || 'Jul 15, 2026 at 10:00 AM';
           tl.to(schedBtn, { scale: 0.96, duration: 0.1, ease: 'power2.in' }, at);
           tl.to(schedBtn, { scale: 1, duration: 0.14, ease: 'power2.out' }, at + 0.1);
-          tl.call(function() {
-            applyStatus('scheduled', scheduledDate);
-          }, null, at + 0.4);
+          var layer = buildStatusLayer('scheduled', scheduledDate);
+          tl.to(statusBar, { backgroundColor: '#5b8fc2', color: '#ffffff',
+            borderBottomColor: 'rgba(232,231,228,0)', duration: 0.2, ease: 'power2.out' }, at + 0.4);
+          tl.to(statusLeft, { autoAlpha: 0, duration: 0.12 }, at + 0.4);
+          tl.to(layer, { autoAlpha: 1, duration: 0.18 }, at + 0.44);
           tl.fromTo(statusBar, { scale: 1 }, { scale: 1.02, duration: 0.3, ease: 'power2.out' }, at + 0.4);
           tl.to(statusBar, { scale: 1, duration: 0.25, ease: 'back.out(2)' }, at + 0.7);
         }
