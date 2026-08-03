@@ -546,73 +546,119 @@
     gsap.set(card, { autoAlpha: 0, y: 16 });
     tl.to(card, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 0.1);
 
-    // ── Script ──
+    // ── Script (SCRUB-SAFE: state lives ON the timeline; tl.call survives
+    // only as direction-correct paired boundaries with compile-time prior
+    // state -- see the cowork-session/quotient-chat doctrine, backlog #50) ──
     if (data.script && data.script.length > 0) {
       var cursorTargets = data.cursor_targets || {
         'tabs': { x: '30%', y: '8%' },
         'table': { x: '50%', y: '45%' }
       };
 
+      function classAt(tl2, node, t, add, remove) {
+        tl2.call(function() {
+          (remove || []).forEach(function(c) { node.classList.add(c); });
+          (add || []).forEach(function(c) { node.classList.remove(c); });
+        }, null, Math.max(0, t - 0.001));
+        tl2.call(function() {
+          (add || []).forEach(function(c) { node.classList.add(c); });
+          (remove || []).forEach(function(c) { node.classList.remove(c); });
+        }, null, t);
+      }
+      function textAt(tl2, node, t, value, prev) {
+        tl2.call(function() { node.textContent = prev; }, null, Math.max(0, t - 0.001));
+        tl2.call(function() { node.textContent = value; }, null, t);
+      }
+      // Status flips are CROSSFADES between a prebuilt pair, never innerHTML
+      // writes: the old pill fades under, the new pill (built at compile,
+      // absolutely overlaid) pops in -- fully reversible.
+      function swapStatus(tl2, stEl, at, newStatus) {
+        if (!stEl) return;
+        var wrapper = document.createElement('span');
+        wrapper.style.cssText = 'position:relative;display:inline-flex;align-items:center;';
+        stEl.parentNode.insertBefore(wrapper, stEl);
+        wrapper.appendChild(stEl);
+        var tmp = document.createElement('div');
+        tmp.innerHTML = statusEl(newStatus);
+        var next = tmp.firstElementChild;
+        next.style.cssText += ';position:absolute;left:0;top:50%;transform:translateY(-50%);white-space:nowrap;';
+        gsap.set(next, { autoAlpha: 0 });
+        wrapper.appendChild(next);
+        tl2.to(stEl, { autoAlpha: 0, duration: 0.15 }, at);
+        tl2.fromTo(next, { autoAlpha: 0, scale: 0.9 },
+          { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: false }, at + 0.05);
+      }
+
+      var compiledTab = activeTab;
+      var compiledDone = doneCount;
+      var scrollCursor = {};
+      var completedEl = el.querySelector('.qcp-completed-count');
+      var groupEl = el.querySelector('.qcp-group-count');
+
       runScript(tl, el, data.script, cursorTargets, ctx, {
-        'switch-tab': function(tl, ctr, action, at) {
-          var tab = el.querySelector('.qcp-tab[data-tab="' + action.tab + '"]');
-          if (tab) {
-            tl.to(tab, { scale: 0.95, duration: 0.09, ease: 'power2.in' }, at);
-            tl.to(tab, { scale: 1, duration: 0.12, ease: 'power2.out' }, at + 0.09);
+        'switch-tab': function(tl2, ctr, action, at) {
+          var name = action.tab;
+          if (!name || name === compiledTab) return;
+          var tabBtn = el.querySelector('.qcp-tab[data-tab="' + name + '"]');
+          if (tabBtn) {
+            tl2.to(tabBtn, { scale: 0.95, duration: 0.09, ease: 'power2.in' }, at);
+            tl2.to(tabBtn, { scale: 1, duration: 0.12, ease: 'power2.out' }, at + 0.09);
           }
-          tl.call(function() { setTab(action.tab); }, null, at + 0.16);
+          var prevName = compiledTab;
+          tabs.forEach(function(t) {
+            if (t.dataset.tab === name) classAt(tl2, t, at + 0.16, ['active'], []);
+            else if (t.dataset.tab === prevName) classAt(tl2, t, at + 0.16, [], ['active']);
+          });
+          views.forEach(function(v) {
+            if (v.dataset.view === name) {
+              classAt(tl2, v, at + 0.16, ['active'], []);
+              tl2.fromTo(v, { autoAlpha: 0, y: 8 },
+                { autoAlpha: 1, y: 0, duration: 0.28, ease: 'power2.out', immediateRender: false }, at + 0.16);
+            } else if (v.dataset.view === prevName) {
+              classAt(tl2, v, at + 0.16, [], ['active']);
+            }
+          });
+          compiledTab = name;
         },
-        'complete-task': function(tl, ctr, action, at) {
-          var idx = action.index || 0;
-          tl.call(function() {
-            var row = taskRows.children[idx];
-            if (!row) return;
-            var ring = row.querySelector('.qcp-ring');
-            ring.classList.remove('dashed');
-            ring.classList.add('done');
-            gsap.fromTo(ring, { scale: 0.6 }, { scale: 1, duration: 0.3, ease: 'back.out(2.5)' });
-            doneCount++;
-            refreshCounts();
-          }, null, at);
+        'complete-task': function(tl2, ctr, action, at) {
+          var row = taskRows.children[action.index || 0];
+          if (!row) return;
+          var ring = row.querySelector('.qcp-ring');
+          classAt(tl2, ring, at, ['done'], ['dashed']);
+          tl2.fromTo(ring, { scale: 0.6 }, { scale: 1, duration: 0.3, ease: 'back.out(2.5)', immediateRender: false }, at);
+          var prevDone = compiledDone;
+          compiledDone++;
+          textAt(tl2, completedEl, at, compiledDone + '/' + tasks.length, prevDone + '/' + tasks.length);
+          textAt(tl2, groupEl, at, String(tasks.length - compiledDone), String(tasks.length - prevDone));
         },
-        'move-event': function(tl, ctr, action, at) {
-          var idx = action.index || 0;
-          var node = evEls[idx];
+        'move-event': function(tl2, ctr, action, at) {
+          var node = evEls[action.index || 0];
           if (!node) return;
           var toDay = Math.min(nDays - 1, action.day !== undefined ? action.day : 0);
-          var toTop = action.top;
-          tl.call(function() {
-            gsap.to(node, { scale: 1.04, boxShadow: '0 10px 28px rgba(0,0,0,0.16)', zIndex: 9, duration: 0.18, ease: 'power2.out' });
-            var target = { left: (toDay * (100 / nDays) + 0.6) + '%', duration: 0.65, ease: 'power2.inOut', delay: 0.2 };
-            if (toTop !== undefined) target.top = toTop + '%';
-            gsap.to(node, target);
-            gsap.to(node, { scale: 1, boxShadow: '0 1px 6px rgba(0,0,0,0.05)', duration: 0.25, ease: 'power2.out', delay: 0.9 });
-          }, null, at);
+          tl2.to(node, { scale: 1.04, boxShadow: '0 10px 28px rgba(0,0,0,0.16)', zIndex: 9,
+            duration: 0.18, ease: 'power2.out' }, at);
+          var target = { left: (toDay * (100 / nDays) + 0.6) + '%', duration: 0.65, ease: 'power2.inOut' };
+          if (action.top !== undefined) target.top = action.top + '%';
+          tl2.to(node, target, at + 0.2);
+          tl2.to(node, { scale: 1, boxShadow: '0 1px 6px rgba(0,0,0,0.05)', duration: 0.25, ease: 'power2.out' }, at + 1.1);
         },
-        'set-event-status': function(tl, ctr, action, at) {
-          var idx = action.index || 0;
-          tl.call(function() {
-            var node = evEls[idx];
-            if (!node) return;
-            var stEl = node.querySelector('.qcp-status');
-            if (stEl) stEl.outerHTML = statusEl(action.status || 'published');
-            gsap.fromTo(node, { scale: 1 }, { scale: 1.03, duration: 0.2, yoyo: true, repeat: 1, ease: 'power2.out' });
-          }, null, at);
+        'set-event-status': function(tl2, ctr, action, at) {
+          var node = evEls[action.index || 0];
+          if (!node) return;
+          swapStatus(tl2, node.querySelector('.qcp-status'), at, action.status || 'published');
+          tl2.fromTo(node, { scale: 1 }, { scale: 1.03, duration: 0.2, yoyo: true, repeat: 1, ease: 'power2.out', immediateRender: false }, at);
         },
-        'set-deliverable-status': function(tl, ctr, action, at) {
-          var idx = action.index || 0;
-          tl.call(function() {
-            var row = delEls[idx];
-            if (!row) return;
-            var cell = row.querySelector('.qcp-del-status');
-            cell.innerHTML = statusEl(action.status || 'published');
-            gsap.fromTo(cell, { scale: 0.9 }, { scale: 1, duration: 0.3, ease: 'back.out(2)' });
-          }, null, at);
+        'set-deliverable-status': function(tl2, ctr, action, at) {
+          var row = delEls[action.index || 0];
+          if (!row) return;
+          var cell = row.querySelector('.qcp-del-status');
+          swapStatus(tl2, cell.firstElementChild, at, action.status || 'published');
         },
-        'scroll-view': function(tl, ctr, action, at) {
-          var view = el.querySelector('.qcp-view.active');
+        'scroll-view': function(tl2, ctr, action, at) {
+          var view = el.querySelector('.qcp-view[data-view="' + compiledTab + '"]') || el.querySelector('.qcp-view.active');
           if (!view) return;
-          tl.to(view, { scrollTop: '+=' + (action.amount || 300), duration: action.duration || 1.6, ease: 'power1.inOut' }, at);
+          scrollCursor[compiledTab] = (scrollCursor[compiledTab] || 0) + (action.amount || 300);
+          tl2.to(view, { scrollTop: scrollCursor[compiledTab], duration: action.duration || 1.6, ease: 'power1.inOut' }, at);
         }
       });
     }
