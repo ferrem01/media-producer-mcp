@@ -54,10 +54,17 @@
     font-size: 6.4vw; line-height: 1.06; letter-spacing: -0.01em; font-weight: 400; }
   .stst.is-dark .stst-line { color: #f2efe6; }
   .stst-line.is-secondary { font-size: 4.2vw; opacity: 0.85; }
+  /* background-clip:text paints glyphs only where the element's background
+     box covers them, and some engines size an inline's paint box from the
+     font's nominal metrics -- the italic g/y swashes that poke past descent
+     rendered with their tails CUT (transparent) on those engines while other
+     rasterizers painted them fine. Vertical padding on an inline changes NO
+     layout; it only extends the paint box. padding-right was already this
+     guard for the italic's rightward overhang. */
   .stst-em { font-style: italic; background: linear-gradient(96deg,
       var(--mp-color-primary, #7c5cff) 10%, #c4489f 55%, #ff6a4d 95%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
-    padding-right: 0.06em; }
+    padding: 0.15em 0.06em 0.35em 0.02em; }
   /* Chapter mode: numbered chapter card -- big brand-color numeral beside a
      clean SANS headline (the "02 / Agent scaffolds & builds" card). */
   .stst.is-chapter .stst-line { font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif;
