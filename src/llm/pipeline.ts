@@ -2369,7 +2369,10 @@ async function runUnifiedPipeline(
   const filmGrammar: import("./creative-director.js").FilmGrammar =
     opts.film_grammar ||
     treatment?.filmGrammar ||
-    (/tempo-cut/i.test(
+    (/hype-cut/i.test(
+      (treatment?.visualStyle?.motionPersonality || "") + (treatment?.directorNote || "") + (opts.prompt || ""),
+    ) ? "hype-cut"
+    : /tempo-cut/i.test(
       (treatment?.visualStyle?.motionPersonality || "") + (treatment?.directorNote || "") + (opts.prompt || ""),
     ) ? "tempo-cut"
       : (opts.speaker_source || pipelineHasNarration) ? "speaker-screencast" : "launch-film");
@@ -2380,10 +2383,10 @@ async function runUnifiedPipeline(
   // high creativity tells codegen to hand-roll custom scenes, which is exactly
   // how montage labels and theme whiplash sneak back in. Caller's explicit
   // creativity always wins.
-  if (filmGrammar === "tempo-cut" && opts.creativity === undefined) {
+  if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && opts.creativity === undefined) {
     opts.creativity = 0.15;
     creativity = 0.15;
-    console.log("  Tempo-cut grammar: creativity clamped to 0.15 (component-first assembly)");
+    console.log(`  ${filmGrammar} grammar: creativity clamped to 0.15 (component-first assembly)`);
   }
   // Editorial is equally component-first: statement beats are st-statement
   // templates, evidence beats are library exhibits -- codegen freeform is
@@ -2430,8 +2433,8 @@ async function runUnifiedPipeline(
   // defaults ON for tempo-cut; an explicit false still wins.
   const wantsMusic = opts.backgroundMusic !== undefined
     ? opts.backgroundMusic
-    : filmGrammar === "tempo-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story";
-  if (filmGrammar === "tempo-cut" && !wantsMusic) {
+    : filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story";
+  if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && !wantsMusic) {
     console.warn("  TEMPO-CUT WITHOUT A MUSIC BED (background_music=false): cuts cannot land on downbeats -- the film will read as a slideshow.");
   }
   const prep = await runGrammarPrep(filmGrammar, {
@@ -2442,7 +2445,7 @@ async function runUnifiedPipeline(
     backgroundMusic: wantsMusic,
     sceneCount,
   });
-  if (filmGrammar === "tempo-cut" && wantsMusic && !prep.beatMap) {
+  if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && wantsMusic && !prep.beatMap) {
     console.warn("  TEMPO-CUT: music selection produced NO beat grid (JAMENDO_CLIENT_ID unset or selection failed) -- cuts will not be bar-quantized.");
   }
   var musicTrack: import("../audio/music.js").MusicTrack | null = prep.music || null;
@@ -2553,7 +2556,7 @@ async function runUnifiedPipeline(
   }
 
   // ── Text-as-voiceover grammars: the type IS the script ──
-  // Both contracts say voiceover_text stays empty, but the storyboard still
+  // These contracts say voiceover_text stays empty, but the storyboard still
   // populates it (measured live: proj_a7b3ffbd shipped narration lines that
   // re-read the captions). Strip in code -- unless the caller explicitly
   // asked for TTS, which overrides the grammar's default. Beats carry their
@@ -2561,7 +2564,10 @@ async function runUnifiedPipeline(
   // build), so the strip covers all three or the copy re-enters (measured
   // live: proj_48475b3d's audio_hints carried scene labels re-filled by the
   // voiceover enforcement below -- which this flag now also disables).
-  const textIsVoiceover = (filmGrammar === "social-reel" || filmGrammar === "data-story") && !opts.voiceover;
+  // tempo-cut/hype-cut/editorial belong on this list too: proj_bf247f37
+  // (tempo-cut) shipped EIGHT baked voiceover tracks reading its scene
+  // LABELS out loud -- the exact failure this strip exists to prevent.
+  const textIsVoiceover = (filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story") && !opts.voiceover;
   if (textIsVoiceover) {
     for (const d of storyboard.scenes as any[]) {
       if (d.voiceover_text) d.voiceover_text = undefined;

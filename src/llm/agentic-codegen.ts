@@ -309,7 +309,7 @@ These are the failures that make a scene look broken. Violate none of them.
 
 Design for a viewer watching a finished video, not a designer reading a spec.
 
-## TEMPO-CUT SCENES (applies whenever the visual notes or creative direction name "tempo-cut")
+## TEMPO-CUT SCENES (applies whenever the visual notes or creative direction name "tempo-cut" or "hype-cut")
 
 In this grammar the CUT carries the energy, so each scene stays disciplined:
 - BUILD FROM THE KIT: stage the library components via \`<component>\` tags — \`composer\` for a typed ask (never hand-roll an input box), \`kinetic-text\` with \`entrance:"type-on"\` for build-up lines, \`annotation\` for narration docked beside a window, the product mocks for surfaces. Hand-rolled versions of surfaces the kit already has are a failure. This holds ESPECIALLY when the notes describe things HAPPENING inside a mock (tabs switching, tasks checking off, a post publishing): those are the mock's own script actions — stage the library component with a \`data.script\` performance, never rebuild the surface to animate it by hand.

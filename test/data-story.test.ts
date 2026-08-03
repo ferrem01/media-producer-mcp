@@ -42,7 +42,7 @@ describe("data-story grammar registration", () => {
   it("enforces length + no-voiceover in code, not just in the contract", async () => {
     const src = await read("../src/llm/pipeline.ts");
     expect(src).toMatch(/"data-story": \{ sceneCap: 7, totalCap: 42/);
-    expect(src).toMatch(/\(filmGrammar === "social-reel" \|\| filmGrammar === "data-story"\) && !opts\.voiceover/);
+    expect(src).toMatch(/\(filmGrammar === "tempo-cut" \|\| filmGrammar === "hype-cut" \|\| filmGrammar === "editorial" \|\| filmGrammar === "social-reel" \|\| filmGrammar === "data-story"\) && !opts\.voiceover/);
   });
 
   it("contract bans invented decompositions and rainbow charts, demands hero scale", async () => {
@@ -54,7 +54,7 @@ describe("data-story grammar registration", () => {
 
   it("is exposed on the generate tool and the operator playbook", async () => {
     const src = await read("../src/server.ts");
-    expect(src).toMatch(/"launch-film", "tempo-cut", "speaker-screencast", "editorial", "social-reel", "data-story"/);
+    expect(src).toMatch(/"launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story"/);
     expect(src).toContain("data-story -- numbers-as-protagonist"); // operator playbook
     expect(src).toMatch(/the numbers \(data-story\)/); // rule of thumb
   });
