@@ -2,7 +2,7 @@
   "type": "st-manifesto",
   "label": "Scene Template: Kinetic Manifesto",
   "category": "scene-template",
-  "description": "WHOLE-SCENE template: the kinetic-type statement beat. ONE sentence owns the frame, landing word by word with scale/weight contrast; accent words slam in brand color with a camera punch. Use for the film's thesis line, a pivotal claim, or a short emotional statement (4-14 words) -- the pure-typography breath between denser scenes. Dark by default.",
+  "description": "WHOLE-SCENE template: the kinetic-type statement beat. ONE sentence owns the frame with scale/weight contrast; accent words in brand color, camera punch throughout. Two entrances: default house line-rise (whole sentence lands as one block), or entrance:'type-on' (words appear in place in reading order and the centered flow re-centers as it grows -- the word-by-word build-up). Use for the film's thesis line, a pivotal claim, or a short emotional statement (4-14 words) -- the pure-typography breath between denser scenes. Dark by default.",
   "data": {
     "text": {
       "type": "string",
@@ -36,6 +36,26 @@
     "uniform": {
       "type": "boolean",
       "label": "true = all words same size (skip the small-connective-word shrink)",
+      "optional": true
+    },
+    "entrance": {
+      "type": "string",
+      "label": "rise (default, whole-sentence house entrance) | type-on (word-by-word build-up with live re-centering)",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "type-on only: when the first word lands (default 0.3)",
+      "optional": true
+    },
+    "word_interval": {
+      "type": "number",
+      "label": "type-on only: seconds between words (default 0.14). Set to the beat subdivision to cut on music.",
+      "optional": true
+    },
+    "word_times": {
+      "type": "array",
+      "label": "type-on only: explicit per-word times in seconds (overrides word_interval)",
       "optional": true
     }
   },
