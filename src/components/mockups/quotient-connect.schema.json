@@ -6,13 +6,17 @@
   "data": {
     "connected": {
       "type": "array",
-      "items": { "type": "object" },
+      "items": {
+        "type": "object"
+      },
       "label": "Already-connected rows: {name, domain?, icon_url?, desc, status: 'connected'|'failed'|'pending'}. Defaults to GitHub/Linear/Canva/Attio.",
       "optional": true
     },
     "marketplace": {
       "type": "array",
-      "items": { "type": "object" },
+      "items": {
+        "type": "object"
+      },
       "label": "Marketplace rows: {name, domain?, icon_url?, desc}. Defaults include Fathom (meeting recordings/transcripts).",
       "optional": true
     },
@@ -23,10 +27,26 @@
     },
     "script": {
       "type": "array",
-      "items": { "type": "object" },
+      "items": {
+        "type": "object"
+      },
       "label": "Timed actions: connect {service: 'Fathom', at, authorize_after?}. Cursor targets exist per marketplace service (lowercased name) and 'allow'.",
+      "optional": true
+    },
+    "show_sidebar": {
+      "type": "boolean",
+      "label": "Show the settings sidebar (default true -- it replaces the main nav in the real app). Set false when composing inside quotient-app-shell's content region.",
       "optional": true
     }
   },
-  "match": { "entry": { "x": 0.5, "y": 0.5 }, "exit": { "x": 0.6, "y": 0.45 } }
+  "match": {
+    "entry": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "exit": {
+      "x": 0.6,
+      "y": 0.45
+    }
+  }
 }

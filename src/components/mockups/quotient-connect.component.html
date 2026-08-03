@@ -119,6 +119,10 @@
 
     // Sidebar icons (tiny generic glyphs, matched to the real screen's weight)
     var NAV_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>';
+    // The settings sidebar is part of the SETTINGS surface (it replaces the
+    // main nav in the real app), so it stays by default -- but hide it when
+    // composing inside quotient-app-shell's content region.
+    if (data.show_sidebar === false) q('.qcn-side').style.display = 'none';
     var active = data.active_nav || 'MCP Servers';
     Array.prototype.forEach.call(el.querySelectorAll('.qcn-nav'), function(n) {
       var label = n.getAttribute('data-nav');
