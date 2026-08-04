@@ -19,17 +19,17 @@
   /* Light-world variant (SPEC-world.md): same sting on the airy ground --
      dark type, soft brand wash, no atmosphere pass. */
   .stlc.light { color: #17171c; }
-  .stlc.light .stlc-url { color: rgba(23, 23, 28, 0.5); }
+  .stlc.light .stlc-url { color: rgba(23, 23, 28, 0.65); }
   .stlc.light::before { content: ''; position: absolute; inset: 0;
     background: radial-gradient(60% 55% at 50% 46%, color-mix(in srgb, var(--mp-color-primary, #4f46e5) 10%, transparent) 0%, transparent 75%); }
   .stlc-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     display: flex; flex-direction: column; align-items: center; gap: 3.4vh; text-align: center; }
   .stlc-logo { height: 72px; width: auto; }
-  .stlc-tagline { font-size: 2.1vw; font-weight: 500; letter-spacing: -0.01em; max-width: 26ch; text-wrap: balance; }
+  .stlc-tagline { font-size: 3vw; font-weight: 600; letter-spacing: -0.015em; max-width: 24ch; text-wrap: balance; }
   .stlc-cta { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.14em;
     text-transform: uppercase; color: #fff; padding: 14px 34px; border-radius: 100px;
     background: linear-gradient(135deg, var(--mp-color-primary, #4f46e5), color-mix(in srgb, var(--mp-color-primary, #4f46e5) 55%, #8b5cf6)); }
-  .stlc-url { font-family: 'Inter', sans-serif; font-size: 14px; letter-spacing: 0.08em; color: rgba(244,244,248,0.55); }
+  .stlc-url { font-family: 'Inter', sans-serif; font-size: 15px; letter-spacing: 0.08em; color: rgba(244,244,248,0.78); }
   .st-overlay { position: absolute; inset: 0; pointer-events: none; }
 </style>
 
