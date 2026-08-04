@@ -63,6 +63,11 @@
       "type": "string",
       "label": "Composer model pill label (default 'Opus 4.7')",
       "optional": true
+    },
+    "docked": {
+      "type": "boolean",
+      "label": "true = merge into quotient-app-shell's white content card (strips the window border/shadow). Position exactly over the shell's content region: x 4.85%, y 7.6%, w 93.8%, h 90.2% with the standard inset shell.",
+      "optional": true
     }
   },
   "script_actions": [
