@@ -127,6 +127,10 @@
   /* The column is PADDING on the container, not forced child widths --
      stretching children turned intrinsic pills (the ••• typing indicator)
      into full-width bars that read as background bleed-through. */
+  /* Docked: the thread IS the shell's white content card -- no second
+     window chrome (border/shadow), just the card's top radius. */
+  .qch.is-docked { border: 0; box-shadow: none; border-radius: 14px 14px 0 0; }
+
   .qch.is-full .qch-msgs { padding: 30px max(5%, calc((100% - 1100px) / 2)) 16px; }
   .qch.is-full .qch-composer { width: min(1100px, 90%); margin: 0 auto; align-self: center; }
   .qch.is-full .qch-agent { font-size: 16.5px; line-height: 1.65; margin: 16px auto; }
@@ -477,6 +481,7 @@
     var copiesBadge = data.copies_badge !== undefined ? data.copies_badge : (data.badge_count !== undefined ? data.badge_count : 2);
     var userInitials = data.user_initials || 'JM';
     if (data.mode === 'full') root.classList.add('is-full');
+    if (data.docked) root.classList.add('is-docked');
     var modeEl = el.querySelector('.qch-mode');
     if (modeEl) modeEl.textContent = data.model || 'Opus 4.7';
     var userAvatarUrl = data.user_avatar_url || data.user_avatar || '';
