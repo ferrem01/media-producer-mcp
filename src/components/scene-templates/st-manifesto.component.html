@@ -28,7 +28,7 @@
   .is-light .stmf-kicker { color: var(--mp-color-primary, #4f46e5); }
   .stmf-flow { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: 80vw; display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;
-    column-gap: 1.6vw; row-gap: 1.2vh; text-align: center; }
+    column-gap: 1.15vw; row-gap: 1.2vh; text-align: center; }
   .stmf-word { display: inline-block; font-size: 5.2vw; font-weight: 500; line-height: 1.04;
     letter-spacing: -0.025em; white-space: nowrap; }
   .stmf-word.is-accent { color: var(--mp-color-primary, #4f46e5); font-weight: 600; }
@@ -69,11 +69,20 @@
     // Tokenize with *star groups* intact: every word inside a group is an
     // accent (a naive whitespace split breaks multi-word accents).
     var tokens = [];
-    var tokRe = /\*([^*]+)\*|(\S+)/g;
+    // Punctuation hugging a *star group* ("*ask*.") stays glued to the
+    // accent word -- a naive split made the period its own flex item with a
+    // full word-gap before it.
+    var tokRe = /(\S*)\*([^*]+)\*(\S*)|(\S+)/g;
     var tm;
     while ((tm = tokRe.exec(String(data.text || ''))) !== null) {
-      if (tm[1] !== undefined) tm[1].split(/\s+/).filter(Boolean).forEach(function(w) { tokens.push({ w: w, star: true }); });
-      else tokens.push({ w: tm[2], star: false });
+      if (tm[2] !== undefined) {
+        var ws = tm[2].split(/\s+/).filter(Boolean);
+        ws.forEach(function(w, i) {
+          if (i === 0 && tm[1]) w = tm[1] + w;
+          if (i === ws.length - 1 && tm[3]) w = w + tm[3];
+          tokens.push({ w: w, star: true });
+        });
+      } else tokens.push({ w: tm[4], star: false });
     }
     // House type system: the sentence lands as ONE block (line rise + fade).
     // Accents are color-only spans that move with their line -- no masks, no
