@@ -8025,7 +8025,7 @@ export function getPreviewHtml(): string {
       if (e.key === 'Escape') {
         studio.dragCancel();
         camPopClose();
-        rvPopClose();
+        studioClearSel();
       }
     }
     function onClick(e) {
@@ -8064,6 +8064,33 @@ export function getPreviewHtml(): string {
     doc.addEventListener('keydown', onKey, true);
     doc.__studioHandlers = { move: onMove, leave: onLeave, click: onClick, ctx: onCtx, down: onDown, dragmove: onDragMove, up: onUp, dragstart: onDragStart, key: onKey };
   }
+
+  // Deselect: clears the canvas selection highlight + popover. Wired to
+  // Escape (inside the canvas and in Studio) and to clicks on the player
+  // surround outside the canvas.
+  function studioClearSel() {
+    studio.sel = null;
+    studio.pendingInside = null;
+    studio.panInside = null;
+    if (studio.selBox) studio.selBox.style.display = 'none';
+    if (studio.selLabel) studio.selLabel.textContent = '';
+    rvPopClose();
+  }
+
+  (function wireDeselect() {
+    window.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      studioClearSel();
+    });
+    var pc = document.getElementById('preview-container');
+    if (pc) pc.addEventListener('click', function(e) {
+      // Only clicks on the surround itself -- the canvas (iframe) handles
+      // its own clicks, and popover clicks must not self-dismiss.
+      if (e.target === pc || e.target.id === 'preview-wrapper') studioClearSel();
+    });
+  })();
 
   function studioSelect(el, doc) {
     studio.pendingInside = null; // new selection = new intent
