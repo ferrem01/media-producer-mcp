@@ -57,6 +57,11 @@
       "type": "array",
       "label": "type-on only: explicit per-word times in seconds (overrides word_interval)",
       "optional": true
+    },
+    "ramp_words": {
+      "type": "array",
+      "label": "Words to render with the per-glyph gradient ramp (primary \u2192 magenta \u2192 orange) \u2014 the st-statement 'rainbow' emphasis.",
+      "optional": true
     }
   },
   "match": {
