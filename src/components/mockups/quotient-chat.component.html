@@ -132,7 +132,8 @@
   .qch.is-docked { border: 0; box-shadow: none; border-radius: 14px 14px 0 0; }
 
   .qch.is-full .qch-msgs { padding: 30px max(5%, calc((100% - 1100px) / 2)) 16px; }
-  .qch.is-full .qch-composer { width: min(1100px, 90%); margin: 0 auto; align-self: center; }
+  /* Real full-screen composer floats WELL above the card's bottom edge. */
+  .qch.is-full .qch-composer { width: min(1100px, 90%); margin: 0 auto 28px; align-self: center; }
   .qch.is-full .qch-agent { font-size: 16.5px; line-height: 1.65; margin: 16px auto; }
   .qch.is-full .qch-user-bubble { font-size: 16px; padding: 13px 20px; }
   .qch.is-full .qch-verb-row { font-size: 15.5px; }
