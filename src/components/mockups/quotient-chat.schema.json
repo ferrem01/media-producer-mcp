@@ -1,12 +1,12 @@
 {
   "type": "quotient-chat",
-  "label": "Quotient Chat — the agent panel",
+  "label": "Quotient Chat \u2014 the agent panel",
   "category": "mockups",
-  "description": "THE Quotient agent chat panel (built from actual screenshots) -- the SAME surface that appears as the right panel of quotient-app-shell; place THIS component over the shell's panel slot for full fidelity (shell show_panel: false, panel slot = x shellX+0.68·shellW, y shellY+0.062·shellH, w 0.31·shellW, h 0.90·shellH; with the standard inset shell that is x 67.6%, y 8%, width 30.5%, height 87%). White rounded panel with the TAB ROW (active tab underlined with ×, optional second tab with the spinning ✳ = a running chat, copies icon with count badge -> References popover, split, ×), the transcript, and the composer (Type a message..., paperclip, Auto, mic, gray send). THE TRANSCRIPT GRAMMAR (all color-coded by entity): verb-line ('Reviewed [in] LinkedIn post' + bold title, or inline 'Created ✉ Weekly AI Marketing Newsletter July 13 2026'); content-card -- the STREAMING box: 'Created/Updated [entity] ...' header + bold title + chevron, and the document content STREAMS word-by-word into a white inner box whose older lines slide up under a top fade (the live-edit treatment for posts/docs/emails/memory); task-status ('Marked 1 task(s) as ◑ In review' + blue-checkbox task rows); agent prose; user bubbles (right-aligned, pink initials avatar); 'Conversation summarized' divider. Entity icons: linkedin (blue tile), x (black tile), email + doc/template (orange), task + campaign (blue), blog/memory (dark). SCRIPTED performable surface; camera anchors: messages, composer, tabs.",
+  "description": "THE Quotient agent chat panel (built from actual screenshots) -- the SAME surface that appears as the right panel of quotient-app-shell; place THIS component over the shell's panel slot for full fidelity (shell show_panel: false, panel slot = x shellX+0.68\u00b7shellW, y shellY+0.062\u00b7shellH, w 0.31\u00b7shellW, h 0.90\u00b7shellH; with the standard inset shell that is x 67.6%, y 8%, width 30.5%, height 87%). White rounded panel with the TAB ROW (active tab underlined with \u00d7, optional second tab with the spinning \u2733 = a running chat, copies icon with count badge -> References popover, split, \u00d7), the transcript, and the composer (Type a message..., paperclip, Auto, mic, gray send). THE TRANSCRIPT GRAMMAR (all color-coded by entity): verb-line ('Reviewed [in] LinkedIn post' + bold title, or inline 'Created \u2709 Weekly AI Marketing Newsletter July 13 2026'); content-card -- the STREAMING box: 'Created/Updated [entity] ...' header + bold title + chevron, and the document content STREAMS word-by-word into a white inner box whose older lines slide up under a top fade (the live-edit treatment for posts/docs/emails/memory); task-status ('Marked 1 task(s) as \u25d1 In review' + blue-checkbox task rows); agent prose; user bubbles (right-aligned, pink initials avatar); 'Conversation summarized' divider. Entity icons: linkedin (blue tile), x (black tile), email + doc/template (orange), task + campaign (blue), blog/memory (dark). SCRIPTED performable surface; camera anchors: messages, composer, tabs.",
   "data": {
     "tabs": {
       "type": "array",
-      "label": "Tab row: [{label, running?: true (spinning ✳, muted)}]. First tab is active with the ×.",
+      "label": "Tab row: [{label, running?: true (spinning \u2733, muted)}]. First tab is active with the \u00d7.",
       "optional": true
     },
     "copies_badge": {
@@ -31,7 +31,7 @@
     },
     "script": {
       "type": "array",
-      "label": "The performance: type-message {text} + send-message, user-message {text}, show-typing/hide-typing, agent-message {text} (**bold** + `code`), verb-line {verb: 'Reviewed'|'Created'|'Updated'|'Marked', entity: 'linkedin'|'x'|'email'|'doc'|'template'|'task'|'campaign'|'blog'|'memory', title, inline_title?: true (title on the verb line, like 'Created ✉ Weekly AI Marketing Newsletter July 13 2026'), noun?}, content-card {verb, entity, title, content: 'the doc text...\\n\\n...', duration: 3, collapse_delay?} (THE streaming beat: the content types itself into the faded box while the scroll-down button floats), task-status {status: 'In review', tasks: ['Draft LinkedIn POV post'], count}, summarized {label?}, open-references {items: [{entity, title, kind: 'Social Post'|'Task'|...}]} / close-references (the popover under the copies icon), switch-tab {index}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (messages, composer, tabs).",
+      "label": "The performance: type-message {text} + send-message, user-message {text}, show-typing/hide-typing, agent-message {text} (**bold** + `code`), verb-line {verb: 'Reviewed'|'Created'|'Updated'|'Marked', entity: 'linkedin'|'x'|'email'|'doc'|'template'|'task'|'campaign'|'blog'|'memory', title, inline_title?: true (title on the verb line, like 'Created \u2709 Weekly AI Marketing Newsletter July 13 2026'), noun?}, content-card {verb, entity, title, content: 'the doc text...\\n\\n...', duration: 3, collapse_delay?} (THE streaming beat: the content types itself into the faded box while the scroll-down button floats), task-status {status: 'In review', tasks: ['Draft LinkedIn POV post'], count}, summarized {label?}, open-references {items: [{entity, title, kind: 'Social Post'|'Task'|...}]} / close-references (the popover under the copies icon), switch-tab {index}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (messages, composer, tabs). Also: error-line {text} (circled-x failure row), search-card {query, results: [{title, desc}]} (tool search-results card), tool-use {tool_name, service} (MCP tool chip).",
       "optional": true
     },
     "cursor_targets": {
@@ -52,6 +52,16 @@
     "user_avatar": {
       "type": "string",
       "label": "LEGACY alias of user_avatar_url",
+      "optional": true
+    },
+    "mode": {
+      "type": "string",
+      "label": "panel (default, compact sidebar) | full (the expanded full-screen thread: centered content column, roomier type)",
+      "optional": true
+    },
+    "model": {
+      "type": "string",
+      "label": "Composer model pill label (default 'Opus 4.7')",
       "optional": true
     }
   },
@@ -107,7 +117,7 @@
     },
     {
       "action": "task-status",
-      "description": "'Marked N task(s) as ◑ In review' + blue-checkbox task rows",
+      "description": "'Marked N task(s) as \u25d1 In review' + blue-checkbox task rows",
       "params": {
         "status": "string",
         "tasks": "array of strings",
