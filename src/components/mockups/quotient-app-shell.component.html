@@ -3,7 +3,7 @@
     <!-- Left icon rail -->
     <div class="qas-rail" data-anchor="nav">
       <div class="qas-rail-top">
-        <div class="qas-rail-btn qas-rail-collapse" style="display:none">
+        <div class="qas-rail-btn qas-rail-collapse">
           <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14 4v16"/><path d="M17.5 10l2 2-2 2"/></svg>
         </div>
         <div class="qas-rail-btn" data-nav="home">
@@ -39,6 +39,9 @@
         <div class="qas-rail-btn" data-nav="audience">
           <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
         </div>
+        <div class="qas-rail-btn" data-nav="analytics">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>
+        </div>
         <div class="qas-rail-btn" data-nav="scheduled">
           <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="10" cy="14" r="3.4"/><path d="M10 12.2V14l1.3 1"/></svg>
         </div>
@@ -49,13 +52,30 @@
       <div class="qas-rail-ava"></div>
     </div>
 
+    <!-- Expanded left nav (data.nav_open): logo header, labeled rows, user footer -->
+    <div class="qas-nav" style="display:none">
+      <div class="qas-nav-head">
+        <img class="qas-nav-logo" alt="" />
+        <span class="qas-nav-brand">Quotient</span>
+        <svg class="qas-nav-brandchev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        <div class="qas-nav-collapse">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/><path d="M6.5 10l-2 2 2 2"/></svg>
+        </div>
+      </div>
+      <div class="qas-nav-rows"></div>
+      <div class="qas-nav-foot">
+        <div class="qas-nav-ava"></div>
+        <div class="qas-nav-user">
+          <div class="qas-nav-name"></div>
+          <div class="qas-nav-mail"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Right side: header + (content | chat panel) -->
     <div class="qas-main">
       <div class="qas-header" data-anchor="header">
         <div class="qas-header-left">
-          <div class="qas-hdr-collapse">
-            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14 4v16"/><path d="M17.5 10l2 2-2 2"/></svg>
-          </div>
           <div class="qas-crumbs"></div>
         </div>
         <div class="qas-header-right">
@@ -167,7 +187,8 @@
     color: #75736e; cursor: pointer;
   }
   .qas-rail-btn svg { width: 17px; height: 17px; }
-  .qas-rail-btn.active { background: #e7e6ef; color: #1a1a1a; }
+  .qas-rail-btn.active { background: #fff; color: #1a1a1a;
+    border: 2px solid #e7e6ef; box-shadow: 0 2px 8px rgba(23,23,28,0.08); }
   .qas-rail-ava {
     width: 32px; height: 32px; border-radius: 50%;
     background: #d5e2f5; overflow: hidden; position: relative;
@@ -180,6 +201,33 @@
   .qas-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
   /* ── Header ── */
+  /* ── Expanded left nav (data.nav_open) ── */
+  .qas-nav { width: 15.5%; min-width: 210px; max-width: 280px; flex-shrink: 0;
+    display: flex; flex-direction: column; background: #f4f4f8;
+    border-right: 1px solid #e9e8f1; padding: 12px 12px 14px; box-sizing: border-box; }
+  .qas-nav-head { display: flex; align-items: center; gap: 8px; padding: 6px 6px 14px; }
+  .qas-nav-logo { width: 26px; height: 26px; border-radius: 50%; }
+  .qas-nav-brand { font-size: 15.5px; font-weight: 700; color: #1a1a1a; }
+  .qas-nav-brandchev { width: 14px; height: 14px; color: #6b6a75; }
+  .qas-nav-collapse { margin-left: auto; color: #55565e; display: flex; }
+  .qas-nav-collapse svg { width: 17px; height: 17px; }
+  .qas-nav-rows { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+  .qas-nav-row { display: flex; align-items: center; gap: 11px; padding: 8.5px 11px;
+    border-radius: 12px; font-size: 13.5px; font-weight: 500; color: #55565e; }
+  .qas-nav-row svg { width: 17px; height: 17px; flex-shrink: 0; }
+  .qas-nav-row.active { background: #fff; color: #1a1a1a; font-weight: 600;
+    border: 2px solid #e7e6ef; box-shadow: 0 2px 8px rgba(23,23,28,0.08); padding: 6.5px 9px; }
+  .qas-nav-chev { margin-left: auto; width: 13px !important; height: 13px !important; color: #a9a8b4; }
+  .qas-nav-foot { border-top: 1px solid #e9e8f1; padding: 12px 6px 0; display: flex;
+    align-items: center; gap: 10px; }
+  .qas-nav-ava { width: 34px; height: 34px; border-radius: 9px; background: #c9c2f2;
+    overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; }
+  .qas-nav-ava img { width: 100%; height: 100%; object-fit: cover; }
+  .qas-nav-name { font-size: 13px; font-weight: 600; color: #1a1a1a; white-space: nowrap; }
+  .qas-nav-mail { font-size: 11.5px; color: #6b6a75; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; max-width: 150px; }
+
   .qas-header {
     height: 5.6%; min-height: 46px;
     display: flex; align-items: center; justify-content: space-between;
@@ -231,7 +279,7 @@
   /* The real app's content well is a WHITE rounded card floating on the
      cool chrome, not a flush region. */
   .qas-content { flex: 1; min-width: 0; position: relative; background: #fff;
-    border: 2px solid #dddce8; border-radius: 14px 14px 0 0; margin: 0 0 0 4px;
+    border: 2px solid #dddce8; border-radius: 14px; margin: 0 6px 14px 4px;
     box-shadow: 0 2px 12px rgba(23,23,28,0.12); overflow: hidden; }
 
   /* ── Agent panel ── */
@@ -426,6 +474,41 @@
     el.querySelector('.qas-tab-label').textContent = panelTab;
     el.querySelector('.qas-pi-badge').textContent = copiesBadge;
     var activeBtn = el.querySelector('.qas-rail-btn[data-nav="' + navActive + '"]');
+
+    // ── Expanded left nav (data.nav_open): labeled rows built from the rail's
+    // own icons, so the two navs can never drift apart. ──
+    if (data.nav_open) {
+      var NAV_LABELS = { home: 'Home', history: 'Chat History', campaigns: 'Campaigns', social: 'Social',
+        blog: 'Blog', email: 'Email', assets: 'Assets', docs: 'Documents', flows: 'Flows',
+        calendar: 'Events', audience: 'Audience', analytics: 'Analytics', scheduled: 'Jobs', memory: 'Memory' };
+      var NAV_CHEVRON = { campaigns: 1, email: 1, audience: 1, analytics: 1 };
+      var nav = el.querySelector('.qas-nav');
+      var rows = nav.querySelector('.qas-nav-rows');
+      el.querySelectorAll('.qas-rail-btn[data-nav]').forEach(function(btn) {
+        var key = btn.getAttribute('data-nav');
+        if (!NAV_LABELS[key]) return;
+        var row = document.createElement('div');
+        row.className = 'qas-nav-row' + (key === navActive ? ' active' : '');
+        row.appendChild(btn.querySelector('svg').cloneNode(true));
+        var lbl = document.createElement('span');
+        lbl.textContent = NAV_LABELS[key];
+        row.appendChild(lbl);
+        if (NAV_CHEVRON[key]) {
+          row.insertAdjacentHTML('beforeend', '<svg class="qas-nav-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>');
+        }
+        rows.appendChild(row);
+      });
+      var navLogo = nav.querySelector('.qas-nav-logo');
+      navLogo.src = data.logo_url || 'https://img.logo.dev/getquotient.ai?token=pk_B_cdrQLyTkSFPzSMm52goQ&format=png&size=64';
+      navLogo.onerror = function() { navLogo.style.display = 'none'; };
+      var navAva = nav.querySelector('.qas-nav-ava');
+      navAva.textContent = userInitials;
+      if (userAvatarUrl) navAva.innerHTML = '<img src="' + userAvatarUrl.replace(/"/g, '') + '" onerror="this.remove()"/>' ;
+      nav.querySelector('.qas-nav-name').textContent = data.user_name || 'Marc Ferrentino';
+      nav.querySelector('.qas-nav-mail').textContent = data.user_email || 'marc@getquotient.ai';
+      nav.style.display = 'flex';
+      rail.style.display = 'none';
+    }
     if (activeBtn) activeBtn.classList.add('active');
     var avaEl = el.querySelector('.qas-rail-ava');
     avaEl.textContent = userInitials;
