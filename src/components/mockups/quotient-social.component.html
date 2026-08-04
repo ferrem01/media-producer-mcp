@@ -193,6 +193,9 @@
     border-radius: 14px;
     box-shadow: 0 10px 32px rgba(23,23,28,0.16);
   }
+  /* Docked: riding quotient-app-shell's white content card -- the outer
+     window chrome goes; the deliverable reads as an app region. */
+  .qsp.is-docked { border: 0; box-shadow: none; border-radius: 0; background: #fff; }
 
   /* ── App chrome bar ── */
   .qsp-appbar {
@@ -518,6 +521,7 @@
 
 <script>
   function createTimeline(el, data, ctx) {
+    if (data.docked) el.querySelector('.qsp').classList.add('is-docked');
     var tl = gsap.timeline();
     var root = el.querySelector('.qsp');
     var appbar = el.querySelector('.qsp-appbar');

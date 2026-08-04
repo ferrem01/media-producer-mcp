@@ -89,6 +89,11 @@
       },
       "label": "Timed actions: publish-blog {at, published_when?}, highlight-hero {at}, scroll-doc {at, amount, duration}. Cursor targets: 'status', 'hero'.",
       "optional": true
+    },
+    "docked": {
+      "type": "boolean",
+      "label": "true = riding quotient-app-shell's white content card: strips the outer window chrome so the surface merges with the card.",
+      "optional": true
     }
   },
   "match": {
