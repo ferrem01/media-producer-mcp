@@ -49,6 +49,8 @@
   .qbl-window { width: 97%; height: 96%; background: #fbfafc; border-radius: 12px;
     box-shadow: 0 20px 60px rgba(23,23,28,0.18); overflow: hidden; display: flex;
     font-family: 'Inter', -apple-system, sans-serif; }
+  /* Docked: inside the shell's content card the doc IS the card. */
+  .qbl.is-docked .qbl-window { width: 100%; height: 100%; box-shadow: none; border-radius: 0; }
   .qbl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fdfdfe; }
   .qbl-docbar { height: 46px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;
     padding: 0 18px; border-bottom: 1px solid #f0eff3; }
@@ -98,6 +100,7 @@
 
 <script>
   function createTimeline(el, data, ctx) {
+    if (data.docked) el.querySelector('.qbl').classList.add('is-docked');
     var tl = gsap.timeline();
     var q = function(s) { return el.querySelector(s); };
     var win = q('.qbl-window');

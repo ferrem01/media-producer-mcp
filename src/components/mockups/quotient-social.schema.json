@@ -1,8 +1,8 @@
 {
   "type": "quotient-social",
-  "label": "Quotient Social — post editor",
+  "label": "Quotient Social \u2014 post editor",
   "category": "mockups",
-  "description": "The Quotient social post editor (built from actual screenshots): white toolbar with the platform badge (X black tile or LinkedIn blue) + post title, kebab/share buttons, the orange flag campaign-tag pill with progress ring, 'Go to thread ↗', and the BLACK Schedule split-button with a Publish Now / Schedule for later dropdown (published posts show 'View ↗' instead); below it the dotted-grid canvas with the post card -- GREEN '✓ Post published on {date}' bar (or gray '✎ Draft') with the char counter ('652/25,000'), the author row (X: brand avatar + X corner badge + blue verified check + @handle; LinkedIn: photo + in corner badge + in name badge), the body text, up to two side-by-side media cards (image, gradient headline placeholder, or file stack), then the card BOTTOM matching the real editor: DRAFTS get the action strip (emoji + image icons and the 'Ask for Changes' button with the Quotient mark) while PUBLISHED posts get the muted Likes/Comments/Reposts/Forwards row (publish-post swaps them live), then the footer AUTHOR block (avatar + name + platform badge + gray Author chip + the first comment, e.g. 'Apply here: {url}'), and BELOW the card the Comments section ('Comments' heading + 'Write a comment...' composer with the circular send button; show_comments to hide). SCRIPTED performable surface. Camera anchors: post, status, media, toolbar.",
+  "description": "The Quotient social post editor (built from actual screenshots): white toolbar with the platform badge (X black tile or LinkedIn blue) + post title, kebab/share buttons, the orange flag campaign-tag pill with progress ring, 'Go to thread \u2197', and the BLACK Schedule split-button with a Publish Now / Schedule for later dropdown (published posts show 'View \u2197' instead); below it the dotted-grid canvas with the post card -- GREEN '\u2713 Post published on {date}' bar (or gray '\u270e Draft') with the char counter ('652/25,000'), the author row (X: brand avatar + X corner badge + blue verified check + @handle; LinkedIn: photo + in corner badge + in name badge), the body text, up to two side-by-side media cards (image, gradient headline placeholder, or file stack), then the card BOTTOM matching the real editor: DRAFTS get the action strip (emoji + image icons and the 'Ask for Changes' button with the Quotient mark) while PUBLISHED posts get the muted Likes/Comments/Reposts/Forwards row (publish-post swaps them live), then the footer AUTHOR block (avatar + name + platform badge + gray Author chip + the first comment, e.g. 'Apply here: {url}'), and BELOW the card the Comments section ('Comments' heading + 'Write a comment...' composer with the circular send button; show_comments to hide). SCRIPTED performable surface. Camera anchors: post, status, media, toolbar.",
   "data": {
     "platform": {
       "type": "string",
@@ -15,7 +15,7 @@
     },
     "status": {
       "type": "string",
-      "label": "Post status (default draft). Published shows the green bar + View button; draft shows the gray ✎ bar + black Schedule button.",
+      "label": "Post status (default draft). Published shows the green bar + View button; draft shows the gray \u270e bar + black Schedule button.",
       "optional": true,
       "enum": [
         "published",
@@ -25,7 +25,7 @@
     },
     "post_title": {
       "type": "string",
-      "label": "Toolbar title (e.g. 'July 9 Changelog — Quotient X')",
+      "label": "Toolbar title (e.g. 'July 9 Changelog \u2014 Quotient X')",
       "optional": true
     },
     "published_date": {
@@ -90,7 +90,7 @@
     },
     "show_app_bar": {
       "type": "boolean",
-      "label": "Show the app chrome bar above the toolbar (bell, Search ⌘+K, New Chat)",
+      "label": "Show the app chrome bar above the toolbar (bell, Search \u2318+K, New Chat)",
       "optional": true
     },
     "embed_image_url": {
@@ -110,7 +110,7 @@
     },
     "script": {
       "type": "array",
-      "label": "Actions: scroll-post {amount, duration}, highlight-status, highlight-media, open-schedule-menu (the black button's Publish Now / Schedule for later dropdown drops down), close-schedule-menu, publish-post {published_date?} (Publish Now row flashes, menu closes, the bar flips GREEN '✓ Post published on …' and Schedule becomes View -- THE money beat), schedule-post {scheduled_date}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (post, status, media, toolbar).",
+      "label": "Actions: scroll-post {amount, duration}, highlight-status, highlight-media, open-schedule-menu (the black button's Publish Now / Schedule for later dropdown drops down), close-schedule-menu, publish-post {published_date?} (Publish Now row flashes, menu closes, the bar flips GREEN '\u2713 Post published on \u2026' and Schedule becomes View -- THE money beat), schedule-post {scheduled_date}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (post, status, media, toolbar).",
       "optional": true
     },
     "cursor_targets": {
@@ -131,6 +131,11 @@
     "show_comments": {
       "type": "boolean",
       "label": "Comments section under the card: heading + 'Write a comment...' composer (default true)",
+      "optional": true
+    },
+    "docked": {
+      "type": "boolean",
+      "label": "true = riding quotient-app-shell's white content card: strips the outer window chrome so the surface merges with the card.",
       "optional": true
     }
   },
@@ -169,7 +174,7 @@
     },
     {
       "action": "publish-post",
-      "description": "The publish beat: the Publish Now row flashes, the menu closes, the status bar flips to the green '✓ Post published on {date}' treatment and the Schedule button becomes View ↗",
+      "description": "The publish beat: the Publish Now row flashes, the menu closes, the status bar flips to the green '\u2713 Post published on {date}' treatment and the Schedule button becomes View \u2197",
       "params": {
         "published_date": "string - date text for the green bar"
       }
