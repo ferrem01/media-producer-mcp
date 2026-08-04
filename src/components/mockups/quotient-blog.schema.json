@@ -74,7 +74,7 @@
     },
     "last_updated": {
       "type": "string",
-      "label": "'Last updated:' text (default 'just now')",
+      "label": "LEGACY: no longer displayed (the real docbar is controls-only)",
       "optional": true
     },
     "threads_count": {
@@ -93,6 +93,11 @@
     "docked": {
       "type": "boolean",
       "label": "true = riding quotient-app-shell's white content card: strips the outer window chrome so the surface merges with the card.",
+      "optional": true
+    },
+    "campaign_progress": {
+      "type": "string",
+      "label": "Campaign chip progress, e.g. '0/1' (adds the count + ring like the real docbar)",
       "optional": true
     }
   },
