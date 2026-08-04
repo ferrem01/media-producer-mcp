@@ -87,14 +87,46 @@
     // House type system: the sentence lands as ONE block (line rise + fade).
     // Accents are color-only spans that move with their line -- no masks, no
     // per-word stagger, no slam, no glow.
+    // Ramp words: per-glyph gradient (primary -> magenta -> orange), the same
+    // 'rainbow' emphasis st-statement uses -- per-glyph SOLID colors, so no
+    // background-clip paint-box bugs.
+    var rampWords = (Array.isArray(data.ramp_words) ? data.ramp_words : []).map(function(w) { return String(w).toLowerCase().replace(/[^\w]/g, ''); });
+    var rp = (window.mpParseColor && mpParseColor(getComputedStyle(root).getPropertyValue('--mp-color-primary').trim() || '#4f46e5')) || { r: 79, g: 70, b: 229 };
+    var rampStops = [
+      { at: 0.10, c: [rp.r, rp.g, rp.b] },
+      { at: 0.55, c: [196, 72, 159] },
+      { at: 0.95, c: [255, 106, 77] },
+    ];
+    function rampAt(t) {
+      var p2 = 0.10 + t * 0.85;
+      var a = rampStops[0], b = rampStops[rampStops.length - 1];
+      for (var ri = 0; ri < rampStops.length - 1; ri++) {
+        if (p2 >= rampStops[ri].at && p2 <= rampStops[ri + 1].at) { a = rampStops[ri]; b = rampStops[ri + 1]; break; }
+      }
+      var f = b.at === a.at ? 0 : (p2 - a.at) / (b.at - a.at);
+      var c = a.c.map(function(v, ci) { return Math.round(v + (b.c[ci] - v) * f); });
+      return 'rgb(' + c.join(',') + ')';
+    }
     tokens.forEach(function(tok) {
       var clean = tok.w.replace(/\*/g, '');
       var bare = clean.toLowerCase().replace(/[^\w]/g, '');
       var w = document.createElement('span');
       w.className = 'stmf-word';
-      w.textContent = clean;
-      if (tok.star || accents.indexOf(bare) !== -1) w.classList.add('is-accent');
-      else if (SMALL[bare] && !data.uniform) w.classList.add('is-small');
+      if (rampWords.indexOf(bare) !== -1) {
+        w.classList.add('is-accent');
+        var chars = Array.from(clean);
+        var n = Math.max(1, chars.length - 1);
+        chars.forEach(function(ch, gi) {
+          var g = document.createElement('span');
+          g.style.color = rampAt(gi / n);
+          g.textContent = ch;
+          w.appendChild(g);
+        });
+      } else {
+        w.textContent = clean;
+        if (tok.star || accents.indexOf(bare) !== -1) w.classList.add('is-accent');
+        else if (SMALL[bare] && !data.uniform) w.classList.add('is-small');
+      }
       flow.appendChild(w);
     });
 
