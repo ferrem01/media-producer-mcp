@@ -287,6 +287,15 @@ export function getPreviewHtml(): string {
   .film-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .film-cell:hover { box-shadow: 0 0 0 1.5px rgba(99,102,241,0.55); z-index: 2; }
   .film-cell.active { box-shadow: 0 0 0 2px #6366f1; z-index: 2; }
+  /* Scene resize: grab the poster's right edge and pull. */
+  .film-edge { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize;
+    border-radius: 0 5px 5px 0; }
+  .film-cell:hover .film-edge { background: linear-gradient(90deg, transparent, rgba(99,102,241,0.45)); }
+  .film-cell.resizing { overflow: visible; box-shadow: 0 0 0 2px #6366f1; z-index: 5; }
+  .film-cell.resizing .film-edge { background: rgba(99,102,241,0.65); }
+  .film-edge-chip { position: absolute; top: -24px; right: 0; background: #1f2430; color: #fff;
+    font: 600 10px Inter, sans-serif; padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+    pointer-events: none; z-index: 6; }
   /* Scene blocks: zebra containers grouping each scene's component bars. */
   .scene-blk { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: pointer;
     border-right: 1px solid rgba(15,23,42,0.06); }
@@ -4184,28 +4193,7 @@ export function getPreviewHtml(): string {
       if (done) return; done = true;
       var v = parseFloat(input.value);
       if (isNaN(v) || v <= 0 || Math.abs(v - oldDur) < 0.01) { renderSceneList(); return; }
-      v = Math.min(120, Math.max(0.5, Math.round(v * 10) / 10));
-      var savedTime = state.masterTime || 0;
-      api('PATCH', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '/scenes/' + encodeURIComponent(scene.id), { duration_seconds: v })
-        .then(function(r) {
-          scene.duration_seconds = r.duration_seconds || v;
-          state.totalDuration = calcTotalDuration();
-          if (savedTime > state.totalDuration) savedTime = Math.max(0, state.totalDuration - 0.1);
-          renderSceneList();
-          studioStatus('\\u23f1 ' + (scene.label || scene.id) + ' \\u2192 ' + scene.duration_seconds.toFixed(1) + 's \\u2014 reloading\\u2026', 'ok');
-          if (state.compositeLoaded) {
-            var compositePath = '/preview-composite/' + state.tenantId + '/' + p.project_id;
-            fetchHtml(compositePath).then(function(freshHtml) {
-              state._compositeHtml = freshHtml;
-              writeSceneToIframe(freshHtml);
-              waitForCompositeReady(function(masterTl) {
-                masterTl.time(Math.max(0.001, savedTime));
-                masterTl.pause();
-              });
-            });
-          }
-        })
-        .catch(function(e) { studioStatus('Duration save failed: ' + e.message, 'err'); renderSceneList(); });
+      saveSceneDuration(scene, v);
     }
     input.addEventListener('keydown', function(ev) {
       if (ev.key === 'Enter') { ev.preventDefault(); save(); }
@@ -4213,6 +4201,73 @@ export function getPreviewHtml(): string {
     });
     input.addEventListener('blur', save);
     input.addEventListener('click', function(ev) { ev.stopPropagation(); });
+  }
+
+  // Shared save for both duration editors (chip input + filmstrip edge drag):
+  // PATCH the built scene, retime the timeline, hot-reload the composite at
+  // the same playhead.
+  function saveSceneDuration(scene, v) {
+    var p = state.currentProject;
+    if (!p || !scene) return;
+    v = Math.min(120, Math.max(0.5, Math.round(v * 10) / 10));
+    var savedTime = state.masterTime || 0;
+    api('PATCH', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '/scenes/' + encodeURIComponent(scene.id), { duration_seconds: v })
+      .then(function(r) {
+        scene.duration_seconds = r.duration_seconds || v;
+        state.totalDuration = calcTotalDuration();
+        if (savedTime > state.totalDuration) savedTime = Math.max(0, state.totalDuration - 0.1);
+        renderSceneList();
+        renderLaneLabels();
+        studioStatus('\\u23f1 ' + (scene.label || scene.id) + ' \\u2192 ' + scene.duration_seconds.toFixed(1) + 's \\u2014 reloading\\u2026', 'ok');
+        if (state.compositeLoaded) {
+          var compositePath = '/preview-composite/' + state.tenantId + '/' + p.project_id;
+          fetchHtml(compositePath).then(function(freshHtml) {
+            state._compositeHtml = freshHtml;
+            writeSceneToIframe(freshHtml);
+            waitForCompositeReady(function(masterTl) {
+              masterTl.time(Math.max(0.001, savedTime));
+              masterTl.pause();
+            });
+          });
+        }
+      })
+      .catch(function(e) { studioStatus('Duration save failed: ' + e.message, 'err'); renderSceneList(); renderLaneLabels(); });
+  }
+
+  // ── Filmstrip edge drag: grab a scene poster's right edge and pull. ──
+  function startFilmEdgeDrag(ev, sceneIdx, cell) {
+    ev.stopPropagation();
+    ev.preventDefault();
+    var p = state.currentProject;
+    var scene = p && p.scenes[sceneIdx];
+    if (!scene) return;
+    var lane = document.getElementById('film-lane');
+    var laneW = lane ? lane.getBoundingClientRect().width : 1;
+    var total = state.totalDuration || calcTotalDuration();
+    var orig = Number(scene.duration_seconds) || 5;
+    var startX = ev.clientX;
+    var live = orig;
+    var chip = document.createElement('div');
+    chip.className = 'film-edge-chip';
+    chip.textContent = orig.toFixed(1) + 's';
+    cell.appendChild(chip);
+    cell.classList.add('resizing');
+    function onMove(e2) {
+      var dSec = ((e2.clientX - startX) / laneW) * total;
+      live = Math.min(120, Math.max(0.5, Math.round((orig + dSec) * 10) / 10));
+      chip.textContent = orig.toFixed(1) + 's \\u2192 ' + live.toFixed(1) + 's';
+      cell.style.width = 'max(6px, calc(' + ((live / total) * 100).toFixed(3) + '% - 2px))';
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      cell.classList.remove('resizing');
+      chip.remove();
+      if (Math.abs(live - orig) < 0.05) { renderLaneLabels(); return; }
+      saveSceneDuration(scene, live);
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   }
 
   function savePropNow() {
@@ -5255,6 +5310,14 @@ export function getPreviewHtml(): string {
           cell.appendChild(img);
           cell.addEventListener('click', function(ev) { ev.stopPropagation(); selectScene(fi2); renderCompLane(); });
           cell.addEventListener('dblclick', function(ev) { ev.stopPropagation(); selectScene(fi2); enterFocus(fi2); });
+          // Right-edge resize handle: drag to retime the scene in place.
+          var edge = document.createElement('div');
+          edge.className = 'film-edge';
+          edge.title = 'Drag to resize this scene (' + fdur.toFixed(1) + 's)';
+          edge.addEventListener('pointerdown', function(ev) { startFilmEdgeDrag(ev, fi2, cell); });
+          edge.addEventListener('click', function(ev) { ev.stopPropagation(); });
+          edge.addEventListener('dblclick', function(ev) { ev.stopPropagation(); });
+          cell.appendChild(edge);
           filmWrap.appendChild(cell);
         })(fi);
       }
