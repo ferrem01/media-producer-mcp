@@ -3,7 +3,7 @@
     <!-- Left icon rail -->
     <div class="qas-rail" data-anchor="nav">
       <div class="qas-rail-top">
-        <div class="qas-rail-btn qas-rail-collapse">
+        <div class="qas-rail-btn qas-rail-collapse" style="display:none">
           <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14 4v16"/><path d="M17.5 10l2 2-2 2"/></svg>
         </div>
         <div class="qas-rail-btn" data-nav="home">
@@ -53,6 +53,9 @@
     <div class="qas-main">
       <div class="qas-header" data-anchor="header">
         <div class="qas-header-left">
+          <div class="qas-hdr-collapse">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14 4v16"/><path d="M17.5 10l2 2-2 2"/></svg>
+          </div>
           <div class="qas-crumbs"></div>
         </div>
         <div class="qas-header-right">
@@ -184,6 +187,11 @@
     flex-shrink: 0;
   }
   .qas-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; padding-left: 6px; }
+  /* Collapse button lives in the HEADER in the real app, not the rail. */
+  .qas-hdr-collapse { display: flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border: 2px solid #d8d7e2; border-radius: 12px;
+    color: #55565e; margin-right: 12px; flex-shrink: 0; }
+  .qas-hdr-collapse svg { width: 18px; height: 18px; }
   .qas-crumbs { display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 0; white-space: nowrap; }
   .qas-crumb { color: #6f6d68; }
   .qas-crumb.last { color: #1a1a1a; font-weight: 500; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }

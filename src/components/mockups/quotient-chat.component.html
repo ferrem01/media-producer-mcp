@@ -139,6 +139,21 @@
   .qch.is-full .qch-cc-title { font-size: 16px; }
   .qch.is-full .qch-cc-content { font-size: 15.5px; }
   .qch.is-full .qch-input { font-size: 15.5px; min-height: 24px; }
+  /* Real full-screen composer: a tall rounded card with generous padding
+     and a large send orb; the panel-toggle icon doesn't exist expanded. */
+  .qch.is-full .qch-composer { border-radius: 24px; padding: 20px 24px 16px; }
+  .qch.is-full .qch-input { min-height: 54px; }
+  .qch.is-full .qch-send { width: 46px; height: 46px; }
+  .qch.is-full .qch-send svg { width: 22px; height: 22px; }
+  .qch.is-full .qch-mode { font-size: 14.5px; }
+  .qch.is-full .qch-star { width: 17px; height: 17px; }
+  .qch.is-full .qch-clip { width: 18px; height: 18px; }
+  .qch.is-full .qch-mic { width: 18px; height: 18px; }
+  .qch.is-full .qch-ti:nth-child(3) { display: none; }
+  /* Inline bold card titles + blue links (the real thread's row anatomy). */
+  .qch-cc-title-inline { color: #1a1a1a; font-weight: 600; }
+  .qch-cc-verb { flex-wrap: wrap; }
+  .qch-link { color: #2f6fed; }
 
   /* Error line: circled-x + muted text (the real thread's failure row). */
   .qch-error { display: flex; align-items: center; gap: 8px; margin: 14px 0 6px;
@@ -441,7 +456,8 @@
     }
     function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     function md(s) {
-      return esc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+      return esc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/(https?:\/\/[^\s<]+)/g, '<span class="qch-link">$1</span>');
     }
     // Paragraphs + "- " bullet blocks (the real thread renders bulleted
     // changelogs and post bodies inside cards and prose).
@@ -502,8 +518,8 @@
       var d = document.createElement('div');
       d.className = 'qch-cc open';
       d.innerHTML = '<div class="qch-cc-head">' +
-        '<div><div class="qch-cc-verb">' + esc(a.verb || 'Created') + ' ' + entIcon(a.entity) + ' ' + esc(a.noun || entNoun(a.entity)) + '</div>' +
-        '<div class="qch-cc-title">' + esc(a.title || '') + '</div></div>' +
+        '<div class="qch-cc-headmain"><div class="qch-cc-verb">' + esc(a.verb || 'Created') + ' ' + entIcon(a.entity) + ' ' + esc(a.noun || entNoun(a.entity)) +
+        ' <span class="qch-cc-title-inline">' + esc(a.title || '') + '</span></div></div>' +
         '<div class="qch-cc-chev"><svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg></div></div>' +
         '<div class="qch-cc-bodywrap"><div class="qch-cc-body short"><div class="qch-cc-content"></div></div></div>';
       return d;
