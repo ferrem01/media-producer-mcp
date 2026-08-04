@@ -165,6 +165,37 @@
   .qch.is-full .qch-search-rd { font-size: 14px; }
   .qch-search-rmain { min-width: 0; flex: 1; }
 
+  /* To-do list card: 'Created to-do list' + progress ring + task rows. */
+  .qch-todo { margin: 14px 0; }
+  .qch-todo-head { display: flex; align-items: center; gap: 8px; padding: 8px 2px;
+    font-size: 14.5px; font-weight: 600; color: #1a1a1a; }
+  .qch-todo-chev { width: 15px; height: 15px; stroke: #6b6963; }
+  .qch-todo-prog { margin-left: auto; display: flex; align-items: center; gap: 6px;
+    font-size: 13.5px; font-weight: 600; color: #55534e; }
+  .qch-todo-prog svg { width: 17px; height: 17px; stroke: #55534e; stroke-width: 2.4; }
+  .qch-todo-body { border: 1.5px solid #eceae4; border-radius: 12px; background: #fff;
+    padding: 6px 14px; box-shadow: 0 2px 10px rgba(23,23,28,0.05); }
+  .qch-todo-item { display: flex; align-items: center; gap: 10px; padding: 9px 2px;
+    font-size: 14px; color: #2a2926; }
+  .qch-todo-item svg { width: 18px; height: 18px; flex-shrink: 0; display: none; }
+  .qch-todo-item .qti-next { stroke: #2a2926; }
+  .qch-todo-item .qti-dash { stroke: #b9b7b1; }
+  .qch-todo-item .qti-done { stroke: #4b7bf5; }
+  .qch-todo-item.is-next .qti-next { display: block; }
+  .qch-todo-item.is-next .qti-text { font-weight: 600; }
+  .qch-todo-item.is-todo .qti-dash { display: block; }
+  .qch-todo-item.is-done .qti-done { display: block; }
+  .qch-todo-item.is-done .qti-text { color: #8a887f; }
+  .qch.is-full .qch-todo-head { font-size: 16px; }
+  .qch.is-full .qch-todo-item { font-size: 15.5px; padding: 10px 2px; }
+
+  /* Streaming cards clip older lines under a soft top fade (the real
+     thread's scrolled-card look). */
+  .qch-cc-bodywrap { position: relative; }
+  .qch-cc-bodywrap::before { content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 26px; background: linear-gradient(#fff, rgba(255,255,255,0)); z-index: 1;
+    pointer-events: none; }
+
   /* Verb line: "Reviewed [ico] LinkedIn post" + optional bold title */
   .qch-verb { margin: 14px 0 6px; }
   .qch-verb-row {
@@ -410,6 +441,18 @@
     function md(s) {
       return esc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
     }
+    // Paragraphs + "- " bullet blocks (the real thread renders bulleted
+    // changelogs and post bodies inside cards and prose).
+    function mdBlocks(text) {
+      return String(text).split(/\n\n+/).map(function(p) {
+        var lines = p.split(/\n/).filter(function(l) { return l.trim(); });
+        var isList = lines.length > 0 && lines.every(function(l) { return /^\s*[-•]\s+/.test(l); });
+        if (isList) {
+          return '<ul>' + lines.map(function(l) { return '<li>' + md(l.replace(/^\s*[-•]\s+/, '')) + '</li>'; }).join('') + '</ul>';
+        }
+        return '<p>' + md(p) + '</p>';
+      }).join('');
+    }
 
     // ── Data ──
     var tabs = data.tabs || [{ label: data.conversation_title || 'Draft LinkedIn POV Post' }];
@@ -476,7 +519,7 @@
     function agentEl(text) {
       var d = document.createElement('div');
       d.className = 'qch-agent';
-      d.innerHTML = String(text).split(/\n\n+/).map(function(p) { return '<p>' + md(p) + '</p>'; }).join('');
+      d.innerHTML = mdBlocks(text);
       return d;
     }
     function userEl(text) {
@@ -514,6 +557,44 @@
       });
       return d;
     }
+    function todoEl(a) {
+      // The real thread's to-do list card: 'Created to-do list' header with
+      // a progress ring counter, then task rows. Row states: next (arrow),
+      // todo (dashed circle), done (blue check). ALL state icons are
+      // prebuilt per row and shown by row class, so check-todo flips are
+      // pure class swaps -- scrub-safe with the paired-boundary helpers.
+      var d = document.createElement('div');
+      d.className = 'qch-todo';
+      var items = (a.items || a.tasks || []).map(function(t) {
+        return typeof t === 'string' ? { text: t, state: 'todo' } : t;
+      });
+      var doneN = items.filter(function(t) { return t.state === 'done'; }).length;
+      var head = document.createElement('div');
+      head.className = 'qch-todo-head';
+      head.innerHTML = '<svg class="qch-todo-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>' +
+        '<span class="qch-todo-title"></span>' +
+        '<span class="qch-todo-prog"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/></svg>' +
+        '<span class="qch-todo-count">' + doneN + '/' + items.length + '</span></span>';
+      head.querySelector('.qch-todo-title').textContent = a.title || 'Created to-do list';
+      d.appendChild(head);
+      var bodyT = document.createElement('div');
+      bodyT.className = 'qch-todo-body';
+      items.forEach(function(t) {
+        var row = document.createElement('div');
+        row.className = 'qch-todo-item is-' + (t.state || 'todo');
+        row.innerHTML =
+          '<svg class="qti-next" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12.5 9.5L15 12l-2.5 2.5"/></svg>' +
+          '<svg class="qti-dash" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="3.2 3.6"/></svg>' +
+          '<svg class="qti-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></svg>' +
+          '<span class="qti-text"></span>';
+        row.querySelector('.qti-text').textContent = t.text || '';
+        bodyT.appendChild(row);
+      });
+      d.appendChild(bodyT);
+      d._todoItems = items.map(function(t) { return t.state || 'todo'; });
+      d._todoCount = d.querySelector('.qch-todo-count');
+      return d;
+    }
     function summarizedEl(label) {
       var d = document.createElement('div');
       d.className = 'qch-summarized';
@@ -523,7 +604,7 @@
     function renderContent(card, text) {
       var body = card.querySelector('.qch-cc-body');
       var c = card.querySelector('.qch-cc-content');
-      c.innerHTML = String(text).split(/\n\n+/).map(function(p) { return '<p>' + md(p) + '</p>'; }).join('');
+      c.innerHTML = mdBlocks(text);
       if (body.scrollHeight > 250) body.classList.remove('short');
     }
 
@@ -579,6 +660,7 @@
       var viewH = msgs.clientHeight;
       var pendingTyped = '';
       var events = [];
+      var todoNodes = [];
 
       // PASS 1: build every node in timeline order, visible, recording the
       // cumulative scrollHeight after each -- margins included for free.
@@ -618,6 +700,7 @@
             node = verbEl({ verb: 'Created', entity: action.entity || 'image', title: action.title || 'Asset' });
             break;
           case 'error-line': node = errorEl(action.text); break;
+          case 'todo-list': node = todoEl(action); todoNodes.push(node); break;
           case 'search-card': node = searchEl(action); break;
         }
         if (node) {
@@ -703,6 +786,28 @@
           'tool-use': function(tl2, ctr, action, at) { var ev = next('tool-use'); if (ev) reveal(tl2, ev, at); },
           'asset-card': function(tl2, ctr, action, at) { var ev = next('asset-card'); if (ev) reveal(tl2, ev, at); },
           'error-line': function(tl2, ctr, action, at) { var ev = next('error-line'); if (ev) reveal(tl2, ev, at); },
+          'todo-list': function(tl2, ctr, action, at) { var ev = next('todo-list'); if (ev) reveal(tl2, ev, at); },
+          'check-todo': function(tl2, ctr, action, at) {
+            // Flip one to-do row's state and tick the ring counter. States
+            // are compile-time tracked so the paired boundaries restore the
+            // TRUE prior state on reverse crossings (no-op flips skipped).
+            var todo = todoNodes[action.todo_index || 0];
+            if (!todo) return;
+            var rows = todo.querySelectorAll('.qch-todo-item');
+            var row = rows[action.index || 0];
+            if (!row) return;
+            var states = todo._todoItems;
+            var prev = states[action.index || 0];
+            var nextState = action.state || 'done';
+            if (prev === nextState) return;
+            classAt(tl2, row, at, ['is-' + nextState], ['is-' + prev]);
+            states[action.index || 0] = nextState;
+            var doneNow = states.filter(function(s) { return s === 'done'; }).length;
+            var prevCount = todo._countStr || todo._todoCount.textContent;
+            var nextCount = doneNow + '/' + states.length;
+            textAt(tl2, todo._todoCount, at, nextCount, prevCount);
+            todo._countStr = nextCount;
+          },
           'search-card': function(tl2, ctr, action, at) { var ev = next('search-card'); if (ev) reveal(tl2, ev, at); },
           'show-typing': function(tl2, ctr, action, at) {
             var ev = next('show-typing');
