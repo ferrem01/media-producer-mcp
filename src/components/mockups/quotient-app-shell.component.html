@@ -133,13 +133,16 @@
     width: 100%; height: 100%;
     position: absolute; top: 0; left: 0;
     display: flex;
-    background: #fbfaf8;
+    background: #f4f4f8;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color: #1a1a1a;
     overflow: hidden;
     border-radius: 16px;
-    border: 2px solid #dedcd6;
-    box-shadow: 0 10px 40px rgba(23,23,28,0.16);
+    /* Cool lavender-gray chrome (matched to the real app); over a light
+       backdrop the window edge needs real weight or the shell reads as
+       the page itself. */
+    border: 2px solid #d8d7e2;
+    box-shadow: 0 18px 56px rgba(23,23,28,0.28), 0 2px 10px rgba(23,23,28,0.10);
   }
   .qas svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -149,8 +152,8 @@
     display: flex; flex-direction: column; align-items: center;
     justify-content: space-between;
     padding: 14px 0 16px;
-    border-right: 1px solid #eeedea;
-    background: #fbfaf8;
+    border-right: 1px solid #e9e8f1;
+    background: #f4f4f8;
     flex-shrink: 0;
   }
   .qas-rail-top { display: flex; flex-direction: column; align-items: center; gap: 5px; }
@@ -161,7 +164,7 @@
     color: #75736e; cursor: pointer;
   }
   .qas-rail-btn svg { width: 17px; height: 17px; }
-  .qas-rail-btn.active { background: #eceae4; color: #1a1a1a; }
+  .qas-rail-btn.active { background: #e7e6ef; color: #1a1a1a; }
   .qas-rail-ava {
     width: 32px; height: 32px; border-radius: 50%;
     background: #d5e2f5; overflow: hidden; position: relative;
@@ -186,25 +189,25 @@
   .qas-crumb.last { color: #1a1a1a; font-weight: 500; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
   .qas-crumb-sep { color: #b9b7b1; font-size: 13px; }
   .qas-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-  .qas-bell { position: relative; color: #55534e; display: flex; padding: 4px; }
+  .qas-bell { position: relative; color: #55565e; display: flex; padding: 4px; }
   .qas-bell svg { width: 18px; height: 18px; }
   .qas-bell-badge {
     position: absolute; top: -6px; left: 10px;
     background: #e8442e; color: #fff;
     font-size: 10px; font-weight: 700;
     padding: 1.5px 6px; border-radius: 9px;
-    border: 2px solid #fbfaf8;
+    border: 2px solid #f4f4f8;
   }
   .qas-search {
     display: flex; align-items: center; gap: 8px;
-    border: 1px solid #e6e4df; border-radius: 10px;
+    border: 1px solid #e3e2ec; border-radius: 10px;
     background: #fff;
-    padding: 8px 12px; font-size: 13.5px; color: #63615c;
+    padding: 8px 12px; font-size: 13.5px; color: #63626d;
     min-width: 210px;
   }
-  .qas-search svg { width: 14px; height: 14px; color: #63615c; }
-  .qas-kbd { margin-left: auto; font-size: 11.5px; color: #6b6963; }
-  .qas-hist-btn { color: #55534e; display: flex; padding: 4px; }
+  .qas-search svg { width: 14px; height: 14px; color: #63626d; }
+  .qas-kbd { margin-left: auto; font-size: 11.5px; color: #6b6a75; }
+  .qas-hist-btn { color: #55565e; display: flex; padding: 4px; }
   .qas-hist-btn svg { width: 17px; height: 17px; }
   .qas-newchat {
     display: flex; align-items: center; gap: 7px;
@@ -217,23 +220,27 @@
 
   /* ── Body split ── */
   .qas-body { flex: 1; min-height: 0; display: flex; }
-  .qas-content { flex: 1; min-width: 0; position: relative; }
+  /* The real app's content well is a WHITE rounded card floating on the
+     cool chrome, not a flush region. */
+  .qas-content { flex: 1; min-width: 0; position: relative; background: #fff;
+    border: 2px solid #dddce8; border-radius: 14px 14px 0 0; margin: 0 0 0 4px;
+    box-shadow: 0 2px 12px rgba(23,23,28,0.12); overflow: hidden; }
 
   /* ── Agent panel ── */
   .qas-panel {
     width: 33%; min-width: 300px;
     display: flex; flex-direction: column;
-    /* 2px divider (color on all edges, width only left): #fbfaf8 is ~3.6%
+    /* 2px divider (color on all edges, width only left): #f4f4f8 is ~3.6%
        from a white page and needs a computed >= 1.5px edge. */
-    border: solid #e6e4df; border-width: 0 0 0 2px;
-    background: #fbfaf8;
+    border: solid #e3e2ec; border-width: 0 0 0 2px;
+    background: #f4f4f8;
     flex-shrink: 0;
   }
   .qas-panel-head {
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 12px;
     height: 46px; min-height: 46px;
-    border-bottom: 1px solid #eeedea;
+    border-bottom: 1px solid #e9e8f1;
   }
   .qas-tab {
     display: flex; align-items: center; gap: 8px;
@@ -244,11 +251,11 @@
     max-width: 70%;
   }
   .qas-tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .qas-tab-x { color: #6b6963; font-size: 15px; }
-  .qas-panel-icons { display: flex; align-items: center; gap: 10px; color: #55534e; }
+  .qas-tab-x { color: #6b6a75; font-size: 15px; }
+  .qas-panel-icons { display: flex; align-items: center; gap: 10px; color: #55565e; }
   .qas-pi { position: relative; display: flex; align-items: center; cursor: pointer; }
   .qas-pi svg { width: 16px; height: 16px; }
-  .qas-pi-close { font-size: 18px; color: #55534e; }
+  .qas-pi-close { font-size: 18px; color: #55565e; }
   .qas-pi-badge {
     position: absolute; top: -7px; right: -7px;
     background: #17171c; color: #fff;
@@ -264,7 +271,7 @@
   .qas-reviewed { margin: 0 0 6px; }
   .qas-reviewed-verb {
     display: flex; align-items: center; gap: 6px;
-    font-size: 13.5px; color: #63615c;
+    font-size: 13.5px; color: #63626d;
   }
   .qas-reviewed-title { font-size: 15px; font-weight: 600; margin-top: 5px; color: #1a1a1a; }
   .qas-plat-ico { display: inline-flex; width: 15px; height: 15px; border-radius: 3px; overflow: hidden; vertical-align: -2px; }
@@ -284,10 +291,10 @@
   }
   .qas-toolcard-verb {
     display: flex; align-items: center; gap: 6px;
-    font-size: 13px; color: #63615c;
+    font-size: 13px; color: #63626d;
   }
   .qas-toolcard-title { font-size: 14.5px; font-weight: 600; margin-top: 4px; color: #1a1a1a; }
-  .qas-toolcard-chev { color: #63615c; transition: transform 0.2s; margin-top: 3px; }
+  .qas-toolcard-chev { color: #63626d; transition: transform 0.2s; margin-top: 3px; }
   .qas-toolcard-chev svg { width: 15px; height: 15px; }
   .qas-toolcard.open .qas-toolcard-chev { transform: rotate(180deg); }
   .qas-toolcard-body {
@@ -298,10 +305,10 @@
   .qas-toolcard.open .qas-toolcard-body { max-height: none; padding: 0 14px 12px; }
   .qas-toolcard-preview {
     font-size: 13.5px; line-height: 1.55; color: #4b4a46;
-    border: 2px solid #e8e6e1; /* 2px: #fdfcfb preview is ~1.4% from white */
+    border: 2px solid #e8e6e1; /* 2px: #fbfbfd preview is ~1.4% from white */
     border-radius: 9px;
     padding: 12px 13px;
-    background: #fdfcfb;
+    background: #fbfbfd;
   }
   .qas-toolcard-preview p { margin: 0 0 10px; }
   .qas-toolcard-preview p:first-child { opacity: 0.45; }
@@ -311,7 +318,7 @@
   .qas-agent-msg b { font-weight: 600; }
   .qas-agent-msg code {
     font-family: ui-monospace, monospace; font-size: 12.5px;
-    background: #f1efe9; border-radius: 4px; padding: 1px 5px;
+    background: #ececf3; border-radius: 4px; padding: 1px 5px;
   }
   .qas-user-msg {
     margin: 14px 0 14px auto;
@@ -324,11 +331,11 @@
   }
   .qas-typing {
     display: inline-flex; gap: 4px; margin: 12px 0;
-    padding: 10px 13px; background: #f1efe9; border-radius: 12px;
+    padding: 10px 13px; background: #ececf3; border-radius: 12px;
   }
   .qas-typing i {
     width: 6px; height: 6px; border-radius: 50%;
-    background: #6b6963; display: block;
+    background: #6b6a75; display: block;
     animation: qasBlink 1.2s infinite;
   }
   .qas-typing i:nth-child(2) { animation-delay: 0.2s; }
@@ -340,13 +347,13 @@
     margin: 0 14px 14px;
     /* 2px: white composer measured 0.0% separation on white pages (house
        precedent: quotient mocks use 2px borders for their light panels). */
-    border: 2px solid #e6e4df; border-radius: 16px;
+    border: 2px solid #e3e2ec; border-radius: 16px;
     background: #fff;
     padding: 13px 14px 11px;
     flex-shrink: 0;
   }
   .qas-input { position: relative; font-size: 14px; color: #1a1a1a; min-height: 21px; }
-  .qas-placeholder { color: #6b6963; position: absolute; left: 0; top: 0; }
+  .qas-placeholder { color: #6b6a75; position: absolute; left: 0; top: 0; }
   .qas-input.filled .qas-placeholder { display: none; }
   .qas-caret {
     display: none; width: 1.5px; height: 15px; background: #1a1a1a;
@@ -358,11 +365,11 @@
     display: flex; align-items: center; justify-content: space-between;
     margin-top: 12px;
   }
-  .qas-ir-left { display: flex; align-items: center; gap: 9px; color: #55534e; }
+  .qas-ir-left { display: flex; align-items: center; gap: 9px; color: #55565e; }
   .qas-clip { width: 16px; height: 16px; }
-  .qas-mode { font-size: 13px; color: #55534e; }
+  .qas-mode { font-size: 13px; color: #55565e; }
   .qas-mode-chev { width: 13px; height: 13px; }
-  .qas-ir-right { display: flex; align-items: center; gap: 11px; color: #55534e; }
+  .qas-ir-right { display: flex; align-items: center; gap: 11px; color: #55565e; }
   .qas-mic { width: 16px; height: 16px; }
   .qas-send {
     width: 30px; height: 30px; border-radius: 50%;
