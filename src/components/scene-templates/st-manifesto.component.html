@@ -90,18 +90,21 @@
     });
 
     if (data.entrance === 'type-on') {
-      // Word-by-word build-up (the sanctioned type-on entrance, same contract
-      // as kinetic-text): every word is in the DOM up front but takes no
-      // space until its beat, so the centered flow re-centers as it grows.
-      // Words APPEAR -- no fade, no travel; pure tl.set, scrub-safe.
+      // Word-by-word build-up, PRE-LAID: the whole sentence occupies its
+      // final layout from frame one (invisible), and each word lands IN
+      // PLACE with a soft rise + blur-off. Nothing that has landed ever
+      // moves again -- the reflow-on-every-word of the naive type-on read
+      // as chop at full-frame scale. fromTo tweens; scrub-safe.
       var at0 = data.at !== undefined ? Number(data.at) : 0.3;
       var step = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.14;
       var wordEls = flow.querySelectorAll('.stmf-word');
       for (var wi = 0; wi < wordEls.length; wi++) {
-        gsap.set(wordEls[wi], { display: 'none' });
+        gsap.set(wordEls[wi], { autoAlpha: 0, y: 9, filter: 'blur(5px)' });
         var when = Array.isArray(data.word_times) && data.word_times[wi] !== undefined
           ? Number(data.word_times[wi]) : at0 + wi * step;
-        tl.set(wordEls[wi], { display: 'inline-block' }, when);
+        tl.fromTo(wordEls[wi], { autoAlpha: 0, y: 9, filter: 'blur(5px)' },
+          { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.3, ease: 'power2.out',
+            immediateRender: false }, when);
       }
     } else if (window.mpLineRise) mpLineRise(tl, flow, 0.35);
     else {
