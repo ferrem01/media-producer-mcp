@@ -1106,6 +1106,33 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         return;
       }
 
+      // ── API: Scene-level patch (Studio duration editor) ──
+      // PATCH /api/projects/{t}/{p}/scenes/{id} {duration_seconds?, label?}
+      // -- edits the BUILT scene (unlike /api/storyboard-scene, which edits
+      // the storyboard draft record).
+      const scenePatchMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)$/);
+      if (scenePatchMatch && method === "PATCH") {
+        const [, spTenant, spProject, spScene] = scenePatchMatch.map(decodeURIComponent);
+        const body = await parseBody(req);
+        const project = await loadProject(spTenant, spProject);
+        if (!project) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const scene = project.scenes.find((s) => s.id === spScene);
+        if (!scene) { jsonResponse(res, 404, { error: "Scene not found" }); return; }
+        if (body.duration_seconds != null && !isNaN(Number(body.duration_seconds))) {
+          scene.duration_seconds = Math.min(120, Math.max(0.5, Number(body.duration_seconds)));
+        }
+        if (typeof body.label === "string" && body.label.trim()) scene.label = body.label.trim();
+        project.updated_at = new Date().toISOString();
+        await saveProject(project);
+        jsonResponse(res, 200, {
+          ok: true,
+          scene_id: spScene,
+          duration_seconds: scene.duration_seconds,
+          total_duration: project.scenes.reduce((s, sc) => s + (sc.duration_seconds || 0), 0),
+        });
+        return;
+      }
+
       // ── API: Delete scene ──
       const deleteSceneMatch = urlPath.match(/^\/api\/projects\/([^/]+)\/([^/]+)\/scenes\/([^/]+)$/);
       if (deleteSceneMatch && method === "DELETE") {

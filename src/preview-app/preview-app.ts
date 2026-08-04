@@ -195,7 +195,12 @@ export function getPreviewHtml(): string {
   .scene-dur {
     font-size: 10px; color: #9ca3af;
     background: #f3f4f6; padding: 1px 6px; border-radius: 10px;
-    display: inline-block;
+    display: inline-block; cursor: pointer;
+  }
+  .scene-dur:hover { color: #4b5563; background: #e5e7eb; }
+  .scene-dur-input {
+    width: 44px; font-size: 10px; border: 1px solid #6366f1; border-radius: 6px;
+    padding: 0 3px; outline: none; background: #fff; color: #111827;
   }
   .scene-meta-row { margin-top: 3px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
   .empty-state {
@@ -2527,7 +2532,7 @@ export function getPreviewHtml(): string {
         + '<div class="scene-info">'
         + '<div class="scene-label"><span class="scene-prov sp-' + sceneProvenance(scene) + '" title="' + escAttr(prov.tip) + '">' + prov.glyph + '</span>' + (i + 1) + '. ' + escHtml(label) + '</div>'
         + '<div class="scene-meta-row">'
-        + '<span class="scene-dur">' + (scene.duration_seconds || 0).toFixed(1) + 's' + (beatCount ? ' \\u00b7 ' + beatCount + ' beats' : '') + '</span>'
+        + '<span class="scene-dur" data-index="' + i + '" title="Click to edit scene duration">' + (scene.duration_seconds || 0).toFixed(1) + 's' + (beatCount ? ' \\u00b7 ' + beatCount + ' beats' : '') + '</span>'
         + '<button class="scene-sb-btn" data-index="' + i + '" title="Storyboard, defects &amp; regenerate">&#x2261; Storyboard</button>'
         + badgeHtml
         + '</div>'
@@ -2538,6 +2543,14 @@ export function getPreviewHtml(): string {
     renderBeatTicks();
     renderAudioLanes();
     renderCamPills();
+
+    // Duration chip: click-to-edit the BUILT scene's runtime in place.
+    els.sceneList.querySelectorAll('.scene-dur').forEach(function(el) {
+      el.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        editSceneDuration(parseInt(el.dataset.index, 10), el);
+      });
+    });
 
     els.sceneList.querySelectorAll('.scene-item').forEach(function(el) {
       el.addEventListener('click', function() {
@@ -4147,6 +4160,59 @@ export function getPreviewHtml(): string {
       track.addEventListener('pointermove', mv);
       track.addEventListener('pointerup', up);
     });
+  }
+
+  // ── Scene duration editor: click the duration chip, type, Enter. ──
+  // Edits the BUILT scene's runtime (PATCH /scenes/{id}) and hot-reloads
+  // the composite at the same playhead -- the ±1-2s trims that don't
+  // deserve a round-trip through the storyboard modal.
+  function editSceneDuration(idx, chipEl) {
+    var p = state.currentProject;
+    var scene = p && p.scenes[idx];
+    if (!scene || chipEl.querySelector('input')) return;
+    var oldDur = Number(scene.duration_seconds) || 0;
+    chipEl.innerHTML = '';
+    var input = document.createElement('input');
+    input.type = 'number'; input.step = '0.1'; input.min = '0.5';
+    input.value = oldDur.toFixed(1);
+    input.className = 'scene-dur-input';
+    chipEl.appendChild(input);
+    input.focus(); input.select();
+    var done = false;
+    function cancel() { if (done) return; done = true; renderSceneList(); }
+    function save() {
+      if (done) return; done = true;
+      var v = parseFloat(input.value);
+      if (isNaN(v) || v <= 0 || Math.abs(v - oldDur) < 0.01) { renderSceneList(); return; }
+      v = Math.min(120, Math.max(0.5, Math.round(v * 10) / 10));
+      var savedTime = state.masterTime || 0;
+      api('PATCH', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id) + '/scenes/' + encodeURIComponent(scene.id), { duration_seconds: v })
+        .then(function(r) {
+          scene.duration_seconds = r.duration_seconds || v;
+          state.totalDuration = calcTotalDuration();
+          if (savedTime > state.totalDuration) savedTime = Math.max(0, state.totalDuration - 0.1);
+          renderSceneList();
+          studioStatus('\\u23f1 ' + (scene.label || scene.id) + ' \\u2192 ' + scene.duration_seconds.toFixed(1) + 's \\u2014 reloading\\u2026', 'ok');
+          if (state.compositeLoaded) {
+            var compositePath = '/preview-composite/' + state.tenantId + '/' + p.project_id;
+            fetchHtml(compositePath).then(function(freshHtml) {
+              state._compositeHtml = freshHtml;
+              writeSceneToIframe(freshHtml);
+              waitForCompositeReady(function(masterTl) {
+                masterTl.time(Math.max(0.001, savedTime));
+                masterTl.pause();
+              });
+            });
+          }
+        })
+        .catch(function(e) { studioStatus('Duration save failed: ' + e.message, 'err'); renderSceneList(); });
+    }
+    input.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+    });
+    input.addEventListener('blur', save);
+    input.addEventListener('click', function(ev) { ev.stopPropagation(); });
   }
 
   function savePropNow() {
