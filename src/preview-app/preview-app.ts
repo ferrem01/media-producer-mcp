@@ -1311,7 +1311,24 @@ export function getPreviewHtml(): string {
   function escAttr(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
   // Calculate total video duration
+  // The composite's REAL scene positions: transitions OVERLAP scenes (scene
+  // B starts transition-duration before A's naive end), so cumulative
+  // duration sums drift late by the accumulated overlap. Prefer the meta
+  // the composite publishes; fall back to naive sums before it's loaded.
+  function compositeMeta() {
+    try {
+      var m = els.previewIframe.contentWindow.__MP_SCENE_META;
+      var p = state.currentProject;
+      return (m && p && p.scenes && m.length === p.scenes.length) ? m : null;
+    } catch (e) { return null; }
+  }
+
   function calcTotalDuration() {
+    var m = compositeMeta();
+    if (m && m.length) {
+      var last = m[m.length - 1];
+      return last.start + last.duration;
+    }
     var p = state.currentProject;
     if (!p || !p.scenes) return 0;
     var total = 0;
@@ -1321,6 +1338,8 @@ export function getPreviewHtml(): string {
 
   // Calculate cumulative time offset for a scene index
   function sceneOffset(index) {
+    var m = compositeMeta();
+    if (m && m[index]) return m[index].start;
     var p = state.currentProject;
     if (!p || !p.scenes) return 0;
     var offset = 0;
@@ -1338,11 +1357,10 @@ export function getPreviewHtml(): string {
     wrap.innerHTML = '';
     var p = state.currentProject;
     if (!p || !p.scenes || !p.scenes.length) return;
-    var total = 0;
-    p.scenes.forEach(function(s) { total += s.duration_seconds || 0; });
+    var total = calcTotalDuration();
     if (!(total > 0)) return;
-    var offset = 0;
     p.scenes.forEach(function(s, si) {
+      var offset = sceneOffset(si);
       if (si > 0) {
         var cut = document.createElement('div');
         cut.className = 'beat-tick scene-cut';
@@ -1362,7 +1380,6 @@ export function getPreviewHtml(): string {
         }
         bt += (b.duration_seconds || 0);
       });
-      offset += s.duration_seconds || 0;
     });
   }
 
@@ -2272,6 +2289,11 @@ export function getPreviewHtml(): string {
           state.compositeLoaded = true;
           buildMediaClips();
           state.totalDuration = w.__MP_DURATION || state.totalDuration;
+          // The strip geometry (ticks, film cells, scene blocks, comp bars)
+          // was drawn with naive duration sums before the composite's REAL
+          // overlapped scene positions existed -- redraw against the meta so
+          // scene cuts sit where the film actually cuts.
+          try { renderBeatTicks(); renderLaneLabels(); } catch (eG) {}
           setTimeout(function() { auditEdlStamps(0); }, 6000);
           cb(w.__MP_TIMELINE);
         }
@@ -5292,15 +5314,18 @@ export function getPreviewHtml(): string {
     var filmWrap = document.getElementById('film-lane');
     if (filmWrap) filmWrap.innerHTML = '';
     var pid2 = p.project_id;
-    var fo = 0;
     p.scenes.forEach(function(sc, fi) {
       var fdur = sc.duration_seconds || 5;
+      var fo = sceneOffset(fi);
+      // Cell spans to the NEXT scene's real start (transitions overlap), so
+      // cells tile without gaps and cuts land where the film actually cuts.
+      var fw = (fi < p.scenes.length - 1) ? Math.max(0.1, sceneOffset(fi + 1) - fo) : fdur;
       if (filmWrap && filmOn) {
         (function(fi2) {
           var cell = document.createElement('div');
           cell.className = 'film-cell' + (fi2 === state.currentSceneIndex ? ' active' : '');
           cell.style.left = ((fo / total) * 100).toFixed(3) + '%';
-          cell.style.width = 'max(6px, calc(' + ((fdur / total) * 100).toFixed(3) + '% - 2px))';
+          cell.style.width = 'max(6px, calc(' + ((fw / total) * 100).toFixed(3) + '% - 2px))';
           cell.title = (fi2 + 1) + '. ' + (sc.label || sc.id) + ' \u00b7 ' + fdur.toFixed(1) + 's';
           var img = document.createElement('img');
           img.setAttribute('loading', 'lazy');
@@ -5321,25 +5346,24 @@ export function getPreviewHtml(): string {
           filmWrap.appendChild(cell);
         })(fi);
       }
-      fo += fdur;
     });
-    var bo = 0;
     p.scenes.forEach(function(sc, bi) {
       (function(bi2) {
+        var bo = sceneOffset(bi2);
+        var bw = (bi2 < p.scenes.length - 1) ? Math.max(0.1, sceneOffset(bi2 + 1) - bo) : (sc.duration_seconds || 5);
         var blk = document.createElement('div');
         blk.className = 'scene-blk' + (bi2 % 2 ? ' odd' : '');
         blk.style.left = ((bo / total) * 100).toFixed(3) + '%';
-        blk.style.width = (((sc.duration_seconds || 5) / total) * 100).toFixed(3) + '%';
+        blk.style.width = ((bw / total) * 100).toFixed(3) + '%';
         blk.style.top = '-2px';
         blk.style.height = 'calc(100% + 2px)';
         blk.addEventListener('click', function(ev) { ev.stopPropagation(); selectSceneQuiet(bi2); renderCompLane(); });
         wrap.appendChild(blk);
       })(bi);
-      bo += (sc.duration_seconds || 5);
     });
-    var offset = 0;
     p.scenes.forEach(function(scene, si) {
       var dur = scene.duration_seconds || 5;
+      var offset = sceneOffset(si);
       var comps = scene.components || [];
       var showAll = comps.length <= CAP;
       var visible = showAll ? comps.length : CAP - 1;
@@ -5398,7 +5422,6 @@ export function getPreviewHtml(): string {
         });
         wrap.appendChild(more);
       }
-      offset += dur;
     });
   }
 
