@@ -3,18 +3,33 @@
     <div class="qbl-window">
       <div class="qbl-main">
         <div class="qbl-docbar">
-          <span class="qbl-updated"></span>
           <span class="qbl-docbar-sp"></span>
-          <span class="qbl-chip qbl-chip-ghost">⋮</span>
-          <span class="qbl-chip qbl-chip-ghost">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>
+          <span class="qbl-pill qbl-pill-ico">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="18.5" r="1.4" fill="currentColor" stroke="none"/></svg>
           </span>
-          <span class="qbl-chip qbl-camp">📣 <span class="qbl-camp-name"></span></span>
-          <span class="qbl-chip">Threads (<span class="qbl-threads"></span>) ↗</span>
+          <span class="qbl-pill qbl-pill-ico">
+            <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="m8.4 13.3 7.2 4.3M15.6 6.4l-7.2 4.3"/></svg>
+          </span>
+          <span class="qbl-pill qbl-camp">
+            <svg class="qbl-camp-ico" viewBox="0 0 24 24"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 11-5.8-1.6"/></svg>
+            <span class="qbl-camp-name"></span>
+            <span class="qbl-camp-prog" style="display:none"><span class="qbl-camp-count"></span>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke-width="2.6"/></svg>
+            </span>
+          </span>
+          <span class="qbl-pill">Threads (<span class="qbl-threads"></span>)
+            <svg class="qbl-arr" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg>
+          </span>
           <span class="qbl-status" data-anchor="status">
-            <span class="qbl-status-face qbl-status-draft">✎ Draft</span>
-            <span class="qbl-status-face qbl-status-pub">🚀 <span class="qbl-pub-text">Published</span></span>
-            <span class="qbl-status-chev">⌄</span>
+            <span class="qbl-status-face qbl-status-draft">
+              <svg viewBox="0 0 24 24"><path d="M12 15c5-4 7-8 7-12-4 0-8 2-12 7l-3 1 4 4 1-3zM6 18c-1 1-2 3-2 3s2-1 3-2"/></svg>
+              Publish</span>
+            <span class="qbl-status-face qbl-status-pub">
+              <svg viewBox="0 0 24 24"><path d="M12 15c5-4 7-8 7-12-4 0-8 2-12 7l-3 1 4 4 1-3zM6 18c-1 1-2 3-2 3s2-1 3-2"/></svg>
+              <span class="qbl-pub-text">Published</span>
+              <span class="qbl-status-div"></span>
+              <svg class="qbl-status-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+            </span>
           </span>
         </div>
         <div class="qbl-scroll">
@@ -52,27 +67,39 @@
   /* Docked: inside the shell's content card the doc IS the card. */
   .qbl.is-docked .qbl-window { width: 100%; height: 100%; box-shadow: none; border-radius: 0; }
   .qbl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fdfdfe; }
-  .qbl-docbar { height: 46px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;
-    padding: 0 18px; border-bottom: 1px solid #f0eff3; }
-  .qbl-updated { font-size: 12.5px; color: #8a8794; flex-shrink: 1; min-width: 0;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Real docbar: right-aligned row of big bordered pills; the status is a
+     BLACK '🚀 Publish' CTA that becomes the white green-rocket
+     'Published {when} | ⌄' pill on publish. */
+  .qbl-docbar { height: 62px; flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+    padding: 0 20px; border-bottom: 1px solid #f0eff3; }
+  .qbl-docbar svg { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
   .qbl-docbar-sp { flex: 1 1 0; min-width: 8px; }
-  .qbl-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600;
-    color: #3c3a44; border: 1px solid #e9e7ef; border-radius: 9px; padding: 6px 11px; background: #fff;
-    white-space: nowrap; }
-  .qbl-chip-ghost { color: #8a8794; }
-  .qbl-camp { color: #4a63c8; }
-  .qbl-status { position: relative; display: inline-flex; align-items: center; gap: 7px;
-    border: 1px solid #e9e7ef; border-radius: 9px; padding: 6px 11px; background: #fff;
-    font-size: 12.5px; font-weight: 600; white-space: nowrap; }
-  .qbl-status-face { display: inline-flex; align-items: center; gap: 6px; }
-  .qbl-status-draft { color: #6f6c7a; }
-  /* Both faces are measured at build and the pill takes the WIDER width,
-     so the Draft -> Published crossfade never changes layout or clips. */
-  .qbl-status-pub { color: #2e7d43; visibility: hidden; opacity: 0; }
-  .qbl-status.is-sized .qbl-status-face { position: absolute; left: 11px; top: 50%;
+  .qbl-pill { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600;
+    color: #17171c; border: 2px solid #e9e7f0; border-radius: 999px; padding: 0 15px; height: 40px;
+    background: #fff; white-space: nowrap; box-sizing: border-box; }
+  .qbl-pill svg { width: 16px; height: 16px; }
+  .qbl-pill-ico { width: 40px; padding: 0; justify-content: center; color: #3c3a44; }
+  .qbl-camp-ico { color: #4b7bf5; }
+  .qbl-camp-prog { display: inline-flex; align-items: center; gap: 5px; color: #6b6875;
+    font-weight: 600; }
+  .qbl-camp-prog svg { width: 15px; height: 15px; color: #8a8794; }
+  .qbl-arr { color: #17171c; }
+  .qbl-status { position: relative; display: inline-flex; align-items: center;
+    border: 2px solid #17171c; border-radius: 999px; height: 40px; background: #17171c;
+    font-size: 13.5px; font-weight: 600; white-space: nowrap; box-sizing: border-box;
+    overflow: hidden; }
+  .qbl-status-face { display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; }
+  .qbl-status-face svg { width: 16px; height: 16px; }
+  .qbl-status-draft { color: #fff; }
+  /* Both faces are measured at build; the container starts at the ACTIVE
+     face's width and the publish tween animates width + colors, so the
+     crossfade is layout-stable and scrub-safe. */
+  .qbl-status-pub { color: #17171c; visibility: hidden; opacity: 0; }
+  .qbl-status-pub > svg:first-child { color: #3f9e58; }
+  .qbl-status.is-sized .qbl-status-face { position: absolute; left: 0; top: 50%;
     transform: translateY(-50%); white-space: nowrap; }
-  .qbl-status-chev { color: #b4b1bd; margin-left: 2px; }
+  .qbl-status-div { width: 1.5px; height: 20px; background: #e5e3ec; margin: 0 2px 0 5px; }
+  .qbl-status-chev { color: #6b6875; }
   .qbl-scroll { flex: 1; min-height: 0; overflow: hidden; display: flex; justify-content: center; }
   .qbl-doc { width: min(660px, 88%); padding: 26px 0 40px; }
   .qbl-hero { width: 100%; aspect-ratio: 1.78 / 1; object-fit: cover; border-radius: 10px;
@@ -108,8 +135,11 @@
     // ── Doc chrome ──
     var title = data.title || 'The Hidden Cost of Manual Marketing Execution';
     var campaign = data.campaign || 'Weekly Blog Post';
-    q('.qbl-updated').textContent = 'Last updated: ' + (data.last_updated || 'just now');
     q('.qbl-camp-name').textContent = campaign;
+    if (data.campaign_progress) {
+      q('.qbl-camp-count').textContent = data.campaign_progress;
+      q('.qbl-camp-prog').style.display = 'inline-flex';
+    }
     q('.qbl-threads').textContent = data.threads_count != null ? data.threads_count : 2;
 
     // ── Status pill: BOTH faces prebuilt; publish flips via crossfade ──
@@ -118,18 +148,22 @@
     var statusPillEl = q('.qbl-status');
     var status = data.status || 'draft';
     q('.qbl-pub-text').textContent = 'Published ' + (data.published_when || 'just now');
-    // Size the pill to its widest face BEFORE absolutizing the faces, so the
-    // crossfade is layout-stable (the Published face is wider than Draft).
-    var wDraft = draftFace.getBoundingClientRect().width;
-    var wPub = pubFace.getBoundingClientRect().width;
-    var chevW = q('.qbl-status-chev').getBoundingClientRect().width;
-    statusPillEl.style.width = Math.ceil(Math.max(wDraft, wPub) + chevW + 24 + 9) + 'px';
+    // Measure both faces at build (pub face is hidden but laid out), then
+    // absolutize; the container takes the ACTIVE face's width and publish
+    // tweens width + colors, so the flip is layout-stable and scrub-safe.
+    pubFace.style.visibility = 'visible';
+    var wDraftC = Math.ceil(draftFace.getBoundingClientRect().width) + 4;
+    var wPubC = Math.ceil(pubFace.getBoundingClientRect().width) + 4;
+    pubFace.style.visibility = '';
     statusPillEl.classList.add('is-sized');
-    q('.qbl-status-chev').style.position = 'absolute';
-    q('.qbl-status-chev').style.right = '11px';
     if (status === 'published') {
+      statusPillEl.style.width = wPubC + 'px';
+      statusPillEl.style.background = '#fff';
+      statusPillEl.style.borderColor = '#e9e7f0';
       gsap.set(draftFace, { autoAlpha: 0 });
       gsap.set(pubFace, { autoAlpha: 1 });
+    } else {
+      statusPillEl.style.width = wDraftC + 'px';
     }
 
     // ── Document ──
@@ -199,13 +233,17 @@
       runScript(tl, el, data.script, cursorTargets, ctx, {
         'publish-blog': function(tl2, ctr, action, at) {
           if (action.published_when) q('.qbl-pub-text').textContent = 'Published ' + action.published_when;
-          tl2.to(draftFace, { autoAlpha: 0, duration: 0.15 }, at);
-          tl2.fromTo(pubFace, { autoAlpha: 0, scale: 0.85 },
-            { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: false }, at + 0.08);
-          tl2.fromTo(statusPill, { scale: 1 }, { scale: 1.05, duration: 0.25, ease: 'power2.out' }, at);
-          tl2.to(statusPill, { scale: 1, duration: 0.25, ease: 'back.out(2)' }, at + 0.3);
-          tl2.fromTo(statusPill, { borderColor: '#e9e7ef' },
-            { borderColor: '#bfe3c8', duration: 0.3, immediateRender: false }, at + 0.08);
+          // Press the black Publish CTA, then it becomes the white
+          // green-rocket Published pill: width + colors tween with the
+          // face crossfade (all timeline-owned).
+          tl2.to(statusPill, { scale: 0.94, duration: 0.1, ease: 'power2.in' }, at);
+          tl2.to(statusPill, { scale: 1, duration: 0.18, ease: 'power2.out' }, at + 0.1);
+          tl2.to(draftFace, { autoAlpha: 0, duration: 0.15 }, at + 0.2);
+          tl2.fromTo(statusPill, { width: wDraftC, backgroundColor: '#17171c', borderColor: '#17171c' },
+            { width: wPubC, backgroundColor: '#ffffff', borderColor: '#e9e7f0',
+              duration: 0.35, ease: 'power2.inOut', immediateRender: false }, at + 0.2);
+          tl2.fromTo(pubFace, { autoAlpha: 0 },
+            { autoAlpha: 1, duration: 0.28, immediateRender: false }, at + 0.38);
         },
         'highlight-hero': function(tl2, ctr, action, at) {
           tl2.fromTo(hero, { scale: 1 }, { scale: 1.015, duration: 0.3, ease: 'power2.out' }, at);
