@@ -1,0 +1,109 @@
+<template>
+  <div class="pnsc">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&display=swap">
+    <svg class="pnsc-svg" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <filter class="pnsc-rough" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.11" numOctaves="2" seed="7" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/>
+        </filter>
+        <mask class="pnsc-mask" maskUnits="userSpaceOnUse">
+          <path class="pnsc-pen" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" d=""/>
+        </mask>
+      </defs>
+      <text class="pnsc-text"></text>
+    </svg>
+  </div>
+</template>
+
+<style scoped>
+  /* ── pen-script: cursive handwriting that WRITES ON, ink-roughened.
+     The letterforms come from a real connected-script font; the reveal is a
+     fat mask stroke swept along the baseline (dashoffset = pen progress).
+     NEVER draws letterforms as paths -- that reads as scribble (litigated in
+     the Behind-the-Craft prototype). A hand-traced mask_path may override
+     the auto sweep for hero macro shots where pen order must be exact. */
+  .pnsc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .pnsc-svg { width: 100%; height: 100%; overflow: visible; }
+  .pnsc-text { font-family: 'Sacramento', cursive; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var svg = el.querySelector('.pnsc-svg');
+    var textEl = el.querySelector('.pnsc-text');
+    var pen = el.querySelector('.pnsc-pen');
+    var mask = el.querySelector('.pnsc-mask');
+    var rough = el.querySelector('.pnsc-rough');
+
+    // Unique ids per instance (multiple pen-scripts in one scene) --
+    // counter, not random, so assembly stays deterministic.
+    window.__pnscN = (window.__pnscN || 0) + 1;
+    var uid = 'pnsc' + window.__pnscN;
+    mask.setAttribute('id', uid + '-m');
+    rough.setAttribute('id', uid + '-r');
+    textEl.setAttribute('mask', 'url(#' + uid + '-m)');
+    if (data.rough !== false) textEl.setAttribute('filter', 'url(#' + uid + '-r)');
+
+    var text = String(data.text || '');
+    // Font-size in viewBox units. The viewBox is sized from a generous
+    // advance estimate; overshoot in the sweep reveals nothing (no ink
+    // there), so estimation error is invisible -- deliberately no measuring
+    // (fonts may not be loaded when timelines build).
+    var fs = 200;
+    var estW = Math.max(1, text.length) * fs * 0.42 + fs * 0.6;
+    var estH = fs * 1.9;
+    var baseline = fs * 1.18;
+    svg.setAttribute('viewBox', '0 0 ' + Math.round(estW) + ' ' + Math.round(estH));
+    textEl.setAttribute('x', fs * 0.15);
+    textEl.setAttribute('y', baseline);
+    textEl.setAttribute('font-size', fs);
+    // Ink color: explicit data.color, else the paper world's ink channel,
+    // else the theme-resolved text color (keeps the line legible on dark
+    // worlds -- warm ink on a dark backdrop measured 1.18:1 in cert).
+    // Optional fields must survive junk values (cert synthesizes prose into
+    // them); an invalid fill would silently become SVG-default black.
+    var colorOk = typeof data.color === 'string' && /^(#|rgb|hsl|var\()/.test(data.color);
+    var ink = colorOk ? data.color : 'var(--mp-ink, var(--mp-color-text, #3b342a))';
+    textEl.style.fill = ink;
+    textEl.style.color = ink; // keep computed color truthful for the gates
+    textEl.textContent = text;
+
+    // Pen mask: supplied hand-traced path, or the auto sweep -- one fat
+    // stroke riding the x-height band with a gentle wobble, tall enough to
+    // swallow ascenders and descenders.
+    var d = typeof data.mask_path === 'string' && /^\s*[Mm]/.test(data.mask_path) ? data.mask_path : null;
+    if (d) {
+      // mask_stroke_width applies ONLY with a hand-traced path -- on the auto
+      // sweep a narrow override hides most of the glyphs (cert caught it).
+      var msw = Number(data.mask_stroke_width);
+      pen.setAttribute('stroke-width', msw > 0 ? msw : fs * 0.42);
+    } else {
+      var y0 = baseline - fs * 0.28;
+      d = 'M ' + (fs * 0.05) + ' ' + y0;
+      var step = fs * 1.1;
+      var n = Math.max(2, Math.ceil(estW / step));
+      for (var i = 1; i <= n; i++) {
+        var x = fs * 0.05 + i * step;
+        var y = y0 + (i % 2 ? -1 : 1) * fs * 0.06;
+        d += ' Q ' + (x - step / 2) + ' ' + (y0 + (i % 2 ? 1 : -1) * fs * 0.09) + ' ' + x + ' ' + y;
+      }
+      pen.setAttribute('stroke-width', fs * 1.6);
+    }
+    pen.setAttribute('d', d);
+
+    var len = pen.getTotalLength();
+    gsap.set(pen, { strokeDasharray: len, strokeDashoffset: len });
+    var at = data.at !== undefined ? Number(data.at) : 0.3;
+    var dur = data.write_seconds !== undefined ? Number(data.write_seconds) : Math.min(3, 0.8 + text.length * 0.09);
+    // The write must finish inside the scene, whatever the data says.
+    dur = Math.max(0.4, Math.min(dur, (ctx.duration || 6) * 0.6));
+    tl.fromTo(pen, { strokeDashoffset: len },
+      { strokeDashoffset: 0, duration: dur, ease: 'power1.inOut', immediateRender: false }, at);
+
+    return tl;
+  }
+</script>

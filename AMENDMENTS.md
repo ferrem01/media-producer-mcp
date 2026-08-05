@@ -2416,3 +2416,29 @@ defaults instead:
   (backlog #49): proj_bf247f37 shipped EIGHT baked voiceover tracks reading
   its scene LABELS out loud because the strip only covered
   social-reel/data-story.
+
+## canvas-tour: specced, not built (the three-video analysis arc)
+
+Marc had three reference films analyzed frame-by-frame (Lenny's Product Pass
+launch, HeyGen's "Behind the Craft" letterpress film, the Remotion Agent
+Skills "Shipper" film). Two local prototypes came out of it (print-palette
+world; the Behind-the-Craft recreation with photographic paper texture,
+font+mask pen-write cursive, and a one-canvas camera route) plus a design
+review that repeatedly SHRANK the scope by mapping "new features" onto
+existing concepts:
+
+- The "camera rig" the tour needs already exists: typed CameraMove
+  (core/types.ts) + __mp_camera_rig. The only change is policy (pipeline may
+  emit moves; today Studio-only) plus a derivation function.
+- "Dive into the built product" (Shipper film's best beat) is NOT a feature:
+  it is docking + camera + timed actions we already have — a recipe plus a
+  slot-card variant on quotient-chat (task #57).
+- Station = fields on a scene (flat list preserved; the nested-scene draft
+  was rejected as un-DRY); the "one continuous film" container is the
+  EXISTING composite assembler gaining a spatial layout mode; the camera
+  track is DERIVED from stations, never stored.
+
+Full design: SPEC-canvas-tour.md (status DESIGN — open questions must be
+resolved before code). Backlog: #54 paper/illustrated world bundle, #56
+canvas-tour, #57 Shipper steals. Build order agreed with Marc: performed-type
+components first, textured-world system second, grammar third.

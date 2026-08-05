@@ -1,0 +1,106 @@
+<template>
+  <div class="pred">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+    <div class="pred-header"></div>
+    <div class="pred-rule pred-rule-top"></div>
+    <div class="pred-para"></div>
+    <div class="pred-cli"><span class="pred-cli-prompt">&#10095;</span><span class="pred-cli-text"></span><span class="pred-cli-cursor">&#9615;</span></div>
+    <div class="pred-verdict"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── para-edit: the self-editing paragraph (fade-the-fluff). A full
+     paragraph sits on the page; a command types; the cut words recede into
+     the paper while the kept words stay full-ink -- the edit performed as a
+     visible diff. The product-demo-as-typography beat from the reference
+     print films. */
+  .pred { position: absolute; inset: 0; padding: 4% 6%;
+    color: var(--mp-ink, var(--mp-color-text, #3f382e)); }
+  .pred-header { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 500;
+    letter-spacing: 0.28em; text-transform: uppercase; text-align: center; opacity: 0.72;
+    margin-bottom: 14px; }
+  .pred-rule { border-top: 3px solid currentColor; border-bottom: 1.5px solid currentColor;
+    padding-top: 3px; opacity: 0.55; margin-bottom: 26px; }
+  .pred-para { font-family: 'Lora', Georgia, serif; font-size: 30px; line-height: 1.62;
+    text-align: justify; }
+  .pred-para span { opacity: 1; }
+  .pred-cli { margin-top: 44px; border-top: 2px solid currentColor; border-bottom: 2px solid currentColor;
+    padding: 15px 6px; font-family: 'IBM Plex Mono', monospace; font-size: 25px; white-space: nowrap;
+    overflow: hidden; }
+  .pred-cli-prompt { opacity: 0.55; margin-right: 0.45em; }
+  .pred-cli-text span { display: none; }
+  .pred-verdict { margin-top: 22px; font-family: 'IBM Plex Mono', monospace; font-size: 21px;
+    opacity: 0.8; visibility: hidden; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var q = function (s) { return el.querySelector(s); };
+
+    var header = q('.pred-header');
+    if (data.header) header.textContent = data.header;
+    else { header.style.display = 'none'; q('.pred-rule-top').style.marginTop = '0'; }
+
+    // Paragraph: segments of {text, cut} laid as word spans. Cut words get
+    // the fade; kept words stay full ink.
+    var para = q('.pred-para');
+    var segs = Array.isArray(data.segments) ? data.segments : [];
+    segs.forEach(function (seg) {
+      String(seg.text || '').split(/\s+/).filter(Boolean).forEach(function (w) {
+        var sp = document.createElement('span');
+        sp.textContent = w + ' ';
+        if (seg.cut) sp.className = 'is-cut';
+        para.appendChild(sp);
+      });
+    });
+
+    var at = data.at !== undefined ? Number(data.at) : 2.6;
+
+    // Optional command line typed before the edit fires (pre-laid spans).
+    var cliWrap = q('.pred-cli');
+    if (data.command) {
+      var cliText = q('.pred-cli-text');
+      var cmd = String(data.command);
+      var cps = 22;
+      var typeStart = Math.max(0.2, at - cmd.length / cps - 0.5);
+      for (var i = 0; i < cmd.length; i++) {
+        var sp2 = document.createElement('span');
+        sp2.textContent = cmd[i];
+        cliText.appendChild(sp2);
+        tl.set(sp2, { display: 'inline' }, typeStart + i / cps);
+      }
+      tl.set(q('.pred-cli-cursor'), { display: 'none' }, at + 0.1);
+    } else {
+      cliWrap.style.display = 'none';
+    }
+
+    // The edit: cut words recede into the paper, staggered in reading order.
+    var fadeTo = data.fade_to !== undefined ? Number(data.fade_to) : 0.3;
+    var cuts = el.querySelectorAll('.pred-para .is-cut');
+    if (cuts.length) {
+      tl.to(cuts, { opacity: fadeTo, duration: 0.5, stagger: 0.012, ease: 'power1.out' }, at);
+    }
+
+    // Verdict line ("✓ 38 words cut. the story kept.")
+    if (data.verdict) {
+      var v = q('.pred-verdict');
+      v.textContent = data.verdict;
+      var vAt = at + 1.3;
+      tl.set(v, { visibility: 'visible' }, vAt);
+      tl.fromTo(v, { opacity: 0 }, { opacity: 1, duration: 0.5, immediateRender: false }, vAt);
+    } else {
+      q('.pred-verdict').style.display = 'none';
+    }
+
+    // Entrance: the page settles on (fade + slight rise), house-calm.
+    var root = q('.pred');
+    gsap.set(root, { autoAlpha: 0, y: 10 });
+    tl.to(root, { autoAlpha: 1, y: 0, duration: 0.45, ease: 'power2.out' }, 0.1);
+
+    return tl;
+  }
+</script>

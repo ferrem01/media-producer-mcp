@@ -959,8 +959,12 @@ export async function captureSingleFrame(options: {
             };
             hasBacking = footageGraded || allEls.some(backs);
           }
+          // SVG text paints with FILL, not color -- computed `color` on an
+          // <svg><text> is just inherited (usually black) and misreports the
+          // glyph ink (pen-script cert measured 1.18:1 on white-fill text).
+          const svgText = el.namespaceURI === "http://www.w3.org/2000/svg";
           out.push({
-            text: txt.slice(0, 60), color: cs.color, fontSize: fs,
+            text: txt.slice(0, 60), color: svgText ? (cs as any).fill || cs.color : cs.color, fontSize: fs,
             x, y, w: Math.round(Math.min(r.width, vw - x)), h: Math.round(Math.min(r.height, vh - y)),
             overVideo, hasBacking,
             opacity: elOpacity, clippedFraction: Math.round(clippedFraction * 100) / 100,
