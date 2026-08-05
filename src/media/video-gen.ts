@@ -512,3 +512,52 @@ export async function generatePresenterVideo(opts: PresenterVideoOptions): Promi
 
   return { concatPath, takes, model, referenceFramePath: firstReferencePath, seams };
 }
+
+/**
+ * ASSET MODES for generate_clip (SPEC-canvas-tour dependencies; task #54):
+ * post-process a Veo clip into a still brand asset.
+ *
+ * - CUTOUT: the clip was prompted as flat sticker art on a solid chroma
+ *   background; sample the actual background color from a corner, then
+ *   colorkey + despill into a transparent PNG. Flat sticker art keys
+ *   cleanly (hard ink outlines, no hair/fuzz) -- proven in the illustrated-
+ *   prop prototype (megaphone sticker on #5fb05e).
+ * - TEXTURE: the clip was prompted as a macro surface photo (paper tooth,
+ *   linen...); take the center square, strip the low-frequency lighting
+ *   with a grainextract high-pass, desaturate -- a neutral tile ready for
+ *   feathered-stamp compositing (NEVER grid/mirror tiling downstream).
+ */
+export async function processClipToCutout(clipPath: string, outPng: string): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const run = promisify(execFile);
+  const tmpFrame = outPng.replace(/\.png$/, ".frame.png");
+  await run(FFMPEG(), ["-y", "-ss", "2", "-i", clipPath, "-frames:v", "1", tmpFrame]);
+  // Sample the background from a corner patch (12,12).
+  const { stdout } = await run(FFMPEG(), [
+    "-i", tmpFrame, "-vf", "crop=1:1:12:12", "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
+  ], { encoding: "buffer" as never }) as never as { stdout: Buffer };
+  const [r, g, b] = [stdout[stdout.length - 3], stdout[stdout.length - 2], stdout[stdout.length - 1]];
+  const hex = [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+  const despill = g >= r && g >= b ? "green" : "blue";
+  await run(FFMPEG(), [
+    "-y", "-i", tmpFrame,
+    "-vf", `colorkey=0x${hex}:0.17:0.10,despill=type=${despill}`,
+    "-pix_fmt", "rgba", outPng,
+  ]);
+  await fs.rm(tmpFrame, { force: true });
+}
+
+export async function processClipToTexture(clipPath: string, outPng: string): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const run = promisify(execFile);
+  await run(FFMPEG(), [
+    "-y", "-ss", "2", "-i", clipPath,
+    "-frames:v", "1",
+    "-vf", "crop='min(iw,ih)':'min(iw,ih)',scale=1024:1024," +
+      "split[a][b];[b]gblur=sigma=40[bl];[a][bl]blend=all_mode=grainextract," +
+      "eq=saturation=0.25:contrast=1.25",
+    outPng,
+  ]);
+}
