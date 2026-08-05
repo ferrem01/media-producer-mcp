@@ -46,7 +46,7 @@ export function bakeDirectLogoData(comp: { type: string; data: Record<string, un
  *  wrapper choreography defaults. */
 export const BACKDROP_TYPES = new Set([
   "webgl-backdrop", "gradient-background", "mesh-gradient", "liquid-background",
-  "depth-blur", "particle-field",
+  "depth-blur", "particle-field", "paper-ground",
 ]);
 
 export interface ComponentSource {

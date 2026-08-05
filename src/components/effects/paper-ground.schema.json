@@ -1,0 +1,28 @@
+{
+  "type": "paper-ground",
+  "label": "Paper Ground (print-world surface)",
+  "category": "effects",
+  "description": "The paper world's full-bleed painted sheet: warm cream tone, pulp mottle, hairline fibers, speckle, edge-fold shading and a soft warm vignette -- deterministic from the world seed so every scene sits on the same piece of paper. Sets the ink channel (--mp-ink, --mp-paper) consumed by pen-script, typewriter print/cli, para-edit and ink-aware templates. The intensity dial spans clean print (0.15) to letterpress (0.85).",
+  "data": {
+    "seed": {
+      "type": "number",
+      "label": "World seed (from the film's WorldSpec)",
+      "optional": true
+    },
+    "tone": {
+      "type": "string",
+      "label": "Paper tone hex (default #f2efe7; never pure white)",
+      "optional": true
+    },
+    "intensity": {
+      "type": "number",
+      "label": "Texture intensity 0-1 (default 0.35). ~0.15 clean print, ~0.85 letterpress.",
+      "optional": true
+    },
+    "vignette": {
+      "type": "boolean",
+      "label": "Edge-fold shading + warm vignette (default true)",
+      "optional": true
+    }
+  }
+}
