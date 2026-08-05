@@ -1572,13 +1572,14 @@ export function createMcpServer(): McpServer {
 
   tool(
     "generate_clip",
-    "Generate a standalone AI video clip with Veo (diffusion video) from a text prompt -- a talking-head take (Veo generates the VOICE too: put the spoken line in quotes inside the prompt), a branded shot no stock library has, or b-roll to attach to a project later. Async: returns a job_id to poll with get(target='job'); the completed job carries download_url, and the clip is saved as a tenant brand video asset so it can be referenced in briefs/uploads. Clips are ~8 seconds. Requires GEMINI_API_KEY on the server.",
+    "Generate a standalone AI video clip with Veo (diffusion video) from a text prompt -- a talking-head take (Veo generates the VOICE too: put the spoken line in quotes inside the prompt), a branded shot no stock library has, or b-roll to attach to a project later. Async: returns a job_id to poll with get(target='job'); the completed job carries download_url, and the clip is saved as a tenant brand video asset so it can be referenced in briefs/uploads. Clips are ~8 seconds. ASSET MODES: mode='cutout' post-processes a frame into a TRANSPARENT PNG sticker (prompt flat sticker art 'centered on a plain solid green background, static shot'); mode='texture' into a neutral high-passed surface tile (prompt 'extreme close-up macro photograph of <surface>, filling the frame, static'). Both save the still as a brand image asset alongside the clip. Requires GEMINI_API_KEY on the server.",
     {
       tenant_id: z.string().optional(),
-      prompt: z.string().describe("The shot as a cinematography direction: subject, action, camera move, light. For speech, include the line in quotes: \"a friendly woman looks into the camera and says: 'One conversation becomes a campaign.'\""),
+      prompt: z.string().describe("The shot as a cinematography direction: subject, action, camera move, light. For speech, include the line in quotes: \"a friendly woman looks into the camera and says: 'One conversation becomes a campaign.'\" For mode='cutout': flat sticker art centered on a plain solid green background, static shot. For mode='texture': a macro surface photo filling the frame, static."),
       aspect_ratio: z.enum(["16:9", "9:16"]).optional().describe("Clip aspect (default 16:9; use 9:16 for reels)"),
       name: z.string().optional().describe("Filename stem for the saved clip (default: clip_<jobid>)"),
       reference_image: z.string().optional().describe("CHARACTER CONSISTENCY: an /assets/... URL or server path to an image the clip animates FROM (first-frame conditioning). Use a frame of a prior take (or a character still) to keep the same presenter across clips."),
+      mode: z.enum(["clip", "cutout", "texture"]).optional().describe("clip (default): just the video. cutout: also key the solid background off a frame -> transparent PNG sticker asset (illustrated props). texture: also high-pass a frame -> neutral surface tile asset (paper/linen worlds)."),
     },
     async (params) => {
       if (!process.env.GEMINI_API_KEY) {
@@ -1613,14 +1614,32 @@ export function createMcpServer(): McpServer {
         if (!clip) {
           throw new Error(`Veo returned no clip: ${lastVideoGenError() || "unknown failure (see server logs)"}`);
         }
-        j.progress = { step: "done", percent: 100, detail: "Clip ready" };
         const servedUrl = `/assets/${tenantId}/brand-kit/video/${filename}`;
+        // Asset modes: distill the clip into a still brand asset (task #54).
+        let still: { asset_url: string; download_url: string; kind: string } | undefined;
+        if (params.mode === "cutout" || params.mode === "texture") {
+          j.progress = { step: params.mode, percent: 80, detail: `Processing the ${params.mode} still` };
+          const { processClipToCutout, processClipToTexture } = await import("./media/video-gen.js");
+          const imgDir = path.join(config.dataDir, tenantId, "brand-kit", "assets", "images");
+          await fs.mkdir(imgDir, { recursive: true });
+          const pngName = `${stem}-${params.mode}.png`;
+          const pngPath = path.join(imgDir, pngName);
+          const clipPath = path.join(outputDir, filename);
+          if (params.mode === "cutout") await processClipToCutout(clipPath, pngPath);
+          else await processClipToTexture(clipPath, pngPath);
+          const stillUrl = `/assets/${tenantId}/brand-kit/images/${pngName}`;
+          still = { asset_url: stillUrl, download_url: `${config.publicUrl}${stillUrl}`, kind: params.mode };
+        }
+        j.progress = { step: "done", percent: 100, detail: still ? `Clip + ${still.kind} still ready` : "Clip ready" };
         return {
           asset_url: servedUrl,
           download_url: `${config.publicUrl}${servedUrl}`,
+          ...(still ? { still } : {}),
           model: clip.model,
           aspect_ratio: aspect,
-          note: "Attach to a film by referencing this /assets URL in a generate/revise brief, or place it on a scene as a video component src.",
+          note: still
+            ? `The ${still.kind} still is a brand image asset -- reference still.asset_url in briefs or place it on a scene (cutout: an image component / illustrated prop; texture: a surface tile for feathered-stamp compositing).`
+            : "Attach to a film by referencing this /assets URL in a generate/revise brief, or place it on a scene as a video component src.",
         };
       });
       return ok({

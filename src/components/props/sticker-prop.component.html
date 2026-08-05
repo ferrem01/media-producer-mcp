@@ -18,16 +18,27 @@
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3); white-space: nowrap; }
   .stkp-ring { width: 100%; height: 100%; border: 4px solid var(--stkp-c, #22c55e);
     border-radius: 50%; box-shadow: 0 0 20px color-mix(in srgb, var(--stkp-c, #22c55e) 40%, transparent); }
+  /* image: an ILLUSTRATED CUTOUT (transparent PNG from generate_clip
+     mode='cutout') performing as a physical object -- the print films'
+     hero-prop beat. The soft drop shadow is what seats it on the surface. */
+  .stkp-image { max-width: 100%; max-height: 100%; object-fit: contain;
+    filter: drop-shadow(0 18px 28px rgba(43, 36, 48, 0.22)); }
+  .stkp-whoosh { position: absolute; pointer-events: none; overflow: visible; }
+  .stkp-whoosh path { fill: none; stroke: var(--mp-ink, #2b2430); stroke-width: 5;
+    stroke-linecap: round; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var host = el.querySelector('.stkp');
-    var kind = data.kind || 'pill'; // stamp | gesture | pill | ring
-    var prop = document.createElement('div');
+    var kind = data.kind || 'pill'; // stamp | gesture | pill | ring | image
+    var isImage = kind === 'image' && typeof data.src === 'string' && data.src;
+    if (kind === 'image' && !isImage) kind = 'pill'; // junk-data guard: no src, fall back
+    var prop = document.createElement(isImage ? 'img' : 'div');
     prop.className = 'stkp-' + kind;
-    if (kind !== 'ring') prop.textContent = String(data.text || '');
+    if (isImage) prop.src = data.src;
+    else if (kind !== 'ring') prop.textContent = String(data.text || '');
     if (data.color) host.style.setProperty('--stkp-c', data.color);
     var rot = data.rotation === undefined ? (kind === 'stamp' ? -8 : 0) : Number(data.rotation) || 0;
     host.appendChild(prop);
@@ -37,7 +48,7 @@
     // POSTS / 5 CHANNELS" ran ~84px past its pill and the overflow read
     // white-on-white at 1.18:1). Shrink to fit, floor at 11px, wrap as the
     // last resort.
-    if (kind !== 'ring') {
+    if (kind !== 'ring' && !isImage) {
       var hostW = host.clientWidth;
       var propW = prop.scrollWidth || prop.offsetWidth;
       if (hostW > 40 && propW > hostW) {
@@ -50,7 +61,30 @@
 
     var at = Math.max(0, Number(data.at) || 0.4);
     var hold = Number(data.hold) || 0; // 0 = stays for the scene
-    if (kind === 'stamp' && window.mpStampIn) {
+    if (isImage) {
+      // The cutout arrives as a physical object: drop in with a slight
+      // over-rotation, settle back -- then rest. motion:'swing' adds a slow
+      // residual sway (a hung/held object); default is the settle only.
+      gsap.set(prop, { transformOrigin: '50% 30%', autoAlpha: 0, y: 26, rotation: rot - 6 });
+      tl.to(prop, { autoAlpha: 1, y: 0, rotation: rot + 2, duration: 0.55, ease: 'back.out(1.5)' }, at)
+        .to(prop, { rotation: rot, duration: 0.7, ease: 'power1.inOut' }, at + 0.55);
+      if (data.motion === 'swing') {
+        tl.to(prop, { rotation: rot + 1.6, duration: 1.4, ease: 'sine.inOut' }, at + 1.25)
+          .to(prop, { rotation: rot - 0.8, duration: 1.4, ease: 'sine.inOut' }, at + 2.65)
+          .to(prop, { rotation: rot, duration: 1.2, ease: 'sine.inOut' }, at + 4.05);
+      }
+      if (data.whoosh !== false) {
+        // Comic motion accents near the entry corner, ink-colored.
+        var wh = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        wh.setAttribute('class', 'stkp-whoosh');
+        wh.setAttribute('viewBox', '0 0 60 90');
+        wh.style.cssText = 'left:16%;bottom:14%;width:11%;height:22%;';
+        wh.innerHTML = '<path d="M 40 8 C 24 30 16 54 18 80"/><path d="M 56 20 C 44 36 38 54 40 74"/>';
+        host.appendChild(wh);
+        gsap.set(wh, { autoAlpha: 0 });
+        tl.to(wh, { autoAlpha: 1, duration: 0.3 }, at + 0.5);
+      }
+    } else if (kind === 'stamp' && window.mpStampIn) {
       mpStampIn(tl, prop, at, { rotation: rot });
     } else if (kind === 'ring') {
       gsap.set(prop, { autoAlpha: 0, scale: 1.35, rotation: rot });
