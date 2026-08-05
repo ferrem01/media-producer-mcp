@@ -1,8 +1,13 @@
 # SPEC: canvas-tour — one sheet, a camera route, no cuts
 
-Status: DESIGN — reviewed with Marc 2026-08-05, NOT implemented. Do not build
-without resolving the open questions at the bottom. Prototype that validated
-every mechanism: the Behind-the-Craft recreation (session scratchpad
+Status: DESIGN, MOSTLY DEFERRED — reviewed with Marc 2026-08-05, NOT
+implemented. After the maker's article (see Addendum), the agreed v1 of this
+grammar is DOCTRINE-ONLY: a grammar prompt + kinetic-continuity transition
+craft + long single scenes with internal camera travel (all existing
+machinery). The station/canvas/spatial-layout design below is retained as a
+CONTINGENCY — build it only if the doctrine version proves insufficient for a
+full-film wandering-sheet feel, and only after re-review. Prototype that
+validated the mechanisms: the Behind-the-Craft recreation (session scratchpad
 `craft-proto/`, rendered as `craft-proto-v2.mp4`; reference film:
 x.com/jakefromheygen/status/2084718040672076145 — "Behind the Craft",
 letterpress paper world, macro camera, pen-written cursive).
