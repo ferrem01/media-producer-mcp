@@ -1,0 +1,38 @@
+{
+  "type": "para-edit",
+  "label": "Para Edit (fade the fluff)",
+  "category": "titles",
+  "description": "The self-editing paragraph: a full serif paragraph on the page, an optional typed command line, then the CUT words recede into the paper while the KEPT words stay full-ink -- an edit performed as a visible diff, paid off with a verdict line. The product-demo-as-typography beat: show bloated copy, type the product's command, watch the fluff fade. Segments alternate kept and cut text.",
+  "data": {
+    "segments": {
+      "type": "array",
+      "label": "Paragraph segments in order: {text, cut: true|false}. Interleave kept sentences with cut fluff.",
+      "required": true
+    },
+    "header": {
+      "type": "string",
+      "label": "Small-caps label above the rule (e.g. 'THE FOLLOW-UP, UNEDITED')",
+      "optional": true
+    },
+    "command": {
+      "type": "string",
+      "label": "Command typed on the CLI line before the edit fires (e.g. 'ask quotient to make it worth reading')",
+      "optional": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the edit fires (seconds, default 2.6). The command types itself to finish just before.",
+      "optional": true
+    },
+    "fade_to": {
+      "type": "number",
+      "label": "Opacity the cut words recede to (default 0.3)",
+      "optional": true
+    },
+    "verdict": {
+      "type": "string",
+      "label": "Payoff line after the edit (e.g. '✓ 38 words cut. the story kept.')",
+      "optional": true
+    }
+  }
+}

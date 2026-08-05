@@ -1,150 +1,144 @@
 <template>
   <div class="typewriter">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Mono:wght@400;500&display=swap">
     <div class="ambient-glow"></div>
     <div class="text-area">
-      <span class="typed-text"></span>
-      <span class="cursor">|</span>
+      <span class="tw-prompt"></span><span class="typed-text"></span><span class="cursor">|</span>
     </div>
   </div>
 </template>
 
 <style scoped>
+  /* ── typewriter: character-by-character type-on with a riding cursor.
+     Three voices via data.style:
+       glass (default) -- the house dark glass card (original look)
+       print -- ink on the world's surface, typewriter slab, block cursor
+       cli   -- monospace prompt line with a chevron and thin caret
+     SCRUB-SAFE: characters are PRE-LAID as hidden spans revealed by tl.set
+     (hidden chars collapse to zero width, so the cursor rides the frontier).
+     The old build mutated textContent from an onUpdate -- GSAP suppresses
+     callbacks on seek jumps, which froze the text under Studio scrubbing. */
   .typewriter {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; width: 100%; position: relative; overflow: hidden;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
     padding: 80px;
-    position: relative;
-    overflow: hidden;
   }
-
   .ambient-glow {
-    position: absolute;
-    width: 600px;
-    height: 400px;
-    border-radius: 50%;
-    background: radial-gradient(
-      ellipse,
-      rgba(167, 139, 250, 0.05) 0%,
-      rgba(139, 92, 246, 0.02) 40%,
-      transparent 70%
-    );
-    pointer-events: none;
-    z-index: 0;
+    position: absolute; width: 600px; height: 400px; border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(167,139,250,0.05) 0%, rgba(139,92,246,0.02) 40%, transparent 70%);
+    pointer-events: none; z-index: 0;
   }
-
   .text-area {
-    font-size: 42px;
-    font-weight: 500;
-    color: var(--mp-color-text, #ffffff);
-    text-align: center;
-    max-width: 80%;
-    line-height: 1.5;
-    letter-spacing: -0.01em;
-    position: relative;
-    z-index: 1;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 20px;
-    padding: 48px 56px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow:
-      0 25px 60px rgba(0, 0, 0, 0.3),
-      0 0 0 1px rgba(255, 255, 255, 0.03);
-    text-shadow: 0 0 40px rgba(167, 139, 250, 0.08);
+    font-size: 42px; font-weight: 500; color: var(--mp-color-text, #ffffff);
+    text-align: center; max-width: 80%; line-height: 1.5; letter-spacing: -0.01em;
+    position: relative; z-index: 1;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 20px; padding: 48px 56px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 25px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.03);
+    text-shadow: 0 0 40px rgba(167,139,250,0.08);
   }
+  .typed-text { white-space: pre-wrap; }
+  .typed-text span { display: none; }
+  .tw-prompt { display: none; }
+  .cursor { color: var(--mp-color-accent, #A78BFA); font-weight: 300;
+    text-shadow: 0 0 20px rgba(167,139,250,0.5); }
 
-  .typed-text {
-    white-space: pre-wrap;
+  /* print: type sits IN the world -- no card, no glow, warm ink, slab face */
+  .typewriter.is-print { padding: 0; }
+  .is-print .ambient-glow { display: none; }
+  .is-print .text-area {
+    background: transparent; border: 0; border-radius: 0; padding: 0;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    box-shadow: none; text-shadow: none;
+    font-family: 'Special Elite', 'Courier New', monospace;
+    font-weight: 400; color: var(--mp-ink, #3b342a); letter-spacing: 0.01em;
   }
+  .is-print .cursor { color: var(--mp-ink, #3b342a); text-shadow: none; font-weight: 400; }
 
-  .cursor {
-    color: var(--mp-color-accent, #A78BFA);
-    font-weight: 300;
-    text-shadow: 0 0 20px rgba(167, 139, 250, 0.5);
-    animation: blink 0.6s step-end infinite;
+  /* cli: a command line -- chevron prompt, mono, thin caret */
+  .typewriter.is-cli { padding: 0; }
+  .is-cli .ambient-glow { display: none; }
+  .is-cli .text-area {
+    background: transparent; border: 0; border-radius: 0; padding: 0;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    box-shadow: none; text-shadow: none; text-align: left;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 400;
+    color: var(--mp-ink, #3b342a); letter-spacing: 0;
   }
-
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-  }
+  .is-cli .tw-prompt { display: inline; margin-right: 0.45em; opacity: 0.55; }
+  .is-cli .cursor { color: currentColor; text-shadow: none; font-weight: 400; }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
+    var root = el.querySelector('.typewriter');
     var typedText = el.querySelector('.typed-text');
     var cursor = el.querySelector('.cursor');
     var textArea = el.querySelector('.text-area');
     var glow = el.querySelector('.ambient-glow');
-    var text = data.text || '';
-    var speed = data.speed || 30;
-
-    if (data.cursor_color) {
-      cursor.style.color = data.cursor_color;
-      cursor.style.textShadow = '0 0 20px ' + data.cursor_color;
+    var style = data.style === 'print' || data.style === 'cli' ? data.style : 'glass';
+    if (style !== 'glass') root.classList.add('is-' + style);
+    if (style === 'cli') {
+      el.querySelector('.tw-prompt').textContent = data.prompt || '❯';
+      cursor.textContent = '▍';
     }
+    if (data.font_size) textArea.style.fontSize = data.font_size;
+    if (data.cursor_color) { cursor.style.color = data.cursor_color;
+      if (style === 'glass') cursor.style.textShadow = '0 0 20px ' + data.cursor_color; }
 
+    var text = String(data.text || '');
+    var speed = Number(data.speed) > 0 ? Number(data.speed) : (style === 'glass' ? 30 : 16);
+    var at = data.at !== undefined ? Number(data.at) : (style === 'glass' ? 0.6 : 0.4);
+
+    // Pre-laid characters: hidden spans revealed by tl.set -- pure data on
+    // the timeline, correct at any seek position.
+    var spans = [];
+    for (var i = 0; i < text.length; i++) {
+      var sp = document.createElement('span');
+      sp.textContent = text[i];
+      typedText.appendChild(sp);
+      spans.push(sp);
+    }
     var typeDuration = text.length / speed;
     var maxTypeDuration = Math.max(ctx.duration * 0.7, ctx.duration - 1.5);
-    if (typeDuration > maxTypeDuration) {
+    if (typeDuration > maxTypeDuration && text.length) {
       typeDuration = maxTypeDuration;
     }
+    var per = text.length ? typeDuration / text.length : 0;
+    spans.forEach(function (sp, i) {
+      tl.set(sp, { display: 'inline' }, at + i * per);
+    });
+    var typedEnd = at + typeDuration;
 
-    var counter = { index: 0 };
+    if (style === 'glass') {
+      gsap.set(textArea, { autoAlpha: 0, y: 30, scale: 1.05, filter: 'blur(5px)' });
+      gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
+      tl.to(glow, { autoAlpha: 1, scale: 1, duration: 0.8, ease: 'power2.out' }, 0.1);
+      tl.to(textArea, { autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out' }, 0.2);
+    } else {
+      gsap.set(textArea, { autoAlpha: 0 });
+      tl.to(textArea, { autoAlpha: 1, duration: 0.25 }, Math.max(0, at - 0.25));
+    }
 
-    // Initial state
-    gsap.set(textArea, { autoAlpha: 0, y: 30, scale: 1.05, filter: 'blur(5px)' });
-    gsap.set(glow, { autoAlpha: 0, scale: 0.6 });
-    typedText.textContent = '';
+    // Cursor blink after typing completes -- deterministic yoyo tween, not a
+    // CSS animation (CSS runs on the wall clock and breaks seek determinism).
+    var blinks = data.hold_cursor === false ? 0 : 4;
+    if (blinks) {
+      tl.to(cursor, { opacity: 0, duration: 0.05, repeat: blinks * 2 - 1, yoyo: true,
+        repeatDelay: 0.4, ease: 'none' }, typedEnd + 0.3);
+    }
 
-    // Ambient glow
-    tl.to(glow, {
-      autoAlpha: 1, scale: 1,
-      duration: 0.8,
-      ease: 'power2.out'
-    }, 0.1);
-
-    // Fade in text area with scale + blur
-    tl.to(textArea, {
-      autoAlpha: 1,
-      y: 0,
-      scale: 1,
-      filter: 'blur(0px)',
-      duration: 0.6,
-      ease: 'power3.out'
-    }, 0.2);
-
-    // Type characters
-    tl.to(counter, {
-      index: text.length,
-      duration: typeDuration,
-      ease: 'steps(' + text.length + ')',
-      onUpdate: function() {
-        typedText.textContent = text.substring(0, Math.round(counter.index));
-      }
-    }, 0.6);
-
-    // Exit
-    if (ctx.duration > typeDuration + 1.5) {
+    // Exit (glass keeps its house exit; print/cli hold for the scene)
+    if (style === 'glass' && ctx.duration > typeDuration + 1.5) {
       var exitAt = ctx.duration - 0.7;
-      tl.to(textArea, {
-        autoAlpha: 0,
-        y: -15,
-        scale: 0.97,
-        duration: 0.45,
-        ease: 'power2.in'
-      }, exitAt);
-      tl.to(glow, {
-        autoAlpha: 0,
-        duration: 0.4,
-        ease: 'power2.in'
-      }, exitAt);
+      tl.to(textArea, { autoAlpha: 0, y: -15, scale: 0.97, duration: 0.45, ease: 'power2.in' }, exitAt);
+      tl.to(glow, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, exitAt);
     }
 
     return tl;

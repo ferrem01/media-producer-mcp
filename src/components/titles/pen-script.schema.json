@@ -1,0 +1,43 @@
+{
+  "type": "pen-script",
+  "label": "Pen Script (handwriting write-on)",
+  "category": "titles",
+  "description": "Cursive handwriting that writes itself on, as if by pen -- a real connected-script font revealed stroke-by-stroke with an ink-roughened edge. The signature opening beat of print/paper films (a line writes at macro zoom, then the camera pulls back). Short lines only (1-6 words); pair with typewriter or plain type for the rest of the sentence.",
+  "data": {
+    "text": {
+      "type": "string",
+      "label": "The line to write (short -- 1-6 words)",
+      "required": true
+    },
+    "at": {
+      "type": "number",
+      "label": "When the pen starts (seconds, default 0.3)",
+      "optional": true
+    },
+    "write_seconds": {
+      "type": "number",
+      "label": "How long the writing takes (default scales with length, max 3)",
+      "optional": true
+    },
+    "color": {
+      "type": "string",
+      "label": "Ink color (default warm ink #43392c)",
+      "optional": true
+    },
+    "rough": {
+      "type": "boolean",
+      "label": "Ink-roughen the edges (default true)",
+      "optional": true
+    },
+    "mask_path": {
+      "type": "string",
+      "label": "Hand-traced pen path (SVG d) overriding the auto sweep -- for hero macro shots where exact pen order matters. Trace against ?debug grid at font-size 200, baseline y=236.",
+      "optional": true
+    },
+    "mask_stroke_width": {
+      "type": "number",
+      "label": "Mask stroke width in viewBox units (with mask_path; default 84)",
+      "optional": true
+    }
+  }
+}
