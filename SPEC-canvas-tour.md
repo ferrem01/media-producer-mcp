@@ -177,3 +177,38 @@ representation. Own refactor, own task; do not smuggle into the grammar work.
 5. **Canvas bounds** — fixed 4x4 default vs storyboard-chosen; and whether
    the film's paper is painted at canvas size once (prototype answer: yes,
    seeded painter at canvas size, cached).
+
+## Addendum: the maker's article (2026-08-05, read after this spec was drafted)
+
+Jake Moran published his workflow (x.com/i/article/2084751816584212480, full
+text in session transcript). Corrections and additions to this spec's read of
+the reference film:
+
+- **The film is NOT one literal canvas.** Only the intro is a continuous shot
+  (one unbroken zoom with in-place era conversions). The rest is ordinary
+  scenes made to READ as continuous by transition craft: scenes exit while
+  still moving, the next enters already in flight with speeds matched, and
+  "every transition is something the outgoing scene causes" (a click, a fall,
+  a launch). This yields a CHEAPER SIBLING to canvas-tour — a
+  kinetic-continuity doctrine (velocity-matched exits/entrances + causality
+  rule) that works in the existing scene-cut architecture on every grammar.
+  Canvas-tour remains the clean model for the wandering-sheet feel; it is no
+  longer the only road to "not a slide deck." Build the doctrine first; it
+  de-risks and feeds the grammar.
+- **The print feel is mostly MOTION, not texture** ("vox pack"): elements
+  animate stop-motion at 12fps while the camera glides at full rate, and
+  printed elements carry a calibrated sub-pixel boil so ink never sits still.
+  Both are cheap and deterministic; they belong to the paper world's motion
+  contract (quantize element tweens to 12fps steps; jitter inked elements
+  sub-pixel per step). This explains the residual "too clean" feel of the
+  prototype after texture + cursive were fixed.
+- **Era-conversion law**: style changes happen MID-WORD at the exact camera
+  distance where old and new letterforms are the same size on screen; the
+  paragraph never re-lays-out. (Match-cut continuity, formalized.)
+- **Workflow validation**: storyboard as STILLS first (contact sheet before
+  motion); spend revisions on the one scene that carries the film; hand-drag
+  positions in an inspector and the agent adopts them as source of truth —
+  the Studio+agent loop, verbatim.
+- **Stack framing**: his prompts carry taste; hand-written local skills carry
+  physics. The platform thesis restated: MegaMedia is that skills layer,
+  productized per tenant.
