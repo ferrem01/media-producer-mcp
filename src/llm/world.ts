@@ -21,7 +21,7 @@ import type { Treatment } from "./creative-director.js";
 export interface WorldSpec {
   /** The continuous backdrop system -- ONE recipe for the whole film. */
   backdrop: {
-    component: "mesh-gradient" | "webgl-backdrop";
+    component: "mesh-gradient" | "webgl-backdrop" | "paper-ground";
     /** Single seed for the film; scene assembly derives nothing per-scene. */
     seed: number;
     /** Brand-resolved palette anchors (hex), 2-4. */
@@ -31,6 +31,10 @@ export interface WorldSpec {
   theme: "light" | "dark";
   /** Full-bleed theme-flip beats the storyboard may spend (chapter cards). */
   chapter_slots: number;
+  /** Print-world surface params (paper-ground only): the intensity dial spans
+   *  clean print (~0.15) to letterpress (~0.85). Carried into the backdrop
+   *  component's data by scene assembly. */
+  surface?: { tone: string; intensity: number };
 }
 
 /** Relative luminance > 0.5 -> light. */
@@ -73,6 +77,30 @@ export function deriveWorld(opts: {
     .filter((c): c is string => typeof c === "string" && /^#[0-9a-fA-F]{3,8}$/.test(c))
     .slice(0, 3);
   if (!palette.length) palette.push(light ? "#6366f1" : "#4f46e5");
+
+  // PAPER WORLD (the print/letterpress aesthetic): chosen when the treatment's
+  // creative direction asks for it in words. Deterministic keyword trigger --
+  // the creative director says "paper"/"print"/"letterpress"/"editorial warm"
+  // and the film lands on a painted sheet instead of a gradient. Always a
+  // light world; the ink channel handles the type.
+  const styleText = [
+    (opts.treatment as any)?.visualStyle?.colorMood,
+    (opts.treatment as any)?.visualStyle?.spatialStrategy,
+    (opts.treatment as any)?.concept,
+  ].filter(Boolean).join(" ").toLowerCase();
+  const paper = /\bpaper\b|\bletterpress\b|\bprint(?:ed)?[- ](?:feel|look|world|aesthetic)|\bnewsprint\b|\bzine\b/.test(styleText);
+  if (paper) {
+    return {
+      backdrop: { component: "paper-ground", seed: hash31(opts.seedSource), palette },
+      theme: "light",
+      chapter_slots: 1,
+      surface: {
+        tone: "#f2efe7",
+        intensity: /\bletterpress\b|\btextured\b/.test(styleText) ? 0.7 : 0.3,
+      },
+    };
+  }
+
   return {
     backdrop: {
       component: light ? "mesh-gradient" : "webgl-backdrop",
@@ -86,6 +114,7 @@ export function deriveWorld(opts: {
 
 /** The scene background color the world implies (authored scenes + templates). */
 export function worldBackground(world: WorldSpec): string {
+  if (world.backdrop.component === "paper-ground") return world.surface?.tone || "#f2efe7";
   return world.theme === "light" ? "#fafaf8" : "#0c0d12";
 }
 
