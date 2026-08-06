@@ -2473,3 +2473,34 @@ machinery in SPEC-canvas-tour.md remains a re-review-gated contingency --
 the doctrine version came first deliberately, and the "Ink Line" storyboard
 (proj_81ceb251) had already invented a one-continuous-desk film from the
 paper world alone, which is what argued for doctrine over machinery.
+
+## The photographic tooth never once reached the paper
+
+Two bugs, one silent failure, found only by reading a shipped film's stored
+world instead of looking at it. `generate_clip mode='texture'` wrote the
+distilled tile to `brand-kit/assets/images/` and returned its URL, but never
+added it to `brandKit.assets` -- and `deriveWorld` resolves the tooth by
+scanning that manifest, not the disk. So the world came back as
+`surface {tone, intensity}` with no `texture` key, on a film explicitly
+built to show the paper look. The motif resolver had the identical hole,
+while its own error message told callers minted cutouts "land in the brand
+kit". With registration fixed and the URL finally arriving, the tooth still
+never stamped: `paper-ground` set `img.src` and tested `img.complete` in the
+same tick, which is always false for an uncached image, and there was no
+onload path at all.
+
+The lesson worth keeping is the failure SHAPE, not the two fixes. Paper with
+no photo on it still looks like paper. Every screenshot, every contrast gate,
+every layout gate read as healthy for three merged PRs, because the
+degradation was to a plausible-looking fallback rather than to something
+broken. Wherever a component's premium path can quietly fall back to a
+procedural one, the component now has to say which path it took:
+`paper-ground` writes `data-mp-tooth` (absent = none requested, 0 =
+requested but not painted, 1 = stamped) and `test/paper-tooth.test.ts`
+asserts all three through a real browser. Apply the same rule to the next
+asset-fed component before trusting a gate to catch it.
+
+Related: CI had been red on master since the playbook grew to eight film
+grammars and the two new axes (5900 chars against a 5000 ceiling). Cut back
+to 4995 rather than raised -- the deletion that mattered was the "rule of
+thumb" line restating all eight grammars a second time.
