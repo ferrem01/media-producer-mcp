@@ -269,7 +269,17 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   // the exact shape the hand-built films use, rendered by the same runtime.
   var allDraftComps: any[] = Array.isArray(draft.components) ? (draft.components as any[]) : [];
   var authoredDraftComps = allDraftComps.filter((c) => c && typeof c === "object" && c.data && typeof c.type === "string");
-  var strayPlainComps = allDraftComps.filter((c) => typeof c === "string" && c !== "webgl-backdrop");
+  // A bare STRING entry means the storyboard named a component without
+  // authoring its data -- codegen has to fill it in, so the scene can't take
+  // the deterministic path. World BACKDROPS are the exception: the world
+  // injects its own backdrop and BACKDROP_CAST_TYPES drops the duplicate, so
+  // naming one costs nothing. The exemption used to list only
+  // "webgl-backdrop", which meant a storyboard that cast ["paper-ground",
+  // {typewriter...}] -- exactly what the paper-world contracts ask for --
+  // fell to codegen and DISCARDED its authored components (measured on "The
+  // Ink Line": 5 of 8 scenes came back as bespoke scene_scene_00N customs
+  // instead of paper-ground + typewriter + pen-script).
+  var strayPlainComps = allDraftComps.filter((c) => typeof c === "string" && BACKDROP_CAST_TYPES.indexOf(c) === -1);
   if (authoredDraftComps.length > 0 && strayPlainComps.length === 0 && !draft.broll_query) {
     return buildAuthoredCompositionScene(sceneId, draft, authoredDraftComps, opts);
   }
