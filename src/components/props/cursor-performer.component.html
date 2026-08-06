@@ -7,7 +7,13 @@
      the scene clicking the things that cause the next beat -- UI exhibits
      become a story. Thread it ACROSS scenes by matching each scene's first
      path point to the previous scene's last (the storyboard's handoff
-     contract), so the hand appears continuous through hard cuts. ── */
+     contract), so the hand appears continuous through hard cuts.
+
+     With `cast`, the same component plays the MULTIPLAYER document: several
+     named cursors moving at once over a product surface. That is a different
+     claim, not a busier version of the same one -- one hand says "someone is
+     doing this", a cast says "a team is already in here". Steal from the
+     Remotion Shipper film; it belongs on takeover/social-proof beats. ── */
   .curp { position: absolute; inset: 0; pointer-events: none; }
 </style>
 
@@ -15,38 +21,91 @@
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
     var host = el.querySelector('.curp');
-    var path = Array.isArray(data.path) && data.path.length ? data.path : [{ at: 0.3, x: '50%', y: '55%' }];
-
-    var cursor = (typeof createCursor === 'function')
-      ? createCursor(host, { size: Number(data.size) || 30 })
-      : null;
-    if (!cursor) { console.warn('cursor-performer: shared cursor util missing'); return tl; }
-    cursor.style.zIndex = '95';
-
-    // Place at the first point immediately (the handoff position from the
-    // previous scene); move point-to-point with eased glides; pulse on click.
-    var p0 = path[0];
-    gsap.set(cursor, { left: p0.x || '50%', top: p0.y || '50%' });
-    if (data.enter === 'fade' || path[0].at > 0.15) {
-      gsap.set(cursor, { autoAlpha: 0 });
-      tl.to(cursor, { autoAlpha: 1, duration: 0.25 }, Math.max(0, (Number(p0.at) || 0.3) - 0.25));
+    if (typeof createCursor !== 'function') {
+      console.warn('cursor-performer: shared cursor util missing');
+      return tl;
     }
-    for (var i = 1; i < path.length; i++) {
-      var prev = path[i - 1];
-      var pt = path[i];
-      var t0 = Math.max(0, Number(prev.at) || 0);
-      var t1 = Math.max(t0 + 0.15, Number(pt.at) || (t0 + 0.6));
-      tl.to(cursor, { left: pt.x, top: pt.y, duration: t1 - t0, ease: 'power2.inOut' }, t0);
+
+    // Multiplayer palette: distinct hues that survive both worlds. Used when
+    // a cast member names no color of its own.
+    var CAST_COLORS = ['#e8543f', '#2d7ff9', '#12a594', '#b45cf0', '#e8912d', '#e0447c'];
+    var isColor = function (c) { return typeof c === 'string' && /^(#[0-9a-fA-F]{3,8}|rgb|hsl|var\()/.test(c); };
+    var isPath = function (p) {
+      return Array.isArray(p) && p.length > 0 && p.every(function (pt) {
+        return pt && typeof pt === 'object' && !Array.isArray(pt);
+      });
+    };
+
+    var size = Number(data.size) > 0 ? Number(data.size) : 30;
+
+    // The cast is the multi-cursor form; `path` alone stays the single
+    // protagonist hand (every existing scene keeps working untouched).
+    var cast = Array.isArray(data.cast)
+      ? data.cast.filter(function (m) { return m && typeof m === 'object' && isPath(m.path); }).slice(0, 6)
+      : [];
+
+    if (!cast.length) {
+      cast = [{
+        path: isPath(data.path) ? data.path : [{ at: 0.3, x: '50%', y: '55%' }],
+        color: isColor(data.color) ? data.color : undefined,
+        name: undefined,
+      }];
     }
-    path.forEach(function(pt) {
-      if (pt.click && typeof clickCursor === 'function') {
-        clickCursor(tl, cursor, Math.max(0, Number(pt.at) || 0));
+
+    // Auto-assign around the colors members claimed for themselves: two
+    // cursors the same color is one cursor with extra steps, and the
+    // collision only shows up when someone names a palette color explicitly.
+    var claimed = {};
+    cast.forEach(function (m) { if (isColor(m.color)) claimed[String(m.color).toLowerCase()] = 1; });
+    var nextAuto = 0;
+    function autoColor() {
+      for (var g = 0; g < CAST_COLORS.length; g++) {
+        var c = CAST_COLORS[nextAuto % CAST_COLORS.length];
+        nextAuto++;
+        if (!claimed[c.toLowerCase()]) { claimed[c.toLowerCase()] = 1; return c; }
+      }
+      return CAST_COLORS[nextAuto++ % CAST_COLORS.length];
+    }
+
+    cast.forEach(function (member, mi) {
+      var path = member.path;
+      var color = isColor(member.color) ? member.color
+        : (cast.length > 1 ? autoColor() : '#1a1a2e');
+      var name = typeof member.name === 'string' && member.name.trim() && cast.length > 1
+        ? member.name : undefined;
+
+      var cursor = createCursor(host, { size: size, color: color, label: name });
+      if (!cursor) return;
+      // Below overlaid type, above the surfaces being pointed at.
+      cursor.style.zIndex = String(95 - mi);
+
+      // Place at the first point immediately (the handoff position from the
+      // previous scene); move point-to-point with eased glides; pulse on click.
+      var p0 = path[0];
+      gsap.set(cursor, { left: p0.x || '50%', top: p0.y || '50%', autoAlpha: 1 });
+      var fadesIn = data.enter === 'fade' || (Number(p0.at) || 0) > 0.15;
+      if (fadesIn) {
+        gsap.set(cursor, { autoAlpha: 0 });
+        tl.to(cursor, { autoAlpha: 1, duration: 0.25 }, Math.max(0, (Number(p0.at) || 0.3) - 0.25));
+      }
+      for (var i = 1; i < path.length; i++) {
+        var prev = path[i - 1];
+        var pt = path[i];
+        var t0 = Math.max(0, Number(prev.at) || 0);
+        var t1 = Math.max(t0 + 0.15, Number(pt.at) || (t0 + 0.6));
+        tl.to(cursor, { left: pt.x, top: pt.y, duration: t1 - t0, ease: 'power2.inOut' }, t0);
+      }
+      path.forEach(function (pt) {
+        if (pt.click && typeof clickCursor === 'function') {
+          clickCursor(tl, cursor, Math.max(0, Number(pt.at) || 0));
+        }
+      });
+      if (data.exit === 'fade') {
+        var last = path[path.length - 1];
+        tl.to(cursor, { autoAlpha: 0, duration: 0.25 }, Math.max(0, (Number(last.at) || 0) + 0.4));
       }
     });
-    if (data.exit === 'fade') {
-      var last = path[path.length - 1];
-      tl.to(cursor, { autoAlpha: 0, duration: 0.25 }, Math.max(0, (Number(last.at) || 0) + 0.4));
-    }
+
     return tl;
   }
 </script>

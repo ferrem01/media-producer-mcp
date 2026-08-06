@@ -2,13 +2,19 @@
   "type": "cursor-performer",
   "label": "Cursor Performer",
   "category": "props",
-  "description": "The film's protagonist hand: a cursor that travels the scene and CLICKS the thing that causes the next beat -- UI exhibits become a story someone is doing. Position its box over the whole stage at a high z_index. CONTINUITY CONTRACT: when threading the cursor across consecutive scenes, make each scene's FIRST path point equal the previous scene's LAST point (same x/y), so the hand reads as continuous through hard cuts. Use on 2-4 consecutive UI scenes max; it should always be traveling toward or clicking something meaningful.",
+  "description": "The film's protagonist hand: a cursor that travels the scene and CLICKS the thing that causes the next beat -- UI exhibits become a story someone is doing. Position its box over the whole stage at a high z_index. CONTINUITY CONTRACT: when threading the cursor across consecutive scenes, make each scene's FIRST path point equal the previous scene's LAST point (same x/y), so the hand reads as continuous through hard cuts. Use on 2-4 consecutive UI scenes max; it should always be traveling toward or clicking something meaningful. MULTIPLAYER CAST: pass `cast` instead of `path` for several NAMED cursors moving at once over a product surface -- that is a different claim, not a busier version of the same one. One hand says 'someone is doing this'; a cast says 'a team is already in here'. Spend it on a takeover or social-proof beat, with 2-4 members, and give each a real path (drifting name tags with nothing to do read as decoration).",
   "data": {
     "path": {
       "type": "array",
-      "label": "[{at, x:'62%', y:'48%', click?:true}] -- scene-local seconds, stage-relative coords",
-      "required": true
+      "label": "[{at, x:'62%', y:'48%', click?:true}] -- scene-local seconds, stage-relative coords. The single protagonist hand.",
+      "optional": true
     },
+    "cast": {
+      "type": "array",
+      "label": "MULTIPLAYER: [{name:'Maria', color?:'#2d7ff9', path:[{at,x,y,click?}]}] -- up to 6. Names render as colored pills trailing each tip; colors auto-assign from a distinct palette when omitted. Overrides `path`.",
+      "optional": true
+    },
+    "color": { "type": "string", "label": "Cursor color for the single-hand form (default near-black)", "optional": true },
     "size": { "type": "number", "label": "Cursor size px (default 30)", "optional": true },
     "enter": { "type": "string", "label": "'fade' to fade in at the first point (default: present from start)", "optional": true },
     "exit": { "type": "string", "label": "'fade' to fade out after the last point", "optional": true }

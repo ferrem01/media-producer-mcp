@@ -17,6 +17,9 @@
  * @param {string}      [options.color="#1a1a2e"]
  * @param {number}      [options.size=24]
  * @param {number}      [options.zIndex=9999]
+ * @param {string}      [options.label]  Name pill trailing the tip (the
+ *   multiplayer-document convention: a named cursor is another PERSON in the
+ *   room, which is the whole point of showing more than one).
  * @returns {HTMLElement} The cursor DOM element.
  */
 function createCursor(container, options) {
@@ -40,6 +43,20 @@ function createCursor(container, options) {
       '<path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.45 0 .67-.53.35-.85L5.85 2.35a.5.5 0 0 0-.35.86z" ' +
             'fill="' + color + '" stroke="#ffffff" stroke-width="1.5"/>' +
     '</svg>';
+
+  if (typeof opts.label === 'string' && opts.label.trim()) {
+    var pill = document.createElement('div');
+    pill.className = 'mp-cursor-label';
+    pill.textContent = opts.label.trim().slice(0, 18);
+    pill.style.cssText =
+      'position:absolute;left:' + Math.round(size * 0.62) + 'px;top:' + Math.round(size * 0.7) + 'px;' +
+      'background:' + color + ';color:#fff;white-space:nowrap;' +
+      'font:600 ' + Math.max(11, Math.round(size * 0.46)) + 'px/1 Inter,system-ui,sans-serif;' +
+      'padding:' + Math.round(size * 0.2) + 'px ' + Math.round(size * 0.34) + 'px;' +
+      'border-radius:' + Math.round(size * 0.3) + 'px;letter-spacing:0.01em;' +
+      'box-shadow:0 1px 3px rgba(0,0,0,0.18)';
+    el.appendChild(pill);
+  }
 
   // Start hidden (opacity 0) so scripts can show it explicitly or
   // it becomes visible on first move.
