@@ -2442,3 +2442,19 @@ Full design: SPEC-canvas-tour.md (status DESIGN — open questions must be
 resolved before code). Backlog: #54 paper/illustrated world bundle, #56
 canvas-tour, #57 Shipper steals. Build order agreed with Marc: performed-type
 components first, textured-world system second, grammar third.
+
+## The creative axes: visual_system + audio_system on generate
+
+Marc's consistency ruling closed the three-video arc: film_grammar was the
+only creative field on generate while WorldSpec lived as invisible machinery
+and motion/motif were prose or proposals -- "I would just love some
+consistency here." The fix is the film-craft triad as the operator surface:
+film_grammar (rhythm) + visual_system (look: world/motion/type/motif) +
+audio_system (sound: music_mood/voice), every subfield omit-to-infer /
+provide-to-pin, resolved by the creative director into the treatment as
+typed data. Motif is pin-only and asset-validated (no sticker film without
+stickers -- the build fails loudly pointing at generate_clip mode='cutout').
+music_mood drives the existing Jamendo search at both selection sites;
+'none' suppresses the bed. The axis map, current + anticipated enum values,
+and the four anti-sprawl growth rules live in SPEC-creative-axes.md -- read
+it before replicating the next video from X.

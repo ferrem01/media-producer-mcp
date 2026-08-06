@@ -36,6 +36,39 @@ export type FilmGrammar = "launch-film" | "tempo-cut" | "hype-cut" | "speaker-sc
 
 export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story"];
 
+/** ── The LOOK axis (visual_system) and SOUND axis (audio_system) ──
+ * The film-craft triad on the generate surface: film_grammar = the RHYTHM,
+ * visual_system = the LOOK, audio_system = the SOUND. Same contract for all
+ * three: omitted -> the creative director infers from the prompt; provided ->
+ * pinned, the director must commit. Enums are registries: every value is
+ * backed by real machinery (a backdrop component, a motion contract, a
+ * component family) -- values without machinery are lies. */
+export interface VisualSystem {
+  /** The film's continuous surface. Backed by WorldSpec derivation. */
+  world?: "light" | "dark" | "paper";
+  /** The physics contract: how things move (and what moves are banned). */
+  motion?: "punchy" | "calm" | "cutout-physics";
+  /** The type voice for display text (brand kit fonts stay the base). */
+  type?: "grotesk" | "editorial-serif" | "typewriter" | "script";
+  /** A recurring performed element family threading the film. */
+  motif?: {
+    kind: "cutout";
+    /** Brand-kit cutout asset URLs (the sticker set). v1: REQUIRED to cast
+     *  the motif; the pipeline resolves *-cutout.png brand images when
+     *  omitted and fails loudly if none exist. */
+    assets?: string[];
+    /** accent = recurring garnish; lead = the motif carries the film. */
+    density?: "accent" | "lead";
+  };
+}
+export interface AudioSystem {
+  /** Music bed mood -- drives the track search. 'none' = no music even if
+   *  background_music was set. */
+  music_mood?: "driving" | "jazzy" | "ambient" | "playful" | "cinematic" | "warm" | "none";
+  /** TTS voice for narration (same values as the legacy voice param). */
+  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
+}
+
 export interface ConceptDirectorOpts {
   prompt: string;
   format: OutputFormat;
@@ -44,6 +77,10 @@ export interface ConceptDirectorOpts {
   referenceImages?: ReferenceImage[];
   /** Caller-fixed film grammar: the director must commit to it, not choose. */
   filmGrammar?: FilmGrammar;
+  /** Caller-pinned look/sound: subfields provided here are commitments; the
+   *  director infers only the omitted ones. */
+  visualSystem?: VisualSystem;
+  audioSystem?: AudioSystem;
   /** A speaker video is attached (forces/implies speaker-screencast). */
   hasSpeaker?: boolean;
 }
@@ -78,6 +115,12 @@ export interface Treatment {
    *  this as DATA: it activates the matching storyboard contract, sets the
    *  assembly policy (component-first vs codegen), and the music policy. */
   filmGrammar?: FilmGrammar;
+  /** The LOOK this treatment commits to (pins passed through; omitted
+   *  subfields inferred by the director). Downstream reads this as DATA:
+   *  world derivation, motion guidance, motif casting. */
+  visualSystem?: VisualSystem;
+  /** The SOUND this treatment commits to: music mood + narration voice. */
+  audioSystem?: AudioSystem;
 }
 
 /**
@@ -179,6 +222,14 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
   "selected": 0,
   "selectionReason": "Why this concept is strongest",
   "filmGrammar": "launch-film | tempo-cut | speaker-screencast | editorial | social-reel | data-story",
+  "visualSystem": {
+    "world": "light | dark | paper -- the film's continuous surface. paper = the print/letterpress world (painted sheet, warm ink): choose it when the prompt asks for a paper/print/zine/letterpress/illustrated-sticker feel. Otherwise omit and the brand decides.",
+    "motion": "punchy | calm | cutout-physics -- the physics contract. calm = settle-never-bounce editorial restraint. cutout-physics = rigid flat pieces that drop/settle/swing like physical stickers (pairs with paper + a cutout motif). Default punchy.",
+    "type": "grotesk | editorial-serif | typewriter | script -- the display-type voice, only when the concept demands one (paper films often want typewriter)."
+  },
+  "audioSystem": {
+    "music_mood": "driving | jazzy | ambient | playful | cinematic | warm | none -- the music bed's personality, chosen to serve the emotional arc."
+  },
   "sceneCount": 3,
   "directorNote": "3-5 sentence creative direction summary that the storyboard should follow"
 }
@@ -199,6 +250,17 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
   } else {
     grammarDirective = `\n\nNo speaker recording exists -- do NOT choose "speaker-screencast".`;
   }
+  // Pinned look/sound: the caller's commitments are constraints the concepts
+  // must be designed AROUND, not suggestions.
+  const vsPins: string[] = [];
+  if (opts.visualSystem?.world) vsPins.push(`world="${opts.visualSystem.world}"`);
+  if (opts.visualSystem?.motion) vsPins.push(`motion="${opts.visualSystem.motion}"`);
+  if (opts.visualSystem?.type) vsPins.push(`type="${opts.visualSystem.type}"`);
+  if (opts.visualSystem?.motif) {
+    vsPins.push(`motif=cutout (${opts.visualSystem.motif.density || "accent"}): the film threads a recurring family of illustrated sticker cutouts -- design the concept so the stickers are ${opts.visualSystem.motif.density === "lead" ? "the protagonists of every scene" : "a recurring garnish that lands on the film's key beats"}`);
+  }
+  if (vsPins.length) grammarDirective += `\n\nTHE CALLER HAS FIXED THE VISUAL SYSTEM: ${vsPins.join("; ")}. These are commitments -- echo them in visualSystem and design the concepts around them.`;
+  if (opts.audioSystem?.music_mood) grammarDirective += `\n\nTHE CALLER HAS FIXED THE MUSIC MOOD: "${opts.audioSystem.music_mood}". Echo it in audioSystem.music_mood.`;
 
   var userPrompt = `Create a ${opts.format} for:
 - ARTIFACT-DRIVEN BEATS: tell each step of a workflow through a mock of the SURFACE where it happens (a chat thread, an agent terminal, a video player, a records list) -- and always show the artifact BUILDING (typed, cascaded, counted, scrubbed), never pre-made. A story told through product surfaces reads as real; a story told through abstract cards reads as slides.\n\n${opts.prompt}${grammarDirective}`;
@@ -255,7 +317,35 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
     directorNote: result.directorNote || `Concept: ${selected.idea}. Pattern: ${selected.pattern}. Through-line: ${selected.throughLine}.`,
     sceneCount: typeof result.sceneCount === "number" ? result.sceneCount : undefined,
     filmGrammar: resolveFilmGrammar(opts, result.filmGrammar),
+    visualSystem: resolveVisualSystem(opts, result.visualSystem),
+    audioSystem: resolveAudioSystem(opts, result.audioSystem),
   };
+}
+
+/** Pins win subfield-by-subfield; the director fills only what the caller
+ *  left open. Invalid director values are dropped (enums are registries --
+ *  a value without machinery behind it must not reach downstream). */
+function resolveVisualSystem(opts: ConceptDirectorOpts, fromLLM: any): VisualSystem | undefined {
+  const pick = <T extends string>(pin: T | undefined, raw: unknown, valid: readonly T[]): T | undefined =>
+    pin ?? (typeof raw === "string" && (valid as readonly string[]).includes(raw) ? (raw as T) : undefined);
+  const vs: VisualSystem = {
+    world: pick(opts.visualSystem?.world, fromLLM?.world, ["light", "dark", "paper"] as const),
+    motion: pick(opts.visualSystem?.motion, fromLLM?.motion, ["punchy", "calm", "cutout-physics"] as const),
+    type: pick(opts.visualSystem?.type, fromLLM?.type, ["grotesk", "editorial-serif", "typewriter", "script"] as const),
+    // Motif is PIN-ONLY for now: the director must not invent a motif the
+    // brand kit has no assets for (the pipeline validates assets exist).
+    motif: opts.visualSystem?.motif,
+  };
+  return vs.world || vs.motion || vs.type || vs.motif ? vs : undefined;
+}
+
+function resolveAudioSystem(opts: ConceptDirectorOpts, fromLLM: any): AudioSystem | undefined {
+  const moods = ["driving", "jazzy", "ambient", "playful", "cinematic", "warm", "none"] as const;
+  const mood = opts.audioSystem?.music_mood
+    ?? (typeof fromLLM?.music_mood === "string" && (moods as readonly string[]).includes(fromLLM.music_mood)
+      ? (fromLLM.music_mood as AudioSystem["music_mood"]) : undefined);
+  const voice = opts.audioSystem?.voice;
+  return mood || voice ? { music_mood: mood, voice } : undefined;
 }
 
 /** The caller's grammar always wins; otherwise validate the director's pick
@@ -286,7 +376,13 @@ ${bible.filmGrammar ? `**FILM GRAMMAR: ${bible.filmGrammar}** -- this contract g
 - Color mood: ${bible.visualStyle.colorMood}
 - Typography attitude: ${bible.visualStyle.typographyAttitude}
 - Motion personality: ${bible.visualStyle.motionPersonality}
-- Spatial strategy: ${bible.visualStyle.spatialStrategy}
+- Spatial strategy: ${bible.visualStyle.spatialStrategy}${bible.visualSystem ? `
+- VISUAL SYSTEM (committed): ${[
+    bible.visualSystem.world ? `world=${bible.visualSystem.world}` : null,
+    bible.visualSystem.motion ? `motion=${bible.visualSystem.motion}${bible.visualSystem.motion === "cutout-physics" ? " (elements move as rigid flat pieces: drop, settle, swing -- no glows, no morphs, no elastic scaling)" : bible.visualSystem.motion === "calm" ? " (settle, never bounce; entrances ease out and land; nothing overshoots or tilts)" : ""}` : null,
+    bible.visualSystem.type ? `type=${bible.visualSystem.type}` : null,
+  ].filter(Boolean).join("; ")}` : ""}${bible.visualSystem?.motif ? `
+- MOTIF (committed, ${bible.visualSystem.motif.density || "accent"}): a recurring family of illustrated sticker cutouts threads the film. Cast them as sticker-prop components with kind="image" using EXACTLY these asset URLs (never invent others): ${(bible.visualSystem.motif.assets || []).join(", ")}. ${bible.visualSystem.motif.density === "lead" ? "The stickers ARE the film's visual protagonists -- every scene features at least one performing (drop-in, settle, swing)." : "Land a sticker on the film's key beats (roughly every 2-3 scenes) -- a recurring thread, not wallpaper."}` : ""}
 
 ${bible.mediaPlan ? `**Media Plan (follow it -- set broll_query / hero_image on the scenes it names):** ${bible.mediaPlan}
 

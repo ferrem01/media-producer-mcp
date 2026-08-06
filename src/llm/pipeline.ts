@@ -95,6 +95,10 @@ export interface PipelineOpts {
   /** L4 film grammar override. When set, the creative director must commit to
    *  it; otherwise the director chooses and downstream reads the choice. */
   film_grammar?: import("./creative-director.js").FilmGrammar;
+  /** The LOOK axis: omitted subfields inferred by the creative director. */
+  visual_system?: import("./creative-director.js").VisualSystem;
+  /** The SOUND axis: music mood + narration voice. */
+  audio_system?: import("./creative-director.js").AudioSystem;
   voiceover?: boolean;      // default: false. Generate TTS voiceover per scene.
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";  // TTS voice (default: nova)
   backgroundMusic?: boolean;  // default: false. Add background music with voiceover ducking.
@@ -2349,6 +2353,8 @@ async function runUnifiedPipeline(
         brandKit,
         referenceImages: processedRefs,
         filmGrammar: opts.film_grammar,
+        visualSystem: opts.visual_system,
+        audioSystem: opts.audio_system,
         hasSpeaker: !!opts.speaker_source || pipelineHasNarration,
       });
       // Inject creative direction into the prompt for the storyboard builder
@@ -2442,7 +2448,10 @@ async function runUnifiedPipeline(
     brandKit,
     tenantId: opts.tenant_id,
     format,
-    backgroundMusic: wantsMusic,
+    // audio_system: 'none' suppresses the bed even where the grammar wants
+    // one; a committed mood overrides the prompt-keyword heuristic.
+    backgroundMusic: wantsMusic && treatment?.audioSystem?.music_mood !== "none",
+    musicMood: treatment?.audioSystem?.music_mood !== "none" ? treatment?.audioSystem?.music_mood : undefined,
     sceneCount,
   });
   if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && wantsMusic && !prep.beatMap) {
@@ -2451,6 +2460,10 @@ async function runUnifiedPipeline(
   var musicTrack: import("../audio/music.js").MusicTrack | null = prep.music || null;
   var beatMap: import("../audio/beat-map.js").BeatMap | undefined = prep.beatMap;
   trace?.endEvent({ mandate: prep.mandate, bpm: beatMap?.bpm });
+
+  // audio_system.voice: the treatment's committed narration voice wins over
+  // the legacy flat param (which stays as the fallback).
+  if (treatment?.audioSystem?.voice) opts.voice = treatment.audioSystem.voice as typeof opts.voice;
 
   // ── The WORLD (SPEC-world.md): one continuous visual container per film ──
   // Derived in code from brand + treatment (deterministic across regens of
@@ -2462,6 +2475,26 @@ async function runUnifiedPipeline(
     seedSource: `${opts.tenant_id}:${(treatment?.concept || richPrompt).slice(0, 80)}`,
   });
   console.log(`  World: ${world.theme} / ${world.backdrop.component} seed=${world.backdrop.seed} palette=[${world.backdrop.palette.join(",")}]`);
+
+  // ── MOTIF assets (visual_system.motif, v1: cutout) ── The sticker set must
+  // EXIST -- silent degradation into "a sticker film with no stickers" is the
+  // failure class the gates exist to prevent, so the seam is loud. Assets
+  // come from the pin, else any brand images matching *-cutout.png.
+  if (treatment?.visualSystem?.motif) {
+    const motif = treatment.visualSystem.motif;
+    if (!motif.assets?.length) {
+      const kitCutouts = (brandKit?.assets || [])
+        .filter((a: any) => a?.type === "image" && /-cutout\.png$/i.test(String(a?.url || "")))
+        .map((a: any) => String(a.url));
+      if (kitCutouts.length) motif.assets = kitCutouts;
+    }
+    if (!motif.assets?.length) {
+      throw new Error(
+        "visual_system.motif 'cutout' is set but no cutout assets exist: pass motif.assets, or mint a sticker set first with generate_clip mode='cutout' (assets land in the brand kit as *-cutout.png)."
+      );
+    }
+    console.log(`  Motif: cutout (${motif.density || "accent"}) with ${motif.assets.length} asset(s)`);
+  }
 
   opts.onProgress?.({ step: "storyboarding", percent: 12, detail: "Storyboarding the film" });
 
@@ -3475,14 +3508,15 @@ async function runUnifiedPipeline(
       console.log(`  Voiceover: generated ${voicePaths.filter(p => p).length} TTS clips`);
 
       // ── Background music with ducking ──
-      if (opts.backgroundMusic) {
+      if (opts.backgroundMusic && treatment?.audioSystem?.music_mood !== "none") {
         try {
           // Prefer the track selected up front by the music-first pass (the
           // storyboard was cut to ITS beat grid); fall back to selecting here.
           let track = musicTrack;
           if (!track) {
             const { selectMusic } = await import("../audio/music.js");
-            const mood = pickMusicMood(richPrompt);
+            const committedMood = treatment?.audioSystem?.music_mood as string | undefined;
+            const mood = committedMood && committedMood !== "none" ? committedMood : pickMusicMood(richPrompt);
             console.log(`  Background music: searching for "${mood}" mood...`);
             const totalDuration = project.scenes.reduce((sum: number, s: any) => sum + s.duration_seconds, 0);
             track = await selectMusic({

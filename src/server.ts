@@ -2130,6 +2130,20 @@ export function createMcpServer(): McpServer {
       canvas_width: z.number().optional().describe("Explicit canvas width. For images, auto-inferred from prompt if omitted."),
       canvas_height: z.number().optional().describe("Explicit canvas height. For images, auto-inferred from prompt if omitted."),
       creativity: z.number().min(0).max(1).optional().describe("Creativity level 0-1. Low (0) prefers library components. High (0.7-1.0) creates one self-contained custom component per scene. Default: 0.5."),
+      visual_system: z.object({
+        world: z.enum(["light", "dark", "paper"]).optional().describe("The film's continuous surface: light (airy mesh), dark (cinematic), paper (painted print/letterpress sheet with the ink channel)."),
+        motion: z.enum(["punchy", "calm", "cutout-physics"]).optional().describe("The physics contract: punchy (house slams/pushes), calm (settle-never-bounce editorial restraint), cutout-physics (rigid flat pieces that drop/settle/swing like stickers)."),
+        type: z.enum(["grotesk", "editorial-serif", "typewriter", "script"]).optional().describe("Display-type voice for the film's big text."),
+        motif: z.object({
+          kind: z.enum(["cutout"]).describe("The recurring element family. cutout = illustrated sticker set threading the film."),
+          assets: z.array(z.string()).optional().describe("Brand-kit cutout asset URLs (the sticker set). Omit to auto-resolve *-cutout.png brand images; the build FAILS LOUDLY if none exist (mint them first with generate_clip mode='cutout')."),
+          density: z.enum(["accent", "lead"]).optional().describe("accent (default): recurring garnish on key beats. lead: the stickers carry the film -- every scene features one performing."),
+        }).optional(),
+      }).optional().describe("The LOOK axis (film-craft triad: film_grammar = rhythm, visual_system = look, audio_system = sound). Omit any subfield and the creative director infers it from the prompt; provide it and it is pinned."),
+      audio_system: z.object({
+        music_mood: z.enum(["driving", "jazzy", "ambient", "playful", "cinematic", "warm", "none"]).optional().describe("The music bed's personality ('none' suppresses music even where the grammar wants a bed)."),
+        voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS narration voice (wins over the legacy flat voice param)."),
+      }).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc."),
       film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. social-reel: vertical 9:16 feed film, 15-30s, hook-first with caption-scale type and a loop seam (canvas defaults to vertical). data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. Omit to let the creative director choose."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
@@ -2280,6 +2294,8 @@ export function createMcpServer(): McpServer {
                   : { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
               creativity: params.creativity,
               film_grammar: params.film_grammar,
+              visual_system: params.visual_system,
+              audio_system: params.audio_system,
               maxRevisions: params.max_revisions,
               project_id: params.project_id,
               voiceover: params.voiceover,
@@ -2327,6 +2343,8 @@ export function createMcpServer(): McpServer {
           const sbBuild = await queueBuildFromStoryboard(params.tenant_id, params.project_id, {
             creativity: params.creativity,
             film_grammar: params.film_grammar,
+            // visual/audio systems act at the creative-director stage; a
+            // build from an existing storyboard is already past it.
             max_revisions: params.max_revisions,
             voiceover: params.voiceover,
             background_music: params.background_music,
@@ -2431,6 +2449,8 @@ export function createMcpServer(): McpServer {
               canvasHeight: params.canvas_height,
               creativity: params.creativity,
               film_grammar: params.film_grammar,
+              visual_system: params.visual_system,
+              audio_system: params.audio_system,
               maxRevisions: params.max_revisions,
               existingSource,
               name: revisionName,
