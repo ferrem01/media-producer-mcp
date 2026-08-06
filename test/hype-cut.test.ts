@@ -51,13 +51,13 @@ describe("hype-cut grammar registration", () => {
 
   it("never ships label-read voiceovers: text-as-voiceover strip covers it (and tempo-cut/editorial)", async () => {
     const src = await read("../src/llm/pipeline.ts");
-    expect(src).toMatch(/\(filmGrammar === "tempo-cut" \|\| filmGrammar === "hype-cut" \|\| filmGrammar === "editorial" \|\| filmGrammar === "social-reel" \|\| filmGrammar === "data-story"\) && !opts\.voiceover/);
+    expect(src).toMatch(/\(filmGrammar === "tempo-cut" \|\| filmGrammar === "hype-cut" \|\| filmGrammar === "editorial" \|\| filmGrammar === "social-reel" \|\| filmGrammar === "data-story" \|\| filmGrammar === "canvas-tour"\) && !opts\.voiceover/);
   });
 
   it("is exposed on the generate tool and the operator instructions", async () => {
     const src = await read("../src/server.ts");
     expect(src).toMatch(/"launch-film", "tempo-cut", "hype-cut", "speaker-screencast"/);
     expect(src).toContain("hype-cut -- story-first hype");
-    expect(src).toContain("the words hype what the product proves (hype-cut)");
+    expect(src).toContain("Choosing: ask what carries the argument");
   });
 });

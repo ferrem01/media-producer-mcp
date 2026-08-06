@@ -328,18 +328,18 @@ BEFORE GENERATING
   * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover. Fast explainers.
   * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats that form ONE continuous scripted session. For use-case narratives (MCP/integration demos).
   * editorial -- typography-first manifesto: huge serif statements alternating with full-bleed evidence. The words are the product.
-  * social-reel -- vertical 9:16, 15-30s: hook in the first 2 seconds, caption-scale type, escalation beats, a loop seam.
-  * data-story -- numbers as protagonist: claim -> proof, ONE live-drawing figure per scene up to the money number; figures come from the brief, never invented.
+  * social-reel -- vertical 9:16, 15-30s: hook in the first 2 seconds, caption-scale type, escalation beats, loop seam.
+  * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene up to the money number; figures come from the brief, never invented.
   * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never chosen without one.
   * canvas-tour -- ONE unbroken shot across a single surface: beats are PLACES the camera travels to, type is PERFORMED where it lives (pen-written, typed, commanded). Craft-forward brand and print films.
-  Choosing: ask what carries the argument -- the product, the words, the numbers, a person, one surface, or the feed format. Relay the choice in those terms.
+  Choosing: ask what carries the argument -- the product, the words, the numbers, a person, one surface, or the feed format.
 - THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture" mints surface tiles).
 - Brand comes from the tenant's brand kit. No kit? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
-- A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and assembles the film.
+- A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and builds the film.
 
-REAL MEDIA (planned and fetched autonomously -- steer it with the brief)
+REAL MEDIA (planned and fetched AUTONOMOUSLY -- steer it with the brief)
 - Per beat the director picks real footage, a generated still, or motion graphics (Pexels stock, AI stills, or Veo video -- Veo only for moving shots no stock library could hold; 0-1 per film, ~8s and 1-3 min each, so say so when asked).
-- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk", "photographic and cinematic". To FORCE a generated shot, describe it and say "generate this shot". Mood-only briefs get motion graphics on UI/data beats and real media on emotional ones.
+- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk", "photographic and cinematic". To FORCE a generated shot, describe it and say "generate this shot" -- that makes it mandatory. Mood-only briefs get motion graphics on UI/data beats and real media on emotional ones.
 - TALKING HEADS are explicit by design (casting a synthetic presenter is the human's call). generate_clip = one Veo clip; quote the spoken line and Veo voices it. generate_presenter = a whole script (~60s) split into consistent takes, returned as ONE stitched clip with scripted-vs-heard per take (relay any drift). Feed either asset_url back as speaker_source and the film goes speaker-led: that voice is the soundtrack and scenes cut on its sentences. reference_image keeps the presenter consistent.
 
 ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
