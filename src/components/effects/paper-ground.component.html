@@ -36,7 +36,8 @@
 
     var tone = typeof data.tone === 'string' && /^#([0-9a-fA-F]{3}){1,2}$/.test(data.tone) ? data.tone : '#f2efe7';
     var intensity = Math.max(0, Math.min(1, Number(data.intensity) >= 0 ? Number(data.intensity) : 0.35));
-    var seed = (Number(data.seed) || 7) >>> 0;
+    var seed0 = (Number(data.seed) || 7) >>> 0;
+    var seed = seed0;
     function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
 
     // Ink channel: warm charcoal on light paper, warm cream on a dark sheet
@@ -62,7 +63,11 @@
       ? data.texture_url : '';
     var hasTex = false;
     function stampTooth(img) {
-      var S = Math.round(Math.min(W, H) * 0.34);
+      // Stamp scale sets the GRAIN. The source is a macro photograph, so a
+      // large stamp magnifies the fibers until the sheet reads as plaster
+      // (measured: 0.34 of the short edge puts each fiber at ~10px). 0.16
+      // lands the grain at ~3px on a 1080p frame -- paper tooth, not relief.
+      var S = Math.round(Math.min(W, H) * 0.16);
       if (!S || !img.naturalWidth) return;
       var stamp = document.createElement('canvas');
       stamp.width = S; stamp.height = S;
@@ -91,64 +96,92 @@
       g.restore();
     }
 
-    g.fillStyle = tone;
-    g.fillRect(0, 0, W, H);
-    // pulp mottle: big soft blobs, barely-there
-    var mottleN = Math.round(60 + 120 * intensity);
-    for (var i = 0; i < mottleN; i++) {
-      var mx = rnd() * W, my = rnd() * H, mr = H * (0.06 + rnd() * 0.16);
-      var grad = g.createRadialGradient(mx, my, 0, mx, my, mr);
-      var dark = rnd() < 0.5;
-      var a = (dark ? 0.020 : 0.030) * (0.5 + intensity);
-      grad.addColorStop(0, dark ? 'rgba(120,106,84,' + a + ')' : 'rgba(255,252,244,' + (a * 1.4) + ')');
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = grad;
-      g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill();
-    }
-    // The tooth goes down over the base + mottle, under the fibers.
-    if (texUrl && texImg) {
-      texImg.src = texUrl;
-      if (texImg.complete && texImg.naturalWidth) { stampTooth(texImg); hasTex = true; }
+    // One full pass over the sheet, in layer order. Re-runnable: the PRNG is
+    // rewound from the film's seed each time, so a repaint lands on exactly
+    // the same pulp, fibers and speckle.
+    function paintSheet() {
+      seed = seed0;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.globalCompositeOperation = 'source-over';
+      g.globalAlpha = 1;
+      g.clearRect(0, 0, W, H);
+      g.fillStyle = tone;
+      g.fillRect(0, 0, W, H);
+      // pulp mottle: big soft blobs, barely-there
+      var mottleN = Math.round(60 + 120 * intensity);
+      for (var i = 0; i < mottleN; i++) {
+        var mx = rnd() * W, my = rnd() * H, mr = H * (0.06 + rnd() * 0.16);
+        var grad = g.createRadialGradient(mx, my, 0, mx, my, mr);
+        var dark = rnd() < 0.5;
+        var a = (dark ? 0.020 : 0.030) * (0.5 + intensity);
+        grad.addColorStop(0, dark ? 'rgba(120,106,84,' + a + ')' : 'rgba(255,252,244,' + (a * 1.4) + ')');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = grad;
+        g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill();
+      }
+      // The tooth goes down over the base + mottle, under the fibers.
+      if (hasTex) stampTooth(texImg);
+      // Observable proof the photo actually landed. The failure this guards
+      // is silent by construction -- procedural paper looks like paper, so a
+      // tooth that never stamped reads as "working" in every screenshot.
+      if (texUrl) el.setAttribute('data-mp-tooth', hasTex ? '1' : '0');
+
+      // fibers: short hairline arcs (thinned when a photo carries the relief)
+      var area = (W * H) / (2880 * 1620);
+      var fiberN = Math.round(area * (6000 + 34000 * intensity) * (hasTex ? 0.45 : 1));
+      g.lineWidth = 1.1;
+      for (var f = 0; f < fiberN; f++) {
+        var x = rnd() * W, y = rnd() * H, ang = rnd() * Math.PI, len = 4 + rnd() * 12;
+        var bow = (rnd() - 0.5) * 6;
+        var fd = rnd() < 0.45;
+        var fa = (fd ? 0.045 : 0.06) + rnd() * 0.05 * (0.5 + intensity);
+        g.strokeStyle = fd ? 'rgba(112,100,80,' + fa + ')' : 'rgba(255,253,246,' + fa + ')';
+        g.beginPath();
+        g.moveTo(x, y);
+        g.quadraticCurveTo(x + Math.cos(ang) * len / 2 + bow, y + Math.sin(ang) * len / 2 - bow,
+          x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+        g.stroke();
+      }
+      // speckle
+      var specN = Math.round(area * (14000 + 40000 * intensity));
+      for (var p = 0; p < specN; p++) {
+        g.fillStyle = rnd() < 0.5 ? 'rgba(110,98,78,0.04)' : 'rgba(255,253,246,0.05)';
+        g.fillRect(rnd() * W, rnd() * H, 1.4, 1.4);
+      }
+      // edge-fold shading (a scanned sheet, not a flat fill) + warm vignette
+      if (data.vignette !== false) {
+        var eg = g.createLinearGradient(0, 0, W * 0.055, 0);
+        eg.addColorStop(0, 'rgba(90,80,62,0.09)');
+        eg.addColorStop(0.55, 'rgba(90,80,62,0.025)');
+        eg.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = eg; g.fillRect(0, 0, W * 0.055, H);
+        var eg2 = g.createLinearGradient(W, 0, W - W * 0.04, 0);
+        eg2.addColorStop(0, 'rgba(90,80,62,0.06)');
+        eg2.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = eg2; g.fillRect(W - W * 0.04, 0, W * 0.04, H);
+        var vg = g.createRadialGradient(W / 2, H * 0.46, H * 0.25, W / 2, H * 0.46, H * 0.95);
+        vg.addColorStop(0, 'rgba(255,255,255,' + (darkSheet ? 0 : 0.10) + ')');
+        vg.addColorStop(0.6, 'rgba(0,0,0,0)');
+        vg.addColorStop(1, 'rgba(112,78,40,0.07)');
+        g.fillStyle = vg; g.fillRect(0, 0, W, H);
+      }
     }
 
-    // fibers: short hairline arcs (thinned when a photo carries the relief)
-    var area = (W * H) / (2880 * 1620);
-    var fiberN = Math.round(area * (6000 + 34000 * intensity) * (hasTex ? 0.45 : 1));
-    g.lineWidth = 1.1;
-    for (var f = 0; f < fiberN; f++) {
-      var x = rnd() * W, y = rnd() * H, ang = rnd() * Math.PI, len = 4 + rnd() * 12;
-      var bow = (rnd() - 0.5) * 6;
-      var fd = rnd() < 0.45;
-      var fa = (fd ? 0.045 : 0.06) + rnd() * 0.05 * (0.5 + intensity);
-      g.strokeStyle = fd ? 'rgba(112,100,80,' + fa + ')' : 'rgba(255,253,246,' + fa + ')';
-      g.beginPath();
-      g.moveTo(x, y);
-      g.quadraticCurveTo(x + Math.cos(ang) * len / 2 + bow, y + Math.sin(ang) * len / 2 - bow,
-        x + Math.cos(ang) * len, y + Math.sin(ang) * len);
-      g.stroke();
-    }
-    // speckle
-    var specN = Math.round(area * (14000 + 40000 * intensity));
-    for (var p = 0; p < specN; p++) {
-      g.fillStyle = rnd() < 0.5 ? 'rgba(110,98,78,0.04)' : 'rgba(255,253,246,0.05)';
-      g.fillRect(rnd() * W, rnd() * H, 1.4, 1.4);
-    }
-    // edge-fold shading (a scanned sheet, not a flat fill) + warm vignette
-    if (data.vignette !== false) {
-      var eg = g.createLinearGradient(0, 0, W * 0.055, 0);
-      eg.addColorStop(0, 'rgba(90,80,62,0.09)');
-      eg.addColorStop(0.55, 'rgba(90,80,62,0.025)');
-      eg.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = eg; g.fillRect(0, 0, W * 0.055, H);
-      var eg2 = g.createLinearGradient(W, 0, W - W * 0.04, 0);
-      eg2.addColorStop(0, 'rgba(90,80,62,0.06)');
-      eg2.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = eg2; g.fillRect(W - W * 0.04, 0, W * 0.04, H);
-      var vg = g.createRadialGradient(W / 2, H * 0.46, H * 0.25, W / 2, H * 0.46, H * 0.95);
-      vg.addColorStop(0, 'rgba(255,255,255,' + (darkSheet ? 0 : 0.10) + ')');
-      vg.addColorStop(0.6, 'rgba(0,0,0,0)');
-      vg.addColorStop(1, 'rgba(112,78,40,0.07)');
-      g.fillStyle = vg; g.fillRect(0, 0, W, H);
+    // Paint the procedural sheet NOW so a missing/blocked tooth can never
+    // leave a blank canvas, then repaint once the photo decodes. Setting
+    // .src and testing .complete in the same tick is always false for an
+    // uncached image -- that is why the tooth silently never appeared.
+    paintSheet();
+    if (texUrl && texImg) {
+      var onTex = function () {
+        if (hasTex || !texImg.naturalWidth) return;
+        hasTex = true;
+        paintSheet();
+      };
+      texImg.addEventListener('load', onTex);
+      texImg.src = texUrl;
+      if (texImg.complete) onTex();
+      else if (texImg.decode) texImg.decode().then(onTex, function () {});
     }
 
     // The paper holds still -- stillness is the world's voice ("settle,
