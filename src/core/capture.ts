@@ -709,6 +709,18 @@ export async function captureSingleFrame(options: {
         new Promise((r) => setTimeout(r, 3000)),
       ]))
       .catch(() => {});
+    // Images decode async too. A component that PAINTS from an image
+    // (paper-ground stamps its photographic tooth onto a canvas) would
+    // otherwise race the screenshot and render nondeterministically --
+    // procedural paper in one frame, textured in the next. Bounded so a
+    // dead asset host can't stall a capture.
+    await page
+      .evaluate(() => Promise.race([
+        Promise.all(Array.from(document.images).map((img) =>
+          img.complete ? Promise.resolve() : img.decode().catch(() => undefined))),
+        new Promise((r) => setTimeout(r, 3000)),
+      ]))
+      .catch(() => {});
 
     // If a specific time is requested, advance the timeline. Swallow a throwing
     // component callback so one fragile scene doesn't abort the capture.

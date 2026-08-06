@@ -19,6 +19,11 @@
       "label": "Texture intensity 0-1 (default 0.35). ~0.15 clean print, ~0.85 letterpress.",
       "optional": true
     },
+    "texture_url": {
+      "type": "string",
+      "label": "PHOTOGRAPHIC TOOTH: a neutral macro surface tile (/assets/... PNG from generate_clip mode='texture'). Stamped at random rotation with feathered edges -- real paper relief instead of procedural noise. Omit for the procedural sheet.",
+      "optional": true
+    },
     "vignette": {
       "type": "boolean",
       "label": "Edge-fold shading + warm vignette (default true)",
