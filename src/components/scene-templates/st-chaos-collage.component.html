@@ -1,0 +1,217 @@
+<template>
+  <div class="stcc">
+    <div class="stcc-swarm"></div>
+    <div class="stcc-scrim"></div>
+    <h1 class="stcc-headline"></h1>
+    <div class="stcc-sub"></div>
+    <img class="stcc-wordmark" alt="" />
+    <div class="stcc-index">{{scene_index}}</div>
+    <div class="st-overlay"></div>
+  </div>
+</template>
+
+<style scoped>
+  /* ── st-chaos-collage: THE PROBLEM BEAT. A headline standing still while
+     the mess it names swarms around it -- notifications, half-read stats,
+     voice memos, unanswered messages -- drifting at different speeds and
+     depths. The grammar for "this is what your week actually looks like",
+     spent once, early, before the product appears.
+
+     Two rules make it a beat instead of clutter. The headline NEVER competes:
+     the swarm sits behind a radial scrim and is capped in opacity, so the
+     legibility gate reads the same contrast it would on an empty frame. And
+     with `resolve`, the swarm clears -- the chaos has to be answerable or the
+     scene is just anxiety. (Remotion "Shipper" steal, #57.) */
+  .stcc { position: absolute; inset: 0; overflow: hidden; color: #f4f4f8;
+    font-family: var(--mp-font-family, 'Inter'), 'Inter', sans-serif; }
+  .stcc.is-light { color: #17171c; }
+  .stcc-swarm { position: absolute; inset: 0; }
+
+  .stcc-card { position: absolute; border-radius: 14px; padding: 1.1vw 1.3vw;
+    background: rgba(255, 255, 255, 0.055); border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+    display: flex; flex-direction: column; gap: 0.55vh; will-change: transform; }
+  /* NO backdrop-filter here. A dozen of these drifting at once crashed the
+     headless renderer on seek (measured: the page died on the first pause),
+     and at 5.5% surface opacity the blur was invisible anyway. */
+  .is-light .stcc-card { background: rgba(23, 23, 28, 0.045); border-color: rgba(23, 23, 28, 0.10);
+    box-shadow: 0 8px 24px rgba(23, 23, 28, 0.10); }
+  .stcc-row { display: flex; align-items: center; gap: 0.6vw; }
+  .stcc-dot { width: 0.55vw; height: 0.55vw; min-width: 6px; min-height: 6px; border-radius: 50%;
+    background: var(--mp-color-primary, #4f46e5); flex: none; }
+  .stcc-t { font-size: 0.95vw; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; }
+  .stcc-b { font-size: 0.85vw; font-weight: 400; opacity: 0.62; white-space: nowrap; }
+  .stcc-v { font-size: 2.2vw; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+  .stcc-wave { display: flex; align-items: flex-end; gap: 0.18vw; height: 2vh; }
+  .stcc-wave i { display: block; width: 0.22vw; min-width: 2px; border-radius: 2px;
+    background: currentColor; opacity: 0.55; }
+  .stcc-bubble { border-radius: 14px 14px 14px 4px; }
+
+  /* The headline's own air. Sized from the type so a long line still clears
+     the swarm behind it rather than sitting on a fixed-size patch. */
+  .stcc-scrim { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 92vw; height: 46vh; z-index: 4; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(12, 13, 18, 0.86) 0%,
+      rgba(12, 13, 18, 0.62) 46%, rgba(12, 13, 18, 0) 74%); }
+  .is-light .stcc-scrim { background: radial-gradient(ellipse at center, rgba(250, 250, 248, 0.88) 0%,
+      rgba(250, 250, 248, 0.66) 46%, rgba(250, 250, 248, 0) 74%); }
+
+  .stcc-headline { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%); margin: 0;
+    z-index: 6; font-weight: 500; font-size: 4.4vw; line-height: 1.04; letter-spacing: -0.025em;
+    text-align: center; width: 72vw; text-wrap: balance; }
+  .stcc-sub { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%);
+    z-index: 6; font-size: 1.35vw; font-weight: 500; letter-spacing: 0.01em; opacity: 0.72;
+    text-align: center; width: 56vw; }
+  .stcc-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.85; z-index: 7; }
+  .stcc-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.2em; opacity: 0.5; z-index: 7; }
+  .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var root = el.querySelector('.stcc');
+    var dur = ctx.duration || 6;
+    var light = data.theme === 'light';
+    if (light) root.classList.add('is-light');
+
+    var seed = (Number(data.seed) || 23) >>> 0;
+    function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+
+    // ── the swarm ──
+    var swarm = el.querySelector('.stcc-swarm');
+    var cards = Array.isArray(data.cards)
+      ? data.cards.filter(function (c) { return c && typeof c === 'object' && !Array.isArray(c); }).slice(0, 14)
+      : [];
+    // No usable cards means no beat -- fail to a clean statement frame rather
+    // than an empty "chaos" scene that says nothing.
+    var KINDS = { notification: 1, stat: 1, waveform: 1, message: 1 };
+    var nodes = [];
+
+    // Ring layout: cards live OUTSIDE the headline's box, at two depths, so
+    // the centre stays legible by construction and not by luck.
+    var N = cards.length;
+    cards.forEach(function (c, i) {
+      var kind = KINDS[c.kind] ? c.kind : 'notification';
+      var node = document.createElement('div');
+      node.className = 'stcc-card' + (kind === 'message' ? ' stcc-bubble' : '');
+
+      var title = typeof c.title === 'string' ? c.title.slice(0, 42) : '';
+      var body = typeof c.body === 'string' ? c.body.slice(0, 48) : '';
+      if (kind === 'stat') {
+        var v = document.createElement('div');
+        v.className = 'stcc-v';
+        v.textContent = (typeof c.value === 'string' || typeof c.value === 'number') ? String(c.value).slice(0, 8) : '—';
+        node.appendChild(v);
+        if (title) { var sl = document.createElement('div'); sl.className = 'stcc-b'; sl.textContent = title; node.appendChild(sl); }
+      } else if (kind === 'waveform') {
+        var row = document.createElement('div');
+        row.className = 'stcc-wave';
+        for (var b = 0; b < 16; b++) {
+          var bar = document.createElement('i');
+          bar.style.height = (18 + Math.round(rnd() * 82)) + '%';
+          row.appendChild(bar);
+        }
+        node.appendChild(row);
+        if (title) { var wl = document.createElement('div'); wl.className = 'stcc-b'; wl.textContent = title; node.appendChild(wl); }
+      } else {
+        var r = document.createElement('div');
+        r.className = 'stcc-row';
+        if (kind === 'notification') { var d = document.createElement('span'); d.className = 'stcc-dot'; r.appendChild(d); }
+        var t = document.createElement('span');
+        t.className = 'stcc-t';
+        t.textContent = title || 'Unread';
+        r.appendChild(t);
+        node.appendChild(r);
+        if (body) { var bb = document.createElement('div'); bb.className = 'stcc-b'; bb.textContent = body; node.appendChild(bb); }
+      }
+
+      // Alternating rings, angle jittered per card, so nothing lands centred.
+      var ring = i % 2 === 0 ? 0.40 : 0.485;
+      var ang = (i / Math.max(1, N)) * Math.PI * 2 + (rnd() - 0.5) * 0.7;
+      var cx = 50 + Math.cos(ang) * ring * 100;
+      var cy = 50 + Math.sin(ang) * ring * 74;
+      node.style.left = Math.max(1, Math.min(86, cx - 7)) + '%';
+      node.style.top = Math.max(2, Math.min(88, cy - 5)) + '%';
+      node.style.zIndex = String(i % 2 === 0 ? 2 : 3);
+      swarm.appendChild(node);
+      nodes.push({ node: node, near: i % 2 !== 0 });
+    });
+
+    // ── the headline ──
+    var h = el.querySelector('.stcc-headline');
+    var sub = el.querySelector('.stcc-sub');
+    var headline = typeof data.headline === 'string' ? data.headline : '';
+    h.innerHTML = headline.split('|').map(function (s) { return s.trim(); })
+      .filter(Boolean).map(function (s) { return '<span>' + s + '</span>'; }).join('<br>');
+    var subText = typeof data.subhead === 'string' ? data.subhead.trim() : '';
+    if (subText) {
+      sub.textContent = subText;
+      // Stack the sub UNDER the headline rather than over it.
+      sub.style.top = 'calc(47% + ' + (h.getBoundingClientRect().height / 2 + 26) + 'px)';
+    } else {
+      sub.style.display = 'none';
+    }
+
+    var wm = el.querySelector('.stcc-wordmark');
+    var logo = typeof data.logo_url === 'string' && /^(\/|https?:|data:|file:)/.test(data.logo_url)
+      ? data.logo_url : (ctx.brandKit && ctx.brandKit.logos && ctx.brandKit.logos[0] && ctx.brandKit.logos[0].url);
+    if (logo) wm.src = logo; else wm.style.display = 'none';
+
+    // ── choreography ──
+    // Cards ARRIVE staggered and off-kilter (the mess accumulates), then
+    // drift slowly for the whole scene. The drift is one long tween per card,
+    // never an infinite repeat: an endless child makes the master's duration
+    // Infinity and the renderer has nothing to seek across.
+    var inWindow = Math.min(1.6, dur * 0.34);
+    nodes.forEach(function (n, i) {
+      var from = { autoAlpha: 0, scale: 0.86, rotation: (rnd() - 0.5) * 9,
+        x: (rnd() - 0.5) * 160, y: (rnd() - 0.5) * 120 };
+      var at = (i / Math.max(1, nodes.length)) * inWindow;
+      tl.fromTo(n.node, from, {
+        autoAlpha: n.near ? 0.92 : 0.55, scale: 1, x: 0, y: 0,
+        duration: 0.7, ease: 'power3.out',
+      }, at);
+      // Parallax: the near ring drifts further, so depth reads without blur.
+      var driftX = (rnd() - 0.5) * (n.near ? 44 : 22);
+      var driftY = (rnd() - 0.5) * (n.near ? 34 : 16);
+      tl.to(n.node, { x: driftX, y: driftY, duration: Math.max(0.1, dur - at - 0.7), ease: 'sine.inOut' }, at + 0.7);
+    });
+
+    tl.fromTo(el.querySelector('.stcc-scrim'), { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.5 }, 0.15);
+    tl.fromTo(h.querySelectorAll('span'), { autoAlpha: 0, y: 22 },
+      { autoAlpha: 1, y: 0, duration: 0.62, stagger: 0.09, ease: 'power3.out' }, Math.min(0.5, dur * 0.1));
+    if (subText) tl.fromTo(sub, { autoAlpha: 0 }, { autoAlpha: 0.72, duration: 0.5 }, Math.min(1.0, dur * 0.24));
+
+    // RESOLVE: the swarm clears. Chaos that is never answered is just
+    // anxiety -- if the storyboard asks for the answer, give it the beat.
+    if (data.resolve) {
+      var out = Math.max(1.2, dur * 0.66);
+      nodes.forEach(function (n, i) {
+        tl.to(n.node, {
+          autoAlpha: 0, scale: 0.9, duration: 0.5, ease: 'power2.in',
+        }, out + (i % 5) * 0.05);
+      });
+      var resolveText = typeof data.resolve === 'string' ? data.resolve.trim() : '';
+      if (resolveText) {
+        // Fade the HEADLINE ITSELF, not its lines: a headline that has left
+        // the frame should read as gone to anything measuring the DOM (the
+        // gates, the motion inspector), not just to the eye.
+        tl.to(h, { autoAlpha: 0, y: -14, duration: 0.4, ease: 'power2.in' }, out);
+        if (subText) tl.to(sub, { autoAlpha: 0, duration: 0.3 }, out);
+        // Its own node, faded in by a tween -- swapping textContent from a
+        // callback would not survive a seek.
+        var rn = document.createElement('div');
+        rn.className = 'stcc-headline';
+        rn.style.zIndex = '7';
+        rn.textContent = resolveText;
+        root.appendChild(rn);
+        tl.fromTo(rn, { autoAlpha: 0, y: 20 },
+          { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' }, out + 0.42);
+      }
+    }
+
+    return tl;
+  }
+</script>

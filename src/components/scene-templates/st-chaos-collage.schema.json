@@ -1,0 +1,23 @@
+{
+  "type": "st-chaos-collage",
+  "label": "Scene Template: Problem Chaos Collage",
+  "category": "scene-template",
+  "description": "WHOLE-SCENE template: THE PROBLEM BEAT. A headline stands still while the mess it names swarms around it -- notifications, half-read stats, voice memos, unanswered messages arriving off-kilter and drifting at two depths. THE grammar for 'this is what your week actually looks like', spent ONCE and EARLY, before the product appears; a second one reads as a tic. The swarm is capped in opacity and sits behind a radial scrim so the headline never competes with it. Set `resolve` to clear the swarm on the back half -- chaos that is never answered is just anxiety, so use the resolve whenever the scene is the setup for the product rather than a standalone gut-punch. Dark by default.",
+  "data": {
+    "headline": { "type": "string", "label": "The problem, stated plainly; | breaks lines" },
+    "cards": {
+      "type": "array",
+      "label": "6-14 pieces of the mess: [{kind:'notification'|'stat'|'waveform'|'message', title, body?, value?}]. Real fragments from the audience's actual week, never lorem."
+    },
+    "subhead": { "type": "string", "label": "One quiet line under the headline", "optional": true },
+    "resolve": { "type": "string", "label": "Truthy clears the swarm on the back half; a STRING also lands as the answer line (e.g. 'One thread.')", "optional": true },
+    "theme": { "type": "string", "label": "dark (default) | light", "optional": true },
+    "seed": { "type": "number", "label": "Layout seed", "optional": true },
+    "logo_url": { "type": "string", "label": "Wordmark URL; defaults to the brand-kit wordmark", "optional": true },
+    "scene_index": { "type": "string", "label": "e.g. 01 / 06", "optional": true }
+  },
+  "match": {
+    "entry": { "x": 0.5, "y": 0.47 },
+    "exit": { "x": 0.5, "y": 0.47 }
+  }
+}
