@@ -32,9 +32,9 @@ import {
  *  cross-cutting -- who narrates, what earns a cut, the music's role, the
  *  camera policy, and how scenes are assembled. Components (L1), scene
  *  templates (L2) and scenes/beats (L3) all live INSIDE one of these. */
-export type FilmGrammar = "launch-film" | "tempo-cut" | "hype-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story";
+export type FilmGrammar = "launch-film" | "tempo-cut" | "hype-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story" | "canvas-tour";
 
-export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story"];
+export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story", "canvas-tour"];
 
 /** ── The LOOK axis (visual_system) and SOUND axis (audio_system) ──
  * The film-craft triad on the generate surface: film_grammar = the RHYTHM,
@@ -165,6 +165,8 @@ Every film commits to exactly ONE grammar. It is not a mood -- it is the contrac
 - "social-reel": the vertical feed dialect (9:16, 15-30s TOTAL). The FORMAT carries the film: a HOOK beat in the first 2 seconds (a bold claim or question in giant type -- the thumb-stopper), 3-5 escalation beats that each pay off the hook a little more, one payoff beat, and a LOOP SEAM (the closing frame composes into the opening frame so the loop replays cleanly). Captions ARE the voiceover at display scale; every beat composes for a vertical phone held in one hand -- content stacked in the middle band, top ~12% and bottom ~18% left clear for platform UI. One brand accent, driving music, hard cuts. For Reels/Shorts/TikTok product moments, feature drops, and social announcements -- anywhere the film ships to a feed. sceneCount for this dialect counts BEATS: hook + each escalation + payoff are separate scenes, so commit to 6-9 -- a sceneCount of 3 contradicts the shape and deadlocks the storyboard.
 - "data-story": the numbers-as-protagonist dialect. The film IS a sequence of data beats: each one stages ONE number or chart as the hero of its scene (a counter counting up live, a bar chart racing, a line drawing its climb, a progress bar filling) with a short claim in type that the number then PROVES. Claim -> proof, claim -> proof, numbers escalating toward the biggest figure, which is the payoff -- the money number lands last and largest. Every figure must come from the brief (never invent statistics); every chart DRAWS on screen, never appears pre-drawn. A dashboard recap is earned only as the finale. For metrics announcements, quarterly recaps, benchmark results, growth stories, ROI cases -- anywhere the argument is quantitative. sceneCount: 5-8 (each data beat is its own scene; setup claims may share the data beat's scene as a leading beat).
 
+- "canvas-tour": the continuous-surface dialect -- the film reads as ONE unbroken shot across a single surface, with NO cuts the viewer can name. Beats are PLACES on that surface, not slides: the camera travels between them (glide, push, pull-back, a slight tilt in transit), and the type is PERFORMED where it lives -- written by a pen (pen-script), typed by a typewriter (typewriter style:"print"), or commanded on a CLI line (typewriter style:"cli") -- never slammed in. Every scene change is CAUSED by the outgoing scene (something falls out of frame and the next beat enters from where it left; a click, a stamp, a line that keeps travelling), and the film's first beat is often a MACRO detail (a pen mid-stroke, an inked word) that pulls back to reveal the whole surface. Music is a quiet bed; the words carry the film. For craft-forward brand films, manifestos with a made-by-hand feeling, and print/letterpress launches. Pairs naturally with visual_system {world:"paper", motion:"calm"} but is not bound to it.
+
 Echo the grammar in visualStyle.motionPersonality (e.g. "tempo-cut: ..."), and let every other choice serve it.
 
 ${brandContext}
@@ -221,7 +223,7 @@ with 2-6-bar product beats (the reference cut runs 15 scenes in ~50s).
   ],
   "selected": 0,
   "selectionReason": "Why this concept is strongest",
-  "filmGrammar": "launch-film | tempo-cut | speaker-screencast | editorial | social-reel | data-story",
+  "filmGrammar": "launch-film | tempo-cut | hype-cut | speaker-screencast | editorial | social-reel | data-story | canvas-tour",
   "visualSystem": {
     "world": "light | dark | paper -- the film's continuous surface. paper = the print/letterpress world (painted sheet, warm ink): choose it when the prompt asks for a paper/print/zine/letterpress/illustrated-sticker feel. Otherwise omit and the brand decides.",
     "motion": "punchy | calm | cutout-physics -- the physics contract. calm = settle-never-bounce editorial restraint. cutout-physics = rigid flat pieces that drop/settle/swing like physical stickers (pairs with paper + a cutout motif). Default punchy.",

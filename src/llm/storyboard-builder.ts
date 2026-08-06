@@ -295,6 +295,13 @@ Beat authoring rules:
 - Each beat may carry its own short "voiceover_text" (~2.5 words/second of beat); the scene's voiceover_text is their concatenation.
 - The scene's visual_notes describe the WORLD (setting, layers, what persists); the beats describe what HAPPENS in it, in order.
 
+### KINETIC CONTINUITY (every grammar -- what separates a film from a stack of slides)
+A cut is not a gap. Author every scene boundary so the film reads as one continuous motion:
+- CAUSED, NOT SCHEDULED: the outgoing scene CAUSES the cut. Something on screen does it -- a cursor clicks the thing that becomes the next scene, a word falls off the bottom of frame, a stamp lands, a line travels off the edge, a card is flicked away. Say the cause in the visual_notes ("...'quality' drops off the BOTTOM of frame, and scene 5's line enters from the bottom").
+- MATCHED MOMENTUM: the outgoing scene exits while still MOVING and the incoming scene enters ALREADY IN FLIGHT, at the same speed and in the same direction. Never let a scene come to a full stop, hold empty, and then have the next thing fade up -- that dead beat is the slideshow tell.
+- CONTINUITY OF DIRECTION: if something left frame-right, the next beat arrives from frame-left (it kept travelling). If something rose out of the top, the next thing comes up from the bottom. State the direction on both sides of the boundary.
+- ONE THING CARRIES OVER: prefer a shared element across the boundary -- the same line, prop, cursor, surface or word persists and re-frames rather than being replaced. (A scene that shares NOTHING with its neighbour needs a reason.)
+
 ${opts.filmGrammar ? `### THIS FILM'S GRAMMAR: ${opts.filmGrammar.toUpperCase()} (committed by the treatment -- its contract section below is MANDATORY, not advisory)
 
 ` : ""}### TEMPO-CUT FILMS (${opts.filmGrammar === "tempo-cut" ? "ACTIVE for this film" : opts.filmGrammar === "hype-cut" ? "INHERITED by this hype-cut film -- every law here applies unless HYPE-CUT FILMS overrides it" : 'when the director\'s treatment names "tempo-cut"'})
@@ -365,6 +372,17 @@ The numbers-as-protagonist dialect: every beat stages a figure, and the figures 
 - THE EDIT: claims are SHORT (2-3s); proofs breathe (3-6s -- long enough for the count/draw to land and hold). Hard cuts; music is a restrained driving bed and counters/draws should land near downbeats.
 - TEXT IS THE VOICEOVER: no narrator. The claim lines are kinetic-text/annotation at display scale; voiceover_text stays empty.
 - OBJECTS, NOT STRINGS: every entry in components[] is an OBJECT with type + data -- same rule as tempo-cut, same reason. The CLOSE is st-logo-close.
+
+### CANVAS-TOUR FILMS (${opts.filmGrammar === "canvas-tour" ? "ACTIVE for this film" : 'when the director\'s treatment names "canvas-tour"'})
+The continuous-surface dialect: ONE unbroken shot across a single surface, no cut the viewer can name. Obey this contract exactly:
+- THE SHAPE: 5-9 scenes in 20-40s. Every scene is a PLACE on the same surface -- the same sheet of paper, desk, wall or board runs under all of them and NEVER resets (same world backdrop, same tone, same texture, scene to scene). The film's total motion is one journey across it: begin at one end, arrive at the other.
+- THE CAMERA IS THE EDIT: there are no hard cuts. Each boundary is a camera TRAVEL -- glide, push in, pull back, a slight tilt in transit -- from the beat that just finished to the next place. Write the move in the visual_notes ("the camera keeps panning right past the arrow sticker and arrives on the ledger sheet"). The KINETIC CONTINUITY rules above are not optional here; they are the grammar.
+- OPEN MACRO, THEN REVEAL: the first beat is usually a MACRO detail -- a pen mid-stroke, a single inked word, the paper's fibers -- that pulls back over 2-4s to reveal the surface it lives on. The last beat is the only true stop: the camera settles and holds.
+- TYPE IS PERFORMED, NEVER SLAMMED: display text arrives by being MADE. pen-script (short handwritten lines, 1-6 words, written by an unseen pen), typewriter style:"print" (typewriter slab typing itself on the surface), typewriter style:"cli" (a command line typing an instruction), para-edit (a full paragraph that edits ITSELF -- fluff receding into the page while the keepers stay). st-manifesto/st-statement slams belong to other grammars; a word that simply appears is a defect here.
+- ONE ELEMENT CARRIES THE FILM: pick a single physical device (a drawn line, a prop, a sheet, a cursor) that persists across every place and stitches them together. Name it in scene 1 and keep it in frame.
+- QUIET, NOT EMPTY: 55-75% of each frame is bare surface. One idea per place, at generous size. Music is a low bed; the type carries the story.
+- NO VOICEOVER: voiceover_text stays empty -- the performed type IS the voice.
+- OBJECTS, NOT STRINGS: every components[] entry is an OBJECT with type + data. The surface component (paper-ground or the world backdrop) is the first entry of every scene.
 
 ### SPEAKER-SCREENCAST FILMS (${opts.filmGrammar === "speaker-screencast" ? "ACTIVE for this film" : "when a speaker recording drives the film"})
 The human on camera owns the film; everything else supports them. The contract:

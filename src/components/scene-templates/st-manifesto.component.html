@@ -2,6 +2,7 @@
   <div class="stmf">
     <div class="stmf-kicker-row"><span class="stmf-rule"></span><span class="stmf-kicker">{{kicker}}</span></div>
     <div class="stmf-flow"></div>
+    <div class="stmf-sticker"></div>
     <img class="stmf-wordmark" alt="" />
     <div class="stmf-index">{{scene_index}}</div>
     <div class="st-overlay"></div>
@@ -33,6 +34,14 @@
     letter-spacing: -0.025em; white-space: nowrap; }
   .stmf-word.is-accent { color: var(--mp-color-primary, #4f46e5); font-weight: 600; }
   .stmf-word.is-small { font-size: 2.6vw; font-weight: 400; opacity: 0.75; }
+  /* sticker-slam: the reversal beat -- an accent slab lands rotated ACROSS
+     the sentence, which grays back to make room for it. The Lenny-film
+     "But it's true!" move. */
+  .stmf-sticker { position: absolute; left: 50%; top: 47%; display: none;
+    padding: 1.4vw 3.2vw 1.7vw; border-radius: 1.1vw; white-space: nowrap;
+    background: var(--mp-color-primary, #4f46e5); color: #fff;
+    font-size: 4.6vw; font-weight: 800; letter-spacing: -0.02em;
+    box-shadow: 0 1.1vw 2.6vw rgba(23,23,28,0.24); }
   .stmf-wordmark { position: absolute; left: 8vw; bottom: 5.4vh; height: 24px; width: auto; opacity: 0.85; }
   .stmf-index { position: absolute; right: 8vw; bottom: 5.4vh; font-family: 'Inter', sans-serif;
     font-size: 13px; font-weight: 600; letter-spacing: 0.2em; opacity: 0.5; }
@@ -147,6 +156,21 @@
           { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.3, ease: 'power2.out',
             immediateRender: false }, when);
       }
+    } else if (data.entrance === 'sticker-slam' || data.sticker_text) {
+      // The sentence lands house-style, then the sticker SLAMS across it and
+      // the sentence recedes to gray -- the reversal, staged as one object
+      // landing on another. Scrub-safe: fromTo + set, no callbacks.
+      if (window.mpLineRise) mpLineRise(tl, flow, 0.35);
+      else { gsap.set(flow, { autoAlpha: 0, y: 10 }); tl.to(flow, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 0.35); }
+      var st = q('.stmf-sticker');
+      st.textContent = String(data.sticker_text || '');
+      st.style.display = 'block';
+      var sAt = data.sticker_at !== undefined ? Number(data.sticker_at) : Math.max(1.2, (dur || 6) * 0.45);
+      var sRot = data.sticker_rotation !== undefined ? Number(data.sticker_rotation) : -4;
+      gsap.set(st, { xPercent: -50, yPercent: -50, autoAlpha: 0, scale: 1.7, rotation: sRot - 6 });
+      tl.to(flow, { color: light ? '#a9a5b3' : '#5b5a68', duration: 0.18 }, sAt - 0.05)
+        .fromTo(st, { autoAlpha: 0, scale: 1.7, rotation: sRot - 6 },
+          { autoAlpha: 1, scale: 1, rotation: sRot, duration: 0.34, ease: 'back.out(2.2)', immediateRender: false }, sAt);
     } else if (window.mpLineRise) mpLineRise(tl, flow, 0.35);
     else {
       gsap.set(flow, { autoAlpha: 0, y: 10 });

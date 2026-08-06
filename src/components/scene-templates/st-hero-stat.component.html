@@ -9,6 +9,7 @@
       <h1 class="sths-headline"></h1>
       <p class="sths-supporting">{{supporting}}</p>
     </div>
+    <div class="sths-burst" aria-hidden="true"></div>
     <div class="sths-stat">
       <div class="sths-num">0</div>
       <div class="sths-numline"></div>
@@ -108,6 +109,15 @@
     letter-spacing: 0.2em; color: var(--mp-color-text-muted, #9ca3af);
   }
   .st-overlay { position: absolute; inset: 0; pointer-events: none; }
+  /* Sunburst: celebration backdrop for the numeral (data.sunburst). Rays sit
+     BEHIND the stat cluster and stay pale -- the number is still the subject
+     (the squint winner), the rays are the applause. */
+  .sths-burst { position: absolute; pointer-events: none; z-index: 0; }
+  .sths-ray { position: absolute; left: -2.6vw; bottom: 0; width: 5.2vw;
+    transform-origin: 50% 100%;
+    background: var(--mp-color-secondary, #d48c34);
+    clip-path: polygon(28% 100%, 72% 100%, 100% 0, 0 0); }
+  .sths-conf { position: absolute; width: 0.8vw; height: 1.3vw; border-radius: 3px; }
 </style>
 
 <script>
@@ -212,6 +222,51 @@
       var sl = q('.sths-statlabel'); if (sl) sl.style.color = 'rgba(244,244,248,0.55)';
       var ix = q('.sths-index'); if (ix) ix.style.color = 'rgba(244,244,248,0.4)';
     }
+    // ── SUNBURST (data.sunburst): the celebration variant -- rotating rays
+    // and a confetti burst behind the numeral. Deterministic (index-derived,
+    // no RNG) so every render and every scrub position is identical. ──
+    var burst = q('.sths-burst');
+    if (data.sunburst && burst) {
+      var statBox = q('.sths-stat');
+      // Park the burst on the numeral cluster's centre.
+      burst.style.left = '68%'; burst.style.top = '42%';
+      burst.style.width = '0'; burst.style.height = '0';
+      var RAYS = 14, rays = [];
+      for (var ri = 0; ri < RAYS; ri++) {
+        var ray = document.createElement('div');
+        ray.className = 'sths-ray';
+        ray.style.height = (17 + (ri * 7) % 11) + 'vw';
+        ray.style.transform = 'rotate(' + (ri * (360 / RAYS)) + 'deg) translateY(-7vw)';
+        burst.appendChild(ray); rays.push(ray);
+      }
+      var CONF = 18, confs = [];
+      var cols = [
+        'var(--mp-color-primary, #4f46e5)', 'var(--mp-color-secondary, #d48c34)',
+        dark ? '#f4f4f8' : '#17171c', 'var(--mp-color-accent, #8b5cf6)',
+      ];
+      for (var ci = 0; ci < CONF; ci++) {
+        var cf = document.createElement('div');
+        cf.className = 'sths-conf';
+        cf.style.background = cols[ci % cols.length];
+        cf.style.left = (Math.cos(ci * 2.39) * (9 + (ci * 3.1) % 7)).toFixed(2) + 'vw';
+        cf.style.top = (Math.sin(ci * 2.39) * (6 + (ci * 2.3) % 5)).toFixed(2) + 'vw';
+        cf.style.transform = 'rotate(' + (ci * 47) + 'deg)';
+        burst.appendChild(cf); confs.push(cf);
+      }
+      // Ray strength is ground-relative: a 0.16 wash vanished on a near-white
+      // world (measured live), while the same value is plenty on dark.
+      gsap.set(rays, { scaleY: 0, opacity: dark ? 0.15 : 0.28 });
+      gsap.set(confs, { scale: 0 });
+      gsap.set(burst, { rotation: -8 });
+      var bAt = data.sunburst_at !== undefined ? Number(data.sunburst_at) : 0.35;
+      tl.to(rays, { scaleY: 1, opacity: dark ? 0.15 : 0.28, duration: 0.5, ease: 'power3.out', stagger: 0.02 }, bAt)
+        .to(burst, { rotation: 6, duration: Math.max(2, (ctx.duration || 6) - bAt), ease: 'none' }, bAt)
+        .to(confs, { scale: 1, duration: 0.3, ease: 'back.out(2)', stagger: 0.015 }, bAt + 0.25)
+        .to(confs, { y: '+=1.4vw', autoAlpha: 0.85, duration: 2.2, ease: 'none' }, bAt + 0.6);
+    } else if (burst) {
+      burst.style.display = 'none';
+    }
+
     if (window.mpAtmosphere) mpAtmosphere(el.querySelector('.sths'), { dark: dark, noBase: !!data.backdrop_active });
     if (window.mpCameraPush) mpCameraPush(tl, el.querySelector('.sths'), ctx.duration, 1.035);
     if (window.mpShimmer && num) mpShimmer(tl, q('.sths-stat'), 2.3);

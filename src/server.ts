@@ -319,7 +319,9 @@ BEFORE GENERATING
   * social-reel -- vertical 9:16, 15-30s: hook in the first 2 seconds, caption-scale type, escalation beats, a loop seam.
   * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene up to the money number. Figures come from the brief, never invented.
   * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never choose it without one.
-  Rule of thumb: the product argues (tempo-cut) vs. the words hype what the product proves (hype-cut) vs. the words (editorial) vs. the numbers (data-story) vs. one cinematic world (launch-film) vs. a person on camera (speaker-screencast) vs. the feed format (social-reel). If their answer doesn't pick one, relay the choice in these terms.
+  * canvas-tour -- ONE unbroken shot across a single surface: beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives (pen-written, typed, commanded), one physical element stitches the film. For craft-forward brand films and print/letterpress launches.
+  Rule of thumb: the product argues (tempo-cut) vs. the words hype what the product proves (hype-cut) vs. the words (editorial) vs. the numbers (data-story) vs. one cinematic world (launch-film) vs. a person on camera (speaker-screencast) vs. the feed format (social-reel) vs. one continuous surface the camera walks (canvas-tour). If their answer doesn't pick one, relay the choice in these terms.
+- THE OTHER TWO AXES (same contract as film_grammar -- omit and the creative director infers from the prompt; pass and it is pinned): visual_system {world: light|dark|paper, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif REQUIRES sticker assets in the brand kit -- mint them with generate_clip mode="cutout" first (mode="texture" mints surface tiles the same way). See SPEC-creative-axes.md for the value registry and how it grows.
 - Brand comes from the tenant's brand kit. No kit yet? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
 - A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and assembles the film automatically.
 
@@ -356,7 +358,7 @@ If something looks wrong in a scene, get{target:'layout'} measures the real geom
 export async function queueBuildFromStoryboard(
   tenantId: string,
   projectId: string,
-  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "hype-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story"; max_revisions?: number; voiceover?: boolean; background_music?: boolean; voice?: string } = {},
+  opts: { creativity?: number; film_grammar?: import("./llm/creative-director.js").FilmGrammar; max_revisions?: number; voiceover?: boolean; background_music?: boolean; voice?: string } = {},
 ): Promise<{ job: { id: string } } | { error: string } | null> {
   const project = await loadProject(tenantId, projectId);
   // Any project that HAS a storyboard rebuilds from it. Only 'rendering' is
@@ -364,6 +366,21 @@ export async function queueBuildFromStoryboard(
   if (!project || !project.storyboard || project.status === "rendering") return null;
 
   const storyboardPrompt = buildPromptFromStoryboard(project.storyboard);
+
+  // THE FILM'S COMMITTED AXES SURVIVE A REBUILD. The treatment is stored on
+  // the project; without reusing it, a storyboard rebuild re-decided the
+  // grammar from scratch -- so a component-first film (editorial /
+  // canvas-tour) lost its creativity clamp and codegen invented a bespoke
+  // component per scene, discarding the library components the storyboard
+  // had cast (measured live on "The Ink Line": 5 of 8 scenes came back as
+  // scene_scene_00N customs instead of paper-ground + typewriter +
+  // pen-script). A caller-passed grammar still wins.
+  const savedTreatment = (project as any).treatment as
+    | { filmGrammar?: import("./llm/creative-director.js").FilmGrammar;
+        visualSystem?: import("./llm/creative-director.js").VisualSystem;
+        audioSystem?: import("./llm/creative-director.js").AudioSystem }
+    | undefined;
+  const rebuildGrammar = opts.film_grammar || savedTreatment?.filmGrammar;
 
   let llmConfig;
   try {
@@ -399,7 +416,9 @@ export async function queueBuildFromStoryboard(
         brandKit: brandKit || project.brand_kit,
         canvas: project.canvas,
         creativity: opts.creativity,
-        film_grammar: opts.film_grammar,
+        film_grammar: rebuildGrammar,
+        visual_system: savedTreatment?.visualSystem,
+        audio_system: savedTreatment?.audioSystem,
         maxRevisions: opts.max_revisions,
         project_id: project.project_id,
         voiceover: wantVoiceover,
@@ -2144,7 +2163,7 @@ export function createMcpServer(): McpServer {
         music_mood: z.enum(["driving", "jazzy", "ambient", "playful", "cinematic", "warm", "none"]).optional().describe("The music bed's personality ('none' suppresses music even where the grammar wants a bed)."),
         voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS narration voice (wins over the legacy flat voice param)."),
       }).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc."),
-      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. social-reel: vertical 9:16 feed film, 15-30s, hook-first with caption-scale type and a loop seam (canvas defaults to vertical). data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. Omit to let the creative director choose."),
+      film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story", "canvas-tour"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. social-reel: vertical 9:16 feed film, 15-30s, hook-first with caption-scale type and a loop seam (canvas defaults to vertical). data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives (pen-written, typed, commanded), one physical element stitches the film together; for craft-forward brand films and print/letterpress launches. Omit to let the creative director choose."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
       voiceover: z.boolean().optional().describe("Generate TTS voiceover narration for each scene (default: false)"),

@@ -40,7 +40,22 @@
     },
     "entrance": {
       "type": "string",
-      "label": "rise (default, whole-sentence house entrance) | type-on (word-by-word build-up with live re-centering)",
+      "label": "rise (default, whole-sentence house entrance) | type-on (word-by-word build-up) | sticker-slam (the sentence lands, then an accent slab SLAMS across it and the sentence grays back -- the reversal beat; requires sticker_text)",
+      "optional": true
+    },
+    "sticker_text": {
+      "type": "string",
+      "label": "sticker-slam only: the short line on the slab (2-4 words, e.g. 'But it's true!')",
+      "optional": true
+    },
+    "sticker_at": {
+      "type": "number",
+      "label": "sticker-slam only: when the slab lands (seconds; default 45% of the scene)",
+      "optional": true
+    },
+    "sticker_rotation": {
+      "type": "number",
+      "label": "sticker-slam only: slab tilt in degrees (default -4)",
       "optional": true
     },
     "at": {
