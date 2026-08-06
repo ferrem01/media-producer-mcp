@@ -1,6 +1,7 @@
 <template>
   <div class="paper-ground">
     <canvas class="pg-canvas"></canvas>
+    <img class="pg-tex" alt="" />
   </div>
 </template>
 
@@ -15,6 +16,10 @@
      (--mp-ink, --mp-paper) that performed-type components consume. */
   .paper-ground { width: 100%; height: 100%; position: relative; overflow: hidden; }
   .pg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* The tooth source lives in the DOM (hidden) so the page's load event and
+     the capture's image wait both account for it -- a texture that decodes
+     after the screenshot would make renders nondeterministic. */
+  .pg-tex { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 </style>
 
 <script>
@@ -45,6 +50,47 @@
     root.style.setProperty('--mp-ink', ink);
 
     // ── paint the sheet (once; the paper does not move) ──
+    // PHOTOGRAPHIC TOOTH (data.texture_url): a real macro surface photo,
+    // high-passed to neutral gray by generate_clip mode='texture', stamped
+    // across the sheet at random rotation with a feathered alpha so there
+    // are no tile seams (grid/mirror tiling makes butterfly artifacts --
+    // measured in the Behind-the-Craft prototype). Procedural fibers stay
+    // as the base layer and thin out when a photo is present: the photo
+    // carries the relief, the fibers carry the pulp.
+    var texImg = el.querySelector('.pg-tex');
+    var texUrl = typeof data.texture_url === 'string' && /^(\/|https?:|data:|file:)/.test(data.texture_url)
+      ? data.texture_url : '';
+    var hasTex = false;
+    function stampTooth(img) {
+      var S = Math.round(Math.min(W, H) * 0.34);
+      if (!S || !img.naturalWidth) return;
+      var stamp = document.createElement('canvas');
+      stamp.width = S; stamp.height = S;
+      var sc = stamp.getContext('2d');
+      sc.drawImage(img, 0, 0, S, S);
+      var fade = sc.createRadialGradient(S / 2, S / 2, S * 0.18, S / 2, S / 2, S * 0.5);
+      fade.addColorStop(0, 'rgba(0,0,0,1)');
+      fade.addColorStop(1, 'rgba(0,0,0,0)');
+      sc.globalCompositeOperation = 'destination-in';
+      sc.fillStyle = fade;
+      sc.fillRect(0, 0, S, S);
+      g.save();
+      g.globalCompositeOperation = 'soft-light';
+      g.globalAlpha = 0.35 + 0.5 * intensity;
+      var step = S * 0.34;
+      for (var sy = -1; sy * step < H + S; sy++) {
+        for (var sx = -1; sx * step < W + S; sx++) {
+          g.save();
+          g.translate(sx * step + (rnd() - 0.5) * step * 0.6, sy * step + (rnd() - 0.5) * step * 0.6);
+          g.rotate(Math.floor(rnd() * 4) * Math.PI / 2);
+          if (rnd() < 0.5) g.scale(-1, 1);
+          g.drawImage(stamp, -S / 2, -S / 2, S, S);
+          g.restore();
+        }
+      }
+      g.restore();
+    }
+
     g.fillStyle = tone;
     g.fillRect(0, 0, W, H);
     // pulp mottle: big soft blobs, barely-there
@@ -59,9 +105,15 @@
       g.fillStyle = grad;
       g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill();
     }
-    // fibers: short hairline arcs
+    // The tooth goes down over the base + mottle, under the fibers.
+    if (texUrl && texImg) {
+      texImg.src = texUrl;
+      if (texImg.complete && texImg.naturalWidth) { stampTooth(texImg); hasTex = true; }
+    }
+
+    // fibers: short hairline arcs (thinned when a photo carries the relief)
     var area = (W * H) / (2880 * 1620);
-    var fiberN = Math.round(area * (6000 + 34000 * intensity));
+    var fiberN = Math.round(area * (6000 + 34000 * intensity) * (hasTex ? 0.45 : 1));
     g.lineWidth = 1.1;
     for (var f = 0; f < fiberN; f++) {
       var x = rnd() * W, y = rnd() * H, ang = rnd() * Math.PI, len = 4 + rnd() * 12;

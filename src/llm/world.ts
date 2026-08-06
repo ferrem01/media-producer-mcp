@@ -34,7 +34,7 @@ export interface WorldSpec {
   /** Print-world surface params (paper-ground only): the intensity dial spans
    *  clean print (~0.15) to letterpress (~0.85). Carried into the backdrop
    *  component's data by scene assembly. */
-  surface?: { tone: string; intensity: number };
+  surface?: { tone: string; intensity: number; texture?: string };
 }
 
 /** Relative luminance > 0.5 -> light. */
@@ -94,6 +94,13 @@ export function deriveWorld(opts: {
   const paper = pinned === "paper"
     || (!pinned && /\bpaper\b|\bletterpress\b|\bprint(?:ed)?[- ](?:feel|look|world|aesthetic)|\bnewsprint\b|\bzine\b/.test(styleText));
   if (paper) {
+    // PHOTOGRAPHIC TOOTH: a texture tile minted into the brand kit by
+    // generate_clip mode='texture' (saved as *-texture.png) is what turns
+    // procedural noise into real paper relief -- the learning that closed
+    // the gap in the Behind-the-Craft prototype. Resolved from the kit, so
+    // minting one is all a tenant has to do.
+    const toothAsset = (kit.assets || []).find(
+      (a: any) => a?.type === "image" && /-texture\.png$/i.test(String(a?.url || "")));
     return {
       backdrop: { component: "paper-ground", seed: hash31(opts.seedSource), palette },
       theme: "light",
@@ -101,6 +108,7 @@ export function deriveWorld(opts: {
       surface: {
         tone: "#f2efe7",
         intensity: /\bletterpress\b|\btextured\b/.test(styleText) ? 0.7 : 0.3,
+        ...(toothAsset ? { texture: String(toothAsset.url) } : {}),
       },
     };
   }

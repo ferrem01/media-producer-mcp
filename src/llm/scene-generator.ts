@@ -592,7 +592,8 @@ function buildAuthoredCompositionScene(
       time_offset: (draft as any).film_start || 0,
       // Paper world: the surface dial rides into paper-ground (ignored by
       // the gradient backdrops).
-      ...(w.surface ? { tone: w.surface.tone, intensity: w.surface.intensity } : {}),
+      ...(w.surface ? { tone: w.surface.tone, intensity: w.surface.intensity,
+        ...(w.surface.texture ? { texture_url: w.surface.texture } : {}) } : {}),
     },
   } : {
     id: "bg",
