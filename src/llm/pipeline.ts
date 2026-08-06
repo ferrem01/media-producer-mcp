@@ -2400,7 +2400,11 @@ async function runUnifiedPipeline(
   // Editorial is equally component-first: statement beats are st-statement
   // templates, evidence beats are library exhibits -- codegen freeform is
   // where the typography discipline dies.
-  if (filmGrammar === "editorial" && opts.creativity === undefined) {
+  // canvas-tour is component-first for the same reason: its beats are
+  // performed-type components (pen-script/typewriter/para-edit) on the world
+  // surface -- codegen freeform reinvents the surface per scene and breaks
+  // the one-unbroken-shot illusion.
+  if ((filmGrammar === "editorial" || filmGrammar === "canvas-tour") && opts.creativity === undefined) {
     opts.creativity = 0.15;
     creativity = 0.15;
     console.log("  Editorial grammar: creativity clamped to 0.15 (template/component-first assembly)");
@@ -2442,7 +2446,7 @@ async function runUnifiedPipeline(
   // defaults ON for tempo-cut; an explicit false still wins.
   const wantsMusic = opts.backgroundMusic !== undefined
     ? opts.backgroundMusic
-    : filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story";
+    : filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story" || filmGrammar === "canvas-tour";
   if ((filmGrammar === "tempo-cut" || filmGrammar === "hype-cut") && !wantsMusic) {
     console.warn("  TEMPO-CUT WITHOUT A MUSIC BED (background_music=false): cuts cannot land on downbeats -- the film will read as a slideshow.");
   }
@@ -2603,7 +2607,7 @@ async function runUnifiedPipeline(
   // tempo-cut/hype-cut/editorial belong on this list too: proj_bf247f37
   // (tempo-cut) shipped EIGHT baked voiceover tracks reading its scene
   // LABELS out loud -- the exact failure this strip exists to prevent.
-  const textIsVoiceover = (filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story") && !opts.voiceover;
+  const textIsVoiceover = (filmGrammar === "tempo-cut" || filmGrammar === "hype-cut" || filmGrammar === "editorial" || filmGrammar === "social-reel" || filmGrammar === "data-story" || filmGrammar === "canvas-tour") && !opts.voiceover;
   if (textIsVoiceover) {
     for (const d of storyboard.scenes as any[]) {
       if (d.voiceover_text) d.voiceover_text = undefined;
