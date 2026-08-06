@@ -6,7 +6,7 @@
   "data": {
     "kind": { "type": "string", "label": "stamp | gesture | pill | ring | image" },
     "text": { "type": "string", "label": "The prop's text (not used for ring/image)", "optional": true },
-    "src": { "type": "string", "label": "image only: the cutout PNG (/assets/... URL from generate_clip mode='cutout')", "optional": true },
+    "src": { "type": "string", "label": "image only: the cutout PNG -- a REAL /assets/... URL from the film's motif assets or brand kit. NEVER cast kind='image' without one (an empty or invented src degrades to an empty pill); when no cutout asset exists, use stamp/gesture/pill/ring instead.", "optional": true },
     "motion": { "type": "string", "label": "image only: 'settle' (default) | 'swing' (slow residual sway, a hung object)", "optional": true },
     "whoosh": { "type": "boolean", "label": "image only: comic motion accents near the entry corner (default true)", "optional": true },
     "color": { "type": "string", "label": "Prop color (defaults: stamp/gesture amber, pill primary, ring green)", "optional": true },

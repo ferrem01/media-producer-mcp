@@ -2142,6 +2142,7 @@ function buildCritiqueFeedback(critique: CritiqueResult): string {
 function storyboardToSaved(
   storyboard: { name: string; scenes: Array<any> },
   voice?: string,
+  musicMood?: string,
 ): Storyboard {
   return {
     narrative: storyboard.name,
@@ -2159,7 +2160,9 @@ function storyboardToSaved(
       beats: Array.isArray(s.beats) && s.beats.length >= 2 ? s.beats : undefined,
     })),
     audio: {
-      music_mood: "corporate",
+      // Single source of truth: the treatment's committed audio system.
+      // "corporate" was a hardcoded legacy default that contradicted it.
+      music_mood: musicMood || "corporate",
       voice: voice || "nova",
       pacing: "moderate",
     },
@@ -2731,7 +2734,7 @@ async function runUnifiedPipeline(
 
   // ── Storyboard-only mode: save storyboard and return early ──
   if (opts.storyboardOnly) {
-    project.storyboard = storyboardToSaved(storyboard, opts.voice as string);
+    project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
     project.prompt = opts.prompt;
     project.status = "storyboard";
     project.created_at = new Date().toISOString();
@@ -3601,7 +3604,7 @@ async function runUnifiedPipeline(
   // Persist the storyboard builder's storyboard (visual notes + suggested components) on the
   // project so it's available for inspection and iteration after a full run,
   // not just in storyboard-only mode.
-  project.storyboard = storyboardToSaved(storyboard, opts.voice as string);
+  project.storyboard = storyboardToSaved(storyboard, opts.voice as string, treatment?.audioSystem?.music_mood);
   project.prompt = opts.prompt;
   project.status = "generated";
   await saveProject(project);
