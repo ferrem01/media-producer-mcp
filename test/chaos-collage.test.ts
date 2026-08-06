@@ -148,6 +148,33 @@ describe("st-chaos-collage: a busy frame that never eats its headline", () => {
     expect(rev).toEqual(fwd);
   }, 300_000);
 
+  it("keeps every card inside the frame, drift and tilt included", async () => {
+    // A first live render put "3 conflicting docs" half off the left edge:
+    // the seat was legal, then the drift and the entrance tilt carried it
+    // out. Seats alone are not the contract -- the swept box is.
+    const worst = await withScene(await collage({ headline: HEADLINE, cards: CARDS, seed: 23 }), (p) =>
+      p.evaluate((W2) => {
+        let out = { left: 0, right: 0, top: 0, bottom: 0, who: "" };
+        for (let t = 0; t <= 7; t += 0.25) {
+          (window as any).__MP_TIMELINE.pause(t);
+          for (const c of Array.from(document.querySelectorAll(".stcc-card"))) {
+            if (parseFloat(getComputedStyle(c as HTMLElement).opacity) < 0.05) continue;
+            const r = (c as HTMLElement).getBoundingClientRect();
+            const over = {
+              left: Math.max(0, -r.left), right: Math.max(0, r.right - W2.w),
+              top: Math.max(0, -r.top), bottom: Math.max(0, r.bottom - W2.h),
+            };
+            const m = Math.max(over.left, over.right, over.top, over.bottom);
+            if (m > Math.max(out.left, out.right, out.top, out.bottom)) {
+              out = { ...over, who: (c.textContent || "").slice(0, 30) };
+            }
+          }
+        }
+        return out;
+      }, { w: W, h: H }));
+    expect(worst, JSON.stringify(worst)).toMatchObject({ left: 0, right: 0, top: 0, bottom: 0 });
+  }, 300_000);
+
   it("degrades to a clean statement frame when the cards are junk", async () => {
     for (const cards of ["a pile of notifications", [1, 2, 3], []]) {
       const got = await withScene(await collage({ headline: HEADLINE, cards }), (p) => readFrame(p, 2.4));
