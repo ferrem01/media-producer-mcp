@@ -41,6 +41,8 @@ export interface GrammarPrepCtx {
   tenantId: string;
   format: import("../core/types.js").OutputFormat;
   backgroundMusic?: boolean;
+  /** audio_system.music_mood commitment: overrides the prompt-keyword mood. */
+  musicMood?: string;
   /** A screen recording to feature (selects the speaker-screencast assemble path). */
   screencastSource?: string;
   /** The narration that owns the clock (audio, or camera+voice). */
@@ -83,7 +85,7 @@ export async function runGrammarPrep(grammar: FilmGrammar, ctx: GrammarPrepCtx):
   if (ctx.backgroundMusic && (ctx.format === "video" || ctx.format === "slideshow")) {
     try {
       const { selectMusic } = await import("../audio/music.js");
-      const mood = pickMusicMood(ctx.prompt);
+      const mood = ctx.musicMood || pickMusicMood(ctx.prompt);
       const estDuration = (ctx.sceneCount || 6) * 5.5;
       console.log(`  [prep:${grammar}] Music-first: searching for "${mood}" mood...`);
       music = await selectMusic({

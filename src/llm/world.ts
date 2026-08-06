@@ -78,17 +78,21 @@ export function deriveWorld(opts: {
     .slice(0, 3);
   if (!palette.length) palette.push(light ? "#6366f1" : "#4f46e5");
 
-  // PAPER WORLD (the print/letterpress aesthetic): chosen when the treatment's
-  // creative direction asks for it in words. Deterministic keyword trigger --
-  // the creative director says "paper"/"print"/"letterpress"/"editorial warm"
-  // and the film lands on a painted sheet instead of a gradient. Always a
-  // light world; the ink channel handles the type.
+  // The treatment's TYPED world commitment (visual_system.world -- a caller
+  // pin passed through, or the director's own typed choice) wins outright.
+  const pinned = (opts.treatment as any)?.visualSystem?.world as ("light" | "dark" | "paper" | undefined);
+
+  // PAPER WORLD (the print/letterpress aesthetic): the typed pin, or the
+  // prose keyword trigger ("paper"/"letterpress"/"newsprint"/"zine") for
+  // treatments that say it in words. Always a light world; the ink channel
+  // handles the type.
   const styleText = [
     (opts.treatment as any)?.visualStyle?.colorMood,
     (opts.treatment as any)?.visualStyle?.spatialStrategy,
     (opts.treatment as any)?.concept,
   ].filter(Boolean).join(" ").toLowerCase();
-  const paper = /\bpaper\b|\bletterpress\b|\bprint(?:ed)?[- ](?:feel|look|world|aesthetic)|\bnewsprint\b|\bzine\b/.test(styleText);
+  const paper = pinned === "paper"
+    || (!pinned && /\bpaper\b|\bletterpress\b|\bprint(?:ed)?[- ](?:feel|look|world|aesthetic)|\bnewsprint\b|\bzine\b/.test(styleText));
   if (paper) {
     return {
       backdrop: { component: "paper-ground", seed: hash31(opts.seedSource), palette },
@@ -101,13 +105,15 @@ export function deriveWorld(opts: {
     };
   }
 
+  // Explicit light/dark pin overrides the brand-luminance default.
+  const wantLight = pinned === "light" ? true : pinned === "dark" ? false : light;
   return {
     backdrop: {
-      component: light ? "mesh-gradient" : "webgl-backdrop",
+      component: wantLight ? "mesh-gradient" : "webgl-backdrop",
       seed: hash31(opts.seedSource),
       palette,
     },
-    theme: light ? "light" : "dark",
+    theme: wantLight ? "light" : "dark",
     chapter_slots: 1,
   };
 }
