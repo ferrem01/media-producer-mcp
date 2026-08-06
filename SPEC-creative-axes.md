@@ -70,15 +70,28 @@ BACKDROP_CAST_TYPES), a WorldSpec union entry, a deriveWorld trigger.
 
 | Value | Feel | Status |
 | --- | --- | --- |
-| `punchy` | house slams, throws, pushes | LIVE (default) |
-| `calm` | settle-never-bounce; entrances ease out and land; nothing overshoots (the Claude-Paper doctrine) | LIVE (guidance) |
-| `cutout-physics` | rigid flat pieces drop/settle/swing; 12fps stop-motion steps + sub-pixel ink boil are the print feel's motion half (Jake Moran's vox pack) | LIVE (guidance; 12fps/boil helpers pending, #58) |
+| `punchy` | house slams, throws, pushes | LIVE (default; the house machinery IS punchy) |
+| `calm` | settle-never-bounce; entrances ease out and land; nothing overshoots (the Claude-Paper doctrine) | LIVE (guidance + banned moves: overshoot, tilt) |
+| `cutout-physics` | rigid flat pieces drop/settle/swing; 12fps stop-motion steps + sub-pixel ink boil are the print feel's motion half (Jake Moran's vox pack) | LIVE (machinery: `shared/motion-physics.js`, applied by the assembler; banned moves: overshoot, glow) |
 | `elastic` | cartoon squash-and-stretch | anticipated |
 | `analog` | VHS jitter, tracking wobble | anticipated |
 | `float` | weightless slow drift | anticipated |
 
-Each value should eventually carry a banned-moves list (motion-as-world-
-personality, #58): what a contract FORBIDS is most of its voice.
+What a contract FORBIDS is most of its voice, so each value carries a
+banned-moves list measured by `checkBannedMoves` (`core/motion-inspect.ts`)
+and surfaced in `get(target:'motion')` warnings. Still unmeasured: morph
+(border-radius / clip-path shape changes) needs per-frame shape sampling the
+inspector does not do -- listed here rather than shipped as a check that
+silently never fires.
+
+The positive half is applied by the assembler, last, after every component
+timeline is wired: `motionPhysicsScript` runs `mpStepQuantize` (element tweens
+onto a 12fps grid, camera exempt) and `mpInkBoil` (turbulence-displacement
+edge wobble on inked wrappers, backdrop exempt). Both are scrub-safe by
+construction -- stepping is an ease and the boil is a sequence of zero-duration
+`set` tweens -- because the renderer seeks rather than plays. The film's value
+reaches the assembler as `Scene.motion_physics`, stamped per scene by the
+pipeline the same way `entrance` is.
 
 ### `type` — display-type voice (brand kit fonts stay the base)
 

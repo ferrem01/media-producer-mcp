@@ -337,6 +337,12 @@ export interface Scene {
    *  ("animated") plays entrances normally, with micro-shot compression on
    *  sub-1.4s scenes. */
   entrance?: "settled" | "animated";
+  /** The film's PHYSICS CONTRACT (visual_system.motion), stamped per scene the
+   *  same way `entrance` is, because the assembler is where it can actually be
+   *  enforced. "cutout-physics" quantizes element motion to 12fps and boils
+   *  inked edges (shared/motion-physics.js); "calm" and "punchy" are checked
+   *  by the motion inspector's banned-moves list. Absent = house behavior. */
+  motion_physics?: "punchy" | "calm" | "cutout-physics";
 }
 
 // ── Audio ──
