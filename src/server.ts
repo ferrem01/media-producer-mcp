@@ -358,7 +358,7 @@ If something looks wrong in a scene, get{target:'layout'} measures the real geom
 export async function queueBuildFromStoryboard(
   tenantId: string,
   projectId: string,
-  opts: { creativity?: number; film_grammar?: "launch-film" | "tempo-cut" | "hype-cut" | "speaker-screencast" | "editorial" | "social-reel" | "data-story"; max_revisions?: number; voiceover?: boolean; background_music?: boolean; voice?: string } = {},
+  opts: { creativity?: number; film_grammar?: import("./llm/creative-director.js").FilmGrammar; max_revisions?: number; voiceover?: boolean; background_music?: boolean; voice?: string } = {},
 ): Promise<{ job: { id: string } } | { error: string } | null> {
   const project = await loadProject(tenantId, projectId);
   // Any project that HAS a storyboard rebuilds from it. Only 'rendering' is
@@ -366,6 +366,21 @@ export async function queueBuildFromStoryboard(
   if (!project || !project.storyboard || project.status === "rendering") return null;
 
   const storyboardPrompt = buildPromptFromStoryboard(project.storyboard);
+
+  // THE FILM'S COMMITTED AXES SURVIVE A REBUILD. The treatment is stored on
+  // the project; without reusing it, a storyboard rebuild re-decided the
+  // grammar from scratch -- so a component-first film (editorial /
+  // canvas-tour) lost its creativity clamp and codegen invented a bespoke
+  // component per scene, discarding the library components the storyboard
+  // had cast (measured live on "The Ink Line": 5 of 8 scenes came back as
+  // scene_scene_00N customs instead of paper-ground + typewriter +
+  // pen-script). A caller-passed grammar still wins.
+  const savedTreatment = (project as any).treatment as
+    | { filmGrammar?: import("./llm/creative-director.js").FilmGrammar;
+        visualSystem?: import("./llm/creative-director.js").VisualSystem;
+        audioSystem?: import("./llm/creative-director.js").AudioSystem }
+    | undefined;
+  const rebuildGrammar = opts.film_grammar || savedTreatment?.filmGrammar;
 
   let llmConfig;
   try {
@@ -401,7 +416,9 @@ export async function queueBuildFromStoryboard(
         brandKit: brandKit || project.brand_kit,
         canvas: project.canvas,
         creativity: opts.creativity,
-        film_grammar: opts.film_grammar,
+        film_grammar: rebuildGrammar,
+        visual_system: savedTreatment?.visualSystem,
+        audio_system: savedTreatment?.audioSystem,
         maxRevisions: opts.max_revisions,
         project_id: project.project_id,
         voiceover: wantVoiceover,
