@@ -7,6 +7,18 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+
+/** Accept an object OR a JSON string for a nested tool argument. Some MCP
+ *  clients serialize nested objects to strings in transit; a strict object
+ *  schema then rejects a perfectly good call (measured live on
+ *  generate.visual_system). Malformed JSON falls through to the object
+ *  schema so the client still gets a precise validation error. */
+function jsonish<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((v) => {
+    if (typeof v !== "string") return v;
+    try { return JSON.parse(v); } catch { return v; }
+  }, schema);
+}
 import {
   createProject,
   loadProject,
@@ -2149,7 +2161,13 @@ export function createMcpServer(): McpServer {
       canvas_width: z.number().optional().describe("Explicit canvas width. For images, auto-inferred from prompt if omitted."),
       canvas_height: z.number().optional().describe("Explicit canvas height. For images, auto-inferred from prompt if omitted."),
       creativity: z.number().min(0).max(1).optional().describe("Creativity level 0-1. Low (0) prefers library components. High (0.7-1.0) creates one self-contained custom component per scene. Default: 0.5."),
-      visual_system: z.object({
+      // Object-or-JSON-STRING: some MCP clients serialize nested object
+      // arguments as strings before they reach the server (observed live --
+      // a claude.ai-side call sent visual_system as a JSON string and the
+      // strict object schema rejected it). Accept both so the axes are
+      // usable from every client; flat params like film_grammar were never
+      // affected.
+      visual_system: jsonish(z.object({
         world: z.enum(["light", "dark", "paper"]).optional().describe("The film's continuous surface: light (airy mesh), dark (cinematic), paper (painted print/letterpress sheet with the ink channel)."),
         motion: z.enum(["punchy", "calm", "cutout-physics"]).optional().describe("The physics contract: punchy (house slams/pushes), calm (settle-never-bounce editorial restraint), cutout-physics (rigid flat pieces that drop/settle/swing like stickers)."),
         type: z.enum(["grotesk", "editorial-serif", "typewriter", "script"]).optional().describe("Display-type voice for the film's big text."),
@@ -2158,11 +2176,11 @@ export function createMcpServer(): McpServer {
           assets: z.array(z.string()).optional().describe("Brand-kit cutout asset URLs (the sticker set). Omit to auto-resolve *-cutout.png brand images; the build FAILS LOUDLY if none exist (mint them first with generate_clip mode='cutout')."),
           density: z.enum(["accent", "lead"]).optional().describe("accent (default): recurring garnish on key beats. lead: the stickers carry the film -- every scene features one performing."),
         }).optional(),
-      }).optional().describe("The LOOK axis (film-craft triad: film_grammar = rhythm, visual_system = look, audio_system = sound). Omit any subfield and the creative director infers it from the prompt; provide it and it is pinned."),
-      audio_system: z.object({
+      })).optional().describe("The LOOK axis (film-craft triad: film_grammar = rhythm, visual_system = look, audio_system = sound). Omit any subfield and the creative director infers it from the prompt; provide it and it is pinned. Accepts an object or a JSON string."),
+      audio_system: jsonish(z.object({
         music_mood: z.enum(["driving", "jazzy", "ambient", "playful", "cinematic", "warm", "none"]).optional().describe("The music bed's personality ('none' suppresses music even where the grammar wants a bed)."),
         voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional().describe("TTS narration voice (wins over the legacy flat voice param)."),
-      }).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc."),
+      })).optional().describe("The SOUND axis. Omit -> the creative director infers the music mood from the emotional arc. Accepts an object or a JSON string."),
       film_grammar: z.enum(["launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story", "canvas-tour"]).optional().describe("L4 film grammar to commit the whole film to. launch-film: few long cinematic worlds. tempo-cut: music-first bar-quantized hard cuts, text-as-voiceover, component-built. hype-cut: story-first hype -- one-bar kinetic type interstitials alternating with longer scripted product beats that form ONE continuous session; premise-first open, two-act escalation, click-driven cut into the payoff app. speaker-screencast: a speaker video owns the clock. editorial: typography-first -- huge serif statements on cream/dark canvases alternating with full-bleed evidence beats. social-reel: vertical 9:16 feed film, 15-30s, hook-first with caption-scale type and a loop seam (canvas defaults to vertical). data-story: numbers-as-protagonist -- claim/proof beats, one live-drawing figure per scene escalating to the money number, real figures only. canvas-tour: one unbroken shot across a single surface -- beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives (pen-written, typed, commanded), one physical element stitches the film together; for craft-forward brand films and print/letterpress launches. Omit to let the creative director choose."),
       max_revisions: z.number().int().min(1).max(6).optional().describe("Critique revision rounds per scene (default: 1, draft-first). Raise to 3-4 for unattended generate-and-render runs so defects are ground out instead of shipped with badges."),
       token: z.string().optional().describe("Auth token"),
