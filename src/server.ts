@@ -1660,6 +1660,32 @@ export function createMcpServer(): McpServer {
           else await processClipToTexture(clipPath, pngPath);
           const stillUrl = `/assets/${tenantId}/brand-kit/images/${pngName}`;
           still = { asset_url: stillUrl, download_url: `${config.publicUrl}${stillUrl}`, kind: params.mode };
+          // Register it in the kit's assets[] -- writing the PNG to the images
+          // directory is NOT enough. Both consumers of a minted still read the
+          // MANIFEST, not the disk: deriveWorld resolves the paper world's
+          // photographic tooth from `*-texture.png` entries, and the motif
+          // resolver auto-fills `visual_system.motif.assets` from `*-cutout.png`
+          // entries. Unregistered, a minted texture silently never reaches the
+          // paper, and a minted sticker set still throws "no cutout assets exist".
+          try {
+            const kit = await loadBrandKit(tenantId);
+            if (kit) {
+              if (!kit.assets) kit.assets = [];
+              const entry = {
+                name: `${stem}-${params.mode}`,
+                url: stillUrl,
+                type: "image" as const,
+                description: `${params.mode === "cutout" ? "Illustrated cutout with a transparent ground" : "Neutral-gray surface tooth tile"}, distilled from a generated clip: ${params.prompt.slice(0, 160)}`,
+                tags: [params.mode, "generated"],
+              };
+              const at = kit.assets.findIndex((a: any) => a?.url === stillUrl);
+              if (at >= 0) kit.assets[at] = entry as any;
+              else kit.assets.push(entry as any);
+              await saveBrandKit(tenantId, kit);
+            }
+          } catch (regErr: any) {
+            console.warn("Failed to register the generated still in the brand kit:", regErr?.message);
+          }
         }
         j.progress = { step: "done", percent: 100, detail: still ? `Clip + ${still.kind} still ready` : "Clip ready" };
         return {
