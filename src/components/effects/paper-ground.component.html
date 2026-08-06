@@ -63,7 +63,11 @@
       ? data.texture_url : '';
     var hasTex = false;
     function stampTooth(img) {
-      var S = Math.round(Math.min(W, H) * 0.34);
+      // Stamp scale sets the GRAIN. The source is a macro photograph, so a
+      // large stamp magnifies the fibers until the sheet reads as plaster
+      // (measured: 0.34 of the short edge puts each fiber at ~10px). 0.16
+      // lands the grain at ~3px on a 1080p frame -- paper tooth, not relief.
+      var S = Math.round(Math.min(W, H) * 0.16);
       if (!S || !img.naturalWidth) return;
       var stamp = document.createElement('canvas');
       stamp.width = S; stamp.height = S;
