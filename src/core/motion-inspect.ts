@@ -26,6 +26,10 @@ export interface MotionSamplePoint {
   rect: { x: number; y: number; w: number; h: number };
   /** Approximate scale factor from the wrapper's transform matrix (1 = none). */
   scale: number;
+  /** Degrees of z-rotation from the same matrix (0 = upright). */
+  rotation: number;
+  /** Largest blur radius painted by the wrapper or its shallow content (px). */
+  glow: number;
 }
 
 export interface ComponentMotion {
@@ -63,6 +67,16 @@ function matrixScale(tr: string): number {
   const a = p[0], b = p[1];
   const s = Math.sqrt(a * a + b * b);
   return isFinite(s) && s > 0 ? Math.round(s * 1000) / 1000 : 1;
+}
+
+/** Degrees of z-rotation from a CSS matrix string (0 = upright). */
+function matrixRotation(tr: string): number {
+  if (!tr || tr === "none") return 0;
+  const m = tr.match(/matrix(?:3d)?\(([^)]+)\)/);
+  if (!m) return 0;
+  const p = m[1].split(",").map((v) => parseFloat(v));
+  const deg = Math.atan2(p[1], p[0]) * 180 / Math.PI;
+  return isFinite(deg) ? Math.round(deg * 10) / 10 : 0;
 }
 
 function matrixTranslate(tr: string): { x: number; y: number } {
@@ -105,6 +119,63 @@ export function summarizeMotion(points: MotionSamplePoint[], sceneDuration: numb
     return `static throughout (visible ${first.t.toFixed(1)}s-${last.t.toFixed(1)}s, no measurable wrapper motion)`;
   }
   return parts.join("; ");
+}
+
+/**
+ * BANNED MOVES -- the negative half of the physics contract.
+ *
+ * `visual_system.motion` promises a physics, and cutout-physics gets that
+ * promise kept positively (12fps stepping + ink boil, applied by the
+ * assembler). `calm` and `punchy` have no positive machinery, so what makes
+ * them real is this: the moves each one forbids are measured, and a film that
+ * breaks its own contract says so out loud in the motion inspection.
+ *
+ * Pure and exported so the thresholds are unit-testable without a browser.
+ *
+ * NOT detected yet: morph (border-radius / clip-path animating between
+ * shapes). It needs per-frame shape sampling the inspector does not do, and a
+ * check that silently never fires is worse than an acknowledged gap.
+ */
+export function checkBannedMoves(
+  motion: string | undefined,
+  components: ComponentMotion[],
+): string[] {
+  if (motion !== "calm" && motion !== "cutout-physics") return [];
+  const out: string[] = [];
+  for (const c of components) {
+    const vis = c.timeline.filter((p) => p.visible && p.opacity > 0.05);
+    if (vis.length < 3) continue;
+
+    // OVERSHOOT / ELASTIC: the wrapper passes its resting scale and comes
+    // back. Both contracts ban it -- "settle, never bounce" for calm, and a
+    // rigid paper cutout has no springiness to overshoot with.
+    const rest = vis[vis.length - 1].scale;
+    const peak = Math.max(...vis.map((p) => p.scale));
+    if (peak - rest > 0.03 && peak - Math.min(...vis.map((p) => p.scale)) > 0.03) {
+      out.push(
+        `${c.type} (${c.id}): overshoots to ${peak.toFixed(2)}x and settles back to ${rest.toFixed(2)}x` +
+        ` -- ${motion} forbids elastic/bounce entrances`);
+    }
+
+    // TILT: calm type stands upright. (cutout-physics WANTS rotation: a
+    // sticker lands askew and stays askew -- that is the look, not a defect.)
+    if (motion === "calm") {
+      const tilt = Math.max(...vis.map((p) => Math.abs(p.rotation)));
+      if (tilt > 1.5) {
+        out.push(`${c.type} (${c.id}): tilts ${tilt.toFixed(1)}deg -- calm keeps elements upright`);
+      }
+    }
+
+    // GLOW: flat printed pieces do not emit light. A hard offset shadow is
+    // fine; a wide soft bloom is the tell.
+    if (motion === "cutout-physics") {
+      const glow = Math.max(...vis.map((p) => p.glow));
+      if (glow > 24) {
+        out.push(`${c.type} (${c.id}): paints a ${glow}px blur -- cutout-physics forbids glows (flat pieces, hard edges)`);
+      }
+    }
+  }
+  return out;
 }
 
 export async function inspectSceneMotion(opts: {
@@ -206,6 +277,19 @@ export async function inspectSceneMotion(opts: {
             visible: cs.visibility !== "hidden" && cs.display !== "none" && r.width > 0 && r.height > 0 && effOpacity > 0.02,
             rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
             transform: cs.transform,
+            // Largest blur radius the wrapper or its shallow content paints
+            // with -- the measurable signature of a "glow".
+            glow: (function () {
+              let px = 0;
+              for (const node of [el as HTMLElement, ...Array.from(el.children).slice(0, 6)]) {
+                const s2 = getComputedStyle(node as HTMLElement);
+                for (const decl of [s2.boxShadow, s2.textShadow, s2.filter]) {
+                  if (!decl || decl === "none") continue;
+                  for (const m of decl.matchAll(/(-?[\d.]+)px/g)) px = Math.max(px, Math.abs(parseFloat(m[1])));
+                }
+              }
+              return Math.round(px);
+            })(),
           };
         });
         const rig = document.querySelector(".__mp_camera_rig") as HTMLElement | null;
@@ -225,12 +309,17 @@ export async function inspectSceneMotion(opts: {
     const components: ComponentMotion[] = (scene.components as any[]).map((c) => {
       const timeline: MotionSamplePoint[] = series.map((s) => {
         const m = s.comps[c.id] || { opacity: 0, visible: false, rect: { x: 0, y: 0, w: 0, h: 0 }, transform: "none" };
-        return { t: s.t, opacity: Math.round(m.opacity * 100) / 100, visible: !!m.visible, rect: m.rect, scale: matrixScale(m.transform) };
+        return {
+          t: s.t, opacity: Math.round(m.opacity * 100) / 100, visible: !!m.visible, rect: m.rect,
+          scale: matrixScale(m.transform), rotation: matrixRotation(m.transform), glow: (m as any).glow || 0,
+        };
       });
       const summary = summarizeMotion(timeline, dur);
       if (summary.startsWith("NEVER VISIBLE")) warnings.push(`${c.type} (${c.id}): never visible in any sample`);
       return { id: c.id, type: c.type, summary, timeline };
     });
+
+    warnings.push(...checkBannedMoves((scene as any).motion_physics, components));
 
     let camera: CameraMotionSample[] | undefined;
     if (series.some((s) => s.camera)) {

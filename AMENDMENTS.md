@@ -2504,3 +2504,39 @@ Related: CI had been red on master since the playbook grew to eight film
 grammars and the two new axes (5900 chars against a 5000 ceiling). Cut back
 to 4995 rather than raised -- the deletion that mattered was the "rule of
 thumb" line restating all eight grammars a second time.
+
+## cutout-physics stops being an adjective
+
+SPEC-creative-axes rule 2 says every value on a creative axis has to be backed
+by machinery. `visual_system.motion: cutout-physics` shipped without any: the
+director was told to describe rigid flat pieces, the codegen was free to
+ignore it, and nothing measured whether it had. An operator could pin the axis
+and get a film indistinguishable from `punchy`.
+
+It now has both halves. Positively, the assembler applies the contract to the
+finished master timeline, LAST -- after every component timeline is wired and
+the orphans are folded in -- so library components, templates and codegen
+scenes are all covered without any of them opting in and none able to opt out:
+`mpStepQuantize` puts element tweens on a 12fps grid while the camera stays
+smooth (a stepped camera reads as dropped frames, not stop-motion), and
+`mpInkBoil` wobbles inked edges by a fraction of a pixel while the backdrop
+holds perfectly still. Jake Moran named those two as most of the print feel.
+
+Both are scrub-safe by construction, which drove the implementation. The
+renderer SEEKS rather than plays and GSAP suppresses callbacks on seek, so
+neither could use onUpdate: stepping is an EASE (`base(floor(p*n)/n)` -- it
+steps the input, so the ease shape survives and a settle still settles, just
+visibly), and the boil is a sequence of zero-duration `set` tweens over a
+pre-rolled seed sequence. The boil displaces at the FILTER level for the same
+reason a transform-jitter version cannot exist: it would have to write x/y
+that the element's own tween already owns.
+
+Negatively, `checkBannedMoves` measures what each contract forbids and reports
+it in `get(target:'motion')` -- overshoot for both calm and cutout-physics,
+tilt for calm only (a sticker landing askew is the cutout look, not a defect),
+soft bloom for cutout-physics. Morph is listed as unmeasured rather than
+shipped as a check that silently never fires.
+
+The film's value reaches the assembler as `Scene.motion_physics`, stamped per
+scene by the pipeline exactly the way `entrance` is -- the assembler only ever
+sees one scene, so a film-level fact has to ride on each one.

@@ -3107,6 +3107,10 @@ async function runUnifiedPipeline(
   await Promise.all(workers);
 
   // Add scenes in order, carrying over voiceover text and stock footage from storyboard builder
+  // The film's PHYSICS CONTRACT rides along per scene (same shape as
+  // `entrance`): the assembler is the only place motion can actually be
+  // enforced, and it only ever sees one scene at a time.
+  const motionPhysics = treatment?.visualSystem?.motion;
   for (let si = 0; si < sceneResults.length; si++) {
     const scene = sceneResults[si].scene;
     const draft = storyboard.scenes[si];
@@ -3114,6 +3118,7 @@ async function runUnifiedPipeline(
       if (!scene.audio_hints) scene.audio_hints = {};
       scene.audio_hints.voiceover_text = draft.voiceover_text;
     }
+    if (motionPhysics) scene.motion_physics = motionPhysics;
     project.scenes.push(scene);
   }
 

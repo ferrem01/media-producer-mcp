@@ -145,6 +145,7 @@ export async function assembleSceneAuto(options: AssembleSceneAutoOptions): Prom
       preview,
       speakerUrl,
       speakerOffset: options.speakerOffset,
+      motionPhysics: scene.motion_physics,
       cameraMoves: scene.camera_moves,
       mediaEdits: scene.media_edits,
     });
@@ -382,7 +383,7 @@ ${wrapperChoreoScript(scene.components, scene.duration_seconds)}
       }
     });
   } catch (e) {}
-
+${motionPhysicsScript(scene.motion_physics, scene.duration_seconds)}
   // Expose for Playwright capture
   window.__MP_TIMELINE = master;
   window.__MP_DURATION = ${scene.duration_seconds};
@@ -580,6 +581,39 @@ export function timelapseClockScript(
       } }, 0);
   })();
 })();
+`;
+}
+
+/**
+ * The PHYSICS CONTRACT, applied to the finished master timeline.
+ *
+ * SPEC-creative-axes rule 2 says every value on a creative axis has to be
+ * backed by machinery. `visual_system.motion: cutout-physics` was prose in a
+ * prompt; this is the machinery. It runs LAST -- after every component
+ * timeline is wired and the orphans are folded in -- so it covers library
+ * components, templates and codegen scenes alike without any of them opting
+ * in, and without any of them able to opt out.
+ *
+ * Only cutout-physics has positive machinery today. `calm` and `punchy` are
+ * enforced negatively, by the motion inspector's banned-moves list, so they
+ * deliberately emit nothing here rather than pretend.
+ */
+export function motionPhysicsScript(motion: string | undefined, sceneDuration: number): string {
+  if (motion !== "cutout-physics") return "";
+  return `
+  // ── physics contract: cutout-physics (shared/motion-physics.js) ──
+  // Elements step at 12fps like stop-motion; the camera stays smooth.
+  // Inked elements boil on the same grid. The backdrop does neither: the
+  // paper is the one thing in a print film that holds perfectly still.
+  try {
+    if (typeof mpStepQuantize === 'function') mpStepQuantize(master);
+    if (typeof mpInkBoil === 'function') {
+      var __inked = Array.prototype.slice.call(
+        document.querySelectorAll('.mp-component[data-cid]:not([data-mp-backdrop])'))
+        .filter(function (el) { return !el.querySelector('video'); });
+      mpInkBoil(master, __inked, { duration: ${sceneDuration}, seed: 11 });
+    }
+  } catch (e) { console.warn('cutout-physics not applied: ' + e.message); }
 `;
 }
 
@@ -1044,6 +1078,8 @@ export async function assembleCodegenScene(options: {
   preview?: boolean;
   /** Speaker URL for resolving "speaker" references */
   speakerUrl?: string;
+  /** The film's physics contract (Scene.motion_physics). */
+  motionPhysics?: import("./types.js").Scene["motion_physics"];
   /** Direct-manipulation camera moves applied as a deterministic rig. */
   cameraMoves?: import("./types.js").CameraMove[];
   mediaEdits?: Record<string, import("./types.js").MediaEdit>;
@@ -1279,7 +1315,7 @@ ${tagResult.html}
       }
     });
   } catch (e) {}
-
+${motionPhysicsScript(options.motionPhysics, duration)}
   // Expose for Playwright capture
   window.__MP_TIMELINE = master;
   window.__MP_DURATION = ${duration};
@@ -2014,7 +2050,7 @@ export async function loadSharedUtilities(): Promise<string> {
   const thisDir = path.dirname(fileURLToPath(import.meta.url));
   const sharedDir = path.join(thisDir, "..", "components", "shared");
 
-  const sharedFiles = ["cursor.js", "typing.js", "camera.js", "script-runner.js", "spring-presets.js", "parallax.js", "text-effects.js", "video-sync.js", "atmosphere.js"];
+  const sharedFiles = ["cursor.js", "typing.js", "camera.js", "script-runner.js", "spring-presets.js", "parallax.js", "text-effects.js", "video-sync.js", "atmosphere.js", "motion-physics.js"];
   const sources: string[] = [];
 
   for (const file of sharedFiles) {
