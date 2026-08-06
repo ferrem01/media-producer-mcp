@@ -319,46 +319,46 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
  * storyboard was ever reviewed, generates against an empty brand kit).
  * Keep it a tight page: clients carry it in context all session.
  */
-export const OPERATOR_PLAYBOOK = `Media Producer turns prompts into branded films (video/image/deck): scenes are code-authored motion graphics, rendered deterministically. You (the agent) drive it; the creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
+export const OPERATOR_PLAYBOOK = `Media Producer turns prompts into branded films (video/image/deck): scenes are code-authored motion graphics, rendered deterministically. Creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
 
 BEFORE GENERATING
-- Ask the human first: audience, goal/CTA, target length, and which film grammar fits.
-- FILM GRAMMARS (the film's dialect; pass film_grammar to pin one, omit to let the creative director choose):
+- Ask first: audience, goal/CTA, target length, and which film grammar fits.
+- FILM GRAMMARS (the film's dialect; pass film_grammar to pin, omit to let the director choose):
   * launch-film -- few long cinematic scenes, one continuous world. Expansive brand moments.
-  * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover. Fast, confident explainers.
-  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats that form ONE continuous scripted session; premise-first open, two-act escalation, a click inside the product drives the cut into the payoff app. For use-case narratives (MCP/integration demos).
+  * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover. Fast explainers.
+  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats that form ONE continuous scripted session. For use-case narratives (MCP/integration demos).
   * editorial -- typography-first manifesto: huge serif statements alternating with full-bleed evidence. The words are the product.
   * social-reel -- vertical 9:16, 15-30s: hook in the first 2 seconds, caption-scale type, escalation beats, a loop seam.
-  * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene up to the money number. Figures come from the brief, never invented.
-  * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never choose it without one.
-  * canvas-tour -- ONE unbroken shot across a single surface: beats are PLACES the camera travels between (no nameable cuts), type is PERFORMED where it lives (pen-written, typed, commanded), one physical element stitches the film. For craft-forward brand films and print/letterpress launches.
-  Rule of thumb: the product argues (tempo-cut) vs. the words hype what the product proves (hype-cut) vs. the words (editorial) vs. the numbers (data-story) vs. one cinematic world (launch-film) vs. a person on camera (speaker-screencast) vs. the feed format (social-reel) vs. one continuous surface the camera walks (canvas-tour). If their answer doesn't pick one, relay the choice in these terms.
-- THE OTHER TWO AXES (same contract as film_grammar -- omit and the creative director infers from the prompt; pass and it is pinned): visual_system {world: light|dark|paper, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif REQUIRES sticker assets in the brand kit -- mint them with generate_clip mode="cutout" first (mode="texture" mints surface tiles the same way). See SPEC-creative-axes.md for the value registry and how it grows.
-- Brand comes from the tenant's brand kit. No kit yet? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
-- A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and assembles the film automatically.
+  * data-story -- numbers as protagonist: claim -> proof, ONE live-drawing figure per scene up to the money number; figures come from the brief, never invented.
+  * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never chosen without one.
+  * canvas-tour -- ONE unbroken shot across a single surface: beats are PLACES the camera travels to, type is PERFORMED where it lives (pen-written, typed, commanded). Craft-forward brand and print films.
+  Choosing: ask what carries the argument -- the product, the words, the numbers, a person, one surface, or the feed format. Relay the choice in those terms.
+- THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture" mints surface tiles).
+- Brand comes from the tenant's brand kit. No kit? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
+- A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and assembles the film.
 
-REAL MEDIA (planned and fetched AUTONOMOUSLY -- you steer it with the brief)
-- Per beat the director picks real footage, a generated still, or motion graphics, from Pexels stock, AI stills, or Veo video (only for moving shots no stock library could contain; 0-1 per film, the expensive one, ~8s and 1-3 min each -- say so when asked).
-- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk", "photographic and cinematic". To FORCE a generated shot, describe it and say "generate this shot" -- that makes it mandatory. Mood-only briefs get motion graphics on UI/data beats and real media on emotional ones; that default is usually right.
-- TALKING HEADS are explicit by design (casting a synthetic presenter is the human's call). generate_clip = one Veo clip; quote the spoken line and Veo voices it. generate_presenter = a whole script (~60s) split into consistent multi-take deliveries, returned as ONE stitched clip, reporting scripted vs heard-by-whisper per take (relay any drift). Feed either asset_url back as speaker_source and the film becomes speaker-led: her voice is the soundtrack, scenes cut on her sentences, content docks beside her. reference_image keeps the same presenter across clips.
+REAL MEDIA (planned and fetched autonomously -- steer it with the brief)
+- Per beat the director picks real footage, a generated still, or motion graphics (Pexels stock, AI stills, or Veo video -- Veo only for moving shots no stock library could hold; 0-1 per film, ~8s and 1-3 min each, so say so when asked).
+- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk", "photographic and cinematic". To FORCE a generated shot, describe it and say "generate this shot". Mood-only briefs get motion graphics on UI/data beats and real media on emotional ones.
+- TALKING HEADS are explicit by design (casting a synthetic presenter is the human's call). generate_clip = one Veo clip; quote the spoken line and Veo voices it. generate_presenter = a whole script (~60s) split into consistent takes, returned as ONE stitched clip with scripted-vs-heard per take (relay any drift). Feed either asset_url back as speaker_source and the film goes speaker-led: that voice is the soundtrack and scenes cut on its sentences. reference_image keeps the presenter consistent.
 
 ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
 1. generate mode='storyboard' -> review the beats with the human, adjust, THEN build scenes.
 2. Proof a single scene as a still: render{scene_id}.
-3. Watch motion live in Studio (studio_url on every project response) -- in-browser, no render. Send the HUMAN there to review and edit rather than describing frames in text.
+3. Watch motion live in Studio (studio_url on every project response) -- in-browser, no render. Send the HUMAN there to review and edit.
 4. First full watch: render{quality:'preview'} (fast). Production render only to ship.
 
 EDITING
-- revise = surgical, natural-language change to a scene ("make the headline white"). Use it before regenerating anything.
+- revise = surgical, natural-language change to a scene ("make the headline white"). Use it before regenerating.
 - add/update/reorder/delete = structural edits. regenerate_asset = re-run one generated image.
 - NEVER edit a project while its render job runs.
 
 JOBS AND DELIVERY
-- generate and render are async: they return a job_id; poll job{action:'status'} (or wait). Progress includes step + percent -- relay it.
-- When a render completes, the job carries download_url (direct MP4 link) and preview_url (Studio). GIVE THE HUMAN THOSE LINKS. Every output is served over HTTPS -- there is never a reason for SSH or server filesystem access.
-- Any time later, get(project_id) / list return rendered, download_url and render_stale (true = the MP4 predates the latest edits; offer a re-render).
+- generate and render are async: they return a job_id; poll job{action:'status'} (or wait). Progress has step + percent -- relay it.
+- When a render completes the job carries download_url (direct MP4) and preview_url (Studio). GIVE THE HUMAN THOSE LINKS. Everything is served over HTTPS -- never a reason for SSH or server filesystem access.
+- Later, get(project_id) / list return rendered, download_url and render_stale (true = the MP4 predates the latest edits; offer a re-render).
 
-If something looks wrong in a scene, get{target:'layout'} measures the real geometry (element boxes, crop math, warnings) -- diagnose before writing a revise instruction.`;
+If a scene looks wrong, get{target:'layout'} measures real geometry (element boxes, crop math, warnings) -- diagnose before writing a revise instruction.`;
 
 /**
  * Queue a build-scenes-from-storyboard job (generate mode='full' on a
