@@ -13,6 +13,7 @@ creative axes — the same triad film craft has used for a century:
 | Axis | Field on `generate` | What it decides | Analog |
 | --- | --- | --- | --- |
 | RHYTHM | `film_grammar` | who narrates, what earns a cut, music's role, scene assembly | editing |
+| | | *values: launch-film, tempo-cut, hype-cut, editorial, social-reel, data-story, speaker-screencast, canvas-tour* | |
 | LOOK | `visual_system` | the surface, the physics, the type voice, recurring devices | art direction |
 | SOUND | `audio_system` | music personality, narration voice, (future: SFX) | sound design |
 
@@ -30,8 +31,10 @@ these fields. Operators never need those words.
    (occasionally a new world/motion/motif value), sound (occasionally a
    mood), components (frequently new — the cheap, safe growth). The
    three-video analysis arc of 2026-08-05 (Lenny Product Pass, Behind the
-   Craft, Remotion Shipper) produced: 1 world value, 1 motion value, 1 motif
-   value, ~6 components, 0 new fields.
+   Craft, Remotion Shipper) produced: 1 grammar value (canvas-tour), 1 world
+   value, 1 motion value, 1 motif value, ~8 components/variants, 0 new
+   fields -- and one universal doctrine (kinetic continuity) that improved
+   every existing grammar.
 2. **Every enum value must be backed by machinery** (a backdrop component, a
    motion contract, a component family, a search mapping). Values without
    machinery are lies the creative director will happily tell.

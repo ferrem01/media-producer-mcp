@@ -2458,3 +2458,18 @@ music_mood drives the existing Jamendo search at both selection sites;
 'none' suppresses the bed. The axis map, current + anticipated enum values,
 and the four anti-sprawl growth rules live in SPEC-creative-axes.md -- read
 it before replicating the next video from X.
+
+## canvas-tour + kinetic continuity (the eighth grammar, doctrine-only)
+
+Shipped as prompts, not machinery: the storyboard contract now carries
+KINETIC CONTINUITY for every grammar (boundaries CAUSED by the outgoing
+scene, momentum matched across the cut, direction continuous, one element
+carried over -- Jake Moran's "every transition is something the outgoing
+scene causes"), and canvas-tour registers as the eighth film_grammar (one
+unbroken shot across a single surface; beats are places; performed type;
+one stitching element; 55-75% bare surface). Component-first like
+editorial, quiet bed on, text-as-voiceover. The station/canvas spatial
+machinery in SPEC-canvas-tour.md remains a re-review-gated contingency --
+the doctrine version came first deliberately, and the "Ink Line" storyboard
+(proj_81ceb251) had already invented a one-continuous-desk film from the
+paper world alone, which is what argued for doctrine over machinery.
