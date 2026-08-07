@@ -237,6 +237,22 @@ export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<Stor
 
   var storytellingGuide = getStorytellingGuide();
 
+  // ONLY the film's own contract is injected. Every grammar used to ship in
+  // every call -- film_grammar merely relabelled the headers -- so a tempo-cut
+  // film carried ~4,500 tokens of laws that did not apply, and CONTRADICTORY
+  // ones: tempo-cut bans mid-film statement slides, hype-cut says they ARE the
+  // connective tissue and had to carry an explicit "this overrides tempo-cut's
+  // no-statement-slides law" clause purely because both were in context.
+  // The old justification (film_grammar is optional, so ship them all and let
+  // the model honour whatever the treatment named) is already false by the time
+  // this prompt is built: pipeline.ts resolves a concrete grammar first and
+  // every fallback terminates. If one somehow does not, we fall back to all.
+  const __g = (g: string) =>
+    !opts.filmGrammar ||
+    opts.filmGrammar === g ||
+    // hype-cut genuinely inherits tempo-cut's edit, and its contract says so.
+    (opts.filmGrammar === "hype-cut" && g === "tempo-cut");
+
   var systemPrompt = `You are a creative director storyboarding a ${opts.format} project.
 
 You think in visual STORIES, not slide decks. Every scene should feel like something the viewer wants to watch, not endure.
@@ -304,7 +320,7 @@ A cut is not a gap. Author every scene boundary so the film reads as one continu
 
 ${opts.filmGrammar ? `### THIS FILM'S GRAMMAR: ${opts.filmGrammar.toUpperCase()} (committed by the treatment -- its contract section below is MANDATORY, not advisory)
 
-` : ""}### TEMPO-CUT FILMS (${opts.filmGrammar === "tempo-cut" ? "ACTIVE for this film" : opts.filmGrammar === "hype-cut" ? "INHERITED by this hype-cut film -- every law here applies unless HYPE-CUT FILMS overrides it" : 'when the director\'s treatment names "tempo-cut"'})
+` : ""}${__g("tempo-cut") ? `### TEMPO-CUT FILMS (${opts.filmGrammar === "tempo-cut" ? "ACTIVE for this film" : opts.filmGrammar === "hype-cut" ? "INHERITED by this hype-cut film -- every law here applies unless HYPE-CUT FILMS overrides it" : 'when the director\'s treatment names "tempo-cut"'})
 When the treatment commits to TEMPO-CUT, the editorial contract above FLIPS from few-long-worlds to many-short-worlds. Obey this contract exactly:
 - THE EDIT: 6-9 scenes in 30-45s, each 1-5 bars long (2-4 bars for performing surfaces; spend 1-bar or half-bar MICRO-BEATS -- a single word, a stamp, one click -- deliberately for punch, 1-3 per film)${opts.beatGrid ? ` (one bar = ${opts.beatGrid.barSec.toFixed(2)}s -- quantize every scene duration to whole bars)` : " (quantize to the music's bar length)"}; every transition_in is {"type":"none"} -- hard cuts land on downbeats. No crossfades, no wipes.
 - ONE THOUGHT PER CUT: each scene carries exactly one idea. If a scene needs a second annotation line swap, that is fine; if it needs a second WORLD, cut.
@@ -319,9 +335,9 @@ When the treatment commits to TEMPO-CUT, the editorial contract above FLIPS from
 - THE PAYOFF BEAT is deterministic: when the story lands on a number (leads, revenue, time saved), stage it as a stat-card or number-counter-row OBJECT with the real figures -- the layout engine gives a hero number center stage. Never hand-roll a results dashboard for the payoff; a freeform payoff is where misaligned frames sneak in.
 - THE CLOSE is a template: the final CTA scene is the st-logo-close scene template (it inherits the film's theme and frames the wordmark + CTA correctly) -- never a freeform CTA composition. A hand-built close is how the one thing the film asks the viewer to do ends up cut off by the canvas edge.
 - OBJECTS, NOT STRINGS: every entry in a tempo-cut scene's components[] must be an OBJECT with type + data (+ script where performable). A single plain-string hint drops the ENTIRE scene to freeform codegen -- the exact path this grammar forbids.
-- BUILD FROM THE KIT: every tempo-cut scene is composed from library components or an st-template -- composer (the ask), kinetic-text entrance:"type-on" (build-up lines), annotation (narration beside a window), the product mocks (quotient-*, claude-*), prop-strike (the gag). Do NOT invent custom scenes in this grammar: hand-rolled surfaces are how corner labels, theme whiplash and clipped type sneak back in. NO montage/scene-name labels anywhere; the film keeps ONE canvas color end to end (a single deliberate dark beat is the only exception). Generic simulators (chat-simulator, ui-terminal-agent) are a LAST resort: if the beat happens in Quotient, Claude, Slack, LinkedIn or X, staging the SPECIFIC product mock is mandatory -- a no-name chat standing in for a named product is a blocking defect (generic_surface).
+- BUILD FROM THE KIT: every tempo-cut scene is composed from library components or an st-template -- composer (the ask), kinetic-text entrance:"type-on" (build-up lines), annotation (narration beside a window), the product mocks (quotient-*, claude-*), prop-strike (the gag). Do NOT invent custom scenes in this grammar: hand-rolled surfaces are how corner labels, theme whiplash and clipped type sneak back in. NO montage/scene-name labels anywhere; the film keeps ONE canvas color end to end (a single deliberate dark beat is the only exception). Generic simulators (chat-simulator, ui-terminal-agent) are a LAST resort: if the beat happens in Quotient, Claude, Slack, LinkedIn or X, staging the SPECIFIC product mock is mandatory -- a no-name chat standing in for a named product is a blocking defect (generic_surface).` : ""}
 
-### HYPE-CUT FILMS (${opts.filmGrammar === "hype-cut" ? "ACTIVE for this film" : 'when the director\'s treatment names "hype-cut"'})
+${__g("hype-cut") ? `### HYPE-CUT FILMS (${opts.filmGrammar === "hype-cut" ? "ACTIVE for this film" : 'when the director\'s treatment names "hype-cut"'})
 Tempo-cut's edit driving editorial's alternation: the words HYPE, the product PROVES. INHERITS EVERY TEMPO-CUT LAW ABOVE not restated here (music-first bar quantization, hard cuts on downbeats, text-is-voiceover, SURFACES PERFORM, CONTINUITY OF STATE, OBJECTS NOT STRINGS, BUILD FROM THE KIT, st-logo-close close). Then:
 - THE ALTERNATION AT PACE: kinetic type interstitials alternate with product beats. An interstitial is an st-statement scene (ONE thought, one *starred* emphasis, ~1 bar / 1-1.5s -- read once, cut); a product beat is a named product mock performing (2-6 bars). Statement slides are not merely allowed mid-film here -- they ARE the connective tissue (this overrides tempo-cut's no-statement-slides law). Never two interstitials in a row except the opening premise pair.
 - PREMISE FIRST: the cold open is 1-2 type beats that set the story's stakes before any product pixel ("A customer just emailed you." / "And it's *glowing*."). The film earns the product by promising the story.
@@ -330,8 +346,8 @@ Tempo-cut's edit driving editorial's alternation: the words HYPE, the product PR
 - THE CLICK CUT: the cut into the payoff surface is diegetic -- the cursor travels to the link/button inside the current surface and CLICKS it, and the next scene IS the destination (script a click action targeting the link, then hard-cut). Never an unmotivated cut into a new app.
 - TEMPERATURE: interstitials own the film's home canvas (st-statement cream by default); at most ONE dark flip, at the act turn.
 - CASTING: interstitials are st-statement ONLY (editorial's component, played at hype pace). Product beats stage the SPECIFIC named mock mid-performance with real product chrome (real connector logos on tool chips); a generic simulator standing in for a named product is a blocking generic_surface defect, same as tempo-cut.
-
-### EDITORIAL FILMS (${opts.filmGrammar === "editorial" ? "ACTIVE for this film" : 'when the director\'s treatment names "editorial"'})
+` : ""}
+${__g("editorial") ? `### EDITORIAL FILMS (${opts.filmGrammar === "editorial" ? "ACTIVE for this film" : 'when the director\'s treatment names "editorial"'})
 The typography-first manifesto dialect: the story is told IN TYPE, punctuated by evidence. Obey this contract exactly:
 - THE ALTERNATION: statement beat -> evidence beat -> statement beat -> evidence beat. A statement beat is an st-statement scene (huge display-serif thought, ONE word starred for the gradient-italic emphasis: "The registry is the *product*."). An evidence beat is ONE full-bleed exhibit that proves the statement just made: a product mock performing, a chart drawing, a map routing, a device showcase, a code animation. Never two statements in a row unless the second is the film's closing line.
 - THE TEMPLATE VOCABULARY IS CLOSED: statement beats are st-statement ONLY. st-manifesto (kinetic sans slam), st-swarm, st-quote, st-photo-close and the other cinematic templates belong to launch-film -- casting ANY of them in an editorial film is a grammar violation, even for the open or the close. The film opens on an st-statement, closes on an st-statement (or st-logo-close when a CTA is required), and every scene between is either st-statement or a performing evidence exhibit. When in doubt: if a scene's job is words, it is st-statement.
@@ -342,8 +358,8 @@ The typography-first manifesto dialect: the story is told IN TYPE, punctuated by
 - EVIDENCE PERFORMS: an evidence beat's surface must be mid-performance (data.script on mocks, animated draw on charts/maps) -- a static screenshot between two beautiful statements is a broken promise.
 - KICKERS AS CHAPTERS: number the chapters with st-statement kicker ("01 - THE PROBLEM"). 2-3 chapters max.
 - NO VOICEOVER: the type is the voice. voiceover_text stays empty on statement beats.
-
-### SOCIAL-REEL FILMS (${opts.filmGrammar === "social-reel" ? "ACTIVE for this film" : 'when the director\'s treatment names "social-reel"'})
+` : ""}
+${__g("social-reel") ? `### SOCIAL-REEL FILMS (${opts.filmGrammar === "social-reel" ? "ACTIVE for this film" : 'when the director\'s treatment names "social-reel"'})
 The vertical feed dialect: 9:16, built to stop a thumb. Obey this contract exactly:
 - THE SHAPE: 15-28s of SCENE TIME (transitions ride on top; the shipped file must stay under 30s), 5-8 scenes. Scene 1 is the HOOK (<=2s): one bold claim or question in giant type that earns the next second -- no logos, no setup, no "welcome". Then 3-5 ESCALATION beats that each pay the hook off a little more, ONE payoff beat (the money shot: the product doing the thing, a number landing), and a CLOSE that composes into the hook frame so the loop replays cleanly (same canvas color, type landing where the hook's type began).
 - VERTICAL COMPOSITION: every scene composes for a phone held in one hand. Content lives in the MIDDLE BAND: keep the top ~12% and bottom ~18% of the canvas clear (platform UI covers them). A landscape-composed scene letterboxed into 9:16 is a blocking defect.
@@ -358,8 +374,8 @@ The vertical feed dialect: 9:16, built to stop a thumb. Obey this contract exact
 - OBJECTS, NOT STRINGS: every scene's components[] entries are OBJECTS with type + data (+ script where performable) -- same rule as tempo-cut, same reason.
 - EVIDENCE AT PHONE SCALE: product mocks (quotient-*, claude-*, device-showcase, cards) are staged LARGE -- one surface filling the middle band, never two side by side. A device-showcase phone in a 9:16 film is a phone-in-phone: prefer the app surface itself, full-bleed. WHOLE DESKTOP WORKSPACES ARE BANNED as surfaces (quotient-app-shell, liquid-glass-desktop, full browser windows): a desktop shell at 1080px wide is sidebar/breadcrumb soup nobody can read (measured live: proj_56358b25 scene 4 -- full-width but illegible). Stage the specific PANEL the beat is about (quotient-chat, composer, the campaign board) and if even that reads desktop-dense, crop it (width 160-240%, negative x) so ONE region is phone-legible.
 - NO VOICEOVER: voiceover_text stays empty; the captions are the script.
-
-### DATA-STORY FILMS (${opts.filmGrammar === "data-story" ? "ACTIVE for this film" : 'when the director\'s treatment names "data-story"'})
+` : ""}
+${__g("data-story") ? `### DATA-STORY FILMS (${opts.filmGrammar === "data-story" ? "ACTIVE for this film" : 'when the director\'s treatment names "data-story"'})
 The numbers-as-protagonist dialect: every beat stages a figure, and the figures argue the case. Obey this contract exactly:
 - THE SHAPE: 5-8 scenes in 25-45s. Each scene is CLAIM -> PROOF: a short line of type states the claim (2-8 words), then ONE data component proves it at hero scale. The claim may live in the same scene as a leading beat (type lands, then the chart draws) or as its own 2-3s setup scene before a bigger proof.
 - ONE NUMBER PER BEAT: each data beat has exactly ONE protagonist figure -- staged HUGE (the hero number fills >=20% of the frame height; a footnote-sized counter in a corner is a defect, measured live: proj_a7b3ffbd scene 1's "47" was a badge). Two competing numbers in one scene is two scenes; a supporting table of line items beside the hero number IS competing numbers. A wall of metrics mid-film is a blocking defect; metric-dashboard is earned ONLY as the finale recap. The protagonist figure always lands IN a data component (stat-card, counter, chart) -- app shells and calendars may set context behind it, but they never carry the number.
@@ -372,8 +388,8 @@ The numbers-as-protagonist dialect: every beat stages a figure, and the figures 
 - THE EDIT: claims are SHORT (2-3s); proofs breathe (3-6s -- long enough for the count/draw to land and hold). Hard cuts; music is a restrained driving bed and counters/draws should land near downbeats.
 - TEXT IS THE VOICEOVER: no narrator. The claim lines are kinetic-text/annotation at display scale; voiceover_text stays empty.
 - OBJECTS, NOT STRINGS: every entry in components[] is an OBJECT with type + data -- same rule as tempo-cut, same reason. The CLOSE is st-logo-close.
-
-### CANVAS-TOUR FILMS (${opts.filmGrammar === "canvas-tour" ? "ACTIVE for this film" : 'when the director\'s treatment names "canvas-tour"'})
+` : ""}
+${__g("canvas-tour") ? `### CANVAS-TOUR FILMS (${opts.filmGrammar === "canvas-tour" ? "ACTIVE for this film" : 'when the director\'s treatment names "canvas-tour"'})
 The continuous-surface dialect: ONE unbroken shot across a single surface, no cut the viewer can name. Obey this contract exactly:
 - THE SHAPE: 5-9 scenes in 20-40s. Every scene is a PLACE on the same surface -- the same sheet of paper, desk, wall or board runs under all of them and NEVER resets (same world backdrop, same tone, same texture, scene to scene). The film's total motion is one journey across it: begin at one end, arrive at the other.
 - THE CAMERA IS THE EDIT: there are no hard cuts. Each boundary is a camera TRAVEL -- glide, push in, pull back, a slight tilt in transit -- from the beat that just finished to the next place. Write the move in the visual_notes ("the camera keeps panning right past the arrow sticker and arrives on the ledger sheet"). The KINETIC CONTINUITY rules above are not optional here; they are the grammar.
@@ -383,8 +399,8 @@ The continuous-surface dialect: ONE unbroken shot across a single surface, no cu
 - QUIET, NOT EMPTY: 55-75% of each frame is bare surface. One idea per place, at generous size. Music is a low bed; the type carries the story.
 - NO VOICEOVER: voiceover_text stays empty -- the performed type IS the voice.
 - OBJECTS, NOT STRINGS: every components[] entry is an OBJECT with type + data. The surface component (paper-ground or the world backdrop) is the first entry of every scene.
-
-### SPEAKER-SCREENCAST FILMS (${opts.filmGrammar === "speaker-screencast" ? "ACTIVE for this film" : "when a speaker recording drives the film"})
+` : ""}
+${__g("speaker-screencast") ? `### SPEAKER-SCREENCAST FILMS (${opts.filmGrammar === "speaker-screencast" ? "ACTIVE for this film" : "when a speaker recording drives the film"})
 The human on camera owns the film; everything else supports them. The contract:
 - THE VOICE IS THE CLOCK: the speaker's sentences decide when scenes cut and when content enters. Author scene/beat durations against what is being SAID, never against an abstract rhythm -- a cut mid-sentence is a failure.
 - THE HUMAN NARRATES: no text-as-voiceover, no statement slides, no annotation lines that duplicate what the speaker is saying out loud. On-screen text is limited to labels/callouts that ADD to the speech (a metric, a name, a step number).
@@ -398,7 +414,7 @@ The human on camera owns the film; everything else supports them. The contract:
   * NEVER cover her with a codegen backdrop: the speaker scenes on either side stay transparent_background:true with NO full-bleed background component -- the camera IS their background.
 - HIDING A MULTI-TAKE SEAM: when the speaker recording was assembled from several generated takes, the brief carries the seam timestamps. A takeover must START ~0.2s BEFORE the seam it hides and run past it -- a cutaway that begins ON the seam exposes the jump it exists to cover.
 - MUSIC: absent, or a bed ducked far under the voice. The voice is always the loudest thing.
-
+` : ""}
 ### Writing Great Visual Notes
 Visual notes MUST be 5+ sentences with specific motion verbs, depth layers (BG/MG/FG), and choreography.
 NOT "show the feature" — describe what HAPPENS frame by frame.
