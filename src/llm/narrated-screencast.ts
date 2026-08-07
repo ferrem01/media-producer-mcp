@@ -372,14 +372,23 @@ export async function attachBoothNarration(opts: {
     scenes
       .filter((s) => (s.components || []).some((c: any) => c.type === "screencast-frame"))
       .sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0))[0];
-  if (!target) throw new Error("project has no screencast scene to narrate");
+  // NO TARGET IS FINE. A booth take IS the speaker (below), and the speaker
+  // lane is FILM-level -- it needs no host scene. `target` is only the scene
+  // that can host the two DECORATIONS: the caption/chapter overlay and the
+  // webcam PiP bubble, both of which are scene-local and both of which are
+  // optional. This used to throw "project has no screencast scene to
+  // narrate", which meant you could not put your own voice over a hype-cut,
+  // an editorial film, or anything else without a screen recording in it --
+  // a caption-offset calculation was gating the audio.
   const startsAt = opts.narrationStartsAt || 0;
   // Narration-file second n == film second n + startsAt; scene-local caption
   // times shift by (scene offset - startsAt).
-  const offset = scenes
-    .slice(0, scenes.indexOf(target))
-    .reduce((sum, s) => sum + (s.duration_seconds || 0), 0) - startsAt;
-  const sceneDur = target.duration_seconds || 0;
+  const offset = target
+    ? scenes
+        .slice(0, scenes.indexOf(target))
+        .reduce((sum, s) => sum + (s.duration_seconds || 0), 0) - startsAt
+    : 0;
+  const sceneDur = target ? target.duration_seconds || 0 : 0;
   const filmDur = scenes.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
   if (Math.abs(narrationDur - (filmDur - startsAt)) > 3) {
     console.log(
@@ -397,7 +406,9 @@ export async function attachBoothNarration(opts: {
   const spine = await getSentenceSpine(resolveVideoPath(narrationSource, opts.dataDir), cacheDir);
   let captionCount = 0;
   let chapterCount = 0;
-  if (spine) {
+  // Captions and chapter cards are scene-local, so they need a host scene.
+  // No host: the narration still becomes the speaker lane below.
+  if (spine && target) {
     const captions = spine.sentences
       .map((s) => ({
         text: s.text,
@@ -448,6 +459,7 @@ export async function attachBoothNarration(opts: {
     const { probeVideo } = await import("../core/video-normalize.js");
     const hasCamera = !!(await probeVideo(resolveVideoPath(narrationSource, opts.dataDir))).videoCodec;
     const takeFile = narrationSource.split("/").pop() || narrationSource;
+    if (!target) throw new Error("no host scene for the PiP"); // caught below
     target.components = (target.components as any[]).filter((c) => c.id !== "booth_pip");
     const me: any = (target as any).media_edits || {};
     for (const k of Object.keys(me)) if (/booth-take/.test(k)) delete me[k];
@@ -521,9 +533,11 @@ export async function attachBoothNarration(opts: {
 
   const parts = [
     `narration ${Math.round(narrationDur)}s attached (picture locked)`,
-    spine
-      ? `spine ${captionCount} captions / ${chapterCount} chapter card(s)`
-      : `no spine (whisper unavailable)`,
+    !target
+      ? `you are the speaker (no screen recording in this film, so no captions or chapter cards -- the voice is the whole overlay)`
+      : spine
+        ? `spine ${captionCount} captions / ${chapterCount} chapter card(s)`
+        : `no spine (whisper unavailable)`,
     musicTitle ? `music bed "${musicTitle}" ducked under narration` : hasBed ? `existing music bed kept` : null,
   ].filter(Boolean);
   return {

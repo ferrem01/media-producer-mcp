@@ -162,9 +162,37 @@ describe("attachBoothNarration", () => {
     ]);
   });
 
-  it("throws on a project with no screencast scene", async () => {
-    const project: any = { project_id: "p", tenant_id: "t", scenes: [{ id: "s1", duration_seconds: 5, components: [{ type: "kinetic-text" }] }] };
-    await expect(attachBoothNarration({ project, narrationSource: "/x.webm" })).rejects.toThrow(/no screencast scene/);
+  // You are the speaker. A booth take is the film's VOICE, and the speaker
+  // lane is film-level -- it no more needs a screen recording than a music bed
+  // does. This used to throw "project has no screencast scene to narrate",
+  // which meant a hype-cut, an editorial film, or any film without a
+  // recording in it could not carry your own voice. The throw was guarding a
+  // caption-offset calculation, not the audio.
+  it("narrates a film with NO screencast in it -- a hype-cut, say", async () => {
+    const project: any = {
+      project_id: "p", tenant_id: "t",
+      scenes: [
+        { id: "s1", duration_seconds: 5, components: [{ type: "kinetic-text" }] },
+        { id: "s2", duration_seconds: 6, components: [{ type: "quotient-chat" }] },
+      ],
+    };
+    const res = await attachBoothNarration({ project, narrationSource: "/assets/t/take.webm" });
+
+    // The voice is the point, and it lands twice: as the audio the render
+    // mixes, and as the speaker lane Studio draws.
+    expect((project.audio as any).tracks[0].id).toBe("narration");
+    expect((project.audio as any).tracks[0].type).toBe("voiceover");
+    expect((project as any).speaker.clips[0].source).toBe("/assets/t/take.webm");
+
+    // Captions and chapter cards are scene-local decorations with nowhere to
+    // live here. They are SKIPPED, and the summary says so rather than
+    // implying a spine was attached.
+    expect(res.captions).toBe(0);
+    expect(res.chapters).toBe(0);
+    expect(res.summary).toContain("you are the speaker");
+    for (const sc of project.scenes) {
+      expect((sc.components || []).some((c: any) => c.type === "narration-track")).toBe(false);
+    }
   });
 
   it("degrades to bare narration when whisper is unavailable", async () => {

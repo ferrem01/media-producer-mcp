@@ -2426,14 +2426,15 @@ export function getPreviewHtml(): string {
         return;
       }
 
-      // Narration booth: offered whenever the film has screencast footage to
-      // narrate over (the attach endpoint needs a screencast scene).
+      // Narration booth: offered on ANY built film. Recording a take makes YOU
+      // the speaker -- the take becomes the film-level speaker lane, which no
+      // more needs a screen recording than a music bed does. It used to be
+      // gated on a screencast-frame component because the attach threw without
+      // one; that throw was guarding a caption-offset calculation, not the
+      // audio, so you could not narrate your own hype-cut.
       var boothBtnEl = document.getElementById('booth-btn');
       if (boothBtnEl) {
-        var hasScreencast = (project.scenes || []).some(function(s) {
-          return (s.components || []).some(function(c) { return c.type === 'screencast-frame'; });
-        });
-        boothBtnEl.style.display = hasScreencast ? '' : 'none';
+        boothBtnEl.style.display = (project.scenes || []).length ? '' : 'none';
       }
       try { booth.script = null; } catch (eBS) {} // re-fetch per project
 
