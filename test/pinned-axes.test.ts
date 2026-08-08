@@ -115,3 +115,49 @@ describe("the active grammar sets the scene budget", () => {
     expect(src).toMatch(/Math\.max\(band\.min, Math\.min\(band\.max, opts\.sceneCount\)\)/);
   });
 });
+
+// A film grammar is a RHYTHM and a visual system is a LOOK; they are chosen
+// independently. The creative director's grammar menu had canvas-tour ending
+// with "Pairs naturally with visual_system {world:'paper', motion:'calm'}",
+// which quietly made one grammar mean one world -- and named that world's
+// components (pen-script, typewriter) while it was at it.
+//
+// The director already has the right instruction in its own schema: choose
+// paper "when the prompt asks for a paper/print/zine/letterpress feel,
+// otherwise omit and the brand decides". The world should follow the USER'S
+// PROMPT, never the grammar they happened to pick.
+describe("the director's grammar menu does not prescribe a look", () => {
+  const grammarMenu = async () => {
+    const src = await read("../src/llm/creative-director.ts");
+    const at = src.indexOf('- "launch-film"');
+    expect(at, "grammar menu not found").toBeGreaterThan(0);
+    // The menu runs to the JSON shape the director is asked to return.
+    const end = src.indexOf('"filmGrammar":', at);
+    return src.slice(at, end > 0 ? end : at + 12000);
+  };
+
+  it("names no visual_system value in any grammar description", async () => {
+    const menu = await grammarMenu();
+    expect(menu, "a grammar is prescribing a world/motion pairing")
+      .not.toMatch(/[Pp]airs naturally with visual_system/);
+    expect(menu, 'a grammar is naming a world value')
+      .not.toMatch(/world:\s*"(paper|light|dark)"/);
+  });
+
+  it("names no world-specific component in any grammar description", async () => {
+    // Same rule as the storyboard-side guard: the parts belong to the world.
+    const menu = await grammarMenu();
+    for (const type of ["pen-script", "sticker-prop", "prop-strike", "para-edit"]) {
+      expect(menu, `the grammar menu names "${type}", which belongs to a world`)
+        .not.toContain(type);
+    }
+  });
+
+  it("still tells the director to pick the world from the PROMPT", async () => {
+    // Removing the coupling must not leave the world unguided -- the schema
+    // line is what makes it a prompt-driven choice rather than a coin flip.
+    const src = await read("../src/llm/creative-director.ts");
+    expect(src).toMatch(/choose it when the prompt asks for/);
+    expect(src).toMatch(/Otherwise omit and the brand decides/);
+  });
+});
