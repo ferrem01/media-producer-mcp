@@ -2150,6 +2150,11 @@ function storyboardToSaved(
       label: s.label,
       purpose: s.purpose || "",
       template: "",
+      // The cast, carried. Dropping it made every templated scene serialize
+      // as an empty one (casting a template also clears `components`), so a
+      // saved storyboard could not answer "what is this film built from?" --
+      // and neither could Studio, the rebuild prompt, or anyone measuring.
+      scene_template: s.scene_template,
       voiceover_text: s.voiceover_text,
       duration_seconds: s.duration_seconds,
       assets: [],

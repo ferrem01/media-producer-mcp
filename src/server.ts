@@ -2920,7 +2920,13 @@ function buildPromptFromStoryboard(storyboard: import("./core/types.js").Storybo
     const s = storyboard.scenes[i];
     prompt += `Scene ${i + 1}: "${s.label}"\n`;
     prompt += `  Purpose: ${s.purpose}\n`;
-    prompt += `  Template: ${s.template}\n`;
+    // `s.template` was always "" -- this line shipped blank on every rebuild.
+    // The real cast is scene_template, and naming it here is what makes an
+    // approved storyboard rebuild into the same film: without it the rebuild
+    // re-decided every scene's composition from the prose alone.
+    if (s.scene_template?.type) {
+      prompt += `  Scene template (KEEP THIS CAST): ${s.scene_template.type} with data ${JSON.stringify(s.scene_template.data || {})}\n`;
+    }
     prompt += `  Duration: ${s.duration_seconds}s\n`;
     if (s.voiceover_text) prompt += `  Voiceover: "${s.voiceover_text}"\n`;
     prompt += `  Visuals: ${s.visual_notes}\n`;

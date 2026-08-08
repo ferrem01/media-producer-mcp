@@ -442,8 +442,19 @@ export interface StoryboardScene {
   label: string;
   /** What this scene communicates */
   purpose: string;
-  /** Scene template ID (e.g. O1, C1, D1) */
+  /** DEAD legacy slot (once an "O1"/"C1"/"D1" id). storyboardToSaved has
+   *  always written "" here and nothing reads it. Use scene_template. */
   template: string;
+  /** The whole-scene template (st-*) this scene was CAST as, with its slot
+   *  data -- assigned by assignSceneTemplates or by the deterministic house
+   *  passes in enforceFilmDirection.
+   *
+   *  This was missing for a long time, and its absence was invisible AND
+   *  actively misleading: casting a template also empties `components`, so a
+   *  templated scene serialized exactly like a scene that got nothing, and
+   *  any attempt to count "how much of this film is templated" from a saved
+   *  storyboard read every template as a codegen fallback. */
+  scene_template?: { type: string; data: Record<string, unknown> };
   /** Voiceover script */
   voiceover_text?: string;
   /** Duration */
