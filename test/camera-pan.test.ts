@@ -1,109 +1,75 @@
 import { describe, it, expect } from "vitest";
-import vm from "node:vm";
-import { cameraMovesScript } from "../src/core/scene-assembler.js";
-import { getPreviewHtml } from "../src/preview-app/preview-app.js";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-// Pan is a PEER effect: independent of zoom at author time, composed at
-// fire time. These tests pin the contract in the generated runtime script
-// (the real behavioral check is a headless GSAP probe -- see AMENDMENTS).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
 
-const canvas = { width: 1920, height: 1080 };
+// The engine has always had a pan: CameraMove.type is "zoom"|"pan"|"rotate"|
+// "reset", the assembler implements it as a peer-effect pure translation, and
+// Studio authors one by hand. The STORYBOARD could not.
+//
+// Its schema described only zoom and reset, and its sanitizer silently dropped
+// everything else -- so a pan the model authored vanished with no error and no
+// log. That is what left canvas-tour without the travel that defines it ("each
+// boundary is a camera TRAVEL to the next PLACE on the surface"), and why the
+// grammar's contract told the writer to put the move in visual_notes as PROSE:
+// a workaround for a closed gate, which nothing downstream reads.
+//
+// The ban on blind RECTS stays -- a rectangle drawn over footage the model
+// cannot see is the invented-callout failure class. That reasoning never
+// applied to a pan, whose focal point sits on a composition the storyboard
+// itself authored.
 
-function scriptFor(moves: any[]): string {
-  return cameraMovesScript(moves as any, canvas, "document.body", "window.__MP_TIMELINE");
-}
-
-describe("peer-effect pan runtime", () => {
-  const pan = [{ at: 2, type: "pan", x: 20, y: 30, duration: 0.8, hold: 1, return: true }];
-
-  it("pan is pure translation resolved at fire time: reads the live scale, never tweens it", () => {
-    const js = scriptFor(pan);
-    // fire-time read of the rig's actual scale (used for math only)...
-    expect(js).toContain("gsap.getProperty(rig.el, 'scaleX')");
-    // ...and the pan tween animates x/y only -- no scale key, no floor
-    const panBranch = js.slice(js.indexOf("PEER-EFFECT pan"), js.indexOf("var to;"));
-    expect(panBranch).not.toContain("scale: function");
-    expect(panBranch).not.toContain("1.4");
+describe("the storyboard can author the pan the engine already had", () => {
+  it("keeps CameraMove.pan as an engine capability, not a new concept", async () => {
+    const types = await read("../src/core/types.ts");
+    expect(types).toMatch(/type:\s*"zoom"\s*\|\s*"pan"\s*\|\s*"rotate"\s*\|\s*"reset"/);
+    const asm = await read("../src/core/scene-assembler.ts");
+    expect(asm, "the assembler must still implement pan").toMatch(/m\.type === 'pan'/);
   });
 
-  it("pan return restores the PRE-PAN position, not wide", () => {
-    const js = scriptFor(pan);
-    expect(js).toContain("pPrior ? pPrior.x : 0");
-    expect(js).toContain("pPrior ? pPrior.y : 0");
+  it("stops dropping pans in the sanitizer", async () => {
+    const src = await read("../src/llm/storyboard-builder.ts");
+    const at = src.indexOf("if (Array.isArray(scene.camera_moves))");
+    expect(at).toBeGreaterThan(0);
+    const body = src.slice(at, at + 1800);
+    expect(body, "pan must survive the filter").toMatch(/\|\|\s*m\.type === "pan"/);
+    // A pan is a focal point in canvas %, clamped -- not an anchor, not a rect.
+    expect(body).toMatch(/m\.type === "pan" \?\s*\{\s*x:\s*pct\(m\.x, 50\), y:\s*pct\(m\.y, 50\)\s*\}/);
+    // Blind rects stay out: nothing may carry w/h through.
+    expect(body).not.toMatch(/\bw:\s*Number\(m\.w\)/);
   });
 
-  it("the old build-time pan floor is gone everywhere", () => {
-    const js = scriptFor(pan);
-    expect(js).not.toContain("Math.max(st.scale, 1.4))");
+  it("does not let a pan carry a scale", async () => {
+    // The engine treats "pan also zooming" as two effects fighting and ignores
+    // scale on a pan outright; emitting it anyway would be misleading data.
+    const src = await read("../src/llm/storyboard-builder.ts");
+    expect(src).toMatch(/m\.scale && m\.type !== "pan"/);
   });
 
-  it("generated camera script is valid JS", () => {
-    const js = scriptFor([
-      { at: 0.5, type: "zoom", scale: 2.5, duration: 0.5, hold: 6, return: true },
-      ...pan,
-    ]);
-    expect(() => new vm.Script(js)).not.toThrow();
-  });
-});
-
-describe("studio pan gesture + parallel lane", () => {
-  const html = getPreviewHtml();
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((x) => x[1]);
-
-  it("studio page script is valid JS (template-literal guard)", () => {
-    expect(scripts.length).toBeGreaterThan(0);
-    for (const s of scripts) expect(() => new vm.Script(s)).not.toThrow();
+  it("tells the model that pan exists", async () => {
+    // The sanitizer accepting pans is useless if the schema never mentions
+    // them -- the model only emits what it is told the shape allows.
+    const src = await read("../src/llm/storyboard-builder.ts");
+    const at = src.indexOf("camera_moves: {");
+    expect(at).toBeGreaterThan(0);
+    const desc = src.slice(at, at + 1400);
+    expect(desc).toMatch(/type:'pan'/);
+    expect(desc, "the model needs the units for x/y").toMatch(/percent of the canvas/);
+    expect(desc, "a pan at 1x is a no-op and the model must know").toMatch(/1x/);
   });
 
-  it("pan is a drag gesture, not a click-to-place", () => {
-    expect(html).toContain("panDragStart");
-    expect(html).not.toContain("panToSelection");
-    // both popovers (element + scene) offer it
-    expect(html.match(/id="rv-pop-pan"/g)?.length).toBe(2);
-  });
-
-  it("pan-inside exists as zoom-inside's sibling", () => {
-    expect(html).toContain("panInsideSelection");
-    expect(html).toContain('id="rv-pop-pan-inside"');
-    // the content rig is the inside target; the scene rig excludes it
-    expect(html).toContain("__mp_camera_rig--content");
-    expect(html).toContain(":not(.__mp_camera_rig--content)");
-  });
-
-  it("a saved drag-pan carries NO scale, and the editor never writes one onto a pan", () => {
-    const m = /var mvU = \{ at: atU, type: 'pan',[^}]*\}/.exec(html);
-    expect(m).toBeTruthy();
-    expect(m![0]).not.toContain("scale");
-    expect(html).toContain("if (next.type === 'pan') delete next.scale;");
-  });
-
-  it("a wide camera refuses the grab with an honest message", () => {
-    expect(html).toContain("nothing to pan");
-  });
-
-  it("pan-inside over a scene zoom falls back to panning the scene camera", () => {
-    // "pan what I see": a scene-zoomed picture is pannable even when the
-    // footage inside the frame isn't magnified.
-    expect(html).toContain("panning the scene camera instead");
-  });
-
-  it("a grab at a zoom block's start rides the zoom from the lane DATA", () => {
-    // The DOM only shows the current instant; a zoom whose window covers
-    // the playhead is pannable even before its ease-in has run. The saved
-    // pan is nudged to start once the zoom settles.
-    expect(html).toContain("zoomInForceAt");
-    expect(html).toContain("afterZoom");
-    expect(html).toContain("the pan starts once it settles");
-  });
-
-  it("the scale reader goes through gsap (matrix3d-proof)", () => {
-    expect(html).toContain("g.getProperty(el, 'scaleX')");
-  });
-
-  it("overlapping effect blocks split the bar height (parallel bars)", () => {
-    expect(html).toContain("placeSegs");
-    expect(html).toContain("fx-thin");
-    // row assignment exists: concurrent blocks get 1/n of the 26px bed
-    expect(html).toContain("26 / s.rows");
+  it("makes canvas-tour author the travel as data, not only as prose", async () => {
+    const src = await read("../src/llm/storyboard-builder.ts");
+    const at = src.indexOf("THE CAMERA IS THE EDIT");
+    expect(at).toBeGreaterThan(0);
+    const law = src.slice(at, at + 1400);
+    expect(law).toMatch(/camera_moves/);
+    expect(law).toMatch(/type:"pan"/);
+    // The prose is still wanted -- it feeds codegen -- but it is no longer the
+    // only place the move exists.
+    expect(law).toMatch(/visual_notes/);
   });
 });

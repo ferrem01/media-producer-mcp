@@ -102,7 +102,7 @@ const SCENE_TOOL_SCHEMA = {
     gen_video: { type: "string", description: "AI-generated video clip prompt -- ONLY for moving shots stock footage cannot plausibly contain (mutually exclusive with broll_query/hero_image)" },
     camera_moves: {
       type: "array",
-      description: "Stage-camera moves on this scene (the ONE camera). ONLY anchored moves are allowed here: {at, type:'zoom', anchor:'componentId.anchorName', scale?, duration?} or {at, type:'reset', duration?}. Anchors come from performable components' CAMERA ANCHORS (e.g. slack-workspace publishes composer, messages, thread-panel -- 'tpl_artifact.composer'). Zoom in while the surface performs, reset before the next thought. Max 4 per scene.",
+      description: "Stage-camera moves on this scene (the ONE camera). Three forms: {at, type:'zoom', anchor:'componentId.anchorName', scale?, duration?} -- anchors come from performable components' CAMERA ANCHORS (e.g. slack-workspace publishes composer, messages, thread-panel -- 'tpl_artifact.composer'); {at, type:'pan', x, y, duration?} -- a TRAVEL to a point on the frame, x/y as percent of the canvas (0-100), pure translation at whatever zoom the camera holds (a pan at 1x has nowhere to go, so pan with a zoom, not instead of one); and {at, type:'reset', duration?}. Zoom in while the surface performs, reset before the next thought. Max 4 per scene.",
       items: {
         type: "object",
         properties: {
@@ -393,7 +393,7 @@ The numbers-as-protagonist dialect: every beat stages a figure, and the figures 
 ${__g("canvas-tour") ? `### CANVAS-TOUR FILMS (${opts.filmGrammar === "canvas-tour" ? "ACTIVE for this film" : 'when the director\'s treatment names "canvas-tour"'})
 The continuous-surface dialect: ONE unbroken shot across a single surface, no cut the viewer can name. Obey this contract exactly:
 - THE SHAPE: 5-9 scenes in 20-40s. Every scene is a PLACE on the same surface -- the same sheet of paper, desk, wall or board runs under all of them and NEVER resets (same world backdrop, same tone, same texture, scene to scene). The film's total motion is one journey across it: begin at one end, arrive at the other.
-- THE CAMERA IS THE EDIT: there are no hard cuts. Each boundary is a camera TRAVEL -- glide, push in, pull back, a slight tilt in transit -- from the beat that just finished to the next place. Write the move in the visual_notes ("the camera keeps panning right past the arrow sticker and arrives on the ledger sheet"). The KINETIC CONTINUITY rules above are not optional here; they are the grammar.
+- THE CAMERA IS THE EDIT: there are no hard cuts. Each boundary is a camera TRAVEL -- glide, push in, pull back -- from the beat that just finished to the next place. AUTHOR IT AS DATA, not only as prose: every scene after the first carries camera_moves, and prose alone leaves the film a stack of cuts on a shared backdrop. A travel is a pan to where the next thing lives, at a zoom that gives it somewhere to go: [{at:0, type:"zoom", anchor:"<the component you are arriving at>", scale:1.4, duration:1.2}, {at:0.1, type:"pan", x:<%>, y:<%>, duration:1.4}] -- x/y are percent of the canvas, so point them at the place on the sheet this beat occupies. A pan at 1x is a deliberate no-op (a wide camera has nowhere to travel), so never pan without holding a zoom. Describe the SAME move in visual_notes too ("the camera keeps panning right past the arrow sticker and arrives on the ledger sheet") -- the prose is for the codegen, the camera_moves are what actually move the camera. The KINETIC CONTINUITY rules above are not optional here; they are the grammar.
 - OPEN MACRO, THEN REVEAL: the first beat is usually a MACRO detail -- a pen mid-stroke, a single inked word, the paper's fibers -- that pulls back over 2-4s to reveal the surface it lives on. The last beat is the only true stop: the camera settles and holds.
 - TYPE IS PERFORMED, NEVER SLAMMED: display text arrives by being MADE. pen-script (short handwritten lines, 1-6 words, written by an unseen pen), typewriter style:"print" (typewriter slab typing itself on the surface), typewriter style:"cli" (a command line typing an instruction), para-edit (a full paragraph that edits ITSELF -- fluff receding into the page while the keepers stay). st-manifesto/st-statement slams belong to other grammars; a word that simply appears is a defect here.
 - ONE ELEMENT CARRIES THE FILM: pick a single physical device (a drawn line, a prop, a sheet, a cursor) that persists across every place and stitches them together. Name it in scene 1 and keep it in frame.
@@ -768,22 +768,36 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
   function normalizeSceneMeta(scene: any): string[] {
     var notes: string[] = [];
 
-    // Camera moves from the LLM: ANCHORED zooms and resets only -- blind
-    // rects are a human-eyes affordance (Studio), an LLM ringing a guessed
-    // rectangle is the invented-callout failure class. Clamp everything.
+    // Camera moves from the LLM: anchored zooms, PANS, and resets. Blind
+    // RECTS stay banned -- a drawn rectangle over footage the model cannot see
+    // is the invented-callout failure class -- but that reasoning never
+    // applied to a pan: its focal point sits on a composition the storyboard
+    // AUTHORED, so it knows where the thing is.
+    //
+    // Dropping pans silently is what left canvas-tour without the travel that
+    // defines it ("each boundary is a camera TRAVEL to the next PLACE"). The
+    // engine has had pan all along -- peer-effect pure translation, the same
+    // move Studio authors by hand -- so the grammar needed the gate opened,
+    // not a new concept invented to get around it.
     if (Array.isArray(scene.camera_moves)) {
       var dur0 = Number(scene.duration_seconds) || 10;
+      var pct = (v: any, d: number) => Math.max(0, Math.min(100, Number(v) != null && isFinite(Number(v)) ? Number(v) : d));
       var cleaned = scene.camera_moves
         .filter((m: any) => m && typeof m === "object")
-        .filter((m: any) => m.type === "reset" || (m.type === "zoom" && typeof m.anchor === "string" && m.anchor.length > 0))
+        .filter((m: any) => m.type === "reset"
+          || (m.type === "zoom" && typeof m.anchor === "string" && m.anchor.length > 0)
+          || m.type === "pan")
         .map((m: any) => ({
           at: Math.max(0, Math.min(dur0 - 0.5, Number(m.at) || 0)),
           type: m.type,
           ...(m.type === "zoom" ? { anchor: String(m.anchor).trim() } : {}),
+          // A pan is a focal point in canvas %, and it ignores scale outright
+          // (the engine treats "pan also zooming" as two effects fighting).
+          ...(m.type === "pan" ? { x: pct(m.x, 50), y: pct(m.y, 50) } : {}),
           // 1.05 floor, not 1.3: a whole-window anchor with a forced 1.3+
           // zoom crops the window's chrome for the length of the move; the
           // subtle push (1.05-1.2) is a legitimate authored choice.
-          ...(m.scale ? { scale: Math.max(1.05, Math.min(2.6, Number(m.scale) || 1.8)) } : {}),
+          ...(m.scale && m.type !== "pan" ? { scale: Math.max(1.05, Math.min(2.6, Number(m.scale) || 1.8)) } : {}),
           duration: Math.max(0.4, Math.min(1.6, Number(m.duration) || 0.9)),
         }))
         .slice(0, 4);
