@@ -376,9 +376,17 @@ ${wrapperChoreoScript(scene.components, scene.duration_seconds)}
   // master deterministically -- captures them frame-accurately instead of
   // letting them free-run and jitter between frames. (The Studio preview is
   // unaffected: it plays the composite document, not this per-scene one.)
+  //
+  // SCRUBBED timelines are exempt. A component played through tweenFromTo
+  // (SETTLED, CARRIED) stays parked on the global timeline while a tween on
+  // the master drives its playhead -- so it looks exactly like an orphan, and
+  // adopting it re-parents it to the master at time 0, silently throwing the
+  // scrub window away. Measured on the carried path: master's children were
+  // the tweenFromTo AND the very timeline it was supposed to be scrubbing, so
+  // the pre-roll had no effect at all and the element still travelled blank.
   try {
     gsap.globalTimeline.getChildren(false, true, true).forEach(function (a) {
-      if (a !== master && a.parent === gsap.globalTimeline) {
+      if (a !== master && a.parent === gsap.globalTimeline && a.data !== '__mp_scrubbed') {
         master.add(a, a.startTime());
       }
     });
@@ -1308,9 +1316,17 @@ ${tagResult.html}
   // master deterministically -- captures them frame-accurately instead of
   // letting them free-run and jitter between frames. (The Studio preview is
   // unaffected: it plays the composite document, not this per-scene one.)
+  //
+  // SCRUBBED timelines are exempt. A component played through tweenFromTo
+  // (SETTLED, CARRIED) stays parked on the global timeline while a tween on
+  // the master drives its playhead -- so it looks exactly like an orphan, and
+  // adopting it re-parents it to the master at time 0, silently throwing the
+  // scrub window away. Measured on the carried path: master's children were
+  // the tweenFromTo AND the very timeline it was supposed to be scrubbing, so
+  // the pre-roll had no effect at all and the element still travelled blank.
   try {
     gsap.globalTimeline.getChildren(false, true, true).forEach(function (a) {
-      if (a !== master && a.parent === gsap.globalTimeline) {
+      if (a !== master && a.parent === gsap.globalTimeline && a.data !== '__mp_scrubbed') {
         master.add(a, a.startTime());
       }
     });
@@ -1866,7 +1882,41 @@ export function buildComponentScript(
   // inside or before the pre-roll and the cut would open on faded content.
   const SETTLE_PRE = 2.2;
   const settled = !!options?.settled && duration <= 2;
-  const ctxDuration = duration;
+
+  // A TRAVELLING ELEMENT MUST NOT TRAVEL EMPTY.
+  //
+  // The wrapper entrance runs from `enter.at` while the component's own
+  // timeline was added at 0, and every component opens on nothing: sticker-prop
+  // holds autoAlpha 0 until data.at (0.4) then throws in over 0.45s, so it is
+  // first visible at ~0.85 -- a hair AFTER an 0.8s slide has already parked it.
+  // Watched on proj_4cd19f8b, and Marc's read of it is exactly right: the
+  // places "may be sliding in from a side, but they're not appearing for a
+  // second or two, so by the time they appear they've already slid in". The
+  // motion was real and invisible, and an invisible entrance is why the slides
+  // read as subtle.
+  //
+  // The fix is a HEAD START, not a delay: give the component's clock a lead so
+  // its own reveal resolves OFF-FRAME and the thing arrives already formed --
+  // the stamp rides in stamped, the type arrives part-written and finishes on
+  // screen. The travel becomes the entrance, which is what the wrapper effect
+  // was always claiming to be.
+  //
+  // Only TRAVELLING effects get this. fade/rise/pop are in-place reveals whose
+  // whole job is to overlap the component's own reveal; pre-rolling those would
+  // just make content pop in fully formed.
+  const TRAVELLING = new Set(["slide-left", "slide-right", "slide-up", "slide-down"]);
+  const enterEff = String((comp as any).enter?.effect || "");
+  // One second clears every component's default lead-in (data.at 0.4 plus a
+  // 0.35-0.55s reveal beat) with margin, and is short enough that a performing
+  // component (typewriter, pen-script) still does most of its work on screen.
+  const CARRY_LEAD = 1.0;
+  // Scenes under ~2.5s cannot spare the tail, and a travelling entrance needs
+  // room to read anyway; `settled` already owns the pre-roll on short cuts.
+  const carryLead = TRAVELLING.has(enterEff) && !settled && duration >= 2.5 ? CARRY_LEAD : 0;
+  // The component authors for the FULL window it is scrubbed across, so its
+  // own exit (authored at ctx.duration - x) still lands x before the cut.
+  const ctxDuration = duration + carryLead;
+
   // Normalize component scripts: strip ES module syntax (illegal outside <script type="module">)
   const normalizedScript = scriptSource
     .replace(/export\s+default\s+function\s+/g, "function ")
@@ -1916,8 +1966,9 @@ ${settled ? `        // SETTLED: play only the [${SETTLE_PRE}, ${SETTLE_PRE + du
         // standing content. tweenFromTo scrubs the child deterministically
         // under the seek-driven master (loops inside keep advancing).
         try {
+          tl_${safeId}.data = '__mp_scrubbed';   // exempt from the orphan-fold below
           master.add(tl_${safeId}.tweenFromTo(${SETTLE_PRE}, ${SETTLE_PRE + duration}, { ease: 'none' }), 0);
-        } catch (eSW_${safeId}) { master.add(tl_${safeId}, 0); }`
+        } catch (eSW_${safeId}) { tl_${safeId}.data = null; master.add(tl_${safeId}, 0); }`
     : `        // MICRO-SHOT compression: component entrances are authored for 4-8s
         // scenes; a sub-1.4s editorial hard cut would spend its whole life
         // mid-entrance (measured: sub-second shots sampled as empty frames).
@@ -1927,7 +1978,15 @@ ${settled ? `        // SETTLED: play only the [${SETTLE_PRE}, ${SETTLE_PRE + du
         if (__dur_${safeId} > 0 && __dur_${safeId} <= 1.4) {
           try { tl_${safeId}.timeScale(Math.max(1, 2.2 / __dur_${safeId})); } catch (eTS_${safeId}) {}
         }
-        master.add(tl_${safeId}, 0);`}
+${carryLead ? `        // CARRIED: this component rides a travelling wrapper entrance, so play
+        // only the [${carryLead}, ${carryLead + duration}] window of its clock -- its own reveal
+        // resolved off-frame and it arrives already formed. Same tweenFromTo
+        // scrub as SETTLED, which is deterministic under the seek-driven master.
+        try {
+          tl_${safeId}.data = '__mp_scrubbed';   // exempt from the orphan-fold below
+          master.add(tl_${safeId}.tweenFromTo(${carryLead}, ${carryLead + duration}, { ease: 'none' }), 0);
+        } catch (eCW_${safeId}) { tl_${safeId}.data = null; master.add(tl_${safeId}, 0); }`
+    : `        master.add(tl_${safeId}, 0);`}`}
       }
     }
   })();`;
