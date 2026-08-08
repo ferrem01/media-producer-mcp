@@ -81,10 +81,18 @@
       chars.appendChild(s);
       spans.push(s);
     });
+    // PRETYPED (same continuation contract as typewriter/retro-post): a
+    // prefix standing from frame one, typing continues from there -- the era
+    // chain carries ONE sentence, and a match-cut into this card must not
+    // restart it. Spans here are per-NON-SPACE-char, so a string prefix is
+    // counted with its spaces stripped.
+    var preSrc = typeof data.pretyped === 'string' ? data.pretyped.replace(/ /g, '').length : Math.floor(Number(data.pretyped) || 0);
+    var pre = Math.max(0, Math.min(spans.length, preSrc));
     spans.forEach(function (s, i) {
-      tl.set(s, { display: 'inline' }, at + i * speed);
+      if (i < pre) { s.style.display = 'inline'; return; }
+      tl.set(s, { display: 'inline' }, at + (i - pre) * speed);
     });
-    var typedEnd = at + spans.length * speed;
+    var typedEnd = at + (spans.length - pre) * speed;
 
     // Submit: the send button presses. Optionally clear the field after.
     var sendAt = data.send_at !== undefined ? Number(data.send_at) : typedEnd + 0.5;
