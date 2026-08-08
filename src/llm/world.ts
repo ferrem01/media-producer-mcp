@@ -68,6 +68,16 @@ function hash31(s: string): number {
 export function deriveWorld(opts: {
   brandKit: BrandKit;
   treatment?: Treatment | null;
+  /** The CALLER's visual_system pin, if they passed one. It outranks the
+   *  treatment, because the treatment only carries a pin if the creative
+   *  director chose to echo it back -- and when it does not, an explicitly
+   *  pinned axis silently disappears. Measured: generate() called with
+   *  visual_system {world:"paper"} produced a mesh-gradient film
+   *  (proj_ecb05e27), because the director's treatment did not repeat the
+   *  world and deriveWorld only ever read the treatment. film_grammar has had
+   *  this precedence all along (caller > director > inference); this is the
+   *  same rule for the look axis. */
+  visualSystem?: { world?: "light" | "dark" | "paper" } | null;
   /** Stable identity for the seed (e.g. `${tenantId}:${prompt.slice(0,80)}`). */
   seedSource: string;
 }): WorldSpec {
@@ -80,7 +90,8 @@ export function deriveWorld(opts: {
 
   // The treatment's TYPED world commitment (visual_system.world -- a caller
   // pin passed through, or the director's own typed choice) wins outright.
-  const pinned = (opts.treatment as any)?.visualSystem?.world as ("light" | "dark" | "paper" | undefined);
+  const pinned = (opts.visualSystem?.world
+    ?? (opts.treatment as any)?.visualSystem?.world) as ("light" | "dark" | "paper" | undefined);
 
   // PAPER WORLD (the print/letterpress aesthetic): the typed pin, or the
   // prose keyword trigger ("paper"/"letterpress"/"newsprint"/"zine") for
