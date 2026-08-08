@@ -1040,9 +1040,60 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
   // Prompt guidance regresses; enforcement doesn't. Fix what code can fix,
   // and print a FILM DIRECTION report so any regression is visible in one
   // glance instead of discovered scene-by-scene in Studio.
-  enforceFilmDirection(scenes);
+  enforceFilmDirection(scenes, { narrative: name });
 
   return { name: name!, scenes } as StoryboardResult;
+}
+
+/** Storyboard labels carry a "Scene 7 — " prefix; the copy never should. */
+function bareLabel(label: string): string {
+  return (label || "").replace(/^\s*scene\s*\d+\s*[-–—:.]\s*/i, "").trim();
+}
+
+/**
+ * Promote an unauthored final CTA scene to the st-logo-close template.
+ *
+ * Deliberately narrow: it fires only on the LAST scene, only when that scene
+ * has neither a template nor any component carrying data, and only when the
+ * scene reads as a CTA/brand close. A final beat that is genuinely something
+ * else is left alone -- this exists to stop codegen inventing the CTA frame,
+ * not to bolt a logo card onto every film.
+ *
+ * Slot copy comes from what the storyboard already wrote: a cta-card staged
+ * anywhere in the film (usually the click beat immediately before the close)
+ * carries the real headline and button text; failing that the film's own
+ * narrative is the tagline and an action-shaped scene label is the pill.
+ * `tagline` is the template's one required slot, so it always gets a value --
+ * a template with holes ships a visibly broken scene, which is worse than
+ * the codegen it replaced.
+ */
+function enforceTemplateClose(scenes: DraftScene[], narrative?: string): void {
+  const last = scenes[scenes.length - 1];
+  if (!last || last.scene_template) return;
+
+  const authored = (last.components || []).some(
+    (c) => typeof c === "object" && c && c.data && Object.keys(c.data).length > 0);
+  if (authored) return;
+
+  const CLOSE_RE = /\b(cta|call to action|book a (demo|call)|get started|sign ?up|free trial|try (it|us)|talk to (us|sales)|wordmark|logo[- ]close|brand close)\b/i;
+  if (!CLOSE_RE.test(`${last.label} ${last.purpose} ${last.visual_notes}`)) return;
+
+  // The CTA copy the film already committed to, wherever it was staged.
+  let card: Record<string, unknown> | undefined;
+  for (const s of scenes) {
+    for (const c of s.components || []) {
+      if (typeof c === "object" && c && c.type === "cta-card" && c.data) card = c.data;
+    }
+  }
+
+  const label = bareLabel(last.label);
+  const tagline = String(card?.description || card?.headline || narrative || label || "").trim();
+  if (!tagline) return;
+  const cta = String(card?.button_text || card?.headline || (/^(book|get|start|try|see|talk|join|sign|request|watch|explore)\b/i.test(label) ? label : "")).trim();
+
+  last.scene_template = { type: "st-logo-close", data: { tagline, ...(cta ? { cta } : {}) } };
+  last.components = [];
+  console.log(`  Film direction: close "${last.label}" had no template -- cast st-logo-close (tagline "${tagline}"${cta ? `, cta "${cta}"` : ""})`);
 }
 
 /**
@@ -1050,10 +1101,11 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
  *  - screencast template scenes in a dark-forward film default to FLOAT
  *  - exactly one world flip: an all-dark template film gets one light pivot
  *    scene (and an all-light one gets a dark pivot) on themable templates
+ *  - an UNAUTHORED closing CTA scene becomes st-logo-close
  *  - report card: templates used, theme sequence, swarm/float/match-cut
  *    counts -- the film's style contract, logged every generation.
  */
-export function enforceFilmDirection(scenes: DraftScene[]): void {
+export function enforceFilmDirection(scenes: DraftScene[], opts?: { narrative?: string }): void {
   const themable = new Set(["st-hero-stat", "st-kinetic-list", "st-screencast", "st-swarm", "st-manifesto", "st-compare", "st-flow", "st-convergence", "st-artifact", "st-chaos-collage"]);
   const tpl = (s: DraftScene) => s.scene_template?.type || null;
   const themeOf = (s: DraftScene): "dark" | "light" | null => {
@@ -1098,6 +1150,22 @@ export function enforceFilmDirection(scenes: DraftScene[]): void {
       console.log(`  Film direction: no world flip -- pivoting "${target.s.label}" to ${data.theme} (one flip is a story beat)`);
     }
   }
+
+  // The close is a template in every grammar's contract -- tempo-cut states it
+  // ("never a freeform CTA composition. A hand-built close is how the one
+  // thing the film asks the viewer to do ends up cut off by the canvas edge"),
+  // hype-cut inherits it, social-reel restates it, editorial allows it
+  // whenever a CTA is required. Six storyboards across three grammars broke it
+  // anyway, and the per-scene template mapper -- which runs on exactly these
+  // scenes -- returned null on every one, including closes whose own
+  // visual_notes read "st-logo-close template scene". Prompt guidance that
+  // regresses this reliably belongs here instead, where enforcement doesn't.
+  //
+  // Only UNAUTHORED closes are taken. A final scene carrying real component
+  // data is a deliberately staged product close (a booking widget, the app
+  // itself) and overwriting it would discard authored work -- the same guard
+  // assignSceneTemplates already applies before it maps any scene.
+  enforceTemplateClose(scenes, opts?.narrative);
 
   // Event rate: a composition that sits still reads as a slide no matter how
   // well the frame is dressed. Count each scene's visual events (setup +
