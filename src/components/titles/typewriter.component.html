@@ -127,14 +127,26 @@
       textArea.style.textAlign = 'left';
     }
 
-    var typeDuration = text.length / speed;
+    // PRETYPED: the first N characters (or the length of a given prefix
+    // string) are standing from frame one, and typing continues from there.
+    // This is what lets a sentence CONTINUE across a boundary or an era flip
+    // -- pen-script writes "Writing has always been", fades, and the
+    // typewriter picks up mid-sentence instead of visibly retyping the part
+    // the viewer just watched being written.
+    var pre = typeof data.pretyped === 'string' ? data.pretyped.length : Math.floor(Number(data.pretyped) || 0);
+    pre = Math.max(0, Math.min(text.length, pre));
+    for (var pi = 0; pi < pre; pi++) spans[pi].style.display = 'inline';
+
+    var remaining = text.length - pre;
+    var typeDuration = remaining / speed;
     var maxTypeDuration = Math.max(ctx.duration * 0.7, ctx.duration - 1.5);
-    if (typeDuration > maxTypeDuration && text.length) {
+    if (typeDuration > maxTypeDuration && remaining) {
       typeDuration = maxTypeDuration;
     }
-    var per = text.length ? typeDuration / text.length : 0;
+    var per = remaining ? typeDuration / remaining : 0;
     spans.forEach(function (sp, i) {
-      tl.set(sp, { display: 'inline' }, at + i * per);
+      if (i < pre) return;
+      tl.set(sp, { display: 'inline' }, at + (i - pre) * per);
     });
     var typedEnd = at + typeDuration;
 

@@ -1,54 +1,59 @@
 {
-  "type": "prop-strike",
-  "label": "Prop Strike (gag card)",
-  "category": "props",
-  "description": "The gag prop: a white card carrying a word or logo gets a hand-drawn X struck through it (the 'we killed ___' joke). Card enters with the house line-rise; the X draws in as two fast strokes and the card takes a little hit. One joke per scene -- pair it with a kinetic-text setup line beside it.",
-  "data": {
-    "text": {
-      "type": "string",
-      "label": "The word on the card (styled like a muted logotype)",
-      "optional": true
-    },
-    "image": {
-      "type": "string",
-      "label": "Image/logo src instead of text",
-      "optional": true
-    },
-    "at": {
-      "type": "number",
-      "label": "When the card rises in (default 0.4)",
-      "optional": true
-    },
-    "strike_at": {
-      "type": "number",
-      "label": "When the X draws (default at + 0.9)",
-      "optional": true
-    },
-    "rotation": {
-      "type": "number",
-      "label": "Card tilt in degrees (default -3)",
-      "optional": true
-    },
-    "ink": {
-      "type": "string",
-      "label": "Stroke color of the X (default near-black #17171c)",
-      "optional": true
-    },
-    "text_color": {
-      "type": "string",
-      "label": "Card text color (default muted logotype grey #a9adb6)",
-      "optional": true
-    },
-    "hold": {
-      "type": "number",
-      "label": "Seconds after the strike before the card fades (0/omit = stays)",
-      "optional": true
-    },
-    "exit_at": {
-      "type": "number",
-      "label": "Fade at this absolute second",
-      "optional": true
-    }
+ "type": "prop-strike",
+ "label": "Prop Strike (gag card)",
+ "category": "props",
+ "description": "The gag prop: a white card carrying a word or logo gets a hand-drawn X struck through it (the 'we killed ___' joke). Card enters with the house line-rise; the X draws in as two fast strokes and the card takes a little hit. One joke per scene -- pair it with a kinetic-text setup line beside it.",
+ "data": {
+  "text": {
+   "type": "string",
+   "label": "The word on the card (styled like a muted logotype)",
+   "optional": true
   },
-  "tier": "animated-prop"
+  "image": {
+   "type": "string",
+   "label": "Image/logo src instead of text",
+   "optional": true
+  },
+  "at": {
+   "type": "number",
+   "label": "When the card rises in (default 0.4)",
+   "optional": true
+  },
+  "strike_at": {
+   "type": "number",
+   "label": "When the X draws (default at + 0.9)",
+   "optional": true
+  },
+  "rotation": {
+   "type": "number",
+   "label": "Card tilt in degrees (default -3)",
+   "optional": true
+  },
+  "ink": {
+   "type": "string",
+   "label": "Stroke color of the X (default near-black #17171c)",
+   "optional": true
+  },
+  "text_color": {
+   "type": "string",
+   "label": "Card text color (default muted logotype grey #a9adb6)",
+   "optional": true
+  },
+  "hold": {
+   "type": "number",
+   "label": "Seconds after the strike before the card fades (0/omit = stays)",
+   "optional": true
+  },
+  "exit_at": {
+   "type": "number",
+   "label": "Fade at this absolute second",
+   "optional": true
+  },
+  "card": {
+   "type": "boolean",
+   "label": "false: no white card -- the strike is ink ON the surface (paper films). Default true keeps the floating card.",
+   "optional": true
+  }
+ },
+ "tier": "animated-prop"
 }

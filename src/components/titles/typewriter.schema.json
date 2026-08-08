@@ -1,49 +1,54 @@
 {
-  "type": "typewriter",
-  "label": "Typewriter",
-  "category": "titles",
-  "description": "Character-by-character type-on with a riding cursor, in three voices: 'glass' (default, the dark glass card), 'print' (ink typewriter slab sitting directly on the world's surface -- the paper-film voice), and 'cli' (a monospace command line with a chevron prompt and block caret -- for typed commands like 'ask quotient to...'). Scrub-safe pre-laid characters.",
-  "data": {
-    "text": {
-      "type": "string",
-      "label": "Text",
-      "required": true
-    },
-    "style": {
-      "type": "string",
-      "label": "glass (default) | print | cli",
-      "optional": true
-    },
-    "speed": {
-      "type": "number",
-      "label": "Characters per second (default 30 glass, 16 print/cli)",
-      "optional": true
-    },
-    "at": {
-      "type": "number",
-      "label": "When typing starts (seconds)",
-      "optional": true
-    },
-    "font_size": {
-      "type": "string",
-      "label": "CSS font-size override (e.g. '64px', '3.4vw')",
-      "optional": true
-    },
-    "prompt": {
-      "type": "string",
-      "label": "cli only: prompt glyph (default ❯)",
-      "optional": true
-    },
-    "hold_cursor": {
-      "type": "boolean",
-      "label": "Blink the cursor after typing completes (default true)",
-      "optional": true
-    },
-    "cursor_color": {
-      "type": "string",
-      "label": "Cursor Color",
-      "optional": true,
-      "placeholder": "#A78BFA"
-    }
+ "type": "typewriter",
+ "label": "Typewriter",
+ "category": "titles",
+ "description": "Character-by-character type-on with a riding cursor, in three voices: 'glass' (default, the dark glass card), 'print' (ink typewriter slab sitting directly on the world's surface -- the paper-film voice), and 'cli' (a monospace command line with a chevron prompt and block caret -- for typed commands like 'ask quotient to...'). Scrub-safe pre-laid characters.",
+ "data": {
+  "text": {
+   "type": "string",
+   "label": "Text",
+   "required": true
+  },
+  "style": {
+   "type": "string",
+   "label": "glass (default) | print | cli",
+   "optional": true
+  },
+  "speed": {
+   "type": "number",
+   "label": "Characters per second (default 30 glass, 16 print/cli)",
+   "optional": true
+  },
+  "at": {
+   "type": "number",
+   "label": "When typing starts (seconds)",
+   "optional": true
+  },
+  "font_size": {
+   "type": "string",
+   "label": "CSS font-size override (e.g. '64px', '3.4vw')",
+   "optional": true
+  },
+  "prompt": {
+   "type": "string",
+   "label": "cli only: prompt glyph (default \u276f)",
+   "optional": true
+  },
+  "hold_cursor": {
+   "type": "boolean",
+   "label": "Blink the cursor after typing completes (default true)",
+   "optional": true
+  },
+  "cursor_color": {
+   "type": "string",
+   "label": "Cursor Color",
+   "optional": true,
+   "placeholder": "#A78BFA"
+  },
+  "pretyped": {
+   "type": "string",
+   "label": "Prefix already standing at frame one (a string -- its length is used -- or a character count); typing continues from there. For continuing a sentence across a boundary or era flip instead of retyping it.",
+   "optional": true
   }
+ }
 }

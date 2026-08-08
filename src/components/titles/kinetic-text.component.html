@@ -5,12 +5,19 @@
 </template>
 
 <style scoped>
-  /* House type system: editorial type gets TWO sanctioned entrances.
+  /* House type system: editorial type gets THREE sanctioned entrances.
      1. line-rise (default): the whole line rises ~10px and fades in.
      2. type-on: words appear IN PLACE in reading order on a fixed interval;
         hidden words take no space, so a centered line reflows as it grows
         (the tempo-cut build-up look). No motion paths, no per-word styling --
-        the only variable is TIME. Emphasis is color only (*stars*). */
+        the only variable is TIME. Emphasis is color only (*stars*).
+     3. assemble: the line is laid out up front and each word FLIES UP into
+        its place from below, staggered; *starred* words land with a scale
+        pop. The print-film gathering beat ("Behind the Craft" 8-10s: the
+        words of the claim rise from the sheet and compose the sentence).
+     And ONE sanctioned exit beyond the default fade: exit:"smear-up" -- the
+     standing words stretch and stream out through the top of frame,
+     staggered, the same film's caused-boundary verb (10-11s). */
   .kinetic-text {
     display: flex;
     align-items: center;
@@ -65,7 +72,38 @@
     var re = /\*([^*]+)\*|([^*]+)/g;
     var m;
 
-    if (data.entrance === 'type-on') {
+    if (data.entrance === 'assemble') {
+      // The line is fully laid out from the first frame (inline-block spans
+      // hold their space), and each word flies UP into place from below.
+      // Deterministic timeline tweens only -- scrub-safe under the
+      // seek-driven master like everything else here.
+      var awords = [];
+      while ((m = re.exec(text)) !== null) {
+        var isAcc = m[1] !== undefined;
+        String(isAcc ? m[1] : m[2]).split(/\s+/).forEach(function (w) {
+          if (w) awords.push({ w: w, accent: isAcc });
+        });
+      }
+      var aAt = data.at !== undefined ? Number(data.at) : 0.3;
+      var aStep = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.12;
+      awords.forEach(function (it, i) {
+        var span = document.createElement('span');
+        if (it.accent) span.className = 'kt-accent';
+        span.textContent = (i > 0 ? ' ' : '') + it.w;
+        span.style.display = 'inline-block';
+        span.style.whiteSpace = 'pre';
+        container.appendChild(span);
+        var when = aAt + i * aStep;
+        gsap.set(span, { y: 90, autoAlpha: 0, rotation: (i % 2 ? 2.5 : -2.5) });
+        tl.to(span, { y: 0, autoAlpha: 1, rotation: 0, duration: 0.55, ease: 'back.out(1.4)' }, when);
+        if (it.accent) {
+          // The key word lands and then GROWS -- the reference's "volume"
+          // swelling as the claim completes.
+          tl.to(span, { scale: 1.22, transformOrigin: '50% 80%', duration: 0.45, ease: 'power2.out' },
+            aAt + awords.length * aStep + 0.35);
+        }
+      });
+    } else if (data.entrance === 'type-on') {
       // Word-by-word build-up. Every word is in the DOM up front but takes
       // no space until its beat, so the line re-centers as it grows. Words
       // APPEAR -- no fade, no travel; scrub-safe (pure tl.set).
@@ -115,9 +153,25 @@
       el.querySelectorAll('.kt-accent').forEach(function (s) { s.style.color = data.accent_color; });
     }
 
-    // Exit: fade only. Nothing floats away.
+    // Exit: fade by default. exit:"smear-up" is the one sanctioned
+    // alternative -- words stretch vertically and stream out the top,
+    // staggered, so the sentence leaves the way ink leaves a page in the
+    // reference film. Runs word-per-word when the entrance built spans;
+    // otherwise the whole container smears as one.
     if (ctx.duration > 2) {
-      tl.to(container, { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, ctx.duration - 0.5);
+      var exitAt = data.exit_at !== undefined ? Number(data.exit_at) : ctx.duration - (data.exit === 'smear-up' ? 0.9 : 0.5);
+      if (data.exit === 'smear-up') {
+        // Per-word only when the entrance built one span per word; line-rise
+        // mixes bare text nodes with accent spans, so it smears as one block.
+        var perWord = data.entrance === 'assemble' || data.entrance === 'type-on';
+        var targets = perWord ? Array.prototype.slice.call(container.children) : [container];
+        targets.forEach(function (t, i) {
+          tl.to(t, { y: -240, scaleY: 1.8, autoAlpha: 0, transformOrigin: '50% 0%',
+            duration: 0.55, ease: 'power2.in' }, exitAt + i * 0.045);
+        });
+      } else {
+        tl.to(container, { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, exitAt);
+      }
     }
 
     return tl;

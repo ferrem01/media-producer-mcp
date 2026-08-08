@@ -49,6 +49,17 @@
     var card = el.querySelector('.pstk-card');
     var textEl = el.querySelector('.pstk-text');
 
+    // card:false -- the strike happens ON the surface, not on a floating
+    // white card. A paper film strikes ink written on the sheet; the card
+    // chrome there reads as an app panel dropped on cream (the exact theme
+    // whiplash the world rules name). Ink defaults follow: warm dark text.
+    if (data.card === false) {
+      card.style.background = 'transparent';
+      card.style.boxShadow = 'none';
+      card.style.borderRadius = '0';
+      textEl.style.color = '#43392c';
+    }
+
     if (data.image) {
       var img = document.createElement('img');
       img.src = data.image;
