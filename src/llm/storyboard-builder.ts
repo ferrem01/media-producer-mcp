@@ -400,6 +400,7 @@ The continuous-surface dialect: ONE unbroken shot across a single surface, no cu
 - QUIET, NOT EMPTY: 55-75% of each frame is bare surface. One idea per place, at generous size. Music is a low bed; the type carries the story.
 - NO VOICEOVER: voiceover_text stays empty -- the performed type IS the voice.
 - OBJECTS, NOT STRINGS: every components[] entry is an OBJECT with type + data. The surface component (paper-ground or the world backdrop) is the first entry of every scene.
+- CAST FROM THE PAPER VOCABULARY -- THE SURFACE IS NOT THE SCENE: a scene whose components are ONLY the backdrop is a dead frame, and describing a proof in visual_notes does not put it on the page. Every place carries a THING, cast from what the library actually has: pen-script for the human's own hand (1-6 words, the opening beat); typewriter style:"print" for anything the system produced, style:"cli" for a commanded line; para-edit when the beat is copy getting better (bloated paragraph -> typed command -> the fluff recedes into the page while the keepers stay full-ink); sticker-prop kind:"stamp" for each artifact LANDING (the letterpress thump -- "BLOG POST", "MON -- BLOG"), kind:"ring" to circle the detail the camera just arrived at, kind:"image" for an illustrated cutout prop; prop-strike for the single struck-through gag. Product-UI mocks (quotient-*, browser-frame, device-*, chat/terminal simulators) belong to the screen grammars: a dark app panel dropped on a cream sheet is exactly the theme whiplash this grammar exists to avoid -- if the beat needs a blog, it is a stamp and a struck headline on the paper, not a browser window.
 ` : ""}
 ${__g("speaker-screencast") ? `### SPEAKER-SCREENCAST FILMS (${opts.filmGrammar === "speaker-screencast" ? "ACTIVE for this film" : "when a speaker recording drives the film"})
 The human on camera owns the film; everything else supports them. The contract:
@@ -1149,6 +1150,23 @@ export function enforceFilmDirection(scenes: DraftScene[]): void {
     if (perEvent > slowest) { slowest = perEvent; slowestLabel = s.label || ""; }
     if (perEvent > 8) {
       console.warn(`  EVENT RATE WARNING: "${s.label}" holds ${dur}s over ${eventsOf(s)} events (${perEvent.toFixed(1)}s/event) -- this reads as a slide; add items/beats or split the scene.`);
+    }
+  }
+
+  // A scene whose only component is the world's surface has nothing ON it.
+  // Measured live (proj_efd519c0, a canvas-tour): scene 5's visual_notes
+  // described a week-grid stamping in cell by cell, and its components were
+  // [paper-ground] -- 6.3s of blank paper. Backdrop-only is invisible to the
+  // template/theme passes above (it IS a legal scene) and codegen does not
+  // rescue it, because a storyboard that authored components is built as an
+  // authored composition. Report it; the repair is a casting decision, not
+  // something code can invent.
+  const BACKDROPS = new Set(["paper-ground", "webgl-backdrop", "mesh-gradient", "gradient-background", "liquid-background", "animated-gradient-text"]);
+  for (const s of scenes) {
+    if (tpl(s) || (s as any).broll_query || (s as any).hero_image) continue;
+    const types = (s.components || []).map((c) => (typeof c === "object" && c ? c.type : c));
+    if (types.length > 0 && types.every((t) => BACKDROPS.has(String(t)))) {
+      console.warn(`  DEAD FRAME WARNING: "${s.label}" carries only the surface (${types.join(", ")}) -- ${s.duration_seconds}s of empty backdrop. Its visual_notes describe content that was never cast.`);
     }
   }
 
