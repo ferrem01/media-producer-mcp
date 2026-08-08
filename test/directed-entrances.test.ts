@@ -153,6 +153,14 @@ describe("the storyboard can reach the choreography", () => {
     const at = src.indexOf('__g("canvas-tour")');
     const laws = src.slice(at, src.indexOf('__g("speaker-screencast")', at));
     expect(laws).toMatch(/THE CONTENT TRAVELS/);
+    // The crossing belongs to the BEAT. Measured on proj_14767f06: the model
+    // read "ONE ELEMENT CARRIES THE FILM" as licence to give the direction to
+    // the carrier alone, so a cursor crossed five scenes of type that never
+    // moved -- an object travelling over a static page, which is the exact
+    // read the grammar exists to avoid.
+    expect(laws).toMatch(/EVERY component in a scene except the surface carries the SAME "enter"/);
+    expect(laws, "the carrier must not be read as the thing that moves")
+      .toMatch(/the carrier does NOT own the direction/);
     expect(laws, "the opposite-edge pairing is the whole trick")
       .toMatch(/exits "slide-left" is arriving from the right/);
     // And it must stop selling the camera as the thing that joins scenes.
