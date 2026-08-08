@@ -214,7 +214,7 @@ export async function assembleScene(options: AssembleOptions): Promise<string> {
     const isBackdrop = BACKDROP_TYPES.has(comp.type);
     componentBlocks.push(
       `  <!-- Component: ${comp.type} (${comp.id}) -->\n` +
-      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ' data-mp-backdrop="1"' : ""} style="${posStyle}">\n` +
+      `  <div class="mp-component" data-cid="${comp.id}"${isBackdrop ? ` data-mp-backdrop="1" data-ctype="${comp.type}"` : ""} style="${posStyle}">\n` +
       `    ${boundHtml}\n` +
       `  </div>`
     );
@@ -725,6 +725,37 @@ export function wrapperChoreoScript(
 `;
 }
 
+/**
+ * How much a backdrop must be oversized to ride INSIDE the camera rig without
+ * its edge ever entering the frame. Focal math (see cameraMovesScript): at
+ * scale s focused on point p, the rig translates by (0.5 - p) * size * s, so
+ * a child spanning (1+2o) * size * s centered keeps the frame covered iff
+ * o >= ((1 + 2|0.5 - p|s) / s - 1) / 2. Pans hold the previously-set zoom,
+ * so the running scale is tracked move to move. Returns null when the moves
+ * demand more than the cap -- the caller then leaves the backdrop parked
+ * outside the rig exactly as before.
+ */
+export function backdropOverscan(moves: import("./types.js").CameraMove[]): number | null {
+  let need = 0;
+  let held = 1;
+  let rotated = false;
+  for (const m of moves) {
+    if (m.type === "reset") { held = 1; continue; }
+    if (m.type === "zoom") held = Math.max(1, Number(m.scale) || 1);
+    if (m.type === "rotate" || m.angle) rotated = true;
+    const s = held;
+    for (const p of [Number(m.x), Number(m.y)]) {
+      if (!isFinite(p)) continue;
+      const off = Math.abs(0.5 - p / 100);
+      const o = ((1 + 2 * off * s) / s - 1) / 2;
+      if (o > need) need = o;
+    }
+  }
+  if (rotated) need += 0.25; // corner excursion bound
+  const withMargin = Math.ceil((need + 0.05) * 20) / 20;
+  return withMargin > 1.2 ? null : withMargin;
+}
+
 export function cameraMovesScript(
   moves: import("./types.js").CameraMove[],
   canvas: { width: number; height: number },
@@ -732,11 +763,41 @@ export function cameraMovesScript(
   timelineExpr: string,
 ): string {
   const movesJson = JSON.stringify(moves);
+  const overscan = backdropOverscan(moves);
   return `
 (function() {
   var moves = ${movesJson};
   if (!moves.length) return;
   var CW = ${canvas.width}, CH = ${canvas.height};
+  // THE WORLD TRAVELS WITH THE CAMERA -- and mostly already did, by accident
+  // of DOM shape. In the single-scene document the components sit inside
+  // .mp-camera, which the rig adopts WHOLE, backdrop included: renders have
+  // been moving the paper all along, with two defects. (1) No overscan, so a
+  // pan/zoom-out can slide the sheet's edge into frame -- masked because the
+  // exposed canvas is the same color as the paper, so the tooth just silently
+  // stops. (2) The composite document (Studio preview) lays wrappers flat and
+  // its rig deliberately PARKS backdrops outside, so Studio showed a still
+  // sheet while the render moved it -- the preview lied about the one thing
+  // that makes a move read as camera ("you can even see the paper moving" --
+  // the reference film, and the whole point).
+  //
+  // Fix for both: a TRAVEL-SAFE surface rides the rig wherever it is, sized
+  // up by OVERSCAN (precomputed from these moves; null = moves wider than
+  // the cap) so its edge never enters frame. Non-travel-safe backdrops keep
+  // their current behaviour on each path.
+  var OVERSCAN = ${overscan === null ? "null" : overscan};
+  var TRAVEL_SAFE = { 'paper-ground': 1 };
+  function stretchWorld(cam) {
+    if (OVERSCAN === null) return;
+    Array.prototype.slice.call(cam.querySelectorAll('[data-mp-backdrop]')).forEach(function (bd) {
+      var ct = bd.getAttribute('data-ctype') || '';
+      if (!TRAVEL_SAFE[ct]) return;
+      var pct = (OVERSCAN * 100).toFixed(1);
+      var span = ((1 + 2 * OVERSCAN) * 100).toFixed(1);
+      bd.style.left = '-' + pct + '%'; bd.style.top = '-' + pct + '%';
+      bd.style.width = span + '%'; bd.style.height = span + '%';
+    });
+  }
   var riggedMedia = [];
   function buildRig(root, target) {
     // Returns { el, box() } or null. box() is the clipping container's rect --
@@ -753,14 +814,24 @@ export function cameraMovesScript(
           var t = n.tagName;
           if (t === 'SCRIPT' || t === 'STYLE') return;
           if (n.id === '__mp_speaker_base') return;
-          // Backdrops stay OUTSIDE the rig: the camera moves the subject,
-          // not the world -- dragging the backdrop exposes the canvas edge.
-          if (n.hasAttribute && n.hasAttribute('data-mp-backdrop')) return;
+          // Flat-laid backdrops (the composite path): a travel-safe surface
+          // now rides the rig -- Studio finally previews the same moving
+          // sheet the render produces. Everything else stays parked outside,
+          // exactly as before.
+          if (n.hasAttribute && n.hasAttribute('data-mp-backdrop')) {
+            var ct = n.getAttribute('data-ctype') || '';
+            if (OVERSCAN !== null && TRAVEL_SAFE[ct]) cam.appendChild(n);
+            return;
+          }
           if (n.classList && n.classList.contains('mp-page-bg')) return;
           if (n.querySelector && n.children.length === 1 && n.firstElementChild && n.firstElementChild.hasAttribute && n.firstElementChild.hasAttribute('data-mp-backdrop')) return;
         }
         cam.appendChild(n);
       });
+      // Whichever path put a travel-safe backdrop inside (flat adoption
+      // above, or riding along inside .mp-camera), give it the overscan its
+      // moves demand so its edge never enters frame.
+      stretchWorld(cam);
       root.appendChild(cam);
       return { el: cam, box: function() { return { width: CW, height: CH, left: 0, top: 0 }; } };
     }
