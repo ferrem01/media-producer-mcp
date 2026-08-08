@@ -31,7 +31,7 @@ import { saveGeneratedComponent } from "../core/component-generator.js";
 import { sceneCompositesOverSpeaker } from "../core/speaker-mode.js";
 import { loadProject, saveProject, createProject } from "../persistence/project.js";
 import { runGrammarPrep, pickMusicMood } from "./grammar-prep.js";
-import { deriveWorld, worldPromptBlock, type WorldSpec } from "./world.js";
+import { deriveWorld, deriveMotionPhysics, worldPromptBlock, type WorldSpec } from "./world.js";
 import { enforceFilmContinuity } from "./continuity.js";
 import { assembleNarratedScreencast } from "./narrated-screencast.js";
 import { loadBrandKit } from "../persistence/brand-kit.js";
@@ -3123,7 +3123,11 @@ async function runUnifiedPipeline(
   // The film's PHYSICS CONTRACT rides along per scene (same shape as
   // `entrance`): the assembler is the only place motion can actually be
   // enforced, and it only ever sees one scene at a time.
-  const motionPhysics = treatment?.visualSystem?.motion;
+  const motionPhysics = deriveMotionPhysics({
+    world,
+    treatment,
+    visualSystem: opts.visual_system as any,
+  });
   for (let si = 0; si < sceneResults.length; si++) {
     const scene = sceneResults[si].scene;
     const draft = storyboard.scenes[si];

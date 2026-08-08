@@ -137,6 +137,37 @@ export function deriveWorld(opts: {
   };
 }
 
+/**
+ * The film's PHYSICS CONTRACT, resolved on the same caller > director >
+ * inference ladder deriveWorld uses. It had neither half: the pipeline read
+ * `treatment.visualSystem.motion` alone, so a caller's `visual_system.motion`
+ * pin vanished whenever the director did not echo it back (the identical bug
+ * the world axis had), and nothing ever inferred one.
+ *
+ * The inference is WITHIN the visual_system axis -- world and motion are two
+ * fields of one look, not two independent axes -- so a paper world defaulting
+ * to stepped physics couples nothing that must stay decoupled. It is the film
+ * grammar that must never reach in here.
+ *
+ * Why paper implies cutout-physics: per the maker of "Behind the Craft" the
+ * print feel is mostly MOTION, not texture -- elements step at 12fps like
+ * stop-motion while the camera glides at full rate, and inked elements carry a
+ * sub-pixel boil. mpStepQuantize/mpInkBoil implement exactly that and fire only
+ * for `cutout-physics`, so every paper film we have shipped ran with the print
+ * feel switched off. An explicit motion pin still wins outright.
+ */
+export function deriveMotionPhysics(opts: {
+  world: WorldSpec;
+  treatment?: Treatment | null;
+  visualSystem?: { motion?: "punchy" | "calm" | "cutout-physics" } | null;
+}): "punchy" | "calm" | "cutout-physics" | undefined {
+  const pinned = opts.visualSystem?.motion
+    ?? (opts.treatment as any)?.visualSystem?.motion;
+  if (pinned) return pinned;
+  if (opts.world.backdrop.component === "paper-ground") return "cutout-physics";
+  return undefined;
+}
+
 /** The scene background color the world implies (authored scenes + templates). */
 export function worldBackground(world: WorldSpec): string {
   if (world.backdrop.component === "paper-ground") return world.surface?.tone || "#f2efe7";
