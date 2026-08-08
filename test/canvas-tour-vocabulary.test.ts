@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { enforceFilmDirection } from "../src/llm/storyboard-builder.js";
+import { worldPromptBlock } from "../src/llm/world.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const read = () => fs.readFile(path.resolve(__dirname, "../src/llm/storyboard-builder.ts"), "utf-8");
@@ -13,16 +14,28 @@ const read = () => fs.readFile(path.resolve(__dirname, "../src/llm/storyboard-bu
 // carousel, an envelope flap with a wax seal, and a week-grid filling cell by
 // cell. None of it was cast.
 //
-// The library was not the problem. The paper world has a real vocabulary --
-// pen-script, typewriter print/cli, para-edit, sticker-prop (stamp/ring/pill/
-// image), prop-strike -- and an earlier storyboard used it well, stamping
-// "BLOG POST" and "MON -- BLOG" onto the sheet.
+// The library was not the problem: the paper world has a real vocabulary and an
+// earlier storyboard used it well. What was missing was anything NAMING that
+// vocabulary -- the catalog is not filtered per film, so all ~177 components
+// reach every call and the long universal casting paragraph sells the screen
+// mocks hard. On a paper world that pull is actively wrong.
 //
-// The contract was. canvas-tour's ONLY component instruction was "the surface
-// component is the first entry of every scene" -- it named the vocabulary for
-// TYPE and never for CONTENT, while tempo-cut and hype-cut carry a long
-// casting paragraph naming ~15 product mocks. Same shape as the
-// OBJECTS-NOT-STRINGS gap: a grammar that cannot say what to cast gets prose.
+// WHERE the naming lives is the load-bearing decision. world and film_grammar
+// are independent axes: a paper film can be tempo-cut or editorial, and a
+// canvas-tour can run on a dark or light world. So the MATERIALS belong to the
+// world, and the grammar only says that every place must carry something.
+// Putting the materials in the grammar would bake a LOOK into a RHYTHM and be
+// wrong every time that grammar ran on a different world.
+
+const paperWorld = {
+  backdrop: { component: "paper-ground" as const, seed: 1, palette: ["#393bf5", "#d48c34"] },
+  theme: "light" as const, chapter_slots: 1,
+  surface: { tone: "#f2efe7", intensity: 0.4 },
+};
+const darkWorld = {
+  backdrop: { component: "webgl-backdrop" as const, seed: 1, palette: ["#393bf5", "#d48c34"] },
+  theme: "dark" as const, chapter_slots: 1,
+};
 
 async function canvasTourLaws(): Promise<string> {
   const src = await read();
@@ -32,69 +45,83 @@ async function canvasTourLaws(): Promise<string> {
   return src.slice(at, end > 0 ? end : at + 6000);
 }
 
-describe("canvas-tour can say what to cast", () => {
-  it("names the paper vocabulary it actually has", async () => {
-    const laws = await canvasTourLaws();
+describe("a world's materials belong to the world, not to a grammar", () => {
+  it("names the paper materials on the paper world", () => {
+    const block = worldPromptBlock(paperWorld);
     for (const type of ["pen-script", "typewriter", "para-edit", "sticker-prop", "prop-strike"]) {
-      expect(laws, `${type} is in the library but the grammar never names it`).toContain(type);
+      expect(block, `${type} is in the library but the paper world never names it`).toContain(type);
     }
-    // The stamp is the letterpress landing -- the film's recurring physical verb.
-    expect(laws).toMatch(/kind:"stamp"/);
+    expect(block).toMatch(/kind:"stamp"/);
   });
 
-  it("says the surface alone is not a scene", async () => {
-    const laws = await canvasTourLaws();
-    expect(laws).toMatch(/THE SURFACE IS NOT THE SCENE/);
-    expect(laws, "prose describing a proof must not count as casting it")
-      .toMatch(/visual_notes does not put it on the page/);
-  });
-
-  it("keeps product-UI mocks out of the paper world", async () => {
+  it("keeps product-UI mocks off the paper", () => {
     // A dark app panel on a cream sheet is the theme whiplash the continuity
     // rules exist to prevent -- and it is what the model reaches for, because
     // the universal casting paragraph names those mocks at length.
+    const block = worldPromptBlock(paperWorld);
+    expect(block).toMatch(/quotient-\*/);
+    expect(block).toMatch(/browser-frame/);
+    expect(block).toMatch(/theme whiplash/);
+  });
+
+  it("says none of that on a world made of something else", () => {
+    // The materials are the PAPER world's, not every world's. A dark film
+    // should hear nothing about letterpress stamps or struck headlines.
+    const block = worldPromptBlock(darkWorld);
+    expect(block).not.toMatch(/pen-script|sticker-prop|prop-strike|letterpress/);
+    // ...while the world block still does its original job.
+    expect(block).toMatch(/Theme: DARK/);
+    expect(block).toMatch(/CHAPTER CARD/);
+  });
+
+  it("leaves canvas-tour saying only that a place must carry something", async () => {
     const laws = await canvasTourLaws();
-    expect(laws).toMatch(/quotient-\*/);
-    expect(laws).toMatch(/browser-frame/);
-    expect(laws).toMatch(/theme whiplash/);
-  });
+    expect(laws).toMatch(/THE SURFACE IS NOT THE SCENE/);
+    expect(laws, "prose describing a thing must not count as casting it")
+      .toMatch(/does not put it on the surface/);
+    // It must point AT the world for the materials rather than listing them.
+    expect(laws).toMatch(/THE WORLD's materials/);
 
-  it("reports a scene that carries only its backdrop", () => {
-    const scene = (o: any) => ({ label: "s", duration_seconds: 6.3, purpose: "", visual_notes: "", components: [], ...o });
+    // The CONTENT vocabulary -- props, stamps, and which mocks are banned --
+    // is the world's business and must not reappear here. (The separate
+    // TYPE IS PERFORMED law does still name the performing-type components;
+    // that one is a genuine rhythm rule -- type arrives by being MADE -- and
+    // predates this split. Worth revisiting, deliberately, not by accident.)
+    expect(laws, "prop vocabulary leaked back into the grammar")
+      .not.toMatch(/sticker-prop|prop-strike/);
+    expect(laws, "which mocks a world rejects is the world's call")
+      .not.toMatch(/quotient-\*|theme whiplash/);
+  });
+});
+
+describe("a scene that carries only its backdrop is reported", () => {
+  const capture = (scenes: any[]) => {
     const warn = console.warn;
     const lines: string[] = [];
     console.warn = (m: any) => { lines.push(String(m)); };
-    try {
-      enforceFilmDirection([
-        scene({ label: "Scene 1 - The Brief", components: [{ type: "paper-ground", data: {} }, { type: "pen-script", data: { text: "go" } }] }),
-        scene({ label: "Scene 5 - The Week Fills In", components: [{ type: "paper-ground", data: {} }] }),
-      ] as any);
-    } finally {
-      console.warn = warn;
-    }
-    const dead = lines.filter((l) => /DEAD FRAME WARNING/.test(l));
-    expect(dead.length, lines.join("\n")).toBe(1);
+    try { enforceFilmDirection(scenes as any); } finally { console.warn = warn; }
+    return lines.filter((l) => /DEAD FRAME WARNING/.test(l));
+  };
+  const scene = (o: any) => ({ label: "s", duration_seconds: 6.3, purpose: "", visual_notes: "", components: [], ...o });
+
+  it("flags the empty place and not the one that cast something", () => {
+    const dead = capture([
+      scene({ label: "Scene 1 - The Brief", components: [{ type: "paper-ground", data: {} }, { type: "pen-script", data: { text: "go" } }] }),
+      scene({ label: "Scene 5 - The Week Fills In", components: [{ type: "paper-ground", data: {} }] }),
+    ]);
+    expect(dead.length).toBe(1);
     expect(dead[0]).toContain("The Week Fills In");
-    expect(dead[0], "the scene that DID cast something must not be flagged").not.toContain("The Brief");
   });
 
-  it("does not flag a templated or footage-led scene", () => {
-    const warn = console.warn;
-    const lines: string[] = [];
-    console.warn = (m: any) => { lines.push(String(m)); };
-    try {
-      enforceFilmDirection([
-        // A template scene legitimately has components: [] -- the template IS
-        // the content, and flagging it would make the warning noise.
-        { label: "T", duration_seconds: 4, purpose: "", visual_notes: "", components: [],
-          scene_template: { type: "st-logo-close", data: { tagline: "x" } } },
-        // Footage carries its own picture.
-        { label: "B", duration_seconds: 5, purpose: "", visual_notes: "", broll_query: "city at dusk",
-          components: [{ type: "mesh-gradient", data: {} }] },
-      ] as any);
-    } finally {
-      console.warn = warn;
-    }
-    expect(lines.filter((l) => /DEAD FRAME WARNING/.test(l))).toEqual([]);
+  it("stays quiet on templated and footage-led scenes", () => {
+    expect(capture([
+      // A template scene legitimately has components: [] -- the template IS the
+      // content, and flagging it would make the warning noise.
+      { label: "T", duration_seconds: 4, purpose: "", visual_notes: "", components: [],
+        scene_template: { type: "st-logo-close", data: { tagline: "x" } } },
+      // Footage carries its own picture.
+      { label: "B", duration_seconds: 5, purpose: "", visual_notes: "", broll_query: "city at dusk",
+        components: [{ type: "mesh-gradient", data: {} }] },
+    ])).toEqual([]);
   });
 });

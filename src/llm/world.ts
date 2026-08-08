@@ -133,11 +133,35 @@ export function worldBackground(world: WorldSpec): string {
 }
 
 /** One compact prompt block describing the world to the storyboard/codegen. */
+/** The MATERIALS a world is made of -- which components can credibly sit on it.
+ *
+ *  This belongs to the world, not to any film grammar. The two axes are
+ *  independent: a paper film can be tempo-cut or editorial, and a canvas-tour
+ *  can run on a dark or light world. Stating a world's vocabulary inside a
+ *  grammar's contract would bake a LOOK into a RHYTHM, and the grammar would
+ *  then be wrong every time it ran on a different world.
+ *
+ *  It exists because the catalog is not filtered per film: all ~177 components
+ *  reach every storyboard call, and the long universal casting paragraph sells
+ *  the screen mocks hard. On a paper world that pull is actively wrong, and
+ *  with nothing naming the paper materials the model cast almost nothing at all
+ *  (measured on proj_efd519c0: scenes carrying paper-ground and one line of
+ *  type, one carrying only the backdrop). */
+function worldMaterials(world: WorldSpec): string | null {
+  if (world.backdrop.component !== "paper-ground") return null;
+  return [
+    `- THE MATERIALS OF THIS WORLD: things printed, written, stamped or struck onto the sheet -- pen-script for a human's own hand (1-6 words), typewriter style:"print" for anything the system produced (style:"cli" for a commanded line), para-edit when the beat is copy getting better (a bloated paragraph, a typed command, the fluff receding into the page while the keepers stay full-ink), sticker-prop kind:"stamp" for an artifact LANDING (the letterpress thump -- "BLOG POST", "MON -- BLOG"), kind:"ring" to circle a detail, kind:"image" for an illustrated cutout, and prop-strike for a struck-through gag.`,
+    `- NOT IN THIS WORLD: product-UI mocks (quotient-*, browser-frame, device-*, chat and terminal simulators). A dark app panel dropped on a cream sheet is exactly the theme whiplash the continuity rules exist to prevent -- if a beat needs a blog, it is a stamp and a struck headline ON the paper, not a browser window floating above it.`,
+  ].join("\n");
+}
+
 export function worldPromptBlock(world: WorldSpec): string {
+  const materials = worldMaterials(world);
   return [
     `THE WORLD (film-level, already decided -- scenes happen INSIDE it):`,
     `- Theme: ${world.theme.toUpperCase()}. Every scene renders on the ${world.theme} world; do NOT invert to ${world.theme === "light" ? "dark" : "light"} for mood.`,
     `- The backdrop is CONTINUOUS across the whole film (${world.backdrop.component}, palette ${world.backdrop.palette.join(", ")}). Scenes do not choose backgrounds; content swaps inside the world.`,
     `- You may spend at most ${world.chapter_slots} CHAPTER CARD: a deliberate full-bleed theme-flip beat (a single word or phrase on the opposite theme) used as punctuation on the film's biggest moment. Everything else stays on-theme.`,
+    ...(materials ? [materials] : []),
   ].join("\n");
 }
