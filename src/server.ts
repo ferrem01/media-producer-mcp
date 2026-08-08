@@ -818,6 +818,7 @@ export function createMcpServer(): McpServer {
       transparent_background: z.union([z.boolean(), z.enum(["true", "false"])]).transform((v) => v === true || v === "true").optional().describe("Speaker films: whether this scene composites OVER the camera (true = transparent, camera shows through -- floating content) or covers it (false = opaque, e.g. a full-frame screencast with the camera only in a PiP). When a speaker_track is set, scenes default to transparent unless this is explicitly false. Set false for an opaque full-frame screencast that should hide the camera base except in its PiP bubble. (Accepts a boolean or the strings \"true\"/\"false\" -- some MCP clients serialize booleans as strings.)"),
       transition_in: transitionSchema,
       entrance: z.enum(["settled", "animated"]).optional().describe("'settled': component entrances are pre-rolled so the cut lands on standing content (editorial fast-cut holds). 'animated' (default) plays entrances normally."),
+      motion_physics: z.enum(["punchy", "calm", "cutout-physics"]).nullable().optional().describe("The scene's physics contract (same shape as entrance -- a film-level fact stamped per scene). 'cutout-physics' steps element motion at 12fps like stop-motion while the camera stays smooth, and adds the sub-pixel ink boil -- most of the print feel on a paper world. Generated films get it from visual_system.motion; hand-built scenes had NO way to switch it on. Pass null to clear."),
       beats: z.array(beatSchema).optional().describe("Replace the scene's beat timeline"),
       content_region: z.object({
         side: z.enum(["left", "right"]),
@@ -1043,6 +1044,11 @@ export function createMcpServer(): McpServer {
           if (params.transparent_background !== undefined) { scene.transparent_background = params.transparent_background; updated = true; }
           if (params.transition_in !== undefined) { scene.transition_in = params.transition_in; updated = true; }
           if (params.entrance !== undefined) { scene.entrance = params.entrance; updated = true; }
+          if (params.motion_physics !== undefined) {
+            if (params.motion_physics === null) delete scene.motion_physics;
+            else scene.motion_physics = params.motion_physics;
+            updated = true;
+          }
           if (params.beats !== undefined) {
             // Normalize against the scene's (possibly just-updated) duration;
             // an empty array clears the beat timeline.
