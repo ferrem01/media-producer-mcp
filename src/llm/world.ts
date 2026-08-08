@@ -147,12 +147,36 @@ export function worldBackground(world: WorldSpec): string {
  *  with nothing naming the paper materials the model cast almost nothing at all
  *  (measured on proj_efd519c0: scenes carrying paper-ground and one line of
  *  type, one carrying only the backdrop). */
+export interface WorldMaterials {
+  /** Component types this world is made of. A film grammar must never name
+   *  these -- the same grammar has to stay true on a different world. The
+   *  grammar-contract test enforces that against this list. */
+  types: string[];
+  text: string;
+}
+
+const SCREEN_KIT: WorldMaterials = {
+  types: ["composer", "kinetic-text", "annotation", "chat-simulator", "ui-terminal-agent"],
+  text: [
+    `- THE MATERIALS OF THIS WORLD: screens and the type that frames them -- composer (the ask being typed), kinetic-text entrance:"type-on" (build-up lines), annotation (narration docked beside a window), and the PRODUCT MOCKS (quotient-*, claude-*, slack-workspace, linkedin-post-card, x-post-card) for anything happening in a real product surface.`,
+    `- GENERIC SIMULATORS ARE A LAST RESORT: chat-simulator and ui-terminal-agent stand in only when the beat happens in no named product. If it happens in Quotient, Claude, Slack, LinkedIn or X, staging the SPECIFIC mock is mandatory -- a no-name chat standing in for a named product is a blocking defect (generic_surface).`,
+  ].join("\n"),
+};
+
+export const WORLD_MATERIALS: Record<string, WorldMaterials> = {
+  "webgl-backdrop": SCREEN_KIT,
+  "mesh-gradient": SCREEN_KIT,
+  "paper-ground": {
+    types: ["pen-script", "typewriter", "para-edit", "sticker-prop", "prop-strike"],
+    text: [
+      `- THE MATERIALS OF THIS WORLD: things printed, written, stamped or struck onto the sheet -- pen-script for a human's own hand (1-6 words), typewriter style:"print" for anything the system produced (style:"cli" for a commanded line), para-edit when the beat is copy getting better (a bloated paragraph, a typed command, the fluff receding into the page while the keepers stay full-ink), sticker-prop kind:"stamp" for an artifact LANDING (the letterpress thump -- "BLOG POST", "MON -- BLOG"), kind:"ring" to circle a detail, kind:"image" for an illustrated cutout, and prop-strike for a struck-through gag.`,
+      `- NOT IN THIS WORLD: product-UI mocks (quotient-*, browser-frame, device-*, chat and terminal simulators). A dark app panel dropped on a cream sheet is exactly the theme whiplash the continuity rules exist to prevent -- if a beat needs a blog, it is a stamp and a struck headline ON the paper, not a browser window floating above it.`,
+    ].join("\n"),
+  },
+};
+
 function worldMaterials(world: WorldSpec): string | null {
-  if (world.backdrop.component !== "paper-ground") return null;
-  return [
-    `- THE MATERIALS OF THIS WORLD: things printed, written, stamped or struck onto the sheet -- pen-script for a human's own hand (1-6 words), typewriter style:"print" for anything the system produced (style:"cli" for a commanded line), para-edit when the beat is copy getting better (a bloated paragraph, a typed command, the fluff receding into the page while the keepers stay full-ink), sticker-prop kind:"stamp" for an artifact LANDING (the letterpress thump -- "BLOG POST", "MON -- BLOG"), kind:"ring" to circle a detail, kind:"image" for an illustrated cutout, and prop-strike for a struck-through gag.`,
-    `- NOT IN THIS WORLD: product-UI mocks (quotient-*, browser-frame, device-*, chat and terminal simulators). A dark app panel dropped on a cream sheet is exactly the theme whiplash the continuity rules exist to prevent -- if a beat needs a blog, it is a stamp and a struck headline ON the paper, not a browser window floating above it.`,
-  ].join("\n");
+  return WORLD_MATERIALS[world.backdrop.component]?.text ?? null;
 }
 
 export function worldPromptBlock(world: WorldSpec): string {
