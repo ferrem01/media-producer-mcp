@@ -75,6 +75,93 @@ async function inkAt(html: string, times: number[]): Promise<number[]> {
   }
 }
 
+/** Wrapper position on the travel axis at each time, camera rig neutralised. */
+async function posAt(html: string, times: number[]): Promise<number[]> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "cross-"));
+  const p = path.join(dir, "scene.html");
+  await fs.writeFile(p, html);
+  const browser = await chromium.launch({
+    ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+  });
+  try {
+    const page: Page = await browser.newPage({ viewport: { width: W, height: H } });
+    await page.goto(`file://${p}`, { waitUntil: "load", timeout: 60_000 });
+    await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 30_000 });
+    const out: number[] = [];
+    for (const t of times) {
+      out.push(await page.evaluate((tt) => {
+        (window as any).__MP_TIMELINE.pause(tt);
+        const cam = document.querySelector(".mp-camera") as HTMLElement | null;
+        const saved = cam ? cam.style.transform : null;
+        if (cam) cam.style.transform = "none";
+        const el = document.querySelector('.mp-component[data-cid="prop"]') as HTMLElement;
+        const x = el.getBoundingClientRect().left;
+        if (cam) cam.style.transform = saved as string;
+        return x;
+      }, t));
+    }
+    return out;
+  } finally {
+    await browser.close();
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+// THE SUBJECT CROSSES, IT NEVER PARKS.
+//
+// A canvas-tour beat was slide in -> stop -> hold four seconds -> slide out.
+// The reference film has no such middle: per its maker, nothing ever comes to
+// a stop, a scene ends while its contents are still travelling and the next
+// opens already in flight. That stop is exactly why our version read as an
+// object sliding rather than a camera arriving -- motion that halts belongs to
+// the thing, motion that only re-frames belongs to the viewer.
+//
+// The data already said crossing. Every scene entered "slide-left" and exited
+// "slide-right": one left-to-right traversal, described in two halves, played
+// with a dead park wedged between them.
+describe("an enter and its opposite exit are one crossing", () => {
+  const DUR = 5;
+  const cross = { enter: { effect: "slide-left" }, exit: { effect: "slide-right" } };
+
+  it("never stops moving, and moves slowest through the middle", async () => {
+    const t = [0.05, 1.2, 2.0, 2.5, 3.0, 3.8, DUR - 0.05];
+    const xs = await posAt(await scene(cross, DUR), t);
+    // Strictly monotonic left-to-right: no frame where it holds position.
+    for (let i = 1; i < xs.length; i++) {
+      expect(xs[i], `went backwards or stalled between ${t[i - 1]}s and ${t[i]}s: ${xs.join(", ")}`)
+        .toBeGreaterThan(xs[i - 1]);
+    }
+    // ...and the middle is the SLOW part -- a pass, not a park. Compare the
+    // rate over the drift against the rate over the approach.
+    const approach = (xs[1] - xs[0]) / (t[1] - t[0]);
+    const drift = (xs[4] - xs[2]) / (t[4] - t[2]);
+    expect(drift, `drift ${drift} was not slower than approach ${approach}`).toBeLessThan(approach / 3);
+    expect(drift, "the middle came to a full stop").toBeGreaterThan(0);
+  }, 300_000);
+
+  it("crosses the frame end to end", async () => {
+    const [start, mid, end] = await posAt(await scene(cross, DUR), [0.02, DUR / 2, DUR - 0.02]);
+    expect(start, "did not start off-frame left").toBeLessThan(0);
+    expect(mid, "was not near centre mid-beat").toBeGreaterThan(0);
+    expect(mid).toBeLessThan(W);
+    expect(end, "did not leave off-frame right").toBeGreaterThan(W * 0.6);
+  }, 300_000);
+
+  it("still parks when the two ends do NOT continue each other", async () => {
+    // Arriving from the left and leaving back to the left is an arrival and a
+    // retreat, not a crossing. Every other grammar's enter/exit pairs keep
+    // today's behaviour exactly.
+    const same = { enter: { effect: "slide-left", duration: 0.8 }, exit: { effect: "slide-left", duration: 0.8 } };
+    const [home, mid] = await posAt(await scene(same, DUR), [2, 3]);
+    expect(Math.abs(mid - home), "a same-direction pair should rest at home").toBeLessThan(2);
+  }, 300_000);
+
+  it("leaves a lone enter alone", async () => {
+    const [mid, end] = await posAt(await scene({ enter: { effect: "slide-left" } }, DUR), [2, DUR - 0.05]);
+    expect(Math.abs(end - mid), "an enter with no exit should stay put").toBeLessThan(2);
+  }, 300_000);
+});
+
 describe("a component carried by a travelling entrance arrives already formed", () => {
   it("is still blank at the top of the scene with no entrance", async () => {
     // The baseline the bug was made of: nothing on screen for the first beat.

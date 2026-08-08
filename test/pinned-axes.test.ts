@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { deriveWorld } from "../src/llm/world.js";
+import { deriveWorld, deriveMotionPhysics } from "../src/llm/world.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
@@ -66,6 +66,57 @@ describe("a caller's visual_system pin outranks the treatment", () => {
     const at = src.indexOf("const world = deriveWorld({");
     expect(at).toBeGreaterThan(0);
     expect(src.slice(at, at + 400)).toMatch(/visualSystem: opts\.visual_system/);
+  });
+});
+
+// The motion field of visual_system had BOTH halves missing. The pipeline read
+// treatment.visualSystem.motion alone, so a caller's pin vanished whenever the
+// director did not echo it back -- the identical bug the world axis had -- and
+// nothing ever inferred one.
+//
+// The consequence was silent and total: mpStepQuantize (12fps element stepping
+// against a smooth camera) and mpInkBoil fire only for `cutout-physics`, and
+// per the maker of "Behind the Craft" that stepping is most of the print feel
+// -- more than the paper texture. Every paper film we shipped ran with it off.
+//
+// The inference lives INSIDE the visual_system axis: world and motion are two
+// fields of one look, so paper implying stepped physics couples nothing that
+// has to stay decoupled. It is the FILM GRAMMAR that must never reach in here.
+describe("the film's physics contract resolves on the same ladder as the world", () => {
+  const paper = { backdrop: { component: "paper-ground" } } as any;
+  const screen = { backdrop: { component: "mesh-gradient" } } as any;
+
+  it("takes the caller's pin over everything", () => {
+    expect(deriveMotionPhysics({
+      world: paper,
+      treatment: { visualSystem: { motion: "calm" } } as any,
+      visualSystem: { motion: "punchy" },
+    })).toBe("punchy");
+  });
+
+  it("lets an explicit pin override the paper inference", () => {
+    expect(deriveMotionPhysics({ world: paper, visualSystem: { motion: "calm" } })).toBe("calm");
+  });
+
+  it("takes the director's choice when the caller pinned nothing", () => {
+    expect(deriveMotionPhysics({
+      world: screen, treatment: { visualSystem: { motion: "punchy" } } as any,
+    })).toBe("punchy");
+  });
+
+  it("infers cutout-physics on paper when nobody pinned anything", () => {
+    expect(deriveMotionPhysics({ world: paper })).toBe("cutout-physics");
+  });
+
+  it("infers nothing on a screen world -- today's behaviour, unchanged", () => {
+    expect(deriveMotionPhysics({ world: screen })).toBeUndefined();
+  });
+
+  it("is actually wired at the call site", async () => {
+    const src = await read("../src/llm/pipeline.ts");
+    const at = src.indexOf("const motionPhysics = deriveMotionPhysics({");
+    expect(at, "the pipeline still reads the treatment directly").toBeGreaterThan(0);
+    expect(src.slice(at, at + 220)).toMatch(/visualSystem: opts\.visual_system/);
   });
 });
 

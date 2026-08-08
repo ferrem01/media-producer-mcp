@@ -657,6 +657,22 @@ export function wrapperChoreoScript(
                 'slide-up': { y: '-115%' }, 'slide-down': { y: '115%' },
                 'rise': { y: 60, autoAlpha: 0 }, 'pop': { scale: 0.72, autoAlpha: 0 },
                 'fade': { autoAlpha: 0 } };
+    // A TRAVERSAL is an enter and an exit that CONTINUE each other: arriving
+    // from the left and leaving to the right is one crossing described in two
+    // halves, and playing it as enter -> park -> exit inserts a dead middle
+    // that nothing in the reference film has. Jake Moran's rule for "Behind
+    // the Craft" is that nothing ever comes to a stop -- a scene ends while
+    // its contents are still travelling and the next opens already in flight.
+    // That stop is what makes our version read as an object that slid in
+    // rather than a camera that arrived: motion which halts belongs to the
+    // thing, motion which only re-frames belongs to the viewer.
+    //
+    // So when the two ends oppose, the subject CROSSES the frame in one move:
+    // a quick approach, a long slow pass through the middle where the beat is
+    // performed and read, a quick departure. That is a camera panning past a
+    // subject, and it is the same data -- no new field, no new concept.
+    var OPPOSITE = { 'slide-left': 'slide-right', 'slide-right': 'slide-left',
+                     'slide-up': 'slide-down', 'slide-down': 'slide-up' };
     CHOREO.forEach(function(c) {
       var el = document.querySelector('.mp-component[data-cid="' + c.cid + '"]');
       if (!el) return;
@@ -667,7 +683,30 @@ export function wrapperChoreoScript(
           transformPerspective: 1100,
         });
       }
-      if (c.enter) {
+      var traverses = c.enter && c.exit && OPPOSITE[c.enter.effect] === c.exit.effect;
+      if (traverses) {
+        var axis = (c.enter.effect === 'slide-up' || c.enter.effect === 'slide-down') ? 'y' : 'x';
+        var fromV = parseFloat(OFF[c.enter.effect][axis]);
+        var toV = parseFloat(OFF[c.exit.effect][axis]);
+        // The pass stays NEAR centre rather than sitting on it: a few percent
+        // of continuous drift is what keeps the subject alive without walking
+        // it out of the composition.
+        var d0 = (fromV < 0 ? -1 : 1) * 5, d1 = -d0;
+        // Fixed approach/departure rather than a fraction of the scene, so a
+        // long beat spends its extra time DRIFTING (the part that reads) and
+        // the frame is never sparse for more than ~0.8s at either end.
+        var pIn = Math.min(0.8, DUR * 0.2), pOut = Math.min(0.8, DUR * 0.2);
+        var pMid = Math.max(0.1, DUR - pIn - pOut);
+        var mk = function(v, dur, ease) {
+          var o = { duration: dur, ease: ease, autoAlpha: 1 }; o[axis] = v + '%'; return o;
+        };
+        var start = { autoAlpha: 1 }; start[axis] = fromV + '%';
+        master.fromTo(el, start, Object.assign(mk(d0, pIn, 'power2.out'),
+          { immediateRender: true }), 0)
+          .to(el, mk(d1, pMid, 'none'), pIn)
+          .to(el, mk(toV, pOut, 'power2.in'), pIn + pMid);
+      }
+      if (c.enter && !traverses) {
         var eFrom = OFF[c.enter.effect] || OFF['fade'];
         var eAt = c.enter.at || 0;
         var eDur = c.enter.duration || 0.8;
@@ -675,7 +714,7 @@ export function wrapperChoreoScript(
           { x: 0, y: 0, scale: 1, autoAlpha: 1, duration: eDur,
             ease: c.enter.ease || 'power3.out', immediateRender: true }, eAt);
       }
-      if (c.exit) {
+      if (c.exit && !traverses) {
         var xTo = OFF[c.exit.effect] || OFF['fade'];
         var xDur = c.exit.duration || 0.8;
         var xAt = c.exit.at != null ? c.exit.at : Math.max(0, DUR - xDur - 0.1);
