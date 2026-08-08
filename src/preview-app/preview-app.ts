@@ -3734,8 +3734,12 @@ export function getPreviewHtml(): string {
       var comps = s.components || [];
       if (comps.length || s.template || s.scene_template) {
         h += '<div class="dv-chips">';
-        var tpl = s.scene_template || s.template;
-        if (tpl) h += '<span class="dv-chip">' + escHtml('template: ' + tpl) + '</span>';
+        // scene_template is {type, data}; s.template is the dead legacy
+        // string. This branch was written before the field was ever
+        // populated, so the object path had never actually rendered -- it
+        // would have printed "template: [object Object]".
+        var tpl = (s.scene_template && s.scene_template.type) || s.template;
+        if (tpl) h += '<span class="dv-chip dv-chip-tpl">' + escHtml('template: ' + tpl) + '</span>';
         comps.forEach(function(c) { h += draftChip(c); });
         h += '</div>';
       }
