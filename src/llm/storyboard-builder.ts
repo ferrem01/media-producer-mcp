@@ -67,6 +67,8 @@ const SCENE_TOOL_SCHEMA = {
             properties: {
               type: { type: "string", description: "Library component type from the catalog" },
               data: { type: "object", description: "The component's data payload. For a 🎬 Scriptable (performable) component this MUST include script: [{action, at, ...params}] -- the timed interaction sequence that makes the surface PERFORM the scene's beats (type-message at 0.5, tool-call at 2.1, respond at 6.0...). Use the component's documented script actions; land actions near beat boundaries." },
+              enter: { type: "string", description: "How this component ENTERS the frame: slide-left | slide-right | slide-up | slide-down | rise | pop | fade. Use the slides to carry momentum across a cut -- a thing that left the previous scene frame-right enters this one from frame-left, so the boundary reads as one continuous move instead of a cut." },
+              exit: { type: "string", description: "How this component LEAVES the frame, same vocabulary. Give the outgoing element an exit whenever the next scene should feel like it continues this one; a scene that stops dead and fades is the slideshow tell." },
             },
             required: ["type"],
           },
@@ -197,7 +199,16 @@ export interface DraftScene {
    *  data). Object = storyboard-authored data; for performable (🎬 Scriptable)
    *  surfaces data.script carries the timed interaction sequence the surface
    *  plays on screen. */
-  components: Array<string | { type: string; data?: Record<string, unknown> }>;
+  components: Array<string | {
+    type: string;
+    data?: Record<string, unknown>;
+    /** Directed entrance/exit run by the stage choreography (slide-left,
+     *  slide-right, slide-up, slide-down, rise, pop, fade). This is what makes
+     *  a cut read as continuous: the camera rig is rebuilt per scene, so only
+     *  content momentum can cross a boundary. */
+    enter?: string | { effect: string; at?: number; duration?: number; stagger?: number; ease?: string };
+    exit?: string | { effect: string; at?: number; duration?: number; stagger?: number; ease?: string };
+  }>;
   /** Whole-scene composition template (st-*): when set, the scene is
    *  INSTANTIATED from the template with this slot data -- no codegen. The
    *  professional-composition path; prefer it whenever a template fits. */
@@ -401,7 +412,8 @@ The numbers-as-protagonist dialect: every beat stages a figure, and the figures 
 ${__g("canvas-tour") ? `### CANVAS-TOUR FILMS (${opts.filmGrammar === "canvas-tour" ? "ACTIVE for this film" : 'when the director\'s treatment names "canvas-tour"'})
 The continuous-surface dialect: ONE unbroken shot across a single surface, no cut the viewer can name. Obey this contract exactly:
 - THE SHAPE: 5-9 scenes in 20-40s. Every scene is a PLACE on the same surface -- the same sheet of paper, desk, wall or board runs under all of them and NEVER resets (same world backdrop, same tone, same texture, scene to scene). The film's total motion is one journey across it: begin at one end, arrive at the other.
-- THE CAMERA IS THE EDIT: there are no hard cuts. Each boundary is a camera TRAVEL -- glide, push in, pull back -- from the beat that just finished to the next place. AUTHOR IT AS DATA, not only as prose: every scene after the first carries camera_moves, and prose alone leaves the film a stack of cuts on a shared backdrop. A travel is a pan to where the next thing lives, at a zoom that gives it somewhere to go: [{at:0, type:"zoom", anchor:"<the component you are arriving at>", scale:1.4, duration:1.2}, {at:0.1, type:"pan", x:<%>, y:<%>, duration:1.4}] -- x/y are percent of the canvas, so point them at the place on the sheet this beat occupies. A pan at 1x is a deliberate no-op (a wide camera has nowhere to travel), so never pan without holding a zoom. Describe the SAME move in visual_notes too ("the camera keeps panning right past the arrow sticker and arrives on the ledger sheet") -- the prose is for the codegen, the camera_moves are what actually move the camera. The KINETIC CONTINUITY rules above are not optional here; they are the grammar.
+- THE CONTENT TRAVELS, AND THAT IS THE EDIT: there are no hard cuts, and the illusion is built by SUBJECTS moving through the frame -- not by the camera. The stage camera is rebuilt for every scene, so it cannot carry anything across a boundary; only content can. AUTHOR THE DIRECTION AS DATA on each component, never only as prose: the outgoing element gets an "exit" and the incoming element of the NEXT scene gets the matching "enter" from the opposite edge, so the two beats read as one continuous move. Something that exits "slide-left" is arriving from the right, so the next scene's subject enters "slide-right"; up pairs with down. Example -- scene N: {"type":"<the thing leaving>","data":{...},"exit":"slide-left"}, then scene N+1: {"type":"<the thing arriving>","data":{...},"enter":"slide-right"}. (Cast the actual types from THE WORLD's materials -- the DIRECTION is this grammar's business, the PARTS are the world's.) Vocabulary: slide-left, slide-right, slide-up, slide-down (the travelling ones), plus rise, pop, fade. Every scene after the first has at least one component with an "enter", and every scene before the last has at least one with an "exit" -- a beat that stops dead and fades is the slideshow tell. Say the same move in visual_notes as well, for the codegen. The KINETIC CONTINUITY rules above are not optional here; they are the grammar.
+- THE CAMERA IS THE DEPTH, NOT THE EDIT: camera_moves are optional here and work only INSIDE a beat -- a slow push into the thing that just landed, a pull-back that reveals the sheet. They cannot join two scenes. A pan is pure translation at whatever zoom the camera holds, so a pan at 1x moves nothing: never pan without holding a zoom.
 - OPEN MACRO, THEN REVEAL: the first beat is usually a MACRO detail -- a pen mid-stroke, a single inked word, the paper's fibers -- that pulls back over 2-4s to reveal the surface it lives on. The last beat is the only true stop: the camera settles and holds.
 - TYPE IS PERFORMED, NEVER SLAMMED: display text arrives by being MADE -- written, struck, typed or commanded into being ON the surface, one short line at a time, while the viewer watches it happen. A word that simply appears (faded up, slammed in, scaled on) is a defect here, and st-manifesto/st-statement slams belong to other grammars. WHICH performers are available is the world's call, not this grammar's -- cast them from THE WORLD's materials named above.
 - ONE ELEMENT CARRIES THE FILM: pick a single physical device (a drawn line, a prop, a sheet, a cursor) that persists across every place and stitches them together. Name it in scene 1 and keep it in frame.
@@ -796,8 +808,15 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
       .map((c: any) => {
         if (typeof c === "string") return c;
         if (c && typeof c.type === "string" && c.type.length > 0) {
+          // enter/exit ride ALONGSIDE data, not inside it -- dropping them
+          // here would have killed directed entrances at the same seam that
+          // once killed scripted performances.
+          const dir = {
+            ...(c.enter ? { enter: c.enter } : {}),
+            ...(c.exit ? { exit: c.exit } : {}),
+          };
           return (c.data && typeof c.data === "object" && Object.keys(c.data).length > 0)
-            ? { type: c.type, data: c.data }
+            ? { type: c.type, data: c.data, ...dir }
             : c.type;
         }
         return "";

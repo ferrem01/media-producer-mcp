@@ -49,15 +49,17 @@ describe("the storyboard can author the pan the engine already had", () => {
     expect(desc, "a pan at 1x is a no-op and the model must know").toMatch(/1x/);
   });
 
-  it("makes canvas-tour author the travel as data, not only as prose", async () => {
+  it("tells canvas-tour the camera adds depth but cannot join two scenes", async () => {
+    // This assertion used to demand the OPPOSITE -- that canvas-tour author
+    // its boundary travel as camera_moves. That was wrong: .mp-camera is
+    // rebuilt per scene, so camera state cannot cross a boundary at all. Only
+    // content momentum can, which is what the grammar now asks for. The camera
+    // is still worth having, just for depth INSIDE a beat.
     const src = await read("../src/llm/storyboard-builder.ts");
-    const at = src.indexOf("THE CAMERA IS THE EDIT");
+    const at = src.indexOf("THE CAMERA IS THE DEPTH, NOT THE EDIT");
     expect(at).toBeGreaterThan(0);
-    const law = src.slice(at, at + 1400);
-    expect(law).toMatch(/camera_moves/);
-    expect(law).toMatch(/type:"pan"/);
-    // The prose is still wanted -- it feeds codegen -- but it is no longer the
-    // only place the move exists.
-    expect(law).toMatch(/visual_notes/);
+    const law = src.slice(at, at + 700);
+    expect(law).toMatch(/cannot join two scenes/);
+    expect(law, "the no-op is the trap worth naming").toMatch(/pan at 1x moves nothing/);
   });
 });
