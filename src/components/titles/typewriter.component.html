@@ -105,6 +105,28 @@
       typedText.appendChild(sp);
       spans.push(sp);
     }
+    // THE CARRIAGE IS FIXED. Hidden characters collapse to zero width (that is
+    // what lets the cursor ride the typing frontier), so in a box sized by its
+    // content the line grows in BOTH directions and every character already
+    // typed slides left as the next one lands -- measured at 167px of slide on
+    // a 20-character line. On screen it reads as text shuffling in place, not
+    // as a line being typed out.
+    //
+    // Reserve the FINISHED line's width up front and left-align inside it: the
+    // block still sits wherever the composition puts it (centred, docked,
+    // wherever the scene positioned the component), but it can no longer grow,
+    // so the origin never moves and the line types rightward like a carriage.
+    // offsetWidth is used deliberately -- it is layout px and ignores the
+    // .mp-camera Ken Burns transform, which getBoundingClientRect would fold in.
+    spans.forEach(function (sp) { sp.style.display = 'inline'; });
+    var reserved = textArea.offsetWidth;
+    spans.forEach(function (sp) { sp.style.display = ''; });
+    if (reserved) {
+      textArea.style.boxSizing = 'border-box';
+      textArea.style.minWidth = reserved + 'px';
+      textArea.style.textAlign = 'left';
+    }
+
     var typeDuration = text.length / speed;
     var maxTypeDuration = Math.max(ctx.duration * 0.7, ctx.duration - 1.5);
     if (typeDuration > maxTypeDuration && text.length) {
