@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { WORLD_MATERIALS } from "../src/llm/world.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const read = () => fs.readFile(path.resolve(__dirname, "../src/llm/storyboard-builder.ts"), "utf-8");
@@ -34,7 +35,13 @@ async function sections(): Promise<{ universal: string; byGrammar: Record<string
   expect(marks.length, "every grammar should be gated").toBe(GRAMMARS.length);
   const byGrammar: Record<string,string> = {};
   marks.forEach((m, i) => {
-    byGrammar[m.g] = src.slice(m.at, i + 1 < marks.length ? marks[i + 1].at : src.length);
+    // Each section is `${__g("x") ? `### ...` : ""}` -- bound it at its OWN
+    // terminator, not at the next section. Slicing the last one to end-of-file
+    // swept the universal tail into it, which inflated its law count and made
+    // the material guard blame it for text it does not contain.
+    const term = src.indexOf('` : ""}', m.at);
+    const next = i + 1 < marks.length ? marks[i + 1].at : src.length;
+    byGrammar[m.g] = src.slice(m.at, term > 0 && term < next ? term : next);
   });
   return { universal: src.slice(0, marks[0].at), byGrammar };
 }
@@ -90,5 +97,76 @@ describe("grammar contracts: only the active one ships", () => {
       "either they are genuinely universal (promote them) or the wording is " +
       "coincidental (rename so this guard stays meaningful)",
     ).toEqual([]);
+  });
+});
+
+// A film grammar answers ONE question -- what carries the argument -- and states
+// the editing logic that follows: the protagonist, the cut logic, the beat
+// structure, and the refusals that protect the protagonist. It does not decide
+// what things are MADE of. film_grammar and visual_system are independent axes,
+// so a grammar that names a world's components is wrong every time it runs on a
+// different world.
+//
+// That was not theoretical. canvas-tour's TYPE IS PERFORMED law demanded
+// pen-script, typewriter and para-edit -- paper materials -- so running it on a
+// dark world asked for cursive ink on a WebGL backdrop. The principle (type
+// arrives by being MADE, never slammed) is real grammar; the performers were
+// the world's. They are split now, and this guard is what keeps them split.
+
+describe("grammars do not name a world's materials", () => {
+  it("states the definition the grammars have to answer to", async () => {
+    const src = await read();
+    expect(src).toMatch(/### WHAT A FILM GRAMMAR IS/);
+    expect(src).toMatch(/WHAT CARRIES THE ARGUMENT/);
+    // The swap test is the operative part -- it is how the next law gets placed.
+    expect(src).toMatch(/still be true after swapping the world/);
+    expect(src, "the sound-drives-the-cut exception has to survive, or tempo-cut's music grid and speaker-screencast's voice clock read as misplaced")
+      .toMatch(/sound drives the cut/);
+  });
+
+  it("keeps every world-owned component type out of every grammar section", async () => {
+    const { byGrammar } = await sections();
+    const owned = Object.entries(WORLD_MATERIALS).flatMap(([world, m]) =>
+      m.types.map((t) => ({ world, type: t })));
+    expect(owned.length, "no world declares materials -- this guard would be vacuous").toBeGreaterThan(0);
+
+    // Debt, not permission. These predate the split and are listed one by one
+    // so the size of the problem stays visible; the guard's job is to stop the
+    // list GROWING. Clearing it means moving each component name into
+    // WORLD_MATERIALS and leaving the grammar stating the principle -- but that
+    // is a four-grammar rewrite of load-bearing casting guidance, and removing
+    // casting guidance is exactly what regressed editorial when the grammar
+    // sections were first gated. It gets done deliberately, with generations to
+    // check it, not as a drive-by. Tracked as its own task.
+    const KNOWN_LEAKS = new Set([
+      "tempo-cut:composer", "tempo-cut:kinetic-text", "tempo-cut:annotation",
+      "social-reel:composer", "social-reel:kinetic-text",
+      "data-story:kinetic-text", "data-story:annotation",
+      "speaker-screencast:annotation",
+    ]);
+
+    const found = new Set<string>();
+    for (const [g, body] of Object.entries(byGrammar)) {
+      for (const { type } of owned) {
+        if (new RegExp(`\\b${type.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(body)) {
+          found.add(`${g}:${type}`);
+        }
+      }
+    }
+
+    const fresh = [...found].filter((k) => !KNOWN_LEAKS.has(k));
+    expect(
+      fresh,
+      "a grammar is naming components that belong to one world -- it will be wrong " +
+      "the moment that grammar runs somewhere else. Move the component names into " +
+      "WORLD_MATERIALS and leave the grammar stating the PRINCIPLE (what must " +
+      "happen), not the parts (what to use). If the law is genuinely about the " +
+      "edit, reword it so it survives a change of world.",
+    ).toEqual([]);
+
+    // ...and the debt list may not rot: an entry that no longer leaks has been
+    // fixed, and leaving it here would quietly re-open the hole it covered.
+    const stale = [...KNOWN_LEAKS].filter((k) => !found.has(k));
+    expect(stale, "these leaks are fixed -- delete them from KNOWN_LEAKS").toEqual([]);
   });
 });
