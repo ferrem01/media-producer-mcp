@@ -2489,6 +2489,9 @@ async function runUnifiedPipeline(
   const world = deriveWorld({
     brandKit,
     treatment,
+    // The caller's pin outranks the treatment: the director does not always
+    // echo visual_system back, and when it does not, a pinned axis vanished.
+    visualSystem: opts.visual_system as any,
     seedSource: `${opts.tenant_id}:${(treatment?.concept || richPrompt).slice(0, 80)}`,
   });
   console.log(`  World: ${world.theme} / ${world.backdrop.component} seed=${world.backdrop.seed} palette=[${world.backdrop.palette.join(",")}]`);

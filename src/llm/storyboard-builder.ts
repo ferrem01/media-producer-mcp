@@ -237,14 +237,52 @@ export interface StoryboardResult {
 /**
  * Build a storyboard with per-component library/custom decisions.
  */
+/**
+ * Each grammar's OWN stated scene band, taken from the shape law at the top of
+ * its contract (tempo-cut's THE EDIT, canvas-tour's THE SHAPE, and so on).
+ *
+ * It lives here because the universal scene-budget line has to defer to it. A
+ * grammar that commits to 5-9 places cannot also be told "3-4, a HARD budget"
+ * by the paragraph above it -- the model obeys whichever is louder, and the
+ * universal one always is.
+ *
+ * launch-film and speaker-screencast are deliberately absent: launch-film IS
+ * the 3-4 default, and speaker-screencast's length comes from the recording
+ * ("the voice is the clock"), so neither wants a band.
+ */
+const GRAMMAR_SCENE_BAND: Record<string, { min: number; max: number }> = {
+  "tempo-cut": { min: 6, max: 9 },
+  "hype-cut": { min: 10, max: 16 },
+  "editorial": { min: 6, max: 10 },
+  "social-reel": { min: 5, max: 8 },
+  "data-story": { min: 5, max: 8 },
+  "canvas-tour": { min: 5, max: 9 },
+};
+
 export async function buildStoryboard(opts: StoryboardBuilderOpts): Promise<StoryboardResult> {
   var catalogStr = formatCatalogForPrompt(opts.componentCatalog);
 
+  // THE ACTIVE GRAMMAR SETS THE BUDGET. This line used to hardcode "3-4 scenes
+  // ... a HARD budget" and name only tempo-cut and hype-cut as exceptions -- so
+  // editorial, social-reel, data-story and canvas-tour were each told 3-4 here
+  // and then asked for 5-10 by their own contract twenty lines below. The
+  // louder, more universal rule won: canvas-tour shipped intro / 15s middle /
+  // outro (proj_ecb05e27) -- three scenes and five beats crammed into the
+  // middle, which is exactly what this text demanded and the opposite of a
+  // tour. Derived from each contract's own stated shape instead.
+  var band = opts.filmGrammar ? GRAMMAR_SCENE_BAND[opts.filmGrammar] : undefined;
+  if (band && opts.sceneCount && (opts.sceneCount < band.min || opts.sceneCount > band.max)) {
+    var clamped = Math.max(band.min, Math.min(band.max, opts.sceneCount));
+    console.warn(`  Scene budget: director asked for ${opts.sceneCount} scenes, but ${opts.filmGrammar} commits to ${band.min}-${band.max} -- using ${clamped}.`);
+    opts = { ...opts, sceneCount: clamped };
+  }
   var sceneCountGuide = opts.sceneCount
     ? `Exactly ${opts.sceneCount} scenes.`
-    : (opts.format === "video"
-      ? "3-4 scenes for films up to 45s -- this is a HARD budget, not a suggestion (5 only for 60s+). EXCEPTION: a TEMPO-CUT film (see TEMPO-CUT FILMS below) inverts this budget -- 6-9 short scenes -- and a HYPE-CUT film (see HYPE-CUT FILMS) inverts it further -- 10-16 scenes alternating one-bar interstitials with 2-6-bar product beats; those contracts win over this line. Otherwise: a scene is a WORLD and you only cut when the world changes (see CUT vs BEAT). The shape of a 30-45s film: an opening world, one or two long living middles (12-24s each, 4-6 beats), a closing CTA world. Before you output, AUDIT your scene list: if two consecutive scenes share the same setting/canvas/metaphor, they are ONE world -- merge them into one scene and turn each of their moments into a beat. Emitting a new scene for every idea is the #1 storyboard failure."
-      : "5-8 scenes (scale to content complexity).");
+    : band
+      ? `${band.min}-${band.max} scenes -- THIS FILM'S GRAMMAR sets the budget, and its contract below says so again. A scene is a WORLD (or, in a continuous-surface grammar, a PLACE); do NOT collapse its places into beats of one long scene to save scenes -- that is how a journey becomes an intro, a middle and an outro.`
+      : (opts.format === "video"
+        ? "3-4 scenes for films up to 45s -- this is a HARD budget, not a suggestion (5 only for 60s+). A scene is a WORLD and you only cut when the world changes (see CUT vs BEAT). The shape of a 30-45s film: an opening world, one or two long living middles (12-24s each, 4-6 beats), a closing CTA world. Before you output, AUDIT your scene list: if two consecutive scenes share the same setting/canvas/metaphor, they are ONE world -- merge them into one scene and turn each of their moments into a beat. Emitting a new scene for every idea is the #1 storyboard failure."
+        : "5-8 scenes (scale to content complexity).");
 
   var storytellingGuide = getStorytellingGuide();
 
@@ -969,9 +1007,15 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
         currentSceneIdx = scenes.length - 1;
         console.log(`  Scene ${scenes.length}: "${scene.label}" (${scene.duration_seconds}s${rawBeats.length ? `, ${rawBeats.length} inline beat(s)` : ""})`);
         var allNotes = notes.concat(prevNotes.map((n) => `previous scene: ${n}`));
-        var budgetNote = (!opts.sceneCount && opts.format === "video" && scenes.length === 3 && totalSoFar + (Number(scene.duration_seconds) || 5) <= 40)
+        // The same contradiction, but live: this fired the moment scene 3 was
+        // added and told the model to turn everything left into beats. On a
+        // grammar with its own band that is precisely wrong -- it is what
+        // collapsed a 5-9 place tour into three scenes with a 15s middle.
+        var budgetNote = (!opts.sceneCount && !band && opts.format === "video" && scenes.length === 3 && totalSoFar + (Number(scene.duration_seconds) || 5) <= 40)
           ? " NOTE: the scene budget is nearly full (3-4 scenes max for a short film) -- remaining ideas should become BEATS of these scenes, not new scenes."
-          : "";
+          : band && scenes.length < band.min
+            ? ` NOTE: ${scenes.length} of ${band.min}-${band.max} scenes so far -- this grammar wants more, so keep going rather than folding the remaining ideas into beats.`
+            : "";
         toolResult = `scene ${scenes.length} added: "${scene.label}"` + (allNotes.length ? ` -- ${allNotes.join("; ")}` : "")
           + " -- call add_beat for each of this scene's beats (3+ beats), or move on if it needs 2 or fewer." + budgetNote;
         }
