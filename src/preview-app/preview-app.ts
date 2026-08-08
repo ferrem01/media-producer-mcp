@@ -666,6 +666,11 @@ export function getPreviewHtml(): string {
   .insp-node .in-dot { width: 8px; height: 8px; border-radius: 3px; flex: none; align-self: center;
     box-shadow: inset 0 0 0 1px rgba(15,23,42,0.08); }
   .insp-node .in-meta { font-size: 10px; color: #9ca3af; flex-shrink: 0; }
+  .insp-choreo { display: flex; gap: 8px; padding: 6px 10px 10px 22px; }
+  .insp-choreo .ch-row { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; }
+  .insp-choreo .ch-lbl { font-size: 10px; color: #6b7280; flex: none; }
+  .insp-choreo .ch-sel { font: 11px Inter, sans-serif; flex: 1; min-width: 0;
+    padding: 3px 4px; border: 1px solid #e5e7eb; border-radius: 5px; background: #fff; color: #374151; }
   #prop-editor { flex: 1; overflow-y: auto; padding: 4px 10px 16px; }
   .prop-script-row { display: flex; gap: 5px; align-items: center; margin-bottom: 4px; }
   .prop-script-row .ps-at { width: 54px; font-size: 11px; padding: 3px 4px; border: 1px solid #dfe3ea; border-radius: 6px; }
@@ -3479,6 +3484,20 @@ export function getPreviewHtml(): string {
     var el = document.getElementById('inspector');
     return !!(el && el.classList.contains('open'));
   }
+  // The effects wrapperChoreoScript can actually run. The four slides are the
+  // travelling ones -- they are what pair across a boundary (something that
+  // exits toward one edge is picked up entering from the opposite one).
+  var CHOREO_EFFECTS = ['slide-left', 'slide-right', 'slide-up', 'slide-down', 'rise', 'pop', 'fade'];
+  function choreoSelect(which, label, current, ci) {
+    var h = '<label class="ch-row"><span class="ch-lbl">' + label + '</span>'
+      + '<select class="ch-sel" data-ch="' + which + '" data-ci="' + ci + '">'
+      + '<option value=""' + (current ? '' : ' selected') + '>\\u2014 none \\u2014</option>';
+    CHOREO_EFFECTS.forEach(function(e) {
+      h += '<option value="' + e + '"' + (e === current ? ' selected' : '') + '>' + e + '</option>';
+    });
+    return h + '</select></label>';
+  }
+
   function renderInspector() {
     var host = document.getElementById('insp-tree');
     if (!host) return;
@@ -3505,11 +3524,27 @@ export function getPreviewHtml(): string {
       var meta = [];
       if (scripts) meta.push(scripts + ' actions');
       if (inAt !== null) meta.push('in @' + inAt.toFixed(1) + 's');
+      var eff = function(a) { return (a && a.effect) || ''; };
+      if (eff(c.enter)) meta.push('\\u2192 ' + eff(c.enter));
+      if (eff(c.exit)) meta.push(eff(c.exit) + ' \\u2192');
       html += '<div class="insp-node' + (i === state.currentComponentIndex ? ' active' : '') + '" data-ci="' + i + '">'
         + '<span class="in-dot" style="background:' + (isCustom ? '#94a3b8' : compColor(c.type)) + '"></span>'
         + '<span class="in-type">' + escHtml(isCustom ? 'Custom scene (generated)' : c.type) + '</span>'
         + '<span class="in-meta">' + escHtml(meta.join(' \\u00b7 ')) + '</span>'
         + '</div>';
+      // DIRECTION, not just timing. Dragging a bar in the timeline only ever
+      // set enter.at/exit.at and defaulted a missing effect to 'fade' -- so a
+      // storyboard that authored "this slides in from the right" was silently
+      // flattened to a fade by the first drag, with no UI that would ever have
+      // shown it. Content direction is what makes a cut read as continuous
+      // (the camera rig is rebuilt per scene and cannot cross a boundary), so
+      // it needs to be visible and editable, not implicit.
+      if (i === state.currentComponentIndex) {
+        html += '<div class="insp-choreo">'
+          + choreoSelect('enter', 'Enters', eff(c.enter), i)
+          + choreoSelect('exit', 'Exits', eff(c.exit), i)
+          + '</div>';
+      }
     });
     host.innerHTML = html || '<div class="empty-state">No components</div>';
     host.querySelectorAll('.insp-node').forEach(function(node) {
@@ -3521,6 +3556,31 @@ export function getPreviewHtml(): string {
       });
       node.addEventListener('mouseenter', function() { outlineComp(ci, true); });
       node.addEventListener('mouseleave', function() { outlineComp(ci, false); });
+    });
+    host.querySelectorAll('.ch-sel').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        var comp = (scene.components || [])[parseInt(sel.dataset.ci, 10)];
+        if (!comp) return;
+        var which = sel.dataset.ch;
+        var effect = sel.value;
+        // Keep whatever timing the timeline drag already set; only the effect
+        // is being chosen here. Clearing removes the animation entirely rather
+        // than leaving an effect-less object behind.
+        var next = null;
+        if (effect) {
+          var prev = comp[which] || {};
+          next = { effect: effect };
+          if (typeof prev.at === 'number') next.at = prev.at;
+          if (typeof prev.duration === 'number') next.duration = prev.duration;
+        }
+        if (next) comp[which] = next; else delete comp[which];
+        var body = {}; body[which] = next;
+        var p = state.currentProject;
+        api('PATCH', '/projects/' + state.tenantId + '/' + p.project_id
+          + '/scenes/' + scene.id + '/components/' + comp.id, body)
+          .then(function() { refreshCompositeQuiet(); renderInspector(); })
+          .catch(function() {});
+      });
     });
     renderProps();
   }

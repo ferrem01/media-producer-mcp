@@ -30,24 +30,12 @@ describe("the storyboard can author the pan the engine already had", () => {
     expect(asm, "the assembler must still implement pan").toMatch(/m\.type === 'pan'/);
   });
 
-  it("stops dropping pans in the sanitizer", async () => {
-    const src = await read("../src/llm/storyboard-builder.ts");
-    const at = src.indexOf("if (Array.isArray(scene.camera_moves))");
-    expect(at).toBeGreaterThan(0);
-    const body = src.slice(at, at + 1800);
-    expect(body, "pan must survive the filter").toMatch(/\|\|\s*m\.type === "pan"/);
-    // A pan is a focal point in canvas %, clamped -- not an anchor, not a rect.
-    expect(body).toMatch(/m\.type === "pan" \?\s*\{\s*x:\s*pct\(m\.x, 50\), y:\s*pct\(m\.y, 50\)\s*\}/);
-    // Blind rects stay out: nothing may carry w/h through.
-    expect(body).not.toMatch(/\bw:\s*Number\(m\.w\)/);
-  });
-
-  it("does not let a pan carry a scale", async () => {
-    // The engine treats "pan also zooming" as two effects fighting and ignores
-    // scale on a pan outright; emitting it anyway would be misleading data.
-    const src = await read("../src/llm/storyboard-builder.ts");
-    expect(src).toMatch(/m\.scale && m\.type !== "pan"/);
-  });
+  // The sanitizer's BEHAVIOUR -- pans surviving the filter, focal points
+  // clamped, scale stripped, blind rects still banned -- is covered directly
+  // in camera-moves.test.ts against the extracted sanitizeCameraMoves(). It
+  // used to be asserted here by reading the inline source, which broke the
+  // moment the logic was extracted: a source-shape assertion tests where the
+  // code lives, not what it does.
 
   it("tells the model that pan exists", async () => {
     // The sanitizer accepting pans is useless if the schema never mentions
@@ -61,15 +49,17 @@ describe("the storyboard can author the pan the engine already had", () => {
     expect(desc, "a pan at 1x is a no-op and the model must know").toMatch(/1x/);
   });
 
-  it("makes canvas-tour author the travel as data, not only as prose", async () => {
+  it("tells canvas-tour the camera adds depth but cannot join two scenes", async () => {
+    // This assertion used to demand the OPPOSITE -- that canvas-tour author
+    // its boundary travel as camera_moves. That was wrong: .mp-camera is
+    // rebuilt per scene, so camera state cannot cross a boundary at all. Only
+    // content momentum can, which is what the grammar now asks for. The camera
+    // is still worth having, just for depth INSIDE a beat.
     const src = await read("../src/llm/storyboard-builder.ts");
-    const at = src.indexOf("THE CAMERA IS THE EDIT");
+    const at = src.indexOf("THE CAMERA IS THE DEPTH, NOT THE EDIT");
     expect(at).toBeGreaterThan(0);
-    const law = src.slice(at, at + 1400);
-    expect(law).toMatch(/camera_moves/);
-    expect(law).toMatch(/type:"pan"/);
-    // The prose is still wanted -- it feeds codegen -- but it is no longer the
-    // only place the move exists.
-    expect(law).toMatch(/visual_notes/);
+    const law = src.slice(at, at + 700);
+    expect(law).toMatch(/cannot join two scenes/);
+    expect(law, "the no-op is the trap worth naming").toMatch(/pan at 1x moves nothing/);
   });
 });

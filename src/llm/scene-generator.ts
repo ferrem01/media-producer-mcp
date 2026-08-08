@@ -292,6 +292,39 @@ export async function generateScene(opts: SceneGeneratorOpts): Promise<Generated
   return await generateCodegenScene(opts, draft, codegenSpec, sceneId);
 }
 
+/** The house entrance/exit effects wrapperChoreoScript knows how to run. */
+const CHOREO_EFFECTS = new Set([
+  "slide-left", "slide-right", "slide-up", "slide-down", "rise", "pop", "fade",
+]);
+
+/**
+ * Accept a storyboard-authored enter/exit in either shape -- the bare string
+ * the contract asks for ("slide-left") or the full ComponentAnimation object --
+ * and drop anything the choreography layer cannot actually run.
+ *
+ * Silently keeping an unknown effect would be the worst outcome: OFF has no
+ * entry for it, so the element would be posed to nothing and simply appear,
+ * which is the "a word that just shows up" defect the grammars call out.
+ */
+function normalizeAnim(v: unknown): import("../core/types.js").ComponentAnimation | undefined {
+  if (!v) return undefined;
+  const raw = typeof v === "string" ? { effect: v } : (v as any);
+  const effect = String(raw?.effect || "").trim();
+  if (!CHOREO_EFFECTS.has(effect)) return undefined;
+  const num = (x: any, lo: number, hi: number) =>
+    Number.isFinite(Number(x)) ? Math.max(lo, Math.min(hi, Number(x))) : undefined;
+  const at = num(raw.at, 0, 60);
+  const duration = num(raw.duration, 0.15, 3);
+  const stagger = num(raw.stagger, 0, 1);
+  return {
+    effect,
+    ...(at !== undefined ? { at } : {}),
+    ...(duration !== undefined ? { duration } : {}),
+    ...(stagger !== undefined ? { stagger } : {}),
+    ...(typeof raw.ease === "string" ? { ease: raw.ease } : {}),
+  };
+}
+
 // ── Authored Composition (deterministic) ──
 
 /**
@@ -556,7 +589,7 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
   return slots;
 }
 
-function buildAuthoredCompositionScene(
+export function buildAuthoredCompositionScene(
   sceneId: string,
   draft: DraftScene,
   authored: Array<{ type: string; data: Record<string, unknown> }>,
@@ -669,7 +702,17 @@ function buildAuthoredCompositionScene(
     // repeats get _2, _3... (duplicate DOM ids silently broke seeks).
     var nth = (seenType[c.type] = (seenType[c.type] || 0) + 1);
     var id = nth === 1 ? c.type : `${c.type}_${nth}`;
-    components.push({ id, type: c.type, data, position: lay.position, z_index: lay.z_index });
+    // Carry the storyboard's DIRECTED entrance/exit onto the wrapper. The
+    // engine has always had this (wrapperChoreoScript: slide-left/-right/-up/
+    // -down, rise, pop, fade) and it is the only thing that can make a cut
+    // read as continuous -- the camera rig is rebuilt per scene, so camera
+    // state cannot cross a boundary. Without this hop the storyboard could
+    // describe "it keeps travelling right" in prose and nothing moved.
+    components.push({
+      id, type: c.type, data, position: lay.position, z_index: lay.z_index,
+      ...(normalizeAnim((c as any).enter) ? { enter: normalizeAnim((c as any).enter)! } : {}),
+      ...(normalizeAnim((c as any).exit) ? { exit: normalizeAnim((c as any).exit)! } : {}),
+    });
   });
   var acTransition: SceneTransition | undefined;
   if (draft.transition_in && draft.transition_in.type !== "none") {
