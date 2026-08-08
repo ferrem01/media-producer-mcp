@@ -455,6 +455,10 @@ export interface StoryboardScene {
    *  any attempt to count "how much of this film is templated" from a saved
    *  storyboard read every template as a codegen fallback. */
   scene_template?: { type: string; data: Record<string, unknown> };
+  /** Stage-camera moves authored for this scene. Carried so an approved
+   *  storyboard rebuilds with the camera the reviewer saw -- without it the
+   *  moves existed only on the built scenes and a rebuild dropped them. */
+  camera_moves?: CameraMove[];
   /** Voiceover script */
   voiceover_text?: string;
   /** Duration */

@@ -30,24 +30,12 @@ describe("the storyboard can author the pan the engine already had", () => {
     expect(asm, "the assembler must still implement pan").toMatch(/m\.type === 'pan'/);
   });
 
-  it("stops dropping pans in the sanitizer", async () => {
-    const src = await read("../src/llm/storyboard-builder.ts");
-    const at = src.indexOf("if (Array.isArray(scene.camera_moves))");
-    expect(at).toBeGreaterThan(0);
-    const body = src.slice(at, at + 1800);
-    expect(body, "pan must survive the filter").toMatch(/\|\|\s*m\.type === "pan"/);
-    // A pan is a focal point in canvas %, clamped -- not an anchor, not a rect.
-    expect(body).toMatch(/m\.type === "pan" \?\s*\{\s*x:\s*pct\(m\.x, 50\), y:\s*pct\(m\.y, 50\)\s*\}/);
-    // Blind rects stay out: nothing may carry w/h through.
-    expect(body).not.toMatch(/\bw:\s*Number\(m\.w\)/);
-  });
-
-  it("does not let a pan carry a scale", async () => {
-    // The engine treats "pan also zooming" as two effects fighting and ignores
-    // scale on a pan outright; emitting it anyway would be misleading data.
-    const src = await read("../src/llm/storyboard-builder.ts");
-    expect(src).toMatch(/m\.scale && m\.type !== "pan"/);
-  });
+  // The sanitizer's BEHAVIOUR -- pans surviving the filter, focal points
+  // clamped, scale stripped, blind rects still banned -- is covered directly
+  // in camera-moves.test.ts against the extracted sanitizeCameraMoves(). It
+  // used to be asserted here by reading the inline source, which broke the
+  // moment the logic was extracted: a source-shape assertion tests where the
+  // code lives, not what it does.
 
   it("tells the model that pan exists", async () => {
     // The sanitizer accepting pans is useless if the schema never mentions

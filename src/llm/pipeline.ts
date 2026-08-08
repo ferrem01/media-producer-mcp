@@ -2155,6 +2155,11 @@ function storyboardToSaved(
       // saved storyboard could not answer "what is this film built from?" --
       // and neither could Studio, the rebuild prompt, or anyone measuring.
       scene_template: s.scene_template,
+      // The camera, carried. Same omission as scene_template before it: the
+      // moves reached the BUILT scenes but never the saved storyboard, so
+      // rebuilding an approved storyboard silently dropped every travel the
+      // reviewer signed off on.
+      camera_moves: s.camera_moves,
       voiceover_text: s.voiceover_text,
       duration_seconds: s.duration_seconds,
       assets: [],

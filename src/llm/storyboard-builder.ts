@@ -777,43 +777,12 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
   function normalizeSceneMeta(scene: any): string[] {
     var notes: string[] = [];
 
-    // Camera moves from the LLM: anchored zooms, PANS, and resets. Blind
-    // RECTS stay banned -- a drawn rectangle over footage the model cannot see
-    // is the invented-callout failure class -- but that reasoning never
-    // applied to a pan: its focal point sits on a composition the storyboard
-    // AUTHORED, so it knows where the thing is.
-    //
-    // Dropping pans silently is what left canvas-tour without the travel that
-    // defines it ("each boundary is a camera TRAVEL to the next PLACE"). The
-    // engine has had pan all along -- peer-effect pure translation, the same
-    // move Studio authors by hand -- so the grammar needed the gate opened,
-    // not a new concept invented to get around it.
+    // Camera moves from the LLM. Extracted so the rules are testable without
+    // an LLM round-trip -- see sanitizeCameraMoves.
     if (Array.isArray(scene.camera_moves)) {
-      var dur0 = Number(scene.duration_seconds) || 10;
-      var pct = (v: any, d: number) => Math.max(0, Math.min(100, Number(v) != null && isFinite(Number(v)) ? Number(v) : d));
-      var cleaned = scene.camera_moves
-        .filter((m: any) => m && typeof m === "object")
-        .filter((m: any) => m.type === "reset"
-          || (m.type === "zoom" && typeof m.anchor === "string" && m.anchor.length > 0)
-          || m.type === "pan")
-        .map((m: any) => ({
-          at: Math.max(0, Math.min(dur0 - 0.5, Number(m.at) || 0)),
-          type: m.type,
-          ...(m.type === "zoom" ? { anchor: String(m.anchor).trim() } : {}),
-          // A pan is a focal point in canvas %, and it ignores scale outright
-          // (the engine treats "pan also zooming" as two effects fighting).
-          ...(m.type === "pan" ? { x: pct(m.x, 50), y: pct(m.y, 50) } : {}),
-          // 1.05 floor, not 1.3: a whole-window anchor with a forced 1.3+
-          // zoom crops the window's chrome for the length of the move; the
-          // subtle push (1.05-1.2) is a legitimate authored choice.
-          ...(m.scale && m.type !== "pan" ? { scale: Math.max(1.05, Math.min(2.6, Number(m.scale) || 1.8)) } : {}),
-          duration: Math.max(0.4, Math.min(1.6, Number(m.duration) || 0.9)),
-        }))
-        .slice(0, 4);
-      if (cleaned.length < scene.camera_moves.length) {
-        notes.push(`dropped ${scene.camera_moves.length - cleaned.length} camera move(s) (anchored zooms and resets only)`);
-      }
-      scene.camera_moves = cleaned;
+      const cam = sanitizeCameraMoves(scene.camera_moves, Number(scene.duration_seconds) || 10);
+      for (const n of cam.notes) notes.push(n);
+      scene.camera_moves = cam.moves;
     }
 
     if (!scene.components || !Array.isArray(scene.components)) {
@@ -1066,6 +1035,78 @@ avatar, or silhouette anywhere: the real camera is the only human in this film.`
   enforceFilmDirection(scenes);
 
   return { name: name!, scenes } as StoryboardResult;
+}
+
+/**
+ * Clamp and repair the stage-camera moves an LLM authored for one scene.
+ *
+ * Anchored zooms, PANS and resets are allowed. Blind RECTS stay banned -- a
+ * rectangle drawn over footage the model cannot see is the invented-callout
+ * failure class -- but that reasoning never applied to a pan, whose focal
+ * point sits on a composition the storyboard itself authored.
+ *
+ * Extracted from buildStoryboard so the rules are testable without an LLM
+ * round-trip. Returns notes for the storyboard's repair log.
+ */
+export function sanitizeCameraMoves(
+  raw: unknown,
+  durationSeconds: number,
+): { moves: import("../core/types.js").CameraMove[]; notes: string[] } {
+  const notes: string[] = [];
+  if (!Array.isArray(raw)) return { moves: [], notes };
+  const dur = durationSeconds > 0 ? durationSeconds : 10;
+  const pct = (v: any, d: number) =>
+    Math.max(0, Math.min(100, Number(v) != null && isFinite(Number(v)) ? Number(v) : d));
+
+  const moves = raw
+    .filter((m: any) => m && typeof m === "object")
+    .filter((m: any) => m.type === "reset"
+      || (m.type === "zoom" && typeof m.anchor === "string" && m.anchor.length > 0)
+      || m.type === "pan")
+    .map((m: any) => ({
+      at: Math.max(0, Math.min(dur - 0.5, Number(m.at) || 0)),
+      type: m.type,
+      ...(m.type === "zoom" ? { anchor: String(m.anchor).trim() } : {}),
+      // A pan is a focal point in canvas %, and it ignores scale outright
+      // (the engine treats "pan also zooming" as two effects fighting).
+      ...(m.type === "pan" ? { x: pct(m.x, 50), y: pct(m.y, 50) } : {}),
+      // 1.05 floor, not 1.3: a whole-window anchor with a forced 1.3+ zoom
+      // crops the window's chrome for the length of the move; the subtle push
+      // (1.05-1.2) is a legitimate authored choice.
+      ...(m.scale && m.type !== "pan" ? { scale: Math.max(1.05, Math.min(2.6, Number(m.scale) || 1.8)) } : {}),
+      duration: Math.max(0.4, Math.min(1.6, Number(m.duration) || 0.9)),
+    }))
+    .slice(0, 4) as any[];
+
+  if (moves.length < raw.length) {
+    notes.push(`dropped ${raw.length - moves.length} camera move(s) (anchored zooms, pans and resets only)`);
+  }
+
+  // A PAN WITH NOWHERE TO GO IS A SILENT NO-OP. Pan is pure translation at
+  // whatever zoom the camera holds, so on a wide camera the cover-clamp pins
+  // it to zero: the move is authored, accepted, rendered, and moves nothing.
+  // Studio surfaces that at drag time; a storyboard has nobody to tell, so it
+  // ships as a film that simply does not travel.
+  //
+  // Measured the first time canvas-tour could author pans at all: BOTH pans in
+  // the film were unzoomed (proj_fcd1a789, to 25%,20% and 75%,20%). The
+  // contract says "never pan without holding a zoom" and the model wrote the
+  // travel while skipping the thing that makes travel possible.
+  //
+  // Repaired rather than reported, because the intent is unambiguous --
+  // "travel to x,y" -- and the fix makes the authored move actually happen
+  // rather than inventing direction the storyboard did not ask for. The push
+  // is deliberately modest: enough to give the pan somewhere to go.
+  const firstPan = moves.find((m) => m.type === "pan");
+  if (firstPan && !moves.some((m) => m.type === "zoom")) {
+    moves.unshift({
+      at: 0, type: "zoom", scale: 1.35, x: 50, y: 50,
+      duration: Math.min(1.2, Math.max(0.6, Number(firstPan.at) || 0.8)),
+    });
+    notes.push("paired an unzoomed pan with a 1.35 push (a pan at 1x moves nothing)");
+  }
+
+  return { moves: moves as any, notes };
 }
 
 /**
