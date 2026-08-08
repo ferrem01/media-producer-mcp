@@ -1,85 +1,95 @@
 {
-  "type": "kinetic-text",
-  "label": "Kinetic Text",
-  "category": "titles",
-  "description": "Editorial text line with the two sanctioned entrances. Default: house line-rise (whole line rises ~10px, fades in ~300ms). entrance:'type-on': words appear in place in reading order on a beat interval and the centered line reflows as it grows (tempo-cut build-up). No per-word effects in either mode. Emphasis via *stars* = brand-color accent, color only.",
-  "data": {
-    "text": {
-      "type": "string",
-      "label": "Text. Wrap key words in *stars* to accent them in brand color.",
-      "required": true
-    },
-    "color": {
-      "type": "string",
-      "label": "Text color override (CSS color). Default is the brand text color -- on dark scenes set an explicit light color, e.g. #f5f6fa.",
-      "optional": true
-    },
-    "entrance": {
-      "type": "string",
-      "label": "rise (default, whole-line house entrance) | type-on (word-by-word build-up with live reflow)",
-      "optional": true
-    },
-    "at": {
-      "type": "number",
-      "label": "type-on only: when the first word lands (default 0.3)",
-      "optional": true
-    },
-    "word_interval": {
-      "type": "number",
-      "label": "type-on only: seconds between words (default 0.14). Set to the beat subdivision to cut on music.",
-      "optional": true
-    },
-    "word_times": {
-      "type": "array",
-      "label": "type-on only: explicit per-word times in seconds (overrides word_interval; e.g. beat-grid times)",
-      "optional": true
-    },
-    "mode": {
-      "type": "string",
-      "label": "LEGACY (ignored)",
-      "optional": true
-    },
-    "effect": {
-      "type": "string",
-      "label": "LEGACY (ignored)",
-      "optional": true
-    },
-    "font_size": {
-      "type": "string",
-      "label": "Override size (CSS, e.g. '16vw' for a hero numeral; default 60px)",
-      "optional": true
-    },
-    "font": {
-      "type": "string",
-      "label": "Font-family override (e.g. \"ui-monospace, 'JetBrains Mono', monospace\")",
-      "optional": true
-    },
-    "letter_spacing": {
-      "type": "string",
-      "label": "Tracking override (e.g. '0.18em' for labels)",
-      "optional": true
-    },
-    "font_weight": {
-      "type": "string",
-      "label": "Weight override (e.g. 800)",
-      "optional": true
-    },
-    "accent_color": {
-      "type": "string",
-      "label": "Accent Color",
-      "optional": true,
-      "description": "Color for *starred* accent words, overriding the brand primary (e.g. an indigo package token in a mono terminal line)."
-    },
-    "align": {
-      "type": "string",
-      "label": "Align",
-      "optional": true,
-      "enum": [
-        "left",
-        "center",
-        "right"
-      ],
-      "description": "Horizontal alignment. left/right turn the centered caption into a flush block (terminal checklists, editorial columns)."
-    }
+ "type": "kinetic-text",
+ "label": "Kinetic Text",
+ "category": "titles",
+ "description": "Editorial text line with the two sanctioned entrances. Default: house line-rise (whole line rises ~10px, fades in ~300ms). entrance:'type-on': words appear in place in reading order on a beat interval and the centered line reflows as it grows (tempo-cut build-up). No per-word effects in either mode. Emphasis via *stars* = brand-color accent, color only.",
+ "data": {
+  "text": {
+   "type": "string",
+   "label": "Text. Wrap key words in *stars* to accent them in brand color.",
+   "required": true
+  },
+  "color": {
+   "type": "string",
+   "label": "Text color override (CSS color). Default is the brand text color -- on dark scenes set an explicit light color, e.g. #f5f6fa.",
+   "optional": true
+  },
+  "entrance": {
+   "type": "string",
+   "label": "line-rise (default) | type-on (words appear in place on a beat) | assemble (words fly up from below into the laid-out line; *starred* word lands with a scale pop -- the print-film gathering beat)",
+   "optional": true
+  },
+  "at": {
+   "type": "number",
+   "label": "type-on only: when the first word lands (default 0.3)",
+   "optional": true
+  },
+  "word_interval": {
+   "type": "number",
+   "label": "type-on only: seconds between words (default 0.14). Set to the beat subdivision to cut on music.",
+   "optional": true
+  },
+  "word_times": {
+   "type": "array",
+   "label": "type-on only: explicit per-word times in seconds (overrides word_interval; e.g. beat-grid times)",
+   "optional": true
+  },
+  "mode": {
+   "type": "string",
+   "label": "LEGACY (ignored)",
+   "optional": true
+  },
+  "effect": {
+   "type": "string",
+   "label": "LEGACY (ignored)",
+   "optional": true
+  },
+  "font_size": {
+   "type": "string",
+   "label": "Override size (CSS, e.g. '16vw' for a hero numeral; default 60px)",
+   "optional": true
+  },
+  "font": {
+   "type": "string",
+   "label": "Font-family override (e.g. \"ui-monospace, 'JetBrains Mono', monospace\")",
+   "optional": true
+  },
+  "letter_spacing": {
+   "type": "string",
+   "label": "Tracking override (e.g. '0.18em' for labels)",
+   "optional": true
+  },
+  "font_weight": {
+   "type": "string",
+   "label": "Weight override (e.g. 800)",
+   "optional": true
+  },
+  "accent_color": {
+   "type": "string",
+   "label": "Accent Color",
+   "optional": true,
+   "description": "Color for *starred* accent words, overriding the brand primary (e.g. an indigo package token in a mono terminal line)."
+  },
+  "align": {
+   "type": "string",
+   "label": "Align",
+   "optional": true,
+   "enum": [
+    "left",
+    "center",
+    "right"
+   ],
+   "description": "Horizontal alignment. left/right turn the centered caption into a flush block (terminal checklists, editorial columns)."
+  },
+  "exit": {
+   "type": "string",
+   "label": "Exit style: fade (default) | smear-up (words stretch and stream out the top, staggered -- the caused-boundary verb between typeset beats)",
+   "optional": true
+  },
+  "exit_at": {
+   "type": "number",
+   "label": "When the exit fires (seconds; default just before the scene ends)",
+   "optional": true
   }
+ }
 }

@@ -1,0 +1,28 @@
+{
+ "type": "retro-post",
+ "label": "Retro Post (era flashback)",
+ "category": "mockups",
+ "description": "The era flashback: a 2008-web status box (blue-bar social chrome) on an aurora desktop wallpaper, with the film's sentence typing inside it. One deliberate jump to an older internet -- the chrome is the costume, the typing is the performance. Full-bleed beat; the film's one theme-flip chapter card in a paper film. Carries the SAME sentence the film is already writing (use pretyped to continue it, never restart it).",
+ "data": {
+  "text": {
+   "type": "string",
+   "label": "The full sentence in the status box",
+   "required": true
+  },
+  "pretyped": {
+   "type": "string",
+   "label": "Prefix already standing at frame one (string -- its length is used -- or a count); typing continues from there",
+   "optional": true
+  },
+  "at": {
+   "type": "number",
+   "label": "When typing starts (seconds, default 0.4)",
+   "optional": true
+  },
+  "speed": {
+   "type": "number",
+   "label": "Characters per second (default 26)",
+   "optional": true
+  }
+ }
+}
