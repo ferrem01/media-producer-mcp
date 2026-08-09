@@ -58,70 +58,78 @@ const KT = "../src/components/titles/kinetic-text.component.html";
 const TW = "../src/components/titles/typewriter.component.html";
 const RP = "../src/components/mockups/retro-post.component.html";
 
-describe("kinetic-text entrance: assemble", () => {
+describe("kinetic-text entrance: assemble (the sentence gathers itself)", () => {
+  // Frame-checked against the reference at 8.5-9.3s: words pop in SCATTERED
+  // around the line's neighbourhood (mostly below, each at its own offset)
+  // and converge up into their slots -- not a formation fly-in from the
+  // bottom edge, and no swell on the key word (that was an invention; the
+  // reference's "volume" leads the EXIT instead).
   const data = { text: "ai allows us to increase our *volume*", entrance: "assemble", at: 0.3, color: "#17171c" };
 
-  it("flies each word up into a line that is laid out from frame one", async () => {
+  it("scatters the words below-and-around, then converges them into the line", async () => {
     const html = await assemble({ data }, "kinetic-text", KT);
     const r = await probe(html, (page) =>
       page.evaluate(() => {
         const tl = (window as any).__MP_TIMELINE;
         const spans = Array.from(document.querySelectorAll(".text-container > span")) as HTMLElement[];
-        const first = spans[0], last = spans[spans.length - 1];
-        tl.pause(0.35);
-        const early = { y: first.getBoundingClientRect().top, op: parseFloat(getComputedStyle(last).opacity) };
-        tl.pause(3.2);
-        const late = { y: first.getBoundingClientRect().top, op: parseFloat(getComputedStyle(last).opacity) };
-        return { count: spans.length, early, late };
+        const rects = () => spans.map((s) => { const b = s.getBoundingClientRect(); return { x: b.left, y: b.top }; });
+        tl.pause(0.45);
+        const early = rects();
+        tl.pause(2.5);
+        const late = rects();
+        // displacement per word between mid-gather and settled
+        const dy = early.map((e, i) => e.y - late[i].y);
+        const dx = early.map((e, i) => Math.abs(e.x - late[i].x));
+        return { n: spans.length, dy, dx };
       }));
-    expect(r.count).toBeGreaterThan(5);
-    // First word mid-flight early (below its resting place), settled later.
-    expect(r.early.y, "first word never travelled").toBeGreaterThan(r.late.y + 20);
-    // Last word still invisible early, standing late.
-    expect(r.early.op).toBeLessThan(0.3);
-    expect(r.late.op).toBeGreaterThan(0.9);
+    expect(r.n).toBeGreaterThan(5);
+    // Most words start BELOW their slot (positive dy) by a meaningful amount...
+    const below = r.dy.filter((d: number) => d > 15).length;
+    expect(below, `dy=${r.dy.map((d: number) => d.toFixed(0)).join(",")}`).toBeGreaterThanOrEqual(Math.floor(r.n * 0.6));
+    // ...and the offsets are SCATTERED, not uniform: spread across words.
+    const spread = Math.max(...r.dy) - Math.min(...r.dy);
+    expect(spread, "every word travelled the same distance -- that is a formation, not a gather").toBeGreaterThan(25);
+    expect(Math.max(...r.dx), "no horizontal scatter at all").toBeGreaterThan(15);
   }, 300_000);
 
-  it("grows the starred word after the line stands", async () => {
+  it("builds the starred word per-character so the exit can roll it up", async () => {
     const html = await assemble({ data }, "kinetic-text", KT);
     const r = await probe(html, (page) =>
       page.evaluate(() => {
-        const tl = (window as any).__MP_TIMELINE;
+        (window as any).__MP_TIMELINE.pause(2.5);
         const acc = document.querySelector(".text-container .kt-accent") as HTMLElement;
-        // Before the swell fires (it starts at aAt + words*step + 0.35 ≈ 1.49
-        // for this line) but after the word has landed enough to have width.
-        tl.pause(1.3);
-        const before = acc.getBoundingClientRect().width;
-        tl.pause(3.4);
-        const after = acc.getBoundingClientRect().width;
-        return { before, after };
+        return { chars: acc.children.length };
       }));
-    expect(r.after, `accent width ${r.before} -> ${r.after}`).toBeGreaterThan(r.before * 1.12);
+    expect(r.chars).toBeGreaterThanOrEqual("volume".length);
   }, 300_000);
 });
 
-describe("kinetic-text exit: smear-up", () => {
-  it("streams the words out the top, staggered, by the end of the scene", async () => {
+describe("kinetic-text exit: smear-up (the starred word leads)", () => {
+  it("rolls the accent word's letters up first, then scatters the rest upward", async () => {
     const html = await assemble(
-      { data: { text: "but that has come at the cost", entrance: "assemble", at: 0.3, exit: "smear-up", exit_at: 3.4 } },
+      { data: { text: "ai allows us to increase our *volume*", entrance: "assemble", at: 0.3, exit: "smear-up", exit_at: 3.0 } },
       "kinetic-text", KT);
     const r = await probe(html, (page) =>
       page.evaluate(() => {
         const tl = (window as any).__MP_TIMELINE;
-        const spans = Array.from(document.querySelectorAll(".text-container > span")) as HTMLElement[];
-        tl.pause(3.0);
-        const standing = spans[0].getBoundingClientRect().top;
-        tl.pause(3.7);
-        // Mid-smear: the FIRST word has left further than the LAST (stagger).
-        const firstMid = spans[0].getBoundingClientRect().top;
-        const lastMid = spans[spans.length - 1].getBoundingClientRect().top;
+        const acc = document.querySelector(".text-container .kt-accent") as HTMLElement;
+        const firstWord = document.querySelector(".text-container > span") as HTMLElement;
+        tl.pause(2.6);
+        const stand = { acc: acc.getBoundingClientRect().top, first: firstWord.getBoundingClientRect().top };
+        tl.pause(3.4);
+        // Early in the exit: the accent's FIRST letter has risen while the
+        // sentence's first word still stands (the lead).
+        const lead = {
+          accChar: (acc.children[1] as HTMLElement).getBoundingClientRect().top,
+          first: firstWord.getBoundingClientRect().top,
+        };
         tl.pause(4.6);
-        const goneOp = parseFloat(getComputedStyle(spans[0]).opacity);
-        return { standing, firstMid, lastMid, goneOp };
+        const goneOp = parseFloat(getComputedStyle(firstWord).opacity);
+        return { stand, lead, goneOp };
       }));
-    expect(r.firstMid, "first word did not rise").toBeLessThan(r.standing - 30);
-    expect(r.firstMid, "no stagger between first and last word").toBeLessThan(r.lastMid - 10);
-    expect(r.goneOp, "words still visible after the smear").toBeLessThan(0.05);
+    expect(r.lead.accChar, "the accent letters did not lead").toBeLessThan(r.stand.acc - 40);
+    expect(Math.abs(r.lead.first - r.stand.first), "the rest left at the same time as the lead").toBeLessThan(20);
+    expect(r.goneOp, "the sentence never left").toBeLessThan(0.05);
   }, 300_000);
 });
 
