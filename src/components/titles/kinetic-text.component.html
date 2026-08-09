@@ -11,13 +11,16 @@
         hidden words take no space, so a centered line reflows as it grows
         (the tempo-cut build-up look). No motion paths, no per-word styling --
         the only variable is TIME. Emphasis is color only (*stars*).
-     3. assemble: the line is laid out up front and each word FLIES UP into
-        its place from below, staggered; *starred* words land with a scale
-        pop. The print-film gathering beat ("Behind the Craft" 8-10s: the
-        words of the claim rise from the sheet and compose the sentence).
+     3. assemble: the words appear SCATTERED around the line's neighbourhood
+        (each at its own offset, mostly below) and CONVERGE up into their
+        slots -- a sentence gathering itself, near-simultaneous rather than
+        reading-order ("Behind the Craft" 8.5-9.3s, frame-checked: the words
+        pop in at staggered positions and travel to the line).
      And ONE sanctioned exit beyond the default fade: exit:"smear-up" -- the
-     standing words stretch and stream out through the top of frame,
-     staggered, the same film's caused-boundary verb (10-11s). */
+     *starred* word LEADS: its letters roll up in a wave, then the whole
+     sentence drifts apart and floats up out of frame, the gathering in
+     reverse (10.1-11.1s: "volume" peels up letter by letter first, no
+     stretch, no scale -- the words simply scatter upward and go). */
   .kinetic-text {
     display: flex;
     align-items: center;
@@ -73,10 +76,13 @@
     var m;
 
     if (data.entrance === 'assemble') {
-      // The line is fully laid out from the first frame (inline-block spans
-      // hold their space), and each word flies UP into place from below.
-      // Deterministic timeline tweens only -- scrub-safe under the
-      // seek-driven master like everything else here.
+      // The sentence GATHERS ITSELF: the line is laid out from frame one
+      // (inline-block spans hold their space), each word starts at its own
+      // scattered offset -- mostly below, each a different distance and
+      // drift -- and converges up into its slot. Near-simultaneous, not
+      // reading-order. Offsets come from a deterministic hash of the word
+      // index (no Math.random -- renders must repeat); timeline tweens only,
+      // scrub-safe under the seek-driven master.
       var awords = [];
       while ((m = re.exec(text)) !== null) {
         var isAcc = m[1] !== undefined;
@@ -85,23 +91,37 @@
         });
       }
       var aAt = data.at !== undefined ? Number(data.at) : 0.3;
-      var aStep = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.12;
+      var aStep = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.07;
+      var rnd = function (i, k) { var v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
       awords.forEach(function (it, i) {
         var span = document.createElement('span');
         if (it.accent) span.className = 'kt-accent';
-        span.textContent = (i > 0 ? ' ' : '') + it.w;
         span.style.display = 'inline-block';
         span.style.whiteSpace = 'pre';
+        if (it.accent) {
+          // The starred word is built per-CHARACTER so the exit can roll it
+          // up letter by letter -- it LEADS the smear (the reference's
+          // "volume" peels upward first).
+          ((i > 0 ? ' ' : '') + it.w).split('').forEach(function (ch) {
+            var c = document.createElement('span');
+            c.textContent = ch;
+            c.style.display = 'inline-block';
+            c.style.whiteSpace = 'pre';
+            span.appendChild(c);
+          });
+        } else {
+          span.textContent = (i > 0 ? ' ' : '') + it.w;
+        }
         container.appendChild(span);
         var when = aAt + i * aStep;
-        gsap.set(span, { y: 90, autoAlpha: 0, rotation: (i % 2 ? 2.5 : -2.5) });
-        tl.to(span, { y: 0, autoAlpha: 1, rotation: 0, duration: 0.55, ease: 'back.out(1.4)' }, when);
-        if (it.accent) {
-          // The key word lands and then GROWS -- the reference's "volume"
-          // swelling as the claim completes.
-          tl.to(span, { scale: 1.22, transformOrigin: '50% 80%', duration: 0.45, ease: 'power2.out' },
-            aAt + awords.length * aStep + 0.35);
-        }
+        gsap.set(span, {
+          x: (rnd(i, 1) - 0.5) * 160,
+          y: 40 + rnd(i, 2) * 110,
+          rotation: (rnd(i, 3) - 0.5) * 7,
+          autoAlpha: 0,
+        });
+        tl.to(span, { autoAlpha: 1, duration: 0.18, ease: 'none' }, when);
+        tl.to(span, { x: 0, y: 0, rotation: 0, duration: 0.6, ease: 'power2.out' }, when + 0.05);
       });
     } else if (data.entrance === 'type-on') {
       // Word-by-word build-up. Every word is in the DOM up front but takes
@@ -153,22 +173,38 @@
       el.querySelectorAll('.kt-accent').forEach(function (s) { s.style.color = data.accent_color; });
     }
 
-    // Exit: fade by default. exit:"smear-up" is the one sanctioned
-    // alternative -- words stretch vertically and stream out the top,
-    // staggered, so the sentence leaves the way ink leaves a page in the
-    // reference film. Runs word-per-word when the entrance built spans;
-    // otherwise the whole container smears as one.
+    // Exit: fade by default. exit:"smear-up" is the gathering in reverse,
+    // frame-checked against the reference (10.1-11.1s): the *starred* word
+    // LEADS -- its letters roll upward in a wave, one by one -- and then the
+    // whole sentence drifts apart and floats up out of frame, each word on
+    // its own scattered path. No stretch, no scale: the words simply rise
+    // and go. Same deterministic hash as the entrance for the scatter.
     if (ctx.duration > 2) {
-      var exitAt = data.exit_at !== undefined ? Number(data.exit_at) : ctx.duration - (data.exit === 'smear-up' ? 0.9 : 0.5);
+      var exitAt = data.exit_at !== undefined ? Number(data.exit_at) : ctx.duration - (data.exit === 'smear-up' ? 1.2 : 0.5);
       if (data.exit === 'smear-up') {
-        // Per-word only when the entrance built one span per word; line-rise
-        // mixes bare text nodes with accent spans, so it smears as one block.
-        var perWord = data.entrance === 'assemble' || data.entrance === 'type-on';
-        var targets = perWord ? Array.prototype.slice.call(container.children) : [container];
-        targets.forEach(function (t, i) {
-          tl.to(t, { y: -240, scaleY: 1.8, autoAlpha: 0, transformOrigin: '50% 0%',
-            duration: 0.55, ease: 'power2.in' }, exitAt + i * 0.045);
+        var xr = function (i, k) { var v = Math.sin(i * 269.5 + k * 183.3) * 43758.5453; return v - Math.floor(v); };
+        var wordEls = Array.prototype.slice.call(container.children);
+        // Phase 1: the accent word's letters peel upward in a wave.
+        var lead = container.querySelector('.kt-accent');
+        if (lead && lead.children.length) {
+          Array.prototype.slice.call(lead.children).forEach(function (c, i) {
+            tl.to(c, { y: -320, rotation: 6 + i * 2, autoAlpha: 0, duration: 0.6, ease: 'power2.in' },
+              exitAt + i * 0.05);
+          });
+        }
+        // Phase 2: the rest of the sentence scatters and floats up after it.
+        var follow = exitAt + 0.3;
+        wordEls.forEach(function (w, i) {
+          if (w === lead) return;
+          tl.to(w, {
+            x: (xr(i, 1) - 0.5) * 220,
+            y: -(260 + xr(i, 2) * 160),
+            rotation: (xr(i, 3) - 0.5) * 12,
+            autoAlpha: 0,
+            duration: 0.7, ease: 'power2.in',
+          }, follow + xr(i, 4) * 0.2);
         });
+        if (!wordEls.length) tl.to(container, { y: -260, autoAlpha: 0, duration: 0.6, ease: 'power2.in' }, exitAt);
       } else {
         tl.to(container, { autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, exitAt);
       }
