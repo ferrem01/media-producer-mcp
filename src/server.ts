@@ -312,14 +312,14 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
 }
 
 /**
- * Operator playbook, delivered to EVERY client in the MCP initialize
+ * MCP instructions, delivered to EVERY client in the MCP initialize
  * handshake. This is the calling agent's "how to be a good client" -- the
  * knowledge that otherwise gets learned one failure at a time (agents
  * telling users to SSH in for their film, production renders before the
  * storyboard was ever reviewed, generates against an empty brand kit).
  * Keep it a tight page: clients carry it in context all session.
  */
-export const OPERATOR_PLAYBOOK = `Media Producer turns prompts into branded films (video/image/deck): code-authored motion graphics, rendered deterministically. Creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
+export const MCP_INSTRUCTIONS = `Media Producer turns prompts into branded films (video/image/deck): code-authored motion graphics, rendered deterministically. Creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
 
 THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterate it (mode:'storyboard' + feedback) until every beat is right -- spend revisions HERE. Build scenes ONCE (mode:'full' + project_id), then small tweaks, then render. mode:'full' cold = drafts only.
 
@@ -527,7 +527,7 @@ export function createMcpServer(): McpServer {
     name: "media-producer-mcp",
     version: "0.1.0",
   }, {
-    instructions: OPERATOR_PLAYBOOK,
+    instructions: MCP_INSTRUCTIONS,
   });
 
   // Tenant-enforcing tool registrar. The HTTP layer stamps the session's

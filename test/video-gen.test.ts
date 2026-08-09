@@ -138,7 +138,7 @@ describe("gen_video wiring (source guards)", () => {
     expect(p).toMatch(/type: "dropped_footage"/);
   });
 
-  it("the operator playbook teaches calling agents to steer media", async () => {
+  it("the MCP instructions teaches calling agents to steer media", async () => {
     const s = await read("../src/server.ts");
     expect(s).toMatch(/REAL MEDIA \(planned and fetched AUTONOMOUSLY/);
     expect(s).toMatch(/STEER WITH LANGUAGE, not tool calls/);

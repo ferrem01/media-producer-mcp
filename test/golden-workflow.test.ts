@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { OPERATOR_PLAYBOOK } from "../src/server.js";
+import { MCP_INSTRUCTIONS } from "../src/server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
@@ -19,7 +19,7 @@ const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
 // was opt-in and undocumented. Marc: "if that's the golden workflow, what
 // can we do to enforce it?"
 //
-// Enforcement: (1) the doctrine leads the operator playbook and the generate
+// Enforcement: (1) the doctrine leads the MCP instructions and the generate
 // tool description -- the operator is almost always an LLM reading exactly
 // those; (2) for VIDEO, generate defaults to stopping at the storyboard, and
 // building is a deliberate second call. Explicit mode always wins; non-video
@@ -27,11 +27,11 @@ const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
 // one-shot.
 
 describe("the golden workflow is enforced", () => {
-  it("leads the operator playbook", () => {
-    expect(OPERATOR_PLAYBOOK).toMatch(/THE GOLDEN WORKFLOW/);
-    expect(OPERATOR_PLAYBOOK).toMatch(/returns a STORYBOARD for video, on purpose/);
-    expect(OPERATOR_PLAYBOOK).toMatch(/spend revisions HERE/);
-    // The playbook ceiling test lives in mcp-download-url.test.ts; adding the
+  it("leads the MCP instructions", () => {
+    expect(MCP_INSTRUCTIONS).toMatch(/THE GOLDEN WORKFLOW/);
+    expect(MCP_INSTRUCTIONS).toMatch(/returns a STORYBOARD for video, on purpose/);
+    expect(MCP_INSTRUCTIONS).toMatch(/spend revisions HERE/);
+    // The MCP instructions ceiling test lives in mcp-download-url.test.ts; adding the
     // doctrine must never be the reason it gets raised.
   });
 
