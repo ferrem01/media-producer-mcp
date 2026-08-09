@@ -49,6 +49,7 @@ import { reviseScene } from "./llm/scene-revise.js";
 import { config } from "./config.js";
 import { proposeSceneCompression, probeMediaDuration } from "./core/auto-compress.js";
 import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
+import { renderStoryboardCards } from "./core/storyboard-cards.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit, SpeakerTrack } from "./core/types.js";
@@ -2400,11 +2401,30 @@ export function createMcpServer(): McpServer {
               }
             }
             j.projectId = project.project_id;
+            // THE TRUE STORYBOARD: render the visual cards for the iterate
+            // loop -- real assembled frames, zero LLM calls. Cards failing
+            // must never fail the storyboard itself (the text board is still
+            // fully usable), so this degrades to a warning.
+            let cardsUrl: string | undefined;
+            let cardStills: Array<string | null> | undefined;
+            try {
+              j.progress = { step: "storyboard-cards", percent: 90, detail: "Photographing the storyboard" };
+              const outDir = projectOutputDir(params.tenant_id, project.project_id);
+              const res = await renderStoryboardCards(project as any, {
+                componentLibDir: config.componentLibDir, gsapDir: config.gsapDir, outDir,
+              });
+              cardsUrl = outputUrl(params.tenant_id, project.project_id, path.basename(res.sheet));
+              cardStills = res.stills.map((s) =>
+                s ? outputUrl(params.tenant_id, project.project_id, path.basename(s)) : null);
+            } catch (e: any) {
+              console.warn(`  storyboard-cards failed (storyboard still usable): ${e?.message}`);
+            }
             j.progress = { step: "complete", percent: 100 };
             return {
               status: "storyboard",
               project_id: project.project_id,
               preview_url: previewUrl(params.tenant_id, project.project_id),
+              ...(cardsUrl ? { storyboard_cards_url: cardsUrl, scene_still_urls: cardStills } : {}),
               storyboard: project.storyboard,
             };
           });
