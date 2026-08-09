@@ -10,11 +10,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const read = (p: string) => fs.readFile(path.resolve(__dirname, p), "utf-8");
 
 // The reference film's remaining vocabulary ("Behind the Craft", getting the
-// golden replication to 100% -- Marc's frame notes):
-// - 8-10s: the words of the claim FLY UP from the sheet and assemble into
-//   the sentence, and the key word ("volume") grows once the line stands.
-// - 10-11s: the standing sentence SMEARS UP -- words stretch and stream out
-//   the top, staggered. The caused boundary between typeset beats.
+// golden replication to 100% -- corrected twice against Marc's stills):
+// - 8-10s: each word of the claim ENTERS FROM BELOW THE FRAME and climbs up
+//   into its slot in reading order, tilted in flight; the starred word lands
+//   with its letters wavy and settles. No swell -- that was an invention.
+// - 10-11s: the starred word LEADS the exit, letters rolling up in a wave,
+//   then the rest of the sentence floats up and out after it.
 // - The era flip carries ONE sentence across pen -> type -> composer; the
 //   typewriter must be able to pick up mid-sentence (pretyped) instead of
 //   visibly retyping what the viewer just watched being written.
@@ -59,37 +60,36 @@ const TW = "../src/components/titles/typewriter.component.html";
 const RP = "../src/components/mockups/retro-post.component.html";
 
 describe("kinetic-text entrance: assemble (the sentence gathers itself)", () => {
-  // Frame-checked against the reference at 8.5-9.3s: words pop in SCATTERED
-  // around the line's neighbourhood (mostly below, each at its own offset)
-  // and converge up into their slots -- not a formation fly-in from the
-  // bottom edge, and no swell on the key word (that was an invention; the
-  // reference's "volume" leads the EXIT instead).
+  // Marc's stills of the reference at 8-10s: "the words come in the bottom"
+  // -- each word enters from below the frame edge and rides up into its
+  // slot, reading order, visible the whole climb. Font-agnostic by
+  // construction (spans + transforms; rise measured per word from its own
+  // laid-out slot).
   const data = { text: "ai allows us to increase our *volume*", entrance: "assemble", at: 0.3, color: "#17171c" };
 
-  it("scatters the words below-and-around, then converges them into the line", async () => {
+  it("climbs each word in from below the frame into its slot", async () => {
     const html = await assemble({ data }, "kinetic-text", KT);
     const r = await probe(html, (page) =>
       page.evaluate(() => {
+        const H = 720;
         const tl = (window as any).__MP_TIMELINE;
         const spans = Array.from(document.querySelectorAll(".text-container > span")) as HTMLElement[];
-        const rects = () => spans.map((s) => { const b = s.getBoundingClientRect(); return { x: b.left, y: b.top }; });
-        tl.pause(0.45);
-        const early = rects();
-        tl.pause(2.5);
-        const late = rects();
-        // displacement per word between mid-gather and settled
-        const dy = early.map((e, i) => e.y - late[i].y);
-        const dx = early.map((e, i) => Math.abs(e.x - late[i].x));
-        return { n: spans.length, dy, dx };
+        const tops = () => spans.map((s) => s.getBoundingClientRect().top);
+        tl.pause(0.55);
+        const early = tops();
+        tl.pause(3.0);
+        const late = tops();
+        return { n: spans.length, H, early, late };
       }));
     expect(r.n).toBeGreaterThan(5);
-    // Most words start BELOW their slot (positive dy) by a meaningful amount...
-    const below = r.dy.filter((d: number) => d > 15).length;
-    expect(below, `dy=${r.dy.map((d: number) => d.toFixed(0)).join(",")}`).toBeGreaterThanOrEqual(Math.floor(r.n * 0.6));
-    // ...and the offsets are SCATTERED, not uniform: spread across words.
-    const spread = Math.max(...r.dy) - Math.min(...r.dy);
-    expect(spread, "every word travelled the same distance -- that is a formation, not a gather").toBeGreaterThan(25);
-    expect(Math.max(...r.dx), "no horizontal scatter at all").toBeGreaterThan(15);
+    // Mid-gather: the first word is airborne INSIDE the frame (left its start,
+    // not yet parked) while the last word is still BELOW the frame edge --
+    // the conveyor, not a simultaneous pop.
+    expect(r.early[0], "first word never entered the frame").toBeLessThan(r.H);
+    expect(r.early[0], "first word teleported to its slot").toBeGreaterThan(r.late[0] + 15);
+    expect(r.early[r.n - 1], "last word should still be waiting below the frame").toBeGreaterThanOrEqual(r.H - 5);
+    // Settled: everything parked at its slot, inside the frame.
+    for (const t of r.late) expect(t).toBeLessThan(r.H * 0.8);
   }, 300_000);
 
   it("builds the starred word per-character so the exit can roll it up", async () => {
