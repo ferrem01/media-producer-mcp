@@ -319,28 +319,30 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
  * storyboard was ever reviewed, generates against an empty brand kit).
  * Keep it a tight page: clients carry it in context all session.
  */
-export const OPERATOR_PLAYBOOK = `Media Producer turns prompts into branded films (video/image/deck): scenes are code-authored motion graphics, rendered deterministically. Creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
+export const OPERATOR_PLAYBOOK = `Media Producer turns prompts into branded films (video/image/deck): code-authored motion graphics, rendered deterministically. Creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
+
+THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterate it (mode:'storyboard' + feedback) until every beat is right -- spend revisions HERE. Build scenes ONCE (mode:'full' + project_id), then small tweaks, then render. mode:'full' cold = drafts only.
 
 BEFORE GENERATING
 - Ask first: audience, goal/CTA, target length, and which film grammar fits.
 - FILM GRAMMARS (the film's dialect; pass film_grammar to pin, omit to let the director choose):
   * launch-film -- few long cinematic scenes, one continuous world. Expansive brand moments.
   * tempo-cut -- product-first montage: driving music, bar-quantized hard cuts, on-screen type IS the voiceover. Fast explainers.
-  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats that form ONE continuous scripted session. For use-case narratives (MCP/integration demos).
+  * hype-cut -- story-first hype: one-bar kinetic type interstitials alternating with longer product beats forming ONE continuous session. Use-case narratives.
   * editorial -- typography-first manifesto: huge serif statements alternating with full-bleed evidence. The words are the product.
   * social-reel -- vertical 9:16, 15-30s: hook in the first 2 seconds, caption-scale type, escalation beats, loop seam.
   * data-story -- numbers-as-protagonist: claim -> proof, ONE live-drawing figure per scene up to the money number; figures come from the brief, never invented.
   * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never chosen without one.
-  * canvas-tour -- ONE unbroken shot across a single surface: beats are PLACES the camera travels to, type is PERFORMED where it lives (pen-written, typed, commanded). Craft-forward brand and print films.
-  Choosing: ask what carries the argument -- the product, the words, the numbers, a person, one surface, or the feed format.
+  * canvas-tour -- ONE unbroken shot across a single surface: beats are PLACES the camera travels, type is PERFORMED where it lives. Craft-forward brand/print films.
+  Choosing: ask what carries the argument -- product, words, numbers, a person, one surface, or the feed.
 - THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture" mints surface tiles).
 - Brand comes from the tenant's brand kit. No kit? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
 - A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and builds the film.
 
 REAL MEDIA (planned and fetched AUTONOMOUSLY -- steer it with the brief)
-- Per beat the director picks real footage, a generated still, or motion graphics (Pexels stock, AI stills, or Veo video -- Veo only for moving shots no stock library could hold; 0-1 per film, ~8s and 1-3 min each, so say so when asked).
-- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk", "photographic and cinematic". To FORCE a generated shot, describe it and say "generate this shot" -- that makes it mandatory. Mood-only briefs get motion graphics on UI/data beats and real media on emotional ones.
-- TALKING HEADS are explicit by design (casting a synthetic presenter is the human's call). generate_clip = one Veo clip; quote the spoken line and Veo voices it. generate_presenter = a whole script (~60s) split into consistent takes, returned as ONE stitched clip with scripted-vs-heard per take (relay any drift). Feed either asset_url back as speaker_source and the film goes speaker-led: that voice is the soundtrack and scenes cut on its sentences. reference_image keeps the presenter consistent.
+- Per beat the director picks real footage, a generated still, or motion graphics (Pexels, AI stills, Veo video -- Veo only for moving shots stock can't hold; 0-1 per film, ~8s, slow).
+- STEER WITH LANGUAGE, not tool calls: "open on real footage of a cluttered desk". To FORCE a generated shot, describe it and say "generate this shot" -- that makes it mandatory. Mood-only briefs get motion graphics on UI/data beats, real media on emotional ones.
+- TALKING HEADS are explicit by design (a synthetic presenter is the human's call). generate_clip = one Veo clip (quote the spoken line). generate_presenter = a whole script (~60s) split into consistent takes, ONE stitched clip (relay scripted-vs-heard drift). Feed either asset_url back as speaker_source: that voice becomes the soundtrack, scenes cut on its sentences. reference_image keeps the presenter consistent.
 
 ITERATE CHEAP-TO-EXPENSIVE (never start with a production render)
 1. generate mode='storyboard' -> review the beats with the human, adjust, THEN build scenes.
@@ -2183,7 +2185,7 @@ export function createMcpServer(): McpServer {
 
   tool(
     "generate",
-    "Generate media from a natural language prompt. Use mode='storyboard' to produce just the storyboard (script + per-scene breakdown + asset requirements) for review. Use mode='full' (default) to produce the scenes: if the project already has a storyboard it builds from that (honoring your edits), otherwise it creates the storyboard first, then builds. Rendering to a final video is a separate step (the render tool). Recommended flow: storyboard -> review/edit -> full -> preview/edit -> render. Recorder films (screen recordings from the Quotient Recorder extension) assemble automatically on upload and get a SPEAKER lane -- edit their talk track with the edit_speaker tool, not by regenerating.",
+    "Generate media from a natural language prompt. THE GOLDEN WORKFLOW (how every good film here was made): (1) generate -> you get a STORYBOARD, not a film; (2) iterate the storyboard round and round with mode='storyboard' + feedback until every beat is right -- this is the cheap, fast loop, spend your revisions HERE; (3) build the scenes ONCE with mode='full' + project_id; (4) after that only small tweaks (update/revise/Studio), then render. For video targets mode defaults to 'storyboard' -- generating a film cold stops at the storyboard on purpose; building is a deliberate second call. Pass mode='full' explicitly to build in one shot (quick drafts, fire-and-forget). Non-video targets (image, component, scene revisions) are one-shot as before. Rendering to MP4 is the separate render tool. Recorder films (screen recordings from the Quotient Recorder extension) assemble automatically on upload and get a SPEAKER lane -- edit their talk track with edit_speaker, not by regenerating.",
     {
       tenant_id: z.string().optional(),
       prompt: z.string().default("").describe("Description of what to generate. Optional when the project already has a storyboard (uses its narrative)."),
@@ -2224,7 +2226,7 @@ export function createMcpServer(): McpServer {
       speaker_start: z.number().optional().describe("Start offset in seconds into the speaker video (skip dead air at start)"),
       speaker_trim_start: z.number().optional().describe("Trim: only use speaker video from this timestamp"),
       speaker_trim_end: z.number().optional().describe("Trim: stop using speaker video at this timestamp"),
-      mode: z.enum(["storyboard", "full"]).optional().default("full").describe("'storyboard' = produce just the storyboard for review (stops there). 'full' (default) = produce the scenes: build from an existing storyboard if the project has one, else create the storyboard first. Rendering the final video is the separate render tool."),
+      mode: z.enum(["storyboard", "full"]).optional().describe("'storyboard' (DEFAULT for video) = produce/revise the storyboard and stop -- the iterate-here step of the golden workflow. 'full' = build the scenes: from the project's existing storyboard if it has one (honoring your edits), else storyboard-then-build in one shot. Non-video targets always behave as 'full'. Rendering the final video is the separate render tool."),
       feedback: z.string().optional().describe("Natural language feedback to revise an existing storyboard. Requires project_id with a project in the storyboard state."),
       reference_images: z.array(z.object({
         url: z.string().describe("HTTPS URL or base64 data URI (data:image/...)"),
@@ -2275,8 +2277,19 @@ export function createMcpServer(): McpServer {
           return ok(withStudio(project));
         }
 
+        // ── THE GOLDEN WORKFLOW DEFAULT: for video, generate stops at the
+        // storyboard. Both of the tenant's best films (and the maker workflow
+        // in SPEC-canvas-tour's addendum) were made by iterating the
+        // storyboard until it was right and only then building scenes once --
+        // so that loop is now the API's shape, not tribal knowledge. Building
+        // is a deliberate second call (mode:'full' + project_id). Non-video
+        // targets and the deterministic screencast path stay one-shot; an
+        // explicit mode always wins.
+        const effectiveMode = params.mode
+          ?? (params.target === "video" && !params.id ? "storyboard" : "full");
+
         // ── Storyboard mode: run unified pipeline in storyboard-only mode ──
-        if (params.mode === "storyboard") {
+        if (effectiveMode === "storyboard") {
           let llmConfig;
           try {
             llmConfig = llmConfigFromEnv();
