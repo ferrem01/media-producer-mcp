@@ -11,16 +11,15 @@
         hidden words take no space, so a centered line reflows as it grows
         (the tempo-cut build-up look). No motion paths, no per-word styling --
         the only variable is TIME. Emphasis is color only (*stars*).
-     3. assemble: the words appear SCATTERED around the line's neighbourhood
-        (each at its own offset, mostly below) and CONVERGE up into their
-        slots -- a sentence gathering itself, near-simultaneous rather than
-        reading-order ("Behind the Craft" 8.5-9.3s, frame-checked: the words
-        pop in at staggered positions and travel to the line).
+     3. assemble: each word ENTERS FROM BELOW THE FRAME and rides up into
+        its slot in reading order -- visible for the whole climb, tilted in
+        flight, straightening as it lands ("Behind the Craft" 8-10s,
+        confirmed against Marc's stills: "the words come in the bottom").
+        The *starred* word lands with its letters still wavy, then settles.
+        Font-agnostic: spans + transforms only, data.font passes through.
      And ONE sanctioned exit beyond the default fade: exit:"smear-up" -- the
-     *starred* word LEADS: its letters roll up in a wave, then the whole
-     sentence drifts apart and floats up out of frame, the gathering in
-     reverse (10.1-11.1s: "volume" peels up letter by letter first, no
-     stretch, no scale -- the words simply scatter upward and go). */
+     *starred* word LEADS: its letters roll up in a wave, then the rest of
+     the sentence drifts apart and floats up out of frame after it. */
   .kinetic-text {
     display: flex;
     align-items: center;
@@ -76,13 +75,14 @@
     var m;
 
     if (data.entrance === 'assemble') {
-      // The sentence GATHERS ITSELF: the line is laid out from frame one
-      // (inline-block spans hold their space), each word starts at its own
-      // scattered offset -- mostly below, each a different distance and
-      // drift -- and converges up into its slot. Near-simultaneous, not
-      // reading-order. Offsets come from a deterministic hash of the word
-      // index (no Math.random -- renders must repeat); timeline tweens only,
-      // scrub-safe under the seek-driven master.
+      // Words climb in FROM BELOW THE FRAME, reading order, overlapped: word
+      // i is still rising as word i+1 enters. Rise distance is measured per
+      // word from its own slot to past the stage bottom (multiline lines
+      // higher up climb further), so the behaviour holds for any font, size
+      // or layout. Drift/tilt come from a deterministic index hash -- no
+      // Math.random, renders must repeat. The starred word is built
+      // per-character: its letters land wavy and settle, and the smear-up
+      // exit peels them back off.
       var awords = [];
       while ((m = re.exec(text)) !== null) {
         var isAcc = m[1] !== undefined;
@@ -91,17 +91,17 @@
         });
       }
       var aAt = data.at !== undefined ? Number(data.at) : 0.3;
-      var aStep = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.07;
+      var aStep = Number(data.word_interval) > 0 ? Number(data.word_interval) : 0.2;
       var rnd = function (i, k) { var v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+      // Travelling words must be visible OUTSIDE the caption box.
+      el.querySelector('.kinetic-text').style.overflow = 'visible';
+      var spansA = [];
       awords.forEach(function (it, i) {
         var span = document.createElement('span');
         if (it.accent) span.className = 'kt-accent';
         span.style.display = 'inline-block';
         span.style.whiteSpace = 'pre';
         if (it.accent) {
-          // The starred word is built per-CHARACTER so the exit can roll it
-          // up letter by letter -- it LEADS the smear (the reference's
-          // "volume" peels upward first).
           ((i > 0 ? ' ' : '') + it.w).split('').forEach(function (ch) {
             var c = document.createElement('span');
             c.textContent = ch;
@@ -113,15 +113,28 @@
           span.textContent = (i > 0 ? ' ' : '') + it.w;
         }
         container.appendChild(span);
+        spansA.push({ span: span, it: it });
+      });
+      // Measure AFTER layout, BEFORE transforms: each word's climb starts
+      // just past the stage bottom, wherever its slot is.
+      var stageH = (ctx.canvas && ctx.canvas.height) || 1080;
+      spansA.forEach(function (o, i) {
+        var slotTop = o.span.getBoundingClientRect().top;
+        var rise = Math.max(120, stageH * 1.1 - slotTop);
         var when = aAt + i * aStep;
-        gsap.set(span, {
-          x: (rnd(i, 1) - 0.5) * 160,
-          y: 40 + rnd(i, 2) * 110,
-          rotation: (rnd(i, 3) - 0.5) * 7,
-          autoAlpha: 0,
+        gsap.set(o.span, {
+          y: rise,
+          x: (rnd(i, 1) - 0.5) * 180,
+          rotation: (rnd(i, 3) - 0.5) * 14,
         });
-        tl.to(span, { autoAlpha: 1, duration: 0.18, ease: 'none' }, when);
-        tl.to(span, { x: 0, y: 0, rotation: 0, duration: 0.6, ease: 'power2.out' }, when + 0.05);
+        tl.to(o.span, { y: 0, x: 0, rotation: 0, duration: 0.8, ease: 'power2.out' }, when);
+        if (o.it.accent && o.span.children.length) {
+          // Land wavy, then settle letter by letter.
+          Array.prototype.slice.call(o.span.children).forEach(function (c, ci) {
+            gsap.set(c, { y: (ci % 2 ? -1 : 1) * (6 + rnd(ci, 5) * 8), rotation: (rnd(ci, 6) - 0.5) * 10 });
+            tl.to(c, { y: 0, rotation: 0, duration: 0.45, ease: 'power2.out' }, when + 0.55 + ci * 0.05);
+          });
+        }
       });
     } else if (data.entrance === 'type-on') {
       // Word-by-word build-up. Every word is in the DOM up front but takes
