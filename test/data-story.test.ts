@@ -52,10 +52,10 @@ describe("data-story grammar registration", () => {
     expect(src).toMatch(/>=20% of the frame height/);
   });
 
-  it("is exposed on the generate tool and the operator playbook", async () => {
+  it("is exposed on the generate tool and the MCP instructions", async () => {
     const src = await read("../src/server.ts");
     expect(src).toMatch(/"launch-film", "tempo-cut", "hype-cut", "speaker-screencast", "editorial", "social-reel", "data-story"/);
-    expect(src).toContain("data-story -- numbers-as-protagonist"); // operator playbook
+    expect(src).toContain("data-story -- numbers-as-protagonist"); // MCP instructions
     expect(src).toContain("Choosing: ask what carries the argument"); // how to pick one
   });
 });

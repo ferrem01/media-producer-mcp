@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { jobWithPreview, renderStatusFields, OPERATOR_PLAYBOOK } from "../src/server.js";
+import { jobWithPreview, renderStatusFields, MCP_INSTRUCTIONS } from "../src/server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -47,14 +47,14 @@ describe("jobWithPreview (MCP job responses)", () => {
   });
 });
 
-// The operator playbook rides the MCP initialize handshake: every client
+// The MCP instructions rides the MCP initialize handshake: every client
 // agent receives it before its first tool call. It must stay compact and
 // keep carrying the load-bearing lessons (links not SSH, iterate ladder,
 // brand kit first, async jobs).
-describe("OPERATOR_PLAYBOOK (handshake instructions)", () => {
+describe("MCP_INSTRUCTIONS (handshake instructions)", () => {
   it("is wired into the McpServer construction", async () => {
     const src = await fs.readFile(path.resolve(__dirname, "../src/server.ts"), "utf-8");
-    expect(src).toMatch(/instructions: OPERATOR_PLAYBOOK/);
+    expect(src).toMatch(/instructions: MCP_INSTRUCTIONS/);
   });
 
   it("carries the load-bearing operator knowledge", () => {
@@ -69,17 +69,17 @@ describe("OPERATOR_PLAYBOOK (handshake instructions)", () => {
       "revise",           // surgical edit before regeneration
       "NEVER edit a project while its render job runs",
     ]) {
-      expect(OPERATOR_PLAYBOOK, `playbook lost: ${phrase}`).toContain(phrase);
+      expect(MCP_INSTRUCTIONS, `MCP instructions lost: ${phrase}`).toContain(phrase);
     }
   });
 
   it("stays a tight page (clients hold it in context all session)", () => {
-    // Budget raised 4000 -> 5000 when the playbook grew from four grammars to
+    // Budget raised 4000 -> 5000 when the MCP instructions grew from four grammars to
     // six and gained the REAL MEDIA section (three media sources + the two
     // presenter tools). The prose was tightened 6232 -> ~4600 first; the rest
     // is surface the operator genuinely has to know. Cut content before you
     // raise this again.
-    expect(OPERATOR_PLAYBOOK.length).toBeLessThan(5000);
+    expect(MCP_INSTRUCTIONS.length).toBeLessThan(5000);
   });
 });
 

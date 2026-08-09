@@ -104,7 +104,7 @@ describe("generate_presenter wiring (source guards)", () => {
     expect(s).toMatch(/seam_seconds: result\.seams/);
   });
 
-  it("tool + playbook expose the flow", async () => {
+  it("tool + MCP instructions expose the flow", async () => {
     const s = await read("../src/server.ts");
     expect(s).toMatch(/"generate_presenter"/);
     expect(s).toMatch(/heard_by_whisper/);
