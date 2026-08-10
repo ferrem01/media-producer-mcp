@@ -27,7 +27,7 @@ import { normalizeBeats } from "./core/beats.js";
 import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-kit.js";
-import { queueBuildFromStoryboard } from "./server.js";
+import { queueBuildFromStoryboard, queueStoryboardGeneration } from "./server.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
@@ -806,7 +806,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -1887,6 +1887,30 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (!gsRes) { jsonResponse(res, 400, { error: "Project has no storyboard to build from (or is mid-render)." }); return; }
         if ("error" in gsRes) { jsonResponse(res, 500, { error: gsRes.error }); return; }
         jsonResponse(res, 202, { ok: true, job_id: gsRes.job.id, project_id: gsProject });
+        return;
+      }
+
+      // POST /api/storyboard-revise/{tenant}/{project} {feedback} -- the
+      // golden workflow's iterate loop FROM STUDIO: same queue as the MCP
+      // generate tool's storyboard revision, so the whole board re-drafts
+      // against the feedback and the cards re-photograph when it lands.
+      const sbReviseMatch = urlPath.match(/^\/api\/storyboard-revise\/([^/]+)\/([^/]+)$/);
+      if (sbReviseMatch && method === "POST") {
+        const [, srTenant, srProject] = sbReviseMatch.map(decodeURIComponent);
+        const srBody = await parseBody(req).catch(() => ({} as any));
+        const srFeedback = String(srBody?.feedback || "").trim();
+        if (!srFeedback) { jsonResponse(res, 400, { error: "feedback is required" }); return; }
+        const srProj = await loadProject(srTenant, srProject);
+        if (!srProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
+        const srRes = await queueStoryboardGeneration({
+          tenant_id: srTenant,
+          prompt: srProj.prompt || srProj.storyboard?.narrative || srProj.name || "Revise this storyboard",
+          target: "video",
+          project_id: srProject,
+          feedback: srFeedback,
+        });
+        if ("error" in srRes) { jsonResponse(res, 500, { error: srRes.error }); return; }
+        jsonResponse(res, 202, { ok: true, job_id: srRes.job.id, project_id: srProject });
         return;
       }
 

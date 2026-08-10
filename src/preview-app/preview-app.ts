@@ -955,32 +955,79 @@ export function getPreviewHtml(): string {
   .scene-sb-btn:hover { background: #e3e7f5; color: #4f46e5; }
   .scene-quality-badge { cursor: pointer; }
 
-  /* ── Storyboard draft view: the script, before any scene exists ── */
-  .dv-still { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px;
-    border: 1px solid #d8dbe4; margin-bottom: 10px; display: block; background: #eceef4; }
+  /* ── Storyboard draft view: THE TRUE STORYBOARD, one card at a time ──
+     Rail = thumbnail strip (pick a scene). Main = that scene's full card:
+     the photographed frame plus the record (purpose, VO, beats, camera
+     copy, component scripts) and a feedback box. Footer = the board's
+     duration segments + board feedback + Build. */
+  .dv-still { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px;
+    border: 1px solid #d8dbe4; margin-bottom: 14px; display: block; background: #eceef4; }
+  .dv-still-ph { width: 100%; aspect-ratio: 16/9; border-radius: 10px; border: 2px dashed #c9cede;
+    margin-bottom: 14px; display: flex; align-items: center; justify-content: center;
+    color: #9ca3af; font-size: 13px; background: #f0f1f6; }
   #draft-view { position: absolute; inset: 0; overflow: auto; background: #f6f7fa; display: none;
-    padding: 20px 26px 48px; z-index: 5; }
+    padding: 18px 26px 30px; z-index: 5; }
   .dv-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
-    max-width: 920px; margin-bottom: 18px; }
+    max-width: 980px; margin: 0 auto 14px; }
   .dv-title { font-size: 19px; font-weight: 700; color: #111827; }
   .dv-sub { font-size: 12px; color: #6b7280; margin-top: 3px; }
   .dv-narr { font-size: 13px; color: #374151; margin-top: 8px; max-width: 640px; }
-  .dv-card { background: #fff; border: 1px solid #e6e8ef; border-radius: 12px; padding: 14px 16px;
-    box-shadow: 0 1px 2px rgba(15,23,42,0.04);
-    margin-bottom: 12px; max-width: 920px; }
+  .dv-card { background: #fff; border: 1px solid #e6e8ef; border-radius: 12px; padding: 18px 20px;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04); max-width: 980px; margin: 0 auto 14px; }
   .dv-card-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
-  .dv-num { font-size: 11px; font-weight: 700; color: #9ca3af; }
-  .dv-label { font-size: 14px; font-weight: 600; color: #111827; flex: 1; }
-  .dv-dur { font-size: 11px; color: #6b7280; }
-  .dv-purpose { font-size: 12px; color: #4f46e5; margin-bottom: 4px; }
+  .dv-num { font-size: 12px; font-weight: 700; color: #9ca3af; }
+  .dv-label { font-size: 16px; font-weight: 700; color: #111827; flex: 1; }
+  .dv-dur { font-size: 11px; font-weight: 700; color: #fff; background: #4f46e5;
+    padding: 2px 10px; border-radius: 999px; }
+  .dv-purpose { font-size: 13px; color: #4f46e5; margin-bottom: 4px; }
   .dv-notes { font-size: 12.5px; color: #374151; line-height: 1.5; margin-bottom: 8px; }
-  .dv-beats { font-size: 11.5px; color: #6b7280; margin-bottom: 8px; }
-  .dv-beat { margin: 2px 0; }
-  .dv-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .dv-sect { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; color: #6b7280;
+    border-top: 1px solid #eceef4; margin-top: 12px; padding-top: 10px; }
+  .dv-beats { font-size: 12px; color: #374151; }
+  .dv-beat { margin: 5px 0 0 2px; }
+  .dv-beat b { color: #4f46e5; }
+  .dv-beat .tc { color: #9ca3af; font-variant-numeric: tabular-nums; margin-right: 4px; }
+  .dv-beat-vo { color: #9ca3af; font-style: italic; margin-left: 34px; }
+  .dv-mono { font-family: 'SF Mono', 'Menlo', monospace; font-size: 11.5px; color: #374151;
+    margin: 3px 0 0 12px; }
+  .dv-mono.mut { color: #9ca3af; }
+  .dv-comp-type { font-size: 12.5px; font-weight: 700; color: #111827; margin-top: 8px; }
+  .dv-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
   .dv-chip { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
     background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
   .dv-chip.authored { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-  .dv-vo { font-size: 11.5px; color: #6b7280; font-style: italic; margin-top: 8px; }
+  .dv-vo { font-size: 12px; color: #6b7280; font-style: italic; margin-bottom: 2px; }
+  .dv-feedback { display: flex; gap: 8px; margin-top: 14px; }
+  .dv-feedback textarea { flex: 1; resize: vertical; min-height: 40px; border: 1px solid #d8dbe4;
+    border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 12.5px; color: #111827;
+    background: #fafbfe; }
+  .dv-feedback textarea:focus { outline: none; border-color: #a5b4fc; background: #fff; }
+  .dv-feedback button { align-self: flex-end; }
+  /* Rail (scene list) in draft mode */
+  .dv-rail-item { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px;
+    cursor: pointer; border-left: 3px solid transparent; }
+  .dv-rail-item:hover { background: #f2f4fa; }
+  .dv-rail-item.active { background: #eef1fb; border-left-color: #4f46e5; }
+  .dv-rail-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px;
+    border: 1px solid #d8dbe4; background: #eceef4; display: block; }
+  .dv-rail-thumb-ph { width: 100%; aspect-ratio: 16/9; border-radius: 6px; border: 1px dashed #c9cede;
+    background: #f0f1f6; display: flex; align-items: center; justify-content: center;
+    color: #b3b9c9; font-size: 10px; }
+  .dv-rail-label { font-size: 11.5px; font-weight: 600; color: #111827; }
+  .dv-rail-meta { font-size: 10.5px; color: #6b7280; }
+  /* Footer: replaces the (meaningless pre-build) transport bar */
+  #draft-footer { display: none; align-items: center; gap: 14px; padding: 10px 16px;
+    background: #fff; border-top: 1px solid #e6e8ef; }
+  #df-segments { flex: 1; display: flex; gap: 3px; height: 26px; }
+  .df-seg { display: flex; align-items: center; justify-content: center; cursor: pointer;
+    border-radius: 6px; background: #eef1fb; color: #6b7280; font-size: 10.5px; font-weight: 600;
+    min-width: 26px; border: 1px solid transparent; }
+  .df-seg:hover { background: #e3e7f5; }
+  .df-seg.active { background: #4f46e5; color: #fff; }
+  #df-total { font-size: 11.5px; color: #6b7280; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #df-feedback { width: 300px; border: 1px solid #d8dbe4; border-radius: 8px; padding: 7px 10px;
+    font: inherit; font-size: 12px; background: #fafbfe; }
+  #df-feedback:focus { outline: none; border-color: #a5b4fc; background: #fff; }
 
   /* ── Brand kit panel ── */
   #brand-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 300; display: none; }
@@ -1110,6 +1157,17 @@ export function getPreviewHtml(): string {
         <div id="playhead-line" style="display:none"></div>
         </div>
       </span>
+    </div>
+
+    <!-- Draft-mode footer: the board's clock and its two actions. Replaces
+         the transport bar while nothing is built (a scrubber with no film
+         is a dead control). -->
+    <div id="draft-footer">
+      <div id="df-segments"></div>
+      <span id="df-total"></span>
+      <input id="df-feedback" type="text" placeholder="Direct the whole board&hellip; (e.g. tighten scene 2, warmer close)">
+      <button class="btn" id="df-revise" title="Re-draft the storyboard against this feedback (a couple of minutes)">&#8635; Revise</button>
+      <button class="btn btn-primary" id="df-build" title="Generate the scenes from this storyboard (a few minutes)">&#9654; Build scenes</button>
     </div>
   </div>
 
@@ -3740,26 +3798,33 @@ export function getPreviewHtml(): string {
     document.addEventListener('click', function() { r.menu.style.display = 'none'; });
   })();
 
-  // ── Storyboard draft view: a project that is script, not scenes yet ──
-  // Storyboard-state projects used to open into an empty timeline ("No
-  // scenes / Failed to load composite") -- the review step of the
-  // storyboard -> review -> build ladder deserves a real surface.
-  var draftBuild = { job: null, timer: null };
+  // ── Storyboard draft view: THE TRUE STORYBOARD, one card at a time ──
+  // A storyboard-state project opens as the director's working surface:
+  // the rail is a thumbnail strip of photographed frames, the main window
+  // is the selected scene's full card, and the footer carries the board's
+  // clock, board-level feedback and Build. The golden workflow's
+  // iterate-round-and-round loop lives HERE, not only in the MCP.
+  var draftBuild = { job: null, timer: null, kind: null };
+  var draftSel = 0;
   function hideDraftView() {
     var dv = document.getElementById('draft-view');
     if (dv) dv.style.display = 'none';
+    var df = document.getElementById('draft-footer');
+    if (df) df.style.display = 'none';
+    var pb = document.getElementById('playback-bar');
+    if (pb) pb.style.display = '';
     if (draftBuild.timer) { clearTimeout(draftBuild.timer); draftBuild.timer = null; }
-    draftBuild.job = null;
+    draftBuild.job = null; draftBuild.kind = null;
   }
-  function draftChip(c) {
-    if (typeof c === 'string') return '<span class="dv-chip">' + escHtml(c) + '</span>';
-    if (!c || !c.type) return '';
-    var extra = '';
-    var d = c.data || {};
-    if (d.asset) extra = ' · ' + d.asset;
-    else if (d.script && d.script.length) extra = ' · ' + d.script.length + ' actions';
-    else if (Object.keys(d).length) extra = ' · data';
-    return '<span class="dv-chip authored" title="Storyboard-authored data">' + escHtml(c.type + extra) + '</span>';
+  function draftStillUrl(project, i) {
+    // Cache-busted on updated_at so a revision's re-photographed cards
+    // replace the stale frames the moment the board reloads.
+    return '/output/' + encodeURIComponent(project.tenant_id) + '/projects/' +
+      encodeURIComponent(project.project_id) + '/storyboard_card_scene_' + (i + 1) + '.png' +
+      '?v=' + encodeURIComponent(project.updated_at || '');
+  }
+  function draftIsAuthored(s) {
+    return (s.components || []).some(function(c) { return c && typeof c === 'object' && c.type && c.data; });
   }
   function renderDraftView(project) {
     var pc = document.getElementById('preview-container');
@@ -3768,105 +3833,223 @@ export function getPreviewHtml(): string {
     els.previewPlaceholder.style.display = 'none';
     var pw = document.getElementById('preview-wrapper');
     if (pw) pw.style.display = 'none';
+    var scenes = (project.storyboard || {}).scenes || [];
+    if (draftSel >= scenes.length) draftSel = 0;
+    renderDraftCard(project);
+    renderDraftRail(project);
+    renderDraftFooter(project);
+    dv.style.display = 'block';
+  }
+  // The selected scene's card, full size in the main window: the frame
+  // (photographed at the settled moment, camera at rest), then the record
+  // -- purpose, VO, timecoded beats, camera copy, component scripts --
+  // and a feedback box aimed at this scene. "A visual plus text."
+  function renderDraftCard(project) {
+    var dv = document.getElementById('draft-view');
     var sb = project.storyboard || {};
     var scenes = sb.scenes || [];
+    var s = scenes[draftSel];
     var total = 0;
-    scenes.forEach(function(s) { total += Number(s.duration_seconds) || 0; });
+    scenes.forEach(function(x) { total += Number(x.duration_seconds) || 0; });
     var h = '<div class="dv-head"><div>' +
       '<div class="dv-title">' + escHtml(project.name || project.project_id) + '</div>' +
-      '<div class="dv-sub">Storyboard draft — ' + scenes.length + ' scenes · ~' + Math.round(total) + 's · nothing built yet</div>' +
+      '<div class="dv-sub">Storyboard draft — ' + scenes.length + ' scenes · ~' + Math.round(total) + 's · nothing built yet · iterate here, then build once</div>' +
       (sb.narrative ? '<div class="dv-narr">' + escHtml(sb.narrative) + '</div>' : '') +
-      '</div><button class="btn btn-primary" id="dv-build" title="Generate the scenes from this storyboard (a few minutes)">▶ Build scenes</button></div>';
-    scenes.forEach(function(s, i) {
-      h += '<div class="dv-card">' +
-        // THE TRUE STORYBOARD: the still photographed at the scene's settled
-        // moment by storyboard-cards (rendered at the generate stop-point).
-        // onerror removes it, so boards from before the cards existed -- or a
-        // scene whose card failed -- degrade to the text-only card. This file
-        // ships to the browser VERBATIM (never through a compiler), so \' in
-        // an inline handler reaches the JS parser as a bare quote and kills
-        // the whole studio script -- keep handlers quote-free.
-        '<img class="dv-still" src="/output/' + encodeURIComponent(project.tenant_id) + '/projects/' +
-          encodeURIComponent(project.project_id) + '/storyboard_card_scene_' + (i + 1) + '.png' +
-          '" onerror="this.remove()">' +
-        '<div class="dv-card-head"><span class="dv-num">' + (i + 1) + '</span>' +
-        '<span class="dv-label">' + escHtml(s.label || ('Scene ' + (i + 1))) + '</span>' +
-        '<span class="dv-dur">' + (Number(s.duration_seconds) || 0) + 's</span></div>' +
-        (s.purpose ? '<div class="dv-purpose">' + escHtml(s.purpose) + '</div>' : '') +
-        (s.visual_notes ? '<div class="dv-notes">' + escHtml(s.visual_notes) + '</div>' : '');
-      var beats = s.beats || [];
-      if (beats.length) {
-        h += '<div class="dv-beats">';
-        beats.forEach(function(b) {
-          h += '<div class="dv-beat">• <b>' + escHtml(b.label || '') + '</b> (' + (Number(b.duration_seconds) || 0) + 's)' +
-            (b.action ? ' — ' + escHtml(b.action) : '') + '</div>';
-        });
-        h += '</div>';
-      }
-      var comps = s.components || [];
-      if (comps.length || s.template || s.scene_template) {
-        h += '<div class="dv-chips">';
-        // scene_template is {type, data}; s.template is the dead legacy
-        // string. This branch was written before the field was ever
-        // populated, so the object path had never actually rendered -- it
-        // would have printed "template: [object Object]".
-        var tpl = (s.scene_template && s.scene_template.type) || s.template;
-        if (tpl) h += '<span class="dv-chip dv-chip-tpl">' + escHtml('template: ' + tpl) + '</span>';
-        comps.forEach(function(c) { h += draftChip(c); });
-        h += '</div>';
-      }
-      if (s.voiceover_text) h += '<div class="dv-vo">“' + escHtml(s.voiceover_text) + '”</div>';
+      '</div></div>';
+    if (!s) { dv.innerHTML = h + '<div class="dv-card">No scenes in this storyboard.</div>'; return; }
+    h += '<div class="dv-card">';
+    h += draftIsAuthored(s)
+      ? '<img class="dv-still" src="' + escAttr(draftStillUrl(project, draftSel)) + '" onerror="this.remove()">'
+      : '<div class="dv-still-ph">codegen scene — frame appears after build</div>';
+    h += '<div class="dv-card-head"><span class="dv-num">' + String(draftSel + 1).padStart(2, '0') + '</span>' +
+      '<span class="dv-label">' + escHtml(s.label || ('Scene ' + (draftSel + 1))) + '</span>' +
+      '<span class="dv-dur">' + (Number(s.duration_seconds) || 0) + 's</span></div>';
+    if (s.purpose) h += '<div class="dv-purpose">' + escHtml(s.purpose) + '</div>';
+    if (s.voiceover_text) h += '<div class="dv-vo">VO: “' + escHtml(s.voiceover_text) + '”</div>';
+    var tpl = (s.scene_template && s.scene_template.type) || s.template;
+    if (tpl) h += '<div class="dv-chips"><span class="dv-chip dv-chip-tpl">' + escHtml('template: ' + tpl) + '</span></div>';
+    if (s.visual_notes) h += '<div class="dv-sect">VISUAL NOTES</div><div class="dv-notes">' + escHtml(s.visual_notes) + '</div>';
+    var beats = s.beats || [];
+    h += '<div class="dv-sect">BEATS</div>';
+    if (beats.length) {
+      var t = 0;
+      h += '<div class="dv-beats">';
+      beats.forEach(function(b) {
+        h += '<div class="dv-beat"><span class="tc">' + t.toFixed(1) + 's</span><b>' + escHtml(b.label || '') + '</b>' +
+          ' <span style="color:#9ca3af;">(' + (Number(b.duration_seconds) || 0) + 's)</span>' +
+          (b.action ? ' — ' + escHtml(b.action) : '') + '</div>';
+        if (b.voiceover_text) h += '<div class="dv-beat-vo">VO: “' + escHtml(b.voiceover_text) + '”</div>';
+        t += Number(b.duration_seconds) || 0;
+      });
       h += '</div>';
-    });
+    } else h += '<div class="dv-mono mut">(no beats)</div>';
+    // Camera moves are copy at this stage: the frame above is the staging,
+    // this section is the coverage plan the film will shoot.
+    var cams = s.camera_moves || [];
+    if (cams.length) {
+      h += '<div class="dv-sect">CAMERA</div>';
+      cams.forEach(function(m) {
+        h += '<div class="dv-mono">@' + m.at + 's ' + escHtml(m.type || '') +
+          (m.scale ? ' ×' + m.scale : '') + (m.anchor ? ' → ' + escHtml(m.anchor) : '') +
+          (m.duration ? ' (' + m.duration + 's)' : '') + '</div>';
+      });
+    }
+    h += '<div class="dv-sect">COMPONENTS &amp; SCRIPTS</div>';
+    var comps = s.components || [];
+    if (comps.length) {
+      comps.forEach(function(c) {
+        if (typeof c === 'string') { h += '<div class="dv-comp-type">' + escHtml(c) + ' <span style="color:#9ca3af;font-weight:400;">(codegen)</span></div>'; return; }
+        if (!c || !c.type) return;
+        h += '<div class="dv-comp-type">' + escHtml(c.type) + '</div>';
+        var script = (c.data || {}).script || [];
+        if (script.length) {
+          script.forEach(function(a) {
+            var extra = a.text != null ? a.text : (a.result != null ? a.result : (a.tool != null ? a.tool : (a.target != null ? a.target : (a.published_date != null ? a.published_date : ''))));
+            h += '<div class="dv-mono">@' + a.at + ' ' + escHtml(a.action || '') +
+              (extra ? ' “' + escHtml(String(extra).slice(0, 64)) + '”' : '') + '</div>';
+          });
+        } else {
+          h += '<div class="dv-mono mut">(static data, no script)</div>';
+        }
+      });
+    } else h += '<div class="dv-mono mut">(none cast)</div>';
+    h += '<div class="dv-feedback">' +
+      '<textarea id="dv-scene-feedback" placeholder="Direct this scene… (e.g. hold the terminal longer, brighter surface)"></textarea>' +
+      '<button class="btn" id="dv-scene-revise">✎ Revise</button></div>';
+    h += '</div>';
     dv.innerHTML = h;
-    dv.style.display = 'block';
-    // Sidebar mirrors the script so the left rail isn't a dead "No scenes"
-    els.sceneList.innerHTML = scenes.map(function(s, i) {
-      return '<div class="empty-state" style="text-align:left;padding:8px 12px;">' + (i + 1) + '. ' +
-        escHtml(s.label || 'Scene') + '</div>';
-    }).join('') || '<div class="empty-state">Empty storyboard</div>';
-    var btn = document.getElementById('dv-build');
-    if (btn) btn.addEventListener('click', function() { startDraftBuild(project.project_id, btn); });
+    var fb = document.getElementById('dv-scene-feedback');
+    var sceneBtn = document.getElementById('dv-scene-revise');
+    if (sceneBtn) sceneBtn.addEventListener('click', function() {
+      var txt = ((fb && fb.value) || '').trim();
+      if (!txt) { studioStatus('Type the direction for this scene first.', 'err'); return; }
+      startDraftJob(project.project_id, sceneBtn,
+        '/storyboard-revise/' + state.tenantId + '/' + project.project_id,
+        { feedback: 'Scene ' + (draftSel + 1) + ' ("' + (s.label || '') + '"): ' + txt +
+          ' — revise ONLY what this feedback asks; keep the other scenes as they are.' },
+        'revise', '✎ Revise');
+    });
   }
-  function startDraftBuild(projectId, btn) {
-    if (draftBuild.job) return;
+  // The rail: a thumbnail strip of the board. Click a frame, get its card.
+  function renderDraftRail(project) {
+    var scenes = (project.storyboard || {}).scenes || [];
+    els.sceneList.innerHTML = scenes.map(function(s, i) {
+      var frame = draftIsAuthored(s)
+        ? '<img class="dv-rail-thumb" src="' + escAttr(draftStillUrl(project, i)) + '" onerror="this.remove()">'
+        : '<div class="dv-rail-thumb-ph">after build</div>';
+      var beats = (s.beats || []).length;
+      return '<div class="dv-rail-item' + (i === draftSel ? ' active' : '') + '" data-index="' + i + '">' +
+        frame +
+        '<div><div class="dv-rail-label">' + (i + 1) + '. ' + escHtml(s.label || 'Scene') + '</div>' +
+        '<div class="dv-rail-meta">' + (Number(s.duration_seconds) || 0) + 's' + (beats ? ' · ' + beats + ' beats' : '') + '</div></div>' +
+        '</div>';
+    }).join('') || '<div class="empty-state">Empty storyboard</div>';
+    els.sceneList.querySelectorAll('.dv-rail-item').forEach(function(el) {
+      el.addEventListener('click', function() {
+        draftSel = parseInt(el.dataset.index, 10);
+        renderDraftCard(project);
+        renderDraftRail(project);
+        syncDraftFooterActive();
+      });
+    });
+  }
+  // The footer: the board's clock as proportional segments, board-level
+  // feedback, and Build -- the screen's shape says "approve, then build".
+  function renderDraftFooter(project) {
+    var pb = document.getElementById('playback-bar');
+    if (pb) pb.style.display = 'none';
+    var df = document.getElementById('draft-footer');
+    if (!df) return;
+    df.style.display = 'flex';
+    var scenes = (project.storyboard || {}).scenes || [];
+    var total = 0;
+    scenes.forEach(function(s) { total += Number(s.duration_seconds) || 0; });
+    var segs = document.getElementById('df-segments');
+    segs.innerHTML = scenes.map(function(s, i) {
+      var flexw = total ? Math.max(4, (Number(s.duration_seconds) || 0) / total * 100) : 10;
+      return '<div class="df-seg' + (i === draftSel ? ' active' : '') + '" data-index="' + i +
+        '" style="flex:' + flexw.toFixed(2) + '" title="' + escAttr((s.label || '') + ' — ' + (Number(s.duration_seconds) || 0) + 's') + '">' + (i + 1) + '</div>';
+    }).join('');
+    segs.querySelectorAll('.df-seg').forEach(function(el) {
+      el.addEventListener('click', function() {
+        draftSel = parseInt(el.dataset.index, 10);
+        renderDraftCard(project);
+        renderDraftRail(project);
+        syncDraftFooterActive();
+      });
+    });
+    document.getElementById('df-total').textContent = '~' + Math.round(total) + 's';
+    // The footer is a singleton in the skeleton; clone-swap the buttons so
+    // re-renders never stack handlers from previous projects.
+    var reviseBtn = document.getElementById('df-revise');
+    var buildBtn = document.getElementById('df-build');
+    var reviseClone = reviseBtn.cloneNode(true); reviseBtn.parentNode.replaceChild(reviseClone, reviseBtn);
+    var buildClone = buildBtn.cloneNode(true); buildBtn.parentNode.replaceChild(buildClone, buildBtn);
+    reviseClone.addEventListener('click', function() {
+      var input = document.getElementById('df-feedback');
+      var txt = ((input && input.value) || '').trim();
+      if (!txt) { studioStatus('Type the direction for the board first.', 'err'); return; }
+      startDraftJob(project.project_id, reviseClone,
+        '/storyboard-revise/' + state.tenantId + '/' + project.project_id,
+        { feedback: txt }, 'revise', '↻ Revise');
+    });
+    buildClone.addEventListener('click', function() {
+      startDraftJob(project.project_id, buildClone,
+        '/generate-scenes/' + state.tenantId + '/' + project.project_id,
+        {}, 'build', '▶ Build scenes');
+    });
+  }
+  function syncDraftFooterActive() {
+    document.querySelectorAll('#df-segments .df-seg').forEach(function(el) {
+      el.classList.toggle('active', parseInt(el.dataset.index, 10) === draftSel);
+    });
+  }
+  // One draft job at a time (build OR revise): both re-draft the surface,
+  // so both poll the same slot and reload the project when they land --
+  // a revision's reload brings the new board AND its re-photographed cards.
+  function startDraftJob(projectId, btn, url, body, kind, idleLabel) {
+    if (draftBuild.job) { studioStatus('A ' + draftBuild.kind + ' is already running — let it land first.', 'err'); return; }
     btn.disabled = true;
-    btn.textContent = '⏳ Building…';
-    api('POST', '/generate-scenes/' + state.tenantId + '/' + projectId, {})
+    btn.textContent = kind === 'build' ? '⏳ Building…' : '⏳ Revising…';
+    api('POST', url, body)
       .then(function(resp) {
         draftBuild.job = resp.job_id;
-        studioStatus('Building scenes from the storyboard — this takes a few minutes; the film loads here when done.', 'ok');
-        pollDraftBuild(projectId, btn);
+        draftBuild.kind = kind;
+        studioStatus(kind === 'build'
+          ? 'Building scenes from the storyboard — this takes a few minutes; the film loads here when done.'
+          : 'Revising the storyboard against your feedback — the board and its cards refresh when it lands.', 'ok');
+        pollDraftJob(projectId, btn, idleLabel);
       })
       .catch(function(e) {
         btn.disabled = false;
-        btn.textContent = '▶ Build scenes';
-        studioStatus('Could not start the build: ' + e.message, 'err');
+        btn.textContent = idleLabel;
+        studioStatus('Could not start: ' + e.message, 'err');
       });
   }
-  function pollDraftBuild(projectId, btn) {
+  function pollDraftJob(projectId, btn, idleLabel) {
     if (!draftBuild.job) return;
     api('/job/' + state.tenantId + '/' + draftBuild.job).then(function(job) {
       if (!draftBuild.job) return;
       if (job.status === 'completed') {
-        draftBuild.job = null;
-        studioStatus('✓ Scenes built — loading the film.', 'ok');
+        var kind = draftBuild.kind;
+        draftBuild.job = null; draftBuild.kind = null;
+        studioStatus(kind === 'build' ? '✓ Scenes built — loading the film.' : '✓ Storyboard revised — reloading the board.', 'ok');
         loadProject(projectId);
         return;
       }
       if (job.status === 'failed') {
-        draftBuild.job = null;
+        draftBuild.job = null; draftBuild.kind = null;
         btn.disabled = false;
-        btn.textContent = '↻ Retry build';
-        studioStatus('Build failed: ' + (job.error || 'unknown error'), 'err');
+        btn.textContent = '↻ Retry';
+        studioStatus((idleLabel || 'Job') + ' failed: ' + (job.error || 'unknown error'), 'err');
         return;
       }
       var pct = (job.progress && job.progress.percent) || 0;
       var detail = (job.progress && job.progress.detail) || (job.progress && job.progress.step) || '';
-      btn.textContent = '⏳ Building… ' + pct + '%' + (detail ? ' · ' + detail : '');
-      draftBuild.timer = setTimeout(function() { pollDraftBuild(projectId, btn); }, 5000);
+      btn.textContent = '⏳ ' + pct + '%' + (detail ? ' · ' + detail : '');
+      draftBuild.timer = setTimeout(function() { pollDraftJob(projectId, btn, idleLabel); }, 5000);
     }).catch(function() {
-      draftBuild.timer = setTimeout(function() { pollDraftBuild(projectId, btn); }, 8000);
+      draftBuild.timer = setTimeout(function() { pollDraftJob(projectId, btn, idleLabel); }, 8000);
     });
   }
 

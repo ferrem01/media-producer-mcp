@@ -523,6 +523,199 @@ export async function queueBuildFromStoryboard(
   return { job };
 }
 
+/**
+ * Queue the storyboard-stage generation job -- fresh boards AND
+ * feedback-driven revisions (the golden workflow's iterate loop). ONE
+ * path for every caller: the MCP generate tool and Studio's revise
+ * endpoint both land here, which is also what guarantees the cards
+ * re-photograph on every pass.
+ */
+export async function queueStoryboardGeneration(params: {
+  tenant_id: string;
+  prompt: string;
+  target?: string;
+  project_id?: string;
+  feedback?: string;
+  canvas_width?: number;
+  canvas_height?: number;
+  creativity?: number;
+  film_grammar?: import("./llm/creative-director.js").FilmGrammar;
+  visual_system?: import("./llm/creative-director.js").VisualSystem;
+  audio_system?: import("./llm/creative-director.js").AudioSystem;
+  max_revisions?: number;
+  voiceover?: boolean;
+  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
+}): Promise<{ job: { id: string } } | { error: string }> {
+  let llmConfig;
+  try {
+    llmConfig = llmConfigFromEnv();
+  } catch (e: any) {
+    return { error: `LLM not configured: ${e.message}` };
+  }
+
+  const brandKit = await loadBrandKit(params.tenant_id);
+
+  // Build the prompt, incorporating feedback for revisions
+  let storyboardPrompt = params.prompt;
+  if (params.project_id && params.feedback) {
+    const existingProject = await loadProject(params.tenant_id, params.project_id);
+    if (!existingProject) return { error: "Project not found for storyboard revision" };
+    if (existingProject.status !== "storyboard" && existingProject.status !== "draft") {
+      return { error: `Cannot revise storyboard: project is in '${existingProject.status}' state` };
+    }
+    storyboardPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
+    if (existingProject.storyboard?.narrative) {
+      storyboardPrompt += `\n\n## Previous Storyboard Narrative\n${existingProject.storyboard.narrative}`;
+    }
+  }
+
+  // Narration-first storyboarding: when the project already carries a
+  // real speaker recording, transcribe it and hand the builder the
+  // ACTUAL script with timings -- scenes land on spoken sentence
+  // boundaries instead of an invented script, and no TTS will be
+  // layered on it later (the narration rule).
+  if (params.project_id) {
+    try {
+      const proj0 = await loadProject(params.tenant_id, params.project_id);
+      const clip0 = proj0?.speaker_track?.clips?.[0];
+      if (clip0?.source && await whisperAvailable()) {
+        const audioPath = resolveVideoPath(clip0.source);
+        const cacheDir = path.join(projectDir(params.tenant_id, params.project_id), "thumbs");
+        const { segments } = await getTranscript(audioPath, cacheDir);
+        if (segments.length) {
+          const total = segments[segments.length - 1].end;
+          const lines: string[] = [];
+          let buf: string[] = [];
+          let t0 = -1;
+          for (const s of segments) {
+            const w = s.text.trim();
+            if (t0 < 0) t0 = s.start;
+            buf.push(w);
+            if (/[.?!]$/.test(w)) { lines.push(`[${t0.toFixed(1)}s] ${buf.join(" ")}`); buf = []; t0 = -1; }
+          }
+          if (buf.length) lines.push(`[${t0.toFixed(1)}s] ${buf.join(" ")}`);
+          storyboardPrompt += `\n\n## RECORDED NARRATION (the project's speaker track -- this IS the soundtrack)\n` +
+            `Total narration length: ${total.toFixed(1)}s. Scene durations MUST sum to this, and scene cuts MUST land on the sentence boundaries below. ` +
+            `Do NOT write new voiceover scripts (no TTS will be generated on top of this recording); each scene's voiceover_text must QUOTE its span of the narration verbatim.\n` +
+            lines.join("\n");
+          console.log(`  Storyboard: injected recorded narration (${segments.length} words, ${total.toFixed(1)}s)`);
+        }
+      }
+    } catch (e: any) {
+      console.warn(`  Storyboard: narration transcript skipped: ${e?.message || e}`);
+    }
+  }
+
+  // Storyboarding runs the creative director + storyboard builder (two LLM
+  // passes) -- well over a connector's tool timeout -- so run it as an async
+  // job and return a job_id to poll, same as full generation.
+  const sbTarget = (params.target === "component" || params.target === "scene") ? "video" : (params.target || "video") as PipelineTarget;
+  const sbJob = queueJob("generate", params.tenant_id, async (j) => {
+    j.progress = { step: "storyboarding", percent: 10 };
+    const pipelineResult = await runGeneratePipeline({
+      prompt: storyboardPrompt,
+      target: sbTarget,
+      tenant_id: params.tenant_id,
+      llmConfig,
+      onProgress: genProgress(j, 10, 95),
+      brandKit: brandKit || {
+        colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
+        fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
+        style: { border_radius: "12px", motion: "cinematic" as const },
+      },
+      // Social-reel ships to a feed: default the canvas vertical unless
+      // the caller sized it explicitly.
+      canvas: (params.canvas_width && params.canvas_height)
+        ? { width: params.canvas_width, height: params.canvas_height, preset: (params.canvas_height > params.canvas_width ? ("vertical" as const) : ("landscape" as const)), fps: 30, background: "#0f172a" }
+        : params.film_grammar === "social-reel"
+          ? { width: 1080, height: 1920, preset: "vertical" as const, fps: 30, background: "#0f172a" }
+          : { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
+      creativity: params.creativity,
+      film_grammar: params.film_grammar,
+      visual_system: params.visual_system,
+      audio_system: params.audio_system,
+      maxRevisions: params.max_revisions,
+      project_id: params.project_id,
+      voiceover: params.voiceover,
+      voice: params.voice,
+      storyboardOnly: true,
+    });
+    if (pipelineResult.status === "error") throw new Error(pipelineResult.error || "Storyboard failed");
+    let project = pipelineResult.project!;
+
+    // If updating an existing project, copy the storyboard over.
+    if (params.project_id && params.project_id !== project.project_id) {
+      const origProject = await loadProject(params.tenant_id, params.project_id);
+      if (origProject) {
+        origProject.prompt = project.prompt;
+        origProject.storyboard = project.storyboard;
+        origProject.status = "storyboard";
+        origProject.updated_at = new Date().toISOString();
+        await saveProject(origProject);
+        project = origProject;
+      }
+    }
+    j.projectId = project.project_id;
+    // THE TRUE STORYBOARD: render the visual cards for the iterate
+    // loop -- real assembled frames, zero LLM calls. Cards failing
+    // must never fail the storyboard itself (the text board is still
+    // fully usable), so this degrades to a warning.
+    let cardsUrl: string | undefined;
+    let cardStills: Array<string | null> | undefined;
+    try {
+      j.progress = { step: "storyboard-cards", percent: 90, detail: "Photographing the storyboard" };
+      const outDir = projectOutputDir(params.tenant_id, project.project_id);
+      const res = await renderStoryboardCards(project as any, {
+        componentLibDir: config.componentLibDir, gsapDir: config.gsapDir, outDir,
+      });
+      cardsUrl = outputUrl(params.tenant_id, project.project_id, path.basename(res.sheet));
+      cardStills = res.stills.map((s) =>
+        s ? outputUrl(params.tenant_id, project.project_id, path.basename(s)) : null);
+    } catch (e: any) {
+      console.warn(`  storyboard-cards failed (storyboard still usable): ${e?.message}`);
+    }
+    j.progress = { step: "complete", percent: 100 };
+    return {
+      status: "storyboard",
+      project_id: project.project_id,
+      preview_url: previewUrl(params.tenant_id, project.project_id),
+      ...(cardsUrl ? { storyboard_cards_url: cardsUrl, scene_still_urls: cardStills } : {}),
+      storyboard: project.storyboard,
+    };
+  });
+  return { job: sbJob };
+}
+
+/**
+ * Re-photograph a draft board's cards after a direct storyboard edit (the
+ * MCP update tool), so the stills never lie about the data under them.
+ * Fire-and-forget with a short settle delay and a per-project in-flight
+ * guard -- an edit burst gets one shoot, and a failure only warns (the
+ * text board stays authoritative).
+ */
+const cardsReshootInFlight = new Set<string>();
+export function reshootStoryboardCardsSoon(tenantId: string, projectId: string): void {
+  const key = `${tenantId}/${projectId}`;
+  if (cardsReshootInFlight.has(key)) return;
+  cardsReshootInFlight.add(key);
+  setTimeout(async () => {
+    try {
+      const project = await loadProject(tenantId, projectId);
+      if (project?.storyboard?.scenes?.length && project.status === "storyboard") {
+        await renderStoryboardCards(project as any, {
+          componentLibDir: config.componentLibDir,
+          gsapDir: config.gsapDir,
+          outDir: projectOutputDir(tenantId, projectId),
+        });
+      }
+    } catch (e: any) {
+      console.warn(`  storyboard-cards refresh failed (board still usable): ${e?.message}`);
+    } finally {
+      cardsReshootInFlight.delete(key);
+    }
+  }, 1500);
+}
+
 export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "media-producer-mcp",
@@ -1000,6 +1193,9 @@ export function createMcpServer(): McpServer {
 
         project.updated_at = new Date().toISOString();
         await saveProject(project);
+        // The stills must follow the data: a direct board edit re-photographs
+        // the cards in the background.
+        reshootStoryboardCardsSoon(params.tenant_id, project.project_id);
         return ok({ status: "updated", project_id: project.project_id, storyboard: project.storyboard });
       }
 
@@ -2291,148 +2487,27 @@ export function createMcpServer(): McpServer {
 
         // ── Storyboard mode: run unified pipeline in storyboard-only mode ──
         if (effectiveMode === "storyboard") {
-          let llmConfig;
-          try {
-            llmConfig = llmConfigFromEnv();
-          } catch (e: any) {
-            return err(`LLM not configured: ${e.message}`);
-          }
-
-          const brandKit = await loadBrandKit(params.tenant_id);
-
-          // Build the prompt, incorporating feedback for revisions
-          let storyboardPrompt = params.prompt;
-          if (params.project_id && params.feedback) {
-            const existingProject = await loadProject(params.tenant_id, params.project_id);
-            if (!existingProject) return err("Project not found for storyboard revision");
-            if (existingProject.status !== "storyboard" && existingProject.status !== "draft") {
-              return err(`Cannot revise storyboard: project is in '${existingProject.status}' state`);
-            }
-            storyboardPrompt += `\n\n## Revision Feedback\n${params.feedback}`;
-            if (existingProject.storyboard?.narrative) {
-              storyboardPrompt += `\n\n## Previous Storyboard Narrative\n${existingProject.storyboard.narrative}`;
-            }
-          }
-
-          // Narration-first storyboarding: when the project already carries a
-          // real speaker recording, transcribe it and hand the builder the
-          // ACTUAL script with timings -- scenes land on spoken sentence
-          // boundaries instead of an invented script, and no TTS will be
-          // layered on it later (the narration rule).
-          if (params.project_id) {
-            try {
-              const proj0 = await loadProject(params.tenant_id, params.project_id);
-              const clip0 = proj0?.speaker_track?.clips?.[0];
-              if (clip0?.source && await whisperAvailable()) {
-                const audioPath = resolveVideoPath(clip0.source);
-                const cacheDir = path.join(projectDir(params.tenant_id, params.project_id), "thumbs");
-                const { segments } = await getTranscript(audioPath, cacheDir);
-                if (segments.length) {
-                  const total = segments[segments.length - 1].end;
-                  const lines: string[] = [];
-                  let buf: string[] = [];
-                  let t0 = -1;
-                  for (const s of segments) {
-                    const w = s.text.trim();
-                    if (t0 < 0) t0 = s.start;
-                    buf.push(w);
-                    if (/[.?!]$/.test(w)) { lines.push(`[${t0.toFixed(1)}s] ${buf.join(" ")}`); buf = []; t0 = -1; }
-                  }
-                  if (buf.length) lines.push(`[${t0.toFixed(1)}s] ${buf.join(" ")}`);
-                  storyboardPrompt += `\n\n## RECORDED NARRATION (the project's speaker track -- this IS the soundtrack)\n` +
-                    `Total narration length: ${total.toFixed(1)}s. Scene durations MUST sum to this, and scene cuts MUST land on the sentence boundaries below. ` +
-                    `Do NOT write new voiceover scripts (no TTS will be generated on top of this recording); each scene's voiceover_text must QUOTE its span of the narration verbatim.\n` +
-                    lines.join("\n");
-                  console.log(`  Storyboard: injected recorded narration (${segments.length} words, ${total.toFixed(1)}s)`);
-                }
-              }
-            } catch (e: any) {
-              console.warn(`  Storyboard: narration transcript skipped: ${e?.message || e}`);
-            }
-          }
-
-          // Storyboarding runs the creative director + storyboard builder (two LLM
-          // passes) -- well over a connector's tool timeout -- so run it as an async
-          // job and return a job_id to poll, same as full generation.
-          const sbTarget = (params.target === "component" || params.target === "scene") ? "video" : (params.target || "video") as PipelineTarget;
-          const sbJob = queueJob("generate", params.tenant_id, async (j) => {
-            j.progress = { step: "storyboarding", percent: 10 };
-            const pipelineResult = await runGeneratePipeline({
-              prompt: storyboardPrompt,
-              target: sbTarget,
-              tenant_id: params.tenant_id,
-              llmConfig,
-              onProgress: genProgress(j, 10, 95),
-              brandKit: brandKit || {
-                colors: { primary: "#5B21B6", secondary: "#7C3AED", accent: "#A78BFA", background: "#0f172a", surface: "#1e293b", text: "#ffffff", text_muted: "#94a3b8" },
-                fonts: [{ family: "Inter", source: "google" as const, weights: [400, 600, 800] }],
-                style: { border_radius: "12px", motion: "cinematic" as const },
-              },
-              // Social-reel ships to a feed: default the canvas vertical unless
-              // the caller sized it explicitly.
-              canvas: (params.canvas_width && params.canvas_height)
-                ? { width: params.canvas_width, height: params.canvas_height, preset: (params.canvas_height > params.canvas_width ? ("vertical" as const) : ("landscape" as const)), fps: 30, background: "#0f172a" }
-                : params.film_grammar === "social-reel"
-                  ? { width: 1080, height: 1920, preset: "vertical" as const, fps: 30, background: "#0f172a" }
-                  : { width: 1920, height: 1080, preset: "landscape" as const, fps: 30, background: "#0f172a" },
-              creativity: params.creativity,
-              film_grammar: params.film_grammar,
-              visual_system: params.visual_system,
-              audio_system: params.audio_system,
-              maxRevisions: params.max_revisions,
-              project_id: params.project_id,
-              voiceover: params.voiceover,
-              voice: params.voice,
-              storyboardOnly: true,
-            });
-            if (pipelineResult.status === "error") throw new Error(pipelineResult.error || "Storyboard failed");
-            let project = pipelineResult.project!;
-
-            // If updating an existing project, copy the storyboard over.
-            if (params.project_id && params.project_id !== project.project_id) {
-              const origProject = await loadProject(params.tenant_id, params.project_id);
-              if (origProject) {
-                origProject.prompt = project.prompt;
-                origProject.storyboard = project.storyboard;
-                origProject.status = "storyboard";
-                origProject.updated_at = new Date().toISOString();
-                await saveProject(origProject);
-                project = origProject;
-              }
-            }
-            j.projectId = project.project_id;
-            // THE TRUE STORYBOARD: render the visual cards for the iterate
-            // loop -- real assembled frames, zero LLM calls. Cards failing
-            // must never fail the storyboard itself (the text board is still
-            // fully usable), so this degrades to a warning.
-            let cardsUrl: string | undefined;
-            let cardStills: Array<string | null> | undefined;
-            try {
-              j.progress = { step: "storyboard-cards", percent: 90, detail: "Photographing the storyboard" };
-              const outDir = projectOutputDir(params.tenant_id, project.project_id);
-              const res = await renderStoryboardCards(project as any, {
-                componentLibDir: config.componentLibDir, gsapDir: config.gsapDir, outDir,
-              });
-              cardsUrl = outputUrl(params.tenant_id, project.project_id, path.basename(res.sheet));
-              cardStills = res.stills.map((s) =>
-                s ? outputUrl(params.tenant_id, project.project_id, path.basename(s)) : null);
-            } catch (e: any) {
-              console.warn(`  storyboard-cards failed (storyboard still usable): ${e?.message}`);
-            }
-            j.progress = { step: "complete", percent: 100 };
-            return {
-              status: "storyboard",
-              project_id: project.project_id,
-              preview_url: previewUrl(params.tenant_id, project.project_id),
-              ...(cardsUrl ? { storyboard_cards_url: cardsUrl, scene_still_urls: cardStills } : {}),
-              storyboard: project.storyboard,
-            };
+          const sbRes = await queueStoryboardGeneration({
+            tenant_id: params.tenant_id,
+            prompt: params.prompt,
+            target: params.target,
+            project_id: params.project_id,
+            feedback: params.feedback,
+            canvas_width: params.canvas_width,
+            canvas_height: params.canvas_height,
+            creativity: params.creativity,
+            film_grammar: params.film_grammar,
+            visual_system: params.visual_system as any,
+            audio_system: params.audio_system as any,
+            max_revisions: params.max_revisions,
+            voiceover: params.voiceover,
+            voice: params.voice,
           });
-
+          if ("error" in sbRes) return err(sbRes.error);
           return ok({
             status: "queued",
-            job_id: sbJob.id,
-            message: `Building the storyboard. Poll with get(target='job', job_id='${sbJob.id}') or job(action='wait', job_id='${sbJob.id}').`,
+            job_id: sbRes.job.id,
+            message: `Building the storyboard. Poll with get(target='job', job_id='${sbRes.job.id}') or job(action='wait', job_id='${sbRes.job.id}').`,
           });
         }
 
