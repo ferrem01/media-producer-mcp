@@ -1903,14 +1903,16 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         const [, srTenant, srProject] = sbReviseMatch.map(decodeURIComponent);
         const srBody = await parseBody(req).catch(() => ({} as any));
         const srFeedback = String(srBody?.feedback || "").trim();
-        if (!srFeedback) { jsonResponse(res, 400, { error: "feedback is required" }); return; }
+        const srDelete = srBody.delete_index !== undefined;
+        if (!srFeedback && !srDelete) { jsonResponse(res, 400, { error: "feedback is required" }); return; }
         const srProj = await loadProject(srTenant, srProject);
         if (!srProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        const surgical = srBody.scene_index !== undefined || srBody.insert_at !== undefined;
+        const surgical = srBody.scene_index !== undefined || srBody.insert_at !== undefined || srDelete;
         const srRes = surgical
           ? queueSurgicalSceneOp(srTenant, srProject, {
               scene_index: srBody.scene_index !== undefined ? Number(srBody.scene_index) : undefined,
               insert_at: srBody.insert_at !== undefined ? Number(srBody.insert_at) : undefined,
+              delete_index: srDelete ? Number(srBody.delete_index) : undefined,
               feedback: srFeedback,
             })
           : await queueStoryboardGeneration({

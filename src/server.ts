@@ -699,14 +699,19 @@ export function queueSurgicalSceneOp(
   projectId: string,
   op: import("./llm/storyboard-surgical.js").SurgicalSceneOp,
 ): { job: { id: string } } | { error: string } {
-  let llmConfig;
-  try {
-    llmConfig = llmConfigFromEnv();
-  } catch (e: any) {
-    return { error: `LLM not configured: ${e.message}` };
+  // Delete is pure data; only the LLM ops (revise/insert) need a key.
+  let llmConfig: any = null;
+  if (op.delete_index === undefined) {
+    try {
+      llmConfig = llmConfigFromEnv();
+    } catch (e: any) {
+      return { error: `LLM not configured: ${e.message}` };
+    }
   }
   const job = queueJob("generate", tenantId, async (j) => {
-    j.progress = { step: "scene-revise", percent: 20, detail: op.insert_at !== undefined ? "Authoring the new scene" : "Revising the scene" };
+    j.progress = { step: "scene-revise", percent: 20,
+      detail: op.delete_index !== undefined ? "Removing the scene"
+        : op.insert_at !== undefined ? "Authoring the new scene" : "Revising the scene" };
     const project = await loadProject(tenantId, projectId);
     if (!project?.storyboard?.scenes) throw new Error("Project has no storyboard");
     if (project.status !== "storyboard" && project.status !== "draft") {
