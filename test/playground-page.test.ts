@@ -34,4 +34,9 @@ describe("the playground page's client script", () => {
     expect(html).toContain("runScript\\s*\\(");
     expect(html).toContain("data\\.([a-zA-Z_]");
   });
+
+  it("fetches the tenant component schema so captured components get a form", () => {
+    expect(html).toContain("/schema");
+    expect(html).toMatch(/tenant-components[^\n]*schema/);
+  });
 });

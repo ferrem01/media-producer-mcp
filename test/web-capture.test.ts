@@ -141,6 +141,7 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
         .controls { margin-left: auto; flex: none; }
       </style></head><body>
       <div class="post" id="post">
+        <h2 style="margin:0;"><span class="vh">Feed post</span></h2>
         <div class="hdr">
           <div class="meta-grid"><div style="display:contents"><div class="meta-col">
             <div class="name-grid"><div class="name-cell">Jake Stein<span class="vh">View Jake Stein's profile</span><span style="display:inline-block;position:relative;width:16px;height:16px;"><svg id="badge" width="16" height="16" viewBox="0 0 16 16" style="position:absolute;top:50%;left:50%;transform:translate(-8px,-8px);"><rect width="16" height="16" fill="#c37d16"/></svg></span> · 1st</div></div>
@@ -181,6 +182,11 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       await page.keyboard.press("c");
       await page.waitForFunction(() => (window as any).__qcLastBundle, { timeout: 15_000 });
       const bundle = await page.evaluate(() => (window as any).__qcLastBundle);
+
+      // The suggested name reads VISIBLE text -- the invisible a11y "Feed
+      // post" heading (present on every LinkedIn card) must not win.
+      expect(bundle.name).toContain("jake-stein");
+      expect(bundle.name).not.toContain("feed-post");
 
       // Render the REPLICA alone and measure where things landed.
       const rf = path.join(dir, "replica.html");
