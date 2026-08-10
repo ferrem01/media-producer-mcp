@@ -120,28 +120,36 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
   // The serializer now rebuilds absolute geometry against containing blocks
   // INSIDE the capture. This fixture is shaped like a LinkedIn post header.
   it("keeps the name, ellipsized title, stats bar and absolute chrome in place", async () => {
+    // Mirrors LinkedIn's SDUI feed structure (from a real logged-in capture):
+    // nested single-track GRIDS placing items with grid-column:-1, wrapped in
+    // display:contents -- computed grid values are not round-trippable, so
+    // the serializer must freeze grid geometry instead of re-baking it.
     const pageHtml = `<!doctype html><html><head><style>
         body { margin: 40px; font-family: Arial; background: #f4f4f8; }
-        .post { width: 550px; background: #fff; border-radius: 8px; padding: 16px; }
+        .post { width: 550px; background: #fff; border-radius: 8px; padding: 16px; overflow: hidden; }
         .hdr { display: flex; align-items: flex-start; }
-        .meta { display: flex; flex-direction: column; flex: 1; min-width: 0; overflow: hidden; text-decoration: none; color: inherit; }
-        .name { font-weight: 600; font-size: 14px; color: #191919; }
+        .meta-grid { display: grid; flex: 1; min-width: 0; }
+        .meta-col { grid-column: -1; grid-row: 1; display: flex; flex-direction: column; }
+        .name-grid { display: grid; }
+        .name-cell { grid-column: -1; grid-row: 1; font-weight: 600; font-size: 14px; color: #191919; }
         .vh { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; width: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
         .title { font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .controls { margin-left: auto; flex: none; }
       </style></head><body>
       <div class="post" id="post">
         <div class="hdr">
-          <a class="meta" href="/in/jake">
-            <span class="name">Jake Stein<span class="vh">View Jake Stein's profile</span></span>
+          <div class="meta-grid"><div style="display:contents"><div class="meta-col">
+            <div class="name-grid"><div class="name-cell">Jake Stein<span class="vh">View Jake Stein's profile</span></div></div>
             <span class="title">Co-founder and CEO at Common Paper | Making contracts better for everyone</span>
-          </a>
+          </div></div></div>
           <div class="controls"><button>x</button></div>
         </div>
         <div>I started going to church. No, really.</div>
-        <div class="social" style="position:relative;margin-top:10px;padding-top:8px;">
-          <span class="counts">973 reactions - 147 comments</span>
-          <button style="position:absolute;right:0;top:8px;">go</button>
+        <div class="social" style="display:grid;margin-top:10px;padding-top:8px;">
+          <div style="grid-column:-1;grid-row:1;position:relative;">
+            <span class="counts">973 reactions - 147 comments</span>
+            <button style="position:absolute;right:0;top:0;">go</button>
+          </div>
         </div>
       </div></body></html>`;
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-hdr-"));
@@ -176,7 +184,7 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       const r = await p2.evaluate(`(() => {
         const all = [...document.body.firstElementChild.querySelectorAll("*")];
         const leaf = (t) => all.find((e) => (e.textContent || "").includes(t) && ![...e.children].some((ch) => (ch.textContent || "").includes(t)));
-        const nameEl = all.find((e) => e.textContent.trim().startsWith("Jake Stein") && e.children.length <= 1);
+        const nameEl = all.filter((e) => e.textContent.trim().startsWith("Jake Stein") && e.children.length <= 1).pop();
         const stats = leaf("973 reactions");
         const goBtn = [...document.querySelectorAll("button")].find((b) => b.textContent === "go");
         const card = document.body.firstElementChild.getBoundingClientRect();

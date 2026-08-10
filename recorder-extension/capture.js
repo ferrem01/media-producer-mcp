@@ -15,8 +15,14 @@
   const STYLE_PROPS = [
     "display", "position", "top", "right", "bottom", "left", "z-index", "flex", "flex-direction",
     "flex-wrap", "flex-grow", "flex-shrink", "flex-basis", "align-items", "align-self", "align-content",
-    "justify-content", "gap", "row-gap", "column-gap", "grid-template-columns", "grid-template-rows",
-    "grid-column", "grid-row", "order", "float", "clear", "overflow", "overflow-x", "overflow-y",
+    "justify-content", "gap", "row-gap", "column-gap",
+    // NOTE: grid-template-*/grid-column/grid-row are deliberately ABSENT.
+    // Computed grid values are not round-trippable: the used template
+    // includes implicit tracks, and re-applied line numbers (LinkedIn places
+    // with grid-column:-1) change meaning against the frozen template --
+    // items get shoved into phantom columns and clipped. Grids are frozen
+    // geometrically instead (container -> block, items -> absolute).
+    "order", "float", "clear", "overflow", "overflow-x", "overflow-y",
     "width", "height", "min-width", "min-height", "max-width", "max-height", "box-sizing",
     "margin-top", "margin-right", "margin-bottom", "margin-left",
     "padding-top", "padding-right", "padding-bottom", "padding-left",
@@ -220,6 +226,21 @@
       const defaults = probeDefaults(tag);
       const parts = [];
       const pos = cs.position;
+      // GRID FREEZE (see STYLE_PROPS note): a grid CONTAINER becomes a plain
+      // positioned block -- its baked width/height already hold its size --
+      // and each grid ITEM is pinned absolutely at its measured offset
+      // inside it. display:contents wrappers are transparent to grid, so
+      // item detection walks up through them.
+      const isGridContainer = cs.display === "grid" || cs.display === "inline-grid";
+      let gridParent = null;
+      if (o !== root) {
+        let p = o.parentElement;
+        while (p && getComputedStyle(p).display === "contents" && p !== root) p = p.parentElement;
+        if (p) {
+          const pd = getComputedStyle(p).display;
+          if (pd === "grid" || pd === "inline-grid") gridParent = p;
+        }
+      }
       for (const p of STYLE_PROPS) {
         // Offsets are a TRAP for positioned elements: getComputedStyle
         // resolves auto top/left/right/bottom to USED page coordinates
@@ -232,7 +253,25 @@
         if (!v || v === defaults[p]) continue;
         parts.push(p + ":" + v);
       }
-      if (pos === "absolute" || pos === "fixed") {
+      if (isGridContainer) {
+        parts.push("display:" + (cs.display === "inline-grid" ? "inline-block" : "block"));
+        if (pos === "static") parts.push("position:relative");
+      }
+      if (gridParent && cs.display !== "contents" && pos !== "absolute" && pos !== "fixed") {
+        // Pin the item where the grid put it (relative to the container's
+        // padding box; absolute offsets are measured from inside the border).
+        const gr = gridParent.getBoundingClientRect();
+        const er = o.getBoundingClientRect();
+        const gcs = getComputedStyle(gridParent);
+        const bt = parseFloat(gcs.borderTopWidth) || 0;
+        const bl = parseFloat(gcs.borderLeftWidth) || 0;
+        parts.push(
+          "position:absolute",
+          "top:" + Math.round(er.top - gr.top - bt) + "px",
+          "left:" + Math.round(er.left - gr.left - bl) + "px",
+          "right:auto", "bottom:auto", "margin:0",
+        );
+      } else if (pos === "absolute" || pos === "fixed") {
         // Rebuild geometry against the nearest positioned ancestor INSIDE the
         // capture (its position style is inlined, so the replica has the same
         // containing block) or against the capture root itself (the clone
