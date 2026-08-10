@@ -462,6 +462,7 @@
       .ab .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: #6b7280; margin-bottom: 5px; }
       .ab iframe, .ab img { width: 100%; border: 1px solid #d8dbe4; border-radius: 8px; background: #f6f7fa; display: block; }
       .subs { margin: 10px 0 0; color: #92400e; background: #fef3c7; border-radius: 8px; padding: 8px 12px; font-size: 12px; display: none; }
+      .flbl { margin-top: 14px; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: #6b7280; }
       .row { display: flex; gap: 10px; margin-top: 14px; }
       .row input, .row textarea { flex: 1; border: 1px solid #d8dbe4; border-radius: 8px; padding: 8px 10px; font: inherit; }
       .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
@@ -479,7 +480,8 @@
         <div><div class="lbl">REFERENCE (the page)</div><img alt=""></div>
       </div>
       <div class="subs"></div>
-      <div class="row"><input class="name" placeholder="component-name" spellcheck="false"><button class="reselect">↩ Reselect</button></div>
+      <div class="flbl">COMPONENT NAME — suggested from the page, yours to edit</div>
+      <div class="row" style="margin-top:4px;"><input class="name" placeholder="component-name" spellcheck="false"><button class="reselect">↩ Reselect</button></div>
       <div class="row"><textarea class="desc" rows="2" placeholder="One-line description (what the storyboard reads when casting this)"></textarea></div>
       <div class="actions"><span class="status"></span><button class="cancel">Cancel</button><button class="primary create">Create component</button></div>
     </div></div>`;

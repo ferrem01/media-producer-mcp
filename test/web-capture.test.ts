@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const tmpData = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-"));
 process.env.MP_DATA_DIR = tmpData;
 
-const { mintCapturedComponent, sanitizeCapturedHtml } = await import("../src/core/web-capture.js");
+const { mintCapturedComponent, sanitizeCapturedHtml, shieldDataUris, reinflateDataUris } = await import("../src/core/web-capture.js");
 const { assembleScene } = await import("../src/core/scene-assembler.js");
 
 const FIXTURE_HTML = `
@@ -252,6 +252,29 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   }, 300_000);
+});
+
+describe("asset shield (LLM edits never see or lose the frozen pixels)", () => {
+  it("round-trips data URIs through placeholder space", () => {
+    const big = "data:image/png;base64," + "A".repeat(4000);
+    const font = "data:font/woff2;base64," + "B".repeat(4000);
+    const tiny = "data:image/gif;base64,R0lGOD"; // small inline icons stay put
+    const source = `<img src="${big}"><style>@font-face{src:url(${font})}</style><img src="${tiny}">`;
+    const { slim, assets } = shieldDataUris(source);
+    expect(assets).toHaveLength(2);
+    expect(slim).not.toContain("AAAA");
+    expect(slim).toContain("data:asset/frozen;qc=0");
+    expect(slim).toContain(tiny);
+    expect(slim.length).toBeLessThan(400);
+    // The LLM edits the slim source (here: appends a div) -- reinflation
+    // restores every original byte.
+    const edited = slim.replace("</style>", "</style><div>new</div>");
+    const restored = reinflateDataUris(edited, assets);
+    expect(restored).toContain(big);
+    expect(restored).toContain(font);
+    expect(restored).toContain("<div>new</div>");
+    expect(restored).not.toContain("data:asset/frozen");
+  });
 });
 
 describe("sanitizeCapturedHtml", () => {

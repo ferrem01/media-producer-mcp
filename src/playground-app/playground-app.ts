@@ -347,6 +347,10 @@ select.field-input { cursor: pointer; }
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 8px;
 }
+.script-help { margin: 4px 0 10px; font-size: 11px; color: #94a3b8; }
+.script-help summary { cursor: pointer; color: #818cf8; font-weight: 600; }
+.script-help-row { margin: 6px 0 0 12px; line-height: 1.5; }
+.script-help-row b { color: #e2e8f0; }
 .script-header h4 {
   font-size: 12px; font-weight: 700; color: #818cf8;
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -1554,6 +1558,27 @@ select.field-input { cursor: pointer; }
     header.appendChild(addBtn);
 
     section.appendChild(header);
+
+    // The verbs are documented in the schema (script_actions[].description)
+    // -- surface them, or nobody knows what "count-up" or "highlight" does.
+    var described = availableActions.filter(function(a) { return a && a.description; });
+    if (described.length) {
+      var help = document.createElement('details');
+      help.className = 'script-help';
+      var sum = document.createElement('summary');
+      sum.textContent = 'What can this component do? (' + described.length + ' actions)';
+      help.appendChild(sum);
+      described.forEach(function(a) {
+        var row = document.createElement('div');
+        row.className = 'script-help-row';
+        var b = document.createElement('b');
+        b.textContent = a.action;
+        row.appendChild(b);
+        row.appendChild(document.createTextNode(' — ' + a.description));
+        help.appendChild(row);
+      });
+      section.appendChild(help);
+    }
 
     // Action name list from available actions
     var actionNames = availableActions.map(function(a) { return a.action; });
