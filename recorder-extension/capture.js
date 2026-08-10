@@ -46,6 +46,10 @@
     }
     let el;
     try { el = probeDoc.createElement(tag); } catch (e) { el = probeDoc.createElement("div"); }
+    // An <a> without href gets NO UA underline/blue, which would make the
+    // probe defaults lie (a site's text-decoration:none would look like the
+    // default and be skipped -- replica links turn blue underlined).
+    if (tag === "a") el.setAttribute("href", "#");
     probeDoc.body.appendChild(el);
     const cs = probeDoc.defaultView.getComputedStyle(el);
     const out = {};
@@ -204,6 +208,7 @@
     const origWalk = [root, ...root.querySelectorAll("*")];
     const cloneWalk = [clone, ...clone.querySelectorAll("*")];
     const fontFamilies = new Set();
+    const rootRect = root.getBoundingClientRect();
 
     for (let i = 0; i < origWalk.length; i++) {
       const o = origWalk[i], c = cloneWalk[i];
@@ -214,15 +219,45 @@
       if (cs.display === "none" || cs.visibility === "hidden") { c.remove(); continue; }
       const defaults = probeDefaults(tag);
       const parts = [];
+      const pos = cs.position;
       for (const p of STYLE_PROPS) {
+        // Offsets are a TRAP for positioned elements: getComputedStyle
+        // resolves auto top/left/right/bottom to USED page coordinates
+        // (top:56px means 56px from the ORIGINAL viewport), which flings
+        // replica elements to alien positions. Only position:relative keeps
+        // its computed offsets (there auto stays auto); absolute/fixed get
+        // reconstructed geometry below.
+        if ((p === "top" || p === "right" || p === "bottom" || p === "left") && pos !== "relative") continue;
         const v = cs.getPropertyValue(p);
         if (!v || v === defaults[p]) continue;
         parts.push(p + ":" + v);
+      }
+      if (pos === "absolute" || pos === "fixed") {
+        // Rebuild geometry against the nearest positioned ancestor INSIDE the
+        // capture (its position style is inlined, so the replica has the same
+        // containing block) or against the capture root itself (the clone
+        // root is forced position:relative below; the shell's .cap-body is
+        // relative too).
+        const op = o.offsetParent;
+        let topV, leftV;
+        if (op && op !== o && root.contains(op) && root !== op) {
+          topV = o.offsetTop; leftV = o.offsetLeft;
+        } else {
+          const er = o.getBoundingClientRect();
+          topV = er.top - rootRect.top; leftV = er.left - rootRect.left;
+        }
+        parts.push("position:absolute", "top:" + Math.round(topV) + "px", "left:" + Math.round(leftV) + "px", "right:auto", "bottom:auto");
+      } else if (pos === "sticky") {
+        // Sticky offsets are meaningless in a frozen replica.
+        parts.push("position:relative");
       }
       fontFamilies.add(cs.fontFamily);
       c.removeAttribute("class");
       c.removeAttribute("id");
       c.setAttribute("style", parts.join(";"));
+      // The clone root must BE a containing block so root-pinned absolute
+      // descendants land where they lived.
+      if (i === 0 && pos === "static") c.setAttribute("style", parts.join(";") + ";position:relative");
       // Freeze live form state into attributes.
       if (tag === "input") { c.setAttribute("value", o.value || ""); if (o.checked) c.setAttribute("checked", ""); }
       if (tag === "textarea") c.textContent = o.value || "";
