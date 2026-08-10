@@ -126,12 +126,16 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
     // the serializer must freeze grid geometry instead of re-baking it.
     const pageHtml = `<!doctype html><html><head><style>
         body { margin: 40px; font-family: Arial; background: #f4f4f8; }
-        .post { width: 550px; background: #fff; border-radius: 8px; padding: 16px; overflow: hidden; }
+        /* 9px base font like the real SDUI card -- children override it.
+           The name is sized at EXACTLY the UA default (16px): a serializer
+           that diffs inherited props against UA defaults skips it, and the
+           replica name then inherits the 9px base and renders tiny. */
+        .post { width: 550px; background: #fff; border-radius: 8px; padding: 16px; overflow: hidden; font-size: 9px; }
         .hdr { display: flex; align-items: flex-start; }
         .meta-grid { display: grid; flex: 1; min-width: 0; }
         .meta-col { grid-column: -1; grid-row: 1; display: flex; flex-direction: column; }
         .name-grid { display: grid; }
-        .name-cell { grid-column: -1; grid-row: 1; font-weight: 600; font-size: 14px; color: #191919; }
+        .name-cell { grid-column: -1; grid-row: 1; font-weight: 600; font-size: 16px; color: #191919; }
         .vh { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; width: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
         .title { font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .controls { margin-left: auto; flex: none; }
@@ -139,7 +143,7 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       <div class="post" id="post">
         <div class="hdr">
           <div class="meta-grid"><div style="display:contents"><div class="meta-col">
-            <div class="name-grid"><div class="name-cell">Jake Stein<span class="vh">View Jake Stein's profile</span></div></div>
+            <div class="name-grid"><div class="name-cell">Jake Stein<span class="vh">View Jake Stein's profile</span><span style="display:inline-block;position:relative;width:16px;height:16px;"><svg id="badge" width="16" height="16" viewBox="0 0 16 16" style="position:absolute;top:50%;left:50%;transform:translate(-8px,-8px);"><rect width="16" height="16" fill="#c37d16"/></svg></span> · 1st</div></div>
             <span class="title">Co-founder and CEO at Common Paper | Making contracts better for everyone</span>
           </div></div></div>
           <div class="controls"><button>x</button></div>
@@ -184,12 +188,14 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       const r = await p2.evaluate(`(() => {
         const all = [...document.body.firstElementChild.querySelectorAll("*")];
         const leaf = (t) => all.find((e) => (e.textContent || "").includes(t) && ![...e.children].some((ch) => (ch.textContent || "").includes(t)));
-        const nameEl = all.filter((e) => e.textContent.trim().startsWith("Jake Stein") && e.children.length <= 1).pop();
+        const nameEl = all.filter((e) => e.textContent.trim().startsWith("Jake Stein") && e.children.length <= 3).pop();
         const stats = leaf("973 reactions");
         const goBtn = [...document.querySelectorAll("button")].find((b) => b.textContent === "go");
+        const badge = document.querySelector("svg");
         const card = document.body.firstElementChild.getBoundingClientRect();
         return {
-          name: nameEl ? { r: nameEl.getBoundingClientRect().toJSON(), color: getComputedStyle(nameEl).color, deco: getComputedStyle(nameEl).textDecorationLine } : null,
+          badge: badge ? badge.getBoundingClientRect().toJSON() : null,
+          name: nameEl ? { r: nameEl.getBoundingClientRect().toJSON(), color: getComputedStyle(nameEl).color, deco: getComputedStyle(nameEl).textDecorationLine, fontSize: getComputedStyle(nameEl).fontSize } : null,
           stats: stats ? stats.getBoundingClientRect().toJSON() : null,
           goBtn: goBtn ? goBtn.getBoundingClientRect().toJSON() : null,
           card: card.toJSON(),
@@ -201,6 +207,9 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       expect(r.name.r.x - r.card.x).toBeLessThan(60);
       expect(r.name.color).toBe("rgb(25, 25, 25)");
       expect(r.name.deco).toContain("none");
+      // ...at its true size, NOT the card's 9px base (inherited props must
+      // diff against the parent, not the UA default)...
+      expect(r.name.fontSize).toBe("16px");
       // ...the stats bar exists IN FLOW below the body text...
       expect(r.stats, "stats bar missing from replica").toBeTruthy();
       expect(r.stats.y).toBeGreaterThan(r.name.r.y + 30);
@@ -209,6 +218,13 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       expect(r.goBtn, "absolute chrome button missing").toBeTruthy();
       expect(Math.abs(r.goBtn.right - (r.card.right - 16))).toBeLessThan(24);
       expect(Math.abs(r.goBtn.y - r.stats.y)).toBeLessThan(30);
+      // ...and the badge SVG (absolute + translate inside a 16px span, the
+      // LinkedIn "in" icon shape) sits ON the name row, translated ONCE.
+      expect(r.badge, "badge svg missing from replica").toBeTruthy();
+      expect(Math.abs(r.badge.y - r.name.r.y)).toBeLessThan(14);
+      expect(r.badge.x - r.card.x).toBeGreaterThan(40);
+      expect(r.badge.x - r.card.x).toBeLessThan(220);
+      expect(Math.round(r.badge.width)).toBe(16);
     } finally {
       if (browser) await browser.close();
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});

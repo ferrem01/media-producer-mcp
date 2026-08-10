@@ -38,6 +38,19 @@
     "visibility", "outline-width", "outline-style", "outline-color", "list-style-type",
   ];
 
+  // INHERITED properties resolve from the PARENT, not from UA defaults --
+  // so "skip when equal to the probe default" is WRONG for them: LinkedIn
+  // names computed at exactly 16px (the UA default) were skipped, then
+  // inherited the container's baked 9px base and rendered tiny. Inherited
+  // props diff against the parent's computed value instead (the parent
+  // carries its own baked value in the replica); the capture root always
+  // bakes them, sealing the component from ambient styles.
+  const INHERITED_PROPS = new Set([
+    "color", "font-family", "font-size", "font-weight", "font-style", "line-height",
+    "letter-spacing", "text-align", "text-transform", "white-space", "word-break",
+    "visibility", "cursor", "list-style-type", "text-shadow",
+  ]);
+
   // ── Per-tag default probe (hidden iframe with a virgin document) ──
   let probeDoc = null;
   const probeCache = new Map();
@@ -241,6 +254,7 @@
           if (pd === "grid" || pd === "inline-grid") gridParent = p;
         }
       }
+      const parentCS = o === root ? null : getComputedStyle(o.parentElement || o);
       for (const p of STYLE_PROPS) {
         // Offsets are a TRAP for positioned elements: getComputedStyle
         // resolves auto top/left/right/bottom to USED page coordinates
@@ -250,7 +264,12 @@
         // reconstructed geometry below.
         if ((p === "top" || p === "right" || p === "bottom" || p === "left") && pos !== "relative") continue;
         const v = cs.getPropertyValue(p);
-        if (!v || v === defaults[p]) continue;
+        if (!v) continue;
+        if (INHERITED_PROPS.has(p)) {
+          if (parentCS && v === parentCS.getPropertyValue(p)) continue;
+        } else {
+          if (v === defaults[p]) continue;
+        }
         parts.push(p + ":" + v);
       }
       if (isGridContainer) {
@@ -276,14 +295,29 @@
         // capture (its position style is inlined, so the replica has the same
         // containing block) or against the capture root itself (the clone
         // root is forced position:relative below; the shell's .cap-body is
-        // relative too).
-        const op = o.offsetParent;
-        let topV, leftV;
-        if (op && op !== o && root.contains(op) && root !== op) {
-          topV = o.offsetTop; leftV = o.offsetLeft;
-        } else {
-          const er = o.getBoundingClientRect();
-          topV = er.top - rootRect.top; leftV = er.left - rootRect.left;
+        // relative too). Walked by hand rather than via offsetParent: SVG
+        // elements have no offsetParent, which used to drop badges/icons to
+        // the coarse root-relative path.
+        let anchor = null;
+        let ap = o.parentElement;
+        while (ap && ap !== root) {
+          const apc = getComputedStyle(ap);
+          if (apc.position !== "static" && apc.display !== "contents") { anchor = ap; break; }
+          ap = ap.parentElement;
+        }
+        const base = anchor || root;
+        const bcs = getComputedStyle(base);
+        const br = base.getBoundingClientRect();
+        const er = o.getBoundingClientRect();
+        let topV = er.top - br.top - (parseFloat(bcs.borderTopWidth) || 0);
+        let leftV = er.left - br.left - (parseFloat(bcs.borderLeftWidth) || 0);
+        // The rect already INCLUDES the element's own transform; the baked
+        // transform will apply AGAIN in the replica. Subtract a pure
+        // translate so it lands once, not twice (badges use matrix(...,-8,-8)).
+        const tm = cs.transform && cs.transform.startsWith("matrix(")
+          ? cs.transform.slice(7, -1).split(",").map(parseFloat) : null;
+        if (tm && tm.length === 6 && tm[0] === 1 && tm[1] === 0 && tm[2] === 0 && tm[3] === 1) {
+          leftV -= tm[4]; topV -= tm[5];
         }
         parts.push("position:absolute", "top:" + Math.round(topV) + "px", "left:" + Math.round(leftV) + "px", "right:auto", "bottom:auto");
       } else if (pos === "sticky") {
@@ -514,7 +548,10 @@
     window.__qcLastBundle = bundle; // debugging + test hook; never read by the flow
     // Local verdict: replica rendered from the serialized bytes themselves,
     // embedded fonts included so the type previews true.
-    $frame.style.height = Math.min(420, Math.max(140, r.height * (($frame.clientWidth || 480) / r.width))) + "px";
+    // Show as much of the replica as the panel allows -- the reference
+    // column renders full height, and A/B-ing a post against a 420px
+    // porthole made every long capture look truncated.
+    $frame.style.height = Math.min(Math.max(window.innerHeight * 0.58, 420), Math.max(140, r.height * (($frame.clientWidth || 480) / r.width))) + "px";
     $frame.srcdoc = '<!doctype html><style>' + fontFaceCss(fonts) + '</style><body style="margin:0;background:#fff;display:flex;align-items:flex-start;justify-content:center;overflow:auto;"><div style="zoom:' +
       Math.min(1, ($frame.clientWidth || 480) / r.width) + '">' + html + "</div></body>";
     if (refUrl) { $ref.src = refUrl; $ref.style.display = "block"; } else $ref.style.display = "none";
