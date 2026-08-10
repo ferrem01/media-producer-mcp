@@ -175,10 +175,14 @@ export async function renderStoryboardCards(project: Project, opts: {
         await fs.writeFile(f, html);
         await page.goto(`file://${f}`, { waitUntil: "domcontentloaded", timeout: 45_000 });
         try { await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 15_000 }); } catch {}
-        // Trailing `undefined`: pause() returns the timeline, and letting that
-        // huge cyclic GSAP graph become the evaluate's return value makes
-        // Playwright's serializer hang forever.
-        await page.evaluate(`window.__MP_TIMELINE && window.__MP_TIMELINE.pause(${settledMoment(draft)}); undefined`);
+        // Seek with time(t), NOT pause(t): pause(t) suppresses GSAP callbacks,
+        // and every performable surface builds its story through tl.call() --
+        // pause-seeking shot an empty terminal as a near-black card. time(t)
+        // fires the calls in order, exactly how capture.ts renders frames.
+        // The trailing `undefined` matters too: returning the timeline makes
+        // Playwright serialize the whole cyclic GSAP graph and hang forever.
+        await page.evaluate(
+          `var __tl = window.__MP_TIMELINE; if (__tl) { __tl.pause(); try { __tl.time(${settledMoment(draft)}); } catch (e) {} } undefined`);
         const still = path.join(opts.outDir, `storyboard_card_scene_${i + 1}.png`);
         await page.screenshot({ path: still });
         stills.push(still);
