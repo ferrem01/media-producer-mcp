@@ -1019,6 +1019,9 @@ export function getPreviewHtml(): string {
     justify-content: center; color: transparent; font-size: 12px; font-weight: 700; cursor: pointer;
     line-height: 1; }
   .dv-rail-add:hover { background: #eef1fb; color: #4f46e5; }
+  .dv-del { border: none; background: none; color: #c2c7d4; font-size: 14px; cursor: pointer;
+    padding: 2px 6px; border-radius: 6px; line-height: 1; }
+  .dv-del:hover { background: #fee2e2; color: #dc2626; }
   /* Footer: replaces the (meaningless pre-build) transport bar */
   #draft-footer { display: none; align-items: center; gap: 14px; padding: 10px 16px;
     background: #fff; border-top: 1px solid #e6e8ef; }
@@ -3871,6 +3874,7 @@ export function getPreviewHtml(): string {
       : '<div class="dv-still-ph">codegen scene — frame appears after build</div>';
     h += '<div class="dv-card-head"><span class="dv-num">' + String(draftSel + 1).padStart(2, '0') + '</span>' +
       '<span class="dv-label">' + escHtml(s.label || ('Scene ' + (draftSel + 1))) + '</span>' +
+      (scenes.length > 1 ? '<button class="dv-del" id="dv-scene-delete" title="Delete this scene from the board">✕</button>' : '') +
       '<span class="dv-dur">' + (Number(s.duration_seconds) || 0) + 's</span></div>';
     if (s.purpose) h += '<div class="dv-purpose">' + escHtml(s.purpose) + '</div>';
     if (s.voiceover_text) h += '<div class="dv-vo">VO: “' + escHtml(s.voiceover_text) + '”</div>';
@@ -3950,6 +3954,14 @@ export function getPreviewHtml(): string {
         '/storyboard-revise/' + state.tenantId + '/' + project.project_id,
         { feedback: txt, scene_index: draftSel },
         'revise', '✎ Revise');
+    });
+    var delBtn = document.getElementById('dv-scene-delete');
+    if (delBtn) delBtn.addEventListener('click', function() {
+      if (!window.confirm('Delete scene ' + (draftSel + 1) + ' ("' + (s.label || '') + '") from the board?')) return;
+      startDraftJob(project.project_id, delBtn,
+        '/storyboard-revise/' + state.tenantId + '/' + project.project_id,
+        { delete_index: draftSel },
+        'revise', '✕');
     });
   }
   // The rail: a thumbnail strip of the board. Click a frame, get its card.

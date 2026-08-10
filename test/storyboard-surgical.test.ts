@@ -68,6 +68,24 @@ describe("surgical scene ops splice, never re-draft", () => {
       .rejects.toThrow(/out of range/);
   });
 
+  it("delete splices the scene out without any LLM call, and keeps the last scene safe", async () => {
+    const { callLLM } = await import("../src/llm/client.js");
+    (callLLM as any).mockClear();
+    const p = board();
+    const before0 = p.storyboard.scenes[0];
+    const removed = await reviseDraftSceneSurgical(p, { delete_index: 1, feedback: "" }, null as any);
+    expect(removed.label).toBe("Two");
+    expect(p.storyboard.scenes).toHaveLength(2);
+    expect(p.storyboard.scenes[0]).toBe(before0);
+    expect(p.storyboard.estimated_duration).toBe(20);
+    expect(callLLM).not.toHaveBeenCalled();
+    // a one-scene board cannot be emptied
+    const solo: any = board();
+    solo.storyboard.scenes = [solo.storyboard.scenes[0]];
+    await expect(reviseDraftSceneSurgical(solo, { delete_index: 0, feedback: "" }, null as any))
+      .rejects.toThrow(/last scene/);
+  });
+
   it("the Studio endpoint routes scene_index/insert_at to the surgical queue", async () => {
     const src = await fs.readFile(path.resolve(__dirname, "../src/index.ts"), "utf-8");
     const at = src.indexOf("/api\\/storyboard-revise");

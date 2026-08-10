@@ -18,8 +18,10 @@ import type { Project } from "../core/types.js";
 export interface SurgicalSceneOp {
   /** Revise the scene at this index in place... */
   scene_index?: number;
-  /** ...or author a NEW scene and insert it at this index (0 = the front). */
+  /** ...or author a NEW scene and insert it at this index (0 = the front)... */
   insert_at?: number;
+  /** ...or delete the scene at this index (deterministic, no LLM). */
+  delete_index?: number;
   feedback: string;
 }
 
@@ -79,6 +81,18 @@ export async function reviseDraftSceneSurgical(
   const sb: any = (project as any).storyboard;
   const scenes: any[] = sb?.scenes || [];
   if (!scenes.length && op.scene_index !== undefined) throw new Error("board has no scenes");
+
+  // Delete is pure data -- no LLM, just the splice-out and the re-clock.
+  if (op.delete_index !== undefined) {
+    const di = Number(op.delete_index);
+    if (isNaN(di) || di < 0 || di >= scenes.length) {
+      throw new Error(`delete_index ${op.delete_index} out of range (${scenes.length} scenes)`);
+    }
+    if (scenes.length === 1) throw new Error("cannot delete the board's last scene");
+    const [removed] = scenes.splice(di, 1);
+    sb.estimated_duration = scenes.reduce((sum: number, s: any) => sum + (Number(s.duration_seconds) || 0), 0);
+    return removed;
+  }
 
   const isInsert = op.insert_at !== undefined;
   const idx = isInsert
