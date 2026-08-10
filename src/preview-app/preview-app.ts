@@ -1018,12 +1018,11 @@ export function getPreviewHtml(): string {
   /* Footer: replaces the (meaningless pre-build) transport bar */
   #draft-footer { display: none; align-items: center; gap: 14px; padding: 10px 16px;
     background: #fff; border-top: 1px solid #e6e8ef; }
-  #df-segments { flex: 1; display: flex; gap: 3px; height: 26px; }
-  .df-seg { display: flex; align-items: center; justify-content: center; cursor: pointer;
-    border-radius: 6px; background: #eef1fb; color: #6b7280; font-size: 10.5px; font-weight: 600;
-    min-width: 26px; border: 1px solid transparent; }
-  .df-seg:hover { background: #e3e7f5; }
-  .df-seg.active { background: #4f46e5; color: #fff; }
+  /* The clock, not a nav: the rail owns scene selection, this bar just
+     shows the board's pacing and follows along. */
+  #df-segments { flex: 1; display: flex; gap: 3px; height: 8px; }
+  .df-seg { border-radius: 4px; background: #e3e7f0; min-width: 10px; }
+  .df-seg.active { background: #4f46e5; }
   #df-total { font-size: 11.5px; color: #6b7280; white-space: nowrap; font-variant-numeric: tabular-nums; }
   #df-feedback { width: 300px; border: 1px solid #d8dbe4; border-radius: 8px; padding: 7px 10px;
     font: inherit; font-size: 12px; background: #fafbfe; }
@@ -3685,8 +3684,12 @@ export function getPreviewHtml(): string {
     var r = renderEls();
     if (!r.wrap) return;
     var p = state.currentProject;
-    r.wrap.style.display = p ? 'inline-flex' : 'none';
-    if (!p) return;
+    // A storyboard draft has nothing to render -- no scenes exist yet. The
+    // draft footer's Build scenes is that state's only forward action.
+    var draft = p && !(p.scenes && p.scenes.length) &&
+      p.storyboard && p.storyboard.scenes && p.storyboard.scenes.length;
+    r.wrap.style.display = (p && !draft) ? 'inline-flex' : 'none';
+    if (!p || draft) return;
     if (render.job) {
       var pct = render.job.percent;
       r.btn.style.display = '';
@@ -3909,7 +3912,20 @@ export function getPreviewHtml(): string {
               (extra ? ' “' + escHtml(String(extra).slice(0, 64)) + '”' : '') + '</div>';
           });
         } else {
-          h += '<div class="dv-mono mut">(static data, no script)</div>';
+          // No script array does NOT mean nothing happens: data-driven
+          // performers (composer, typewriter…) act from these fields --
+          // "the ask types itself" IS text + at + send_at. Print the
+          // performance data so the card never contradicts the beats.
+          var dataRows = [];
+          Object.keys(c.data || {}).forEach(function(k) {
+            var v = c.data[k];
+            if (v == null || typeof v === 'object') return;
+            if (typeof v === 'string' && v.length > 56) v = v.slice(0, 56) + '…';
+            dataRows.push(escHtml(k) + ': ' + escHtml(String(v)));
+          });
+          h += dataRows.length
+            ? '<div class="dv-mono">' + dataRows.join(' · ') + '</div>'
+            : '<div class="dv-mono mut">(no data)</div>';
         }
       });
     } else h += '<div class="dv-mono mut">(none cast)</div>';
@@ -3968,16 +3984,8 @@ export function getPreviewHtml(): string {
     segs.innerHTML = scenes.map(function(s, i) {
       var flexw = total ? Math.max(4, (Number(s.duration_seconds) || 0) / total * 100) : 10;
       return '<div class="df-seg' + (i === draftSel ? ' active' : '') + '" data-index="' + i +
-        '" style="flex:' + flexw.toFixed(2) + '" title="' + escAttr((s.label || '') + ' — ' + (Number(s.duration_seconds) || 0) + 's') + '">' + (i + 1) + '</div>';
+        '" style="flex:' + flexw.toFixed(2) + '" title="' + escAttr((s.label || '') + ' — ' + (Number(s.duration_seconds) || 0) + 's') + '"></div>';
     }).join('');
-    segs.querySelectorAll('.df-seg').forEach(function(el) {
-      el.addEventListener('click', function() {
-        draftSel = parseInt(el.dataset.index, 10);
-        renderDraftCard(project);
-        renderDraftRail(project);
-        syncDraftFooterActive();
-      });
-    });
     document.getElementById('df-total').textContent = '~' + Math.round(total) + 's';
     // The footer is a singleton in the skeleton; clone-swap the buttons so
     // re-renders never stack handlers from previous projects.
