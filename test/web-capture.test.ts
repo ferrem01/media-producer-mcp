@@ -174,10 +174,17 @@ describe("mintCapturedComponent", () => {
         var run = document.querySelector('.cap-hl-run');
         var price = document.querySelector('.price');
         var cursor = document.querySelector('.mp-cursor');
+        var btn = Array.from(document.querySelectorAll('button')).find(function (b) { return b.textContent.indexOf('Upgrade') !== -1; });
+        var dist = null;
+        if (cursor && btn) {
+          var c = cursor.getBoundingClientRect(), b = btn.getBoundingClientRect();
+          dist = Math.hypot((c.left + c.width / 2) - (b.left + b.width / 2), (c.top + c.height / 2) - (b.top + b.height / 2));
+        }
         return {
           hl: run ? getComputedStyle(run).backgroundSize : null,
           price: price ? price.textContent : null,
           cursorShown: cursor ? getComputedStyle(cursor).opacity : null,
+          cursorToButton: dist,
         };
       })()`) as any;
       // The underline ripped across the quote...
@@ -187,8 +194,12 @@ describe("mintCapturedComponent", () => {
       // ...the price counted up to $49 keeping its dress...
       expect(r.price).toContain("49");
       expect(r.price).toContain("$");
-      // ...and the film's cursor entered to click Upgrade.
+      // ...and the film's cursor TRAVELED to Upgrade (not just appeared:
+      // a function-valued target once left it visible at 0,0 -- pin the
+      // position, cursor tip near the button's center).
       expect(r.cursorShown, "cursor never appeared for the click").toBeTruthy();
+      expect(r.cursorToButton, "cursor-to-button distance unmeasurable").not.toBeNull();
+      expect(r.cursorToButton, `cursor never reached the button (${Math.round(r.cursorToButton)}px away)`).toBeLessThan(80);
     } finally {
       if (browser) await browser.close();
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});

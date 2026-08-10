@@ -218,22 +218,24 @@ function runCapturePerformance(tl, container, data, ctx) {
     if ((a.action === 'click' || a.action === 'move-cursor' || a.action === 'hover' || a.action === 'double-click') && (a.text || a.selector) && !a.target) {
       var el = capResolve(root, a);
       if (el) {
-        var name = '__cap_t' + (dynCount++);
-        (function (elc) {
-          dynTargets[name] = function () {
-            var r = elc.getBoundingClientRect();
-            var cr = container.getBoundingClientRect();
-            return {
-              x: ((r.left + r.width / 2 - cr.left) / cr.width * 100) + '%',
-              y: ((r.top + r.height / 2 - cr.top) / cr.height * 100) + '%',
-            };
+        // Resolve to a STATIC {x,y} now: moveCursor reads target.x directly
+        // (no function support), and static percent targets keep the tween on
+        // the timeline -- scrub-safe for frame-by-frame capture. Percent of
+        // the container is scale-invariant, so the fit() transform cancels.
+        var r = el.getBoundingClientRect();
+        var cr = container.getBoundingClientRect();
+        if (cr.width > 0 && cr.height > 0) {
+          var name = '__cap_t' + (dynCount++);
+          dynTargets[name] = {
+            x: ((r.left + r.width / 2 - cr.left) / cr.width * 100) + '%',
+            y: ((r.top + r.height / 2 - cr.top) / cr.height * 100) + '%',
           };
-        })(el);
-        var copy = {};
-        for (var k in a) copy[k] = a[k];
-        copy.target = name;
-        cursorScript.push(copy);
-        continue;
+          var copy = {};
+          for (var k in a) copy[k] = a[k];
+          copy.target = name;
+          cursorScript.push(copy);
+          continue;
+        }
       }
     }
     cursorScript.push(a);
