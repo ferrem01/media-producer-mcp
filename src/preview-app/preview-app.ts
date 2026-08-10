@@ -1015,6 +1015,10 @@ export function getPreviewHtml(): string {
     color: #b3b9c9; font-size: 10px; }
   .dv-rail-label { font-size: 11.5px; font-weight: 600; color: #111827; }
   .dv-rail-meta { font-size: 10.5px; color: #6b7280; }
+  .dv-rail-add { height: 14px; margin: 0 12px; border-radius: 7px; display: flex; align-items: center;
+    justify-content: center; color: transparent; font-size: 12px; font-weight: 700; cursor: pointer;
+    line-height: 1; }
+  .dv-rail-add:hover { background: #eef1fb; color: #4f46e5; }
   /* Footer: replaces the (meaningless pre-build) transport bar */
   #draft-footer { display: none; align-items: center; gap: 14px; padding: 10px 16px;
     background: #fff; border-top: 1px solid #e6e8ef; }
@@ -1164,8 +1168,8 @@ export function getPreviewHtml(): string {
     <div id="draft-footer">
       <div id="df-segments"></div>
       <span id="df-total"></span>
-      <input id="df-feedback" type="text" placeholder="Direct the whole board&hellip; (e.g. tighten scene 2, warmer close)">
-      <button class="btn" id="df-revise" title="Re-draft the storyboard against this feedback (a couple of minutes)">&#8635; Revise</button>
+      <input id="df-feedback" type="text" placeholder="Re-draft the whole board&hellip; (all scenes may change)">
+      <button class="btn" id="df-revise" title="Re-draft the ENTIRE storyboard against this direction — every scene may be re-interpreted. For one scene, use the box on its card.">&#8635; Re-draft board</button>
       <button class="btn btn-primary" id="df-build" title="Generate the scenes from this storyboard (a few minutes)">&#9654; Build scenes</button>
     </div>
   </div>
@@ -3940,33 +3944,54 @@ export function getPreviewHtml(): string {
     if (sceneBtn) sceneBtn.addEventListener('click', function() {
       var txt = ((fb && fb.value) || '').trim();
       if (!txt) { studioStatus('Type the direction for this scene first.', 'err'); return; }
+      // SURGICAL: scene_index makes the server revise only this scene and
+      // splice it -- the other scenes stay byte-identical by construction.
       startDraftJob(project.project_id, sceneBtn,
         '/storyboard-revise/' + state.tenantId + '/' + project.project_id,
-        { feedback: 'Scene ' + (draftSel + 1) + ' ("' + (s.label || '') + '"): ' + txt +
-          ' — revise ONLY what this feedback asks; keep the other scenes as they are.' },
+        { feedback: txt, scene_index: draftSel },
         'revise', '✎ Revise');
     });
   }
   // The rail: a thumbnail strip of the board. Click a frame, get its card.
+  // Between panels (and at both ends) a thin "+" strip inserts a NEW scene
+  // exactly there -- the film-industry move of pinning a fresh panel into
+  // the board. The description prompts inline; the server authors just that
+  // one scene and splices it, leaving the rest untouched.
   function renderDraftRail(project) {
     var scenes = (project.storyboard || {}).scenes || [];
-    els.sceneList.innerHTML = scenes.map(function(s, i) {
+    var h = '';
+    scenes.forEach(function(s, i) {
+      h += '<div class="dv-rail-add" data-at="' + i + '" title="Insert a new scene here">+</div>';
       var frame = draftIsAuthored(s)
         ? '<img class="dv-rail-thumb" src="' + escAttr(draftStillUrl(project, i)) + '" onerror="this.remove()">'
         : '<div class="dv-rail-thumb-ph">after build</div>';
       var beats = (s.beats || []).length;
-      return '<div class="dv-rail-item' + (i === draftSel ? ' active' : '') + '" data-index="' + i + '">' +
+      h += '<div class="dv-rail-item' + (i === draftSel ? ' active' : '') + '" data-index="' + i + '">' +
         frame +
         '<div><div class="dv-rail-label">' + (i + 1) + '. ' + escHtml(s.label || 'Scene') + '</div>' +
         '<div class="dv-rail-meta">' + (Number(s.duration_seconds) || 0) + 's' + (beats ? ' · ' + beats + ' beats' : '') + '</div></div>' +
         '</div>';
-    }).join('') || '<div class="empty-state">Empty storyboard</div>';
+    });
+    if (scenes.length) h += '<div class="dv-rail-add" data-at="' + scenes.length + '" title="Insert a new scene here">+</div>';
+    els.sceneList.innerHTML = h || '<div class="empty-state">Empty storyboard</div>';
     els.sceneList.querySelectorAll('.dv-rail-item').forEach(function(el) {
       el.addEventListener('click', function() {
         draftSel = parseInt(el.dataset.index, 10);
         renderDraftCard(project);
         renderDraftRail(project);
         syncDraftFooterActive();
+      });
+    });
+    els.sceneList.querySelectorAll('.dv-rail-add').forEach(function(el) {
+      el.addEventListener('click', function() {
+        var at = parseInt(el.dataset.at, 10);
+        var desc = window.prompt('Describe the new scene to insert at position ' + (at + 1) + ':');
+        if (!desc || !desc.trim()) return;
+        draftSel = at;
+        startDraftJob(project.project_id, el,
+          '/storyboard-revise/' + state.tenantId + '/' + project.project_id,
+          { feedback: desc.trim(), insert_at: at },
+          'revise', '+');
       });
     });
   }

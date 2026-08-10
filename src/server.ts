@@ -50,6 +50,7 @@ import { config } from "./config.js";
 import { proposeSceneCompression, probeMediaDuration } from "./core/auto-compress.js";
 import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
 import { renderStoryboardCards } from "./core/storyboard-cards.js";
+import { reviseDraftSceneSurgical } from "./llm/storyboard-surgical.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import type { Scene, SceneComponent, BrandKit, SpeakerTrack } from "./core/types.js";
@@ -684,6 +685,50 @@ export async function queueStoryboardGeneration(params: {
     };
   });
   return { job: sbJob };
+}
+
+/**
+ * Queue a SURGICAL scene op (revise one scene in place, or author + insert
+ * one new scene) -- the golden workflow's "punch up one panel" move, next
+ * to queueStoryboardGeneration's "re-break the whole story". Splice-based:
+ * the other scenes stay byte-identical by construction. Cards re-shoot
+ * before the job completes so the client's reload sees fresh frames.
+ */
+export function queueSurgicalSceneOp(
+  tenantId: string,
+  projectId: string,
+  op: import("./llm/storyboard-surgical.js").SurgicalSceneOp,
+): { job: { id: string } } | { error: string } {
+  let llmConfig;
+  try {
+    llmConfig = llmConfigFromEnv();
+  } catch (e: any) {
+    return { error: `LLM not configured: ${e.message}` };
+  }
+  const job = queueJob("generate", tenantId, async (j) => {
+    j.progress = { step: "scene-revise", percent: 20, detail: op.insert_at !== undefined ? "Authoring the new scene" : "Revising the scene" };
+    const project = await loadProject(tenantId, projectId);
+    if (!project?.storyboard?.scenes) throw new Error("Project has no storyboard");
+    if (project.status !== "storyboard" && project.status !== "draft") {
+      throw new Error(`Cannot revise storyboard: project is in '${project.status}' state`);
+    }
+    const scene = await reviseDraftSceneSurgical(project, op, llmConfig);
+    project.updated_at = new Date().toISOString();
+    await saveProject(project);
+    j.progress = { step: "storyboard-cards", percent: 75, detail: "Photographing the storyboard" };
+    try {
+      await renderStoryboardCards(project as any, {
+        componentLibDir: config.componentLibDir, gsapDir: config.gsapDir,
+        outDir: projectOutputDir(tenantId, projectId),
+      });
+    } catch (e: any) {
+      console.warn(`  storyboard-cards after surgical op failed (board still usable): ${e?.message}`);
+    }
+    j.progress = { step: "complete", percent: 100 };
+    return { status: "storyboard", project_id: projectId, scene_label: scene.label };
+  });
+  job.projectId = projectId;
+  return { job };
 }
 
 /**
