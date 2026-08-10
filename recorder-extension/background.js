@@ -246,6 +246,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         return;
       }
+      if (msg.type === "qc-fetch") {
+        // Asset rescue for the component camera: page scripts cannot read
+        // bytes from CORS-less media CDNs (media.licdn.com et al), but the
+        // service worker CAN -- host_permissions <all_urls> exempts it. The
+        // fetch still rides the user's own cookies; only our injected
+        // content script can send this message.
+        try {
+          if (!/^https?:/i.test(msg.url || "")) { sendResponse({ ok: false, error: "bad url" }); return; }
+          const res = await fetch(msg.url, { credentials: "include" });
+          if (!res.ok) { sendResponse({ ok: false, error: "HTTP " + res.status }); return; }
+          const buf = await res.arrayBuffer();
+          if (buf.byteLength > 3 * 1024 * 1024) { sendResponse({ ok: false, error: "asset too large" }); return; }
+          const mime = (res.headers.get("content-type") || "application/octet-stream").split(";")[0];
+          const bytes = new Uint8Array(buf);
+          let bin = "";
+          for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+          sendResponse({ ok: true, dataUri: "data:" + mime + ";base64," + btoa(bin) });
+        } catch (e) {
+          sendResponse({ ok: false, error: String(e && e.message || e) });
+        }
+        return;
+      }
       if (msg.type === "qc-mint") {
         const settings = await getSettings();
         const server = settings.server || SERVER;

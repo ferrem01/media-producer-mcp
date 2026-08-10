@@ -16,6 +16,14 @@ import { chromium } from "playwright";
 import { LAUNCH_OPTS } from "./capture.js";
 import { tenantComponentsDir } from "../persistence/paths.js";
 
+export interface CaptureFont {
+  family: string;
+  weight?: string;
+  style?: string;
+  /** The font binary as a data URI (extension fetches + bakes it). */
+  data: string;
+}
+
 export interface CaptureBundle {
   /** kebab-case component name, e.g. "brightloop-testimonial" */
   name: string;
@@ -23,6 +31,8 @@ export interface CaptureBundle {
   description?: string;
   /** The serialized subtree: computed styles inlined, assets as data URIs. */
   html: string;
+  /** Embedded webfonts so the replica keeps the site's real type. */
+  fonts?: CaptureFont[];
   /** Reference screenshot of the region as a data URL (PNG). */
   screenshot?: string;
   source_url?: string;
@@ -98,6 +108,24 @@ export async function sanitizeCapturedHtml(html: string): Promise<string> {
 
 const NAME_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
+/** Fonts the shell will carry: data-URI binaries only, sane families, capped. */
+const FONT_DATA_RE = /^data:(?:font\/[a-z0-9.+-]+|application\/(?:x-)?font[a-z0-9.+-]*|application\/octet-stream);base64,[A-Za-z0-9+/=]+$/;
+function fontFaceCss(fonts: CaptureFont[] | undefined): string {
+  const out: string[] = [];
+  let budget = 5 * 1024 * 1024;
+  for (const f of (fonts || []).slice(0, 8)) {
+    if (!f || typeof f.data !== "string" || !FONT_DATA_RE.test(f.data)) continue;
+    if (f.data.length > budget) continue;
+    const family = String(f.family || "").replace(/[^\w -]/g, "").trim().slice(0, 64);
+    if (!family) continue;
+    const weight = /^[a-z0-9 ]{1,20}$/i.test(String(f.weight || "")) ? f.weight : "normal";
+    const style = /^(normal|italic|oblique[a-z0-9 ]*)$/i.test(String(f.style || "")) ? f.style : "normal";
+    budget -= f.data.length;
+    out.push(`  @font-face { font-family: "${family}"; src: url(${f.data}); font-weight: ${weight}; font-style: ${style}; font-display: swap; }`);
+  }
+  return out.join("\n");
+}
+
 function componentShell(name: string, bundle: CaptureBundle, cleanedHtml: string): string {
   const w = Math.round(bundle.width);
   const h = Math.round(bundle.height);
@@ -123,6 +151,7 @@ ${cleanedHtml}
   </div>
 </template>
 <style>
+__FONT_FACES__
   .cap-root { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .cap-frame { position: relative; flex: none; width: ${w}px; height: ${h}px; }
   .cap-body { position: relative; width: ${w}px; height: ${h}px; overflow: hidden; }
@@ -218,7 +247,10 @@ export async function mintCapturedComponent(
   const capturedAt = now.toISOString();
   const componentPath = path.join(rootDir, `${name}.component.html`);
   const schemaPath = path.join(capDir, `${name}.schema.json`);
-  await fs.writeFile(componentPath, componentShell(name, bundle, cleaned).replace("__CAPTURED_AT__", capturedAt));
+  const shell = componentShell(name, bundle, cleaned)
+    .replace("__CAPTURED_AT__", capturedAt)
+    .replace("__FONT_FACES__", fontFaceCss(bundle.fonts));
+  await fs.writeFile(componentPath, shell);
   const schema = componentSchema(name, bundle);
   (schema as any).capture.captured_at = capturedAt;
   await fs.writeFile(schemaPath, JSON.stringify(schema, null, 2));
