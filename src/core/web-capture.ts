@@ -106,6 +106,26 @@ export async function sanitizeCapturedHtml(html: string): Promise<string> {
   }
 }
 
+/**
+ * ASSET SHIELD (SPEC-web-capture.md: no LLM in the visual path). Captured
+ * components carry megabytes of data-URI pixels; any LLM edit must never see
+ * them (context blowout) and could never return them intact. Swap each for a
+ * short stable placeholder before the model sees the source; splice the
+ * originals back into whatever it returns.
+ */
+export function shieldDataUris(source: string): { slim: string; assets: string[] } {
+  const assets: string[] = [];
+  const slim = source.replace(
+    /data:[a-z0-9.+/-]+;base64,[A-Za-z0-9+/=]{256,}/gi,
+    (m) => { assets.push(m); return `data:asset/frozen;qc=${assets.length - 1}`; },
+  );
+  return { slim, assets };
+}
+
+export function reinflateDataUris(source: string, assets: string[]): string {
+  return source.replace(/data:asset\/frozen;qc=(\d+)/g, (m, i) => assets[Number(i)] ?? m);
+}
+
 const NAME_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 /** Fonts the shell will carry: data-URI binaries only, sane families, capped. */

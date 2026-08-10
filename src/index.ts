@@ -28,7 +28,7 @@ import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-kit.js";
 import { queueBuildFromStoryboard, queueStoryboardGeneration, queueSurgicalSceneOp } from "./server.js";
-import { mintCapturedComponent } from "./core/web-capture.js";
+import { mintCapturedComponent, shieldDataUris, reinflateDataUris } from "./core/web-capture.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
@@ -1570,16 +1570,23 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           const llmConfig = llmConfigFromEnv();
           const systemPrompt = componentSystemPrompt((body.format as string) || "video");
 
+          // ASSET SHIELD: captured components carry megabytes of data-URI
+          // pixels (frozen frames, avatars, fonts). The LLM must never see
+          // them (context blowout; and the spec's rule -- no LLM in the
+          // visual path) and could never return them inside any token
+          // budget. Swap each for a short placeholder, reinflate after.
+          const { slim: slimSource, assets: shieldedAssets } = shieldDataUris(currentSource);
+
           const userPrompt = `Here is an existing component:
 
 \`\`\`html
-${currentSource}
+${slimSource}
 \`\`\`
 
 Please modify this component according to the following instruction:
 ${instruction}
 
-Return the COMPLETE updated .component.html file. Keep all existing functionality unless the instruction specifically asks to change it. Make only the requested changes.`;
+Return the COMPLETE updated .component.html file. Keep all existing functionality unless the instruction specifically asks to change it. Make only the requested changes.${shieldedAssets.length ? "\n\nIMPORTANT: URLs of the form data:asset/frozen;qc=N are frozen embedded images. Keep every one of them EXACTLY as written -- never expand, invent, or drop them." : ""}`;
 
           const raw = await callLLM(llmConfig, [
             { role: "system", content: systemPrompt },
@@ -1590,6 +1597,9 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
           let source = raw.trim();
           const fenceMatch = source.match(/```(?:html)?\s*\n([\s\S]*?)\n```/);
           if (fenceMatch) source = fenceMatch[1].trim();
+
+          // Reinflate the shielded assets.
+          source = reinflateDataUris(source, shieldedAssets);
 
           jsonResponse(res, 200, { source });
         } catch (err) {
