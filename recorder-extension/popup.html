@@ -52,6 +52,10 @@
     </select>
     <div id="dest-hint" style="font-size:10px;color:#9ca3af;margin:2px 0 0 0;">New project assembles a full walkthrough. Picking an existing project adds this take to it as a new scene.</div>
     <button id="record">● Record this tab</button>
+    <!-- Component camera (SPEC-web-capture.md): pick any region of the page,
+         confirm in the local verdict panel, and it mints a scriptable tenant
+         component. Nothing is sent until you confirm. -->
+    <button id="capture" style="width:100%;margin-top:8px;padding:9px;border:1px solid #393bf5;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;background:#fff;color:#393bf5;">⌖ Capture component from this page</button>
     <div id="status"></div>
     <div class="hint">While recording: ⌘/Ctrl+Shift+N marks a chapter. Stop from this popup; the film assembles automatically and appears in Studio.</div>
     <script src="popup.js"></script>
