@@ -112,6 +112,102 @@ describe("extension picker + serializer (capture.js)", () => {
   }, 300_000);
 });
 
+describe("extension serializer: positioned layout survives (the LinkedIn header bug)", () => {
+  // getComputedStyle resolves auto offsets on absolute elements to USED page
+  // coordinates (top:56px = 56px from the ORIGINAL viewport). Baking those
+  // flung a11y-hidden spans and absolute chrome to alien positions -- the
+  // name vanished, the header collapsed right, the stats bar disappeared.
+  // The serializer now rebuilds absolute geometry against containing blocks
+  // INSIDE the capture. This fixture is shaped like a LinkedIn post header.
+  it("keeps the name, ellipsized title, stats bar and absolute chrome in place", async () => {
+    const pageHtml = `<!doctype html><html><head><style>
+        body { margin: 40px; font-family: Arial; background: #f4f4f8; }
+        .post { width: 550px; background: #fff; border-radius: 8px; padding: 16px; }
+        .hdr { display: flex; align-items: flex-start; }
+        .meta { display: flex; flex-direction: column; flex: 1; min-width: 0; overflow: hidden; text-decoration: none; color: inherit; }
+        .name { font-weight: 600; font-size: 14px; color: #191919; }
+        .vh { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; width: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
+        .title { font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .controls { margin-left: auto; flex: none; }
+      </style></head><body>
+      <div class="post" id="post">
+        <div class="hdr">
+          <a class="meta" href="/in/jake">
+            <span class="name">Jake Stein<span class="vh">View Jake Stein's profile</span></span>
+            <span class="title">Co-founder and CEO at Common Paper | Making contracts better for everyone</span>
+          </a>
+          <div class="controls"><button>x</button></div>
+        </div>
+        <div>I started going to church. No, really.</div>
+        <div class="social" style="position:relative;margin-top:10px;padding-top:8px;">
+          <span class="counts">973 reactions - 147 comments</span>
+          <button style="position:absolute;right:0;top:8px;">go</button>
+        </div>
+      </div></body></html>`;
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-hdr-"));
+    const pageFile = path.join(dir, "page.html");
+    await fs.writeFile(pageFile, pageHtml);
+    const captureJs = await fs.readFile(path.resolve(__dirname, "../recorder-extension/capture.js"), "utf-8");
+
+    let browser: Browser | null = null;
+    try {
+      browser = await chromium.launch({
+        ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+      });
+      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+      await page.goto(`file://${pageFile}`, { waitUntil: "load" });
+      await page.evaluate(`window.chrome = window.chrome || {}; window.chrome.runtime = {
+        sendMessage: async (msg) => ({ ok: true, type: "stub" }),
+      };`);
+      await page.evaluate(captureJs);
+      const box = await page.locator("#post").boundingBox();
+      await page.mouse.move(box!.x + 10, box!.y + 40);
+      await page.mouse.wheel(0, -1);
+      await page.mouse.wheel(0, -1);
+      await page.keyboard.press("c");
+      await page.waitForFunction(() => (window as any).__qcLastBundle, { timeout: 15_000 });
+      const bundle = await page.evaluate(() => (window as any).__qcLastBundle);
+
+      // Render the REPLICA alone and measure where things landed.
+      const rf = path.join(dir, "replica.html");
+      await fs.writeFile(rf, `<!doctype html><body style="margin:20px;background:#f4f4f8">${bundle.html}</body>`);
+      const p2 = await browser.newPage({ viewport: { width: 700, height: 400 } });
+      await p2.goto(`file://${rf}`, { waitUntil: "load" });
+      const r = await p2.evaluate(`(() => {
+        const all = [...document.body.firstElementChild.querySelectorAll("*")];
+        const leaf = (t) => all.find((e) => (e.textContent || "").includes(t) && ![...e.children].some((ch) => (ch.textContent || "").includes(t)));
+        const nameEl = all.find((e) => e.textContent.trim().startsWith("Jake Stein") && e.children.length <= 1);
+        const stats = leaf("973 reactions");
+        const goBtn = [...document.querySelectorAll("button")].find((b) => b.textContent === "go");
+        const card = document.body.firstElementChild.getBoundingClientRect();
+        return {
+          name: nameEl ? { r: nameEl.getBoundingClientRect().toJSON(), color: getComputedStyle(nameEl).color, deco: getComputedStyle(nameEl).textDecorationLine } : null,
+          stats: stats ? stats.getBoundingClientRect().toJSON() : null,
+          goBtn: goBtn ? goBtn.getBoundingClientRect().toJSON() : null,
+          card: card.toJSON(),
+        };
+      })()`) as any;
+      // The visible name renders wide, on the left, dark, not underlined...
+      expect(r.name, "name element missing from replica").toBeTruthy();
+      expect(r.name.r.width).toBeGreaterThan(40);
+      expect(r.name.r.x - r.card.x).toBeLessThan(60);
+      expect(r.name.color).toBe("rgb(25, 25, 25)");
+      expect(r.name.deco).toContain("none");
+      // ...the stats bar exists IN FLOW below the body text...
+      expect(r.stats, "stats bar missing from replica").toBeTruthy();
+      expect(r.stats.y).toBeGreaterThan(r.name.r.y + 30);
+      // ...and the absolute button anchors to ITS bar's right edge, not to
+      // some page-viewport coordinate.
+      expect(r.goBtn, "absolute chrome button missing").toBeTruthy();
+      expect(Math.abs(r.goBtn.right - (r.card.right - 16))).toBeLessThan(24);
+      expect(Math.abs(r.goBtn.y - r.stats.y)).toBeLessThan(30);
+    } finally {
+      if (browser) await browser.close();
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }, 300_000);
+});
+
 describe("sanitizeCapturedHtml", () => {
   it("strips scripts, handlers, iframes and external refs but keeps the surface", async () => {
     const clean = await sanitizeCapturedHtml(FIXTURE_HTML);
