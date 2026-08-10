@@ -38,6 +38,19 @@
     "visibility", "outline-width", "outline-style", "outline-color", "list-style-type",
   ];
 
+  // INHERITED properties resolve from the PARENT, not from UA defaults --
+  // so "skip when equal to the probe default" is WRONG for them: LinkedIn
+  // names computed at exactly 16px (the UA default) were skipped, then
+  // inherited the container's baked 9px base and rendered tiny. Inherited
+  // props diff against the parent's computed value instead (the parent
+  // carries its own baked value in the replica); the capture root always
+  // bakes them, sealing the component from ambient styles.
+  const INHERITED_PROPS = new Set([
+    "color", "font-family", "font-size", "font-weight", "font-style", "line-height",
+    "letter-spacing", "text-align", "text-transform", "white-space", "word-break",
+    "visibility", "cursor", "list-style-type", "text-shadow",
+  ]);
+
   // ── Per-tag default probe (hidden iframe with a virgin document) ──
   let probeDoc = null;
   const probeCache = new Map();
@@ -241,6 +254,7 @@
           if (pd === "grid" || pd === "inline-grid") gridParent = p;
         }
       }
+      const parentCS = o === root ? null : getComputedStyle(o.parentElement || o);
       for (const p of STYLE_PROPS) {
         // Offsets are a TRAP for positioned elements: getComputedStyle
         // resolves auto top/left/right/bottom to USED page coordinates
@@ -250,7 +264,12 @@
         // reconstructed geometry below.
         if ((p === "top" || p === "right" || p === "bottom" || p === "left") && pos !== "relative") continue;
         const v = cs.getPropertyValue(p);
-        if (!v || v === defaults[p]) continue;
+        if (!v) continue;
+        if (INHERITED_PROPS.has(p)) {
+          if (parentCS && v === parentCS.getPropertyValue(p)) continue;
+        } else {
+          if (v === defaults[p]) continue;
+        }
         parts.push(p + ":" + v);
       }
       if (isGridContainer) {

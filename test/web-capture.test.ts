@@ -126,12 +126,16 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
     // the serializer must freeze grid geometry instead of re-baking it.
     const pageHtml = `<!doctype html><html><head><style>
         body { margin: 40px; font-family: Arial; background: #f4f4f8; }
-        .post { width: 550px; background: #fff; border-radius: 8px; padding: 16px; overflow: hidden; }
+        /* 9px base font like the real SDUI card -- children override it.
+           The name is sized at EXACTLY the UA default (16px): a serializer
+           that diffs inherited props against UA defaults skips it, and the
+           replica name then inherits the 9px base and renders tiny. */
+        .post { width: 550px; background: #fff; border-radius: 8px; padding: 16px; overflow: hidden; font-size: 9px; }
         .hdr { display: flex; align-items: flex-start; }
         .meta-grid { display: grid; flex: 1; min-width: 0; }
         .meta-col { grid-column: -1; grid-row: 1; display: flex; flex-direction: column; }
         .name-grid { display: grid; }
-        .name-cell { grid-column: -1; grid-row: 1; font-weight: 600; font-size: 14px; color: #191919; }
+        .name-cell { grid-column: -1; grid-row: 1; font-weight: 600; font-size: 16px; color: #191919; }
         .vh { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; width: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
         .title { font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .controls { margin-left: auto; flex: none; }
@@ -191,7 +195,7 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
         const card = document.body.firstElementChild.getBoundingClientRect();
         return {
           badge: badge ? badge.getBoundingClientRect().toJSON() : null,
-          name: nameEl ? { r: nameEl.getBoundingClientRect().toJSON(), color: getComputedStyle(nameEl).color, deco: getComputedStyle(nameEl).textDecorationLine } : null,
+          name: nameEl ? { r: nameEl.getBoundingClientRect().toJSON(), color: getComputedStyle(nameEl).color, deco: getComputedStyle(nameEl).textDecorationLine, fontSize: getComputedStyle(nameEl).fontSize } : null,
           stats: stats ? stats.getBoundingClientRect().toJSON() : null,
           goBtn: goBtn ? goBtn.getBoundingClientRect().toJSON() : null,
           card: card.toJSON(),
@@ -203,6 +207,9 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       expect(r.name.r.x - r.card.x).toBeLessThan(60);
       expect(r.name.color).toBe("rgb(25, 25, 25)");
       expect(r.name.deco).toContain("none");
+      // ...at its true size, NOT the card's 9px base (inherited props must
+      // diff against the parent, not the UA default)...
+      expect(r.name.fontSize).toBe("16px");
       // ...the stats bar exists IN FLOW below the body text...
       expect(r.stats, "stats bar missing from replica").toBeTruthy();
       expect(r.stats.y).toBeGreaterThan(r.name.r.y + 30);
