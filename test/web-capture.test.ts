@@ -31,6 +31,66 @@ const FIXTURE_HTML = `
   <iframe src="https://evil.example.com/frame"></iframe>
 </div>`;
 
+describe("extension picker + serializer (capture.js)", () => {
+  it("picks a region, serializes it with inlined styles, and the bundle mints", async () => {
+    const pageHtml = `<!doctype html><html><head><style>
+        .card { width: 380px; background: #fff; border: 1px solid #e2e2ef; border-radius: 14px; padding: 22px; font-family: Arial; color: #17171c; }
+        .tier { font-size: 13px; color: #6b7280; letter-spacing: .08em; }
+        .price { font-size: 40px; font-weight: 700; }
+        .cta { background: #393bf5; color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; }
+      </style></head><body style="margin:40px;background:#f4f4f8;">
+      <div class="card" id="pricebox"><div class="tier">STARTER</div>
+        <div class="price">$29/mo</div>
+        <p>Launches that feel like magic instead of chaos.</p>
+        <button class="cta" onclick="evil()">Upgrade now</button>
+        <script>window.evil = () => {}</` + `script>
+      </div></body></html>`;
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-page-"));
+    const pageFile = path.join(dir, "page.html");
+    await fs.writeFile(pageFile, pageHtml);
+    const captureJs = await fs.readFile(path.resolve(__dirname, "../recorder-extension/capture.js"), "utf-8");
+
+    let browser: Browser | null = null;
+    let bundle: any;
+    try {
+      browser = await chromium.launch({
+        ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+      });
+      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+      await page.goto(`file://${pageFile}`, { waitUntil: "load" });
+      // Stub the extension messaging the content script expects.
+      await page.evaluate(`window.chrome = window.chrome || {}; window.chrome.runtime = {
+        sendMessage: async (msg) => msg.type === "qc-shot" ? { ok: false } : { ok: true, type: "stub" },
+      };`);
+      await page.evaluate(captureJs);
+      // Hover the card, then press C to capture it.
+      const box = await page.locator("#pricebox").boundingBox();
+      await page.mouse.move(box!.x + 10, box!.y + 10);
+      // The hover lands on an inner element; widen once to the card via wheel-up.
+      await page.mouse.wheel(0, -1);
+      await page.keyboard.press("c");
+      await page.waitForFunction(() => (window as any).__qcLastBundle, { timeout: 15_000 });
+      bundle = await page.evaluate(() => (window as any).__qcLastBundle);
+    } finally {
+      if (browser) await browser.close();
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+
+    // The serialized replica carries the page's own computed look...
+    expect(bundle.html).toContain("Upgrade now");
+    expect(bundle.html).toContain("$29/mo");
+    expect(bundle.html).toMatch(/border-top-left-radius:\s*14px/);
+    expect(bundle.html).toMatch(/rgb\(57,\s*59,\s*245\)/); // the CTA violet, computed
+    expect(bundle.width).toBeGreaterThan(300);
+    // ...and the bundle mints through the REAL server path.
+    const minted = await mintCapturedComponent("captest", { ...bundle, name: "picker-pricing" });
+    const html = await fs.readFile(minted.componentPath, "utf-8");
+    expect(html).toContain("Upgrade now");
+    expect(html).not.toMatch(/onclick/i);
+    expect(html).not.toMatch(/<script>window.evil/);
+  }, 300_000);
+});
+
 describe("sanitizeCapturedHtml", () => {
   it("strips scripts, handlers, iframes and external refs but keeps the surface", async () => {
     const clean = await sanitizeCapturedHtml(FIXTURE_HTML);

@@ -215,6 +215,54 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
       if (msg.type === "qr-auth-status") { sendResponse(await authStatus()); return; }
+
+      // ── Component camera (SPEC-web-capture.md) ──
+      // qc-start: inject the picker into the active tab (popup button).
+      // qc-shot: rasterize the visible tab for the reference screenshot.
+      // qc-mint: POST the confirmed bundle -- the FIRST moment anything
+      // leaves the browser; picker + verdict panel are fully local.
+      if (msg.type === "qc-start") {
+        const settings = await getSettings();
+        if (!settings.tenant || !settings.token) { sendResponse({ ok: false, error: "Sign in first." }); return; }
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id || !/^https?:/.test(tab.url || "")) {
+          sendResponse({ ok: false, error: "Switch to a normal website tab first." });
+          return;
+        }
+        try {
+          await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["capture.js"] });
+          sendResponse({ ok: true });
+        } catch (e) {
+          sendResponse({ ok: false, error: "This page can't be captured (" + (e.message || e) + ")" });
+        }
+        return;
+      }
+      if (msg.type === "qc-shot") {
+        try {
+          const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: "png" });
+          sendResponse({ ok: true, dataUrl });
+        } catch (e) {
+          sendResponse({ ok: false, error: String(e && e.message || e) });
+        }
+        return;
+      }
+      if (msg.type === "qc-mint") {
+        const settings = await getSettings();
+        const server = settings.server || SERVER;
+        if (!settings.tenant || !settings.token) { sendResponse({ ok: false, error: "signed out" }); return; }
+        try {
+          const res = await fetch(
+            `${server}/api/capture-component/${encodeURIComponent(settings.tenant)}?token=${encodeURIComponent(settings.token)}`,
+            { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(msg.bundle) },
+          );
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) { sendResponse({ ok: false, error: body.error || ("HTTP " + res.status) }); return; }
+          sendResponse({ ok: true, type: body.type });
+        } catch (e) {
+          sendResponse({ ok: false, error: String(e && e.message || e) });
+        }
+        return;
+      }
       if (msg.type === "qr-signin") {
         try { const a = await signIn(); sendResponse({ ok: true, email: a.email, name: a.name, picture: a.picture, tenant: a.tenant_id }); }
         catch (e) { sendResponse({ ok: false, error: e.message }); }

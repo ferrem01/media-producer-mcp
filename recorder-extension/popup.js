@@ -9,6 +9,7 @@ function renderAuth(st) {
   $("auth-in").style.display = signedIn ? "flex" : "none";
   $("record").dataset.needsAuth = signedIn ? "" : "1";
   $("record").disabled = !signedIn;
+  $("capture").disabled = !signedIn;
   if (signedIn) {
     $("auth-name").textContent = st.name || "";
     $("auth-email").textContent = st.email || "";
@@ -77,6 +78,14 @@ $("signout").addEventListener("click", async (e) => {
   e.preventDefault();
   await chrome.runtime.sendMessage({ type: "qr-signout" });
   renderAuth({ signedIn: false });
+});
+
+// Component camera: inject the picker into the page and get out of the way
+// (the whole flow -- outline, capture, verdict, confirm -- lives in-page).
+$("capture").addEventListener("click", async () => {
+  const res = await chrome.runtime.sendMessage({ type: "qc-start" });
+  if (res && res.ok) window.close();
+  else $("status").textContent = (res && res.error) || "Could not start capture.";
 });
 
 function showStatus(st) {
