@@ -33,6 +33,12 @@ describe("settledMoment", () => {
   it("defaults sensibly with no timing data at all", () => {
     expect(settledMoment({ duration_seconds: 6 })).toBeCloseTo(3.6, 1);
   });
+
+  it("photographs template scenes at the payoff, not the flight", () => {
+    // st-* choreography resolves late by design (the swarm locks, the stat
+    // lands) -- with no timing data the template default sits at 80%.
+    expect(settledMoment({ duration_seconds: 8, scene_template: { type: "st-swarm" } })).toBeCloseTo(6.4, 1);
+  });
 });
 
 describe("renderStoryboardCards", () => {

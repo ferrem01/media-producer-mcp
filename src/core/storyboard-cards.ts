@@ -21,7 +21,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { assembleScene } from "./scene-assembler.js";
 import { LAUNCH_OPTS } from "./capture.js";
-import { buildAuthoredCompositionScene } from "../llm/scene-generator.js";
+import { buildAuthoredCompositionScene, buildTemplateScene } from "../llm/scene-generator.js";
 import type { Project } from "./types.js";
 
 /**
@@ -34,6 +34,7 @@ import type { Project } from "./types.js";
 export function settledMoment(draft: {
   duration_seconds?: number;
   components?: Array<{ data?: Record<string, unknown> }>;
+  scene_template?: { type?: string };
 }): number {
   const dur = Number(draft.duration_seconds) || 6;
   let maxAt = 0;
@@ -49,7 +50,11 @@ export function settledMoment(draft: {
       }
     }
   }
-  const want = maxAt > 0 ? maxAt + 0.8 : dur * 0.6;
+  // Template scenes carry no timing data, but their choreography resolves
+  // late by design (the swarm locks, the stat lands) -- photograph the
+  // payoff, not the flight.
+  const fallback = draft.scene_template?.type ? dur * 0.8 : dur * 0.6;
+  const want = maxAt > 0 ? maxAt + 0.8 : fallback;
   return Math.min(dur * 0.85, Math.max(dur * 0.5, want));
 }
 
@@ -80,7 +85,26 @@ function cardHtml(scenes: Array<Record<string, any>>, stills: Array<string | nul
       const vo = b.voiceover_text ? `<div class="bv">VO: &ldquo;${esc(b.voiceover_text)}&rdquo;</div>` : "";
       return `${head}<div class="ba">${esc(b.action)}</div>${vo}`;
     }).join("");
-    const comps = (ss.components || []).map((c: any) => {
+    // A template scene's performance lives in its slot data -- show it, or a
+    // revision that only touches slots looks like a no-op on the card.
+    const tplRows = (() => {
+      const st = ss.scene_template;
+      if (!st?.type) return "";
+      const rows = Object.entries(st.data || {})
+        .map(([k, v]) => {
+          if (v == null) return null;
+          if (Array.isArray(v)) {
+            const labels = v.map((it: any) => typeof it === "object" ? (it.label ?? it.value ?? "") : String(it))
+              .filter(Boolean).join(", ");
+            return `${esc(k)}: [${esc(labels.slice(0, 90))}]`;
+          }
+          if (typeof v === "object") return null;
+          return `${esc(k)}: ${esc(String(v).length > 56 ? String(v).slice(0, 56) + "…" : v)}`;
+        })
+        .filter(Boolean).join(" &middot; ");
+      return `<div class="ct">template: ${esc(st.type)}</div><div class="sc">${rows || "(no slots)"}</div>`;
+    })();
+    const comps = tplRows + (ss.components || []).map((c: any) => {
       const script = ((c.data || {}).script || []) as any[];
       // Scriptless components still perform -- from their data. Print those
       // fields so the card never contradicts a beat ("the ask types itself"
@@ -164,20 +188,30 @@ export async function renderStoryboardCards(project: Project, opts: {
       const draft = scenes[i];
       const authored = (draft.components || []).filter(
         (c: any) => c && typeof c === "object" && c.data && typeof c.type === "string");
-      if (!authored.length) { stills.push(null); continue; }
+      const isTemplate = typeof draft.scene_template?.type === "string"
+        && draft.scene_template.type.startsWith("st-");
+      if (!authored.length && !isTemplate) { stills.push(null); continue; }
       try {
         // The card is the STAGING, not the coverage: photograph the full
         // composition with the camera at rest so the whole layout is
         // judgeable. Camera moves are film-time direction -- they appear on
         // the card as copy (the CAMERA section), never applied to the photo.
         const { camera_moves: _cm, ...staged } = draft;
-        const { scene } = buildAuthoredCompositionScene(`card_s${i}`, staged, authored, {
+        const cardOpts = {
           sceneIndex: i, totalScenes: scenes.length,
           brandKit: (project as any).brand_kit || { colors: {}, fonts: [] },
           canvas, world: (project as any).world,
           tenantId: (project as any).tenant_id, projectId: (project as any).project_id,
           prompt: sb?.narrative || "", format: "video",
-        } as any);
+        } as any;
+        // Template scenes photograph through the EXACT build-path
+        // instantiation (buildTemplateScene) -- these are deterministic
+        // designer compositions, not codegen; a placeholder here made a
+        // successful revision look like a no-op (the "Hi this is working"
+        // swarm edit landed in the data with nothing to show for it).
+        const { scene } = isTemplate
+          ? buildTemplateScene(`card_s${i}`, staged, { ...cardOpts, scene: staged })!
+          : buildAuthoredCompositionScene(`card_s${i}`, staged, authored, cardOpts);
         const types = [...new Set((scene.components || []).map((c: any) => c.type))] as string[];
         const comps = await Promise.all(types.map(async (t) => {
           const p = lib.get(t);

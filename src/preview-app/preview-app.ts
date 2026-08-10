@@ -3834,7 +3834,11 @@ export function getPreviewHtml(): string {
       '?v=' + encodeURIComponent(project.updated_at || '');
   }
   function draftIsAuthored(s) {
-    return (s.components || []).some(function(c) { return c && typeof c === 'object' && c.type && c.data; });
+    // Frames exist for authored component scenes AND template (st-*) scenes
+    // -- both instantiate deterministically, so both get photographed. Only
+    // true codegen scenes wait for the build.
+    return (s.components || []).some(function(c) { return c && typeof c === 'object' && c.type && c.data; })
+      || !!(s.scene_template && String(s.scene_template.type || '').indexOf('st-') === 0);
   }
   function renderDraftView(project) {
     var pc = document.getElementById('preview-container');
@@ -3907,6 +3911,27 @@ export function getPreviewHtml(): string {
       });
     }
     h += '<div class="dv-sect">COMPONENTS &amp; SCRIPTS</div>';
+    // A template scene performs from its SLOT DATA -- print it, or a
+    // revision that only touches slots looks like nothing happened.
+    if (s.scene_template && s.scene_template.type) {
+      h += '<div class="dv-comp-type">template: ' + escHtml(s.scene_template.type) + '</div>';
+      var tplData = s.scene_template.data || {};
+      var tplRows = [];
+      Object.keys(tplData).forEach(function(k) {
+        var v = tplData[k];
+        if (v == null) return;
+        if (Object.prototype.toString.call(v) === '[object Array]') {
+          var labels = v.map(function(it) { return (it && typeof it === 'object') ? (it.label || it.value || '') : String(it); })
+            .filter(Boolean).join(', ');
+          tplRows.push(escHtml(k) + ': [' + escHtml(labels.slice(0, 90)) + ']');
+          return;
+        }
+        if (typeof v === 'object') return;
+        if (typeof v === 'string' && v.length > 56) v = v.slice(0, 56) + '…';
+        tplRows.push(escHtml(k) + ': ' + escHtml(String(v)));
+      });
+      h += tplRows.length ? '<div class="dv-mono">' + tplRows.join(' · ') + '</div>' : '<div class="dv-mono mut">(no slots)</div>';
+    }
     var comps = s.components || [];
     if (comps.length) {
       comps.forEach(function(c) {
@@ -3937,7 +3962,7 @@ export function getPreviewHtml(): string {
             : '<div class="dv-mono mut">(no data)</div>';
         }
       });
-    } else h += '<div class="dv-mono mut">(none cast)</div>';
+    } else if (!(s.scene_template && s.scene_template.type)) h += '<div class="dv-mono mut">(none cast)</div>';
     h += '<div class="dv-feedback">' +
       '<textarea id="dv-scene-feedback" placeholder="Direct this scene… (e.g. hold the terminal longer, brighter surface)"></textarea>' +
       '<button class="btn" id="dv-scene-revise">✎ Revise</button></div>';
