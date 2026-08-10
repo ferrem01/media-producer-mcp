@@ -27,7 +27,7 @@ import { normalizeBeats } from "./core/beats.js";
 import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-kit.js";
-import { queueBuildFromStoryboard, queueStoryboardGeneration } from "./server.js";
+import { queueBuildFromStoryboard, queueStoryboardGeneration, queueSurgicalSceneOp } from "./server.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
@@ -1890,10 +1890,14 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
-      // POST /api/storyboard-revise/{tenant}/{project} {feedback} -- the
-      // golden workflow's iterate loop FROM STUDIO: same queue as the MCP
-      // generate tool's storyboard revision, so the whole board re-drafts
-      // against the feedback and the cards re-photograph when it lands.
+      // POST /api/storyboard-revise/{tenant}/{project} -- the golden
+      // workflow's iterate loop FROM STUDIO, two grains:
+      //   {feedback}                          -> re-draft the WHOLE board
+      //   {feedback, scene_index}             -> surgically revise ONE scene
+      //   {feedback, insert_at}               -> author + insert ONE scene
+      // Whole-board runs the same queue as the MCP generate revision; the
+      // surgical ops splice, so other scenes stay byte-identical. Every
+      // path re-photographs the cards before its job completes.
       const sbReviseMatch = urlPath.match(/^\/api\/storyboard-revise\/([^/]+)\/([^/]+)$/);
       if (sbReviseMatch && method === "POST") {
         const [, srTenant, srProject] = sbReviseMatch.map(decodeURIComponent);
@@ -1902,13 +1906,20 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         if (!srFeedback) { jsonResponse(res, 400, { error: "feedback is required" }); return; }
         const srProj = await loadProject(srTenant, srProject);
         if (!srProj) { jsonResponse(res, 404, { error: "Project not found" }); return; }
-        const srRes = await queueStoryboardGeneration({
-          tenant_id: srTenant,
-          prompt: srProj.prompt || srProj.storyboard?.narrative || srProj.name || "Revise this storyboard",
-          target: "video",
-          project_id: srProject,
-          feedback: srFeedback,
-        });
+        const surgical = srBody.scene_index !== undefined || srBody.insert_at !== undefined;
+        const srRes = surgical
+          ? queueSurgicalSceneOp(srTenant, srProject, {
+              scene_index: srBody.scene_index !== undefined ? Number(srBody.scene_index) : undefined,
+              insert_at: srBody.insert_at !== undefined ? Number(srBody.insert_at) : undefined,
+              feedback: srFeedback,
+            })
+          : await queueStoryboardGeneration({
+              tenant_id: srTenant,
+              prompt: srProj.prompt || srProj.storyboard?.narrative || srProj.name || "Revise this storyboard",
+              target: "video",
+              project_id: srProject,
+              feedback: srFeedback,
+            });
         if ("error" in srRes) { jsonResponse(res, 500, { error: srRes.error }); return; }
         jsonResponse(res, 202, { ok: true, job_id: srRes.job.id, project_id: srProject });
         return;
