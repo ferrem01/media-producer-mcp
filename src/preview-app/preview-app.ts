@@ -3842,6 +3842,7 @@ export function getPreviewHtml(): string {
     renderDraftRail(project);
     renderDraftFooter(project);
     dv.style.display = 'block';
+    resumeDraftJob(project);
   }
   // The selected scene's card, full size in the main window: the frame
   // (photographed at the settled moment, camera at rest), then the record
@@ -4015,6 +4016,18 @@ export function getPreviewHtml(): string {
   // One draft job at a time (build OR revise): both re-draft the surface,
   // so both poll the same slot and reload the project when they land --
   // a revision's reload brings the new board AND its re-photographed cards.
+  //
+  // The in-flight job is persisted to localStorage and resumed on load: a
+  // page reload must not orphan a running revision. And a job the server no
+  // longer knows (jobs are in-memory; a deploy restart drops them) is a
+  // TERMINAL state the user must hear about -- the first live revision was
+  // lost exactly that way, with the client silently retrying a dead job id
+  // forever while the button never changed.
+  function draftJobKey(projectId) { return 'mp_draft_job_' + state.tenantId + '_' + projectId; }
+  function clearDraftJob(projectId) {
+    draftBuild.job = null; draftBuild.kind = null;
+    try { localStorage.removeItem(draftJobKey(projectId)); } catch (e) {}
+  }
   function startDraftJob(projectId, btn, url, body, kind, idleLabel) {
     if (draftBuild.job) { studioStatus('A ' + draftBuild.kind + ' is already running — let it land first.', 'err'); return; }
     btn.disabled = true;
@@ -4023,10 +4036,11 @@ export function getPreviewHtml(): string {
       .then(function(resp) {
         draftBuild.job = resp.job_id;
         draftBuild.kind = kind;
+        try { localStorage.setItem(draftJobKey(projectId), JSON.stringify({ job: resp.job_id, kind: kind })); } catch (e) {}
         studioStatus(kind === 'build'
           ? 'Building scenes from the storyboard — this takes a few minutes; the film loads here when done.'
           : 'Revising the storyboard against your feedback — the board and its cards refresh when it lands.', 'ok');
-        pollDraftJob(projectId, btn, idleLabel);
+        pollDraftJob(projectId, btn, idleLabel, 0);
       })
       .catch(function(e) {
         btn.disabled = false;
@@ -4034,19 +4048,34 @@ export function getPreviewHtml(): string {
         studioStatus('Could not start: ' + e.message, 'err');
       });
   }
-  function pollDraftJob(projectId, btn, idleLabel) {
+  // Called from renderDraftView: pick a persisted in-flight job back up so
+  // a reload (or a returning tab) keeps following it to the refresh.
+  function resumeDraftJob(project) {
+    if (draftBuild.job) return;
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(draftJobKey(project.project_id)) || 'null'); } catch (e) {}
+    if (!saved || !saved.job) return;
+    draftBuild.job = saved.job;
+    draftBuild.kind = saved.kind || 'revise';
+    var btn = document.getElementById(saved.kind === 'build' ? 'df-build' : 'df-revise');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Checking…'; }
+    studioStatus('Picking up the running ' + draftBuild.kind + ' — the board refreshes when it lands.', 'ok');
+    pollDraftJob(project.project_id, btn || document.createElement('button'),
+      saved.kind === 'build' ? '▶ Build scenes' : '↻ Revise', 0);
+  }
+  function pollDraftJob(projectId, btn, idleLabel, misses) {
     if (!draftBuild.job) return;
     api('/job/' + state.tenantId + '/' + draftBuild.job).then(function(job) {
       if (!draftBuild.job) return;
       if (job.status === 'completed') {
         var kind = draftBuild.kind;
-        draftBuild.job = null; draftBuild.kind = null;
+        clearDraftJob(projectId);
         studioStatus(kind === 'build' ? '✓ Scenes built — loading the film.' : '✓ Storyboard revised — reloading the board.', 'ok');
         loadProject(projectId);
         return;
       }
       if (job.status === 'failed') {
-        draftBuild.job = null; draftBuild.kind = null;
+        clearDraftJob(projectId);
         btn.disabled = false;
         btn.textContent = '↻ Retry';
         studioStatus((idleLabel || 'Job') + ' failed: ' + (job.error || 'unknown error'), 'err');
@@ -4055,9 +4084,22 @@ export function getPreviewHtml(): string {
       var pct = (job.progress && job.progress.percent) || 0;
       var detail = (job.progress && job.progress.detail) || (job.progress && job.progress.step) || '';
       btn.textContent = '⏳ ' + pct + '%' + (detail ? ' · ' + detail : '');
-      draftBuild.timer = setTimeout(function() { pollDraftJob(projectId, btn, idleLabel); }, 5000);
-    }).catch(function() {
-      draftBuild.timer = setTimeout(function() { pollDraftJob(projectId, btn, idleLabel); }, 8000);
+      draftBuild.timer = setTimeout(function() { pollDraftJob(projectId, btn, idleLabel, 0); }, 5000);
+    }).catch(function(e) {
+      var gone = /not found|404/i.test((e && e.message) || '');
+      var next = (misses || 0) + 1;
+      if (gone || next >= 5) {
+        // The server does not know this job (deploy restart drops in-memory
+        // jobs) or we cannot reach it at all. Silence here loses the edit.
+        clearDraftJob(projectId);
+        btn.disabled = false;
+        btn.textContent = idleLabel;
+        studioStatus(gone
+          ? 'That job is gone — the server likely restarted mid-run, so the edit did NOT land. Run it again.'
+          : 'Lost contact with the server while waiting — reload the page to check whether the edit landed.', 'err');
+        return;
+      }
+      draftBuild.timer = setTimeout(function() { pollDraftJob(projectId, btn, idleLabel, next); }, 8000);
     });
   }
 
