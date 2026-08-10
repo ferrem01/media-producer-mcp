@@ -35,7 +35,10 @@ const BROWSER_ARGS = [
 ];
 // Optional explicit Chromium path (e.g. constrained CI/remote envs where the
 // bundled Playwright revision isn't downloaded). Honors MP_CHROMIUM_PATH.
-const LAUNCH_OPTS = {
+/** Shared launch options: the GL/sandbox flags every scene-shooting browser
+ *  needs, so out-of-pipeline shooters (storyboard cards) render webgl
+ *  backdrops the same way the capture pipeline does. */
+export const LAUNCH_OPTS = {
   args: BROWSER_ARGS,
   ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
 };

@@ -956,6 +956,8 @@ export function getPreviewHtml(): string {
   .scene-quality-badge { cursor: pointer; }
 
   /* ── Storyboard draft view: the script, before any scene exists ── */
+  .dv-still { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px;
+    border: 1px solid #d8dbe4; margin-bottom: 10px; display: block; background: #eceef4; }
   #draft-view { position: absolute; inset: 0; overflow: auto; background: #f6f7fa; display: none;
     padding: 20px 26px 48px; z-index: 5; }
   .dv-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
@@ -3777,6 +3779,13 @@ export function getPreviewHtml(): string {
       '</div><button class="btn btn-primary" id="dv-build" title="Generate the scenes from this storyboard (a few minutes)">▶ Build scenes</button></div>';
     scenes.forEach(function(s, i) {
       h += '<div class="dv-card">' +
+        // THE TRUE STORYBOARD: the still photographed at the scene's settled
+        // moment by storyboard-cards (rendered at the generate stop-point).
+        // onerror hides it, so boards from before the cards existed -- or a
+        // scene whose card failed -- degrade to the text-only card.
+        '<img class="dv-still" src="/output/' + encodeURIComponent(project.tenant_id) + '/projects/' +
+          encodeURIComponent(project.project_id) + '/storyboard_card_scene_' + (i + 1) + '.png' +
+          '" onerror="this.style.display=\'none\'">' +
         '<div class="dv-card-head"><span class="dv-num">' + (i + 1) + '</span>' +
         '<span class="dv-label">' + escHtml(s.label || ('Scene ' + (i + 1))) + '</span>' +
         '<span class="dv-dur">' + (Number(s.duration_seconds) || 0) + 's</span></div>' +
