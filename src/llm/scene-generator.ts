@@ -52,212 +52,229 @@ export interface GeneratedScene {
 }
 
 /**
+ * Instantiate a scene_template (st-*) draft into a Scene: designer-built
+ * composition + slot data, deterministic and LLM-free. Extracted from
+ * generateScene so out-of-pipeline shooters (storyboard cards) photograph
+ * template scenes with the EXACT build-path instantiation. Returns null
+ * when the draft carries no template.
+ */
+export function buildTemplateScene(sceneId: string, draft: any, opts: SceneGeneratorOpts): GeneratedScene | null {
+
+// ── Scene-template instantiation (no codegen) ──
+// A storyboard-selected st-* template is a designer-built composition;
+// the scene is the template + slot data, deterministic and instant. The
+// professional-composition path -- codegen only runs when no template fit.
+var st = (draft as any).scene_template;
+if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
+  console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (scene template ${st.type})`);
+  var stData = (st.data && typeof st.data === "object") ? st.data : {};
+  // The WORLD's theme is the template's theme unless the storyboard set one
+  // explicitly (SPEC-world.md): a light film must not close on a template
+  // that defaults dark -- that temperature jump is the deck-of-posters bug.
+  if (opts.world && !(stData as any).theme) (stData as any).theme = opts.world.theme;
+  // Default the wordmark slot from the brand kit when the template wants
+  // one and the storyboard didn't fill it.
+  if (!(stData as any).logo_url && opts.brandKit?.logos?.length) {
+    var wmLogo = opts.brandKit.logos.find((l: any) => l.variant === "wordmark" || l.variant === "full") || opts.brandKit.logos[0];
+    if (wmLogo) (stData as any).logo_url = wmLogo.url;
+  }
+  if (!(stData as any).scene_index) (stData as any).scene_index = `${String(opts.sceneIndex + 1).padStart(2, "0")} / ${String(opts.totalScenes).padStart(2, "0")}`;
+  // st-photo-close takes the scene's generated hero image as its world;
+  // the mapper leaves the slot empty because the image is enriched later.
+  if (st.type === "st-photo-close" && !(stData as any).backdrop_image && opts.imageUrl) {
+    (stData as any).backdrop_image = opts.imageUrl;
+  }
+  // Dark template scenes get the WebGL cinematic backdrop (translucent lit
+  // ribbons on three.js) as their z0 world; the template's atmosphere then
+  // runs baseless as a lighting pass over it.
+  // Float defaults to the dark world but honors an explicit light theme
+  // (Apple-style white-room float: light atmosphere + grid, no backdrop).
+  if (st.type === "st-screencast" && (stData as any).presentation === "float" && !(stData as any).theme) {
+    (stData as any).theme = "dark";
+  }
+  var stDarkDefault = ["st-logo-close", "st-quote", "st-swarm", "st-manifesto", "st-compare", "st-flow", "st-convergence"];
+  var stIsDark = (stDarkDefault.indexOf(st.type) !== -1 && (stData as any).theme !== "light")
+    || (stData as any).theme === "dark";
+  // Speaker templates composite over the live camera (transparent) or cover it
+  // with their own footage/panel (screencast). A z0 WebGL backdrop would paint
+  // over the camera -- never add one for the speaker family.
+  var stSpeakerTemplate = st.type === "st-speaker-screencast"
+    || st.type === "st-speaker-lowerthird" || st.type === "st-speaker-split";
+  // An explicit backdrop_image is its own world -- it replaces the WebGL
+  // ribbons (two competing backdrops read as noise).
+  // st-statement paints its own full-bleed editorial canvas (cream/near-black)
+  // -- a webgl backdrop underneath is invisible paint, never inject one.
+  var stWantsWebgl = stIsDark && !(stData as any).backdrop_image && !stSpeakerTemplate && st.type !== "st-statement";
+  if (stWantsWebgl) (stData as any).backdrop_active = true;
+  var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
+  if (stWantsWebgl) {
+    stComponents.unshift({
+      id: "tpl_bg",
+      type: "webgl-backdrop",
+      z_index: 0,
+      // In a world: the film's one backdrop, clock-offset to film time.
+      data: opts.world
+        ? { seed: opts.world.backdrop.seed, colors: opts.world.backdrop.palette, time_offset: (draft as any).film_start || 0 }
+        : { seed: 3 + opts.sceneIndex * 4 },
+    });
+  }
+  // st-artifact is a SHELL: the artifact (a ui-mock or media component
+  // that BUILDS on screen) rides in a sibling instance positioned in the
+  // non-editorial zone.
+  if (st.type === "st-artifact") {
+    var art = (stData as any).artifact;
+    if (art && typeof art.type === "string") {
+      var editorialLeft = (stData as any).editorial_side === "left";
+      stComponents.push({
+        id: "tpl_artifact",
+        type: art.type,
+        z_index: 20,
+        position: editorialLeft
+          ? { x: "42%", y: "10%", width: "55%", height: "80%" }
+          : { x: "3%", y: "10%", width: "55%", height: "80%" },
+        data: (art.data && typeof art.data === "object") ? art.data : {},
+      });
+    } else {
+      console.warn(`  st-artifact: no artifact slot -- editorial column only`);
+    }
+  }
+  // st-screencast is a SHELL: the footage itself rides in a sibling
+  // screencast-frame instance (browser chrome + crop:'auto' ingest-analysis
+  // chrome removal). The frame's box leaves the shell's bottom band free
+  // for the timed caption chips.
+  if (st.type === "st-screencast") {
+    var src = (stData as any).source || (draft as any).assets?.find?.((a: string) => /\.(mp4|webm|mov|m4v)/i.test(a));
+    if (src) {
+      // LLMs shorten asset paths in transit; a source that doesn't resolve
+      // on disk ships an empty frame. Recover by basename before wiring.
+      var recoveredSrc = recoverAssetUrl(src, opts.tenantId);
+      if (recoveredSrc !== src) {
+        console.warn(`  st-screencast: source "${src}" not on disk -- recovered to "${recoveredSrc}"`);
+        src = recoveredSrc;
+        (stData as any).source = recoveredSrc;
+      }
+      var stFloat = (stData as any).presentation === "float";
+      stComponents.push({
+        id: "tpl_video",
+        type: "screencast-frame",
+        z_index: 20,
+        position: { x: "0%", y: "4%", width: "100%", height: "82%" },
+        data: {
+          video_url: src,
+          frame_style: stFloat ? "plain" : "macos-browser",
+          presentation: stFloat ? "float" : undefined,
+          theme: (stData as any).theme,
+          callouts: Array.isArray((stData as any).callouts) ? (stData as any).callouts : undefined,
+          crop: "auto",
+          url_text: (stData as any).url_text || "",
+          max_width_pct: Number((stData as any).max_width_pct) || (stFloat ? 72 : 80),
+          // Camera PiP pass-through: the template exposes the pip_* slots and
+          // forwards them verbatim to the footage frame, which owns the
+          // bubble. Only set when the caller provides a camera source.
+          pip_source: (stData as any).pip_source || undefined,
+          pip_position: (stData as any).pip_position || undefined,
+          pip_size: (stData as any).pip_size !== undefined ? Number((stData as any).pip_size) : undefined,
+          pip_shape: (stData as any).pip_shape || undefined,
+          pip_start_at: (stData as any).pip_start_at !== undefined ? Number((stData as any).pip_start_at) : undefined,
+        },
+      });
+    } else {
+      console.warn(`  st-screencast: no footage source in slots or draft assets -- shell only`);
+    }
+  }
+  // st-speaker-screencast is a SHELL too: the recording + camera bubble ride
+  // in a sibling screencast-frame stamped with the known-good speaker-screencast
+  // recipe (frameless, rounded, inset, circular PiP wired to the speaker track).
+  // The scene is OPAQUE so it covers the speaker base except the PiP.
+  var stSpeakerOpaque = false;
+  if (st.type === "st-speaker-screencast") {
+    var ssSrc = (stData as any).source || (draft as any).assets?.find?.((a: string) => /\.(mp4|webm|mov|m4v)/i.test(a));
+    if (ssSrc) {
+      var ssRecovered = recoverAssetUrl(ssSrc, opts.tenantId);
+      if (ssRecovered !== ssSrc) {
+        console.warn(`  st-speaker-screencast: source "${ssSrc}" not on disk -- recovered to "${ssRecovered}"`);
+        ssSrc = ssRecovered;
+      }
+      // pip_source defaults to the "speaker" token (bind to the speaker track);
+      // "none"/null hides the bubble; anything else is a plain camera URL.
+      var ssPipRaw = (stData as any).pip_source;
+      var ssPip = ssPipRaw === undefined ? "speaker" : ssPipRaw;
+      var ssPipSource = (ssPip === "none" || ssPip === null || ssPip === "") ? undefined : ssPip;
+      stComponents.push({
+        id: "tpl_video",
+        type: "screencast-frame",
+        z_index: 20,
+        position: { x: "0%", y: "0%", width: "100%", height: "100%" },
+        data: {
+          video_url: ssSrc,
+          frame_style: "none",
+          crop: "auto",
+          shadow: false,
+          corner_radius: (stData as any).corner_radius !== undefined ? Number((stData as any).corner_radius) : 30,
+          max_width_pct: (stData as any).max_width_pct !== undefined ? Number((stData as any).max_width_pct) : 88,
+          pip_source: ssPipSource,
+          pip_shape: "circle",
+          pip_size: (stData as any).pip_size !== undefined ? Number((stData as any).pip_size) : 15,
+          pip_position: (stData as any).pip_position || "bottom-right",
+          pip_start_at: (stData as any).pip_start_at !== undefined ? Number((stData as any).pip_start_at) : undefined,
+        },
+      });
+      stSpeakerOpaque = true; // full-frame screencast covers the speaker base
+    } else {
+      console.warn(`  st-speaker-screencast: no footage source in slots or draft assets -- shell only`);
+    }
+  }
+  // st-speaker-split is TRANSPARENT (camera shows on the clear side); the shell
+  // paints the opaque panel on the content side. An optional paired component
+  // (chart / stat / mock / motion graphic) rides in the panel's lower zone.
+  if (st.type === "st-speaker-split") {
+    var ssContent = (stData as any).content;
+    var ssHasSlot = ssContent && typeof ssContent.type === "string";
+    (stData as any).has_slot = !!ssHasSlot; // shell top-aligns copy above the graphic
+    if (ssHasSlot) {
+      var splitRight = ((stData as any).side || "right") !== "left"; // content on right by default
+      stComponents.push({
+        id: "tpl_content",
+        type: ssContent.type,
+        z_index: 20,
+        position: splitRight
+          ? { x: "50%", y: "40%", width: "44%", height: "50%" }
+          : { x: "6%", y: "40%", width: "44%", height: "50%" },
+        data: (ssContent.data && typeof ssContent.data === "object") ? ssContent.data : {},
+      });
+    }
+  }
+  return {
+    scene: {
+      id: sceneId,
+      label: draft.label,
+      duration_seconds: draft.duration_seconds || 8,
+      transition_in: draft.transition_in as any,
+      // Opaque so the full-frame screencast composites OVER the speaker base
+      // (camera shows only in the PiP), matching sceneCompositesOverSpeaker.
+      ...(stSpeakerOpaque ? { transparent_background: false } : {}),
+      beats: draft.beats as any,
+      camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
+      components: stComponents,
+      audio_hints: draft.voiceover_text ? { voiceover_text: draft.voiceover_text } : undefined,
+    } as any,
+  };
+}
+  return null;
+}
+
+/**
  * Generate a single scene with mixed library, custom, or template components.
  */
 export async function generateScene(opts: SceneGeneratorOpts): Promise<GeneratedScene> {
   var draft = opts.scene;
   var sceneId = `scene_${String(opts.sceneIndex + 1).padStart(3, "0")}`;
-
   // ── Scene-template instantiation (no codegen) ──
-  // A storyboard-selected st-* template is a designer-built composition;
-  // the scene is the template + slot data, deterministic and instant. The
-  // professional-composition path -- codegen only runs when no template fit.
-  var st = (draft as any).scene_template;
-  if (st && typeof st.type === "string" && st.type.startsWith("st-")) {
-    console.log(`  Scene ${opts.sceneIndex + 1}/${opts.totalScenes}: "${draft.label}" (scene template ${st.type})`);
-    var stData = (st.data && typeof st.data === "object") ? st.data : {};
-    // The WORLD's theme is the template's theme unless the storyboard set one
-    // explicitly (SPEC-world.md): a light film must not close on a template
-    // that defaults dark -- that temperature jump is the deck-of-posters bug.
-    if (opts.world && !(stData as any).theme) (stData as any).theme = opts.world.theme;
-    // Default the wordmark slot from the brand kit when the template wants
-    // one and the storyboard didn't fill it.
-    if (!(stData as any).logo_url && opts.brandKit?.logos?.length) {
-      var wmLogo = opts.brandKit.logos.find((l: any) => l.variant === "wordmark" || l.variant === "full") || opts.brandKit.logos[0];
-      if (wmLogo) (stData as any).logo_url = wmLogo.url;
-    }
-    if (!(stData as any).scene_index) (stData as any).scene_index = `${String(opts.sceneIndex + 1).padStart(2, "0")} / ${String(opts.totalScenes).padStart(2, "0")}`;
-    // st-photo-close takes the scene's generated hero image as its world;
-    // the mapper leaves the slot empty because the image is enriched later.
-    if (st.type === "st-photo-close" && !(stData as any).backdrop_image && opts.imageUrl) {
-      (stData as any).backdrop_image = opts.imageUrl;
-    }
-    // Dark template scenes get the WebGL cinematic backdrop (translucent lit
-    // ribbons on three.js) as their z0 world; the template's atmosphere then
-    // runs baseless as a lighting pass over it.
-    // Float defaults to the dark world but honors an explicit light theme
-    // (Apple-style white-room float: light atmosphere + grid, no backdrop).
-    if (st.type === "st-screencast" && (stData as any).presentation === "float" && !(stData as any).theme) {
-      (stData as any).theme = "dark";
-    }
-    var stDarkDefault = ["st-logo-close", "st-quote", "st-swarm", "st-manifesto", "st-compare", "st-flow", "st-convergence"];
-    var stIsDark = (stDarkDefault.indexOf(st.type) !== -1 && (stData as any).theme !== "light")
-      || (stData as any).theme === "dark";
-    // Speaker templates composite over the live camera (transparent) or cover it
-    // with their own footage/panel (screencast). A z0 WebGL backdrop would paint
-    // over the camera -- never add one for the speaker family.
-    var stSpeakerTemplate = st.type === "st-speaker-screencast"
-      || st.type === "st-speaker-lowerthird" || st.type === "st-speaker-split";
-    // An explicit backdrop_image is its own world -- it replaces the WebGL
-    // ribbons (two competing backdrops read as noise).
-    // st-statement paints its own full-bleed editorial canvas (cream/near-black)
-    // -- a webgl backdrop underneath is invisible paint, never inject one.
-    var stWantsWebgl = stIsDark && !(stData as any).backdrop_image && !stSpeakerTemplate && st.type !== "st-statement";
-    if (stWantsWebgl) (stData as any).backdrop_active = true;
-    var stComponents: any[] = [{ id: "tpl_0", type: st.type, data: stData, z_index: 10 }];
-    if (stWantsWebgl) {
-      stComponents.unshift({
-        id: "tpl_bg",
-        type: "webgl-backdrop",
-        z_index: 0,
-        // In a world: the film's one backdrop, clock-offset to film time.
-        data: opts.world
-          ? { seed: opts.world.backdrop.seed, colors: opts.world.backdrop.palette, time_offset: (draft as any).film_start || 0 }
-          : { seed: 3 + opts.sceneIndex * 4 },
-      });
-    }
-    // st-artifact is a SHELL: the artifact (a ui-mock or media component
-    // that BUILDS on screen) rides in a sibling instance positioned in the
-    // non-editorial zone.
-    if (st.type === "st-artifact") {
-      var art = (stData as any).artifact;
-      if (art && typeof art.type === "string") {
-        var editorialLeft = (stData as any).editorial_side === "left";
-        stComponents.push({
-          id: "tpl_artifact",
-          type: art.type,
-          z_index: 20,
-          position: editorialLeft
-            ? { x: "42%", y: "10%", width: "55%", height: "80%" }
-            : { x: "3%", y: "10%", width: "55%", height: "80%" },
-          data: (art.data && typeof art.data === "object") ? art.data : {},
-        });
-      } else {
-        console.warn(`  st-artifact: no artifact slot -- editorial column only`);
-      }
-    }
-    // st-screencast is a SHELL: the footage itself rides in a sibling
-    // screencast-frame instance (browser chrome + crop:'auto' ingest-analysis
-    // chrome removal). The frame's box leaves the shell's bottom band free
-    // for the timed caption chips.
-    if (st.type === "st-screencast") {
-      var src = (stData as any).source || (draft as any).assets?.find?.((a: string) => /\.(mp4|webm|mov|m4v)/i.test(a));
-      if (src) {
-        // LLMs shorten asset paths in transit; a source that doesn't resolve
-        // on disk ships an empty frame. Recover by basename before wiring.
-        var recoveredSrc = recoverAssetUrl(src, opts.tenantId);
-        if (recoveredSrc !== src) {
-          console.warn(`  st-screencast: source "${src}" not on disk -- recovered to "${recoveredSrc}"`);
-          src = recoveredSrc;
-          (stData as any).source = recoveredSrc;
-        }
-        var stFloat = (stData as any).presentation === "float";
-        stComponents.push({
-          id: "tpl_video",
-          type: "screencast-frame",
-          z_index: 20,
-          position: { x: "0%", y: "4%", width: "100%", height: "82%" },
-          data: {
-            video_url: src,
-            frame_style: stFloat ? "plain" : "macos-browser",
-            presentation: stFloat ? "float" : undefined,
-            theme: (stData as any).theme,
-            callouts: Array.isArray((stData as any).callouts) ? (stData as any).callouts : undefined,
-            crop: "auto",
-            url_text: (stData as any).url_text || "",
-            max_width_pct: Number((stData as any).max_width_pct) || (stFloat ? 72 : 80),
-            // Camera PiP pass-through: the template exposes the pip_* slots and
-            // forwards them verbatim to the footage frame, which owns the
-            // bubble. Only set when the caller provides a camera source.
-            pip_source: (stData as any).pip_source || undefined,
-            pip_position: (stData as any).pip_position || undefined,
-            pip_size: (stData as any).pip_size !== undefined ? Number((stData as any).pip_size) : undefined,
-            pip_shape: (stData as any).pip_shape || undefined,
-            pip_start_at: (stData as any).pip_start_at !== undefined ? Number((stData as any).pip_start_at) : undefined,
-          },
-        });
-      } else {
-        console.warn(`  st-screencast: no footage source in slots or draft assets -- shell only`);
-      }
-    }
-    // st-speaker-screencast is a SHELL too: the recording + camera bubble ride
-    // in a sibling screencast-frame stamped with the known-good speaker-screencast
-    // recipe (frameless, rounded, inset, circular PiP wired to the speaker track).
-    // The scene is OPAQUE so it covers the speaker base except the PiP.
-    var stSpeakerOpaque = false;
-    if (st.type === "st-speaker-screencast") {
-      var ssSrc = (stData as any).source || (draft as any).assets?.find?.((a: string) => /\.(mp4|webm|mov|m4v)/i.test(a));
-      if (ssSrc) {
-        var ssRecovered = recoverAssetUrl(ssSrc, opts.tenantId);
-        if (ssRecovered !== ssSrc) {
-          console.warn(`  st-speaker-screencast: source "${ssSrc}" not on disk -- recovered to "${ssRecovered}"`);
-          ssSrc = ssRecovered;
-        }
-        // pip_source defaults to the "speaker" token (bind to the speaker track);
-        // "none"/null hides the bubble; anything else is a plain camera URL.
-        var ssPipRaw = (stData as any).pip_source;
-        var ssPip = ssPipRaw === undefined ? "speaker" : ssPipRaw;
-        var ssPipSource = (ssPip === "none" || ssPip === null || ssPip === "") ? undefined : ssPip;
-        stComponents.push({
-          id: "tpl_video",
-          type: "screencast-frame",
-          z_index: 20,
-          position: { x: "0%", y: "0%", width: "100%", height: "100%" },
-          data: {
-            video_url: ssSrc,
-            frame_style: "none",
-            crop: "auto",
-            shadow: false,
-            corner_radius: (stData as any).corner_radius !== undefined ? Number((stData as any).corner_radius) : 30,
-            max_width_pct: (stData as any).max_width_pct !== undefined ? Number((stData as any).max_width_pct) : 88,
-            pip_source: ssPipSource,
-            pip_shape: "circle",
-            pip_size: (stData as any).pip_size !== undefined ? Number((stData as any).pip_size) : 15,
-            pip_position: (stData as any).pip_position || "bottom-right",
-            pip_start_at: (stData as any).pip_start_at !== undefined ? Number((stData as any).pip_start_at) : undefined,
-          },
-        });
-        stSpeakerOpaque = true; // full-frame screencast covers the speaker base
-      } else {
-        console.warn(`  st-speaker-screencast: no footage source in slots or draft assets -- shell only`);
-      }
-    }
-    // st-speaker-split is TRANSPARENT (camera shows on the clear side); the shell
-    // paints the opaque panel on the content side. An optional paired component
-    // (chart / stat / mock / motion graphic) rides in the panel's lower zone.
-    if (st.type === "st-speaker-split") {
-      var ssContent = (stData as any).content;
-      var ssHasSlot = ssContent && typeof ssContent.type === "string";
-      (stData as any).has_slot = !!ssHasSlot; // shell top-aligns copy above the graphic
-      if (ssHasSlot) {
-        var splitRight = ((stData as any).side || "right") !== "left"; // content on right by default
-        stComponents.push({
-          id: "tpl_content",
-          type: ssContent.type,
-          z_index: 20,
-          position: splitRight
-            ? { x: "50%", y: "40%", width: "44%", height: "50%" }
-            : { x: "6%", y: "40%", width: "44%", height: "50%" },
-          data: (ssContent.data && typeof ssContent.data === "object") ? ssContent.data : {},
-        });
-      }
-    }
-    return {
-      scene: {
-        id: sceneId,
-        label: draft.label,
-        duration_seconds: draft.duration_seconds || 8,
-        transition_in: draft.transition_in as any,
-        // Opaque so the full-frame screencast composites OVER the speaker base
-        // (camera shows only in the PiP), matching sceneCompositesOverSpeaker.
-        ...(stSpeakerOpaque ? { transparent_background: false } : {}),
-        beats: draft.beats as any,
-        camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
-        components: stComponents,
-        audio_hints: draft.voiceover_text ? { voiceover_text: draft.voiceover_text } : undefined,
-      } as any,
-    };
-  }
+  // Extracted to buildTemplateScene (shared with the storyboard-card
+  // shooter): a storyboard-selected st-* template is a designer-built
+  // composition -- deterministic and instant, codegen never runs.
+  var tplScene = buildTemplateScene(sceneId, draft, opts);
+  if (tplScene) return tplScene;
 
   // ── Deterministic authored-composition path (no codegen) ──
   // When the storyboard fully authored the scene's components (data +
