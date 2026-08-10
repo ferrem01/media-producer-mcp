@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Quotient Recorder",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyy0IuIQ897ApCu/AgQKfI347g8wcbYLDrD4BBIuXesrqjrXPiNmrj7fyokKUOPV8+FU/MXIDHJnD+UfBpDPVTdER/w99u1271UoUvFw03F7UA0p01LOssqyfIDdI9cDew6MQNGtmjxYid4ajq07ZySKkUCtGRMyqfq1xBLCvX5OWzc7ZWJowXi82+PtSacRBb5WICm3SH5ZSn343/DlJR9biM+TL0qEaXI1nHrV+0A3XTUXHhrFUFzaEw7Ve7/ekFfxmXGmKtKpChtu+mZf/bSUSM5gfHvAa2+d0nw+kiAgMuYdHlTgqka4eXGI1ViwPuK70E4dsoVrtrp+iVNZbOQIDAQAB",
   "description": "Record a tab + ground-truth events (clicks, navigations, idle) and turn it into a finished walkthrough film via the Quotient media producer.",
   "permissions": [
