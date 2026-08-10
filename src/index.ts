@@ -1616,13 +1616,17 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
       const tenantSourceMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/source$/);
       if (tenantSourceMatch && method === "GET") {
         const [, tid, compType] = tenantSourceMatch.map(decodeURIComponent);
-        // Search all category subdirs
+        // FLAT first (captured components mint their html at the root -- that
+        // is where render/critique look), then the category subdirs.
         const tenantCompDir = path.join(config.dataDir, tid, "components");
         try {
+          const candidates = [path.join(tenantCompDir, `${compType}.component.html`)];
           const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
           for (const cat of cats) {
             if (!cat.isDirectory()) continue;
-            const filePath = path.join(tenantCompDir, cat.name, `${compType}.component.html`);
+            candidates.push(path.join(tenantCompDir, cat.name, `${compType}.component.html`));
+          }
+          for (const filePath of candidates) {
             try {
               const source = await fs.readFile(filePath, "utf-8");
               res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
@@ -1643,14 +1647,21 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         const [, tid, compType] = tenantDeleteMatch.map(decodeURIComponent);
         const tenantCompDir = path.join(config.dataDir, tid, "components");
         try {
+          // FLAT first: a captured component is html at the root + schema and
+          // reference screenshot under captured/.
+          const candidates = [path.join(tenantCompDir, `${compType}.component.html`)];
           const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
           for (const cat of cats) {
             if (!cat.isDirectory()) continue;
-            const filePath = path.join(tenantCompDir, cat.name, `${compType}.component.html`);
+            candidates.push(path.join(tenantCompDir, cat.name, `${compType}.component.html`));
+          }
+          for (const filePath of candidates) {
             try {
               await fs.unlink(filePath);
-              // Also delete schema if exists
+              // Also delete schema + capture artifacts if they exist
               try { await fs.unlink(filePath.replace(".component.html", ".schema.json")); } catch {}
+              try { await fs.unlink(path.join(tenantCompDir, "captured", `${compType}.schema.json`)); } catch {}
+              try { await fs.unlink(path.join(tenantCompDir, "captured", `${compType}.capture-ref.png`)); } catch {}
               jsonResponse(res, 200, { ok: true, deleted: compType });
               return;
             } catch { continue; }
@@ -1669,20 +1680,25 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         const tenantCompDir = path.join(config.dataDir, tid, "components");
         const components: Array<{ type: string; category: string; label: string }> = [];
 
+        const label = (t: string) => t.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
         try {
           const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
           for (const cat of cats) {
+            // FLAT root files are captured components (mintCapturedComponent
+            // writes the html at the root so render/critique find it; the
+            // schema lives under captured/).
+            if (cat.isFile() && cat.name.endsWith(".component.html")) {
+              const t = cat.name.replace(".component.html", "");
+              components.push({ type: t, category: "captured", label: label(t) });
+              continue;
+            }
             if (!cat.isDirectory()) continue;
             const catPath = path.join(tenantCompDir, cat.name);
             const files = await fs.readdir(catPath);
             for (const f of files) {
               if (!f.endsWith(".component.html")) continue;
               const t = f.replace(".component.html", "");
-              components.push({
-                type: t,
-                category: cat.name,
-                label: t.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
-              });
+              components.push({ type: t, category: cat.name, label: label(t) });
             }
           }
         } catch {

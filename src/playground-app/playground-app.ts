@@ -727,7 +727,7 @@ select.field-input { cursor: pointer; }
     }
 
     // 2. Extract data.xxx references from script
-    var dataRefs = source.match(/data\.([a-zA-Z_][a-zA-Z0-9_]*)/g);
+    var dataRefs = source.match(/data\\.([a-zA-Z_][a-zA-Z0-9_]*)/g);
     if (dataRefs) {
       dataRefs.forEach(function(m) {
         var key = m.replace('data.', '');
@@ -737,10 +737,10 @@ select.field-input { cursor: pointer; }
     }
 
     // 3. Extract {{mustache}} references from template
-    var mustacheMatches = source.match(/\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g);
+    var mustacheMatches = source.match(/\\{\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}\\}/g);
     if (mustacheMatches) {
       mustacheMatches.forEach(function(m) {
-        var key = m.replace(/\{\{|\}\}/g, '');
+        var key = m.replace(/\\{\\{|\\}\\}/g, '');
         if (!data[key]) data[key] = generatePlaceholder(key);
       });
     }
@@ -1159,7 +1159,7 @@ select.field-input { cursor: pointer; }
 
     try {
     var type = field.type || 'string';
-    var label = field.label || key.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+    var label = field.label || key.replace(/_/g, ' ').replace(/\\b\\w/g, function(c) { return c.toUpperCase(); });
     var isRequired = field.required === true;
     var isOptional = field.optional === true;
 
@@ -1868,10 +1868,10 @@ select.field-input { cursor: pointer; }
     var actions = [];
     // Match runScript handler objects: runScript(tl, el, ..., { 'action-name': function... })
     // Pattern: 'action-name' or "action-name" as keys in handler objects
-    var handlerPattern = /['"]([a-z][a-z0-9-]+)['"]\s*:\s*function/g;
+    var handlerPattern = /['"]([a-z][a-z0-9-]+)['"]\\s*:\\s*function/g;
     var match;
     // Look for the handlers object passed to runScript
-    var runScriptMatch = source.match(/runScript\s*\([^)]*,\s*\{([^}]+)\}/);
+    var runScriptMatch = source.match(/runScript\\s*\\([^)]*,\\s*\\{([^}]+)\\}/);
     if (runScriptMatch) {
       var handlersBlock = runScriptMatch[1];
       while ((match = handlerPattern.exec(handlersBlock)) !== null) {
@@ -1879,7 +1879,7 @@ select.field-input { cursor: pointer; }
       }
     }
     // Also look for handlers defined separately: var handlers = { ... }
-    var handlersVarMatch = source.match(/(?:var|const|let)\s+handlers\s*=\s*\{([^}]+)\}/);
+    var handlersVarMatch = source.match(/(?:var|const|let)\\s+handlers\\s*=\\s*\\{([^}]+)\\}/);
     if (handlersVarMatch) {
       handlerPattern.lastIndex = 0;
       var block = handlersVarMatch[1];
