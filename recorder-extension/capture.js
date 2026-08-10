@@ -576,21 +576,45 @@
     $name.value = bundle.name;
   }
 
+  // Text a HUMAN can actually see: skip text nodes living in clipped or
+  // hidden containers (a11y duplicates like LinkedIn's invisible "Feed post"
+  // heading must not win the name).
+  function visibleText(el) {
+    if (!el) return "";
+    let out = "";
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    let n;
+    while ((n = w.nextNode())) {
+      const p = n.parentElement;
+      if (!p) continue;
+      const r = p.getBoundingClientRect();
+      if (r.width < 3 || r.height < 3) continue;
+      const c = getComputedStyle(p);
+      if (c.visibility === "hidden" || c.display === "none") continue;
+      out += n.textContent + " ";
+      if (out.length > 120) break;
+    }
+    return out.replace(/\s+/g, " ").trim();
+  }
+
   function suggestName(el) {
     // site + something a HUMAN would call the thing: its heading, its label,
     // or the first strong words inside it -- never the tag name of a div
-    // ("linkedin-div" helps no one).
+    // ("linkedin-div" helps no one) and never invisible a11y copy
+    // ("linkedin-feed-post" named every post the same).
     const site = location.hostname.replace(/^www\./, "").split(".")[0];
     const pickText = () => {
-      const h = el.querySelector("h1,h2,h3,h4,[role=heading]");
-      if (h && h.textContent.trim()) return h.textContent;
+      for (const h of el.querySelectorAll("h1,h2,h3,h4,[role=heading]")) {
+        const t = visibleText(h);
+        if (t) return t;
+      }
       const a = el.getAttribute("aria-label");
       if (a && a.trim()) return a;
-      const strong = el.querySelector("strong,b,[class*=title],[class*=name],a[href]");
-      if (strong && strong.textContent.trim()) return strong.textContent;
-      const words = (el.textContent || "").trim();
-      if (words) return words;
-      return document.title || el.tagName;
+      for (const s of el.querySelectorAll("strong,b,[class*=title],[class*=name],a[href]")) {
+        const t = visibleText(s);
+        if (t) return t;
+      }
+      return visibleText(el) || document.title || el.tagName;
     };
     const words = pickText().trim().split(/\s+/).slice(0, 3).join("-");
     return (site + "-" + words).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);

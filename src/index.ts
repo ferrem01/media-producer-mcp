@@ -1641,6 +1641,30 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
         return;
       }
 
+      // ── Playground API: Get tenant component schema ──
+      // Captured components mint one (entrance/accent/script + the verb
+      // list); the playground's form editor renders from it.
+      const tenantSchemaMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)\/schema$/);
+      if (tenantSchemaMatch && method === "GET") {
+        const [, tid, compType] = tenantSchemaMatch.map(decodeURIComponent);
+        const tenantCompDir = path.join(config.dataDir, tid, "components");
+        try {
+          const cats = await fs.readdir(tenantCompDir, { withFileTypes: true });
+          for (const cat of cats) {
+            if (!cat.isDirectory()) continue;
+            try {
+              const raw = await fs.readFile(path.join(tenantCompDir, cat.name, `${compType}.schema.json`), "utf-8");
+              jsonResponse(res, 200, JSON.parse(raw));
+              return;
+            } catch { continue; }
+          }
+          jsonResponse(res, 404, { error: "Schema not found" });
+        } catch {
+          jsonResponse(res, 404, { error: "Schema not found" });
+        }
+        return;
+      }
+
       // ── Playground API: Delete tenant component ──
       const tenantDeleteMatch = urlPath.match(/^\/playground\/api\/tenant-components\/([^/]+)\/([^/]+)$/);
       if (tenantDeleteMatch && method === "DELETE") {

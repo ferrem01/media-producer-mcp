@@ -667,6 +667,14 @@ select.field-input { cursor: pointer; }
   function loadTenantComponent(type) {
     api('GET', '/playground/api/tenant-components/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(type) + '/source').then(function(source) {
       setComponent(type, 'custom', source);
+      // Captured components mint a schema (entrance/accent/script + the verb
+      // list) -- fetch it so the form editor works for them too.
+      api('GET', '/playground/api/tenant-components/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(type) + '/schema').then(function(schema) {
+        state.currentSchema = schema;
+        if (formMode === 'form') {
+          try { renderDataForm(JSON.parse(els.dataEditor.value || '{}'), schema); } catch (e) {}
+        }
+      }).catch(function() { /* plain custom component: no schema, no form */ });
     }).catch(function(err) {
       alert('Failed to load: ' + err.message);
     });
