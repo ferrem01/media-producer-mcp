@@ -61,7 +61,9 @@ describe("a saved storyboard says what it was cast as", () => {
     const app = await read("../src/preview-app/preview-app.ts");
     const at = app.indexOf("function renderDraftView");
     expect(at).toBeGreaterThan(0);
-    const body = app.slice(at, at + 3000);
+    // Window sized to renderDraftView's head; the storyboard-card still and
+    // its comment now sit above the chips, so 3000 chars no longer reached them.
+    const body = app.slice(at, at + 4500);
     expect(body).toMatch(/s\.scene_template && s\.scene_template\.type/);
   });
 

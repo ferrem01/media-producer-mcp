@@ -3781,11 +3781,14 @@ export function getPreviewHtml(): string {
       h += '<div class="dv-card">' +
         // THE TRUE STORYBOARD: the still photographed at the scene's settled
         // moment by storyboard-cards (rendered at the generate stop-point).
-        // onerror hides it, so boards from before the cards existed -- or a
-        // scene whose card failed -- degrade to the text-only card.
+        // onerror removes it, so boards from before the cards existed -- or a
+        // scene whose card failed -- degrade to the text-only card. This file
+        // ships to the browser VERBATIM (never through a compiler), so \' in
+        // an inline handler reaches the JS parser as a bare quote and kills
+        // the whole studio script -- keep handlers quote-free.
         '<img class="dv-still" src="/output/' + encodeURIComponent(project.tenant_id) + '/projects/' +
           encodeURIComponent(project.project_id) + '/storyboard_card_scene_' + (i + 1) + '.png' +
-          '" onerror="this.style.display=\'none\'">' +
+          '" onerror="this.remove()">' +
         '<div class="dv-card-head"><span class="dv-num">' + (i + 1) + '</span>' +
         '<span class="dv-label">' + escHtml(s.label || ('Scene ' + (i + 1))) + '</span>' +
         '<span class="dv-dur">' + (Number(s.duration_seconds) || 0) + 's</span></div>' +
