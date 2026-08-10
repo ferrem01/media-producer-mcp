@@ -28,6 +28,7 @@ import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-kit.js";
 import { queueBuildFromStoryboard, queueStoryboardGeneration, queueSurgicalSceneOp } from "./server.js";
+import { mintCapturedComponent } from "./core/web-capture.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
@@ -806,7 +807,7 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
       // test/tenant-enforcement.test.ts, which fails on unregistered routes).
       const tenantSeg =
         urlPath.match(/^\/api\/revise\/undo\/([^/]+)/) ||
-        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
+        urlPath.match(/^\/api\/(?:projects|project-version|scene-thumbnail|scene-thumb|preview-scene|preview-composite|render|render-status|job|generate-scenes|storyboard-revise|capture-component|brand-kit|brand-asset|upload-asset|recorder-events|recorder-generate|booth-narration|booth-script|speaker-cut|speaker-restore|reanalyze-asset|studio-log|analyze-asset|revise|regenerate|storyboard-scene|camera-moves|speaker-waveform|speaker-transcript|compress-waiting|timelapse|media-edits|generate-image|traces)\/([^/]+)/);
       if (tenantSeg && !requireTenant(req, res, decodeURIComponent(tenantSeg[1]))) return;
 
       // ── Auth: Get current user (requires auth) ──
@@ -1924,6 +1925,27 @@ Return the COMPLETE updated .component.html file. Keep all existing functionalit
             });
         if ("error" in srRes) { jsonResponse(res, 500, { error: srRes.error }); return; }
         jsonResponse(res, 202, { ok: true, job_id: srRes.job.id, project_id: srProject });
+        return;
+      }
+
+      // POST /api/capture-component/{tenant} -- the extension's component
+      // camera (SPEC-web-capture.md): a capture bundle in, a minted tenant
+      // component out. The server never trusts the client bundle -- it
+      // re-sanitizes before stamping the shell.
+      const capCompMatch = urlPath.match(/^\/api\/capture-component\/([^/]+)$/);
+      if (capCompMatch && method === "POST") {
+        const capTenant = decodeURIComponent(capCompMatch[1]);
+        try {
+          const capBody = await parseBody(req);
+          const minted = await mintCapturedComponent(capTenant, capBody as any);
+          jsonResponse(res, 201, {
+            ok: true,
+            type: minted.type,
+            message: `Component "${minted.type}" minted -- castable in storyboards now (category: captured).`,
+          });
+        } catch (e: any) {
+          jsonResponse(res, 400, { error: e?.message || String(e) });
+        }
         return;
       }
 

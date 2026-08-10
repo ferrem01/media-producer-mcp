@@ -173,12 +173,19 @@ export async function renderStoryboardCards(project: Project, opts: {
   componentLibDir: string;
   gsapDir: string;
   outDir: string;
+  /** Tenant components dir -- captured components live here (SPEC-web-capture). */
+  tenantComponentLibDir?: string;
 }): Promise<StoryboardCardsResult> {
   const sb: any = (project as any).storyboard;
   const scenes: any[] = sb?.scenes || [];
   if (!scenes.length) throw new Error("project has no storyboard scenes");
   await fs.mkdir(opts.outDir, { recursive: true });
   const lib = await indexComponents(opts.componentLibDir);
+  if (opts.tenantComponentLibDir) {
+    // Tenant entries win on collision: a tenant's captured or custom
+    // component of the same name is the one their board means.
+    for (const [k, v] of await indexComponents(opts.tenantComponentLibDir)) lib.set(k, v);
+  }
   const canvas: any = (project as any).canvas || { width: 1920, height: 1080, fps: 30 };
   const browser = await chromium.launch(LAUNCH_OPTS);
   const stills: Array<string | null> = [];

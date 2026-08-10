@@ -48,7 +48,7 @@ import { llmConfigFromEnv } from "./llm/client.js";
 import { reviseScene } from "./llm/scene-revise.js";
 import { config } from "./config.js";
 import { proposeSceneCompression, probeMediaDuration } from "./core/auto-compress.js";
-import { projectDir, projectOutputDir, projectAssetsDir } from "./persistence/paths.js";
+import { projectDir, projectOutputDir, projectAssetsDir, tenantComponentsDir } from "./persistence/paths.js";
 import { renderStoryboardCards } from "./core/storyboard-cards.js";
 import { reviseDraftSceneSurgical } from "./llm/storyboard-surgical.js";
 import path from "node:path";
@@ -667,7 +667,8 @@ export async function queueStoryboardGeneration(params: {
       j.progress = { step: "storyboard-cards", percent: 90, detail: "Photographing the storyboard" };
       const outDir = projectOutputDir(params.tenant_id, project.project_id);
       const res = await renderStoryboardCards(project as any, {
-        componentLibDir: config.componentLibDir, gsapDir: config.gsapDir, outDir,
+        componentLibDir: config.componentLibDir, gsapDir: config.gsapDir,
+        tenantComponentLibDir: tenantComponentsDir(params.tenant_id), outDir,
       });
       cardsUrl = outputUrl(params.tenant_id, project.project_id, path.basename(res.sheet));
       cardStills = res.stills.map((s) =>
@@ -724,6 +725,7 @@ export function queueSurgicalSceneOp(
     try {
       await renderStoryboardCards(project as any, {
         componentLibDir: config.componentLibDir, gsapDir: config.gsapDir,
+        tenantComponentLibDir: tenantComponentsDir(tenantId),
         outDir: projectOutputDir(tenantId, projectId),
       });
     } catch (e: any) {
@@ -755,6 +757,7 @@ export function reshootStoryboardCardsSoon(tenantId: string, projectId: string):
         await renderStoryboardCards(project as any, {
           componentLibDir: config.componentLibDir,
           gsapDir: config.gsapDir,
+          tenantComponentLibDir: tenantComponentsDir(tenantId),
           outDir: projectOutputDir(tenantId, projectId),
         });
       }
