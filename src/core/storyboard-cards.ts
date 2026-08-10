@@ -82,12 +82,19 @@ function cardHtml(scenes: Array<Record<string, any>>, stills: Array<string | nul
     }).join("");
     const comps = (ss.components || []).map((c: any) => {
       const script = ((c.data || {}).script || []) as any[];
+      // Scriptless components still perform -- from their data. Print those
+      // fields so the card never contradicts a beat ("the ask types itself"
+      // IS `text` + `at` + `send_at` on the composer).
+      const dataRow = Object.entries(c.data || {})
+        .filter(([, v]) => v != null && typeof v !== "object")
+        .map(([k, v]) => `${esc(k)}: ${esc(String(v).length > 56 ? String(v).slice(0, 56) + "…" : v)}`)
+        .join(" &middot; ");
       const rows = script.length
         ? script.map((a) => {
             const extra = a.text ?? a.result ?? a.tool ?? a.target ?? a.published_date ?? "";
             return `<div class="sc">@${esc(a.at)} ${esc(a.action)}${extra ? ` &ldquo;${esc(String(extra).slice(0, 64))}&rdquo;` : ""}</div>`;
           }).join("")
-        : `<div class="sc mut">(static data, no script)</div>`;
+        : (dataRow ? `<div class="sc">${dataRow}</div>` : `<div class="sc mut">(no data)</div>`);
       return `<div class="ct">${esc(c.type)}</div>${rows}`;
     }).join("");
     // Camera moves are copy on the card, never applied to the photo -- the
