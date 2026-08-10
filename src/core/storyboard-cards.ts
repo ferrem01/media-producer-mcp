@@ -90,6 +90,10 @@ function cardHtml(scenes: Array<Record<string, any>>, stills: Array<string | nul
         : `<div class="sc mut">(static data, no script)</div>`;
       return `<div class="ct">${esc(c.type)}</div>${rows}`;
     }).join("");
+    // Camera moves are copy on the card, never applied to the photo -- the
+    // frame shows the staging, this section carries the coverage plan.
+    const cam = (ss.camera_moves || []).map((m: any) =>
+      `<div class="sc">@${esc(m.at)}s ${esc(m.type)}${m.scale ? ` &times;${esc(m.scale)}` : ""}${m.anchor ? ` &rarr; ${esc(m.anchor)}` : ""}${m.duration ? ` (${esc(m.duration)}s)` : ""}</div>`).join("");
     const frame = stills[i]
       ? `<img class="frame" src="${path.basename(stills[i]!)}">`
       : `<div class="frame ph">codegen scene &mdash; frame appears after build</div>`;
@@ -98,6 +102,7 @@ function cardHtml(scenes: Array<Record<string, any>>, stills: Array<string | nul
       <div class="purpose">${esc(ss.purpose)}</div>
       ${ss.voiceover_text ? `<div class="vo">VO: &ldquo;${esc(ss.voiceover_text)}&rdquo;</div>` : ""}
       <div class="sect">BEATS</div>${beats || '<div class="sc mut">(no beats)</div>'}
+      ${cam ? `<div class="sect">CAMERA</div>${cam}` : ""}
       <div class="sect">COMPONENTS &amp; SCRIPTS</div>${comps || '<div class="sc mut">(none cast)</div>'}
     </div>`;
   }).join("");
@@ -154,7 +159,12 @@ export async function renderStoryboardCards(project: Project, opts: {
         (c: any) => c && typeof c === "object" && c.data && typeof c.type === "string");
       if (!authored.length) { stills.push(null); continue; }
       try {
-        const { scene } = buildAuthoredCompositionScene(`card_s${i}`, draft, authored, {
+        // The card is the STAGING, not the coverage: photograph the full
+        // composition with the camera at rest so the whole layout is
+        // judgeable. Camera moves are film-time direction -- they appear on
+        // the card as copy (the CAMERA section), never applied to the photo.
+        const { camera_moves: _cm, ...staged } = draft;
+        const { scene } = buildAuthoredCompositionScene(`card_s${i}`, staged, authored, {
           sceneIndex: i, totalScenes: scenes.length,
           brandKit: (project as any).brand_kit || { colors: {}, fonts: [] },
           canvas, world: (project as any).world,
