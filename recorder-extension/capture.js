@@ -233,41 +233,87 @@
     }
 
     // Bake images: <img> src (resolve currentSrc for srcset) + CSS backgrounds.
-    // VIDEO becomes an <img> carrying its own region of the reference
-    // screenshot (poster as second choice) -- the layout box survives because
-    // the swap keeps the computed style already inlined on the clone.
+    //
+    // THE PAINT GUARANTEE: every element that paints media ends up carrying
+    // either its real BYTES (data URI) or its real PIXELS (its own region
+    // cropped from the reference screenshot). VIDEO, CANVAS, IFRAME, OBJECT
+    // and EMBED cannot ride along as DOM -- players draw through layers that
+    // clone as empty black -- so they are frozen from the screenshot (poster,
+    // then dark placeholder, as the ladder below). An IMG whose bytes cannot
+    // be fetched falls back to its frozen region instead of vanishing. Every
+    // freeze is NAMED in the panel notes so a miss is a report, not a mystery.
+    const frozen = [];
+    function freezeRegion(o, c, label) {
+      const r = o.getBoundingClientRect();
+      const base = ((c.getAttribute && c.getAttribute("style")) || "") +
+        ";width:" + Math.round(r.width) + "px;height:" + Math.round(r.height) + "px;";
+      const crop = cropFromShot(shotImg, r);
+      if (crop) {
+        const img = document.createElement("img");
+        img.setAttribute("style", base + "object-fit:cover;");
+        img.setAttribute("alt", "");
+        img.setAttribute("src", crop);
+        try { c.replaceWith(img); frozen.push(label); return true; } catch (e) { return false; }
+      }
+      return false;
+    }
+    function darkPlaceholder(o, c, label) {
+      const r = o.getBoundingClientRect();
+      const ph = document.createElement("div");
+      ph.setAttribute("style", ((c.getAttribute && c.getAttribute("style")) || "") +
+        ";width:" + Math.round(r.width) + "px;height:" + Math.round(r.height) + "px;background:#111;");
+      try { c.replaceWith(ph); } catch (e) { /* already detached */ }
+      substitutions.push(label + " region could not be frozen (offscreen at capture?) -- dark placeholder");
+    }
     const imgJobs = [];
     for (let i = 0; i < origWalk.length; i++) {
       const o = origWalk[i], c = cloneWalk[i];
       if (!c || c.nodeType !== 1) continue;
-      if (o.tagName === "VIDEO") {
-        const img = document.createElement("img");
-        img.setAttribute("style", (c.getAttribute("style") || "") + ";object-fit:cover;");
-        img.setAttribute("alt", "");
-        const crop = cropFromShot(shotImg, o.getBoundingClientRect());
-        if (crop) img.setAttribute("src", crop);
-        else if (o.poster) imgJobs.push(toDataUri(o.poster).then((d) => { if (d) img.setAttribute("src", d); }));
-        else substitutions.push("video region: no screenshot or poster to freeze -- dark placeholder");
-        c.replaceWith(img);
+      const tag = o.tagName;
+      if (tag === "VIDEO" || tag === "CANVAS" || tag === "IFRAME" || tag === "OBJECT" || tag === "EMBED") {
+        if (freezeRegion(o, c, tag.toLowerCase())) continue;
+        if (tag === "VIDEO" && o.poster) {
+          const img = document.createElement("img");
+          img.setAttribute("style", (c.getAttribute("style") || "") + ";object-fit:cover;");
+          img.setAttribute("alt", "");
+          const cRef = c;
+          imgJobs.push(toDataUri(o.poster).then((d) => {
+            if (d) { img.setAttribute("src", d); try { cRef.replaceWith(img); frozen.push("video poster"); } catch (e) {} }
+            else darkPlaceholder(o, cRef, "video");
+          }));
+          continue;
+        }
+        darkPlaceholder(o, c, tag.toLowerCase());
         continue;
       }
-      if (o.tagName === "IMG") {
+      if (tag === "IMG") {
         const src = o.currentSrc || o.src;
         c.removeAttribute("srcset"); c.removeAttribute("sizes"); c.removeAttribute("loading");
-        imgJobs.push(toDataUri(src).then((d) => { if (d) c.setAttribute("src", d); else c.removeAttribute("src"); }));
+        imgJobs.push(toDataUri(src).then((d) => {
+          if (d) c.setAttribute("src", d);
+          else if (!freezeRegion(o, c, "img")) c.removeAttribute("src");
+        }));
       }
       const bg = getComputedStyle(o).backgroundImage;
       const m = bg && bg !== "none" ? bg.match(/url\(["']?([^"')]+)["']?\)/) : null;
       if (m && !m[1].startsWith("data:")) {
         imgJobs.push(toDataUri(m[1]).then((d) => {
           const st = c.getAttribute("style") || "";
-          c.setAttribute("style", d
-            ? st.replace(bg.replace(/"/g, '"'), "") + ";background-image:url(" + d + ")"
-            : st.replace(/background-image:[^;]*(;|$)/, ""));
+          if (d) { c.setAttribute("style", st + ";background-image:url(" + d + ")"); return; }
+          // A leaf that paints ONLY its background can be frozen whole;
+          // anything with children keeps its content and drops the bg.
+          if (!o.children.length && !(o.textContent || "").trim() && freezeRegion(o, c, "background")) return;
+          c.setAttribute("style", st.replace(/background-image:[^;]*(;|$)/, ""));
         }));
       }
     }
     await Promise.all(imgJobs);
+    if (frozen.length) {
+      const counts = {};
+      for (const f of frozen) counts[f] = (counts[f] || 0) + 1;
+      substitutions.push("frozen from screenshot (exact pixels, not live DOM): " +
+        Object.keys(counts).map((k) => counts[k] + "× " + k).join(", "));
+    }
 
     // Fonts: bake the real webfont binaries for every non-system family in
     // use (the @font-face hunt + fetch ladder above). Only families that

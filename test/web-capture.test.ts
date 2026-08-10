@@ -43,6 +43,7 @@ describe("extension picker + serializer (capture.js)", () => {
         <div class="price">$29/mo</div>
         <p>Launches that feel like magic instead of chaos.</p>
         <video style="width:100%;height:60px;background:#000;"></video>
+        <canvas width="80" height="40"></canvas>
         <button class="cta" onclick="evil()">Upgrade now</button>
         <script>window.evil = () => {}</` + `script>
       </div></body></html>`;
@@ -59,9 +60,21 @@ describe("extension picker + serializer (capture.js)", () => {
       });
       const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
       await page.goto(`file://${pageFile}`, { waitUntil: "load" });
-      // Stub the extension messaging the content script expects.
+      // Stub the extension messaging the content script expects. qc-shot
+      // returns REAL pixels (a solid-teal viewport canvas) so the screenshot
+      // freeze path runs exactly as in production.
       await page.evaluate(`window.chrome = window.chrome || {}; window.chrome.runtime = {
-        sendMessage: async (msg) => msg.type === "qc-shot" ? { ok: false } : { ok: true, type: "stub" },
+        sendMessage: async (msg) => {
+          if (msg.type === "qc-shot") {
+            const cv = document.createElement("canvas");
+            cv.width = Math.round(innerWidth * devicePixelRatio);
+            cv.height = Math.round(innerHeight * devicePixelRatio);
+            const cx = cv.getContext("2d");
+            cx.fillStyle = "#3fa7a0"; cx.fillRect(0, 0, cv.width, cv.height);
+            return { ok: true, dataUrl: cv.toDataURL("image/png") };
+          }
+          return { ok: true, type: "stub" };
+        },
       };`);
       await page.evaluate(captureJs);
       // Hover the card, then press C to capture it.
@@ -83,10 +96,13 @@ describe("extension picker + serializer (capture.js)", () => {
     expect(bundle.html).toMatch(/border-top-left-radius:\s*14px/);
     expect(bundle.html).toMatch(/rgb\(57,\s*59,\s*245\)/); // the CTA violet, computed
     expect(bundle.width).toBeGreaterThan(300);
-    // ...VIDEO never rides along: it becomes an <img> freeze-frame (or an
-    // empty placeholder when, as here, no screenshot/poster exists)...
+    // ...and the PAINT GUARANTEE holds: media that cannot ride as DOM
+    // (video, canvas) never survives serialization -- each region is FROZEN
+    // from the reference screenshot as an <img> carrying real pixels.
     expect(bundle.html).not.toMatch(/<video/i);
-    expect(bundle.html).toMatch(/<img[^>]*object-fit:\s*cover/i);
+    expect(bundle.html).not.toMatch(/<canvas/i);
+    const frozenImgs = bundle.html.match(/<img[^>]*object-fit:cover[^>]*src="data:image\/png/gi) || [];
+    expect(frozenImgs.length, "video + canvas should both be frozen from the screenshot").toBeGreaterThanOrEqual(2);
     // ...and the bundle mints through the REAL server path.
     const minted = await mintCapturedComponent("captest", { ...bundle, name: "picker-pricing" });
     const html = await fs.readFile(minted.componentPath, "utf-8");
