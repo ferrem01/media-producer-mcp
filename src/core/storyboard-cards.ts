@@ -90,6 +90,10 @@ function cardHtml(scenes: Array<Record<string, any>>, stills: Array<string | nul
         : `<div class="sc mut">(static data, no script)</div>`;
       return `<div class="ct">${esc(c.type)}</div>${rows}`;
     }).join("");
+    // Camera moves are copy on the card, never applied to the photo -- the
+    // frame shows the staging, this section carries the coverage plan.
+    const cam = (ss.camera_moves || []).map((m: any) =>
+      `<div class="sc">@${esc(m.at)}s ${esc(m.type)}${m.scale ? ` &times;${esc(m.scale)}` : ""}${m.anchor ? ` &rarr; ${esc(m.anchor)}` : ""}${m.duration ? ` (${esc(m.duration)}s)` : ""}</div>`).join("");
     const frame = stills[i]
       ? `<img class="frame" src="${path.basename(stills[i]!)}">`
       : `<div class="frame ph">codegen scene &mdash; frame appears after build</div>`;
@@ -98,6 +102,7 @@ function cardHtml(scenes: Array<Record<string, any>>, stills: Array<string | nul
       <div class="purpose">${esc(ss.purpose)}</div>
       ${ss.voiceover_text ? `<div class="vo">VO: &ldquo;${esc(ss.voiceover_text)}&rdquo;</div>` : ""}
       <div class="sect">BEATS</div>${beats || '<div class="sc mut">(no beats)</div>'}
+      ${cam ? `<div class="sect">CAMERA</div>${cam}` : ""}
       <div class="sect">COMPONENTS &amp; SCRIPTS</div>${comps || '<div class="sc mut">(none cast)</div>'}
     </div>`;
   }).join("");
@@ -154,7 +159,12 @@ export async function renderStoryboardCards(project: Project, opts: {
         (c: any) => c && typeof c === "object" && c.data && typeof c.type === "string");
       if (!authored.length) { stills.push(null); continue; }
       try {
-        const { scene } = buildAuthoredCompositionScene(`card_s${i}`, draft, authored, {
+        // The card is the STAGING, not the coverage: photograph the full
+        // composition with the camera at rest so the whole layout is
+        // judgeable. Camera moves are film-time direction -- they appear on
+        // the card as copy (the CAMERA section), never applied to the photo.
+        const { camera_moves: _cm, ...staged } = draft;
+        const { scene } = buildAuthoredCompositionScene(`card_s${i}`, staged, authored, {
           sceneIndex: i, totalScenes: scenes.length,
           brandKit: (project as any).brand_kit || { colors: {}, fonts: [] },
           canvas, world: (project as any).world,
@@ -175,10 +185,14 @@ export async function renderStoryboardCards(project: Project, opts: {
         await fs.writeFile(f, html);
         await page.goto(`file://${f}`, { waitUntil: "domcontentloaded", timeout: 45_000 });
         try { await page.waitForFunction(() => (window as any).__MP_READY === true, { timeout: 15_000 }); } catch {}
-        // Trailing `undefined`: pause() returns the timeline, and letting that
-        // huge cyclic GSAP graph become the evaluate's return value makes
-        // Playwright's serializer hang forever.
-        await page.evaluate(`window.__MP_TIMELINE && window.__MP_TIMELINE.pause(${settledMoment(draft)}); undefined`);
+        // Seek with time(t), NOT pause(t): pause(t) suppresses GSAP callbacks,
+        // and every performable surface builds its story through tl.call() --
+        // pause-seeking shot an empty terminal as a near-black card. time(t)
+        // fires the calls in order, exactly how capture.ts renders frames.
+        // The trailing `undefined` matters too: returning the timeline makes
+        // Playwright serialize the whole cyclic GSAP graph and hang forever.
+        await page.evaluate(
+          `var __tl = window.__MP_TIMELINE; if (__tl) { __tl.pause(); try { __tl.time(${settledMoment(draft)}); } catch (e) {} } undefined`);
         const still = path.join(opts.outDir, `storyboard_card_scene_${i + 1}.png`);
         await page.screenshot({ path: still });
         stills.push(still);
