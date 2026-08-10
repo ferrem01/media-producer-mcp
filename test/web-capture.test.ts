@@ -42,6 +42,7 @@ describe("extension picker + serializer (capture.js)", () => {
       <div class="card" id="pricebox"><div class="tier">STARTER</div>
         <div class="price">$29/mo</div>
         <p>Launches that feel like magic instead of chaos.</p>
+        <video style="width:100%;height:60px;background:#000;"></video>
         <button class="cta" onclick="evil()">Upgrade now</button>
         <script>window.evil = () => {}</` + `script>
       </div></body></html>`;
@@ -82,6 +83,10 @@ describe("extension picker + serializer (capture.js)", () => {
     expect(bundle.html).toMatch(/border-top-left-radius:\s*14px/);
     expect(bundle.html).toMatch(/rgb\(57,\s*59,\s*245\)/); // the CTA violet, computed
     expect(bundle.width).toBeGreaterThan(300);
+    // ...VIDEO never rides along: it becomes an <img> freeze-frame (or an
+    // empty placeholder when, as here, no screenshot/poster exists)...
+    expect(bundle.html).not.toMatch(/<video/i);
+    expect(bundle.html).toMatch(/<img[^>]*object-fit:\s*cover/i);
     // ...and the bundle mints through the REAL server path.
     const minted = await mintCapturedComponent("captest", { ...bundle, name: "picker-pricing" });
     const html = await fs.readFile(minted.componentPath, "utf-8");
@@ -114,6 +119,14 @@ describe("mintCapturedComponent", () => {
       source_url: "https://acme.example.com/pricing",
       width: 420, height: 260,
       screenshot: "data:image/png;base64," + Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString("base64"),
+      fonts: [
+        // A real embedded face the shell must carry...
+        { family: "Acme Grotesk", weight: "700", style: "normal", data: "data:font/woff2;base64," + Buffer.from("fake-font-bytes").toString("base64") },
+        // ...and two hostile ones it must drop: an external URL (the whole
+        // point is NO network at render) and an injection attempt.
+        { family: "Evil", data: "https://evil.example.com/font.woff2" },
+        { family: 'Break"}</style><script>alert(1)</script>', data: "data:font/woff2;base64,QUJD" },
+      ],
     });
   }, 120_000);
 
@@ -127,6 +140,11 @@ describe("mintCapturedComponent", () => {
     expect(html).toContain("Upgrade now");
     expect(html).not.toMatch(/onclick/i);
     expect(html).toContain("source_url: https://acme.example.com/pricing");
+    // Embedded fonts: the real face rides in the shell, the hostile ones die.
+    expect(html).toContain('@font-face { font-family: "Acme Grotesk"');
+    expect(html).toContain("data:font/woff2;base64,");
+    expect(html).not.toContain("evil.example.com/font");
+    expect(html).not.toMatch(/<script>alert/);
     const schema = JSON.parse(await fs.readFile(minted.schemaPath, "utf-8"));
     expect(schema.category).toBe("captured");
     expect(schema.description).toContain("CAPTURED SURFACE");

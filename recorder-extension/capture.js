@@ -56,34 +56,149 @@
   }
 
   // ── Asset inlining: fetch with the PAGE's credentials, return data URI ──
+  // Two rungs: an in-page fetch first (page cookies, same as the site itself),
+  // then the background service worker (host_permissions reach hosts whose
+  // CORS policy blocks page scripts -- media CDNs like media.licdn.com serve
+  // images fine to <img> but refuse fetch() from the page).
   const assetCache = new Map();
   const substitutions = [];
+  async function pageFetchDataUri(url) {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const blob = await res.blob();
+    if (blob.size > 3 * 1024 * 1024) throw new Error("asset too large");
+    return await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+  async function bgFetchDataUri(url) {
+    const res = await chrome.runtime.sendMessage({ type: "qc-fetch", url });
+    if (res && res.ok && res.dataUri) return res.dataUri;
+    throw new Error((res && res.error) || "blocked");
+  }
   async function toDataUri(url) {
     if (!url || url.startsWith("data:")) return url;
     if (assetCache.has(url)) return assetCache.get(url);
     const p = (async () => {
       try {
-        const res = await fetch(url, { credentials: "include" });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const blob = await res.blob();
-        if (blob.size > 3 * 1024 * 1024) throw new Error("asset too large");
-        return await new Promise((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(r.result);
-          r.onerror = reject;
-          r.readAsDataURL(blob);
-        });
-      } catch (e) {
-        substitutions.push("asset dropped: " + url.slice(0, 80) + " (" + (e.message || "blocked") + ")");
-        return null;
+        return await pageFetchDataUri(url);
+      } catch (e1) {
+        try {
+          return await bgFetchDataUri(url);
+        } catch (e2) {
+          substitutions.push("asset dropped: " + url.slice(0, 80) + " (" + (e2.message || e1.message || "blocked") + ")");
+          return null;
+        }
       }
     })();
     assetCache.set(url, p);
     return p;
   }
 
+  // ── Webfont embedding: find the @font-face behind each used family and
+  // bake the binary. Same-origin sheets read directly; cross-origin sheets
+  // (rules unreadable from the page) are fetched as text via the background
+  // and their @font-face blocks parsed out. Font files themselves are served
+  // with CORS (webfonts require it), so the fetch ladder above lands them.
+  const SYSTEM_FONT_RE = /^(-apple-system|system-ui|BlinkMacSystemFont|Segoe UI|Arial|Helvetica( Neue)?|Georgia|Times( New Roman)?|Courier( New)?|Verdana|Tahoma|ui-monospace|ui-sans-serif|ui-serif|ui-rounded|monospace|sans-serif|serif|cursive|fantasy)$/i;
+  function faceFromCss(block, baseHref) {
+    const fam = block.match(/font-family\s*:\s*["']?([^;"'}]+)/i);
+    if (!fam) return null;
+    const weight = (block.match(/font-weight\s*:\s*([^;}]+)/i) || [])[1];
+    const style = (block.match(/font-style\s*:\s*([^;}]+)/i) || [])[1];
+    const srcs = [...block.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)(?:\s*format\(\s*["']?([^"')]+)["']?\s*\))?/gi)]
+      .map((m) => ({ url: m[1], format: (m[2] || "").toLowerCase() }))
+      .filter((s) => !s.url.startsWith("data:"));
+    if (!srcs.length) return null;
+    const pick = srcs.find((s) => s.format.includes("woff2")) || srcs.find((s) => s.format.includes("woff")) || srcs[0];
+    let abs;
+    try { abs = new URL(pick.url, baseHref).href; } catch (e) { return null; }
+    return {
+      family: fam[1].trim(),
+      weight: (weight || "normal").trim(),
+      style: (style || "normal").trim(),
+      url: abs,
+    };
+  }
+  async function collectFonts(familyStacks) {
+    const wanted = new Set();
+    for (const stack of familyStacks) {
+      const first = (stack || "").split(",")[0].trim().replace(/^["']|["']$/g, "");
+      if (first && !SYSTEM_FONT_RE.test(first)) wanted.add(first.toLowerCase());
+    }
+    if (!wanted.size) return [];
+    const candidates = [];
+    const crossOrigin = [];
+    for (const sheet of document.styleSheets) {
+      let rules = null;
+      try { rules = sheet.cssRules; } catch (e) { rules = null; }
+      if (rules) {
+        for (const rule of rules) {
+          if (rule.constructor.name === "CSSFontFaceRule" || (rule.cssText || "").startsWith("@font-face")) {
+            const f = faceFromCss(rule.cssText, sheet.href || location.href);
+            if (f) candidates.push(f);
+          }
+        }
+      } else if (sheet.href) {
+        crossOrigin.push(sheet.href);
+      }
+    }
+    for (const href of crossOrigin.slice(0, 8)) {
+      try {
+        const dataUri = await bgFetchDataUri(href);
+        const css = atob(dataUri.split(",")[1] || "");
+        for (const block of css.match(/@font-face\s*\{[^}]*\}/gi) || []) {
+          const f = faceFromCss(block, href);
+          if (f) candidates.push(f);
+        }
+      } catch (e) { /* sheet unreadable -- the family just falls back */ }
+    }
+    const out = [];
+    const seen = new Set();
+    const missing = new Set(wanted);
+    for (const f of candidates) {
+      if (!wanted.has(f.family.toLowerCase())) continue;
+      const key = f.family.toLowerCase() + "|" + f.weight + "|" + f.style;
+      if (seen.has(key) || out.length >= 6) continue;
+      seen.add(key);
+      const data = await toDataUri(f.url);
+      if (data && data.length < 2.5 * 1024 * 1024) {
+        out.push({ family: f.family, weight: f.weight, style: f.style, data });
+        missing.delete(f.family.toLowerCase());
+      }
+    }
+    if (missing.size) substitutions.push("fonts fall back to system stacks: " + [...missing].slice(0, 3).join(" · "));
+    return out;
+  }
+  function fontFaceCss(fonts) {
+    return (fonts || []).map((f) =>
+      '@font-face{font-family:"' + f.family.replace(/["\\]/g, "") + '";src:url(' + f.data +
+      ");font-weight:" + f.weight + ";font-style:" + f.style + ";font-display:swap}").join("");
+  }
+
   // ── Serialize: clone the subtree, inline computed styles, bake assets ──
-  async function serialize(root) {
+  // shotImg (the full-tab reference screenshot, may be null) funds the video
+  // fallback: a VIDEO cannot ride along, but its REGION of the screenshot can
+  // -- real pixels as a frozen frame instead of a black box. Deterministic:
+  // it is literally the page as photographed.
+  function cropFromShot(shotImg, r) {
+    if (!shotImg || r.width < 2 || r.height < 2) return null;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const ix = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
+    const iy = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+    if (ix * iy < r.width * r.height * 0.5) return null; // mostly offscreen: crop would be garbage
+    try {
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(r.width * DPR); cv.height = Math.round(r.height * DPR);
+      cv.getContext("2d").drawImage(shotImg, r.left * DPR, r.top * DPR, r.width * DPR, r.height * DPR, 0, 0, cv.width, cv.height);
+      return cv.toDataURL("image/png");
+    } catch (e) { return null; }
+  }
+
+  async function serialize(root, shotImg) {
     substitutions.length = 0;
     const clone = root.cloneNode(true);
     const origWalk = [root, ...root.querySelectorAll("*")];
@@ -118,10 +233,24 @@
     }
 
     // Bake images: <img> src (resolve currentSrc for srcset) + CSS backgrounds.
+    // VIDEO becomes an <img> carrying its own region of the reference
+    // screenshot (poster as second choice) -- the layout box survives because
+    // the swap keeps the computed style already inlined on the clone.
     const imgJobs = [];
     for (let i = 0; i < origWalk.length; i++) {
       const o = origWalk[i], c = cloneWalk[i];
       if (!c || c.nodeType !== 1) continue;
+      if (o.tagName === "VIDEO") {
+        const img = document.createElement("img");
+        img.setAttribute("style", (c.getAttribute("style") || "") + ";object-fit:cover;");
+        img.setAttribute("alt", "");
+        const crop = cropFromShot(shotImg, o.getBoundingClientRect());
+        if (crop) img.setAttribute("src", crop);
+        else if (o.poster) imgJobs.push(toDataUri(o.poster).then((d) => { if (d) img.setAttribute("src", d); }));
+        else substitutions.push("video region: no screenshot or poster to freeze -- dark placeholder");
+        c.replaceWith(img);
+        continue;
+      }
       if (o.tagName === "IMG") {
         const src = o.currentSrc || o.src;
         c.removeAttribute("srcset"); c.removeAttribute("sizes"); c.removeAttribute("loading");
@@ -140,12 +269,12 @@
     }
     await Promise.all(imgJobs);
 
-    // v1 fonts: families ride along as computed font stacks; binaries are not
-    // embedded (licensed CDNs mostly block it) -- the panel says so.
-    const families = [...fontFamilies].filter((f) => f && !/^(-apple-system|system-ui|Arial|Helvetica|Georgia|Times|Courier|monospace|sans-serif|serif)/i.test(f));
-    if (families.length) substitutions.push("fonts fall back to system stacks: " + families.slice(0, 3).join(" · "));
+    // Fonts: bake the real webfont binaries for every non-system family in
+    // use (the @font-face hunt + fetch ladder above). Only families that
+    // cannot be landed fall back, and the panel says which.
+    const fonts = await collectFonts([...fontFamilies]);
 
-    return clone.outerHTML;
+    return { html: clone.outerHTML, fonts };
   }
 
   // ── Picker overlay (shadow DOM so page CSS can't touch it) ──
@@ -235,39 +364,38 @@
     // The picker chrome must not photobomb the reference screenshot.
     host.style.display = "none";
     await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
-    // Reference screenshot: background rasterizes the visible tab, we crop.
-    let refUrl = null;
+    // Reference screenshot: background rasterizes the visible tab. Decoded
+    // ONCE -- the same pixels fund the verdict-panel reference crop AND the
+    // frozen frames for any video regions inside the pick.
+    let refUrl = null, shotImg = null;
     try {
       const shot = await chrome.runtime.sendMessage({ type: "qc-shot" });
       if (shot && shot.ok) {
-        refUrl = await new Promise((resolve) => {
+        shotImg = await new Promise((resolve) => {
           const img = new Image();
-          img.onload = () => {
-            const cv = document.createElement("canvas");
-            cv.width = Math.round(r.width * DPR); cv.height = Math.round(r.height * DPR);
-            cv.getContext("2d").drawImage(img, r.left * DPR, r.top * DPR, r.width * DPR, r.height * DPR, 0, 0, cv.width, cv.height);
-            resolve(cv.toDataURL("image/png"));
-          };
+          img.onload = () => resolve(img);
           img.onerror = () => resolve(null);
           img.src = shot.dataUrl;
         });
+        refUrl = cropFromShot(shotImg, r);
       }
     } catch (e) { /* screenshot is best-effort */ }
 
-    const html = await serialize(pickedEl);
+    const { html, fonts } = await serialize(pickedEl, shotImg);
     host.style.display = "";
     outline(null);
 
     bundle = {
       name: suggestName(pickedEl),
-      html, screenshot: refUrl,
+      html, fonts, screenshot: refUrl,
       source_url: location.origin + location.pathname,
       width: Math.round(r.width), height: Math.round(r.height), dpr: DPR,
     };
     window.__qcLastBundle = bundle; // debugging + test hook; never read by the flow
-    // Local verdict: replica rendered from the serialized bytes themselves.
+    // Local verdict: replica rendered from the serialized bytes themselves,
+    // embedded fonts included so the type previews true.
     $frame.style.height = Math.min(420, Math.max(140, r.height * (($frame.clientWidth || 480) / r.width))) + "px";
-    $frame.srcdoc = '<!doctype html><body style="margin:0;background:#fff;display:flex;align-items:flex-start;justify-content:center;overflow:auto;"><div style="zoom:' +
+    $frame.srcdoc = '<!doctype html><style>' + fontFaceCss(fonts) + '</style><body style="margin:0;background:#fff;display:flex;align-items:flex-start;justify-content:center;overflow:auto;"><div style="zoom:' +
       Math.min(1, ($frame.clientWidth || 480) / r.width) + '">' + html + "</div></body>";
     if (refUrl) { $ref.src = refUrl; $ref.style.display = "block"; } else $ref.style.display = "none";
     $subs.style.display = substitutions.length ? "block" : "none";
@@ -278,9 +406,23 @@
   }
 
   function suggestName(el) {
+    // site + something a HUMAN would call the thing: its heading, its label,
+    // or the first strong words inside it -- never the tag name of a div
+    // ("linkedin-div" helps no one).
     const site = location.hostname.replace(/^www\./, "").split(".")[0];
-    const role = (el.getAttribute("aria-label") || el.tagName.toLowerCase());
-    return (site + "-" + role).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+    const pickText = () => {
+      const h = el.querySelector("h1,h2,h3,h4,[role=heading]");
+      if (h && h.textContent.trim()) return h.textContent;
+      const a = el.getAttribute("aria-label");
+      if (a && a.trim()) return a;
+      const strong = el.querySelector("strong,b,[class*=title],[class*=name],a[href]");
+      if (strong && strong.textContent.trim()) return strong.textContent;
+      const words = (el.textContent || "").trim();
+      if (words) return words;
+      return document.title || el.tagName;
+    };
+    const words = pickText().trim().split(/\s+/).slice(0, 3).join("-");
+    return (site + "-" + words).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
   }
 
   function reselect() { $panel.style.display = "none"; $hint.style.display = "block"; $hint.textContent = ""; outline(current()); resetHint(); }
