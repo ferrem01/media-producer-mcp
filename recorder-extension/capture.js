@@ -266,7 +266,19 @@
         const v = cs.getPropertyValue(p);
         if (!v) continue;
         if (INHERITED_PROPS.has(p)) {
-          if (parentCS && v === parentCS.getPropertyValue(p)) continue;
+          // "Skip if equal to parent" is only safe when the UA does not
+          // specially style this tag for this prop. Where it DOES (<a>
+          // color, button/input fonts, heading sizes), the UA value beats
+          // inheritance in the replica -- LinkedIn's name link matched its
+          // parent color, got skipped, and rendered UA blue; the Follow
+          // button's font-size matched its parent, got skipped, and fell to
+          // 13px UA Arial (wider text -> "+ Follo" clipped).
+          const divDefault = probeDefaults("div")[p];
+          if (defaults[p] !== divDefault) {
+            if (v === defaults[p]) continue; // UA-styled tag: diff vs its own default
+          } else if (parentCS && v === parentCS.getPropertyValue(p)) {
+            continue; // plainly inherited: the parent carries it
+          }
         } else {
           if (v === defaults[p]) continue;
         }
@@ -547,19 +559,21 @@
     };
     window.__qcLastBundle = bundle; // debugging + test hook; never read by the flow
     // Local verdict: replica rendered from the serialized bytes themselves,
-    // embedded fonts included so the type previews true.
-    // Show as much of the replica as the panel allows -- the reference
-    // column renders full height, and A/B-ing a post against a 420px
-    // porthole made every long capture look truncated.
-    $frame.style.height = Math.min(Math.max(window.innerHeight * 0.58, 420), Math.max(140, r.height * (($frame.clientWidth || 480) / r.width))) + "px";
-    $frame.srcdoc = '<!doctype html><style>' + fontFaceCss(fonts) + '</style><body style="margin:0;background:#fff;display:flex;align-items:flex-start;justify-content:center;overflow:auto;"><div style="zoom:' +
-      Math.min(1, ($frame.clientWidth || 480) / r.width) + '">' + html + "</div></body>";
+    // embedded fonts included so the type previews true. The panel opens
+    // FIRST so the column width is measurable -- then the replica scales to
+    // the SAME displayed width as the reference (which fills its column,
+    // upscaling included) and gets its full proportional height, so both
+    // sides run the same length and A/B line for line as the panel scrolls.
+    $panel.style.display = "flex";
+    $hint.style.display = "none";
+    const scale = ($frame.clientWidth || 480) / r.width;
+    $frame.style.height = Math.max(140, Math.round(r.height * scale)) + "px";
+    $frame.srcdoc = '<!doctype html><style>' + fontFaceCss(fonts) + '</style><body style="margin:0;background:#fff;overflow:hidden;"><div style="zoom:' +
+      scale + '">' + html + "</div></body>";
     if (refUrl) { $ref.src = refUrl; $ref.style.display = "block"; } else $ref.style.display = "none";
     $subs.style.display = substitutions.length ? "block" : "none";
     $subs.textContent = substitutions.slice(0, 4).join("  ·  ");
     $name.value = bundle.name;
-    $panel.style.display = "flex";
-    $hint.style.display = "none";
   }
 
   function suggestName(el) {

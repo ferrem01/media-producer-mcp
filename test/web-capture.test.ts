@@ -145,6 +145,8 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
           <div class="meta-grid"><div style="display:contents"><div class="meta-col">
             <div class="name-grid"><div class="name-cell">Jake Stein<span class="vh">View Jake Stein's profile</span><span style="display:inline-block;position:relative;width:16px;height:16px;"><svg id="badge" width="16" height="16" viewBox="0 0 16 16" style="position:absolute;top:50%;left:50%;transform:translate(-8px,-8px);"><rect width="16" height="16" fill="#c37d16"/></svg></span> · 1st</div></div>
             <span class="title">Co-founder and CEO at Common Paper | Making contracts better for everyone</span>
+            <a id="plainlink" href="/in/jake" style="color:#191919;text-decoration:none;font-size:14px;">View profile</a>
+            <div style="font-size:14px;"><button id="followbtn" style="font-size:14px;font-weight:600;font-family:Arial;">Follow</button></div>
           </div></div></div>
           <div class="controls"><button>x</button></div>
         </div>
@@ -192,8 +194,12 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
         const stats = leaf("973 reactions");
         const goBtn = [...document.querySelectorAll("button")].find((b) => b.textContent === "go");
         const badge = document.querySelector("svg");
+        const link = [...document.querySelectorAll("a")].find((a) => a.textContent === "View profile");
+        const followBtn = [...document.querySelectorAll("button")].find((b) => b.textContent === "Follow");
         const card = document.body.firstElementChild.getBoundingClientRect();
         return {
+          link: link ? { color: getComputedStyle(link).color, deco: getComputedStyle(link).textDecorationLine } : null,
+          followBtn: followBtn ? { fontSize: getComputedStyle(followBtn).fontSize, fontWeight: getComputedStyle(followBtn).fontWeight } : null,
           badge: badge ? badge.getBoundingClientRect().toJSON() : null,
           name: nameEl ? { r: nameEl.getBoundingClientRect().toJSON(), color: getComputedStyle(nameEl).color, deco: getComputedStyle(nameEl).textDecorationLine, fontSize: getComputedStyle(nameEl).fontSize } : null,
           stats: stats ? stats.getBoundingClientRect().toJSON() : null,
@@ -210,6 +216,16 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       // ...at its true size, NOT the card's 9px base (inherited props must
       // diff against the parent, not the UA default)...
       expect(r.name.fontSize).toBe("16px");
+      // ...UA-styled tags keep their SITE styling even when it equals the
+      // parent: an inherit-colored link must not fall to UA blue/underline,
+      // and a button matching its parent's font must not fall to UA 13px
+      // (which clipped "+ Follo")...
+      expect(r.link, "plain link missing").toBeTruthy();
+      expect(r.link.color).toBe("rgb(25, 25, 25)");
+      expect(r.link.deco).toContain("none");
+      expect(r.followBtn, "follow button missing").toBeTruthy();
+      expect(r.followBtn.fontSize).toBe("14px");
+      expect(r.followBtn.fontWeight).toBe("600");
       // ...the stats bar exists IN FLOW below the body text...
       expect(r.stats, "stats bar missing from replica").toBeTruthy();
       expect(r.stats.y).toBeGreaterThan(r.name.r.y + 30);
