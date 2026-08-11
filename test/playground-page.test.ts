@@ -39,4 +39,14 @@ describe("the playground page's client script", () => {
     expect(html).toContain("/schema");
     expect(html).toMatch(/tenant-components[^\n]*schema/);
   });
+
+  it("tracks unsaved changes: dirty flag, leave guards, instant form learning", () => {
+    expect(html).toContain("dirty-flag");
+    expect(html).toContain("Unsaved changes");
+    expect(html).toContain("beforeunload");
+    expect(html).toContain("confirmDiscard");
+    // The client-side field derivation must reach the browser with REAL
+    // backslashes (the template literal eats single ones).
+    expect(html).toContain("\\bdata\\.([a-zA-Z_]");
+  });
 });

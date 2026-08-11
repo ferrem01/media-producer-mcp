@@ -401,6 +401,7 @@ select.field-input { cursor: pointer; }
     <span class="logo">Playground</span>
     <input type="text" id="tenant-input" placeholder="tenant-id" />
     <span id="comp-name">No component loaded</span>
+    <span id="dirty-flag" style="display:none;color:#fbbf24;font-size:12px;font-weight:600;margin-right:4px;">&#9679; Unsaved changes</span>
     <button class="topbar-btn secondary" id="refresh-btn" title="Refresh preview">Refresh</button>
     <button class="topbar-btn" id="save-btn" disabled>Save to Library</button>
   </div>
@@ -503,8 +504,58 @@ select.field-input { cursor: pointer; }
     previewDebounce: null,
     generating: false,
     currentSchema: null,
-    formData: null
+    formData: null,
+    savedSource: ''
   };
+
+  // ── Unsaved-changes tracking ──
+  // An edit (chat or manual) is WORKING STATE until "Save to Library"; the
+  // flag makes that visible and the guards make it hard to lose.
+  function isDirty() {
+    return !!state.currentType && els.sourceEditor.value !== state.savedSource;
+  }
+  function updateDirtyFlag() {
+    document.getElementById('dirty-flag').style.display = isDirty() ? 'inline' : 'none';
+  }
+  function confirmDiscard() {
+    if (!isDirty()) return true;
+    return confirm('You have UNSAVED changes to "' + state.currentType + '". Discard them?');
+  }
+  window.addEventListener('beforeunload', function(e) {
+    if (isDirty()) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // Mirror of the server's deriveDataFields: the FORM learns new fields the
+  // moment an edit introduces them -- not on save. (Save persists; it does
+  // not reveal.)
+  function deriveFieldsFromSource(source) {
+    var fields = {};
+    var patterns = [
+      /data-bind=["']([a-zA-Z_][a-zA-Z0-9_]*)["']/g,
+      /\\bdata\\.([a-zA-Z_][a-zA-Z0-9_]*)/g,
+      /\\{\\{\\{?[#^]?\\s*([a-zA-Z_][a-zA-Z0-9_]*)/g
+    ];
+    for (var i = 0; i < patterns.length; i++) {
+      var m;
+      while ((m = patterns[i].exec(source)) !== null) {
+        var key = m[1];
+        if (key === 'script' || key === 'cursor_targets') continue;
+        if (!fields[key]) fields[key] = { type: 'string', label: key.replace(/_/g, ' ').replace(/\\b\\w/g, function(c) { return c.toUpperCase(); }), optional: true };
+      }
+    }
+    return fields;
+  }
+  function refreshSchemaFromSource(source) {
+    var derived = deriveFieldsFromSource(source);
+    if (!state.currentSchema) state.currentSchema = { data: {} };
+    if (!state.currentSchema.data) state.currentSchema.data = {};
+    for (var k in derived) {
+      if (!state.currentSchema.data[k]) state.currentSchema.data[k] = derived[k];
+    }
+    if (formMode === 'form') {
+      try { renderDataForm(JSON.parse(els.dataEditor.value || '{}'), state.currentSchema); } catch (e) {}
+    }
+  }
 
   // ── DOM Refs ──
   var els = {
@@ -655,6 +706,7 @@ select.field-input { cursor: pointer; }
 
   // ── Load Component Source ──
   function loadGlobalComponent(category, type) {
+    if (!confirmDiscard()) return;
     var sourceUrl = '/playground/api/components/' + encodeURIComponent(category) + '/' + encodeURIComponent(type) + '/source';
     var defaultsUrl = '/playground/api/components/' + encodeURIComponent(category) + '/' + encodeURIComponent(type) + '/defaults';
     
@@ -669,6 +721,7 @@ select.field-input { cursor: pointer; }
   }
 
   function loadTenantComponent(type) {
+    if (!confirmDiscard()) return;
     api('GET', '/playground/api/tenant-components/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(type) + '/source').then(function(source) {
       setComponent(type, 'custom', source);
       // Captured components mint a schema (entrance/accent/script + the verb
@@ -689,7 +742,9 @@ select.field-input { cursor: pointer; }
     state.currentCategory = category;
     state.currentSource = source;
     state.currentSchema = null;
+    state.savedSource = source;
     els.sourceEditor.value = source;
+    updateDirtyFlag();
     els.compName.textContent = type;
     els.saveBtn.disabled = false;
     // Use schema-derived defaults if available, fall back to regex extraction
@@ -810,6 +865,7 @@ select.field-input { cursor: pointer; }
 
   function updatePreview() {
     var source = els.sourceEditor.value;
+    if (state.currentType) refreshSchemaFromSource(source);
     if (!source.trim()) {
       els.previewSizer.style.display = 'none';
       els.previewPlaceholder.style.display = '';
@@ -961,7 +1017,9 @@ select.field-input { cursor: pointer; }
 
       state.currentSource = result.source;
       els.sourceEditor.value = result.source;
-      addChatMessage('assistant', 'Updated! Preview refreshing.');
+      updateDirtyFlag();
+      refreshSchemaFromSource(result.source);
+      addChatMessage('assistant', 'Updated! Preview, form and source all reflect the change -- UNSAVED until you Save to Library.');
 
       // Hot-reload: extract custom script actions from updated source and refresh form
       if (state.currentSchema) {
@@ -1012,6 +1070,8 @@ select.field-input { cursor: pointer; }
       category: state.currentCategory || 'custom'
     }).then(function() {
       els.previewStatus.textContent = 'Saved!';
+      state.savedSource = els.sourceEditor.value;
+      updateDirtyFlag();
       setTimeout(function() { els.previewStatus.textContent = ''; }, 2000);
       loadTenantComponents();
       // The server re-derives the schema on save (new data-binds become
@@ -1033,6 +1093,7 @@ select.field-input { cursor: pointer; }
   // ── Source / Data change ──
   els.sourceEditor.addEventListener('input', function() {
     state.currentSource = els.sourceEditor.value;
+    updateDirtyFlag();
     schedulePreview();
   });
   els.dataEditor.addEventListener('input', function() {
