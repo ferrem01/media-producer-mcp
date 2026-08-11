@@ -130,11 +130,14 @@ describe("extension serializer: same-origin iframes are WALKED INTO, not frozen 
         .pane { width: 900px; margin: 24px; background: #fff; border: 1px solid #e4e4ee; border-radius: 12px; }
         .tabs { padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; }
         .scroll { height: 640px; overflow-y: auto; }
-        .scroll iframe { width: 100%; height: 2400px; border: 0; display: block; }
+        /* Like the real broadcast editor: the email lays out at a 1366px
+           "Desktop" width and is DISPLAYED scaled down to fit the pane. */
+        .zoom { transform: scale(0.61); transform-origin: 0 0; width: 1366px; }
+        .zoom iframe { width: 1366px; height: 2400px; border: 0; display: block; }
       </style></head><body>
       <div class="pane" id="pane">
         <div class="tabs">Desktop</div>
-        <div class="scroll"><iframe srcdoc="${emailBody.replace(/"/g, "&quot;")}"></iframe></div>
+        <div class="scroll"><div class="zoom"><iframe srcdoc="${emailBody.replace(/"/g, "&quot;")}"></iframe></div></div>
       </div></body></html>`;
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-iframe-"));
     const pageFile = path.join(dir, "page.html");
@@ -178,6 +181,10 @@ describe("extension serializer: same-origin iframes are WALKED INTO, not frozen 
     expect(bundle.html).toContain("Embed video in your blog posts"); // ...but its CONTENT does
     expect(bundle.html).toContain("Paragraph 11"); // including far below the fold
     expect(bundle.html).not.toMatch(/background:#111/); // no placeholder in sight
+    // The app shows the 1366px layout scaled to 61% -- the walk-in must
+    // reproduce that (content at layout width, scaled to the visual box),
+    // or the email's baked centering margins shove it right and clip it.
+    expect(bundle.html).toMatch(/width:1366px;transform:scale\(0\.61\d*\);transform-origin:0 0/);
     // The email survives the real mint path too.
     const minted = await mintCapturedComponent("captest", { ...bundle, name: "email-preview-pane" });
     const html = await fs.readFile(minted.componentPath, "utf-8");
