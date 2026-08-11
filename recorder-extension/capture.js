@@ -221,8 +221,14 @@
     } catch (e) { return null; }
   }
 
-  async function serialize(root, shotImg) {
-    substitutions.length = 0;
+  // Style resolution must come from the element's OWN window: elements
+  // inside a same-origin iframe (the walk-in below) have their own view,
+  // and the top window's getComputedStyle is not defined for them.
+  const csOf = (el) => el.ownerDocument.defaultView.getComputedStyle(el);
+
+  async function serialize(root, shotImg, depth) {
+    depth = depth || 0;
+    if (!depth) substitutions.length = 0;
     const clone = root.cloneNode(true);
     const origWalk = [root, ...root.querySelectorAll("*")];
     const cloneWalk = [clone, ...clone.querySelectorAll("*")];
@@ -234,7 +240,7 @@
       if (!c || c.nodeType !== 1) continue;
       const tag = o.tagName.toLowerCase();
       if (tag === "script" || tag === "iframe" || tag === "object" || tag === "embed") continue; // server kills them anyway
-      const cs = getComputedStyle(o);
+      const cs = csOf(o);
       if (cs.display === "none" || cs.visibility === "hidden") { c.remove(); continue; }
       const defaults = probeDefaults(tag);
       const parts = [];
@@ -248,13 +254,13 @@
       let gridParent = null;
       if (o !== root) {
         let p = o.parentElement;
-        while (p && getComputedStyle(p).display === "contents" && p !== root) p = p.parentElement;
+        while (p && csOf(p).display === "contents" && p !== root) p = p.parentElement;
         if (p) {
-          const pd = getComputedStyle(p).display;
+          const pd = csOf(p).display;
           if (pd === "grid" || pd === "inline-grid") gridParent = p;
         }
       }
-      const parentCS = o === root ? null : getComputedStyle(o.parentElement || o);
+      const parentCS = o === root ? null : csOf(o.parentElement || o);
       for (const p of STYLE_PROPS) {
         // Offsets are a TRAP for positioned elements: getComputedStyle
         // resolves auto top/left/right/bottom to USED page coordinates
@@ -293,7 +299,7 @@
         // padding box; absolute offsets are measured from inside the border).
         const gr = gridParent.getBoundingClientRect();
         const er = o.getBoundingClientRect();
-        const gcs = getComputedStyle(gridParent);
+        const gcs = csOf(gridParent);
         const bt = parseFloat(gcs.borderTopWidth) || 0;
         const bl = parseFloat(gcs.borderLeftWidth) || 0;
         parts.push(
@@ -313,12 +319,12 @@
         let anchor = null;
         let ap = o.parentElement;
         while (ap && ap !== root) {
-          const apc = getComputedStyle(ap);
+          const apc = csOf(ap);
           if (apc.position !== "static" && apc.display !== "contents") { anchor = ap; break; }
           ap = ap.parentElement;
         }
         const base = anchor || root;
-        const bcs = getComputedStyle(base);
+        const bcs = csOf(base);
         const br = base.getBoundingClientRect();
         const er = o.getBoundingClientRect();
         let topV = er.top - br.top - (parseFloat(bcs.borderTopWidth) || 0);
@@ -390,6 +396,29 @@
       const o = origWalk[i], c = cloneWalk[i];
       if (!c || c.nodeType !== 1) continue;
       const tag = o.tagName;
+      if (tag === "IFRAME" && depth < 2) {
+        // WALK IN: an app's preview iframe (email editors, doc previews) is
+        // usually same-origin or srcdoc -- its DOM is readable, and real DOM
+        // beats frozen pixels every time (a tall email is mostly below the
+        // fold, so the freeze gate would refuse it anyway). The iframe
+        // becomes a same-sized clipping div carrying the serialized inner
+        // document. Cross-origin frames throw here and fall to the ladder.
+        let idoc = null;
+        try { idoc = o.contentDocument; } catch (e) { /* cross-origin */ }
+        if (idoc && idoc.body) {
+          try {
+            const inner = await serialize(idoc.body, null, depth + 1);
+            const r = o.getBoundingClientRect();
+            const wrap = document.createElement("div");
+            wrap.setAttribute("style", ((c.getAttribute && c.getAttribute("style")) || "") +
+              ";width:" + Math.round(r.width) + "px;height:" + Math.round(r.height) + "px;overflow:hidden;");
+            wrap.innerHTML = inner.html;
+            c.replaceWith(wrap);
+            substitutions.push("iframe captured as live DOM (same-origin walk-in)");
+            continue;
+          } catch (e) { /* fall through to the freeze ladder */ }
+        }
+      }
       if (tag === "VIDEO" || tag === "CANVAS" || tag === "IFRAME" || tag === "OBJECT" || tag === "EMBED") {
         if (freezeRegion(o, c, tag.toLowerCase())) continue;
         if (tag === "VIDEO" && o.poster) {
@@ -414,7 +443,7 @@
           else if (!freezeRegion(o, c, "img")) c.removeAttribute("src");
         }));
       }
-      const bg = getComputedStyle(o).backgroundImage;
+      const bg = csOf(o).backgroundImage;
       const m = bg && bg !== "none" ? bg.match(/url\(["']?([^"')]+)["']?\)/) : null;
       if (m && !m[1].startsWith("data:")) {
         imgJobs.push(toDataUri(m[1]).then((d) => {
@@ -435,12 +464,24 @@
         Object.keys(counts).map((k) => counts[k] + "× " + k).join(", "));
     }
 
+    // A walked-in iframe's root is its <body> -- but <body> dissolves when
+    // parsed back via innerHTML and its inlined style dies with it. Rehome
+    // the inlined look onto a plain div.
+    let outEl = clone;
+    if (outEl.tagName === "BODY" || outEl.tagName === "HTML") {
+      const div = document.createElement("div");
+      for (const a of [...outEl.attributes]) div.setAttribute(a.name, a.value);
+      while (outEl.firstChild) div.appendChild(outEl.firstChild);
+      outEl = div;
+    }
+
     // Fonts: bake the real webfont binaries for every non-system family in
     // use (the @font-face hunt + fetch ladder above). Only families that
-    // cannot be landed fall back, and the panel says which.
-    const fonts = await collectFonts([...fontFamilies]);
+    // cannot be landed fall back, and the panel says which. Inner documents
+    // (walked-in iframes) skip the hunt -- email HTML carries its stacks.
+    const fonts = depth ? [] : await collectFonts([...fontFamilies]);
 
-    return { html: clone.outerHTML, fonts };
+    return { html: outEl.outerHTML, fonts };
   }
 
   // ── Picker overlay (shadow DOM so page CSS can't touch it) ──
