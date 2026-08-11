@@ -409,12 +409,27 @@
           try {
             const inner = await serialize(idoc.body, null, depth + 1);
             const r = o.getBoundingClientRect();
+            // Apps often DISPLAY the preview scaled (a 1366px "Desktop"
+            // layout shown at 61%): the rect is the visual box, but the
+            // inner document's baked pixel values (centering margins!) live
+            // in LAYOUT coordinates. Reproduce the app's trick: lay the
+            // content out at its true width, scale it to fit the box.
+            const layoutW = o.clientWidth || Math.round(r.width);
+            const k = layoutW ? r.width / layoutW : 1;
             const wrap = document.createElement("div");
             wrap.setAttribute("style", ((c.getAttribute && c.getAttribute("style")) || "") +
               ";width:" + Math.round(r.width) + "px;height:" + Math.round(r.height) + "px;overflow:hidden;");
-            wrap.innerHTML = inner.html;
+            if (Math.abs(k - 1) > 0.01) {
+              const scaler = document.createElement("div");
+              scaler.setAttribute("style", "width:" + layoutW + "px;transform:scale(" + k.toFixed(4) + ");transform-origin:0 0;");
+              scaler.innerHTML = inner.html;
+              wrap.appendChild(scaler);
+            } else {
+              wrap.innerHTML = inner.html;
+            }
             c.replaceWith(wrap);
-            substitutions.push("iframe captured as live DOM (same-origin walk-in)");
+            substitutions.push("iframe captured as live DOM (same-origin walk-in" +
+              (Math.abs(k - 1) > 0.01 ? ", shown at " + Math.round(k * 100) + "%" : "") + ")");
             continue;
           } catch (e) { /* fall through to the freeze ladder */ }
         }
