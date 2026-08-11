@@ -735,13 +735,20 @@ select.field-input { cursor: pointer; }
       // list) -- fetch it so the form editor works for them too.
       api('GET', '/playground/api/tenant-components/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(type) + '/schema').then(function(schema) {
         state.currentSchema = schema;
-        // A captured component is COMPLETE without data -- every field is an
-        // override of the frozen original. Start from {} so fallbacks show;
-        // the legacy Sample-Value prefill would leak junk into renders.
-        els.dataEditor.value = '{}';
-        state.formData = {};
+        // Platform convention: components open with sample data already in
+        // the JSON. For a capture the honest sample data is the REAL
+        // captured text -- prefill each content field with the value its
+        // bind currently wraps (never "Sample Value" junk). Behavior knobs
+        // (entrance/accent: nothing to extract) stay empty with hints.
+        var prefill = {};
+        var derived = deriveFieldsFromSource(els.sourceEditor.value);
+        for (var dk in derived) {
+          if (derived[dk].placeholder) prefill[dk] = derived[dk].placeholder;
+        }
+        els.dataEditor.value = JSON.stringify(prefill, null, 2);
+        state.formData = prefill;
         if (formMode === 'form') {
-          try { renderDataForm({}, schema); } catch (e) {}
+          try { renderDataForm(prefill, schema); } catch (e) {}
         }
       }).catch(function() { /* plain custom component: no schema, no form */ });
     }).catch(function(err) {
