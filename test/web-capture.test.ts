@@ -251,6 +251,10 @@ describe("extension serializer: pick INSIDE a scaled editor canvas (the real Quo
            pick happens INSIDE it, so none of this rides along. */
         .canvas { transform: translate(200px, 30px) scale(0.612); transform-origin: 0 0; width: 1366px; }
         #pane { width: 1366px; background: #f9f9fb; }
+        /* Tailwind preflight: an INVISIBLE zero-width solid border on
+           everything. Baking its style without its width resurrects it at
+           the initial 'medium' (3px) -- grey boxes around every block. */
+        #pane, #pane * { border: 0 solid rgb(239, 240, 246); }
         .tabs { padding: 10px; font-size: 13px; }
         .email { width: 600px; margin: 0 auto; border-collapse: collapse; background: #fff; }
         .email td { padding: 8px 0; }
@@ -303,6 +307,7 @@ describe("extension serializer: pick INSIDE a scaled editor canvas (the real Quo
           h1Width: hr.width,
           h1LeftInPane: hr.left - root.left,
           rightEdgeVisible: !!(hit && (hit === h1 || h1.contains(hit) || hit.contains(h1))),
+          h1BorderWidth: getComputedStyle(h1).borderTopWidth,
         };
       });
       await replica.close();
@@ -312,6 +317,9 @@ describe("extension serializer: pick INSIDE a scaled editor canvas (the real Quo
       expect(m!.h1LeftInPane).toBeGreaterThan(215); // centered, not shoved by layout-px margins
       expect(m!.h1LeftInPane).toBeLessThan(255);
       expect(m!.rightEdgeVisible, "email right edge is clipped").toBe(true);
+      // Zero-width preflight borders stay DEAD: baked style-without-width
+      // would resolve to 'medium' = 3px here.
+      expect(m!.h1BorderWidth, "invisible border resurrected in the replica").toBe("0px");
     } finally {
       if (browser) await browser.close();
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
