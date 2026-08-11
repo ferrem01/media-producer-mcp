@@ -172,6 +172,39 @@ describe("extension serializer: same-origin iframes are WALKED INTO, not frozen 
       await page.keyboard.press("c");
       await page.waitForFunction(() => (window as any).__qcLastBundle, { timeout: 15_000 });
       bundle = await page.evaluate(() => (window as any).__qcLastBundle);
+
+      // GEOMETRY, not eyeballs: render the replica and MEASURE where the
+      // email lands. The v1.8/1.9 failures (email shoved right + clipped;
+      // then double-scaled) all passed presence checks -- only visual
+      // measurement pins the composition: layout-sized wrap scaled once by
+      // the baked ancestor transform.
+      const replica = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      await replica.setContent(`<body style="margin:0"><div id="root">${bundle.html}</div></body>`);
+      const m = await replica.evaluate(() => {
+        const h1 = [...document.querySelectorAll("h1")].find((el) => (el.textContent || "").includes("Embed video"));
+        if (!h1) return null;
+        const hr = h1.getBoundingClientRect();
+        const root = document.getElementById("root")!.firstElementChild!.getBoundingClientRect();
+        const hit = document.elementFromPoint(hr.right - 8, hr.top + hr.height / 2);
+        return {
+          h1Width: hr.width,
+          h1LeftInPane: hr.left - root.left,
+          rightEdgeVisible: !!(hit && (hit === h1 || h1.contains(hit) || hit.contains(h1))),
+        };
+      });
+      await replica.close();
+      expect(m, "email h1 missing from rendered replica").toBeTruthy();
+      // 600px column at the app's 61% zoom: ~366px visually. Double-scaling
+      // (v1.9) gives ~223; unscaled layout leak gives ~600. Both fail here.
+      expect(m!.h1Width).toBeGreaterThan(340);
+      expect(m!.h1Width).toBeLessThan(392);
+      // Centering: (1366-600)/2 * 0.61 = ~234 from the pane's left edge.
+      // The v1.8 bug shoved this right; a dead-centered replica pins it.
+      expect(m!.h1LeftInPane).toBeGreaterThan(215);
+      expect(m!.h1LeftInPane).toBeLessThan(255);
+      // And the right edge actually PAINTS (v1.8 clipped it): hit-testing
+      // respects overflow clipping, so a clipped h1 fails this probe.
+      expect(m!.rightEdgeVisible, "email right edge is clipped by the wrap").toBe(true);
     } finally {
       if (browser) await browser.close();
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
@@ -181,10 +214,11 @@ describe("extension serializer: same-origin iframes are WALKED INTO, not frozen 
     expect(bundle.html).toContain("Embed video in your blog posts"); // ...but its CONTENT does
     expect(bundle.html).toContain("Paragraph 11"); // including far below the fold
     expect(bundle.html).not.toMatch(/background:#111/); // no placeholder in sight
-    // The app shows the 1366px layout scaled to 61% -- the walk-in must
-    // reproduce that (content at layout width, scaled to the visual box),
-    // or the email's baked centering margins shove it right and clip it.
-    expect(bundle.html).toMatch(/width:1366px;transform:scale\(0\.61\d*\);transform-origin:0 0/);
+    // The app shows the 1366px layout scaled to 61%. The wrap lives in
+    // LAYOUT coordinates; the baked ancestor transform (with its baked
+    // origin) does the scaling -- exactly like the real page. The geometry
+    // block above proves the composition; here just pin the layout sizing.
+    expect(bundle.html).toContain("width:1366px;height:2400px;overflow:hidden");
     // The email survives the real mint path too.
     const minted = await mintCapturedComponent("captest", { ...bundle, name: "email-preview-pane" });
     const html = await fs.readFile(minted.componentPath, "utf-8");

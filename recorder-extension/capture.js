@@ -342,6 +342,11 @@
         // Sticky offsets are meaningless in a frozen replica.
         parts.push("position:relative");
       }
+      // A baked transform needs its baked ORIGIN: computed transform-origin
+      // resolves to px and DEFAULTS to the element's center, so a replica
+      // that drops it scales/rotates about the wrong point -- an app's
+      // origin-0 zoom wrapper shifts its whole subtree right and down.
+      if (cs.transform && cs.transform !== "none") parts.push("transform-origin:" + cs.transformOrigin);
       fontFamilies.add(cs.fontFamily);
       c.removeAttribute("class");
       c.removeAttribute("id");
@@ -408,28 +413,22 @@
         if (idoc && idoc.body) {
           try {
             const inner = await serialize(idoc.body, null, depth + 1);
-            const r = o.getBoundingClientRect();
-            // Apps often DISPLAY the preview scaled (a 1366px "Desktop"
-            // layout shown at 61%): the rect is the visual box, but the
-            // inner document's baked pixel values (centering margins!) live
-            // in LAYOUT coordinates. Reproduce the app's trick: lay the
-            // content out at its true width, scale it to fit the box.
-            const layoutW = o.clientWidth || Math.round(r.width);
-            const k = layoutW ? r.width / layoutW : 1;
+            // The replacement must live in LAYOUT coordinates (clientWidth/
+            // Height), NOT the visual rect: apps display previews scaled
+            // (a 1366px "Desktop" shown at 61%) and that ancestor transform
+            // is baked into the clone -- it will scale this wrap exactly as
+            // it scaled the iframe. Sizing by the visual rect double-applies
+            // the scale: the box comes out too small while the inner
+            // document's baked pixel margins stay layout-sized -- content
+            // shoved right and clipped.
+            const layoutW = o.clientWidth || Math.round(o.getBoundingClientRect().width);
+            const layoutH = o.clientHeight || Math.round(o.getBoundingClientRect().height);
             const wrap = document.createElement("div");
             wrap.setAttribute("style", ((c.getAttribute && c.getAttribute("style")) || "") +
-              ";width:" + Math.round(r.width) + "px;height:" + Math.round(r.height) + "px;overflow:hidden;");
-            if (Math.abs(k - 1) > 0.01) {
-              const scaler = document.createElement("div");
-              scaler.setAttribute("style", "width:" + layoutW + "px;transform:scale(" + k.toFixed(4) + ");transform-origin:0 0;");
-              scaler.innerHTML = inner.html;
-              wrap.appendChild(scaler);
-            } else {
-              wrap.innerHTML = inner.html;
-            }
+              ";width:" + layoutW + "px;height:" + layoutH + "px;overflow:hidden;");
+            wrap.innerHTML = inner.html;
             c.replaceWith(wrap);
-            substitutions.push("iframe captured as live DOM (same-origin walk-in" +
-              (Math.abs(k - 1) > 0.01 ? ", shown at " + Math.round(k * 100) + "%" : "") + ")");
+            substitutions.push("iframe captured as live DOM (same-origin walk-in)");
             continue;
           } catch (e) { /* fall through to the freeze ladder */ }
         }
