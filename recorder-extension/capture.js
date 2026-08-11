@@ -34,7 +34,12 @@
     "color", "font-family", "font-size", "font-weight", "font-style", "line-height", "letter-spacing",
     "text-align", "text-decoration-line", "text-decoration-color", "text-transform", "white-space",
     "text-overflow", "vertical-align", "word-break", "opacity", "box-shadow", "text-shadow",
-    "transform", "filter", "backdrop-filter", "object-fit", "object-position", "cursor",
+    // ALL the ways an element can be scaled/moved: the transform property,
+    // the standalone scale/translate/rotate properties, and CSS zoom (how
+    // app preview panes often shrink a desktop layout). Missing any of
+    // them leaves the replica laid out full-size with the shrink lost.
+    "transform", "scale", "translate", "rotate", "zoom",
+    "filter", "backdrop-filter", "object-fit", "object-position", "cursor",
     "visibility", "outline-width", "outline-style", "outline-color", "list-style-type",
   ];
 
@@ -346,7 +351,9 @@
       // resolves to px and DEFAULTS to the element's center, so a replica
       // that drops it scales/rotates about the wrong point -- an app's
       // origin-0 zoom wrapper shifts its whole subtree right and down.
-      if (cs.transform && cs.transform !== "none") parts.push("transform-origin:" + cs.transformOrigin);
+      if ((cs.transform && cs.transform !== "none") ||
+          (cs.scale && cs.scale !== "none") ||
+          (cs.rotate && cs.rotate !== "none")) parts.push("transform-origin:" + cs.transformOrigin);
       fontFamilies.add(cs.fontFamily);
       c.removeAttribute("class");
       c.removeAttribute("id");

@@ -117,7 +117,16 @@ describe("extension serializer: same-origin iframes are WALKED INTO, not frozen 
   // ladder's crop gate (>=50% visible) refused it, so the whole email became
   // a placeholder -- Marc captured his broadcast editor and got a blank pane.
   // Same-origin/srcdoc frames have readable DOM: serialize INTO them.
-  it("captures the email DOM inside a tall preview iframe", async () => {
+  //
+  // Apps shrink a "Desktop" layout to fit the pane in THREE different ways;
+  // the serializer must reproduce all of them, so the same geometry test
+  // runs once per mechanism.
+  const SCALERS: Array<[string, string]> = [
+    ["transform", "transform: scale(0.61); transform-origin: 0 0;"],
+    ["css zoom", "zoom: 0.61;"],
+    ["scale property", "scale: 0.61; transform-origin: 0 0;"],
+  ];
+  it.each(SCALERS)("captures the email DOM inside a tall preview iframe (%s)", async (_label, scalerCss) => {
     const emailBody = [
       '<div style="width:600px;margin:0 auto;font-family:Georgia,serif;background:#fff;">',
       '<p style="font-size:11px;color:#888;">PRODUCT RELEASE</p>',
@@ -132,7 +141,7 @@ describe("extension serializer: same-origin iframes are WALKED INTO, not frozen 
         .scroll { height: 640px; overflow-y: auto; }
         /* Like the real broadcast editor: the email lays out at a 1366px
            "Desktop" width and is DISPLAYED scaled down to fit the pane. */
-        .zoom { transform: scale(0.61); transform-origin: 0 0; width: 1366px; }
+        .zoom { ${scalerCss} width: 1366px; }
         .zoom iframe { width: 1366px; height: 2400px; border: 0; display: block; }
       </style></head><body>
       <div class="pane" id="pane">
