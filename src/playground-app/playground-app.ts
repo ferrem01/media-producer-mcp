@@ -1069,7 +1069,19 @@ select.field-input { cursor: pointer; }
       els.sourceEditor.value = result.source;
       updateDirtyFlag();
       refreshSchemaFromSource(result.source);
-      addChatMessage('assistant', 'Updated! Preview, form and source all reflect the change -- UNSAVED until you Save to Library.');
+      // New content fields arrive VALUED: the JSON gains the real text the
+      // bind wraps, right now -- not on the next load. (Platform convention:
+      // the sample data lives in the JSON.) Only ABSENT keys gain values, so
+      // a field the user emptied on purpose stays empty.
+      var derivedNow = deriveFieldsFromSource(result.source);
+      var dataNow = {};
+      try { dataNow = JSON.parse(els.dataEditor.value || '{}'); } catch (e) { dataNow = {}; }
+      for (var ndk in derivedNow) {
+        if (derivedNow[ndk].placeholder && !(ndk in dataNow)) dataNow[ndk] = derivedNow[ndk].placeholder;
+      }
+      els.dataEditor.value = JSON.stringify(dataNow, null, 2);
+      state.formData = dataNow;
+      addChatMessage('assistant', 'Updated! Preview, form, JSON and source all reflect the change -- UNSAVED until you Save to Library.');
 
       // Hot-reload: extract custom script actions from updated source and refresh form
       if (state.currentSchema) {
