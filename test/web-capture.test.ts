@@ -306,6 +306,39 @@ describe("applyLlmEdits (chat edits arrive as SEARCH/REPLACE, never the whole fi
   it("rejects responses that are neither", () => {
     expect(() => applyLlmEdits(src, "I updated the component for you!")).toThrow(/neither/);
   });
+
+  it("drops spurious diff3 ======= dividers but keeps ALL replacement content", () => {
+    // Verbatim failure shape from live replays on the captured LinkedIn
+    // component: the model anchors on existing code, writes the new code,
+    // then a SECOND ======= and the re-stated anchor. The old parser kept
+    // the divider as content -- a ======= line in the applied script.
+    const raw = [
+      "<<<<<<< SEARCH",
+      "<p>Post body text</p>",
+      "=======",
+      '<p data-bind="body">NEW BOUND COPY</p>',
+      "=======",
+      "<p>Post body text</p>",
+      ">>>>>>> REPLACE",
+    ].join("\n");
+    const out = applyLlmEdits(src, raw);
+    expect(out).toContain('data-bind="body"');
+    expect(out).toContain("<p>Post body text</p>"); // re-stated anchor SURVIVES (insert-before semantics)
+    expect(out).not.toMatch(/^={7}$/m); // the divider itself never reaches the source
+  });
+
+  it("fails LOUDLY if edit markers would leak into the applied source", () => {
+    const raw = [
+      "<<<<<<< SEARCH",
+      "<p>Post body text</p>",
+      "=======",
+      "<p>ok</p>",
+      "<<<<<<< SEARCH",
+      "mangled",
+      ">>>>>>> REPLACE",
+    ].join("\n");
+    expect(() => applyLlmEdits(src, raw)).toThrow(/leaked/);
+  });
 });
 
 describe("sanitizeCapturedHtml", () => {
