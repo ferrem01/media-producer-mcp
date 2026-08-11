@@ -39,6 +39,10 @@
     // app preview panes often shrink a desktop layout). Missing any of
     // them leaves the replica laid out full-size with the shrink lost.
     "transform", "scale", "translate", "rotate", "zoom",
+    // SVG paints its color through CSS too (X's verified badge is an svg
+    // whose blue is a class-applied fill) -- classes are stripped at
+    // capture, so the paint must ride inline or the icon goes BLACK.
+    "fill", "stroke", "stroke-width",
     "filter", "backdrop-filter", "object-fit", "object-position", "cursor",
     "visibility", "outline-width", "outline-style", "outline-color", "list-style-type",
   ];
