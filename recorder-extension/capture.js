@@ -502,7 +502,29 @@
     // (walked-in iframes) skip the hunt -- email HTML carries its stacks.
     const fonts = depth ? [] : await collectFonts([...fontFamilies]);
 
-    return { html: outEl.outerHTML, fonts };
+    let html = outEl.outerHTML;
+    // AMPUTATED ANCESTOR SCALE: if the picked root lives inside a scaled
+    // ancestor (an editor canvas at 61%, a zoomed preview), its measured
+    // rect is VISUAL while every baked style is LAYOUT -- and the ancestor
+    // carrying the scale is outside the pick, so it never rides along. The
+    // replica then lays out full-size in a visual-size box: content shoved
+    // by its baked centering margins and clipped. Reproduce the missing
+    // scale at the root.
+    if (!depth) {
+      const rr = root.getBoundingClientRect();
+      const lw = root.offsetWidth || 0;
+      const lh = root.offsetHeight || 0;
+      if (lw && Math.abs(rr.width / lw - 1) > 0.02) {
+        const k = rr.width / lw;
+        html = '<div style="width:' + Math.round(rr.width) + "px;height:" + Math.round(rr.height) + 'px;overflow:hidden;">' +
+          '<div style="width:' + lw + "px;height:" + lh + "px;transform:scale(" + k.toFixed(4) + ');transform-origin:0 0;">' +
+          html + "</div></div>";
+        substitutions.push("picked region is displayed at " + Math.round(k * 100) +
+          "% by an ancestor outside the pick -- scale reproduced at the root");
+      }
+    }
+
+    return { html, fonts };
   }
 
   // ── Picker overlay (shadow DOM so page CSS can't touch it) ──

@@ -235,6 +235,90 @@ describe("extension serializer: same-origin iframes are WALKED INTO, not frozen 
   }, 300_000);
 });
 
+describe("extension serializer: pick INSIDE a scaled editor canvas (the real Quotient shape)", () => {
+  // Marc's $0 dump ended the iframe theory: the email is plain light-DOM
+  // tables, and the 61% zoom lives on an ANCESTOR editor-canvas
+  // (transform: matrix(0.612,...,470,48)) OUTSIDE the pick. Every measured
+  // rect is visual (~836px), every baked style is layout (1366px), and the
+  // scaling ancestor never rides along -- so the replica laid out full-size
+  // in a visual-size box: email shoved right by its baked centering margins
+  // and clipped. The serializer must reproduce the amputated scale at the
+  // root.
+  it("reproduces the ancestor scale at the capture root", async () => {
+    const pageHtml = `<!doctype html><html><head><style>
+        body { margin: 0; font-family: Arial; background: #e9e9ef; }
+        /* The editor canvas: pans with translate, zooms with scale -- the
+           pick happens INSIDE it, so none of this rides along. */
+        .canvas { transform: translate(200px, 30px) scale(0.612); transform-origin: 0 0; width: 1366px; }
+        #pane { width: 1366px; background: #f9f9fb; }
+        .tabs { padding: 10px; font-size: 13px; }
+        .email { width: 600px; margin: 0 auto; border-collapse: collapse; background: #fff; }
+        .email td { padding: 8px 0; }
+      </style></head><body>
+      <div class="canvas"><div id="pane">
+        <div class="tabs">Desktop</div>
+        <table class="email"><tbody>
+          <tr><td><h1 style="font-size:28px;margin:0;">Embed video in your blog posts</h1></td></tr>
+          <tr><td><p>This update covers July 11 through July 28, 2026.</p></td></tr>
+        </tbody></table>
+      </div></div></body></html>`;
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-canvas-"));
+    const pageFile = path.join(dir, "page.html");
+    await fs.writeFile(pageFile, pageHtml);
+    const captureJs = await fs.readFile(path.resolve(__dirname, "../recorder-extension/capture.js"), "utf-8");
+
+    let browser: Browser | null = null;
+    let bundle: any;
+    try {
+      browser = await chromium.launch({
+        ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+      });
+      const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      await page.goto(`file://${pageFile}`, { waitUntil: "load" });
+      await page.evaluate(`window.chrome = window.chrome || {}; window.chrome.runtime = {
+        sendMessage: async (msg) => ({ ok: true, type: "stub" }),
+      };`);
+      await page.evaluate(captureJs);
+      const box = await page.locator("#pane").boundingBox();
+      await page.mouse.move(box!.x + 6, box!.y + 6);
+      await page.mouse.wheel(0, -1);
+      await page.keyboard.press("c");
+      await page.waitForFunction(() => (window as any).__qcLastBundle, { timeout: 15_000 });
+      bundle = await page.evaluate(() => (window as any).__qcLastBundle);
+
+      // The bundle is VISUAL-sized, and the root scaler makes the layout fit it.
+      expect(bundle.width).toBeGreaterThan(830);
+      expect(bundle.width).toBeLessThan(842);
+      expect(bundle.html).toMatch(/transform:scale\(0\.61\d*\);transform-origin:0 0/);
+
+      const replica = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      await replica.setContent(`<body style="margin:0"><div id="root">${bundle.html}</div></body>`);
+      const m = await replica.evaluate(() => {
+        const h1 = [...document.querySelectorAll("h1")].find((el) => (el.textContent || "").includes("Embed video"));
+        if (!h1) return null;
+        const hr = h1.getBoundingClientRect();
+        const root = document.getElementById("root")!.firstElementChild!.getBoundingClientRect();
+        const hit = document.elementFromPoint(hr.right - 8, hr.top + hr.height / 2);
+        return {
+          h1Width: hr.width,
+          h1LeftInPane: hr.left - root.left,
+          rightEdgeVisible: !!(hit && (hit === h1 || h1.contains(hit) || hit.contains(h1))),
+        };
+      });
+      await replica.close();
+      expect(m, "email h1 missing from rendered replica").toBeTruthy();
+      expect(m!.h1Width).toBeGreaterThan(340); // 600px column at 61.2% -- unscaled leak gives ~600
+      expect(m!.h1Width).toBeLessThan(395);
+      expect(m!.h1LeftInPane).toBeGreaterThan(215); // centered, not shoved by layout-px margins
+      expect(m!.h1LeftInPane).toBeLessThan(255);
+      expect(m!.rightEdgeVisible, "email right edge is clipped").toBe(true);
+    } finally {
+      if (browser) await browser.close();
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }, 300_000);
+});
+
 describe("extension serializer: positioned layout survives (the LinkedIn header bug)", () => {
   // getComputedStyle resolves auto offsets on absolute elements to USED page
   // coordinates (top:56px = 56px from the ORIGINAL viewport). Baking those
