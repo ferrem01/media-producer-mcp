@@ -368,6 +368,10 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
         .meta-col { grid-column: -1; grid-row: 1; display: flex; flex-direction: column; }
         .name-grid { display: grid; }
         .name-cell { grid-column: -1; grid-row: 1; font-weight: 600; font-size: 16px; color: #191919; }
+        /* X's verified badge: the blue is a CLASS-applied CSS fill -- the
+           class dies at capture, so the paint must be inlined or the icon
+           renders default BLACK. */
+        .verified { fill: rgb(29, 155, 240); stroke: rgb(255, 255, 255); stroke-width: 1.5px; }
         .vh { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; width: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
         .title { font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .controls { margin-left: auto; flex: none; }
@@ -376,7 +380,7 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
         <h2 style="margin:0;"><span class="vh">Feed post</span></h2>
         <div class="hdr">
           <div class="meta-grid"><div style="display:contents"><div class="meta-col">
-            <div class="name-grid"><div class="name-cell">Jake Stein<span class="vh">View Jake Stein's profile</span><span style="display:inline-block;position:relative;width:16px;height:16px;"><svg id="badge" width="16" height="16" viewBox="0 0 16 16" style="position:absolute;top:50%;left:50%;transform:translate(-8px,-8px);"><rect width="16" height="16" fill="#c37d16"/></svg></span> · 1st</div></div>
+            <div class="name-grid"><div class="name-cell">Jake Stein<span class="vh">View Jake Stein's profile</span><span style="display:inline-block;position:relative;width:16px;height:16px;"><svg id="badge" width="16" height="16" viewBox="0 0 16 16" style="position:absolute;top:50%;left:50%;transform:translate(-8px,-8px);"><rect width="16" height="16" fill="#c37d16"/><path class="verified" d="M2 8l4 4 8-8"/></svg></span> · 1st</div></div>
             <span class="title">Co-founder and CEO at Common Paper | Making contracts better for everyone</span>
             <a id="plainlink" href="/in/jake" style="color:#191919;text-decoration:none;font-size:14px;">View profile</a>
             <div style="font-size:14px;"><button id="followbtn" style="font-size:14px;font-weight:600;font-family:Arial;">Follow</button></div>
@@ -479,6 +483,10 @@ describe("extension serializer: positioned layout survives (the LinkedIn header 
       expect(r.badge.x - r.card.x).toBeGreaterThan(40);
       expect(r.badge.x - r.card.x).toBeLessThan(220);
       expect(Math.round(r.badge.width)).toBe(16);
+      // ...and the CLASS-applied SVG paint rides inline (X's blue verified
+      // check went BLACK when the class died and no fill was baked).
+      expect(bundle.html).toMatch(/fill:\s*rgb\(29,\s*155,\s*240\)/);
+      expect(bundle.html).toMatch(/stroke:\s*rgb\(255,\s*255,\s*255\)/);
     } finally {
       if (browser) await browser.close();
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
