@@ -146,7 +146,14 @@ export function applyLlmEdits(source: string, raw: string): string {
     if (idx === -1) {
       throw new Error(`An edit could not be applied -- this text was not found verbatim: "${search.slice(0, 120)}..."`);
     }
-    out = out.slice(0, idx) + replace + out.slice(idx + search.length);
+    // Models sometimes emit diff3-style blocks: replacement, a spurious
+    // ======= divider, then re-stated context. Keep the CONTENT, drop the
+    // divider lines -- content over markers.
+    const cleaned = replace.replace(/\n={7}(?=\n)/g, "").replace(/^={7}\n/, "").replace(/\n={7}$/, "");
+    out = out.slice(0, idx) + cleaned + out.slice(idx + search.length);
+  }
+  if (/(^|\n)(?:<{7} SEARCH|={7}|>{7} REPLACE)(?=\n|$)/.test(out)) {
+    throw new Error("Edit markers leaked into the component source -- the model's edit format was malformed.");
   }
   return out;
 }
