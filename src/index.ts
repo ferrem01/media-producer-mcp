@@ -28,7 +28,7 @@ import { runGeneratePipeline } from "./llm/pipeline.js";
 import { componentSystemPrompt } from "./llm/prompts.js";
 import { loadBrandKit, saveBrandKit, brandAssetPath } from "./persistence/brand-kit.js";
 import { queueBuildFromStoryboard, queueStoryboardGeneration, queueSurgicalSceneOp } from "./server.js";
-import { mintCapturedComponent, shieldDataUris, reinflateDataUris } from "./core/web-capture.js";
+import { mintCapturedComponent, shieldDataUris, reinflateDataUris, applyLlmEdits } from "./core/web-capture.js";
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
@@ -1577,28 +1577,39 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           // budget. Swap each for a short placeholder, reinflate after.
           const { slim: slimSource, assets: shieldedAssets } = shieldDataUris(currentSource);
 
+          // The model returns EDITS, not the whole file -- a large component
+          // (captured posts run 100KB+ of markup even shielded) cannot be
+          // echoed back inside any output-token budget.
           const userPrompt = `Here is an existing component:
 
 \`\`\`html
 ${slimSource}
 \`\`\`
 
-Please modify this component according to the following instruction:
+Modify this component according to the following instruction:
 ${instruction}
 
-Return the COMPLETE updated .component.html file. Keep all existing functionality unless the instruction specifically asks to change it. Make only the requested changes.${shieldedAssets.length ? "\n\nIMPORTANT: URLs of the form data:asset/frozen;qc=N are frozen embedded images. Keep every one of them EXACTLY as written -- never expand, invent, or drop them." : ""}`;
+Respond with one or more edits in EXACTLY this format and nothing else:
+
+<<<<<<< SEARCH
+[an exact contiguous excerpt copied verbatim from the file above]
+=======
+[its replacement]
+>>>>>>> REPLACE
+
+Rules:
+- SEARCH text must be copied EXACTLY from the file (byte-for-byte), with enough surrounding context to be unique.
+- Use multiple blocks for multiple changes, ordered top to bottom.
+- Keep all existing functionality unless the instruction asks to change it.
+- Do NOT return the whole file.${shieldedAssets.length ? "\n- URLs of the form data:asset/frozen;qc=N are frozen embedded images. Never expand, invent, or drop them." : ""}`;
 
           const raw = await callLLM(llmConfig, [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
-          ], { maxTokens: 8000 });
+          ], { maxTokens: 16000 });
 
-          // Extract source (strip markdown fences)
-          let source = raw.trim();
-          const fenceMatch = source.match(/```(?:html)?\s*\n([\s\S]*?)\n```/);
-          if (fenceMatch) source = fenceMatch[1].trim();
-
-          // Reinflate the shielded assets.
+          // Apply the edits to the SHIELDED source, then reinflate pixels.
+          let source = applyLlmEdits(slimSource, raw.trim());
           source = reinflateDataUris(source, shieldedAssets);
 
           jsonResponse(res, 200, { source });

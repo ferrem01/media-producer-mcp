@@ -126,6 +126,31 @@ export function reinflateDataUris(source: string, assets: string[]): string {
   return source.replace(/data:asset\/frozen;qc=(\d+)/g, (m, i) => assets[Number(i)] ?? m);
 }
 
+/**
+ * Apply an LLM's edit response to a source file. The model is asked for
+ * SEARCH/REPLACE blocks (returning a whole large component would blow any
+ * output-token budget); a complete fenced file is accepted as a fallback for
+ * small components. Throws with a precise message when a SEARCH block does
+ * not match, so the chat shows a real error instead of silently mangling.
+ */
+export function applyLlmEdits(source: string, raw: string): string {
+  const blocks = [...raw.matchAll(/<{7} SEARCH\n([\s\S]*?)\n={7}\n([\s\S]*?)\n>{7} REPLACE/g)];
+  if (blocks.length === 0) {
+    const fence = raw.match(/```(?:html)?\s*\n([\s\S]*?)\n```/);
+    if (fence && fence[1].includes("<template>")) return fence[1].trim();
+    throw new Error("The model returned neither SEARCH/REPLACE edits nor a complete component file.");
+  }
+  let out = source;
+  for (const [, search, replace] of blocks) {
+    const idx = out.indexOf(search);
+    if (idx === -1) {
+      throw new Error(`An edit could not be applied -- this text was not found verbatim: "${search.slice(0, 120)}..."`);
+    }
+    out = out.slice(0, idx) + replace + out.slice(idx + search.length);
+  }
+  return out;
+}
+
 const NAME_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 /** Fonts the shell will carry: data-URI binaries only, sane families, capped. */

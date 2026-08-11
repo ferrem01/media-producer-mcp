@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const tmpData = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-"));
 process.env.MP_DATA_DIR = tmpData;
 
-const { mintCapturedComponent, sanitizeCapturedHtml, shieldDataUris, reinflateDataUris } = await import("../src/core/web-capture.js");
+const { mintCapturedComponent, sanitizeCapturedHtml, shieldDataUris, reinflateDataUris, applyLlmEdits } = await import("../src/core/web-capture.js");
 const { assembleScene } = await import("../src/core/scene-assembler.js");
 
 const FIXTURE_HTML = `
@@ -274,6 +274,37 @@ describe("asset shield (LLM edits never see or lose the frozen pixels)", () => {
     expect(restored).toContain(font);
     expect(restored).toContain("<div>new</div>");
     expect(restored).not.toContain("data:asset/frozen");
+  });
+});
+
+describe("applyLlmEdits (chat edits arrive as SEARCH/REPLACE, never the whole file)", () => {
+  const src = "<template>\n<div>Hello Gina Kleiner</div>\n<p>Post body text</p>\n</template>";
+
+  it("applies one and many blocks in order", () => {
+    const raw = [
+      "<<<<<<< SEARCH", "<div>Hello Gina Kleiner</div>", "=======",
+      '<div>Hello <span data-bind="author_name">Gina Kleiner</span></div>', ">>>>>>> REPLACE",
+      "<<<<<<< SEARCH", "<p>Post body text</p>", "=======",
+      '<p data-bind="body">Post body text</p>', ">>>>>>> REPLACE",
+    ].join("\n");
+    const out = applyLlmEdits(src, raw);
+    expect(out).toContain('data-bind="author_name"');
+    expect(out).toContain('data-bind="body"');
+    expect(out).toContain("<template>");
+  });
+
+  it("fails LOUDLY when a SEARCH does not match", () => {
+    const raw = "<<<<<<< SEARCH\n<div>not in the file</div>\n=======\n<div>x</div>\n>>>>>>> REPLACE";
+    expect(() => applyLlmEdits(src, raw)).toThrow(/not found verbatim/);
+  });
+
+  it("accepts a complete fenced file as fallback for small components", () => {
+    const raw = "```html\n<template>\n<div>rewritten</div>\n</template>\n```";
+    expect(applyLlmEdits(src, raw)).toContain("rewritten");
+  });
+
+  it("rejects responses that are neither", () => {
+    expect(() => applyLlmEdits(src, "I updated the component for you!")).toThrow(/neither/);
   });
 });
 
