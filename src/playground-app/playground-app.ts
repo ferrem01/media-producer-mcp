@@ -543,6 +543,13 @@ select.field-input { cursor: pointer; }
         if (!fields[key]) fields[key] = { type: 'string', label: key.replace(/_/g, ' ').replace(/\\b\\w/g, function(c) { return c.toUpperCase(); }), optional: true };
       }
     }
+    // The text a bind currently wraps IS its fallback -- surface it as the
+    // form placeholder so an empty field reads as "shows this".
+    var bindText = /data-bind=["']([a-zA-Z_][a-zA-Z0-9_]*)["'][^>]*>\\s*([^<]{1,80})/g;
+    var bt;
+    while ((bt = bindText.exec(source)) !== null) {
+      if (fields[bt[1]] && !fields[bt[1]].placeholder) fields[bt[1]].placeholder = bt[2].replace(/\\s+/g, ' ').trim();
+    }
     return fields;
   }
   function refreshSchemaFromSource(source) {
@@ -728,8 +735,13 @@ select.field-input { cursor: pointer; }
       // list) -- fetch it so the form editor works for them too.
       api('GET', '/playground/api/tenant-components/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(type) + '/schema').then(function(schema) {
         state.currentSchema = schema;
+        // A captured component is COMPLETE without data -- every field is an
+        // override of the frozen original. Start from {} so fallbacks show;
+        // the legacy Sample-Value prefill would leak junk into renders.
+        els.dataEditor.value = '{}';
+        state.formData = {};
         if (formMode === 'form') {
-          try { renderDataForm(JSON.parse(els.dataEditor.value || '{}'), schema); } catch (e) {}
+          try { renderDataForm({}, schema); } catch (e) {}
         }
       }).catch(function() { /* plain custom component: no schema, no form */ });
     }).catch(function(err) {
