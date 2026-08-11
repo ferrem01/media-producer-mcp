@@ -84,6 +84,11 @@ describe("the playground page's client script", () => {
     expect(fields.name_direct.placeholder).toBe("Direct text"); // stops at the close, no sibling leak
   });
 
+  it("chat edits land VALUED: the JSON gains the real text at edit time, not next load", () => {
+    expect(html).toContain("New content fields arrive VALUED");
+    expect(html).toContain("Preview, form, JSON and source all reflect the change");
+  });
+
   it("tracks unsaved changes: dirty flag, leave guards, instant form learning", () => {
     expect(html).toContain("dirty-flag");
     expect(html).toContain("Unsaved changes");
