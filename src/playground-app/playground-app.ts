@@ -556,6 +556,22 @@ select.field-input { cursor: pointer; }
         if (btxt) fields[bt[1]].placeholder = btxt;
       }
     }
+    // The OTHER abstraction shape -- the one the LLM actually writes for
+    // captured components: a script binding with a literal fallback,
+    //   el.textContent = (data && data.author_name) || 'Gina Kleiner';
+    // The real captured value IS that fallback literal. Lift it. Behavior
+    // knobs (entrance/accent) stay empty on purpose -- hints, not values.
+    var scriptFallback = /\\bdata\\.([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\)?\\s*\\|\\|\\s*("([^"\\\\]{1,120})"|'([^'\\\\]{1,120})')/g;
+    var sf;
+    while ((sf = scriptFallback.exec(source)) !== null) {
+      var sfKey = sf[1];
+      if (sfKey === 'entrance' || sfKey === 'accent') continue;
+      if (fields[sfKey] && !fields[sfKey].placeholder) {
+        var fb = (sf[3] !== undefined ? sf[3] : sf[4]) || '';
+        fb = fb.replace(/\\s+/g, ' ').trim().slice(0, 80);
+        if (fb) fields[sfKey].placeholder = fb;
+      }
+    }
     return fields;
   }
   // Inner text of the element whose opening tag ends at index start: scan tags
