@@ -20,7 +20,7 @@ import { getPlaygroundHtml } from "./playground-app/playground-app.js";
 import { buildComponentCatalog } from "./llm/catalog.js";
 import { speakerSceneFilmStarts } from "./core/speaker-track.js";
 import { generateComponent, saveGeneratedComponent } from "./core/component-generator.js";
-import { writeComponentSchema } from "./core/component-schema.js";
+import { writeComponentSchema, deriveDataFields } from "./core/component-schema.js";
 import { callLLM, llmConfigFromEnv, type LLMConfig } from "./llm/client.js";
 import { reviseScene, undoScene } from "./llm/scene-revise.js";
 import { normalizeBeats } from "./core/beats.js";
@@ -1492,6 +1492,31 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
         }
 
         try {
+          // A CAPTURED component lives FLAT in the tenant dir (schema under
+          // captured/). Saving one must update it IN PLACE -- writing a copy
+          // into custom/ would leave two files answering to the same type --
+          // and the schema must LEARN any data fields the edit introduced
+          // (chat-abstracted binds like data.author_name), while keeping its
+          // capture metadata, script_actions, and existing field definitions.
+          if (saveTenantId) {
+            const rootDir = path.join(config.dataDir, saveTenantId, "components");
+            const flatPath = path.join(rootDir, `${type}.component.html`);
+            const isCaptured = await fs.access(flatPath).then(() => true).catch(() => false);
+            if (isCaptured) {
+              await fs.writeFile(flatPath, source, "utf-8");
+              const capSchemaPath = path.join(rootDir, "captured", `${type}.schema.json`);
+              try {
+                const schema = JSON.parse(await fs.readFile(capSchemaPath, "utf-8"));
+                const derived = deriveDataFields(source);
+                delete (derived as Record<string, unknown>).script;
+                schema.data = { ...derived, ...(schema.data || {}) };
+                await fs.writeFile(capSchemaPath, JSON.stringify(schema, null, 2), "utf-8");
+              } catch { /* schema missing: nothing to merge into */ }
+              jsonResponse(res, 200, { ok: true, updated: "captured" });
+              return;
+            }
+          }
+
           // If tenant_id provided, save to tenant's custom components dir
           let saveDir: string;
           if (saveTenantId) {

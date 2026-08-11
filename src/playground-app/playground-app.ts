@@ -1014,6 +1014,12 @@ select.field-input { cursor: pointer; }
       els.previewStatus.textContent = 'Saved!';
       setTimeout(function() { els.previewStatus.textContent = ''; }, 2000);
       loadTenantComponents();
+      // The server re-derives the schema on save (new data-binds become
+      // fields) -- re-fetch it so the FORM learns them immediately.
+      api('GET', '/playground/api/tenant-components/' + encodeURIComponent(tid) + '/' + encodeURIComponent(state.currentType) + '/schema').then(function(schema) {
+        state.currentSchema = schema;
+        try { renderDataForm(JSON.parse(els.dataEditor.value || '{}'), schema); } catch (e) {}
+      }).catch(function() { /* no schema for plain custom components */ });
     }).catch(function(err) {
       alert('Save failed: ' + err.message);
     });
