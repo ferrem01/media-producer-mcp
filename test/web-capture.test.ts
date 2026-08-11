@@ -85,6 +85,21 @@ describe("extension picker + serializer (capture.js)", () => {
       await page.keyboard.press("c");
       await page.waitForFunction(() => (window as any).__qcLastBundle, { timeout: 15_000 });
       bundle = await page.evaluate(() => (window as any).__qcLastBundle);
+      // The verdict panel previews with transform, NEVER zoom: zoom
+      // re-lays-out at the scaled size, and text that fits its ellipsis
+      // box exactly at 1:1 (X names) tips over and ellipsizes in the
+      // preview only. transform paints the true layout smaller.
+      const panelSrcdoc = await page.evaluate(() => {
+        for (const el of document.documentElement.children) {
+          if ((el as any).shadowRoot) {
+            const f = (el as any).shadowRoot.querySelector("iframe");
+            if (f) return f.getAttribute("srcdoc") || "";
+          }
+        }
+        return "";
+      });
+      expect(panelSrcdoc).toContain("transform:scale(");
+      expect(panelSrcdoc).not.toContain("zoom:");
     } finally {
       if (browser) await browser.close();
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
