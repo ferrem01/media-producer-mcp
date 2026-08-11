@@ -40,6 +40,50 @@ describe("the playground page's client script", () => {
     expect(html).toMatch(/tenant-components[^\n]*schema/);
   });
 
+  it("extracts real captured values from binds that wrap NESTED markup", () => {
+    // Marc's JSON tab opened as {} because the old placeholder regex demanded
+    // text directly after the bind's ">" -- captured LinkedIn markup nests
+    // its text inside span-soup. Extract the derivation functions from the
+    // emitted page and EXECUTE them, so the walker (and its template-literal
+    // escaping) is proven against exactly what the browser runs.
+    const extractFunction = (name: string): string => {
+      const start = html.indexOf(`function ${name}(`);
+      expect(start, `function ${name} not found in page`).toBeGreaterThan(-1);
+      let depth = 0;
+      for (let i = html.indexOf("{", start); i < html.length; i++) {
+        const c = html[i];
+        if (html[i - 1] === "\\") continue; // \{ in a regex literal is not a block
+        if (c === "{") depth++;
+        else if (c === "}") {
+          depth--;
+          if (depth === 0) return html.slice(start, i + 1);
+        }
+      }
+      throw new Error(`unbalanced braces extracting ${name}`);
+    };
+    const derive = new Function(
+      `${extractFunction("bindInnerText")}; ${extractFunction("deriveFieldsFromSource")}; return deriveFieldsFromSource;`,
+    )() as (source: string) => Record<string, { placeholder?: string }>;
+
+    const source = [
+      '<div class="post">',
+      '  <span data-bind="author_name" style="font-weight:600"><span dir="ltr"><span aria-hidden="true">Gina Kleiner</span></span></span>',
+      '  <span data-bind="author_headline"><span aria-hidden="true"></span><span>Chief of Staff at Quotient</span></span>',
+      '  <p data-bind="post_text">We just shipped <strong>something big</strong> today.</p>',
+      '  <span data-bind="avatar_shot"><img src="data:image/png;base64,AAAA"></span>',
+      '  <span data-bind="name_direct">Direct text</span><span>NOT part of the bind</span>',
+      "</div>",
+    ].join("\n");
+    const fields = derive(source);
+
+    expect(fields.author_name.placeholder).toBe("Gina Kleiner"); // two levels deep
+    // The old regex's exact failure: first child is an EMPTY element.
+    expect(fields.author_headline.placeholder).toBe("Chief of Staff at Quotient");
+    expect(fields.post_text.placeholder).toBe("We just shipped something big today.");
+    expect(fields.avatar_shot.placeholder).toBeUndefined(); // media-only bind: nothing to prefill
+    expect(fields.name_direct.placeholder).toBe("Direct text"); // stops at the close, no sibling leak
+  });
+
   it("tracks unsaved changes: dirty flag, leave guards, instant form learning", () => {
     expect(html).toContain("dirty-flag");
     expect(html).toContain("Unsaved changes");

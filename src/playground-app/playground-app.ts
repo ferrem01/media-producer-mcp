@@ -544,13 +544,44 @@ select.field-input { cursor: pointer; }
       }
     }
     // The text a bind currently wraps IS its fallback -- surface it as the
-    // form placeholder so an empty field reads as "shows this".
-    var bindText = /data-bind=["']([a-zA-Z_][a-zA-Z0-9_]*)["'][^>]*>\\s*([^<]{1,80})/g;
+    // form placeholder / JSON prefill. A regex demanding text directly after
+    // the bind's ">" missed every bind wrapping nested markup (captured
+    // LinkedIn span-soup) -- walk the element instead, collecting text
+    // through children until the bind's own closing tag.
+    var bindOpen = /data-bind=["']([a-zA-Z_][a-zA-Z0-9_]*)["'][^>]*>/g;
     var bt;
-    while ((bt = bindText.exec(source)) !== null) {
-      if (fields[bt[1]] && !fields[bt[1]].placeholder) fields[bt[1]].placeholder = bt[2].replace(/\\s+/g, ' ').trim();
+    while ((bt = bindOpen.exec(source)) !== null) {
+      if (fields[bt[1]] && !fields[bt[1]].placeholder) {
+        var btxt = bindInnerText(source, bindOpen.lastIndex);
+        if (btxt) fields[bt[1]].placeholder = btxt;
+      }
     }
     return fields;
+  }
+  // Inner text of the element whose opening tag ends at index start: scan tags
+  // tracking depth so nested children are traversed, not mistaken for the
+  // end. Self-contained on purpose -- the page test extracts and EXECUTES it.
+  function bindInnerText(src, start) {
+    var voids = { area:1, base:1, br:1, col:1, embed:1, hr:1, img:1, input:1, link:1, meta:1, param:1, source:1, track:1, wbr:1 };
+    var tag = /<\\/?([a-zA-Z][a-zA-Z0-9-]*)[^>]*>/g;
+    tag.lastIndex = start;
+    var out = '';
+    var depth = 0;
+    var last = start;
+    var m;
+    while ((m = tag.exec(src)) !== null) {
+      out += src.slice(last, m.index);
+      last = tag.lastIndex;
+      if (m[0].charAt(1) === '/') {
+        if (depth === 0) break;
+        depth--;
+      } else if (!voids[m[1].toLowerCase()] && m[0].charAt(m[0].length - 2) !== '/') {
+        depth++;
+      }
+      if (out.length > 400) break;
+    }
+    out = out.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    return out.replace(/\\s+/g, ' ').trim().slice(0, 80);
   }
   function refreshSchemaFromSource(source) {
     var derived = deriveFieldsFromSource(source);
