@@ -274,6 +274,16 @@
         // its computed offsets (there auto stays auto); absolute/fixed get
         // reconstructed geometry below.
         if ((p === "top" || p === "right" || p === "bottom" || p === "left") && pos !== "relative") continue;
+        // A zero-width border is INVISIBLE -- but baking its style ("solid")
+        // without its width resurrects it at the CSS initial 'medium' (3px).
+        // Tailwind preflight puts border:0 solid <grey> on EVERYTHING, and
+        // the replica grew grey 3px boxes around every block. Bake border
+        // style/color only for sides that actually have width. Same for
+        // outline: invisible when the style is none or the width is zero.
+        const bSide = p.startsWith("border-") && (p.endsWith("-style") || p.endsWith("-color"))
+          ? p.slice(0, p.lastIndexOf("-")) : null;
+        if (bSide && parseFloat(cs.getPropertyValue(bSide + "-width")) === 0) continue;
+        if (p.startsWith("outline-") && (cs.outlineStyle === "none" || parseFloat(cs.outlineWidth) === 0)) continue;
         const v = cs.getPropertyValue(p);
         if (!v) continue;
         if (INHERITED_PROPS.has(p)) {
