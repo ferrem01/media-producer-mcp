@@ -629,7 +629,7 @@
     // Reference screenshot: background rasterizes the visible tab. Decoded
     // ONCE -- the same pixels fund the verdict-panel reference crop AND the
     // frozen frames for any video regions inside the pick.
-    let refUrl = null, shotImg = null;
+    let refUrl = null, shotImg = null, refClipped = false;
     try {
       const shot = await chrome.runtime.sendMessage({ type: "qc-shot" });
       if (shot && shot.ok) {
@@ -640,10 +640,28 @@
           img.src = shot.dataUrl;
         });
         refUrl = cropFromShot(shotImg, r);
+        // A region mostly beyond the viewport (tall email, scaled canvas)
+        // fails cropFromShot's >=50%-visible gate -- right for media
+        // freezes, wrong for the panel's reference, which must NEVER go
+        // blank. Fall back to the VISIBLE intersection of the pick.
+        if (!refUrl && shotImg) {
+          const vis = {
+            left: Math.max(r.left, 0), top: Math.max(r.top, 0),
+            right: Math.min(r.right, window.innerWidth),
+            bottom: Math.min(r.bottom, window.innerHeight),
+          };
+          vis.width = vis.right - vis.left;
+          vis.height = vis.bottom - vis.top;
+          if (vis.width > 2 && vis.height > 2) {
+            refUrl = cropFromShot(shotImg, vis);
+            refClipped = !!refUrl;
+          }
+        }
       }
     } catch (e) { /* screenshot is best-effort */ }
 
     const { html, fonts } = await serialize(pickedEl, shotImg);
+    if (refClipped) substitutions.push("reference shows only the visible part of the page -- the capture extends beyond the viewport");
     host.style.display = "";
     outline(null);
 
