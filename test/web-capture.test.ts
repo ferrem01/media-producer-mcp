@@ -250,7 +250,10 @@ describe("extension serializer: pick INSIDE a scaled editor canvas (the real Quo
         /* The editor canvas: pans with translate, zooms with scale -- the
            pick happens INSIDE it, so none of this rides along. */
         .canvas { transform: translate(200px, 30px) scale(0.612); transform-origin: 0 0; width: 1366px; }
-        #pane { width: 1366px; background: #f9f9fb; }
+        /* Tall like a real email: the pane's visual height exceeds the
+           viewport, so the reference crop must fall back to the VISIBLE
+           part instead of going blank. */
+        #pane { width: 1366px; min-height: 3000px; background: #f9f9fb; }
         /* Tailwind preflight: an INVISIBLE zero-width solid border on
            everything. Baking its style without its width resurrects it at
            the initial 'medium' (3px) -- grey boxes around every block. */
@@ -280,7 +283,17 @@ describe("extension serializer: pick INSIDE a scaled editor canvas (the real Quo
       const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
       await page.goto(`file://${pageFile}`, { waitUntil: "load" });
       await page.evaluate(`window.chrome = window.chrome || {}; window.chrome.runtime = {
-        sendMessage: async (msg) => ({ ok: true, type: "stub" }),
+        sendMessage: async (msg) => {
+          if (msg.type === "qc-shot") {
+            const cv = document.createElement("canvas");
+            cv.width = Math.round(innerWidth * devicePixelRatio);
+            cv.height = Math.round(innerHeight * devicePixelRatio);
+            const cx = cv.getContext("2d");
+            cx.fillStyle = "#3fa7a0"; cx.fillRect(0, 0, cv.width, cv.height);
+            return { ok: true, dataUrl: cv.toDataURL("image/png") };
+          }
+          return { ok: true, type: "stub" };
+        },
       };`);
       await page.evaluate(captureJs);
       const box = await page.locator("#pane").boundingBox();
@@ -294,6 +307,10 @@ describe("extension serializer: pick INSIDE a scaled editor canvas (the real Quo
       expect(bundle.width).toBeGreaterThan(830);
       expect(bundle.width).toBeLessThan(842);
       expect(bundle.html).toMatch(/transform:scale\(0\.61\d*\);transform-origin:0 0/);
+      // The pick extends far beyond the viewport, which fails the >=50%
+      // freeze gate -- but the panel's REFERENCE must never blank: it falls
+      // back to the visible intersection.
+      expect(bundle.screenshot, "reference went blank for a tall pick").toMatch(/^data:image\/png/);
 
       const replica = await browser.newPage({ viewport: { width: 1280, height: 800 } });
       await replica.setContent(`<body style="margin:0"><div id="root">${bundle.html}</div></body>`);
