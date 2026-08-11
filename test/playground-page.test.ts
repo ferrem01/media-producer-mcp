@@ -62,8 +62,12 @@ describe("the playground page's client script", () => {
       throw new Error(`unbalanced braces extracting ${name}`);
     };
     const derive = new Function(
-      `${extractFunction("bindInnerText")}; ${extractFunction("deriveFieldsFromSource")}; return deriveFieldsFromSource;`,
+      `${extractFunction("bindInnerText")}; ${extractFunction("findSelectorText")}; ${extractFunction("deriveFieldsFromSource")}; return deriveFieldsFromSource;`,
     )() as (source: string) => Record<string, { placeholder?: string }>;
+
+    const LONG_COPY =
+      "Marketing is continuing to shift, whether it's the changing buying journey or the rise of AI. " +
+      "But through everything, brands still have to get in front of the right audience to reach decision-makers.";
 
     const source = [
       '<div class="post">',
@@ -72,14 +76,19 @@ describe("the playground page's client script", () => {
       '  <p data-bind="post_text">We just shipped <strong>something big</strong> today.</p>',
       '  <span data-bind="avatar_shot"><img src="data:image/png;base64,AAAA"></span>',
       '  <span data-bind="name_direct">Direct text</span><span>NOT part of the bind</span>',
+      `  <p class="commentary cap-post-copy">${LONG_COPY}</p>`,
       "</div>",
-      // The abstraction shape the LLM ACTUALLY writes for captured
-      // components (verbatim from Marc's live linkedin-feed-post): a script
-      // binding whose || fallback IS the real captured value.
+      // The abstraction shapes the LLM ACTUALLY writes for captured
+      // components (verbatim from Marc's live linkedin-feed-post replays):
+      // (a) a script binding whose || fallback IS the real captured value,
+      // (b) a marker class + guarded setter with NO fallback -- the value
+      //     lives only in the tagged element's markup.
       "<script>",
       "  var authorNameEl = el.querySelector('.name');",
       "  authorNameEl.textContent = (data && data.author_sig) || 'Gina Kleiner';",
       '  el.querySelector(".cap").textContent = data.caption || "Real caption";',
+      "  var postCopyEl = el.querySelector('.cap-post-copy');",
+      "  if (postCopyEl && data && data.post_copy) { postCopyEl.textContent = data.post_copy; }",
       "  var accentColor = data.accent || '#393bf5';",
       "  if (data.entrance === 'rise') {}",
       "</script>",
@@ -95,6 +104,10 @@ describe("the playground page's client script", () => {
     // Script-fallback lifts: the || literal is the real value.
     expect(fields.author_sig.placeholder).toBe("Gina Kleiner");
     expect(fields.caption.placeholder).toBe("Real caption");
+    // Marker-class shape: selector resolved to the element's markup text,
+    // and LONG copy (>120 chars) survives whole -- a truncated value would
+    // corrupt the preview the moment it is treated as data.
+    expect(fields.post_copy.placeholder).toBe(LONG_COPY);
     // Behavior knobs stay empty on purpose -- hints, not values.
     expect(fields.accent.placeholder).toBeUndefined();
     expect(fields.entrance.placeholder).toBeUndefined();

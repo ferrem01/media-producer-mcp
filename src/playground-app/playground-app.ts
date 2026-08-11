@@ -561,18 +561,70 @@ select.field-input { cursor: pointer; }
     //   el.textContent = (data && data.author_name) || 'Gina Kleiner';
     // The real captured value IS that fallback literal. Lift it. Behavior
     // knobs (entrance/accent) stay empty on purpose -- hints, not values.
-    var scriptFallback = /\\bdata\\.([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\)?\\s*\\|\\|\\s*("([^"\\\\]{1,120})"|'([^'\\\\]{1,120})')/g;
+    var scriptFallback = /\\bdata\\.([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\)?\\s*\\|\\|\\s*("([^"\\\\]{1,600})"|'([^'\\\\]{1,600})')/g;
     var sf;
     while ((sf = scriptFallback.exec(source)) !== null) {
       var sfKey = sf[1];
       if (sfKey === 'entrance' || sfKey === 'accent') continue;
       if (fields[sfKey] && !fields[sfKey].placeholder) {
         var fb = (sf[3] !== undefined ? sf[3] : sf[4]) || '';
-        fb = fb.replace(/\\s+/g, ' ').trim().slice(0, 80);
+        fb = fb.replace(/\\s+/g, ' ').trim().slice(0, 500);
         if (fb) fields[sfKey].placeholder = fb;
       }
     }
+    // The THIRD abstraction shape the LLM writes: tag the target element
+    // with a marker class and set it from data, NO fallback literal --
+    //   var postTextEl = el.querySelector('.cap-post-text');
+    //   if (postTextEl && data && data.post_text) postTextEl.textContent = data.post_text;
+    // The real value is the tagged element's current text in the MARKUP:
+    // resolve the selector by scanning (one code path, executable in the
+    // page test -- no DOMParser divergence between test and browser).
+    var selForVar = {};
+    var varDecl = /(?:var|let|const)\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*=\\s*[^;\\n]*?querySelector\\(\\s*["']([^"']+)["']/g;
+    var vd;
+    while ((vd = varDecl.exec(source)) !== null) selForVar[vd[1]] = vd[2];
+    var assign = /(?:querySelector\\(\\s*["']([^"']+)["']\\s*\\)|([a-zA-Z_$][a-zA-Z0-9_$]*))\\s*\\.(?:textContent|innerText|innerHTML)\\s*=\\s*[^;]{0,80}?\\bdata\\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
+    var asg;
+    while ((asg = assign.exec(source)) !== null) {
+      var aKey = asg[3];
+      if (aKey === 'entrance' || aKey === 'accent') continue;
+      if (!fields[aKey] || fields[aKey].placeholder) continue;
+      var aSel = asg[1] || selForVar[asg[2]];
+      if (!aSel) continue;
+      var atxt = findSelectorText(source, aSel);
+      if (atxt) fields[aKey].placeholder = atxt;
+    }
     return fields;
+  }
+  // Locate the element a simple selector points at (last segment: .class,
+  // #id, or [attr="value"]) and return its inner text via bindInnerText.
+  function findSelectorText(source, sel) {
+    var seg = (sel || '').trim().split(/[\\s>]+/).pop() || '';
+    var pos = -1;
+    var m;
+    var dot = seg.lastIndexOf('.');
+    if (seg.charAt(0) === '#') {
+      var idName = seg.slice(1);
+      var idRe = /id=["']([^"']*)["']/g;
+      while ((m = idRe.exec(source)) !== null) { if (m[1] === idName) { pos = m.index; break; } }
+    } else if (dot >= 0) {
+      var cls = seg.slice(dot + 1).replace(/[^-_a-zA-Z0-9]/g, '');
+      var clsRe = /class=["']([^"']*)["']/g;
+      while ((m = clsRe.exec(source)) !== null) {
+        if ((' ' + m[1] + ' ').indexOf(' ' + cls + ' ') >= 0) { pos = m.index; break; }
+      }
+    } else {
+      var am = /\\[([-a-zA-Z0-9_]+)=["']?([^\\]"']*)/.exec(seg);
+      if (am) {
+        var probe = am[1] + '="' + am[2] + '"';
+        pos = source.indexOf(probe);
+        if (pos < 0) { probe = am[1] + "='" + am[2] + "'"; pos = source.indexOf(probe); }
+      }
+    }
+    if (pos < 0) return '';
+    var gt = source.indexOf('>', pos);
+    if (gt < 0) return '';
+    return bindInnerText(source, gt + 1);
   }
   // Inner text of the element whose opening tag ends at index start: scan tags
   // tracking depth so nested children are traversed, not mistaken for the
@@ -594,10 +646,10 @@ select.field-input { cursor: pointer; }
       } else if (!voids[m[1].toLowerCase()] && m[0].charAt(m[0].length - 2) !== '/') {
         depth++;
       }
-      if (out.length > 400) break;
+      if (out.length > 1500) break;
     }
     out = out.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
-    return out.replace(/\\s+/g, ' ').trim().slice(0, 80);
+    return out.replace(/\\s+/g, ' ').trim().slice(0, 500);
   }
   function refreshSchemaFromSource(source) {
     var derived = deriveFieldsFromSource(source);
