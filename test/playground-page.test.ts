@@ -73,6 +73,16 @@ describe("the playground page's client script", () => {
       '  <span data-bind="avatar_shot"><img src="data:image/png;base64,AAAA"></span>',
       '  <span data-bind="name_direct">Direct text</span><span>NOT part of the bind</span>',
       "</div>",
+      // The abstraction shape the LLM ACTUALLY writes for captured
+      // components (verbatim from Marc's live linkedin-feed-post): a script
+      // binding whose || fallback IS the real captured value.
+      "<script>",
+      "  var authorNameEl = el.querySelector('.name');",
+      "  authorNameEl.textContent = (data && data.author_sig) || 'Gina Kleiner';",
+      '  el.querySelector(".cap").textContent = data.caption || "Real caption";',
+      "  var accentColor = data.accent || '#393bf5';",
+      "  if (data.entrance === 'rise') {}",
+      "</script>",
     ].join("\n");
     const fields = derive(source);
 
@@ -82,6 +92,12 @@ describe("the playground page's client script", () => {
     expect(fields.post_text.placeholder).toBe("We just shipped something big today.");
     expect(fields.avatar_shot.placeholder).toBeUndefined(); // media-only bind: nothing to prefill
     expect(fields.name_direct.placeholder).toBe("Direct text"); // stops at the close, no sibling leak
+    // Script-fallback lifts: the || literal is the real value.
+    expect(fields.author_sig.placeholder).toBe("Gina Kleiner");
+    expect(fields.caption.placeholder).toBe("Real caption");
+    // Behavior knobs stay empty on purpose -- hints, not values.
+    expect(fields.accent.placeholder).toBeUndefined();
+    expect(fields.entrance.placeholder).toBeUndefined();
   });
 
   it("chat edits land VALUED: the JSON gains the real text at edit time, not next load", () => {
