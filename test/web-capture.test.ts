@@ -112,6 +112,79 @@ describe("extension picker + serializer (capture.js)", () => {
   }, 300_000);
 });
 
+describe("extension serializer: same-origin iframes are WALKED INTO, not frozen (the Quotient email-preview bug)", () => {
+  // An app's email preview is an iframe taller than any viewport. The freeze
+  // ladder's crop gate (>=50% visible) refused it, so the whole email became
+  // a placeholder -- Marc captured his broadcast editor and got a blank pane.
+  // Same-origin/srcdoc frames have readable DOM: serialize INTO them.
+  it("captures the email DOM inside a tall preview iframe", async () => {
+    const emailBody = [
+      '<div style="width:600px;margin:0 auto;font-family:Georgia,serif;background:#fff;">',
+      '<p style="font-size:11px;color:#888;">PRODUCT RELEASE</p>',
+      "<h1 style=\"font-size:28px;\">Embed video in your blog posts</h1>",
+      ...Array.from({ length: 12 }, (_, i) => `<p>Paragraph ${i} pushing the email far below the fold.</p>`),
+      "</div>",
+    ].join("");
+    const pageHtml = `<!doctype html><html><head><style>
+        body { margin: 0; font-family: Arial; background: #f7f7fa; }
+        .pane { width: 900px; margin: 24px; background: #fff; border: 1px solid #e4e4ee; border-radius: 12px; }
+        .tabs { padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+        .scroll { height: 640px; overflow-y: auto; }
+        .scroll iframe { width: 100%; height: 2400px; border: 0; display: block; }
+      </style></head><body>
+      <div class="pane" id="pane">
+        <div class="tabs">Desktop</div>
+        <div class="scroll"><iframe srcdoc="${emailBody.replace(/"/g, "&quot;")}"></iframe></div>
+      </div></body></html>`;
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-iframe-"));
+    const pageFile = path.join(dir, "page.html");
+    await fs.writeFile(pageFile, pageHtml);
+    const captureJs = await fs.readFile(path.resolve(__dirname, "../recorder-extension/capture.js"), "utf-8");
+
+    let browser: Browser | null = null;
+    let bundle: any;
+    try {
+      browser = await chromium.launch({
+        ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+      });
+      const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      await page.goto(`file://${pageFile}`, { waitUntil: "load" });
+      await page.evaluate(`window.chrome = window.chrome || {}; window.chrome.runtime = {
+        sendMessage: async (msg) => {
+          if (msg.type === "qc-shot") {
+            const cv = document.createElement("canvas");
+            cv.width = Math.round(innerWidth * devicePixelRatio);
+            cv.height = Math.round(innerHeight * devicePixelRatio);
+            const cx = cv.getContext("2d");
+            cx.fillStyle = "#3fa7a0"; cx.fillRect(0, 0, cv.width, cv.height);
+            return { ok: true, dataUrl: cv.toDataURL("image/png") };
+          }
+          return { ok: true, type: "stub" };
+        },
+      };`);
+      await page.evaluate(captureJs);
+      const box = await page.locator("#pane").boundingBox();
+      await page.mouse.move(box!.x + 6, box!.y + 6);
+      await page.mouse.wheel(0, -1);
+      await page.keyboard.press("c");
+      await page.waitForFunction(() => (window as any).__qcLastBundle, { timeout: 15_000 });
+      bundle = await page.evaluate(() => (window as any).__qcLastBundle);
+    } finally {
+      if (browser) await browser.close();
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+
+    expect(bundle.html).not.toMatch(/<iframe/i); // can't ride as DOM...
+    expect(bundle.html).toContain("Embed video in your blog posts"); // ...but its CONTENT does
+    expect(bundle.html).toContain("Paragraph 11"); // including far below the fold
+    expect(bundle.html).not.toMatch(/background:#111/); // no placeholder in sight
+    // The email survives the real mint path too.
+    const minted = await mintCapturedComponent("captest", { ...bundle, name: "email-preview-pane" });
+    const html = await fs.readFile(minted.componentPath, "utf-8");
+    expect(html).toContain("Embed video in your blog posts");
+  }, 300_000);
+});
+
 describe("extension serializer: positioned layout survives (the LinkedIn header bug)", () => {
   // getComputedStyle resolves auto offsets on absolute elements to USED page
   // coordinates (top:56px = 56px from the ORIGINAL viewport). Baking those
