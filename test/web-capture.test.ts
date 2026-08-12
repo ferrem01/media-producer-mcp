@@ -256,6 +256,16 @@ describe("extension serializer: same-origin iframes are WALKED INTO, not frozen 
     const minted = await mintCapturedComponent("captest", { ...bundle, name: "email-preview-pane" });
     const html = await fs.readFile(minted.componentPath, "utf-8");
     expect(html).toContain("Embed video in your blog posts");
+
+    // ...and the FILM pipeline can find it: minted components live FLAT in
+    // the tenant dir, and the renderer's search path (project -> tenant ->
+    // library, recursive) must resolve them -- Marc's first component film
+    // rendered four EMPTY scenes because the render queue never searched
+    // the tenant library.
+    const { loadSource } = await import("../src/core/layout-inspect.js");
+    const filmSource = await loadSource("email-preview-pane", "captest", "no-such-project");
+    expect(filmSource, "minted component invisible to the film renderer").toBeTruthy();
+    expect(filmSource!).toContain("Embed video in your blog posts");
   }, 300_000);
 });
 
