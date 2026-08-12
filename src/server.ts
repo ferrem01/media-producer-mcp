@@ -1794,10 +1794,14 @@ export function createMcpServer(): McpServer {
           const captureModule = await import("./core/capture.js");
 
           const types = new Set(scene.components.map((c) => c.type));
-          const projectComponentsDir = path.join(projectDir(params.tenant_id, params.project_id), "components");
+          // loadSource searches project -> TENANT -> library (recursively, so
+          // captured components living FLAT in the tenant dir resolve too).
+          // The old local helper skipped the tenant library entirely, so a
+          // scene cast with a captured/custom component previewed BLANK.
+          const { loadSource } = await import("./core/layout-inspect.js");
           const components: Array<{ type: string; source: string }> = [];
           for (const t of types) {
-            const source = await findComponentSource(t, [projectComponentsDir]);
+            const source = await loadSource(t, params.tenant_id!, params.project_id);
             if (source) components.push({ type: t, source });
           }
 
@@ -3149,26 +3153,3 @@ function guessExtension(contentType: string): string {
   return map[contentType] || "bin";
 }
 
-async function findComponentSource(type: string, extraDirs?: string[]): Promise<string | null> {
-  // Check extra dirs first (project-local components)
-  if (extraDirs) {
-    for (const dir of extraDirs) {
-      try {
-        const fp = path.join(dir, `${type}.component.html`);
-        return await fs.readFile(fp, "utf-8");
-      } catch { /* not here */ }
-    }
-  }
-  // Search library subdirectories
-  try {
-    const categories = await fs.readdir(config.componentLibDir, { withFileTypes: true });
-    for (const cat of categories) {
-      if (!cat.isDirectory()) continue;
-      const fp = path.join(config.componentLibDir, cat.name, `${type}.component.html`);
-      try {
-        return await fs.readFile(fp, "utf-8");
-      } catch { /* not here */ }
-    }
-  } catch { /* no lib dir */ }
-  return null;
-}

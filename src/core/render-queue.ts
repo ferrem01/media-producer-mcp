@@ -169,7 +169,15 @@ async function runRender(
       workDir: path.join(projectDir(job.tenantId, projectId), "_work", job.id),
       componentLibDir: config.componentLibDir,
       gsapDir: config.gsapDir,
-      extraComponentDirs: [path.join(projectDir(job.tenantId, projectId), "components")],
+      // Project-local scene components first, then the TENANT component
+      // library: captured components live FLAT in its root and playground
+      // customs under custom/. Without these, components the operator minted
+      // are invisible to film renders -- scenes assembled EMPTY.
+      extraComponentDirs: [
+        path.join(projectDir(job.tenantId, projectId), "components"),
+        path.join(config.dataDir, job.tenantId, "components"),
+        path.join(config.dataDir, job.tenantId, "components", "custom"),
+      ],
       outputPath,
       audioOnly: options?.audioOnly,
       onProgress: (percent, detail) => {
