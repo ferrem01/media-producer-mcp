@@ -312,6 +312,14 @@ html, body {
   max-width: 100%;
   box-sizing: border-box;
 }
+/* Captured components are FROZEN pixel layouts: baked widths are often
+   wider than their parents ON PURPOSE (an email laid out at 1366px inside
+   a 513px clip, scaled back down by a baked transform). The safety clamp
+   reflows them into soup -- content squeezed narrow with fixed-width
+   children spilling out the side. Exempt the whole captured subtree. */
+.mp-component .cap-root, .mp-component .cap-root * {
+  max-width: none;
+}
 
 img, video {
   max-width: 100%;
@@ -1330,6 +1338,11 @@ html, body {
 .component-instance * {
   max-width: 100%;
   box-sizing: border-box;
+}
+/* Same captured-subtree exemption as the assembled-scene path above:
+   frozen pixel layouts must keep their baked widths. */
+.component-instance .cap-root, .component-instance .cap-root * {
+  max-width: none;
 }
 
 img, video {

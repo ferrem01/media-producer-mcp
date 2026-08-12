@@ -266,6 +266,58 @@ describe("extension serializer: same-origin iframes are WALKED INTO, not frozen 
     const filmSource = await loadSource("email-preview-pane", "captest", "no-such-project");
     expect(filmSource, "minted component invisible to the film renderer").toBeTruthy();
     expect(filmSource!).toContain("Embed video in your blog posts");
+
+    // ...and SCENES must not crush it: the assembler's safety clamp
+    // (.mp-component * { max-width: 100% }) reflowed the frozen layout --
+    // the scaler inner (laid out WIDER than its clip on purpose) squeezed
+    // narrow with fixed-width children spilling out the side. The captured
+    // subtree is exempt; inner and frame must land the same visual width.
+    const sceneHtml = await assembleScene({
+      scene: {
+        id: "s-test", label: "t", duration_seconds: 5,
+        components: [{
+          id: "cap1", type: "email-preview-pane",
+          data: {},
+          position: { x: 100, y: 40, width: 500, height: 900 },
+        }],
+      } as any,
+      components: [{ type: "email-preview-pane", source: filmSource! }],
+      brandKit: { colors: { primary: "#393bf5", background: "#fff", text: "#17171c" } } as any,
+      canvas: { width: 1920, height: 1080, fps: 30 } as any,
+      gsapDir: path.resolve(__dirname, "../vendor/gsap"),
+    });
+    const sceneDir = await fs.mkdtemp(path.join(os.tmpdir(), "webcap-scene-"));
+    const scenePath = path.join(sceneDir, "scene.html");
+    await fs.writeFile(scenePath, sceneHtml);
+    const sb = await chromium.launch({
+      ...(process.env.MP_CHROMIUM_PATH ? { executablePath: process.env.MP_CHROMIUM_PATH } : {}),
+    });
+    try {
+      const sp = await sb.newPage({ viewport: { width: 1920, height: 1080 } });
+      await sp.goto(`file://${scenePath}`, { waitUntil: "load" });
+      await sp.waitForTimeout(1500);
+      const sm = await sp.evaluate(() => {
+        const body = document.querySelector(".cap-body")!;
+        const inner = body.firstElementChild!.firstElementChild as HTMLElement;
+        const frame = document.querySelector(".cap-frame") as HTMLElement;
+        const ir = inner.getBoundingClientRect();
+        const fr = frame.getBoundingClientRect();
+        return {
+          innerMaxWidth: getComputedStyle(inner).maxWidth,
+          innerBoxW: Math.round(ir.width),
+          frameBoxW: Math.round(fr.width),
+          innerOverflowRight: Math.round(ir.right - fr.right),
+        };
+      });
+      expect(sm.innerMaxWidth, "safety clamp reflowed the frozen capture").toBe("none");
+      // The clamp bug crushed the inner to ~37% of the frame (content
+      // squeezed narrow, fixed-width children spilling out the side).
+      expect(sm.innerBoxW, "inner crushed by the safety clamp").toBeGreaterThan(sm.frameBoxW * 0.6);
+      expect(sm.innerOverflowRight, "inner spills past the frame").toBeLessThanOrEqual(2);
+    } finally {
+      await sb.close();
+      await fs.rm(sceneDir, { recursive: true, force: true }).catch(() => {});
+    }
   }, 300_000);
 });
 
