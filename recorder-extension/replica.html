@@ -1,0 +1,13 @@
+<!doctype html>
+<!-- The verdict panel's replica stage. Rendered as an EXTENSION page so the
+     preview carries the extension's CSP, not the host page's: srcdoc iframes
+     inherit the site CSP, and x.com's font-src forbids data: -- every
+     embedded webfont ERRORED and the replica rendered in a wider fallback
+     (ellipsized names). Here, captured data: fonts load. -->
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: #fff; overflow: hidden; }
+  #stage { transform-origin: 0 0; }
+</style>
+<div id="stage"></div>
+<script src="replica.js"></script>

@@ -63,7 +63,9 @@ describe("extension picker + serializer (capture.js)", () => {
       // Stub the extension messaging the content script expects. qc-shot
       // returns REAL pixels (a solid-teal viewport canvas) so the screenshot
       // freeze path runs exactly as in production.
+      const extDir = path.resolve(__dirname, "../recorder-extension");
       await page.evaluate(`window.chrome = window.chrome || {}; window.chrome.runtime = {
+        getURL: (p) => ${JSON.stringify("file://" + extDir + "/")} + p,
         sendMessage: async (msg) => {
           if (msg.type === "qc-shot") {
             const cv = document.createElement("canvas");
@@ -85,21 +87,28 @@ describe("extension picker + serializer (capture.js)", () => {
       await page.keyboard.press("c");
       await page.waitForFunction(() => (window as any).__qcLastBundle, { timeout: 15_000 });
       bundle = await page.evaluate(() => (window as any).__qcLastBundle);
-      // The verdict panel previews with transform, NEVER zoom: zoom
-      // re-lays-out at the scaled size, and text that fits its ellipsis
-      // box exactly at 1:1 (X names) tips over and ellipsizes in the
-      // preview only. transform paints the true layout smaller.
-      const panelSrcdoc = await page.evaluate(() => {
-        for (const el of document.documentElement.children) {
-          if ((el as any).shadowRoot) {
-            const f = (el as any).shadowRoot.querySelector("iframe");
-            if (f) return f.getAttribute("srcdoc") || "";
-          }
-        }
-        return "";
-      });
-      expect(panelSrcdoc).toContain("transform:scale(");
-      expect(panelSrcdoc).not.toContain("zoom:");
+      // The verdict panel renders the replica in an EXTENSION page (srcdoc
+      // would inherit the host page's CSP -- x.com forbids data: fonts and
+      // every embedded face errored, ellipsizing names in the preview).
+      // The stage scales with transform, never zoom.
+      let replicaFrame: any = null;
+      for (let i = 0; i < 50 && !replicaFrame; i++) {
+        replicaFrame = page.frames().find((fr) => fr.url().includes("replica.html"));
+        if (!replicaFrame) await page.waitForTimeout(100);
+      }
+      expect(replicaFrame, "replica extension-page frame did not load").toBeTruthy();
+      await replicaFrame.waitForFunction(
+        () => ((document.getElementById("stage") || ({} as any)).innerHTML || "").length > 100,
+        undefined, { timeout: 10_000 },
+      );
+      const stage = await replicaFrame.evaluate(() => ({
+        text: document.getElementById("stage")!.textContent || "",
+        transform: (document.getElementById("stage") as HTMLElement).style.transform,
+        fontsStyleTag: !!document.getElementById("qc-fonts"),
+      }));
+      expect(stage.text).toContain("Upgrade now"); // the capture actually rendered
+      expect(stage.transform).toMatch(/^scale\(/); // transform, not zoom
+      expect(stage.fontsStyleTag).toBe(true); // captured @font-face css injected
     } finally {
       if (browser) await browser.close();
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
