@@ -686,13 +686,25 @@
     $hint.style.display = "none";
     const scale = ($frame.clientWidth || 480) / r.width;
     $frame.style.height = Math.max(140, Math.round(r.height * scale)) + "px";
-    // transform, NOT zoom: zoom RE-LAYS-OUT at the scaled size, and text
-    // that fits its box exactly at 1:1 (X names in ellipsis containers)
-    // tips over at fractional zoom and ellipsizes in the preview only.
-    // transform paints the true 1:1 layout smaller -- what you see is the
-    // component, not a re-layout of it.
-    $frame.srcdoc = '<!doctype html><style>' + fontFaceCss(fonts) + '</style><body style="margin:0;background:#fff;overflow:hidden;"><div style="width:' +
-      Math.round(r.width) + "px;transform:scale(" + scale + ');transform-origin:0 0;">' + html + "</div></body>";
+    // The replica renders in an EXTENSION page, not srcdoc: srcdoc iframes
+    // inherit the host page's CSP, and on x.com font-src forbids data: --
+    // every embedded webfont ERRORED and the replica fell back to wider
+    // system glyphs (ellipsized names). The extension page carries the
+    // extension's own CSP, so the captured fonts actually load. Inside,
+    // the stage scales with transform, NEVER zoom (zoom re-lays-out and
+    // exact-fit ellipsis boxes tip over at fractional scale).
+    const replicaMsg = { type: "qc-replica", html, fontCss: fontFaceCss(fonts), width: Math.round(r.width), scale };
+    if (chrome.runtime && chrome.runtime.getURL) {
+      $frame.removeAttribute("sandbox");
+      $frame.src = chrome.runtime.getURL("replica.html") + "?t=" + Date.now();
+      $frame.onload = () => {
+        try { $frame.contentWindow.postMessage(replicaMsg, "*"); } catch (e) {}
+      };
+    } else {
+      // No extension runtime (test harness): same stage, inline.
+      $frame.srcdoc = '<!doctype html><style>' + replicaMsg.fontCss + '</style><body style="margin:0;background:#fff;overflow:hidden;"><div style="width:' +
+        replicaMsg.width + "px;transform:scale(" + scale + ');transform-origin:0 0;">' + html + "</div></body>";
+    }
     if (refUrl) { $ref.src = refUrl; $ref.style.display = "block"; } else $ref.style.display = "none";
     $subs.style.display = substitutions.length ? "block" : "none";
     $subs.textContent = substitutions.slice(0, 4).join("  ·  ");
