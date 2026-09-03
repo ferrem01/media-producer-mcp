@@ -1,0 +1,293 @@
+<template>
+  <div class="funnel-chart">
+    <h2 class="funnel-title">{{title}}</h2>
+    <div class="funnel-card">
+      <div class="funnel-rows"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+  .funnel-chart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mp-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+    padding: 80px;
+    box-sizing: border-box;
+  }
+
+  .funnel-title {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    margin: 0 0 32px 0;
+    text-align: center;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(167, 139, 250, 0.1);
+  }
+
+  .funnel-title:empty {
+    display: none;
+  }
+
+  .funnel-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 40px 48px;
+    width: 100%;
+    flex: 1;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 25px 60px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+  }
+
+  .funnel-rows {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    height: 100%;
+  }
+
+  .funnel-row {
+    display: grid;
+    grid-template-columns: 170px 1fr 100px;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+    min-height: 48px;
+    max-height: 118px;
+  }
+
+  .funnel-label {
+    font-size: 19px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.01em;
+  }
+
+  .funnel-track {
+    position: relative;
+    height: 76%;
+    display: flex;
+    align-items: center;
+  }
+
+  .funnel-bar {
+    height: 100%;
+    border-radius: 10px;
+    min-width: 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 0 20px rgba(167, 139, 250, 0.1);
+  }
+
+  .funnel-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
+    border-radius: 10px 10px 0 0;
+    pointer-events: none;
+  }
+
+  .funnel-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--mp-color-text, #ffffff);
+    padding-left: 18px;
+    white-space: nowrap;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+  }
+
+  /* When a bar is too short to hold its number, the value sits OUTSIDE it. */
+  .funnel-value.outside {
+    position: absolute;
+    left: 100%;
+    padding-left: 14px;
+    text-shadow: 0 0 20px rgba(167, 139, 250, 0.15);
+  }
+
+  .funnel-retention {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--mp-color-accent, #a78bfa);
+    background: rgba(167, 139, 250, 0.1);
+    border: 1px solid rgba(167, 139, 250, 0.22);
+    border-radius: 999px;
+    padding: 5px 12px;
+    text-align: center;
+    white-space: nowrap;
+    justify-self: start;
+  }
+
+  .funnel-retention:empty {
+    display: none;
+  }
+
+  .funnel-row.is-money .funnel-bar {
+    box-shadow: 0 0 34px rgba(167, 139, 250, 0.35);
+  }
+
+  .funnel-row.is-money .funnel-value {
+    font-size: 32px;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var card = el.querySelector('.funnel-card');
+    var rowsEl = el.querySelector('.funnel-rows');
+    var title = el.querySelector('.funnel-title');
+    var stages = data.stages || [];
+    if (!stages.length) return tl;
+
+    var maxVal = Math.max.apply(null, stages.map(function (s) { return Number(s.value) || 0; })) || 1;
+    var defaultGradients = [
+      ['var(--mp-color-secondary, #22d3ee)', '#06b6d4'],
+      ['var(--mp-color-primary, #6366f1)', '#4f46e5'],
+      ['var(--mp-color-accent, #a78bfa)', 'var(--mp-color-primary, #6366f1)'],
+      ['#f472b6', '#ec4899'],
+      ['#fbbf24', '#f59e0b']
+    ];
+
+    var showRetention = data.show_retention !== false;
+    var counters = [];
+
+    stages.forEach(function (stage, i) {
+      var row = document.createElement('div');
+      row.className = 'funnel-row' + (i === stages.length - 1 ? ' is-money' : '');
+
+      var label = document.createElement('div');
+      label.className = 'funnel-label';
+      label.textContent = stage.label || '';
+
+      var track = document.createElement('div');
+      track.className = 'funnel-track';
+
+      var bar = document.createElement('div');
+      bar.className = 'funnel-bar';
+      var grad = defaultGradients[i % defaultGradients.length];
+      bar.style.background = stage.color
+        ? 'linear-gradient(180deg, ' + stage.color + ' 0%, ' + stage.color + 'cc 100%)'
+        : 'linear-gradient(90deg, ' + grad[0] + ' 0%, ' + grad[1] + ' 100%)';
+      var val = Number(stage.value) || 0;
+      var pct = Math.max(4, (val / maxVal) * 100);
+      bar.style.width = '0%';
+      bar.dataset.targetWidth = pct + '%';
+
+      var value = document.createElement('div');
+      value.className = 'funnel-value' + (pct < 22 ? ' outside' : '');
+      value.textContent = '0';
+
+      var retention = document.createElement('div');
+      retention.className = 'funnel-retention';
+      if (showRetention && i > 0) {
+        var prev = Number(stages[i - 1].value) || 0;
+        var r = stage.retention != null
+          ? stage.retention
+          : (prev > 0 ? Math.round((val / prev) * 100) + '%' : '');
+        retention.textContent = r ? String(r) : '';
+      }
+
+      // Outside values anchor to the bar's right edge, so they ride the draw.
+      bar.appendChild(value);
+      track.appendChild(bar);
+      row.appendChild(label);
+      row.appendChild(track);
+      row.appendChild(retention);
+      rowsEl.appendChild(row);
+
+      counters.push({ el: value, to: val, display: stage.display, bar: bar, retention: retention, row: row });
+    });
+
+    var rows = rowsEl.querySelectorAll('.funnel-row');
+    var labels = rowsEl.querySelectorAll('.funnel-label');
+    var retentions = rowsEl.querySelectorAll('.funnel-retention');
+
+    gsap.set(labels, { autoAlpha: 0, x: -10 });
+    gsap.set(retentions, { autoAlpha: 0, scale: 0.7 });
+
+    // Title entrance
+    if (title && title.textContent.trim()) {
+      gsap.set(title, { autoAlpha: 0, y: 20, filter: 'blur(4px)' });
+      tl.to(title, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out' }, 0.2);
+    }
+
+    // Card entrance
+    gsap.set(card, { autoAlpha: 0, y: 30, scale: 1.05, filter: 'blur(4px)' });
+    tl.to(card, {
+      autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)',
+      duration: 0.6, ease: 'power3.out'
+    }, 0.3);
+
+    // Rows draw top-to-bottom: label in, bar sweeps, number rides the count,
+    // then the retention badge pops. The last stage (the money number) lands
+    // with a touch more drama.
+    var step = ctx.motion === 'minimal' ? 0.22 : 0.34;
+    counters.forEach(function (c, i) {
+      var at = 0.7 + i * step;
+      var isMoney = i === counters.length - 1;
+      var drawDur = isMoney ? 0.85 : 0.65;
+
+      tl.to(labels[i], { autoAlpha: 1, x: 0, duration: 0.3, ease: 'power2.out' }, at);
+      tl.to(c.bar, {
+        width: c.bar.dataset.targetWidth,
+        duration: drawDur,
+        ease: isMoney ? 'power4.out' : 'power3.out'
+      }, at + 0.05);
+
+      var prox = { n: 0 };
+      tl.to(prox, {
+        n: c.to, duration: drawDur, ease: 'power2.out',
+        onUpdate: function () {
+          c.el.textContent = c.display != null && prox.n >= c.to
+            ? String(c.display)
+            : Math.round(prox.n).toLocaleString('en-US');
+        }
+      }, at + 0.05);
+
+      if (c.retention.textContent) {
+        tl.to(retentions[i], { autoAlpha: 1, scale: 1, duration: 0.3, ease: 'back.out(2)' }, at + drawDur * 0.8);
+      }
+      if (isMoney) {
+        tl.fromTo(c.row, { scale: 1 }, { scale: 1.03, duration: 0.18, ease: 'power2.out' }, at + drawDur);
+        tl.to(c.row, { scale: 1, duration: 0.25, ease: 'power2.inOut' }, at + drawDur + 0.18);
+      }
+    });
+
+    // Exit
+    if (ctx.duration > 2) {
+      var exitAt = ctx.duration - 0.7;
+      tl.to(el.querySelector('.funnel-chart'), {
+        autoAlpha: 0,
+        duration: 0.4,
+        ease: 'power2.in'
+      }, exitAt);
+    }
+
+    return tl;
+  }
+</script>
