@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "description": "Stage name (e.g. Sent, Delivered, Opened, Clicked)" },
+          "value": { "type": "number", "description": "Stage count -- bars scale to the largest stage" },
+          "display": { "type": "string", "description": "Override the final displayed value (e.g. \"1.9K\")" },
+          "retention": { "type": "string", "description": "Override the computed step-conversion badge (e.g. \"57%\")" },
+          "color": { "type": "string", "description": "Override the bar color" }
+        },
+        "required": ["label", "value"]
+      },
+      "description": "Funnel stages top-to-bottom. Bars draw in sequence with count-ups; each stage after the first shows its conversion from the previous stage; the LAST stage is styled as the money number."
+    },
+    "title": { "type": "string", "description": "Chart title" },
+    "show_retention": { "type": "boolean", "description": "Show step-conversion badges (default true)" }
+  },
+  "required": ["stages"]
+}
