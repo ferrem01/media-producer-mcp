@@ -390,13 +390,18 @@
     background: #ecf4ed; border-radius: 999px; padding: 2px 8px;
   }
   .qcp-mx-kpi-delta.down { color: #d64545; background: #faecec; }
+  /* Metrics fills its view: the chart card takes whatever height the KPIs
+     and channel table leave, so the tab never shows a dead lower half. */
+  .qcp-metrics.active { display: flex; flex-direction: column; }
   .qcp-mx-chart-card {
     margin: 0 24px 16px;
     border: 1px solid #eceae6; border-radius: 12px;
     padding: 14px 16px 8px;
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
   }
   .qcp-mx-chart-title { font-size: 13px; font-weight: 600; color: #33322f; margin-bottom: 8px; }
-  .qcp-mx-chart { width: 100%; height: 150px; display: block; }
+  .qcp-mx-chart { width: 100%; flex: 1; min-height: 120px; display: block; }
   .qcp-mx-chart-labels {
     display: flex; justify-content: space-between;
     font-size: 11.5px; color: #6b6963; padding: 5px 2px 3px;
