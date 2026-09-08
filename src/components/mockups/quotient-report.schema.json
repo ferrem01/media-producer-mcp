@@ -1,0 +1,49 @@
+{
+  "type": "quotient-report",
+  "label": "Quotient Analytics saved-report screen",
+  "category": "mockups",
+  "description": "The Quotient Analytics SAVED REPORT screen, in the real product design language: white card with a 'Saved Report' badge + report title, date-range chip and Refresh/Share buttons; a KPI column whose values COUNT UP with green delta pills; a hero trend chart whose line DRAWS itself left-to-right (area fades in under it); and a 'By channel' breakdown whose bars FILL. The entrance IS the performance -- cast it wherever the story says 'see the whole picture' or 'the agent built a report'. Works standalone, or docked into quotient-app-shell's content region (docked: true) so the agent panel narrates beside it. PERFORMABLE surface (cursor verbs via script).",
+  "data": {
+    "title": {
+      "type": "string",
+      "label": "Report title (default 'Inbound Funnel — Last 30 Days')",
+      "optional": true
+    },
+    "range": {
+      "type": "string",
+      "label": "Date-range chip text (default 'Aug 8 – Sep 8')",
+      "optional": true
+    },
+    "kpis": {
+      "type": "array",
+      "label": "KPI column: [{label, value: number (counts up), display?: final text override e.g. '128K', delta?: '+38%' (leading - renders red)}] -- 3 fit best",
+      "optional": true
+    },
+    "chart": {
+      "type": "object",
+      "label": "Hero trend: {title, points: [numbers -- the line draws through them], labels: [x-axis labels]}",
+      "optional": true
+    },
+    "sources": {
+      "type": "array",
+      "label": "'By channel' bars: [{name, pct: 0-100 fill, value: '4,120'}]",
+      "optional": true
+    },
+    "script": {
+      "type": "array",
+      "label": "Optional cursor actions (move-cursor, click, wait) -- the entrance choreography runs regardless",
+      "optional": true
+    },
+    "cursor_targets": {
+      "type": "object",
+      "label": "Named cursor positions (refresh, chart)",
+      "optional": true
+    },
+    "docked": {
+      "type": "boolean",
+      "label": "true = merge into quotient-app-shell's white content card (strips the window border/shadow). Position over the shell's content-card box.",
+      "optional": true
+    }
+  },
+  "tier": "performable-surface"
+}

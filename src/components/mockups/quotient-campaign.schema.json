@@ -1,8 +1,8 @@
 {
   "type": "quotient-campaign",
-  "label": "Quotient Campaign screen (Brief / Tasks / Activation / Deliverables)",
+  "label": "Quotient Campaign screen (Brief / Tasks / Activation / Deliverables / Metrics)",
   "category": "mockups",
-  "description": "The Quotient campaign screen (built from actual screenshots), designed as a CENTER component for quotient-app-shell (use its content-region contract) or standalone. White card with the tab bar -- Brief / Tasks / Activation / Deliverables / Chats -- and four working views: BRIEF is the rich-text doc ('Last updated', big title, Date Range chips + Owner row with avatar, headed sections with paragraphs and bullets); TASKS is the table ('Tasks \u00b7 Completed 0/6', Filters/Grouping/black New, 'To-do 6' group, rows with dashed-circle checkbox, due date, red priority bars, owner avatar, deliverable platform icon, and the 'Get Started' Quotient chat chip); ACTIVATION is the week calendar (time gutter, day columns, deliverable cards with platform badge, title, time, avatar, and Published/Draft/Launched status) where cards can be DRAGGED between days; DELIVERABLES is the status table (type icon, name, green-rocket Published vs dashed Draft, date, linked task). SCRIPTED performable surface. Camera anchors: tabs, brief, tasks, calendar, deliverables.",
+  "description": "The Quotient campaign screen (built from actual screenshots), designed as a CENTER component for quotient-app-shell (use its content-region contract) or standalone. White card with the tab bar -- Brief / Tasks / Activation / Deliverables / Chats -- and four working views: BRIEF is the rich-text doc ('Last updated', big title, Date Range chips + Owner row with avatar, headed sections with paragraphs and bullets); TASKS is the table ('Tasks \u00b7 Completed 0/6', Filters/Grouping/black New, 'To-do 6' group, rows with dashed-circle checkbox, due date, red priority bars, owner avatar, deliverable platform icon, and the 'Get Started' Quotient chat chip); ACTIVATION is the week calendar (time gutter, day columns, deliverable cards with platform badge, title, time, avatar, and Published/Draft/Launched status) where cards can be DRAGGED between days; DELIVERABLES is the status table (type icon, name, green-rocket Published vs dashed Draft, date, linked task); METRICS is the campaign analytics view (date-range + Refresh header, KPI tiles whose values COUNT UP with green delta pills, a trend line that DRAWS itself, and a per-channel table -- LinkedIn/X/Email impressions, clicks, CTR -- whose rows cascade in). switch-tab to 'metrics' triggers the whole metrics performance mid-scene: THE campaign-measurement beat. SCRIPTED performable surface. Camera anchors: tabs, brief, tasks, calendar, deliverables, metrics.",
   "data": {
     "title": {
       "type": "string",
@@ -31,7 +31,7 @@
     },
     "active_tab": {
       "type": "string",
-      "label": "Tab at open: brief (default) | tasks | activation | deliverables",
+      "label": "Tab at open: brief (default) | tasks | activation | deliverables | metrics (opens mid-performance: KPIs count, line draws)",
       "optional": true
     },
     "brief_sections": {
@@ -54,9 +54,14 @@
       "label": "Deliverable rows: [{platform, kind: 'Social Post', name, status: 'published'|'draft'|'scheduled', date, task}]",
       "optional": true
     },
+    "metrics": {
+      "type": "object",
+      "label": "Metrics tab: {range: 'Jul 05 – Jul 19', kpis: [{label, value: number (counts up), display?: '48.2K', delta?: '+62%'}] (4 fit best), chart: {title, points: [numbers], labels: [x-axis]}, channels: [{platform: 'linkedin'|'x'|'email', name, impressions: '31,400', clicks, ctr}]}",
+      "optional": true
+    },
     "script": {
       "type": "array",
-      "label": "Actions: switch-tab {tab: 'brief'|'tasks'|'activation'|'deliverables'} (tab press + view crossfade -- THE tour beat), complete-task {index} (checkbox fills green, Completed count ticks), move-event {index, day, top?} (the calendar card LIFTS with a shadow and glides to another day column -- the drag-and-drop beat), set-event-status {index, status} (calendar card status flips, e.g. draft -> published), set-deliverable-status {index, status} (table status flips to the green rocket), scroll-view {amount, duration}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (tabs, brief, tasks, calendar, deliverables).",
+      "label": "Actions: switch-tab {tab: 'brief'|'tasks'|'activation'|'deliverables'|'metrics'} (tab press + view crossfade -- THE tour beat; 'metrics' also fires the KPI count-ups + line draw), complete-task {index} (checkbox fills green, Completed count ticks), move-event {index, day, top?} (the calendar card LIFTS with a shadow and glides to another day column -- the drag-and-drop beat), set-event-status {index, status} (calendar card status flips, e.g. draft -> published), set-deliverable-status {index, status} (table status flips to the green rocket), scroll-view {amount, duration}. Plus base actions (move-cursor, click, wait). NEVER move the camera from a script -- scene camera_moves with anchors (tabs, brief, tasks, calendar, deliverables).",
       "optional": true
     },
     "cursor_targets": {
@@ -73,9 +78,9 @@
   "script_actions": [
     {
       "action": "switch-tab",
-      "description": "Press a tab; the view crossfades in",
+      "description": "Press a tab; the view crossfades in. 'metrics' also fires the metrics performance (KPI count-ups, line draw, channel cascade)",
       "params": {
-        "tab": "string - brief|tasks|activation|deliverables|chats"
+        "tab": "string - brief|tasks|activation|deliverables|metrics|chats"
       }
     },
     {
