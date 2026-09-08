@@ -32,7 +32,7 @@ import { mintCapturedComponent, shieldDataUris, reinflateDataUris, applyLlmEdits
 import { parseComponent, bindTemplate, scopeCSS } from "./core/component-parser.js";
 import { buildPlaygroundPreview } from "./playground-app/preview-builder.js";
 import { generateDefaultsFromSchema } from "./playground-app/schema-defaults.js";
-import { listProjects, loadProject, saveProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent } from "./persistence/project.js";
+import { listProjects, loadProject, saveProject, deleteProject, addScene, removeScene, reorderScenes, ensureStoryboardScene, addComponent, removeComponent } from "./persistence/project.js";
 import { queueRender, getJobStatus, listJobs } from "./core/render-queue.js";
 import { getJob, listAllJobs, queueJob } from "./core/job-queue.js";
 import { assembleSceneAuto, loadSharedUtilities, type ComponentSource } from "./core/scene-assembler.js";
@@ -1064,6 +1064,21 @@ async function streamFile(req: http.IncomingMessage, res: http.ServerResponse, f
           return;
         }
         jsonResponse(res, 200, project);
+        return;
+      }
+
+      // ── API: Delete project ──
+      // The whole project directory goes -- scenes, assets, and rendered
+      // output live inside it. Studio confirms before calling; there is no
+      // undo on the server side.
+      if (getMatch && method === "DELETE") {
+        const [, tenantId, projectId] = getMatch.map(decodeURIComponent);
+        const deleted = await deleteProject(tenantId, projectId);
+        if (!deleted) {
+          jsonResponse(res, 404, { error: "Project not found" });
+          return;
+        }
+        jsonResponse(res, 200, { ok: true, deleted: projectId });
         return;
       }
 

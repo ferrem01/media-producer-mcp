@@ -1079,6 +1079,7 @@ export function getPreviewHtml(): string {
     <div class="header-controls">
       <label>Project</label>
       <select id="project-select" disabled><option value="">Loading&#8230;</option></select>
+      <button class="btn btn-secondary" id="project-delete-btn" style="display:none;" title="Delete this project &#8212; scenes, assets and rendered MP4. Asks first; cannot be undone.">&#128465;</button>
       <button class="btn btn-secondary" id="booth-btn" style="display:none;" title="Record a voiceover while the cut plays (narration booth)">&#127908; Narrate</button>
       <button class="btn btn-secondary" id="inspect-btn" title="Scene structure: what this scene is made of &#8212; components, data, scripts">&#11026; Inspect</button>
       <button class="btn btn-secondary" id="brand-btn" style="display:none;" title="View and edit this tenant's brand kit: colors, voice, logos, assets">&#127912; Brand</button>
@@ -2486,6 +2487,8 @@ export function getPreviewHtml(): string {
 
       var brandBtnEl = document.getElementById('brand-btn');
       if (brandBtnEl) brandBtnEl.style.display = '';
+      var projDelBtnEl = document.getElementById('project-delete-btn');
+      if (projDelBtnEl) projDelBtnEl.style.display = '';
 
       // Storyboard-state project: show the SCRIPT (draft view), not an empty
       // timeline. Everything below assumes built scenes.
@@ -3670,6 +3673,40 @@ export function getPreviewHtml(): string {
       if (panel.classList.contains('open')) renderInspector();
     });
     if (close && panel) close.addEventListener('click', function() { panel.classList.remove('open'); });
+  })();
+
+  // ── Delete project (header trash, one-by-one library triage) ──
+  // Deletes the OPEN project after an explicit confirm that names it and
+  // spells out what goes with it. On success the page reloads with no
+  // ?project param, so every bit of per-project state resets honestly.
+  (function wireProjectDelete() {
+    var btn = document.getElementById('project-delete-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      var p = state.currentProject;
+      if (!p) return;
+      var name = p.name || p.project_id;
+      var sceneCount = (p.scenes || []).length || ((p.storyboard && p.storyboard.scenes) || []).length;
+      if (!window.confirm('Delete project "' + name + '"?\\n\\nThis removes its ' + sceneCount +
+          ' scene(s), assets, and any rendered MP4 from the server. It cannot be undone.')) return;
+      btn.disabled = true;
+      api('DELETE', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), null)
+        .then(function(r) {
+          if (!r || r.ok === false) {
+            btn.disabled = false;
+            studioStatus('Delete failed: ' + ((r && r.error) || 'unknown'), 'err');
+            return;
+          }
+          // Full reset: drop the ?project param and reload the picker fresh.
+          var url = new URL(window.location.href);
+          url.searchParams.delete('project');
+          window.location.href = url.toString();
+        })
+        .catch(function(e) {
+          btn.disabled = false;
+          studioStatus('Delete failed: ' + e.message, 'err');
+        });
+    });
   })();
 
   // ── Render & download (the film must be reachable from Studio -- no SSH) ──
