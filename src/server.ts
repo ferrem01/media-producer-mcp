@@ -323,7 +323,7 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
  */
 export const MCP_INSTRUCTIONS = `Media Producer turns prompts into branded films (video/image/deck): code-authored motion graphics, rendered deterministically. Creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
 
-THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterate it (mode:'storyboard' + feedback) until every beat is right -- spend revisions HERE. Build scenes ONCE (mode:'full' + project_id), then small tweaks, then render. mode:'full' cold = drafts only.
+THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterate until right -- spend revisions HERE: feedback redrafts the WHOLE board (minutes); the storyboard tool edits ONE scene. Build ONCE (mode:'full' + project_id), tweak, render. mode:'full' cold = drafts only.
 
 BEFORE GENERATING
 - Ask first: audience, goal/CTA, target length, and which film grammar fits.
@@ -1741,6 +1741,65 @@ export function createMcpServer(): McpServer {
         // fix the named cause in a follow-up revise.
         layout_warnings: result.layout_warnings,
         scene_html_bytes: result.sceneHtml?.length ?? 0,
+      });
+    },
+  );
+
+  // ─────────────────────────────────────────────
+  // storyboard - Surgical per-scene ops on a DRAFT board
+  // ─────────────────────────────────────────────
+  // The MCP twin of Studio's draft-view ✕ / card-revise / "+" strip. Without
+  // this, the only MCP path to "delete two scenes" was a whole-board redraft
+  // (minutes of LLM, every scene mutable). Same queueSurgicalSceneOp the
+  // Studio route uses: splice semantics, other scenes byte-identical, cards
+  // re-photographed before the job completes.
+  tool(
+    "storyboard",
+    "Surgically edit ONE scene of a project's DRAFT storyboard (project status 'storyboard'/'draft') -- the per-scene grain of the golden workflow's iterate loop. Exactly one of: delete_index (remove that scene -- instant, data-only, no LLM), scene_index + feedback (re-author just that scene from the feedback), insert_at + feedback (author ONE new scene and splice it in at that position). All other scenes stay byte-identical, and the storyboard cards re-photograph before the job completes. Whole-board redrafts stay generate(mode='storyboard') + feedback. Indices are 0-based positions in the current board (check with get first if unsure). Returns a job -- poll with job(action='status').",
+    {
+      tenant_id: z.string().optional(),
+      project_id: z.string(),
+      delete_index: z.number().int().min(0).optional()
+        .describe("Remove the scene at this 0-based position (instant; no feedback needed)"),
+      scene_index: z.number().int().min(0).optional()
+        .describe("Re-author ONLY the scene at this 0-based position from `feedback`"),
+      insert_at: z.number().int().min(0).optional()
+        .describe("Author ONE new scene from `feedback` and splice it in at this 0-based position"),
+      feedback: z.string().optional()
+        .describe("What the revised/inserted scene should be (required for scene_index / insert_at)"),
+    },
+    async (params) => {
+      const tenantId = params.tenant_id; // stamped by the tool registrar
+      if (!tenantId) return err("tenant_id could not be resolved");
+      const ops = [params.delete_index, params.scene_index, params.insert_at]
+        .filter((v) => v !== undefined).length;
+      if (ops !== 1) {
+        return err("Pass exactly one of delete_index, scene_index, or insert_at");
+      }
+      if (params.delete_index === undefined && !String(params.feedback || "").trim()) {
+        return err("feedback is required for scene_index / insert_at");
+      }
+      const project = await loadProject(tenantId, params.project_id);
+      if (!project) return err(`Project ${params.project_id} not found`);
+      const boardLen = project.storyboard?.scenes?.length || 0;
+      if (!boardLen) return err("Project has no draft storyboard (already built? use revise/update on scenes instead)");
+      const idx = params.delete_index ?? params.scene_index ?? params.insert_at ?? 0;
+      const maxIdx = params.insert_at !== undefined ? boardLen : boardLen - 1;
+      if (idx > maxIdx) return err(`Index ${idx} out of range (board has ${boardLen} scenes)`);
+      const res = queueSurgicalSceneOp(tenantId, params.project_id, {
+        delete_index: params.delete_index,
+        scene_index: params.scene_index,
+        insert_at: params.insert_at,
+        feedback: String(params.feedback || "").trim(),
+      });
+      if ("error" in res) return err(res.error);
+      return ok({
+        status: "queued",
+        job_id: res.job.id,
+        op: params.delete_index !== undefined ? "delete" : params.scene_index !== undefined ? "revise" : "insert",
+        index: idx,
+        board_scenes_before: boardLen,
+        message: `Surgical ${params.delete_index !== undefined ? "delete" : params.scene_index !== undefined ? "scene revise" : "scene insert"} queued. Poll with job(action='status', job_id='${res.job.id}').`,
       });
     },
   );
