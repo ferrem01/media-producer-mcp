@@ -1062,6 +1062,7 @@ export function createMcpServer(): McpServer {
         background: z.string().optional(),
       }).optional(),
       status: z.enum(["draft", "storyboard", "generated", "rendering", "rendered", "failed"]).optional(),
+      world: z.enum(["light", "dark", "paper", "plain"]).optional().describe("Re-derive and store the film's WORLD (the continuous ground every scene sits on): light (airy mesh), dark (cinematic), paper (print sheet), plain (FLAT brand-white, no backdrop at all). Project-level; storyboard cards re-photograph on the new world, and builds inherit it."),
 
       // Scene-level updates
       label: z.string().optional(),
@@ -1270,6 +1271,26 @@ export function createMcpServer(): McpServer {
           project.name = params.name;
           updated = true;
         }
+        // The film's WORLD is project-level state written once at generate
+        // time; without this there was NO edit path -- a film storyboarded
+        // on the light mesh could never be reviewed or built on another
+        // world (measured live: proj_b97b2be8's "blotchy" light-mesh cards).
+        // Re-derive with the pin (brand palette + seed stay consistent),
+        // store it, and stamp the saved treatment so builds inherit it.
+        if (params.world !== undefined) {
+          const { deriveWorld } = await import("./llm/world.js");
+          const kitForWorld = (await loadBrandKit(params.tenant_id).catch(() => null)) || (project as any).brand_kit || { colors: {}, fonts: [] };
+          const savedT = (project as any).treatment;
+          const newWorld = deriveWorld({
+            brandKit: kitForWorld,
+            treatment: savedT,
+            visualSystem: { world: params.world },
+            seedSource: `${params.tenant_id}:${String(savedT?.concept || project.prompt || project.name || "").slice(0, 80)}`,
+          });
+          (project as any).world = newWorld;
+          if (savedT) savedT.visualSystem = { ...(savedT.visualSystem || {}), world: params.world };
+          updated = true;
+        }
         if (params.canvas !== undefined) {
           Object.assign(project.canvas, params.canvas);
           updated = true;
@@ -1379,7 +1400,16 @@ export function createMcpServer(): McpServer {
         if (updated) {
           project.updated_at = new Date().toISOString();
           await saveProject(project);
-          return ok({ status: "updated", project_id: project.project_id, ...(pipWarning ? { warning: pipWarning } : {}) });
+          // A world change repaints every card's ground -- the stills must
+          // follow the data, same rule as direct board edits.
+          if (params.world !== undefined && project.storyboard?.scenes?.length) {
+            reshootStoryboardCardsSoon(params.tenant_id, project.project_id);
+          }
+          return ok({
+            status: "updated", project_id: project.project_id,
+            ...(params.world !== undefined ? { world: (project as any).world } : {}),
+            ...(pipWarning ? { warning: pipWarning } : {}),
+          });
         }
       }
 
