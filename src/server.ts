@@ -323,7 +323,7 @@ export function jobWithPreview(job: Record<string, unknown>): Record<string, unk
  */
 export const MCP_INSTRUCTIONS = `Media Producer turns prompts into branded films (video/image/deck): code-authored motion graphics, rendered deterministically. Creative direction, storyboarding and quality gates run server-side -- your job is a good brief and the right tool at the right time.
 
-THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterate it until every beat is right -- spend revisions HERE. Match the revision's GRAIN to the tool: generate (mode:'storyboard' + feedback) REDRAFTS THE WHOLE BOARD (minutes, and every scene may change) -- reach for it only when the film's shape is wrong. For one scene, use the storyboard tool: delete a scene (instant, data-only), revise one scene, or insert one scene -- the other scenes stay byte-identical. Build scenes ONCE (mode:'full' + project_id), then small tweaks, then render. mode:'full' cold = drafts only.
+THE GOLDEN WORKFLOW: generate returns a STORYBOARD for video, on purpose. Iterate until every beat is right -- feedback redrafts the WHOLE board (minutes); the storyboard tool edits ONE scene. Build ONCE (mode:'full' + project_id), tweak, then render. mode:'full' cold = drafts only.
 
 BEFORE GENERATING
 - Ask first: audience, goal/CTA, target length, and which film grammar fits.
