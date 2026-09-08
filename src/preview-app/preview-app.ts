@@ -3687,7 +3687,7 @@ export function getPreviewHtml(): string {
       if (!p) return;
       var name = p.name || p.project_id;
       var sceneCount = (p.scenes || []).length || ((p.storyboard && p.storyboard.scenes) || []).length;
-      if (!window.confirm('Delete project "' + name + '"?\n\nThis removes its ' + sceneCount +
+      if (!window.confirm('Delete project "' + name + '"?\\n\\nThis removes its ' + sceneCount +
           ' scene(s), assets, and any rendered MP4 from the server. It cannot be undone.')) return;
       btn.disabled = true;
       api('DELETE', '/projects/' + encodeURIComponent(state.tenantId) + '/' + encodeURIComponent(p.project_id), null)
