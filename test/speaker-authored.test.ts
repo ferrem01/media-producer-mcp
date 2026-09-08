@@ -17,7 +17,7 @@ describe("authored compositions in speaker films", () => {
   it("skip the opaque world backdrop and dock content beside the speaker", async () => {
     const sg = await read("../src/llm/scene-generator.ts");
     expect(sg).toMatch(/speakerBase = !!opts\.hasSpeakerTrack/);
-    expect(sg).toMatch(/speakerBase \? \[\] :/);              // no backdrop component
+    expect(sg).toMatch(/if \(!speakerBase\) \{/);             // no backdrop component over the camera base
     expect(sg).toMatch(/SPEAKER-VISIBLE LAYOUT/);
     expect(sg).toMatch(/pct\(62, dockRows\[k\]\[0\], 35/);    // right-third dock
     expect(sg).toMatch(/pct\(4, spRows\[k\]\[0\], 54/);       // lower-left captions

@@ -21,7 +21,7 @@ import type { Treatment } from "./creative-director.js";
 export interface WorldSpec {
   /** The continuous backdrop system -- ONE recipe for the whole film. */
   backdrop: {
-    component: "mesh-gradient" | "webgl-backdrop" | "paper-ground";
+    component: "mesh-gradient" | "webgl-backdrop" | "paper-ground" | "none";
     /** Single seed for the film; scene assembly derives nothing per-scene. */
     seed: number;
     /** Brand-resolved palette anchors (hex), 2-4. */
@@ -77,7 +77,7 @@ export function deriveWorld(opts: {
    *  world and deriveWorld only ever read the treatment. film_grammar has had
    *  this precedence all along (caller > director > inference); this is the
    *  same rule for the look axis. */
-  visualSystem?: { world?: "light" | "dark" | "paper" } | null;
+  visualSystem?: { world?: "light" | "dark" | "paper" | "plain" } | null;
   /** Stable identity for the seed (e.g. `${tenantId}:${prompt.slice(0,80)}`). */
   seedSource: string;
 }): WorldSpec {
@@ -91,7 +91,20 @@ export function deriveWorld(opts: {
   // The treatment's TYPED world commitment (visual_system.world -- a caller
   // pin passed through, or the director's own typed choice) wins outright.
   const pinned = (opts.visualSystem?.world
-    ?? (opts.treatment as any)?.visualSystem?.world) as ("light" | "dark" | "paper" | undefined);
+    ?? (opts.treatment as any)?.visualSystem?.world) as ("light" | "dark" | "paper" | "plain" | undefined);
+
+  // PLAIN WORLD (product-first films): a FLAT brand-background canvas with
+  // NO backdrop component at all -- no mesh, no wash, no texture. For films
+  // whose scenes are crisp product UI on white (the brand-guideline "clean
+  // white canvas" look); the airy mesh of the light world reads as clutter
+  // behind real interface chrome. Explicit pin only -- never inferred.
+  if (pinned === "plain") {
+    return {
+      backdrop: { component: "none", seed: hash31(opts.seedSource), palette },
+      theme: light ? "light" : "dark",
+      chapter_slots: 1,
+    };
+  }
 
   // PAPER WORLD (the print/letterpress aesthetic): the typed pin, or the
   // prose keyword trigger ("paper"/"letterpress"/"newsprint"/"zine") for
@@ -171,6 +184,7 @@ export function deriveMotionPhysics(opts: {
 /** The scene background color the world implies (authored scenes + templates). */
 export function worldBackground(world: WorldSpec): string {
   if (world.backdrop.component === "paper-ground") return world.surface?.tone || "#f2efe7";
+  if (world.backdrop.component === "none") return world.theme === "light" ? "#ffffff" : "#0c0d12";
   return world.theme === "light" ? "#fafaf8" : "#0c0d12";
 }
 
@@ -226,7 +240,9 @@ export function worldPromptBlock(world: WorldSpec): string {
   return [
     `THE WORLD (film-level, already decided -- scenes happen INSIDE it):`,
     `- Theme: ${world.theme.toUpperCase()}. Every scene renders on the ${world.theme} world; do NOT invert to ${world.theme === "light" ? "dark" : "light"} for mood.`,
-    `- The backdrop is CONTINUOUS across the whole film (${world.backdrop.component}, palette ${world.backdrop.palette.join(", ")}). Scenes do not choose backgrounds; content swaps inside the world.`,
+    world.backdrop.component === "none"
+      ? `- The ground is a FLAT ${worldBackground(world)} canvas -- NO backdrop component, no gradients, no wash, no texture. Content and type carry every scene; scenes do not choose backgrounds.`
+      : `- The backdrop is CONTINUOUS across the whole film (${world.backdrop.component}, palette ${world.backdrop.palette.join(", ")}). Scenes do not choose backgrounds; content swaps inside the world.`,
     `- You may spend at most ${world.chapter_slots} CHAPTER CARD: a deliberate full-bleed theme-flip beat (a single word or phrase on the opposite theme) used as punctuation on the film's biggest moment. Everything else stays on-theme.`,
     ...(materials ? [materials] : []),
   ].join("\n");
