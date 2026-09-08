@@ -648,8 +648,8 @@
         mxLineLen += Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]);
       }
       mxSvg.innerHTML =
-        '<path class="qcp-mx-area" d="' + dLine + ' L' + xy[xy.length - 1][0].toFixed(1) + ' ' + (H - PAD) + ' L' + PAD + ' ' + (H - PAD) + ' Z" style="fill:rgba(23,23,28,0.07);stroke:none"/>' +
-        '<path class="qcp-mx-line" d="' + dLine + '" style="fill:none;stroke:#17171c;stroke-width:2.4"/>';
+        '<path class="qcp-mx-area" d="' + dLine + ' L' + xy[xy.length - 1][0].toFixed(1) + ' ' + (H - PAD) + ' L' + PAD + ' ' + (H - PAD) + ' Z" style="fill:rgba(57,59,245,0.10);stroke:none"/>' +
+        '<path class="qcp-mx-line" d="' + dLine + '" style="fill:none;stroke:#393bf5;stroke-width:2.4"/>';
       mxLine = mxSvg.querySelector('.qcp-mx-line');
       mxArea = mxSvg.querySelector('.qcp-mx-area');
       mxLine.style.strokeDasharray = mxLineLen;
