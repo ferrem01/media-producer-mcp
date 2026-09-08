@@ -120,7 +120,7 @@
   .qrp-source-row { display: grid; grid-template-columns: 92px 1fr 74px; align-items: center; gap: 12px; }
   .qrp-source-name { font-size: 12.5px; font-weight: 600; color: #33322f; }
   .qrp-source-track { height: 10px; background: #f2f1ed; border-radius: 999px; overflow: hidden; }
-  .qrp-source-fill { display: block; height: 100%; border-radius: 999px; background: #17171c; width: 0%; }
+  .qrp-source-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #393bf5, #6366f9); width: 0%; }
   .qrp-source-val { font-size: 12.5px; font-weight: 600; color: #55534e; text-align: right; font-variant-numeric: tabular-nums; }
 </style>
 
@@ -184,8 +184,8 @@
         lineLen += Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]);
       }
       svg.innerHTML =
-        '<path class="qrp-area" d="' + dLine + ' L' + xy[xy.length - 1][0].toFixed(1) + ' ' + (H - PAD) + ' L' + PAD + ' ' + (H - PAD) + ' Z" style="fill:rgba(23,23,28,0.07);stroke:none"/>' +
-        '<path class="qrp-line" d="' + dLine + '" style="fill:none;stroke:#17171c;stroke-width:2.6"/>';
+        '<path class="qrp-area" d="' + dLine + ' L' + xy[xy.length - 1][0].toFixed(1) + ' ' + (H - PAD) + ' L' + PAD + ' ' + (H - PAD) + ' Z" style="fill:rgba(57,59,245,0.10);stroke:none"/>' +
+        '<path class="qrp-line" d="' + dLine + '" style="fill:none;stroke:#393bf5;stroke-width:2.6"/>';
       line = svg.querySelector('.qrp-line');
       area = svg.querySelector('.qrp-area');
       line.style.strokeDasharray = lineLen;
