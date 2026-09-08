@@ -337,7 +337,7 @@ BEFORE GENERATING
   * speaker-screencast -- a human recording owns the film and the clock. Auto-selected when a speaker/screencast source is attached; never chosen without one.
   * canvas-tour -- ONE unbroken shot across a single surface: beats are PLACES the camera travels, type is PERFORMED where it lives. Craft-forward brand/print films.
   Choosing: ask what carries the argument -- product, words, numbers, a person, one surface, or the feed.
-- THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture" mints surface tiles).
+- THE OTHER TWO AXES (same contract as film_grammar -- omit to infer, pass to pin): visual_system {world: light|dark|paper|plain, motion: punchy|calm|cutout-physics, type: grotesk|editorial-serif|typewriter|script, motif:{kind:"cutout", assets, density}} is the LOOK; audio_system {music_mood, voice} is the SOUND. A cutout motif needs sticker assets in the kit -- mint them with generate_clip mode="cutout" (mode="texture": surface tiles).
 - Brand comes from the tenant's brand kit. No kit? Run extract_brand_from_website or upload assets first -- otherwise the film is unbranded.
 - A recorded screen demo? Don't prompt-generate it: the Chrome recorder extension (/extension.zip) captures tab + voice and builds the film.
 
@@ -374,7 +374,7 @@ If a scene looks wrong, get{target:'layout'} measures real geometry (element box
 export async function queueBuildFromStoryboard(
   tenantId: string,
   projectId: string,
-  opts: { creativity?: number; film_grammar?: import("./llm/creative-director.js").FilmGrammar; max_revisions?: number; voiceover?: boolean; background_music?: boolean; voice?: string } = {},
+  opts: { creativity?: number; film_grammar?: import("./llm/creative-director.js").FilmGrammar; visual_system?: import("./llm/creative-director.js").VisualSystem; max_revisions?: number; voiceover?: boolean; background_music?: boolean; voice?: string } = {},
 ): Promise<{ job: { id: string } } | { error: string } | null> {
   const project = await loadProject(tenantId, projectId);
   // Any project that HAS a storyboard rebuilds from it. Only 'rendering' is
@@ -433,7 +433,10 @@ export async function queueBuildFromStoryboard(
         canvas: project.canvas,
         creativity: opts.creativity,
         film_grammar: rebuildGrammar,
-        visual_system: savedTreatment?.visualSystem,
+        // Caller pin wins over the saved treatment -- same precedence the
+        // grammar has (a build is the last chance to re-pin the look, e.g.
+        // switching a light-mesh film to the plain flat-white world).
+        visual_system: opts.visual_system ?? savedTreatment?.visualSystem,
         audio_system: savedTreatment?.audioSystem,
         maxRevisions: opts.max_revisions,
         project_id: project.project_id,
@@ -2515,7 +2518,7 @@ export function createMcpServer(): McpServer {
       // usable from every client; flat params like film_grammar were never
       // affected.
       visual_system: jsonish(z.object({
-        world: z.enum(["light", "dark", "paper"]).optional().describe("The film's continuous surface: light (airy mesh), dark (cinematic), paper (painted print/letterpress sheet with the ink channel)."),
+        world: z.enum(["light", "dark", "paper", "plain"]).optional().describe("The film's continuous surface: light (airy mesh), dark (cinematic), paper (painted print/letterpress sheet with the ink channel), plain (FLAT brand-white canvas, no backdrop at all -- for product-first films where UI chrome is the star)."),
         motion: z.enum(["punchy", "calm", "cutout-physics"]).optional().describe("The physics contract: punchy (house slams/pushes), calm (settle-never-bounce editorial restraint), cutout-physics (rigid flat pieces that drop/settle/swing like stickers)."),
         type: z.enum(["grotesk", "editorial-serif", "typewriter", "script"]).optional().describe("Display-type voice for the film's big text."),
         motif: z.object({
@@ -2636,8 +2639,11 @@ export function createMcpServer(): McpServer {
           const sbBuild = await queueBuildFromStoryboard(params.tenant_id, params.project_id, {
             creativity: params.creativity,
             film_grammar: params.film_grammar,
-            // visual/audio systems act at the creative-director stage; a
-            // build from an existing storyboard is already past it.
+            // The look axis still acts at build time (deriveWorld runs in the
+            // build pipeline), so a caller's visual_system pin passes through
+            // and outranks the saved treatment. audio_system stays
+            // treatment-owned (music/voice were already committed).
+            visual_system: params.visual_system as any,
             max_revisions: params.max_revisions,
             voiceover: params.voiceover,
             background_music: params.background_music,

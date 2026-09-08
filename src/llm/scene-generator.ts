@@ -16,7 +16,7 @@ import { formatBeatSheet } from "../core/beats.js";
 import type { Treatment } from "./creative-director.js";
 import { loadAssetIntel } from "../core/asset-intel.js";
 import { recoverAssetUrl, resolveVideoPath } from "../core/video-path.js";
-import { hexIsLight } from "./world.js";
+import { hexIsLight, worldBackground } from "./world.js";
 
 // ── Types ──
 
@@ -630,28 +630,38 @@ export function buildAuthoredCompositionScene(
   // every cut. With a world: same component, same seed, clock offset to
   // film time so the drift continues across the cut.
   var w = opts.world;
-  var components: any[] = speakerBase ? [] : [w ? {
-    id: "bg",
-    type: w.backdrop.component,
-    z_index: 1,
-    position: { x: 0, y: 0, width: "100%", height: "100%" },
-    data: {
-      seed: w.backdrop.seed,
-      colors: w.backdrop.palette,
-      theme: w.theme,
-      time_offset: (draft as any).film_start || 0,
-      // Paper world: the surface dial rides into paper-ground (ignored by
-      // the gradient backdrops).
-      ...(w.surface ? { tone: w.surface.tone, intensity: w.surface.intensity,
-        ...(w.surface.texture ? { texture_url: w.surface.texture } : {}) } : {}),
-    },
-  } : {
-    id: "bg",
-    type: "webgl-backdrop",
-    z_index: 1,
-    position: { x: 0, y: 0, width: "100%", height: "100%" },
-    data: { seed: 5 + opts.sceneIndex * 7 },
-  }];
+  // The PLAIN world carries NO backdrop component at all -- the scene body's
+  // flat brand background IS the ground (worldBackground handles the color).
+  var bgComp: any = null;
+  if (!speakerBase) {
+    if (w && w.backdrop.component !== "none") {
+      bgComp = {
+        id: "bg",
+        type: w.backdrop.component,
+        z_index: 1,
+        position: { x: 0, y: 0, width: "100%", height: "100%" },
+        data: {
+          seed: w.backdrop.seed,
+          colors: w.backdrop.palette,
+          theme: w.theme,
+          time_offset: (draft as any).film_start || 0,
+          // Paper world: the surface dial rides into paper-ground (ignored by
+          // the gradient backdrops).
+          ...(w.surface ? { tone: w.surface.tone, intensity: w.surface.intensity,
+            ...(w.surface.texture ? { texture_url: w.surface.texture } : {}) } : {}),
+        },
+      };
+    } else if (!w) {
+      bgComp = {
+        id: "bg",
+        type: "webgl-backdrop",
+        z_index: 1,
+        position: { x: 0, y: 0, width: "100%", height: "100%" },
+        data: { seed: 5 + opts.sceneIndex * 7 },
+      };
+    }
+  }
+  var components: any[] = bgComp ? [bgComp] : [];
   // MEDIA BACKDROP: fetched footage/stills must reach the screen in authored
   // compositions too. The codegen path composes provided media itself, but
   // this path is deterministic and previously had NO channel -- measured
@@ -743,7 +753,7 @@ export function buildAuthoredCompositionScene(
     label: draft.label,
     duration_seconds: draft.duration_seconds || 8,
     transition_in: acTransition,
-    background: w ? (w.theme === "light" ? "#fafaf8" : "#0c0d12") : "#0c0d12",
+    background: w ? worldBackground(w) : "#0c0d12",
     beats: Array.isArray(draft.beats) && draft.beats.length >= 2 ? (draft.beats as any) : undefined,
     camera_moves: (draft as any).camera_moves?.length ? (draft as any).camera_moves : undefined,
     components,

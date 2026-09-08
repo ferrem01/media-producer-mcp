@@ -45,7 +45,7 @@ export const FILM_GRAMMARS: FilmGrammar[] = ["launch-film", "tempo-cut", "hype-c
  * component family) -- values without machinery are lies. */
 export interface VisualSystem {
   /** The film's continuous surface. Backed by WorldSpec derivation. */
-  world?: "light" | "dark" | "paper";
+  world?: "light" | "dark" | "paper" | "plain";
   /** The physics contract: how things move (and what moves are banned). */
   motion?: "punchy" | "calm" | "cutout-physics";
   /** The type voice for display text (brand kit fonts stay the base). */
