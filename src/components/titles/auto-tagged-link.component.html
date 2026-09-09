@@ -1,0 +1,115 @@
+<template>
+  <div class="atl">
+    <div class="atl-link"></div>
+  </div>
+</template>
+
+<style scoped>
+  .atl {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 6%;
+    box-sizing: border-box;
+  }
+  .atl-link {
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+    font-weight: 600;
+    line-height: 1.42;
+    letter-spacing: -0.01em;
+    /* A URL is one unbroken token. Allow wrapping BETWEEN segments only
+       (each segment is nowrap below), so a line never breaks mid-parameter
+       and leaves an orphan like "linkedi / n" at the fold. */
+    overflow-wrap: anywhere;
+    word-break: normal;
+    text-align: left;
+    max-width: 100%;
+  }
+  .atl-seg { white-space: nowrap; border-radius: 4px; }
+  /* The caret only ever accompanies the HUMAN-typed part -- the appended
+     tags arrive with no caret, which is the whole argument. */
+  .atl-caret {
+    display: inline-block;
+    width: 0.09em; height: 0.95em;
+    vertical-align: text-bottom;
+    margin-left: 0.04em;
+  }
+</style>
+
+<script>
+  function createTimeline(el, data, ctx) {
+    var tl = gsap.timeline();
+    var wrap = el.querySelector('.atl-link');
+
+    var base = data.base != null ? String(data.base) : 'getquotient.link/q3-launch';
+    var params = Array.isArray(data.params) ? data.params.map(String) : [];
+    var ink = data.ink || '#17171c';
+    var accent = data.accent || '#393bf5';
+    var typeAt = data.type_at != null ? Number(data.type_at) : 0.2;
+    var typeDur = data.type_duration != null ? Number(data.type_duration) : 1.0;
+    var interval = data.param_interval != null ? Number(data.param_interval) : 0.7;
+    var times = Array.isArray(data.param_times) ? data.param_times.map(Number) : null;
+
+    wrap.style.fontSize = data.font_size || '56px';
+    wrap.style.color = ink;
+
+    // Every span is built at COMPILE time and animated on the timeline --
+    // nothing is created mid-play, so a scrubbed frame renders identically
+    // to a played one (the render pipeline seeks, it does not watch).
+    var baseSeg = document.createElement('span');
+    baseSeg.className = 'atl-seg atl-base';
+    baseSeg.style.color = ink;
+    wrap.appendChild(baseSeg);
+
+    var caret = document.createElement('span');
+    caret.className = 'atl-caret';
+    caret.style.background = accent;
+    wrap.appendChild(caret);
+
+    var paramSegs = params.map(function (p) {
+      var s = document.createElement('span');
+      s.className = 'atl-seg atl-param';
+      s.style.color = accent;
+      s.textContent = p;
+      wrap.appendChild(s);
+      return s;
+    });
+
+    // ── The human half: the short link types itself, caret blinking ──
+    var prox = { n: 0 };
+    gsap.set(baseSeg, { text: '' });
+    baseSeg.textContent = '';
+    tl.to(prox, {
+      n: base.length, duration: typeDur, ease: 'none',
+      onUpdate: function () { baseSeg.textContent = base.slice(0, Math.ceil(prox.n)); },
+    }, typeAt);
+
+    // Finite repeat, never -1: an infinite tween would make the master
+    // timeline's duration infinite and the frame-seeking renderer could
+    // never find the end of the scene.
+    var blinks = Math.max(1, Math.round((typeDur + 0.3) / 0.9));
+    gsap.set(caret, { autoAlpha: 1 });
+    tl.to(caret, { autoAlpha: 0, duration: 0.45, repeat: blinks, yoyo: true, ease: 'none' }, typeAt);
+
+    var firstParamAt = times && times.length ? times[0] : typeAt + typeDur + 0.35;
+
+    // ── The automatic half: the tags APPEAR. No caret, no typing -- each
+    // segment lands whole with a violet flash, because nobody wrote them.
+    paramSegs.forEach(function (seg, i) {
+      var at = times && times[i] != null ? times[i] : firstParamAt + i * interval;
+      gsap.set(seg, { autoAlpha: 0 });
+      tl.fromTo(seg,
+        { autoAlpha: 0, scale: 0.92 },
+        { autoAlpha: 1, scale: 1, duration: 0.24, ease: 'back.out(2.2)', immediateRender: false },
+        at);
+      tl.fromTo(seg,
+        { backgroundColor: 'rgba(57,59,245,0.20)' },
+        { backgroundColor: 'rgba(57,59,245,0)', duration: 0.55, ease: 'power2.out', immediateRender: false },
+        at);
+    });
+
+    // The caret is gone before the first tag lands -- the hand left the keyboard.
+    tl.to(caret, { autoAlpha: 0, duration: 0.12 }, Math.max(0, firstParamAt - 0.18));
+
+    return tl;
+  }
+</script>
