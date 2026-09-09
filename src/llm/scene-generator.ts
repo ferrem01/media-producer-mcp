@@ -745,8 +745,22 @@ export function buildAuthoredCompositionScene(
     // read as continuous -- the camera rig is rebuilt per scene, so camera
     // state cannot cross a boundary. Without this hop the storyboard could
     // describe "it keeps travelling right" in prose and nothing moved.
+    // THE BOARD'S POSITION WINS. authoredLayout assigns a slot per component
+    // TYPE, which is right when the storyboard only says "put a funnel here"
+    // -- but a board that wrote an explicit position said something the type
+    // alone cannot express, and the layout has no way to know better.
+    // Measured live: a brand outro authored full-bleed (0/0/100%/100%) came
+    // back in the generic surface slot (8%/6.5%/84%/87%) -- an inset window
+    // drawn around a mastered clip, which then tripped the edge-bleed gate on
+    // the border the inset had just created.
+    var authoredPos = (c as any).position;
+    var hasAuthoredPos = !!authoredPos && typeof authoredPos === "object"
+      && authoredPos.x !== undefined && authoredPos.y !== undefined;
+    if (hasAuthoredPos && JSON.stringify(authoredPos) !== JSON.stringify(lay.position)) {
+      console.log(`    ${c.type}: honoring the board's own position (${JSON.stringify(authoredPos)}) over the ${c.type} layout slot`);
+    }
     components.push({
-      id, type: c.type, data, position: lay.position, z_index: lay.z_index,
+      id, type: c.type, data, position: hasAuthoredPos ? authoredPos : lay.position, z_index: lay.z_index,
       ...(normalizeAnim((c as any).enter) ? { enter: normalizeAnim((c as any).enter)! } : {}),
       ...(normalizeAnim((c as any).exit) ? { exit: normalizeAnim((c as any).exit)! } : {}),
     });
