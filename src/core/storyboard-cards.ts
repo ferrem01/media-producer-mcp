@@ -208,6 +208,9 @@ export async function renderStoryboardCards(project: Project, opts: {
           sceneIndex: i, totalScenes: scenes.length,
           brandKit: (project as any).brand_kit || { colors: {}, fonts: [] },
           canvas, world: (project as any).world,
+          // The cards must preview the BUILD's layout doctrine (cut grammars
+          // stamp copy over the surface instead of a side column).
+          treatment: (project as any).treatment,
           tenantId: (project as any).tenant_id, projectId: (project as any).project_id,
           prompt: sb?.narrative || "", format: "video",
         } as any;

@@ -403,7 +403,15 @@ function stackRows(n: number, bandY: number, bandH: number, gap: number): Array<
  * stage) instead of stacking into the same 84% inset -- the collision that
  * made films read as sloppy.
  */
-function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false, speaker = false, takeover = false): LayoutSlot[] {
+function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, vertical = false, speaker = false, takeover = false, grammar?: string): LayoutSlot[] {
+  // THE FRAME BELONGS TO ONE THING AT A TIME (tempo-cut / hype-cut): in the
+  // cut grammars a product surface owns the whole frame and claim type is a
+  // lower-third stamp OVER it (or its own interstitial beat) -- never a side
+  // column. The docked-window-plus-right-column recipe below is a slide
+  // layout, not a film layout; it shrank every proof surface and orphaned
+  // the type (operator verdict on proj_b97b2be8: "I don't see a world where
+  // that looks good for these videos").
+  var cutGrammar = grammar === "tempo-cut" || grammar === "hype-cut";
   var slots: LayoutSlot[] = authored.map(() => null);
   var accentCount = 0;
   var surfaceIdx: number[] = [];
@@ -539,7 +547,7 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
     // A lone surface: classic 84% single-window inset -- unless editorial
     // copy rides with it, in which case the window docks left and the copy
     // gets a real right column instead of stacking on top of the window.
-    slots[unplacedSurfaces[0]] = hasEditorial
+    slots[unplacedSurfaces[0]] = (hasEditorial && !cutGrammar)
       ? { position: { x: "3%", y: "8%", width: "58%", height: "84%" }, z_index: 10 }
       : { position: { x: "8%", y: "6.5%", width: "84%", height: "87%" }, z_index: 10 };
   } else if (unplacedSurfaces.length > 0) {
@@ -555,8 +563,9 @@ function authoredLayout(authored: Array<{ type: string }>, hasWorld: boolean, ve
   // ── Editorial copy: docked column / lower third / center stage ──
   var editorialIdx = heroIdx.concat(captionIdx); // heroes first (top of column)
   if (editorialIdx.length > 0) {
-    if (surfaceIdx.length === 1 && unplacedSurfaces.length === 1) {
-      // One docked window -> right column, stacked.
+    if (surfaceIdx.length === 1 && unplacedSurfaces.length === 1 && !cutGrammar) {
+      // One docked window -> right column, stacked. (Non-cut grammars only:
+      // tempo-cut/hype-cut fall through to the lower-third stamp.)
       var rows = stackRows(editorialIdx.length, 12, 76, 4);
       editorialIdx.forEach((idx, k) => {
         slots[idx] = { position: pct(64, rows[k][0], 33, rows[k][1]), z_index: 20 + k };
@@ -622,7 +631,8 @@ export function buildAuthoredCompositionScene(
   // A takeover scene is one the storyboard/pipeline marked opaque: it
   // REPLACES the speaker rather than sitting beside her.
   var isTakeover = speakerBase && (draft as any).transparent_background === false;
-  var slots = authoredLayout(authored, !!opts.world, opts.canvas.height > opts.canvas.width, speakerBase, isTakeover);
+  var slots = authoredLayout(authored, !!opts.world, opts.canvas.height > opts.canvas.width, speakerBase, isTakeover,
+    (opts as any).filmGrammar || (opts.treatment as any)?.filmGrammar);
   // The dark cinematic world under every mock window, matching the film's
   // template scenes (and the hand-built originals).
   // The film's ONE world under every scene (SPEC-world.md). The per-scene
