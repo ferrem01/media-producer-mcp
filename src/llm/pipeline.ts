@@ -2727,8 +2727,18 @@ async function runUnifiedPipeline(
   // ── Beat quantization: every cut lands on a downbeat ──
   // Each segment (incoming transition + scene) is snapped to a whole number of
   // bars, so cumulative cut points fall exactly on the track's bar grid.
-  if (beatMap) {
+  //
+  // NOT on a build-from-board: the approved durations ARE the edit. A board
+  // the storyboard pass authored is already bar-aligned, so re-quantizing it
+  // is a no-op -- the ONLY durations it changes are the ones a human edited
+  // afterwards, which is exactly what must survive. Measured live on
+  // proj_efc4ae45: type cards lengthened to 2.0-3.0s so the lines finish
+  // revealing and hold long enough to read came back at 1.5s, cutting mid-
+  // reveal again, because the build re-snapped them to the old track's grid.
+  if (beatMap && !opts.presetStoryboard) {
     quantizeScenesToBars(storyboard.scenes, beatMap.barSec, grammarSceneCap);
+  } else if (beatMap) {
+    console.log(`  Build-from-board: beat grid available (${beatMap.bpm} BPM, bar=${beatMap.barSec.toFixed(2)}s) but NOT re-quantizing -- the approved durations are the edit.`);
   }
 
   // Film-time starts (post-quantization): the continuous world backdrop
