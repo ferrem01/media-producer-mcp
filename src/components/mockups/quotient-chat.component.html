@@ -194,8 +194,15 @@
      ("which campaign?") or a trend line ("how is it doing?"), both of which
      BUILD -- the counts run up, the bars fill, the line draws. Same warm
      card chrome as the search/content cards so it reads as one surface. */
-  .qch-chart { margin: 14px 0; border: 1.5px solid #e6e4de; border-radius: 12px;
-    padding: 6px 12px 12px; background: #fff; }
+  /* A white card on the thread's white panel is a ghost: the layout gate
+     measured 0.0% lightness separation and flagged it. A 1.5px border is
+     exactly MIN_VISIBLE_BORDER, so it fails the >= test under any subpixel
+     rounding. The result card is the ANSWER -- it should read as a lifted
+     object anyway, so it gets a tinted fill, a 2px edge and a real shadow
+     rather than the thinnest thing that would clear the gate. */
+  .qch-chart { margin: 14px 0; border: 2px solid #e2e0d9; border-radius: 12px;
+    padding: 6px 12px 12px; background: #fdfdfb;
+    box-shadow: 0 2px 10px rgba(26, 26, 26, 0.06); }
   .qch-chart-head { display: flex; align-items: center; gap: 6px; padding: 8px 2px 2px;
     font-size: 13px; color: #6b6963; }
   .qch-chart-title { font-size: 14.5px; font-weight: 600; color: #1a1a1a;
