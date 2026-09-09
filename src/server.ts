@@ -460,6 +460,15 @@ export async function queueBuildFromStoryboard(
       if (newProjectId && newProjectId !== projectId) {
         const origProject = await loadProject(tenantId, projectId);
         if (generatedProject && origProject) {
+          // THE BED THE FILM WAS CUT AGAINST SURVIVES A REBUILD. The pipeline
+          // re-selects music on every build (music-first is how tempo-cut
+          // earns its bar grid), so the auto-pick used to silently overwrite
+          // a track the user had chosen by hand -- measured live on
+          // proj_efc4ae45, where a deliberate swap to the reference film's
+          // bed came back reverted, mix settings and all. Generated
+          // VOICEOVER is new every build and must come through; the MUSIC
+          // lane is the one the human owns.
+          const priorMusic = (origProject.audio?.tracks || []).filter((t: any) => t.type === "music");
           origProject.scenes = generatedProject.scenes;
           origProject.audio = generatedProject.audio;
           // The working copy's audio tracks reference ITS project dir; the
@@ -469,6 +478,11 @@ export async function queueBuildFromStoryboard(
             if (typeof (tr as any).source === "string") {
               (tr as any).source = (tr as any).source.split(`/projects/${newProjectId}/`).join(`/projects/${projectId}/`);
             }
+          }
+          if (wantMusic && priorMusic.length) {
+            const rebuilt = (origProject.audio?.tracks || []).filter((t: any) => t.type !== "music");
+            origProject.audio = { ...(origProject.audio || {}), tracks: [...priorMusic, ...rebuilt] };
+            console.log(`  Build-from-storyboard: kept the project's own music bed (${priorMusic.map((t: any) => t.id).join(", ")}) over the pipeline's re-pick`);
           }
           origProject.assets = generatedProject.assets;
           origProject.canvas = generatedProject.canvas;

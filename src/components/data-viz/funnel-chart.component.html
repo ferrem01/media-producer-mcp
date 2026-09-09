@@ -73,7 +73,12 @@
   .funnel-label {
     font-size: 19px;
     font-weight: 600;
-    color: #94a3b8;
+    /* Dark-world design ink. The light branch below takes FULL ink instead
+       of the token: a real kit's text_muted (#8f8f9f here) measures 3.2:1
+       on white -- better than the 2.18:1 this used to hardcode, still short
+       of the 4.5:1 a 19px label owes. Hierarchy comes from size and the
+       bar, not from a washed-out label. */
+    color: var(--mp-color-text-muted, #94a3b8);
     text-align: right;
     white-space: nowrap;
     overflow: hidden;
@@ -113,19 +118,36 @@
   .funnel-value {
     font-size: 26px;
     font-weight: 700;
-    color: var(--mp-color-text, #ffffff);
+    /* This number rides INSIDE the bar, so its ground is the brand fill --
+       not the scene. --mp-color-on-primary is picked from that fill's
+       luminance, so it clears contrast on a violet bar and on a pale one.
+       (--mp-color-text is the SCENE's ink: near-black on a light brand,
+       which measured ~2.1:1 against the blue bar.) */
+    color: var(--mp-color-on-primary, #ffffff);
     padding-left: 18px;
     white-space: nowrap;
     position: relative;
     z-index: 1;
+    /* The bar is a flex row; without this the number is allowed to shrink
+       below its own text and clips (measured: "2,412" lost 26px). */
+    flex: 0 0 auto;
     text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
   }
 
-  /* When a bar is too short to hold its number, the value sits OUTSIDE it. */
+  /* When a bar is too short to hold its number, the value sits OUTSIDE it --
+     on the SCENE's ground, so it takes the scene's ink, not the fill's. */
   .funnel-value.outside {
     position: absolute;
     left: 100%;
     padding-left: 14px;
+    /* Absolutely positioned at left:100%, the box has ZERO available space
+       to its right, so its width collapsed to the bar's and the number
+       clipped its own box (measured 25-42px lost on the short stages).
+       `width: max-content` does NOT fix it -- Chrome still clamps it to the
+       available space (measured: 71.23px against a 96px max-content). A
+       min-width floor is not clampable, so it does. */
+    min-width: max-content;
+    color: var(--mp-color-text, #ffffff);
     text-shadow: 0 0 20px rgba(167, 139, 250, 0.15);
   }
 
@@ -153,25 +175,109 @@
   .funnel-row.is-money .funnel-value {
     font-size: 32px;
   }
+
+  /* ── The light world ──
+     Everything above is dark-first: a glass card lit from inside, violet
+     glows, shadows tuned for a near-black ground. Dropped onto the plain
+     brand-white world those read as a smudge (the card vanishes, the drop
+     shadow greys the page, the accent pill sits at ~2.4:1). The .is-light
+     branch re-grounds them; the script sets the class from the world's own
+     ink, so no schema slot is needed. */
+  .funnel-chart.is-light .funnel-card {
+    background: rgba(15, 23, 42, 0.015);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.7),
+      0 18px 44px rgba(15, 23, 42, 0.08),
+      0 0 0 1px rgba(15, 23, 42, 0.04);
+  }
+
+  .funnel-chart.is-light .funnel-label {
+    color: var(--mp-color-text, #0f172a);
+  }
+
+  .funnel-chart.is-light .funnel-title,
+  .funnel-chart.is-light .funnel-value.outside {
+    text-shadow: none;
+  }
+
+  .funnel-chart.is-light .funnel-bar {
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.10);
+  }
+
+  .funnel-chart.is-light .funnel-row.is-money .funnel-bar {
+    box-shadow: 0 8px 26px rgba(15, 23, 42, 0.18);
+  }
+
+  /* The accent is the brand's warm secondary in most kits -- readable on
+     near-black, ~2.4:1 on white. Primary is the ink-side brand color. */
+  .funnel-chart.is-light .funnel-retention {
+    color: var(--mp-color-primary, #4f46e5);
+    background: rgba(15, 23, 42, 0.04);
+    border: 1px solid rgba(15, 23, 42, 0.10);
+  }
 </style>
 
 <script>
   function createTimeline(el, data, ctx) {
     var tl = gsap.timeline();
+    var root = el.querySelector('.funnel-chart') || el;
     var card = el.querySelector('.funnel-card');
     var rowsEl = el.querySelector('.funnel-rows');
     var title = el.querySelector('.funnel-title');
     var stages = data.stages || [];
     if (!stages.length) return tl;
 
+    // WHICH WORLD ARE WE ON? The assembler sets --mp-color-text to #ffffff
+    // on a dark scene and to the brand's ink on a light one, so the ink's
+    // own luminance is the answer -- no schema slot, no guessing from the
+    // backdrop component (the plain world has none).
+    (function () {
+      var ink = getComputedStyle(root).getPropertyValue('--mp-color-text').trim();
+      var rgb = window.mpParseColor ? mpParseColor(ink) : null;
+      if (!rgb) {
+        var m6 = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(ink);
+        var m3 = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(ink);
+        var mr = /rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/.exec(ink);
+        if (m6) rgb = { r: parseInt(m6[1], 16), g: parseInt(m6[2], 16), b: parseInt(m6[3], 16) };
+        else if (m3) rgb = { r: parseInt(m3[1] + m3[1], 16), g: parseInt(m3[2] + m3[2], 16), b: parseInt(m3[3] + m3[3], 16) };
+        else if (mr) rgb = { r: +mr[1], g: +mr[2], b: +mr[3] };
+      }
+      if (!rgb) return;
+      // Dark ink means a light ground.
+      if (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b < 140) root.classList.add('is-light');
+    })();
+
     var maxVal = Math.max.apply(null, stages.map(function (s) { return Number(s.value) || 0; })) || 1;
-    var defaultGradients = [
-      ['var(--mp-color-secondary, #22d3ee)', '#06b6d4'],
-      ['var(--mp-color-primary, #6366f1)', '#4f46e5'],
-      ['var(--mp-color-accent, #a78bfa)', 'var(--mp-color-primary, #6366f1)'],
-      ['#f472b6', '#ec4899'],
-      ['#fbbf24', '#f59e0b']
-    ];
+
+    // ── THE FUNNEL IS ONE HUE, RAMPED BY DEPTH ──
+    // The old ramp walked the whole palette (secondary -> primary -> accent
+    // -> pink -> amber). On a real brand kit that renders as five unrelated
+    // bars -- orange, blue, near-black, pink -- when what the chart means is
+    // ONE audience narrowing. Stages now tint the brand primary from light
+    // at the mouth to deep at the money row, so the color itself carries the
+    // narrowing. The light end stops at 18% toward white because the value
+    // rides ON the bar in white: past that it drops under 4.5:1.
+    var brandPrimary = (function () {
+      var raw = getComputedStyle(root).getPropertyValue('--mp-color-primary').trim();
+      var rgb = window.mpParseColor ? mpParseColor(raw) : null;
+      if (!rgb) {
+        var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(raw);
+        if (m) rgb = { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+      }
+      return rgb || { r: 99, g: 102, b: 241 };
+    })();
+    function rampStop(f) {
+      // f in [0,1]: 0 = mouth (lightened 18% toward white), 1 = money row
+      // (deepened 40% toward ink). Linear in between.
+      var t = -0.18 + f * 0.58;
+      var mixR, mixG, mixB, k;
+      if (t < 0) { k = -t; mixR = 255; mixG = 255; mixB = 255; }
+      else { k = t; mixR = 11; mixG = 11; mixB = 46; }
+      return 'rgb(' + Math.round(brandPrimary.r * (1 - k) + mixR * k) + ',' +
+        Math.round(brandPrimary.g * (1 - k) + mixG * k) + ',' +
+        Math.round(brandPrimary.b * (1 - k) + mixB * k) + ')';
+    }
 
     var showRetention = data.show_retention !== false;
     var counters = [];
@@ -189,10 +295,10 @@
 
       var bar = document.createElement('div');
       bar.className = 'funnel-bar';
-      var grad = defaultGradients[i % defaultGradients.length];
+      var span = Math.max(1, stages.length - 1);
       bar.style.background = stage.color
         ? 'linear-gradient(180deg, ' + stage.color + ' 0%, ' + stage.color + 'cc 100%)'
-        : 'linear-gradient(90deg, ' + grad[0] + ' 0%, ' + grad[1] + ' 100%)';
+        : 'linear-gradient(90deg, ' + rampStop(i / span) + ' 0%, ' + rampStop(Math.min(1, (i + 0.6) / span)) + ' 100%)';
       var val = Number(stage.value) || 0;
       var pct = Math.max(4, (val / maxVal) * 100);
       bar.style.width = '0%';
