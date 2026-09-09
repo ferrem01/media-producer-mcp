@@ -14,6 +14,7 @@
 
 import path from "node:path";
 import { proposeSceneCompression, probeMediaDuration, proposeChapterPins } from "../core/auto-compress.js";
+import { probeAudioLevel, describeLevel } from "../core/audio-level.js";
 import { getSentenceSpine, type SentenceSpine } from "../core/sentence-spine.js";
 import { resolveVideoPath } from "../core/video-path.js";
 import { callLLM, type LLMConfig } from "./client.js";
@@ -363,6 +364,28 @@ export async function attachBoothNarration(opts: {
   const { project, narrationSource } = opts;
   const narrationDur = await probeMediaDuration(narrationSource, opts.dataDir);
   if (!(narrationDur > 0.5)) throw new Error("narration take is empty or unreadable");
+
+  // IS THERE A VOICE IN IT? The duration check above passes anything longer
+  // than half a second, including a full-length take of digital zeros --
+  // which is exactly what a mic being null-processed by an echo canceller
+  // produces. Measured live: two 54s takes, valid Opus, correct duration,
+  // every sample 0.0, and the film shipped mute with no warning at all. A
+  // silent narration is never what anyone meant, and it is the one defect
+  // that survives every downstream gate (they all look at PICTURE), so it
+  // stops the build here rather than becoming a video nobody can use.
+  const level = await probeAudioLevel(narrationSource, opts.dataDir);
+  if (level.silent) {
+    throw new Error(
+      `narration take has no audible voice (${describeLevel(level)}) -- the file is ${Math.round(narrationDur)}s of ` +
+      `silence, so the film would be built mute. This is almost always the CAPTURE DEVICE, not the take: check the ` +
+      `microphone selected in chrome://settings/content/microphone, and note that echo cancellation can null a mic ` +
+      `entirely when the same hardware is both the speakers and the input. Re-record once the level meter on the ` +
+      `recorder's setup page moves while you speak.`,
+    );
+  }
+  if (level.faint) {
+    console.warn(`  Narration is faint (${describeLevel(level)}) -- audible, but well under a normal voice take.`);
+  }
 
   // The scene the VO narrates over: the one carrying media edits (the
   // compressed walkthrough), else the longest screencast-frame scene.

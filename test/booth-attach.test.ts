@@ -12,6 +12,15 @@ vi.mock("../src/core/auto-compress.js", () => ({
   proposeSceneCompression: vi.fn(),
   proposeChapterPins: vi.fn(),
 }));
+vi.mock("../src/core/audio-level.js", () => ({
+  // These suites mock every media probe and pass paths that never exist on
+  // disk -- a real measurement would report "no audio stream" and the guard
+  // would (correctly) refuse to build. A healthy level keeps them testing
+  // the assembly logic they are about; the guard itself is covered by its
+  // own test below.
+  probeAudioLevel: vi.fn(async () => ({ hasAudio: true, meanDb: -24, maxDb: -6, silent: false, faint: false })),
+  describeLevel: (l: any) => `mean ${l.meanDb}dB, peak ${l.maxDb}dB`,
+}));
 vi.mock("../src/core/sentence-spine.js", () => ({
   getSentenceSpine: vi.fn(async () => ({
     sentences: [
@@ -36,6 +45,7 @@ import { attachBoothNarration } from "../src/llm/narrated-screencast.js";
 import { getSentenceSpine } from "../src/core/sentence-spine.js";
 import { selectMusic } from "../src/audio/music.js";
 import { probeVideo } from "../src/core/video-normalize.js";
+import { probeAudioLevel } from "../src/core/audio-level.js";
 
 function recorderProject(): any {
   return {
@@ -202,5 +212,30 @@ describe("attachBoothNarration", () => {
     expect(res.captions).toBe(0);
     expect(res.summary).toContain("no spine");
     expect((project.audio as any).tracks[0].id).toBe("narration");
+  });
+
+  // A take of digital silence passes every downstream gate -- they all look at
+  // PICTURE -- so it reaches the viewer as a mute film. Two real recorder
+  // takes shipped that way (mean -73.9dB and -91.0dB) before this existed.
+  it("refuses a narration take that has no audible voice", async () => {
+    (probeAudioLevel as any).mockResolvedValueOnce({
+      hasAudio: true, meanDb: -91, maxDb: -91, silent: true, faint: false,
+    });
+    const project = recorderProject();
+    await expect(
+      attachBoothNarration({ project, narrationSource: "/assets/t/silent-take.webm" }),
+    ).rejects.toThrow(/no audible voice/i);
+    // and it stops BEFORE laying any track down
+    expect(project.audio).toBeUndefined();
+  });
+
+  it("builds a faint-but-audible take rather than rejecting it", async () => {
+    (probeAudioLevel as any).mockResolvedValueOnce({
+      hasAudio: true, meanDb: -58, maxDb: -30, silent: false, faint: true,
+    });
+    const project = recorderProject();
+    const res = await attachBoothNarration({ project, narrationSource: "/assets/t/quiet-take.webm" });
+    expect((project.audio as any).tracks[0].id).toBe("narration");
+    expect(res).toBeTruthy();
   });
 });

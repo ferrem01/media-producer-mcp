@@ -10,6 +10,7 @@
 // PAUSE/RESUME (both recorders in lockstep; the film has no paused footage)
 // -> STOP (upload) or ABORT (armed-but-never-rolled).
 
+let capturedAudioDevice = null; // which mic this take actually used
 let recorder = null;       // tab video (+ mic when no camera)
 let camRecorder = null;    // camera + mic (its own file, same clock)
 let chunks = [];
@@ -58,10 +59,48 @@ async function prep(streamId, mic, camera, dims) {
 
     if (mic || camera) {
       // Permission was primed by the setup tab (offscreen can't prompt).
+      // ECHO CANCELLATION IS OFF, DELIBERATELY. AEC subtracts what is
+      // PLAYING OUT from what is coming IN -- it exists for calls, where the
+      // far end would otherwise hear itself. A screen recording has no far
+      // end, so there is nothing legitimate for it to remove.
+      //
+      // It is not merely useless here, it is destructive: when the capture
+      // device and the render device are the same hardware -- any combined
+      // USB audio endpoint, e.g. a monitor that is both speakers and mic --
+      // the canceller can subtract the input against itself and emit exactly
+      // zero. Measured live on an LG UltraFine Display Audio: two full takes
+      // recorded a valid 48kHz mono Opus track, correct duration, with EVERY
+      // SAMPLE 0.0 (mean -91dB, zero-crossing rate 0.000000) while the camera
+      // video from the SAME getUserMedia call was perfect and the very same
+      // mic transcribed fine elsewhere in Chrome. Silence like that is what a
+      // canceller outputs; a dead mic still gives you a noise floor.
+      //
+      // Noise suppression and auto-gain stay on: they only shape the signal.
+      const savedDevice = (await chrome.storage.sync.get({ micDeviceId: "" })).micDeviceId;
       micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: true,
+          autoGainControl: true,
+          // Pin the device the user actually chose on the setup page, so a
+          // docking event that reshuffles Chrome's default input cannot
+          // silently move the recording to another microphone.
+          ...(savedDevice ? { deviceId: { exact: savedDevice } } : {}),
+        },
         ...(camera ? { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } } : {}),
       });
+      const micTrack = micStream.getAudioTracks()[0];
+      if (micTrack) {
+        // Record WHICH microphone this take came from. Without it, a silent
+        // file is undiagnosable after the fact -- webm carries no device
+        // metadata, so the only evidence is the samples themselves.
+        const st = (micTrack.getSettings && micTrack.getSettings()) || {};
+        capturedAudioDevice = { label: micTrack.label || "", deviceId: st.deviceId || "",
+          sampleRate: st.sampleRate || 0, channels: st.channelCount || 0,
+          echoCancellation: st.echoCancellation, noiseSuppression: st.noiseSuppression,
+          autoGainControl: st.autoGainControl };
+        try { console.log("[qr] capturing audio from:", capturedAudioDevice.label || "(unlabelled)", capturedAudioDevice); } catch (e) {}
+      }
       if (camera && micStream.getVideoTracks().length) {
         // Camera mode: voice lives WITH the face in its own recording; the
         // tab file stays video-only. Both recorders start in the same tick,
