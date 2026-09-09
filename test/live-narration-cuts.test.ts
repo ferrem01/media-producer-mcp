@@ -29,6 +29,15 @@ vi.mock("../src/core/idle-silence.js", async (importOriginal) => {
     cutAudioTo: vi.fn(async () => {}),
   };
 });
+vi.mock("../src/core/audio-level.js", () => ({
+  // These suites mock every media probe and pass paths that never exist on
+  // disk -- a real measurement would report "no audio stream" and the guard
+  // would (correctly) refuse to build. A healthy level keeps them testing
+  // the assembly logic they are about; the guard itself is covered by its
+  // own test below.
+  probeAudioLevel: vi.fn(async () => ({ hasAudio: true, meanDb: -24, maxDb: -6, silent: false, faint: false })),
+  describeLevel: (l: any) => `mean ${l.meanDb}dB, peak ${l.maxDb}dB`,
+}));
 vi.mock("../src/core/sentence-spine.js", () => ({ getSentenceSpine: vi.fn(async () => null) }));
 vi.mock("../src/core/recorder-events.js", () => ({ loadRecorderEvents: vi.fn(async () => null) }));
 vi.mock("../src/core/video-normalize.js", () => ({
