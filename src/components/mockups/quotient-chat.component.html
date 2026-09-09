@@ -187,6 +187,46 @@
   .qch.is-full .qch-search-rd { font-size: 14px; }
   .qch-search-rmain { min-width: 0; flex: 1; }
 
+  /* ── Result card: the thread ANSWERS with a figure ──
+     The transcript could stream prose and stream a doc, but the moment the
+     agent is asked an analytics question it has to hand back numbers. This
+     is that block: a titled card carrying a KPI row and either ranked bars
+     ("which campaign?") or a trend line ("how is it doing?"), both of which
+     BUILD -- the counts run up, the bars fill, the line draws. Same warm
+     card chrome as the search/content cards so it reads as one surface. */
+  .qch-chart { margin: 14px 0; border: 1.5px solid #e6e4de; border-radius: 12px;
+    padding: 6px 12px 12px; background: #fff; }
+  .qch-chart-head { display: flex; align-items: center; gap: 6px; padding: 8px 2px 2px;
+    font-size: 13px; color: #6b6963; }
+  .qch-chart-title { font-size: 14.5px; font-weight: 600; color: #1a1a1a;
+    margin: 2px 2px 10px; }
+  .qch-chart-kpis { display: flex; gap: 10px; margin-bottom: 12px; }
+  .qch-kpi { flex: 1; border: 1.5px solid #eceae4; border-radius: 10px; padding: 8px 10px; }
+  .qch-kpi-val { font-size: 19px; font-weight: 700; color: #1a1a1a;
+    letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .qch-kpi-lab { font-size: 11.5px; color: #6b6963; margin-top: 1px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qch-kpi-delta { font-size: 11px; font-weight: 700; color: var(--mp-color-primary, #393bf5);
+    margin-top: 3px; }
+  .qch-bar-row { display: grid; grid-template-columns: 92px 1fr auto; gap: 9px;
+    align-items: center; margin-top: 7px; }
+  .qch-bar-lab { font-size: 12.5px; color: #55534e; text-align: right;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qch-bar-track { height: 16px; border-radius: 5px; background: #f4f3ef; overflow: hidden; }
+  .qch-bar-fill { height: 100%; width: 0%; border-radius: 5px;
+    background: linear-gradient(90deg, var(--mp-color-primary, #393bf5), #6366f9); }
+  .qch-bar-val { font-size: 12.5px; font-weight: 700; color: #1a1a1a;
+    font-variant-numeric: tabular-nums; min-width: max-content; }
+  .qch-chart-svg { display: block; width: 100%; height: 92px; overflow: visible; }
+  .qch-chart-line { fill: none; stroke: var(--mp-color-primary, #393bf5);
+    stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .qch-chart-area { fill: rgba(57, 59, 245, 0.10); stroke: none; }
+  .qch-chart-xlab { display: flex; justify-content: space-between; margin-top: 4px;
+    font-size: 11px; color: #6b6963; }
+  .qch.is-full .qch-chart-title { font-size: 16px; }
+  .qch.is-full .qch-kpi-val { font-size: 22px; }
+  .qch.is-full .qch-bar-lab, .qch.is-full .qch-bar-val { font-size: 14px; }
+
   /* To-do list card: 'Created to-do list' + progress ring + task rows. */
   .qch-todo { margin: 14px 0; }
   .qch-todo-head { display: flex; align-items: center; gap: 8px; padding: 8px 2px;
@@ -580,6 +620,85 @@
       });
       return d;
     }
+    function chartCardEl(a) {
+      // Built at compile time with every value at its FINAL text/width, so
+      // the measure pass sees the true card height; the animation handler
+      // then rewinds each figure and plays it forward on the timeline.
+      var d = document.createElement('div');
+      d.className = 'qch-chart';
+      var head = document.createElement('div');
+      head.className = 'qch-chart-head';
+      head.innerHTML = esc(a.verb || 'Analyzed') + ' ' + entIcon(a.entity || 'campaign') +
+        ' <span>' + esc(a.noun || entNoun(a.entity || 'campaign')) + '</span>';
+      d.appendChild(head);
+      if (a.title) {
+        var t = document.createElement('div');
+        t.className = 'qch-chart-title';
+        t.textContent = a.title;
+        d.appendChild(t);
+      }
+      var kpis = Array.isArray(a.kpis) ? a.kpis : [];
+      if (kpis.length) {
+        var row = document.createElement('div');
+        row.className = 'qch-chart-kpis';
+        kpis.forEach(function(k) {
+          var c = document.createElement('div');
+          c.className = 'qch-kpi';
+          c.innerHTML = '<div class="qch-kpi-val"></div><div class="qch-kpi-lab"></div>' +
+            (k.delta ? '<div class="qch-kpi-delta"></div>' : '');
+          c.querySelector('.qch-kpi-val').textContent = k.display != null ? k.display : String(k.value != null ? k.value : '');
+          c.querySelector('.qch-kpi-lab').textContent = k.label || '';
+          if (k.delta) c.querySelector('.qch-kpi-delta').textContent = k.delta;
+          row.appendChild(c);
+        });
+        d.appendChild(row);
+      }
+      var bars = Array.isArray(a.bars) ? a.bars : [];
+      if (bars.length) {
+        var maxV = Math.max.apply(null, bars.map(function(b) { return Number(b.value) || 0; })) || 1;
+        bars.forEach(function(b) {
+          var r = document.createElement('div');
+          r.className = 'qch-bar-row';
+          r.innerHTML = '<div class="qch-bar-lab"></div><div class="qch-bar-track">' +
+            '<div class="qch-bar-fill"></div></div><div class="qch-bar-val"></div>';
+          r.querySelector('.qch-bar-lab').textContent = b.label || '';
+          r.querySelector('.qch-bar-val').textContent = b.display != null ? b.display : String(b.value != null ? b.value : '');
+          r.querySelector('.qch-bar-fill').dataset.pct =
+            Math.max(3, Math.round((Number(b.value) || 0) / maxV * 100));
+          d.appendChild(r);
+        });
+      }
+      var pts = Array.isArray(a.points) ? a.points.map(Number) : [];
+      if (pts.length > 1) {
+        // Exact segment math -- never getTotalLength(), which is unreliable
+        // under frame-seeking; the dash length below is the summed geometry.
+        var W = 300, H = 92, lo = Math.min.apply(null, pts), hi = Math.max.apply(null, pts);
+        var span = (hi - lo) || 1;
+        var xy = pts.map(function(v, i) {
+          return [i / (pts.length - 1) * W, H - 6 - (v - lo) / span * (H - 16)];
+        });
+        var dLine = xy.map(function(p, i) { return (i ? 'L' : 'M') + p[0].toFixed(2) + ' ' + p[1].toFixed(2); }).join(' ');
+        var len = 0;
+        for (var i2 = 1; i2 < xy.length; i2++) {
+          len += Math.sqrt(Math.pow(xy[i2][0] - xy[i2 - 1][0], 2) + Math.pow(xy[i2][1] - xy[i2 - 1][1], 2));
+        }
+        var svg = document.createElement('div');
+        svg.innerHTML = '<svg class="qch-chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+          '<path class="qch-chart-area" d="' + dLine + ' L' + W + ' ' + H + ' L0 ' + H + ' Z"/>' +
+          '<path class="qch-chart-line" d="' + dLine + '"/></svg>';
+        var pathEl = svg.querySelector('.qch-chart-line');
+        pathEl.dataset.len = len.toFixed(2);
+        d.appendChild(svg.firstChild);
+        var labs = Array.isArray(a.labels) ? a.labels.filter(Boolean) : [];
+        if (labs.length) {
+          var lx = document.createElement('div');
+          lx.className = 'qch-chart-xlab';
+          labs.forEach(function(l) { var s2 = document.createElement('span'); s2.textContent = l; lx.appendChild(s2); });
+          d.appendChild(lx);
+        }
+      }
+      return d;
+    }
     function todoEl(a) {
       // The real thread's to-do list card: 'Created to-do list' header with
       // a progress ring counter, then task rows. Row states: next (arrow),
@@ -725,6 +844,7 @@
           case 'error-line': node = errorEl(action.text); break;
           case 'todo-list': node = todoEl(action); todoNodes.push(node); break;
           case 'search-card': node = searchEl(action); break;
+          case 'chart-card': node = chartCardEl(action); break;
         }
         if (node) {
           msgs.appendChild(node);
@@ -832,6 +952,70 @@
             todo._countStr = nextCount;
           },
           'search-card': function(tl2, ctr, action, at) { var ev = next('search-card'); if (ev) reveal(tl2, ev, at); },
+          'chart-card': function(tl2, ctr, action, at) {
+            // The figure BUILDS after the card lands: counts run up, bars
+            // fill left to right, the line draws. Every value is a tween on
+            // the master timeline (no onComplete state, no repeat), so a
+            // scrub to any frame shows the figure exactly that far along.
+            var ev = next('chart-card');
+            if (!ev) return;
+            reveal(tl2, ev, at);
+            var dur = action.duration || 1.4;
+            var t0 = at + 0.22;
+            var kpis = Array.isArray(action.kpis) ? action.kpis : [];
+            ev.node.querySelectorAll('.qch-kpi-val').forEach(function(valEl, i) {
+              var k = kpis[i] || {};
+              var to = Number(k.value);
+              if (!isFinite(to)) return;
+              var end = k.display != null ? String(k.display) : String(to);
+              // Split the final string around its ONE number so the $ / % / K
+              // ride along and the figure never changes shape as it counts.
+              // A KPI with no digits at all ("LinkedIn", "Healthy") is not a
+              // countable quantity -- it just appears. Splitting it with the
+              // old greedy prefix+suffix pair matched the whole word TWICE
+              // and rendered "LinkedIn0LinkedIn" mid-count.
+              var parts = /^([^0-9]*)([0-9][0-9,.]*)([^0-9]*)$/.exec(end);
+              if (!parts) {
+                tl2.fromTo(valEl, { autoAlpha: 0 },
+                  { autoAlpha: 1, duration: 0.35, ease: 'power2.out', immediateRender: false }, t0);
+                return;
+              }
+              var pre = parts[1], suf = parts[3];
+              var dec = (/\.(\d+)/.exec(parts[2]) || ['', ''])[1].length;
+              var fmt = function(n) {
+                return pre + (dec ? n.toFixed(dec) : Math.round(n).toLocaleString('en-US')) + suf;
+              };
+              // Land the card already showing zero: without this the figure
+              // flashes its final value for the frames between the reveal and
+              // the first count tick.
+              tl2.set(valEl, { innerText: fmt(0) }, at);
+              var ctr2 = { n: 0 };
+              tl2.fromTo(ctr2, { n: 0 }, { n: to, duration: dur, ease: 'power2.out', immediateRender: false,
+                onUpdate: function() { valEl.textContent = fmt(ctr2.n); } }, t0);
+              tl2.set(valEl, { innerText: end }, t0 + dur);
+            });
+            ev.node.querySelectorAll('.qch-kpi-delta, .qch-kpi-lab').forEach(function(x, i) {
+              tl2.fromTo(x, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3, immediateRender: false }, t0 + i * 0.04);
+            });
+            ev.node.querySelectorAll('.qch-bar-fill').forEach(function(bar, i) {
+              tl2.fromTo(bar, { width: '0%' },
+                { width: bar.dataset.pct + '%', duration: dur, ease: 'power3.out', immediateRender: false },
+                t0 + i * 0.09);
+            });
+            ev.node.querySelectorAll('.qch-bar-val').forEach(function(v, i) {
+              tl2.fromTo(v, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.25, immediateRender: false },
+                t0 + i * 0.09 + dur * 0.62);
+            });
+            var line = ev.node.querySelector('.qch-chart-line');
+            if (line) {
+              var len = Number(line.dataset.len) || 300;
+              tl2.fromTo(line, { strokeDasharray: len, strokeDashoffset: len },
+                { strokeDashoffset: 0, duration: dur, ease: 'none', immediateRender: false }, t0);
+              var area = ev.node.querySelector('.qch-chart-area');
+              if (area) tl2.fromTo(area, { autoAlpha: 0 },
+                { autoAlpha: 1, duration: dur * 0.8, ease: 'power2.out', immediateRender: false }, t0 + dur * 0.2);
+            }
+          },
           'show-typing': function(tl2, ctr, action, at) {
             var ev = next('show-typing');
             if (!ev) return;
