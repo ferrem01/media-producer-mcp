@@ -51,6 +51,26 @@ const VIDEO_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i;
  *  key the render/Studio use. The primary screencast maps to "screencast" (the
  *  render resolves it to the largest non-speaker video); additional videos are
  *  keyed by a src-substring selector so several clips can each carry edits. */
+/**
+ * A scene whose ONLY component is a bare `video` is a pre-rendered BRAND CLIP
+ * -- an intro or outro sting -- not a screen recording. The renderer already
+ * treats this exact shape specially (it re-encodes the source straight to the
+ * timeline instead of capturing it through the browser), and its pacing is the
+ * thing that was mastered: the held beats a compressor reads as "dead air" are
+ * the design.
+ *
+ * findSceneScreencasts matches ANY component carrying a video source, so
+ * without this guard the auto-compress pass time-lapsed brand clips too.
+ * Measured live on the analytics film: a 5.18s brand outro came back at 3.3s
+ * with everything past the 3s mark running at 8x -- the sting's whole landing
+ * thrown away. The manual "compress the waiting" action in Studio goes through
+ * a different path and stays available if someone genuinely wants it here.
+ */
+export function isBrandClipScene(scene: Scene): boolean {
+  const comps = (scene.components || []) as SceneComponent[];
+  return comps.length === 1 && comps[0]?.type === "video";
+}
+
 export function findSceneScreencasts(scene: Scene): { target: string; src: string }[] {
   const out: { target: string; src: string }[] = [];
   const comps = (scene.components || []) as SceneComponent[];
@@ -90,6 +110,7 @@ export async function proposeSceneCompression(
   const minIdle = opts?.minIdle ?? 2;
   const applied: ProposeResult["applied"] = [];
   const result: ProposeResult = { applied };
+  if (isBrandClipScene(scene)) return result;
   const targets = findSceneScreencasts(scene);
   if (!targets.length) return result;
 
