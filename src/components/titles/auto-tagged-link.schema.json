@@ -1,0 +1,54 @@
+{
+  "type": "auto-tagged-link",
+  "label": "Auto-Tagged Link",
+  "category": "titles",
+  "description": "A single URL as the whole frame -- no browser, no chrome, oversized monospace. The SHORT link types itself character by character in ink with a blinking caret (the part a human wrote); then the caret vanishes and the UTM parameters APPEAR one at a time in the brand accent with a flash, never typed. The two colors carry the argument: dark is yours, accent is automatic. Cast it for auto-tagging / attribution beats where the claim is 'you never wrote these tags' -- it is a type detail-cut, not a product mock, so it needs no window and fills the frame on its own.",
+  "data": {
+    "base": {
+      "type": "string",
+      "label": "The short link a human would type (ink colored, types character by character). Default 'getquotient.link/q3-launch'",
+      "optional": true
+    },
+    "params": {
+      "type": "array",
+      "label": "Query segments that append THEMSELVES, in order, each in accent color with a flash -- include the leading ? and & (e.g. [\"?utm_source=linkedin\", \"&utm_campaign=q3_launch\", \"&utm_medium=social\"])",
+      "optional": true
+    },
+    "type_at": {
+      "type": "number",
+      "label": "When the base link starts typing (seconds, default 0.2)",
+      "optional": true
+    },
+    "type_duration": {
+      "type": "number",
+      "label": "How long the base link takes to type (seconds, default 1.0)",
+      "optional": true
+    },
+    "param_interval": {
+      "type": "number",
+      "label": "Seconds between appended segments (default 0.7). Ignored when param_times is set.",
+      "optional": true
+    },
+    "param_times": {
+      "type": "array",
+      "label": "Explicit seconds for each appended segment (overrides param_interval -- use it to land tags on the beat grid)",
+      "optional": true
+    },
+    "font_size": {
+      "type": "string",
+      "label": "CSS size for the link (default '56px'). A ~90-character tagged URL wraps to two lines at this size on a 1920 canvas.",
+      "optional": true
+    },
+    "ink": {
+      "type": "string",
+      "label": "Color of the human-typed base link (default '#17171c')",
+      "optional": true
+    },
+    "accent": {
+      "type": "string",
+      "label": "Color of the auto-appended parameters and the caret (default '#393bf5')",
+      "optional": true
+    }
+  },
+  "tier": "performable-surface"
+}
