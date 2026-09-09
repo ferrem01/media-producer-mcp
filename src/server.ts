@@ -444,6 +444,12 @@ export async function queueBuildFromStoryboard(
         backgroundMusic: wantMusic,
         voice: (opts.voice as any) || (project.storyboard!.audio.voice as any),
         sceneCount: project.storyboard!.scenes.length,
+        // BUILD THE BOARD, DON'T REDRAFT IT: the approved storyboard goes in
+        // verbatim, and the saved full treatment replaces a fresh concept
+        // pass. The prompt round-trip above (buildPromptFromStoryboard) now
+        // only serves as fallback context for paths that still need prose.
+        presetStoryboard: project.storyboard!,
+        presetTreatment: (project as any).treatment,
       });
 
       // Copy generated scenes, audio, and assets from the new project back to the original storyboarded project

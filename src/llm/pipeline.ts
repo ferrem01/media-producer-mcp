@@ -131,6 +131,16 @@ export interface PipelineOpts {
 
   // Storyboard-only mode: run concept director + storyboard builder, save storyboard, stop before scene generation
   storyboardOnly?: boolean;
+
+  /** BUILD-FROM-BOARD: an approved saved storyboard to build VERBATIM.
+   *  Skips the creative director AND the storyboard builder -- the board the
+   *  human iterated and signed off IS the film; a build must never redraft
+   *  it. (Measured live, proj_b97b2be8: the prompt round-trip re-invented
+   *  funnel stages, claim copy, KPI values, and re-grew two cut scenes.)
+   *  Pair with presetTreatment (the project's saved full treatment) so the
+   *  committed grammar/look/sound survive without a fresh concept pass. */
+  presetStoryboard?: import("../core/types.js").Storyboard;
+  presetTreatment?: import("./creative-director.js").Treatment;
 }
 
 export interface PipelineResult {
@@ -2355,7 +2365,13 @@ async function runUnifiedPipeline(
   // Creative Director: reads the raw prompt, fills the gaps as the expert,
   // commits to ONE concept + look, and decides the scene count.
   var treatment: Treatment | undefined;
-  if (format !== "image") {
+  if (format !== "image" && opts.presetStoryboard && opts.presetTreatment) {
+    // Build-from-board: the film's creative direction was committed when the
+    // board was made; re-running the director here is where redrafts begin.
+    treatment = opts.presetTreatment;
+    if (!sceneCount) sceneCount = opts.presetStoryboard.scenes.length;
+    console.log(`  Build-from-board: reusing the saved treatment ("${treatment.concept}") -- concept stage skipped.`);
+  } else if (format !== "image") {
     opts.onProgress?.({ step: "concept", percent: 8, detail: "Designing the creative direction" });
     trace?.beginEvent("creative_director");
     try {
@@ -2518,24 +2534,37 @@ async function runUnifiedPipeline(
 
   opts.onProgress?.({ step: "storyboarding", percent: 12, detail: "Storyboarding the film" });
 
-  var storyboard = await buildStoryboard({
-    prompt: richPrompt,
-    rawPrompt: opts.prompt,
-    format,
-    llmConfig: opts.llmConfig,
-    brandKit,
-    canvas,
-    componentCatalog: catalog,
-    sceneCount,
-    creativity,
-    tenantId: opts.tenant_id,
-    hasSpeakerTrack: !!opts.speaker_source,
-    referenceImages: processedRefs,
-    treatment,
-    beatGrid: beatMap ? { bpm: beatMap.bpm, barSec: beatMap.barSec } : undefined,
-    filmGrammar,
-    world,
-  });
+  var storyboard: { name: string; scenes: any[] };
+  if (opts.presetStoryboard) {
+    // Build-from-board: the saved scenes ARE DraftScenes (storyboardToSaved
+    // is field-preserving), so hydrate them verbatim -- data, claims, casts,
+    // scripts, camera moves, all byte-for-byte what the human approved.
+    storyboard = {
+      name: opts.presetStoryboard.narrative || "Film",
+      scenes: opts.presetStoryboard.scenes.map((s: any) => ({ ...s })),
+    };
+    opts.onProgress?.({ step: "storyboarding", percent: 14, detail: "Building the approved storyboard verbatim" });
+    console.log(`  Build-from-board: ${storyboard.scenes.length} approved scenes taken VERBATIM -- storyboarding stage skipped.`);
+  } else {
+    storyboard = await buildStoryboard({
+      prompt: richPrompt,
+      rawPrompt: opts.prompt,
+      format,
+      llmConfig: opts.llmConfig,
+      brandKit,
+      canvas,
+      componentCatalog: catalog,
+      sceneCount,
+      creativity,
+      tenantId: opts.tenant_id,
+      hasSpeakerTrack: !!opts.speaker_source,
+      referenceImages: processedRefs,
+      treatment,
+      beatGrid: beatMap ? { bpm: beatMap.bpm, barSec: beatMap.barSec } : undefined,
+      filmGrammar,
+      world,
+    });
+  }
   trace?.endEvent({ scenes: storyboard.scenes.length });
 
   // ── Motif discipline: one caption style per film ──
