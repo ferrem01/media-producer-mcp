@@ -20,9 +20,11 @@ function renderAuth(st) {
 
 async function load() {
   try { $("ver").textContent = "v" + chrome.runtime.getManifest().version; } catch (e) {}
-  const s = await chrome.storage.sync.get({ mic: false, camera: false, destProject: "" });
+  const s = await chrome.storage.sync.get({ mic: true, camera: false, prompter: false, destProject: "" });
   $("mic").checked = !!s.mic;
   $("camera").checked = !!s.camera;
+  $("prompter").checked = !!s.prompter;
+  syncHints();
   const auth = await chrome.runtime.sendMessage({ type: "qr-auth-status" });
   renderAuth(auth);
   if (auth && auth.signedIn) loadDestinations(s.destProject);
@@ -129,7 +131,12 @@ function setRecording(on) {
 }
 
 async function save() {
-  await chrome.storage.sync.set({ mic: $("mic").checked, camera: $("camera").checked });
+  await chrome.storage.sync.set({
+    mic: $("mic").checked,
+    camera: $("camera").checked,
+    // A prompter with no voice to prompt is a window that does nothing.
+    prompter: $("prompter").checked && $("mic").checked,
+  });
 }
 
 async function ensurePermission(name, withCam) {
@@ -148,6 +155,28 @@ async function ensurePermission(name, withCam) {
 // open only when the grant was missing, which meant the people most likely to
 // need it -- everyone already set up, recording every day -- could never get
 // to it. A silent microphone is invisible until you watch the finished film.
+// The teleprompter is only meaningful when there is a voice to prompt, and
+// saying so beats silently doing nothing.
+function syncHints() {
+  const voice = $("mic").checked;
+  const p = $("prompter");
+  p.disabled = !voice;
+  const hint = document.getElementById("prompter-hint");
+  hint.textContent = voice
+    ? "A separate window with your script, scrolling while you talk. Never appears on film."
+    : "Turn on \u201cRecord my voice\u201d to use the teleprompter.";
+  hint.style.opacity = voice ? "1" : "0.6";
+  document.getElementById("cam-hint").textContent = voice
+    ? "A picture-in-picture bubble of you over the demo."
+    : "A picture-in-picture bubble of you over the demo \u2014 silent, since your voice is off.";
+}
+["mic", "camera", "prompter"].forEach((id) => {
+  document.getElementById(id)?.addEventListener("change", () => {
+    chrome.storage.sync.set({ [id]: document.getElementById(id).checked });
+    syncHints();
+  });
+});
+
 document.getElementById("mic-test")?.addEventListener("click", (e) => {
   e.preventDefault();
   chrome.tabs.create({ url: chrome.runtime.getURL("mic.html") });

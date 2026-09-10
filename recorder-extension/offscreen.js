@@ -11,6 +11,41 @@
 // -> STOP (upload) or ABORT (armed-but-never-rolled).
 
 let capturedAudioDevice = null; // which mic this take actually used
+// Live input level, sampled off the REAL capture stream and relayed to the
+// recording HUD. The HUD runs in the recorded tab's content script, which has
+// no access to this stream (and must never open its own -- that would prompt
+// for microphone access on every site you record). So the level is measured
+// where the audio actually is and pushed out.
+let levelCtx = null, levelAnalyser = null, levelBuf = null, levelTimer = null;
+function startLevelMeter(stream) {
+  stopLevelMeter();
+  try {
+    levelCtx = new (self.AudioContext || self.webkitAudioContext)();
+    levelAnalyser = levelCtx.createAnalyser();
+    levelAnalyser.fftSize = 1024;
+    levelCtx.createMediaStreamSource(stream).connect(levelAnalyser);
+    levelBuf = new Float32Array(levelAnalyser.fftSize);
+    // ~8/sec: fast enough to read as live, slow enough not to hammer the
+    // service worker that relays it.
+    levelTimer = setInterval(() => {
+      try {
+        levelAnalyser.getFloatTimeDomainData(levelBuf);
+        let sum = 0;
+        for (let i = 0; i < levelBuf.length; i++) sum += levelBuf[i] * levelBuf[i];
+        const rms = Math.sqrt(sum / levelBuf.length);
+        const db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+        // -60dB floor -> 0, 0dB -> 1, so speech sits mid-scale.
+        const level = Math.max(0, Math.min(1, (db + 60) / 60));
+        chrome.runtime.sendMessage({ type: "qr-level", level });
+      } catch (e) {}
+    }, 120);
+  } catch (e) { /* metering is a nicety, never a blocker */ }
+}
+function stopLevelMeter() {
+  if (levelTimer) { clearInterval(levelTimer); levelTimer = null; }
+  if (levelCtx) { try { levelCtx.close(); } catch (e) {} levelCtx = null; }
+  levelAnalyser = null; levelBuf = null;
+}
 let recorder = null;       // tab video (+ mic when no camera)
 let camRecorder = null;    // camera + mic (its own file, same clock)
 let chunks = [];
@@ -37,8 +72,8 @@ chrome.runtime.onMessage.addListener((msg) => {
   else if (msg.type === "qr-offscreen-begin") { begin(); startTick(); }
   else if (msg.type === "qr-offscreen-pause") { stopTick(); try { recorder?.pause(); camRecorder?.pause(); } catch (e) {} }
   else if (msg.type === "qr-offscreen-resume") { startTick(); try { recorder?.resume(); camRecorder?.resume(); } catch (e) {} }
-  else if (msg.type === "qr-offscreen-abort") { stopTick(); abort(); }
-  else if (msg.type === "qr-offscreen-stop") { stopTick(); stop(msg.upload); }
+  else if (msg.type === "qr-offscreen-abort") { stopTick(); stopLevelMeter(); abort(); }
+  else if (msg.type === "qr-offscreen-stop") { stopTick(); stopLevelMeter(); stop(msg.upload); }
 });
 
 async function prep(streamId, mic, camera, dims, micDeviceId) {
@@ -82,9 +117,25 @@ async function prep(streamId, mic, camera, dims, micDeviceId) {
       // whole media prep down with it -- no camera, no mic, just an error
       // badge. Which is exactly what shipping that read did. The background
       // worker already owns settings; it passes this in like mic and camera.
+      // Camera-without-voice used to be impossible: the camera branch took the
+      // whole stream, audio included, so a user who unticked the mic still got
+      // recorded. Now the switch governs the microphone in BOTH directions.
       const videoWanted = camera
         ? { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } }
         : {};
+      if (!mic) {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: false, ...videoWanted });
+        camStream = micStream;
+        camRecorder = new MediaRecorder(camStream, { mimeType: "video/webm;codecs=vp9", videoBitsPerSecond: 2_500_000 });
+        camChunks = [];
+        camRecorder.ondataavailable = (e) => { if (e.data && e.data.size) camChunks.push(e.data); };
+        const st0 = tab.getVideoTracks()[0]?.getSettings?.() || {};
+        trackDims = { width: st0.width || 0, height: st0.height || 0 };
+        chunks = [];
+        recorder = new MediaRecorder(new MediaStream(tabTracks), { mimeType, videoBitsPerSecond: 8_000_000 });
+        recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+        return;
+      }
       const audioBase = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };
       try {
         // Pin the chosen device so a docking event that reshuffles Chrome's
@@ -112,6 +163,7 @@ async function prep(streamId, mic, camera, dims, micDeviceId) {
           echoCancellation: st.echoCancellation, noiseSuppression: st.noiseSuppression,
           autoGainControl: st.autoGainControl };
         try { console.log("[qr] capturing audio from:", capturedAudioDevice.label || "(unlabelled)", capturedAudioDevice); } catch (e) {}
+        startLevelMeter(micStream);
       }
       if (camera && micStream.getVideoTracks().length) {
         // Camera mode: voice lives WITH the face in its own recording; the
