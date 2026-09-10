@@ -135,6 +135,23 @@ document.getElementById("enable").addEventListener("click", async () => {
   }
 });
 
+// Already granted? Then this page is not a permission prompt, it is the mic
+// CHECK -- open it ready to use instead of behind a button that re-asks for
+// something the browser has already said yes to.
+(async () => {
+  try {
+    const p = await navigator.permissions.query({ name: "microphone" });
+    if (p.state !== "granted") return;
+    status.className = "ok";
+    status.textContent = "✓ Microphone already enabled — check the level below before you record.";
+    document.getElementById("enable").textContent = "Re-check permission";
+    document.getElementById("check").style.display = "block";
+    const saved = (await chrome.storage.sync.get({ micDeviceId: "" })).micDeviceId;
+    const chosen = await listDevices(saved);
+    await monitor(chosen);
+  } catch (e) { /* no permissions API -> the button path still works */ }
+})();
+
 document.getElementById("dev").addEventListener("change", (e) => monitor(e.target.value));
 navigator.mediaDevices.addEventListener("devicechange", async () => {
   if (document.getElementById("check").style.display !== "block") return;

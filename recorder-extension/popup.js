@@ -144,6 +144,15 @@ async function ensurePermission(name, withCam) {
   return granted;
 }
 
+// The mic check has to be reachable even once permission EXISTS. It used to
+// open only when the grant was missing, which meant the people most likely to
+// need it -- everyone already set up, recording every day -- could never get
+// to it. A silent microphone is invisible until you watch the finished film.
+document.getElementById("mic-test")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL("mic.html") });
+});
+
 // Mode A needs mic permission for the extension origin, and a permission
 // prompt can't live in this popup (the prompt steals focus, the popup
 // closes, the prompt cancels itself). If not yet granted, open a dedicated

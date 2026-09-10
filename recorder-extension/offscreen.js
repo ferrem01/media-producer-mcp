@@ -33,7 +33,7 @@ function stopTick() {
 }
 
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === "qr-offscreen-prep") prep(msg.streamId, msg.mic, msg.camera, msg.dims);
+  if (msg.type === "qr-offscreen-prep") prep(msg.streamId, msg.mic, msg.camera, msg.dims, msg.micDeviceId);
   else if (msg.type === "qr-offscreen-begin") { begin(); startTick(); }
   else if (msg.type === "qr-offscreen-pause") { stopTick(); try { recorder?.pause(); camRecorder?.pause(); } catch (e) {} }
   else if (msg.type === "qr-offscreen-resume") { startTick(); try { recorder?.resume(); camRecorder?.resume(); } catch (e) {} }
@@ -41,7 +41,7 @@ chrome.runtime.onMessage.addListener((msg) => {
   else if (msg.type === "qr-offscreen-stop") { stopTick(); stop(msg.upload); }
 });
 
-async function prep(streamId, mic, camera, dims) {
+async function prep(streamId, mic, camera, dims, micDeviceId) {
   try {
     // Pinning min==max==tab size makes Chrome deliver tab-exact frames
     // instead of display-sized frames with the tab letterboxed inside.
@@ -76,19 +76,31 @@ async function prep(streamId, mic, camera, dims) {
       // canceller outputs; a dead mic still gives you a noise floor.
       //
       // Noise suppression and auto-gain stay on: they only shape the signal.
-      const savedDevice = (await chrome.storage.sync.get({ micDeviceId: "" })).micDeviceId;
-      micStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: true,
-          autoGainControl: true,
-          // Pin the device the user actually chose on the setup page, so a
-          // docking event that reshuffles Chrome's default input cannot
-          // silently move the recording to another microphone.
-          ...(savedDevice ? { deviceId: { exact: savedDevice } } : {}),
-        },
-        ...(camera ? { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } } : {}),
-      });
+      // The chosen device arrives in the PREP MESSAGE. It is deliberately not
+      // read from chrome.storage here: an offscreen document has a restricted
+      // API surface, and an unproven API call inside this try{} takes the
+      // whole media prep down with it -- no camera, no mic, just an error
+      // badge. Which is exactly what shipping that read did. The background
+      // worker already owns settings; it passes this in like mic and camera.
+      const videoWanted = camera
+        ? { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } }
+        : {};
+      const audioBase = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };
+      try {
+        // Pin the chosen device so a docking event that reshuffles Chrome's
+        // default input cannot silently move the recording to another mic.
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: micDeviceId ? { ...audioBase, deviceId: { exact: micDeviceId } } : audioBase,
+          ...videoWanted,
+        });
+      } catch (pinErr) {
+        // A pinned device that is currently absent (undocked, unplugged)
+        // raises OverconstrainedError. Losing the preferred microphone must
+        // degrade to the default one, never cost the user the take.
+        if (!micDeviceId) throw pinErr;
+        try { console.warn("[qr] pinned mic unavailable, falling back to default:", pinErr && pinErr.name); } catch (e) {}
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: audioBase, ...videoWanted });
+      }
       const micTrack = micStream.getAudioTracks()[0];
       if (micTrack) {
         // Record WHICH microphone this take came from. Without it, a silent
