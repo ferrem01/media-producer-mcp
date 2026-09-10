@@ -11,7 +11,7 @@
 // clock (the film has no paused footage, so events must not either).
 let session = null; // { tabId, phase, startedMs, pausedMs, pauseBegan, events, settings, prompterWin }
 
-const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: false, camera: false, destProject: "" };
+const DEFAULTS = { server: "", tenant: "", token: "", project: "library", mic: false, camera: false, destProject: "", micDeviceId: "" };
 
 // The one server this build talks to. Users never see or enter it -- the
 // whole setup is "Sign in with Google". (Override via settings.server only
@@ -352,7 +352,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         // Prep media (getUserMedia + MediaRecorder objects) now; recording
         // starts on qr-roll after the in-page click-to-roll + countdown.
-        await chrome.runtime.sendMessage({ type: "qr-offscreen-prep", streamId, mic: !!settings.mic, camera: !!settings.camera, dims });
+        await chrome.runtime.sendMessage({ type: "qr-offscreen-prep", streamId, mic: !!settings.mic, camera: !!settings.camera, dims, micDeviceId: settings.micDeviceId || "" });
         await chrome.tabs.sendMessage(tab.id, { type: "qr-arm" });
 
         // Mode A gets a teleprompter in a SEPARATE window: tab capture films
